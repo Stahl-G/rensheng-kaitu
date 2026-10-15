@@ -37,7 +37,7 @@ export async function loginWeixin(options: {
         signal: options.signal,
       });
       if (!qr.qrcode || !qr.qrcode_img_content) throw new Error("微信未返回登录链接");
-      options.display(qr.qrcode_img_content);
+      options.display(qr.qrcode_img_content.replaceAll("&amp;", "&"));
       baseUrl = defaultBaseUrl;
     }
     let status: LoginStatus;
