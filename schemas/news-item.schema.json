@@ -8,27 +8,6 @@
     },
     {
       "if": {
-        "required": ["via"],
-        "properties": {
-          "via": {
-            "not": {
-              "enum": ["rss", "user"]
-            }
-          }
-        }
-      },
-      "then": {
-        "required": ["summary", "details", "comment", "published_at"],
-        "properties": {
-          "summary": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    },
-    {
-      "if": {
         "required": ["kind"],
         "properties": {
           "kind": {

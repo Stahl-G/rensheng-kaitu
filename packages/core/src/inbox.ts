@@ -91,6 +91,15 @@ async function prepare(ws: Workspace, file: string, text: string) {
         }
         const { date: _date, ...withoutDate } = data;
         if (["project_metric", "github_snapshot"].includes(type)) assertPublicProject(ws, data.project);
+        // 采集规范（collect-news）只约束新投递的 Agent 新闻；已入库的旧新闻不受影响。
+        if (type === "news_item" && !["rss", "user"].includes(String(data.via))) {
+          const missing = ["summary", "details", "comment", "published_at"].filter(
+            (key) =>
+              data[key] === undefined || data[key] === "" || (Array.isArray(data[key]) && !data[key].length),
+          );
+          if (missing.length)
+            throw new KaituError(`缺少字段 ${missing.join("、")}（见 collect-news 技能）`, "BAD_INBOX");
+        }
         const record = fields.includes("date") ? data : withoutDate;
         if (type === "experience")
           await addExperiences(ws, [record as unknown as ExperienceInput], "agent", { dryRun: true });
