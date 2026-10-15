@@ -5,7 +5,7 @@
   "engines": { "node": "^22.19.0 || >=24" },
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "build": "pnpm --filter @kaitu/core build && pnpm --filter @kaitu/channels build && pnpm --filter @kaitu/web build && pnpm --filter kaitu build",
+    "build": "pnpm -r build",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck",
     "guide:health": "node scripts/sync-health-guide.mjs",

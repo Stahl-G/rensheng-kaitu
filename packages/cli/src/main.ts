@@ -67,6 +67,7 @@ import {
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { channelsCommand, installShutdown } from "./channels.js";
+import { dshCommand } from "./dsh.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
 import { startUi } from "./ui/server.js";
@@ -81,6 +82,7 @@ const HELP = `开图 kaitu
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
+  kaitu dsh                                       生成 dsh 插件配置并打印启动命令
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
   kaitu channels pair <通道>                       生成本人配对码
   kaitu channels start [--only <通道>]             前台启动手机通道
@@ -231,6 +233,10 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "dsh": {
+      console.log(dshCommand(workspace(values)));
+      return 0;
+    }
     case "channels": {
       await channelsCommand(workspace(values), args, values.only, values["json-out"]);
       return 0;

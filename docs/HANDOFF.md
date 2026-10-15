@@ -143,6 +143,8 @@
 
 ## 8.1 进展记录
 
+- dsh 插件原型：四工具、提示注入、`kaitu dsh` 已实现，四项检查（100 测试）及 CLI / 工作台 SSE 冒烟通过；npm 加载与真实对话待实测，见 [dsh.md](dsh.md)。
+
 ### 2026-10-15：M5 第一部分——手机通道
 
 - `@kaitu/channels` 实现四通道文本收发、一次性本人配对、按会话排队的本机 Agent 与 CLI / `ui --channels`；凭据、配对及会话留本机。操作见 [channels.md](channels.md)。

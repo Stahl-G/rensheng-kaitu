@@ -30,6 +30,8 @@
 
 ## 后端补充进度（2026-10-15）
 
+dsh 插件原型已实现：`kaitu dsh` 生成启动配置，四工具复用 core；npm 版加载与真实模型对话待实测，见 [dsh.md](dsh.md)。
+
 状态目录、`.git` 迁移与 Google Drive 模式已实现：本地历史放 `.kaitu/history.git`，Drive 模式下程序状态全部留在本机。
 CLI / 工作台提供开关与状态，云端 Agent 通过收件箱写入；入口与现状文件自动维护。
 临时目录迁移往返、历史恢复、只读降级、收件箱与工作台防循环已验证；真实 Drive / Grok Bot / ChatGPT Dots 待实测。

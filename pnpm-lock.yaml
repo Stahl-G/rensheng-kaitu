@@ -75,6 +75,12 @@ importers:
         specifier: ^2.6.0
         version: 2.9.1
 
+  packages/dsh-plugin:
+    dependencies:
+      '@kaitu/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/web:
     dependencies:
       echarts:
