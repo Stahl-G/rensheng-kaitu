@@ -1,7 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": ["**/dist/**", "**/node_modules/**", "docs/reference/**", "packages/dsh-plugin/lib/**"]
+    "ignore": [
+      "**/dist/**",
+      "**/node_modules/**",
+      "docs/reference/**",
+      "packages/dsh-plugin/lib/**",
+      "packages/core/data/cities.json",
+      ".claude/settings.local.json"
+    ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
   "linter": { "rules": { "recommended": true } },

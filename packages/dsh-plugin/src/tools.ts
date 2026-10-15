@@ -1,6 +1,8 @@
 import { isAbsolute } from "node:path";
 import {
+  type ExperienceInput,
   Workspace,
+  addExperiences,
   addRecord,
   defaultRoot,
   history,
@@ -22,7 +24,8 @@ export interface Config {
 const instructions = [
   "这是用户的开图工作区。记录前先调用 kaitu_status，传 type 可查该类型的字段规范。",
   "能合理估算的（饮食份量、热量、营养）按常见份量直接估算写入，误差写进 uncertainty，记录后一句话说明假设，不追问；时间缺省为现在。只有无法估算且会让记录失去意义时才问一次。session_id 这类编号自己生成。只用开图工具写记录，回复要短。",
-  "日常记录直接写；外部日历、批量导入、规则与目标变更须确认。本插件仅支持单条记录和查询。",
+  "日常记录直接写；外部日历、批量导入、规则与目标变更须确认。地点经历可批量提交。",
+  "地点经历用 kaitu_add_experience，只给城市名和国家代码，不给坐标；计划中的行程用 planned。",
   "以工具结果确认写入；version 为空时不要声称已保存版本。",
 ].join("\n");
 
@@ -112,6 +115,11 @@ export function apply(ctx: Context, config: Config = {}): void {
     ),
     async (args) => {
       if (typeof args.type !== "string" || !args.type.trim()) throw new Error("type 必须是非空字符串");
+      if (args.type === "experience")
+        return {
+          ok: true,
+          ...(await addExperiences(ws, [object(args.fields) as unknown as ExperienceInput], "agent")),
+        };
       const result = addRecord(ws, args.type, object(args.fields), { by: "agent" });
       const saved = { ok: true, id: result.record.id, file: result.file };
       try {
@@ -121,6 +129,36 @@ export function apply(ctx: Context, config: Config = {}): void {
         return { ...saved, version: null, versionError: (error as Error).message };
       }
     },
+  );
+  register(
+    "kaitu_add_experience",
+    "批量记录城市经历。place 只给 name 和 country 国家代码，不要给坐标；计划中的行程用 planned。",
+    parameters(
+      {
+        items: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            required: ["place", "event_type", "fact_status", "time_precision", "source"],
+            additionalProperties: false,
+            properties: {
+              place: parameters({ name: { type: "string" }, country: { type: "string" } }, ["name"]),
+              event_type: { enum: ["lived", "worked", "studied", "travel", "visit", "other"] },
+              fact_status: { enum: ["observed", "user_reported", "inferred", "planned", "suggested"] },
+              time_precision: { enum: ["year", "month", "day", "unknown"] },
+              start: { type: "string" },
+              end: { type: "string" },
+              title: { type: "string" },
+              notes: { type: "string" },
+              source: { type: "string" },
+            },
+          },
+        },
+      },
+      ["items"],
+    ),
+    async (args) => ({ ok: true, ...(await addExperiences(ws, args.items as ExperienceInput[], "agent")) }),
   );
   register("kaitu_validate", "校验当前工作区，返回问题原文。", parameters({}), () => {
     const issues = validateWorkspace(ws);

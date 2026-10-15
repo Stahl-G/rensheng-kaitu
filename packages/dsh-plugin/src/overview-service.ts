@@ -4,13 +4,15 @@ import {
   Workspace,
   defaultRoot,
   dismissNews,
+  lifeMap,
   listProjects,
   readNews,
   readOverviewPage,
+  resolveExperience,
   tryNews,
 } from "@kaitu/core";
 import type { Config } from "./tools.js";
-import type { DoingProject, NewsAction, NewsData, OverviewData } from "./types.js";
+import type { DoingProject, LifeMapData, NewsAction, NewsData, OverviewData } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -48,6 +50,17 @@ export class KaituOverviewService extends TypertRemoteService {
   async dismissNews(id: string): Promise<NewsAction> {
     const result = await dismissNews(this.workspace, id);
     return { id: result.record.id, status: "dismissed", version: result.version };
+  }
+
+  @Remote("lifeMap")
+  async lifeMap(): Promise<LifeMapData> {
+    return lifeMap(this.workspace);
+  }
+
+  @Remote("resolveExperience")
+  async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
+    const result = await resolveExperience(this.workspace, id, geonameid);
+    return { id: result.record.id, version: result.version };
   }
 
   @Remote("projects")

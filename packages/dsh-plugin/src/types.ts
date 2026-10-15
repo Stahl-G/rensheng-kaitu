@@ -8,6 +8,7 @@ import type {
   financeOverview,
   previewFinanceImport,
 } from "@kaitu/core";
+export type { LifeMapData, LifeMapFeature, Experience, City } from "@kaitu/core";
 
 /** 浏览器与 Host 的只读总览契约。 */
 export interface OverviewSource {

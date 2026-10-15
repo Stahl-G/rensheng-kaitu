@@ -21,7 +21,17 @@ const REQUIRED_FILES = [
   "me/goals.json",
   "memory/MEMORY.md",
 ];
-const BUILTIN_MODULES = ["me", "health", "calendar", "feed", "learning", "decisions", "reviews", "projects"];
+const BUILTIN_MODULES = [
+  "me",
+  "health",
+  "calendar",
+  "feed",
+  "learning",
+  "decisions",
+  "reviews",
+  "projects",
+  "explore",
+];
 
 export async function doctor(ws: Workspace): Promise<Check[]> {
   const checks: Check[] = [];
