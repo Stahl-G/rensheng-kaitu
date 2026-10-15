@@ -646,6 +646,7 @@ async function run(argv: string[]): Promise<number> {
           sleep: "睡眠",
           activity: "活动",
           meal: "饮食",
+          workout: "训练",
           event: "日程",
           unsupported: "未映射数据",
           incomplete_bp: "不完整血压",

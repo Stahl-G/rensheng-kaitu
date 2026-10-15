@@ -217,9 +217,14 @@ export function Settings({
               Object.entries(upload.preview.types).map(([type, counts]) => (
                 <div key={type}>
                   <strong>
-                    {{ metric: "身体指标", sleep: "睡眠", activity: "活动", meal: "饮食", event: "日程" }[
-                      type
-                    ] ?? type}
+                    {{
+                      metric: "身体指标",
+                      sleep: "睡眠",
+                      activity: "活动",
+                      meal: "饮食",
+                      workout: "训练",
+                      event: "日程",
+                    }[type] ?? type}
                   </strong>
                   <CountsView value={counts} />
                 </div>

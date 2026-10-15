@@ -549,7 +549,7 @@ AGPL 项目只作为独立程序使用，不复制其代码进本仓库。本仓
 4. `AGENTS.md` 生成器与模板。
 5. 技能：§8.2 全部技能。
 6. `kaitu mcp`：stdio MCP 服务。
-7. `kaitu dashboard`：单文件静态 HTML，显示今天、健康趋势、动态简报、目标进度。
+7. `kaitu ui`：本地工作台，显示今天、健康趋势、动态简报、目标进度（取代旧 `dashboard`）。
 8. 示例数据：Apple Health 导出样例（合成）、`.ics` 样例、ChatGPT 记忆贴回样例、Nut AI 导出样例。
 9. README（含免责声明、安装、隐私说明）。
 
@@ -564,7 +564,7 @@ AGPL 项目只作为独立程序使用，不复制其代码进本仓库。本仓
 - [ ] 说「加一个读书模块」，生成合法 `module.json`，`kaitu validate` 通过。
 - [ ] `kaitu history` 显示上述每一步的版本；`kaitu restore` 能恢复任意一步。
 - [ ] 全程没有写入 `~/kaitu` 之外的文件；`.kaitu/secrets.json` 未进入版本历史。
-- [ ] `kaitu dashboard` 生成的页面在浏览器中正确显示上述数据。
+- [ ] `kaitu ui` 打开的本地工作台在浏览器中正确显示上述数据。
 
 ### 阶段 2：DeepSeek Harness 验证（约 3 天）
 
@@ -687,5 +687,5 @@ WebUI 稳定后，用 DeepSeek Harness 已有的 Electron 桌面载体打包 mac
 | T10 | `AGENTS.md` 生成器与模板 | T3 | 生成内容覆盖 §8.1 全部要点 |
 | T11 | 技能：§8.2 全部 `SKILL.md` | T6–T10 | 在 Codex 中走通 §10 阶段 1 验收清单 |
 | T12 | `kaitu mcp` | T4–T9 | MCP 客户端可列出并调用工具 |
-| T13 | `kaitu dashboard` | T4 | 样例数据页面正确 |
+| T13 | `kaitu ui`（取代旧静态 dashboard） | T4 | 样例数据页面正确 |
 | T14 | README、示例数据、隐私说明 | 全部 | 新用户按 README 完成初始化 |
