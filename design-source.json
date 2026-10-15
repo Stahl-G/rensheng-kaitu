@@ -1,0 +1,15 @@
+{
+  "source_repository": "https://github.com/Stahl-G/rensheng-kaitu",
+  "design_commit": "84f11a286a1980472f71943dbde46513449f4477",
+  "paths": [
+    "docs/design/kaitu-mark.svg",
+    "docs/design/overview.dc.html",
+    "docs/design/health.dc.html",
+    "docs/design/doing.dc.html",
+    "docs/design/news.dc.html",
+    "docs/design/me.dc.html",
+    "packages/dsh-plugin/src/client/OverviewPage.module.css"
+  ],
+  "preview_data": "synthetic examples from original design, read-only",
+  "commit": "03e9d7c5d11b25234a55422a3b205d884f712832"
+}
