@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "$id": "https://kaitu.local/schemas/finance-fx-rate.schema.json",
+  "title": "finance fx-rate",
+  "required": ["date", "from_currency", "to_currency", "rate", "source"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "visibility": {
+      "enum": ["private", "shared"]
+    },
+    "corrected_by_user": {
+      "type": "boolean"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "from_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["CNY"]
+    },
+    "to_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["CNY"]
+    },
+    "rate": {
+      "type": "string",
+      "pattern": "^(?:0\\.\\d*[1-9]\\d*|[1-9]\\d*(?:\\.\\d+)?)$",
+      "examples": ["12.3400"]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

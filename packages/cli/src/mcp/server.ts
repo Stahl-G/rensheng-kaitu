@@ -4,6 +4,7 @@ import {
   addTask,
   assertPublicProject,
   completeTask,
+  findRecordType,
   inboxNoteDone,
   inboxNotes,
   listMemories,
@@ -104,12 +105,16 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) =>
-      readRecords(ws, type, { from, to }).filter(
-        (row) =>
-          tools !== "remote" ||
-          !["project_metric", "github_snapshot"].includes(type) ||
-          publicProject(ws, row.project),
-      ),
+      tools === "remote" &&
+      (findRecordType(ws, type).module.def.id === "finance" ||
+        findRecordType(ws, type).module.dir === "finance")
+        ? []
+        : readRecords(ws, type, { from, to }).filter(
+            (row) =>
+              tools !== "remote" ||
+              !["project_metric", "github_snapshot"].includes(type) ||
+              publicProject(ws, row.project),
+          ),
   );
   register(
     "task_add",

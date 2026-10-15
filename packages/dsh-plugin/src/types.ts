@@ -1,3 +1,14 @@
+import type {
+  FinanceImportOptions,
+  FinanceViewOptions,
+  commitFinanceImport,
+  financeAccounts,
+  financeCashflow,
+  financeInvestments,
+  financeOverview,
+  previewFinanceImport,
+} from "@kaitu/core";
+
 /** 浏览器与 Host 的只读总览契约。 */
 export interface OverviewSource {
   file: string;
@@ -117,3 +128,16 @@ export interface DoingProject {
     history: { date: string; stars: number; forks: number; open_issues: number; open_prs: number }[];
   } | null;
 }
+
+/** 财务边界类型从 core 派生，供生成器为浏览器导入具名契约。 */
+export interface FinanceRemoteViewOptions extends FinanceViewOptions {}
+export interface FinanceRemoteImportOptions extends FinanceImportOptions {}
+export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {
+  account: string;
+}
+export type FinanceOverviewData = ReturnType<typeof financeOverview>;
+export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
+export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
+export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
+export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
+export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;

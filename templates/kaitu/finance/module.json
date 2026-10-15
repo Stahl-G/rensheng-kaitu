@@ -1,0 +1,32 @@
+{
+  "id": "finance",
+  "name": "财务",
+  "version": 1,
+  "visibility": "agent",
+  "description": "原币账户、账单、持仓与汇率",
+  "records": {
+    "finance_account": {
+      "path": "data/account/{YYYY-MM}.jsonl",
+      "schema": "schemas/finance-account.schema.json",
+      "label": "账户"
+    },
+    "finance_transaction": {
+      "path": "data/transaction/{YYYY-MM}.jsonl",
+      "schema": "schemas/finance-transaction.schema.json",
+      "label": "流水"
+    },
+    "finance_holding_snapshot": {
+      "path": "data/holding_snapshot/{YYYY-MM}.jsonl",
+      "schema": "schemas/finance-holding-snapshot.schema.json",
+      "label": "持仓快照"
+    },
+    "finance_fx_rate": {
+      "path": "data/fx_rate/{YYYY-MM}.jsonl",
+      "schema": "schemas/finance-fx-rate.schema.json",
+      "label": "汇率"
+    }
+  },
+  "agent": {
+    "instructions": "财务原币金额用十进制字符串，未知值为 null。批量导入先预览再确认。转账、本金与收益分开，使用 core finance 数据函数查询。"
+  }
+}
