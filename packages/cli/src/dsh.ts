@@ -25,7 +25,8 @@ function entry(ws: Workspace): string {
 export function installDsh(ws: Workspace): string {
   const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
   const patch = join(home, "profiles", "desktop", "cordis.patch.yml");
-  if (!existsSync(patch)) throw new KaituError(`没找到 ${patch}，请先安装并打开一次 DeepSeek Harness 桌面应用`, "NO_DSH");
+  if (!existsSync(patch))
+    throw new KaituError(`没找到 ${patch}，请先安装并打开一次 DeepSeek Harness 桌面应用`, "NO_DSH");
   const text = readFileSync(patch, "utf8");
   const block = `${START}\n${entry(ws)}${END}\n`;
   const start = text.indexOf(START);
