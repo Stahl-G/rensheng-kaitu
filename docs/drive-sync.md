@@ -75,6 +75,8 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 
 ### 健康数据收件箱
 
+按[一页安装指南](guides/apple-health.html)部署健康收件箱，密钥自动生成，本人设置页可复制完整同步地址；手机安装快捷指令时粘贴一次，并设每晚 22:00 运行。
+设置页无法识别部署账号时，在编辑器手动运行 `showSyncUrl()` 从执行日志复制地址；实际 Gmail 身份识别、iPhone 与 Drive 链路待实测。
 Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 `inbox/health/`。
 复用 Agent 收件箱的稳定检查与监听；成功后原件归档到 `inbox/processed/YYYY-MM-DD/`，失败附原因转为待整理笔记。
 成功归档的健康原件不进版本历史，整理后的记录按来源与自然键去重，有变化才存一个版本。

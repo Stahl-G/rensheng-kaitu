@@ -1,10 +1,13 @@
-<title>开图健康同步</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开图健康同步 · 安装</title>
 <style>
-/* 布局：单栏手机优先的操作指南；顶部一条数据流示意，下面是按顺序执行的步骤卡，最后是补历史与常见问题 */
+/* 单栏安装指南：沿用开图浅绿配色，三步操作与一个问题折叠区。 */
 :root {
+  color-scheme: light;
   --bg: #f4f6f3;
   --surface: #ffffff;
   --fg: #1d2620;
@@ -12,195 +15,286 @@
   --line: #d9e0da;
   --accent: #2f5d48;
   --accent-soft: #e3ece6;
-  --warn-bg: #fbf1dc;
-  --warn-fg: #6b4a12;
   --code-bg: #eef2ee;
-  --display: "Noto Serif SC", "Songti SC", serif;
-  --body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Songti SC", serif;
+  --body: "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #141a16; --surface: #1c241f; --fg: #e5ece7; --muted: #9aa9a0; --line: #2e3a33;
-    --accent: #8cc2a6; --accent-soft: #23332a; --warn-bg: #3a2f17; --warn-fg: #f1d394; --code-bg: #232d27;
+    --accent: #8cc2a6; --accent-soft: #23332a; --code-bg: #232d27;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #141a16; --surface: #1c241f; --fg: #e5ece7; --muted: #9aa9a0; --line: #2e3a33;
-  --accent: #8cc2a6; --accent-soft: #23332a; --warn-bg: #3a2f17; --warn-fg: #f1d394; --code-bg: #232d27;
+  --accent: #8cc2a6; --accent-soft: #23332a; --code-bg: #232d27;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.7; }
-.wrap { max-width: 720px; margin: 0 auto; padding-inline: 18px; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 28px; }
-h1, h2 { font-family: var(--display); text-wrap: balance; line-height: 1.3; margin: 0; }
-h1 { font-size: clamp(28px, 6vw, 38px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.75 var(--body); }
+main { max-width: 720px; margin: 0 auto; padding: 32px 16px 48px; display: grid; gap: 24px; }
+header, section { display: grid; gap: 14px; min-width: 0; }
+h1, h2 { margin: 0; line-height: 1.4; overflow-wrap: anywhere; min-width: 0; }
+h1 { font: 700 clamp(28px, 6vw, 38px)/1.35 var(--display); }
 h2 { font-size: 22px; }
-h3 { font-size: 17px; margin: 0; }
 p { margin: 0; }
-.eyebrow { font-size: 13px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
-.lead { color: var(--muted); font-size: 17px; max-width: 34em; }
-.status { background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
-.flow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; }
-.flow svg { display: block; width: 100%; min-width: 560px; height: auto; }
-.flow text { font-family: var(--body); }
-.needs { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
-.needs li { display: flex; gap: 10px; align-items: baseline; }
-.needs li::before { content: "✓"; color: var(--accent); font-weight: 700; }
-.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: step; }
-.step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 14px; counter-increment: step; }
-.step::before { content: counter(step); grid-row: span 3; width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
-.step p, .step ul { color: var(--fg); }
-.step ul { margin: 0; padding-left: 1.2em; }
-.path { font-family: var(--mono); font-size: 14px; background: var(--code-bg); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
-.tap { font-weight: 700; }
-.copyrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
-.copyrow code { font-family: var(--mono); font-size: 14px; background: var(--code-bg); border-radius: 6px; padding: 6px 10px; overflow-x: auto; max-width: 100%; }
-button { font: inherit; font-size: 14px; border-radius: 8px; padding: 6px 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button[disabled] { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
-.hint { font-size: 14px; color: var(--muted); }
-.types { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.types span { font-size: 13px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 2px 10px; }
-section { display: grid; gap: 12px; }
-details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
-details + details { margin-top: 8px; }
-summary { cursor: pointer; font-weight: 500; }
-details p { margin-top: 8px; color: var(--muted); }
-footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.brand, .hint, footer { color: var(--muted); }
+.hint { font-size: 14px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; }
+.actions, .options { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button, .button {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+  padding: 10px 16px; border: 1px solid var(--accent); border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent); font: 600 16px/1.4 var(--body);
+  text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.button[aria-disabled="true"] { border-color: var(--line); color: var(--muted); background: var(--code-bg); cursor: default; }
+.options span { padding: 5px 10px; background: var(--accent-soft); color: var(--accent); border-radius: 6px; font-size: 14px; }
+textarea {
+  display: block; width: 100%; min-width: 0; height: 168px; padding: 12px;
+  border: 1px solid var(--line); border-radius: 8px; resize: vertical;
+  background: var(--code-bg); color: var(--fg); font: 14px/1.6 var(--mono);
+}
+code { font: .9em var(--mono); overflow-wrap: anywhere; }
+.path { padding: 14px; background: var(--code-bg); border-radius: 8px; }
+details { border-top: 1px solid var(--line); padding-top: 18px; }
+summary { font-size: 20px; font-weight: 700; cursor: pointer; }
+details h3 { font-size: 16px; margin: 16px 0 6px; }
+details p { color: var(--muted); }
+footer { border-top: 1px solid var(--line); padding-top: 18px; font-size: 14px; }
 </style>
-
-<div class="wrap">
-  <header style="display:grid;gap:12px">
-    <div class="eyebrow">开图 · Apple 健康</div>
-    <h1>每天早上，自动把健康数据交给开图</h1>
-    <p class="lead">用 iPhone 自带的「快捷指令」，每天把 iPhone 和 Apple Watch 记录的步数、睡眠、体重、心率和训练，放进你自己的 Google Drive。开图看到后自动整理进「健康」。免费，不用装别的 App。</p>
-    <p class="status">预览版：这是最终的使用流程。「开图健康同步」快捷指令文件和开图这边的自动导入正在制作，做好后下面第 2 步的按钮会变成可用。</p>
+</head>
+<body>
+<main>
+  <header>
+    <p class="brand">开图 · Apple 健康</p>
+    <h1>三步装好，每晚自动同步</h1>
+    <p>把 iPhone 和 Apple Watch 的健康数据存到自己的 Google Drive，再由电脑上的开图导入。</p>
+    <p class="hint">先在电脑上开启开图的「同步到 Google Drive」，用同一个 Google 账号完成第 1 步；第 2、3 步在 iPhone 上操作。</p>
   </header>
 
-  <div class="flow" aria-label="数据流：iPhone 健康，经快捷指令，存到 Google Drive，再由你 Mac 上的开图导入">
-    <svg viewBox="0 0 640 120" role="img">
-      <g font-size="14">
-        <rect x="4" y="30" width="128" height="60" rx="12" fill="var(--accent-soft)" stroke="var(--line)"/>
-        <text x="68" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">iPhone 健康</text>
-        <text x="68" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">含 Apple Watch</text>
-        <rect x="170" y="30" width="128" height="60" rx="12" fill="var(--surface)" stroke="var(--accent)"/>
-        <text x="234" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">快捷指令</text>
-        <text x="234" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">每天 08:30</text>
-        <rect x="336" y="30" width="140" height="60" rx="12" fill="var(--surface)" stroke="var(--line)"/>
-        <text x="406" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">Google Drive</text>
-        <text x="406" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">kaitu/inbox/health</text>
-        <rect x="514" y="30" width="122" height="60" rx="12" fill="var(--accent-soft)" stroke="var(--line)"/>
-        <text x="575" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">开图</text>
-        <text x="575" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">自动导入</text>
-      </g>
-      <g stroke="var(--accent)" stroke-width="2" fill="none">
-        <path d="M136 60 H164"/><path d="M302 60 H330"/><path d="M480 60 H508"/>
-      </g>
-      <g fill="var(--accent)">
-        <path d="M164 55 L170 60 L164 65 Z"/><path d="M330 55 L336 60 L330 65 Z"/><path d="M508 55 L514 60 L508 65 Z"/>
-      </g>
-    </svg>
-  </div>
-
-  <section>
-    <h2>开始前</h2>
-    <ul class="needs">
-      <li>iPhone，系统 iOS 17 或更新；有 Apple Watch 更好，没有也可以（iPhone 自己会记步数）。</li>
-      <li>iPhone 上装好 Google Drive App，并用开图所在的同一个 Google 账号登录。</li>
-      <li>开图已经开启「同步到 Google Drive」，Drive 里能看到 <span class="path">kaitu</span> 文件夹。</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>五步设置，只做一次</h2>
-    <ol class="steps">
-      <li class="step">
-        <h3>让「文件」App 能存到 Google Drive</h3>
-        <p>先打开一次 <span class="tap">Google Drive</span> App，确认已登录、能看到你的文件，再退出。没打开过的话，下面的列表里不会出现它。</p>
-        <ul>
-          <li>打开 iPhone 自带的 <span class="tap">文件</span> App，点底部 <span class="tap">浏览</span>（如果停在某个文件夹里，再点一次回到最上层）。</li>
-          <li>点右上角 <span class="tap">⋯</span> → <span class="tap">编辑</span>。</li>
-          <li>在「位置」列表里，把 <span class="tap">Google Drive</span> 右边的开关打开，点 <span class="tap">完成</span>。</li>
-        </ul>
-        <p>之后在 <span class="tap">浏览 → 位置</span> 里能看到 Google Drive，点进去就是「我的云端硬盘」和 <span class="path">kaitu</span> 文件夹。</p>
-        <p class="hint">列表里没有 Google Drive：把 Google Drive App 更新到最新版再打开一次，彻底关掉「文件」重开，仍不行就重启手机。若 Google Drive 设了隐私屏幕，第一次打开会要求 Face ID。</p>
-      </li>
-      <li class="step">
-        <h3>添加「开图健康同步」快捷指令</h3>
-        <p>在 iPhone 上打开下面的链接，点 <span class="tap">添加快捷指令</span>。</p>
-        <div class="copyrow"><button type="button" disabled>下载快捷指令（制作中）</button></div>
-        <p class="hint">它只读取健康数据并存成一个小文件，不联网发送给任何人。</p>
-      </li>
-      <li class="step">
-        <h3>第一次运行，允许读取健康数据</h3>
-        <p>在 <span class="tap">快捷指令</span> 里点一下「开图健康同步」。系统会问要读取哪些数据，全部打开：</p>
-        <div class="types"><span>步数</span><span>体重</span><span>体脂率</span><span>静息心率</span><span>睡眠</span><span>体能训练</span><span>活动能量</span></div>
-        <p>问保存位置时，选 Google Drive 里的这个文件夹（没有就新建）：</p>
-        <div class="copyrow"><code id="folder">kaitu/inbox/health</code><button type="button" data-copy="folder" id="copy-folder">复制路径</button></div>
-      </li>
-      <li class="step">
-        <h3>设成每天自动运行</h3>
-        <p>打开「开图健康同步」编辑页 → 底部搜索栏上拉，点 <span class="tap">自动化</span> → <span class="tap">特定时间</span>，时间选 <span class="tap">22:00</span>（一天结束时步数最完整），点右侧箭头确认 <span class="tap">重复：每天</span>、<span class="tap">自动化</span> 打开、<span class="tap">通知</span> 关闭。再到 <span class="tap">ⓘ → 隐私</span> 确认「锁定时允许运行」已打开。设好后在 <span class="tap">资料库 → 自动化 → 个人</span> 能看到这一条。</p>
-        <p class="hint">时间选你起床后、通常已经解锁手机的时候。iPhone 锁屏时健康数据是加密的，快捷指令读不到。</p>
-      </li>
-      <li class="step">
-        <h3>确认开图收到了</h3>
-        <p>第二天打开开图工作台的 <span class="tap">健康</span>，应该能看到昨天的睡眠、步数和训练。也可以在 Mac 上运行：</p>
-        <div class="copyrow"><code id="cmd">kaitu status</code><button type="button" data-copy="cmd" id="copy-cmd">复制命令</button></div>
-      </li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>补上以前的数据（可选，一次）</h2>
-    <p>快捷指令每天只同步前一天。想把过去几年的记录一起放进开图：</p>
-    <ol style="margin:0;padding-left:1.3em;display:grid;gap:6px">
-      <li>打开 <span class="tap">健康</span> → 右上角头像 → <span class="tap">导出所有健康数据</span>，等它生成 <span class="path">export.zip</span>（数据多的话要几分钟）。</li>
-      <li>在分享菜单里选 <span class="tap">存储到「文件」</span>，存到 <span class="path">kaitu/inbox/health</span>。</li>
-      <li>开图会自动识别并导入；重复的记录会自动跳过，导入后可以整体撤销。</li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>常见问题</h2>
-    <div>
-      <details>
-        <summary>数据会被发到哪里？</summary>
-        <p>只到你自己的 Google Drive，然后由你电脑上的开图读取。快捷指令和开图都不会把健康数据发给我们或其他服务。之后你让哪个 AI 读开图，就由你自己决定。</p>
-      </details>
-      <details>
-        <summary>早上忘了解锁手机，那天会不会漏？</summary>
-        <p>会跳过那一次，但不会丢：下一次运行会把没同步的天数一起补上。也可以随时手动点一下快捷指令。同一天的数据重复同步不会重复记录。</p>
-      </details>
-      <details>
-        <summary>没有 Apple Watch 可以用吗？</summary>
-        <p>可以。iPhone 会记录步数和步行距离；体重、睡眠可以来自体重秤或其他 App 写入「健康」的数据。只是心率和训练记录会少一些。</p>
-      </details>
-      <details>
-        <summary>为什么不用 Health Auto Export 这类 App？</summary>
-        <p>它们功能更多，但自动导出要付费订阅。「快捷指令」是 iPhone 自带的，免费，开图需要的这几项数据它都能读到。</p>
-      </details>
-      <details>
-        <summary>想停掉怎么办？</summary>
-        <p>在 <span class="tap">资料库 → 自动化 → 个人</span> 里关掉这条自动化即可。已经导入开图的数据不受影响。</p>
-      </details>
+  <section class="step" aria-labelledby="step-1">
+    <h2 id="step-1">1. 获取你的同步地址</h2>
+    <p>点「复制代码」，再打开 script.new。将新项目编辑器里的默认代码全部替换为下方代码，保存。</p>
+    <div class="actions">
+      <button id="copy-code" type="button">复制代码</button>
+      <a class="button" href="https://script.new" target="_blank" rel="noopener noreferrer">打开 script.new ↗</a>
     </div>
+    <p id="copy-status" class="hint" role="status"></p>
+    <label for="gs-code" class="hint">健康收件箱完整代码</label>
+<!-- gs:start -->
+<textarea id="gs-code" readonly spellcheck="false" aria-label="健康收件箱完整代码">// 开图健康收件箱：接收快捷指令数据，写入 Google Drive 的 kaitu/inbox/health/。
+// 1. 打开 script.new，新建项目并粘贴本文件。
+// 2. 部署 → 新建部署 → 网页应用，执行身份「我」、访问权限「任何人」，完成授权。
+// 3. 用部署账号打开部署网址，复制「你的同步地址」，在手机安装快捷指令时粘贴。
+
+var FOLDER_PATH = [&#39;kaitu&#39;, &#39;inbox&#39;, &#39;health&#39;];
+var MAX_BYTES = 5 * 1024 * 1024;
+
+function getKey() {
+  var properties = PropertiesService.getScriptProperties();
+  var key = properties.getProperty(&#39;KAITU_KEY&#39;);
+  if (key) return key;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    key = properties.getProperty(&#39;KAITU_KEY&#39;);
+    if (!key) {
+      key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, &#39;&#39;);
+      properties.setProperty(&#39;KAITU_KEY&#39;, key);
+    }
+    return key;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function syncUrl() {
+  var url = ScriptApp.getService().getUrl();
+  if (!url) throw new Error(&#39;请先部署为网页应用，再运行 showSyncUrl。&#39;);
+  return url + &#39;?key=&#39; + encodeURIComponent(getKey());
+}
+
+function showSyncUrl() {
+  Logger.log(syncUrl());
+}
+
+function doGet() {
+  var activeEmail = Session.getActiveUser().getEmail();
+  if (!activeEmail || activeEmail !== Session.getEffectiveUser().getEmail()) {
+    return ContentService.createTextOutput(&#39;开图健康收件箱&#39;);
+  }
+  var url = syncUrl();
+  var status;
+  try {
+    var inbox = folder(false);
+    status = inbox ? &#39;收件夹 kaitu/inbox/health 已存在。&#39; : &#39;收件夹 kaitu/inbox/health 尚不存在，首次同步会自动创建。&#39;;
+    if (inbox) {
+      var files = inbox.getFiles();
+      var latest = null;
+      while (files.hasNext()) {
+        var file = files.next();
+        if (!latest || file.getLastUpdated() &gt; latest.getLastUpdated()) latest = file;
+      }
+      status += latest
+        ? &#39;\n最近文件：&#39; + latest.getName() + &#39;\n时间：&#39; + latest.getLastUpdated().toISOString()
+        : &#39;\n还没有收到文件（已导入的文件可能已归档）。&#39;;
+    }
+  } catch (err) {
+    status = &#39;暂时无法检查收件夹：&#39; + err.message;
+  }
+  var html = `&lt;!doctype html&gt;
+&lt;html lang=&quot;zh-CN&quot;&gt;
+&lt;head&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;开图健康同步设置&lt;/title&gt;
+&lt;style&gt;
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 640px; padding: 32px 20px; font: 16px/1.7 system-ui, sans-serif; }
+h1 { font-size: 30px; line-height: 1.3; }
+h2 { font-size: 20px; margin-top: 32px; }
+textarea { width: 100%; padding: 12px; font: 16px/1.5 ui-monospace, monospace; resize: vertical; }
+button { padding: 12px 20px; min-height: 44px; font: inherit; cursor: pointer; margin-top: 12px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+&lt;/style&gt;&lt;/head&gt;
+&lt;body&gt;
+&lt;p&gt;开图 · 健康同步&lt;/p&gt;
+&lt;h1&gt;你的同步地址&lt;/h1&gt;
+&lt;textarea id=&quot;sync-url&quot; aria-label=&quot;你的同步地址&quot; rows=&quot;5&quot; readonly&gt;${escapeHtml(url)}&lt;/textarea&gt;
+&lt;button id=&quot;copy&quot; type=&quot;button&quot;&gt;复制&lt;/button&gt;&lt;p id=&quot;copy-status&quot; role=&quot;status&quot;&gt;&lt;/p&gt;
+&lt;h2&gt;下一步：在手机安装快捷指令&lt;/h2&gt;
+&lt;p&gt;回到安装页，在 iPhone 上点「添加快捷指令」。安装时问「粘贴你的同步地址」，粘贴上方完整地址即可。&lt;/p&gt;
+&lt;p&gt;安装后手动运行一次，允许读取健康数据，再按安装页说明设为每晚 22:00 自动运行。&lt;/p&gt;
+&lt;h2&gt;自检状态&lt;/h2&gt;&lt;pre&gt;${escapeHtml(status)}&lt;/pre&gt;
+&lt;p&gt;首次运行后刷新本页，可以查看收件状态。时间以 UTC 显示。&lt;/p&gt;
+&lt;script&gt;
+document.getElementById(&#39;copy&#39;).addEventListener(&#39;click&#39;, async function () {
+  var field = document.getElementById(&#39;sync-url&#39;);
+  var status = document.getElementById(&#39;copy-status&#39;);
+  try {
+    await navigator.clipboard.writeText(field.value);
+    status.textContent = &#39;已复制&#39;;
+  } catch (err) {
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    status.textContent = document.execCommand(&#39;copy&#39;) ? &#39;已复制&#39; : &#39;已选中地址，请长按或按复制键复制。&#39;;
+  }
+});
+&lt;/script&gt;&lt;/body&gt;&lt;/html&gt;`;
+  return HtmlService.createHtmlOutput(html)
+    .addMetaTag(&#39;viewport&#39;, &#39;width=device-width, initial-scale=1&#39;);
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&amp;&lt;&gt;&quot;&#39;]/g, function (character) {
+    return { &#39;&amp;&#39;: &#39;&amp;amp;&#39;, &#39;&lt;&#39;: &#39;&amp;lt;&#39;, &#39;&gt;&#39;: &#39;&amp;gt;&#39;, &#39;&quot;&#39;: &#39;&amp;quot;&#39;, &quot;&#39;&quot;: &#39;&amp;#39;&#39; }[character];
+  });
+}
+
+function doPost(e) {
+  var expected = getKey();
+  if (!expected || !e || !e.parameter || e.parameter.key !== expected) {
+    return reply({ ok: false, error: &#39;密钥不对&#39; });
+  }
+  var body = e.postData &amp;&amp; e.postData.contents;
+  if (!body) return reply({ ok: false, error: &#39;没有收到数据&#39; });
+  if (body.length &gt; MAX_BYTES) return reply({ ok: false, error: &#39;数据太大&#39; });
+  var isJson = true;
+  try {
+    JSON.parse(body);
+  } catch (err) {
+    isJson = false;
+  }
+  // 不是 JSON 也不丢：存成 .txt，开图会把它当待整理笔记
+  var stamp = Utilities.formatDate(new Date(), &#39;UTC&#39;, &quot;yyyyMMdd&#39;T&#39;HHmmss&#39;Z&#39;&quot;);
+  var name = stamp + &#39;-&#39; + Utilities.getUuid().slice(0, 8) + (isJson ? &#39;.health.json&#39; : &#39;.health.txt&#39;);
+  folder().createFile(name, body, isJson ? &#39;application/json&#39; : &#39;text/plain&#39;);
+  return reply({ ok: true, file: name });
+}
+
+function folder(create) {
+  var current = DriveApp.getRootFolder();
+  for (var i = 0; i &lt; FOLDER_PATH.length; i++) {
+    var part = FOLDER_PATH[i];
+    var found = current.getFoldersByName(part);
+    if (!found.hasNext() &amp;&amp; create === false) return null;
+    current = found.hasNext() ? found.next() : current.createFolder(part);
+  }
+  return current;
+}
+
+function reply(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+</textarea>
+<!-- gs:end -->
+    <p>点右上角「部署 → 新建部署」，在类型中选「网页应用」，选好下面两项，再点「部署」并按提示授权。</p>
+    <div class="options" aria-label="部署选项">
+      <span><strong>执行身份：我</strong></span>
+      <span><strong>访问权限：任何人</strong></span>
+    </div>
+    <p>打开部署给出的网页应用网址。用部署账号登录后，会看到大字「你的同步地址」，点「复制」。它已包含密钥，手机安装时只需粘贴一次。</p>
+    <p class="hint">若只看到「开图健康收件箱」：确认使用部署账号。仍不显示时，回编辑器顶部选择 <code>showSyncUrl</code>，点「运行」，从执行日志复制完整同步地址。</p>
   </section>
 
-  <footer>开图 · 灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</footer>
-</div>
+  <section class="step" aria-labelledby="step-2">
+    <h2 id="step-2">2. 在手机添加快捷指令</h2>
+    <p>在 iPhone 上打开本页，点下面的按钮。安装时只问一个问题：「粘贴你的同步地址」。粘贴第 1 步复制的完整地址，完成添加。</p>
+    <div class="actions">
+      <a id="add-shortcut" class="button" role="button" aria-disabled="true" tabindex="-1">即将提供</a>
+    </div>
+    <p>添加后手动运行一次「开图健康同步」，按提示允许读取健康数据和访问同步地址。回到同步地址设置页刷新，可查看收件夹和最近文件。</p>
+  </section>
 
+  <section class="step" aria-labelledby="step-3">
+    <h2 id="step-3">3. 每晚 22:00 自动运行</h2>
+    <p>iOS 26：打开「开图健康同步」编辑页，从底部搜索栏上拉，按下面的路径设置：</p>
+    <p class="path"><strong>自动化 → 特定时间 → 22:00</strong></p>
+    <p>点箭头，确认 <strong>重复：每天</strong>、<strong>自动化：打开</strong>、<strong>通知：关闭</strong>。</p>
+  </section>
+
+  <details>
+    <summary>常见问题</summary>
+    <h3>快捷指令提示「此操作不被允许」</h3>
+    <p>打开 iPhone「设置 → 快捷指令 → 高级」，开启「允许共享大量数据」，再运行一次。</p>
+    <h3>睡眠数据为空</h3>
+    <p>不戴表睡觉是正常的，空文件会被直接归档，不会生成空的健康记录。</p>
+    <h3>如何停用</h3>
+    <p>回到快捷指令编辑页，从底部搜索栏上拉 → 自动化，关闭这条自动化即可。要停用收件箱，在 Apps Script「部署 → 管理部署」中归档部署。</p>
+  </details>
+
+  <footer>数据到 Drive 后，电脑上开着 <code>kaitu ui</code> 或运行 <code>kaitu inbox process</code> 就会导入开图。</footer>
+</main>
 <script>
-document.querySelectorAll("button[data-copy]").forEach(function (btn) {
-  btn.addEventListener("click", function () {
-    var el = document.getElementById(btn.getAttribute("data-copy"));
-    var text = el.textContent;
-    var done = function () { btn.textContent = "已复制"; setTimeout(function () { btn.textContent = btn.id === "copy-cmd" ? "复制命令" : "复制路径"; }, 1600); };
-    var select = function () { var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "已选中，请手动复制"; };
-    try { navigator.clipboard.writeText(text).then(done, select); } catch (e) { select(); }
-  });
+const SHORTCUT_URL = "";
+
+const shortcut = document.getElementById("add-shortcut");
+if (SHORTCUT_URL) {
+  shortcut.href = SHORTCUT_URL;
+  shortcut.textContent = "添加快捷指令";
+  shortcut.removeAttribute("aria-disabled");
+  shortcut.removeAttribute("tabindex");
+}
+
+const copyButton = document.getElementById("copy-code");
+copyButton.addEventListener("click", async function () {
+  const field = document.getElementById("gs-code");
+  const status = document.getElementById("copy-status");
+  try {
+    await navigator.clipboard.writeText(field.value);
+    status.textContent = "已复制代码，可以打开 script.new 粘贴了。";
+  } catch (error) {
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    status.textContent = document.execCommand("copy")
+      ? "已复制代码，可以打开 script.new 粘贴了。"
+      : "已选中全部代码，请长按或按复制键复制。";
+  }
 });
 </script>
+</body>
+</html>

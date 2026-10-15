@@ -145,6 +145,8 @@
 
 ### 2026-10-15：工作区升级与健康收件箱
 
+- 健康同步改为一页三步安装：Apps Script 自动生成密钥，仅本人设置页显示同步地址与收件状态，`showSyncUrl()` 供编辑器备用；个人 Gmail 身份识别待实测。
+- 改 `.gs` 后运行 `pnpm guide:health` 更新安装页内嵌代码，一项一致性测试防遗漏；快捷指令 iCloud 链接仍为空，按钮待提供。
 - 快捷指令新增换行字符串并列列表（type / values / starts），与 samples 数组并存；复用健康映射，支持每日累计更新、分类型活动合并与中文睡眠阶段。
 - 并列列长不一致时整文件附原因转待整理笔记；格式见 `docs/guides/health-shortcut-format.md`。
 - `kaitu upgrade [--dry-run]` 按模板哈希升级：补内置模块与新增 records / views / sources / tabs，保留用户字段与自建技能。

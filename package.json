@@ -8,6 +8,7 @@
     "build": "pnpm --filter @kaitu/core build && pnpm --filter @kaitu/web build && pnpm --filter kaitu build",
     "test": "vitest run",
     "typecheck": "pnpm -r typecheck",
+    "guide:health": "node scripts/sync-health-guide.mjs",
     "lint": "biome check ."
   },
   "devDependencies": {
