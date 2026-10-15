@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { addMemory, removeMemory } from "../src/memory.js";
+import { history, restore } from "../src/history.js";
+import { addMemory, importMemories, listMemories, removeMemory } from "../src/memory.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
@@ -28,4 +29,23 @@ describe("记忆", () => {
     expect(m.created).toBe("2026-11-01");
     expect(validateWorkspace(ws)).toEqual([]);
   });
+});
+
+it("整批记忆只生成一个版本，恢复后全部消失", async () => {
+  const ws = await freshWorkspace();
+  const before = await history(ws);
+  const indexBefore = ws.readText("memory/MEMORY.md");
+  const inputs = [
+    { type: "preference" as const, name: "语言", text: "使用中文" },
+    { type: "context" as const, name: "项目", text: "正在整理读书计划" },
+  ];
+  await importMemories(ws, inputs, { dryRun: true });
+  expect(listMemories(ws)).toEqual([]);
+  expect(await history(ws)).toEqual(before);
+  await importMemories(ws, inputs);
+  expect(listMemories(ws)).toHaveLength(2);
+  expect((await history(ws)).length).toBe(before.length + 1);
+  await restore(ws, before[0]?.oid as string);
+  expect(listMemories(ws)).toEqual([]);
+  expect(ws.readText("memory/MEMORY.md")).toBe(indexBefore);
 });

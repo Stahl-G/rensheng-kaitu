@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 import {
   type ImportSource,
   KaituError,
+  MAX_PHOTO_BYTES,
+  type Pose,
   type Workspace,
+  addPhotoBytes,
   completeNext,
   decideProposal,
   discardUpload,
@@ -15,8 +18,10 @@ import {
   ignoredWorkspaceChange,
   importUpload,
   pendingWorkspaceFiles,
+  readPhoto,
   readWorkbench,
   removeMemory,
+  removePhoto,
   restore,
   snapshot,
   stageUpload,
@@ -170,6 +175,11 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     try {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
       if (req.method === "GET") {
+        if (url.pathname.startsWith("/api/photos/")) {
+          const photo = readPhoto(ws, decodeURIComponent(url.pathname.slice("/api/photos/".length)));
+          res.writeHead(200, { "Content-Type": photo.contentType });
+          return res.end(photo.bytes);
+        }
         if (url.pathname === "/api/state") return json(res, 200, { ...readWorkbench(ws), watchError });
         if (url.pathname === "/api/history") return json(res, 200, await exclusive(() => history(ws)));
         if (url.pathname === "/api/events") {
@@ -195,6 +205,20 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         } catch {
           return json(res, 404, { error: "文件不存在" });
         }
+      }
+      if (url.pathname === "/api/photos/add") {
+        const bytes = await body(req, MAX_PHOTO_BYTES);
+        const result = await exclusive(async () => {
+          await saveExternal();
+          return addPhotoBytes(ws, bytes, {
+            pose: (url.searchParams.get("pose") ?? "other") as Pose,
+            ts: url.searchParams.get("ts") ?? undefined,
+            notes: url.searchParams.get("notes") ?? undefined,
+            by: "user",
+          });
+        });
+        notify();
+        return json(res, 200, result);
       }
       if (url.pathname === "/api/import/preview") {
         const source = url.searchParams.get("source") as ImportSource;
@@ -227,6 +251,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         }
         await saveExternal();
         switch (url.pathname) {
+          case "/api/photos/delete":
+            return removePhoto(ws, field(data, "id"), { by: "user" });
           case "/api/proposal":
             return decideProposal(ws, field(data, "id"), field(data, "decision") as "confirmed" | "rejected");
           case "/api/next":

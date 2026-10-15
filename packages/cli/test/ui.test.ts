@@ -71,3 +71,38 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
   await new Promise((resolve) => setTimeout(resolve, 300));
   expect((await history(ws)).length).toBe(before + 2);
 });
+
+it("图片接口只返回有记录的照片，拒绝任意路径和 ..", async () => {
+  const { ws, ui } = await setup();
+  const bytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR1sAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const response = await fetch(`${ui.url}/api/photos/add?pose=side`, {
+    method: "POST",
+    headers: { "X-Kaitu": "1", Origin: ui.url },
+    body: bytes,
+  });
+  expect(response.status).toBe(200);
+  const { record } = await response.json();
+  const photo = await fetch(`${ui.url}/api/photos/${record.id}`);
+  expect(photo.headers.get("content-type")).toBe("image/png");
+  expect(Buffer.from(await photo.arrayBuffer())).toEqual(bytes);
+  ws.writeText("health/files/photos/unregistered.png", bytes);
+  for (const path of [
+    "health/files/photos/unregistered.png",
+    "../me/profile.md",
+    "files/photos/../../me/profile.md",
+  ]) {
+    expect((await fetch(`${ui.url}/api/photos/${encodeURIComponent(path)}`)).status).not.toBe(200);
+  }
+  ws.appendLine(
+    "health/data/photos/2026-10.jsonl",
+    JSON.stringify({
+      ...record,
+      file: "files/photos/../secret.png",
+      rev: 2,
+    }),
+  );
+  expect((await fetch(`${ui.url}/api/photos/${record.id}`)).status).toBe(400);
+});

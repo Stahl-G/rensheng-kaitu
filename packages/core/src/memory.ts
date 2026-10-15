@@ -1,4 +1,4 @@
-import { readdirSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
@@ -32,6 +32,7 @@ export interface MemoryEntry extends Memory {
 export interface MemoryOptions {
   by?: By;
   now?: Date;
+  actor?: string;
 }
 
 const TYPES: Record<MemoryType, string> = {
@@ -129,7 +130,7 @@ export async function addMemory(
   const file = availableFile(ws, data.type, data.name);
   ws.writeText(memoryPath(file), stringifyFrontmatter(data));
   rewriteIndex(ws);
-  await snapshot(ws, `${who(opts.by)}记住了：${data.name}`, now);
+  await snapshot(ws, `${opts.actor ?? who(opts.by)}记住了：${data.name}`, now);
   return { ...data, file };
 }
 
@@ -148,7 +149,7 @@ export async function updateMemory(
   ws.writeText(memoryPath(nextFile), stringifyFrontmatter(data, current.body));
   if (nextFile !== file) rmSync(ws.resolve(memoryPath(file)));
   rewriteIndex(ws);
-  await snapshot(ws, `${who(opts.by)}更新了一条记忆：${data.name}`, now);
+  await snapshot(ws, `${opts.actor ?? who(opts.by)}更新了一条记忆：${data.name}`, now);
   return { ...data, file: nextFile };
 }
 
@@ -160,6 +161,42 @@ export async function removeMemory(
   const { data } = readMemory(ws, file);
   rmSync(ws.resolve(memoryPath(file)));
   rewriteIndex(ws);
-  await snapshot(ws, `${who(opts.by)}删除了一条记忆：${data.name}`, opts.now);
+  await snapshot(ws, `${opts.actor ?? who(opts.by)}删除了一条记忆：${data.name}`, opts.now);
   return { ...data, file };
+}
+
+export async function importMemories(
+  ws: Workspace,
+  inputs: MemoryInput[],
+  opts: MemoryOptions & { dryRun?: boolean } = {},
+) {
+  if (!Array.isArray(inputs)) throw new KaituError("候选文件必须是记忆数组", "BAD_ARGS");
+  const date = isoInZone(opts.now ?? new Date(), ws.timeZone()).slice(0, 10);
+  const candidates = inputs.map((input) => {
+    const data: Memory = { ...input, sensitive: input.sensitive ?? false, created: date, updated: date };
+    validateMemory(data);
+    return data;
+  });
+  if (opts.dryRun) return { entries: candidates, version: null };
+  const entries = candidates.map((data) => {
+    const file = availableFile(ws, data.type, data.name);
+    ws.writeText(memoryPath(file), stringifyFrontmatter(data));
+    return { ...data, file };
+  });
+  if (!entries.length) return { entries, version: null };
+  rewriteIndex(ws);
+  const version = await snapshot(
+    ws,
+    `${opts.actor ?? who(opts.by)}导入了 ${entries.length} 条记忆`,
+    opts.now,
+  );
+  return { entries, version };
+}
+
+export function importMemoryFile(
+  ws: Workspace,
+  file: string,
+  opts: MemoryOptions & { dryRun?: boolean } = {},
+) {
+  return importMemories(ws, JSON.parse(readFileSync(file, "utf8")), opts);
 }

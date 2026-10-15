@@ -6,8 +6,10 @@ import {
   KaituError,
   type MemoryInput,
   type MemoryPatch,
+  type Pose,
   Workspace,
   addMemory,
+  addPhoto,
   addRecord,
   defaultRoot,
   deleteRecord,
@@ -17,12 +19,16 @@ import {
   importAppleHealth,
   importChatgptConversations,
   importIcs,
+  importMemoryFile,
   importNutAi,
   initWorkspace,
   listMemories,
+  mcpToken,
   readRecords,
+  readStatus,
   reindexChats,
   removeMemory,
+  removePhoto,
   restore,
   searchChats,
   searchMemories,
@@ -33,6 +39,9 @@ import {
   writeAgentsMd,
 } from "@kaitu/core";
 
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { startMcpHttp } from "./mcp/http.js";
+import { createMcpServer } from "./mcp/server.js";
 import { startUi } from "./ui/server.js";
 
 const HELP = `开图 kaitu
@@ -43,6 +52,12 @@ const HELP = `开图 kaitu
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
   kaitu agents-md                                  重新生成 AGENTS.md
+  kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
+  kaitu mcp token [--rotate]                      查看或轮换 HTTP token
+  kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
+  kaitu photo add <图片> [--pose front|side|back|other] [--ts 时间] [--notes 说明]
+  kaitu photo list                                 列出体态照片
+  kaitu photo rm <id>                              删除体态照片
   kaitu record add <类型> --json '{...}'           写入一条记录
   kaitu record update <类型> <id> --json '{...}'   修改记录
   kaitu record rm <类型> <id>                      删除记录
@@ -51,6 +66,7 @@ const HELP = `开图 kaitu
   kaitu memory update <文件名> [--type 类型] [--name 名称] [--text 内容] [--sensitive | --no-sensitive]
   kaitu memory rm <文件名>                          删除记忆
   kaitu memory list                                列出记忆
+  kaitu memory import --file <候选.json> [--dry-run]  批量导入记忆
   kaitu memory search <词>                          搜索记忆
   kaitu import chatgpt-conversations <文件> [--dry-run]
   kaitu import apple-health <export.zip|export.xml> [--dry-run]
@@ -70,6 +86,13 @@ const HELP = `开图 kaitu
 
 const options = {
   sample: { type: "boolean" },
+  http: { type: "boolean" },
+  rotate: { type: "boolean" },
+  tools: { type: "string" },
+  pose: { type: "string" },
+  ts: { type: "string" },
+  notes: { type: "string" },
+  file: { type: "string" },
   port: { type: "string" },
   "no-open": { type: "boolean" },
   dir: { type: "string" },
@@ -170,6 +193,44 @@ async function run(argv: string[]): Promise<number> {
       process.once("SIGTERM", stop);
       return 0;
     }
+    case "mcp": {
+      const ws = workspace(values);
+      if (args[0] === "token") {
+        console.log(mcpToken(ws, values.rotate));
+        return 0;
+      }
+      if (args.length) throw new KaituError("未知 mcp 子命令", "BAD_ARGS");
+      const tools = values.tools ?? (values.http ? "remote" : "all");
+      if (tools !== "remote" && tools !== "all")
+        throw new KaituError("--tools 只能是 remote 或 all", "BAD_ARGS");
+      if (values.http) {
+        const http = await startMcpHttp(ws, {
+          port: values.port === undefined ? undefined : Number(values.port),
+          tools,
+        });
+        console.error(`开图 MCP：${http.url}（${tools}）\n用 kaitu mcp token 查看 token。`);
+        const stop = () => {
+          void http.close().then(
+            () => process.exit(0),
+            () => process.exit(1),
+          );
+        };
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      } else {
+        const server = createMcpServer(ws, tools);
+        await server.connect(new StdioServerTransport());
+        const stop = () => {
+          void server.close().then(
+            () => process.exit(0),
+            () => process.exit(1),
+          );
+        };
+        process.once("SIGINT", stop);
+        process.once("SIGTERM", stop);
+      }
+      return 0;
+    }
     case "doctor": {
       const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());
       const checks = await doctor(ws);
@@ -198,6 +259,58 @@ async function run(argv: string[]): Promise<number> {
       writeAgentsMd(ws);
       await snapshot(ws, "重新生成了 AGENTS.md");
       out(values, { ok: true }, "已重新生成 AGENTS.md。");
+      return 0;
+    }
+    case "status": {
+      const result = readStatus(workspace(values));
+      const recent = result.recent7;
+      const moduleLines = result.modules.flatMap((module) => {
+        const progress = module.progress;
+        const summary = progress
+          ? `${progress.current}/${progress.target} ${progress.unit ?? ""}`
+          : "未设进度";
+        return [
+          `${module.module}：${summary}`,
+          ...(module.next ?? []).map((item) => `  ${item.title}（${item.status}）`),
+        ];
+      });
+      const recentSummary = [
+        `最近 7 天：训练 ${recent.workouts} 次`,
+        `平均睡眠 ${recent.averageSleepHours?.toFixed(1) ?? "—"} 小时`,
+        `平均蛋白质 ${recent.averageProteinG?.toFixed(0) ?? "—"} g`,
+      ].join("，");
+      out(
+        values,
+        result,
+        [
+          `${result.today} · ${result.now.pending} 条日程建议待确认`,
+          ...result.now.blocks.map((b) => `${b.start ?? "待办"} ${b.title}（${b.status}）`),
+          ...moduleLines,
+          recentSummary,
+          `最新体重：${recent.latestWeight ? `${recent.latestWeight.value} ${recent.latestWeight.unit}` : "—"}`,
+          ...result.warnings,
+        ].join("\n"),
+      );
+      return 0;
+    }
+    case "photo": {
+      const [sub, arg] = args;
+      const ws = workspace(values);
+      if (sub === "list") {
+        const photos = readRecords(ws, "photo").reverse();
+        out(values, photos, photos.map((r) => JSON.stringify(r)).join("\n") || "（没有照片）");
+      } else if (sub === "add") {
+        const result = await addPhoto(ws, need(arg, "图片"), {
+          pose: (values.pose ?? "other") as Pose,
+          ts: values.ts,
+          notes: values.notes,
+          by: parseBy(values.by),
+        });
+        out(values, result, `已添加体态照片：${result.record.id}`);
+      } else if (sub === "rm") {
+        const result = await removePhoto(ws, need(arg, "id"), { by: parseBy(values.by) });
+        out(values, result, "已删除体态照片。");
+      } else throw new KaituError("未知 photo 子命令", "BAD_ARGS");
       return 0;
     }
     case "record": {
@@ -233,6 +346,14 @@ async function run(argv: string[]): Promise<number> {
     case "memory": {
       const [sub, arg] = args;
       const ws = workspace(values);
+      if (sub === "import") {
+        const result = await importMemoryFile(ws, need(values.file, "--file"), {
+          dryRun: values["dry-run"],
+          by: parseBy(values.by),
+        });
+        out(values, result, `${values["dry-run"] ? "预览" : "已导入"} ${result.entries.length} 条记忆。`);
+        return 0;
+      }
       if (sub === "list" || sub === "search") {
         const memories = sub === "list" ? listMemories(ws) : searchMemories(ws, need(arg, "词"));
         out(

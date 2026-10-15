@@ -12,3 +12,5 @@
 | ECharts | Apache-2.0 | https://github.com/apache/echarts |
 | markdown-it | MIT | https://github.com/markdown-it/markdown-it |
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
+| @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
+| zod | MIT | https://github.com/colinhacks/zod |

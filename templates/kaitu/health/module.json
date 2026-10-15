@@ -27,6 +27,11 @@
       "path": "data/metrics/{YYYY-MM}.jsonl",
       "schema": "schemas/metric.schema.json",
       "label": "指标"
+    },
+    "photo": {
+      "path": "data/photos/{YYYY-MM}.jsonl",
+      "schema": "schemas/photo.schema.json",
+      "label": "体态照片"
     }
   },
   "views": [

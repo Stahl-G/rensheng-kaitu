@@ -1,8 +1,14 @@
 import { useState } from "preact/hooks";
 import { type StoredRecord, type WorkbenchData, dateOffset, dayOf, number } from "./api";
-import { Chart, Empty, Markdown, Panel } from "./components";
+import { type Act, Chart, Empty, Markdown, Panel } from "./components";
+import { Photos } from "./photos";
 const tabs = ["训练", "饮食", "睡眠与活动", "身体指标"];
-export function Health({ data }: { data: WorkbenchData }) {
+export function Health({
+  data,
+  act,
+  busy,
+  refresh,
+}: { data: WorkbenchData; act: Act; busy: boolean; refresh: () => Promise<void> }) {
   const [tab, setTab] = useState("训练");
   const [exercise, setExercise] = useState("");
   const records = (type: string) => data.records[type] ?? [];
@@ -254,6 +260,7 @@ export function Health({ data }: { data: WorkbenchData }) {
               ]}
             />
           ))}
+          <Photos data={data} act={act} busy={busy} refresh={refresh} />
           <Panel title="最近体检">
             {!data.labs.length && <Empty>把体检文件交给 Agent 整理，指标与异常标记会显示在这里。</Empty>}
             {data.labs.map((lab) => (

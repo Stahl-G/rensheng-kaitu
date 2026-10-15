@@ -4,12 +4,16 @@
   "private": true,
   "description": "开图：把个人生活放进一个本地文件夹，任何 Agent 都能接手",
   "type": "module",
-  "bin": { "kaitu": "dist/main.js" },
+  "bin": {
+    "kaitu": "dist/main.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@kaitu/core": "workspace:*"
+    "@kaitu/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.7"
   }
 }

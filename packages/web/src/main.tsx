@@ -142,7 +142,7 @@ function App() {
               {page === "今天" && (
                 <Today data={data} busy={busy} act={act} settings={() => setPage("设置")} />
               )}
-              {page === "健康" && <Health data={data} />}
+              {page === "健康" && <Health data={data} act={act} busy={busy} refresh={refresh} />}
               {page === "动态" && <Feed data={data} />}
               {page === "我的" && <Me data={data} act={act} busy={busy} />}
               {page === "设置" && (

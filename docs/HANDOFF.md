@@ -105,7 +105,7 @@
 
 | 事项 | 影响 |
 |---|---|
-| Codex 技能目录的位置与 `SKILL.md` 格式细节 | 阶段 1 技能放在哪里 |
+| Codex 技能目录：模板使用 `.agents/skills/<name>/SKILL.md`，frontmatter 为 name / description；CLI 0.162.1 在临时工作区执行 `codex exec --ephemeral -s read-only` 时于初始化阶段报 `Operation not permitted`，`debug prompt-input` 同样受限，尚不能确认实际注入 | 已实现模板与双目录复制；待可运行 Codex 的环境完成发现验证 |
 | `codex exec` 的非交互参数 | 以后定时调用 Codex |
 | Codex 能否通过 `~/kaitu/.mcp.json` 或必须用 `codex mcp add` 配置 MCP | 阶段 1 的 MCP 配置方式 |
 | `node:sqlite` 是否带 FTS5 | 不带就用 better-sqlite3 |
@@ -197,3 +197,28 @@
 2. 目标用户以国内为主还是海外：影响默认模型预置、健康设备支持（华为、小米）。
 3. 记忆自动提取用主模型，还是单独配置一个便宜的小模型。
 4. 仓库是否改名为 `rensheng-kaitu`。
+
+
+### 2026-10-15：体态照片、M3 实现与 MCP
+
+- 照片由 core 按文件头识别 JPEG / PNG / WebP，macOS HEIC 调用系统 sips 转 JPEG；原件和 photo 记录一起进历史。
+  CLI 与身体指标页支持添加、删除，工作台提供日期对比；图片接口只按记录 id 读取，上传限制 25MB。
+- 16 个技能正本在模板 `.agents/skills/`，init / agents-md 同时复制到 `.claude/skills/`，两处均进历史。
+  AGENTS.md 补齐日常节奏、技能、工作台和 MCP。status 汇总今天和最近 7 天；memory import 整批一个版本。
+  训练次数按日期与 session_id 去重；睡眠按醒来日、蛋白质按记录日先汇总，均只平均有记录的日期。
+- MCP 使用 SDK：stdio 默认 all，HTTP 默认 remote，只监听 127.0.0.1，Bearer token 与 Host 校验。
+  HTTP 每会话独立绑定 initialize 的客户端名，所有写操作串行，版本说明带 MCP 来源。
+  token 权限 600，轮换后后续请求立即拒绝旧值；不内置隧道，接入方法见 remote-agents.md。
+- 必要自动测试覆盖照片与读取范围、整批记忆恢复、sample status、SDK stdio 调用和 HTTP 认证。
+  Codex 技能发现实测受当前执行环境权限限制，详见 §6；不把技能结构校验当成实际 Agent 工作流验收。
+
+- 本轮最终检查：`pnpm build`、`pnpm typecheck`、`pnpm lint`、`pnpm test` 通过（73 项，新增 7 项必要用例）。
+  另用 SDK HTTP 客户端冒烟调用 all 集合的 15 个工具，核对客户端来源版本、token 权限及双目录技能进历史。
+  浏览器看到照片墙、上传和对比入口；浏览器未授予上传文件权限，界面上传 / 双日期切换 / 删除闭环未完成。
+  HEIC 的真实文件转换、Grok Bot / ChatGPT Dots、公网隧道与 PRD §10 的完整 Agent 行为验收未验证。
+
+### 2026-10-15：实测结论（Claude）
+
+- **Codex 技能目录已核实**：在 `kaitu init` 生成的工作区里运行 `codex exec`，16 个开图技能（`.agents/skills/`）全部被识别，并成功按 log-workout 技能记录了训练。
+- **Codex 沙箱会把 `.git` 设为只读**：Codex 调 `kaitu` 时记录能写入，但版本保存报 `EPERM`。解决：版本库改存到状态目录（本地模式 `.kaitu/history.git`，Drive 模式在本机状态目录），与 `docs/drive-sync.md` 一并实现。
+

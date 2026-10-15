@@ -1,12 +1,24 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { templateDir } from "./assets.js";
+import { parseFrontmatter } from "./frontmatter.js";
 import { listModules } from "./modules.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
 
-/**
- * 生成 AGENTS.md。完整版见 PRD §8.1（T10）；这里先覆盖读取顺序、模块清单、写入与确认规则。
- * 分隔线以下是用户追加的内容，重新生成时原样保留。
- */
+function skills() {
+  const dir = join(templateDir(), ".agents/skills");
+  return readdirSync(dir)
+    .sort()
+    .map((name) => {
+      const text = readFileSync(join(dir, name, "SKILL.md"), "utf8");
+      const { data } = parseFrontmatter<{ name: string; description: string }>(text);
+      return { name, text, description: data.description };
+    });
+}
+
+/** 分隔线以下是用户追加的内容，重新生成时原样保留。 */
 export function renderAgentsMd(ws: Workspace): string {
   const modules = listModules(ws);
   const moduleRows = modules
@@ -66,6 +78,8 @@ ${instructions}
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
+- 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
+- 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
 - 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。
 
 ## 5. 确认规则
@@ -91,7 +105,44 @@ ${instructions}
 - 有对应模块的内容写进模块，不进记忆。健康诊断等敏感信息仅在用户明确要求时保存，并加 \`--sensitive\`。
 - 晚间复盘合并重复、处理矛盾并刷新档案摘要。用 \`kaitu chats search <词>\` 检索历史对话。
 
-## 8. 安全
+## 8. 日常节奏
+
+- 早间（morning-plan）：读规则、目标、日程、下一步和昨晚睡眠，按训练频率排今天，建议保留 pending。
+- 晚间（evening-review）：核对完成情况、更新模块状态、写日报、整理记忆，最后保存版本。
+- 周复盘（weekly-review）：汇总本周进展和障碍，更新下周下一步。
+- 月复盘（monthly-review）：汇总整月，满两个月后做有数据支持的现状分析；规则和目标变更仍须确认。
+- 阶段 1 手动触发这些技能，不会自动设置定时任务。
+
+## 9. 技能与常用命令
+
+正本在 \`.agents/skills/\`，同步副本在 \`.claude/skills/\`；\`kaitu agents-md\` 同时更新两处。
+
+| 技能 | 何时使用 |
+|---|---|
+${skills()
+  .map((s) => `| ${s.name} | ${s.description} |`)
+  .join("\n")}
+
+- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据。
+- \`kaitu memory import --file <候选.json> [--dry-run]\`：确认后的记忆数组一次导入、一个版本。
+- \`kaitu import apple-health|nut-ai|ics <文件> --dry-run\`：先预览，用户确认后移除 --dry-run。
+- \`kaitu doctor\` 检查工作区，\`kaitu validate [路径]\` 校验格式。
+
+## 10. 工作台
+
+运行 \`kaitu ui\` 打开今天、健康、动态、我的；在工作台确认建议、导入与查看历史。
+工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
+
+## 11. MCP
+
+- 本机：\`kaitu mcp\` 用 stdio。Claude Code 读取本目录 \`.mcp.json\`。
+- Codex：在工作区运行 \`codex mcp add kaitu -- kaitu mcp\`；非默认目录先设置 \`KAITU_DIR\`。
+- 云端：\`kaitu mcp --http\` 只监听 127.0.0.1:4871，默认精简 remote 工具，须 Bearer token。
+- \`kaitu mcp token\` 查看 token，\`kaitu mcp token --rotate\` 轮换；不把 token 放进版本文件或日志。
+- MCP 可读状态、记录、记忆和对话，可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
+- 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
+
+## 12. 安全
 
 - 不执行与本文件夹无关的命令。
 - 不把密钥写进任何文件。
@@ -102,5 +153,10 @@ ${userPart}`;
 }
 
 export function writeAgentsMd(ws: Workspace): void {
+  for (const skill of skills()) {
+    for (const base of [".agents", ".claude"]) {
+      ws.writeText(`${base}/skills/${skill.name}/SKILL.md`, skill.text);
+    }
+  }
   ws.writeText("AGENTS.md", renderAgentsMd(ws));
 }

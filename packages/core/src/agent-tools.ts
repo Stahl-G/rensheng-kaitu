@@ -1,0 +1,89 @@
+import { realpathSync } from "node:fs";
+import { extname, relative, sep } from "node:path";
+import { KaituError } from "./errors.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { snapshot } from "./history.js";
+import { findRecordType } from "./modules.js";
+import { removePhoto } from "./photos.js";
+import { addRecord, deleteRecord, updateRecord } from "./records.js";
+import { schemas } from "./schema.js";
+import { isoInZone, localDate } from "./time.js";
+import { ulid } from "./ulid.js";
+import type { TodayPlan } from "./workbench.js";
+import type { Workspace } from "./workspace.js";
+
+export function readAgentFile(ws: Workspace, file: string): string {
+  const abs = ws.resolve(file);
+  // 同时检查请求路径和真实路径，不能借工作区内链接读取程序状态。
+  const paths = [
+    relative(ws.root, abs).split(sep).join("/"),
+    relative(realpathSync(ws.root), realpathSync(abs)).split(sep).join("/"),
+  ];
+  for (const path of paths) {
+    if (
+      path.split("/").some((part) => part === ".kaitu" || part === ".git") ||
+      ![".md", ".json"].includes(extname(path))
+    ) {
+      throw new KaituError("只允许读取工作区内的 .md / .json，不读 .kaitu/ 或版本库目录", "OUT_OF_SCOPE");
+    }
+  }
+  return ws.readText(file);
+}
+
+export async function writeAgentRecord(
+  ws: Workspace,
+  operation: "add" | "update" | "delete",
+  type: string,
+  actor: string,
+  data: Record<string, unknown> = {},
+  id = "",
+) {
+  const ref = findRecordType(ws, type);
+  if (type === "photo" && operation === "delete") return removePhoto(ws, id, { by: "agent", actor });
+  const result =
+    operation === "add"
+      ? addRecord(ws, type, data)
+      : operation === "update"
+        ? updateRecord(ws, type, id, data)
+        : deleteRecord(ws, type, id);
+  const message = operation === "add" ? "记录了" : operation === "update" ? "修改了" : "删除了";
+  const version = await snapshot(
+    ws,
+    `${actor}在${ref.module.def.name}模块${message} 1 条${ref.def.label ?? type}`,
+  );
+  return { ...result, version };
+}
+
+export async function writeDigest(ws: Workspace, date: string, content: string, actor: string) {
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    Number.isNaN(Date.parse(date)) ||
+    new Date(date).toISOString().slice(0, 10) !== date
+  ) {
+    throw new KaituError("简报日期不合法", "BAD_ARGS");
+  }
+  const file = `feed/digests/${date}.md`;
+  ws.writeText(file, content);
+  return { file, version: await snapshot(ws, `${actor}写入了 ${date} 的动态简报`) };
+}
+
+export interface ProposedBlock {
+  title: string;
+  start: string;
+  end: string;
+  module?: string;
+  ref?: string;
+}
+
+export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: string, now = new Date()) {
+  const date = localDate(now, ws.timeZone());
+  const current = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+  const parsed = current.data.date === date ? current : { data: { date, blocks: [] } as TodayPlan, body: "" };
+  if (input.end <= input.start) throw new KaituError("结束时间必须晚于开始时间", "BAD_ARGS");
+  const block = { ...input, id: ulid(), kind: "proposal" as const, status: "pending" as const };
+  parsed.data.blocks.push(block);
+  const data = { ...parsed.data, generated_at: isoInZone(now, ws.timeZone()) };
+  if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");
+  ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
+  return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
+}

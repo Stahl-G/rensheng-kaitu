@@ -46,7 +46,7 @@
 | P4 | 先建议，后确认 | 写入外部系统（日历）和批量导入需要人确认；日常记录、自动记忆直接写入但可撤销 |
 | P5 | 能用开源不自造 | 健康数据、饮食识别、日历、RSS、Agent 运行时、模型适配全部复用成熟开源项目 |
 | P6 | 个人工具，不做企业级溯源 | 不做证据绑定、评分、审计包、多用户。版本历史足以支撑撤销与回看 |
-| P7 | 本地优先、隐私优先 | 不做云同步、不发送产品埋点；明确告知哪些数据会发给哪个模型 |
+| P7 | 本地优先、隐私优先 | 默认不做云同步、不发送产品埋点；明确告知哪些数据会发给哪个模型。Google Drive 模式为用户主动开启的可选项，版本库与密钥始终留在本机（见 `docs/drive-sync.md`） |
 
 ---
 
@@ -444,22 +444,22 @@ sensitive: false
 | 技能 | 触发 | 做什么 |
 |---|---|---|
 | onboarding | 首次使用 | 引导导入 ChatGPT 记忆、填写档案、目标、规则、连接数据源 |
-| import-chatgpt | 「导入 ChatGPT」 | 给出提示词 → 解析贴回内容 → 列候选 → 确认后写入 |
+| import-chatgpt-memory | 「导入 ChatGPT」 | 给出提示词 → 解析贴回内容 → 列候选 → 确认后写入 |
 | morning-plan | 「早上好」/ 定时 | 同步 → 读规则、目标、日程、各模块下一步 → 写 `NOW.md` → 提出日程建议 |
 | evening-review | 「复盘」/ 定时 | 对照 `NOW.md` 判断完成情况 → 更新 `STATUS.md` → 写日报 → 整理记忆 |
 | weekly-review / monthly-review | 定时或手动 | 周 / 月复盘；月度现状分析 |
 | look-back | 「过去 N 天……」 | 按时间段汇总各模块数据与对话，回答「为什么没达成」类问题 |
 | log-workout | 训练描述 | 解析并写入 workout；给出下次加重建议 |
 | log-meal | 饮食描述或饮食应用导入 | 文字记录或从 Nut AI / CalorieMate 导入；汇总当天热量与蛋白质 |
-| health-sync | 早间计划内 / 手动 | Oura 同步、Apple Health 导入 |
+| health-import | 手动导入 | Apple Health / Nut AI / .ics 预览与确认导入 |
 | lab-import | 拖入体检 PDF | 抽取指标写入 `labs/`，标注异常，提出复查建议 |
 | daily-feed | 早间计划内 / 手动 | 拉取订阅源 → 按兴趣筛选 → 写当天简报 |
 | learn-topic | 「帮我学 XX」 | 建主题目录、整理资料、与用户讨论、记录观念变化、转成行动 |
 | decision | 「帮我决定 XX」 | 建决策档案、列候选与标准、可选询问多个模型、记录选择与复议条件 |
 | add-module | 「加一个 XX 模块」 | 生成 `module.json` 与 `STATUS.md` |
-| dashboard | 「看看进度」 | 阶段 1 过渡：生成静态 `dashboard.html` |
+| log-photo | 体态照片 | 保存原件与姿势，在工作台按日期对比 |
 
-技能目录位置以各 Agent 官方约定为准（Codex 的技能目录在实现时按官方文档确认）。
+技能正本在 `.agents/skills/`，初始化与 `agents-md` 同步复制至 `.claude/skills/`；体态照片与进度查看使用 `kaitu ui`。
 
 ### 8.3 工具 / 命令（`kaitu` CLI，同时以 MCP 暴露）
 
@@ -470,7 +470,9 @@ sensitive: false
 | `kaitu validate [path]` | 按 schema 校验 |
 | `kaitu agents-md` | 重新生成 `AGENTS.md` |
 | `kaitu record add <type> --json ...` | 写入一条记录（生成 id、ts、by，校验后追加） |
-| `kaitu status` | 汇总 `NOW.md` 与各模块 `STATUS.md` |
+| `kaitu status [--json-out]` | 今天的块与待确认、各模块进度和 next、最近 7 天训练 / 睡眠 / 蛋白质及最新体重 |
+| `kaitu memory import --file <候选.json> [--dry-run]` | 确认后的记忆数组整批写入，一个版本 |
+| `kaitu photo add` / `list` / `rm` | 添加、查询和删除体态照片及原件 |
 | `kaitu memory add|update|rm|list|search` | 记忆操作 |
 | `kaitu chats search <q>` | 历史对话全文检索 |
 | `kaitu import chatgpt-conversations <file>` | 导入对话到 `chats/` |
@@ -481,10 +483,10 @@ sensitive: false
 | `kaitu feed fetch` | 拉取订阅源到缓存，输出待整理条目 |
 | `kaitu history [path]` / `kaitu restore <version> [path]` | 版本历史与恢复 |
 | `kaitu snapshot -m <msg>` | 手动生成版本 |
-| `kaitu dashboard` | 生成静态 `dashboard.html` |
+| `kaitu ui` | 打开本地工作台，查看进度与确认建议 |
 | `kaitu mcp` | 以 stdio MCP 服务提供上述能力（含 `memory_*`、`search_chats`、`record_add`） |
 
-`~/kaitu/.mcp.json` 预置 `kaitu mcp` 与日历 MCP，Codex / Claude Code / Pi 系 Agent 共用同一份配置。
+`~/kaitu/.mcp.json` 预置 `kaitu mcp`，供 Claude Code 读取；Codex 用 `codex mcp add kaitu -- kaitu mcp` 注册。非默认目录通过 `KAITU_DIR` 指定。
 
 ---
 
@@ -572,7 +574,7 @@ WebUI 稳定后，用 DeepSeek Harness 已有的 Electron 桌面载体打包 mac
 
 ## 11. 隐私与安全
 
-- 所有数据只存在本机 `~/kaitu/`；不提供云同步。
+- 默认所有数据只存在本机 `~/kaitu/`。用户可主动开启 Google Drive 模式（`docs/drive-sync.md`）：数据文件同步到用户自己的 Drive，版本库、密钥、索引始终留在本机。
 - 不发送任何产品埋点或遥测（阶段 3 必须禁用 DeepSeek Harness 的相关插件）。
 - 引导页明确告知：对话、记录与导入内容会发送给用户选择的模型服务（阶段 1 为 OpenAI）。
 - 密钥只存 `.kaitu/secrets.json`（权限 600），不进版本历史、不写入任何其他文件、不出现在日志中。
