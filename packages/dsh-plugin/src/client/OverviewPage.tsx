@@ -22,7 +22,13 @@ const sections = [
 ];
 const collapseKey = "kaitu.overview.sectionsCollapsed";
 function Actor({ source, name }: { source: OverviewVersion["source"]; name?: string | null }) {
-  if (source === "unknown") return null;
+  if (source === "unknown")
+    return (
+      <>
+        <span aria-hidden="true" className={css.avatar} style={{ visibility: "hidden" }} />
+        <span aria-hidden="true" className={css.actor} />
+      </>
+    );
   const label =
     source === "user" ? "你" : source === "agent" ? "本机 Agent" : name ? `${name} · 云端` : "云端 Agent";
   const initial = source === "user" ? "你" : source === "agent" ? "本" : (name?.[0]?.toUpperCase() ?? "云");
@@ -77,9 +83,7 @@ function MetricChart({ metric }: { metric: OverviewMetric }) {
             />
           ))}
         </div>
-        <span className={css.muted}>
-          虚线框 = 没记录（不算 0）{goal !== undefined ? ` · 横线 = 目标 ${goal} 小时` : ""}
-        </span>
+        <span className={css.muted}>虚线 = 没记录{goal !== undefined ? ` · 目标 ${goal} 小时` : ""}</span>
       </>
     );
   }
@@ -421,7 +425,7 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
               )}
               <div className={css.columns}>
                 <div className={css.mainColumn}>
-                  <Section title="日程" source="来源：NOW.md" id="kt-today">
+                  <Section title="日程" id="kt-today">
                     {data.blocks.map((block) => (
                       <Row
                         key={block.id}
@@ -457,7 +461,10 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                       </p>
                     )}
                   </Section>
-                  <Section title="下一步" source={`全部 ${data.next.length} 条 · 每模块最多 5 条`}>
+                  <Section
+                    title="下一步"
+                    source={data.next.length > 5 ? `共 ${data.next.length} 条` : undefined}
+                  >
                     {data.next.map((item) => (
                       <Row key={`${item.file}:${item.id}`}>
                         <span className={css.checkCircle} aria-hidden="true" />
