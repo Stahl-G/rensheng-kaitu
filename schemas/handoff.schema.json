@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/handoff.schema.json",
+  "type": "object",
+  "required": ["agent", "at"],
+  "properties": {
+    "agent": { "type": "string", "minLength": 1 },
+    "at": { "type": "string", "format": "date-time" },
+    "follows": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

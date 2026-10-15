@@ -38,12 +38,12 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 
 ## 云端 Agent 怎么读
 
-- 根目录生成 `AGENT-README.md`：给云端 Agent 的简短入口（这是谁的工作区、先读哪几个文件、怎么把结果放回来、不能做什么）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
+- 根目录生成 `AGENT-README.md`（云端接力入口）与 `ORGANIZER.md`（夜间整理规则）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
 - 根目录生成 `OVERVIEW.md`：`kaitu status` 的 Markdown 版（今天的安排与待确认、各模块进度与下一步、最近 7 天关键数据）。每次 core 写入、晚间复盘保存版本及工作台检测到外部改动后刷新；内容不变不重写，派生文件事件不触发自动版本。云端 Agent 读这一个文件就能「一眼看到情况」。
 
-## 云端 Agent 怎么写：收件箱（不直接改文件）
+## 云端 Agent 怎么写
 
-两边同时改同一个文件会产生冲突副本，所以云端 Agent **只在 `inbox/agents/` 里新建文件**，每个文件名唯一，不改已有文件。开图看到新文件后写入、存版本，成功原件移到 `inbox/processed/`；写错的部分连同原内容、原因、字段参考和示例转为 `inbox/notes/YYYY-MM-DD/` 的待整理笔记。
+按 [云端接力协议](cloud-relay.md)：白天只新建收件箱文件和交接记录，夜间整理员更新状态。本机处理成功后，收件箱原件移到 `inbox/processed/`，写错的部分转为 `inbox/notes/YYYY-MM-DD/`。
 
 格式不确定时直接写 `*.note.md`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 
@@ -63,7 +63,7 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 记录逐行、记忆逐条校验：合法部分立即写入，其余部分保留待整理；只接受新增操作。来源可写在简报 frontmatter、每行记录、每条记忆或建议的 `agent` 字段。
 未处理文件不进版本，成功原件与待整理笔记均保存版本；处理时间与进程锁留在本机状态目录。
 无法识别的文件也转为笔记；二进制只记录文件名、大小，原件放当日 notes 的 `files/`。同名文件保留独立副本，不覆盖。
-本地模式同样生成 `AGENT-README.md`、`OVERVIEW.md` 与 `inbox/agents/`。入口与现状开头标明用户时区与当天 UTC 偏移。
+本地模式同样生成 `AGENT-README.md`、`ORGANIZER.md`、`OVERVIEW.md` 与 `inbox/agents/`、`handoffs/daily/`、`handoffs/archive/`。入口与现状开头标明用户时区与当天 UTC 偏移。
 
 记录格式从各模块 schema 自动生成，含自定义模块；`AGENT-README.md` 与本机 `AGENTS.md` 内嵌字段与示例。
 本机可用 `kaitu record types` 列出全部类型、`kaitu record schema <类型>` 查单个类型。

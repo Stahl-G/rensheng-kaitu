@@ -30,7 +30,8 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
 
 export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
   const version = templateVersion();
-  if (!templateOutdated(ws)) return { templateVersion: version, changes: [], version: null };
+  if (!templateOutdated(ws) && ws.exists("ORGANIZER.md") && ws.exists("handoffs/daily"))
+    return { templateVersion: version, changes: [], version: null };
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();
   const deletes: string[] = [];
@@ -94,15 +95,17 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     ...deletes.map((file) => `删除 ${file}`),
     "AGENTS.md",
     "AGENT-README.md",
+    "ORGANIZER.md",
     "OVERVIEW.md",
     ".kaitu/config.json",
   ];
-  if (!ws.exists("inbox/health")) changes.push("inbox/health/");
+  const directories = ["inbox/health", "handoffs/daily", "handoffs/archive"];
+  for (const dir of directories) if (!ws.exists(dir)) changes.push(`${dir}/`);
   if (existsSync(join(ws.root, ".git"))) changes.push(".git → 本机状态目录/history.git");
   if (options.dryRun) return { templateVersion: version, changes, version: null };
   migrateHistory(ws.root);
   await batchOverview(ws, async () => {
-    if (!ws.exists("inbox/health")) mkdirSync(ws.resolve("inbox/health"), { recursive: true });
+    for (const dir of directories) mkdirSync(ws.resolve(dir), { recursive: true });
     for (const [file, content] of writes) ws.writeText(file, content);
     for (const file of deletes) rmSync(ws.resolve(file));
     writeAgentsMd(ws);

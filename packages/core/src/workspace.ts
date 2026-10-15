@@ -167,7 +167,7 @@ export class Workspace {
     if (
       overviewDeferred(this) ||
       rel.startsWith(".kaitu/") ||
-      ["AGENT-README.md", "OVERVIEW.md"].includes(rel) ||
+      ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
       !this.exists("AGENT-README.md")
     )
       return;

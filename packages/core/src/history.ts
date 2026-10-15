@@ -275,7 +275,8 @@ export async function restore(
     }
   }
   for (const f of targetFiles) {
-    if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md"].includes(f)) continue;
+    if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f))
+      continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     if (privateSlugs.size && /^projects\/data\/metrics\/[^/]+\.jsonl$/.test(f)) {
       const rows = Buffer.from(blob)

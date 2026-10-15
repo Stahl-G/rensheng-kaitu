@@ -145,11 +145,11 @@ ${skills()
 运行 \`kaitu ui\` 打开今天、健康、动态、我的；在工作台确认建议、导入与查看历史。
 工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
 
-## 11. Google Drive 与收件箱
+## 11. Google Drive 与云端接力
 
 - 默认本地模式；用户可用 \`kaitu drive enable [--drive-dir <我的云端硬盘路径>]\` 开启 Drive 同步。
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
-- 云端 Agent 先读 \`AGENT-README.md\` 与 \`OVERVIEW.md\`，只在 \`inbox/agents/\` 新建唯一文件。
+- 云端 Agent 白天只追加（规则见 \`AGENT-README.md\`）；整理员每天整理一次（规则见 \`ORGANIZER.md\`）。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
 - 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。

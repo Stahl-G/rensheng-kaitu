@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
 import { CONFIG_VERSION } from "./init.js";
 import { listModules } from "./modules.js";
@@ -96,6 +96,17 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     if (leaked.length) add("版本历史中没有密钥", false, `已被记录：${leaked.join("、")}`);
   }
 
+  const conflicts: string[] = [];
+  function findConflicts(dir: string) {
+    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
+      if (entry.isSymbolicLink() || [".git", ".kaitu", "node_modules"].includes(entry.name)) continue;
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (/ \(\d+\)(?:\.[^/]+)?$/.test(entry.name)) conflicts.push(file);
+      if (entry.isDirectory()) findConflicts(file);
+    }
+  }
+  findConflicts("");
+  add("无 Drive 同名冲突副本", !conflicts.length, conflicts.length ? conflicts.join("、") : undefined);
   const issues = validateWorkspace(ws);
   add(
     "数据格式校验",
