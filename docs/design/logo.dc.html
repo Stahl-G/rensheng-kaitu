@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Kaitu Logo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#FCFCFB}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 56px 64px; display: flex; flex-direction: column; gap: 40px; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif; color: #1F1E1D; background: #FCFCFB">
+  <header style="display: flex; flex-direction: column; gap: 6px">
+    <h1 style="margin: 0; font-size: 28px; line-height: 36px; font-weight: 600">Kaitu 标志</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 24px; color: #4D4C48">保留概念图的六边形立方体轮廓，中心换成「你在这里」的点：从你自己出发，看清全局。</p>
+  </header>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+    <section style="display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px 24px 28px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 0 0 2px {{accent}}, 0 1px 3px rgba(31,30,29,0.06)">
+      <svg width="148" height="148" viewBox="0 0 24 24" fill="none" role="img" aria-label="方案 A：立方体加中心点">
+        <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="2" fill="{{accent}}"/>
+      </svg>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+        <span style="font-size: 18px; line-height: 26px; font-weight: 600">A · 你在这里（推荐）</span>
+        <span style="font-size: 14px; line-height: 20px; color: #6B6A66; text-align: center">轮廓延续概念图，中心点让它不再像「软件包」图标</span>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px 24px 28px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06)">
+      <svg width="148" height="148" viewBox="0 0 24 24" fill="none" role="img" aria-label="方案 B：展开的地图">
+        <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M8.2 5.4v13.2M15.8 5.4v13.2" stroke="#1F1E1D" stroke-width="1.6" stroke-linecap="round"/>
+        <circle cx="15.8" cy="10.4" r="1.9" fill="{{accent}}"/>
+      </svg>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+        <span style="font-size: 18px; line-height: 26px; font-weight: 600">B · 展开的地图</span>
+        <span style="font-size: 14px; line-height: 20px; color: #6B6A66; text-align: center">六边形里三折地图，点落在其中一折上</span>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 40px 24px 28px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06)">
+      <svg width="148" height="148" viewBox="0 0 24 24" fill="none" role="img" aria-label="方案 C：路线">
+        <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="M8 16.6c1.4-3.8 4.6-1.6 6-5.2" stroke="#1F1E1D" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="0.1 2.6"/>
+        <circle cx="8" cy="16.6" r="1.2" fill="#1F1E1D"/>
+        <circle cx="15" cy="9.4" r="2" fill="{{accent}}"/>
+      </svg>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 4px">
+        <span style="font-size: 18px; line-height: 26px; font-weight: 600">C · 一条路线</span>
+        <span style="font-size: 14px; line-height: 20px; color: #6B6A66; text-align: center">从现在到下一个点，强调「推进」</span>
+      </div>
+    </section>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 48px; padding: 28px 32px; border-radius: 20px; background: #F5F5F3">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="2.1" fill="{{accent}}"/>
+      </svg>
+      <span style="font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.2px">Kaitu</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="2.4" fill="{{accent}}"/>
+      </svg>
+      <span style="font-size: 15px; line-height: 22px">侧栏小尺寸</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <div style="width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #1F1E1D">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#FFFFFF" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2" fill="#7FA2F0"/>
+        </svg>
+      </div>
+      <span style="font-size: 15px; line-height: 22px">应用图标（深色底）</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 14px">
+      <div style="width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; border-radius: 22px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.1)">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="2" fill="{{accent}}"/>
+        </svg>
+      </div>
+      <span style="font-size: 15px; line-height: 22px">应用图标（浅色底）</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#3D6FE0","options":["#3D6FE0","#2E8B57","#1F1E1D"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { accent: this.props.accent ?? '#3D6FE0' };
+  }
+}
+</script>
+</body>
+</html>

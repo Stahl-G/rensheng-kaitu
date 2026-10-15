@@ -7,7 +7,7 @@ dsh 0.2.0-rc.2 源码在 `/Users/yihongguo/Developer/deepseek-harness-rc2`（只
 在 dsh 桌面应用里：侧栏左上角显示 Kaitu 标志和名称，对话首屏也换成 Kaitu 标志；侧栏底部「设置」旁边或设置页里写一行「Powered by DSH」（按品牌规范只用缩写 DSH，不用 DeepSeek Harness 全名）；隐藏开图用不上的入口。
 
 ## 要做
-1. **品牌**：在 `packages/dsh-plugin` 的 client 入口里，占住三个品牌插槽，或者在必须单独成包时新建 `packages/dsh-brand`，选更简单的那种。标志用简单的线条 SVG：地图折页加一个点，和总览页侧栏入口的图标同一套风格。名称为「Kaitu」。
+1. **品牌**：在 `packages/dsh-plugin` 的 client 入口里，占住三个品牌插槽，或者在必须单独成包时新建 `packages/dsh-brand`，选更简单的那种。标志用 `docs/design/kaitu-mark.svg`（六边形立方体轮廓 + 中心蓝点，线条用 currentColor，深色模式蓝点改用 `#7FA2F0`），侧栏入口「开图」的图标也换成它。名称为「Kaitu」。
 2. **撤掉官方品牌**：查清怎么让 `ui-brand-official` 不生效，可能是 profile patch 移除或禁用插件、改构建 profile，或者别的方式。只有用户本机 profile 能做到的方式才算数。如果桌面版官方构建做不到，写清楚依据，留到第二步打包时处理。
 3. **隐藏入口**：列出侧栏和顶栏现有的全部入口及其来源插件，然后给出建议：哪些保留（新会话、开图、设置、会话列表），哪些隐藏（插件市场、工作区管理、账号相关、埋点相关）。能用 patch 关掉的，就写进 `kaitu dsh --install` 生成的段落；关不掉的列出原因。**这些改动只能写在 kaitu:start…end 段里**，不能动用户 profile 的其他部分。
 4. **Powered by DSH**：找一个能放这行字的插槽（设置页、侧栏底部或「关于」），放上去。写成「Powered by DSH <版本号>」，版本号读取当前实际运行的 dsh 版本，不写死。
