@@ -9,6 +9,7 @@ import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { batchSnapshot, snapshot } from "./history.js";
+import { withStateLock } from "./lock.js";
 import { batchOverview } from "./overview.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
@@ -170,41 +171,43 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
   });
 }
 export async function createProject(ws: Workspace, input: ProjectInput) {
-  if (!ws.exists("projects/module.json")) {
-    ws.writeText(
-      "projects/module.json",
-      fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
-    );
-    const config = ws.readJson<{ modules: string[] }>(".kaitu/config.json");
-    config.modules = [...new Set([...config.modules, "projects"])];
-    ws.writeJson(".kaitu/config.json", config, { internal: true });
-    writeAgentsMd(ws);
-  }
-  const data: ProjectStatus = {
-    ...input,
-    title: input.title.trim(),
-    stage: "active",
-    local_only: input.local_only ?? false,
-    links: input.links ?? [],
-    updated: isoInZone(new Date(), ws.timeZone()),
-    next: [],
-  };
-  checkStatus(data);
-  const base =
-    data.title
-      .toLowerCase()
-      .replace(/[^a-z0-9-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .replace(/-+/g, "-") || ulid().slice(-8).toLowerCase();
-  let slug = ["data", "projects"].includes(base) ? `${base}-project` : base;
-  while (slugs(ws).includes(slug)) slug = `${base}-${ulid().slice(-8).toLowerCase()}`;
-  const dir = driveProjects(ws) && data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
-  await batchOverview(ws, async () => {
-    ws.writeText(`${dir}/STATUS.md`, stringifyFrontmatter(data, `# ${data.title}\n`), { internal: true });
-    ws.writeText(`${dir}/notes.md`, "# 背景、要点、相关人\n", { internal: true });
-    ws.writeText(`${dir}/log.md`, "# 项目进展\n", { internal: true });
+  return withStateLock(ws, "新建项目", async () => {
+    if (!ws.exists("projects/module.json")) {
+      ws.writeText(
+        "projects/module.json",
+        fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
+      );
+      const config = ws.readJson<{ modules: string[] }>(".kaitu/config.json");
+      config.modules = [...new Set([...config.modules, "projects"])];
+      ws.writeJson(".kaitu/config.json", config, { internal: true });
+      writeAgentsMd(ws);
+    }
+    const data: ProjectStatus = {
+      ...input,
+      title: input.title.trim(),
+      stage: "active",
+      local_only: input.local_only ?? false,
+      links: input.links ?? [],
+      updated: isoInZone(new Date(), ws.timeZone()),
+      next: [],
+    };
+    checkStatus(data);
+    const base =
+      data.title
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-+/g, "-") || ulid().slice(-8).toLowerCase();
+    let slug = ["data", "projects"].includes(base) ? `${base}-project` : base;
+    while (slugs(ws).includes(slug)) slug = `${base}-${ulid().slice(-8).toLowerCase()}`;
+    const dir = driveProjects(ws) && data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
+    await batchOverview(ws, async () => {
+      ws.writeText(`${dir}/STATUS.md`, stringifyFrontmatter(data, `# ${data.title}\n`), { internal: true });
+      ws.writeText(`${dir}/notes.md`, "# 背景、要点、相关人\n", { internal: true });
+      ws.writeText(`${dir}/log.md`, "# 项目进展\n", { internal: true });
+    });
+    return { slug, version: await projectVersion(ws, slug, `你新建了项目：${data.title}`) };
   });
-  return { slug, version: await projectVersion(ws, slug, `你新建了项目：${data.title}`) };
 }
 function validDate(date: string) {
   if (
@@ -254,21 +257,23 @@ export async function logProject(
   text: string,
   options: { date?: string; by: By },
 ) {
-  if (!text.trim()) throw new KaituError("进展不能为空", "BAD_ARGS");
-  return batchOverview(ws, async () => {
-    appendLog(ws, slug, text, options.date ?? localDate(new Date(), ws.timeZone()));
-    const project = readProject(ws, slug);
-    project.data.updated = isoInZone(new Date(), ws.timeZone());
-    ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
-      internal: true,
+  return withStateLock(ws, "记录项目进展", async () => {
+    if (!text.trim()) throw new KaituError("进展不能为空", "BAD_ARGS");
+    return batchOverview(ws, async () => {
+      appendLog(ws, slug, text, options.date ?? localDate(new Date(), ws.timeZone()));
+      const project = readProject(ws, slug);
+      project.data.updated = isoInZone(new Date(), ws.timeZone());
+      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
+        internal: true,
+      });
+      return {
+        version: await projectVersion(
+          ws,
+          slug,
+          `${options.by === "user" ? "你" : "Agent "}记录了项目进展：${project.data.title}`,
+        ),
+      };
     });
-    return {
-      version: await projectVersion(
-        ws,
-        slug,
-        `${options.by === "user" ? "你" : "Agent "}记录了项目进展：${project.data.title}`,
-      ),
-    };
   });
 }
 
@@ -310,42 +315,52 @@ function transferMetrics(source: Workspace, target: Workspace, slug: string) {
   }
 }
 export function relocateProjects(ws: Workspace, toPrivate: boolean) {
-  for (const slug of slugs(ws)) {
-    const project = readProject(ws, slug);
-    if (!project.data.local_only) continue;
-    const target = toPrivate ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
-    if (project.dir === target) continue;
-    const store = privateStore(ws);
-    transferMetrics(toPrivate ? ws : store, toPrivate ? store : ws, slug);
-    moveDirectory(ws, project.dir, target);
-  }
+  return withStateLock(ws, "迁移项目", () => {
+    for (const slug of slugs(ws)) {
+      const project = readProject(ws, slug);
+      if (!project.data.local_only) continue;
+      const target = toPrivate ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
+      if (project.dir === target) continue;
+      const store = privateStore(ws);
+      transferMetrics(toPrivate ? ws : store, toPrivate ? store : ws, slug);
+      moveDirectory(ws, project.dir, target);
+    }
+  });
 }
 export async function setProject(
   ws: Workspace,
   slug: string,
   patch: Partial<Pick<ProjectStatus, "stage" | "local_only" | "links" | "next">>,
 ) {
-  return batchOverview(ws, async () => {
-    const project = readProject(ws, slug);
-    const data = { ...project.data, ...patch, updated: isoInZone(new Date(), ws.timeZone()) };
-    checkStatus(data);
-    ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body), { internal: true });
-    if (driveProjects(ws) && data.local_only !== project.data.local_only) {
-      const store = privateStore(ws);
-      transferMetrics(data.local_only ? ws : store, data.local_only ? store : ws, slug);
-      moveDirectory(ws, project.dir, data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`);
-    }
-    const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
-    // 共享目录移除也需要在工作区历史中保存。
-    if (driveProjects(ws) && data.local_only !== project.data.local_only)
-      await snapshot(ws, "更新了项目的本机存储设置");
-    return { version };
+  return withStateLock(ws, "更新项目", async () => {
+    return batchOverview(ws, async () => {
+      const project = readProject(ws, slug);
+      const data = { ...project.data, ...patch, updated: isoInZone(new Date(), ws.timeZone()) };
+      checkStatus(data);
+      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body), { internal: true });
+      if (driveProjects(ws) && data.local_only !== project.data.local_only) {
+        const store = privateStore(ws);
+        transferMetrics(data.local_only ? ws : store, data.local_only ? store : ws, slug);
+        moveDirectory(
+          ws,
+          project.dir,
+          data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`,
+        );
+      }
+      const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
+      // 共享目录移除也需要在工作区历史中保存。
+      if (driveProjects(ws) && data.local_only !== project.data.local_only)
+        await snapshot(ws, "更新了项目的本机存储设置");
+      return { version };
+    });
   });
 }
 export function linkProject(ws: Workspace, slug: string, link: ProjectLink) {
-  const project = readProject(ws, slug);
-  const links = project.data.links.filter((item) => !(item.path === link.path && item.role === link.role));
-  return setProject(ws, slug, { links: [...links, link] });
+  return withStateLock(ws, "链接项目", () => {
+    const project = readProject(ws, slug);
+    const links = project.data.links.filter((item) => !(item.path === link.path && item.role === link.role));
+    return setProject(ws, slug, { links: [...links, link] });
+  });
 }
 
 function linkedPath(link: ProjectLink): string {
@@ -426,144 +441,147 @@ function wordCount(text: string, markdown: boolean): number {
 }
 
 export async function syncProject(ws: Workspace, slug: string, options: { now?: Date } = {}) {
-  return batchOverview(ws, async () => {
-    const project = readProject(ws, slug);
-    const sorted = sortLog(project.log);
-    if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
-    const now = options.now ?? new Date();
-    const tz = ws.timeZone();
-    const today = localDate(now, tz);
-    const firstDay = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-    const store = metricStore(ws, project.data);
-    const existing = readRecords(store, "project_metric").filter((r) => r.project === slug);
-    const issues: { path: string; message: string }[] = [];
-    const written: StoredRecord[] = [];
-    function metric(kind: "words" | "commits", date: string, value: number, detail?: string[]) {
-      const previous = existing.find((r) => r.kind === kind && String(r.ts).slice(0, 10) === date);
-      const data = {
-        project: slug,
-        kind,
-        value,
-        ...(detail ? { detail } : {}),
-        ts: isoInZone(localTimeToInstant(`${date}T12:00:00`, tz), tz),
-      };
-      const record = previous
-        ? updateRecord(store, "project_metric", previous.id, data).record
-        : addRecord(store, "project_metric", data).record;
-      written.push(record);
-      return record;
-    }
-    const manuscripts = project.data.links.filter((l) => l.role === "manuscript");
-    let words = 0;
-    let wordsOk = manuscripts.length > 0;
-    const seenFiles = new Set<string>();
-    for (const link of manuscripts) {
-      try {
-        const root = linkedPath(link);
-        for (const path of manuscriptFiles(root, link.include)) {
-          const real = fs.realpathSync(path);
-          if (seenFiles.has(real)) continue;
-          seenFiles.add(real);
-          words +=
-            extname(path).toLowerCase() === ".docx"
-              ? wordCount(docxText(fs.readFileSync(path)), false)
-              : wordCount(fs.readFileSync(path, "utf8"), extname(path).toLowerCase() === ".md");
-        }
-      } catch (error) {
-        wordsOk = false;
-        issues.push({ path: link.path, message: (error as Error).message });
+  return withStateLock(ws, "同步项目进度", async () => {
+    return batchOverview(ws, async () => {
+      const project = readProject(ws, slug);
+      const sorted = sortLog(project.log);
+      if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
+      const now = options.now ?? new Date();
+      const tz = ws.timeZone();
+      const today = localDate(now, tz);
+      const firstDay = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
+      const store = metricStore(ws, project.data);
+      const existing = readRecords(store, "project_metric").filter((r) => r.project === slug);
+      const issues: { path: string; message: string }[] = [];
+      const written: StoredRecord[] = [];
+      function metric(kind: "words" | "commits", date: string, value: number, detail?: string[]) {
+        const previous = existing.find((r) => r.kind === kind && String(r.ts).slice(0, 10) === date);
+        const data = {
+          project: slug,
+          kind,
+          value,
+          ...(detail ? { detail } : {}),
+          ts: isoInZone(localTimeToInstant(`${date}T12:00:00`, tz), tz),
+        };
+        const record = previous
+          ? updateRecord(store, "project_metric", previous.id, data).record
+          : addRecord(store, "project_metric", data).record;
+        written.push(record);
+        return record;
       }
-    }
-    if (wordsOk) {
-      const wordMetrics = existing.filter((r) => r.kind === "words" && String(r.ts).slice(0, 10) <= today);
-      const previous =
-        wordMetrics.filter((r) => String(r.ts).slice(0, 10) < today).at(-1) ?? wordMetrics.at(-1);
-      metric("words", today, words);
-      const delta = previous ? words - Number(previous.value) : null;
-      appendLog(
-        ws,
+      const manuscripts = project.data.links.filter((l) => l.role === "manuscript");
+      let words = 0;
+      let wordsOk = manuscripts.length > 0;
+      const seenFiles = new Set<string>();
+      for (const link of manuscripts) {
+        try {
+          const root = linkedPath(link);
+          for (const path of manuscriptFiles(root, link.include)) {
+            const real = fs.realpathSync(path);
+            if (seenFiles.has(real)) continue;
+            seenFiles.add(real);
+            words +=
+              extname(path).toLowerCase() === ".docx"
+                ? wordCount(docxText(fs.readFileSync(path)), false)
+                : wordCount(fs.readFileSync(path, "utf8"), extname(path).toLowerCase() === ".md");
+          }
+        } catch (error) {
+          wordsOk = false;
+          issues.push({ path: link.path, message: (error as Error).message });
+        }
+      }
+      if (wordsOk) {
+        const wordMetrics = existing.filter((r) => r.kind === "words" && String(r.ts).slice(0, 10) <= today);
+        const previous =
+          wordMetrics.filter((r) => String(r.ts).slice(0, 10) < today).at(-1) ?? wordMetrics.at(-1);
+        metric("words", today, words);
+        const delta = previous ? words - Number(previous.value) : null;
+        appendLog(
+          ws,
+          slug,
+          `字数 ${words.toLocaleString("en-US")}（${delta === null ? "首次统计" : `${delta >= 0 ? "+" : ""}${delta.toLocaleString("en-US")}`}）`,
+          today,
+          "words",
+        );
+      }
+      const repos = project.data.links.filter((l) => l.role === "repo");
+      const commitDates = existing.filter((r) => r.kind === "commits").map((r) => String(r.ts).slice(0, 10));
+      const from = [firstDay, ...commitDates].sort()[0] as string;
+      const counts = new Map<
+        string,
+        { count: number; titles: { timestamp: number; oid: string; title: string }[] }
+      >();
+      const seenCommits = new Set<string>();
+      let reposOk = repos.length > 0;
+      for (const link of repos) {
+        try {
+          const dir = linkedPath(link);
+          if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
+          const refs: string[] = [];
+          for (const namespace of ["refs/heads", "refs/remotes"]) {
+            for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
+              refs.push(`${namespace}/${ref}`);
+            }
+          }
+          // 只读取所有分支的对象与引用，不执行 status、checkout 或任何写命令。
+          for (const ref of refs) {
+            for (const { oid, commit } of await git.log({ fs, dir, ref })) {
+              if (seenCommits.has(oid)) continue;
+              seenCommits.add(oid);
+              const timestamp = commit.author.timestamp;
+              const day = localDate(new Date(timestamp * 1000), tz);
+              if (day < from || day >= today) continue;
+              const item = counts.get(day) ?? { count: 0, titles: [] };
+              item.count++;
+              item.titles.push({
+                timestamp,
+                oid,
+                title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
+              });
+              counts.set(day, item);
+            }
+          }
+        } catch (error) {
+          reposOk = false;
+          issues.push({ path: link.path, message: (error as Error).message });
+        }
+      }
+      if (reposOk) {
+        for (const date of new Set([...commitDates, ...counts.keys()])) {
+          const item = counts.get(date);
+          const detail = [
+            ...new Set(
+              (item?.titles ?? [])
+                .sort((a, b) => b.timestamp - a.timestamp || a.oid.localeCompare(b.oid))
+                .map((entry) => entry.title),
+            ),
+          ].slice(0, 10);
+          const total = item?.count ?? 0;
+          const previous = existing.find((r) => r.kind === "commits" && String(r.ts).slice(0, 10) === date);
+          if (previous?.value === total && JSON.stringify(previous.detail) === JSON.stringify(detail))
+            continue;
+          metric("commits", date, total, detail);
+          appendLog(ws, slug, `${total} 次提交：${detail.join("；")}`, date, "commits");
+        }
+      }
+      for (const link of project.data.links.filter((l) => l.role === "folder")) {
+        try {
+          fs.accessSync(linkedPath(link), fs.constants.R_OK);
+        } catch (error) {
+          issues.push({ path: link.path, message: (error as Error).message });
+        }
+      }
+      project.data.updated = isoInZone(now, tz);
+      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
+        internal: true,
+      });
+      return {
         slug,
-        `字数 ${words.toLocaleString("en-US")}（${delta === null ? "首次统计" : `${delta >= 0 ? "+" : ""}${delta.toLocaleString("en-US")}`}）`,
-        today,
-        "words",
-      );
-    }
-    const repos = project.data.links.filter((l) => l.role === "repo");
-    const commitDates = existing.filter((r) => r.kind === "commits").map((r) => String(r.ts).slice(0, 10));
-    const from = [firstDay, ...commitDates].sort()[0] as string;
-    const counts = new Map<
-      string,
-      { count: number; titles: { timestamp: number; oid: string; title: string }[] }
-    >();
-    const seenCommits = new Set<string>();
-    let reposOk = repos.length > 0;
-    for (const link of repos) {
-      try {
-        const dir = linkedPath(link);
-        if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
-        const refs: string[] = [];
-        for (const namespace of ["refs/heads", "refs/remotes"]) {
-          for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
-            refs.push(`${namespace}/${ref}`);
-          }
-        }
-        // 只读取所有分支的对象与引用，不执行 status、checkout 或任何写命令。
-        for (const ref of refs) {
-          for (const { oid, commit } of await git.log({ fs, dir, ref })) {
-            if (seenCommits.has(oid)) continue;
-            seenCommits.add(oid);
-            const timestamp = commit.author.timestamp;
-            const day = localDate(new Date(timestamp * 1000), tz);
-            if (day < from || day >= today) continue;
-            const item = counts.get(day) ?? { count: 0, titles: [] };
-            item.count++;
-            item.titles.push({
-              timestamp,
-              oid,
-              title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
-            });
-            counts.set(day, item);
-          }
-        }
-      } catch (error) {
-        reposOk = false;
-        issues.push({ path: link.path, message: (error as Error).message });
-      }
-    }
-    if (reposOk) {
-      for (const date of new Set([...commitDates, ...counts.keys()])) {
-        const item = counts.get(date);
-        const detail = [
-          ...new Set(
-            (item?.titles ?? [])
-              .sort((a, b) => b.timestamp - a.timestamp || a.oid.localeCompare(b.oid))
-              .map((entry) => entry.title),
-          ),
-        ].slice(0, 10);
-        const total = item?.count ?? 0;
-        const previous = existing.find((r) => r.kind === "commits" && String(r.ts).slice(0, 10) === date);
-        if (previous?.value === total && JSON.stringify(previous.detail) === JSON.stringify(detail)) continue;
-        metric("commits", date, total, detail);
-        appendLog(ws, slug, `${total} 次提交：${detail.join("；")}`, date, "commits");
-      }
-    }
-    for (const link of project.data.links.filter((l) => l.role === "folder")) {
-      try {
-        fs.accessSync(linkedPath(link), fs.constants.R_OK);
-      } catch (error) {
-        issues.push({ path: link.path, message: (error as Error).message });
-      }
-    }
-    project.data.updated = isoInZone(now, tz);
-    ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
-      internal: true,
+        metrics: written,
+        issues,
+        version: await projectVersion(ws, slug, `同步了项目进度：${project.data.title}`, now),
+      };
     });
-    return {
-      slug,
-      metrics: written,
-      issues,
-      version: await projectVersion(ws, slug, `同步了项目进度：${project.data.title}`, now),
-    };
   });
 }
 export async function syncProjects(ws: Workspace) {
@@ -575,19 +593,26 @@ export async function syncProjects(ws: Workspace) {
 }
 
 export function rebaseProjectLinks(ws: Workspace, oldRoot: string, newRoot: string) {
-  for (const slug of slugs(ws)) {
-    const project = readProject(ws, slug);
-    let changed = false;
-    for (const link of project.data.links) {
-      const rel = relative(oldRoot, linkedPath(link));
-      if (rel && !rel.startsWith("..") && !isAbsolute(rel)) {
-        link.path = join(newRoot, rel);
-        changed = true;
+  const movedLink = (link: ProjectLink) => {
+    const rel = relative(oldRoot, linkedPath(link));
+    return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : null;
+  };
+  if (!slugs(ws).some((slug) => readProject(ws, slug).data.links.some(movedLink))) return;
+  return withStateLock(ws, "更新项目链接", () => {
+    for (const slug of slugs(ws)) {
+      const project = readProject(ws, slug);
+      let changed = false;
+      for (const link of project.data.links) {
+        const rel = movedLink(link);
+        if (rel) {
+          link.path = join(newRoot, rel);
+          changed = true;
+        }
       }
+      if (changed)
+        ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
+          internal: true,
+        });
     }
-    if (changed)
-      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
-        internal: true,
-      });
-  }
+  });
 }

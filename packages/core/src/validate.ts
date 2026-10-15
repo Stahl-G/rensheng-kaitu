@@ -146,7 +146,13 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
   // 其余已知格式的文件
   for (const f of files.filter(inScope)) {
     const name = f.split("/").pop() ?? "";
-    if (name === "STATUS.md") {
+    if (f === "LOCK.json") {
+      const d = json(f);
+      if (d !== undefined) check(reg.builtin("lock.schema.json"), d, f, issues);
+    } else if (f.startsWith("handoffs/") && name.endsWith(".md")) {
+      const d = fm(f);
+      if (d) check(reg.builtin("handoff.schema.json"), d, f, issues);
+    } else if (name === "STATUS.md") {
       const d = fm(f);
       if (d) check(reg.builtin("status.schema.json"), d, f, issues);
     } else if (f === "NOW.md") {

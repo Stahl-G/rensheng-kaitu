@@ -3,6 +3,7 @@ import { extname, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
+import { withStateLock } from "./lock.js";
 import { findRecordType } from "./modules.js";
 import { removePhoto } from "./photos.js";
 import { assertPublicProject } from "./projects.js";
@@ -117,14 +118,17 @@ export interface ProposedBlock {
 }
 
 export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: string, now = new Date()) {
-  const date = localDate(now, ws.timeZone());
-  const current = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
-  const parsed = current.data.date === date ? current : { data: { date, blocks: [] } as TodayPlan, body: "" };
-  if (input.end <= input.start) throw new KaituError("结束时间必须晚于开始时间", "BAD_ARGS");
-  const block = { ...input, id: ulid(), kind: "proposal" as const, status: "pending" as const };
-  parsed.data.blocks.push(block);
-  const data = { ...parsed.data, generated_at: isoInZone(now, ws.timeZone()) };
-  if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");
-  ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
-  return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
+  return withStateLock(ws, "提出日程建议", async () => {
+    const date = localDate(now, ws.timeZone());
+    const current = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+    const parsed =
+      current.data.date === date ? current : { data: { date, blocks: [] } as TodayPlan, body: "" };
+    if (input.end <= input.start) throw new KaituError("结束时间必须晚于开始时间", "BAD_ARGS");
+    const block = { ...input, id: ulid(), kind: "proposal" as const, status: "pending" as const };
+    parsed.data.blocks.push(block);
+    const data = { ...parsed.data, generated_at: isoInZone(now, ws.timeZone()) };
+    if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");
+    ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
+    return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
+  });
 }

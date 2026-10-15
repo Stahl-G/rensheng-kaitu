@@ -1,6 +1,7 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
 import { CONFIG_VERSION } from "./init.js";
+import { readLock } from "./lock.js";
 import { listModules } from "./modules.js";
 import { templateOutdated } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
@@ -96,7 +97,33 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     if (leaked.length) add("版本历史中没有密钥", false, `已被记录：${leaked.join("、")}`);
   }
 
-  const issues = validateWorkspace(ws);
+  const conflicts: string[] = [];
+  function findConflicts(dir: string) {
+    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
+      if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) findConflicts(file);
+      else if (/^(?:STATUS|NOW) \(\d+\)\.md$/.test(entry.name)) conflicts.push(file);
+    }
+  }
+  findConflicts("");
+  add("状态文件无 Drive 冲突副本", !conflicts.length, conflicts.length ? conflicts.join("、") : undefined);
+  try {
+    const lock = readLock(ws);
+    add(
+      "接力锁",
+      true,
+      lock && Date.parse(lock.expires_at) <= Date.now()
+        ? `${lock.holder} 的锁已过期，可由下一位接管`
+        : lock
+          ? `${lock.holder} 持锁至 ${lock.expires_at}`
+          : undefined,
+    );
+  } catch (error) {
+    add("接力锁", true, (error as Error).message);
+  }
+  // 锁损坏只提示；validate 仍独立报告其格式错误。
+  const issues = validateWorkspace(ws).filter((issue) => issue.file !== "LOCK.json");
   add(
     "数据格式校验",
     issues.length === 0,

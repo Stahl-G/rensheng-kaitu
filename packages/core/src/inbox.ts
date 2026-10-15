@@ -20,7 +20,9 @@ import { parseAppleHealth, parseHealthShortcut } from "./importers/apple-health.
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
+import { lockUnavailable } from "./lock.js";
 import { type MemoryInput, importMemories } from "./memory.js";
+import { refreshOverview } from "./overview.js";
 import { assertPublicProject } from "./projects.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
@@ -189,6 +191,7 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
 }
 
 export async function processInbox(ws: Workspace, options: { stableMs?: number } = {}) {
+  refreshOverview(ws);
   const result = { processed: [] as string[], notes: [] as string[], pending: [] as string[] };
   if (!["inbox/agents", "inbox/health", "inbox/rejected"].some((dir) => ws.exists(dir))) return result;
   const lock = ws.resolve(".kaitu/cache/inbox.lock", { internal: true });
@@ -327,6 +330,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
             try {
               await prepared.apply();
             } catch (error) {
+              if (lockUnavailable(error)) throw error;
               errors.push(`${(error as Error).message}\n\n${INBOX_FORMATS}`);
             }
           }
@@ -336,7 +340,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
             result.processed.push(file);
           }
         },
-      );
+      ).catch((error: unknown) => {
+        if (!lockUnavailable(error)) throw error;
+        result.pending.push(file);
+      });
     }
     ws.writeJson(".kaitu/inbox-state.json", { lastProcessed: new Date().toISOString() }, { internal: true });
     return result;

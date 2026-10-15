@@ -2,12 +2,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:f
 import { join } from "node:path";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
-import { doctor } from "./doctor.js";
+import { type Check, doctor } from "./doctor.js";
 import { GITIGNORE, snapshot } from "./history.js";
+import { withStateLock } from "./lock.js";
 import { type ModuleDef, listModules } from "./modules.js";
 import { batchOverview } from "./overview.js";
 import { templateOutdated, templateVersion } from "./template-version.js";
-import { validateWorkspace } from "./validate.js";
+import { type Issue, validateWorkspace } from "./validate.js";
 import { type Workspace, migrateHistory } from "./workspace.js";
 
 function templateFiles(directory: string): Map<string, Buffer> {
@@ -28,7 +29,16 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
   return [...(existing ?? []), ...defaults.filter((item) => !have.has(key(item)))];
 }
 
-export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
+export async function upgradeWorkspace(
+  ws: Workspace,
+  options: { dryRun?: boolean } = {},
+): Promise<{
+  templateVersion: string;
+  changes: string[];
+  version: string | null;
+  validation?: Issue[];
+  checks?: Check[];
+}> {
   const version = templateVersion();
   if (!templateOutdated(ws)) return { templateVersion: version, changes: [], version: null };
   const files = templateFiles(templateDir());
@@ -97,24 +107,28 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     "OVERVIEW.md",
     ".kaitu/config.json",
   ];
-  if (!ws.exists("inbox/health")) changes.push("inbox/health/");
+  for (const dir of ["inbox/health", "handoffs"]) {
+    if (!ws.exists(dir)) changes.push(`${dir}/`);
+  }
   if (existsSync(join(ws.root, ".git"))) changes.push(".git → 本机状态目录/history.git");
   if (options.dryRun) return { templateVersion: version, changes, version: null };
-  migrateHistory(ws.root);
-  await batchOverview(ws, async () => {
-    if (!ws.exists("inbox/health")) mkdirSync(ws.resolve("inbox/health"), { recursive: true });
-    for (const [file, content] of writes) ws.writeText(file, content);
-    for (const file of deletes) rmSync(ws.resolve(file));
-    writeAgentsMd(ws);
-    const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
-    ws.writeJson(
-      ".kaitu/config.json",
-      { ...config, template_version: version, modules: listModules(ws).map((m) => m.dir) },
-      { internal: true },
-    );
+  return withStateLock(ws, "升级工作区", async () => {
+    migrateHistory(ws.root);
+    await batchOverview(ws, async () => {
+      for (const dir of ["inbox/health", "handoffs"]) mkdirSync(ws.resolve(dir), { recursive: true });
+      for (const [file, content] of writes) ws.writeText(file, content);
+      for (const file of deletes) rmSync(ws.resolve(file));
+      writeAgentsMd(ws);
+      const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
+      ws.writeJson(
+        ".kaitu/config.json",
+        { ...config, template_version: version, modules: listModules(ws).map((m) => m.dir) },
+        { internal: true },
+      );
+    });
+    const saved = await snapshot(ws, `开图升级到 ${version}`);
+    const validation = validateWorkspace(ws);
+    const checks = await doctor(ws);
+    return { templateVersion: version, changes, version: saved, validation, checks };
   });
-  const saved = await snapshot(ws, `开图升级到 ${version}`);
-  const validation = validateWorkspace(ws);
-  const checks = await doctor(ws);
-  return { templateVersion: version, changes, version: saved, validation, checks };
 }

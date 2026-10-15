@@ -145,11 +145,19 @@ ${skills()
 运行 \`kaitu ui\` 打开今天、健康、动态、我的；在工作台确认建议、导入与查看历史。
 工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
 
-## 11. Google Drive 与收件箱
+## 11. Google Drive 与云端接力
 
 - 默认本地模式；用户可用 \`kaitu drive enable [--drive-dir <我的云端硬盘路径>]\` 开启 Drive 同步。
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
-- 云端 Agent 先读 \`AGENT-README.md\` 与 \`OVERVIEW.md\`，只在 \`inbox/agents/\` 新建唯一文件。
+- 接手顺序：\`AGENT-README.md\` → \`LOCK.json\` → \`OVERVIEW.md\`（记下生成时间）→ \`NOW.md\` 与相关模块 \`<模块>/STATUS.md\`。
+- 再读 \`handoffs/YYYY-MM/\` 中比现状生成时间新的交接记录（按时间排序，最多最近 10 份），以及 \`inbox/agents/\` 未处理文件；这些也算现状。
+- 只追加：\`inbox/agents/*\` 和 \`handoffs/YYYY-MM/<时间>-<agent>.md\`，只新建唯一文件名，不改已有文件。
+- 状态：\`NOW.md\` 与各模块 \`<模块>/STATUS.md\`（含学习、决策、共享项目）须持锁修改，改前重读、只改需要的部分。
+- 其余文件云端只读，包括 \`OVERVIEW.md\`、\`AGENT-README.md\`、\`AGENTS.md\`、\`<模块>/data/\`、\`me/goals.json\`、\`me/rules.md\`。
+- Drive 取锁：读 \`LOCK.json\`，不存在或 expires_at 已过期才写自己的 holder、purpose、acquired_at、expires_at（带时区 ISO 时间，最多 15 分钟）。
+- 写锁后等几秒重读，holder 仍是自己才取锁成功；超过 10 分钟未完成就续期。结束把 expires_at 改成当前时间，不删除文件。
+- 未取到锁就只追加收件箱或交接记录，在「未决」说明想改什么，并提示「<holder> 正在更新，稍后再试」。本机以 kaitu-local 持锁，后台遇锁推迟。
+- 动过任何东西，结束前写一份交接记录：frontmatter 为 agent、at，正文含「做了什么」「下一步」「未决 / 需要用户」；OVERVIEW.md 列最近 3 份。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
 - 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。

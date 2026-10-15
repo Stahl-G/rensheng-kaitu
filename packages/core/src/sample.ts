@@ -4,6 +4,7 @@ import git from "isomorphic-git";
 import { assetsRoot } from "./assets.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import { batchSnapshot, snapshot } from "./history.js";
+import { withStateLock } from "./lock.js";
 import { addMemory } from "./memory.js";
 import { listModules } from "./modules.js";
 import { createProject, setProject, syncProject } from "./projects.js";
@@ -14,7 +15,9 @@ import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
 
 export async function populateSample(ws: Workspace, now = new Date()): Promise<void> {
-  return batchSnapshot(ws, "添加了演示用的生活记录", () => writeSample(ws, now));
+  return withStateLock(ws, "生成样例", async () => {
+    return batchSnapshot(ws, "添加了演示用的生活记录", () => writeSample(ws, now));
+  });
 }
 
 async function writeSample(ws: Workspace, now: Date): Promise<void> {

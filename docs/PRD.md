@@ -134,6 +134,8 @@
 ├─ AGENTS.md                 # 自动生成：Agent 入口说明（见 §8）
 ├─ CLAUDE.md                 # 一行：指向 AGENTS.md
 ├─ NOW.md                    # 今天的计划（见 §6.4）
+├─ LOCK.json                 # Drive 状态文件租约锁（最长 15 分钟）
+├─ handoffs/YYYY-MM/<时间>-<agent>.md # 只追加交接记录，frontmatter: agent、at
 ├─ me/                       # 我的
 │  ├─ module.json
 │  ├─ profile.md             # 基本情况（用户主动维护）
@@ -427,6 +429,8 @@ sensitive: false
 时间可在设置中修改。阶段 1 由用户在 Codex 中手动触发；阶段 3 由 DeepSeek Harness 的 schedule 执行。
 
 ### 7.5 确认流
+
+Drive 模式下状态文件须持锁修改，接力步骤见 [cloud-relay.md](cloud-relay.md)。
 
 | 操作 | 是否需要人确认 |
 |---|---|

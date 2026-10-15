@@ -113,7 +113,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }
     const version = await snapshot(
       ws,
-      `文件夹有改动：${files
+      `${driveStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
         .slice(0, 3)
         .map((file) => file.split("/").at(-1))
         .join("、")}等 ${files.length} 个文件`,
