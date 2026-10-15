@@ -4,6 +4,7 @@ import {
   addTask,
   assertPublicProject,
   completeTask,
+  dismissNews,
   findRecordType,
   inboxNoteDone,
   inboxNotes,
@@ -15,6 +16,7 @@ import {
   proposeBlock,
   publicProject,
   readAgentFile,
+  readNews,
   readRecords,
   readStatus,
   recordReferences,
@@ -24,6 +26,7 @@ import {
   snapshot,
   syncProject,
   syncProjects,
+  tryNews,
   updateMemory,
   writeAgentRecord,
   writeDigest,
@@ -99,6 +102,21 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     readStatus(ws, new Date(), tools === "remote"),
   );
   register("inbox_notes", "读取未整理的收件箱笔记及来源。", {}, () => inboxNotes(ws));
+  register("news_read", "读取近期新闻推荐、今天 X 热门和来源数量。", {}, () => readNews(ws));
+  register(
+    "news_try",
+    "将新闻加入对应模块的建议下一步，保存版本。",
+    { id: text },
+    ({ id }) => tryNews(ws, id),
+    true,
+  );
+  register(
+    "news_dismiss",
+    "标记新闻不相关并静音来源，保存版本。",
+    { id: text },
+    ({ id }) => dismissNews(ws, id),
+    true,
+  );
   register("record_types", "列出全部记录类型、字段约束和合法示例，只读。", {}, () => recordReferences(ws));
   register(
     "record_list",

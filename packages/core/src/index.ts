@@ -46,3 +46,4 @@ export * from "./overview-page.js";
 export * from "./github.js";
 
 export * from "./finance/index.js";
+export * from "./news.js";
