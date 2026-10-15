@@ -12,6 +12,8 @@
 
 ## 开发
 
+`kaitu ui [--port 4870] [--no-open] [--dir ~/kaitu]` 启动本地工作台；`kaitu init <目录> --sample` 创建演示数据。
+
 需要 Node 22.19+ 与 pnpm。
 
 ```bash

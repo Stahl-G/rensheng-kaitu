@@ -42,6 +42,15 @@ async function headOid(ws: Workspace): Promise<string | null> {
   }
 }
 
+export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
+  const matrix = await git.statusMatrix({ fs, dir: ws.root });
+  return matrix
+    .filter(
+      ([file, head, workdir, stage]) => !neverTrack(file) && !(head === 1 && workdir === 1 && stage === 1),
+    )
+    .map(([file]) => file);
+}
+
 /** 把工作区当前状态记为一个版本；没有改动时返回 null。 */
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   await ensureHistory(ws);

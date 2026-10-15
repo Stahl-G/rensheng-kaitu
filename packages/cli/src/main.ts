@@ -33,10 +33,13 @@ import {
   writeAgentsMd,
 } from "@kaitu/core";
 
+import { startUi } from "./ui/server.js";
+
 const HELP = `开图 kaitu
 
 用法：
-  kaitu init [目录] [--timezone Asia/Shanghai]   创建工作区（默认 ~/kaitu）
+  kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
+  kaitu ui [--port 4870] [--no-open]                打开本地工作台
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
   kaitu agents-md                                  重新生成 AGENTS.md
@@ -66,6 +69,9 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  sample: { type: "boolean" },
+  port: { type: "string" },
+  "no-open": { type: "boolean" },
   dir: { type: "string" },
   json: { type: "string" },
   "json-out": { type: "boolean" },
@@ -140,12 +146,28 @@ async function run(argv: string[]): Promise<number> {
   switch (cmd) {
     case "init": {
       const root = resolve(args[0] ?? values.dir ?? defaultRoot());
-      const ws = await initWorkspace(root, { timeZone: values.timezone });
+      const ws = await initWorkspace(root, { timeZone: values.timezone, sample: values.sample });
       out(
         values,
         { root: ws.root },
         `已创建开图工作区：${ws.root}\n下一步：在这个文件夹里打开 Codex，说「开始使用开图」。`,
       );
+      return 0;
+    }
+    case "ui": {
+      const ui = await startUi(workspace(values), {
+        port: values.port === undefined ? undefined : Number(values.port),
+        open: !values["no-open"],
+      });
+      console.log(`开图工作台：${ui.url}\n按 Ctrl+C 关闭。`);
+      const stop = () => {
+        void ui.close().then(
+          () => process.exit(0),
+          () => process.exit(1),
+        );
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
       return 0;
     }
     case "doctor": {

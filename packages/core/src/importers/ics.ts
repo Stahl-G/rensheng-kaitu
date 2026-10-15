@@ -9,6 +9,7 @@ import { type Candidate, candidate, importBatch } from "./batch.js";
 export interface IcsOptions {
   dryRun?: boolean;
   calendar?: string;
+  fallbackCalendarName?: string;
   from?: string;
   to?: string;
   now?: Date;
@@ -82,7 +83,11 @@ export async function importIcs(ws: Workspace, inputFile: string, opts: IcsOptio
     if (calendar.name !== "vcalendar") throw new Error("Missing VCALENDAR");
     name =
       opts.calendar ??
-      String(calendar.getFirstPropertyValue("x-wr-calname") ?? basename(inputFile, extname(inputFile)));
+      String(
+        calendar.getFirstPropertyValue("x-wr-calname") ??
+          opts.fallbackCalendarName ??
+          basename(inputFile, extname(inputFile)),
+      );
     prepareZones(calendar, zone);
     const components = calendar.getAllSubcomponents("vevent");
     for (const component of components) {

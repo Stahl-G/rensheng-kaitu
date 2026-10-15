@@ -6,6 +6,7 @@ import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { ensureHistory, snapshot } from "./history.js";
 import { listModules } from "./modules.js";
+import { populateSample } from "./sample.js";
 import { assertTimeZone, isoInZone } from "./time.js";
 import { Workspace } from "./workspace.js";
 
@@ -26,6 +27,7 @@ const EMPTY_DIRS = [
 ];
 
 export interface InitOptions {
+  sample?: boolean;
   timeZone?: string;
   now?: Date;
 }
@@ -70,5 +72,6 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
 
   await ensureHistory(ws);
   await snapshot(ws, "初始化开图工作区", now);
+  if (opts.sample) await populateSample(ws, now);
   return ws;
 }

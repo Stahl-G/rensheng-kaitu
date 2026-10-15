@@ -84,7 +84,7 @@
 | 2 | 薄肌训练 | 训练日与休息日隔天交替、动作、重量、组数、次数、训练视频、渐进超负荷、教练与 AI 双重反馈 | 00:01:39–00:07:07 | 健康 · 训练 |
 | 3 | 饮食与营养 | 餐前餐后拍照估算热量、蛋白质 140–150 g、补充剂（蛋白粉 25 g、肌酸 5 g）、进食顺序建议 | 00:01:39–00:06:33 | 健康 · 饮食 |
 | 4 | 睡眠与日常活动 | Oura Ring 读取睡眠与消耗，热量缺口 600 卡以内，与饮食、训练合并分析 | 00:03:34–00:04:48 | 健康 · 睡眠与活动 |
-| 5 | 身体指标与健康记录 | 身高、体重、体脂；6 个月、一年的体态对比照片；血糖、血脂、胆固醇等检查；「主动健康管理」 | 00:01:18；约 00:19；02:03:52 | 健康 · 身体指标 |
+| 5 | 身体指标与健康记录 | 身高、体重、体脂；6 个月、一年的体态对比照片；血糖、血脂、胆固醇等检查；「主动健康管理」 | 00:01:18；约 00:19；02:03:52 | 健康 · 身体指标（含体态照片与按日期对比） |
 | 6 | 日程与日常安排 | 主持人概括「健身、上课、schedule 都 AI 化」，孙认可，未展开具体功能 | 00:10:40–00:10:45 | 页面「今天」 |
 | 7 | 科技与行业动态 | 看 X 和关注人物动态，自己抓加 AI 抓，围绕兴趣选一个方向钻研 | 00:17:56–00:21:07 | 页面「动态」 |
 | 8 | 学习与认知更新 | 理论建设一周、教程视频逐帧逐句交给 AI、与 AI 辩论修正旧观念、学完立即执行 | 00:05:19；00:21:51；01:18:17；02:13:01 | Agent 管理：学习 |
@@ -149,8 +149,10 @@
 │  │  ├─ sleep/YYYY-MM.jsonl
 │  │  ├─ activity/YYYY-MM.jsonl
 │  │  ├─ metrics/YYYY-MM.jsonl     # 体重、体脂、血压等单值指标
-│  │  └─ labs/YYYY-MM-DD-<slug>.json # 体检报告抽取结果
+│  │  ├─ labs/YYYY-MM-DD-<slug>.json # 体检报告抽取结果
+│  │  └─ photos/YYYY-MM.jsonl       # 体态照片记录（照片文件在 files/photos/）
 │  └─ files/                 # 体检 PDF 等原件
+│     └─ photos/YYYY-MM-DD-<id>.<ext>  # 体态照片原件，只存本机
 ├─ calendar/
 │  ├─ module.json
 │  ├─ STATUS.md
@@ -315,6 +317,7 @@ goal_priority: [g1]
 | activity | `date`、`steps?`、`active_kcal?`、`total_kcal?`、`source` |
 | metric | `kind`（weight / body_fat / height / bp / glucose …）、`value`、`unit`、`source` |
 | lab | `date`、`items[]`（`name`、`value`、`unit`、`ref_range?`、`flag?`）、`file` |
+| photo | `file`（相对健康模块目录，如 `files/photos/2026-10-15-01J….jpg`）、`pose`（front / side / back / other）、`notes?` |
 | event | `start`、`end`、`title`、`calendar`、`external_id?`、`source` |
 | feed_item | 在 `.kaitu/cache` 中，不进版本历史；简报写入 `digests/` |
 

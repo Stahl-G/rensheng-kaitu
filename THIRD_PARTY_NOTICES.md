@@ -8,3 +8,7 @@
 | isomorphic-git | MIT | https://github.com/isomorphic-git/isomorphic-git |
 | ajv | MIT | https://github.com/ajv-validator/ajv |
 | yaml | ISC | https://github.com/eemeli/yaml |
+| Preact | MIT | https://github.com/preactjs/preact |
+| ECharts | Apache-2.0 | https://github.com/apache/echarts |
+| markdown-it | MIT | https://github.com/markdown-it/markdown-it |
+| Vite（仅构建） | MIT | https://github.com/vitejs/vite |
