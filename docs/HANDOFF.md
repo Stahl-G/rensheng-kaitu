@@ -10,7 +10,7 @@
 
 ### 0.0 2026-10-15 晚：开图 App（dsh 插件）进度
 
-- 主分支：`claude/dsh-overview-page`（已推送）。本机 `kaitu` 指向 `~/Developer/rensheng-kaitu-runtime`，更新：`git checkout --detach claude/dsh-overview-page && pnpm build`，再重启桌面应用。
+- 主分支：`main`（2026-10-15 起为 GitHub 默认分支，其余开发分支已合并删除；新功能从 `main` 切分支，做完合回）。本机 `kaitu` 指向 `~/Developer/rensheng-kaitu-runtime`，更新：`git fetch origin && git checkout --detach origin/main && pnpm build`，再重启桌面应用。
 - 桌面应用已装 Kaitu 品牌（标志、名称、Powered by DSH 版本）并隐藏无关入口；账号后端必须保留，桌面欢迎页启动时查询登录状态，禁用会导致应用无法启动。
 - 板块页面：今天、健康、在做的事、资讯、关于我（含更换头像，头像只在本机）已完成；地图、财务页面进行中，没有设计稿，按现有设计语言与 PRD 1.0 第 12 节做。
 - 后端已完成：GitHub 同步（项目）、财务 P0（支付宝 / 持仓 CSV）、资讯（任何 Agent 投递 news_item / trend）、人生地图（离线城市表 `packages/core/data/cities.json`，GeoNames CC BY 4.0，坐标只来自城市表）。
@@ -23,13 +23,13 @@
 | 能力 | 入口 | 实测结果 |
 |---|---|---|
 | 工作区 | Drive 模式：`~/Library/CloudStorage/GoogleDrive-…/我的云端硬盘/kaitu`；程序状态在 `~/Library/Application Support/kaitu/<uuid>/` | `kaitu validate` 通过 |
-| 本机 `kaitu` 命令 | 指向独立 worktree `~/Developer/rensheng-kaitu-runtime`（detached），改完代码要在那里 `git fetch ~/Developer/rensheng-kaitu feat/t1-t5-foundation && git checkout --detach FETCH_HEAD && pnpm build` | — |
+| 本机 `kaitu` 命令 | 指向独立 worktree `~/Developer/rensheng-kaitu-runtime`（detached），改完代码要在那里 `git fetch origin && git checkout --detach origin/main && pnpm build` | — |
 | Apple 健康同步 | iPhone 快捷指令每晚 22:00 → Apps Script → `inbox/health/` → 工作台或 `kaitu inbox process` 导入；安装页 `docs/guides/apple-health.html`，分享链接 `https://www.icloud.com/shortcuts/3e47eb2c6bae4714a08f340f8f444fd8` | 步数已入库；不戴表睡觉的空睡眠数据直接归档 |
 | 手机通道 | `kaitu ui --channels`（前台进程，电脑休眠或关终端即停） | Telegram、微信：配对、「处理中」回执、Codex 写入、版本均通过；飞书、QQ 未实测 |
 | DeepSeek Harness | 桌面应用 0.2.0-rc.2；`kaitu dsh --install` 把插件写进 `~/.dsh/profiles/desktop/cordis.patch.yml` 的 `# kaitu:start…end` 段 | 新会话里调用 `kaitu_status` / `kaitu_add_record` 写入饮食并存版本；默认模型是 opencode-go |
 | 浏览器导入 | 工作台设置 → 导入 | 预览 → 确认 → 撤销已补验（M4-06） |
 
-仓库：`Stahl-G/rensheng-kaitu`（公开，2026-10-15 由 `Stahl-G/-` 改名），默认分支 `claude/zen-tesla-n3ot1p`，开发分支 `feat/t1-t5-foundation`（PR #1 已合并）。访谈逐字稿已移出仓库（`.gitignore`），只在原开发机本地；旧提交里仍可见，是否改写历史未决。
+仓库：`Stahl-G/rensheng-kaitu`（公开，2026-10-15 由 `Stahl-G/-` 改名），默认分支 `main`；网站在 `gh-pages`；Kaitu.app 打包在 `claude/kaitu-app`（未完成）。访谈逐字稿已移出仓库（`.gitignore`），只在原开发机本地；旧提交里仍可见，是否改写历史未决。
 
 ### 0.2 分工与工作方式
 
