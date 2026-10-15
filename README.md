@@ -30,3 +30,7 @@ node packages/cli/dist/main.js init /tmp/kaitu-demo
 
 - 产品需求：[`docs/PRD.md`](docs/PRD.md)
 - 开发交接：[`docs/HANDOFF.md`](docs/HANDOFF.md)
+
+## 许可证
+
+[MIT](LICENSE)。npm 包名规划为 `rensheng-kaitu`（命令行仍为 `kaitu`）。

@@ -2,6 +2,7 @@
   "name": "@kaitu/channels",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "开图手机通道：微信 / 飞书 / QQ / Telegram 收发消息",
   "type": "module",
   "main": "dist/index.js",

@@ -1,12 +1,14 @@
 {
-  "name": "kaitu",
+  "name": "rensheng-kaitu",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "开图：把个人生活放进一个本地文件夹，任何 Agent 都能接手",
   "type": "module",
   "bin": {
     "kaitu": "dist/main.js"
   },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
