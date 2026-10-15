@@ -350,43 +350,47 @@ export function OverviewPage({
             </>
           )}
         </nav>
-        {current !== "feed" && current !== "projects" && current !== "health" && current !== "map" && current !== "finance" && (
-          <header className={css.header}>
-            <div>
-              <h1>
-                {current === "me" && <span className={css.meDot} aria-hidden="true" />}
-                {currentName}
-              </h1>
-              <p className={css.subtitle}>
-                {current === "me"
-                  ? "目标、作息规则和 AI 记住的你 · 改目标和规则前会先问你"
-                  : data
-                    ? data.empty
-                      ? `工作区在 ${data.root} · 还没有记录`
-                      : `${new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${data.today}T12:00:00Z`))} · 数据截至 ${time(data.cutoff)} · 工作区在 ${data.drive ? "Google Drive" : data.root}`
-                    : "正在读取工作区…"}
-              </p>
-            </div>
-            <div className={css.actions}>
-              <Button
-                size="sm"
-                className={css.button}
-                disabled={loading}
-                onClick={() => {
-                  void refresh();
-                  setMeRevision((n) => n + 1);
-                }}
-              >
-                {loading ? "刷新中…" : "刷新"}
-              </Button>
-              {!data?.empty && (
-                <Button size="sm" className={`${css.button} ${css.primary}`} onClick={onAgent}>
-                  问问开图
+        {current !== "feed" &&
+          current !== "projects" &&
+          current !== "health" &&
+          current !== "map" &&
+          current !== "finance" && (
+            <header className={css.header}>
+              <div>
+                <h1>
+                  {current === "me" && <span className={css.meDot} aria-hidden="true" />}
+                  {currentName}
+                </h1>
+                <p className={css.subtitle}>
+                  {current === "me"
+                    ? "目标、作息规则和 AI 记住的你 · 改目标和规则前会先问你"
+                    : data
+                      ? data.empty
+                        ? `工作区在 ${data.root} · 还没有记录`
+                        : `${new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${data.today}T12:00:00Z`))} · 数据截至 ${time(data.cutoff)} · 工作区在 ${data.drive ? "Google Drive" : data.root}`
+                      : "正在读取工作区…"}
+                </p>
+              </div>
+              <div className={css.actions}>
+                <Button
+                  size="sm"
+                  className={css.button}
+                  disabled={loading}
+                  onClick={() => {
+                    void refresh();
+                    setMeRevision((n) => n + 1);
+                  }}
+                >
+                  {loading ? "刷新中…" : "刷新"}
                 </Button>
-              )}
-            </div>
-          </header>
-        )}
+                {!data?.empty && (
+                  <Button size="sm" className={`${css.button} ${css.primary}`} onClick={onAgent}>
+                    问问开图
+                  </Button>
+                )}
+              </div>
+            </header>
+          )}
         {error && (
           <div role="alert" className={css.notice}>
             读取失败：{error}{" "}
