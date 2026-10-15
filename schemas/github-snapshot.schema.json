@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/github-snapshot.schema.json",
+  "title": "GitHub 快照",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "required": [
+    "project",
+    "repo",
+    "stars",
+    "forks",
+    "open_issues",
+    "open_prs",
+    "default_branch",
+    "archived",
+    "pushed_at",
+    "latest_release",
+    "commits",
+    "ci"
+  ],
+  "properties": {
+    "project": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "examples": ["example-project"]
+    },
+    "repo": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$",
+      "examples": ["owner/repo"]
+    },
+    "stars": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "forks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "open_issues": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "open_prs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "default_branch": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean"
+    },
+    "pushed_at": {
+      "type": ["string", "null"]
+    },
+    "latest_release": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": ["tag", "name", "published_at", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "tag": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "published_at": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "commits": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["sha", "title", "date"],
+        "additionalProperties": false,
+        "properties": {
+          "sha": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{7}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "date": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "required": ["state", "run_at", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": ["success", "failure", "running", "none", "no_access"]
+        },
+        "run_at": {
+          "type": ["string", "null"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

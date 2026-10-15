@@ -82,3 +82,38 @@ export interface OverviewData {
   notes: OverviewSource[];
   warnings: string[];
 }
+
+export interface DoingProject {
+  slug: string;
+  title: string;
+  stage: "idea" | "active" | "paused" | "done";
+  kind: "work" | "personal";
+  next: { id: string; title: string; status: "todo" | "proposed" | "done" | "skipped" }[];
+  completion: { done: number; total: number; basis: "progress" | "tasks" } | null;
+  github: {
+    repo: string;
+    url: string;
+    latest: {
+      stars: number;
+      forks: number;
+      open_issues: number;
+      open_prs: number;
+      default_branch: string;
+      archived: boolean;
+      pushed_at: string | null;
+      latest_release: { tag: string; name: string; published_at: string; url: string } | null;
+      commits: { sha: string; title: string; date: string }[];
+      ci: {
+        state: "success" | "failure" | "running" | "none" | "no_access";
+        run_at: string | null;
+        url: string | null;
+      };
+      ts: string;
+    } | null;
+    stale: boolean;
+    problem: "gone_or_forbidden" | "rate_limited" | "network" | "archived" | "renamed" | null;
+    ok_at: string | null;
+    since: string | null;
+    history: { date: string; stars: number; forks: number; open_issues: number; open_prs: number }[];
+  } | null;
+}

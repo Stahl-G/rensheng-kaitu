@@ -8,8 +8,9 @@ import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
-import { findRecordType, recordFileFor } from "./modules.js";
+import { type ModuleDef, findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
@@ -29,6 +30,7 @@ export interface ProjectStatus extends ModuleStatus {
   stage: "idea" | "active" | "paused" | "done";
   local_only: boolean;
   links: ProjectLink[];
+  github?: { repo: string };
 }
 export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
   Partial<Pick<ProjectStatus, "local_only" | "links">>;
@@ -84,10 +86,20 @@ function privateStore(ws: Workspace): Workspace {
       fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
     );
   }
+  const module = store.readJson<ModuleDef>("projects/module.json");
+  if (!module.records?.github_snapshot) {
+    const template = JSON.parse(fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"));
+    module.records = { ...module.records, github_snapshot: template.records.github_snapshot };
+    store.writeJson("projects/module.json", module);
+  }
   return store;
 }
-function metricStore(ws: Workspace, data: ProjectStatus): Workspace {
-  return driveProjects(ws) && data.local_only ? privateStore(ws) : ws;
+export function metricStore(ws: Workspace, data: ProjectStatus, readonly = false): Workspace {
+  if (!driveProjects(ws) || !data.local_only) return ws;
+  if (!readonly) return privateStore(ws);
+  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { maintain: false });
+  store.timeZone = () => ws.timeZone();
+  return store;
 }
 export async function projectVersion(ws: Workspace, slug: string, message: string, now = new Date()) {
   const { data } = readProject(ws, slug);
@@ -153,6 +165,25 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
         local_only: project.data.local_only,
         progress: project.data.progress,
         next: project.data.next ?? [],
+        github: projectGithub(ws, slug, now),
+        completion: project.data.progress
+          ? {
+              done: project.data.progress.current,
+              total: project.data.progress.target,
+              basis: "progress" as const,
+            }
+          : (() => {
+              const tasks = (project.data.next ?? []).filter(
+                (item) => !["proposed", "skipped"].includes(item.status),
+              );
+              return tasks.length
+                ? {
+                    done: tasks.filter((item) => item.status === "done").length,
+                    total: tasks.length,
+                    basis: "tasks" as const,
+                  }
+                : null;
+            })(),
         lastLogDate:
           [...project.log.matchAll(/^## (\d{4}-\d{2}-\d{2})\s*$/gm)]
             .map((m) => m[1] as string)
@@ -257,7 +288,7 @@ function sortLog(log: string) {
     .map((section) => section.text)
     .join("\n\n")}\n`;
 }
-function appendLog(ws: Workspace, slug: string, text: string, date: string, marker?: string) {
+export function appendLog(ws: Workspace, slug: string, text: string, date: string, marker?: string) {
   validDate(date);
   const project = readProject(ws, slug);
   const heading = `## ${date}`;
@@ -316,7 +347,10 @@ function moveDirectory(ws: Workspace, source: string, target: string) {
   }
 }
 function transferMetrics(source: Workspace, target: Workspace, slug: string) {
-  const dir = "projects/data/metrics";
+  for (const dir of ["projects/data/metrics", "projects/data/github"])
+    transferProjectRecords(source, target, slug, dir);
+}
+function transferProjectRecords(source: Workspace, target: Workspace, slug: string, dir: string) {
   if (!source.exists(dir)) return;
   const files = fs.readdirSync(source.resolve(dir)).filter((file) => /^\d{4}-\d{2}\.jsonl$/.test(file));
   const ids = new Set<string>();
@@ -353,7 +387,7 @@ export function relocateProjects(ws: Workspace, toPrivate: boolean) {
 export async function setProject(
   ws: Workspace,
   slug: string,
-  patch: Partial<Pick<ProjectStatus, "stage" | "local_only" | "links" | "next">>,
+  patch: Partial<Pick<ProjectStatus, "stage" | "local_only" | "links" | "next" | "github">>,
 ) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
@@ -588,11 +622,15 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
       internal: true,
     });
+    const github = project.data.github ? await syncGithub(ws, slug, { now }) : null;
+    if (github?.problem) issues.push({ path: github.repo, message: github.problem });
     return {
       slug,
       metrics: written,
       issues,
-      version: await projectVersion(ws, slug, `同步了项目进度：${project.data.title}`, now),
+      version: github?.ok
+        ? github.version
+        : await projectVersion(ws, slug, `同步了项目进度：${project.data.title}`, now),
     };
   });
 }

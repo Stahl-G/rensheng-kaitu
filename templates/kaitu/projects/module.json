@@ -9,6 +9,11 @@
       "path": "data/metrics/{YYYY-MM}.jsonl",
       "schema": "schemas/project-metric.schema.json",
       "label": "项目进度"
+    },
+    "github_snapshot": {
+      "path": "data/github/{YYYY-MM}.jsonl",
+      "schema": "schemas/github-snapshot.schema.json",
+      "label": "GitHub 快照"
     }
   },
   "agent": {

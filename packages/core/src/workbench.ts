@@ -123,7 +123,10 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
         type,
         () =>
           readRecords(ws, type).filter(
-            (r) => !publicOnly || type !== "project_metric" || publicProject(ws, r.project),
+            (r) =>
+              !publicOnly ||
+              !["project_metric", "github_snapshot"].includes(type) ||
+              publicProject(ws, r.project),
           ),
         [],
       ),

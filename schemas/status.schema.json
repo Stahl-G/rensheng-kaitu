@@ -101,6 +101,17 @@
           }
         }
       }
+    },
+    "github": {
+      "type": "object",
+      "required": ["repo"],
+      "additionalProperties": false,
+      "properties": {
+        "repo": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$"
+        }
+      }
     }
   }
 }

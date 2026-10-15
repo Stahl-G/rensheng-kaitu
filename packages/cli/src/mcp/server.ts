@@ -10,6 +10,7 @@ import {
   listProjects,
   listTasks,
   logProject,
+  projectGithub,
   proposeBlock,
   publicProject,
   readAgentFile,
@@ -104,7 +105,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) =>
       readRecords(ws, type, { from, to }).filter(
-        (row) => tools !== "remote" || type !== "project_metric" || publicProject(ws, row.project),
+        (row) =>
+          tools !== "remote" ||
+          !["project_metric", "github_snapshot"].includes(type) ||
+          publicProject(ws, row.project),
       ),
   );
   register(
@@ -181,6 +185,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   register("project_list", "列出项目进度与下一步。", {}, () =>
     listProjects(ws, { publicOnly: tools === "remote" }),
   );
+  register("project_github", "读取项目 GitHub 快照与同步状态。", { slug: text }, ({ slug }) => {
+    if (tools === "remote") assertPublicProject(ws, slug);
+    return projectGithub(ws, slug);
+  });
   register(
     "project_log",
     "记录项目进展。",
