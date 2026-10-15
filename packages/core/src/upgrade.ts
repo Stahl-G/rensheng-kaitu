@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, rmdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
@@ -30,39 +30,11 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
 
 export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
   const version = templateVersion();
-  const moves: { from: string; to: string }[] = [];
-  const emptyMonths: string[] = [];
-  const destinations = new Set<string>();
-  if (ws.exists("handoffs")) {
-    for (const month of readdirSync(ws.resolve("handoffs"), { withFileTypes: true })) {
-      if (!month.isDirectory() || !/^\d{4}-\d{2}(?: \(\d+\))?$/.test(month.name)) continue;
-      const dir = `handoffs/${month.name}`;
-      const entries = readdirSync(ws.resolve(dir), { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-        let to = `handoffs/${entry.name}`;
-        let suffix = 2;
-        while (ws.exists(to) || destinations.has(to)) {
-          to = `handoffs/${entry.name.slice(0, -3)}-${suffix++}.md`;
-        }
-        destinations.add(to);
-        moves.push({ from: `${dir}/${entry.name}`, to });
-      }
-      if (entries.every((entry) => entry.isFile() && entry.name.endsWith(".md"))) emptyMonths.push(dir);
-    }
-  }
-  if (
-    !templateOutdated(ws) &&
-    !moves.length &&
-    !emptyMonths.length &&
-    !ws.exists("LOCK.json") &&
-    ws.exists("ORGANIZER.md")
-  )
+  if (!templateOutdated(ws) && ws.exists("ORGANIZER.md") && ws.exists("handoffs/daily"))
     return { templateVersion: version, changes: [], version: null };
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();
   const deletes: string[] = [];
-  if (ws.exists("LOCK.json")) deletes.push("LOCK.json");
   for (const [file, bytes] of files) {
     if (!file.endsWith("/module.json") || file.split("/").length !== 2) continue;
     const dir = file.split("/")[0];
@@ -120,8 +92,6 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     writes.set(".gitignore", `${ignore}${ignore.endsWith("\n") ? "" : "\n"}${missingIgnores.join("\n")}\n`);
   const changes = [
     ...writes.keys(),
-    ...moves.map(({ from, to }) => `${from} → ${to}`),
-    ...emptyMonths.map((dir) => `删除空目录 ${dir}/`),
     ...deletes.map((file) => `删除 ${file}`),
     "AGENTS.md",
     "AGENT-README.md",
@@ -136,8 +106,6 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   migrateHistory(ws.root);
   await batchOverview(ws, async () => {
     for (const dir of directories) mkdirSync(ws.resolve(dir), { recursive: true });
-    for (const { from, to } of moves) renameSync(ws.resolve(from), ws.resolve(to));
-    for (const dir of emptyMonths) rmdirSync(ws.resolve(dir));
     for (const [file, content] of writes) ws.writeText(file, content);
     for (const file of deletes) rmSync(ws.resolve(file));
     writeAgentsMd(ws);

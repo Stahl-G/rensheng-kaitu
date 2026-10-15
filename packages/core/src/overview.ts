@@ -23,7 +23,7 @@ ${timeZoneNotice(ws.timeZone(), now)}
 ## 两个角色与文件
 
 - 接力者（任何 Agent）：只在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录、不改已有文件。
-- 整理员（用户设定的夜间定时任务）：按 ORGANIZER.md 写 handoffs/daily/<YYYY-MM-DD>.md，更新 NOW.md 和各模块 STATUS.md，归档已整理的交接。
+- 整理员（用户设定的夜间定时任务）：按 ORGANIZER.md 写 handoffs/daily/<YYYY-MM-DD>.md，更新各模块 STATUS.md 的下一步，归档已整理的交接。
 - ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md、<模块>/data/、me/* 由本机 kaitu 维护，云端只读。
 
 ## 交接记录
@@ -72,12 +72,14 @@ export function renderOrganizer(): string {
 
 1. handoffs/daily/<今天>.md 已存在：今晚已经有人整理过，直接结束。
 2. 读最新的每日整理（没有就读 OVERVIEW.md），再读它之后的全部交接记录和 inbox/agents/ 文件。
-3. 更新 NOW.md 和各模块 STATUS.md，让下一步清单与最新交接一致。改之前先重读，只改需要的部分。
+3. 让各模块 STATUS.md 的 next 与最新交接一致，同时更新 updated。改之前先重读；只改这两个字段，不动其他字段和正文。
 4. 写 handoffs/daily/<今天>.md，frontmatter 为 organizer（你的 Agent 名）、date（YYYY-MM-DD）。
    正文包含「昨天做了什么」（附来源文件）、「当前下一步」（完整清单）、「未决事项」、「收件箱里还没导入的记录」。
 5. 把已整理的交接记录移到 handoffs/archive/<今天>/。不删除文件，不动收件箱，留给本机导入。
    无法移动时，在每日整理中列出已整理的文件；接手者只读比每日整理新的交接。
 6. 拿不准的地方（如两份交接互相矛盾）写进每日整理的「未决事项」，不要猜。
+
+不能做：删除任何文件；改 NOW.md、inbox/、<模块>/data/、me/、memory/ 和本机生成的文件；写外部日历或替用户联系任何人。
 `;
 }
 

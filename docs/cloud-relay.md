@@ -9,7 +9,7 @@
 | 角色 | 谁 | 能做什么 |
 |---|---|---|
 | **接力者** | 任何 Agent，任何时候 | 只新建文件：收件箱记录、交接记录。不改任何已有文件 |
-| **整理员** | 任何 Agent，由用户设定定时任务（建议凌晨 3 点） | 按 `ORGANIZER.md` 写当天的每日整理，更新 `NOW.md` 与各模块 `STATUS.md`，归档已整理的交接记录 |
+| **整理员** | 任何 Agent，由用户设定定时任务（建议凌晨 3 点） | 按 `ORGANIZER.md` 写当天的每日整理，更新各模块 `STATUS.md` 的下一步，归档已整理的交接记录 |
 
 整理员不和某个 Agent 绑定。谁的定时任务先跑，谁就当这一晚的整理员；后跑的看到当天的每日整理已经存在，就直接结束。所以可以给几家都设上定时任务，彼此错开半小时，互为备份。
 
@@ -21,7 +21,8 @@
 | `handoffs/<YYYYMMDDTHHMM>-<agent>.md` | 接力者 | 交接记录，平铺存放，不建子目录（两个 Agent 同时建子目录会在 Drive 上产生同名文件夹） |
 | `handoffs/daily/<YYYY-MM-DD>.md` | 整理员 | 每日整理，是新一天的起点 |
 | `handoffs/archive/<YYYY-MM-DD>/` | 整理员 | 已整理的交接记录移到这里，不删除 |
-| `NOW.md`、`<模块>/STATUS.md` | 整理员；本机 `kaitu` | 白天接力者不改 |
+| `<模块>/STATUS.md` | 整理员（只改 `next`、`updated`）；本机 `kaitu` | 白天接力者不改 |
+| `NOW.md` | 本机 `kaitu`、早间计划 | 云端只读 |
 | `ORGANIZER.md`、`AGENT-README.md`、`OVERVIEW.md`、`AGENTS.md`、`data/`、`me/*` | 本机 `kaitu` | 云端只读 |
 
 交接记录：
@@ -58,10 +59,12 @@ follows: handoffs/20261016T0830-dot.md
 
 1. `handoffs/daily/<今天>.md` 已经存在：说明今晚已经有人整理过，直接结束。
 2. 读最新的每日整理，再读它之后的全部交接记录和收件箱文件。
-3. 更新 `NOW.md` 和各模块的 `STATUS.md`，让下一步清单与最新交接一致。改之前先重读，只改需要改的部分。
+3. 让各模块 `STATUS.md` 的 `next` 与最新交接一致，同时更新 `updated`。只改这两个字段，不动其他字段和正文。
 4. 写 `handoffs/daily/<今天>.md`，内容是：昨天做了什么（附来源文件）、当前下一步、未决事项、收件箱里还没导入的记录。
 5. 把已整理的交接记录移到 `handoffs/archive/<今天>/`。不删除任何文件，收件箱文件也不动，留给本机导入。
 6. 有拿不准的地方（例如两份交接互相矛盾），就写进每日整理的「未决」，不要猜。
+
+整理员不能做的：删除任何文件；改 `NOW.md`、`inbox/`、`data/`、`me/`、`memory/` 和本机生成的文件；写外部日历或替用户联系任何人。这些都只是协议约定，真正的权限边界是 Drive 授权，所以授权时尽量只给开图文件夹。
 
 ## 5. 本机 `kaitu`
 
@@ -69,7 +72,7 @@ follows: handoffs/20261016T0830-dot.md
 - `OVERVIEW.md` 增加两节：最新一份每日整理的路径，以及最近 3 份交接记录。
 - 生成 `ORGANIZER.md`。
 - `kaitu doctor` 报告 Drive 冲突副本（例如 `STATUS (1).md`）和同名子目录。
-- 删除第一版留下的锁：`LOCK.json`、`lock.ts`、锁相关的 schema 与写入包装。`upgrade` 时把 `handoffs/YYYY-MM/` 里的文件平铺回 `handoffs/`，并删除 `LOCK.json`。
+- `upgrade` 补建 `handoffs/daily/`、`handoffs/archive/` 并生成 `ORGANIZER.md`。第一版留下的 `LOCK.json` 已经没有程序读取，可以手动删除。
 
 ## 6. 待实测
 

@@ -4,7 +4,7 @@
 
 ## 准备（电脑开着）
 
-更新到第二版后，升级测试工作区。升级会把旧的月份子目录平铺回来，并删除 `LOCK.json`：
+测试工作区已经升级到第二版（2026-10-15 由 Claude 完成）。以后新建测试工作区时，运行：
 
 ```bash
 D=$(ls -d ~/Library/CloudStorage/GoogleDrive-*/我的云端硬盘 | head -1)/kaitu-relay-test && HOME=~/kaitu-relay-home kaitu upgrade --dir "$D"

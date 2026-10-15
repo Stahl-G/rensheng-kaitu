@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { rmSync, statSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   type ModuleDef,
@@ -94,44 +94,6 @@ it("旧模板升级补类型和模块、覆盖内置技能，保留用户内容�
     for (const type of ["task", "photo", "workout", "project_metric"])
       expect(readRecords(ws, type)).toHaveLength(1);
     expect(validateWorkspace(ws)).toEqual([]);
-  } finally {
-    rmSync(original.root, { recursive: true, force: true });
-  }
-});
-
-it("旧交接月份目录与 Drive 同名副本平铺、删除锁，预览不写入且重复迁移无变化", async () => {
-  const original = await freshWorkspace();
-  try {
-    const name = "20261015T0900-dot.md";
-    const handoff = (agent: string) => `---\nagent: ${agent}\nat: 2026-10-15T09:00:00+08:00\n---\n`;
-    original.writeText(`handoffs/${name}`, handoff("root"));
-    original.writeText(`handoffs/2026-10/${name}`, handoff("dot"));
-    original.writeText(`handoffs/2026-10 (1)/${name}`, handoff("grok"));
-    original.writeText("handoffs/2026-09/20260930T1000-chatgpt.md", handoff("chatgpt"));
-    mkdirSync(original.resolve("handoffs/2026-08"));
-    original.writeJson("LOCK.json", { holder: "dot" });
-    const ws = new Workspace(original.root, { maintain: false });
-    const before = workspaceFileStamps(ws);
-    const versions = await history(ws);
-    expect((await upgradeWorkspace(ws, { dryRun: true })).changes.length).toBeGreaterThan(0);
-    expect(workspaceFileStamps(ws)).toEqual(before);
-    expect(ws.exists("handoffs/2026-08")).toBe(true);
-    expect(await history(ws)).toEqual(versions);
-
-    const result = await upgradeWorkspace(ws);
-    expect(result.validation).toEqual([]);
-    expect(ws.exists("LOCK.json")).toBe(false);
-    for (const dir of ["2026-08", "2026-09", "2026-10", "2026-10 (1)"])
-      expect(ws.exists(`handoffs/${dir}`)).toBe(false);
-    const files = readdirSync(ws.resolve("handoffs")).filter((file) => file.endsWith(".md"));
-    expect(files.map((file) => ws.readText(`handoffs/${file}`)).sort()).toEqual(
-      ["root", "dot", "grok", "chatgpt"].map(handoff).sort(),
-    );
-    const after = workspaceFileStamps(ws);
-    const migratedVersions = await history(ws);
-    expect((await upgradeWorkspace(ws)).changes).toEqual([]);
-    expect(workspaceFileStamps(ws)).toEqual(after);
-    expect(await history(ws)).toEqual(migratedVersions);
   } finally {
     rmSync(original.root, { recursive: true, force: true });
   }
