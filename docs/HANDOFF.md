@@ -39,6 +39,8 @@
 
 ### 0.4 下一步：阶段 2「DeepSeek Harness 验证」（PRD §10）
 
+> **2026-10-15 暂停**：用户把方向调整为「云端可以独立运行」，阶段 2 先暂停。当前优先级是云端接力：按 [cloud-relay.md](cloud-relay.md) 实现租约锁和只追加写入（任务说明见 [briefs/cloud-relay.md](briefs/cloud-relay.md)），再由用户按 [验收脚本](acceptance/cloud-relay.md) 实测 Dot → Grok → ChatGPT 接力。dsh 0.2.0-rc.2 源码已克隆到 `~/Developer/deepseek-harness-rc2`，恢复阶段 2 时直接用。
+
 按顺序做，每项一个 Codex 任务；任务说明草稿在 [`docs/briefs/`](briefs/)：
 
 1. **定时任务**（[stage2-schedule.md](briefs/stage2-schedule.md)）：用 dsh 的 schedule 跑早间计划 07:30、晚间复盘 22:00，通过 MCP 接日历。这是 PRD §13「作者连续用 30 天」的前提，优先级最高。
