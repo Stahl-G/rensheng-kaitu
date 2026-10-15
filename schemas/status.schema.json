@@ -5,15 +5,26 @@
   "type": "object",
   "required": ["updated"],
   "properties": {
-    "updated": { "type": ["string", "null"], "format": "date-time" },
+    "updated": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
     "progress": {
       "type": ["object", "null"],
       "required": ["label", "current", "target"],
       "properties": {
-        "label": { "type": "string" },
-        "current": { "type": "number" },
-        "target": { "type": "number" },
-        "unit": { "type": "string" }
+        "label": {
+          "type": "string"
+        },
+        "current": {
+          "type": "number"
+        },
+        "target": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
       }
     },
     "next": {
@@ -22,16 +33,74 @@
         "type": "object",
         "required": ["id", "title", "status"],
         "properties": {
-          "id": { "type": "string", "minLength": 1 },
-          "title": { "type": "string", "minLength": 1 },
-          "priority": { "enum": ["high", "normal", "low"] },
-          "estimate": { "type": ["string", "null"] },
-          "when": { "type": ["string", "null"] },
-          "due": { "type": ["string", "null"], "format": "date" },
-          "status": { "enum": ["todo", "proposed", "done", "skipped"] }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "enum": ["high", "normal", "low"]
+          },
+          "estimate": {
+            "type": ["string", "null"]
+          },
+          "when": {
+            "type": ["string", "null"]
+          },
+          "due": {
+            "type": ["string", "null"],
+            "format": "date"
+          },
+          "status": {
+            "enum": ["todo", "proposed", "done", "skipped"]
+          }
         }
       }
     },
-    "blocked": { "type": "array" }
+    "blocked": {
+      "type": "array"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": ["work", "personal"]
+    },
+    "stage": {
+      "enum": ["idea", "active", "paused", "done"]
+    },
+    "local_only": {
+      "type": "boolean",
+      "default": false
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?:/|~/|[A-Za-z]:[\\\\/])"
+          },
+          "role": {
+            "enum": ["manuscript", "repo", "folder"]
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+            }
+          }
+        }
+      }
+    }
   }
 }

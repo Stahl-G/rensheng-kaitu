@@ -7,7 +7,7 @@ description: 用户要求周复盘或到每周回顾时，汇总一周证据并�
 
 ## 步骤
 
-1. 运行 `kaitu status --json-out`，确定用户时区与当前进度。
+1. 先运行 `kaitu project sync` 同步项目进度，再运行 `kaitu status --json-out`，确定用户时区与当前进度。
 2. 先明确这一周的起止日期，默认用户时区的周一到周日。
 3. 读取期间的 reviews/daily/，以及 NOW.md 的当前计划。
 4. 用 `kaitu record list workout --from 起日 --to 止日 --json-out` 查询训练。
@@ -26,6 +26,8 @@ description: 用户要求周复盘或到每周回顾时，汇总一周证据并�
 17. 不把一次异常波动写成长期趋势。
 18. 运行 `kaitu validate`。
 19. 运行 `kaitu snapshot -m "Agent 完成了周复盘"`。
+
+项目回顾包含工作与个人项目的推进、障碍、下一步；仅本机项目的内容留在该项目日志，不写进共享日报、周报或记忆。
 
 ## 确认点
 

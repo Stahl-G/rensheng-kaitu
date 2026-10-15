@@ -4,6 +4,7 @@ import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./fron
 import { snapshot } from "./history.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
+import { listProjects, projectStatusFiles, projectVersion, publicProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -69,7 +70,7 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
     .reverse();
 }
 
-export function statusFiles(ws: Workspace): { file: string; module: string }[] {
+export function statusFiles(ws: Workspace, publicOnly = false): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
@@ -79,7 +80,10 @@ export function statusFiles(ws: Workspace): { file: string; module: string }[] {
       else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }
-  for (const module of listModules(ws)) walk(module.dir, module.def.name);
+  for (const module of listModules(ws)) {
+    if (module.dir !== "projects") walk(module.dir, module.def.name);
+  }
+  out.push(...projectStatusFiles(ws, publicOnly));
   return out;
 }
 
@@ -96,7 +100,7 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   return parsed;
 }
 
-export function readWorkbench(ws: Workspace, now = new Date()) {
+export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = false) {
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
   function read<T>(label: string, fn: () => T, fallback: T): T {
@@ -109,7 +113,17 @@ export function readWorkbench(ws: Workspace, now = new Date()) {
   }
   const modules = listModules(ws);
   const records = Object.fromEntries(
-    listRecordTypes(ws).map(({ type }) => [type, read(type, () => readRecords(ws, type), [])]),
+    listRecordTypes(ws).map(({ type }) => [
+      type,
+      read(
+        type,
+        () =>
+          readRecords(ws, type).filter(
+            (r) => !publicOnly || type !== "project_metric" || publicProject(ws, r.project),
+          ),
+        [],
+      ),
+    ]),
   );
   const docs = (dir: string) => files(ws, dir, ".md").map((file) => ({ file, body: ws.readText(file) }));
   return {
@@ -120,7 +134,8 @@ export function readWorkbench(ws: Workspace, now = new Date()) {
       data: { date: null, blocks: [] } as TodayPlan,
       body: "",
     }),
-    statuses: statusFiles(ws).flatMap(({ file, module }) =>
+    projects: read("项目", () => listProjects(ws, { now, publicOnly }), []),
+    statuses: statusFiles(ws, publicOnly).flatMap(({ file, module }) =>
       read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
     ),
     modules,
@@ -159,8 +174,9 @@ async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, e
       "INVALID_DOCUMENT",
     );
   }
-  ws.writeText(file, stringifyFrontmatter(parsed.data, parsed.body));
-  return { version: await snapshot(ws, message) };
+  ws.writeText(file, stringifyFrontmatter(parsed.data, parsed.body), { internal: true });
+  const slug = /^(?:projects|\.kaitu\/local-projects)\/([^/]+)\/STATUS\.md$/.exec(file)?.[1];
+  return { version: slug ? await projectVersion(ws, slug, message) : await snapshot(ws, message) };
 }
 
 export function decideProposal(ws: Workspace, id: string, decision: "confirmed" | "rejected") {

@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import type { ValidateFunction } from "ajv";
 import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
+import { projectStatusFiles } from "./projects.js";
 import { recordLines } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { localMonth, parseTs } from "./time.js";
@@ -18,7 +19,7 @@ function walk(root: string, dir: string, out: string[]): void {
   for (const name of readdirSync(join(root, dir))) {
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
-    if (rel === ".kaitu/cache" || rel === ".kaitu/history.git") continue;
+    if ([".kaitu/cache", ".kaitu/history.git", ".kaitu/local-projects"].includes(rel)) continue;
     if (statSync(join(root, rel)).isDirectory()) walk(root, rel, out);
     else out.push(rel);
   }
@@ -136,6 +137,10 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
         }
       }
     }
+  }
+
+  for (const { file } of projectStatusFiles(ws)) {
+    if (file.startsWith(".kaitu/") && !files.includes(file)) files.push(file);
   }
 
   // 其余已知格式的文件

@@ -142,6 +142,15 @@
 
 ## 8.1 进展记录
 
+### 2026-10-15：项目模块（D21）
+
+- core / CLI 支持项目建档、链接、日志、阶段与本机设置，工作台「我的」与「今天」汇总项目和下一步。
+- 正文与普通仓库只读；字数按天修订，提交按作者日期同步已结束的日期，首次回看最近 7 天；只保存计数与最多 10 条、80 字的标题。
+- Drive 开关与 local_only 切换迁移项目及全部进度修订；本机项目在状态目录 local-projects/<slug>/，其 metric 在 local-projects/projects/data/metrics/，独立本机版本也在此目录内。
+- OVERVIEW、MCP remote、收件箱及 Drive 下的旧工作区恢复过滤本机项目；项目技能及日常回顾已接入。
+- build、typecheck、lint、test 全过（80 项，仅新增 3 项）；临时 CLI / sample、工作台接口与 MCP 冒烟通过。真实 Drive、真实链接目录、浏览器与完整 Agent 工作流待实测。
+
+
 ### 2026-10-15：T1–T5 完成（分支 `feat/t1-t5-foundation`）
 
 - 结构：`packages/core`（全部逻辑）、`packages/cli`（`kaitu` 命令，只做参数解析与输出）、`schemas/`、`templates/kaitu/`。阶段 3 的 dsh 插件直接依赖 `@kaitu/core`。

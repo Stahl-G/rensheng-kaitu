@@ -30,6 +30,8 @@ import {
   restore,
   snapshot,
   stageUpload,
+  syncProject,
+  syncProjects,
   workspaceFileStamps,
 } from "@kaitu/core";
 
@@ -309,6 +311,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
               startWatching();
             }
           }
+          case "/api/projects/sync":
+            return typeof data.slug === "string" ? syncProject(ws, data.slug) : syncProjects(ws);
           case "/api/photos/delete":
             return removePhoto(ws, field(data, "id"), { by: "user" });
           case "/api/proposal":

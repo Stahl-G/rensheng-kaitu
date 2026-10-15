@@ -1,8 +1,12 @@
 import {
   type Workspace,
   addMemory,
+  assertPublicProject,
   listMemories,
+  listProjects,
+  logProject,
   proposeBlock,
+  publicProject,
   readAgentFile,
   readRecords,
   readStatus,
@@ -10,6 +14,8 @@ import {
   searchChats,
   searchMemories,
   snapshot,
+  syncProject,
+  syncProjects,
   updateMemory,
   writeAgentRecord,
   writeDigest,
@@ -81,12 +87,17 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     source: z.string().optional(),
     sensitive: z.boolean().optional(),
   };
-  register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () => readStatus(ws));
+  register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
+    readStatus(ws, new Date(), tools === "remote"),
+  );
   register(
     "record_list",
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
-    ({ type, from, to }) => readRecords(ws, type, { from, to }),
+    ({ type, from, to }) =>
+      readRecords(ws, type, { from, to }).filter(
+        (row) => tools !== "remote" || type !== "project_metric" || publicProject(ws, row.project),
+      ),
   );
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
@@ -102,7 +113,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "read_file",
     "只读工作区内 .md / .json，不读 .kaitu/ 和版本库目录，无需确认。",
     { path: text },
-    ({ path }) => readAgentFile(ws, path),
+    ({ path }) => readAgentFile(ws, path, tools === "remote"),
   );
   register(
     "record_add",
@@ -138,7 +149,27 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     (input) => proposeBlock(ws, input, actor()),
     true,
   );
+  register("project_list", "列出项目进度与下一步。", {}, () =>
+    listProjects(ws, { publicOnly: tools === "remote" }),
+  );
+  register(
+    "project_log",
+    "记录项目进展。",
+    { slug: text, text, date: date.optional() },
+    async (input) => {
+      if (tools === "remote") assertPublicProject(ws, input.slug);
+      return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
+    },
+    true,
+  );
   if (tools === "all") {
+    register(
+      "project_sync",
+      "只读链接文件夹并同步项目计数。",
+      { slug: text.optional() },
+      ({ slug }) => (slug ? syncProject(ws, slug) : syncProjects(ws)),
+      true,
+    );
     register(
       "record_update",
       "修改一条记录，无需确认，可撤销。",

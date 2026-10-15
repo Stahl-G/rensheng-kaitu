@@ -17,6 +17,7 @@ import { doctor } from "./doctor.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { refreshOverview } from "./overview.js";
+import { rebaseProjectLinks, relocateProjects } from "./projects.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -145,6 +146,8 @@ export async function enableDrive(ws: Workspace, options: { driveDir?: string; n
   separate(state, target);
   separate(state, old);
   const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
+  relocateProjects(ws, true);
+  refreshOverview(ws);
   move(join(old, ".kaitu"), state);
   try {
     mkdirSync(join(old, ".kaitu"));
@@ -156,9 +159,12 @@ export async function enableDrive(ws: Workspace, options: { driveDir?: string; n
     rmSync(join(old, ".kaitu"), { recursive: true, force: true });
     move(state, join(old, ".kaitu"));
     ws.writeJson(".kaitu/config.json", config, { internal: true });
+    relocateProjects(ws, false);
+    refreshOverview(ws);
     throw error;
   }
   ws.root = target;
+  rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
   await snapshot(ws, "开启 Google Drive 同步");
@@ -202,6 +208,8 @@ export async function disableDrive(ws: Workspace, options: { to?: string } = {})
   }
   const { state_dir: _state, ...local } = config;
   ws.writeJson(".kaitu/config.json", local, { internal: true });
+  relocateProjects(ws, false);
+  rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
   await snapshot(ws, "关闭 Google Drive 同步，搬回本机");

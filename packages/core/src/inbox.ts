@@ -17,6 +17,7 @@ import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { batchSnapshot } from "./history.js";
 import { type MemoryInput, importMemories } from "./memory.js";
+import { assertPublicProject } from "./projects.js";
 import { addRecords } from "./records.js";
 import { localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -68,6 +69,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
       if (typeof type !== "string" || ["id", "by", "rev", "deleted"].some((key) => key in data)) {
         throw new KaituError("只接受新增记录，不能修改或删除", "BAD_INBOX");
       }
+      if (type === "project_metric") assertPublicProject(ws, data.project);
       const group = groups.get(type) ?? [];
       group.push(data);
       groups.set(type, group);

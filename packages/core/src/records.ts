@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
 import { type RecordTypeRef, findRecordType, recordFileFor, recordFilePattern } from "./modules.js";
+import { assertPublicProject, driveProjects } from "./projects.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -33,6 +34,8 @@ export interface WriteResult {
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
+  if (ref.type === "project_metric" && driveProjects(ws) && !record.deleted)
+    assertPublicProject(ws, record.project);
   const reg = schemas();
   const fn = record.deleted
     ? reg.builtin("tombstone.schema.json")

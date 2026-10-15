@@ -7,7 +7,7 @@ description: 用户要晚间复盘或回顾今天时，对照计划更新进展�
 
 ## 步骤
 
-1. 运行 `kaitu status --json-out`，读取 NOW.md 和各模块 STATUS.md。
+1. 先运行 `kaitu project sync` 同步项目进度，再运行 `kaitu status --json-out`，读取 NOW.md 和各模块 STATUS.md。
 2. 用 `kaitu record list workout --from YYYY-MM-DD --to YYYY-MM-DD` 查看今天训练。
 3. 同样查询 meal、sleep、activity；不把没有记录直接判成没有发生。
 4. 逐项核对 NOW.md，区分有记录证据、用户说明与尚未核实。
@@ -26,6 +26,8 @@ description: 用户要晚间复盘或回顾今天时，对照计划更新进展�
 17. 按实际变化刷新 me/profile.md 的简短摘要。
 18. 运行 `kaitu validate`，修正结构错误。
 19. 最后运行 `kaitu snapshot -m "Agent 完成了晚间复盘"`。
+
+项目回顾包含工作与个人项目的推进、障碍、下一步；仅本机项目的内容留在该项目日志，不写进共享日报、周报或记忆。
 
 ## 确认点
 

@@ -2,8 +2,8 @@ import { localDate, parseTs } from "./time.js";
 import { readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-export function readStatus(ws: Workspace, now = new Date()) {
-  const data = readWorkbench(ws, now);
+export function readStatus(ws: Workspace, now = new Date(), publicOnly = false) {
+  const data = readWorkbench(ws, now, publicOnly);
   const from = new Date(Date.parse(`${data.today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
   const recent = (type: string, field = "ts") =>
@@ -27,6 +27,7 @@ export function readStatus(ws: Workspace, now = new Date()) {
       pending: blocks.filter((b) => b.kind === "proposal" && b.status === "pending").length,
     },
     modules: data.statuses.map(({ file, module, data }) => ({ file, module, ...data })),
+    projects: data.projects,
     recent7: {
       from,
       to: data.today,

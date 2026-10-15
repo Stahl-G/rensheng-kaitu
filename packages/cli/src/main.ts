@@ -7,10 +7,13 @@ import {
   type MemoryInput,
   type MemoryPatch,
   type Pose,
+  type ProjectLink,
+  type ProjectStatus,
   Workspace,
   addMemory,
   addPhoto,
   addRecord,
+  createProject,
   defaultRoot,
   deleteRecord,
   disableDrive,
@@ -25,9 +28,13 @@ import {
   importMemoryFile,
   importNutAi,
   initWorkspace,
+  linkProject,
   listMemories,
+  listProjects,
+  logProject,
   mcpToken,
   processInbox,
+  readProject,
   readRecords,
   readStatus,
   reindexChats,
@@ -36,7 +43,10 @@ import {
   restore,
   searchChats,
   searchMemories,
+  setProject,
   snapshot,
+  syncProject,
+  syncProjects,
   updateMemory,
   updateRecord,
   validateWorkspace,
@@ -63,6 +73,11 @@ const HELP = `开图 kaitu
   kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
   kaitu mcp token [--rotate]                      查看或轮换 HTTP token
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
+  kaitu project new --title <标题> --kind work|personal [--local-only] [--link <路径>[:manuscript|repo|folder]]...
+  kaitu project list | show <slug> | log <slug> --text <内容>
+  kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
+  kaitu project sync [<slug>]
+  kaitu project set <slug> [--stage idea|active|paused|done] [--local-only|--no-local-only] [--next-json <数组>]
   kaitu photo add <图片> [--pose front|side|back|other] [--ts 时间] [--notes 说明]
   kaitu photo list                                 列出体态照片
   kaitu photo rm <id>                              删除体态照片
@@ -93,6 +108,16 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  title: { type: "string" },
+  kind: { type: "string" },
+  stage: { type: "string" },
+  role: { type: "string" },
+  date: { type: "string" },
+  link: { type: "string", multiple: true },
+  include: { type: "string", multiple: true },
+  "next-json": { type: "string" },
+  "local-only": { type: "boolean" },
+  "no-local-only": { type: "boolean" },
   "drive-dir": { type: "string" },
   sample: { type: "boolean" },
   http: { type: "boolean" },
@@ -176,6 +201,53 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "project": {
+      const ws = workspace(values);
+      const [action, slug, path] = args;
+      if (values["local-only"] && values["no-local-only"]) throw new KaituError("本机选项冲突", "BAD_ARGS");
+      let result: unknown;
+      if (action === "new") {
+        const links = (values.link ?? []).map((input) => {
+          const match = /:(manuscript|repo|folder)$/.exec(input);
+          return {
+            path: match ? input.slice(0, match.index) : input,
+            role: match?.[1] ?? "folder",
+          } as ProjectLink;
+        });
+        result = await createProject(ws, {
+          title: need(values.title, "--title"),
+          kind: need(values.kind, "--kind") as ProjectStatus["kind"],
+          local_only: values["local-only"],
+          links,
+        });
+      } else if (action === "list") result = listProjects(ws);
+      else if (action === "show") result = readProject(ws, need(slug, "slug"));
+      else if (action === "log")
+        result = await logProject(ws, need(slug, "slug"), need(values.text, "--text"), {
+          date: values.date,
+          by: parseBy(values.by),
+        });
+      else if (action === "link")
+        result = await linkProject(ws, need(slug, "slug"), {
+          path: need(path, "路径"),
+          role: (values.role ?? "folder") as ProjectLink["role"],
+          include: values.include,
+        });
+      else if (action === "sync") result = slug ? await syncProject(ws, slug) : await syncProjects(ws);
+      else if (action === "set")
+        result = await setProject(ws, need(slug, "slug"), {
+          ...(values["next-json"] ? { next: JSON.parse(values["next-json"]) } : {}),
+          ...(values.stage ? { stage: values.stage as ProjectStatus["stage"] } : {}),
+          ...(values["local-only"]
+            ? { local_only: true }
+            : values["no-local-only"]
+              ? { local_only: false }
+              : {}),
+        });
+      else throw new KaituError("使用 project new / list / show / log / link / sync / set", "BAD_ARGS");
+      out(values, result, JSON.stringify(result, null, 2));
+      return 0;
+    }
     case "drive": {
       const ws = workspace(values);
       const action = args[0];
@@ -324,6 +396,11 @@ async function run(argv: string[]): Promise<number> {
           `${result.today} · ${result.now.pending} 条日程建议待确认`,
           ...result.now.blocks.map((b) => `${b.start ?? "待办"} ${b.title}（${b.status}）`),
           ...moduleLines,
+          "项目：",
+          ...result.projects.flatMap((project) => [
+            `${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}${project.local_only ? " / 仅本机" : ""}）：近 7 天字数变化 ${project.recent7.words ?? "—"}，${project.recent7.commits} 次提交`,
+            ...project.next.map((item) => `  ${item.title}（${item.status}）`),
+          ]),
           recentSummary,
           `最新体重：${recent.latestWeight ? `${recent.latestWeight.value} ${recent.latestWeight.unit}` : "—"}`,
           ...result.warnings,

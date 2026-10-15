@@ -2,7 +2,9 @@ import fs from "node:fs";
 import { join } from "node:path";
 import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
+import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
+import { driveProjects, projectStatusFiles, readProject } from "./projects.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -11,6 +13,7 @@ export const NEVER_TRACK = [
   ".kaitu/secrets.json",
   ".kaitu/index.sqlite",
   ".kaitu/cache/",
+  ".kaitu/local-projects/",
   ".kaitu/history.git/",
   ".kaitu/inbox-state.json",
   "inbox/agents/",
@@ -22,6 +25,7 @@ export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/index.sqlite
 .kaitu/index.sqlite-*
 .kaitu/cache/
+.kaitu/local-projects/
 .kaitu/history.git/
 .kaitu/inbox-state.json
 inbox/agents/
@@ -216,16 +220,66 @@ export async function restore(
     throw new KaituError(`版本 ${version.slice(0, 7)} 中没有 ${prefix}`, "NOT_FOUND");
   }
 
+  // Drive 中的工作区历史只恢复共享项目；本机项目保留在独立的本机版本库。
+  const privateSlugs = new Set<string>();
+  const privateMetricIds = new Set<string>();
+  if (driveProjects(ws)) {
+    for (const { file } of projectStatusFiles(ws)) {
+      const slug = file.split("/").at(-2) as string;
+      if (readProject(ws, slug).data.local_only) privateSlugs.add(slug);
+    }
+    const allTargetFiles = await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target });
+    for (const file of allTargetFiles.filter((file) => /^projects\/[^/]+\/STATUS\.md$/.test(file))) {
+      const { blob } = await git.readBlob({
+        fs,
+        dir,
+        gitdir: historyDirectory(ws),
+        oid: target,
+        filepath: file,
+      });
+      if (parseFrontmatter<{ local_only?: boolean }>(Buffer.from(blob).toString("utf8")).data.local_only) {
+        privateSlugs.add(file.split("/")[1] as string);
+      }
+    }
+    for (const file of allTargetFiles.filter((file) =>
+      /^projects\/data\/metrics\/[^/]+\.jsonl$/.test(file),
+    )) {
+      const { blob } = await git.readBlob({
+        fs,
+        dir,
+        gitdir: historyDirectory(ws),
+        oid: target,
+        filepath: file,
+      });
+      for (const line of Buffer.from(blob).toString("utf8").split("\n").filter(Boolean)) {
+        const row = JSON.parse(line);
+        if (privateSlugs.has(row.project)) privateMetricIds.add(row.id);
+      }
+    }
+  }
+  const privateFile = (file: string) =>
+    privateSlugs.has(file.split("/")[0] === "projects" ? (file.split("/")[1] ?? "") : "");
   let changed = 0;
   for (const f of currentFiles) {
-    if (!targetFiles.has(f) && !neverTrack(f)) {
+    if (!targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
       fs.rmSync(ws.resolve(f, { internal: true }), { force: true });
       changed++;
     }
   }
   for (const f of targetFiles) {
-    if (neverTrack(f)) continue;
-    const { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
+    if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md"].includes(f)) continue;
+    let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
+    if (privateSlugs.size && /^projects\/data\/metrics\/[^/]+\.jsonl$/.test(f)) {
+      const rows = Buffer.from(blob)
+        .toString("utf8")
+        .split("\n")
+        .filter(Boolean)
+        .filter((line) => {
+          const row = JSON.parse(line);
+          return !privateSlugs.has(row.project) && !privateMetricIds.has(row.id);
+        });
+      blob = Buffer.from(rows.length ? `${rows.join("\n")}\n` : "");
+    }
     const abs = ws.resolve(f, { internal: true });
     if (fs.existsSync(abs) && Buffer.compare(fs.readFileSync(abs), Buffer.from(blob)) === 0) continue;
     if (f === ".kaitu/config.json") {

@@ -34,6 +34,9 @@
 CLI / 工作台提供开关与状态，云端 Agent 通过收件箱写入；入口与现状文件自动维护。
 临时目录迁移往返、历史恢复、只读降级、收件箱与工作台防循环已验证；真实 Drive / Grok Bot / ChatGPT Dots 待实测。
 
+项目模块（D21）已实现：本机只读链接、字数 / 提交同步、CLI / MCP / 工作台与项目技能；
+Drive 下 local_only 项目、进度记录及版本留本机，公开现状与 remote 工具过滤。验证结果见 HANDOFF §8.1。
+
 ## 工作台技术选择（M2）
 
 - 前端：Vite + Preact（轻、MIT），图表 ECharts（Apache-2.0），全部打包进本地静态文件，不用 CDN。

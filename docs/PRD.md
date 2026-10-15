@@ -270,6 +270,12 @@ blocked: []
 本周完成 2/3 次训练；蛋白质日均 128 g，低于 150 g 目标……
 ```
 
+项目 `projects/<slug>/STATUS.md` 在通用字段之外包含 `title`（显示名）、`kind: work|personal`、
+`stage: idea|active|paused|done`、`local_only`（默认 false）和 `links` 数组。
+每条链接包含本机绝对路径或 `~/` 开头的 `path`、`role: manuscript|repo|folder`，可用 `include` 指定相对路径 glob。
+正文与代码留在链接文件夹内，只读；项目目录只存 STATUS、背景笔记 `notes.md` 与按 `## YYYY-MM-DD` 分节的 `log.md`。
+Drive 模式下，仅本机项目在本机状态目录 `local-projects/<slug>/`，进度记录也留本机，core 透明解析位置。
+
 ### 6.4 `NOW.md`
 
 ```markdown
@@ -326,6 +332,7 @@ goal_priority: [g1]
 | lab | `date`、`items[]`（`name`、`value`、`unit`、`ref_range?`、`flag?`）、`file` |
 | photo | `file`（相对健康模块目录，如 `files/photos/2026-10-15-01J….jpg`）、`pose`（front / side / back / other）、`notes?` |
 | event | `start`、`end`、`title`、`calendar`、`external_id?`、`source` |
+| project_metric | `project`（slug）、`kind`（words / commits）、`value`（当前总字数 / 当天提交数）、`detail?`（至多 10 条提交标题，每条至多 80 字） |
 | feed_item | 在 `.kaitu/cache` 中，不进版本历史；简报写入 `digests/` |
 
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。

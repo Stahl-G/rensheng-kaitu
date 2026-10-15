@@ -1,11 +1,12 @@
-import { readFileSync } from "node:fs";
+import fs, { readFileSync } from "node:fs";
 import { join } from "node:path";
+import git from "isomorphic-git";
 import { assetsRoot } from "./assets.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
-import { snapshot } from "./history.js";
+import { batchSnapshot, snapshot } from "./history.js";
 import { addMemory } from "./memory.js";
 import { listModules } from "./modules.js";
-import { batchOverview } from "./overview.js";
+import { createProject, setProject, syncProject } from "./projects.js";
 import { addRecords } from "./records.js";
 import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import { discardUpload, importUpload, stageUpload } from "./ui-imports.js";
@@ -13,7 +14,7 @@ import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
 
 export async function populateSample(ws: Workspace, now = new Date()): Promise<void> {
-  return batchOverview(ws, () => writeSample(ws, now));
+  return batchSnapshot(ws, "添加了演示用的生活记录", () => writeSample(ws, now));
 }
 
 async function writeSample(ws: Workspace, now: Date): Promise<void> {
@@ -252,6 +253,39 @@ async function writeSample(ws: Workspace, now: Date): Promise<void> {
   ]) {
     await addMemory(ws, { type: "preference", name: name as string, text: text as string }, { now });
   }
+  ws.writeText("sample-projects/story/manuscript/chapter.md", "# 第一章\n\n月光照亮小镇。A quiet night.\n");
+  ws.writeText("sample-projects/code/README.md", "# 合成代码项目\n");
+  ws.writeText("sample-projects/code/example.txt", "synthetic sample\n");
+  const repo = ws.resolve("sample-projects/code");
+  await git.init({ fs, dir: repo, defaultBranch: "main" });
+  await git.add({ fs, dir: repo, filepath: "example.txt" });
+  await git.commit({
+    fs,
+    dir: repo,
+    message: "创建合成示例",
+    author: {
+      name: "Sample",
+      email: "sample@localhost",
+      timestamp: Math.floor(+new Date(time(day(-1), "10:00")) / 1000),
+      timezoneOffset: 0,
+    },
+  });
+  const writing = await createProject(ws, {
+    title: "合成写作项目",
+    kind: "personal",
+    links: [
+      { path: ws.resolve("sample-projects/story"), role: "manuscript", include: ["manuscript/**/*.md"] },
+    ],
+  });
+  const coding = await createProject(ws, {
+    title: "合成代码项目",
+    kind: "work",
+    links: [{ path: repo, role: "repo" }],
+  });
+  await setProject(ws, writing.slug, { next: [{ id: "story-next", title: "写完下一节", status: "todo" }] });
+  await setProject(ws, coding.slug, { next: [{ id: "code-next", title: "整理示例说明", status: "todo" }] });
+  await syncProject(ws, writing.slug, { now });
+  await syncProject(ws, coding.slug, { now });
   const issues = validateWorkspace(ws);
   if (issues.length) throw new Error(`样例校验失败：${JSON.stringify(issues)}`);
   await snapshot(ws, "添加了演示用的生活记录", now);

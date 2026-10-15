@@ -5,14 +5,15 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { findRecordType } from "./modules.js";
 import { removePhoto } from "./photos.js";
-import { addRecord, deleteRecord, updateRecord } from "./records.js";
+import { assertPublicProject } from "./projects.js";
+import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { TodayPlan } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-export function readAgentFile(ws: Workspace, file: string): string {
+export function readAgentFile(ws: Workspace, file: string, publicOnly = false): string {
   const abs = ws.resolve(file);
   // 同时检查请求路径和真实路径，不能借工作区内链接读取程序状态。
   const paths = [
@@ -27,6 +28,12 @@ export function readAgentFile(ws: Workspace, file: string): string {
       throw new KaituError("只允许读取工作区内的 .md / .json，不读 .kaitu/ 或版本库目录", "OUT_OF_SCOPE");
     }
   }
+  if (publicOnly) {
+    for (const path of paths) {
+      const slug = /^projects\/([^/]+)\//.exec(path)?.[1];
+      if (slug && !["data", "module.json"].includes(slug)) assertPublicProject(ws, slug);
+    }
+  }
   return ws.readText(file);
 }
 
@@ -38,6 +45,10 @@ export async function writeAgentRecord(
   data: Record<string, unknown> = {},
   id = "",
 ) {
+  if (type === "project_metric") {
+    const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
+    assertPublicProject(ws, data.project ?? current?.project);
+  }
   const ref = findRecordType(ws, type);
   if (type === "photo" && operation === "delete") return removePhoto(ws, id, { by: "agent", actor });
   const result =

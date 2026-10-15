@@ -127,6 +127,41 @@ export function Me({ data, act, busy }: { data: WorkbenchData; act: Act; busy: b
           </Panel>
         </div>
       </div>
+      <Panel title="项目">
+        {!data.projects.length && <Empty>告诉 Agent 你正在做哪些项目。</Empty>}
+        {data.projects.map((project) => (
+          <div class="goal" key={project.slug}>
+            <h3>
+              {project.title} · {project.kind === "work" ? "工作" : "个人"} ·{" "}
+              {{ idea: "构想", active: "进行中", paused: "暂停", done: "完成" }[project.stage]}
+              {project.local_only ? " · 仅本机" : ""}
+            </h3>
+            <p>
+              近 7 天字数变化：{project.recent7.words ?? "—"} · 提交：{project.recent7.commits}
+            </p>
+            <p>
+              下一步：
+              {project.next
+                .filter((item) => item.status === "todo")
+                .map((item) => item.title)
+                .join("；") || "待补"}
+            </p>
+            <p class="muted">最近进展：{project.lastLogDate ?? "待补"}</p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => act("projects/sync", { slug: project.slug }, "项目进度已同步")}
+            >
+              同步进度
+            </button>
+            <details>
+              <summary>状态与进展日志</summary>
+              <Markdown text={project.body} />
+              <Markdown text={project.log} />
+            </details>
+          </div>
+        ))}
+      </Panel>
       <Panel title="现状报告">
         {!data.reports.length && <Empty>积累记录后，让 Agent 做一次现状分析。</Empty>}
         {data.reports.map((report) => (

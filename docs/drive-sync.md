@@ -26,6 +26,7 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 | 内容 | 位置 |
 |---|---|
 | 数据文件（模块、记录、记忆、对话、NOW.md、AGENTS.md……） | Drive 内的 `kaitu/` |
+| 仅本机项目与进度 | **本机**状态目录 `local-projects/<slug>/`；metric 在 `local-projects/projects/data/metrics/`，不会进入 OVERVIEW 或 MCP remote |
 | `.kaitu/config.json`（不含密钥） | Drive 内，额外记录 `"state_dir"` |
 | 版本库（git 目录） | **本机**状态目录 `history.git`（isomorphic-git 的 `gitdir` 与 `dir` 分开）。同步盘与 git 目录放一起会产生冲突副本、损坏版本库 |
 | `secrets.json`、`index.sqlite`、`cache/`、上传暂存 | **本机**状态目录。Google Drive 电脑版不支持排除规则，所以不能靠忽略文件 |

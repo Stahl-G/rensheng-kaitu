@@ -38,7 +38,7 @@ function put(ws: Workspace, file: string, text: string) {
 
 export function refreshOverview(ws: Workspace, now = new Date()): void {
   if (!ws.exists(".kaitu/config.json") || !ws.exists("NOW.md") || !ws.exists("me/rules.md")) return;
-  const data = readStatus(ws, now);
+  const data = readStatus(ws, now, true);
   const lines = [`# 开图现状 · ${data.today}`, "", `待确认建议：${data.now.pending}`, "", "## 今天", ""];
   for (const block of data.now.blocks) {
     lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.kind} / ${block.status}）`);
@@ -52,6 +52,17 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
       lines.push(`${p.label}：${p.current} / ${p.target} ${p.unit ?? ""}`, "");
     }
     for (const next of module.next ?? []) lines.push(`- ${next.title}（${next.status}）`);
+    lines.push("");
+  }
+  lines.push("## 项目", "");
+  for (const project of data.projects) {
+    lines.push(
+      `### ${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}）`,
+      "",
+      `近 7 天：字数变化 ${project.recent7.words ?? "待补"}；${project.recent7.commits} 次提交`,
+      `最近进展：${project.lastLogDate ?? "待补"}`,
+    );
+    for (const next of project.next) lines.push(`- ${next.title}（${next.status}）`);
     lines.push("");
   }
   const r = data.recent7;

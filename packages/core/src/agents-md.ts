@@ -78,6 +78,7 @@ ${instructions}
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
+- 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。仅本机项目不写进共享计划、复盘或记忆。
 - 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
 - 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
 - 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。
@@ -123,7 +124,7 @@ ${skills()
   .map((s) => `| ${s.name} | ${s.description} |`)
   .join("\n")}
 
-- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据。
+- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据，以及项目进度。
 - \`kaitu memory import --file <候选.json> [--dry-run]\`：确认后的记忆数组一次导入、一个版本。
 - \`kaitu import apple-health|nut-ai|ics <文件> --dry-run\`：先预览，用户确认后移除 --dry-run。
 - \`kaitu doctor\` 检查工作区，\`kaitu validate [路径]\` 校验格式。

@@ -45,9 +45,13 @@ function App() {
   const act = async (path: string, input: unknown, success: string) => {
     setBusy(true);
     try {
-      await request(path, input);
+      const result = await request<{ issues?: { path: string; message: string }[] }>(path, input);
       await refresh();
-      setMessage(success);
+      setMessage(
+        result?.issues?.length
+          ? result.issues.map((issue) => `${issue.path}：${issue.message}`).join("；")
+          : success,
+      );
       return true;
     } catch (error) {
       setError((error as Error).message);
