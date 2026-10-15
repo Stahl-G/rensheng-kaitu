@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE HealthData [<!ELEMENT HealthData ANY>]>
+<HealthData locale="en_US">
+  <ExportDate value="2026-10-02 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Scale" unit="lb" value="154" startDate="2026-09-30 20:00:00 +0000"/>
+  <Record type="HKQuantityTypeIdentifierBodyFatPercentage" sourceName="Scale" unit="%" value="0.18" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierHeight" sourceName="Manual" unit="m" value="1.75" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierBloodPressureSystolic" sourceName="Cuff" unit="mmHg" value="120" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierBloodPressureDiastolic" sourceName="Cuff" unit="mmHg" value="80" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierBloodGlucose" sourceName="Meter" unit="mg/dL" value="90.091" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Watch" unit="count/min" value="58" startDate="2026-10-01 08:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Watch" unit="count" value="200" startDate="2026-09-30 23:30:00 +0800" endDate="2026-10-01 00:30:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Watch" unit="count" value="100" startDate="2026-10-01 08:00:00 +0800" endDate="2026-10-01 08:10:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Watch" unit="count" value="200" startDate="2026-10-01 09:00:00 +0800" endDate="2026-10-01 09:10:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Phone" unit="count" value="250" startDate="2026-10-01 08:00:00 +0800" endDate="2026-10-01 09:10:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Watch" unit="kcal" value="300" startDate="2026-10-01 09:00:00 +0800" endDate="2026-10-01 10:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Phone" unit="kcal" value="200" startDate="2026-10-01 09:00:00 +0800" endDate="2026-10-01 10:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierBasalEnergyBurned" sourceName="Watch" unit="kcal" value="1500" startDate="2026-10-01 00:00:00 +0800" endDate="2026-10-02 00:00:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisInBed" startDate="2026-09-30 22:30:00 +0800" endDate="2026-10-01 06:30:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepCore" startDate="2026-09-30 23:00:00 +0800" endDate="2026-10-01 01:00:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAwake" startDate="2026-10-01 01:00:00 +0800" endDate="2026-10-01 01:30:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepDeep" startDate="2026-10-01 01:30:00 +0800" endDate="2026-10-01 03:00:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepREM" startDate="2026-10-01 03:00:00 +0800" endDate="2026-10-01 05:00:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Watch" value="HKCategoryValueSleepAnalysisAsleepUnspecified" startDate="2026-10-01 05:00:00 +0800" endDate="2026-10-01 06:00:00 +0800"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Phone" value="HKCategoryValueSleepAnalysisAsleep" startDate="2026-09-30 23:00:00 +0800" endDate="2026-10-01 05:00:00 +0800"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Watch" unit="count/min" value="80" startDate="2026-10-01 09:00:00 +0800"/>
+  <Workout workoutActivityType="HKWorkoutActivityTypeRunning" startDate="2026-10-01 09:00:00 +0800" endDate="2026-10-01 10:00:00 +0800"/>
+</HealthData>

@@ -1,0 +1,127 @@
+import { isDeepStrictEqual } from "node:util";
+import { KaituError } from "../errors.js";
+import { snapshot } from "../history.js";
+import { type StoredRecord, addRecords, deleteRecord, readRecords, updateRecord } from "../records.js";
+import type { Workspace } from "../workspace.js";
+
+export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event";
+export interface Candidate {
+  type: ImportType;
+  data: Record<string, unknown>;
+  key: string;
+}
+export interface Counts {
+  added: number;
+  updated: number;
+  deleted: number;
+  skipped: number;
+}
+export interface BatchImportResult extends Counts {
+  types: Partial<Record<ImportType, Counts>>;
+  ignored: Record<string, number>;
+  version: string | null;
+}
+export interface BatchOptions {
+  dryRun?: boolean;
+  ignored?: Record<string, number>;
+  scope?: (record: StoredRecord) => boolean;
+  deleteMissing?: (record: StoredRecord) => boolean;
+}
+
+export function naturalKey(type: ImportType, data: Record<string, unknown>): string {
+  switch (type) {
+    case "metric":
+      return JSON.stringify([data.kind, new Date(String(data.ts)).toISOString()]);
+    case "sleep":
+      return new Date(String(data.start)).toISOString();
+    case "activity":
+      return String(data.date);
+    case "meal":
+      return new Date(String(data.ts)).toISOString();
+    case "event":
+      return String(data.external_id);
+  }
+}
+
+export function candidate(type: ImportType, data: Record<string, unknown>): Candidate {
+  return { type, data, key: naturalKey(type, data) };
+}
+
+function content(record: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).filter(
+      ([key, value]) => !["id", "rev", "by", "deleted"].includes(key) && value !== undefined,
+    ),
+  );
+}
+
+export async function importBatch(
+  ws: Workspace,
+  source: "apple-health" | "ics" | "nut-ai",
+  candidates: Candidate[],
+  opts: BatchOptions = {},
+): Promise<BatchImportResult> {
+  const by = `import:${source}` as const;
+  const result: BatchImportResult = {
+    added: 0,
+    updated: 0,
+    deleted: 0,
+    skipped: 0,
+    types: {},
+    ignored: opts.ignored ?? {},
+    version: null,
+  };
+  const groups = new Map<ImportType, Map<string, Candidate>>();
+  for (const item of candidates) {
+    const group = groups.get(item.type) ?? new Map<string, Candidate>();
+    group.set(item.key, item);
+    groups.set(item.type, group);
+  }
+  if (opts.deleteMissing && !groups.has("event")) groups.set("event", new Map());
+  const plans = [...groups].map(([type, group]) => {
+    const records = readRecords(ws, type).filter((r) => r.by === by && (!opts.scope || opts.scope(r)));
+    const existing = new Map(records.map((r) => [naturalKey(type, r), r]));
+    const added: Record<string, unknown>[] = [];
+    const updated: { id: string; patch: Record<string, unknown> }[] = [];
+    const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
+    for (const item of group.values()) {
+      const previous = existing.get(item.key);
+      if (!previous) added.push(item.data);
+      else if (isDeepStrictEqual(content(previous), content(item.data))) counts.skipped++;
+      else {
+        const patch = Object.fromEntries(Object.keys(content(previous)).map((key) => [key, undefined]));
+        updated.push({ id: previous.id, patch: { ...patch, ...item.data } });
+      }
+    }
+    const deleted = opts.deleteMissing
+      ? records.filter((r) => !group.has(naturalKey(type, r)) && opts.deleteMissing?.(r))
+      : [];
+    counts.added = added.length;
+    counts.updated = updated.length;
+    counts.deleted = deleted.length;
+    result.types[type] = counts;
+    for (const action of ["added", "updated", "deleted", "skipped"] as const)
+      result[action] += counts[action];
+    // 预览也使用记录写入层的同一份校验，整批合法后才开始追加。
+    try {
+      addRecords(
+        ws,
+        type,
+        [...group.values()].map((item) => item.data),
+        { by, dryRun: true },
+      );
+    } catch {
+      throw new KaituError(`导入（${source}）包含不合法的 ${type} 记录`, "INVALID_IMPORT");
+    }
+    return { type, added, updated, deleted };
+  });
+  const changed = result.added + result.updated + result.deleted;
+  if (opts.dryRun || !changed) return result;
+  for (const plan of plans) {
+    if (plan.added.length) addRecords(ws, plan.type, plan.added, { by });
+    for (const item of plan.updated) updateRecord(ws, plan.type, item.id, item.patch, { by });
+    for (const item of plan.deleted) deleteRecord(ws, plan.type, item.id, { by });
+  }
+  result.version = await snapshot(ws, `导入（${source}）了 ${changed} 条记录`);
+  return result;
+}

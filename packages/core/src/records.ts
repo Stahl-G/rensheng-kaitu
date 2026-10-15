@@ -72,13 +72,35 @@ export function addRecord(
   data: Record<string, unknown>,
   opts: WriteOptions = {},
 ): WriteResult {
+  return addRecords(ws, type, [data], opts)[0] as WriteResult;
+}
+
+export function addRecords(
+  ws: Workspace,
+  type: string,
+  data: Record<string, unknown>[],
+  opts: WriteOptions & { dryRun?: boolean } = {},
+): WriteResult[] {
   const ref = findRecordType(ws, type);
   const tz = ws.timeZone();
-  const ts = typeof data.ts === "string" ? data.ts : isoInZone(opts.now ?? new Date(), tz);
-  parseTs(ts);
-  const { ts: _ts, ...rest } = stripReserved(data);
-  const record: StoredRecord = { id: ulid(), ts, by: opts.by ?? "agent", ...rest };
-  return write(ws, ref, record, tz);
+  const results = data.map((item) => {
+    const ts = typeof item.ts === "string" ? item.ts : isoInZone(opts.now ?? new Date(), tz);
+    parseTs(ts);
+    const { ts: _ts, ...rest } = stripReserved(item);
+    const record: StoredRecord = { id: ulid(), ts, by: opts.by ?? "agent", ...rest };
+    validateRecord(ws, ref, record);
+    return { type, module: ref.module.dir, file: recordFileFor(ref, localMonth(parseTs(ts), tz)), record };
+  });
+  if (!opts.dryRun) {
+    const files = new Map<string, string[]>();
+    for (const { file, record } of results) {
+      const lines = files.get(file) ?? [];
+      lines.push(JSON.stringify(record));
+      files.set(file, lines);
+    }
+    for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
+  }
+  return results;
 }
 
 /** 修改：追加同 id、rev+1 的完整新版本。 */

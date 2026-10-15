@@ -9,17 +9,23 @@ interface Parts {
   second: string;
 }
 
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
 function partsIn(date: Date, timeZone: string): Parts {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  });
+  let fmt = formatters.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    });
+    formatters.set(timeZone, fmt);
+  }
   const out: Record<string, string> = {};
   for (const p of fmt.formatToParts(date)) out[p.type] = p.value;
   return out as unknown as Parts;
@@ -69,4 +75,19 @@ export function parseTs(ts: string): Date {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) throw new Error(`无法解析的时间：${ts}`);
   return d;
+}
+
+export function localTimeToInstant(wall: string, timeZone: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(wall)) throw new Error("本地时间格式不合法");
+  const naive = new Date(`${wall}Z`);
+  if (!Number.isFinite(naive.getTime()) || naive.toISOString().slice(0, 19) !== wall) {
+    throw new Error("本地时间不合法");
+  }
+  const offsets = new Set(
+    [-86400000, 0, 86400000].map((delta) => offsetMinutes(new Date(naive.getTime() + delta), timeZone)),
+  );
+  const candidates = [...offsets].map((offset) => new Date(naive.getTime() - offset * 60000));
+  const matches = candidates.filter((date) => isoInZone(date, timeZone).slice(0, 19) === wall);
+  // 重复时刻取第一次，春季跳时按跳时前的偏移解释（RFC 5545）。
+  return new Date(matches.length ? Math.min(...matches.map(Number)) : Math.max(...candidates.map(Number)));
 }

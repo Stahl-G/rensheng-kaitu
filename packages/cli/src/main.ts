@@ -14,7 +14,10 @@ import {
   doctor,
   findRecordType,
   history,
+  importAppleHealth,
   importChatgptConversations,
+  importIcs,
+  importNutAi,
   initWorkspace,
   listMemories,
   readRecords,
@@ -47,6 +50,9 @@ const HELP = `开图 kaitu
   kaitu memory list                                列出记忆
   kaitu memory search <词>                          搜索记忆
   kaitu import chatgpt-conversations <文件> [--dry-run]
+  kaitu import apple-health <export.zip|export.xml> [--dry-run]
+  kaitu import ics <文件.ics> [--calendar 名称] [--from 日期] [--to 日期] [--dry-run]
+  kaitu import nut-ai <backup.json> [--dry-run]
   kaitu chats search <词> [--limit N]               搜索历史对话
   kaitu chats reindex                              重建对话索引
   kaitu history [路径] [--limit N]                 版本历史
@@ -76,6 +82,7 @@ const options = {
   sensitive: { type: "boolean" },
   "no-sensitive": { type: "boolean" },
   "dry-run": { type: "boolean" },
+  calendar: { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -249,6 +256,48 @@ async function run(argv: string[]): Promise<number> {
     }
     case "import": {
       const [source, file] = args;
+      if (source === "apple-health" || source === "ics" || source === "nut-ai") {
+        const ws = workspace(values);
+        const input = need(file, "文件");
+        const opts = { dryRun: values["dry-run"] };
+        const result =
+          source === "apple-health"
+            ? await importAppleHealth(ws, input, opts)
+            : source === "nut-ai"
+              ? await importNutAi(ws, input, opts)
+              : await importIcs(ws, input, {
+                  ...opts,
+                  calendar: values.calendar,
+                  from: values.from,
+                  to: values.to,
+                });
+        const labels: Record<string, string> = {
+          metric: "指标",
+          sleep: "睡眠",
+          activity: "活动",
+          meal: "饮食",
+          event: "日程",
+          unsupported: "未映射数据",
+          incomplete_bp: "不完整血压",
+          meals_without_items: "待分析餐食",
+          exercise_entries: "有氧热量记录",
+        };
+        const summary = Object.entries(result.types).map(
+          ([type, counts]) =>
+            `${labels[type]}：新增 ${counts.added}，更新 ${counts.updated}，删除 ${counts.deleted}，跳过 ${counts.skipped}`,
+        );
+        const ignored = Object.entries(result.ignored)
+          .filter(([, count]) => count > 0)
+          .map(([reason, count]) => `${labels[reason]} ${count} 条`);
+        out(
+          values,
+          result,
+          `${values["dry-run"] ? "预览" : "导入完成"}：\n${summary.join("\n") || "没有可导入记录"}${
+            ignored.length ? `\n另跳过：${ignored.join("，")}` : ""
+          }。`,
+        );
+        return 0;
+      }
       if (source !== "chatgpt-conversations") {
         throw new KaituError(`未知导入来源：${source ?? ""}`, "BAD_ARGS");
       }

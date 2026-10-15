@@ -1,0 +1,62 @@
+{
+  "format": "nutai.backup",
+  "format_version": 1,
+  "schema_version": 1,
+  "exported_at": 1790899200000,
+  "app_version": "synthetic",
+  "tables": {
+    "meals": [
+      {
+        "id": "meal-demo",
+        "logged_at": 1790785800125,
+        "local_date": "2026-10-01",
+        "meal_slot": null,
+        "portion_eaten_fraction": 0.5,
+        "analysis_status": "complete"
+      },
+      {
+        "id": "pending-demo",
+        "logged_at": 1790827200000,
+        "meal_slot": "lunch",
+        "analysis_status": "pending"
+      }
+    ],
+    "log_items": [
+      {
+        "meal_id": "meal-demo",
+        "display_name": "合成豆饭",
+        "grams": 200,
+        "snap_energy_kcal": 400,
+        "snap_protein_g": 40,
+        "snap_fat_g": 10,
+        "snap_carb_g": 30,
+        "band_half_pct": 10
+      },
+      {
+        "meal_id": "meal-demo",
+        "display_name": "合成配菜",
+        "grams": 100,
+        "snap_energy_kcal": 200,
+        "snap_protein_g": 10,
+        "snap_fat_g": 5,
+        "snap_carb_g": 20,
+        "band_half_pct": 20
+      }
+    ],
+    "weight_entries": [
+      {
+        "id": "weight-demo",
+        "logged_at": 1790798400000,
+        "weight_kg": 70
+      }
+    ],
+    "exercise_entries": [
+      {
+        "id": "exercise-demo",
+        "logged_at": 1790816400000,
+        "energy_kcal": 200
+      }
+    ],
+    "ignored_table": []
+  }
+}
