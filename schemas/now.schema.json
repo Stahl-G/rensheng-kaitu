@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/now.schema.json",
+  "title": "NOW.md frontmatter",
+  "type": "object",
+  "required": ["date", "blocks"],
+  "properties": {
+    "date": { "type": ["string", "null"], "format": "date" },
+    "generated_at": { "type": ["string", "null"], "format": "date-time" },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "kind", "status"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+          "end": { "type": "string", "pattern": "^([01]\\d|2[0-4]):[0-5]\\d$" },
+          "title": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["event", "proposal", "task"] },
+          "module": { "type": "string" },
+          "ref": { "type": "string" },
+          "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] }
+        },
+        "if": { "properties": { "kind": { "enum": ["event", "proposal"] } } },
+        "then": { "required": ["start", "end"] }
+      }
+    },
+    "attention": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "title"],
+        "properties": {
+          "kind": { "type": "string" },
+          "title": { "type": "string" },
+          "ref": { "type": "string" }
+        }
+      }
+    }
+  }
+}

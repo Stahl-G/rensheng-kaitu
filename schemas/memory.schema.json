@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/memory.schema.json",
+  "title": "memory/<type>_<slug>.md frontmatter",
+  "type": "object",
+  "required": ["type", "name", "text", "created", "updated"],
+  "properties": {
+    "type": { "enum": ["preference", "fact", "context", "person", "decision"] },
+    "name": { "type": "string", "minLength": 1 },
+    "text": { "type": "string", "minLength": 1 },
+    "source": { "type": "string" },
+    "created": { "type": "string", "format": "date" },
+    "updated": { "type": "string", "format": "date" },
+    "sensitive": { "type": "boolean" }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "calendar",
+  "name": "日程",
+  "version": 1,
+  "visibility": "nav",
+  "description": "日历快照；显示在「今天」页面",
+  "records": {
+    "event": { "path": "data/events/{YYYY-MM}.jsonl", "schema": "schemas/event.schema.json", "label": "日程" }
+  },
+  "views": [{ "type": "timeline", "title": "本周日程", "record": "event", "x": "start" }],
+  "sources": [{ "type": "import", "id": "ics" }, { "type": "mcp", "id": "caldav" }],
+  "agent": {
+    "instructions": "这里是外部日历的只读快照。日程建议写进 NOW.md 的 proposal 块，等用户确认后才能写入外部日历。"
+  }
+}

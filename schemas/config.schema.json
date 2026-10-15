@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/config.schema.json",
+  "title": ".kaitu/config.json",
+  "type": "object",
+  "required": ["version", "modules"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "created": { "type": "string", "format": "date-time" },
+    "modules": { "type": "array", "items": { "type": "string" } },
+    "sources": { "type": "object" }
+  },
+  "not": { "anyOf": [{ "required": ["apiKey"] }, { "required": ["secrets"] }] }
+}

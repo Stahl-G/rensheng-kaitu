@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/lab.schema.json",
+  "title": "体检报告抽取结果（单文件 JSON，不是 JSONL）",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["date", "items", "file"],
+  "properties": {
+    "date": { "type": "string", "format": "date" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "unit"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "value": { "type": ["number", "string"] },
+          "unit": { "type": "string" },
+          "ref_range": { "type": "string" },
+          "flag": { "enum": ["high", "low", "normal", "abnormal"] }
+        }
+      }
+    },
+    "file": { "type": "string", "description": "原件路径，相对于模块目录，如 files/2026-10-01-体检.pdf" }
+  }
+}

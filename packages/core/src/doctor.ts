@@ -1,0 +1,101 @@
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { NEVER_TRACK, hasHistory, isTracked } from "./history.js";
+import { CONFIG_VERSION } from "./init.js";
+import { listModules } from "./modules.js";
+import { validateWorkspace } from "./validate.js";
+import type { Workspace } from "./workspace.js";
+
+export interface Check {
+  name: string;
+  ok: boolean;
+  detail?: string;
+}
+
+const REQUIRED_FILES = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "NOW.md",
+  "me/profile.md",
+  "me/rules.md",
+  "me/goals.json",
+  "memory/MEMORY.md",
+];
+const BUILTIN_MODULES = ["me", "health", "calendar", "feed", "learning", "decisions", "reviews"];
+
+export async function doctor(ws: Workspace): Promise<Check[]> {
+  const checks: Check[] = [];
+  const add = (name: string, ok: boolean, detail?: string) => checks.push({ name, ok, detail });
+
+  if (!existsSync(ws.root)) {
+    add("工作区存在", false, `${ws.root} 不存在，先运行 kaitu init`);
+    return checks;
+  }
+  if (!ws.exists(".kaitu/config.json")) {
+    add("工作区已初始化", false, "缺少 .kaitu/config.json，先运行 kaitu init");
+    return checks;
+  }
+  try {
+    const cfg = ws.readJson<{ version?: number }>(".kaitu/config.json");
+    add(
+      "配置版本",
+      cfg.version === CONFIG_VERSION,
+      cfg.version === CONFIG_VERSION ? undefined : `版本 ${cfg.version}，当前程序支持 ${CONFIG_VERSION}`,
+    );
+  } catch (e) {
+    add("配置可读", false, (e as Error).message);
+  }
+
+  const missing = REQUIRED_FILES.filter((f) => !ws.exists(f));
+  add("必需文件齐全", missing.length === 0, missing.length ? `缺少：${missing.join("、")}` : undefined);
+
+  const have = new Set(listModules(ws).map((m) => m.dir));
+  const lacking = BUILTIN_MODULES.filter((m) => !have.has(m));
+  add("内置模块齐全", lacking.length === 0, lacking.length ? `缺少：${lacking.join("、")}` : undefined);
+
+  try {
+    add("时区有效", true, ws.timeZone());
+  } catch (e) {
+    add("时区有效", false, (e as Error).message);
+  }
+
+  const secrets = join(ws.root, ".kaitu", "secrets.json");
+  if (!existsSync(secrets)) add("密钥文件", false, "缺少 .kaitu/secrets.json");
+  else {
+    const mode = statSync(secrets).mode & 0o777;
+    add(
+      "密钥文件权限为 600",
+      mode === 0o600,
+      mode === 0o600 ? undefined : `当前为 ${mode.toString(8)}，运行 chmod 600 ${secrets}`,
+    );
+  }
+
+  if (!hasHistory(ws)) add("版本历史已启用", false, "缺少版本库");
+  else {
+    add("版本历史已启用", true);
+    const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
+    const notIgnored = NEVER_TRACK.filter((p) => !ignore.split("\n").includes(p));
+    add(
+      "密钥与索引不进版本历史",
+      notIgnored.length === 0,
+      notIgnored.length ? `.gitignore 缺少：${notIgnored.join("、")}` : undefined,
+    );
+    const leaked = [];
+    for (const p of [".kaitu/secrets.json", ".kaitu/index.sqlite"])
+      if (await isTracked(ws, p)) leaked.push(p);
+    if (leaked.length) add("版本历史中没有密钥", false, `已被记录：${leaked.join("、")}`);
+  }
+
+  const issues = validateWorkspace(ws);
+  add(
+    "数据格式校验",
+    issues.length === 0,
+    issues.length
+      ? issues
+          .slice(0, 5)
+          .map((i) => `${i.file}${i.line ? `:${i.line}` : ""} ${i.message}`)
+          .join("\n") + (issues.length > 5 ? `\n……共 ${issues.length} 处，运行 kaitu validate 查看全部` : "")
+      : undefined,
+  );
+  return checks;
+}

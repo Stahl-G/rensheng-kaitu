@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/meal.schema.json",
+  "title": "饮食",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["meal", "items", "kcal", "protein_g", "source"],
+  "properties": {
+    "meal": { "enum": ["早", "午", "晚", "加餐"] },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "grams": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "kcal": { "type": "number", "minimum": 0 },
+    "protein_g": { "type": "number", "minimum": 0 },
+    "carbs_g": { "type": "number", "minimum": 0 },
+    "fat_g": { "type": "number", "minimum": 0 },
+    "uncertainty": { "type": "number", "minimum": 0, "description": "热量估算误差，单位 kcal" },
+    "photo": { "type": "string" },
+    "source": { "type": "string", "minLength": 1 }
+  }
+}

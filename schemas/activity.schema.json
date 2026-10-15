@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/activity.schema.json",
+  "title": "日常活动",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["date", "source"],
+  "properties": {
+    "date": { "type": "string", "format": "date" },
+    "steps": { "type": "integer", "minimum": 0 },
+    "active_kcal": { "type": "number", "minimum": 0 },
+    "total_kcal": { "type": "number", "minimum": 0 },
+    "source": { "type": "string", "minLength": 1 }
+  }
+}

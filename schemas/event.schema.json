@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/event.schema.json",
+  "title": "日程",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["start", "end", "title", "calendar", "source"],
+  "properties": {
+    "start": { "type": "string", "anyOf": [{ "format": "date-time" }, { "format": "date" }] },
+    "end": { "type": "string", "anyOf": [{ "format": "date-time" }, { "format": "date" }] },
+    "title": { "type": "string" },
+    "calendar": { "type": "string" },
+    "external_id": { "type": "string" },
+    "source": { "type": "string", "minLength": 1 }
+  }
+}

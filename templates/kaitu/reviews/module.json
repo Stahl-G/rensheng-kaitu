@@ -1,0 +1,10 @@
+{
+  "id": "reviews",
+  "name": "复盘",
+  "version": 1,
+  "visibility": "agent",
+  "description": "日报、周报、月报",
+  "agent": {
+    "instructions": "日报写 daily/YYYY-MM-DD.md，周报写 weekly/YYYY-Www.md（ISO 周），月报写 monthly/YYYY-MM.md。"
+  }
+}

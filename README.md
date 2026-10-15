@@ -8,7 +8,18 @@
 
 ## 状态
 
-想法验证阶段，还没有可运行的代码。
+想法验证阶段。阶段 1 的基础部分（T1–T5）已完成：数据规范的 JSON Schema、`kaitu init` / `doctor` / `validate`、记录读写、版本历史。
+
+## 开发
+
+需要 Node 22.19+ 与 pnpm。
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+node packages/cli/dist/main.js init /tmp/kaitu-demo
+```
 
 - 产品需求：[`docs/PRD.md`](docs/PRD.md)
 - 开发交接：[`docs/HANDOFF.md`](docs/HANDOFF.md)

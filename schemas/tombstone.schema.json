@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/tombstone.schema.json",
+  "title": "删除标记",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["deleted"],
+  "properties": { "deleted": { "const": true } }
+}

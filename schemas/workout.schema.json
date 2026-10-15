@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/workout.schema.json",
+  "title": "训练",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["exercise", "sets", "reps", "weight_kg", "session_id"],
+  "properties": {
+    "exercise": { "type": "string", "minLength": 1 },
+    "sets": { "type": "integer", "minimum": 1 },
+    "reps": { "type": "integer", "minimum": 1 },
+    "weight_kg": { "type": "number", "minimum": 0 },
+    "rpe": { "type": "number", "minimum": 1, "maximum": 10 },
+    "video": { "type": "string" },
+    "notes": { "type": "string" },
+    "session_id": { "type": "string", "minLength": 1 }
+  }
+}

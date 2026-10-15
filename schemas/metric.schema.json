@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/metric.schema.json",
+  "title": "身体指标",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["kind", "value", "unit", "source"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "weight / body_fat / height / bp / glucose …"
+    },
+    "value": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string", "minLength": 1, "description": "复合值，如血压 120/80" }
+      ]
+    },
+    "unit": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 }
+  }
+}

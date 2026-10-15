@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/rules.schema.json",
+  "title": "me/rules.md frontmatter",
+  "$defs": {
+    "hhmm": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+    "span": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": { "start": { "$ref": "#/$defs/hhmm" }, "end": { "$ref": "#/$defs/hhmm" } }
+    }
+  },
+  "type": "object",
+  "required": ["timezone"],
+  "properties": {
+    "timezone": { "type": "string", "minLength": 1, "description": "IANA 时区，如 Asia/Shanghai" },
+    "sleep": { "$ref": "#/$defs/span" },
+    "work_hours": {
+      "allOf": [{ "$ref": "#/$defs/span" }],
+      "properties": {
+        "days": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 6 } }
+      }
+    },
+    "no_tasks_after": { "$ref": "#/$defs/hhmm" },
+    "training": {
+      "type": "object",
+      "properties": {
+        "pattern": { "enum": ["alternate-days", "daily", "weekdays", "custom"] },
+        "duration_min": { "type": "integer", "minimum": 1 },
+        "preferred": { "enum": ["morning", "noon", "afternoon", "evening"] }
+      }
+    },
+    "nutrition": {
+      "type": "object",
+      "properties": {
+        "protein_g": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0 },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "deficit_kcal_max": { "type": "number", "minimum": 0 }
+      }
+    },
+    "goal_priority": { "type": "array", "items": { "type": "string" } }
+  }
+}

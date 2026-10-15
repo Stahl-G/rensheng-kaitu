@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/supplement.schema.json",
+  "title": "补充剂",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["name", "amount", "unit"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "amount": { "type": "number", "minimum": 0 },
+    "unit": { "type": "string", "minLength": 1 }
+  }
+}

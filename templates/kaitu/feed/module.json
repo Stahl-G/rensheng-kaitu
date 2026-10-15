@@ -1,0 +1,11 @@
+{
+  "id": "feed",
+  "name": "动态",
+  "version": 1,
+  "visibility": "nav",
+  "description": "每日简报、订阅源、兴趣关键词",
+  "views": [{ "type": "doc", "title": "今日简报", "path": "digests/{YYYY-MM-DD}.md" }],
+  "agent": {
+    "instructions": "订阅源与兴趣关键词在 feeds.json。早间计划时拉取订阅源，按兴趣筛选后写 digests/YYYY-MM-DD.md。"
+  }
+}

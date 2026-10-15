@@ -1,0 +1,10 @@
+{
+  "id": "learning",
+  "name": "学习",
+  "version": 1,
+  "visibility": "agent",
+  "description": "按主题整理资料、要点、观念变化与行动",
+  "agent": {
+    "instructions": "每个主题一个子目录 <topic>/，含 STATUS.md、sources/、notes.md、beliefs.md、actions.md。需要用户做的事放进 STATUS.md 的 next，会出现在「今天」。"
+  }
+}

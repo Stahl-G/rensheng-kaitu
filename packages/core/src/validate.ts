@@ -1,0 +1,170 @@
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import type { ValidateFunction } from "ajv";
+import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
+import { recordLines } from "./records.js";
+import { formatErrors, schemas } from "./schema.js";
+import { localMonth, parseTs } from "./time.js";
+import type { Workspace } from "./workspace.js";
+
+export interface Issue {
+  file: string;
+  line?: number;
+  message: string;
+}
+
+function walk(root: string, dir: string, out: string[]): void {
+  for (const name of readdirSync(join(root, dir))) {
+    if (name === ".git" || name === "node_modules") continue;
+    const rel = dir ? `${dir}/${name}` : name;
+    if (rel === ".kaitu/cache") continue;
+    if (statSync(join(root, rel)).isDirectory()) walk(root, rel, out);
+    else out.push(rel);
+  }
+}
+
+function check(fn: ValidateFunction, data: unknown, file: string, issues: Issue[], line?: number): void {
+  if (!fn(data)) {
+    for (const e of formatErrors(fn.errors)) issues.push({ file, line, message: `${e.path} ${e.message}` });
+  }
+}
+
+/** 按 schema 校验整个工作区；给了 path 只报告该路径（文件或目录）下的问题。 */
+export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
+  const reg = schemas();
+  const issues: Issue[] = [];
+  const files: string[] = [];
+  walk(ws.root, "", files);
+  const prefix = path ? relative(ws.root, join(ws.root, path)).replace(/\\/g, "/") : "";
+  const inScope = (f: string) => !prefix || f === prefix || f.startsWith(`${prefix}/`);
+
+  const json = (f: string): unknown => {
+    try {
+      return ws.readJson(f);
+    } catch (e) {
+      issues.push({ file: f, message: `不是合法 JSON：${(e as Error).message}` });
+      return undefined;
+    }
+  };
+  const fm = (f: string): Record<string, unknown> | undefined => {
+    const text = ws.readText(f);
+    if (!hasFrontmatter(text)) {
+      issues.push({ file: f, message: "缺少 frontmatter" });
+      return undefined;
+    }
+    try {
+      return parseFrontmatter(text).data;
+    } catch (e) {
+      issues.push({ file: f, message: `frontmatter 不是合法 YAML：${(e as Error).message}` });
+      return undefined;
+    }
+  };
+
+  let tz: string | undefined;
+  try {
+    tz = ws.timeZone();
+  } catch (e) {
+    issues.push({ file: "me/rules.md", message: (e as Error).message });
+  }
+
+  // module.json
+  for (const m of listModules(ws)) {
+    const f = `${m.dir}/module.json`;
+    check(reg.builtin("module.schema.json"), m.def, f, issues);
+    if (m.def.id !== m.dir) issues.push({ file: f, message: `id「${m.def.id}」应与目录名「${m.dir}」一致` });
+    for (const [type, def] of Object.entries(m.def.records ?? {})) {
+      try {
+        reg.forModule(m.def.id, join(ws.root, m.dir), def.schema);
+      } catch (e) {
+        issues.push({ file: f, message: `记录类型 ${type}：${(e as Error).message}` });
+      }
+    }
+  }
+  // 顶层有 module.json 但读不出来的目录
+  for (const f of files) {
+    if (/^[^/]+\/module\.json$/.test(f) && !listModules(ws).some((m) => `${m.dir}/module.json` === f))
+      json(f);
+  }
+
+  // 记录：逐行校验，并检查是否放在 ts 本地月份对应的文件
+  const seenTypes = new Map<string, string>();
+  for (const ref of listRecordTypes(ws)) {
+    const other = seenTypes.get(ref.type);
+    if (other)
+      issues.push({
+        file: `${ref.module.dir}/module.json`,
+        message: `记录类型 ${ref.type} 与 ${other} 模块重复`,
+      });
+    seenTypes.set(ref.type, ref.module.dir);
+    let fn: ValidateFunction;
+    try {
+      fn = reg.forModule(ref.module.def.id, join(ws.root, ref.module.dir), ref.def.schema);
+    } catch {
+      continue;
+    }
+    const tomb = reg.builtin("tombstone.schema.json");
+    const { match } = recordFilePattern(ref);
+    for (const l of recordLines(ws, ref)) {
+      if (!inScope(l.file)) continue;
+      let rec: Record<string, unknown>;
+      try {
+        rec = JSON.parse(l.raw);
+      } catch {
+        issues.push({ file: l.file, line: l.line, message: "不是合法 JSON" });
+        continue;
+      }
+      if (rec.deleted === true) {
+        check(tomb, rec, l.file, issues, l.line);
+        continue;
+      }
+      check(fn, rec, l.file, issues, l.line);
+      check(reg.builtin("record-base.schema.json"), rec, l.file, issues, l.line);
+      if (tz && typeof rec.ts === "string") {
+        try {
+          const month = localMonth(parseTs(rec.ts), tz);
+          const fileMonth = match.exec(l.file.split("/").pop() ?? "")?.[1];
+          if (fileMonth && fileMonth !== month) {
+            issues.push({
+              file: l.file,
+              line: l.line,
+              message: `ts 属于 ${month}，却放在 ${fileMonth} 的文件里`,
+            });
+          }
+        } catch (e) {
+          issues.push({ file: l.file, line: l.line, message: (e as Error).message });
+        }
+      }
+    }
+  }
+
+  // 其余已知格式的文件
+  for (const f of files.filter(inScope)) {
+    const name = f.split("/").pop() ?? "";
+    if (name === "STATUS.md") {
+      const d = fm(f);
+      if (d) check(reg.builtin("status.schema.json"), d, f, issues);
+    } else if (f === "NOW.md") {
+      const d = fm(f);
+      if (d) check(reg.builtin("now.schema.json"), d, f, issues);
+    } else if (f === "me/rules.md") {
+      const d = fm(f);
+      if (d) check(reg.builtin("rules.schema.json"), d, f, issues);
+    } else if (f === "me/goals.json") {
+      const d = json(f);
+      if (d !== undefined) check(reg.builtin("goals.schema.json"), d, f, issues);
+    } else if (f.startsWith("memory/") && name.endsWith(".md") && name !== "MEMORY.md") {
+      const d = fm(f);
+      if (d) check(reg.builtin("memory.schema.json"), d, f, issues);
+    } else if (/^[^/]+\/data\/labs\/[^/]+\.json$/.test(f)) {
+      const d = json(f);
+      if (d !== undefined) check(reg.builtin("lab.schema.json"), d, f, issues);
+    } else if (f === ".kaitu/config.json") {
+      const d = json(f);
+      if (d !== undefined) check(reg.builtin("config.schema.json"), d, f, issues);
+    }
+  }
+
+  if (prefix && !existsSync(join(ws.root, prefix))) issues.push({ file: prefix, message: "路径不存在" });
+  return issues.filter((i) => inScope(i.file));
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/record-base.schema.json",
+  "title": "记录公共字段",
+  "type": "object",
+  "required": ["id", "ts", "by"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID" },
+    "ts": { "type": "string", "format": "date-time", "description": "ISO 8601，带时区偏移" },
+    "by": { "type": "string", "pattern": "^(user|agent|import:[a-z0-9-]+)$" },
+    "rev": { "type": "integer", "minimum": 1 }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "decisions",
+  "name": "方向与决策",
+  "version": 1,
+  "visibility": "agent",
+  "description": "决策档案：候选、标准、多模型意见、选择与理由",
+  "agent": {
+    "instructions": "每个决策一个子目录 <slug>/，含 STATUS.md 与 decision.md（候选、标准、多模型意见、选择与理由、复议条件）。等用户拍板时在 NOW.md 的 attention 里加一张 decision 卡片。"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/sleep.schema.json",
+  "title": "睡眠",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["start", "end", "duration_min", "source"],
+  "properties": {
+    "start": { "type": "string", "format": "date-time" },
+    "end": { "type": "string", "format": "date-time" },
+    "duration_min": { "type": "number", "minimum": 0 },
+    "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "hrv": { "type": "number", "minimum": 0 },
+    "resting_hr": { "type": "number", "minimum": 0 },
+    "source": { "type": "string", "minLength": 1 }
+  }
+}
