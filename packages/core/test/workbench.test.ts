@@ -1,4 +1,3 @@
-import { rmSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   completeNext,
@@ -58,35 +57,4 @@ describe("工作台写入", () => {
     const ws = await initWorkspace(tmp(), { sample: true });
     expect(validateWorkspace(ws)).toEqual([]);
   });
-});
-
-it("他人持锁时本机完成下一步不改写 STATUS", async () => {
-  const ws = await freshWorkspace();
-  const state = tmp();
-  try {
-    const file = "health/STATUS.md";
-    ws.writeText(
-      file,
-      stringifyFrontmatter({ updated: null, next: [{ id: "n1", title: "训练", status: "todo" }] }),
-    );
-    const before = ws.readText(file);
-    ws.writeJson(
-      ".kaitu/config.json",
-      { ...ws.readJson<object>(".kaitu/config.json"), state_dir: state },
-      { internal: true },
-    );
-    ws.writeJson("LOCK.json", {
-      holder: "dot",
-      purpose: "更新状态",
-      acquired_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
-    });
-    await expect(completeNext(ws, file, "n1")).rejects.toThrowError(
-      expect.objectContaining({ code: "LOCK_BUSY" }),
-    );
-    expect(ws.readText(file)).toBe(before);
-  } finally {
-    rmSync(ws.root, { recursive: true, force: true });
-    rmSync(state, { recursive: true, force: true });
-  }
 });

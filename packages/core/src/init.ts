@@ -25,7 +25,8 @@ const EMPTY_DIRS = [
   "reviews/monthly",
   "chats",
   "inbox/agents",
-  "handoffs",
+  "handoffs/daily",
+  "handoffs/archive",
   "inbox/health",
   ".kaitu/cache",
 ];

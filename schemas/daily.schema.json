@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/daily.schema.json",
+  "type": "object",
+  "required": ["organizer", "date"],
+  "properties": {
+    "organizer": { "type": "string", "minLength": 1 },
+    "date": { "type": "string", "format": "date" }
+  },
+  "additionalProperties": true
+}

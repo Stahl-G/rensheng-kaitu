@@ -19,7 +19,8 @@ function walk(root: string, dir: string, out: string[]): void {
   for (const name of readdirSync(join(root, dir))) {
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
-    if ([".kaitu/cache", ".kaitu/history.git", ".kaitu/local-projects"].includes(rel)) continue;
+    if ([".kaitu/cache", ".kaitu/history.git", ".kaitu/local-projects", "handoffs/archive"].includes(rel))
+      continue;
     if (statSync(join(root, rel)).isDirectory()) walk(root, rel, out);
     else out.push(rel);
   }
@@ -146,10 +147,10 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
   // 其余已知格式的文件
   for (const f of files.filter(inScope)) {
     const name = f.split("/").pop() ?? "";
-    if (f === "LOCK.json") {
-      const d = json(f);
-      if (d !== undefined) check(reg.builtin("lock.schema.json"), d, f, issues);
-    } else if (f.startsWith("handoffs/") && name.endsWith(".md")) {
+    if (/^handoffs\/daily\/[^/]+\.md$/.test(f)) {
+      const d = fm(f);
+      if (d) check(reg.builtin("daily.schema.json"), d, f, issues);
+    } else if (/^handoffs\/[^/]+\.md$/.test(f)) {
       const d = fm(f);
       if (d) check(reg.builtin("handoff.schema.json"), d, f, issues);
     } else if (name === "STATUS.md") {

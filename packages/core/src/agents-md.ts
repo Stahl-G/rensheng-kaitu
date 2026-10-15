@@ -149,8 +149,7 @@ ${skills()
 
 - 默认本地模式；用户可用 \`kaitu drive enable [--drive-dir <我的云端硬盘路径>]\` 开启 Drive 同步。
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
-- 云端接力规则（只追加、状态锁、交接记录）见工作区 \`AGENT-README.md\`；用 \`kaitu\` 命令写状态会自动持锁。
-- 直接编辑 \`NOW.md\` 或 \`STATUS.md\` 前，按 \`AGENT-README.md\` 的状态锁步骤取锁；改动后写一份交接记录。
+- 云端 Agent 白天只追加（规则见 \`AGENT-README.md\`）；整理员每天整理一次（规则见 \`ORGANIZER.md\`）。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
 - 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。

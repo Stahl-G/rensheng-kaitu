@@ -134,8 +134,11 @@
 ├─ AGENTS.md                 # 自动生成：Agent 入口说明（见 §8）
 ├─ CLAUDE.md                 # 一行：指向 AGENTS.md
 ├─ NOW.md                    # 今天的计划（见 §6.4）
-├─ LOCK.json                 # Drive 状态文件租约锁（最长 15 分钟）
-├─ handoffs/YYYY-MM/<时间>-<agent>.md # 只追加交接记录，frontmatter: agent、at
+├─ ORGANIZER.md              # 自动生成：夜间整理员规则
+├─ handoffs/                 # 交接记录平铺，frontmatter: agent、at，可选 follows
+│  ├─ <YYYYMMDDTHHMM>-<agent>.md
+│  ├─ daily/<YYYY-MM-DD>.md   # 每日整理，frontmatter: organizer、date
+│  └─ archive/<YYYY-MM-DD>/   # 已整理的交接记录，不做校验
 ├─ me/                       # 我的
 │  ├─ module.json
 │  ├─ profile.md             # 基本情况（用户主动维护）
@@ -430,7 +433,7 @@ sensitive: false
 
 ### 7.5 确认流
 
-Drive 模式下状态文件须持锁修改，接力步骤见 [cloud-relay.md](cloud-relay.md)。
+云端 Agent 白天只追加；整理员按 ORGANIZER.md 更新状态。接力步骤见 [cloud-relay.md](cloud-relay.md)。
 
 | 操作 | 是否需要人确认 |
 |---|---|

@@ -5,7 +5,8 @@
   "required": ["agent", "at"],
   "properties": {
     "agent": { "type": "string", "minLength": 1 },
-    "at": { "type": "string", "format": "date-time" }
+    "at": { "type": "string", "format": "date-time" },
+    "follows": { "type": "string", "minLength": 1 }
   },
   "additionalProperties": true
 }

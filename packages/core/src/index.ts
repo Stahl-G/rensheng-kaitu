@@ -41,5 +41,3 @@ export * from "./tasks.js";
 
 export * from "./upgrade.js";
 export * from "./template-version.js";
-
-export * from "./lock.js";

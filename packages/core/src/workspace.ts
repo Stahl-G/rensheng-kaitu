@@ -15,7 +15,6 @@ import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
-import { isStateFile, withStateLock } from "./lock.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
 import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
@@ -145,16 +144,12 @@ export class Workspace {
     content: string | Uint8Array,
     opts: { internal?: boolean; mode?: number } = {},
   ): void {
-    const write = () => {
-      const abs = this.resolve(rel, opts);
-      mkdirSync(dirname(abs), { recursive: true });
-      const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
-      writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
-      renameSync(tmp, abs);
-      this.refreshAfterWrite(rel);
-    };
-    if (isStateFile(rel)) withStateLock(this, `更新 ${rel}`, write);
-    else write();
+    const abs = this.resolve(rel, opts);
+    mkdirSync(dirname(abs), { recursive: true });
+    const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
+    writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
+    renameSync(tmp, abs);
+    this.refreshAfterWrite(rel);
   }
 
   writeJson(rel: string, value: unknown, opts: { internal?: boolean; mode?: number } = {}): void {
@@ -162,21 +157,17 @@ export class Workspace {
   }
 
   appendLine(rel: string, line: string): void {
-    const write = () => {
-      const abs = this.resolve(rel);
-      mkdirSync(dirname(abs), { recursive: true });
-      appendFileSync(abs, `${line}\n`);
-      this.refreshAfterWrite(rel);
-    };
-    if (isStateFile(rel)) withStateLock(this, `更新 ${rel}`, write);
-    else write();
+    const abs = this.resolve(rel);
+    mkdirSync(dirname(abs), { recursive: true });
+    appendFileSync(abs, `${line}\n`);
+    this.refreshAfterWrite(rel);
   }
 
   private refreshAfterWrite(rel: string): void {
     if (
       overviewDeferred(this) ||
       rel.startsWith(".kaitu/") ||
-      ["AGENT-README.md", "OVERVIEW.md", "LOCK.json"].includes(rel) ||
+      ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
       !this.exists("AGENT-README.md")
     )
       return;

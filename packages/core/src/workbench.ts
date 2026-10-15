@@ -3,7 +3,6 @@ import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
-import { withStateLock } from "./lock.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
 import { listProjects, projectStatusFiles, projectVersion, publicProject } from "./projects.js";
@@ -170,22 +169,20 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
 export type WorkbenchData = ReturnType<typeof readWorkbench>;
 
 async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, edit: (data: T) => string) {
-  return withStateLock(ws, "更新状态文件", async () => {
-    const parsed = parseFrontmatter<T>(ws.readText(file));
-    const message = edit(parsed.data);
-    const validate = schemas().builtin(schema);
-    if (!validate(parsed.data)) {
-      throw new KaituError(
-        `文件格式不合法：${formatErrors(validate.errors)
-          .map((e) => e.message)
-          .join("，")}`,
-        "INVALID_DOCUMENT",
-      );
-    }
-    ws.writeText(file, stringifyFrontmatter(parsed.data, parsed.body), { internal: true });
-    const slug = /^(?:projects|\.kaitu\/local-projects)\/([^/]+)\/STATUS\.md$/.exec(file)?.[1];
-    return { version: slug ? await projectVersion(ws, slug, message) : await snapshot(ws, message) };
-  });
+  const parsed = parseFrontmatter<T>(ws.readText(file));
+  const message = edit(parsed.data);
+  const validate = schemas().builtin(schema);
+  if (!validate(parsed.data)) {
+    throw new KaituError(
+      `文件格式不合法：${formatErrors(validate.errors)
+        .map((e) => e.message)
+        .join("，")}`,
+      "INVALID_DOCUMENT",
+    );
+  }
+  ws.writeText(file, stringifyFrontmatter(parsed.data, parsed.body), { internal: true });
+  const slug = /^(?:projects|\.kaitu\/local-projects)\/([^/]+)\/STATUS\.md$/.exec(file)?.[1];
+  return { version: slug ? await projectVersion(ws, slug, message) : await snapshot(ws, message) };
 }
 
 export function decideProposal(ws: Workspace, id: string, decision: "confirmed" | "rejected") {
@@ -214,7 +211,6 @@ export function completeNext(ws: Workspace, file: string, id: string, now = new 
 export function ignoredWorkspaceChange(file: string): boolean {
   return (
     file === "OVERVIEW.md" ||
-    file === "LOCK.json" ||
     file === ".kaitu/inbox-state.json" ||
     file === ".kaitu/channels" ||
     file.startsWith(".kaitu/channels/") ||

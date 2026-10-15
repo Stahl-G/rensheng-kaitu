@@ -1,18 +1,22 @@
-# 任务：云端接力协议（租约锁 + 记录只追加）
+# 任务：云端接力第二版（白天只追加，夜里整理一次；去掉租约锁）
 
-先读 `docs/cloud-relay.md`（设计已定，按它实现）、`docs/drive-sync.md`、`packages/core/src/overview.ts`、`inbox.ts`、`agents-md.ts`、`doctor.ts`，以及写 `NOW.md` 和 `STATUS.md` 的地方（`agent-tools.ts`、`projects.ts`、`workbench.ts` 等，用 `grep -rn 'STATUS.md\|NOW.md' packages/core/src` 找全）。不联网、不提交、不加依赖。
+先读 `docs/cloud-relay.md`（第二版设计已定，按它实现），再看上一版的提交 `git show 2998328 b105d00`，那一版加了租约锁，本次要把它去掉。不联网、不提交、不加依赖。
 
 ## 要做
-1. **AGENT-README**：改写 `renderAgentReadme`，按设计 §2–§4 写清三类文件、锁的步骤、接手时的读取顺序和交接记录格式。保持简短、路径写全，原有的收件箱格式和记录格式两节保留。
-2. **锁**：在 core 加 `lock.ts`，提供 `acquireLock(ws, holder, purpose)`、`releaseLock`、`readLock`，有效期 15 分钟，写入后重读确认。只在 Drive 模式下生效，本地模式直接放行。凡是本机写 `NOW.md` 或 `STATUS.md` 的入口都包一层，`holder` 为 `kaitu-local`。被他人持锁时：后台处理（inbox process、自动维护）推迟到下一轮；工作台或 CLI 操作抛出可读错误「<holder> 正在更新，稍后再试」。
-3. **交接记录**：`init` 和 `upgrade` 创建 `handoffs/`；`OVERVIEW.md` 开头写明生成时间，再加「最近交接」一节，列最近 3 份（agent、时间、「下一步」第一条）。
-4. **doctor**：报告状态文件的 Drive 冲突副本（同目录下名字形如 `STATUS (1).md`、`NOW (1).md` 的文件），以及 `LOCK.json` 格式错误；锁过期但还写着持有人的，只提示，不算失败。
-5. **规范**：新增 `schemas/lock.schema.json`，以及 `schemas/handoff.schema.json`（只校验 frontmatter 的 `agent`、`at`）；`validate` 覆盖这两类文件。PRD §6.1 加 `LOCK.json`、`handoffs/`；§7.5 加一句「状态文件须持锁修改」；`agents-md.ts` §11 同步改写；`docs/drive-sync.md` 中「云端 Agent 怎么写」一节指向 `cloud-relay.md`。
+1. **去掉锁**：删除 `packages/core/src/lock.ts`、`schemas/lock.schema.json`、`packages/core/test/lock.test.ts`，以及所有 `withStateLock` / `isStateFile` / `lockUnavailable` 包装和调用（workspace、history、projects、agent-tools、workbench、inbox、doctor 等），恢复成上一版之前的写法。只留下真正需要的改动，不要残留无用的分支；`NEVER_TRACK` 和 `.gitignore` 里的 `LOCK.json` 也删掉。
+2. **交接记录平铺**：`handoffs/<YYYYMMDDTHHMM>-<agent>.md`，frontmatter 为 `agent`、`at`，可选 `follows`；新增 `handoffs/daily/<YYYY-MM-DD>.md`（frontmatter `organizer`、`date`）和 `handoffs/archive/<日期>/`。更新 `schemas/handoff.schema.json`，新增 `schemas/daily.schema.json`，`validate` 覆盖这两类文件；`archive/` 下的文件不做校验。
+3. **入口文件**：改写 `renderAgentReadme`，按设计 §1–§3 写，短而准，原有的收件箱格式和记录格式两节保留。新增 `renderOrganizer`，生成根目录的 `ORGANIZER.md`（设计 §4），由 `refreshOverview` 与 `AGENT-README.md` 一同写出；init、upgrade 时生成。
+4. **OVERVIEW**：保留生成时间；增加「最新每日整理」（路径与日期）；「最近交接」改为读取平铺目录下的最近 3 份。
+5. **upgrade 迁移**：把 `handoffs/YYYY-MM/`（包括 Drive 生成的同名副本，例如 `2026-10 (1)`）里的 `.md` 移回 `handoffs/`，删除空的月份目录和 `LOCK.json`；重复运行不出错，`--dry-run` 不写入。
+6. **doctor**：保留状态文件冲突副本检查，并扩展为报告任意目录下名字形如 `xxx (1)` 的同名副本，包括文件夹；删除锁相关的检查。
+7. **文档**：`agents-md.ts` §11 改为两行：云端规则见 `AGENT-README.md`，整理员规则见 `ORGANIZER.md`。PRD §6.1 把 `LOCK.json` 换成 `ORGANIZER.md`，把 `handoffs/` 的说明改为平铺加 `daily/`、`archive/`；§7.5 删掉持锁那句，改成「云端 Agent 白天只追加；整理员按 ORGANIZER.md 更新状态」。`docs/drive-sync.md` 相应段落同步。
 
 ## 测试（只写必须的）
-- 锁：取锁、他人持锁时被拒、过期后可以接管，共一个测试文件。
-- 本机写 STATUS 时遇到他人持锁被拒：一个测试。
-- 不断言文案，不 mock 文件系统，用临时目录。
+- upgrade 迁移：月份目录和同名副本平铺回根目录、`LOCK.json` 删除、重复运行无变化，一个测试。
+- 不写其他测试，不断言文案。删掉为锁写的测试，包括 `workbench.test.ts` 里的锁用例。
 
 ## 完成标准
-`pnpm build`、`pnpm typecheck`、`pnpm lint`、`pnpm test` 全部通过；`kaitu init --sample` 生成的 `AGENT-README.md` 包含新规则，`kaitu validate` 通过。中文简短汇报：改了哪些写入入口，有没有遗漏的状态写入点，哪些只能真机验证。
+`pnpm build`、`pnpm typecheck`、`pnpm lint`、`pnpm test` 全部通过；`kaitu init --sample` 生成 `AGENT-README.md` 与 `ORGANIZER.md`，`kaitu validate` 通过。汇报用中文，两三行：改了什么、删了什么。不要写免责声明。
+
+## 补充
+- 仓库根目录就是当前目录（git worktree），只改这里，不碰 `~/Developer/rensheng-kaitu`、`~/Developer/rensheng-kaitu-runtime`、`~/kaitu` 和 Google Drive。

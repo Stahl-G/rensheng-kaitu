@@ -14,47 +14,41 @@ ${timeZoneNotice(ws.timeZone(), now)}
 
 ## 接手顺序
 
-1. AGENT-README.md → LOCK.json。
-2. OVERVIEW.md，记下开头的生成时间。
-3. NOW.md、相关模块的 <模块>/STATUS.md；背景见 me/profile.md、me/rules.md、memory/MEMORY.md。
-4. handoffs/YYYY-MM/ 中比 OVERVIEW.md 生成时间新的交接记录，按时间排序，最多最近 10 份。
-5. inbox/agents/ 中未处理的文件也算现状；回答进度时与交接记录、OVERVIEW.md 合起来看。
+1. AGENT-README.md。
+2. handoffs/daily/ 里最新的每日整理；没有就读 OVERVIEW.md。
+3. handoffs/ 根目录下比它新的交接记录，按时间排序。
+4. inbox/agents/ 里比它新的文件。
+5. 需要细节时再读 NOW.md、<模块>/STATUS.md、me/、memory/。
 
-## 三类文件
+## 两个角色与文件
 
-- 只追加，不用锁：inbox/agents/*、handoffs/YYYY-MM/<时间>-<agent>.md。只新建唯一文件名，不改已有文件。
-- 状态，须持锁：NOW.md、各模块 <模块>/STATUS.md（含 learning/<topic>/STATUS.md、decisions/<slug>/STATUS.md、projects/<slug>/STATUS.md）。
-- 云端只读，由本机生成：OVERVIEW.md、AGENT-README.md、AGENTS.md、<模块>/data/、me/goals.json、me/rules.md 及其余文件。
-
-## 状态锁（Drive 模式）
-
-1. 读根目录 LOCK.json；不存在或 expires_at 已过期才能写自己的锁。
-2. 写入 {"holder":"你的 agent 名","purpose":"本次目的","acquired_at":"带时区的 ISO 时间","expires_at":"最多 15 分钟后"}。
-3. 等几秒重读 LOCK.json，holder 仍是自己才算取锁成功。每个状态文件改前重读，只改需要的部分；超过 10 分钟未完成就续期。
-4. 完成后把 LOCK.json 的 expires_at 改为当前时间，不删除文件。
-5. 未取到锁就不改状态文件；可继续追加收件箱与交接记录，在「未决」写明想改什么，并告诉用户「<holder> 正在更新，稍后再试」。
-
-持锁人为 kaitu-local 时是本机开图在写，同样等它过期或放锁。
+- 接力者（任何 Agent）：只在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录、不改已有文件。
+- 整理员（用户设定的夜间定时任务）：按 ORGANIZER.md 写 handoffs/daily/<YYYY-MM-DD>.md，更新 NOW.md 和各模块 STATUS.md，归档已整理的交接。
+- ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md、<模块>/data/、me/* 由本机 kaitu 维护，云端只读。
 
 ## 交接记录
 
-只要动过任何东西，结束前新建 handoffs/YYYY-MM/<时间>-<agent>.md，例如：
+只要做过任何事，结束前新建 handoffs/<YYYYMMDDTHHMM>-<agent>.md，例如：
 
 \`\`\`markdown
 ---
 agent: grok-bot
 at: 2026-10-16T09:12:00+08:00
+follows: handoffs/20261016T0830-dot.md
 ---
 ## 做了什么
 - 记录午饭：inbox/agents/grok-bot-20261016T0912.records.jsonl
-## 下一步
-- 周六有氧 30 分钟
+## 当前下一步
+- health：周四练背 40 分钟（已完成）
+- health：周六有氧 30 分钟
 ## 未决 / 需要用户
 - 无
 \`\`\`
 
-记录交到 inbox/agents/，不直接改 <模块>/data/。格式不确定时写 *.note.md；错误部分会转为待整理笔记。
-本机 kaitu ui 或 kaitu inbox process 处理，成功原件归档到 inbox/processed/YYYY-MM-DD/，待整理内容在 inbox/notes/YYYY-MM-DD/。
+follows 可选，指向接续的上一份交接或每日整理。「当前下一步」写完整清单，不只写改动。
+两份交接接续同一份时，把两份都读，在自己的交接里合并「当前下一步」。
+记录交到 inbox/agents/；格式不确定时写 *.note.md。
+本机 kaitu ui 或 kaitu inbox process 处理，成功原件归档到 inbox/processed/YYYY-MM-DD/，错误部分转到 inbox/notes/YYYY-MM-DD/ 待整理。
 
 ## 收件箱格式
 
@@ -70,29 +64,58 @@ project_metric 的 project 填已存在的共享项目 slug；不接受仅本机
 `;
 }
 
+export function renderOrganizer(): string {
+  return `# 开图夜间整理员
+
+任何 Agent 都可承担此角色。由用户设定夜间定时任务（建议凌晨 3 点），多家任务错开半小时互为备份。
+日期按 me/rules.md 的 timezone 判断。
+
+1. handoffs/daily/<今天>.md 已存在：今晚已经有人整理过，直接结束。
+2. 读最新的每日整理（没有就读 OVERVIEW.md），再读它之后的全部交接记录和 inbox/agents/ 文件。
+3. 更新 NOW.md 和各模块 STATUS.md，让下一步清单与最新交接一致。改之前先重读，只改需要的部分。
+4. 写 handoffs/daily/<今天>.md，frontmatter 为 organizer（你的 Agent 名）、date（YYYY-MM-DD）。
+   正文包含「昨天做了什么」（附来源文件）、「当前下一步」（完整清单）、「未决事项」、「收件箱里还没导入的记录」。
+5. 把已整理的交接记录移到 handoffs/archive/<今天>/。不删除文件，不动收件箱，留给本机导入。
+   无法移动时，在每日整理中列出已整理的文件；接手者只读比每日整理新的交接。
+6. 拿不准的地方（如两份交接互相矛盾）写进每日整理的「未决事项」，不要猜。
+`;
+}
+
 function recentHandoffs(ws: Workspace) {
   const entries: { file: string; agent: string; at: string; next: string }[] = [];
   if (!ws.exists("handoffs")) return entries;
-  for (const month of readdirSync(ws.resolve("handoffs"), { withFileTypes: true })) {
-    if (!month.isDirectory() || !/^\d{4}-\d{2}$/.test(month.name)) continue;
-    const dir = `handoffs/${month.name}`;
-    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
-      const file = `${dir}/${entry.name}`;
-      try {
-        const { data, body } = parseFrontmatter<{ agent: string; at: string }>(ws.readText(file));
-        if (!schemas().builtin("handoff.schema.json")(data)) continue;
-        const section = body.split(/^## 下一步[^\S\n]*\r?\n/m)[1]?.split(/^## /m)[0] ?? "";
-        const next = /^\s*(?:[-*+]|\d+[.)]) (.+)$/m.exec(section)?.[1] ?? "待补";
-        entries.push({ file, ...data, next });
-      } catch {
-        // 格式错误交给 validate 报告，不阻断现状刷新。
-      }
+  for (const entry of readdirSync(ws.resolve("handoffs"), { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const file = `handoffs/${entry.name}`;
+    try {
+      const { data, body } = parseFrontmatter<{ agent: string; at: string }>(ws.readText(file));
+      if (!schemas().builtin("handoff.schema.json")(data)) continue;
+      const section = body.split(/^## (?:当前)?下一步[^\S\n]*\r?\n/m)[1]?.split(/^## /m)[0] ?? "";
+      const next = /^\s*(?:[-*+]|\d+[.)]) (.+)$/m.exec(section)?.[1] ?? "待补";
+      entries.push({ file, ...data, next });
+    } catch {
+      // 格式错误交给 validate 报告，不阻断现状刷新。
     }
   }
   return entries
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || b.file.localeCompare(a.file))
     .slice(0, 3);
+}
+
+function latestDaily(ws: Workspace) {
+  if (!ws.exists("handoffs/daily")) return;
+  const entries: { file: string; date: string }[] = [];
+  for (const entry of readdirSync(ws.resolve("handoffs/daily"), { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+    const file = `handoffs/daily/${entry.name}`;
+    try {
+      const { data } = parseFrontmatter<{ organizer: string; date: string }>(ws.readText(file));
+      if (schemas().builtin("daily.schema.json")(data)) entries.push({ file, date: data.date });
+    } catch {
+      // 格式错误交给 validate 报告，不阻断现状刷新。
+    }
+  }
+  return entries.sort((a, b) => b.date.localeCompare(a.date) || b.file.localeCompare(a.file))[0];
 }
 
 const deferred = new WeakMap<Workspace, number>();
@@ -135,6 +158,9 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.kind} / ${block.status}）`);
   }
   if (!data.now.blocks.length) lines.push("暂无安排。");
+  lines.push("", "## 最新每日整理", "");
+  const daily = latestDaily(ws);
+  lines.push(daily ? `- ${daily.date}（${daily.file}）` : "暂无每日整理。");
   lines.push("", "## 最近交接", "");
   const handoffs = recentHandoffs(ws);
   for (const handoff of handoffs) {
@@ -188,6 +214,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     "",
   );
   put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
+  put(ws, "ORGANIZER.md", renderOrganizer());
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
   const withoutTime = (value: string) => value.replace(/^生成时间：.*$/m, "");
