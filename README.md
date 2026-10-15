@@ -8,7 +8,7 @@
 
 ## 状态
 
-想法验证阶段。阶段 1 的基础部分（T1–T5）已完成：数据规范的 JSON Schema、`kaitu init` / `doctor` / `validate`、记录读写、版本历史。
+阶段 1（本地工作区、工作台、健康同步、手机通道、DeepSeek Harness 插件）基本完成，正在做阶段 2 验证；当前目标与里程碑见 [docs/GOAL.md](docs/GOAL.md)。
 
 ## 开发
 

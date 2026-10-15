@@ -83,31 +83,20 @@ export function Me({ data, act, busy }: { data: WorkbenchData; act: Act; busy: b
         <div class="stack">
           <Panel title="正在前进的目标">
             {!data.goals.length && <Empty>告诉 Agent 你现在最想完成的一件事。</Empty>}
-            {data.goals.map((goal) => {
-              const status = data.statuses.find((item) => item.file === `${goal.area}/STATUS.md`);
-              const progress = status?.data.progress;
-              return (
-                <div class="goal" key={goal.id}>
-                  <h3>{goal.title}</h3>
-                  <p class="muted">
-                    {goal.metric} {goal.target}
-                    {goal.due ? ` · ${goal.due} 前` : ""}
-                  </p>
-                  {progress && progress.target > 0 ? (
-                    <>
-                      <progress max={progress.target} value={progress.current} aria-label={goal.title} />
-                      <small>
-                        {progress.label}：{progress.current} / {progress.target} {progress.unit}
-                      </small>
-                    </>
-                  ) : goal.status === "done" ? (
-                    <progress value={1} max={1} aria-label={goal.title} />
-                  ) : (
-                    <small>进度待 Agent 更新</small>
-                  )}
-                </div>
-              );
-            })}
+            {data.goals.map((goal) => (
+              <div class="goal" key={goal.id}>
+                <h3>{goal.title}</h3>
+                <p class="muted">
+                  {goal.metric} {goal.target}
+                  {goal.due ? ` · ${goal.due} 前` : ""}
+                </p>
+                {goal.status === "done" ? (
+                  <progress value={1} max={1} aria-label={goal.title} />
+                ) : (
+                  <small>暂无单独进度</small>
+                )}
+              </div>
+            ))}
           </Panel>
           <Panel title="作息与目标值">
             <dl>

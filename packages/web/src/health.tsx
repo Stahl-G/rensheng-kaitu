@@ -34,6 +34,10 @@ export function Health({
   const meals = records("meal");
   const kcal = valueOn(meals, data.today, "kcal", true);
   const protein = valueOn(meals, data.today, "protein_g", true);
+  const todayMeals = meals.filter((r) => dayOf(r.ts, data.timeZone) === data.today);
+  // 餐食营养是 Agent 估算；少于两餐或没有晚餐时缺口不可信
+  const mealsComplete = todayMeals.length >= 2 && todayMeals.some((r) => r.meal === "晚");
+  const approx = (value: number | null) => (value === null ? "—" : `约 ${number(value)}`);
   const nutrition = data.rules.data.nutrition;
   const activity = records("activity");
   const total = valueOn(activity, data.today, "total_kcal");
@@ -67,7 +71,7 @@ export function Health({
           <div>
             <span>今天蛋白质</span>
             <strong>
-              {number(protein)}
+              {approx(protein)}
               <small> g</small>
             </strong>
           </div>
@@ -190,27 +194,33 @@ export function Health({
           <Panel title="今天的营养">
             <div class="stats">
               <div>
-                <span>热量</span>
+                <span>已记录摄入</span>
                 <strong>
-                  {number(kcal)}
+                  {approx(kcal)}
                   <small> kcal</small>
                 </strong>
                 <small>{total !== null ? `当天消耗 ${number(total)} kcal` : "还没有当天消耗记录"}</small>
               </div>
               <div>
-                <span>蛋白质</span>
+                <span>已记录蛋白质</span>
                 <strong>
-                  {number(protein)}
+                  {approx(protein)}
                   <small> g</small>
                 </strong>
                 <small>目标 {nutrition?.protein_g?.join("–") ?? "未设置"} g</small>
               </div>
               <div>
                 <span>热量缺口</span>
-                <strong>
-                  {number(total !== null && kcal !== null ? total - kcal : null)}
-                  <small> kcal</small>
-                </strong>
+                {mealsComplete && total !== null && kcal !== null ? (
+                  <strong>
+                    {approx(total - kcal)}
+                    <small> kcal</small>
+                  </strong>
+                ) : (
+                  <strong>
+                    <small>{mealsComplete ? "还没有当天消耗记录" : "记录不完整，暂不计算"}</small>
+                  </strong>
+                )}
                 <small>规则上限 {nutrition?.deficit_kcal_max ?? "未设置"} kcal</small>
               </div>
             </div>
