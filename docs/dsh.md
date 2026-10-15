@@ -74,25 +74,79 @@
 目标来自 me/rules.md 的作息和营养规则；每天的缺失值为 null，真实零值保留。项目柱图使用每日字数增量或提交数，浅紫槽固定高度。
 「需要你处理」仅显示非零项目，全零时隐藏。页面使用局部 `--kt-*` 配色，跟随 dsh 的明暗主题。
 
-### rc.2 品牌能力（本次仅核对）
+## Kaitu 品牌与入口
 
-rc.2 支持通过第三方 client 插件替换侧栏品牌名和标识：占据 `sidebar.brand.name`、`sidebar.brand.mark` 两个公开 Slot，
-并在 profile 的插件组合中停用官方品牌插件、加载替代插件；没有一个 profile 的 appName / logo 参数能完成这件事。
-依据为本机同版源码的 [Slot 声明](/Users/yihongguo/Developer/deepseek-harness-rc2/packages/client/ui-sidebar/src/client/index.ts:76)、
-[官方品牌注册实例](/Users/yihongguo/Developer/deepseek-harness-rc2/packages/client/ui-brand-official/src/client/index.ts:17) 和
-[品牌包的替换说明](/Users/yihongguo/Developer/deepseek-harness-rc2/packages/client/ui-brand-official/README.zh.md:34)。
+`kaitu dsh --install` 现在把品牌替换与入口开关一起写入 `# kaitu:start…end`，重复安装只替换该段，保留前后的用户配置。
+默认空 profile 的 `[]` 保留，将托管段插入方括号内；网页版 `kaitu dsh` 使用同一组开关。
+不另建品牌包：`@kaitu/dsh-plugin/client` 占据 `sidebar.brand.mark`、`sidebar.brand.name`、`conversation.hero.brand.mark`。
+标志取自 [kaitu-mark.svg](design/kaitu-mark.svg)，轮廓用 currentColor，中心点浅色为 `#3D6FE0`、深色为 `#7FA2F0`，名称为 Kaitu。
+「开图」导航图标复用同一组件。
 
-浏览器 / 页面窗口标题由构建时的 `DSH_CLIENT_TITLE` 控制（[AppFrame](/Users/yihongguo/Developer/deepseek-harness-rc2/packages/client/ui-layout/src/client/AppFrame.tsx:233)）；
-桌面安装包应用名和图标由打包配置指定（[productName](/Users/yihongguo/Developer/deepseek-harness-rc2/apps/desktop/scripts/electron-builder-config.mjs:109)、
-[macOS 图标](/Users/yihongguo/Developer/deepseek-harness-rc2/apps/desktop/scripts/electron-builder-config.mjs:151)），不能只靠运行时 profile 更名。
-本次没有注册品牌或设置 Slot，也没有修改 dsh profile 与外壳。
+`sidebar.footer.action` 在设置上方显示 `Powered by DSH <版本号>`，收起侧栏时显示 DSH，悬停可读完整文字。
+版本通过 `kaitu.dshVersion` Remote 从运行 Host 的 `DSH_CLIENT_VERSION` 读取；桌面启动器负责传入已安装应用的版本，
+依据 `apps/desktop/src/main.ts:445`，不使用插件版本或 CLI 锁定版本。缺少版本元数据的自定义 Host 仅显示 Powered by DSH。
+
+### rc.2 入口清单与处理
+
+下表源码路径相对于本机只读源码 `/Users/yihongguo/Developer/deepseek-harness-rc2`。
+插件名简写为组合中的 id，通常对应 `@deepseek-ai/dsh-client-<id>`；当前 profile 是否组合实验包决定其入口是否出现。
+
+| 位置 / 入口 | 来源插件与源码 | 建议与本次处理 |
+|---|---|---|
+| 侧栏品牌、新会话、展开 / 收起；macOS 收起后的顶栏同类按钮 | `ui-sidebar`，`packages/client/ui-sidebar/src/client/{index.ts,SidebarRoot.tsx,HeaderLeadingControls.tsx}` | 保留，替换品牌 |
+| 侧栏「开图」 | `@kaitu/dsh-plugin`，本仓库 `packages/dsh-plugin/src/client/index.tsx` | 保留，换为六边形标志 |
+| 侧栏插件市场 / 插件页 | `ui-plugin-manager`，`packages/client/ui-plugin-manager/src/client/index.ts:139` | patch 禁用 |
+| 侧栏「自动化任务」、顶栏任务目录、右栏任务详情 | `ui-schedule`（实验 schedule bundle），`packages/client/ui-schedule/src/client/index.ts:178`、`:210` | 保留，供早间计划与晚间复盘使用 |
+| 侧栏会话搜索、分组 / 排序 / 已归档过滤、会话列表、置顶 / 重命名 / 分支 / 归档 | `ui-workspace`，`packages/client/ui-workspace/src/client/index.ts:260`、`:285` | 保留 |
+| 侧栏添加、重命名、删除、拖动工作区；首屏工作区选择 | 同一个 `ui-workspace`，`src/client/rows/WorkspaceBrowser.tsx` | 无独立开关；与列表、导航共存，留打包时替换呈现 |
+| 工作区目录选择对话框 | `directory-picker` 自动选择 native / browse，`packages/host/directory-picker-auto/src/index.ts` | 保留，`ui-workspace` 必需依赖 `remote.directoryPicker` |
+| 侧栏底部动态插件 / Cordis 面板 | `ui-cordis`，`packages/extensions/ui-cordis/src/client/index.ts:86` | patch 禁用 |
+| 侧栏「设置」 | `ui-settings-general`，`packages/client/ui-settings-general/src/client/index.ts:175`；区段契约由 `ui-settings` 提供 | 保留通用、外观、语言、模型等设置 |
+| 设置中的内置插件区与清单 | `ui-settings-plugins`、`ui-settings-plugin-inventory` | patch 禁用两个界面插件 |
+| 设置账号 / 登录、额度提示与账号引导 | `ui-settings-account`，`packages/client/ui-settings-account/src/client/index.ts` | patch 禁用界面与三个账号后端，保留 API Key 模型 |
+| 设置日志上传 | `ui-settings-session-log`，`packages/client/ui-settings-session-log/src/client/index.ts:36` | patch 禁用 |
+| 顶栏会话标题、祖先会话跳转、对话视图页签 | `ui-conversation`，`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx` | 保留 |
+| 顶栏子 Agent 目录与谱系菜单 | `ui-subagent`，`packages/client/ui-subagent/src/client/index.ts:76` | patch 禁用界面 |
+| 顶栏 Agent preset 标签、首屏 preset 选择、通用设置 preset 行 | `ui-agent-preset`，`packages/client/ui-agent-preset/src/client/index.ts:183` | patch 禁用界面，运行时 preset 注册表仍保留 |
+| 顶栏 Team 菜单 | 实验 `ui-agent-team`，`packages/experimental/client-ui-agent-team/src/client/mount.ts` | 默认 desktop 未组合，无需 patch；开图打包不组合 agent-team-profile |
+| 顶栏后台任务 | `ui-jobs`，`packages/client/ui-jobs/src/client/index.ts:38` | 保留，用于观察正在运行的任务 |
+| 顶栏「Open In…」 | `ui-open-in-app`，`packages/client/ui-open-in-app/src/client/index.ts:103` | patch 禁用界面 |
+| 原生应用菜单（关于、检查更新、管理 dsh 命令、隐藏 / 退出）、编辑菜单；macOS 文件 / 窗口菜单 | 桌面主进程与 preload，`apps/desktop/src/main.ts:939`、`preload-menu.ts` | 主进程固定，profile 无法改；打包修改品牌与更新渠道 |
+| 顶栏右栏展开 / 收起，右栏新增页签及引导页 | `ui-sidebar-right`，`packages/client/ui-sidebar-right/src/client/index.ts:238` | 保留文档预览容器 |
+| 右栏终端、浏览器、工作区文件树 | `ui-sidebar-terminal`、`ui-sidebar-browser`、`ui-sidebar-files` | patch 禁用这三个界面插件 |
+| 右栏文档预览 | `ui-sidebar-documentpreview` | 保留 |
+| 产品埋点、桌面遥测、会话遥测 | `product-analytics`、`desktop-product-telemetry`、`session-telemetry-otel` | 没有独立侧栏入口，patch 禁用三者；上传日志入口另见上表 |
+
+### patch 能力与官方品牌
+
+用户 patch 在 bundle 之后合成（`packages/boot/app-boot/src/profile.ts:7`）。`insert` 追加插件或组内条目，按 id 的覆盖可设置
+`disabled: true` 或替换整个 config；config 不深合并，name 只校验原插件名。此 patch 方言没有 remove 操作，不能把 Loader 的
+`EntryTree.remove()` 当作 YAML 操作。格式依据 `packages/preset/agent-preset/skills/cordis-composition-reference/SKILL.md`，
+实现为 `vendor/include/src/index.ts` 的 `applyEntryPatches` / `PatchOptions`。
+
+本次使用 `- id: ui-brand-official` / `disabled: true`。官方品牌虽有构建时 `official` 条件，但仍是 profile 中的普通插件行
+（`packages/bundle/web-app/cordis.patch.yml:318`）；模块扫描明确跳过 disabled 行
+（`packages/client/modules/src/index.ts:983`），所以官方桌面构建也可通过本机 profile 撤掉它，无需改 dsh 源码。
+三个插槽声明与官方注册分别见 `packages/client/ui-sidebar/src/client/index.ts:76`、
+`packages/client/ui-conversation/src/client/apply.ts:318`、`packages/client/ui-brand-official/src/client/index.ts:17`。
+
+桌面打包待办：
+
+- 替换 `ui-workspace` 的工作区管理呈现，保留会话列表与 `uiWorkspace` 新会话导航服务。
+- 将 `DSH_CLIENT_TITLE` 设为 Kaitu（`packages/client/ui-layout/src/client/AppFrame.tsx:233`）。
+- 设置桌面 `productName`、应用图标和安装包资源（`apps/desktop/scripts/electron-builder-config.mjs:109`、`:151`）。
+- 修改原生关于面板、菜单和首次启动页的品牌资源，接入开图的更新渠道；它们来自桌面主进程 / preload，
+  不受 Cordis profile 控制（`apps/desktop/src/main.ts:930`、`:948`、`src/client/welcome.tsx`）。
+- 开图构建不组合实验 agent-team-profile；以上运行时 patch 随开图 profile 组合。
+
+本次 build、typecheck、lint 与 102 项测试通过，包括一个安装段回归测试；另核对隔离临时 profile 的安装与 rc.2 原函数合成、品牌组件输出；未改写本机 desktop profile，未重启真实桌面应用验收。
 
 构建仅使用已安装 npm 包：生成严格 Host/Remote codec，再将浏览器 CJS 封装为 dsh module factory。
 rc.2 的生成器只识别工作区中的协议声明，因此构建时在临时目录登记已安装的协议声明，结束后清理；不依赖 dsh 源码目录。
 第一版已在 dsh 桌面 rc.2 实测加载成功。
-本轮按两份最终设计稿调整，仅修改当前 worktree，没有新增依赖、提交或改写桌面 profile。
+总览设计轮次按两份最终设计稿调整，没有新增依赖、提交或改写桌面 profile。
 
-本轮验证：build、typecheck、lint、101 项测试通过，仅更新已有 overview 测试，覆盖逐日缺失 null、真实零值、同次训练去重、
+总览设计轮次验证：build、typecheck、lint、101 项测试通过，仅更新已有 overview 测试，覆盖逐日缺失 null、真实零值、同次训练去重、
 睡眠按结束日期归日，以及项目字数增量与提交数。隔离预览使用临时合成工作区与 Preact / Button 渲染适配，
 检查了有数据、空状态、板块占位与返回、收起状态刷新保留、明暗配色、缺失睡眠框、体重记录按钮、项目产出槽和 375 像素排版。
 维护版本过滤与云端 Agent 名称提取通过实际 core 查询检查；没有新增 UI 测试。

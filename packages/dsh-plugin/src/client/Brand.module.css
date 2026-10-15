@@ -1,0 +1,16 @@
+.dot {
+  fill: #3d6fe0;
+}
+
+body[data-ds-dark-theme] .dot {
+  fill: #7fa2f0;
+}
+
+.powered {
+  display: block;
+  padding: 8px 12px;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
