@@ -34,6 +34,7 @@
 | `body_mass` | 体重 / `kg` | metric 的 weight，`units` 为 `lb` 时换算为 kg |
 | `body_fat_percentage` | 0–1 小数 / `fraction` | metric 的 body_fat，乘 100 转百分数；也可指定 `%` 提供百分数 |
 | `resting_heart_rate` | 静息心率 / `bpm` | metric 的 resting_hr |
+| `hrv_sdnn` | HRV(SDNN) / `ms` | metric 的 hrv_sdnn；`units` 为 `s` 时转为 ms |
 | `sleep_analysis` | 阶段名 / 空字符串 | 必须提供 `ends`，共用原始样本的睡眠合并规则 |
 | `workout` | 时长（分钟）/ `min` | cardio 训练；`names` 为活动名称，省略时为「其他训练」，`ends` 可省略 |
 
@@ -110,10 +111,14 @@
 | `body_mass` | 数值，`kg`、`lb` 或 `g` | 体重，转为 kg |
 | `body_fat_percentage` | 数值，`%`（18 表示 18%）或 `fraction`（0.18 表示 18%） | 体脂率，转为 % |
 | `resting_heart_rate` | 数值，`bpm` 或 `count/min` | 静息心率 |
+| `hrv_sdnn` | 数值，`ms` 或 `s` | 心率变异性 SDNN，统一为 ms |
 | `sleep_analysis` | 字符串，unit 为 `""` | 睡眠片段 |
 | `active_energy` | 数值，`kcal`、`kJ` 或 `cal` | 活动热量 |
 | `basal_energy` | 数值，`kcal`、`kJ` 或 `cal` | 基础热量，与活动热量合计为总热量 |
 | `workout` | 数值为时长，unit 为 `min`，另有 `workout` 对象 | 训练 |
+| `symptom_<kind>` | 字符串，unit 为 `""` | symptom；普通症状为 severity，食欲变化为 appetite_change |
+| `state_of_mind` | 七级情绪字符串，unit 为 `""` | mood 的 valence |
+| `heart_notification` | high_heart_rate / low_heart_rate / irregular_rhythm，unit 为 `""` | 独立 heart_notification 记录 |
 
 睡眠 value 接受 `asleep`、`asleep_core`、`asleep_deep`、`asleep_rem`、`asleep_unspecified`；
 `awake`、`in_bed` 可原样提供，但不计入睡眠。也接受官方 `HKCategoryValueSleepAnalysisAsleep…` 名称。
@@ -128,10 +133,24 @@
 开图转换为中文活动名，所有 Apple 体能训练均记为 `modality: cardio`；未知活动显示为「体能训练」。
 力量训练仅导入时长，组数、次数、重量由用户另行记录。
 
+## KaituSync 三类新域
+
+三类新域只支持 samples 数组。并列列表和官方 XML 的新域格式尚未接入；现有类型与 HRV 的原有入口保持不变。
+症状 kind 共 11 类：abdominal_cramps、appetite_changes、chest_tightness_or_pain、coughing、dizziness、fatigue、
+headache、nausea、shortness_of_breath、sore_throat、chills。
+普通症状 value 为 unspecified / mild / moderate / severe；食欲变化只接受 unspecified / decreased / increased。
+手机不导出未出现的症状和未变化的食欲，不把它们当作新发生的事件。
+
+心理状态保留 very_unpleasant / unpleasant / slightly_unpleasant / neutral / slightly_pleasant / pleasant / very_pleasant。
+心率通知独立存储在健康模块，不生成日历事件。导入时三类均以 start 作为 ts，转为用户时区。
+
+旧工作区执行 kaitu upgrade 后即可使用新记录。手机实验开关默认关闭，更新本机运行时后再由用户手动开启。
+
 ## 收件箱处理
 
 两种 JSON 格式和官方 XML / zip 使用相同的映射与导入来源 `import:apple-health`。
-自然键：指标为 kind + 测量时刻，活动为本地 date，睡眠为 start，训练为开始时刻 + 中文活动名。
+自然键：指标、症状与心率通知为 kind + UTC 测量时刻，心理状态为 UTC 时刻；
+活动为本地 date，睡眠为 start，训练为开始时刻 + 中文活动名。
 同一键内容变化会追加修订；相同样本重复导入不新增记录或版本。
 有改动时整份文件一个版本，说明为「从 Apple 健康同步了 N 条记录（快捷指令）」。
 

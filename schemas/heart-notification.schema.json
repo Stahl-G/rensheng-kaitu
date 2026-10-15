@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/heart-notification.schema.json",
+  "title": "心率通知",
+  "description": "设备发出的心率通知，独立于日历 event，不据此推断诊断结论。",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["kind", "source"],
+  "properties": {
+    "kind": { "enum": ["high_heart_rate", "low_heart_rate", "irregular_rhythm"] },
+    "source": { "type": "string", "minLength": 1, "examples": ["apple-health"] }
+  },
+  "unevaluatedProperties": false,
+  "examples": [{ "kind": "high_heart_rate", "source": "apple-health" }]
+}

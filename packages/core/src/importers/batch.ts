@@ -4,7 +4,16 @@ import { snapshot } from "../history.js";
 import { type StoredRecord, addRecords, deleteRecord, readRecords, updateRecord } from "../records.js";
 import type { Workspace } from "../workspace.js";
 
-export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event" | "workout";
+export type ImportType =
+  | "metric"
+  | "sleep"
+  | "activity"
+  | "meal"
+  | "event"
+  | "workout"
+  | "symptom"
+  | "mood"
+  | "heart_notification";
 export interface Candidate {
   type: ImportType;
   data: Record<string, unknown>;
@@ -35,12 +44,15 @@ export function naturalKey(type: ImportType, data: Record<string, unknown>): str
     case "workout":
       return JSON.stringify([new Date(String(data.ts)).toISOString(), data.exercise]);
     case "metric":
+    case "symptom":
+    case "heart_notification":
       return JSON.stringify([data.kind, new Date(String(data.ts)).toISOString()]);
     case "sleep":
       return new Date(String(data.start)).toISOString();
     case "activity":
       return String(data.date);
     case "meal":
+    case "mood":
       return new Date(String(data.ts)).toISOString();
     case "event":
       return String(data.external_id);

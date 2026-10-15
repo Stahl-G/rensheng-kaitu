@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/mood.schema.json",
+  "title": "心理状态",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["valence", "source"],
+  "properties": {
+    "valence": {
+      "enum": [
+        "very_unpleasant",
+        "unpleasant",
+        "slightly_unpleasant",
+        "neutral",
+        "slightly_pleasant",
+        "pleasant",
+        "very_pleasant"
+      ]
+    },
+    "source": { "type": "string", "minLength": 1, "examples": ["apple-health"] }
+  },
+  "unevaluatedProperties": false,
+  "examples": [{ "valence": "slightly_pleasant", "source": "apple-health" }]
+}

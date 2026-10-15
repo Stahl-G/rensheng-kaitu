@@ -89,6 +89,12 @@ function activityName(value: string): string {
   return ACTIVITIES[key] ?? (/\p{Script=Han}/u.test(value) ? value : "体能训练");
 }
 
+function healthEventType(type: string) {
+  if (type.startsWith("symptom_")) return "symptom" as const;
+  if (type === "state_of_mind") return "mood" as const;
+  if (type === "heart_notification") return "heart_notification" as const;
+}
+
 export function healthCandidates(zone: string) {
   const candidates: Candidate[] = [];
   const ignored: Record<string, number> = { unsupported: 0, incomplete_bp: 0 };
@@ -113,6 +119,23 @@ export function healthCandidates(zone: string) {
       );
       return;
     }
+    const eventType = healthEventType(type);
+    if (eventType) {
+      if (sample.unit !== "" || typeof sample.value !== "string")
+        throw new Error("健康事件必须使用字符串值与空单位");
+      const start = parseTs(sample.start);
+      if (+parseTs(sample.end) < +start) throw new Error("Invalid health event interval");
+      const data: Record<string, unknown> = {
+        ts: isoInZone(start, zone),
+        source: "apple-health",
+      };
+      if (eventType === "symptom") {
+        data.kind = type.slice("symptom_".length);
+        data[data.kind === "appetite_changes" ? "appetite_change" : "severity"] = sample.value;
+      } else data[eventType === "mood" ? "valence" : "kind"] = sample.value;
+      candidates.push(candidate(eventType, data));
+      return;
+    }
     if (
       ![
         "BodyMass",
@@ -122,6 +145,7 @@ export function healthCandidates(zone: string) {
         "BloodPressureDiastolic",
         "BloodGlucose",
         "RestingHeartRate",
+        "HeartRateVariabilitySDNN",
         "StepCount",
         "ActiveEnergyBurned",
         "BasalEnergyBurned",
@@ -175,6 +199,9 @@ export function healthCandidates(zone: string) {
         break;
       case "RestingHeartRate":
         metric("resting_hr", convert({ bpm: 1, "count/min": 1 }), "bpm");
+        break;
+      case "HeartRateVariabilitySDNN":
+        metric("hrv_sdnn", convert({ ms: 1, s: 1000 }), "ms");
         break;
       case "BloodPressureSystolic":
       case "BloodPressureDiastolic": {
@@ -402,6 +429,7 @@ const SHORTCUT_TYPES: Record<string, { type: string; unit: string }> = {
   body_mass: { type: "BodyMass", unit: "kg" },
   body_fat_percentage: { type: "BodyFatPercentage", unit: "fraction" },
   resting_heart_rate: { type: "RestingHeartRate", unit: "bpm" },
+  hrv_sdnn: { type: "HeartRateVariabilitySDNN", unit: "ms" },
   sleep_analysis: { type: "HKCategoryTypeIdentifierSleepAnalysis", unit: "" },
   active_energy: { type: "ActiveEnergyBurned", unit: "kcal" },
   basal_energy: { type: "BasalEnergyBurned", unit: "kcal" },
@@ -491,7 +519,9 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     }
     const collector = healthCandidates(zone);
     for (const sample of samples) {
-      const type = SHORTCUT_TYPES[sample.type]?.type;
+      const type =
+        SHORTCUT_TYPES[sample.type]?.type ??
+        (typeof sample.type === "string" && healthEventType(sample.type) ? sample.type : undefined);
       if (
         !type ||
         typeof sample.source !== "string" ||

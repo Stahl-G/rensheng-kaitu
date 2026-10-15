@@ -25,7 +25,13 @@ it("旧模板升级补类型和模块、覆盖内置技能，保留用户内容�
     me.records = oldMeRecords;
     original.writeJson("me/module.json", me);
     const health = original.readJson<ModuleDef>("health/module.json");
-    const { photo: _photo, ...oldHealthRecords } = health.records ?? {};
+    const {
+      photo: _photo,
+      symptom: _symptom,
+      mood: _mood,
+      heart_notification: _heart,
+      ...oldHealthRecords
+    } = health.records ?? {};
     health.records = oldHealthRecords;
     health.visibility = "agent";
     health.agent = { instructions: "用户自己的指令" };
@@ -91,7 +97,18 @@ it("旧模板升级补类型和模块、覆盖内置技能，保留用户内容�
     addRecord(ws, "workout", { modality: "cardio", exercise: "跑步", duration_min: 30, distance_km: 5 });
     const project = await createProject(ws, { title: "合成项目", kind: "personal" });
     addRecord(ws, "project_metric", { project: project.slug, kind: "words", value: 200 });
-    for (const type of ["task", "photo", "workout", "project_metric"])
+    addRecord(ws, "symptom", { kind: "appetite_changes", appetite_change: "decreased", source: "user" });
+    addRecord(ws, "mood", { valence: "slightly_unpleasant", source: "user" });
+    addRecord(ws, "heart_notification", { kind: "low_heart_rate", source: "apple-health" });
+    for (const type of [
+      "task",
+      "photo",
+      "workout",
+      "project_metric",
+      "symptom",
+      "mood",
+      "heart_notification",
+    ])
       expect(readRecords(ws, type)).toHaveLength(1);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {

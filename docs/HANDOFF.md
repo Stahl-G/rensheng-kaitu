@@ -8,6 +8,15 @@
 
 ## 0. 当前交接（最新，先读）
 
+### 2026-10-16：健康采集域扩展
+
+- 用户已批准三类独立健康记录：symptom、mood、heart_notification，心率通知不复用日历 event。
+- 本分支已接入 KaituSync samples 的 11 类症状、七级心理状态、三类心率通知与 HRV。
+- 已同步 schema、PRD §6、内置健康模块、生成的 Agent 说明和旧工作区升级；新域暂不扩展 XML / 并列列表。
+- 当前改动在 codex/health-hrv 独立工作区，未合入 main，未修改真实用户工作区或运行时。
+- 四个健康专用 MCP 工具仍为提案；已有 record_list 可读新类型。格式入口：docs/proposals/kaitu-health-v2.md。
+
+
 ### 0.0 2026-10-15 晚：开图 App（dsh 插件）进度
 
 - 主分支：`main`（2026-10-15 起为 GitHub 默认分支，其余开发分支已合并删除；新功能从 `main` 切分支，做完合回）。本机 `kaitu` 指向 `~/Developer/rensheng-kaitu-runtime`，更新：`git fetch origin && git checkout --detach origin/main && pnpm build`，再重启桌面应用。

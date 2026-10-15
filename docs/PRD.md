@@ -336,7 +336,10 @@ goal_priority: [g1]
 | supplement | `name`、`amount`、`unit` |
 | sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source` |
 | activity | `date`、`steps?`、`active_kcal?`、`total_kcal?`、`source` |
-| metric | `kind`（weight / body_fat / height / bp / glucose …）、`value`、`unit`、`source` |
+| metric | `kind`（weight / body_fat / height / bp / glucose / hrv_sdnn …）、`value`、`unit`、`source` |
+| symptom | `kind`、`source`；普通症状填 `severity: unspecified / mild / moderate / severe`，食欲变化只填 `appetite_change: unspecified / decreased / increased` |
+| mood | `valence`（very_unpleasant / unpleasant / slightly_unpleasant / neutral / slightly_pleasant / pleasant / very_pleasant）、`source` |
+| heart_notification | `kind: high_heart_rate / low_heart_rate / irregular_rhythm`、`source`；独立健康记录，不属于日历 event |
 | lab | `date`、`items[]`（`name`、`value`、`unit`、`ref_range?`、`flag?`）、`file` |
 | photo | `file`（相对健康模块目录，如 `files/photos/2026-10-15-01J….jpg`）、`pose`（front / side / back / other）、`notes?` |
 | event | `start`、`end`、`title`、`calendar`、`external_id?`、`source` |
@@ -365,6 +368,11 @@ x_post 必须有 post.url，release 必须有 version，paper 必须有非空 au
 读不到全文时摘要须注明「只读到标题和导语」。不合格行按现有收件箱规则转待整理笔记，并写明缺失字段。
 所有采集遵守 `.agents/skills/collect-news/SKILL.md`：数字、引语、图片来自原文，图片只存 URL、不下载，事实与看法分开。
 只有能读取 X 的 Agent（如 Grok）采集 X，其他 Agent 跳过，不得编造。
+
+2026-10-16 经用户批准扩展健康记录：symptom / mood / heart_notification 继承记录公共字段，按 ts 的本地月份存储。
+Apple 健康导入中，症状与心率通知按 kind + UTC 时刻去重，心理状态按 UTC 时刻去重；改变值追加修订。
+手机发送的 symptom_* / state_of_mind / heart_notification 字符串样本映射到上述记录，使用空单位。
+普通症状与食欲变化的字段互斥；未知类型或非法值保留整份原件为待整理笔记，不导入文件的部分内容。
 
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。
 
