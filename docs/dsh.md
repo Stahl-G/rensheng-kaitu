@@ -1,4 +1,19 @@
-# 用 DeepSeek 对话记录开图
+# 用 DeepSeek Harness 对话记录开图
+
+推荐用 DeepSeek Harness 桌面应用（0.2.0-rc.2）：
+
+1. 安装并打开一次桌面应用，在 **设置 → 模型** 配好模型（DeepSeek、opencode-go 或其他 API Key）。
+2. 在开图仓库运行 `pnpm build`，然后：
+
+   ```sh
+   kaitu dsh --install
+   ```
+
+   它把开图插件写进 `~/.dsh/profiles/desktop/cordis.patch.yml`（只维护 `# kaitu:start` 到 `# kaitu:end` 这一段，重复运行会替换）。
+3. 退出并重新打开桌面应用，点 **新会话**，说「今天深蹲 3×12 60kg」。
+4. 另开终端运行 `kaitu ui`，在工作台「健康 → 训练」与「历史」看记录和版本。
+
+## 不用桌面应用：网页版
 
 1. 安装 Node.js 22.19 以上的 22.x，或 Node.js 24 及以上版本。在开图仓库运行：
 
