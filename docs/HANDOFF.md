@@ -8,6 +8,16 @@
 
 ## 0. 当前交接（最新，先读）
 
+### 0.0 2026-10-15 晚：开图 App（dsh 插件）进度
+
+- 主分支：`claude/dsh-overview-page`（已推送）。本机 `kaitu` 指向 `~/Developer/rensheng-kaitu-runtime`，更新：`git checkout --detach claude/dsh-overview-page && pnpm build`，再重启桌面应用。
+- 桌面应用已装 Kaitu 品牌（标志、名称、Powered by DSH 版本）并隐藏无关入口；账号后端必须保留，桌面欢迎页启动时查询登录状态，禁用会导致应用无法启动。
+- 板块页面：今天、健康、在做的事、资讯、关于我（含更换头像，头像只在本机）已完成；地图、财务页面进行中，没有设计稿，按现有设计语言与 PRD 1.0 第 12 节做。
+- 后端已完成：GitHub 同步（项目）、财务 P0（支付宝 / 持仓 CSV）、资讯（任何 Agent 投递 news_item / trend）、人生地图（离线城市表 `packages/core/data/cities.json`，GeoNames CC BY 4.0，坐标只来自城市表）。
+- 真实工作区已 `kaitu upgrade`（新增 explore、finance 模块）。
+- 工作方式：Claude 直接 `codex exec` 派任务，一个任务一个 worktree，审查、删无用内容、跑四项检查、合并。不经过中间 Claude 会话。
+- 写给 Codex 的规则：测试最多 2 个、只测用户能感受到的行为；不加哈希、免责声明、「待实测」段落；四项检查只跑一次。负载高时 CLI 测试偶尔超 5 秒，单独复跑能过即可。
+
 ### 0.1 现在能用什么（均已真机实测）
 
 | 能力 | 入口 | 实测结果 |
