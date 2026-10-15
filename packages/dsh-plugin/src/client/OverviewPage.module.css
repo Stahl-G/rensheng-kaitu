@@ -838,3 +838,12 @@ body[data-ds-dark-theme] .page {
   font-size: 14px;
   line-height: 22px;
 }
+
+.meDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background: var(--kt-me);
+}
