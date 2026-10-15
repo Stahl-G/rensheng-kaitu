@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { type FSWatcher, readFileSync, watch } from "node:fs";
+import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +35,8 @@ import {
   syncProjects,
   workspaceFileStamps,
 } from "@kaitu/core";
+import { dshCommand } from "../dsh.js";
+import { productMutations, productRequest } from "./product.js";
 
 export interface UiOptions {
   port?: number;
@@ -42,8 +44,11 @@ export interface UiOptions {
   snapshotDelayMs?: number;
   refreshDelayMs?: number;
   inboxStableMs?: number;
+  webRoot?: string;
+  openAi?: () => Promise<{ url?: string }>;
 }
-const WEB_ROOT = fileURLToPath(new URL("../../../web/dist/", import.meta.url));
+const PRODUCT_ROOT = fileURLToPath(new URL("../../../dsh-plugin/dist/standalone/", import.meta.url));
+const LEGACY_ROOT = fileURLToPath(new URL("../../../web/dist/", import.meta.url));
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -73,6 +78,50 @@ function field(data: Record<string, unknown>, key: string): string {
 }
 
 export async function startUi(ws: Workspace, options: UiOptions = {}) {
+  const WEB_ROOT = options.webRoot ?? (existsSync(`${PRODUCT_ROOT}/index.html`) ? PRODUCT_ROOT : LEGACY_ROOT);
+  let aiChild: ReturnType<typeof spawn> | undefined;
+  let aiReady: Promise<{ url?: string }> | undefined;
+  const openAi = () => {
+    if (options.openAi) return options.openAi();
+    if (aiReady) return aiReady;
+    dshCommand(ws);
+    aiReady = new Promise<{ url: string }>((resolveAi, rejectAi) => {
+      aiChild = spawn(
+        "npx",
+        [
+          "--yes",
+          "@deepseek-ai/dsh@0.2.0-rc.2",
+          "web",
+          "--patch",
+          ws.resolve(".kaitu/cache/dsh/cordis.yml", { internal: true }),
+          "--port",
+          "0",
+          "--no-open",
+        ],
+        {
+          env: { ...process.env, DSH_HOME: ws.resolve(".kaitu/optional-ai", { internal: true }) },
+          stdio: ["ignore", "pipe", "ignore"],
+          detached: process.platform !== "win32",
+        },
+      );
+      let output = "";
+      aiChild.stdout?.on("data", (chunk) => {
+        output = (output + String(chunk)).slice(-4000);
+        const url = /dsh web: (http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+)/.exec(output)?.[1];
+        if (url) resolveAi({ url });
+      });
+      aiChild.once("error", () => {
+        aiReady = undefined;
+        rejectAi(new KaituError("无法启动内置 AI，请检查 Node.js 与网络连接", "AI_START"));
+      });
+      aiChild.once("exit", () => {
+        aiReady = undefined;
+        aiChild = undefined;
+        rejectAi(new KaituError("内置 AI 已退出，请重新打开", "AI_START"));
+      });
+    });
+    return aiReady;
+  };
   const requestedPort = options.port ?? 4870;
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
     throw new KaituError("端口必须是 1–65535 的整数", "BAD_ARGS");
@@ -207,7 +256,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!hosts.includes(req.headers.host ?? "")) return json(res, 403, { error: "拒绝非本机 Host" });
@@ -221,6 +270,45 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }
     try {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
+      if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
+        const method = url.pathname.slice("/api/product/".length);
+        const args = JSON.parse(
+          (
+            await body(req, method === "financeImportPreview" ? 49 * 1024 * 1024 : 3 * 1024 * 1024)
+          ).toString(),
+        );
+        if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
+        let draftId: string | undefined;
+        if (method === "openAi" && typeof args[0] === "string" && args[0].trim()) {
+          if (args[0].length > 100000) throw new KaituError("请求内容过长", "BAD_ARGS");
+          draftId = randomUUID();
+          ws.writeJson(
+            ".kaitu/cache/ai-draft.json",
+            { id: draftId, text: args[0] },
+            { internal: true, mode: 0o600 },
+          );
+        }
+        const result =
+          method === "openAi"
+            ? await openAi()
+            : await exclusive(async () => {
+                const mutates = productMutations.has(method);
+                if (mutates) await saveExternal();
+                const value = await productRequest(ws, method, args);
+                if (mutates) notify();
+                return value;
+              });
+        if (
+          method === "openAi" &&
+          draftId &&
+          result &&
+          typeof result === "object" &&
+          "url" in result &&
+          typeof result.url === "string"
+        )
+          return json(res, 200, { ...result, url: `${result.url}#kaitu-draft=${draftId}` });
+        return json(res, 200, result ?? null);
+      }
       if (req.method === "GET") {
         if (url.pathname.startsWith("/api/photos/")) {
           const photo = readPhoto(ws, decodeURIComponent(url.pathname.slice("/api/photos/".length)));
@@ -363,6 +451,16 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }
   });
   const close = async () => {
+    if (aiChild?.pid) {
+      if (process.platform === "win32") aiChild.kill();
+      else {
+        try {
+          process.kill(-aiChild.pid, "SIGTERM");
+        } catch {
+          /* 自建进程组已退出。 */
+        }
+      }
+    }
     closed = true;
     watcher?.close();
     clearTimeout(inboxTimer);

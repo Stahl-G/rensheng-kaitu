@@ -52,6 +52,7 @@ function entry(
     return [
       ...disabled.map((id) => ({ id, disabled: true })),
       { id: "tool-skill", disabled: false },
+      { id: "ui-settings-models", config: { credentialOnboarding: false } },
       {
         insert: [...schedules, { id: "kaitu", name: plugin, config: { workspace } }],
       },
@@ -63,6 +64,9 @@ function entry(
     ...disabled.flatMap((id) => [`- id: ${id}`, "  disabled: true"]),
     "- id: tool-skill",
     "  disabled: false",
+    "- id: ui-settings-models",
+    "  config:",
+    "    credentialOnboarding: false",
     "- insert:",
     ...schedules.flatMap(({ id, name }) => [`    - id: ${id}`, `      name: ${JSON.stringify(name)}`]),
     "    - id: kaitu",

@@ -1,8 +1,11 @@
+import { rmSync } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
   KaituError,
   Workspace,
+  captureNote,
+  decideProposal,
   defaultRoot,
   dismissNews,
   editExperience,
@@ -83,6 +86,39 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("workspacePath")
   async workspacePath(): Promise<string> {
     return this.workspace.root;
+  }
+
+  @Remote("aiDraft")
+  async aiDraft(id?: string): Promise<{ id: string; text: string } | null> {
+    return this.write(async () => {
+      const file = ".kaitu/cache/ai-draft.json";
+      if (!this.workspace.exists(file)) return null;
+      const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
+      if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
+      const value = draft.text;
+      if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
+        throw new KaituError("会话草稿不合法", "BAD_ARGS");
+      return { id: draft.id, text: value };
+    });
+  }
+
+  @Remote("ackAiDraft")
+  async ackAiDraft(id: string): Promise<void> {
+    await this.write(async () => {
+      const file = ".kaitu/cache/ai-draft.json";
+      if (this.workspace.exists(file) && this.workspace.readJson<{ id?: string }>(file).id === id)
+        rmSync(this.workspace.resolve(file, { internal: true }));
+    });
+  }
+
+  @Remote("decideProposal")
+  async decideProposal(id: string, decision: "confirmed" | "rejected"): Promise<{ version: string | null }> {
+    return this.write(() => decideProposal(this.workspace, id, decision));
+  }
+
+  @Remote("capture")
+  async capture(text: string): Promise<{ path: string; version: string | null }> {
+    return this.write(() => captureNote(this.workspace, text));
   }
 
   @Remote("news")

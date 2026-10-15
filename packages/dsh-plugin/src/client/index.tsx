@@ -40,13 +40,13 @@ export async function apply(ctx: Context) {
       "uiWorkspace",
     ],
     apply(ctx: Context) {
-      let opening: Promise<void> | undefined;
+      let opening: Promise<boolean> | undefined;
       const open = (text?: string) => {
         if (opening) return opening;
         opening = (async () => {
           const result = await ctx.remote.kaitu.workspacePath();
           if (!result.ok) throw new Error(result.error.message);
-          await openKaituSession(
+          return openKaituSession(
             {
               workspaces: ctx.get("workspaces"),
               sessions: ctx.get("sessions"),
@@ -62,6 +62,30 @@ export async function apply(ctx: Context) {
         });
         return opening;
       };
+      ctx.effect(() => {
+        let checking = false;
+        const check = async () => {
+          if (checking || opening) return;
+          checking = true;
+          try {
+            const draftId =
+              new URLSearchParams(window.location.hash.slice(1)).get("kaitu-draft") ?? undefined;
+            const draft = await ctx.remote.kaitu.aiDraft(draftId);
+            if (draft.ok && draft.value && (await open(draft.value.text))) {
+              await ctx.remote.kaitu.ackAiDraft(draft.value.id);
+              if (draftId)
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+          } catch {
+            /* Host 重新连接后继续读取尚未领取的草稿。 */
+          } finally {
+            checking = false;
+          }
+        };
+        const timer = setInterval(() => void check(), 3000);
+        void check();
+        return () => clearInterval(timer);
+      });
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
         if (!result.ok) throw new Error(result.error.message);
@@ -84,6 +108,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              decideProposal: async (id: string, decision: "confirmed" | "rejected") => {
+                const result = await ctx.remote.kaitu.decideProposal(id, decision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              capture: async (text: string) => {
+                const result = await ctx.remote.kaitu.capture(text);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              onAdvanced: () => ctx.layout.selectPanel("plugins" as MainPanelId),
               loadNews: async () => {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);

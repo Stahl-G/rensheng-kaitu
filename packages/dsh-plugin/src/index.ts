@@ -38,6 +38,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const stop = startInboxLoop(ws, 60000, queue);
   ctx.effect(() => stop);
   ctx.inject(["schedule", "sessionController", "sessions"], (services) => {
+    if (!config.enableAutomation) return;
     services.effect(() => {
       let pending: Promise<void> | undefined;
       let complete = false;

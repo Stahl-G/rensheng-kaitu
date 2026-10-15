@@ -296,7 +296,7 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
         <div>
           <h1>
             <span className={css.dot} aria-hidden="true" />
-            资讯
+            发现
           </h1>
           <p className={css.subtitle}>
             {data
@@ -378,7 +378,8 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
                   <p className={css.empty}>暂无记录。和开图聊聊你最近关注的事，再请它整理资讯。</p>
                 )}
               </section>
-              <section aria-label="X 热门">
+              <details aria-label="热门话题">
+                <summary className={css.link}>更多热门话题</summary>
                 <div className={css.heading}>
                   <h2>X 热门</h2>
                 </div>
@@ -392,7 +393,7 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
                 {!data.trends.length && (
                   <p className={css.empty}>暂无记录。可以请 Agent 整理你关注的话题。</p>
                 )}
-              </section>
+              </details>
               <section aria-label="其他新闻">
                 <div className={css.heading}>
                   <h2>其他新闻</h2>

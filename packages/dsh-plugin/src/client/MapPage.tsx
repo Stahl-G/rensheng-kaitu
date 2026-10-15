@@ -673,40 +673,62 @@ export function MapPage({
         </div>
       ) : (
         <>
-          <div className={css.toolbar}>
-            <fieldset className={css.legend} aria-label="地图图层">
-              {layers.map((layer) => (
+          <details className={css.review}>
+            <summary>地图工具 · 图层、年份与显示方式</summary>
+            <div className={css.toolbar}>
+              <fieldset className={css.legend} aria-label="地图图层">
+                {layers.map((layer) => (
+                  <button
+                    type="button"
+                    key={layer.id}
+                    aria-pressed={enabled.includes(layer.id)}
+                    onClick={() => {
+                      setEnabled((current) =>
+                        current.includes(layer.id)
+                          ? current.filter((id) => id !== layer.id)
+                          : [...current, layer.id],
+                      );
+                      setSelected(null);
+                    }}
+                  >
+                    <span className={css.shape} data-layer={layer.id} aria-hidden="true" />
+                    {layer.name}
+                  </button>
+                ))}
+              </fieldset>
+              <fieldset className={css.switch} aria-label="显示方式">
+                {(
+                  [
+                    ["map", "地图"],
+                    ["list", "列表"],
+                  ] as const
+                ).map(([id, name]) => (
+                  <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
+                    {name}
+                  </button>
+                ))}
+              </fieldset>
+            </div>
+            <fieldset className={css.years} aria-label="按年份筛选">
+              {[
+                { id: "all", name: "全部" },
+                ...years.map((id) => ({ id, name: id })),
+                { id: "undated", name: `时间不详 ${data.undated}` },
+              ].map((item) => (
                 <button
                   type="button"
-                  key={layer.id}
-                  aria-pressed={enabled.includes(layer.id)}
+                  key={item.id}
+                  aria-pressed={year === item.id}
                   onClick={() => {
-                    setEnabled((current) =>
-                      current.includes(layer.id)
-                        ? current.filter((id) => id !== layer.id)
-                        : [...current, layer.id],
-                    );
+                    setYear(item.id);
                     setSelected(null);
                   }}
                 >
-                  <span className={css.shape} data-layer={layer.id} aria-hidden="true" />
-                  {layer.name}
+                  {item.name}
                 </button>
               ))}
             </fieldset>
-            <fieldset className={css.switch} aria-label="显示方式">
-              {(
-                [
-                  ["map", "地图"],
-                  ["list", "列表"],
-                ] as const
-              ).map(([id, name]) => (
-                <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
-                  {name}
-                </button>
-              ))}
-            </fieldset>
-          </div>
+          </details>
           <div className={css.layout} data-view={view}>
             <CityMap cities={cities} selected={city?.id ?? null} onSelect={setSelected} />
             <section className={css.listPane} aria-label="城市列表">
@@ -792,25 +814,6 @@ export function MapPage({
               ))}
             </section>
           </div>
-          <fieldset className={css.years} aria-label="按年份筛选">
-            {[
-              { id: "all", name: "全部" },
-              ...years.map((id) => ({ id, name: id })),
-              { id: "undated", name: `时间不详 ${data.undated}` },
-            ].map((item) => (
-              <button
-                type="button"
-                key={item.id}
-                aria-pressed={year === item.id}
-                onClick={() => {
-                  setYear(item.id);
-                  setSelected(null);
-                }}
-              >
-                {item.name}
-              </button>
-            ))}
-          </fieldset>
 
           {compact && details}
         </>

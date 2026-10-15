@@ -51,13 +51,25 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 ## 装好后怎么用
 
 打开 `Kaitu.dmg`，将 `Kaitu.app` 拖入 Applications 后双击；只有应用目录时直接复制后打开。
-首次启动按欢迎页完成模型配置，填写自己的 API Key，然后进入「开图」。
+默认直接进入独立本地工作台，只有总览、开图、记录三个导航。查看资料、保存原文、打开地图和财务不要求模型或 API Key。
+「AI 与连接」先提供已有 AI 的接手说明，主动选择「使用内置 AI」后才启动 DSH、配置模型。
 
 工作区优先使用 `~/Library/Application Support/kaitu/current-workspace.json` 指向的有效目录，
-否则使用 `~/kaitu`，空目录会自动初始化。首次注册的 DSH 默认工作区就是这个开图目录，
-从侧栏或快捷键新建会话会沿用当前工作区，也可从开图页面进入开图会话。
+否则使用 `~/kaitu`，空目录会自动初始化。默认资料服务只监听本机随机端口，退出应用时停止。
+应用移动后会自动更新内置插件路径。已存在的健康目标和任务保留，新用户不预填私人健康数值、不自动创建多种定时任务。
 
-应用状态、模型凭据、DSH 会话和 Electron 数据保存在 `~/.kaitu-app/`，开图文件保留在原工作区。
-模型配置在 Kaitu 中单独填写。DSH 插件市场及插件设置入口保留，可继续安装和管理插件。
-每次启动共用 `kaitu dsh --install` 的生成函数更新开图受管段，包含定时任务包去重，保留段外配置。
-应用移动后会自动更新内置插件路径。Kaitu 与原 DSH 使用同一默认 Host 端口，按需打开其中一个。
+应用状态和 Electron 数据保存在 `~/.kaitu-app/`，开图文件保留在原工作区。
+按需启动的内置 AI 使用 `~/.kaitu-app/ai/` 隔离会话与凭据，与资料服务分开运行。
+插件市场和运行时配置只通过高级设置进入。
+
+## 隔离验收
+
+```sh
+KAITU_APP_HOME=/tmp/kaitu-test/state \
+KAITU_DIR=/tmp/kaitu-test/workspace \
+KAITU_APP_PORT=0 \
+/path/to/Kaitu.app/Contents/MacOS/Kaitu
+```
+
+显式指定隔离目录后不读取真实工作区指针。`KAITU_APP_HOME` 与 `KAITU_DIR` 必须是绝对路径。
+`KAITU_APP_PORT` 只影响主动启动的内置 AI，普通资料界面始终使用系统分配的本机端口。

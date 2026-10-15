@@ -21,6 +21,7 @@ export const inject = ["tools", "systemPrompt"];
 
 export interface Config {
   workspace?: string;
+  enableAutomation?: boolean;
 }
 
 const instructions = [

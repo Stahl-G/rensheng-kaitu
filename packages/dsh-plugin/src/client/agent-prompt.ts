@@ -17,16 +17,17 @@ export async function openKaituSession(
   services: KaituSessionServices,
   workspace: string,
   text?: string,
-): Promise<void> {
+): Promise<boolean> {
   const navigation = services.layout.beginNavigation();
   const target = await services.workspaces.create({ path: workspace });
-  if (navigation.aborted) return;
+  if (navigation.aborted) return false;
   const id = await services.sessions.create({ workspaceId: target.workspaceId });
-  if (navigation.aborted) return;
+  if (navigation.aborted) return false;
   services.uiWorkspace.openSession(id);
   if (text) {
     const scope = services.sessions.scope(id);
     if (!scope) throw new Error("开图会话尚未就绪，请重试");
     services.conversation.input.for(scope).setDraft(text);
   }
+  return true;
 }

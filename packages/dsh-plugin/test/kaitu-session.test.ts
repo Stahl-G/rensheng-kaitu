@@ -45,4 +45,13 @@ it("开图入口注册自己的工作区、创建新会话并仅在新会话预�
   expect(services.sessions.scope).toHaveBeenCalledWith("new-1");
   expect(services.conversation.input.for).toHaveBeenCalledWith(scope);
   expect(draft).toHaveBeenCalledTimes(1);
+  const controller = new AbortController();
+  services.layout.beginNavigation = () => controller.signal;
+  services.workspaces.create = async () => {
+    controller.abort();
+    return { workspaceId: "kaitu" };
+  };
+  expect(await openKaituSession(services, "/synthetic/kaitu", "启动恢复期间的草稿")).toBe(false);
+  expect(count).toBe(2);
+  expect(draft).toHaveBeenCalledTimes(1);
 });

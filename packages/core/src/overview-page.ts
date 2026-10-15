@@ -1,6 +1,6 @@
 import { driveStatus } from "./drive.js";
 import { history } from "./history.js";
-import { inboxNotes } from "./inbox-notes.js";
+import { inboxNotes, noteMetadata } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { latestDaily } from "./overview.js";
 import type { StoredRecord } from "./records.js";
@@ -110,12 +110,68 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     (m) =>
       m[1]?.toLowerCase() !== "x" && !/^(?:无|暂无|没有|无未决事项)[。.!！\s]*$/.test(m[2]?.trim() ?? ""),
   );
-  const next = status.modules.flatMap((module) =>
-    (module.next ?? [])
-      .filter((item) => item.status === "todo" || item.status === "proposed")
-      .slice(0, 5)
-      .map((item) => ({ ...item, module: module.module, file: module.file })),
+  const next = status.modules
+    .flatMap((module) =>
+      (module.next ?? [])
+        .filter((item) => item.status === "todo" || item.status === "proposed")
+        .map((item) => ({ ...item, module: module.module, file: module.file })),
+    )
+    .sort((a, b) => {
+      const overdue = (item: typeof a) => (item.due && item.due < data.today ? 0 : 1);
+      const priority = (item: typeof a) => (item.priority === "high" ? 0 : item.priority === "low" ? 2 : 1);
+      return (
+        overdue(a) - overdue(b) ||
+        priority(a) - priority(b) ||
+        (a.due ?? "9999").localeCompare(b.due ?? "9999") ||
+        Number(a.status === "proposed") - Number(b.status === "proposed")
+      );
+    });
+  const allNext = next.map((item) => ({
+    id: item.id,
+    title: item.title,
+    proposed: item.status === "proposed",
+    module: item.module,
+    file: item.file,
+    section: item.file.startsWith("health/")
+      ? "health"
+      : /^(?:projects|\.kaitu\/local-projects)\//.test(item.file)
+        ? "projects"
+        : item.file.startsWith("feed/")
+          ? "feed"
+          : item.file.startsWith("me/")
+            ? "me"
+            : "today",
+  }));
+  const notes = inboxNotes(ws).map((note) => ({
+    file: note.path,
+    text: note.content,
+    status: noteMetadata(note.content).kind === "capture" ? ("received" as const) : ("needs_review" as const),
+  }));
+  const pendingFiles = ["inbox/agents", "inbox/health"].reduce(
+    (count, directory) =>
+      count +
+      (ws.exists(directory)
+        ? readdirSync(ws.resolve(directory), { withFileTypes: true }).filter(
+            (entry) => entry.isFile() && !entry.name.startsWith("."),
+          ).length
+        : 0),
+    0,
   );
+  const versions = (await history(ws))
+    .flatMap((v) => {
+      const text = friendlyVersion(v.message);
+      return text
+        ? [
+            {
+              ...v,
+              text,
+              source: versionSource(v.message),
+              actor: /Drive 收件箱[：:]\s*([^）)]+)/.exec(v.message)?.[1]?.trim() ?? null,
+            },
+          ]
+        : [];
+    })
+    .slice(0, 30);
   return {
     root: data.root,
     timeZone: data.timeZone,
@@ -131,37 +187,14 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       !daily &&
       !data.inboxNotes,
     blocks: status.now.blocks,
-    next: next.map((item) => ({
-      id: item.id,
-      title: item.title,
-      proposed: item.status === "proposed",
-      module: item.module,
-      file: item.file,
-      section: item.file.startsWith("health/")
-        ? "health"
-        : /^(?:projects|\.kaitu\/local-projects)\//.test(item.file)
-          ? "projects"
-          : item.file.startsWith("feed/")
-            ? "feed"
-            : item.file.startsWith("me/")
-              ? "me"
-              : "today",
-    })),
-    versions: (await history(ws))
-      .flatMap((v) => {
-        const text = friendlyVersion(v.message);
-        return text
-          ? [
-              {
-                ...v,
-                text,
-                source: versionSource(v.message),
-                actor: /Drive 收件箱[：:]\s*([^）)]+)/.exec(v.message)?.[1]?.trim() ?? null,
-              },
-            ]
-          : [];
-      })
-      .slice(0, 10),
+    next: allNext.slice(0, 3),
+    allNext,
+    versions,
+    sync: {
+      received: pendingFiles + notes.filter((note) => note.status === "received").length,
+      needsReview: notes.filter((note) => note.status === "needs_review").length,
+      updatedAt: versions.find((v) => !/等待整理|待整理笔记/.test(v.message))?.time ?? null,
+    },
     daily: daily ? { ...daily, unresolved: dailyItems.length } : null,
     projects: status.projects
       .filter((p) => p.stage === "active")
@@ -218,8 +251,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       },
     ],
     pending: status.now.pending,
-    inboxNotes: data.inboxNotes,
-    notes: inboxNotes(ws).map((note) => ({ file: note.path, text: note.content })),
+    inboxNotes: notes.filter((note) => note.status === "needs_review").length,
+    notes,
     warnings: data.warnings,
   };
 }
+import { readdirSync } from "node:fs";

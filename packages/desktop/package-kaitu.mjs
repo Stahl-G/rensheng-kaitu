@@ -61,8 +61,8 @@ const plan = [
   "Frameworks: 按实际 helper 应用重命名 Kaitu Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
   "Resources: 移除 app-update.yml；从 SVG 生成 PNG / ICNS；内置插件、初始化器、schemas、templates、data 与 DSH 协议转接包",
-  "MacOS: xcrun clang 构建原生 Kaitu 启动入口 → Electron Node 初始化 profile → 原生 DSH",
-  "首次启动：读取 current-workspace.json，否则 ~/kaitu；共用 CLI patch（含定时任务、插件市场）；默认开图工作区与开图页",
+  "MacOS: xcrun clang 构建原生 Kaitu 启动入口 → Electron Node 初始化资料 → 独立本地工作台",
+  "首次启动：读取 current-workspace.json，否则 ~/kaitu；默认三个导航，无模型也能记录与查看；主动选择内置 AI 后才启动 DSH",
   "数据目录：DSH_HOME、Electron userData / 日志 / 崩溃记录均在 ~/.kaitu-app/",
   identity
     ? `SIGN ${identity}：逐层签名 Electron / 内置 Mach-O / 应用，hardened runtime + DSH entitlements + timestamp`
@@ -154,6 +154,7 @@ const packagedManifest = {
 packagedManifest.dshMandatoryUpdatePolicy = undefined;
 changes.set("package.json", Buffer.from(`${JSON.stringify(packagedManifest, null, 2)}\n`));
 changes.set("kaitu-bootstrap.mjs", readFileSync(join(directory, "bootstrap.mjs")));
+changes.set("kaitu-environment.mjs", readFileSync(join(directory, "environment.mjs")));
 
 console.log(`app.asar: ${[...changes.keys()].join(", ")}；替换 ${replacements} 处品牌文案`);
 if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("请在 macOS arm64 上后处理");
@@ -403,6 +404,19 @@ async function writePayload(payload) {
     },
     external: ["better-sqlite3"],
   });
+  await build({
+    entryPoints: [join(directory, "local.mjs")],
+    outfile: join(payload, "dist/local.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: {
+      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+    },
+    external: ["better-sqlite3"],
+  });
+  cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
   const clientPath = join(root, "packages/dsh-plugin/dist/client.js");
   const client = readFileSync(clientPath, "utf8");
   // 主面板已注册；不要依赖 bundle 尾部，地图组件会在其后附带许可证。
