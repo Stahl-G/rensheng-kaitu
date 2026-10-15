@@ -75,6 +75,81 @@
   opacity: 0.6;
   cursor: wait;
 }
+.page button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+.editor {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+.editor fieldset,
+.editor label {
+  display: grid;
+  gap: 6px;
+}
+.editor fieldset {
+  gap: 12px;
+}
+.editor label {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--kt-secondary);
+}
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.editor input,
+.editor select,
+.editor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--kt-muted);
+  border-radius: 8px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  font: inherit;
+}
+.editor input:focus-visible,
+.editor select:focus-visible,
+.editor textarea:focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .editor input:hover,
+  .editor select:hover,
+  .editor textarea:hover {
+    background: var(--kt-subtle);
+  }
+}
+.editor fieldset:disabled {
+  opacity: 0.6;
+}
+.editor [aria-invalid="true"] {
+  border-color: var(--kt-map-ink);
+  outline: 1px dashed var(--kt-map-ink);
+}
+.formError {
+  padding: 10px;
+  color: var(--kt-text);
+  border-inline-start: 3px solid var(--kt-map-ink);
+  background: var(--kt-map-tint);
+}
+.editor .actions button {
+  min-height: 44px;
+}
 .page button:hover:not(:disabled) {
   filter: brightness(0.95);
 }

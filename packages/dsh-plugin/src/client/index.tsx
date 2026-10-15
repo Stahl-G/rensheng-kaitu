@@ -152,6 +152,23 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              editExperience: async (
+                id: string,
+                changes: import("../types.js").ExperienceChanges,
+                revision: number,
+              ) => {
+                const result = await ctx.remote.kaitu.editExperience(id, changes, revision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              hideExperience: async (id: string, revision: number) => {
+                const result = await ctx.remote.kaitu.hideExperience(id, revision);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              unhideExperience: async (id: string, revision: number) => {
+                const result = await ctx.remote.kaitu.unhideExperience(id, revision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
               loadProjects: async () => {
                 const result = await ctx.remote.kaitu.projects();
                 if (!result.ok) throw new Error(result.error.message);

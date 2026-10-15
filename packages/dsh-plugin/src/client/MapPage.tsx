@@ -8,12 +8,16 @@ import {
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Experience, LifeMapData } from "../types.js";
+import type { Experience, ExperienceChanges, LifeMapData } from "../types.js";
+import { ExperienceEditor } from "./ExperienceEditor.js";
 import css from "./MapPage.module.css";
 
 export interface MapPageProps {
   loadLifeMap: () => Promise<LifeMapData>;
   resolveExperience: (id: string, geonameid: number) => Promise<unknown>;
+  editExperience: (id: string, changes: ExperienceChanges, revision: number) => Promise<void>;
+  hideExperience: (id: string, revision: number) => Promise<number>;
+  unhideExperience: (id: string, revision: number) => Promise<void>;
   onPrompt: (text: string) => void;
 }
 type Layer = LifeMapData["features"][number]["properties"]["layer"];
@@ -53,7 +57,21 @@ function dateLabel(value: string | undefined, precision: Experience["time_precis
   if (precision === "year" || !month) return year;
   return `${year} 年 ${Number(month)} 月${precision === "day" && day ? ` ${Number(day)} 日` : ""}`;
 }
-function ExperienceDetails({ item, onPrompt }: { item: Experience; onPrompt: MapPageProps["onPrompt"] }) {
+function ExperienceDetails({
+  item,
+  onPrompt,
+  save,
+  hide,
+}: {
+  item: Experience;
+  onPrompt: MapPageProps["onPrompt"];
+  save: (item: Experience, changes: ExperienceChanges) => Promise<void>;
+  hide: (item: Experience) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [confirmHide, setConfirmHide] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
     <article className={css.experience}>
       <div className={css.experienceHeading}>
@@ -72,6 +90,63 @@ function ExperienceDetails({ item, onPrompt }: { item: Experience; onPrompt: Map
       </p>
       {item.notes && <p className={css.notes}>{item.notes}</p>}
       <p className={css.source}>来源：{item.source || "暂无记录"}</p>
+      {editing ? (
+        <ExperienceEditor
+          item={item}
+          save={async (changes) => {
+            await save(item, changes);
+            setEditing(false);
+          }}
+          cancel={() => setEditing(false)}
+        />
+      ) : (
+        <div className={css.actions}>
+          <button type="button" className={css.link} onClick={() => setEditing(true)}>
+            修正经历
+          </button>
+          <button type="button" className={css.link} onClick={() => setConfirmHide(true)}>
+            隐藏
+          </button>
+        </div>
+      )}
+      {confirmHide && (
+        <div className={css.notice}>
+          <p>隐藏这段经历？之后可撤销，旧来源同步不会重新添加。</p>
+          <div className={css.actions}>
+            <button
+              type="button"
+              className={css.control}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  await hide(item);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "隐藏中…" : "确认隐藏"}
+            </button>
+            <button
+              type="button"
+              className={css.control}
+              disabled={busy}
+              onClick={() => setConfirmHide(false)}
+            >
+              保留
+            </button>
+          </div>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className={css.formError}>
+          {error}
+        </p>
+      )}
       <button
         type="button"
         className={css.link}
@@ -79,7 +154,7 @@ function ExperienceDetails({ item, onPrompt }: { item: Experience; onPrompt: Map
           onPrompt(`帮我核对并修改「${item.place.name}」的这段经历（${item.id}），先和我确认地点、时间和分类`)
         }
       >
-        纠正这段经历
+        请开图协助核对
       </button>
     </article>
   );
@@ -328,7 +403,16 @@ function CityMap({
   );
 }
 
-export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPageProps) {
+export function MapPage({
+  loadLifeMap,
+  resolveExperience,
+  editExperience,
+  hideExperience,
+  unhideExperience,
+  onPrompt,
+}: MapPageProps) {
+  const [notice, setNotice] = useState<string | null>(null);
+  const [undo, setUndo] = useState<{ id: string; revision: number } | null>(null);
   const [data, setData] = useState<LifeMapData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -432,6 +516,30 @@ export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPagePro
     };
   }, [selectedId, compact]);
   const dismiss = () => setSelected(null);
+  const save = async (item: Experience, changes: ExperienceChanges) => {
+    await editExperience(item.id, changes, item.rev ?? 1);
+    setNotice("修正已保存");
+    await refresh();
+  };
+  const hide = async (item: Experience) => {
+    const revision = await hideExperience(item.id, item.rev ?? 1);
+    setUndo({ id: item.id, revision });
+    setNotice("经历已隐藏");
+    await refresh();
+  };
+  const unhide = async (id: string, revision: number) => {
+    setBusy(true);
+    try {
+      await unhideExperience(id, revision);
+      setUndo(null);
+      setNotice("隐藏已撤销");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
   const resolve = async (id: string, candidate: number) => {
     setBusy(true);
     setError(null);
@@ -457,7 +565,9 @@ export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPagePro
         onKeyDown={(event) => {
           if (event.key === "Escape") dismiss();
           if (compact && event.key === "Tab") {
-            const focusable = sheet.current?.querySelectorAll<HTMLElement>("button, a[href]");
+            const focusable = sheet.current?.querySelectorAll<HTMLElement>(
+              "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])",
+            );
             const first = focusable?.[0];
             const last = focusable?.[focusable.length - 1];
             if (event.shiftKey && document.activeElement === first) {
@@ -482,7 +592,13 @@ export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPagePro
           </button>
         </div>
         {city.experiences.map((item) => (
-          <ExperienceDetails key={item.id} item={item} onPrompt={ask} />
+          <ExperienceDetails
+            key={`${item.id}:${item.rev ?? 1}`}
+            item={item}
+            onPrompt={ask}
+            save={save}
+            hide={hide}
+          />
         ))}
       </div>
     </>
@@ -508,6 +624,42 @@ export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPagePro
             重新读取
           </button>
         </p>
+      )}
+      {notice && (
+        <output className={css.notice}>
+          {notice}
+          {undo && (
+            <button
+              type="button"
+              className={css.control}
+              disabled={busy}
+              onClick={() => void unhide(undo.id, undo.revision)}
+            >
+              撤销隐藏
+            </button>
+          )}
+        </output>
+      )}
+      {!!data?.hidden.length && (
+        <details className={css.review}>
+          <summary>已隐藏 {data.hidden.length} 段经历</summary>
+          {data.hidden.map(({ item, revision }) => (
+            <div key={item.id} className={css.reviewItem}>
+              <strong>{item.title || item.place.name}</strong>
+              <p className={css.source}>
+                {item.place.name} · {dateLabel(item.start, item.time_precision)} · 来源：{item.source}
+              </p>
+              <button
+                type="button"
+                className={css.control}
+                disabled={busy}
+                onClick={() => void unhide(item.id, revision)}
+              >
+                恢复这段经历
+              </button>
+            </div>
+          ))}
+        </details>
       )}
       {!data ? (
         <output className={css.empty}>{error ? "经历读取失败，请重试。" : "正在读取经历…"}</output>
@@ -566,7 +718,13 @@ export function MapPage({ loadLifeMap, resolveExperience, onPrompt }: MapPagePro
                   {data.review.map((item) => (
                     <div key={item.id} className={css.reviewItem}>
                       <h3>原地名：{item.place.name}</h3>
-                      <ExperienceDetails item={item} onPrompt={ask} />
+                      <ExperienceDetails
+                        key={`${item.id}:${item.rev ?? 1}`}
+                        item={item}
+                        onPrompt={ask}
+                        save={save}
+                        hide={hide}
+                      />
                       {item.review?.candidates.length ? (
                         item.review.candidates.map((candidate) => (
                           <button

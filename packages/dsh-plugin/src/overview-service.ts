@@ -5,6 +5,8 @@ import {
   Workspace,
   defaultRoot,
   dismissNews,
+  editExperience,
+  hideExperience,
   lifeMap,
   listProjects,
   readAvatar,
@@ -17,6 +19,7 @@ import {
   resolveExperience,
   saveAvatar,
   tryNews,
+  unhideExperience,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
 import { readMe } from "./me-data.js";
@@ -24,6 +27,7 @@ import type { Config } from "./tools.js";
 import type {
   DoingData,
   DoingProject,
+  ExperienceChanges,
   HealthData,
   LifeMapData,
   MeData,
@@ -107,6 +111,22 @@ export class KaituOverviewService extends TypertRemoteService {
   async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
     const result = await this.write(() => resolveExperience(this.workspace, id, geonameid));
     return { id: result.record.id, version: result.version };
+  }
+
+  @Remote("editExperience")
+  async editExperience(id: string, changes: ExperienceChanges, revision: number): Promise<void> {
+    await this.write(() => editExperience(this.workspace, id, changes, revision));
+  }
+
+  @Remote("hideExperience")
+  async hideExperience(id: string, revision: number): Promise<number> {
+    const result = await this.write(() => hideExperience(this.workspace, id, revision));
+    return result.record.rev as number;
+  }
+
+  @Remote("unhideExperience")
+  async unhideExperience(id: string, revision: number): Promise<void> {
+    await this.write(() => unhideExperience(this.workspace, id, revision));
   }
 
   @Remote("me")

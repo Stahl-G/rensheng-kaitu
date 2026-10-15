@@ -238,6 +238,9 @@ export function OverviewPage({
   loadHealthPhoto,
   loadLifeMap,
   resolveExperience,
+  editExperience,
+  hideExperience,
+  unhideExperience,
   loadFinanceOverview,
   loadFinanceCashflow,
   loadFinanceInvestments,
@@ -407,7 +410,14 @@ export function OverviewPage({
         {current === "me" ? (
           <MePage key={meRevision} {...me} />
         ) : current === "map" ? (
-          <MapPage loadLifeMap={loadLifeMap} resolveExperience={resolveExperience} onPrompt={me.onPrompt} />
+          <MapPage
+            loadLifeMap={loadLifeMap}
+            resolveExperience={resolveExperience}
+            editExperience={editExperience}
+            hideExperience={hideExperience}
+            unhideExperience={unhideExperience}
+            onPrompt={me.onPrompt}
+          />
         ) : current === "finance" ? (
           <FinancePage
             loadFinanceOverview={loadFinanceOverview}

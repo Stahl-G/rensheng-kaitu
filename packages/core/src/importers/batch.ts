@@ -1,7 +1,13 @@
 import { isDeepStrictEqual } from "node:util";
 import { KaituError } from "../errors.js";
 import { snapshot } from "../history.js";
-import { type StoredRecord, addRecords, deleteRecord, readRecords, updateRecord } from "../records.js";
+import {
+  type StoredRecord,
+  addRecords,
+  deleteRecord,
+  readRecordRevisions,
+  updateRecord,
+} from "../records.js";
 import type { Workspace } from "../workspace.js";
 
 export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event" | "workout";
@@ -83,13 +89,31 @@ export async function importBatch(
   }
   if (opts.deleteMissing && !groups.has("event")) groups.set("event", new Map());
   const plans = [...groups].map(([type, group]) => {
-    const records = readRecords(ws, type).filter((r) => r.by === by && (!opts.scope || opts.scope(r)));
-    const existing = new Map(records.map((r) => [naturalKey(type, r), r]));
+    const revisions = readRecordRevisions(ws, type);
+    const latest = new Map<string, StoredRecord>();
+    for (const record of revisions) {
+      const previous = latest.get(record.id);
+      if (!previous || (record.rev ?? 1) >= (previous.rev ?? 1)) latest.set(record.id, record);
+    }
+    const records = [...latest.values()].filter(
+      (record) => !record.deleted && record.by === by && (!opts.scope || opts.scope(record)),
+    );
+    const existing = new Map<string, StoredRecord>();
+    for (const record of revisions) {
+      if (!record.deleted && record.by === by && (!opts.scope || opts.scope(record)))
+        existing.set(naturalKey(type, record), latest.get(record.id) as StoredRecord);
+    }
     const added: Record<string, unknown>[] = [];
     const updated: { id: string; patch: Record<string, unknown> }[] = [];
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
     for (const item of group.values()) {
-      const previous = existing.get(item.key);
+      const known = existing.get(item.key);
+      // 依据导入时的身份找到人工修订或删除的记录，旧来源不能覆盖或重新创建它。
+      if (known && known.by !== by) {
+        counts.skipped++;
+        continue;
+      }
+      const previous = known?.deleted ? undefined : known;
       let data = item.data;
       if (previous && item.activityTotals) {
         data = { ...content(previous), ...data };

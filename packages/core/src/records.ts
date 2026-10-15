@@ -198,16 +198,21 @@ export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
   return out;
 }
 
+/** 读取已有追加历史，包含修正前的原始记录与删除标记。 */
+export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[] {
+  return recordLines(ws, findRecordType(ws, type)).map((line) => {
+    try {
+      return JSON.parse(line.raw) as StoredRecord;
+    } catch {
+      throw new KaituError(`${line.file}:${line.line} 不是合法 JSON`, "CORRUPT");
+    }
+  });
+}
+
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
 function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord> {
   const latest = new Map<string, StoredRecord>();
-  for (const l of recordLines(ws, ref)) {
-    let rec: StoredRecord;
-    try {
-      rec = JSON.parse(l.raw);
-    } catch {
-      throw new KaituError(`${l.file}:${l.line} 不是合法 JSON`, "CORRUPT");
-    }
+  for (const rec of readRecordRevisions(ws, ref.type)) {
     const prev = latest.get(rec.id);
     if (!prev || (rec.rev ?? 1) >= (prev.rev ?? 1)) latest.set(rec.id, rec);
   }
