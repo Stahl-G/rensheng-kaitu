@@ -4,6 +4,7 @@ export { assetsRoot, schemasDir, templateDir } from "./assets.js";
 export * from "./chat-search.js";
 export * from "./chats.js";
 export * from "./doctor.js";
+export * from "./doing-page.js";
 export * from "./errors.js";
 export * from "./frontmatter.js";
 export * from "./history.js";

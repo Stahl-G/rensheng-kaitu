@@ -7,17 +7,18 @@ import type {
   OverviewSource,
   OverviewVersion,
 } from "../types.js";
+import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import css from "./OverviewPage.module.css";
 
-export interface OverviewPageProps extends MePageProps {
+export interface OverviewPageProps extends MePageProps, DoingPageProps {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
 }
 const sections = [
   { id: "today", name: "今天", tip: "今天的安排、下一步和要你确认的事" },
   { id: "health", name: "健康", tip: "训练、饮食、睡眠和身体数据" },
-  { id: "projects", name: "在做的事", tip: "你的项目和长期计划，以及进度" },
+  { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
   { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
   { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
 ];
@@ -213,7 +214,7 @@ function Section({
   );
 }
 
-export function OverviewPage({ load, onAgent, ...me }: OverviewPageProps) {
+export function OverviewPage({ load, onAgent, loadProjects, loadDoing, ...me }: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
   const [meRevision, setMeRevision] = useState(0);
   const [collapsed, setCollapsed] = useState(() => {
@@ -262,7 +263,10 @@ export function OverviewPage({ load, onAgent, ...me }: OverviewPageProps) {
   const stamp = (value: string) =>
     format(value, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
   return (
-    <main className={`${css.page} ${data?.empty ? css.emptyPage : ""}`} aria-busy={loading}>
+    <main
+      className={`${css.page} ${data?.empty && current !== "projects" ? css.emptyPage : ""}`}
+      aria-busy={loading}
+    >
       <div className={css.content}>
         <nav className={`${css.sectionNav} ${collapsed ? css.collapsedNav : ""}`} aria-label="开图板块">
           {collapsed ? (
@@ -314,41 +318,43 @@ export function OverviewPage({ load, onAgent, ...me }: OverviewPageProps) {
             </>
           )}
         </nav>
-        <header className={css.header}>
-          <div>
-            <h1>
-              {current === "me" && <span className={css.meDot} aria-hidden="true" />}
-              {currentName}
-            </h1>
-            <p className={css.subtitle}>
-              {current === "me"
-                ? "目标、作息规则和 AI 记住的你 · 改目标和规则前会先问你"
-                : data
-                  ? data.empty
-                    ? `工作区在 ${data.root} · 还没有记录`
-                    : `${new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${data.today}T12:00:00Z`))} · 数据截至 ${time(data.cutoff)} · 工作区在 ${data.drive ? "Google Drive" : data.root}`
-                  : "正在读取工作区…"}
-            </p>
-          </div>
-          <div className={css.actions}>
-            <Button
-              size="sm"
-              className={css.button}
-              disabled={loading}
-              onClick={() => {
-                void refresh();
-                setMeRevision((n) => n + 1);
-              }}
-            >
-              {loading ? "刷新中…" : "刷新"}
-            </Button>
-            {!data?.empty && (
-              <Button size="sm" className={`${css.button} ${css.primary}`} onClick={onAgent}>
-                问问开图
+        {current !== "projects" && (
+          <header className={css.header}>
+            <div>
+              <h1>
+                {current === "me" && <span className={css.meDot} aria-hidden="true" />}
+                {currentName}
+              </h1>
+              <p className={css.subtitle}>
+                {current === "me"
+                  ? "目标、作息规则和 AI 记住的你 · 改目标和规则前会先问你"
+                  : data
+                    ? data.empty
+                      ? `工作区在 ${data.root} · 还没有记录`
+                      : `${new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${data.today}T12:00:00Z`))} · 数据截至 ${time(data.cutoff)} · 工作区在 ${data.drive ? "Google Drive" : data.root}`
+                    : "正在读取工作区…"}
+              </p>
+            </div>
+            <div className={css.actions}>
+              <Button
+                size="sm"
+                className={css.button}
+                disabled={loading}
+                onClick={() => {
+                  void refresh();
+                  setMeRevision((n) => n + 1);
+                }}
+              >
+                {loading ? "刷新中…" : "刷新"}
               </Button>
-            )}
-          </div>
-        </header>
+              {!data?.empty && (
+                <Button size="sm" className={`${css.button} ${css.primary}`} onClick={onAgent}>
+                  问问开图
+                </Button>
+              )}
+            </div>
+          </header>
+        )}
         {error && (
           <div role="alert" className={css.notice}>
             读取失败：{error}{" "}
@@ -364,6 +370,13 @@ export function OverviewPage({ load, onAgent, ...me }: OverviewPageProps) {
         ))}
         {current === "me" ? (
           <MePage key={meRevision} {...me} />
+        ) : current === "projects" ? (
+          <DoingPage
+            loadProjects={loadProjects}
+            loadDoing={loadDoing}
+            onPrompt={me.onPrompt}
+            timeZone={data?.timeZone}
+          />
         ) : current !== "today" ? (
           <section className={css.placeholder}>
             <p>这一页还在做</p>
