@@ -68,6 +68,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadLifeMap: async () => {
+                const result = await ctx.remote.kaitu.lifeMap();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              resolveExperience: async (id: string, geonameid: number) => {
+                const result = await ctx.remote.kaitu.resolveExperience(id, geonameid);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadProjects: async () => {
                 const result = await ctx.remote.kaitu.projects();
                 if (!result.ok) throw new Error(result.error.message);

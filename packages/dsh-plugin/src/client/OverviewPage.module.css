@@ -21,6 +21,9 @@
   --kt-projects: #6b5bd6;
   --kt-projects-tint: #eceafb;
   --kt-projects-ink: #4b3db0;
+  --kt-map: #2674cb;
+  --kt-map-tint: #e6f0fc;
+  --kt-map-ink: #205ca0;
   --kt-feed: #c47a12;
   --kt-feed-tint: #faeedc;
   --kt-feed-ink: #8a520a;
@@ -66,6 +69,9 @@ body[data-ds-dark-theme] .page {
   --kt-projects: #a69aef;
   --kt-projects-tint: #332c50;
   --kt-projects-ink: #c4bbff;
+  --kt-map: #79b6ff;
+  --kt-map-tint: #20364e;
+  --kt-map-ink: #add2ff;
   --kt-feed: #e5ad57;
   --kt-feed-tint: #45341e;
   --kt-feed-ink: #f2cb8d;
@@ -570,6 +576,11 @@ body[data-ds-dark-theme] .page {
   --kt-section: var(--kt-feed);
   --kt-section-tint: var(--kt-feed-tint);
   --kt-section-ink: var(--kt-feed-ink);
+}
+.page [data-section="map"] {
+  --kt-section: var(--kt-map);
+  --kt-section-tint: var(--kt-map-tint);
+  --kt-section-ink: var(--kt-map-ink);
 }
 .page [data-section="me"] {
   --kt-section: var(--kt-me);
