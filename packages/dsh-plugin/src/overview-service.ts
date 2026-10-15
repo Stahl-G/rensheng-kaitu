@@ -1,8 +1,16 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
-import { Workspace, defaultRoot, listProjects, readOverviewPage } from "@kaitu/core";
+import {
+  Workspace,
+  defaultRoot,
+  dismissNews,
+  listProjects,
+  readNews,
+  readOverviewPage,
+  tryNews,
+} from "@kaitu/core";
 import type { Config } from "./tools.js";
-import type { DoingProject, OverviewData } from "./types.js";
+import type { DoingProject, NewsAction, NewsData, OverviewData } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -10,7 +18,7 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-/** 工作区只读总览，不激活 Agent 或触发同步。 */
+/** 工作区页面数据与资讯操作。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
 
@@ -23,6 +31,23 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("news")
+  async news(): Promise<NewsData> {
+    return readNews(this.workspace);
+  }
+
+  @Remote("tryNews")
+  async tryNews(id: string): Promise<NewsAction> {
+    const result = await tryNews(this.workspace, id);
+    return { id: result.record.id, status: "tried", version: result.version };
+  }
+
+  @Remote("dismissNews")
+  async dismissNews(id: string): Promise<NewsAction> {
+    const result = await dismissNews(this.workspace, id);
+    return { id: result.record.id, status: "dismissed", version: result.version };
   }
 
   @Remote("projects")

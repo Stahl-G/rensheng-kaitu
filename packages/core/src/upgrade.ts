@@ -62,6 +62,15 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     if (JSON.stringify(merged) !== JSON.stringify(existing))
       writes.set(file, `${JSON.stringify(merged, null, 2)}\n`);
   }
+  const feedFile = "feed/feeds.json";
+  if (ws.exists(feedFile)) {
+    const feeds = ws.readJson<Record<string, unknown>>(feedFile);
+    if (feeds.muted === undefined)
+      writes.set(feedFile, `${JSON.stringify({ ...feeds, muted: [] }, null, 2)}\n`);
+  } else {
+    const defaults = files.get(feedFile);
+    if (defaults) writes.set(feedFile, defaults);
+  }
   const skillRoot = ".agents/skills/";
   const builtinSkills = new Set(
     [...files.keys()].filter((file) => file.startsWith(skillRoot)).map((file) => file.split("/")[2]),

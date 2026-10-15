@@ -1,7 +1,41 @@
-/** 浏览器与 Host 的只读总览契约。 */
+/** 浏览器与 Host 的数据契约。 */
 export interface OverviewSource {
   file: string;
   text: string;
+}
+
+export type NewsVia = "rss" | "grok" | "dot" | "codex" | "agent" | "user";
+export interface NewsItem {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  via: NewsVia;
+  summary?: string;
+  image?: string;
+  published_at?: string;
+  relevance?: { module: string; ref?: string; reason: string };
+  status: "new" | "tried" | "dismissed";
+}
+export interface NewsTrend {
+  id: string;
+  topic: string;
+  posts?: number;
+  url?: string;
+  image?: string;
+  via: NewsVia;
+}
+export interface NewsData {
+  date: string;
+  picked: NewsItem[];
+  trends: NewsTrend[];
+  others: NewsItem[];
+  sources: Partial<Record<NewsVia, number>>;
+}
+export interface NewsAction {
+  id: string;
+  status: "tried" | "dismissed";
+  version: string | null;
 }
 export interface OverviewMetric {
   key: string;
