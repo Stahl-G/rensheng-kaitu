@@ -1,0 +1,200 @@
+<title>开图健康同步</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* 布局：单栏手机优先的操作指南；顶部一条数据流示意，下面是按顺序执行的步骤卡，最后是补历史与常见问题 */
+:root {
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --fg: #1d2620;
+  --muted: #5d6b62;
+  --line: #d9e0da;
+  --accent: #2f5d48;
+  --accent-soft: #e3ece6;
+  --warn-bg: #fbf1dc;
+  --warn-fg: #6b4a12;
+  --code-bg: #eef2ee;
+  --display: "Noto Serif SC", "Songti SC", serif;
+  --body: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a16; --surface: #1c241f; --fg: #e5ece7; --muted: #9aa9a0; --line: #2e3a33;
+    --accent: #8cc2a6; --accent-soft: #23332a; --warn-bg: #3a2f17; --warn-fg: #f1d394; --code-bg: #232d27;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a16; --surface: #1c241f; --fg: #e5ece7; --muted: #9aa9a0; --line: #2e3a33;
+  --accent: #8cc2a6; --accent-soft: #23332a; --warn-bg: #3a2f17; --warn-fg: #f1d394; --code-bg: #232d27;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.7; }
+.wrap { max-width: 720px; margin: 0 auto; padding-inline: 18px; padding-block: 28px 64px; display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; line-height: 1.3; margin: 0; }
+h1 { font-size: clamp(28px, 6vw, 38px); }
+h2 { font-size: 22px; }
+h3 { font-size: 17px; margin: 0; }
+p { margin: 0; }
+.eyebrow { font-size: 13px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.lead { color: var(--muted); font-size: 17px; max-width: 34em; }
+.status { background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.flow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-x: auto; }
+.flow svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.flow text { font-family: var(--body); }
+.needs { display: grid; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.needs li { display: flex; gap: 10px; align-items: baseline; }
+.needs li::before { content: "✓"; color: var(--accent); font-weight: 700; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: step; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 4px 14px; counter-increment: step; }
+.step::before { content: counter(step); grid-row: span 3; width: 34px; height: 34px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.step p, .step ul { color: var(--fg); }
+.step ul { margin: 0; padding-left: 1.2em; }
+.path { font-family: var(--mono); font-size: 14px; background: var(--code-bg); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.tap { font-weight: 700; }
+.copyrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+.copyrow code { font-family: var(--mono); font-size: 14px; background: var(--code-bg); border-radius: 6px; padding: 6px 10px; overflow-x: auto; max-width: 100%; }
+button { font: inherit; font-size: 14px; border-radius: 8px; padding: 6px 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[disabled] { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+.hint { font-size: 14px; color: var(--muted); }
+.types { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.types span { font-size: 13px; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 2px 10px; }
+section { display: grid; gap: 12px; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+details + details { margin-top: 8px; }
+summary { cursor: pointer; font-weight: 500; }
+details p { margin-top: 8px; color: var(--muted); }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">开图 · Apple 健康</div>
+    <h1>每天早上，自动把健康数据交给开图</h1>
+    <p class="lead">用 iPhone 自带的「快捷指令」，每天把 iPhone 和 Apple Watch 记录的步数、睡眠、体重、心率和训练，放进你自己的 Google Drive。开图看到后自动整理进「健康」。免费，不用装别的 App。</p>
+    <p class="status">预览版：这是最终的使用流程。「开图健康同步」快捷指令文件和开图这边的自动导入正在制作，做好后下面第 2 步的按钮会变成可用。</p>
+  </header>
+
+  <div class="flow" aria-label="数据流：iPhone 健康，经快捷指令，存到 Google Drive，再由你 Mac 上的开图导入">
+    <svg viewBox="0 0 640 120" role="img">
+      <g font-size="14">
+        <rect x="4" y="30" width="128" height="60" rx="12" fill="var(--accent-soft)" stroke="var(--line)"/>
+        <text x="68" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">iPhone 健康</text>
+        <text x="68" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">含 Apple Watch</text>
+        <rect x="170" y="30" width="128" height="60" rx="12" fill="var(--surface)" stroke="var(--accent)"/>
+        <text x="234" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">快捷指令</text>
+        <text x="234" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">每天 08:30</text>
+        <rect x="336" y="30" width="140" height="60" rx="12" fill="var(--surface)" stroke="var(--line)"/>
+        <text x="406" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">Google Drive</text>
+        <text x="406" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">kaitu/inbox/health</text>
+        <rect x="514" y="30" width="122" height="60" rx="12" fill="var(--accent-soft)" stroke="var(--line)"/>
+        <text x="575" y="56" text-anchor="middle" fill="var(--fg)" font-weight="700">开图</text>
+        <text x="575" y="76" text-anchor="middle" fill="var(--muted)" font-size="12">自动导入</text>
+      </g>
+      <g stroke="var(--accent)" stroke-width="2" fill="none">
+        <path d="M136 60 H164"/><path d="M302 60 H330"/><path d="M480 60 H508"/>
+      </g>
+      <g fill="var(--accent)">
+        <path d="M164 55 L170 60 L164 65 Z"/><path d="M330 55 L336 60 L330 65 Z"/><path d="M508 55 L514 60 L508 65 Z"/>
+      </g>
+    </svg>
+  </div>
+
+  <section>
+    <h2>开始前</h2>
+    <ul class="needs">
+      <li>iPhone，系统 iOS 17 或更新；有 Apple Watch 更好，没有也可以（iPhone 自己会记步数）。</li>
+      <li>iPhone 上装好 Google Drive App，并用开图所在的同一个 Google 账号登录。</li>
+      <li>开图已经开启「同步到 Google Drive」，Drive 里能看到 <span class="path">kaitu</span> 文件夹。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>五步设置，只做一次</h2>
+    <ol class="steps">
+      <li class="step">
+        <h3>让「文件」App 能存到 Google Drive</h3>
+        <p>打开 <span class="tap">文件</span> → 底部 <span class="tap">浏览</span> → 右上角 <span class="tap">···</span> → <span class="tap">编辑</span>，打开 <span class="tap">Google Drive</span> 的开关。</p>
+        <p class="hint">快捷指令通过「文件」把数据存进 Drive，这一步让它看得到你的 Drive。</p>
+      </li>
+      <li class="step">
+        <h3>添加「开图健康同步」快捷指令</h3>
+        <p>在 iPhone 上打开下面的链接，点 <span class="tap">添加快捷指令</span>。</p>
+        <div class="copyrow"><button type="button" disabled>下载快捷指令（制作中）</button></div>
+        <p class="hint">它只读取健康数据并存成一个小文件，不联网发送给任何人。</p>
+      </li>
+      <li class="step">
+        <h3>第一次运行，允许读取健康数据</h3>
+        <p>在 <span class="tap">快捷指令</span> 里点一下「开图健康同步」。系统会问要读取哪些数据，全部打开：</p>
+        <div class="types"><span>步数</span><span>体重</span><span>体脂率</span><span>静息心率</span><span>睡眠</span><span>体能训练</span><span>活动能量</span></div>
+        <p>问保存位置时，选 Google Drive 里的这个文件夹（没有就新建）：</p>
+        <div class="copyrow"><code id="folder">kaitu/inbox/health</code><button type="button" data-copy="folder" id="copy-folder">复制路径</button></div>
+      </li>
+      <li class="step">
+        <h3>设成每天自动运行</h3>
+        <p><span class="tap">快捷指令</span> → 底部 <span class="tap">自动化</span> → <span class="tap">+</span> → <span class="tap">特定时间</span>，选 <span class="tap">08:30</span>、<span class="tap">每天</span> → 选 <span class="tap">立即运行</span> → 下一步选「开图健康同步」。</p>
+        <p class="hint">时间选你起床后、通常已经解锁手机的时候。iPhone 锁屏时健康数据是加密的，快捷指令读不到。</p>
+      </li>
+      <li class="step">
+        <h3>确认开图收到了</h3>
+        <p>第二天打开开图工作台的 <span class="tap">健康</span>，应该能看到昨天的睡眠、步数和训练。也可以在 Mac 上运行：</p>
+        <div class="copyrow"><code id="cmd">kaitu status</code><button type="button" data-copy="cmd" id="copy-cmd">复制命令</button></div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>补上以前的数据（可选，一次）</h2>
+    <p>快捷指令每天只同步前一天。想把过去几年的记录一起放进开图：</p>
+    <ol style="margin:0;padding-left:1.3em;display:grid;gap:6px">
+      <li>打开 <span class="tap">健康</span> → 右上角头像 → <span class="tap">导出所有健康数据</span>，等它生成 <span class="path">export.zip</span>（数据多的话要几分钟）。</li>
+      <li>在分享菜单里选 <span class="tap">存储到「文件」</span>，存到 <span class="path">kaitu/inbox/health</span>。</li>
+      <li>开图会自动识别并导入；重复的记录会自动跳过，导入后可以整体撤销。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>常见问题</h2>
+    <div>
+      <details>
+        <summary>数据会被发到哪里？</summary>
+        <p>只到你自己的 Google Drive，然后由你电脑上的开图读取。快捷指令和开图都不会把健康数据发给我们或其他服务。之后你让哪个 AI 读开图，就由你自己决定。</p>
+      </details>
+      <details>
+        <summary>早上忘了解锁手机，那天会不会漏？</summary>
+        <p>会跳过那一次，但不会丢：下一次运行会把没同步的天数一起补上。也可以随时手动点一下快捷指令。同一天的数据重复同步不会重复记录。</p>
+      </details>
+      <details>
+        <summary>没有 Apple Watch 可以用吗？</summary>
+        <p>可以。iPhone 会记录步数和步行距离；体重、睡眠可以来自体重秤或其他 App 写入「健康」的数据。只是心率和训练记录会少一些。</p>
+      </details>
+      <details>
+        <summary>为什么不用 Health Auto Export 这类 App？</summary>
+        <p>它们功能更多，但自动导出要付费订阅。「快捷指令」是 iPhone 自带的，免费，开图需要的这几项数据它都能读到。</p>
+      </details>
+      <details>
+        <summary>想停掉怎么办？</summary>
+        <p>在 <span class="tap">快捷指令 → 自动化</span> 里关掉或删除这条自动化即可。已经导入开图的数据不受影响。</p>
+      </details>
+    </div>
+  </section>
+
+  <footer>开图 · 灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</footer>
+</div>
+
+<script>
+document.querySelectorAll("button[data-copy]").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var el = document.getElementById(btn.getAttribute("data-copy"));
+    var text = el.textContent;
+    var done = function () { btn.textContent = "已复制"; setTimeout(function () { btn.textContent = btn.id === "copy-cmd" ? "复制命令" : "复制路径"; }, 1600); };
+    var select = function () { var r = document.createRange(); r.selectNodeContents(el); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "已选中，请手动复制"; };
+    try { navigator.clipboard.writeText(text).then(done, select); } catch (e) { select(); }
+  });
+});
+</script>
