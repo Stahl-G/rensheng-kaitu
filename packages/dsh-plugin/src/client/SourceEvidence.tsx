@@ -5,7 +5,8 @@ import css from "./MapPage.module.css";
 export function SourceEvidence({
   id,
   load,
-}: { id: string; load: (id: string) => Promise<ExperienceSource> }) {
+  label = "查看原文",
+}: { id: string; label?: string; load: (id: string) => Promise<ExperienceSource> }) {
   const focus = useRef<HTMLElement>(null);
   const [source, setSource] = useState<ExperienceSource | null>(null);
   const [open, setOpen] = useState(false);
@@ -41,10 +42,10 @@ export function SourceEvidence({
           }
         }}
       >
-        {busy ? "正在读取原文…" : open ? "收起原文" : "查看原文"}
+        {busy ? "正在读取原文…" : open ? "收起原文" : label}
       </button>
       {open && (
-        <div aria-label="经历来源原文">
+        <div aria-label="来源原文">
           {error && <p role="alert">{error}</p>}
           {source?.kind === "local" && (
             <>

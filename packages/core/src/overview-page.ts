@@ -148,6 +148,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     text: note.content,
     status: noteMetadata(note.content).kind === "capture" ? ("received" as const) : ("needs_review" as const),
   }));
+  const directionSuggestions = (data.records.direction ?? []).filter(
+    (row) => row.status === "suggested",
+  ).length;
   const mapNeedsReview = (data.records.experience ?? []).filter(
     (row) => row.review || !experienceLayer(row as unknown as TimedExperience, data.today),
   ).length;
@@ -196,7 +199,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     versions,
     sync: {
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
-      needsReview: mapNeedsReview + notes.filter((note) => note.status === "needs_review").length,
+      needsReview:
+        mapNeedsReview + directionSuggestions + notes.filter((note) => note.status === "needs_review").length,
+      directionSuggestions,
       mapNeedsReview,
       updatedAt: versions.find((v) => !/等待整理|待整理笔记/.test(v.message))?.time ?? null,
     },

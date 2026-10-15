@@ -27,7 +27,8 @@
     "ical.js": "^2.2.1",
     "isomorphic-git": "^1.27.0",
     "saxes": "^6.0.0",
-    "yaml": "^2.6.0"
+    "yaml": "^2.6.0",
+    "zod": "^4.6.7"
   },
   "files": ["dist", "data"]
 }

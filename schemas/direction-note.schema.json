@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/direction-note.schema.json",
+  "title": "方向资料与认识变化",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "required": ["direction_id", "kind", "text", "stance", "question"],
+  "properties": {
+    "question": {
+      "type": "string",
+      "minLength": 1
+    },
+    "direction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": ["evidence", "reflection", "decision"]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stance": {
+      "enum": ["unclear", "supports", "refutes"]
+    },
+    "source": {
+      "type": "string"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": ["project", "decision", "source"]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "unevaluatedProperties": false
+}

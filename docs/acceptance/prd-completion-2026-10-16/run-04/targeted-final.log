@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /Users/yihongguo/Developer/rensheng-kaitu-prd
+
+ ✓ packages/cli/test/mcp.test.ts (2 tests) 2053ms
+   ✓ SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源，不能调用删除  1574ms
+   ✓ HTTP 拒绝缺失或错误 token 和错误 Host，有效 token 能连接，轮换后旧 token 失效  478ms
+ ✓ packages/core/test/exploration.test.ts (2 tests) 5444ms
+   ✓ 真实尝试的完成与假设判断分开，负面结果可暂停方向，依据、关联和修订在重启后保留  3770ms
+   ✓ AI 提议不替用户采纳，旧版本不能覆盖新状态，错方向或私有项目的关联不产生写入  1673ms
+
+ Test Files  2 passed (2)
+      Tests  4 passed (4)
+   Start at  03:44:38
+   Duration  6.11s (transform 242ms, setup 0ms, collect 968ms, tests 7.50s, environment 0ms, prepare 116ms)

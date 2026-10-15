@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/direction.schema.json",
+  "title": "探索方向",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "required": ["title", "motivation", "hypothesis", "status", "favorite"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "motivation": {
+      "type": "string"
+    },
+    "hypothesis": {
+      "type": "string"
+    },
+    "unknowns": {
+      "type": "string"
+    },
+    "status": {
+      "enum": ["suggested", "active", "paused", "archived", "dismissed"]
+    },
+    "favorite": {
+      "type": "boolean"
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "ref"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": ["project", "decision", "source"]
+          },
+          "ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "unevaluatedProperties": false
+}

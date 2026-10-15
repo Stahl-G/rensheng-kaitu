@@ -12,6 +12,7 @@ import {
   disableDrive,
   driveStatus,
   enableDrive,
+  explorationCommandSchema,
   importAppleHealth,
   importChatgptConversations,
   importIcs,
@@ -29,6 +30,7 @@ import {
   projectDirectory,
   projectVersion,
   readAgentFile,
+  readExploration,
   readProject,
   readRecords,
   removeMemory,
@@ -44,6 +46,7 @@ import {
   updateMemory,
   writeAgentRecord,
   writeAgentsMd,
+  writeExploration,
 } from "@kaitu/core";
 import { z } from "zod";
 import type { Context, MutationQueue } from "./dsh.js";
@@ -115,6 +118,15 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         }),
     });
   }
+  register("kaitu_exploration_read", "读取方向、依据、尝试与认识变化。", z.object({}).strict(), () =>
+    readExploration(ws),
+  );
+  register(
+    "kaitu_exploration_write",
+    "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户决定方向状态。",
+    z.object({ command: explorationCommandSchema }).strict(),
+    ({ command }) => writeExploration(ws, command, "agent"),
+  );
   register(
     "kaitu_records",
     "查询或修订记录。日期按工作区时区；删除超过十条须确认。",

@@ -7,6 +7,9 @@
 实现状态及验收见 [prd-completion.md](prd-completion.md)。
 独立本地桌面入口和 DSH 插件共用三个导航的 React 页面；默认不启动 AI Runtime。
 新工作区没有私人健康目标和默认自动化，已有配置保留。运行与隔离验收见 [desktop.md](desktop.md)。
+轻量方向与尝试见 [第 4 轮验收](acceptance/prd-completion-2026-10-16/run-04.md)：
+方向决策由用户保存，AI 通过专用 exploration 工具提议与补资料，通用记录工具不能绕过采纳步骤。
+当前隔离桌面包为 `dist/prd-explore-final/Kaitu.app`，锁屏尚未完成原生窗口验收。
 
 - 交接日期：2026-10-15
 - 最近更新：2026-10-15，本地 Claude Code 会话交给后续 Claude Code / Codex 会话。

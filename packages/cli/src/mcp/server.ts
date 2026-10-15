@@ -6,6 +6,7 @@ import {
   assertPublicProject,
   completeTask,
   dismissNews,
+  explorationCommandSchema,
   findRecordType,
   inboxNoteDone,
   inboxNotes,
@@ -18,6 +19,7 @@ import {
   proposeBlock,
   publicProject,
   readAgentFile,
+  readExploration,
   readNews,
   readRecords,
   readStatus,
@@ -33,6 +35,7 @@ import {
   updateMemory,
   writeAgentRecord,
   writeDigest,
+  writeExploration,
 } from "@kaitu/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -181,6 +184,14 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "批量记录地点经历，只给城市名和国家代码，不给坐标；计划用 planned。",
     { items: z.array(experience).min(1) },
     ({ items }) => addExperiences(ws, items, "agent"),
+    true,
+  );
+  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
+  register(
+    "exploration_write",
+    "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户采纳、暂停或归档。",
+    { command: explorationCommandSchema },
+    ({ command }) => writeExploration(ws, command, "agent"),
     true,
   );
   register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));

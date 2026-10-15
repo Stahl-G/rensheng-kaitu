@@ -15,6 +15,8 @@ import {
   readAvatar,
   readDoing,
   readExperienceSource,
+  readExploration,
+  readExplorationSource,
   readHealthPage,
   readNews,
   readOverviewPage,
@@ -24,6 +26,7 @@ import {
   saveAvatar,
   tryNews,
   unhideExperience,
+  writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
 import { readMe } from "./me-data.js";
@@ -33,6 +36,8 @@ import type {
   DoingProject,
   ExperienceChanges,
   ExperienceSource,
+  ExplorationCommand,
+  ExplorationData,
   HealthData,
   LifeMapData,
   MeData,
@@ -138,6 +143,26 @@ export class KaituOverviewService extends TypertRemoteService {
   async dismissNews(id: string): Promise<NewsAction> {
     const result = await this.write(() => dismissNews(this.workspace, id));
     return { id: result.record.id, status: "dismissed", version: result.version };
+  }
+
+  @Remote("exploration")
+  async exploration(): Promise<ExplorationData> {
+    return readExploration(this.workspace);
+  }
+  @Remote("explorationWrite")
+  async explorationWrite(command: ExplorationCommand): Promise<{ id: string; version: string | null }> {
+    return this.write(async () => {
+      const { id, version } = await writeExploration(this.workspace, command, "user");
+      return { id, version };
+    });
+  }
+  @Remote("explorationSource")
+  async explorationSource(
+    owner: "direction" | "direction_note" | "exploration_experiment",
+    id: string,
+    reference?: number,
+  ): Promise<ExperienceSource> {
+    return readExplorationSource(this.workspace, owner, id, reference);
   }
 
   @Remote("experienceSource")

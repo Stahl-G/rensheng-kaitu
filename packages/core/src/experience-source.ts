@@ -22,7 +22,10 @@ export type ExperienceSource =
 export async function readExperienceSource(ws: Workspace, id: string): Promise<ExperienceSource> {
   const record = readRecords(ws, "experience").find((item) => item.id === id);
   if (!record) throw new KaituError("经历不存在或已隐藏", "NOT_FOUND");
-  const locator = String(record.source);
+  return readSourceContent(ws, String(record.source));
+}
+
+export async function readSourceContent(ws: Workspace, locator: string): Promise<ExperienceSource> {
   if (/^https?:\/\//i.test(locator)) {
     try {
       const url = new URL(locator);

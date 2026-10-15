@@ -35,6 +35,14 @@ export interface WriteResult {
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
+  if (
+    ref.type === "direction" &&
+    record.by !== "user" &&
+    !record.deleted &&
+    ((record.rev ?? 1) !== 1 || record.status !== "suggested" || record.favorite !== false)
+  ) {
+    throw new KaituError("AI 只能新增方向建议，方向状态由用户决定", "USER_DECISION");
+  }
   if (["project_metric", "github_snapshot"].includes(ref.type) && driveProjects(ws) && !record.deleted)
     assertPublicProject(ws, record.project);
   const reg = schemas();

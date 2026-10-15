@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { MeData, OverviewData, OverviewVersion } from "../types.js";
+import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -13,6 +14,7 @@ export interface OverviewPageProps
   extends MePageProps,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
+    Omit<DirectionsPageProps, "onPrompt" | "goals">,
     Omit<MapPageProps, "onPrompt">,
     Omit<HealthPageProps, "onPrompt">,
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone"> {
@@ -394,6 +396,18 @@ export function OverviewPage(props: OverviewPageProps) {
                     {data.sync.mapNeedsReview} 段地点经历需要核对
                   </button>
                 )}
+                {data.sync.directionSuggestions > 0 && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("directions");
+                      setView("explore");
+                    }}
+                  >
+                    {data.sync.directionSuggestions} 个探索方向建议
+                  </button>
+                )}
                 {!!data.daily?.unresolved && <p>{data.daily.unresolved} 项未决事项，见近期回顾</p>}
               </Section>
             )}
@@ -581,40 +595,7 @@ export function OverviewPage(props: OverviewPageProps) {
             ) : exploreView === "discoveries" ? (
               <NewsPage {...childProps} />
             ) : (
-              <>
-                {personal?.goals.length ? (
-                  <Section title="正在探索的方向">
-                    {personal.goals.map((goal) => (
-                      <article className={css.direction} key={goal.id}>
-                        <h2>{goal.title}</h2>
-                        {goal.approach && <p>{goal.approach}</p>}
-                        {goal.actual && <p className={css.muted}>最近认识：{goal.actual}</p>}
-                        {goal.due && <p className={css.muted}>目标日期 {goal.due}</p>}
-                        <button
-                          type="button"
-                          className={css.link}
-                          onClick={() =>
-                            prompt(`一起看看「${goal.title}」：梳理已有依据、未知条件和一个低成本尝试。`)
-                          }
-                        >
-                          梳理下一步 →
-                        </button>
-                      </article>
-                    ))}
-                  </Section>
-                ) : (
-                  <div className={css.focus}>
-                    <h2>一个值得探索的问题</h2>
-                    <p className={css.subtitle}>从你关心的方向出发，把依据、尝试和新的认识慢慢串起来。</p>
-                    <button type="button" className={css.link} onClick={() => prompt("我想探索一个方向：")}>
-                      记下我的方向 →
-                    </button>
-                  </div>
-                )}
-                <button type="button" className={css.link} onClick={() => setExploreView("footprints")}>
-                  回看我的地理足迹 →
-                </button>
-              </>
+              <DirectionsPage {...childProps} goals={personal?.goals} />
             )}
           </>
         )}

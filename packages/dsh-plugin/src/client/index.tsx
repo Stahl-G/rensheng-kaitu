@@ -192,6 +192,25 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadExploration: async () => {
+                const result = await ctx.remote.kaitu.exploration();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              writeExploration: async (command: import("../types.js").ExplorationCommand) => {
+                const result = await ctx.remote.kaitu.explorationWrite(command);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadExplorationSource: async (
+                owner: "direction" | "direction_note" | "exploration_experiment",
+                id: string,
+                reference?: number,
+              ) => {
+                const result = await ctx.remote.kaitu.explorationSource(owner, id, reference);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadLifeMap: async () => {
                 const result = await ctx.remote.kaitu.lifeMap();
                 if (!result.ok) throw new Error(result.error.message);

@@ -1,5 +1,6 @@
 import {
   type ExperienceChanges,
+  type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
   KaituError,
@@ -21,6 +22,8 @@ import {
   readAvatar,
   readDoing,
   readExperienceSource,
+  readExploration,
+  readExplorationSource,
   readHealthPage,
   readMe,
   readNews,
@@ -32,9 +35,11 @@ import {
   stageFinanceUpload,
   tryNews,
   unhideExperience,
+  writeExploration,
 } from "@kaitu/core";
 
 export const productMutations = new Set([
+  "explorationWrite",
   "capture",
   "decideProposal",
   "resolveExperience",
@@ -58,6 +63,17 @@ export async function productRequest(ws: Workspace, method: string, args: unknow
     return args[i] as number;
   };
   switch (method) {
+    case "exploration":
+      return readExploration(ws);
+    case "explorationWrite":
+      return writeExploration(ws, args[0] as ExplorationCommand, "user");
+    case "explorationSource":
+      return readExplorationSource(
+        ws,
+        text(0) as "direction" | "direction_note" | "exploration_experiment",
+        text(1),
+        args[2] == null ? undefined : revision(2),
+      );
     case "overview":
       return readOverviewPage(ws);
     case "decideProposal":
