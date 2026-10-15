@@ -143,6 +143,18 @@
 
 ## 8.1 进展记录
 
+### 2026-10-15：工作区升级与健康收件箱
+
+- `kaitu upgrade [--dry-run]` 按模板哈希升级：补内置模块与新增 records / views / sources / tabs，保留用户字段与自建技能。
+- 两处内置技能覆盖更新，重新生成 AGENTS / AGENT-README / OVERVIEW；整次升级一个版本，随后 validate 与 doctor。当前版本重复运行不写入。
+- 初始化记录 template_version；旧模板在 doctor 与工作台提示升级，预览不执行工作区迁移或维护写入。
+- `inbox/health/` 支持官方 export.zip / export.xml 和快捷指令 *.health.json，工作台自动处理或 inbox process 手动处理。
+- 两种入口共用样本映射：单位、来源聚合、跨午夜分摊与睡眠合并保持一致；Apple 体能训练均记 cardio，中文活动名，力量组次仍手记。
+- 健康原件成功归档且不进版本历史，失败转附件笔记；整理记录按自然键追加修订，重复投递不存新版本。
+- 合成旧模板与健康文件测试已覆盖升级保留、幂等、时区与跨夜、文件稳定、工作台自动 zip 导入。build、typecheck、lint、test 全过（94 项）；测试并发上限 4，保留原超时时间。
+- 构建后 CLI 临时工作区冒烟通过：旧 .git 历史保留、预览不迁移、整次升级一个版本、重复升级 / 导入无改动。
+- 快捷指令原始格式见 docs/guides/health-shortcut-format.md；实际 iPhone 快捷指令与真实 Drive 同步仍待实测。
+
 ### 2026-10-15：项目模块（D21）
 
 - core / CLI 支持项目建档、链接、日志、阶段与本机设置，工作台「我的」与「今天」汇总项目和下一步。

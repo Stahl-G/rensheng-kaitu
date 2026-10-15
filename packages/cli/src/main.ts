@@ -59,6 +59,7 @@ import {
   syncProjects,
   updateMemory,
   updateRecord,
+  upgradeWorkspace,
   validateWorkspace,
   writeAgentsMd,
 } from "@kaitu/core";
@@ -76,8 +77,9 @@ const HELP = `开图 kaitu
   kaitu drive disable [--to <目录>]                  搬回本机
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
-  kaitu inbox process                               处理云端 Agent 收件箱
+  kaitu inbox process                               处理 Agent 与健康数据收件箱
   kaitu ui [--port 4870] [--no-open]                打开本地工作台
+  kaitu upgrade [--dry-run]                         升级内置模板与技能
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
   kaitu agents-md                                  重新生成 AGENTS.md
@@ -376,6 +378,22 @@ async function run(argv: string[]): Promise<number> {
         process.once("SIGTERM", stop);
       }
       return 0;
+    }
+    case "upgrade": {
+      const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain: false });
+      if (!ws.exists(".kaitu/config.json")) throw new KaituError("先运行 kaitu init", "NOT_INITIALIZED");
+      const result = await upgradeWorkspace(ws, { dryRun: values["dry-run"] });
+      const problems = result.checks?.filter((check) => !check.ok) ?? [];
+      const lines = result.changes.length
+        ? [`${values["dry-run"] ? "将升级" : "已升级"}到 ${result.templateVersion}：`, ...result.changes]
+        : ["内置模板已是当前版本，没有改动。"];
+      if (result.checks) {
+        lines.push(`校验：${result.validation?.length ? "有问题" : "通过"}`);
+        lines.push(`doctor：${problems.length ? "有问题" : "通过"}`);
+        lines.push(...problems.map((check) => `${check.name} ${check.detail ?? ""}`));
+      }
+      out(values, result, lines.join("\n"));
+      return problems.length || result.validation?.length ? 1 : 0;
     }
     case "doctor": {
       const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());

@@ -4,7 +4,7 @@ import { snapshot } from "../history.js";
 import { type StoredRecord, addRecords, deleteRecord, readRecords, updateRecord } from "../records.js";
 import type { Workspace } from "../workspace.js";
 
-export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event";
+export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event" | "workout";
 export interface Candidate {
   type: ImportType;
   data: Record<string, unknown>;
@@ -23,6 +23,7 @@ export interface BatchImportResult extends Counts {
 }
 export interface BatchOptions {
   dryRun?: boolean;
+  message?: (changed: number) => string;
   ignored?: Record<string, number>;
   scope?: (record: StoredRecord) => boolean;
   deleteMissing?: (record: StoredRecord) => boolean;
@@ -30,6 +31,8 @@ export interface BatchOptions {
 
 export function naturalKey(type: ImportType, data: Record<string, unknown>): string {
   switch (type) {
+    case "workout":
+      return JSON.stringify([new Date(String(data.ts)).toISOString(), data.exercise]);
     case "metric":
       return JSON.stringify([data.kind, new Date(String(data.ts)).toISOString()]);
     case "sleep":
@@ -122,6 +125,6 @@ export async function importBatch(
     for (const item of plan.updated) updateRecord(ws, plan.type, item.id, item.patch, { by });
     for (const item of plan.deleted) deleteRecord(ws, plan.type, item.id, { by });
   }
-  result.version = await snapshot(ws, `导入（${source}）了 ${changed} 条记录`);
+  result.version = await snapshot(ws, opts.message?.(changed) ?? `导入（${source}）了 ${changed} 条记录`);
   return result;
 }

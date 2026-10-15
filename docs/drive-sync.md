@@ -73,6 +73,14 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 类型本身定义 date（如 activity）时保留，其他类型在写入前去掉 date。
 未知类型的笔记列出所有可用类型，已知类型附该类型字段参考和示例。
 
+### 健康数据收件箱
+
+Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 `inbox/health/`。
+复用 Agent 收件箱的稳定检查与监听；成功后原件归档到 `inbox/processed/YYYY-MM-DD/`，失败附原因转为待整理笔记。
+成功归档的健康原件不进版本历史，整理后的记录按来源与自然键去重，有变化才存一个版本。
+快捷指令只需输出原始样本，格式见 [health-shortcut-format.md](guides/health-shortcut-format.md)。
+旧工作区先运行 `kaitu upgrade` 更新内置模块与技能，`kaitu upgrade --dry-run` 可预览。
+
 谁来处理收件箱：`kaitu ui` 运行时自动处理（复用文件监听）；也可以手动 `kaitu inbox process`。
 
 本机用 `kaitu inbox notes` 列出未整理笔记，用 `kaitu inbox done <路径>` 整理后归档到 `inbox/notes/done/YYYY-MM-DD/` 并生成版本。

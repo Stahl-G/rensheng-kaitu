@@ -137,6 +137,7 @@ ${skills()
 - \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据，以及项目进度和今天到期 / 过期 / 提醒的待办。
 - \`kaitu memory import --file <候选.json> [--dry-run]\`：确认后的记忆数组一次导入、一个版本。
 - \`kaitu import apple-health|nut-ai|ics <文件> --dry-run\`：先预览，用户确认后移除 --dry-run。
+- \`kaitu upgrade [--dry-run]\`：升级内置模块与技能，保留自定义配置。
 - \`kaitu doctor\` 检查工作区，\`kaitu validate [路径]\` 校验格式。
 
 ## 10. 工作台
@@ -152,6 +153,7 @@ ${skills()
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
 - 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
+- Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
 - 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
 - 本地模式同样维护入口与现状文件；晚间复盘最后运行 snapshot 会刷新现状。
 

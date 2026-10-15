@@ -35,7 +35,7 @@ export function stateDirectory(root: string): string {
   return state ?? join(root, STATE_DIR);
 }
 
-function migrateHistory(root: string): void {
+export function migrateHistory(root: string): void {
   const old = join(root, ".git");
   const target = join(stateDirectory(root), "history.git");
   if (!existsSync(join(root, STATE_DIR, "config.json")) || !existsSync(old)) return;
@@ -73,8 +73,9 @@ function isInside(root: string, target: string): boolean {
 export class Workspace {
   root: string;
 
-  constructor(root: string) {
+  constructor(root: string, options: { maintain?: boolean } = {}) {
     this.root = resolve(root);
+    if (options.maintain === false) return;
     migrateHistory(this.root);
     if (this.exists(".kaitu/config.json")) {
       ensureTaskModule(this);

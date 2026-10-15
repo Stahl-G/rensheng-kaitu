@@ -141,3 +141,58 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+it("健康快捷指令稳定后才整批导入，重复投递无版本，失败文件作为附件转笔记", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const file = "inbox/health/daily.health.json";
+    const samples = [
+      {
+        type: "body_mass",
+        start: "2026-10-01T08:00:00+08:00",
+        end: "2026-10-01T08:00:00+08:00",
+        value: 70,
+        unit: "kg",
+        source: "Scale",
+      },
+    ];
+    const payload = {
+      format: "kaitu.health.v1",
+      exported_at: "2026-10-02T08:30:00+08:00",
+      device: "iPhone",
+      samples,
+    };
+    const before = await history(ws);
+    ws.writeText(file, "{");
+    const processing = processInbox(ws, { stableMs: 80 });
+    await setTimeout(10);
+    ws.writeJson(file, payload);
+    expect((await processing).pending).toEqual([file]);
+    expect(readRecords(ws, "metric")).toEqual([]);
+    expect(await history(ws)).toEqual(before);
+    expect((await processInbox(ws, { stableMs: 0 })).processed).toEqual([file]);
+    expect(readRecords(ws, "metric")).toMatchObject([{ kind: "weight", value: 70, unit: "kg" }]);
+    const versions = await history(ws);
+    expect(versions).toHaveLength(before.length + 1);
+    const date = localDate(new Date(), ws.timeZone());
+    expect(ws.readJson(`inbox/processed/${date}/daily.health.json`)).toEqual(payload);
+    // 导出时间和文件名变化，原始样本不变，仍不生成新版本。
+    ws.writeJson("inbox/health/again.health.json", { ...payload, exported_at: "2026-10-02T09:30:00+08:00" });
+    await processInbox(ws, { stableMs: 0 });
+    expect(await history(ws)).toEqual(versions);
+    ws.writeJson("inbox/health/invalid.health.json", {
+      ...payload,
+      samples: [...samples, { ...samples[0], start: "2026-10-01T09:00:00" }],
+    });
+    const invalid = await processInbox(ws, { stableMs: 0 });
+    expect(invalid.notes).toHaveLength(1);
+    expect(readRecords(ws, "metric")).toHaveLength(1);
+    const note = parseFrontmatter<{ attachment: string }>(ws.readText(invalid.notes[0] as string));
+    expect(ws.readJson(note.data.attachment)).toMatchObject({
+      samples: [...samples, { ...samples[0], start: "2026-10-01T09:00:00" }],
+    });
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});

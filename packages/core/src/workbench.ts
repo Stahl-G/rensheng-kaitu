@@ -9,6 +9,7 @@ import { listProjects, projectStatusFiles, projectVersion, publicProject } from 
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { tasksForToday } from "./tasks.js";
+import { templateOutdated } from "./template-version.js";
 import { isoInZone, localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -105,6 +106,7 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
 export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = false) {
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
+  if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
   function read<T>(label: string, fn: () => T, fallback: T): T {
     try {
       return fn();
