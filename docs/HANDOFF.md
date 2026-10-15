@@ -193,6 +193,13 @@
 
 ## 8.1 进展记录
 
+### 2026-10-15：财务 P0（数据层与 dsh Host）
+
+- 新增 finance 四类记录、原币定点计算、支付宝 / 券商 CSV 预览提交与幂等对账；旧工作区通过 upgrade 补齐。
+- 四个财务视图携带记录 ID、统计区间与缺失原因；独立 kaituFinance Remote 提供四视图及预览 / 提交 / 放弃。
+- MCP remote 的 record_list / read_file 屏蔽财务明细；原件只留本机状态目录，提交或放弃后删除。
+- 说明见 [finance.md](finance.md)。
+
 - dsh 插件：四工具、提示注入、`kaitu dsh [--install]`；桌面应用 0.2.0-rc.2 中真实对话写入已实测，见 [dsh.md](dsh.md)。
 
 ### 2026-10-15：M5 第一部分——手机通道

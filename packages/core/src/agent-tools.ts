@@ -3,8 +3,9 @@ import { extname, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
-import { findRecordType } from "./modules.js";
+import { findRecordType, listModules } from "./modules.js";
 import { removePhoto } from "./photos.js";
+import { type ExperienceInput, addExperiences } from "./places.js";
 import { assertPublicProject } from "./projects.js";
 import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
@@ -29,7 +30,15 @@ export function readAgentFile(ws: Workspace, file: string, publicOnly = false): 
     }
   }
   if (publicOnly) {
+    const financialModules = [
+      "finance",
+      ...listModules(ws)
+        .filter((m) => m.def.id === "finance" || m.dir === "finance")
+        .map((m) => m.dir),
+    ];
     for (const path of paths) {
+      if (financialModules.some((dir) => path === dir || path.startsWith(`${dir}/`)))
+        throw new KaituError("财务明细只允许在本机读取", "OUT_OF_SCOPE");
       const slug = /^projects\/([^/]+)\//.exec(path)?.[1];
       if (slug && !["data", "module.json"].includes(slug)) assertPublicProject(ws, slug);
     }
@@ -45,6 +54,8 @@ export async function writeAgentRecord(
   data: Record<string, unknown> = {},
   id = "",
 ) {
+  if (type === "experience" && operation === "add")
+    return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
   if (["project_metric", "github_snapshot"].includes(type)) {
     const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
     assertPublicProject(ws, data.project ?? current?.project);

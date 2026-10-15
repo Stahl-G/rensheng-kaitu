@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
 import { type RecordTypeRef, findRecordType, recordFileFor, recordFilePattern } from "./modules.js";
+import { mergeNewsRecord } from "./news.js";
 import { assertPublicProject, driveProjects } from "./projects.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
@@ -86,17 +87,45 @@ export function addRecords(
 ): WriteResult[] {
   const ref = findRecordType(ws, type);
   const tz = ws.timeZone();
+  const news = type === "news_item" || type === "trend";
+  const existing = news ? readRecords(ws, type) : [];
+  const pending: WriteResult[] = [];
   const results = data.map((item) => {
     const ts = typeof item.ts === "string" ? item.ts : isoInZone(opts.now ?? new Date(), tz);
     parseTs(ts);
     const { ts: _ts, ...rest } = stripReserved(item);
-    const record: StoredRecord = { id: ulid(), ts, by: opts.by ?? "agent", ...rest };
+    let record: StoredRecord = {
+      id: ulid(),
+      ts,
+      by: opts.by ?? "agent",
+      ...rest,
+      ...(type === "news_item" ? { status: "new" } : {}),
+    };
     validateRecord(ws, ref, record);
-    return { type, module: ref.module.dir, file: recordFileFor(ref, localMonth(parseTs(ts), tz)), record };
+    if (news) {
+      record = mergeNewsRecord(type, record, existing, tz);
+      validateRecord(ws, ref, record);
+    }
+    const changed = !existing.includes(record);
+    const result = {
+      type,
+      module: ref.module.dir,
+      file: recordFileFor(ref, localMonth(parseTs(record.ts), tz)),
+      record,
+    };
+    if (changed) {
+      pending.push(result);
+      if (news) {
+        const index = existing.findIndex((row) => row.id === record.id);
+        if (index < 0) existing.push(record);
+        else existing[index] = record;
+      }
+    }
+    return result;
   });
   if (!opts.dryRun) {
     const files = new Map<string, string[]>();
-    for (const { file, record } of results) {
+    for (const { file, record } of pending) {
       const lines = files.get(file) ?? [];
       lines.push(JSON.stringify(record));
       files.set(file, lines);
@@ -200,4 +229,24 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
     .filter((r) => !r.deleted)
     .filter((r) => (!opts.from || day(r) >= opts.from) && (!opts.to || day(r) <= opts.to))
     .sort((a, b) => parseTs(a.ts).getTime() - parseTs(b.ts).getTime() || a.id.localeCompare(b.id));
+}
+
+/** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
+export function appendPreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  const plans = entries.map(({ type, record }) => {
+    const ref = findRecordType(ws, type);
+    parseTs(record.ts);
+    validateRecord(ws, ref, record);
+    return { file: recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone())), record };
+  });
+  const files = new Map<string, string[]>();
+  for (const { file, record } of plans) {
+    const lines = files.get(file) ?? [];
+    lines.push(JSON.stringify(record));
+    files.set(file, lines);
+  }
+  for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
 }

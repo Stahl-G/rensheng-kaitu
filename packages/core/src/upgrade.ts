@@ -30,7 +30,12 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
 
 export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
   const version = templateVersion();
-  if (!templateOutdated(ws) && ws.exists("ORGANIZER.md") && ws.exists("handoffs/daily"))
+  if (
+    !templateOutdated(ws) &&
+    ws.exists("ORGANIZER.md") &&
+    ws.exists("handoffs/daily") &&
+    ws.exists("explore/module.json")
+  )
     return { templateVersion: version, changes: [], version: null };
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();
@@ -61,6 +66,15 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
       );
     if (JSON.stringify(merged) !== JSON.stringify(existing))
       writes.set(file, `${JSON.stringify(merged, null, 2)}\n`);
+  }
+  const feedFile = "feed/feeds.json";
+  if (ws.exists(feedFile)) {
+    const feeds = ws.readJson<Record<string, unknown>>(feedFile);
+    if (feeds.muted === undefined)
+      writes.set(feedFile, `${JSON.stringify({ ...feeds, muted: [] }, null, 2)}\n`);
+  } else {
+    const defaults = files.get(feedFile);
+    if (defaults) writes.set(feedFile, defaults);
   }
   const skillRoot = ".agents/skills/";
   const builtinSkills = new Set(

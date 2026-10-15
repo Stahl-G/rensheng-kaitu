@@ -78,6 +78,7 @@ ${instructions}
   - 修改：\`kaitu record update <类型> <id> --json '{...}'\`
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
+- 地点经历用 MCP \`experience_add\` 或 dsh \`kaitu_add_experience\`，只给城市名和国家代码；计划用 planned，坐标由城市表提供。
 - 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--project slug]\`，新建为 open。
 - \`kaitu task list [--all]\` 查询，\`kaitu task done <id>\` 完成，\`kaitu task cancel <id>\` 取消；状态变化追加修订并保存版本。
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
@@ -164,6 +165,7 @@ ${skills()
 - 云端：\`kaitu mcp --http\` 只监听 127.0.0.1:4871，默认精简 remote 工具，须 Bearer token。
 - \`kaitu mcp token\` 查看 token，\`kaitu mcp token --rotate\` 轮换；不把 token 放进版本文件或日志。
 - MCP 可读状态、记录、记忆和对话，可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
+- 新闻用 \`news_item\` 投递并写明 \`relevance.reason\`，X 热门用 \`trend\`；复用新增记录工具或收件箱。\`news_read\` 读取资讯，\`news_try\` 生成 proposed 下一步，\`news_dismiss\` 静音来源。
 - 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
 
 ## 13. 安全

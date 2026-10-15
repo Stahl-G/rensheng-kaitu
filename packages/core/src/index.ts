@@ -45,3 +45,7 @@ export * from "./template-version.js";
 
 export * from "./overview-page.js";
 export * from "./github.js";
+
+export * from "./finance/index.js";
+export * from "./news.js";
+export * from "./places.js";

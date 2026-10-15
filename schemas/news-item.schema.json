@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/news-item.schema.json",
+  "title": "新闻",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["title", "url", "source", "via", "status"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "url": { "type": "string", "format": "uri" },
+    "source": { "type": "string", "minLength": 1 },
+    "via": { "enum": ["rss", "grok", "dot", "codex", "agent", "user"] },
+    "summary": { "type": "string" },
+    "image": { "type": "string", "format": "uri" },
+    "published_at": { "type": "string", "format": "date-time" },
+    "relevance": {
+      "type": "object",
+      "required": ["module", "reason"],
+      "properties": {
+        "module": { "type": "string", "minLength": 1 },
+        "ref": { "type": "string" },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "status": { "enum": ["new", "tried", "dismissed"], "default": "new" }
+  },
+  "examples": [
+    {
+      "title": "Lean 标准库更新",
+      "url": "https://example.com/lean",
+      "source": "Lean 官方博客",
+      "via": "rss",
+      "status": "new"
+    }
+  ]
+}

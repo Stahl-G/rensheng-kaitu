@@ -4,15 +4,20 @@ import {
   KaituError,
   Workspace,
   defaultRoot,
+  dismissNews,
+  lifeMap,
   listProjects,
   readAvatar,
+  readNews,
   readOverviewPage,
   removeAvatar,
+  resolveExperience,
   saveAvatar,
+  tryNews,
 } from "@kaitu/core";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
-import type { DoingProject, MeData, OverviewData } from "./types.js";
+import type { DoingProject, LifeMapData, MeData, NewsAction, NewsData, OverviewData } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -20,7 +25,7 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-/** 工作区页面与本机头像，不激活 Agent 或触发同步。 */
+/** 工作区页面数据、资讯与地点核对、本机头像。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
 
@@ -33,6 +38,34 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("news")
+  async news(): Promise<NewsData> {
+    return readNews(this.workspace);
+  }
+
+  @Remote("tryNews")
+  async tryNews(id: string): Promise<NewsAction> {
+    const result = await tryNews(this.workspace, id);
+    return { id: result.record.id, status: "tried", version: result.version };
+  }
+
+  @Remote("dismissNews")
+  async dismissNews(id: string): Promise<NewsAction> {
+    const result = await dismissNews(this.workspace, id);
+    return { id: result.record.id, status: "dismissed", version: result.version };
+  }
+
+  @Remote("lifeMap")
+  async lifeMap(): Promise<LifeMapData> {
+    return lifeMap(this.workspace);
+  }
+
+  @Remote("resolveExperience")
+  async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
+    const result = await resolveExperience(this.workspace, id, geonameid);
+    return { id: result.record.id, version: result.version };
   }
 
   @Remote("me")

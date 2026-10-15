@@ -1,11 +1,15 @@
 import {
   type Workspace,
+  addExperiences,
   addMemory,
   addTask,
   assertPublicProject,
   completeTask,
+  dismissNews,
+  findRecordType,
   inboxNoteDone,
   inboxNotes,
+  lifeMap,
   listMemories,
   listProjects,
   listTasks,
@@ -14,15 +18,18 @@ import {
   proposeBlock,
   publicProject,
   readAgentFile,
+  readNews,
   readRecords,
   readStatus,
   recordReferences,
   removeMemory,
+  resolvePlace,
   searchChats,
   searchMemories,
   snapshot,
   syncProject,
   syncProjects,
+  tryNews,
   updateMemory,
   writeAgentRecord,
   writeDigest,
@@ -98,18 +105,37 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     readStatus(ws, new Date(), tools === "remote"),
   );
   register("inbox_notes", "读取未整理的收件箱笔记及来源。", {}, () => inboxNotes(ws));
+  register("news_read", "读取近期新闻推荐、今天 X 热门和来源数量。", {}, () => readNews(ws));
+  register(
+    "news_try",
+    "将新闻加入对应模块的建议下一步，保存版本。",
+    { id: text },
+    ({ id }) => tryNews(ws, id),
+    true,
+  );
+  register(
+    "news_dismiss",
+    "标记新闻不相关并静音来源，保存版本。",
+    { id: text },
+    ({ id }) => dismissNews(ws, id),
+    true,
+  );
   register("record_types", "列出全部记录类型、字段约束和合法示例，只读。", {}, () => recordReferences(ws));
   register(
     "record_list",
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) =>
-      readRecords(ws, type, { from, to }).filter(
-        (row) =>
-          tools !== "remote" ||
-          !["project_metric", "github_snapshot"].includes(type) ||
-          publicProject(ws, row.project),
-      ),
+      tools === "remote" &&
+      (findRecordType(ws, type).module.def.id === "finance" ||
+        findRecordType(ws, type).module.dir === "finance")
+        ? []
+        : readRecords(ws, type, { from, to }).filter(
+            (row) =>
+              tools !== "remote" ||
+              !["project_metric", "github_snapshot"].includes(type) ||
+              publicProject(ws, row.project),
+          ),
   );
   register(
     "task_add",
@@ -131,6 +157,33 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
     (input) => listTasks(ws, input),
   );
+  const experience = z
+    .object({
+      place: z.object({ name: text, country: text.optional() }).strict(),
+      event_type: z.enum(["lived", "worked", "studied", "travel", "visit", "other"]),
+      fact_status: z.enum(["observed", "user_reported", "inferred", "planned", "suggested"]),
+      start: text.optional(),
+      end: text.optional(),
+      time_precision: z.enum(["year", "month", "day", "unknown"]),
+      title: text.optional(),
+      notes: text.optional(),
+      source: text,
+    })
+    .strict();
+  register(
+    "place_resolve",
+    "按城市名和国家代码查询城市候选，只读。",
+    { name: text, country: text.optional() },
+    ({ name, country }) => resolvePlace(name, country),
+  );
+  register(
+    "experience_add",
+    "批量记录地点经历，只给城市名和国家代码，不给坐标；计划用 planned。",
+    { items: z.array(experience).min(1) },
+    ({ items }) => addExperiences(ws, items, "agent"),
+    true,
+  );
+  register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     searchMemories(ws, query),

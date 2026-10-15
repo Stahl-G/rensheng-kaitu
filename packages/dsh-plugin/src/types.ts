@@ -1,7 +1,53 @@
+import type {
+  FinanceImportOptions,
+  FinanceViewOptions,
+  commitFinanceImport,
+  financeAccounts,
+  financeCashflow,
+  financeInvestments,
+  financeOverview,
+  previewFinanceImport,
+} from "@kaitu/core";
+export type { LifeMapData, LifeMapFeature, Experience, City } from "@kaitu/core";
+
 /** 浏览器与 Host 的只读总览契约。 */
 export interface OverviewSource {
   file: string;
   text: string;
+}
+
+export type NewsVia = "rss" | "grok" | "dot" | "codex" | "agent" | "user";
+export interface NewsItem {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  via: NewsVia;
+  summary?: string;
+  image?: string;
+  published_at?: string;
+  relevance?: { module: string; ref?: string; reason: string };
+  status: "new" | "tried" | "dismissed";
+}
+export interface NewsTrend {
+  id: string;
+  topic: string;
+  posts?: number;
+  url?: string;
+  image?: string;
+  via: NewsVia;
+}
+export interface NewsData {
+  date: string;
+  picked: NewsItem[];
+  trends: NewsTrend[];
+  others: NewsItem[];
+  sources: Partial<Record<NewsVia, number>>;
+}
+export interface NewsAction {
+  id: string;
+  status: "tried" | "dismissed";
+  version: string | null;
 }
 export interface OverviewMetric {
   key: string;
@@ -118,6 +164,18 @@ export interface DoingProject {
   } | null;
 }
 
+/** 财务边界类型从 core 派生，供生成器为浏览器导入具名契约。 */
+export interface FinanceRemoteViewOptions extends FinanceViewOptions {}
+export interface FinanceRemoteImportOptions extends FinanceImportOptions {}
+export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {
+  account: string;
+}
+export type FinanceOverviewData = ReturnType<typeof financeOverview>;
+export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
+export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
+export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
+export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
+export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;
 export interface MeGoal {
   id: string;
   title: string;
