@@ -8,6 +8,7 @@ import type {
   OverviewVersion,
 } from "../types.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
+import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
@@ -19,7 +20,8 @@ export interface OverviewPageProps
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<MapPageProps, "onPrompt">,
-    Omit<HealthPageProps, "onPrompt"> {
+    Omit<HealthPageProps, "onPrompt">,
+    Omit<FinancePageProps, "onPrompt" | "today" | "timeZone"> {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
 }
@@ -29,6 +31,7 @@ const sections = [
   { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
   { id: "map", name: "地图", tip: "走过的、现在的和计划去的城市" },
   { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
+  { id: "finance", name: "财务", tip: "收支、投资和账户 · 明细只在本机" },
   { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
 ];
 const collapseKey = "kaitu.overview.sectionsCollapsed";
@@ -235,6 +238,13 @@ export function OverviewPage({
   loadHealthPhoto,
   loadLifeMap,
   resolveExperience,
+  loadFinanceOverview,
+  loadFinanceCashflow,
+  loadFinanceInvestments,
+  loadFinanceAccounts,
+  previewFinanceImport,
+  commitFinanceImport,
+  discardFinanceImport,
   ...me
 }: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
@@ -340,7 +350,7 @@ export function OverviewPage({
             </>
           )}
         </nav>
-        {current !== "feed" && current !== "projects" && current !== "health" && current !== "map" && (
+        {current !== "feed" && current !== "projects" && current !== "health" && current !== "map" && current !== "finance" && (
           <header className={css.header}>
             <div>
               <h1>
@@ -394,6 +404,19 @@ export function OverviewPage({
           <MePage key={meRevision} {...me} />
         ) : current === "map" ? (
           <MapPage loadLifeMap={loadLifeMap} resolveExperience={resolveExperience} onPrompt={me.onPrompt} />
+        ) : current === "finance" ? (
+          <FinancePage
+            loadFinanceOverview={loadFinanceOverview}
+            loadFinanceCashflow={loadFinanceCashflow}
+            loadFinanceInvestments={loadFinanceInvestments}
+            loadFinanceAccounts={loadFinanceAccounts}
+            previewFinanceImport={previewFinanceImport}
+            commitFinanceImport={commitFinanceImport}
+            discardFinanceImport={discardFinanceImport}
+            onPrompt={me.onPrompt}
+            today={data?.today}
+            timeZone={data?.timeZone}
+          />
         ) : current === "feed" ? (
           <NewsPage loadNews={loadNews} tryNews={tryNews} dismissNews={dismissNews} onPrompt={me.onPrompt} />
         ) : current === "projects" ? (

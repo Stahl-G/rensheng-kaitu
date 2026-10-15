@@ -223,6 +223,40 @@ export function financeOverview(ws: Workspace, options: FinanceViewOptions = {})
   return {
     period: { from: null, to: ctx.asOf, as_of: ctx.asOf },
     currencies: groups,
+    records: [
+      ...ctx.accounts.map((a) => ({
+        id: a.id,
+        date: a.balance_at ?? a.ts,
+        description: `${a.name} · 余额基准`,
+        currency: a.currency,
+        amount: a.balance ?? null,
+      })),
+      ...ctx.transactions.map((r) => ({
+        id: r.id,
+        date: r.ts,
+        description: [r.counterparty, r.description].filter(Boolean).join(" · ") || "交易记录",
+        currency: r.currency,
+        amount: r.amount,
+      })),
+      ...holdings.map((h) => ({
+        id: h.id,
+        date: h.ts,
+        description: [h.security_code, h.name].filter(Boolean).join(" · ") || "持仓记录",
+        currency: h.currency,
+        amount: holdingValue(h).amount,
+      })),
+    ],
+    pending: ctx.transactions
+      .filter((r) => r.reconciliation !== "ok")
+      .map((r) => ({
+        id: r.id,
+        date: r.ts,
+        amount: r.amount,
+        currency: r.currency,
+        description: [r.counterparty, r.description].filter(Boolean).join(" · ") || "交易记录",
+        status: r.reconciliation,
+        reason: r.review_reason ?? null,
+      })),
     converted: options.targetCurrency
       ? {
           cash: convert(cash, options.targetCurrency, ctx.rates),
@@ -285,6 +319,47 @@ export function financeCashflow(ws: Workspace, from: string, to: string, options
   return {
     period: { from, to, as_of: ctx.asOf },
     currencies,
+    consumption_categories: ["expense", "interest", "refund"].flatMap((category) =>
+      ids(rows.filter((r) => r.category === category).map((r) => r.currency)).map((currency) => ({
+        category,
+        currency,
+        total: sum(
+          rows
+            .filter((r) => r.category === category && r.currency === currency)
+            .map((r) => ({
+              currency,
+              amount: r.reconciliation === "candidate_duplicate" ? null : financeEffects(r).consumption,
+              ids: [r.id],
+              missing: r.reconciliation === "candidate_duplicate" ? ["candidate_duplicate"] : [],
+              date: r.ts.slice(0, 10),
+            })),
+        ),
+      })),
+    ),
+    excluded: ["transfer", "sale", "loan_in", "loan_repay", "refund"].flatMap((category) =>
+      ids(rows.filter((r) => r.category === category).map((r) => r.currency)).map((currency) => ({
+        category,
+        currency,
+        total: sum(
+          rows
+            .filter((r) => r.category === category && r.currency === currency)
+            .map((r) => ({
+              currency,
+              amount:
+                r.reconciliation === "candidate_duplicate" ||
+                r.direction_unknown ||
+                (category === "refund" && r.reconciliation !== "ok")
+                  ? null
+                  : category === "sale"
+                    ? financeEffects(r).principal
+                    : r.amount,
+              ids: [r.id],
+              missing: [],
+              date: r.ts.slice(0, 10),
+            })),
+        ),
+      })),
+    ),
     pending: rows
       .filter((r) => r.reconciliation !== "ok")
       .map((r) => ({ record_ids: [r.id], status: r.reconciliation, reason: r.review_reason ?? null })),
