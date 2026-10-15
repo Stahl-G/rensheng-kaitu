@@ -1,3 +1,4 @@
+import { isUtf8 } from "node:buffer";
 import {
   closeSync,
   existsSync,
@@ -5,17 +6,18 @@ import {
   openSync,
   readFileSync,
   readdirSync,
-  renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { proposeBlock, writeDigest } from "./agent-tools.js";
 import { KaituError } from "./errors.js";
-import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { batchSnapshot } from "./history.js";
+import { INBOX_FORMATS } from "./inbox-formats.js";
+import { availableInboxPath, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories } from "./memory.js";
 import { assertPublicProject } from "./projects.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
@@ -28,14 +30,7 @@ function object(value: unknown): Record<string, unknown> {
     throw new KaituError("必须是 JSON 对象", "BAD_INBOX");
   return value as Record<string, unknown>;
 }
-function sourceAgent(value: unknown): string {
-  return typeof value === "string" && value.trim()
-    ? value
-        .trim()
-        .replace(/[\r\n]/g, " ")
-        .slice(0, 100)
-    : "云端 Agent";
-}
+const sourceAgent = noteAgent;
 function only(data: Record<string, unknown>, fields: string[]) {
   if (Object.keys(data).some((key) => !fields.includes(key)))
     throw new KaituError("收件箱包含不支持的字段", "BAD_INBOX");
@@ -61,17 +56,22 @@ async function prepare(ws: Workspace, file: string, text: string) {
     };
   }
   if (file.endsWith(".records.jsonl")) {
-    if (!text.endsWith("\n")) throw new KaituError("JSONL 必须以换行结束", "INCOMPLETE_INBOX");
-    const rows = text
-      .split(/\r?\n/)
-      .filter((line) => line.trim())
-      .map((line) => object(JSON.parse(line)));
-    if (!rows.length) throw new KaituError("记录文件为空", "BAD_INBOX");
-    const groups = new Map<string, Record<string, unknown>[]>();
-    const fileAgent = rows.find((row) => typeof row.agent === "string" && row.agent.trim())?.agent;
-    for (const row of rows) {
-      const { type, agent, ...data } = row;
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    const rows = lines.map((line) => {
       try {
+        return object(JSON.parse(line));
+      } catch {
+        return null;
+      }
+    });
+    const errors: string[] = [];
+    if (!lines.length) errors.push(`记录文件为空\n\n${recordRejectionHelp(ws, undefined)}`);
+    const groups = new Map<string, Record<string, unknown>[]>();
+    const fileAgent = rows.find((row) => row && typeof row.agent === "string" && row.agent.trim())?.agent;
+    for (const [index, row] of rows.entries()) {
+      const { type, agent, ...data } = row ?? {};
+      try {
+        if (!row) throw new KaituError("必须是合法 JSON 对象", "BAD_INBOX");
         if (typeof type !== "string" || ["id", "by", "rev", "deleted"].some((key) => key in data)) {
           throw new KaituError("只接受新增记录，不能修改或删除", "BAD_INBOX");
         }
@@ -88,23 +88,20 @@ async function prepare(ws: Workspace, file: string, text: string) {
         }
         const { date: _date, ...withoutDate } = data;
         if (type === "project_metric") assertPublicProject(ws, data.project);
+        const record = fields.includes("date") ? data : withoutDate;
+        addRecords(ws, type, [record], { dryRun: true });
         const group = groups.get(type) ?? [];
-        group.push(fields.includes("date") ? data : withoutDate);
+        group.push(record);
         groups.set(type, group);
       } catch (error) {
-        throw new KaituError(`${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`, "BAD_INBOX");
+        errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`);
       }
     }
-    for (const [type, rows] of groups) {
-      try {
-        addRecords(ws, type, rows, { dryRun: true });
-      } catch (error) {
-        throw new KaituError(`${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`, "BAD_INBOX");
-      }
-    }
-    const agents = [...new Set(rows.map((row) => sourceAgent(row.agent)))].join("、");
+    const agents = [...new Set(rows.map((row) => sourceAgent(row?.agent ?? fileAgent)))].join("、");
     return {
-      message: `Agent（Drive 收件箱：${agents}）新增了 ${rows.length} 条记录`,
+      errors,
+      agent: agents,
+      message: `Agent（Drive 收件箱：${agents}）新增了 ${[...groups.values()].flat().length} 条记录`,
       apply: async () => {
         for (const [type, rows] of groups) addRecords(ws, type, rows);
       },
@@ -113,15 +110,26 @@ async function prepare(ws: Workspace, file: string, text: string) {
   if (file.endsWith(".memory.json")) {
     const raw: unknown = JSON.parse(text);
     if (!Array.isArray(raw) || !raw.length) throw new KaituError("记忆文件必须是非空候选数组", "BAD_INBOX");
-    const rows = raw.map(object);
-    const inputs = rows.map((row) => {
-      only(row, ["type", "name", "text", "source", "sensitive", "agent"]);
-      const { agent: _agent, ...input } = row;
-      return input as unknown as MemoryInput;
-    });
-    await importMemories(ws, inputs, { dryRun: true });
-    const actor = `Agent（Drive 收件箱：${[...new Set(rows.map((row) => sourceAgent(row.agent)))].join("、")}）`;
+    const inputs: MemoryInput[] = [];
+    const agents: string[] = [];
+    const errors: string[] = [];
+    for (const [index, value] of raw.entries()) {
+      try {
+        const row = object(value);
+        agents.push(sourceAgent(row.agent));
+        only(row, ["type", "name", "text", "source", "sensitive", "agent"]);
+        const { agent: _agent, ...input } = row;
+        await importMemories(ws, [input as unknown as MemoryInput], { dryRun: true });
+        inputs.push(input as unknown as MemoryInput);
+      } catch (error) {
+        errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${INBOX_FORMATS}`);
+      }
+    }
+    const agent = [...new Set(agents)].join("、") || sourceAgent(undefined);
+    const actor = `Agent（Drive 收件箱：${agent}）`;
     return {
+      errors,
+      agent,
       message: `${actor}导入了 ${inputs.length} 条记忆`,
       apply: () => importMemories(ws, inputs, { actor }),
     };
@@ -149,19 +157,37 @@ function stamp(ws: Workspace, file: string) {
   const stat = statSync(ws.resolve(file));
   return `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
 }
-function archive(ws: Workspace, file: string, directory: string) {
-  const name = file.slice(file.lastIndexOf("/") + 1);
-  const target = `${directory}/${name}`;
-  if (ws.exists(target)) throw new KaituError(`归档文件已存在：${target}`, "CONFLICT");
-  const abs = ws.resolve(target);
-  mkdirSync(dirname(abs), { recursive: true });
-  renameSync(ws.resolve(file), abs);
+function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: string) {
+  const bytes = readFileSync(ws.resolve(file));
+  const directory = `inbox/notes/${localDate(new Date(), ws.timeZone())}`;
+  if (file.endsWith(".note.md") && !errors.length && isUtf8(bytes) && !bytes.includes(0)) {
+    return moveInboxFile(ws, file, directory);
+  }
+  const text = isUtf8(bytes) && !bytes.includes(0) ? bytes.toString("utf8") : null;
+  const attachment = text === null ? moveInboxFile(ws, file, `${directory}/files`) : undefined;
+  const target = availableInboxPath(ws, directory, `${basename(file)}.md`);
+  ws.writeText(
+    target,
+    stringifyFrontmatter(
+      {
+        agent: sourceAgent(agent ?? (text === null ? undefined : noteMetadata(text).agent)),
+        original: basename(file),
+        ...(attachment ? { attachment } : {}),
+      },
+      [
+        "# 待整理笔记",
+        errors.join("\n\n"),
+        text === null ? `文件：${basename(file)}\n大小：${bytes.length} 字节\n原件：${attachment}` : text,
+      ].join("\n\n"),
+    ),
+  );
+  if (text !== null) rmSync(ws.resolve(file));
   return target;
 }
 
 export async function processInbox(ws: Workspace, options: { stableMs?: number } = {}) {
-  const result = { processed: [] as string[], rejected: [] as string[], pending: [] as string[] };
-  if (!ws.exists("inbox/agents")) return result;
+  const result = { processed: [] as string[], notes: [] as string[], pending: [] as string[] };
+  if (!ws.exists("inbox/agents") && !ws.exists("inbox/rejected")) return result;
   const lock = ws.resolve(".kaitu/cache/inbox.lock", { internal: true });
   mkdirSync(dirname(lock), { recursive: true });
   if (existsSync(lock)) {
@@ -184,11 +210,32 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
   }
   try {
     writeFileSync(fd, String(process.pid));
+    if (ws.exists("inbox/rejected")) {
+      for (const entry of readdirSync(ws.resolve("inbox/rejected"), { withFileTypes: true })) {
+        if (!entry.isFile() || entry.name.endsWith(".error.txt")) continue;
+        const file = `inbox/rejected/${entry.name}`;
+        const receipt = `${file}.error.txt`;
+        await batchSnapshot(ws, "Agent 迁入了旧收件箱待整理笔记", async () => {
+          result.notes.push(saveNote(ws, file, ws.exists(receipt) ? [ws.readText(receipt)] : []));
+          if (ws.exists(receipt)) rmSync(ws.resolve(receipt));
+        });
+      }
+      for (const entry of readdirSync(ws.resolve("inbox/rejected"), { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        await batchSnapshot(ws, "Agent 迁入了旧收件箱待整理笔记", async () => {
+          result.notes.push(saveNote(ws, `inbox/rejected/${entry.name}`));
+        });
+      }
+      if (!readdirSync(ws.resolve("inbox/rejected")).length)
+        rmSync(ws.resolve("inbox/rejected"), { recursive: true });
+    }
     const observed = new Map<string, string>();
-    for (const entry of readdirSync(ws.resolve("inbox/agents"), { withFileTypes: true })) {
-      if (!entry.isFile() || entry.name.startsWith(".") || entry.name.endsWith(".tmp")) continue;
-      const file = `inbox/agents/${entry.name}`;
-      observed.set(file, stamp(ws, file));
+    if (ws.exists("inbox/agents")) {
+      for (const entry of readdirSync(ws.resolve("inbox/agents"), { withFileTypes: true })) {
+        if (!entry.isFile()) continue;
+        const file = `inbox/agents/${entry.name}`;
+        observed.set(file, stamp(ws, file));
+      }
     }
     if (!observed.size) return result;
     await setTimeout(options.stableMs ?? 1500);
@@ -198,40 +245,48 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         result.pending.push(file);
         continue;
       }
-      try {
-        const text = ws.readText(file);
-        const prepared = await prepare(ws, file, text);
-        if (stamp(ws, file) !== before) {
-          result.pending.push(file);
-          continue;
+      const text = ws.readText(file);
+      let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
+      let errors: string[] = [];
+      if (!file.endsWith(".note.md")) {
+        try {
+          prepared = await prepare(ws, file, text);
+          errors = prepared.errors ?? [];
+        } catch (error) {
+          errors = [`${(error as Error).message}\n\n${INBOX_FORMATS}`];
         }
-        const directory = `inbox/processed/${localDate(new Date(), ws.timeZone())}`;
-        const target = `${directory}/${file.split("/").at(-1)}`;
-        if (ws.exists(target)) throw new KaituError(`归档文件已存在：${target}`, "CONFLICT");
-        await batchSnapshot(ws, prepared.message, async () => {
-          await prepared.apply();
-          archive(ws, file, directory);
-        });
-        result.processed.push(file);
-      } catch (error) {
-        if (!ws.exists(file)) throw error;
-        const position = /position (\d+)/.exec((error as Error).message)?.[1];
-        const incompleteJson =
-          error instanceof SyntaxError &&
-          (/Unexpected end|Unterminated string/.test(error.message) ||
-            (position !== undefined && Number(position) >= ws.readText(file).trimEnd().length));
-        if ((error as KaituError).code === "INCOMPLETE_INBOX" || incompleteJson) {
-          result.pending.push(file);
-          continue;
-        }
-        if (stamp(ws, file) !== before) {
-          result.pending.push(file);
-          continue;
-        }
-        const target = archive(ws, file, "inbox/rejected");
-        ws.writeText(`${target}.error.txt`, `${(error as Error).message}\n`);
-        result.rejected.push(file);
       }
+      if (stamp(ws, file) !== before) {
+        result.pending.push(file);
+        continue;
+      }
+      let metadata = noteMetadata(text);
+      try {
+        const raw = JSON.parse(text);
+        metadata = Array.isArray(raw) ? (raw.find((row) => row?.agent) ?? metadata) : (raw ?? metadata);
+      } catch {}
+      const agent = prepared && "agent" in prepared ? prepared.agent : metadata.agent;
+      await batchSnapshot(
+        ws,
+        () =>
+          errors.length || !prepared
+            ? `Agent（Drive 收件箱：${sourceAgent(agent)}）留了一条待整理笔记`
+            : prepared.message,
+        async () => {
+          if (prepared) {
+            try {
+              await prepared.apply();
+            } catch (error) {
+              errors.push(`${(error as Error).message}\n\n${INBOX_FORMATS}`);
+            }
+          }
+          if (errors.length || !prepared) result.notes.push(saveNote(ws, file, errors, sourceAgent(agent)));
+          else {
+            moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+            result.processed.push(file);
+          }
+        },
+      );
     }
     ws.writeJson(".kaitu/inbox-state.json", { lastProcessed: new Date().toISOString() }, { internal: true });
     return result;

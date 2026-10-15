@@ -21,6 +21,7 @@ export function readStatus(ws: Workspace, now = new Date(), publicOnly = false) 
   const blocks = data.now.data.date === data.today ? data.now.data.blocks : [];
   return {
     today: data.today,
+    inboxNotes: data.inboxNotes,
     now: {
       date: data.now.data.date,
       blocks,

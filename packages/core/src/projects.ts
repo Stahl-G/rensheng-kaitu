@@ -215,6 +215,18 @@ function validDate(date: string) {
     throw new KaituError("日期不合法", "BAD_ARGS");
   }
 }
+function sortLog(log: string) {
+  const headings = [...log.matchAll(/^## \d{4}-\d{2}-\d{2}[^\S\n]*\r?$/gm)];
+  if (!headings.length) return log;
+  const sections = headings.map((match, i) => ({
+    date: match[0].slice(3, 13),
+    text: log.slice(match.index, headings[i + 1]?.index ?? log.length).trimEnd(),
+  }));
+  return `${log.slice(0, headings[0]?.index).trimEnd()}\n\n${sections
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((section) => section.text)
+    .join("\n\n")}\n`;
+}
 function appendLog(ws: Workspace, slug: string, text: string, date: string, marker?: string) {
   validDate(date);
   const project = readProject(ws, slug);
@@ -234,7 +246,7 @@ function appendLog(ws: Workspace, slug: string, text: string, date: string, mark
     section = `${lines.join("\n").trimEnd()}\n`;
     log = log.slice(0, start) + section + log.slice(sectionEnd);
   }
-  ws.writeText(`${project.dir}/log.md`, log, { internal: true });
+  ws.writeText(`${project.dir}/log.md`, sortLog(log), { internal: true });
 }
 export async function logProject(
   ws: Workspace,
@@ -416,6 +428,8 @@ function wordCount(text: string, markdown: boolean): number {
 export async function syncProject(ws: Workspace, slug: string, options: { now?: Date } = {}) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
+    const sorted = sortLog(project.log);
+    if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
     const now = options.now ?? new Date();
     const tz = ws.timeZone();
     const today = localDate(now, tz);
@@ -519,10 +533,13 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     if (reposOk) {
       for (const date of new Set([...commitDates, ...counts.keys()])) {
         const item = counts.get(date);
-        const detail = (item?.titles ?? [])
-          .sort((a, b) => b.timestamp - a.timestamp || a.oid.localeCompare(b.oid))
-          .slice(0, 10)
-          .map((entry) => entry.title);
+        const detail = [
+          ...new Set(
+            (item?.titles ?? [])
+              .sort((a, b) => b.timestamp - a.timestamp || a.oid.localeCompare(b.oid))
+              .map((entry) => entry.title),
+          ),
+        ].slice(0, 10);
         const total = item?.count ?? 0;
         const previous = existing.find((r) => r.kind === "commits" && String(r.ts).slice(0, 10) === date);
         if (previous?.value === total && JSON.stringify(previous.detail) === JSON.stringify(detail)) continue;

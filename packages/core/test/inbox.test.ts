@@ -3,6 +3,7 @@ import { setTimeout } from "node:timers/promises";
 import { expect, it } from "vitest";
 import {
   history,
+  inboxNotes,
   listMemories,
   localDate,
   parseFrontmatter,
@@ -13,7 +14,7 @@ import {
 } from "../src/index.js";
 import { freshWorkspace, workout } from "./helpers.js";
 
-it("四种收件箱各一个带来源版本，非法整批拒绝，未稳定文件留到下一轮", async () => {
+it("四种收件箱各一个带来源版本，混合记录保留合法行与错误笔记，未稳定文件留到下一轮", async () => {
   const ws = await freshWorkspace();
   try {
     const date = localDate(new Date(), ws.timeZone());
@@ -40,13 +41,13 @@ it("四种收件箱各一个带来源版本，非法整批拒绝，未稳定文�
     const before = await history(ws);
     const result = await processInbox(ws, { stableMs: 30 });
     expect(result.processed).toHaveLength(4);
-    expect(result.rejected).toEqual(["inbox/agents/invalid.records.jsonl"]);
+    expect(result.notes).toHaveLength(1);
     const versions = await history(ws);
-    expect(versions.length).toBe(before.length + 4);
+    expect(versions.length).toBe(before.length + 5);
     for (const source of ["digest-source", "records-source", "memory-source", "proposal-source"]) {
-      expect(versions.slice(0, 4).filter((v) => v.message.includes(source))).toHaveLength(1);
+      expect(versions.slice(0, 5).filter((v) => v.message.includes(source))).toHaveLength(1);
     }
-    expect(readRecords(ws, "workout")).toHaveLength(1);
+    expect(readRecords(ws, "workout")).toHaveLength(2);
     expect(readRecords(ws, "metric")).toEqual([]);
     expect(listMemories(ws)).toHaveLength(1);
     const plan = parseFrontmatter<{ blocks: { kind: string; status: string }[] }>(ws.readText("NOW.md"));
@@ -57,34 +58,36 @@ it("四种收件箱各一个带来源版本，非法整批拒绝，未稳定文�
       expect(ws.readText(`inbox/processed/${date}/${name}`)).toBe(files[name as keyof typeof files]);
       expect(ws.exists(`inbox/agents/${name}`)).toBe(false);
     }
-    expect(ws.exists("inbox/rejected/invalid.records.jsonl.error.txt")).toBe(true);
-    expect(ws.readText("inbox/rejected/invalid.records.jsonl")).toBe(files["invalid.records.jsonl"]);
+    expect(ws.exists("inbox/rejected")).toBe(false);
+    const note = inboxNotes(ws)[0];
+    expect(note?.content.endsWith(files["invalid.records.jsonl"])).toBe(true);
+    expect(ws.exists("inbox/agents/invalid.records.jsonl")).toBe(false);
     expect(validateWorkspace(ws)).toEqual([]);
     const partial = "inbox/agents/partial.memory.json";
     ws.writeText(partial, '[{"type":"fact","name":"尚未完成"');
-    expect((await processInbox(ws, { stableMs: 20 })).pending).toEqual([partial]);
+    expect((await processInbox(ws, { stableMs: 20 })).notes).toHaveLength(1);
     expect(listMemories(ws)).toHaveLength(1);
-    expect(ws.exists(partial)).toBe(true);
-    rmSync(ws.resolve(partial));
+    expect(ws.exists(partial)).toBe(false);
+    const afterPartial = await history(ws);
     const incoming = "inbox/agents/changing.records.jsonl";
     ws.writeText(incoming, `${JSON.stringify({ type: "workout", ...workout })}\n`);
     const processing = processInbox(ws, { stableMs: 80 });
     await setTimeout(10);
     ws.appendLine(incoming, JSON.stringify({ type: "workout", ...workout, session_id: "s2" }));
     expect((await processing).pending).toEqual([incoming]);
-    expect(readRecords(ws, "workout")).toHaveLength(1);
-    expect(await history(ws)).toEqual(versions);
+    expect(readRecords(ws, "workout")).toHaveLength(2);
+    expect(await history(ws)).toEqual(afterPartial);
     expect((await processInbox(ws, { stableMs: 20 })).processed).toEqual([incoming]);
-    expect(readRecords(ws, "workout")).toHaveLength(3);
-    expect((await history(ws)).length).toBe(versions.length + 1);
+    expect(readRecords(ws, "workout")).toHaveLength(4);
+    expect((await history(ws)).length).toBe(afterPartial.length + 1);
     expect((await processInbox(ws, { stableMs: 20 })).processed).toEqual([]);
-    expect((await history(ws)).length).toBe(versions.length + 1);
+    expect((await history(ws)).length).toBe(afterPartial.length + 1);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }
 }, 10000);
 
-it("记录补齐来源和本地日期，剥离传输字段，拒绝未知类型并列出可用类型", async () => {
+it("记录补齐来源和本地日期，剥离传输字段，保留未知类型为笔记", async () => {
   const ws = await freshWorkspace("America/New_York");
   try {
     const input = [
@@ -102,7 +105,7 @@ it("记录补齐来源和本地日期，剥离传输字段，拒绝未知类型�
     ];
     ws.writeText("inbox/agents/dot.records.jsonl", `${input.map((r) => JSON.stringify(r)).join("\n")}\n`);
     const result = await processInbox(ws, { stableMs: 0 });
-    expect(result.rejected).toEqual([]);
+    expect(result.notes).toEqual([]);
     const rows = readRecords(ws, "metric");
     expect(rows.map(({ source, ts }) => ({ source, ts }))).toEqual([
       { source: "scale", ts: "2026-01-01T12:00:00-05:00" },
@@ -119,16 +122,12 @@ it("记录补齐来源和本地日期，剥离传输字段，拒绝未知类型�
       "inbox/agents/anonymous.records.jsonl",
       `${JSON.stringify({ type: "metric", kind: "weight", value: 73, unit: "kg" })}\n`,
     );
-    expect((await processInbox(ws, { stableMs: 0 })).rejected).toEqual([]);
+    expect((await processInbox(ws, { stableMs: 0 })).notes).toEqual([]);
     expect(readRecords(ws, "metric").find((r) => r.value === 73)?.source).toBe("cloud-agent");
     ws.writeText("inbox/agents/unknown.records.jsonl", '{"type":"unknown","value":1}\n');
-    expect((await processInbox(ws, { stableMs: 0 })).rejected).toHaveLength(1);
-    const error = ws.readText("inbox/rejected/unknown.records.jsonl.error.txt");
-    const help = JSON.parse(error.slice(error.indexOf("\n\n") + 2));
-    const { listRecordTypes } = await import("../src/index.js");
-    expect(help.record_types.map((ref: { type: string }) => ref.type)).toEqual(
-      listRecordTypes(ws).map((ref) => ref.type),
-    );
+    expect((await processInbox(ws, { stableMs: 0 })).notes).toHaveLength(1);
+    expect(inboxNotes(ws)).toHaveLength(1);
+    expect(ws.exists("inbox/rejected")).toBe(false);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

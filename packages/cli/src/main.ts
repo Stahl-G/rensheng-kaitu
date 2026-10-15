@@ -27,6 +27,8 @@ import {
   importIcs,
   importMemoryFile,
   importNutAi,
+  inboxNoteDone,
+  inboxNotes,
   initWorkspace,
   linkProject,
   listMemories,
@@ -69,6 +71,7 @@ const HELP = `开图 kaitu
   kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
   kaitu drive disable [--to <目录>]                  搬回本机
   kaitu drive status                                查看同步状态
+  kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理云端 Agent 收件箱
   kaitu ui [--port 4870] [--no-open]                打开本地工作台
   kaitu doctor                                     检查工作区
@@ -274,12 +277,28 @@ async function run(argv: string[]): Promise<number> {
       return 0;
     }
     case "inbox": {
-      if (args[0] !== "process") throw new KaituError("使用 inbox process", "BAD_ARGS");
-      const result = await processInbox(workspace(values));
+      const ws = workspace(values);
+      if (args[0] === "notes") {
+        const notes = inboxNotes(ws);
+        out(
+          values,
+          notes,
+          notes.map((note) => `${note.path}（${note.agent}）\n${note.content}`).join("\n\n") ||
+            "没有待整理笔记",
+        );
+        return 0;
+      }
+      if (args[0] === "done") {
+        const result = await inboxNoteDone(ws, need(args[1], "路径"));
+        out(values, result, `已归档：${result.path}`);
+        return 0;
+      }
+      if (args[0] !== "process") throw new KaituError("使用 inbox process / notes / done <路径>", "BAD_ARGS");
+      const result = await processInbox(ws);
       out(
         values,
         result,
-        `已处理 ${result.processed.length}，已拒绝 ${result.rejected.length}，待同步完成 ${result.pending.length}`,
+        `已处理 ${result.processed.length}，转为待整理笔记 ${result.notes.length}，待同步完成 ${result.pending.length}`,
       );
       return 0;
     }
@@ -400,6 +419,7 @@ async function run(argv: string[]): Promise<number> {
         result,
         [
           `${result.today} · ${result.now.pending} 条日程建议待确认`,
+          `${result.inboxNotes} 条待整理笔记`,
           ...result.now.blocks.map((b) => `${b.start ?? "待办"} ${b.title}（${b.status}）`),
           ...moduleLines,
           "项目：",

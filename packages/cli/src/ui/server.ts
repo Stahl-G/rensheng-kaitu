@@ -132,7 +132,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
       if (closed) return;
       void exclusive(async () => {
         const result = await processInbox(ws, { stableMs: options.inboxStableMs });
-        if (result.processed.length || result.rejected.length) notify();
+        if (result.processed.length || result.notes.length) notify();
         if (result.pending.length && !closed) scheduleInbox();
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);

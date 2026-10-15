@@ -43,12 +43,15 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 
 ## 云端 Agent 怎么写：收件箱（不直接改文件）
 
-两边同时改同一个文件会产生冲突副本，所以云端 Agent **只在 `inbox/agents/` 里新建文件**，每个文件名唯一，不改已有文件。开图看到新文件后校验、写入、存版本，把原件移到 `inbox/processed/`（失败的移到 `inbox/rejected/` 并附原因、字段参考和合法示例）。
+两边同时改同一个文件会产生冲突副本，所以云端 Agent **只在 `inbox/agents/` 里新建文件**，每个文件名唯一，不改已有文件。开图看到新文件后写入、存版本，成功原件移到 `inbox/processed/`；写错的部分连同原内容、原因、字段参考和示例转为 `inbox/notes/YYYY-MM-DD/` 的待整理笔记。
 
-收件箱接受的文件（与 MCP 的 remote 工具集一致）：
+格式不确定时直接写 `*.note.md`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
+
+收件箱接受的文件：
 
 | 文件 | 作用 |
 |---|---|
+| `*.note.md`（frontmatter 可选 `agent`、`date`） | 原样保存为待整理笔记，正文可写任意自然语言 |
 | `*.digest.md`（frontmatter 含 `date`） | 按来源合并到 `feed/digests/<date>.md`；同一来源重交替换自己的小节 |
 | `*.records.jsonl`（每行 `{"type": "...", ...}`） | 逐条 `record add`，整批一个版本 |
 | `*.memory.json`（候选记忆数组） | `memory import`，整批一个版本 |
@@ -56,9 +59,10 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 
 版本说明带来源，如「Agent（Drive 收件箱：grok-bot）写入了今天的动态简报」；来源取文件 frontmatter / 字段里的 `agent`，没有就写「云端 Agent」。不接受删除、恢复、改规则与目标。
 
-处理前间隔 1.5 秒核对大小与修改时间，写入仍在变化时留待下一轮；JSONL 需要末尾换行。
-整批记录、记忆先校验再写；只接受新增操作。来源可写在简报 frontmatter、每行记录、每条记忆或建议的 `agent` 字段。
-未处理与被拒绝的文件不进版本，成功原件随数据一起归档进该次版本；处理时间与进程锁留在本机状态目录。
+处理前间隔 1.5 秒核对大小与修改时间，写入仍在变化时留待下一轮。
+记录逐行、记忆逐条校验：合法部分立即写入，其余部分保留待整理；只接受新增操作。来源可写在简报 frontmatter、每行记录、每条记忆或建议的 `agent` 字段。
+未处理文件不进版本，成功原件与待整理笔记均保存版本；处理时间与进程锁留在本机状态目录。
+无法识别的文件也转为笔记；二进制只记录文件名、大小，原件放当日 notes 的 `files/`。同名文件保留独立副本，不覆盖。
 本地模式同样生成 `AGENT-README.md`、`OVERVIEW.md` 与 `inbox/agents/`。入口与现状开头标明用户时区与当天 UTC 偏移。
 
 记录格式从各模块 schema 自动生成，含自定义模块；`AGENT-README.md` 与本机 `AGENTS.md` 内嵌字段与示例。
@@ -67,13 +71,17 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 收件箱的 `type` 与 `agent` 是传输字段，写入前去掉；有 `source` 字段的类型未填时取同文件 agent，缺省为 `cloud-agent`。
 不自动猜测改名。时间可省略 ts（当前时间），或给带偏移的 ts；只给 date 时按用户时区当天 12:00 转为 ts。
 类型本身定义 date（如 activity）时保留，其他类型在写入前去掉 date。
-未知类型的拒绝回执列出所有可用类型，已知类型附该类型字段参考和示例。
+未知类型的笔记列出所有可用类型，已知类型附该类型字段参考和示例。
 
 谁来处理收件箱：`kaitu ui` 运行时自动处理（复用文件监听）；也可以手动 `kaitu inbox process`。
 
+本机用 `kaitu inbox notes` 列出未整理笔记，用 `kaitu inbox done <路径>` 整理后归档到 `inbox/notes/done/YYYY-MM-DD/` 并生成版本。
+`kaitu status`、OVERVIEW 与工作台「今天 · 需要你处理」显示待整理数量。
+晚间复盘由本机 Agent 把可结构化内容写入记录、记忆或简报，保留原 agent 来源；拿不准的留着并列入日报。
+
 ## 与 MCP 的关系
 
-收件箱是默认路径（零暴露）。需要实时调用时再用 `kaitu mcp --http` + 隧道（见 `docs/remote-agents.md`）。两条路写入同一套 core 函数、同一套校验。
+收件箱是默认路径（零暴露）。需要实时调用时再用 `kaitu mcp --http` + 隧道（见 `docs/remote-agents.md`）。两条路写入同一套 core 函数、同一套校验。MCP 的 `inbox_notes` 只读列出笔记，`inbox_note_done` 仅在 `--tools all` 中提供。
 
 ## 待核实
 

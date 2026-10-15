@@ -2,6 +2,8 @@ import {
   type Workspace,
   addMemory,
   assertPublicProject,
+  inboxNoteDone,
+  inboxNotes,
   listMemories,
   listProjects,
   logProject,
@@ -91,6 +93,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),
   );
+  register("inbox_notes", "读取未整理的收件箱笔记及来源。", {}, () => inboxNotes(ws));
   register("record_types", "列出全部记录类型、字段约束和合法示例，只读。", {}, () => recordReferences(ws));
   register(
     "record_list",
@@ -166,6 +169,13 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     true,
   );
   if (tools === "all") {
+    register(
+      "inbox_note_done",
+      "将已整理的笔记归档并保存版本。",
+      { path: text },
+      ({ path }) => inboxNoteDone(ws, path, actor()),
+      true,
+    );
     register(
       "project_sync",
       "只读链接文件夹并同步项目计数。",

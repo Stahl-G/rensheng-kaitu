@@ -91,7 +91,7 @@ const batchDepth = new WeakMap<Workspace, number>();
 
 export async function batchSnapshot<T>(
   ws: Workspace,
-  message: string,
+  message: string | (() => string),
   operation: () => Promise<T>,
 ): Promise<T> {
   batchDepth.set(ws, (batchDepth.get(ws) ?? 0) + 1);
@@ -101,7 +101,7 @@ export async function batchSnapshot<T>(
   } finally {
     batchDepth.set(ws, (batchDepth.get(ws) ?? 1) - 1);
   }
-  await snapshot(ws, message);
+  await snapshot(ws, typeof message === "function" ? message() : message);
   return result;
 }
 

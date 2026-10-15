@@ -128,7 +128,8 @@ export function Today({
         </Panel>
         <div class="stack">
           <Panel title="需要你处理">
-            {!(data.now.data.attention?.length || proposals.length) && (
+            {data.inboxNotes > 0 && <p>{data.inboxNotes} 条待整理笔记</p>}
+            {!(data.now.data.attention?.length || proposals.length || data.inboxNotes) && (
               <Empty>暂时没有需要你处理的事。</Empty>
             )}
             {data.now.data.attention?.map((attention, index) => (

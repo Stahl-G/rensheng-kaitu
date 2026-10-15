@@ -113,7 +113,7 @@ it("Drive 迁移与本机设置隔离项目、旧 metric、OVERVIEW、remote 和
       "inbox/agents/private.records.jsonl",
       `${JSON.stringify({ type: "project_metric", project: privateProject.slug, kind: "words", value: 99 })}\n`,
     );
-    expect((await processInbox(ws, { stableMs: 1 })).rejected).toHaveLength(1);
+    expect((await processInbox(ws, { stableMs: 1 })).notes).toHaveLength(1);
     const addedInDrive = await createProject(ws, {
       title: "drive-local",
       kind: "personal",

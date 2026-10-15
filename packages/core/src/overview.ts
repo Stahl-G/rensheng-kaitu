@@ -1,3 +1,4 @@
+import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
 import { readStatus } from "./status.js";
 import { timeZoneNotice } from "./time.js";
@@ -10,25 +11,13 @@ ${timeZoneNotice(ws.timeZone(), now)}
 
 先读 OVERVIEW.md 了解今天与最近数据，再读 me/profile.md、me/rules.md、NOW.md、memory/MEMORY.md。
 只在 inbox/agents/ 新建唯一文件名（如你的名称加时间戳），不改已有文件或数据。
-开图校验后写入、保存版本，原件归档到 inbox/processed/YYYY-MM-DD/；失败原因在 inbox/rejected/*.error.txt。
+格式不确定时直接写 *.note.md，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
+成功原件归档到 inbox/processed/YYYY-MM-DD/；待整理内容在 inbox/notes/YYYY-MM-DD/。
 运行 kaitu ui 自动处理，或本机运行 kaitu inbox process。
 
 ## 收件箱格式
 
-- <唯一名>.records.jsonl：每行一个对象，以换行结束。type 选择下面的记录类型，agent 可选，填你的稳定名称。
-- <唯一名>.digest.md：frontmatter 必填 date（YYYY-MM-DD），可选 agent；正文 Markdown。同日按 agent 分节合并，同源重交替换自己的部分。
-  示例：
-\`\`\`md
----
-date: "2026-10-15"
-agent: example-bot
----
-今天的动态简报。
-\`\`\`
-- <唯一名>.memory.json：非空数组。每项必填 type（preference / fact / context / person / decision）、name、text（非空字符串）；可选 source（字符串）、sensitive（布尔）、agent（字符串）。
-  示例：\`[{"type":"preference","name":"训练时间","text":"喜欢晚间训练","agent":"example-bot"}]\`
-- <唯一名>.proposal.json：对象，必填 title（字符串）、start、end（HH:mm，结束可为 24:00，须晚于开始）；可选 module、agent（字符串）。用于今天的待确认建议。
-  示例：\`{"title":"散步","start":"18:00","end":"18:30","module":"health","agent":"example-bot"}\`
+${INBOX_FORMATS}
 
 不接受删除、恢复、规则或目标修改。日程建议须用户在工作台确认；敏感记忆须用户明确要求。
 
@@ -69,6 +58,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     timeZoneNotice(ws.timeZone(), now),
     "",
     `待确认建议：${data.now.pending}`,
+    `${data.inboxNotes} 条待整理笔记`,
     "",
     `## 今天（${ws.timeZone()}）`,
     "",

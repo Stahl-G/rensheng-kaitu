@@ -148,8 +148,9 @@ ${skills()
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
 - 云端 Agent 先读 \`AGENT-README.md\` 与 \`OVERVIEW.md\`，只在 \`inbox/agents/\` 新建唯一文件。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
+- 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
-- 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；失败在 \`inbox/rejected/\` 附原因。
+- 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
 - 本地模式同样维护入口与现状文件；晚间复盘最后运行 snapshot 会刷新现状。
 
 ## 12. MCP

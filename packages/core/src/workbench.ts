@@ -2,6 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
+import { inboxNotes } from "./inbox-notes.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
 import { listProjects, projectStatusFiles, projectVersion, publicProject } from "./projects.js";
@@ -129,6 +130,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
   return {
     root: ws.root,
     today,
+    inboxNotes: inboxNotes(ws).length,
     timeZone: ws.timeZone(),
     now: read("今天的计划", () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }), {
       data: { date: null, blocks: [] } as TodayPlan,
@@ -214,8 +216,7 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file === ".kaitu/cache" ||
     file.startsWith(".kaitu/cache/") ||
     file.startsWith(".kaitu/index.sqlite") ||
-    file.endsWith(".tmp") ||
-    file.endsWith(".DS_Store")
+    (!file.startsWith("inbox/agents/") && (file.endsWith(".tmp") || file.endsWith(".DS_Store")))
   );
 }
 

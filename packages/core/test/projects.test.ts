@@ -67,7 +67,7 @@ it("正文 glob、Markdown 和 docx 混合计数，重复同步修订当天记�
   }
 });
 
-it("只读同步合成仓库的已结束日期提交，重跑不重复计数且文件与 .git 保持原样", async () => {
+it("同步修正日志日期倒序、同日标题去重，保留计数与原仓库", async () => {
   const repo = tmp();
   const ws = await freshWorkspace();
   const files = (root: string): Record<string, string> => {
@@ -96,7 +96,7 @@ it("只读同步合成仓库的已结束日期提交，重跑不重复计数且�
         timestamp: Date.parse("2026-09-01T00:00:00Z") / 1000,
       },
     });
-    for (const [index, title] of ["first chapter", "edit chapter"].entries()) {
+    for (const [index, title] of ["edit chapter", "edit chapter"].entries()) {
       await git.branch({ fs, dir: repo, ref: `work-${index}`, object: old, checkout: true });
       fs.writeFileSync(join(repo, "chapter.txt"), `synthetic ${index}`);
       await git.add({ fs, dir: repo, filepath: "chapter.txt" });
@@ -133,14 +133,30 @@ it("只读同步合成仓库的已结束日期提交，重跑不重复计数且�
       kind: "work",
       links: [{ path: repo, role: "repo" }],
     });
+    const sections = ["2026-10-11", "2026-10-10", "2026-10-09", "2026-10-14"].map(
+      (date) => `## ${date}\n\n- 手写 ${date}\n`,
+    );
+    ws.writeText(`projects/${slug}/log.md`, `# 项目进展\n\n${sections.join("\n")}`);
     expect((await syncProject(ws, slug, { now: new Date("2026-10-14T05:00:00Z") })).metrics).toEqual([]);
+    expect(readProject(ws, slug).log).toBe(
+      `# 项目进展\n\n${[...sections].sort((a, b) => b.localeCompare(a)).join("\n")}`,
+    );
     await syncProject(ws, slug, { now: new Date("2026-10-15T05:00:00Z") });
     await syncProject(ws, slug, { now: new Date("2026-10-15T06:00:00Z") });
     expect(
       readRecords(ws, "project_metric").map((r) => ({ kind: r.kind, value: r.value, detail: r.detail })),
-    ).toEqual([{ kind: "commits", value: 2, detail: ["edit chapter", "first chapter"] }]);
-    expect(readProject(ws, slug).log).toContain("2 次提交：edit chapter；first chapter");
-    expect(readProject(ws, slug).log.split("<!-- sync:commits -->")).toHaveLength(2);
+    ).toEqual([{ kind: "commits", value: 2, detail: ["edit chapter"] }]);
+    expect(readProject(ws, slug).log).toContain("2 次提交：edit chapter");
+    const log = readProject(ws, slug).log;
+    expect([...log.matchAll(/^## (.+)$/gm)].map((match) => match[1])).toEqual([
+      "2026-10-14",
+      "2026-10-11",
+      "2026-10-10",
+      "2026-10-09",
+    ]);
+    for (const section of sections) expect(log).toContain(section.trimEnd());
+    expect(log.split("edit chapter")).toHaveLength(2);
+    expect(log.split("<!-- sync:commits -->")).toHaveLength(2);
     expect(await git.resolveRef({ fs, dir: repo, ref: "HEAD" })).toBe(head);
     expect(files(repo)).toEqual(before);
   } finally {
