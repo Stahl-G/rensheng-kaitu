@@ -112,6 +112,7 @@
 
 | 模块 | 人接触的方式 |
 |---|---|
+| 项目（个人项目与工作） | 对话中发起；下一步出现在「今天」，进度卡片在「我的」（是否单独进导航由界面设计决定）；早间计划按 `rules.md` 的工作时间区分工作与个人项目 |
 | 学习 | 对话中发起；需要人做的事出现在「今天」 |
 | 方向与决策 | 对话中发起；待拍板时「今天」出现卡片 |
 | 复盘 | 日报 / 周报 / 月报推送到对话；可随时问 Agent 回看任意时间段 |
@@ -170,6 +171,12 @@
 │     ├─ notes.md            # 要点
 │     ├─ beliefs.md          # 观念变化记录
 │     └─ actions.md          # 转成的行动
+├─ projects/                # 个人项目与工作（D21）
+│  ├─ module.json
+│  └─ <slug>/
+│     ├─ STATUS.md           # frontmatter 另含 kind: work | personal、local_only: bool
+│     ├─ notes.md            # 背景、要点、相关人
+│     └─ log.md              # 按日期记的进展
 ├─ decisions/
 │  ├─ module.json
 │  └─ <slug>/

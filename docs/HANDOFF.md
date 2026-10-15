@@ -59,6 +59,8 @@
 | D17 | 定时任务：早间计划、晚间复盘、周复盘、月复盘与现状分析 | 覆盖访谈中的日报与长期复盘；参考 Instinct 的每日记忆整理 |
 | D18 | **轻量优先**：默认安装不要求 Docker 或其他服务；能当库嵌入的开源项目直接嵌入，要部署服务的只做可选连接；我们只做现状文件夹 + 本地工作台（见 `docs/GOAL.md`） | 用户裁决（2026-10-15）；与北极星「任何人、尽量简单」一致 |
 | D19 | 体态照片：健康模块新增 `photo` 记录，照片原件存在 `health/files/photos/`，只在本机，进版本历史；身体指标页提供按日期并排对比 | 用户确认（2026-10-15）；覆盖访谈中「6 个月、一年的体态对比照片」 |
+| D20 | Google Drive 模式：数据进 Drive，版本库 / 密钥 / 索引留本机；云端 Agent 读 OVERVIEW.md、写 inbox/agents/（见 `docs/drive-sync.md`） | 用户选择先服务 Grok Bot / ChatGPT Dots 用户（2026-10-15） |
+| D21 | 新增内置模块「项目」（`projects/`，个人项目与工作）：每个项目一个子目录（STATUS / notes / log），`kind: work|personal`；`local_only: true` 的项目不进 Google Drive、不出现在 OVERVIEW.md | 用户认可（2026-10-15）；工作内容可能保密 |
 
 ---
 
