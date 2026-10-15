@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { addRecords, history, initWorkspace, readRecords, validateWorkspace } from "@kaitu/core";
 import { expect, it } from "vitest";
 import type { ToolDefinition } from "../src/dsh.js";
-import { apply } from "../src/index.js";
+import { apply } from "../src/tools.js";
 
 it("合法训练写入并存版本，非法记录返回原始校验错误且不写入", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-dsh-"));

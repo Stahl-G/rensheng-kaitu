@@ -1,6 +1,8 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
-  "files": { "ignore": ["**/dist/**", "**/node_modules/**", "docs/reference/**"] },
+  "files": {
+    "ignore": ["**/dist/**", "**/node_modules/**", "docs/reference/**", "packages/dsh-plugin/lib/**"]
+  },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
   "linter": { "rules": { "recommended": true } },
   "organizeImports": { "enabled": true }

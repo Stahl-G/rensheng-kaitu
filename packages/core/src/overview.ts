@@ -104,15 +104,17 @@ function recentHandoffs(ws: Workspace) {
     .slice(0, 3);
 }
 
-function latestDaily(ws: Workspace) {
+export function latestDaily(ws: Workspace) {
   if (!ws.exists("handoffs/daily")) return;
-  const entries: { file: string; date: string }[] = [];
+  const entries: { file: string; date: string; organizer: string; body: string }[] = [];
   for (const entry of readdirSync(ws.resolve("handoffs/daily"), { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const file = `handoffs/daily/${entry.name}`;
     try {
-      const { data } = parseFrontmatter<{ organizer: string; date: string }>(ws.readText(file));
-      if (schemas().builtin("daily.schema.json")(data)) entries.push({ file, date: data.date });
+      const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(ws.readText(file));
+      if (schemas().builtin("daily.schema.json")(data)) {
+        entries.push({ file, date: data.date, organizer: data.organizer, body });
+      }
     } catch {
       // 格式错误交给 validate 报告，不阻断现状刷新。
     }

@@ -10,7 +10,11 @@ const END = "# kaitu:end";
 
 function entry(ws: Workspace): string {
   const plugin = fileURLToPath(new URL("../../dsh-plugin/dist/index.js", import.meta.url));
-  if (!existsSync(plugin)) throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
+  if (
+    !existsSync(plugin) ||
+    !existsSync(fileURLToPath(new URL("../../dsh-plugin/dist/client.js", import.meta.url)))
+  )
+    throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
   return [
     "- insert:",
     "    - id: kaitu",
@@ -36,7 +40,7 @@ export function installDsh(ws: Workspace): string {
       ? text.slice(0, start) + block + text.slice(end + END.length).replace(/^\n/, "")
       : `${text.replace(/\n?$/, "\n")}${block}`;
   writeFileSync(patch, next);
-  return `已把开图插件写入 ${patch}。重启 DeepSeek Harness 桌面应用后，新建会话即可使用（桌面应用需为 ${DSH_VERSION}）。`;
+  return `已把开图插件写入 ${patch}。重启 DeepSeek Harness 桌面应用后，侧栏点「开图」查看总览，新建会话可记录（桌面应用需为 ${DSH_VERSION}）。`;
 }
 
 export function dshCommand(ws: Workspace): string {

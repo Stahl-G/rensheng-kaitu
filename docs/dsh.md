@@ -53,9 +53,28 @@
 插件只注册现状、新增单条记录、校验、历史四个工具。补记时间用带时区偏移的 `ts`。
 手动配置参见 [cordis.example.yml](../packages/dsh-plugin/cordis.example.yml)，插件路径必须填 `dist/index.js` 的绝对路径。
 
-原型依据本地 dsh `57190202`（`0.2.1-alpha.3`）：
-`packages/llm/llm/src/types.ts` 定义原始工具参数 schema，
-`packages/core/tools/src/index.ts` 定义注册、规范 JSON 返回值和 `output.render`，
-`packages/core/system-prompt/src/index.ts` 提供 `systemPrompt.section()`，用于追加开图说明。
-没有该服务时，说明回退到 `kaitu_status` 描述。
-已做离线工具写入与工作台检查；npm 版 dsh 加载、API 对话尚待实际验证，原 PRD 的 `0.2.0-rc.2` 不在本次兼容性验证范围内。
+当前按 dsh `0.2.0-rc.2` 源码与同版 npm 类型实现。
+四个对话工具沿用 `tools.register()` 和 `systemPrompt.section()`；总览通过严格生成的 Remote 和 Slots 接入。
+已有桌面对话写入结果见 [HANDOFF §0.1](HANDOFF.md#01-现在能用什么均已真机实测)。
+
+## 总览页
+
+构建后运行 `kaitu dsh --install`，退出并重新打开桌面应用，侧栏点「开图」即可查看总览。
+页面与四个对话工具使用同一个插件、同一个工作区；网页版同样在 `kaitu dsh` 生成的配置中加载。
+
+总览显示最近 10 个版本、最新每日整理与未决事项、今天的安排、各模块未完成的前 5 条下一步、活跃项目、健康指标和待整理笔记。
+点击行可展开对应记录或文件路径；「刷新」重新读取工作区，「问 Agent」返回当前对话。
+建议在本页标为待确认，回到对话处理。新工作区显示导入记忆、健康设置与去对话的引导。
+
+健康统计按工作区时区覆盖今天及前 6 天，截止于本次查询时间；睡眠与蛋白质只对有记录日期取日均。
+估算数据标「约」，缺失指标显示「暂无记录」，最新体重单独注明测量日期。
+项目没有同步提交记录时显示「暂无记录」。版本来源按已有提交说明识别，旧说明无法识别时显示「来源未记录」。
+页面使用局部 `--kt-*` 配色，跟随 dsh 的明暗主题，不修改外壳样式。
+
+构建仅使用已安装 npm 包：生成严格 Host/Remote codec，再将浏览器 CJS 封装为 dsh module factory。
+rc.2 的生成器只识别工作区中的协议声明，因此构建时在临时目录登记已安装的协议声明，结束后清理；不依赖 dsh 源码目录。
+桌面 rc.2 的实际插件扫描、侧栏导航、连接重建与主题切换仍需在桌面应用验收。
+
+本次离线验证：build、typecheck、lint、101 项测试通过；临时工作区中实际 Host 产物加载、descriptor 注册、Remote codec、
+client factory 注册与查询、临时桌面 profile 重复安装通过。隔离渲染检查覆盖明暗配色、空状态、来源展开和 320 / 375 像素窄屏；
+预览使用临时渲染适配，不代表桌面 dsh 集成已验收。

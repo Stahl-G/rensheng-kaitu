@@ -5,3 +5,6 @@ dist/
 
 # 访谈逐字稿仅本地参考，不公开（版权）
 docs/reference/interview-transcript.*
+
+# dsh generated reflection and declarations
+packages/dsh-plugin/lib/

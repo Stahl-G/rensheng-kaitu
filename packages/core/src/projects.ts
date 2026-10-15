@@ -9,10 +9,11 @@ import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { batchSnapshot, snapshot } from "./history.js";
+import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
-import { isoInZone, localDate, localTimeToInstant } from "./time.js";
+import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { ModuleStatus } from "./workbench.js";
 import { Workspace, stateDirectory } from "./workspace.js";
@@ -160,11 +161,23 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
           commits: metrics
             .filter((r) => r.kind === "commits" && String(r.ts).slice(0, 10) >= from)
             .reduce((total, r) => total + Number(r.value), 0),
+          commitsRecorded: metrics.some((r) => r.kind === "commits" && String(r.ts).slice(0, 10) >= from),
         },
         words: last ? Number(last.value) : null,
         body: project.body,
         log: project.log,
         file: `${project.dir}/STATUS.md`,
+        metricFiles: [
+          ...new Set(
+            metrics.map((r) => {
+              const file = recordFileFor(
+                findRecordType(store, "project_metric"),
+                localMonth(parseTs(r.ts), ws.timeZone()),
+              );
+              return store === ws ? file : `.kaitu/local-projects/${file}`;
+            }),
+          ),
+        ],
       },
     ];
   });

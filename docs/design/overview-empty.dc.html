@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图总览 · 空状态</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0;background:#FCFCFB}
+a{color:#2F5FC4;text-decoration:none;font-weight:500}
+a:hover{text-decoration:underline dotted;text-underline-offset:3px}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1000px; font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', sans-serif; color: #1F1E1D; background: #FCFCFB">
+
+  <nav aria-label="Kaitu 侧栏" style="flex: 1 1 248px; max-width: 272px; box-sizing: border-box; padding: 20px 14px; background: #F5F5F3; display: flex; flex-direction: column; gap: 4px">
+    <div style="padding: 4px 12px 24px; font-size: 18px; line-height: 26px; font-weight: 600">Kaitu</div>
+    <a href="#" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; color: #1F1E1D; font-weight: 400; font-size: 16px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>新会话</a>
+    <a href="#" aria-current="page" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; background: #E9E8E4; color: #1F1E1D; font-weight: 500; font-size: 16px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2.5 4.5 6 3l4 1.5 3.5-1.5v8.5L10 13l-4-1.5L2.5 13z" stroke-linejoin="round"/><path d="M6 3v8.5M10 4.5V13"/></svg>开图</a>
+    <a href="#" style="margin-top: auto; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 10px; border-radius: 8px; color: #1F1E1D; font-weight: 400; font-size: 16px">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4" stroke-linecap="round"/></svg>
+      <span style="display: flex; flex-direction: column"><span>设置</span><span style="margin-top: 2px; font-size: 13px; line-height: 18px; color: #6B6A66">Powered by DSH</span></span></a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 36px 48px 64px">
+    <div style="max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px">
+      <nav aria-label="开图板块" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: #F0EFEC"><button type="button" aria-pressed="true" style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 9px; border: 0; background: #FFFFFF; box-shadow: 0 1px 2px rgba(31,30,29,0.08); color: #1F1E1D; font-size: 15px; font-weight: 600; cursor: pointer"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #1F1E1D"></span>今天</button><button type="button" style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 9px; border: 0; background: transparent; box-shadow: none; color: #1F1E1D; font-size: 15px; font-weight: 400; cursor: pointer"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #2E8B57"></span>健康</button><button type="button" style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 9px; border: 0; background: transparent; box-shadow: none; color: #1F1E1D; font-size: 15px; font-weight: 400; cursor: pointer"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #6B5BD6"></span>在做的事</button><button type="button" style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 9px; border: 0; background: transparent; box-shadow: none; color: #1F1E1D; font-size: 15px; font-weight: 400; cursor: pointer"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #C47A12"></span>资讯</button><button type="button" style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 18px; border-radius: 9px; border: 0; background: transparent; box-shadow: none; color: #1F1E1D; font-size: 15px; font-weight: 400; cursor: pointer"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #C2507A"></span>关于我</button></nav>
+
+      <header style="display: flex; flex-direction: column; gap: 4px">
+        <h1 style="margin: 0; font-size: 26px; line-height: 34px; font-weight: 600">今天</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 22px; color: #6B6A66">工作区在 ~/kaitu · 还没有记录</p>
+      </header>
+
+      <section aria-labelledby="h-start" style="display: flex; flex-direction: column; gap: 16px; padding: 24px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06)">
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <h2 id="h-start" style="margin: 0; font-size: 18px; line-height: 26px; font-weight: 600">先让开图认识你</h2>
+          <p style="margin: 0; font-size: 15px; line-height: 22px; color: #4D4C48">选一件你最想让 AI 持续跟进的事。做完这一步，这里就会出现今天的安排和下一步。</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px">
+          <sc-for list="{{starts}}" as="s" hint-placeholder-count="3">
+            <button type="button" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-height: 112px; padding: 14px; border-radius: 12px; border: 0; background: #F5F5F3; color: #1F1E1D; text-align: left; cursor: pointer">
+              <span style="font-size: 16px; line-height: 24px; font-weight: 600">{{s.title}}</span>
+              <span style="font-size: 13px; line-height: 18px; color: #4D4C48">{{s.body}}</span>
+              <span style="margin-top: auto; font-size: 13px; line-height: 18px; color: #2F5FC4; font-weight: 500">{{s.cta}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+        <sc-for list="{{empties}}" as="e" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 12px; background: #F5F5F3">
+            <span style="font-size: 13px; line-height: 18px; color: #6B6A66">{{e.label}}</span>
+            <span style="font-size: 17px; line-height: 24px; font-weight: 600; color: #8A8984">暂无记录</span>
+            <span style="font-size: 13px; line-height: 18px; color: #6B6A66">{{e.hint}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      starts: [
+        { title: '导入 ChatGPT 记忆', body: '把 ChatGPT 记得的你粘贴进来，开图整理成档案和目标。', cta: '开始导入' },
+        { title: '连上 Apple 健康', body: '每晚自动同步步数、睡眠和训练，不用手记。', cta: '查看设置方法' },
+        { title: '随口说一句', body: '比如「今天深蹲 3×12 60kg」，Agent 会记下来。', cta: '去对话' }
+      ],
+      empties: [
+        { label: '今天', hint: '连上日历或说一句「安排今天」' },
+        { label: '下一步', hint: '设一个目标后自动生成' },
+        { label: '健康', hint: '记一次训练或连上 Apple 健康' },
+        { label: '在做的事', hint: '说「新建项目：小说二稿」' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
