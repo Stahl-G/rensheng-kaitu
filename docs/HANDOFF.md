@@ -39,7 +39,7 @@
 
 ### 0.4 下一步：阶段 2「DeepSeek Harness 验证」（PRD §10）
 
-> **2026-10-15 暂停**：用户把方向调整为「云端可以独立运行」，阶段 2 先暂停。当前优先级是云端接力：按 [cloud-relay.md](cloud-relay.md) 实现租约锁和只追加写入（任务说明见 [briefs/cloud-relay.md](briefs/cloud-relay.md)），再由用户按 [验收脚本](acceptance/cloud-relay.md) 实测 Dot → Grok → ChatGPT 接力。dsh 0.2.0-rc.2 源码已克隆到 `~/Developer/deepseek-harness-rc2`，恢复阶段 2 时直接用。
+> **2026-10-15 暂停**：用户把方向调整为「云端可以独立运行」，阶段 2 先暂停。当前优先级是云端接力：[cloud-relay.md](cloud-relay.md) 已实现，用户已按 [验收脚本](acceptance/cloud-relay.md) 实测通过（第二版：白天只追加、夜间任意 Agent 整理；锁已废弃）。dsh 0.2.0-rc.2 源码已克隆到 `~/Developer/deepseek-harness-rc2`，恢复阶段 2 时直接用。
 
 按顺序做，每项一个 Codex 任务；任务说明草稿在 [`docs/briefs/`](briefs/)：
 
