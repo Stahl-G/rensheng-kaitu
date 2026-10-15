@@ -171,34 +171,17 @@ const empties = [
   { label: "在做的事", hint: "说「新建项目：小说二稿」" },
 ];
 
-function Sources({ items }: { items: OverviewSource[] }) {
+function noteLine(text = "") {
+  const body = text.replace(/^---\n[\s\S]*?\n---\n?/, "");
   return (
-    <div className={css.sources}>
-      {items.map((source, index) => (
-        <div key={`${source.file}:${index}`}>
-          <code>{source.file}</code>
-          {source.text && <pre>{source.text}</pre>}
-        </div>
-      ))}
-      {!items.length && <p>暂无记录</p>}
-    </div>
+    body
+      .split("\n")
+      .find((line) => line.trim())
+      ?.trim() ?? "（空笔记）"
   );
 }
-function Row({
-  children,
-  sources,
-  className = "",
-}: {
-  children: ReactNode;
-  sources: OverviewSource[];
-  className?: string;
-}) {
-  return (
-    <details className={`${css.disclosure} ${className}`}>
-      <summary className={css.row}>{children}</summary>
-      <Sources items={sources} />
-    </details>
-  );
+function Row({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`${css.row} ${className}`}>{children}</div>;
 }
 function Section({
   title,
@@ -427,7 +410,11 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                   {data.inboxNotes > 0 && (
                     <details>
                       <summary className={css.link}>{data.inboxNotes} 条待整理笔记</summary>
-                      <Sources items={data.notes} />
+                      <ul className={css.noteList}>
+                        {data.notes.map((note) => (
+                          <li key={note.file}>{noteLine(note.text)}</li>
+                        ))}
+                      </ul>
                     </details>
                   )}
                 </section>
@@ -439,10 +426,6 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                       <Row
                         key={block.id}
                         className={block.kind === "proposal" && block.status === "pending" ? css.pending : ""}
-                        sources={[
-                          { file: "NOW.md", text: JSON.stringify(block, null, 2) },
-                          ...(block.ref ? [{ file: block.ref, text: "" }] : []),
-                        ]}
                       >
                         <span className={css.blockTime}>
                           {block.start ? block.start : "待安排"}
@@ -476,7 +459,7 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                   </Section>
                   <Section title="下一步" source={`全部 ${data.next.length} 条 · 每模块最多 5 条`}>
                     {data.next.map((item) => (
-                      <Row key={`${item.file}:${item.id}`} sources={[{ file: item.file, text: item.title }]}>
+                      <Row key={`${item.file}:${item.id}`}>
                         <span className={css.checkCircle} aria-hidden="true" />
                         <span className={css.blockTitle}>{item.title}</span>
                         <span className={css.tag} data-section={item.section}>
@@ -491,37 +474,29 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                   <Section title="近期变化" source="版本历史">
                     <div id="kt-daily">
                       {data.daily ? (
-                        <Row
-                          className={css.daily}
-                          sources={[{ file: data.daily.file, text: data.daily.body }]}
-                        >
-                          <strong>
-                            {data.daily.date === data.today
-                              ? "今天的每日整理"
-                              : `${data.daily.date} 的每日整理`}
-                          </strong>
-                          <span className={css.blockTitle}>
-                            {data.daily.organizer} 整理 · {data.daily.unresolved} 条未决等你确认
-                          </span>
-                          <span className={css.cta}>打开</span>
-                        </Row>
+                        <details className={css.dailyDetails}>
+                          <summary className={`${css.row} ${css.daily}`}>
+                            <strong>
+                              {data.daily.date === data.today
+                                ? "今天的每日整理"
+                                : `${data.daily.date} 的每日整理`}
+                            </strong>
+                            <span className={css.blockTitle}>
+                              {data.daily.organizer} 整理 · {data.daily.unresolved} 条未决等你确认
+                            </span>
+                            <span className={css.cta}>打开</span>
+                          </summary>
+                          <div className={css.dailyBody}>{data.daily.body.trim()}</div>
+                        </details>
                       ) : (
                         <p className={css.emptyHint}>暂无每日整理</p>
                       )}
                     </div>
                     {data.versions.map((version) => (
-                      <Row
-                        key={version.oid}
-                        sources={[
-                          {
-                            file: `版本 ${version.short}`,
-                            text: `${version.time}\n${version.message}\n${version.oid}`,
-                          },
-                        ]}
-                      >
+                      <Row key={version.oid}>
                         <span className={css.versionTime}>{stamp(version.time)}</span>
                         <Actor source={version.source} name={version.actor} />
-                        <span className={css.versionText}>{version.message}</span>
+                        <span className={css.versionText}>{version.text}</span>
                       </Row>
                     ))}
                     {!data.versions.length && <p className={css.emptyHint}>暂无版本记录</p>}
@@ -553,7 +528,7 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                           </div>
                         </div>
                       ) : (
-                        <Row key={metric.key} className={css.metric} sources={metric.sources}>
+                        <Row key={metric.key} className={css.metric}>
                           <span className={css.metricHeading}>
                             <span className={css.muted}>{metric.label}</span>
                             <strong
@@ -571,17 +546,7 @@ export function OverviewPage({ load, onAgent }: OverviewPageProps) {
                   </section>
                   <Section title="进行中的项目">
                     {data.projects.map((project) => (
-                      <Row
-                        key={project.slug}
-                        className={css.project}
-                        sources={[
-                          { file: project.file, text: project.next.join("\n") },
-                          {
-                            file: project.metricFiles.join("\n") || project.file,
-                            text: `${project.from}–${project.to}\n字数变化：${project.words ?? "暂无记录"}\n提交数：${project.commits ?? "暂无记录"}`,
-                          },
-                        ]}
-                      >
+                      <Row key={project.slug} className={css.project}>
                         <strong>{project.title}</strong>
                         <span>下一步：{project.next[0] ?? "暂无记录"}</span>
                         <span className={css.projectFooter}>

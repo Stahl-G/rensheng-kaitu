@@ -40,6 +40,7 @@ export interface OverviewVersion {
   oid: string;
   short: string;
   message: string;
+  text: string;
   time: string;
   source: "user" | "agent" | "cloud" | "unknown";
   actor: string | null;

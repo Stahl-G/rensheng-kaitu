@@ -9,6 +9,34 @@ import { localDate, localMonth, parseTs } from "./time.js";
 import { readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
+const RECORD_NAMES: Record<string, string> = {
+  meal: "记录了一餐",
+  workout: "记录了一次训练",
+  sleep: "记录了睡眠",
+  metric: "记录了身体数据",
+  activity: "记录了活动",
+  task: "加了一条待办",
+};
+
+/** 把版本说明改写成用户看得懂的一句话；系统维护类返回 null（不显示）。 */
+function friendlyVersion(message: string): string | null {
+  if (
+    /开图升级到|AGENTS\.md|文件夹有改动|初始化|内置模板|恢复点|消息处理|转为待整理笔记|整理了一条收件箱笔记|同步了 0 条|同步了项目进度|移出 Drive|开启 Google Drive/.test(
+      message,
+    )
+  )
+    return null;
+  const written = /对话写入[：:]\s*(\w+)/.exec(message);
+  if (written) return RECORD_NAMES[written[1] ?? ""] ?? "记了一条记录";
+  const text = message
+    .replace(/^Agent\s*（Drive 收件箱[：:][^）]*）\s*/, "")
+    .replace(/^(Agent|你)\s*/, "")
+    .replace(/（快捷指令）$/, "")
+    .replace(/(新建了|更新了)项目[：:]\s*(.+)$/, "$1项目「$2」")
+    .replace(/^留了一条待整理笔记$/, "留了一条笔记，等你整理");
+  return text || null;
+}
+
 function versionSource(message: string): "user" | "agent" | "cloud" | "unknown" {
   if (/Drive 收件箱|云端|cloud-agent/i.test(message)) return "cloud";
   if (/DeepSeek 对话|Agent|agent/i.test(message)) return "agent";
@@ -124,18 +152,20 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
               : "today",
     })),
     versions: (await history(ws))
-      .filter(
-        (v) =>
-          !/开图升级到|重新生成了?\s*AGENTS\.md|文件夹有改动|初始化(?:了)?(?:开图|工作区)|更新了?内置模板/i.test(
-            v.message,
-          ),
-      )
-      .slice(0, 10)
-      .map((v) => ({
-        ...v,
-        source: versionSource(v.message),
-        actor: /Drive 收件箱[：:]\s*([^）)]+)/.exec(v.message)?.[1]?.trim() ?? null,
-      })),
+      .flatMap((v) => {
+        const text = friendlyVersion(v.message);
+        return text
+          ? [
+              {
+                ...v,
+                text,
+                source: versionSource(v.message),
+                actor: /Drive 收件箱[：:]\s*([^）)]+)/.exec(v.message)?.[1]?.trim() ?? null,
+              },
+            ]
+          : [];
+      })
+      .slice(0, 10),
     daily: daily ? { ...daily, unresolved: dailyItems.length } : null,
     projects: status.projects
       .filter((p) => p.stage === "active")

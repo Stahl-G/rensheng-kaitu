@@ -817,3 +817,24 @@ body[data-ds-dark-theme] .page {
   bottom: 0;
   background: var(--kt-projects);
 }
+
+.noteList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--kt-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.dailyDetails > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.dailyBody {
+  padding: 12px 14px;
+  white-space: pre-wrap;
+  color: var(--kt-secondary);
+  font-size: 14px;
+  line-height: 22px;
+}
