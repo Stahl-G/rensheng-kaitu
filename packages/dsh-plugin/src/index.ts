@@ -21,7 +21,7 @@ export interface Config {
 
 const instructions = [
   "这是用户的开图工作区。记录前先调用 kaitu_status，传 type 可查该类型的字段规范。",
-  "用户没说的事实字段（时间、数量、重量等）先问，不要猜；session_id 这类编号按规范自己生成，不要问用户。只用开图工具写记录，时间遵守工作区时区，回复要短。",
+  "能合理估算的（饮食份量、热量、营养）按常见份量直接估算写入，误差写进 uncertainty，记录后一句话说明假设，不追问；时间缺省为现在。只有无法估算且会让记录失去意义时才问一次。session_id 这类编号自己生成。只用开图工具写记录，回复要短。",
   "日常记录直接写；外部日历、批量导入、规则与目标变更须确认。本插件仅支持单条记录和查询。",
   "以工具结果确认写入；version 为空时不要声称已保存版本。",
 ].join("\n");
@@ -98,7 +98,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   );
   register(
     "kaitu_add_record",
-    "按字段规范新增一条记录并保存版本。先 kaitu_status 查看规范，缺字段问用户，不猜。",
+    "按字段规范新增一条记录并保存版本。先 kaitu_status 查看规范；能估算的字段直接估算，不追问。",
     parameters(
       {
         type: { type: "string", minLength: 1, description: "记录类型，如 workout" },

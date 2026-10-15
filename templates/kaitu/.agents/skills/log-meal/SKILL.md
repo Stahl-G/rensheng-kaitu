@@ -10,7 +10,7 @@ description: 用户提供饮食文字或照片时，估算并记录营养、误�
 1. 读取 me/rules.md 的 nutrition 与 health/module.json。
 2. 运行 `kaitu record list meal --from 今天 --to 今天 --json-out`。
 3. 识别早、午、晚或加餐，拆出食物名称和已知份量。
-4. 有照片时由 Agent 看图估算；看不清就询问影响热量的关键份量。
+4. 份量没说或看不清时，按常见份量直接估算并写进 uncertainty，不追问；记录后一句话说明假设，用户可再修正。
 5. 区分包装标注、用户称重和目测，不冒充精确测量。
 6. 估算热量 kcal、蛋白质 protein_g，可补 carbs_g、fat_g。
 7. 文字和照片的估算都必须写 uncertainty，单位为 kcal 的合理误差幅度。
