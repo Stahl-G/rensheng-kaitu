@@ -31,6 +31,7 @@ export interface ProjectStatus extends ModuleStatus {
   local_only: boolean;
   links: ProjectLink[];
   github?: { repo: string };
+  blocked?: unknown[];
 }
 export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
   Partial<Pick<ProjectStatus, "local_only" | "links">>;
@@ -391,7 +392,9 @@ export function relocateProjects(ws: Workspace, toPrivate: boolean) {
 export async function setProject(
   ws: Workspace,
   slug: string,
-  patch: Partial<Pick<ProjectStatus, "stage" | "local_only" | "links" | "next" | "github">>,
+  patch: Partial<
+    Pick<ProjectStatus, "stage" | "local_only" | "links" | "next" | "github" | "progress" | "blocked">
+  >,
 ) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
@@ -513,7 +516,10 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
         kind,
         value,
         ...(detail ? { detail } : {}),
-        ts: isoInZone(localTimeToInstant(`${date}T12:00:00`, tz), tz),
+        ts: isoInZone(
+          kind === "words" && date === today ? now : localTimeToInstant(`${date}T12:00:00`, tz),
+          tz,
+        ),
       };
       const record = previous
         ? updateRecord(store, "project_metric", previous.id, data).record

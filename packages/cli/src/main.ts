@@ -240,7 +240,11 @@ async function run(argv: string[]): Promise<number> {
 
   switch (cmd) {
     case "dsh": {
-      console.log(values.install ? installDsh(workspace(values)) : dshCommand(workspace(values)));
+      let ws = new Workspace(values.dir ?? defaultRoot());
+      if (!values.install && !ws.exists(".kaitu/config.json")) {
+        ws = await initWorkspace(ws.root, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      }
+      console.log(values.install ? installDsh(ws) : dshCommand(ws));
       return 0;
     }
     case "channels": {

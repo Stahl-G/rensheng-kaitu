@@ -12,6 +12,7 @@ import {
   previewFinanceImport,
   stageFinanceUpload,
 } from "@kaitu/core";
+import type { MutationQueue } from "./dsh.js";
 import type { Config } from "./tools.js";
 import type {
   FinanceAccountsData,
@@ -32,9 +33,14 @@ declare module "@deepseek-ai/cordis" {
 }
 export class KaituFinanceService extends TypertRemoteService {
   private readonly workspace: Workspace;
-  constructor(ctx: Context, config: Config = {}) {
+  constructor(
+    ctx: Context,
+    config: Config = {},
+    workspace?: Workspace,
+    private readonly write: MutationQueue = (run) => run(),
+  ) {
     super(ctx, "kaituFinance");
-    this.workspace = new Workspace(config.workspace ?? defaultRoot(), { maintain: false });
+    this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot(), { maintain: false });
   }
   @Remote("financeOverview")
   async financeOverview(options?: FinanceRemoteViewOptions): Promise<FinanceOverviewData> {
@@ -81,7 +87,7 @@ export class KaituFinanceService extends TypertRemoteService {
     options: FinanceRemoteCommitOptions,
   ): Promise<FinanceImportCommitData> {
     this.assertUpload(file);
-    return commitFinanceImport(this.workspace, file, options);
+    return this.write(() => commitFinanceImport(this.workspace, file, options));
   }
   @Remote("financeImportDiscard")
   async financeImportDiscard(file: string): Promise<void> {

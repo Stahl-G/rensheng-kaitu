@@ -364,7 +364,8 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
           );
         }
       }
-      if (project.data.github?.repo !== repo) {
+      const renamed = project.data.github?.repo !== repo;
+      if (renamed) {
         bindRepo(ws, slug, repo, now);
         appendLog(
           ws,
@@ -382,7 +383,10 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
         ok: true,
         problem,
         snapshot: record,
-        version: await projectVersion(ws, slug, `同步了 GitHub：${project.data.title}`, now),
+        version:
+          same && !renamed
+            ? null
+            : await projectVersion(ws, slug, `同步了 GitHub：${project.data.title}`, now),
       };
     } catch (error) {
       problem = error instanceof GithubFailure ? error.problem : "network";

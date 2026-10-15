@@ -12,7 +12,9 @@ import {
   snapshot,
   validateWorkspace,
 } from "@kaitu/core";
-import type { Context } from "./dsh.js";
+import type { Context, MutationQueue } from "./dsh.js";
+import { skillToolGuide } from "./skills.js";
+import { registerWorkflowTools } from "./workflow-tools.js";
 
 export const name = "kaitu";
 export const inject = ["tools", "systemPrompt"];
@@ -38,16 +40,27 @@ function parameters(properties: Record<string, unknown>, required: string[] = []
   return { type: "object", properties, required, additionalProperties: false };
 }
 
-export function apply(ctx: Context, config: Config = {}): void {
+export function apply(ctx: Context, config: Config = {}, workspace?: Workspace): MutationQueue {
   if (config.workspace !== undefined && !isAbsolute(config.workspace)) {
     throw new Error("workspace 必须是绝对路径");
   }
-  const ws = new Workspace(config.workspace ?? defaultRoot());
+  const ws = workspace ?? new Workspace(config.workspace ?? defaultRoot());
   if (!ws.exists(".kaitu/config.json")) throw new Error(`${ws.root} 还不是开图工作区，先运行 kaitu init`);
-  ctx.systemPrompt?.section({ name: "kaitu:workspace", order: 3000, text: instructions, interpolate: false });
+  ctx.systemPrompt?.section({
+    name: "kaitu:workspace",
+    order: 3000,
+    text: `${instructions}\n${skillToolGuide}`,
+    interpolate: false,
+  });
 
   // 同一插件的调用排队，避免并行写入时争抢版本库。
   let pending: Promise<unknown> = Promise.resolve();
+  const queue: MutationQueue = (run) => {
+    const result = pending.then(run);
+    pending = result.catch(() => {});
+    return result;
+  };
+  registerWorkflowTools(ctx, ws, queue);
   function register(
     toolName: string,
     description: string,
@@ -176,4 +189,5 @@ export function apply(ctx: Context, config: Config = {}): void {
       return { ok: true, versions: await history(ws, { limit }) };
     },
   );
+  return queue;
 }

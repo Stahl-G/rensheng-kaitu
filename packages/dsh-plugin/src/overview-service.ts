@@ -18,6 +18,7 @@ import {
   saveAvatar,
   tryNews,
 } from "@kaitu/core";
+import type { MutationQueue } from "./dsh.js";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
 import type {
@@ -59,9 +60,14 @@ declare module "@deepseek-ai/cordis" {
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
 
-  constructor(ctx: Context, config: Config = {}) {
+  constructor(
+    ctx: Context,
+    config: Config = {},
+    workspace?: Workspace,
+    private readonly write: MutationQueue = (run) => run(),
+  ) {
     super(ctx, "kaitu");
-    this.workspace = new Workspace(config.workspace ?? defaultRoot());
+    this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
   }
 
   /** Desktop passes its installed release version to the running Host (apps/desktop/src/main.ts). */
@@ -77,13 +83,13 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("tryNews")
   async tryNews(id: string): Promise<NewsAction> {
-    const result = await tryNews(this.workspace, id);
+    const result = await this.write(() => tryNews(this.workspace, id));
     return { id: result.record.id, status: "tried", version: result.version };
   }
 
   @Remote("dismissNews")
   async dismissNews(id: string): Promise<NewsAction> {
-    const result = await dismissNews(this.workspace, id);
+    const result = await this.write(() => dismissNews(this.workspace, id));
     return { id: result.record.id, status: "dismissed", version: result.version };
   }
 
@@ -94,7 +100,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("resolveExperience")
   async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
-    const result = await resolveExperience(this.workspace, id, geonameid);
+    const result = await this.write(() => resolveExperience(this.workspace, id, geonameid));
     return { id: result.record.id, version: result.version };
   }
 

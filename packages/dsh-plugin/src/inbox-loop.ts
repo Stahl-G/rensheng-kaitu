@@ -1,8 +1,13 @@
 import { type FSWatcher, watch } from "node:fs";
 import { type Workspace, processInbox } from "@kaitu/core";
+import type { MutationQueue } from "./dsh.js";
 
 /** dsh 开着时处理收件箱：启动时一次、收件箱有变化时、以及每分钟兜底一次（Drive 同步不一定触发文件事件）。 */
-export function startInboxLoop(ws: Workspace, intervalMs = 60000): () => void {
+export function startInboxLoop(
+  ws: Workspace,
+  intervalMs = 60000,
+  queue: MutationQueue = (run) => run(),
+): () => void {
   let running = false;
   let again = false;
   let closed = false;
@@ -15,7 +20,9 @@ export function startInboxLoop(ws: Workspace, intervalMs = 60000): () => void {
     }
     running = true;
     try {
-      await processInbox(ws);
+      await queue(async () => {
+        if (!closed) await processInbox(ws);
+      });
     } catch (error) {
       console.warn("[kaitu] 处理收件箱失败：", (error as Error).message);
     } finally {

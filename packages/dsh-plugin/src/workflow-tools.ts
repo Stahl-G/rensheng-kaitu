@@ -1,0 +1,444 @@
+import { readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import {
+  type Workspace,
+  addMemory,
+  addPhoto,
+  addTask,
+  cancelTask,
+  completeTask,
+  createProject,
+  disableDrive,
+  driveStatus,
+  enableDrive,
+  importAppleHealth,
+  importChatgptConversations,
+  importIcs,
+  importMemories,
+  importNutAi,
+  inboxNoteDone,
+  inboxNotes,
+  lifeMap,
+  linkProject,
+  listMemories,
+  listProjects,
+  listTasks,
+  logProject,
+  processInbox,
+  projectDirectory,
+  projectVersion,
+  readAgentFile,
+  readProject,
+  readRecords,
+  removeMemory,
+  removePhoto,
+  resolvePlace,
+  restore,
+  searchChats,
+  searchMemories,
+  setProject,
+  snapshot,
+  syncProject,
+  syncProjects,
+  updateMemory,
+  writeAgentRecord,
+  writeAgentsMd,
+} from "@kaitu/core";
+import { z } from "zod";
+import type { Context, MutationQueue } from "./dsh.js";
+import { archiveHandoffs, listFiles, writeFiles } from "./workspace-files.js";
+
+const text = z.string().min(1);
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+// 用户指定的本机导入原件可在工作区外；只有专用解析器读原件，写入仍经 Workspace。
+function inputPath(ws: Workspace, path: string): string {
+  return isAbsolute(path) ? path : ws.resolve(path);
+}
+const fields = z.record(z.string(), z.unknown());
+const memory = z
+  .object({
+    type: z.enum(["preference", "fact", "context", "person", "decision"]),
+    name: text,
+    text,
+    source: z.string().optional(),
+    sensitive: z.boolean().optional(),
+  })
+  .strict();
+const task = z
+  .object({
+    title: text,
+    due: text.optional(),
+    remind_at: text.optional(),
+    project: text.optional(),
+    notes: text.optional(),
+    source: text.optional(),
+  })
+  .strict();
+const link = z
+  .object({ path: text, role: z.enum(["manuscript", "repo", "folder"]), include: z.array(text).optional() })
+  .strict();
+const next = z
+  .object({
+    id: text,
+    title: text,
+    status: z.enum(["todo", "proposed", "done", "skipped"]),
+    priority: z.enum(["high", "normal", "low"]).optional(),
+    due: text.nullable().optional(),
+    estimate: text.nullable().optional(),
+  })
+  .passthrough();
+
+export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: MutationQueue) {
+  function register<T extends z.ZodType>(
+    name: string,
+    description: string,
+    schema: T,
+    run: (input: z.infer<T>) => unknown | Promise<unknown>,
+  ) {
+    ctx.tools.register({
+      name,
+      description,
+      parameters: { ...z.toJSONSchema(schema), type: "object" } as Record<string, unknown>,
+      output: {
+        schema: { type: "object", additionalProperties: true },
+        render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }],
+      },
+      execute: (args, exec) =>
+        queue(async () => {
+          try {
+            exec.signal.throwIfAborted();
+            return { ok: true, result: await run(schema.parse(args)) };
+          } catch (error) {
+            return { ok: false, error: (error as Error).message };
+          }
+        }),
+    });
+  }
+  register(
+    "kaitu_records",
+    "查询或修订记录。日期按工作区时区；删除超过十条须确认。",
+    z.discriminatedUnion("operation", [
+      z
+        .object({ operation: z.literal("list"), type: text, from: date.optional(), to: date.optional() })
+        .strict(),
+      z.object({ operation: z.literal("update"), type: text, id: text, fields }).strict(),
+      z.object({ operation: z.literal("delete"), type: text, id: text }).strict(),
+    ]),
+    (input) =>
+      input.operation === "list"
+        ? readRecords(ws, input.type, input)
+        : writeAgentRecord(
+            ws,
+            input.operation,
+            input.type,
+            "DeepSeek",
+            input.operation === "update" ? input.fields : {},
+            input.id,
+          ),
+  );
+  register(
+    "kaitu_restore",
+    "用户选择历史版本并确认后恢复工作区或指定路径，恢复前自动保存当前改动。",
+    z.object({ version: text, path: text.optional(), confirmed: z.boolean().default(false) }).strict(),
+    ({ version, path, confirmed }) => {
+      if (!confirmed) throw new Error("恢复版本须先获得用户确认");
+      return restore(ws, version, { path });
+    },
+  );
+  register(
+    "kaitu_search_chats",
+    "检索已导入的历史对话，返回来源路径。",
+    z.object({ query: text, limit: z.number().int().min(1).max(100).optional() }).strict(),
+    ({ query, limit }) => searchChats(ws, query, { limit }),
+  );
+  register(
+    "kaitu_workspace",
+    "读写开图文档、列目录、保存版本或归档交接。批量文件会一起校验；规则与目标须先确认。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("read"), path: text }).strict(),
+      z.object({ operation: z.literal("list"), path: z.string() }).strict(),
+      z
+        .object({
+          operation: z.literal("write"),
+          files: z.array(z.object({ path: text, content: z.string() }).strict()).min(1),
+          confirmed: z.boolean().default(false),
+        })
+        .strict(),
+      z.object({ operation: z.literal("snapshot"), message: text }).strict(),
+      z.object({ operation: z.literal("agents-md") }).strict(),
+      z.object({ operation: z.literal("archive-handoffs"), files: z.array(text).min(1), date }).strict(),
+    ]),
+    async (input) => {
+      switch (input.operation) {
+        case "read":
+          return { path: input.path, content: readAgentFile(ws, input.path) };
+        case "list":
+          return listFiles(ws, input.path);
+        case "write":
+          return writeFiles(ws, input.files, input.confirmed);
+        case "snapshot":
+          return { version: await snapshot(ws, `DeepSeek：${input.message}`) };
+        case "agents-md":
+          writeAgentsMd(ws);
+          return { version: await snapshot(ws, "DeepSeek 刷新了 Agent 入口") };
+        case "archive-handoffs":
+          return archiveHandoffs(ws, input.files, input.date);
+      }
+    },
+  );
+  register(
+    "kaitu_memory",
+    "记忆增删查与批量导入。import 先 dryRun，用户确认后再执行；敏感内容须用户明确要求。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("list") }).strict(),
+      z.object({ operation: z.literal("search"), query: text }).strict(),
+      z.object({ operation: z.literal("add"), entry: memory }).strict(),
+      z
+        .object({
+          operation: z.literal("update"),
+          file: text,
+          patch: memory.omit({ source: true }).partial(),
+        })
+        .strict(),
+      z.object({ operation: z.literal("delete"), file: text }).strict(),
+      z
+        .object({
+          operation: z.literal("import"),
+          entries: z.array(memory),
+          dryRun: z.boolean().default(true),
+          confirmed: z.boolean().default(false),
+        })
+        .strict(),
+    ]),
+    (input) => {
+      switch (input.operation) {
+        case "list":
+          return listMemories(ws);
+        case "search":
+          return searchMemories(ws, input.query);
+        case "add":
+          return addMemory(ws, input.entry, { by: "agent", actor: "DeepSeek" });
+        case "update":
+          return updateMemory(ws, input.file, input.patch, { actor: "DeepSeek" });
+        case "delete":
+          return removeMemory(ws, input.file, { actor: "DeepSeek" });
+        case "import":
+          if (!input.dryRun && !input.confirmed) throw new Error("批量导入须先预览并获得用户确认");
+          return importMemories(ws, input.entries, { dryRun: input.dryRun, by: "agent", actor: "DeepSeek" });
+      }
+    },
+  );
+  register(
+    "kaitu_tasks",
+    "新建、查询、完成或取消待办。",
+    z.discriminatedUnion("operation", [
+      z
+        .object({
+          operation: z.literal("list"),
+          status: z.enum(["open", "done", "cancelled", "all"]).optional(),
+          dueBefore: text.optional(),
+        })
+        .strict(),
+      z.object({ operation: z.literal("add"), task }).strict(),
+      z.object({ operation: z.enum(["done", "cancel"]), id: text }).strict(),
+    ]),
+    (input) =>
+      input.operation === "list"
+        ? listTasks(ws, input)
+        : input.operation === "add"
+          ? addTask(ws, input.task, { by: "agent", actor: "DeepSeek" })
+          : input.operation === "done"
+            ? completeTask(ws, input.id, { by: "agent", actor: "DeepSeek" })
+            : cancelTask(ws, input.id, { by: "agent", actor: "DeepSeek" }),
+  );
+  register(
+    "kaitu_inbox",
+    "读取待整理笔记、完成后归档，或立即处理稳定的收件箱文件。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.enum(["notes", "process"]) }).strict(),
+      z.object({ operation: z.literal("done"), path: text }).strict(),
+    ]),
+    (input) =>
+      input.operation === "notes"
+        ? inboxNotes(ws)
+        : input.operation === "done"
+          ? inboxNoteDone(ws, input.path, "DeepSeek")
+          : processInbox(ws),
+  );
+  register(
+    "kaitu_import",
+    "导入用户指定的本机健康、日历或 ChatGPT 文件，path 可为绝对路径。先 dryRun 预览数量，用户确认后相同参数执行。",
+    z
+      .object({
+        source: z.enum(["apple-health", "nut-ai", "ics", "chatgpt-conversations"]),
+        path: text,
+        dryRun: z.boolean().default(true),
+        confirmed: z.boolean().default(false),
+        calendar: text.optional(),
+        from: date.optional(),
+        to: date.optional(),
+      })
+      .strict(),
+    (input) => {
+      if (!input.dryRun && !input.confirmed) throw new Error("导入须先预览并获得用户确认");
+      const path = inputPath(ws, input.path);
+      if (input.source === "ics")
+        return importIcs(ws, path, {
+          dryRun: input.dryRun,
+          calendar: input.calendar,
+          from: input.from,
+          to: input.to,
+        });
+      if (input.source === "apple-health") return importAppleHealth(ws, path, { dryRun: input.dryRun });
+      if (input.source === "nut-ai") return importNutAi(ws, path, { dryRun: input.dryRun });
+      return importChatgptConversations(ws, path, { dryRun: input.dryRun });
+    },
+  );
+  register(
+    "kaitu_photos",
+    "保存用户指定的本机体态照片原件、列出照片或删除照片及记录。path 可为绝对路径。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("list") }).strict(),
+      z
+        .object({
+          operation: z.literal("add"),
+          path: text,
+          pose: z.enum(["front", "side", "back", "other"]),
+          ts: text.optional(),
+          notes: text.optional(),
+        })
+        .strict(),
+      z.object({ operation: z.literal("delete"), id: text }).strict(),
+    ]),
+    (input) =>
+      input.operation === "list"
+        ? readRecords(ws, "photo")
+        : input.operation === "delete"
+          ? removePhoto(ws, input.id, { by: "agent", actor: "DeepSeek" })
+          : addPhoto(ws, inputPath(ws, input.path), { ...input, by: "agent" }),
+  );
+  register(
+    "kaitu_life_map",
+    "查询人生地图或按城市名检索离线地点候选。",
+    z.object({ name: text.optional(), country: text.optional() }).strict(),
+    ({ name, country }) => (name ? resolvePlace(name, country) : lifeMap(ws)),
+  );
+  register(
+    "kaitu_projects",
+    "项目建档、链接、进度同步和文档读写。链接目录只读，项目写入支持仅本机存储。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("list") }).strict(),
+      z
+        .object({
+          operation: z.literal("new"),
+          title: text,
+          kind: z.enum(["work", "personal"]),
+          local_only: z.boolean().optional(),
+        })
+        .strict(),
+      z.object({ operation: z.literal("show"), slug: text }).strict(),
+      z.object({ operation: z.literal("sync"), slug: text.optional() }).strict(),
+      z.object({ operation: z.literal("link"), slug: text, link }).strict(),
+      z
+        .object({
+          operation: z.literal("set"),
+          slug: text,
+          patch: z
+            .object({
+              stage: z.enum(["idea", "active", "paused", "done"]).optional(),
+              local_only: z.boolean().optional(),
+              next: z.array(next).optional(),
+              progress: z
+                .object({ label: text, current: z.number(), target: z.number(), unit: text.optional() })
+                .nullable()
+                .optional(),
+              blocked: z.array(z.unknown()).optional(),
+            })
+            .strict(),
+        })
+        .strict(),
+      z.object({ operation: z.literal("log"), slug: text, text, date: date.optional() }).strict(),
+      z.object({ operation: z.literal("project-read"), slug: text, path: text }).strict(),
+      z
+        .object({
+          operation: z.literal("project-write"),
+          slug: text,
+          path: z.enum(["notes.md", "log.md"]),
+          content: z.string(),
+        })
+        .strict(),
+      z
+        .object({
+          operation: z.literal("linked-read"),
+          slug: text,
+          linkIndex: z.number().int().min(0),
+          path: text,
+        })
+        .strict(),
+    ]),
+    async (input) => {
+      switch (input.operation) {
+        case "list":
+          return listProjects(ws);
+        case "new":
+          return createProject(ws, input);
+        case "show":
+          return readProject(ws, input.slug);
+        case "sync":
+          return input.slug ? syncProject(ws, input.slug) : syncProjects(ws);
+        case "link":
+          return linkProject(ws, input.slug, input.link);
+        case "set":
+          return setProject(ws, input.slug, input.patch);
+        case "log":
+          return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
+        case "project-read": {
+          if (!["STATUS.md", "notes.md", "log.md"].includes(input.path))
+            throw new Error("只读取项目状态、笔记和日志");
+          return { content: ws.readText(`${projectDirectory(ws, input.slug)}/${input.path}`) };
+        }
+        case "project-write": {
+          ws.writeText(`${projectDirectory(ws, input.slug)}/${input.path}`, input.content, {
+            internal: true,
+          });
+          return { version: await projectVersion(ws, input.slug, "DeepSeek 更新了项目文档") };
+        }
+        case "linked-read": {
+          const item = readProject(ws, input.slug).data.links[input.linkIndex];
+          if (!item) throw new Error("链接不存在");
+          const root = realpathSync(
+            item.path.startsWith("~/") ? join(homedir(), item.path.slice(2)) : item.path,
+          );
+          const path = realpathSync(resolve(root, input.path));
+          const rel = relative(root, path);
+          if (
+            rel.startsWith("..") ||
+            rel.split(/[\\/]/).some((part) => part.startsWith(".")) ||
+            !/\.md$/i.test(path)
+          )
+            throw new Error("只读链接目录内 Markdown");
+          return { content: readFileSync(path, "utf8") };
+        }
+      }
+    },
+  );
+  register(
+    "kaitu_drive",
+    "查看同步状态；用户选择开启或关闭后迁移工作区。不会安装或授权云端服务。",
+    z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("status") }).strict(),
+      z
+        .object({ operation: z.literal("enable"), driveDir: text.optional(), confirmed: z.boolean() })
+        .strict(),
+      z.object({ operation: z.literal("disable"), to: text.optional(), confirmed: z.boolean() }).strict(),
+    ]),
+    (input) => {
+      if (input.operation === "status") return driveStatus(ws);
+      if (!input.confirmed) throw new Error("迁移工作区须先获得用户确认");
+      return input.operation === "enable"
+        ? enableDrive(ws, { driveDir: input.driveDir })
+        : disableDrive(ws, { to: input.to });
+    },
+  );
+}

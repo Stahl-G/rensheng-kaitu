@@ -162,6 +162,20 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.kind} / ${block.status}）`);
   }
   if (!data.now.blocks.length) lines.push("暂无安排。");
+  if (data.now.date !== data.today) {
+    // 过期计划仍是接力证据，明确标出日期，避免把它混入今天或在更新时丢掉变化。
+    try {
+      const plan = parseFrontmatter<{
+        date: string;
+        blocks: { start?: string; end?: string; title: string; status: string }[];
+      }>(ws.readText("NOW.md")).data;
+      lines.push("", `## 最近计划（${plan.date}）`, "");
+      for (const block of plan.blocks)
+        lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);
+    } catch {
+      // 格式问题已由 readStatus 的 warnings 报告。
+    }
+  }
   lines.push("", "## 最新每日整理", "");
   const daily = latestDaily(ws);
   lines.push(daily ? `- ${daily.date}（${daily.file}）` : "暂无每日整理。");

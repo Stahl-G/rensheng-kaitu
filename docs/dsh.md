@@ -11,7 +11,7 @@
 
    它把开图插件写进 `~/.dsh/profiles/desktop/cordis.patch.yml`（只维护 `# kaitu:start` 到 `# kaitu:end` 这一段，重复运行会替换）。
 3. 退出并重新打开桌面应用，点 **新会话**，说「今天深蹲 3×12 60kg」。
-4. 另开终端运行 `kaitu ui`，在工作台「健康 → 训练」与「历史」看记录和版本。
+4. 在 dsh 侧栏「开图 → 健康」查看记录；在对话中查询版本。无需另开工作台。
 
 ## 不用桌面应用：网页版
 
@@ -21,14 +21,13 @@
    pnpm build
    ```
 
-2. 首次使用先创建工作区，再生成本机插件配置：
+2. 生成本机插件配置（首次使用会自动初始化工作区）：
 
    ```sh
-   node packages/cli/dist/main.js init
    node packages/cli/dist/main.js dsh
    ```
 
-   已有工作区跳过 `init`。已配置 `kaitu` 命令时可直接运行 `kaitu dsh`。
+   已配置 `kaitu` 命令时可直接运行 `kaitu dsh`。
    非默认工作区加 `--dir /你的/工作区`，也可设置 `KAITU_DIR`。
    命令只生成状态目录内的 `cache/dsh/cordis.yml`，输出一行启动命令：
 
@@ -40,27 +39,93 @@
    打开终端给出的本机地址，在 **设置 → 模型 → DeepSeek 卡片** 输入 API 密钥并保存，然后在模型选择器选 DeepSeek 模型。
    操作依据 dsh 的 `docs/user/guide/providers.zh.md`。密钥由 dsh 管理，不填进开图 patch。
 
-4. 另开一个终端，在同一开图仓库运行工作台（自定义目录时两边传相同的 `--dir`）：
-
-   ```sh
-   node packages/cli/dist/main.js ui
-   ```
-
-5. 在 dsh 对话框输入「今天深蹲 3×12，60kg」。Agent 先查看现状和字段规范，能估算的（份量、热量）直接估算并说明假设，不追问。
-   写入成功后，在工作台「健康 → 训练」与「历史」查看记录及版本。
+4. 在 dsh 对话框输入「今天深蹲 3×12，60kg」。Agent 先查看现状和字段规范，能估算的（份量、热量）直接估算并说明假设，不追问。
+   写入成功后，在侧栏「开图 → 健康」查看记录，在对话里查询版本。
    还可以说「校验一下工作区」或「看最近 5 个版本」。
 
-插件只注册现状、新增单条记录、校验、历史四个工具。补记时间用带时区偏移的 `ts`。
+插件注册技能 provider、说明、工作流工具和开图页面。补记时间用带时区偏移的 `ts`。
 手动配置参见 [cordis.example.yml](../packages/dsh-plugin/cordis.example.yml)，插件路径必须填 `dist/index.js` 的绝对路径。
 
 当前按 dsh `0.2.0-rc.2` 源码与同版 npm 类型实现。
-四个对话工具沿用 `tools.register()` 和 `systemPrompt.section()`；总览通过严格生成的 Remote 和 Slots 接入。
+对话工具沿用 `tools.register()` 和 `systemPrompt.section()`；总览通过严格生成的 Remote 和 Slots 接入。
 已有桌面对话写入结果见 [HANDOFF §0.1](HANDOFF.md#01-现在能用什么均已真机实测)。
+
+## 装上即可用
+
+这里的安装入口是 `kaitu dsh --install`：安装时一次写入桌面 profile，之后打开 dsh 即自动就位。
+插件自身不依赖会话 cwd，也不要求运行 `kaitu ui`、CLI、MCP 或手工建立技能链接。
+自动收件箱、对话写入与会生成版本的页面操作共用写入队列，避免并行导入时吞掉另一项操作的版本。
+首次挂载默认创建 `defaultRoot()` 工作区（采用本机时区）；已有工作区自动执行 core upgrade，保留用户配置与自建技能。
+显式 `config.workspace` 优先；非空且未初始化的目录按 core 的保护规则拒绝覆盖。
+
+| 能力 | 状态 | 自动行为 / 依据 |
+|---|---|---|
+| 全部工作区技能 | 已在本次补上 | host 注册 `kaitu-workspace` provider，读取 `.agents/skills/*/SKILL.md`，与会话 cwd 无关；每秒检查外部文件变化并 invalidate，正文每次加载重新读取 |
+| 收件箱自动处理 | 现在可用 | `inbox-loop.ts` 在启动、文件变化后及每分钟调用 core processInbox；不用另开工作台 |
+| Agent 说明 | 已在本次补上 | 全局 system prompt 注入写入与确认规则、读取顺序和 CLI → 工具映射；档案与规则通过工具读取，避免把整个私有工作区塞入所有会话 |
+| 记录与查询 | 已在本次补上 | 保留原工具，补记录查询 / 修订、对话检索、记忆、待办、项目、导入、文档读写、照片和地点查询；全部复用 core |
+| 每日整理、早间计划 | 已在本次补上 | 安装 patch 加载 schedule 与其界面；首次启动创建专用持久会话及 03:00 每日整理、07:30 早间计划，使用工作区当时时区；回执存本机 `.kaitu/dsh-setup.json`，重启保留用户对任务的修改和删除 |
+| 头像 | 现在可用 | 「关于我」选择文件，经 Remote 存入本机状态目录；不依赖会话目录或 CLI |
+| 本机文件 | 已在本次补上 | 文档读写限定开图工作区；导入与体态照片支持用户指定的本机绝对路径，项目链接目录只读；仅本机项目由 core 解析与保存 |
+| 云端入口 AGENT-README / ORGANIZER | 已在本次补上 | 初始化、升级与 core refreshOverview 自动生成 / 维护，同时生成 OVERVIEW；不依赖用户启动其他程序 |
+| Drive 开关与迁移 | 已在本次补上 | 对话调用 core enableDrive / disableDrive，页面、工具与 provider 共用同一 Workspace；重启跟随 core 的 WORKSPACE-MOVED 入口 |
+| 模型密钥、外部账号与云端 Agent 授权 | 做不到自动代填 | 密钥与授权属于用户，模型在 dsh 设置填写；Drive 需要用户已安装并登录自己的同步客户端，云端连接器仍需本人授权 |
+| dsh 关闭时执行任务、没有模型时生成内容 | 做不到 | rc.2 schedule 是 Host 内的计时与会话 follow-up；应用关闭没有进程执行，生成内容使用 dsh 配置的模型 |
+| 抓取任意联网来源、体检 PDF 的 OCR | 做不到保证所有模型都具备 | daily-feed 依赖会话的联网工具或用户提供正文，lab-import 依赖模型能读附件或用户提供指标；core 没有通用抓取器 / OCR 引擎 |
+
+### 注册层级与安装依据（dsh 0.2.0-rc.2）
+
+以下路径相对于只读参考仓库 `deepseek-harness-rc2`：
+
+- `packages/skill/skill/src/index.ts` 的 `SkillRegistry.registerProvider()` 按调用 context 的 scope 注册，
+  host 在 global 层，会话读取 global + 自身 scope chain。开图安装为顶层插件，因此不需要把 provider 塞进各个 preset。
+- `packages/bundle/web-app/cordis.patch.yml:475` 明确保留 host skill 注册表，仅禁用默认 host filesystem provider。
+  `presets/{standard,ptc,cordis}.patch.yml` 各自挂载 filesystem 与 tool-skill；minimal 未挂载 tool-skill。
+  安装 patch 重新启用 base 的 host tool-skill，保证 minimal 也有目录与加载器。
+  `packages/skill/tool-skill/src/index.ts` 仅在自己的精确工具注册对当前 Agent 可见时发布目录，
+  所以 standard 等 preset 的同名 scoped 工具覆盖 host 工具后，不会重复发布目录。
+- `packages/skill/skill-filesystem/{README.md,src/index.ts}` 采用 frontmatter 提供摘要、get 时重读正文、外部更新 invalidate。
+  开图 provider 沿用 name / description、调用权限、whenToUse、metadata、resourceBase 语义，使用 core 的 YAML 解析。
+  同名技能遵守 dsh 的 scope 优先级，当前会话显式定义的同名技能仍可覆盖 host 技能。
+- `packages/boot/app-boot/src/profile.ts` 将 schedule bundle 列为默认关闭的可选包。
+  `packages/experimental/schedule-bundle/cordis.patch.yml` 通过顶层行组合 schedule 与 ui-schedule。
+  开图安装 patch 用相同包补齐服务和界面，已有 schedule bundle 或 profile 同包声明时复用；直接只挂插件模块的自定义 host 仍须提供这两个宿主服务。
+- `packages/schedule/schedule/src/index.ts` 的 create 绑定原 sessionId，runtime.ts 用 resolveAgent → followup → sessions.flush 投递。
+  开图通过公开 sessionController.create / resolveAgent 创建并保存专用会话，再调用 schedule.create，不自行写 dsh 的任务数据库。
+  初始化失败会记录 Host 日志并每分钟重试；已完成的初始化不在重启时重建用户删除的任务。
+
+### 18 个内置技能的 dsh 执行入口
+
+技能正文加载时附带工具映射，原始通用技能仍适用于 Codex / Claude Code。
+
+| 技能 | dsh 步骤所用工具 |
+|---|---|
+| onboarding | status、workspace 读取 / 写档案、memory、drive；页面直接用侧栏「开图」 |
+| import-chatgpt-memory | memory list / import（预览、确认后整批写入） |
+| morning-plan | status、tasks、records、projects、workspace 读写 NOW；建议保持待确认 |
+| evening-review | projects sync、inbox、tasks、records、memory、workspace 写状态与日报 |
+| weekly-review / monthly-review | records、search_chats、photos、projects、workspace 写复盘 |
+| look-back | records、search_chats、workspace 读证据 / 写回看 |
+| log-workout / log-meal | status 查字段、records 查询 / 修订、add_record 写入 |
+| health-import | import 支持 Apple Health、Nut AI、ICS、ChatGPT 对话，默认 dryRun |
+| lab-import | 会话读取附件后，workspace 一次写报告 JSON 并按现有 schema 校验 |
+| daily-feed | 会话读取来源，workspace 读写简报；缺来源时使用用户提供的正文 |
+| learn-topic / decision | search_chats、workspace 创建主题 / 决策文档与状态 |
+| add-module | workspace 批量写 module.json / STATUS / schema，校验成功后刷新 Agent 入口 |
+| log-photo | photos 保存原件 / 查询 / 删除；健康页读取已有照片 |
+| project | projects 建档 / 链接 / 同步 / 日志 / 设置；project-read / project-write 支持仅本机项目 |
+| build-life-map | memory、search_chats、workspace 读档案，add_experience；life_map 查地点候选和结果 |
+
+新增自动测试仅一项：临时工作区技能跨 cwd 发现、加载正文、外部更新刷新及卸载停止监听。
+离线冒烟使用 rc.2 的真实 SkillRegistry / ToolRuntime，确认无关 cwd 可发现 18 个技能、加载 build-life-map，
+并完成记录查询、记忆预览及带版本回执的记录 / 文档写入。
+完整检查中同时修复：上午项目字数被未来的中午时间戳隐藏、午夜后的旧计划变化未进入接力摘要、
+GitHub 内容未变仍生成同步版本。dsh 初始化回执列入本机状态的历史排除项。
 
 ## 总览页
 
 构建后运行 `kaitu dsh --install`，退出并重新打开桌面应用，侧栏点「开图」即可查看总览。
-页面与四个对话工具使用同一个插件、同一个工作区；网页版同样在 `kaitu dsh` 生成的配置中加载。
+页面与对话工具使用同一个插件、同一个工作区；网页版同样在 `kaitu dsh` 生成的配置中加载。
 
 总览显示最近 10 个有意义的改动版本、最新每日整理与未决事项、今天的安排、各模块未完成的前 5 条下一步、活跃项目、健康指标和待整理笔记。
 点击行可展开对应记录或文件路径；「刷新」重新读取工作区，「问问开图」返回当前对话。
