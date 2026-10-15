@@ -123,7 +123,8 @@ export function projectStatusFiles(ws: Workspace, publicOnly = false) {
   });
 }
 export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now?: Date } = {}) {
-  const today = localDate(options.now ?? new Date(), ws.timeZone());
+  const now = options.now ?? new Date();
+  const today = localDate(now, ws.timeZone());
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   return slugs(ws).flatMap((slug) => {
     const project = readProject(ws, slug);
@@ -135,12 +136,13 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
     if (store !== ws) store.timeZone = () => ws.timeZone();
     const metrics = store.exists("projects/module.json")
       ? readRecords(store, "project_metric").filter(
-          (r) => r.project === slug && String(r.ts).slice(0, 10) <= today,
+          (r) => r.project === slug && Date.parse(r.ts) <= now.getTime(),
         )
       : [];
     const words = metrics.filter((r) => r.kind === "words");
-    const recentWords = words.filter((r) => String(r.ts).slice(0, 10) >= from);
-    const baseline = words.filter((r) => String(r.ts).slice(0, 10) < from).at(-1) ?? recentWords[0];
+    const recentWords = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) >= from);
+    const baseline =
+      words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < from).at(-1) ?? recentWords[0];
     const last = words.at(-1);
     return [
       {
@@ -157,11 +159,26 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
             .sort()
             .at(-1) ?? null,
         recent7: {
+          daily: Array.from({ length: 7 }, (_, i) => {
+            const date = new Date(Date.parse(`${from}T12:00:00Z`) + i * 86400000).toISOString().slice(0, 10);
+            const current = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) === date).at(-1);
+            const previous = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < date).at(-1);
+            const commits = metrics.filter(
+              (r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) === date,
+            );
+            return {
+              date,
+              words: current && previous ? Number(current.value) - Number(previous.value) : null,
+              commits: commits.length ? commits.reduce((sum, r) => sum + Number(r.value), 0) : null,
+            };
+          }),
           words: last && baseline && recentWords.length ? Number(last.value) - Number(baseline.value) : null,
           commits: metrics
-            .filter((r) => r.kind === "commits" && String(r.ts).slice(0, 10) >= from)
+            .filter((r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) >= from)
             .reduce((total, r) => total + Number(r.value), 0),
-          commitsRecorded: metrics.some((r) => r.kind === "commits" && String(r.ts).slice(0, 10) >= from),
+          commitsRecorded: metrics.some(
+            (r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) >= from,
+          ),
         },
         words: last ? Number(last.value) : null,
         body: project.body,

@@ -55,8 +55,27 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       cutoff,
       latest: records.at(-1) ? String(records.at(-1)?.[dateField]) : null,
       sources: sources(type, records),
+      daily: dailyValues(records, field, dateField, type === "sleep" ? 60 : 1),
+      target: type === "sleep" ? (sleepTarget ? [sleepTarget] : null) : (proteinTarget ?? null),
     };
   };
+  const dates = Array.from({ length: 7 }, (_, i) =>
+    new Date(Date.parse(`${status.recent7.from}T12:00:00Z`) + i * 86400000).toISOString().slice(0, 10),
+  );
+  const dailyValues = (records: StoredRecord[], field: string, dateField = "ts", divisor = 1) =>
+    dates.map((date) => {
+      const values = records.filter((r) => day(r[dateField]) === date && typeof r[field] === "number");
+      return {
+        date,
+        value: values.length ? values.reduce((sum, r) => sum + Number(r[field]), 0) / divisor : null,
+      };
+    });
+  const sleepRule = data.rules.data.sleep;
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
+  const sleepTarget = sleepRule
+    ? ((minutes(sleepRule.end) - minutes(sleepRule.start) + 1440) % 1440) / 60
+    : null;
+  const proteinTarget = data.rules.data.nutrition?.protein_g;
   const workouts = rows("workout");
   const weight = (data.records.metric ?? [])
     .filter((r) => r.kind === "weight" && Date.parse(r.ts) <= now.getTime())
@@ -94,8 +113,29 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       proposed: item.status === "proposed",
       module: item.module,
       file: item.file,
+      section: item.file.startsWith("health/")
+        ? "health"
+        : /^(?:projects|\.kaitu\/local-projects)\//.test(item.file)
+          ? "projects"
+          : item.file.startsWith("feed/")
+            ? "feed"
+            : item.file.startsWith("me/")
+              ? "me"
+              : "today",
     })),
-    versions: (await history(ws, { limit: 10 })).map((v) => ({ ...v, source: versionSource(v.message) })),
+    versions: (await history(ws))
+      .filter(
+        (v) =>
+          !/开图升级到|重新生成了?\s*AGENTS\.md|文件夹有改动|初始化(?:了)?(?:开图|工作区)|更新了?内置模板/i.test(
+            v.message,
+          ),
+      )
+      .slice(0, 10)
+      .map((v) => ({
+        ...v,
+        source: versionSource(v.message),
+        actor: /Drive 收件箱[：:]\s*([^）)]+)/.exec(v.message)?.[1]?.trim() ?? null,
+      })),
     daily: daily ? { ...daily, unresolved: dailyItems.length } : null,
     projects: status.projects
       .filter((p) => p.stage === "active")
@@ -107,6 +147,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         next: p.next.filter((n) => n.status === "todo" || n.status === "proposed").map((n) => n.title),
         words: p.recent7.words,
         commits: p.recent7.commitsRecorded ? p.recent7.commits : null,
+        daily: p.recent7.daily,
         from: status.recent7.from,
         to: data.today,
       })),
@@ -125,6 +166,14 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         cutoff,
         latest: workouts.at(-1)?.ts ?? null,
         sources: sources("workout", workouts),
+        daily: dates.map((date) => {
+          const sessions = workouts.filter((r) => day(r.ts) === date);
+          return {
+            date,
+            value: sessions.length ? new Set(sessions.map((r) => r.session_id ?? r.id)).size : null,
+          };
+        }),
+        target: null,
       },
       metric("sleep", "日均睡眠", "小时", "sleep", "duration_min", "end"),
       metric("protein", "日均蛋白质", "g", "meal", "protein_g"),
@@ -140,6 +189,8 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         cutoff,
         latest: weight?.ts ?? null,
         sources: sources("metric", weight ? [weight] : []),
+        daily: [],
+        target: null,
       },
     ],
     pending: status.now.pending,

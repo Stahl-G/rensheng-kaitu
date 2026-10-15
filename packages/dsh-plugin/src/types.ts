@@ -15,6 +15,8 @@ export interface OverviewMetric {
   cutoff: string;
   latest: string | null;
   sources: OverviewSource[];
+  daily: { date: string; value: number | null }[];
+  target: number[] | null;
 }
 export interface OverviewBlock {
   id: string;
@@ -30,6 +32,7 @@ export interface OverviewNext {
   id: string;
   title: string;
   proposed: boolean;
+  section: string;
   module: string;
   file: string;
 }
@@ -39,6 +42,7 @@ export interface OverviewVersion {
   message: string;
   time: string;
   source: "user" | "agent" | "cloud" | "unknown";
+  actor: string | null;
 }
 export interface OverviewDaily {
   file: string;
@@ -55,6 +59,7 @@ export interface OverviewProject {
   next: string[];
   words: number | null;
   commits: number | null;
+  daily: { date: string; words: number | null; commits: number | null }[];
   from: string;
   to: string;
 }
