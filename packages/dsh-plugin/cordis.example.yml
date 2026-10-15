@@ -1,0 +1,5 @@
+- insert:
+    - id: kaitu
+      name: '/absolute/path/to/rensheng-kaitu/packages/dsh-plugin/dist/index.js'
+      config:
+        workspace: '/absolute/path/to/kaitu'

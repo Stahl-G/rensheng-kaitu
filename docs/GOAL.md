@@ -20,9 +20,9 @@
 | M1 | 数据层（T1–T7）：格式、校验、记录、版本、记忆、对话检索、导入 | 构建、lint、测试全部通过；样例导入可撤销 | T1–T7 完成 |
 | M2 | 本地工作台 MVP：`kaitu ui` 启动本机网页，4 个页面读 `~/kaitu`，文件变化实时刷新；确认日程建议、导入（预览→确认）、版本历史与恢复都能在界面里做 | 不打开终端以外的任何服务；用样例数据走通 PRD §3.3 场景 1–3 的界面部分 | 实现与必要自动测试、CLI / 浏览器冒烟通过；完整界面验收见 M4 |
 | M3 | Agent 侧：`AGENTS.md` 完整版（T10）+ 核心技能（onboarding、导入 ChatGPT、早间计划、晚间复盘、记录训练 / 饮食、加模块） | 在 Codex 里走通 PRD §10 阶段 1 验收清单 | 实现完成（含体态照片与提前的 MCP）；自动检查通过，Codex 技能发现受执行环境权限限制，实际工作流验收待补 |
-| M4 | 验收：Codex 用电脑操控实际打开工作台，按脚本走一遍新用户流程，报告问题 | 问题清单清零或已记录为后续任务 | 待开始 |
+| M4 | 验收：Codex 用电脑操控实际打开工作台，按脚本走一遍新用户流程，报告问题 | 问题清单清零或已记录为后续任务 | 已执行：8 项问题已修 5 项，2 项设计待办、1 项浏览器上传授权阻塞已记录；四项检查通过，见 [验收报告](acceptance/m4-report.md) |
 
-| M5 | **开图 App = DSH 外壳 + 手机通道**：阶段 2 验证 DSH（换品牌、关埋点与 shell、挂页面、定时任务）；工作台页面迁为 DSH 插件（React）。手机通道**不运行 OpenClaw**，新建小模块 `kaitu-channels`，统一「收消息 / 回消息」接口：微信抽取腾讯官方 `@tencent-weixin/openclaw-weixin`（MIT）的扫码登录、接口、媒体、发送模块并去掉 OpenClaw 依赖（记录抽取版本，定期对照上游）；QQ 用官方 `@tencent-connect/qqbot-nodejs`（MIT）；飞书用官方 `@larksuiteoapi/node-sdk`（MIT，长连接）；Telegram 用 `grammy`（MIT）。只监听本机、只回复本人。DSH 前由本机 Codex 在 `~/kaitu` 续接会话回答；DSH 后包成 DSH 插件 | 手机上说「今天深蹲 3×12 60kg」→ 工作台实时出现记录与版本 | 待开始 |
+| M5 | **开图 App = DSH 外壳 + 手机通道**：阶段 2 验证 DSH（换品牌、关埋点与 shell、挂页面、定时任务）；工作台页面迁为 DSH 插件（React）。手机通道**不运行 OpenClaw**，新建小模块 `kaitu-channels`，统一「收消息 / 回消息」接口：微信抽取腾讯官方 `@tencent-weixin/openclaw-weixin`（MIT）的扫码登录、接口、媒体、发送模块并去掉 OpenClaw 依赖（记录抽取版本，定期对照上游）；QQ 用官方 `@tencent-connect/qqbot-nodejs`（MIT）；飞书用官方 `@larksuiteoapi/node-sdk`（MIT，长连接）；Telegram 用 `grammy`（MIT）。只监听本机、只回复本人。DSH 前由本机 Codex 在 `~/kaitu` 续接会话回答；DSH 后包成 DSH 插件 | 手机上说「今天深蹲 3×12 60kg」→ 工作台实时出现记录与版本 | 第一部分手机通道已实现，离线集成与四项检查通过；四平台真实收发 / Codex 续会话待实测，DSH 待开始 |
 
 **界面（2026-10-15 定）**：M2 的 Preact 工作台只作为后端验证工具，不再打磨样式。后端（数据层、MCP、Drive、手机通道）完成后，用 Claude Design 从头设计，直接实现为 DSH App 的插件页面；工作台的接口与 core 函数保留复用。
 
@@ -30,12 +30,18 @@
 
 ## 后端补充进度（2026-10-15）
 
+dsh 插件原型已实现：`kaitu dsh` 生成启动配置，四工具复用 core；npm 版加载与真实模型对话待实测，见 [dsh.md](dsh.md)。
+
 状态目录、`.git` 迁移与 Google Drive 模式已实现：本地历史放 `.kaitu/history.git`，Drive 模式下程序状态全部留在本机。
 CLI / 工作台提供开关与状态，云端 Agent 通过收件箱写入；入口与现状文件自动维护。
 临时目录迁移往返、历史恢复、只读降级、收件箱与工作台防循环已验证；真实 Drive / Grok Bot / ChatGPT Dots 待实测。
 
 项目模块（D21）已实现：本机只读链接、字数 / 提交同步、CLI / MCP / 工作台与项目技能；
 Drive 下 local_only 项目、进度记录及版本留本机，公开现状与 remote 工具过滤。验证结果见 HANDOFF §8.1。
+
+工作区升级与健康收件箱已实现：`kaitu upgrade` 补齐内置类型、模块和技能，保留用户配置，支持预览与重复运行不写入。
+工作台与 `inbox process` 可导入官方健康导出和快捷指令原始样本；共用映射、按自然键去重，合成自动导入已验证。
+实际快捷指令文件与真实 iPhone / Drive 同步待实测；完整检查结果见 HANDOFF §8.1。
 
 ## 工作台技术选择（M2）
 

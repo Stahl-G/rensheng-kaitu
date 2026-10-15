@@ -16,7 +16,9 @@ export const NEVER_TRACK = [
   ".kaitu/local-projects/",
   ".kaitu/history.git/",
   ".kaitu/inbox-state.json",
+  ".kaitu/channels/",
   "inbox/agents/",
+  "inbox/health/",
   "inbox/rejected/",
 ];
 
@@ -28,7 +30,12 @@ export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/local-projects/
 .kaitu/history.git/
 .kaitu/inbox-state.json
+.kaitu/channels/
 inbox/agents/
+inbox/health/
+inbox/processed/**/*.health*.json
+inbox/processed/**/*.zip
+inbox/processed/**/*.xml
 inbox/rejected/
 *.tmp
 .DS_Store
@@ -37,8 +44,9 @@ inbox/rejected/
 const AUTHOR = { name: "开图", email: "kaitu@localhost" };
 
 function neverTrack(path: string): boolean {
-  return NEVER_TRACK.some((p) =>
-    p.endsWith("/") ? path.startsWith(p) : path === p || path.startsWith(`${p}-`),
+  return (
+    /^inbox\/processed\/.*(?:\.health[^/]*\.json|\.zip|\.xml)$/i.test(path) ||
+    NEVER_TRACK.some((p) => (p.endsWith("/") ? path.startsWith(p) : path === p || path.startsWith(`${p}-`)))
   );
 }
 

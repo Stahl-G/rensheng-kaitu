@@ -140,7 +140,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   }
   function changedFile(file: string) {
     if (closed || ignoredWorkspaceChange(file)) return;
-    if (file === "inbox" || file.startsWith("inbox/agents")) scheduleInbox();
+    if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
+      scheduleInbox();
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
       void exclusive(async () => {

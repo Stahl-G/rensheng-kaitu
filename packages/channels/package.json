@@ -1,0 +1,19 @@
+{
+  "name": "@kaitu/channels",
+  "version": "0.0.0",
+  "private": true,
+  "description": "开图手机通道：微信 / 飞书 / QQ / Telegram 收发消息",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@kaitu/core": "workspace:*",
+    "@larksuiteoapi/node-sdk": "^1.75.0",
+    "@tencent-connect/qqbot-nodejs": "^1.0.5",
+    "grammy": "^1.46.0"
+  }
+}

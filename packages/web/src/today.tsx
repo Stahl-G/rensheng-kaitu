@@ -121,7 +121,8 @@ export function Today({
             .filter((b) => b.kind === "task")
             .map((task) => (
               <p key={task.id} class="task">
-                □ {task.title}
+                {task.status === "done" ? "✓" : task.status === "skipped" ? "—" : "□"} {task.title}
+                {task.status === "done" ? "（已完成）" : task.status === "skipped" ? "（已跳过）" : ""}
               </p>
             ))}
           {data.now.body && <Markdown text={data.now.body} />}

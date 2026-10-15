@@ -2,3 +2,6 @@
 node_modules/
 dist/
 .kaitu/
+
+# 访谈逐字稿仅本地参考，不公开（版权）
+docs/reference/interview-transcript.*

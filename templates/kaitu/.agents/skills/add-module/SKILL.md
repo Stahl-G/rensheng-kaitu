@@ -13,7 +13,7 @@ description: 用户要求新增自定义模块时，确认用途和导航位置�
 4. 目录与 id 使用同一个小写英文 slug，不与已有目录重名。
 5. 在一个简短方案中列出名称、用途、记录类型与 visibility。
 6. 用户选定导航方式后创建 <slug>/module.json 和 STATUS.md。
-7. module.json 必需字段按已有模板和 module.schema.json 填写。
+7. module.json 参照已有模块。无结构化记录的读书模块可用下面的最小定义，不需要查找工作区外的 schema 文件。
 8. 没有结构化记录需求时不造 schema，records 可为空对象。
 9. 有需求时在模块 schemas/ 下写 JSON Schema，引用 record-base.schema.json。
 10. 新记录类型与全工作区其他类型不能重名。
@@ -27,6 +27,35 @@ description: 用户要求新增自定义模块时，确认用途和导航位置�
 18. 用 `kaitu record list <新类型>` 确认记录定义能被发现（有记录类型时）。
 19. 运行 `kaitu snapshot -m "Agent 创建了自定义模块"`。
 20. 用 `kaitu ui` 设置页检查模块定义与显示方式。
+
+## 最小示例
+
+`reading/module.json`：
+
+```json
+{
+  "id": "reading",
+  "name": "读书",
+  "version": 1,
+  "visibility": "agent",
+  "records": {},
+  "views": [{ "type": "doc", "title": "读书笔记", "path": "notes.md" }],
+  "agent": { "instructions": "记录读书笔记，把下一步放进 STATUS.md。" }
+}
+```
+
+`reading/STATUS.md`（updated 替换为用户时区的当前时间，下一步替换为用户选定的行动）：
+
+```yaml
+---
+updated: "2026-10-15T08:00:00+08:00"
+next:
+  - id: read-1
+    title: 读完第一章并写笔记
+    status: todo
+---
+从第一章开始。
+```
 
 ## 确认点
 

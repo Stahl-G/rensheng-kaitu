@@ -2,6 +2,7 @@ import { existsSync, statSync } from "node:fs";
 import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
 import { CONFIG_VERSION } from "./init.js";
 import { listModules } from "./modules.js";
+import { templateOutdated } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
 
@@ -20,7 +21,7 @@ const REQUIRED_FILES = [
   "me/goals.json",
   "memory/MEMORY.md",
 ];
-const BUILTIN_MODULES = ["me", "health", "calendar", "feed", "learning", "decisions", "reviews"];
+const BUILTIN_MODULES = ["me", "health", "calendar", "feed", "learning", "decisions", "reviews", "projects"];
 
 export async function doctor(ws: Workspace): Promise<Check[]> {
   const checks: Check[] = [];
@@ -35,6 +36,8 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     return checks;
   }
   try {
+    const outdated = templateOutdated(ws);
+    add("内置模板版本", !outdated, outdated ? "运行 kaitu upgrade" : undefined);
     const cfg = ws.readJson<{ version?: number }>(".kaitu/config.json");
     add(
       "配置版本",

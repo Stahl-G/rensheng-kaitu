@@ -7,6 +7,7 @@ import { KaituError } from "./errors.js";
 import { ensureHistory, snapshot } from "./history.js";
 import { listModules } from "./modules.js";
 import { populateSample } from "./sample.js";
+import { templateVersion } from "./template-version.js";
 import { assertTimeZone, isoInZone } from "./time.js";
 import { Workspace } from "./workspace.js";
 
@@ -24,6 +25,7 @@ const EMPTY_DIRS = [
   "reviews/monthly",
   "chats",
   "inbox/agents",
+  "inbox/health",
   ".kaitu/cache",
 ];
 
@@ -61,6 +63,7 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
     ".kaitu/config.json",
     {
       version: CONFIG_VERSION,
+      template_version: templateVersion(),
       created: isoInZone(now, tz),
       modules: listModules(ws).map((m) => m.dir),
       sources: {},

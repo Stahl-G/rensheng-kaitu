@@ -14,6 +14,9 @@
 
 `kaitu ui [--port 4870] [--no-open] [--dir ~/kaitu]` 启动本地工作台；`kaitu init <目录> --sample` 创建演示数据。
 
+合成导入样例：[Apple Health](examples/apple-health/export.xml)、[日历](examples/calendar.ics)、
+[ChatGPT 记忆](examples/chatgpt-memory.md)、[Nut AI](examples/nut-ai-backup.json)。
+
 需要 Node 22.19+ 与 pnpm。
 
 ```bash

@@ -16,6 +16,8 @@ import { proposeBlock, writeDigest } from "./agent-tools.js";
 import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { batchSnapshot } from "./history.js";
+import { parseAppleHealth, parseHealthShortcut } from "./importers/apple-health.js";
+import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories } from "./memory.js";
@@ -157,13 +159,14 @@ function stamp(ws: Workspace, file: string) {
   const stat = statSync(ws.resolve(file));
   return `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
 }
-function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: string) {
-  const bytes = readFileSync(ws.resolve(file));
+function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: string, attach = false) {
+  const size = statSync(ws.resolve(file)).size;
+  const bytes = attach ? Buffer.alloc(0) : readFileSync(ws.resolve(file));
   const directory = `inbox/notes/${localDate(new Date(), ws.timeZone())}`;
   if (file.endsWith(".note.md") && !errors.length && isUtf8(bytes) && !bytes.includes(0)) {
     return moveInboxFile(ws, file, directory);
   }
-  const text = isUtf8(bytes) && !bytes.includes(0) ? bytes.toString("utf8") : null;
+  const text = !attach && isUtf8(bytes) && !bytes.includes(0) ? bytes.toString("utf8") : null;
   const attachment = text === null ? moveInboxFile(ws, file, `${directory}/files`) : undefined;
   const target = availableInboxPath(ws, directory, `${basename(file)}.md`);
   ws.writeText(
@@ -177,7 +180,7 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
       [
         "# 待整理笔记",
         errors.join("\n\n"),
-        text === null ? `文件：${basename(file)}\n大小：${bytes.length} 字节\n原件：${attachment}` : text,
+        text === null ? `文件：${basename(file)}\n大小：${size} 字节\n原件：${attachment}` : text,
       ].join("\n\n"),
     ),
   );
@@ -187,7 +190,7 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
 
 export async function processInbox(ws: Workspace, options: { stableMs?: number } = {}) {
   const result = { processed: [] as string[], notes: [] as string[], pending: [] as string[] };
-  if (!ws.exists("inbox/agents") && !ws.exists("inbox/rejected")) return result;
+  if (!["inbox/agents", "inbox/health", "inbox/rejected"].some((dir) => ws.exists(dir))) return result;
   const lock = ws.resolve(".kaitu/cache/inbox.lock", { internal: true });
   mkdirSync(dirname(lock), { recursive: true });
   if (existsSync(lock)) {
@@ -230,10 +233,11 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         rmSync(ws.resolve("inbox/rejected"), { recursive: true });
     }
     const observed = new Map<string, string>();
-    if (ws.exists("inbox/agents")) {
-      for (const entry of readdirSync(ws.resolve("inbox/agents"), { withFileTypes: true })) {
-        if (!entry.isFile()) continue;
-        const file = `inbox/agents/${entry.name}`;
+    for (const dir of ["inbox/agents", "inbox/health"]) {
+      if (!ws.exists(dir)) continue;
+      for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
+        if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name === ".DS_Store") continue;
+        const file = `${dir}/${entry.name}`;
         observed.set(file, stamp(ws, file));
       }
     }
@@ -243,6 +247,52 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       if (!ws.exists(file)) continue;
       if (stamp(ws, file) !== before) {
         result.pending.push(file);
+        continue;
+      }
+      if (file.startsWith("inbox/health/")) {
+        let parsed: Awaited<ReturnType<typeof parseAppleHealth>> | undefined;
+        const shortcut = file.endsWith(".health.json");
+        const errors: string[] = [];
+        try {
+          parsed = shortcut
+            ? parseHealthShortcut(ws.resolve(file), ws.timeZone())
+            : /^export\.(zip|xml)$/i.test(basename(file))
+              ? await parseAppleHealth(ws.resolve(file), ws.timeZone())
+              : undefined;
+          if (!parsed)
+            throw new KaituError("健康收件箱接受 export.zip、export.xml 或 *.health.json", "BAD_INBOX");
+        } catch (error) {
+          errors.push((error as Error).message);
+        }
+        if (!ws.exists(file) || stamp(ws, file) !== before) {
+          result.pending.push(file);
+          continue;
+        }
+        let count = 0;
+        await batchSnapshot(
+          ws,
+          () =>
+            errors.length
+              ? "Apple 健康文件转为待整理笔记"
+              : `从 Apple 健康同步了 ${count} 条记录${shortcut ? "（快捷指令）" : ""}`,
+          async () => {
+            if (parsed) {
+              try {
+                const imported = await importBatch(ws, "apple-health", parsed.candidates, {
+                  ignored: parsed.ignored,
+                });
+                count = imported.added + imported.updated;
+              } catch (error) {
+                errors.push((error as Error).message);
+              }
+            }
+            if (errors.length) result.notes.push(saveNote(ws, file, errors, "Apple 健康", true));
+            else {
+              moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+              result.processed.push(file);
+            }
+          },
+        );
         continue;
       }
       const text = ws.readText(file);

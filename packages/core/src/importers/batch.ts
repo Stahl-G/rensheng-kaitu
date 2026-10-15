@@ -4,11 +4,12 @@ import { snapshot } from "../history.js";
 import { type StoredRecord, addRecords, deleteRecord, readRecords, updateRecord } from "../records.js";
 import type { Workspace } from "../workspace.js";
 
-export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event";
+export type ImportType = "metric" | "sleep" | "activity" | "meal" | "event" | "workout";
 export interface Candidate {
   type: ImportType;
   data: Record<string, unknown>;
   key: string;
+  activityTotals?: { basalKcal?: number };
 }
 export interface Counts {
   added: number;
@@ -23,6 +24,7 @@ export interface BatchImportResult extends Counts {
 }
 export interface BatchOptions {
   dryRun?: boolean;
+  message?: (changed: number) => string;
   ignored?: Record<string, number>;
   scope?: (record: StoredRecord) => boolean;
   deleteMissing?: (record: StoredRecord) => boolean;
@@ -30,6 +32,8 @@ export interface BatchOptions {
 
 export function naturalKey(type: ImportType, data: Record<string, unknown>): string {
   switch (type) {
+    case "workout":
+      return JSON.stringify([new Date(String(data.ts)).toISOString(), data.exercise]);
     case "metric":
       return JSON.stringify([data.kind, new Date(String(data.ts)).toISOString()]);
     case "sleep":
@@ -86,11 +90,22 @@ export async function importBatch(
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
     for (const item of group.values()) {
       const previous = existing.get(item.key);
-      if (!previous) added.push(item.data);
-      else if (isDeepStrictEqual(content(previous), content(item.data))) counts.skipped++;
+      let data = item.data;
+      if (previous && item.activityTotals) {
+        data = { ...content(previous), ...data };
+        if (item.data.total_kcal !== undefined) {
+          const basal =
+            item.activityTotals.basalKcal ??
+            Number(previous.total_kcal ?? 0) - Number(previous.active_kcal ?? 0);
+          data.total_kcal = Number(data.active_kcal ?? 0) + basal;
+        }
+        group.set(item.key, { ...item, data });
+      }
+      if (!previous) added.push(data);
+      else if (isDeepStrictEqual(content(previous), content(data))) counts.skipped++;
       else {
         const patch = Object.fromEntries(Object.keys(content(previous)).map((key) => [key, undefined]));
-        updated.push({ id: previous.id, patch: { ...patch, ...item.data } });
+        updated.push({ id: previous.id, patch: { ...patch, ...data } });
       }
     }
     const deleted = opts.deleteMissing
@@ -122,6 +137,6 @@ export async function importBatch(
     for (const item of plan.updated) updateRecord(ws, plan.type, item.id, item.patch, { by });
     for (const item of plan.deleted) deleteRecord(ws, plan.type, item.id, { by });
   }
-  result.version = await snapshot(ws, `导入（${source}）了 ${changed} 条记录`);
+  result.version = await snapshot(ws, opts.message?.(changed) ?? `导入（${source}）了 ${changed} 条记录`);
   return result;
 }

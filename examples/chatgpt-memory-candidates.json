@@ -1,0 +1,4 @@
+[
+  { "type": "preference", "name": "沟通偏好", "text": "喜欢简短、具体的中文。" },
+  { "type": "fact", "name": "兴趣", "text": "喜欢阅读科幻小说。" }
+]

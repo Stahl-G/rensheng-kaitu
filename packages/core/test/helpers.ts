@@ -1,6 +1,7 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { zipSync } from "fflate";
 import { type Workspace, initWorkspace } from "../src/index.js";
 
 export function tmp(): string {
@@ -12,3 +13,11 @@ export async function freshWorkspace(timeZone = "Asia/Shanghai"): Promise<Worksp
 }
 
 export const workout = { exercise: "深蹲", sets: 3, reps: 12, weight_kg: 60, session_id: "s1" };
+
+export function appleHealthZip(): Uint8Array {
+  return zipSync({
+    "apple_health_export/export.xml": readFileSync(
+      new URL("../../../examples/apple-health/export.xml", import.meta.url),
+    ),
+  });
+}

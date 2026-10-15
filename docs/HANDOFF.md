@@ -143,6 +143,31 @@
 
 ## 8.1 进展记录
 
+- dsh 插件原型：四工具、提示注入、`kaitu dsh` 已实现，四项检查（100 测试）及 CLI / 工作台 SSE 冒烟通过；npm 加载与真实对话待实测，见 [dsh.md](dsh.md)。
+
+### 2026-10-15：M5 第一部分——手机通道
+
+- `@kaitu/channels` 实现四通道文本收发、一次性本人配对、按会话排队的本机 Agent 与 CLI / `ui --channels`；凭据、配对及会话留本机。操作见 [channels.md](channels.md)。
+- 微信抽取 `@tencent-weixin/openclaw-weixin@2.4.10`，保留 LICENSE 与差异说明，无新增外部依赖；四项检查全过（99 项）。
+  假 Codex resume / CLI / 本地工作台冒烟通过；四平台真实登录、收发与 Codex 续会话待实测，DSH 未开始。
+
+### 2026-10-15：工作区升级与健康收件箱
+
+- 快捷指令 iCloud 链接（ec325763…）已填入安装页。重新分享前：清空「文本」动作与导入问题的「默认回答」——默认回答会随链接一起分享，曾因此泄露密钥（已轮换）。分享后在 Mac 打开链接核对无密钥。
+- 健康同步改为一页三步安装：Apps Script 自动生成密钥，仅本人设置页显示同步地址与收件状态，`showSyncUrl()` 供编辑器备用；个人 Gmail 身份识别待实测。
+- 改 `.gs` 后运行 `pnpm guide:health` 更新安装页内嵌代码，一项一致性测试防遗漏；快捷指令 iCloud 链接仍为空，按钮待提供。
+- 快捷指令新增换行字符串并列列表（type / values / starts），与 samples 数组并存；复用健康映射，支持每日累计更新、分类型活动合并与中文睡眠阶段。
+- 并列列长不一致时整文件附原因转待整理笔记；格式见 `docs/guides/health-shortcut-format.md`。
+- `kaitu upgrade [--dry-run]` 按模板哈希升级：补内置模块与新增 records / views / sources / tabs，保留用户字段与自建技能。
+- 两处内置技能覆盖更新，重新生成 AGENTS / AGENT-README / OVERVIEW；整次升级一个版本，随后 validate 与 doctor。当前版本重复运行不写入。
+- 初始化记录 template_version；旧模板在 doctor 与工作台提示升级，预览不执行工作区迁移或维护写入。
+- `inbox/health/` 支持官方 export.zip / export.xml 和快捷指令 *.health.json，工作台自动处理或 inbox process 手动处理。
+- 两种入口共用样本映射：单位、来源聚合、跨午夜分摊与睡眠合并保持一致；Apple 体能训练均记 cardio，中文活动名，力量组次仍手记。
+- 健康原件成功归档且不进版本历史，失败转附件笔记；整理记录按自然键追加修订，重复投递不存新版本。
+- 合成旧模板与健康文件测试已覆盖升级保留、幂等、时区与跨夜、文件稳定、工作台自动 zip 导入。build、typecheck、lint、test 全过（94 项）；测试并发上限 4，保留原超时时间。
+- 构建后 CLI 临时工作区冒烟通过：旧 .git 历史保留、预览不迁移、整次升级一个版本、重复升级 / 导入无改动。
+- 快捷指令原始格式见 docs/guides/health-shortcut-format.md；实际 iPhone 快捷指令与真实 Drive 同步仍待实测。
+
 ### 2026-10-15：项目模块（D21）
 
 - core / CLI 支持项目建档、链接、日志、阶段与本机设置，工作台「我的」与「今天」汇总项目和下一步。

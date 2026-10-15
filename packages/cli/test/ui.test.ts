@@ -2,8 +2,17 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { history, initWorkspace, parseFrontmatter, snapshot, stringifyFrontmatter } from "@kaitu/core";
+import {
+  history,
+  initWorkspace,
+  localDate,
+  parseFrontmatter,
+  readRecords,
+  snapshot,
+  stringifyFrontmatter,
+} from "@kaitu/core";
 import { afterEach, expect, it } from "vitest";
+import { appleHealthZip } from "../../core/test/helpers.js";
 import { startUi } from "../src/ui/server.js";
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -124,4 +133,25 @@ it("图片接口只返回有记录的照片，拒绝任意路径和 ..", async (
     }),
   );
   expect((await fetch(`${ui.url}/api/photos/${record.id}`)).status).toBe(400);
+});
+
+it("工作台自动导入健康 zip，归档原件，重复投递不增加记录或版本", async () => {
+  const { ws } = await setup();
+  const before = (await history(ws)).length;
+  const zip = appleHealthZip();
+  const incoming = "inbox/health/export.zip";
+  ws.writeText(incoming, zip);
+  await expect.poll(() => readRecords(ws, "metric").length, { timeout: 5000 }).toBe(6);
+  await expect.poll(async () => (await history(ws)).length, { timeout: 5000 }).toBe(before + 1);
+  expect(readRecords(ws, "workout")).toMatchObject([
+    { exercise: "跑步", modality: "cardio", duration_min: 60 },
+  ]);
+  const archived = `inbox/processed/${localDate(new Date(), ws.timeZone())}/export.zip`;
+  expect(ws.exists(archived)).toBe(true);
+  expect(ws.exists(incoming)).toBe(false);
+  ws.writeText(incoming, zip);
+  await expect.poll(() => ws.exists(incoming), { timeout: 5000 }).toBe(false);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(await history(ws)).toHaveLength(before + 1);
+  expect(readRecords(ws, "metric")).toHaveLength(6);
 });
