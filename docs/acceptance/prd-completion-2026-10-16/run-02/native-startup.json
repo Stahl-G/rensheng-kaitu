@@ -15,18 +15,9 @@
     "needsReview": 0,
     "updatedAt": null
   },
-  "healthTargets": [
-    null,
-    null,
-    null,
-    null
-  ],
+  "healthTargets": [null, null, null, null],
   "financeCurrencies": [],
-  "childKinds": [
-    "gpu-process",
-    "utility",
-    "renderer"
-  ],
+  "childKinds": ["gpu-process", "utility", "renderer"],
   "startsAiHost": false,
   "nativeWindowVerified": false
 }
