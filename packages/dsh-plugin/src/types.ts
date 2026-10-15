@@ -117,3 +117,36 @@ export interface DoingProject {
     history: { date: string; stars: number; forks: number; open_issues: number; open_prs: number }[];
   } | null;
 }
+
+export interface MeGoal {
+  id: string;
+  title: string;
+  area?: string;
+  metric?: string;
+  target?: string;
+  due?: string;
+  approach?: string;
+  actual?: string;
+}
+export interface MeRules {
+  timezone?: string;
+  sleep?: { start: string; end: string };
+  work_hours?: { start: string; end: string; days?: number[] };
+  training?: { pattern?: string; duration_min?: number; preferred?: string };
+  nutrition?: { protein_g?: number[] };
+  no_tasks_after?: string;
+}
+export interface MeData {
+  name: string | null;
+  bio: string | null;
+  avatar: string | null;
+  goals: MeGoal[];
+  rules: MeRules;
+  memories: {
+    file: string;
+    type: "preference" | "fact" | "context" | "person" | "decision";
+    text: string;
+    source: string | null;
+    sensitive: boolean;
+  }[];
+}

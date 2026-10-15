@@ -6,6 +6,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import contribution from "../../lib/typert.remote-client.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { OverviewPage } from "./OverviewPage.js";
+import { prefillAgent } from "./agent-prompt.js";
 
 export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
@@ -23,7 +24,7 @@ export async function apply(ctx: Context) {
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
-    inject: ["slots", "remote.kaitu", "layout"],
+    inject: ["slots", "remote.kaitu", "layout", "sessions", "conversation"],
     apply(ctx: Context) {
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
@@ -46,6 +47,24 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              loadMe: async () => {
+                const result = await ctx.remote.kaitu.me();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              setAvatar: async (base64: string) => {
+                const result = await ctx.remote.kaitu.setAvatar(base64);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              removeAvatar: async () => {
+                const result = await ctx.remote.kaitu.removeAvatar();
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              onPrompt: (text: string) => {
+                prefillAgent(ctx, text);
+                ctx.layout.selectPanel(null);
               },
               onAgent: () => ctx.layout.selectPanel(null),
             }),

@@ -1,8 +1,18 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
-import { Workspace, defaultRoot, listProjects, readOverviewPage } from "@kaitu/core";
+import {
+  KaituError,
+  Workspace,
+  defaultRoot,
+  listProjects,
+  readAvatar,
+  readOverviewPage,
+  removeAvatar,
+  saveAvatar,
+} from "@kaitu/core";
+import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
-import type { DoingProject, OverviewData } from "./types.js";
+import type { DoingProject, MeData, OverviewData } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -10,7 +20,7 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-/** 工作区只读总览，不激活 Agent 或触发同步。 */
+/** 工作区页面与本机头像，不激活 Agent 或触发同步。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
 
@@ -23,6 +33,27 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("me")
+  async me(): Promise<MeData> {
+    return readMe(this.workspace);
+  }
+
+  @Remote("setAvatar")
+  async setAvatar(base64: string): Promise<string | null> {
+    if (
+      base64.length > Math.ceil((2 * 1024 * 1024) / 3) * 4 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
+    )
+      throw new KaituError("头像数据不合法或超过 2MB", "INVALID_AVATAR");
+    saveAvatar(this.workspace, Buffer.from(base64, "base64"));
+    return readAvatar(this.workspace);
+  }
+
+  @Remote("removeAvatar")
+  async removeAvatar(): Promise<void> {
+    removeAvatar(this.workspace);
   }
 
   @Remote("projects")
