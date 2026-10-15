@@ -8,6 +8,7 @@ import { listModules, listRecordTypes } from "./modules.js";
 import { listProjects, projectStatusFiles, projectVersion, publicProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
+import { tasksForToday } from "./tasks.js";
 import { isoInZone, localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -142,6 +143,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     ),
     modules,
     records,
+    tasks: read("待办", () => tasksForToday(records.task ?? [], ws.timeZone(), now), []),
     profile: ws.exists("me/profile.md") ? ws.readText("me/profile.md") : "",
     rules: read("作息规则", () => document<Rules>(ws, "me/rules.md", { timezone: ws.timeZone() }), {
       data: { timezone: ws.timeZone() } as Rules,

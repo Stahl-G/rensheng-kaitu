@@ -12,7 +12,13 @@ export function Health({
   const [tab, setTab] = useState("训练");
   const [exercise, setExercise] = useState("");
   const records = (type: string) => data.records[type] ?? [];
-  const workouts = records("workout");
+  const workouts = records("workout").filter((row) => row.modality !== "cardio");
+  const cardio = records("workout").filter(
+    (row) =>
+      row.modality === "cardio" &&
+      dayOf(row.ts, data.timeZone) >= dateOffset(data.today, -29) &&
+      dayOf(row.ts, data.timeZone) <= data.today,
+  );
   const exercises = [...new Set(workouts.map((r) => String(r.exercise)))];
   const selected = exercises.includes(exercise) ? exercise : (exercises[0] ?? "");
   const days = (count: number) =>
@@ -88,6 +94,33 @@ export function Health({
       </div>
       {tab === "训练" && (
         <>
+          <Panel title="近 30 天有氧">
+            {cardio.length ? (
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      {["日期", "项目", "距离（km）", "时长（分钟）"].map((title) => (
+                        <th key={title}>{title}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...cardio].reverse().map((row) => (
+                      <tr key={row.id}>
+                        <td>{dayOf(row.ts, data.timeZone)}</td>
+                        <td>{String(row.exercise)}</td>
+                        <td>{number(row.distance_km, 2)}</td>
+                        <td>{number(row.duration_min, 1)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <Empty>对 Agent 说「跑步 5 公里 28 分钟」，开始记录有氧。</Empty>
+            )}
+          </Panel>
           <div class="toolbar">
             <label>
               动作{" "}

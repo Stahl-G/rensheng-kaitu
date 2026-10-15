@@ -4,6 +4,9 @@
   "version": 1,
   "visibility": "nav",
   "description": "档案、目标、作息与规则、月度现状报告",
+  "records": {
+    "task": { "path": "data/tasks/{YYYY-MM}.jsonl", "schema": "schemas/task.schema.json", "label": "待办" }
+  },
   "views": [
     { "type": "doc", "title": "档案", "path": "profile.md" },
     { "type": "progress", "title": "目标", "path": "goals.json" },

@@ -9,12 +9,16 @@ description: 用户要晚间复盘或回顾今天时，对照计划更新进展�
 
 1. 先运行 `kaitu project sync` 同步项目进度，再运行 `kaitu status --json-out`，读取 NOW.md 和各模块 STATUS.md。
 2. 运行 `kaitu inbox notes`，逐条把能结构化的内容用 `kaitu record add`、`kaitu memory import --file <候选.json>` 或写简报等写入。
-   来源记为笔记里的 agent；混合文件只整理失败条目，合法部分已经写入。完成后运行 `kaitu inbox done <路径>`。
-   拿不准的保留待整理，并在日报里列出。
+   来源记为笔记里的 agent；混合文件只整理失败条目，合法部分已经写入。
+   笔记里的待办（含 *.note.md）用 `kaitu task add --title "待办" [--due 日期或带偏移时间] [--remind-at 带偏移时间] [--project slug]` 转成 task。
+   先查 `kaitu task list --all --json-out`，避免把已整理或已完成的事项重复新建；相对日期按笔记日期及用户时区理解，不确定的日期保留待澄清。
+   保留笔记的 agent 来源与原路径，用 `kaitu record update task <id> --json` 补 source、notes。
+   所有条目整理完成后运行 `kaitu inbox done <路径>`；拿不准的保留待整理，并在日报里列出。
 3. 用 `kaitu record list workout --from YYYY-MM-DD --to YYYY-MM-DD` 查看今天训练。
 4. 同样查询 meal、sleep、activity；不把没有记录直接判成没有发生。
 5. 逐项核对 NOW.md，区分有记录证据、用户说明与尚未核实。
-6. 只追问会改变完成判断的关键缺口。
+6. 根据 status 的 tasks 提醒用户过期项；仅在记录或用户说明确认完成后用 `kaitu task done <id>`，不因排进计划就标完成。
+   只追问会改变完成判断的关键缺口。
 7. 保留 NOW.md 原有块 id，按实际更新 done 或 skipped。
 8. 记录未完成的具体原因；尚不清楚的原因写待补。
 9. 更新相关模块 STATUS.md 的 progress、next、blocked、updated。

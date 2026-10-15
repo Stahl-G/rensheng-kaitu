@@ -140,6 +140,7 @@
 │  ├─ goals.json             # 目标
 │  ├─ rules.md               # 作息与排程约束
 │  ├─ STATUS.md
+│  ├─ data/tasks/YYYY-MM.jsonl # 待办与提醒，按创建时间 ts 分月
 │  └─ reports/YYYY-MM.md     # 月度现状报告
 ├─ health/
 │  ├─ module.json
@@ -235,7 +236,7 @@
     { "type": "manual" }
   ],
   "agent": {
-    "instructions": "记录训练时按 workout schema 写入；每次训练后对比上次同动作重量，给出下次加重建议。"
+    "instructions": "力量训练按 workout schema 写入，对比上次同动作重量给出下次加重建议；有氧用 modality: cardio，记录时长和已知距离，对比同项目配速或时长。"
   }
 }
 ```
@@ -323,7 +324,9 @@ goal_priority: [g1]
 
 | 记录 | 关键字段 |
 |---|---|
-| workout | `exercise`、`sets`、`reps`、`weight_kg`、`rpe?`、`video?`、`notes?`、`session_id` |
+| workout（力量） | `modality?: strength`（缺省视为力量）、`exercise`、`sets`、`reps`、`weight_kg`、`session_id`；可选 `rpe`、`video`、`notes` |
+| workout（有氧） | `modality: cardio`、`exercise`、`duration_min`；可选 `distance_km`、`avg_hr`、`kcal`、`elevation_m`、`rpe`、`notes`、`session_id` |
+| task（me 模块） | `title`、`status: open / done / cancelled`（新建为 open）；可选 `due`（日期或带偏移时间）、`remind_at`（带偏移时间）、`project`（slug）、`notes`、`source` |
 | meal | `meal`（早/午/晚/加餐）、`items[]`（`name`、`grams?`）、`kcal`、`protein_g`、`carbs_g?`、`fat_g?`、`uncertainty?`、`photo?`、`source` |
 | supplement | `name`、`amount`、`unit` |
 | sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source` |
@@ -334,6 +337,11 @@ goal_priority: [g1]
 | event | `start`、`end`、`title`、`calendar`、`external_id?`、`source` |
 | project_metric | `project`（slug）、`kind`（words / commits）、`value`（当前总字数 / 当天提交数）、`detail?`（至多 10 条提交标题，每条至多 80 字） |
 | feed_item | 在 `.kaitu/cache` 中，不进版本历史；简报写入 `digests/` |
+
+待办按创建时间 `ts` 分月，状态变化通过 `updateRecord` 追加同 id 的修订，保留创建时间。
+日期型 due 在用户时区当天结束后才过期，时间型 due 按具体时刻过期；今天到期和今天提醒按用户时区查询。
+`kaitu status`、OVERVIEW.md 和今天页列出今天到期、已过期、今天提醒的 open 待办；今天页可标完成。
+提醒暂由早间计划与今天页列出，推送通道留到 M5。收件箱 records 可新增 task，笔记中的待办由晚间复盘整理。
 
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。
 
@@ -463,7 +471,7 @@ sensitive: false
 | evening-review | 「复盘」/ 定时 | 对照 `NOW.md` 判断完成情况 → 更新 `STATUS.md` → 写日报 → 整理记忆 |
 | weekly-review / monthly-review | 定时或手动 | 周 / 月复盘；月度现状分析 |
 | look-back | 「过去 N 天……」 | 按时间段汇总各模块数据与对话，回答「为什么没达成」类问题 |
-| log-workout | 训练描述 | 解析并写入 workout；给出下次加重建议 |
+| log-workout | 训练描述 | 解析并写入力量或有氧 workout；力量给出下次加重建议，有氧对比配速或时长 |
 | log-meal | 饮食描述或饮食应用导入 | 文字记录或从 Nut AI / CalorieMate 导入；汇总当天热量与蛋白质 |
 | health-import | 手动导入 | Apple Health / Nut AI / .ics 预览与确认导入 |
 | lab-import | 拖入体检 PDF | 抽取指标写入 `labs/`，标注异常，提出复查建议 |
@@ -486,6 +494,7 @@ sensitive: false
 | `kaitu record add <type> --json ...` | 写入一条记录（生成 id、ts、by，校验后追加） |
 | `kaitu status [--json-out]` | 今天的块与待确认、各模块进度和 next、最近 7 天训练 / 睡眠 / 蛋白质及最新体重 |
 | `kaitu memory import --file <候选.json> [--dry-run]` | 确认后的记忆数组整批写入，一个版本 |
+| `kaitu task add / list / done / cancel` | 新建、查询、完成或取消待办，写操作生成版本 |
 | `kaitu photo add` / `list` / `rm` | 添加、查询和删除体态照片及原件 |
 | `kaitu memory add|update|rm|list|search` | 记忆操作 |
 | `kaitu chats search <q>` | 历史对话全文检索 |

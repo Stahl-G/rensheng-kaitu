@@ -12,6 +12,14 @@ describe("记录 schema", () => {
   it.each([
     [
       "workout.schema.json",
+      { ...base, modality: "cardio", exercise: "跑步", duration_min: 28, distance_km: 5 },
+    ],
+    [
+      "workout.schema.json",
+      { ...base, modality: "strength", exercise: "深蹲", sets: 3, reps: 12, weight_kg: 60, session_id: "s1" },
+    ],
+    [
+      "workout.schema.json",
       { ...base, exercise: "深蹲", sets: 3, reps: 12, weight_kg: 60, session_id: "s1" },
     ],
     [
@@ -74,6 +82,18 @@ describe("记录 schema", () => {
       { ...base, exercise: "深蹲", sets: 3, reps: 12, session_id: "s1" },
       "缺 weight_kg",
     ],
+    [
+      "workout.schema.json",
+      { ...base, modality: "strength", exercise: "深蹲", duration_min: 28 },
+      "力量缺组次重量和 session_id",
+    ],
+    ["workout.schema.json", { ...base, modality: "cardio", exercise: "跑步", distance_km: 5 }, "有氧缺时长"],
+    [
+      "task.schema.json",
+      { ...base, title: "礼物", status: "open", due: "2026-10-15T09:00:00" },
+      "截止时间无偏移",
+    ],
+    ["task.schema.json", { ...base, title: "礼物", status: "open", remind_at: "2026-10-15" }, "提醒只有日期"],
     [
       "workout.schema.json",
       { ...base, exercise: "深蹲", sets: 0, reps: 12, weight_kg: 60, session_id: "s1" },

@@ -22,6 +22,7 @@ export function readStatus(ws: Workspace, now = new Date(), publicOnly = false) 
   return {
     today: data.today,
     inboxNotes: data.inboxNotes,
+    tasks: data.tasks,
     now: {
       date: data.now.data.date,
       blocks,
@@ -32,7 +33,7 @@ export function readStatus(ws: Workspace, now = new Date(), publicOnly = false) 
     recent7: {
       from,
       to: data.today,
-      workouts: new Set(recent("workout").map((r) => `${day(r.ts)}:${r.session_id}`)).size,
+      workouts: new Set(recent("workout").map((r) => `${day(r.ts)}:${r.session_id ?? r.id}`)).size,
       averageSleepHours: averageDaily("sleep", "duration_min", "end", 60),
       averageProteinG: averageDaily("meal", "protein_g"),
       latestWeight:

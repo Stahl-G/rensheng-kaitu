@@ -16,6 +16,7 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
 
 export const STATE_DIR = ".kaitu";
@@ -76,6 +77,7 @@ export class Workspace {
     this.root = resolve(root);
     migrateHistory(this.root);
     if (this.exists(".kaitu/config.json")) {
+      ensureTaskModule(this);
       maintainHistoryIgnore(this);
       refreshOverview(this);
     }

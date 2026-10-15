@@ -1,11 +1,14 @@
 import {
   type Workspace,
   addMemory,
+  addTask,
   assertPublicProject,
+  completeTask,
   inboxNoteDone,
   inboxNotes,
   listMemories,
   listProjects,
+  listTasks,
   logProject,
   proposeBlock,
   publicProject,
@@ -104,6 +107,26 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
         (row) => tools !== "remote" || type !== "project_metric" || publicProject(ws, row.project),
       ),
   );
+  register(
+    "task_add",
+    "新增待办，status 为 open，保存版本。remind_at 供今天页与早间计划提醒。",
+    {
+      title: text,
+      due: text.optional(),
+      remind_at: text.optional(),
+      project: text.optional(),
+      notes: text.optional(),
+      source: text.optional(),
+    },
+    (input) => addTask(ws, input, { by: "agent", actor: actor() }),
+    true,
+  );
+  register(
+    "task_list",
+    "查询待办，默认 open；dueBefore 日期含当天，时间截止按用户时区判断。",
+    { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
+    (input) => listTasks(ws, input),
+  );
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     searchMemories(ws, query),
@@ -169,6 +192,13 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     true,
   );
   if (tools === "all") {
+    register(
+      "task_done",
+      "完成待办，追加修订并保存版本。",
+      { id: text },
+      ({ id }) => completeTask(ws, id, { by: "agent", actor: actor() }),
+      true,
+    );
     register(
       "inbox_note_done",
       "将已整理的笔记归档并保存版本。",

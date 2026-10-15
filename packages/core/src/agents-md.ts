@@ -78,6 +78,8 @@ ${instructions}
   - 修改：\`kaitu record update <类型> <id> --json '{...}'\`
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
+- 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--project slug]\`，新建为 open。
+- \`kaitu task list [--all]\` 查询，\`kaitu task done <id>\` 完成，\`kaitu task cancel <id>\` 取消；状态变化追加修订并保存版本。
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
 - 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。仅本机项目不写进共享计划、复盘或记忆。
 - 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
@@ -95,7 +97,7 @@ ${renderRecordReference(ws)}
 
 | 操作 | 是否需要用户确认 |
 |---|---|
-| 日常记录（训练、饮食、指标） | 否，直接写，可撤销 |
+| 日常记录（训练、饮食、指标、待办） | 否，直接写，可撤销 |
 | 自动记忆 | 否，直接写，告诉用户「已记住：……」 |
 | 写入外部日历 | 是 |
 | 批量导入 | 是（一屏列出，默认全选） |
@@ -116,8 +118,8 @@ ${renderRecordReference(ws)}
 
 ## 8. 日常节奏
 
-- 早间（morning-plan）：读规则、目标、日程、下一步和昨晚睡眠，按训练频率排今天，建议保留 pending。
-- 晚间（evening-review）：核对完成情况、更新模块状态、写日报、整理记忆，最后保存版本。
+- 早间（morning-plan）：读规则、目标、日程、下一步、今天到期与提醒的待办和昨晚睡眠，按训练频率排今天，建议保留 pending。
+- 晚间（evening-review）：把笔记待办整理为 task、提醒过期项、核对完成情况、更新模块状态、写日报、整理记忆，最后保存版本。
 - 周复盘（weekly-review）：汇总本周进展和障碍，更新下周下一步。
 - 月复盘（monthly-review）：汇总整月，满两个月后做有数据支持的现状分析；规则和目标变更仍须确认。
 - 阶段 1 手动触发这些技能，不会自动设置定时任务。
@@ -132,7 +134,7 @@ ${skills()
   .map((s) => `| ${s.name} | ${s.description} |`)
   .join("\n")}
 
-- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据，以及项目进度。
+- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据，以及项目进度和今天到期 / 过期 / 提醒的待办。
 - \`kaitu memory import --file <候选.json> [--dry-run]\`：确认后的记忆数组一次导入、一个版本。
 - \`kaitu import apple-health|nut-ai|ics <文件> --dry-run\`：先预览，用户确认后移除 --dry-run。
 - \`kaitu doctor\` 检查工作区，\`kaitu validate [路径]\` 校验格式。

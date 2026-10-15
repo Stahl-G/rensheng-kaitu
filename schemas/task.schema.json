@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/task.schema.json",
+  "title": "待办",
+  "description": "新建 status 为 open；按 ts 创建时间分月，完成或取消时追加修订。日期截止到用户时区当天结束，时间截止到具体时刻。",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["title", "status"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["open", "done", "cancelled"], "default": "open" },
+    "due": { "type": "string", "anyOf": [{ "format": "date" }, { "format": "date-time" }] },
+    "remind_at": { "type": "string", "format": "date-time" },
+    "project": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "notes": { "type": "string" },
+    "source": { "type": "string" }
+  },
+  "examples": [
+    {
+      "title": "给妈妈买生日礼物",
+      "status": "open",
+      "due": "2026-10-22",
+      "remind_at": "2026-10-22T09:00:00+08:00"
+    }
+  ]
+}

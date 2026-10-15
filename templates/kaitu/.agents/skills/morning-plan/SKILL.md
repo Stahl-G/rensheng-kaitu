@@ -7,7 +7,9 @@ description: 用户说早上好或要求安排今天时，按规则和已有日�
 
 ## 步骤
 
-1. 运行 `kaitu status --json-out`，读取今天已有块与各模块下一步。
+1. 运行 `kaitu status --json-out`，读取今天已有块、各模块下一步和 tasks 中今天到期、已过期、今天提醒的待办。
+   用 `kaitu task list --json-out` 查看未完成待办，按用户时区把到期和提醒项排进今天计划，优先处理过期项。
+   不占时间的待办写为 kind: task、module: me、ref: 待办 id；需要时间段则提出 pending 日程建议，避免与现有块重复。
 2. 依次读 `me/rules.md`、`me/goals.json`、各模块 `STATUS.md` 的 next。
 3. 按 rules.md 的 timezone 确定今天日期和当前时间。
 4. 运行 `kaitu record list event --from YYYY-MM-DD --to YYYY-MM-DD --json-out`。

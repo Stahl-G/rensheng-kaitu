@@ -61,6 +61,7 @@
 | D19 | 体态照片：健康模块新增 `photo` 记录，照片原件存在 `health/files/photos/`，只在本机，进版本历史；身体指标页提供按日期并排对比 | 用户确认（2026-10-15）；覆盖访谈中「6 个月、一年的体态对比照片」 |
 | D20 | Google Drive 模式：数据进 Drive，版本库 / 密钥 / 索引留本机；云端 Agent 读 OVERVIEW.md、写 inbox/agents/（见 `docs/drive-sync.md`） | 用户选择先服务 Grok Bot / ChatGPT Dots 用户（2026-10-15） |
 | D21 | 新增内置模块「项目」（`projects/`，个人项目与工作）：每个项目一个子目录（STATUS / notes / log），`kind: work|personal`；`local_only: true` 的项目不进 Google Drive、不出现在 OVERVIEW.md | 用户认可（2026-10-15）；工作内容可能保密 |
+| D22 | workout 扩展有氧，旧力量兼容；me 新增 task 待办 / 提醒，沿用追加修订与版本。提醒先在早间计划与今天页列出，推送留 M5 | 用户 2026-10-15 确认；来源：ChatGPT Dot 收件箱实测跑步与生日礼物待办 |
 
 ---
 

@@ -102,10 +102,19 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
         date: "2026-07-01",
       },
       { type: "activity", date: "2026-07-01", steps: 100 },
+      { type: "task", title: "给妈妈买生日礼物", status: "open", due: "2026-07-08" },
     ];
     ws.writeText("inbox/agents/dot.records.jsonl", `${input.map((r) => JSON.stringify(r)).join("\n")}\n`);
     const result = await processInbox(ws, { stableMs: 0 });
     expect(result.notes).toEqual([]);
+    expect(readRecords(ws, "task")).toEqual([
+      expect.objectContaining({
+        title: "给妈妈买生日礼物",
+        status: "open",
+        due: "2026-07-08",
+        source: "dot",
+      }),
+    ]);
     const rows = readRecords(ws, "metric");
     expect(rows.map(({ source, ts }) => ({ source, ts }))).toEqual([
       { source: "scale", ts: "2026-01-01T12:00:00-05:00" },

@@ -15,6 +15,7 @@ export const CONFIG_VERSION = 1;
 /** 模板之外还要建的空目录（git 不保存空目录，所以不放进模板）。 */
 const EMPTY_DIRS = [
   "me/reports",
+  "me/data/tasks",
   "health/data/labs",
   "health/files",
   "feed/digests",

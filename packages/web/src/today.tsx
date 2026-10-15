@@ -127,6 +127,42 @@ export function Today({
           {data.now.body && <Markdown text={data.now.body} />}
         </Panel>
         <div class="stack">
+          <Panel title="待办与提醒">
+            {!data.tasks.length && <Empty>今天没有到期或提醒的待办，也没有过期项。</Empty>}
+            {data.tasks.map((task) => (
+              <div class="list-row" key={task.id}>
+                <div class="grow">
+                  <small class="muted">
+                    {[task.overdue && "已过期", task.dueToday && "今天到期", task.remindToday && "今天提醒"]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </small>
+                  <p>{task.title}</p>
+                  {task.due && (
+                    <small>
+                      截止：
+                      {task.due.length === 10
+                        ? task.due
+                        : new Date(task.due).toLocaleString("zh-CN", { timeZone: data.timeZone })}
+                    </small>
+                  )}
+                  {task.remind_at && (
+                    <small>
+                      {" "}
+                      提醒：{new Date(task.remind_at).toLocaleString("zh-CN", { timeZone: data.timeZone })}
+                    </small>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => act("tasks/done", { id: task.id }, "已完成待办")}
+                >
+                  完成
+                </button>
+              </div>
+            ))}
+          </Panel>
           <Panel title="需要你处理">
             {data.inboxNotes > 0 && <p>{data.inboxNotes} 条待整理笔记</p>}
             {!(data.now.data.attention?.length || proposals.length || data.inboxNotes) && (

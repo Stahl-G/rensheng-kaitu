@@ -65,6 +65,6 @@
     { "type": "manual" }
   ],
   "agent": {
-    "instructions": "记录训练时按 workout schema 写入，同一次训练的各个动作用同一个 session_id；每次训练后对比上次同动作的重量，给出下次加重建议。饮食写 meal，蛋白粉、肌酸等写 supplement。体检报告抽取结果写 data/labs/YYYY-MM-DD-<slug>.json，原件放 files/。只做记录、趋势与提醒，不做医疗诊断。"
+    "instructions": "记录训练时按 workout schema 写入，同一次训练的各个动作用同一个 session_id；力量训练对比上次同动作的重量，给出下次加重建议。有氧用 modality: cardio，填写 exercise、duration_min 和已知的 distance_km，不要求组次重量或 session_id；对比同项目配速或时长，不给加重建议。饮食写 meal，蛋白粉、肌酸等写 supplement。体检报告抽取结果写 data/labs/YYYY-MM-DD-<slug>.json，原件放 files/。只做记录、趋势与提醒，不做医疗诊断。"
   }
 }

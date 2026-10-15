@@ -28,10 +28,12 @@ it("所有内置与自定义记录的生成示例均通过实际写入校验", a
       $defs: { edition: { type: "string", pattern: "^v[0-9]+$", examples: ["v2"] } },
     });
     const references = recordReferences(ws);
-    for (const { type, example } of references) {
-      const { type: _type, ...input } = example;
-      const [result] = addRecords(ws, type, [input], { dryRun: true });
-      expect(result?.record).toMatchObject(input);
+    for (const { type, examples } of references) {
+      for (const example of examples) {
+        const { type: _type, ...input } = example;
+        const [result] = addRecords(ws, type, [input], { dryRun: true });
+        expect(result?.record).toMatchObject(input);
+      }
     }
     expect(references.some((ref) => ref.type === "reading")).toBe(true);
   } finally {

@@ -67,6 +67,18 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.kind} / ${block.status}）`);
   }
   if (!data.now.blocks.length) lines.push("暂无安排。");
+  lines.push("", "## 待办与提醒", "");
+  for (const task of data.tasks) {
+    const tags = [
+      task.overdue && "已过期",
+      task.dueToday && "今天到期",
+      task.remindToday && "今天提醒",
+    ].filter(Boolean);
+    lines.push(
+      `- ${task.title}（${tags.join(" / ")}）${task.due ? ` 截止：${task.due}` : ""}${task.remind_at ? ` 提醒：${task.remind_at}` : ""}`,
+    );
+  }
+  if (!data.tasks.length) lines.push("今天没有到期或提醒的待办，也没有过期项。");
   lines.push("", "## 模块进度与下一步", "");
   for (const module of data.modules) {
     lines.push(`### ${module.module}（${module.file}）`, "");

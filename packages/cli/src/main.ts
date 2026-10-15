@@ -13,6 +13,9 @@ import {
   addMemory,
   addPhoto,
   addRecord,
+  addTask,
+  cancelTask,
+  completeTask,
   createProject,
   defaultRoot,
   deleteRecord,
@@ -33,6 +36,7 @@ import {
   linkProject,
   listMemories,
   listProjects,
+  listTasks,
   logProject,
   mcpToken,
   processInbox,
@@ -85,6 +89,9 @@ const HELP = `开图 kaitu
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
   kaitu project sync [<slug>]
   kaitu project set <slug> [--stage idea|active|paused|done] [--local-only|--no-local-only] [--next-json <数组>]
+  kaitu task add --title <标题> [--due <日期或时间>] [--remind-at <时间>] [--project <slug>]
+  kaitu task list [--all]                          列出未完成待办（--all 含已完成 / 取消）
+  kaitu task done <id> | cancel <id>               完成 / 取消待办
   kaitu photo add <图片> [--pose front|side|back|other] [--ts 时间] [--notes 说明]
   kaitu photo list                                 列出体态照片
   kaitu photo rm <id>                              删除体态照片
@@ -118,6 +125,10 @@ const HELP = `开图 kaitu
 
 const options = {
   title: { type: "string" },
+  due: { type: "string" },
+  "remind-at": { type: "string" },
+  project: { type: "string" },
+  all: { type: "boolean" },
   kind: { type: "string" },
   stage: { type: "string" },
   role: { type: "string" },
@@ -421,6 +432,14 @@ async function run(argv: string[]): Promise<number> {
           `${result.today} · ${result.now.pending} 条日程建议待确认`,
           `${result.inboxNotes} 条待整理笔记`,
           ...result.now.blocks.map((b) => `${b.start ?? "待办"} ${b.title}（${b.status}）`),
+          ...result.tasks.map((task) => {
+            const tags = [
+              task.overdue && "已过期",
+              task.dueToday && "今天到期",
+              task.remindToday && "今天提醒",
+            ].filter(Boolean);
+            return `${task.title}（${tags.join(" / ")}）`;
+          }),
           ...moduleLines,
           "项目：",
           ...result.projects.flatMap((project) => [
@@ -432,6 +451,47 @@ async function run(argv: string[]): Promise<number> {
           ...result.warnings,
         ].join("\n"),
       );
+      return 0;
+    }
+    case "task": {
+      const [action, id] = args;
+      const ws = workspace(values);
+      if (action === "list") {
+        const tasks = listTasks(ws, { status: values.all ? "all" : "open" });
+        out(
+          values,
+          tasks,
+          tasks
+            .map(
+              (task) =>
+                `${task.id} ${task.title}（${task.status}）${task.due ? ` 截止：${task.due}` : ""}${task.remind_at ? ` 提醒：${task.remind_at}` : ""}`,
+            )
+            .join("\n") || "（没有待办）",
+        );
+        return 0;
+      }
+      const by = values.by ? parseBy(values.by) : "user";
+      const options = { by, actor: who(by) };
+      const result =
+        action === "add"
+          ? await addTask(
+              ws,
+              {
+                title: need(values.title, "--title"),
+                due: values.due,
+                remind_at: values["remind-at"],
+                project: values.project,
+              },
+              options,
+            )
+          : action === "done"
+            ? await completeTask(ws, need(id, "id"), options)
+            : action === "cancel"
+              ? await cancelTask(ws, need(id, "id"), options)
+              : undefined;
+      if (!result) throw new KaituError("使用 task add / list / done / cancel", "BAD_ARGS");
+      const actionLabel = action === "add" ? "记下" : action === "done" ? "完成" : "取消";
+      out(values, result, `${who(by)}${actionLabel}了待办：${result.record.title}\nid: ${result.record.id}`);
       return 0;
     }
     case "photo": {

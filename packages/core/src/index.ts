@@ -36,3 +36,5 @@ export * from "./projects.js";
 export * from "./record-reference.js";
 
 export * from "./inbox-notes.js";
+
+export * from "./tasks.js";

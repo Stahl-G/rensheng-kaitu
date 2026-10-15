@@ -12,6 +12,7 @@ import {
   type Workspace,
   addPhotoBytes,
   completeNext,
+  completeTask,
   decideProposal,
   disableDrive,
   discardUpload,
@@ -317,6 +318,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             return removePhoto(ws, field(data, "id"), { by: "user" });
           case "/api/proposal":
             return decideProposal(ws, field(data, "id"), field(data, "decision") as "confirmed" | "rejected");
+          case "/api/tasks/done":
+            return completeTask(ws, field(data, "id"), { by: "user" });
           case "/api/next":
             return completeNext(ws, field(data, "file"), field(data, "id"));
           case "/api/memory/delete":

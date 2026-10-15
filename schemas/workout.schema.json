@@ -2,16 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kaitu.local/schemas/workout.schema.json",
   "title": "训练",
+  "description": "力量默认 modality: strength，缺省也视为力量；有氧用 modality: cardio。力量必填 sets、reps、weight_kg、session_id；有氧必填 duration_min。",
   "allOf": [{ "$ref": "record-base.schema.json" }],
-  "required": ["exercise", "sets", "reps", "weight_kg", "session_id"],
+  "required": ["exercise"],
+  "if": { "properties": { "modality": { "const": "cardio" } }, "required": ["modality"] },
+  "then": { "required": ["duration_min"] },
+  "else": { "required": ["sets", "reps", "weight_kg", "session_id"] },
   "properties": {
+    "modality": { "enum": ["strength", "cardio"], "default": "strength" },
     "exercise": { "type": "string", "minLength": 1 },
     "sets": { "type": "integer", "minimum": 1 },
     "reps": { "type": "integer", "minimum": 1 },
     "weight_kg": { "type": "number", "minimum": 0 },
+    "duration_min": { "type": "number", "exclusiveMinimum": 0 },
+    "distance_km": { "type": "number", "minimum": 0 },
+    "avg_hr": { "type": "number", "exclusiveMinimum": 0 },
+    "kcal": { "type": "number", "minimum": 0 },
+    "elevation_m": { "type": "number", "minimum": 0 },
     "rpe": { "type": "number", "minimum": 1, "maximum": 10 },
     "video": { "type": "string" },
     "notes": { "type": "string" },
     "session_id": { "type": "string", "minLength": 1 }
-  }
+  },
+  "examples": [
+    { "exercise": "深蹲", "sets": 3, "reps": 12, "weight_kg": 60, "session_id": "strength-1" },
+    { "modality": "cardio", "exercise": "跑步", "duration_min": 28, "distance_km": 5 }
+  ]
 }

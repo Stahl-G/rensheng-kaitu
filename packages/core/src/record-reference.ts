@@ -13,6 +13,9 @@ interface Schema {
   required?: string[];
   properties?: Record<string, Schema>;
   allOf?: Schema[];
+  if?: Schema;
+  then?: Schema;
+  else?: Schema;
   oneOf?: Schema[];
   anyOf?: Schema[];
   enum?: unknown[];
@@ -129,11 +132,14 @@ export function recordReference(ws: Workspace, type: string) {
   const fields = Object.entries(schema.properties ?? {}).filter(([name]) => !GENERATED.has(name));
   const required = fields.filter(([name]) => schema.required?.includes(name));
   const optional = fields.filter(([name]) => !schema.required?.includes(name));
-  const supplied = schema.examples?.[0] as Record<string, unknown> | undefined;
-  const example = {
-    ...Object.fromEntries(required.map(([name, field]) => [name, supplied?.[name] ?? exampleValue(field)])),
-    ...Object.fromEntries(Object.entries(supplied ?? {}).filter(([name]) => !GENERATED.has(name))),
-  };
+  const examples = (schema.examples?.length ? schema.examples : [{}]).map((value) => {
+    const supplied = value as Record<string, unknown>;
+    return {
+      type,
+      ...Object.fromEntries(required.map(([name, field]) => [name, supplied[name] ?? exampleValue(field)])),
+      ...Object.fromEntries(Object.entries(supplied).filter(([name]) => !GENERATED.has(name))),
+    };
+  });
   return {
     type,
     label: ref.def.label ?? schema.title ?? type,
@@ -141,7 +147,16 @@ export function recordReference(ws: Workspace, type: string) {
     moduleLabel: ref.module.def.name,
     required: required.map(([name, field]) => ({ name, constraints: describe(field) })),
     optional: optional.map(([name, field]) => ({ name, constraints: describe(field) })),
-    example: { type, ...example },
+    description: schema.description,
+    conditionalRequired: schema.if
+      ? {
+          when: describe(schema.if),
+          requiredWhen: schema.then?.required ?? [],
+          requiredOtherwise: schema.else?.required ?? [],
+        }
+      : undefined,
+    example: examples[0] ?? { type },
+    examples,
   };
 }
 
@@ -179,9 +194,14 @@ export function renderRecordReference(ws: Workspace, type?: string): string {
         ? `### ${ref}\nSchema 尚未可用；用 kaitu record schema ${ref} 查看原因。`
         : [
             `### ${ref.type} · ${ref.label}（${ref.moduleLabel} / ${ref.module}）`,
-            `必填：${fieldLine(ref.required)}。可选：${fieldLine(ref.optional)}。`,
-            `示例 JSONL：\`${JSON.stringify(ref.example)}\``,
-          ].join("\n"),
+            ref.description,
+            `固定必填：${fieldLine(ref.required)}。其他字段：${fieldLine(ref.optional)}。`,
+            ref.conditionalRequired &&
+              `条件必填：当 ${ref.conditionalRequired.when} 时 ${ref.conditionalRequired.requiredWhen.join("、")}；否则 ${ref.conditionalRequired.requiredOtherwise.join("、")}。`,
+            ...ref.examples.map((example) => `示例 JSONL：\`${JSON.stringify(example)}\``),
+          ]
+            .filter(Boolean)
+            .join("\n"),
     ),
   ].join("\n\n");
 }
