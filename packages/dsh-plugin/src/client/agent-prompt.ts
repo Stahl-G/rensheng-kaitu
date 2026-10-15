@@ -1,18 +1,32 @@
 import type { Context } from "@deepseek-ai/cordis";
 
-interface Sessions {
-  list: { getSnapshot(): { byId: Record<string, { id: string; retainedBy: { mainView?: number } }> } };
-  scope(id: string): Context | undefined;
-}
-interface Conversation {
-  input: { for(scope: Context): { setDraft(text: string): void } };
+// rc.2: workspace-controller/client/service, session-controller/client/sessions/service,
+// ui-workspace/client/navigation. Use the owners so workspace feeds and mainView retention stay consistent.
+export interface KaituSessionServices {
+  workspaces: { create(input: { path: string }): Promise<{ workspaceId: string }> };
+  sessions: {
+    create(input: { workspaceId: string }): Promise<string>;
+    scope(id: string): Context | undefined;
+  };
+  uiWorkspace: { openSession(id: string): void };
+  conversation: { input: { for(scope: Context): { setDraft(text: string): void } } };
+  layout: { beginNavigation(): AbortSignal };
 }
 
-export function prefillAgent(ctx: Context, text: string): void {
-  const sessions = ctx.get("sessions") as Sessions;
-  const conversation = ctx.get("conversation") as Conversation;
-  const session = Object.values(sessions.list.getSnapshot().byId).find((s) => s.retainedBy.mainView);
-  const scope = session && sessions.scope(session.id);
-  if (!scope) throw new Error("请先打开一个对话，再编辑档案");
-  conversation.input.for(scope).setDraft(text);
+export async function openKaituSession(
+  services: KaituSessionServices,
+  workspace: string,
+  text?: string,
+): Promise<void> {
+  const navigation = services.layout.beginNavigation();
+  const target = await services.workspaces.create({ path: workspace });
+  if (navigation.aborted) return;
+  const id = await services.sessions.create({ workspaceId: target.workspaceId });
+  if (navigation.aborted) return;
+  services.uiWorkspace.openSession(id);
+  if (text) {
+    const scope = services.sessions.scope(id);
+    if (!scope) throw new Error("开图会话尚未就绪，请重试");
+    services.conversation.input.for(scope).setDraft(text);
+  }
 }

@@ -35,6 +35,9 @@ it("不同 Agent 重复投递带 utm 的新闻只保留一条并补全缺失信�
         source: "Grok",
         via: "grok",
         summary: "证明自动化更强",
+        details: ["改进证明搜索", "支持库更新", "有发布说明"],
+        comment: "可以试用新版本。",
+        published_at: "2026-11-01T09:00:00+08:00",
         ts: "2026-11-01T10:00:00+08:00",
         relevance: { module: "learning", reason: "正在学 Lean" },
       })}\n`,
@@ -47,6 +50,9 @@ it("不同 Agent 重复投递带 utm 的新闻只保留一条并补全缺失信�
       source: "Codex",
       via: "codex",
       summary: "不覆盖已有摘要",
+      details: ["改进证明搜索", "支持库更新", "有发布说明"],
+      comment: "可以试用新版本。",
+      published_at: "2026-11-01T09:00:00+08:00",
       image: "https://example.com/lean.png",
     });
     expect(repeated.record.id).toBe(first.record.id);
@@ -100,7 +106,16 @@ it("试一下把新闻变成对应模块的下一步，不相关后同来源不�
           relevance: { module: "health", reason: "安排恢复日" },
           published_at: "2026-10-14T10:00:00+08:00",
         },
-        { title: "其他新闻", url: "https://example.com/other", source: "其他来源", via: "codex" },
+        {
+          title: "其他新闻",
+          url: "https://example.com/other",
+          source: "其他来源",
+          via: "codex",
+          summary: "其他来源的新消息",
+          details: ["要点一", "要点二", "要点三"],
+          comment: "可持续关注。",
+          published_at: "2026-10-15T10:00:00+08:00",
+        },
       ],
       { now },
     );
@@ -131,6 +146,32 @@ it("试一下把新闻变成对应模块的下一步，不相关后同来源不�
     expect(parseFrontmatter<{ next: unknown[] }>(ws.readText("me/STATUS.md")).data.next).toEqual([
       expect.objectContaining({ title: "其他新闻", status: "proposed", ref: third.id }),
     ]);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("缺摘要的 Agent 新闻转待整理，并保留缺失字段原因", async () => {
+  const ws = await freshWorkspace();
+  try {
+    ws.writeText(
+      "inbox/agents/incomplete.news.jsonl",
+      `${JSON.stringify({
+        type: "news_item",
+        agent: "grok",
+        via: "grok",
+        title: "合成新闻",
+        url: "https://example.com/incomplete",
+        source: "合成来源",
+        details: ["第一点", "第二点", "第三点"],
+        comment: "值得关注。",
+        published_at: "2026-10-15T06:00:00+08:00",
+      })}\n`,
+    );
+    const result = await processInbox(ws, { stableMs: 0 });
+    expect(readRecords(ws, "news_item")).toEqual([]);
+    expect(result.notes).toHaveLength(1);
+    expect(ws.readText(result.notes[0] as string)).toContain("缺少字段 summary");
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

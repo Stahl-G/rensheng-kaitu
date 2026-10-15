@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NewsAction, NewsData, NewsItem, NewsVia } from "../types.js";
+import type {
+  NewsAction,
+  NewsData,
+  NewsDiscussion,
+  NewsItem,
+  NewsPost,
+  NewsTrend,
+  NewsVia,
+} from "../types.js";
 import css from "./NewsPage.module.css";
 
 export interface NewsPageProps {
@@ -24,11 +32,32 @@ const areas: Record<string, string> = {
   me: "关于我",
 };
 const focusPrompt = "我想调整资讯关注点：";
-function NewsImage({ src, className }: { src?: string; className?: string }) {
+function webUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function NewsImage({ src, className, source = "X" }: { src?: string; className?: string; source?: string }) {
   const [failed, setFailed] = useState<string | null>(null);
-  return src && src !== failed ? (
-    <img src={src} className={className} alt="" loading="lazy" onError={() => setFailed(src)} />
-  ) : null;
+  const url = webUrl(src);
+  return url && url !== failed ? (
+    <img
+      src={url}
+      className={className}
+      alt=""
+      loading="lazy"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(url)}
+    />
+  ) : (
+    <span className={`${className ?? ""} ${css.placeholder}`} role="img" aria-label={`${source} · 暂无图片`}>
+      {Array.from(source)[0]?.toUpperCase() ?? "?"}
+    </span>
+  );
 }
 function Source({ item }: { item: NewsItem }) {
   return (
@@ -41,12 +70,160 @@ function Source({ item }: { item: NewsItem }) {
   );
 }
 function NewsLink({ url, children }: { url?: string; children: string }) {
-  return url ? (
-    <a href={url} target="_blank" rel="noopener noreferrer">
+  const href = webUrl(url);
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   ) : (
     <span>{children}</span>
+  );
+}
+
+function PostCard({ post }: { post: NewsPost }) {
+  const author = post.author || post.handle || "X";
+  return (
+    <article className={css.post} aria-label="X 原帖">
+      <header className={css.postHeader}>
+        <span className={css.avatar} aria-hidden="true">
+          {Array.from(author)[0]}
+        </span>
+        <span>
+          <strong>{author}</strong>
+          {post.handle && <span className={css.meta}> {post.handle}</span>}
+        </span>
+      </header>
+      {post.text && <p className={css.postText}>{post.text}</p>}
+      {!!post.media?.length && (
+        <div className={css.mediaGrid}>
+          {post.media.map((src) => (
+            <NewsImage key={src} src={src} className={css.postImage} source={author} />
+          ))}
+        </div>
+      )}
+      <footer className={css.postFooter}>
+        <span className={css.meta}>
+          {post.likes !== undefined && <span>点赞 {post.likes.toLocaleString("zh-CN")} </span>}
+          {post.reposts !== undefined && <span>转发 {post.reposts.toLocaleString("zh-CN")} </span>}
+          {post.replies !== undefined && <span>回复 {post.replies.toLocaleString("zh-CN")} </span>}
+        </span>
+        {post.posted_at && (
+          <time className={css.meta} dateTime={post.posted_at}>
+            {new Date(post.posted_at).toLocaleString("zh-CN")}
+          </time>
+        )}
+        <NewsLink url={post.url}>查看原帖 ↗</NewsLink>
+      </footer>
+    </article>
+  );
+}
+function Discussion({ rows }: { rows?: NewsDiscussion[] }) {
+  if (!rows?.length) return null;
+  return (
+    <section className={css.discussion} aria-label="讨论">
+      <h4>讨论</h4>
+      {rows.slice(0, 3).map((row) => (
+        <div key={`${row.who}-${row.quote}`}>
+          <p>{row.stance}</p>
+          <blockquote>
+            「{row.quote}」<cite> — {row.who}</cite>
+          </blockquote>
+        </div>
+      ))}
+    </section>
+  );
+}
+function NewsDetails({ item }: { item: NewsItem }) {
+  const metadata = [
+    item.author,
+    item.authors?.join("、"),
+    item.venue,
+    item.version,
+    item.channel,
+    item.duration,
+  ].filter(Boolean);
+  return (
+    <details className={css.rich}>
+      <summary className={css.cardLead}>
+        <NewsImage src={item.image} className={css.image} source={item.source} />
+        <span className={css.body}>
+          <strong className={css.title}>{item.title}</strong>
+          {item.summary && <span className={css.summary}>{item.summary}</span>}
+          <Source item={item} />
+          <span className={css.expandHint}>展开内容</span>
+        </span>
+      </summary>
+      <div className={css.expanded}>
+        {!!item.details?.length && (
+          <ul className={css.points}>
+            {item.details.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        )}
+        {item.post && <PostCard post={item.post} />}
+        <Discussion rows={item.discussion} />
+        {item.comment && (
+          <section className={css.analysis}>
+            <h4>
+              开图的看法 <span className={css.ai}>AI 分析</span>
+            </h4>
+            <p>{item.comment}</p>
+          </section>
+        )}
+        {metadata.length > 0 && <p className={css.meta}>{metadata.join(" · ")}</p>}
+        {item.quote && (
+          <blockquote>
+            「{item.quote}」{item.author && <cite> — {item.author}</cite>}
+          </blockquote>
+        )}
+        {!!item.highlights?.length && (
+          <ul className={css.points}>
+            {item.highlights.map((point) => (
+              <li key={`${point.time}-${point.text}`}>
+                <strong>{point.time}</strong> {point.text}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className={css.sourceLinks}>
+          <NewsLink url={item.url}>阅读原文 ↗</NewsLink>
+          {item.repo && <NewsLink url={item.repo}>代码仓库 ↗</NewsLink>}
+          {item.sources?.map((source) => (
+            <NewsLink key={source.url} url={source.url}>
+              {source.name}
+            </NewsLink>
+          ))}
+          {item.published_at && (
+            <time className={css.meta} dateTime={item.published_at}>
+              {new Date(item.published_at).toLocaleString("zh-CN")}
+            </time>
+          )}
+        </div>
+      </div>
+    </details>
+  );
+}
+function TrendDetails({ trend }: { trend: NewsTrend }) {
+  return (
+    <details className={css.rich}>
+      <summary className={css.trendLead}>
+        <NewsImage src={trend.image ?? trend.samples?.[0]?.media?.[0]} className={css.trendImage} />
+        <strong className={css.title}>{trend.topic}</strong>
+        {trend.summary && <span className={css.summary}>{trend.summary}</span>}
+        <span className={css.meta}>
+          {trend.posts === undefined ? "X 热门" : `${trend.posts.toLocaleString("zh-CN")} 条讨论`}
+        </span>
+        <span className={css.expandHint}>展开原帖与讨论</span>
+      </summary>
+      <div className={css.expanded}>
+        {trend.samples?.map((post) => (
+          <PostCard key={post.url} post={post} />
+        ))}
+        <Discussion rows={trend.discussion} />
+        {trend.url && <NewsLink url={trend.url}>查看话题 ↗</NewsLink>}
+      </div>
+    </details>
   );
 }
 
@@ -160,12 +337,8 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
                 <div className={css.picked}>
                   {picked.map((item) => (
                     <article key={item.id} className={css.card} aria-busy={pending.includes(item.id)}>
-                      <NewsImage src={item.image} className={css.image} />
+                      <NewsDetails item={item} />
                       <div className={css.body}>
-                        <Source item={item} />
-                        <h3>
-                          <NewsLink url={item.url}>{item.title}</NewsLink>
-                        </h3>
                         <p className={css.reason}>{item.relevance?.reason || "暂无记录"}</p>
                         <div className={css.cardFooter}>
                           <span className={css.meta}>
@@ -208,22 +381,11 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
               <section aria-label="X 热门">
                 <div className={css.heading}>
                   <h2>X 热门</h2>
-                  {data.trends.some((trend) => trend.via === "grok") && (
-                    <span className={css.meta}>Grok 每 2 小时更新</span>
-                  )}
                 </div>
                 <div className={css.trends}>
                   {data.trends.map((trend) => (
                     <article className={css.trend} key={trend.id}>
-                      <NewsImage src={trend.image} className={css.trendImage} />
-                      <h3>
-                        <NewsLink url={trend.url}>{trend.topic}</NewsLink>
-                      </h3>
-                      <span className={css.meta}>
-                        {trend.posts === undefined
-                          ? "讨论数暂无记录"
-                          : `${trend.posts.toLocaleString("zh-CN")} 条讨论`}
-                      </span>
+                      <TrendDetails trend={trend} />
                     </article>
                   ))}
                 </div>
@@ -247,13 +409,7 @@ export function NewsPage({ loadNews, tryNews, dismissNews, onPrompt }: NewsPageP
                 </div>
                 {(expanded ? data.others : data.others.slice(0, 4)).map((item) => (
                   <article key={item.id} className={css.other}>
-                    <NewsImage src={item.image} className={css.thumbnail} />
-                    <div>
-                      <h3>
-                        <NewsLink url={item.url}>{item.title}</NewsLink>
-                      </h3>
-                      <Source item={item} />
-                    </div>
+                    <NewsDetails item={item} />
                   </article>
                 ))}
                 {!data.others.length && (

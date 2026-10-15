@@ -18,6 +18,6 @@
   },
   "views": [{ "type": "doc", "title": "今日简报", "path": "digests/{YYYY-MM-DD}.md" }],
   "agent": {
-    "instructions": "订阅源、兴趣关键词与 muted 在 feeds.json。早间计划时拉取订阅源，按兴趣筛选后写 digests/YYYY-MM-DD.md。发现和用户目标、在做的事、所在地有关的新闻就投递 news_item，写明 relevance.module 与 relevance.reason；X 热门写 trend。用现有新增记录工具或 inbox/agents/*.records.jsonl 投递，开图按 URL 去重新闻、按本地日期与 topic 修订热门。"
+    "instructions": "先读 .agents/skills/collect-news/SKILL.md，按通用规则与来源补充采集。订阅源、兴趣关键词与 muted 在 feeds.json。早间计划时拉取订阅源，按兴趣筛选后写 digests/YYYY-MM-DD.md。发现和用户目标、在做的事、所在地有关的新闻就投递 news_item，写明 relevance.module 与 relevance.reason；X 热门写 trend。用现有新增记录工具或 inbox/agents/*.records.jsonl 投递，开图按 URL 去重新闻、按本地日期与 topic 修订热门。"
   }
 }

@@ -18,26 +18,13 @@ export interface OverviewSource {
   text: string;
 }
 
-export type NewsVia = "rss" | "grok" | "dot" | "codex" | "agent" | "user";
-export interface NewsItem {
+export type { NewsVia, NewsPost, NewsDiscussion } from "@kaitu/core";
+import type { NewsContent, NewsVia, TrendContent } from "@kaitu/core";
+export interface NewsItem extends NewsContent {
   id: string;
-  title: string;
-  url: string;
-  source: string;
-  via: NewsVia;
-  summary?: string;
-  image?: string;
-  published_at?: string;
-  relevance?: { module: string; ref?: string; reason: string };
-  status: "new" | "tried" | "dismissed";
 }
-export interface NewsTrend {
+export interface NewsTrend extends TrendContent {
   id: string;
-  topic: string;
-  posts?: number;
-  url?: string;
-  image?: string;
-  via: NewsVia;
 }
 export interface NewsData {
   date: string;

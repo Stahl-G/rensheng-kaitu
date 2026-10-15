@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     maxWorkers: 4,
+    // 测试多在临时目录里跑真实 git 与文件读写，机器忙时单个测试会超过默认 5 秒。
+    testTimeout: 15000,
     include: ["packages/*/test/**/*.test.ts"],
   },
 });

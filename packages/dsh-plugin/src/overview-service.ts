@@ -76,6 +76,11 @@ export class KaituOverviewService extends TypertRemoteService {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
   }
 
+  @Remote("workspacePath")
+  async workspacePath(): Promise<string> {
+    return this.workspace.root;
+  }
+
   @Remote("news")
   async news(): Promise<NewsData> {
     return readNews(this.workspace);

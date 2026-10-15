@@ -348,6 +348,24 @@ goal_priority: [g1]
 `kaitu status`、OVERVIEW.md 和今天页列出今天到期、已过期、今天提醒的 open 待办；今天页可标完成。
 提醒暂由早间计划与今天页列出，推送通道留到 M5。收件箱 records 可新增 task，笔记中的待办由晚间复盘整理。
 
+#### 资讯记录（news_item / trend）
+
+news_item 保留 title、url、source、via、status；新增字段均可选，按采集条件校验。
+kind 为 article（默认）/ x_post / paper / release / video / podcast / rss。
+通用新增 details（3–5 条字符串要点）、sources（[{name, url}] 合并同事件来源）、comment（1–2 句 AI 分析）。
+image 仍是封面图 URL，summary 是事实摘要，published_at 是原文发布时间。
+article 可填 author、quote（原文引语 ≤60 字）；paper 可填 authors（字符串数组）、venue；release 可填 repo、version；
+video / podcast 可填 channel、duration（时长字符串）、highlights（[{time: 时间点字符串, text: 一句话}]）。
+post 为 X 原帖对象：author、handle、text、url、media（图片 URL 数组）、likes、reposts、replies、posted_at。
+discussion 为最多 3 条 {stance: 观点概括, quote: ≤60字短原话, who: 账号}。
+trend 新增 summary、samples（结构同 post 的代表性原帖数组）、discussion；原有 posts 保留讨论数量含义。
+
+news_item 的 via 非 rss/user 时，summary、details、comment、published_at 必填且非空；
+x_post 必须有 post.url，release 必须有 version，paper 必须有非空 authors。
+读不到全文时摘要须注明「只读到标题和导语」。不合格行按现有收件箱规则转待整理笔记，并写明缺失字段。
+所有采集遵守 `.agents/skills/collect-news/SKILL.md`：数字、引语、图片来自原文，图片只存 URL、不下载，事实与看法分开。
+只有能读取 X 的 Agent（如 Grok）采集 X，其他 Agent 跳过，不得编造。
+
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。
 
 ---
@@ -482,6 +500,7 @@ sensitive: false
 | log-meal | 饮食描述或饮食应用导入 | 文字记录或从 Nut AI / CalorieMate 导入；汇总当天热量与蛋白质 |
 | health-import | 手动导入 | Apple Health / Nut AI / .ics 预览与确认导入 |
 | lab-import | 拖入体检 PDF | 抽取指标写入 `labs/`，标注异常，提出复查建议 |
+| collect-news | 采集资讯 | 通用真实性与交付要求，加网页、论文、发布、视频播客、X 来源补充 |
 | daily-feed | 早间计划内 / 手动 | 拉取订阅源 → 按兴趣筛选 → 写当天简报 |
 | learn-topic | 「帮我学 XX」 | 建主题目录、整理资料、与用户讨论、记录观念变化、转成行动 |
 | decision | 「帮我决定 XX」 | 建决策档案、列候选与标准、可选询问多个模型、记录选择与复议条件 |

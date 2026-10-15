@@ -9,7 +9,38 @@ import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
 
 export type NewsVia = "rss" | "grok" | "dot" | "codex" | "agent" | "user";
-export interface NewsItem extends StoredRecord {
+export interface NewsPost {
+  author?: string;
+  handle?: string;
+  text?: string;
+  url: string;
+  media?: string[];
+  likes?: number;
+  reposts?: number;
+  replies?: number;
+  posted_at?: string;
+}
+export interface NewsDiscussion {
+  stance: string;
+  quote: string;
+  who: string;
+}
+export interface NewsContent {
+  kind?: "article" | "x_post" | "paper" | "release" | "video" | "podcast" | "rss";
+  author?: string;
+  quote?: string;
+  authors?: string[];
+  venue?: string;
+  repo?: string;
+  version?: string;
+  channel?: string;
+  duration?: string;
+  highlights?: { time: string; text: string }[];
+  sources?: { name: string; url: string }[];
+  details?: string[];
+  post?: NewsPost;
+  discussion?: NewsDiscussion[];
+  comment?: string;
   title: string;
   url: string;
   source: string;
@@ -20,13 +51,18 @@ export interface NewsItem extends StoredRecord {
   relevance?: { module: string; ref?: string; reason: string };
   status: "new" | "tried" | "dismissed";
 }
-export interface Trend extends StoredRecord {
+export interface NewsItem extends StoredRecord, NewsContent {}
+export interface TrendContent {
+  summary?: string;
+  samples?: NewsPost[];
+  discussion?: NewsDiscussion[];
   topic: string;
   posts?: number;
   url?: string;
   image?: string;
   via: NewsVia;
 }
+export interface Trend extends StoredRecord, TrendContent {}
 export interface NewsData {
   date: string;
   picked: NewsItem[];
@@ -54,9 +90,13 @@ export function mergeNewsRecord(
   timeZone: string,
 ): StoredRecord {
   if (type === "news_item") record.url = newsUrl(record.url as string);
+  const urls = (row: StoredRecord) =>
+    [row.url as string, ...((row.sources as NewsItem["sources"]) ?? []).map((source) => source.url)].map(
+      newsUrl,
+    );
   const current = existing.find((row) =>
     type === "news_item"
-      ? newsUrl(row.url as string) === record.url
+      ? urls(row).some((url) => urls(record).includes(url))
       : row.topic === record.topic &&
         localDate(parseTs(row.ts), timeZone) === localDate(parseTs(record.ts), timeZone),
   );
@@ -69,6 +109,16 @@ export function mergeNewsRecord(
         JSON.stringify(current[key]) !== JSON.stringify(value),
     ),
   );
+  if (type === "news_item" && (record.sources || current.sources || record.url !== current.url)) {
+    const combined = [
+      { name: current.source as string, url: current.url as string },
+      ...((current.sources as NewsItem["sources"]) ?? []),
+      { name: record.source as string, url: record.url as string },
+      ...((record.sources as NewsItem["sources"]) ?? []),
+    ];
+    const sources = [...new Map(combined.map((source) => [newsUrl(source.url), source])).values()];
+    if (JSON.stringify(sources) !== JSON.stringify(current.sources)) patch.sources = sources;
+  }
   if (!Object.keys(patch).length) return current;
   return { ...current, ...patch, by: record.by, rev: (current.rev ?? 1) + 1 };
 }
@@ -109,7 +159,7 @@ export function readNews(ws: Workspace, now = new Date()): NewsData {
   return {
     date,
     picked,
-    trends: (readRecords(ws, "trend", { from: date, to: date }) as Trend[]).reverse().slice(0, 4),
+    trends: (readRecords(ws, "trend", { from: date, to: date }) as Trend[]).reverse(),
     others: fresh.filter((row) => !chosen.has(row.id)),
     sources,
     keywords: settings.keywords ?? null,

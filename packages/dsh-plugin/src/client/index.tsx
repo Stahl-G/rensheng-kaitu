@@ -10,8 +10,8 @@ import type {
   FinanceRemoteViewOptions,
 } from "../types.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
-import { OverviewPage } from "./OverviewPage.js";
-import { prefillAgent } from "./agent-prompt.js";
+import { SessionPage } from "./SessionPage.js";
+import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
 
 export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
@@ -29,8 +29,39 @@ export async function apply(ctx: Context) {
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
-    inject: ["slots", "remote.kaitu", "remote.kaituFinance", "layout", "sessions", "conversation"],
+    inject: [
+      "slots",
+      "remote.kaitu",
+      "remote.kaituFinance",
+      "layout",
+      "sessions",
+      "conversation",
+      "workspaces",
+      "uiWorkspace",
+    ],
     apply(ctx: Context) {
+      let opening: Promise<void> | undefined;
+      const open = (text?: string) => {
+        if (opening) return opening;
+        opening = (async () => {
+          const result = await ctx.remote.kaitu.workspacePath();
+          if (!result.ok) throw new Error(result.error.message);
+          await openKaituSession(
+            {
+              workspaces: ctx.get("workspaces"),
+              sessions: ctx.get("sessions"),
+              uiWorkspace: ctx.get("uiWorkspace"),
+              conversation: ctx.get("conversation"),
+              layout: ctx.layout,
+            } as KaituSessionServices,
+            result.value,
+            text,
+          );
+        })().finally(() => {
+          opening = undefined;
+        });
+        return opening;
+      };
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
         if (!result.ok) throw new Error(result.error.message);
@@ -150,14 +181,11 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.removeAvatar();
                 if (!result.ok) throw new Error(result.error.message);
               },
-              onPrompt: (text: string) => {
-                prefillAgent(ctx, text);
-                ctx.layout.selectPanel(null);
-              },
-              onAgent: () => ctx.layout.selectPanel(null),
+              onPrompt: (text: string) => open(text),
+              onAgent: () => open(),
             }),
           },
-          OverviewPage,
+          SessionPage,
         ),
       );
       ctx.slots.inject("sidebar.panellist", () =>

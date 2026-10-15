@@ -58,7 +58,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
       apply: () => writeDigest(ws, date, text, actor, sourceAgent(data.agent)),
     };
   }
-  if (file.endsWith(".records.jsonl")) {
+  if (file.endsWith(".records.jsonl") || file.endsWith(".news.jsonl")) {
     const lines = text.split(/\r?\n/).filter((line) => line.trim());
     const rows = lines.map((line) => {
       try {

@@ -16,7 +16,7 @@
 - 后端已完成：GitHub 同步（项目）、财务 P0（支付宝 / 持仓 CSV）、资讯（任何 Agent 投递 news_item / trend）、人生地图（离线城市表 `packages/core/data/cities.json`，GeoNames CC BY 4.0，坐标只来自城市表）。
 - 真实工作区已 `kaitu upgrade`（新增 explore、finance 模块）。
 - 工作方式：Claude 直接 `codex exec` 派任务，一个任务一个 worktree，审查、删无用内容、跑四项检查、合并。不经过中间 Claude 会话。
-- 写给 Codex 的规则：测试最多 2 个、只测用户能感受到的行为；不加哈希、免责声明、「待实测」段落；四项检查只跑一次。负载高时 CLI 测试偶尔超 5 秒，单独复跑能过即可。
+- 写给 Codex 的规则：测试最多 2 个、只测用户能感受到的行为；不加哈希、免责声明、「待实测」段落；四项检查只跑一次。测试默认超时为 15 秒（vitest.config.ts），机器忙时也不会误报。
 
 ### 0.1 现在能用什么（均已真机实测）
 

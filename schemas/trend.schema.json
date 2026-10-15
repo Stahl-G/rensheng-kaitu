@@ -2,14 +2,51 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kaitu.local/schemas/trend.schema.json",
   "title": "X 热门",
-  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
   "required": ["topic", "via"],
   "properties": {
-    "topic": { "type": "string", "minLength": 1 },
-    "posts": { "type": "integer", "minimum": 0 },
-    "url": { "type": "string", "format": "uri" },
-    "image": { "type": "string", "format": "uri" },
-    "via": { "enum": ["rss", "grok", "dot", "codex", "agent", "user"] }
+    "topic": {
+      "type": "string",
+      "minLength": 1
+    },
+    "posts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "image": {
+      "type": "string",
+      "format": "uri"
+    },
+    "via": {
+      "enum": ["rss", "grok", "dot", "codex", "agent", "user"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "$ref": "news-item.schema.json#/$defs/post"
+      }
+    },
+    "discussion": {
+      "$ref": "news-item.schema.json#/$defs/discussion"
+    }
   },
-  "examples": [{ "topic": "#Lean4", "posts": 8900, "via": "grok" }]
+  "examples": [
+    {
+      "topic": "#Lean4",
+      "posts": 8900,
+      "via": "grok"
+    }
+  ]
 }

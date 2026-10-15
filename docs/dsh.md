@@ -160,14 +160,14 @@ GitHub 内容未变仍生成同步版本。dsh 初始化回执列入本机状态
 |---|---|---|
 | 侧栏品牌、新会话、展开 / 收起；macOS 收起后的顶栏同类按钮 | `ui-sidebar`，`packages/client/ui-sidebar/src/client/{index.ts,SidebarRoot.tsx,HeaderLeadingControls.tsx}` | 保留，替换品牌 |
 | 侧栏「开图」 | `@kaitu/dsh-plugin`，本仓库 `packages/dsh-plugin/src/client/index.tsx` | 保留，换为六边形标志 |
-| 侧栏插件市场 / 插件页 | `ui-plugin-manager`，`packages/client/ui-plugin-manager/src/client/index.ts:139` | patch 禁用 |
+| 侧栏插件市场 / 插件页 | `ui-plugin-manager`，`packages/client/ui-plugin-manager/src/client/index.ts:139` | 保留（用户要求） |
 | 侧栏「自动化任务」、顶栏任务目录、右栏任务详情 | `ui-schedule`（实验 schedule bundle），`packages/client/ui-schedule/src/client/index.ts:178`、`:210` | 保留，供早间计划与晚间复盘使用 |
 | 侧栏会话搜索、分组 / 排序 / 已归档过滤、会话列表、置顶 / 重命名 / 分支 / 归档 | `ui-workspace`，`packages/client/ui-workspace/src/client/index.ts:260`、`:285` | 保留 |
 | 侧栏添加、重命名、删除、拖动工作区；首屏工作区选择 | 同一个 `ui-workspace`，`src/client/rows/WorkspaceBrowser.tsx` | 无独立开关；与列表、导航共存，留打包时替换呈现 |
 | 工作区目录选择对话框 | `directory-picker` 自动选择 native / browse，`packages/host/directory-picker-auto/src/index.ts` | 保留，`ui-workspace` 必需依赖 `remote.directoryPicker` |
-| 侧栏底部动态插件 / Cordis 面板 | `ui-cordis`，`packages/extensions/ui-cordis/src/client/index.ts:86` | patch 禁用 |
+| 侧栏底部动态插件 / Cordis 面板 | `ui-cordis`，`packages/extensions/ui-cordis/src/client/index.ts:86` | 保留（用户要求） |
 | 侧栏「设置」 | `ui-settings-general`，`packages/client/ui-settings-general/src/client/index.ts:175`；区段契约由 `ui-settings` 提供 | 保留通用、外观、语言、模型等设置 |
-| 设置中的内置插件区与清单 | `ui-settings-plugins`、`ui-settings-plugin-inventory` | patch 禁用两个界面插件 |
+| 设置中的内置插件区与清单 | `ui-settings-plugins`、`ui-settings-plugin-inventory` | 保留（用户要求） |
 | 设置账号 / 登录、额度提示与账号引导 | `ui-settings-account`，`packages/client/ui-settings-account/src/client/index.ts` | patch 只禁用界面；三个账号后端保留，桌面欢迎页启动时要查询登录状态（`apps/desktop/src/welcome-backend.ts:117`），禁用会导致应用无法启动 |
 | 设置日志上传 | `ui-settings-session-log`，`packages/client/ui-settings-session-log/src/client/index.ts:36` | patch 禁用 |
 | 顶栏会话标题、祖先会话跳转、对话视图页签 | `ui-conversation`，`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx` | 保留 |
@@ -215,3 +215,16 @@ rc.2 的生成器只识别工作区中的协议声明，因此构建时在临时
 睡眠按结束日期归日，以及项目字数增量与提交数。隔离预览使用临时合成工作区与 Preact / Button 渲染适配，
 检查了有数据、空状态、板块占位与返回、收起状态刷新保留、明暗配色、缺失睡眠框、体重记录按钮、项目产出槽和 375 像素排版。
 维护版本过滤与云端 Agent 名称提取通过实际 core 查询检查；没有新增 UI 测试。
+
+## 开图会话
+
+「问问开图」、总览「需要你处理」、空状态「随口说一句」及板块里的对话入口，统一注册插件 workspace 对应工作区，
+再新建并切换到该工作区的会话；引导文字只预填，不自动发送。
+
+rc.2 源码依据：`api/workspace-controller/src/client/service.ts` 的 create({path}) 注册或复用工作区，
+`api/session-controller/src/types.ts` 的 SessionCreateRequest 支持 workspaceId 或 cwd（不能同时传），
+`client/ui-workspace/src/client/navigation.ts` 的 openSession 维护主会话引用并切换对话面板。
+`session-controller` 的 Config 只有 nativeOpen，缺省 cwd 固定取 process.cwd()；
+`workspace-controller` 的 documentsDirectory 只影响首次初始化，在其下创建 DSH 子目录。
+因此 rc.2 没有可在 `kaitu dsh --install` 品牌 patch 中设置的默认工作区或新会话 cwd 配置，不能用 documentsDirectory 替代。
+Kaitu.app profile 与 DSH 插件形态均使用显式工作区入口；DSH 自带「新会话」仍遵循原来的当前/最近工作区规则。

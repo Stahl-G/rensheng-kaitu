@@ -56,6 +56,13 @@ ${INBOX_FORMATS}
 
 不接受删除、恢复、规则或目标修改。日程建议须用户在工作台确认；敏感记忆须用户明确要求。
 
+## 资讯投递
+
+先读 [collect-news](.agents/skills/collect-news/SKILL.md)，所有 Agent 遵守通用规则，再按来源补充采集。
+Agent 新闻必填 summary、details、comment、published_at；X 仅由能读取 X 的 Agent 采集，其他 Agent 跳过。
+news_item 的 kind 缺省 article；X 热门用 trend.samples 放原帖，posts 仍为数量。
+可交 *.news.jsonl 或 *.records.jsonl，缺字段转待整理并注明原因。
+
 ## 记录格式
 
 ${renderRecordReference(ws)}

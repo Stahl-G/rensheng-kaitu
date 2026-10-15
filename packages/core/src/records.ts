@@ -99,7 +99,7 @@ export function addRecords(
       ts,
       by: opts.by ?? "agent",
       ...rest,
-      ...(type === "news_item" ? { status: "new" } : {}),
+      ...(type === "news_item" ? { kind: rest.kind ?? "article", status: "new" } : {}),
     };
     validateRecord(ws, ref, record);
     if (news) {

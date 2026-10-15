@@ -33,10 +33,6 @@ function entry(ws: Workspace, flow: boolean, schedules: { id: string; name: stri
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
   const disabled = [
     "ui-brand-official",
-    "ui-plugin-manager",
-    "ui-cordis",
-    "ui-settings-plugins",
-    "ui-settings-plugin-inventory",
     "ui-settings-account",
     "desktop-product-telemetry",
     "product-analytics",
