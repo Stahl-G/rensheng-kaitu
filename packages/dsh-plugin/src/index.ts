@@ -13,7 +13,7 @@ import {
 import type { Context } from "./dsh.js";
 
 export const name = "kaitu";
-export const inject = ["tools"];
+export const inject = ["tools", "systemPrompt"];
 
 export interface Config {
   workspace?: string;
