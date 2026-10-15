@@ -10,6 +10,7 @@ import {
   readAgentFile,
   readRecords,
   readStatus,
+  recordReferences,
   removeMemory,
   searchChats,
   searchMemories,
@@ -90,6 +91,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),
   );
+  register("record_types", "列出全部记录类型、字段约束和合法示例，只读。", {}, () => recordReferences(ws));
   register(
     "record_list",
     "按用户时区的日期范围查询记录，无需确认。",
@@ -131,9 +133,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   );
   register(
     "write_digest",
-    "写当天或指定日期的动态简报，无需确认；会替换同日文件，先读取并合并已有内容。",
+    "写当天或指定日期的动态简报，无需确认；按客户端来源合并，同一来源再次提交只替换自己的小节。",
     { date, content: text.max(500000) },
-    ({ date, content }) => writeDigest(ws, date, content, actor()),
+    ({ date, content }) =>
+      writeDigest(ws, date, content, actor(), server.server.getClientVersion()?.name ?? "unknown"),
     true,
   );
   register(

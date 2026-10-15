@@ -18,8 +18,9 @@ import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { batchSnapshot } from "./history.js";
 import { type MemoryInput, importMemories } from "./memory.js";
 import { assertPublicProject } from "./projects.js";
+import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
-import { localDate } from "./time.js";
+import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
 function object(value: unknown): Record<string, unknown> {
@@ -54,7 +55,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
       throw new KaituError("简报必须有合法 date frontmatter", "BAD_INBOX");
     }
     const actor = `Agent（Drive 收件箱：${sourceAgent(data.agent)}）`;
-    return { message: `${actor}写入了 ${date} 的动态简报`, apply: () => writeDigest(ws, date, text, actor) };
+    return {
+      message: `${actor}写入了 ${date} 的动态简报`,
+      apply: () => writeDigest(ws, date, text, actor, sourceAgent(data.agent)),
+    };
   }
   if (file.endsWith(".records.jsonl")) {
     if (!text.endsWith("\n")) throw new KaituError("JSONL 必须以换行结束", "INCOMPLETE_INBOX");
@@ -64,17 +68,40 @@ async function prepare(ws: Workspace, file: string, text: string) {
       .map((line) => object(JSON.parse(line)));
     if (!rows.length) throw new KaituError("记录文件为空", "BAD_INBOX");
     const groups = new Map<string, Record<string, unknown>[]>();
+    const fileAgent = rows.find((row) => typeof row.agent === "string" && row.agent.trim())?.agent;
     for (const row of rows) {
-      const { type, agent: _agent, ...data } = row;
-      if (typeof type !== "string" || ["id", "by", "rev", "deleted"].some((key) => key in data)) {
-        throw new KaituError("只接受新增记录，不能修改或删除", "BAD_INBOX");
+      const { type, agent, ...data } = row;
+      try {
+        if (typeof type !== "string" || ["id", "by", "rev", "deleted"].some((key) => key in data)) {
+          throw new KaituError("只接受新增记录，不能修改或删除", "BAD_INBOX");
+        }
+        const reference = recordReference(ws, type);
+        const fields = [...reference.required, ...reference.optional].map((field) => field.name);
+        if (fields.includes("source") && data.source === undefined) {
+          const source = agent ?? fileAgent;
+          data.source = typeof source === "string" && source.trim() ? source.trim() : "cloud-agent";
+        }
+        if (data.ts !== undefined && typeof data.ts !== "string")
+          throw new KaituError("ts 必须是带时区偏移的字符串", "BAD_INBOX");
+        if (data.ts === undefined && data.date !== undefined) {
+          data.ts = isoInZone(localTimeToInstant(`${data.date}T12:00:00`, ws.timeZone()), ws.timeZone());
+        }
+        const { date: _date, ...withoutDate } = data;
+        if (type === "project_metric") assertPublicProject(ws, data.project);
+        const group = groups.get(type) ?? [];
+        group.push(fields.includes("date") ? data : withoutDate);
+        groups.set(type, group);
+      } catch (error) {
+        throw new KaituError(`${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`, "BAD_INBOX");
       }
-      if (type === "project_metric") assertPublicProject(ws, data.project);
-      const group = groups.get(type) ?? [];
-      group.push(data);
-      groups.set(type, group);
     }
-    for (const [type, rows] of groups) addRecords(ws, type, rows, { dryRun: true });
+    for (const [type, rows] of groups) {
+      try {
+        addRecords(ws, type, rows, { dryRun: true });
+      } catch (error) {
+        throw new KaituError(`${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`, "BAD_INBOX");
+      }
+    }
     const agents = [...new Set(rows.map((row) => sourceAgent(row.agent)))].join("、");
     return {
       message: `Agent（Drive 收件箱：${agents}）新增了 ${rows.length} 条记录`,

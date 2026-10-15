@@ -357,6 +357,8 @@ function manuscriptFiles(root: string, include = ["**/*"]): string[] {
       if (entry.isDirectory()) walk(path);
       else if (
         [".md", ".txt", ".docx"].includes(extname(path).toLowerCase()) &&
+        // 说明文件不是正文
+        !/^(readme|agents|claude)\.md$/i.test(entry.name) &&
         include.some((pattern) => matchesGlob(relative(root, path).split("\\").join("/"), pattern))
       )
         out.push(path);
@@ -459,62 +461,74 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       }
     }
     if (wordsOk) {
-      const previous = existing.filter((r) => r.kind === "words" && String(r.ts).slice(0, 10) < today).at(-1);
+      const wordMetrics = existing.filter((r) => r.kind === "words" && String(r.ts).slice(0, 10) <= today);
+      const previous =
+        wordMetrics.filter((r) => String(r.ts).slice(0, 10) < today).at(-1) ?? wordMetrics.at(-1);
       metric("words", today, words);
-      const delta = previous ? words - Number(previous.value) : 0;
+      const delta = previous ? words - Number(previous.value) : null;
       appendLog(
         ws,
         slug,
-        `字数 ${words.toLocaleString("en-US")}（${delta >= 0 ? "+" : ""}${delta.toLocaleString("en-US")}）`,
+        `字数 ${words.toLocaleString("en-US")}（${delta === null ? "首次统计" : `${delta >= 0 ? "+" : ""}${delta.toLocaleString("en-US")}`}）`,
         today,
         "words",
       );
     }
     const repos = project.data.links.filter((l) => l.role === "repo");
-    const cursorFile = `${project.dir}/.sync.json`;
-    const cursors = ws.exists(cursorFile) ? ws.readJson<Record<string, string>>(cursorFile) : {};
-    const counts = new Map<string, { count: number; titles: string[] }>();
-    const nextCursors = { ...cursors };
+    const commitDates = existing.filter((r) => r.kind === "commits").map((r) => String(r.ts).slice(0, 10));
+    const from = [firstDay, ...commitDates].sort()[0] as string;
+    const counts = new Map<
+      string,
+      { count: number; titles: { timestamp: number; oid: string; title: string }[] }
+    >();
     const seenCommits = new Set<string>();
     let reposOk = repos.length > 0;
     for (const link of repos) {
       try {
         const dir = linkedPath(link);
         if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
-        const from = cursors[link.path] ?? firstDay;
-        // log/readCommit 只读取对象与引用，不执行 status、checkout 或任何写命令。
-        let entries: Awaited<ReturnType<typeof git.log>>;
-        try {
-          entries = await git.log({ fs, dir });
-        } catch (error) {
-          if ((error as { code?: string }).code !== "NotFoundError") throw error;
-          entries = [];
+        const refs: string[] = [];
+        for (const namespace of ["refs/heads", "refs/remotes"]) {
+          for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
+            refs.push(`${namespace}/${ref}`);
+          }
         }
-        for (const { oid, commit } of entries) {
-          const day = localDate(new Date(commit.author.timestamp * 1000), tz);
-          if (day < from || day >= today || seenCommits.has(`${dir}:${oid}`)) continue;
-          seenCommits.add(`${dir}:${oid}`);
-          const item = counts.get(day) ?? { count: 0, titles: [] };
-          item.count++;
-          if (item.titles.length < 10)
-            item.titles.push([...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""));
-          counts.set(day, item);
+        // 只读取所有分支的对象与引用，不执行 status、checkout 或任何写命令。
+        for (const ref of refs) {
+          for (const { oid, commit } of await git.log({ fs, dir, ref })) {
+            if (seenCommits.has(oid)) continue;
+            seenCommits.add(oid);
+            const timestamp = commit.author.timestamp;
+            const day = localDate(new Date(timestamp * 1000), tz);
+            if (day < from || day >= today) continue;
+            const item = counts.get(day) ?? { count: 0, titles: [] };
+            item.count++;
+            item.titles.push({
+              timestamp,
+              oid,
+              title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
+            });
+            counts.set(day, item);
+          }
         }
-        nextCursors[link.path] = today;
       } catch (error) {
         reposOk = false;
         issues.push({ path: link.path, message: (error as Error).message });
       }
     }
     if (reposOk) {
-      for (const [date, item] of [...counts].sort(([a], [b]) => a.localeCompare(b))) {
+      for (const date of new Set([...commitDates, ...counts.keys()])) {
+        const item = counts.get(date);
+        const detail = (item?.titles ?? [])
+          .sort((a, b) => b.timestamp - a.timestamp || a.oid.localeCompare(b.oid))
+          .slice(0, 10)
+          .map((entry) => entry.title);
+        const total = item?.count ?? 0;
         const previous = existing.find((r) => r.kind === "commits" && String(r.ts).slice(0, 10) === date);
-        const detail = [...((previous?.detail ?? []) as string[]), ...item.titles].slice(0, 10);
-        const total = Number(previous?.value ?? 0) + item.count;
+        if (previous?.value === total && JSON.stringify(previous.detail) === JSON.stringify(detail)) continue;
         metric("commits", date, total, detail);
         appendLog(ws, slug, `${total} 次提交：${detail.join("；")}`, date, "commits");
       }
-      ws.writeJson(cursorFile, nextCursors, { internal: true });
     }
     for (const link of project.data.links.filter((l) => l.role === "folder")) {
       try {

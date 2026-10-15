@@ -11,7 +11,8 @@
   "properties": {
     "file": {
       "type": "string",
-      "pattern": "^files/photos/\\d{4}-\\d{2}-\\d{2}-[0-9A-HJKMNP-TV-Z]{26}\\.(jpg|png|webp)$"
+      "pattern": "^files/photos/\\d{4}-\\d{2}-\\d{2}-[0-9A-HJKMNP-TV-Z]{26}\\.(jpg|png|webp)$",
+      "examples": ["files/photos/2026-10-15-01ARZ3NDEKTSV4RRFFQ69G5FAV.jpg"]
     },
     "pose": {
       "enum": ["front", "side", "back", "other"]

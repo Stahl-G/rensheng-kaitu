@@ -91,3 +91,7 @@ export function localTimeToInstant(wall: string, timeZone: string): Date {
   // 重复时刻取第一次，春季跳时按跳时前的偏移解释（RFC 5545）。
   return new Date(matches.length ? Math.min(...matches.map(Number)) : Math.max(...candidates.map(Number)));
 }
+
+export function timeZoneNotice(timeZone: string, now = new Date()): string {
+  return `时区：${timeZone}（UTC${isoInZone(now, timeZone).slice(-6)}）；以下时间均为该时区。`;
+}

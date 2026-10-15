@@ -32,3 +32,5 @@ export * from "./overview.js";
 export * from "./inbox.js";
 
 export * from "./projects.js";
+
+export * from "./record-reference.js";

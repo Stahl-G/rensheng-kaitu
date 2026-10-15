@@ -14,7 +14,7 @@ kaitu mcp token --dir /你的工作区
 请求必须带 `Authorization: Bearer <token>`。token 存在状态目录的 `secrets.json`（本地模式为 `.kaitu/secrets.json`，Drive 模式留在本机；权限 600），不进版本历史。
 用 `kaitu mcp token --rotate` 轮换；正在运行的服务会在后续请求中拒绝旧 token。
 
-HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档；新增记录、记忆、简报和待确认日程建议。
+HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档；`record_types` 只读列出记录类型、字段与示例；新增记录、记忆、简报和待确认日程建议。
 `--tools all` 才开放修改、删除和保存版本；stdio 默认 all，也可显式加 `--tools remote`。
 工具不提供恢复版本、删除模块、修改规则或目标、任意文件写入。
 
@@ -32,5 +32,5 @@ HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档；�
 
 公网地址和 token 交给谁，谁就能通过所开放的工具读取你的记录、记忆和对话，并写入内容。
 先用 remote 集合；不需要时关闭隧道，token 泄露时立即轮换。客户端名用于版本说明，不作为可信身份认证。
-外部简报可用 `write_digest` 写入 `feed/digests/YYYY-MM-DD.md`；工具会替换同日文件，写前先读取合并已有内容。
+外部简报可用 `write_digest` 写入 `feed/digests/YYYY-MM-DD.md`；工具按 MCP 客户端名称分节合并，同一来源重交只替换自己的小节。
 `propose_block` 只产生待确认建议，用户在工作台确认后才能进一步写外部日历。

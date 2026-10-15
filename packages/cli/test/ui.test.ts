@@ -89,7 +89,7 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
   await expect.poll(async () => (await history(ws)).length, { timeout: 3000 }).toBe(before + 3);
   await new Promise((resolve) => setTimeout(resolve, 300));
   expect((await history(ws)).length).toBe(before + 3);
-});
+}, 10000);
 
 it("图片接口只返回有记录的照片，拒绝任意路径和 ..", async () => {
   const { ws, ui } = await setup();

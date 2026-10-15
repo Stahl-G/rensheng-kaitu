@@ -84,7 +84,20 @@ it("只读同步合成仓库的已结束日期提交，重跑不重复计数且�
   };
   try {
     await git.init({ fs, dir: repo, defaultBranch: "main" });
+    fs.writeFileSync(join(repo, "chapter.txt"), "old");
+    await git.add({ fs, dir: repo, filepath: "chapter.txt" });
+    const old = await git.commit({
+      fs,
+      dir: repo,
+      message: "old",
+      author: {
+        name: "Test",
+        email: "test@localhost",
+        timestamp: Date.parse("2026-09-01T00:00:00Z") / 1000,
+      },
+    });
     for (const [index, title] of ["first chapter", "edit chapter"].entries()) {
+      await git.branch({ fs, dir: repo, ref: `work-${index}`, object: old, checkout: true });
       fs.writeFileSync(join(repo, "chapter.txt"), `synthetic ${index}`);
       await git.add({ fs, dir: repo, filepath: "chapter.txt" });
       await git.commit({
@@ -94,11 +107,25 @@ it("只读同步合成仓库的已结束日期提交，重跑不重复计数且�
         author: {
           name: "Test",
           email: "test@localhost",
-          timestamp: Date.parse(`2026-10-14T0${index}:00:00Z`) / 1000,
+          timestamp: Date.parse(index === 0 ? "2026-10-13T16:30:00Z" : "2026-10-14T01:00:00Z") / 1000,
           timezoneOffset: 0,
         },
       });
     }
+    await git.addRemote({ fs, dir: repo, remote: "origin", url: "https://example.test/offline.git" });
+    await git.writeRef({
+      fs,
+      dir: repo,
+      ref: "refs/remotes/origin/shared",
+      value: await git.resolveRef({ fs, dir: repo, ref: "HEAD" }),
+    });
+    await git.writeRef({
+      fs,
+      dir: repo,
+      ref: "refs/remotes/orphan/mirror",
+      value: await git.resolveRef({ fs, dir: repo, ref: "work-0" }),
+    });
+    await git.checkout({ fs, dir: repo, ref: "main" });
     const before = files(repo);
     const head = await git.resolveRef({ fs, dir: repo, ref: "HEAD" });
     const { slug } = await createProject(ws, {

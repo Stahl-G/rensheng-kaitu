@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { templateDir } from "./assets.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { listModules } from "./modules.js";
+import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
@@ -82,6 +83,13 @@ ${instructions}
 - 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
 - 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
 - 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。
+
+### 记录格式参考
+
+${renderRecordReference(ws)}
+
+本机 \`kaitu record add <类型> --json\` 只传示例中 type 以外的字段；date 简写与 source 自动补齐仅用于收件箱。
+用 \`kaitu record types\` 列出类型，\`kaitu record schema <类型>\` 查看单个类型。
 
 ## 5. 确认规则
 

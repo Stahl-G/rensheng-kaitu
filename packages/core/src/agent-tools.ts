@@ -65,7 +65,13 @@ export async function writeAgentRecord(
   return { ...result, version };
 }
 
-export async function writeDigest(ws: Workspace, date: string, content: string, actor: string) {
+export async function writeDigest(
+  ws: Workspace,
+  date: string,
+  content: string,
+  actor: string,
+  source = actor,
+) {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
     Number.isNaN(Date.parse(date)) ||
@@ -74,7 +80,31 @@ export async function writeDigest(ws: Workspace, date: string, content: string, 
     throw new KaituError("简报日期不合法", "BAD_ARGS");
   }
   const file = `feed/digests/${date}.md`;
-  ws.writeText(file, content);
+  const name =
+    source
+      .trim()
+      .replace(/[\r\n\p{Cc}\p{Cf}]/gu, " ")
+      .slice(0, 100) || "cloud-agent";
+  const heading = `## 来自 ${name}`;
+  const body = parseFrontmatter(content).body.trim();
+  // 来源正文从三级标题开始，避免正文标题被识别为来源分节。
+  const nested = body.replace(
+    /^(#{1,5}) /gm,
+    (_match, hashes: string) => `${"#".repeat(Math.min(6, hashes.length + 2))} `,
+  );
+  const section = `${heading}\n\n${nested}\n`;
+  const existing = ws.exists(file) ? ws.readText(file) : "";
+  const headings = [...existing.matchAll(/^## 来自 .+$/gm)];
+  const current = headings.find((match) => match[0] === heading);
+  let merged: string;
+  if (current?.index !== undefined) {
+    const start = current.index;
+    const end = headings.find((match) => (match.index ?? 0) > start)?.index ?? existing.length;
+    merged = `${existing.slice(0, start)}${section}\n${existing.slice(end)}`;
+  } else {
+    merged = `${existing.trimEnd()}\n\n${section}`.trimStart();
+  }
+  ws.writeText(file, merged);
   return { file, version: await snapshot(ws, `${actor}写入了 ${date} 的动态简报`) };
 }
 

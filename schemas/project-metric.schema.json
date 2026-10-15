@@ -11,7 +11,8 @@
   "properties": {
     "project": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "examples": ["example-project"]
     },
     "kind": {
       "enum": ["words", "commits"]

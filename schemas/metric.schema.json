@@ -8,15 +8,17 @@
     "kind": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]*$",
-      "description": "weight / body_fat / height / bp / glucose …"
+      "description": "weight / body_fat / height / bp / glucose …",
+      "examples": ["weight"]
     },
     "value": {
       "oneOf": [
         { "type": "number" },
         { "type": "string", "minLength": 1, "description": "复合值，如血压 120/80" }
-      ]
+      ],
+      "examples": [70]
     },
-    "unit": { "type": "string", "minLength": 1 },
-    "source": { "type": "string", "minLength": 1 }
+    "unit": { "type": "string", "minLength": 1, "examples": ["kg"] },
+    "source": { "type": "string", "minLength": 1, "examples": ["cloud-agent"] }
   }
 }

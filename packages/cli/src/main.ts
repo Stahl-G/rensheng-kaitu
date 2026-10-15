@@ -37,9 +37,13 @@ import {
   readProject,
   readRecords,
   readStatus,
+  recordReference,
+  recordReferences,
+  recordTypeSummary,
   reindexChats,
   removeMemory,
   removePhoto,
+  renderRecordReference,
   restore,
   searchChats,
   searchMemories,
@@ -81,6 +85,8 @@ const HELP = `开图 kaitu
   kaitu photo add <图片> [--pose front|side|back|other] [--ts 时间] [--notes 说明]
   kaitu photo list                                 列出体态照片
   kaitu photo rm <id>                              删除体态照片
+  kaitu record types                              列出全部记录类型
+  kaitu record schema <类型>                      查看字段与示例
   kaitu record add <类型> --json '{...}'           写入一条记录
   kaitu record update <类型> <id> --json '{...}'   修改记录
   kaitu record rm <类型> <id>                      删除记录
@@ -431,7 +437,15 @@ async function run(argv: string[]): Promise<number> {
     case "record": {
       const [sub, type, id] = args;
       const ws = workspace(values);
+      if (sub === "types") {
+        out(values, recordReferences(ws), recordTypeSummary(ws));
+        return 0;
+      }
       const t = need(type, "类型");
+      if (sub === "schema") {
+        out(values, recordReference(ws, t), renderRecordReference(ws, t));
+        return 0;
+      }
       if (sub === "list") {
         const records = readRecords(ws, t, { from: values.from, to: values.to });
         out(values, records, records.map((r) => JSON.stringify(r)).join("\n") || "（没有记录）");

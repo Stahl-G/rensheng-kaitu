@@ -83,3 +83,53 @@ it("四种收件箱各一个带来源版本，非法整批拒绝，未稳定文�
     rmSync(ws.root, { recursive: true, force: true });
   }
 }, 10000);
+
+it("记录补齐来源和本地日期，剥离传输字段，拒绝未知类型并列出可用类型", async () => {
+  const ws = await freshWorkspace("America/New_York");
+  try {
+    const input = [
+      { type: "metric", kind: "weight", value: 70, unit: "kg", date: "2026-07-01", agent: "dot" },
+      { type: "metric", kind: "weight", value: 71, unit: "kg", date: "2026-01-01", source: "scale" },
+      {
+        type: "metric",
+        kind: "weight",
+        value: 72,
+        unit: "kg",
+        ts: "2026-07-02T16:00:00-04:00",
+        date: "2026-07-01",
+      },
+      { type: "activity", date: "2026-07-01", steps: 100 },
+    ];
+    ws.writeText("inbox/agents/dot.records.jsonl", `${input.map((r) => JSON.stringify(r)).join("\n")}\n`);
+    const result = await processInbox(ws, { stableMs: 0 });
+    expect(result.rejected).toEqual([]);
+    const rows = readRecords(ws, "metric");
+    expect(rows.map(({ source, ts }) => ({ source, ts }))).toEqual([
+      { source: "scale", ts: "2026-01-01T12:00:00-05:00" },
+      { source: "dot", ts: "2026-07-01T12:00:00-04:00" },
+      { source: "dot", ts: "2026-07-02T16:00:00-04:00" },
+    ]);
+    expect(rows.every((row) => !["agent", "type", "date"].some((key) => key in row))).toBe(true);
+    expect(readRecords(ws, "activity")[0]).toMatchObject({
+      date: "2026-07-01",
+      ts: "2026-07-01T12:00:00-04:00",
+      source: "dot",
+    });
+    ws.writeText(
+      "inbox/agents/anonymous.records.jsonl",
+      `${JSON.stringify({ type: "metric", kind: "weight", value: 73, unit: "kg" })}\n`,
+    );
+    expect((await processInbox(ws, { stableMs: 0 })).rejected).toEqual([]);
+    expect(readRecords(ws, "metric").find((r) => r.value === 73)?.source).toBe("cloud-agent");
+    ws.writeText("inbox/agents/unknown.records.jsonl", '{"type":"unknown","value":1}\n');
+    expect((await processInbox(ws, { stableMs: 0 })).rejected).toHaveLength(1);
+    const error = ws.readText("inbox/rejected/unknown.records.jsonl.error.txt");
+    const help = JSON.parse(error.slice(error.indexOf("\n\n") + 2));
+    const { listRecordTypes } = await import("../src/index.js");
+    expect(help.record_types.map((ref: { type: string }) => ref.type)).toEqual(
+      listRecordTypes(ws).map((ref) => ref.type),
+    );
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
