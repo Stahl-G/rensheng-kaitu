@@ -256,7 +256,13 @@ export function OverviewPage(props: OverviewPageProps) {
           <div className={css.accountArea}>
             <details className={css.sync}>
               <summary>{syncLabel}</summary>
-              <p>已收到的资料还在等待整理。正式记录更新后才会进入对应图表。</p>
+              <p>
+                {data?.sync.needsReview
+                  ? "有资料需要核对，可在总览查看处理入口。"
+                  : data?.sync.received
+                    ? "已收到的资料还在等待整理。正式记录更新后才会进入对应图表。"
+                    : "资料已更新到本机视图。"}
+              </p>
               <button type="button" className={css.link} onClick={() => void refresh()}>
                 刷新状态
               </button>
@@ -371,9 +377,21 @@ export function OverviewPage(props: OverviewPageProps) {
                       </button>
                     </div>
                   ))}
-                {data.sync.needsReview > 0 && (
+                {data.inboxNotes > 0 && (
                   <button type="button" className={css.link} onClick={() => openRecord("all")}>
-                    {data.sync.needsReview} 条资料需要核对
+                    {data.inboxNotes} 条资料需要核对
+                  </button>
+                )}
+                {data.sync.mapNeedsReview > 0 && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("footprints");
+                      setView("explore");
+                    }}
+                  >
+                    {data.sync.mapNeedsReview} 段地点经历需要核对
                   </button>
                 )}
                 {!!data.daily?.unresolved && <p>{data.daily.unresolved} 项未决事项，见近期回顾</p>}

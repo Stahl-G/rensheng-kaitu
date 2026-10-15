@@ -103,6 +103,17 @@ export async function apply(ctx: Context) {
             name: "main",
             key: panel,
             inject: () => ({
+              subscribe: (refresh: () => void) => {
+                const update = () => {
+                  if (document.visibilityState === "visible") refresh();
+                };
+                const timer = setInterval(update, 5000);
+                document.addEventListener("visibilitychange", update);
+                return () => {
+                  clearInterval(timer);
+                  document.removeEventListener("visibilitychange", update);
+                };
+              },
               load: async () => {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
@@ -173,6 +184,11 @@ export async function apply(ctx: Context) {
               },
               loadMe: async () => {
                 const result = await ctx.remote.kaitu.me();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadExperienceSource: async (id: string) => {
+                const result = await ctx.remote.kaitu.experienceSource(id);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },

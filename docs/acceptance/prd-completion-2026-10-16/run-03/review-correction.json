@@ -1,0 +1,34 @@
+{
+  "replay": {
+    "entries": [],
+    "added": 0,
+    "version": null
+  },
+  "revised": {
+    "id": "01M50GZSAYE54DBD3JS4CG77Q6",
+    "ts": "2026-10-16T02:35:23+07:00",
+    "by": "user",
+    "title": "首尔未来日期待核对",
+    "event_type": "visit",
+    "start": "2030",
+    "time_precision": "year",
+    "place": {
+      "name": "Seoul",
+      "country": "KR",
+      "geonameid": 1835848,
+      "lat": 37.566,
+      "lng": 126.9784,
+      "precision": "city"
+    },
+    "fact_status": "planned",
+    "source": "me/sources/map-evidence.md#L28",
+    "rev": 3
+  },
+  "sync": {
+    "received": 0,
+    "needsReview": 0,
+    "mapNeedsReview": 0,
+    "updatedAt": "2026-10-16T02:54:50+07:00"
+  },
+  "experiences": 8
+}

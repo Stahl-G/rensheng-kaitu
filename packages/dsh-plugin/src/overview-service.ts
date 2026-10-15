@@ -14,6 +14,7 @@ import {
   listProjects,
   readAvatar,
   readDoing,
+  readExperienceSource,
   readHealthPage,
   readNews,
   readOverviewPage,
@@ -31,6 +32,7 @@ import type {
   DoingData,
   DoingProject,
   ExperienceChanges,
+  ExperienceSource,
   HealthData,
   LifeMapData,
   MeData,
@@ -136,6 +138,11 @@ export class KaituOverviewService extends TypertRemoteService {
   async dismissNews(id: string): Promise<NewsAction> {
     const result = await this.write(() => dismissNews(this.workspace, id));
     return { id: result.record.id, status: "dismissed", version: result.version };
+  }
+
+  @Remote("experienceSource")
+  async experienceSource(id: string): Promise<ExperienceSource> {
+    return readExperienceSource(this.workspace, id);
   }
 
   @Remote("lifeMap")

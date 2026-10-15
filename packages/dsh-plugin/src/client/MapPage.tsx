@@ -1,4 +1,10 @@
 import {
+  experienceInterval,
+  experienceLayer,
+  experienceOverlaps,
+  experienceYears,
+} from "@kaitu/core/experience-time";
+import {
   type GeoJSONSource,
   Map as LibreMap,
   LngLatBounds,
@@ -11,8 +17,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Experience, ExperienceChanges, LifeMapData } from "../types.js";
 import { ExperienceEditor } from "./ExperienceEditor.js";
 import css from "./MapPage.module.css";
+import { SourceEvidence } from "./SourceEvidence.js";
 
 export interface MapPageProps {
+  subscribe?: (refresh: () => void) => () => void;
+  loadExperienceSource: (id: string) => Promise<import("../types.js").ExperienceSource>;
   loadLifeMap: () => Promise<LifeMapData>;
   resolveExperience: (id: string, geonameid: number) => Promise<unknown>;
   editExperience: (id: string, changes: ExperienceChanges, revision: number) => Promise<void>;
@@ -36,7 +45,7 @@ const eventTypes = {
   other: "其他",
 };
 const statuses = {
-  observed: "你说的",
+  observed: "已记录",
   user_reported: "你说的",
   inferred: "AI 推测",
   planned: "计划",
@@ -45,12 +54,6 @@ const statuses = {
 const prompt = "用 build-life-map 技能，从我的记忆里整理去过和住过的城市";
 const cityId = (place: Experience["place"]) =>
   String(place.geonameid ?? `${place.country ?? ""}:${place.name}`);
-function layerOf(item: Experience): Layer {
-  if (item.fact_status === "planned" || item.fact_status === "suggested") return "planned";
-  return item.fact_status !== "inferred" && ["lived", "worked"].includes(item.event_type) && !item.end
-    ? "now"
-    : "been";
-}
 function dateLabel(value: string | undefined, precision: Experience["time_precision"]) {
   if (!value || precision === "unknown") return "暂无记录";
   const [year, month, day] = value.split("-");
@@ -62,8 +65,12 @@ function ExperienceDetails({
   onPrompt,
   save,
   hide,
+  asOf,
+  loadSource,
 }: {
   item: Experience;
+  asOf: string;
+  loadSource: MapPageProps["loadExperienceSource"];
   onPrompt: MapPageProps["onPrompt"];
   save: (item: Experience, changes: ExperienceChanges) => Promise<void>;
   hide: (item: Experience) => Promise<void>;
@@ -84,12 +91,13 @@ function ExperienceDetails({
         {eventTypes[item.event_type]} · {dateLabel(item.start, item.time_precision)}
         {item.end
           ? ` – ${dateLabel(item.end, item.time_precision)}`
-          : layerOf(item) === "now"
+          : experienceLayer(item, asOf) === "now"
             ? " – 至今"
             : ""}
       </p>
       {item.notes && <p className={css.notes}>{item.notes}</p>}
       <p className={css.source}>来源：{item.source || "暂无记录"}</p>
+      <SourceEvidence id={item.id} load={loadSource} />
       {editing ? (
         <ExperienceEditor
           item={item}
@@ -195,12 +203,21 @@ function CityMap({
   cities,
   selected,
   onSelect,
-}: { cities: CityGroup[]; selected: string | null; onSelect: (id: string) => void }) {
+  onUnavailable,
+}: {
+  cities: CityGroup[];
+  selected: string | null;
+  onSelect: (id: string) => void;
+  onUnavailable: () => void;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const latest = useRef({ cities, onSelect });
   latest.current = { cities, onSelect };
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  useEffect(() => {
+    if (state === "failed") onUnavailable();
+  }, [state, onUnavailable]);
   const geojson = useMemo(
     () => ({
       type: "FeatureCollection" as const,
@@ -404,6 +421,8 @@ function CityMap({
 }
 
 export function MapPage({
+  subscribe,
+  loadExperienceSource,
   loadLifeMap,
   resolveExperience,
   editExperience,
@@ -417,10 +436,13 @@ export function MapPage({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [year, setYear] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [enabled, setEnabled] = useState<Layer[]>(["been", "now", "planned"]);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState("map");
   const [compact, setCompact] = useState(false);
+  const mapUnavailable = useCallback(() => setView("list"), []);
   const page = useRef<HTMLDivElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
@@ -441,6 +463,7 @@ export function MapPage({
       sequence.current++;
     };
   }, [refresh]);
+  useEffect(() => subscribe?.(() => void refresh()), [subscribe, refresh]);
   useEffect(() => {
     if (!page.current) return;
     const resize = new ResizeObserver(([entry]) => {
@@ -456,22 +479,21 @@ export function MapPage({
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const years = [
-    ...new Set(data?.experiences.flatMap((item) => (item.start ? [item.start.slice(0, 4)] : []))),
-  ]
-    .sort()
-    .reverse();
+  const years = data ? experienceYears(data.experiences, data.asOf) : [];
+  const invalidRange = year === "range" && !!from && !!to && from > to;
   const cities = useMemo(() => {
+    if (!data) return [];
     const groups = new Map<string, CityGroup>();
     for (const item of data?.experiences ?? []) {
-      const layer = layerOf(item);
-      if (item.review || !enabled.includes(layer)) continue;
-      if (year === "undated" && (item.start || item.end)) continue;
-      if (year !== "all" && year !== "undated") {
-        const start = item.start?.slice(0, 4) ?? item.end?.slice(0, 4);
-        const end = item.end?.slice(0, 4) ?? (layer === "now" ? "9999" : start);
-        if (!start || !end || year < start || year > end) continue;
-      }
+      const layer = experienceLayer(item, data.asOf);
+      if (item.review || !layer || !enabled.includes(layer)) continue;
+      if (year === "undated" && experienceInterval(item)) continue;
+      if (year === "range" && !experienceOverlaps(item, from || undefined, to || undefined)) continue;
+      if (
+        !["all", "undated", "range"].includes(year) &&
+        !experienceOverlaps(item, `${year}-01-01`, `${year}-12-31`)
+      )
+        continue;
       const id = cityId(item.place);
       let group = groups.get(id);
       if (!group) {
@@ -494,7 +516,7 @@ export function MapPage({
     for (const group of groups.values())
       group.layers.sort((a, b) => layers.findIndex((l) => l.id === a) - layers.findIndex((l) => l.id === b));
     return [...groups.values()];
-  }, [data, enabled, year]);
+  }, [data, enabled, year, from, to]);
   const city = cities.find((item) => item.id === selected);
   const selectedId = city?.id;
   useEffect(() => {
@@ -552,7 +574,7 @@ export function MapPage({
       setBusy(false);
     }
   };
-  const details = city && (
+  const details = city && data && (
     <>
       {compact && <div className={css.backdrop} aria-hidden="true" />}
       <div
@@ -596,6 +618,8 @@ export function MapPage({
             key={`${item.id}:${item.rev ?? 1}`}
             item={item}
             onPrompt={ask}
+            asOf={data.asOf}
+            loadSource={loadExperienceSource}
             save={save}
             hide={hide}
           />
@@ -674,7 +698,7 @@ export function MapPage({
       ) : (
         <>
           <details className={css.review}>
-            <summary>地图工具 · 图层、年份与显示方式</summary>
+            <summary>地图工具 · 图层与时间</summary>
             <div className={css.toolbar}>
               <fieldset className={css.legend} aria-label="地图图层">
                 {layers.map((layer) => (
@@ -721,6 +745,8 @@ export function MapPage({
                   aria-pressed={year === item.id}
                   onClick={() => {
                     setYear(item.id);
+                    setFrom("");
+                    setTo("");
                     setSelected(null);
                   }}
                 >
@@ -728,22 +754,108 @@ export function MapPage({
                 </button>
               ))}
             </fieldset>
+            <fieldset className={css.range} aria-label="按日期区间筛选">
+              <label>
+                从
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => {
+                    setFrom(e.target.value);
+                    setYear(e.target.value || to ? "range" : "all");
+                    setSelected(null);
+                  }}
+                />
+              </label>
+              <label>
+                至
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => {
+                    setTo(e.target.value);
+                    setYear(e.target.value || from ? "range" : "all");
+                    setSelected(null);
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className={css.control}
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                  setYear("all");
+                  setSelected(null);
+                }}
+              >
+                清除时间筛选
+              </button>
+            </fieldset>
+            {invalidRange && (
+              <p role="alert" className={css.formError}>
+                开始日期不能晚于结束日期
+              </p>
+            )}
           </details>
+          {(year !== "all" || enabled.length !== layers.length) && (
+            <div className={css.filterStatus}>
+              <span>
+                {year === "undated"
+                  ? "时间不详"
+                  : year === "range"
+                    ? `${from || "不限"} — ${to || "不限"}`
+                    : year === "all"
+                      ? "全部时间"
+                      : `${year} 年`}
+                {enabled.length !== layers.length
+                  ? ` · ${
+                      layers
+                        .filter((l) => enabled.includes(l.id))
+                        .map((l) => l.name)
+                        .join("、") || "未选择图层"
+                    }`
+                  : ""}
+              </span>
+              <button
+                type="button"
+                className={css.link}
+                onClick={() => {
+                  setYear("all");
+                  setFrom("");
+                  setTo("");
+                  setEnabled(layers.map((l) => l.id));
+                  setSelected(null);
+                }}
+              >
+                重置筛选
+              </button>
+            </div>
+          )}
           <div className={css.layout} data-view={view}>
-            <CityMap cities={cities} selected={city?.id ?? null} onSelect={setSelected} />
+            <CityMap
+              cities={cities}
+              selected={city?.id ?? null}
+              onSelect={setSelected}
+              onUnavailable={mapUnavailable}
+            />
             <section className={css.listPane} aria-label="城市列表">
               {!!data.review.length && (
                 <details className={css.review}>
                   <summary>
-                    {data.review.length} 个地点待你确认 <span aria-hidden="true">⌄</span>
+                    {data.review.length} 段经历待核对 <span aria-hidden="true">⌄</span>
                   </summary>
                   {data.review.map((item) => (
                     <div key={item.id} className={css.reviewItem}>
-                      <h3>原地名：{item.place.name}</h3>
+                      <h3>
+                        {item.place.name} · {item.review ? "地点待核对" : "事实或时间待核对"}
+                      </h3>
                       <ExperienceDetails
                         key={`${item.id}:${item.rev ?? 1}`}
                         item={item}
                         onPrompt={ask}
+                        asOf={data.asOf}
+                        loadSource={loadExperienceSource}
                         save={save}
                         hide={hide}
                       />
@@ -771,7 +883,11 @@ export function MapPage({
                           </button>
                         ))
                       ) : (
-                        <p className={css.secondary}>没有候选城市，和开图核对地名。</p>
+                        <p className={css.secondary}>
+                          {item.review
+                            ? "没有候选城市，可修正地名。"
+                            : "这条记录是推测或日期仍在未来，核对后才计入已到访。"}
+                        </p>
                       )}
                     </div>
                   ))}

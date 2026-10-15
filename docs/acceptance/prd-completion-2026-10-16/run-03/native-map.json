@@ -1,0 +1,53 @@
+{
+  "testedAt": "2026-10-15T19:52:04.682Z",
+  "app": "/Users/yihongguo/Developer/rensheng-kaitu-prd/dist/prd-map/Kaitu.app",
+  "workspace": "/tmp/kaitu-map-evidence/native-workspace",
+  "pid": 3967,
+  "port": "59203",
+  "asOf": "2026-10-16",
+  "experiences": 8,
+  "layers": [
+    {
+      "city": "Hanoi",
+      "layer": "been",
+      "count": 2
+    },
+    {
+      "city": "Ho Chi Minh City",
+      "layer": "been",
+      "count": 1
+    },
+    {
+      "city": "Tokyo",
+      "layer": "been",
+      "count": 2
+    },
+    {
+      "city": "Hanoi",
+      "layer": "now",
+      "count": 1
+    },
+    {
+      "city": "Da Nang",
+      "layer": "planned",
+      "count": 1
+    }
+  ],
+  "review": ["首尔未来日期待核对"],
+  "sync": {
+    "received": 0,
+    "needsReview": 1,
+    "mapNeedsReview": 1,
+    "updatedAt": "2026-10-16T02:46:40+07:00"
+  },
+  "source": {
+    "kind": "local",
+    "locator": "me/sources/map-evidence.md#L20",
+    "file": "me/sources/map-evidence.md",
+    "text": "资料段落 12\n资料段落 13\n资料段落 14\n资料段落 15\n资料段落 16\n资料段落 17\n资料段落 18\n资料段落 19\n2019 到 2022 年在河内生活。2021 年六月仍在那里。\n资料段落 21\n2024 年 2 月 29 日，再次到河内旅行。\n资料段落 23\n2024 年 12 月 20 日到 2025 年 1 月 10 日，在东京旅行。\n资料段落 25\n还记得一次东京到访，但日期想不起来了。\n资料段落 27\n这条资料写着 2030 年首尔到访，需要核对实际状态。\n",
+    "firstLine": 12,
+    "focusLine": 20,
+    "truncated": true
+  },
+  "nativeWindowVerified": false
+}

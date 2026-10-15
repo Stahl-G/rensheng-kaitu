@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { KaituError } from "./errors.js";
+import { experienceInterval, experienceLayer } from "./experience-time.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
 import {
@@ -12,6 +13,7 @@ import {
   readRecords,
   updateRecord,
 } from "./records.js";
+import { localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
 export interface City {
@@ -58,6 +60,7 @@ export interface LifeMapFeature {
 }
 export interface LifeMapData {
   type: "FeatureCollection";
+  asOf: string;
   features: LifeMapFeature[];
   review: Experience[];
   undated: number;
@@ -278,7 +281,8 @@ export async function resolveExperience(ws: Workspace, id: string, geonameid: nu
   return { ...record, version };
 }
 
-export function lifeMap(ws: Workspace): LifeMapData {
+export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
+  const asOf = localDate(now, ws.timeZone());
   const rows = experiences(ws).sort(
     (a, b) =>
       (a.start ?? a.end ?? "9999").localeCompare(b.start ?? b.end ?? "9999") || a.id.localeCompare(b.id),
@@ -296,16 +300,9 @@ export function lifeMap(ws: Workspace): LifeMapData {
     }
   }
   for (const item of rows) {
-    const { place, fact_status: status } = item;
+    const { place } = item;
     if (item.review || place.lat === undefined || place.lng === undefined) continue;
-    const layer: MapLayer | null =
-      status === "planned" || status === "suggested"
-        ? "planned"
-        : status === "observed" || status === "user_reported"
-          ? ["lived", "worked"].includes(item.event_type) && !item.end
-            ? "now"
-            : "been"
-          : null;
+    const layer = experienceLayer(item, asOf);
     if (!layer) continue;
     const id = `${place.geonameid}:${layer}`;
     let feature = groups.get(id);
@@ -321,9 +318,10 @@ export function lifeMap(ws: Workspace): LifeMapData {
   }
   return {
     type: "FeatureCollection",
+    asOf,
     features: [...groups.values()],
-    review: rows.filter((item) => item.review),
-    undated: rows.filter((item) => !item.start && !item.end).length,
+    review: rows.filter((item) => item.review || !experienceLayer(item, asOf)),
+    undated: rows.filter((item) => !experienceInterval(item)).length,
     experiences: rows,
     hidden: [...hidden.values()]
       .filter(

@@ -1,0 +1,461 @@
+{
+  "result": {
+    "entries": [
+      {
+        "id": "01M50HMF38M09GBY4NQBMKPEHZ",
+        "ts": "2026-10-16T02:46:40+07:00",
+        "by": "agent",
+        "place": {
+          "name": "Ho Chi Minh City",
+          "country": "VN",
+          "geonameid": 1566083,
+          "lat": 10.823,
+          "lng": 106.6296,
+          "precision": "city"
+        },
+        "event_type": "travel",
+        "fact_status": "user_reported",
+        "start": "2023",
+        "time_precision": "year",
+        "title": "外部写入的胡志明市旅行",
+        "source": "me/sources/map-evidence.md#L34"
+      }
+    ],
+    "added": 1,
+    "version": "4ebbfbf034d9752a2abb4a77adb7cc74bc57e2cb"
+  },
+  "map": {
+    "type": "FeatureCollection",
+    "asOf": "2026-10-16",
+    "features": [
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [105.8412, 21.0245]
+        },
+        "properties": {
+          "layer": "been",
+          "place": {
+            "name": "Hanoi",
+            "country": "VN",
+            "geonameid": 1581130,
+            "lat": 21.0245,
+            "lng": 105.8412,
+            "precision": "city"
+          },
+          "experiences": [
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q2",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "河内居住",
+              "event_type": "lived",
+              "start": "2019",
+              "end": "2022",
+              "time_precision": "year",
+              "place": {
+                "name": "Hanoi",
+                "country": "VN",
+                "geonameid": 1581130,
+                "lat": 21.0245,
+                "lng": 105.8412,
+                "precision": "city"
+              },
+              "fact_status": "user_reported",
+              "source": "me/sources/map-evidence.md#L20",
+              "rev": 2
+            },
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q3",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "河内闰日旅行",
+              "event_type": "travel",
+              "start": "2024-02-29",
+              "time_precision": "day",
+              "place": {
+                "name": "Hanoi",
+                "country": "VN",
+                "geonameid": 1581130,
+                "lat": 21.0245,
+                "lng": 105.8412,
+                "precision": "city"
+              },
+              "fact_status": "user_reported",
+              "source": "me/sources/map-evidence.md#L22",
+              "rev": 2
+            }
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [106.6296, 10.823]
+        },
+        "properties": {
+          "layer": "been",
+          "place": {
+            "name": "Ho Chi Minh City",
+            "country": "VN",
+            "geonameid": 1566083,
+            "lat": 10.823,
+            "lng": 106.6296,
+            "precision": "city"
+          },
+          "experiences": [
+            {
+              "id": "01M50HMF38M09GBY4NQBMKPEHZ",
+              "ts": "2026-10-16T02:46:40+07:00",
+              "by": "agent",
+              "place": {
+                "name": "Ho Chi Minh City",
+                "country": "VN",
+                "geonameid": 1566083,
+                "lat": 10.823,
+                "lng": 106.6296,
+                "precision": "city"
+              },
+              "event_type": "travel",
+              "fact_status": "user_reported",
+              "start": "2023",
+              "time_precision": "year",
+              "title": "外部写入的胡志明市旅行",
+              "source": "me/sources/map-evidence.md#L34"
+            }
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [139.6917, 35.6895]
+        },
+        "properties": {
+          "layer": "been",
+          "place": {
+            "name": "Tokyo",
+            "country": "JP",
+            "geonameid": 1850147,
+            "lat": 35.6895,
+            "lng": 139.6917,
+            "precision": "city"
+          },
+          "experiences": [
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q4",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "东京跨年旅行",
+              "event_type": "travel",
+              "start": "2024-12-20",
+              "end": "2025-01-10",
+              "time_precision": "day",
+              "place": {
+                "name": "Tokyo",
+                "country": "JP",
+                "geonameid": 1850147,
+                "lat": 35.6895,
+                "lng": 139.6917,
+                "precision": "city"
+              },
+              "fact_status": "user_reported",
+              "source": "me/sources/map-evidence.md#L24",
+              "rev": 2
+            },
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q5",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "东京日期不详",
+              "event_type": "visit",
+              "time_precision": "unknown",
+              "place": {
+                "name": "Tokyo",
+                "country": "JP",
+                "geonameid": 1850147,
+                "lat": 35.6895,
+                "lng": 139.6917,
+                "precision": "city"
+              },
+              "fact_status": "user_reported",
+              "source": "me/sources/map-evidence.md#L26",
+              "rev": 2
+            }
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [105.8412, 21.0245]
+        },
+        "properties": {
+          "layer": "now",
+          "place": {
+            "name": "Hanoi",
+            "country": "VN",
+            "geonameid": 1581130,
+            "lat": 21.0245,
+            "lng": 105.8412,
+            "precision": "city"
+          },
+          "experiences": [
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q8",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "河内工作",
+              "event_type": "worked",
+              "start": "2026-01",
+              "end": "2027-06",
+              "time_precision": "month",
+              "place": {
+                "name": "Hanoi",
+                "country": "VN",
+                "geonameid": 1581130,
+                "lat": 21.0245,
+                "lng": 105.8412,
+                "precision": "city"
+              },
+              "fact_status": "user_reported",
+              "source": "me/sources/map-evidence.md#L32",
+              "rev": 2
+            }
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [108.2208, 16.0678]
+        },
+        "properties": {
+          "layer": "planned",
+          "place": {
+            "name": "Da Nang",
+            "country": "VN",
+            "geonameid": 1583992,
+            "lat": 16.0678,
+            "lng": 108.2208,
+            "precision": "city"
+          },
+          "experiences": [
+            {
+              "id": "01M50GZSAYE54DBD3JS4CG77Q7",
+              "ts": "2026-10-16T02:35:23+07:00",
+              "by": "user",
+              "title": "岘港计划",
+              "event_type": "travel",
+              "start": "2026-12",
+              "time_precision": "month",
+              "fact_status": "planned",
+              "place": {
+                "name": "Da Nang",
+                "country": "VN",
+                "geonameid": 1583992,
+                "lat": 16.0678,
+                "lng": 108.2208,
+                "precision": "city"
+              },
+              "source": "me/sources/map-evidence.md#L30",
+              "rev": 2
+            }
+          ]
+        }
+      }
+    ],
+    "review": [
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q6",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "首尔未来日期待核对",
+        "event_type": "visit",
+        "start": "2030",
+        "time_precision": "year",
+        "place": {
+          "name": "Seoul",
+          "country": "KR",
+          "geonameid": 1835848,
+          "lat": 37.566,
+          "lng": 126.9784,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L28",
+        "rev": 2
+      }
+    ],
+    "undated": 1,
+    "experiences": [
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q2",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "河内居住",
+        "event_type": "lived",
+        "start": "2019",
+        "end": "2022",
+        "time_precision": "year",
+        "place": {
+          "name": "Hanoi",
+          "country": "VN",
+          "geonameid": 1581130,
+          "lat": 21.0245,
+          "lng": 105.8412,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L20",
+        "rev": 2
+      },
+      {
+        "id": "01M50HMF38M09GBY4NQBMKPEHZ",
+        "ts": "2026-10-16T02:46:40+07:00",
+        "by": "agent",
+        "place": {
+          "name": "Ho Chi Minh City",
+          "country": "VN",
+          "geonameid": 1566083,
+          "lat": 10.823,
+          "lng": 106.6296,
+          "precision": "city"
+        },
+        "event_type": "travel",
+        "fact_status": "user_reported",
+        "start": "2023",
+        "time_precision": "year",
+        "title": "外部写入的胡志明市旅行",
+        "source": "me/sources/map-evidence.md#L34"
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q3",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "河内闰日旅行",
+        "event_type": "travel",
+        "start": "2024-02-29",
+        "time_precision": "day",
+        "place": {
+          "name": "Hanoi",
+          "country": "VN",
+          "geonameid": 1581130,
+          "lat": 21.0245,
+          "lng": 105.8412,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L22",
+        "rev": 2
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q4",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "东京跨年旅行",
+        "event_type": "travel",
+        "start": "2024-12-20",
+        "end": "2025-01-10",
+        "time_precision": "day",
+        "place": {
+          "name": "Tokyo",
+          "country": "JP",
+          "geonameid": 1850147,
+          "lat": 35.6895,
+          "lng": 139.6917,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L24",
+        "rev": 2
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q8",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "河内工作",
+        "event_type": "worked",
+        "start": "2026-01",
+        "end": "2027-06",
+        "time_precision": "month",
+        "place": {
+          "name": "Hanoi",
+          "country": "VN",
+          "geonameid": 1581130,
+          "lat": 21.0245,
+          "lng": 105.8412,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L32",
+        "rev": 2
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q7",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "岘港计划",
+        "event_type": "travel",
+        "start": "2026-12",
+        "time_precision": "month",
+        "fact_status": "planned",
+        "place": {
+          "name": "Da Nang",
+          "country": "VN",
+          "geonameid": 1583992,
+          "lat": 16.0678,
+          "lng": 108.2208,
+          "precision": "city"
+        },
+        "source": "me/sources/map-evidence.md#L30",
+        "rev": 2
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q6",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "首尔未来日期待核对",
+        "event_type": "visit",
+        "start": "2030",
+        "time_precision": "year",
+        "place": {
+          "name": "Seoul",
+          "country": "KR",
+          "geonameid": 1835848,
+          "lat": 37.566,
+          "lng": 126.9784,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L28",
+        "rev": 2
+      },
+      {
+        "id": "01M50GZSAYE54DBD3JS4CG77Q5",
+        "ts": "2026-10-16T02:35:23+07:00",
+        "by": "user",
+        "title": "东京日期不详",
+        "event_type": "visit",
+        "time_precision": "unknown",
+        "place": {
+          "name": "Tokyo",
+          "country": "JP",
+          "geonameid": 1850147,
+          "lat": 35.6895,
+          "lng": 139.6917,
+          "precision": "city"
+        },
+        "fact_status": "user_reported",
+        "source": "me/sources/map-evidence.md#L26",
+        "rev": 2
+      }
+    ],
+    "hidden": []
+  }
+}

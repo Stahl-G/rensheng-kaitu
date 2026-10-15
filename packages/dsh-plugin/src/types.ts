@@ -11,6 +11,7 @@ import type {
 } from "@kaitu/core";
 export type HealthData = ReturnType<typeof readHealthPage>;
 export type {
+  ExperienceSource,
   LifeMapData,
   LifeMapFeature,
   Experience,
@@ -119,7 +120,7 @@ export interface OverviewData {
   blocks: OverviewBlock[];
   next: OverviewNext[];
   allNext: OverviewNext[];
-  sync: { received: number; needsReview: number; updatedAt: string | null };
+  sync: { received: number; needsReview: number; mapNeedsReview: number; updatedAt: string | null };
   versions: OverviewVersion[];
   daily: OverviewDaily | null;
   projects: OverviewProject[];

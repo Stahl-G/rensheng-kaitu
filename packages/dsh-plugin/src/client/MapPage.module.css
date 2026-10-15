@@ -476,3 +476,60 @@
     background: rgb(0 0 0 / 35%);
   }
 }
+
+.range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  border: 0;
+  padding: 12px 0;
+  align-items: end;
+}
+.range label {
+  display: grid;
+  gap: 6px;
+}
+.range input {
+  max-width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--kt-control);
+  background: var(--kt-card);
+  color: var(--kt-text);
+  border-radius: 6px;
+}
+.evidence {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0;
+  min-width: 0;
+}
+.sourceText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--kt-subtle);
+  color: var(--kt-text);
+  font: inherit;
+  line-height: 1.7;
+}
+
+.filterStatus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: var(--kt-secondary);
+  font-size: 13px;
+}
+.source {
+  overflow-wrap: anywhere;
+}
+
+.sourceText mark {
+  background: var(--kt-map-tint);
+  color: inherit;
+}

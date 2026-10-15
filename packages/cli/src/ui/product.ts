@@ -20,6 +20,7 @@ import {
   previewFinanceImport,
   readAvatar,
   readDoing,
+  readExperienceSource,
   readHealthPage,
   readMe,
   readNews,
@@ -87,6 +88,8 @@ export async function productRequest(ws: Workspace, method: string, args: unknow
           : null,
         recent7: { ...p.recent7, commits: p.recent7.commitsRecorded ? p.recent7.commits : null },
       }));
+    case "experienceSource":
+      return readExperienceSource(ws, text(0));
     case "lifeMap":
       return lifeMap(ws);
     case "resolveExperience":

@@ -37,6 +37,7 @@ const props: OverviewPageProps = {
   loadHealthPhoto: (id) => call("healthPhoto", id),
   loadProjects: () => call("projects"),
   loadDoing: () => call("doing"),
+  loadExperienceSource: (id) => call("experienceSource", id),
   loadLifeMap: () => call("lifeMap"),
   resolveExperience: (id, city) => call("resolveExperience", id, city),
   editExperience: (id, changes, revision) => call("editExperience", id, changes, revision),
