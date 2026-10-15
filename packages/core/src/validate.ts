@@ -156,6 +156,38 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
     } else if (f.startsWith("memory/") && name.endsWith(".md") && name !== "MEMORY.md") {
       const d = fm(f);
       if (d) check(reg.builtin("memory.schema.json"), d, f, issues);
+    } else if (f.startsWith("chats/") && name.endsWith(".jsonl")) {
+      const lines = ws.readText(f).split("\n");
+      if (lines.at(-1) === "") lines.pop();
+      if (lines.length === 0) issues.push({ file: f, message: "缺少对话头" });
+      for (const [i, raw] of lines.entries()) {
+        let row: unknown;
+        try {
+          row = JSON.parse(raw);
+        } catch {
+          issues.push({ file: f, line: i + 1, message: "不是合法 JSON" });
+          continue;
+        }
+        check(reg.builtin("chat.schema.json"), row, f, issues, i + 1);
+        const data = row as Record<string, unknown> | null;
+        if (data?.type !== (i === 0 ? "chat" : "message")) {
+          issues.push({
+            file: f,
+            line: i + 1,
+            message: i === 0 ? "首行必须是对话头" : "对话头之后只能是消息",
+          });
+        }
+        if (i === 0 && data?.type === "chat" && tz && typeof data.created === "string") {
+          try {
+            const month = localMonth(parseTs(data.created), tz).replace("-", "/");
+            if (f !== `chats/${month}/${data.id}.jsonl`) {
+              issues.push({ file: f, message: "路径应与对话 id 和创建时间的本地月份一致" });
+            }
+          } catch (e) {
+            issues.push({ file: f, line: 1, message: (e as Error).message });
+          }
+        }
+      }
     } else if (/^[^/]+\/data\/labs\/[^/]+\.json$/.test(f)) {
       const d = json(f);
       if (d !== undefined) check(reg.builtin("lab.schema.json"), d, f, issues);

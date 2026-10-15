@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/chat.schema.json",
+  "title": "对话 JSONL 行",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "title", "source", "created", "updated"],
+      "properties": {
+        "type": { "const": "chat" },
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "source": { "type": "string", "minLength": 1 },
+        "created": { "type": "string", "format": "date-time" },
+        "updated": { "type": "string", "format": "date-time" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "role", "ts", "text"],
+      "properties": {
+        "type": { "const": "message" },
+        "id": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["user", "assistant", "system", "tool"] },
+        "ts": { "type": ["string", "null"], "format": "date-time" },
+        "text": { "type": "string" }
+      }
+    }
+  ]
+}

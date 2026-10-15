@@ -49,6 +49,14 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   const missing = REQUIRED_FILES.filter((f) => !ws.exists(f));
   add("必需文件齐全", missing.length === 0, missing.length ? `缺少：${missing.join("、")}` : undefined);
 
+  if (ws.exists("memory/MEMORY.md")) {
+    // 中文约每字一个 token，其他字符约四个一个，仅用于提醒整理。
+    const text = ws.readText("memory/MEMORY.md");
+    const chinese = [...text].filter((char) => /[\u3400-\u9fff]/.test(char)).length;
+    const tokens = Math.ceil(chinese + ([...text].length - chinese) / 4);
+    add("记忆索引大小", tokens <= 3000, tokens > 3000 ? "需要在晚间复盘中合并" : undefined);
+  }
+
   const have = new Set(listModules(ws).map((m) => m.dir));
   const lacking = BUILTIN_MODULES.filter((m) => !have.has(m));
   add("内置模块齐全", lacking.length === 0, lacking.length ? `缺少：${lacking.join("、")}` : undefined);

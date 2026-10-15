@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { schemas } from "../src/index.js";
+import { schemas, validateWorkspace } from "../src/index.js";
+import { freshWorkspace } from "./helpers.js";
 
 const base = { id: "01J9Z8Y7X6W5V4T3S2R1Q0P9N8", ts: "2026-10-15T21:00:00+08:00", by: "agent" };
 
@@ -119,6 +120,28 @@ describe("记录 schema", () => {
 });
 
 describe("文件格式 schema", () => {
+  it("对话逐行校验，拒绝非法消息和放错月份的文件", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    const header = {
+      type: "chat",
+      id: "chat-1",
+      title: "测试对话",
+      source: "chatgpt",
+      created: "2026-10-31T23:30:00Z",
+      updated: "2026-10-31T23:30:00Z",
+    };
+    const message = { type: "message", id: "m-1", role: "user", ts: null, text: "你好" };
+    const file = "chats/2026/11/chat-1.jsonl";
+    const write = (rows: unknown[]) =>
+      ws.writeText(file, `${rows.map((r) => JSON.stringify(r)).join("\n")}\n`);
+    write([header, message]);
+    expect(validateWorkspace(ws, "chats")).toEqual([]);
+    write([header, { ...message, role: "invalid" }]);
+    expect(validateWorkspace(ws, "chats").some((i) => i.line === 2)).toBe(true);
+    write([{ ...header, created: "2026-10-01T00:00:00+08:00" }, message]);
+    expect(validateWorkspace(ws, "chats").length).toBeGreaterThan(0);
+  });
+
   it("module.json：visibility 与视图类型受限，schema 路径不能跳出模块目录", () => {
     const mod = { id: "books", name: "读书", version: 1, visibility: "agent" };
     expect(valid("module.schema.json", mod)).toBe(true);

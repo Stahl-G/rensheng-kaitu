@@ -1,10 +1,13 @@
 export * from "./agents-md.js";
 export { assetsRoot, schemasDir, templateDir } from "./assets.js";
+export * from "./chat-search.js";
+export * from "./chats.js";
 export * from "./doctor.js";
 export * from "./errors.js";
 export * from "./frontmatter.js";
 export * from "./history.js";
 export * from "./init.js";
+export * from "./memory.js";
 export * from "./modules.js";
 export * from "./records.js";
 export { formatErrors, SchemaRegistry, schemas, type SchemaIssue } from "./schema.js";

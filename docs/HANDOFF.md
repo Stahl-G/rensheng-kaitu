@@ -147,9 +147,19 @@
   - 修改记录时，新版本写进新 `ts` 所在月份的文件；读取时跨所有月份按 `rev` 取最新，所以改日期不会留下旧版本。删除标记写在删除时刻所在月份。
   - `record add` 的 `ts` 可由调用方给出（补记昨天的训练），必须带时区偏移；不给就用当前时间。
   - 恢复前先自动存一个版本，恢复本身也生成一个版本，所以恢复可以撤销。密钥、索引、缓存除 `.gitignore` 外还在代码里硬排除。
+  - 对话放在 `chats/YYYY/MM/<id>.jsonl`，月份按创建时间在用户时区切分。首行是
+    `{type:"chat",id,title,source,created,updated}`，之后每行是
+    `{type:"message",id,role,ts,text}`，`role` 为 `user|assistant|system|tool`。
+    时间为带偏移的 ISO 8601，原消息无时间时 `ts` 为 `null`；按 `chat.schema.json` 校验。
 - 外部文件变化的 30 秒防抖自动提交（PRD §7.3）需要常驻进程，留到阶段 3；阶段 1 用 `kaitu snapshot -m`，AGENTS.md 已写明。
-- `AGENTS.md` 生成器先做了基础版（读取顺序、模块清单、写入与确认规则、安全），T10 再补记忆规则、日常节奏、技能清单。
+- `AGENTS.md` 生成器先做了基础版（读取顺序、模块清单、写入与确认规则、安全），记忆规则已在 T6 补齐，T10 再补日常节奏、技能清单。
 - 已核实：Node 26 的 `node:sqlite` 带 FTS5。Node 22 上尚未验证（HANDOFF §6 一项仍待确认）。
+
+### 2026-10-15：T6 记忆与对话检索
+
+- 记忆增改删后重写 `MEMORY.md` 并自动生成版本；更改名称或类型会重命名条目文件，保留正文和来源。
+- ChatGPT JSON / zip 导入按 `current_node` 选择显示分支，同一更新时间跳过，整次导入仅生成一个版本；`--dry-run` 不写入。
+- 对话全文索引使用 `node:sqlite` FTS5 trigram，少于 3 字符改用 LIKE。索引可重建，搜索时同步文件变化与恢复操作。
 
 ## 9. 用户偏好（从讨论中总结）
 

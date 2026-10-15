@@ -4,17 +4,27 @@ import { parseArgs } from "node:util";
 import {
   type By,
   KaituError,
+  type MemoryInput,
+  type MemoryPatch,
   Workspace,
+  addMemory,
   addRecord,
   defaultRoot,
   deleteRecord,
   doctor,
   findRecordType,
   history,
+  importChatgptConversations,
   initWorkspace,
+  listMemories,
   readRecords,
+  reindexChats,
+  removeMemory,
   restore,
+  searchChats,
+  searchMemories,
   snapshot,
+  updateMemory,
   updateRecord,
   validateWorkspace,
   writeAgentsMd,
@@ -31,6 +41,14 @@ const HELP = `开图 kaitu
   kaitu record update <类型> <id> --json '{...}'   修改记录
   kaitu record rm <类型> <id>                      删除记录
   kaitu record list <类型> [--from 日期] [--to 日期]
+  kaitu memory add --type <类型> --name <名称> --text <内容> [--source 路径] [--sensitive]
+  kaitu memory update <文件名> [--type 类型] [--name 名称] [--text 内容] [--sensitive | --no-sensitive]
+  kaitu memory rm <文件名>                          删除记忆
+  kaitu memory list                                列出记忆
+  kaitu memory search <词>                          搜索记忆
+  kaitu import chatgpt-conversations <文件> [--dry-run]
+  kaitu chats search <词> [--limit N]               搜索历史对话
+  kaitu chats reindex                              重建对话索引
   kaitu history [路径] [--limit N]                 版本历史
   kaitu restore <版本> [路径]                      恢复到某个版本
   kaitu snapshot -m <说明>                         手动保存一个版本
@@ -51,6 +69,13 @@ const options = {
   limit: { type: "string" },
   timezone: { type: "string" },
   message: { type: "string", short: "m" },
+  type: { type: "string" },
+  name: { type: "string" },
+  text: { type: "string" },
+  source: { type: "string" },
+  sensitive: { type: "boolean" },
+  "no-sensitive": { type: "boolean" },
+  "dry-run": { type: "boolean" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -174,6 +199,91 @@ async function run(argv: string[]): Promise<number> {
       }
       const version = await snapshot(ws, message);
       out(values, { ...result, version }, `${message}（${result.file}）\nid: ${result.record.id}`);
+      return 0;
+    }
+    case "memory": {
+      const [sub, arg] = args;
+      const ws = workspace(values);
+      if (sub === "list" || sub === "search") {
+        const memories = sub === "list" ? listMemories(ws) : searchMemories(ws, need(arg, "词"));
+        out(
+          values,
+          memories,
+          memories.map((m) => `${m.file}  ${m.name} —— ${m.text}`).join("\n") || "（没有记忆）",
+        );
+        return 0;
+      }
+      if (values.sensitive && values["no-sensitive"]) {
+        throw new KaituError("--sensitive 与 --no-sensitive 不能同时使用", "BAD_ARGS");
+      }
+      const opts = { by: values.by ? parseBy(values.by) : undefined };
+      if (sub === "add") {
+        const entry = await addMemory(
+          ws,
+          {
+            type: need(values.type, "--type") as MemoryInput["type"],
+            name: need(values.name, "--name"),
+            text: need(values.text, "--text"),
+            source: values.source,
+            sensitive: values.sensitive,
+          },
+          opts,
+        );
+        out(values, entry, `已记住：${entry.name}（memory/${entry.file}）`);
+      } else if (sub === "update") {
+        const patch: MemoryPatch = {};
+        if (values.type !== undefined) patch.type = values.type as MemoryInput["type"];
+        if (values.name !== undefined) patch.name = values.name;
+        if (values.text !== undefined) patch.text = values.text;
+        if (values.sensitive !== undefined) patch.sensitive = values.sensitive;
+        if (values["no-sensitive"]) patch.sensitive = false;
+        const entry = await updateMemory(ws, need(arg, "文件名"), patch, opts);
+        out(values, entry, `已更新记忆：${entry.name}（memory/${entry.file}）`);
+      } else if (sub === "rm") {
+        const entry = await removeMemory(ws, need(arg, "文件名"), opts);
+        out(values, entry, `已删除记忆：${entry.name}`);
+      } else {
+        throw new KaituError(`未知子命令：memory ${sub ?? ""}`, "BAD_ARGS");
+      }
+      return 0;
+    }
+    case "import": {
+      const [source, file] = args;
+      if (source !== "chatgpt-conversations") {
+        throw new KaituError(`未知导入来源：${source ?? ""}`, "BAD_ARGS");
+      }
+      const result = await importChatgptConversations(workspace(values), need(file, "文件"), {
+        dryRun: values["dry-run"],
+      });
+      const actions = { added: "新增", updated: "更新", skipped: "跳过" };
+      out(
+        values,
+        result,
+        `${values["dry-run"] ? "预览：将" : "已"}新增 ${result.added} 段，更新 ${result.updated} 段，跳过 ${result.skipped} 段。\n${result.entries
+          .map((entry) => `${actions[entry.action]}：${entry.title}`)
+          .join("\n")}`,
+      );
+      return 0;
+    }
+    case "chats": {
+      const [sub, query] = args;
+      const ws = workspace(values);
+      if (sub === "reindex") {
+        const count = reindexChats(ws);
+        out(values, { count }, `已重建 ${count} 段对话的索引。`);
+      } else if (sub === "search") {
+        const results = searchChats(ws, need(query, "词"), {
+          limit: values.limit === undefined ? undefined : Number(values.limit),
+        });
+        out(
+          values,
+          results,
+          results.map((r) => `${r.id}  ${r.title}  ${r.date}\n${r.file}\n${r.snippet}`).join("\n\n") ||
+            "（没有匹配的对话）",
+        );
+      } else {
+        throw new KaituError(`未知子命令：chats ${sub ?? ""}`, "BAD_ARGS");
+      }
       return 0;
     }
     case "history": {
