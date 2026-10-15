@@ -86,7 +86,7 @@ function activityName(value: string): string {
     .replace(/^HKWorkoutActivityType/, "")
     .replace(/([a-z])([A-Z])/g, "$1_$2")
     .toLowerCase();
-  return ACTIVITIES[key] ?? "体能训练";
+  return ACTIVITIES[key] ?? (/\p{Script=Han}/u.test(value) ? value : "体能训练");
 }
 
 export function healthCandidates(zone: string) {
@@ -228,8 +228,8 @@ export function healthCandidates(zone: string) {
       const steps = max("StepCount");
       const active = max("ActiveEnergyBurned");
       const basal = max("BasalEnergyBurned");
-      candidates.push(
-        candidate("activity", {
+      candidates.push({
+        ...candidate("activity", {
           ts: isoInZone(localTimeToInstant(`${date}T00:00:00`, zone), zone),
           date,
           ...(steps === undefined ? {} : { steps: Math.round(steps) }),
@@ -239,7 +239,8 @@ export function healthCandidates(zone: string) {
             : { total_kcal: (active ?? 0) + (basal ?? 0) }),
           source: "apple-health",
         }),
-      );
+        activityTotals: { basalKcal: basal },
+      });
     }
     const nights = new Map<string, Map<string, Session[]>>();
     for (const [source, segments] of sleep) {
@@ -396,15 +397,15 @@ export async function importAppleHealth(ws: Workspace, inputFile: string, opts: 
   return importBatch(ws, "apple-health", candidates, { ...opts, ignored });
 }
 
-const SHORTCUT_TYPES: Record<string, string> = {
-  step_count: "StepCount",
-  body_mass: "BodyMass",
-  body_fat_percentage: "BodyFatPercentage",
-  resting_heart_rate: "RestingHeartRate",
-  sleep_analysis: "HKCategoryTypeIdentifierSleepAnalysis",
-  active_energy: "ActiveEnergyBurned",
-  basal_energy: "BasalEnergyBurned",
-  workout: "workout",
+const SHORTCUT_TYPES: Record<string, { type: string; unit: string }> = {
+  step_count: { type: "StepCount", unit: "count" },
+  body_mass: { type: "BodyMass", unit: "kg" },
+  body_fat_percentage: { type: "BodyFatPercentage", unit: "fraction" },
+  resting_heart_rate: { type: "RestingHeartRate", unit: "bpm" },
+  sleep_analysis: { type: "HKCategoryTypeIdentifierSleepAnalysis", unit: "" },
+  active_energy: { type: "ActiveEnergyBurned", unit: "kcal" },
+  basal_energy: { type: "BasalEnergyBurned", unit: "kcal" },
+  workout: { type: "workout", unit: "min" },
 };
 const SLEEP_VALUES: Record<string, string> = {
   asleep: "Asleep",
@@ -414,17 +415,83 @@ const SLEEP_VALUES: Record<string, string> = {
   asleep_unspecified: "AsleepUnspecified",
   awake: "Awake",
   in_bed: "InBed",
+  core: "AsleepCore",
+  deep: "AsleepDeep",
+  rem: "AsleepREM",
+  "in bed": "InBed",
+  核心: "AsleepCore",
+  深度: "AsleepDeep",
+  快速动眼: "AsleepREM",
+  快速眼动: "AsleepREM",
+  清醒: "Awake",
+  在床上: "InBed",
+  睡眠: "Asleep",
+  睡着: "Asleep",
+  已入睡: "Asleep",
+  核心睡眠: "AsleepCore",
+  深度睡眠: "AsleepDeep",
+  快速动眼睡眠: "AsleepREM",
 };
+
+function parallelSamples(raw: Record<string, unknown>) {
+  const type = typeof raw.type === "string" ? raw.type : "";
+  const definition = SHORTCUT_TYPES[type];
+  if (!definition) throw new Error(`未知健康类型：${type}`);
+  // 没有样本时快捷指令发来空字符串（如不戴表睡觉），直接归档，不生成笔记。
+  if (raw.values === "" && raw.starts === "") return [];
+  const columns: Record<string, string[]> = {};
+  for (const key of ["values", "starts", "ends", "units", "names", "sources"]) {
+    const value = raw[key];
+    if (value === undefined && !["values", "starts"].includes(key)) continue;
+    if (typeof value !== "string") throw new Error(`${key} 必须是换行分隔的字符串`);
+    const lines = value.split(/\r\n|\n|\r/).map((line) => line.trim());
+    const count = columns.values?.length;
+    if (count !== undefined && lines.length !== count)
+      throw new Error(`${key} 有 ${lines.length} 行，与 values 的 ${count} 行不一致`);
+    columns[key] = lines;
+  }
+  if (type === "sleep_analysis" && !columns.ends) throw new Error("sleep_analysis 缺少 ends");
+  return (columns.values ?? []).map((value, index) => {
+    const start = columns.starts?.[index] ?? "";
+    if (!value || !start) throw new Error(`第 ${index + 1} 行的 values 或 starts 为空`);
+    const end = columns.ends?.[index] ?? start;
+    parseTs(end);
+    if (+parseTs(end) < +parseTs(start)) throw new Error(`第 ${index + 1} 行的 ends 早于 starts`);
+    const daily = ["step_count", "active_energy", "basal_energy"].includes(type);
+    return {
+      type,
+      start,
+      // 并列列表的活动值已经按天汇总，不按首条样本至 ends 的时长分摊。
+      end: daily ? start : end,
+      value,
+      unit: columns.units?.[index] ?? definition.unit,
+      source: columns.sources?.[index] ?? "快捷指令",
+      ...(type === "workout"
+        ? { workout: { activity: columns.names?.[index] ?? "other", duration_min: Number(value) } }
+        : {}),
+    };
+  });
+}
 
 export function parseHealthShortcut(inputFile: string, zone: string) {
   try {
     const raw = JSON.parse(readFileSync(inputFile, "utf8"));
-    if (raw.format !== "kaitu.health.v1" || typeof raw.device !== "string" || !Array.isArray(raw.samples))
+    if (!raw || typeof raw !== "object" || Array.isArray(raw))
       throw new Error("Invalid health shortcut envelope");
-    parseTs(raw.exported_at);
+    const parallel = "values" in raw && "starts" in raw && "type" in raw;
+    let samples = raw.samples;
+    if (parallel) {
+      if (raw.format !== undefined && raw.format !== "kaitu.health.v1")
+        throw new Error("Invalid health shortcut format");
+      samples = parallelSamples(raw);
+    } else {
+      if (raw.format !== "kaitu.health.v1" || typeof raw.device !== "string" || !Array.isArray(samples))
+        throw new Error("Invalid health shortcut envelope");
+      parseTs(raw.exported_at);
+    }
     const collector = healthCandidates(zone);
-    for (const sample of raw.samples) {
-      const type = SHORTCUT_TYPES[sample.type];
+    for (const sample of samples) {
+      const type = SHORTCUT_TYPES[sample.type]?.type;
       if (
         !type ||
         typeof sample.source !== "string" ||
@@ -455,14 +522,14 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
         unit: sample.unit,
         value:
           type === "HKCategoryTypeIdentifierSleepAnalysis"
-            ? (SLEEP_VALUES[sample.value] ?? sample.value)
+            ? (SLEEP_VALUES[String(sample.value).toLowerCase()] ?? sample.value)
             : sample.value,
         workout,
       });
     }
     return collector.finish();
-  } catch {
-    throw new KaituError("无法解析快捷指令健康文件", "INVALID_IMPORT");
+  } catch (error) {
+    throw new KaituError(`无法解析快捷指令健康文件：${(error as Error).message}`, "INVALID_IMPORT");
   }
 }
 

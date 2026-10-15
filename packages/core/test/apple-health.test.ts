@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { strToU8, zipSync } from "fflate";
 import { expect, it } from "vitest";
 import { history, restore } from "../src/history.js";
-import { importAppleHealth } from "../src/importers/apple-health.js";
+import { importAppleHealth, importHealthShortcut } from "../src/importers/apple-health.js";
 import { readRecords } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace, tmp } from "./helpers.js";
@@ -162,7 +162,6 @@ it("快捷指令复用映射：本地日期、两来源步数、睡眠合并与�
     ],
   };
   writeFileSync(file, JSON.stringify(raw));
-  const { importHealthShortcut } = await import("../src/importers/apple-health.js");
   const result = await importHealthShortcut(ws, file);
   expect(result.added).toBe(7);
   expect(readRecords(ws, "activity")).toMatchObject([
@@ -195,5 +194,36 @@ it("快捷指令复用映射：本地日期、两来源步数、睡眠合并与�
   );
   expect((await importAppleHealth(ws, xml)).version).toBeNull();
   expect(await history(ws)).toEqual(versions);
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("健康并列列表中文睡眠阶段跨午夜合并，重叠只计一次，清醒与在床不计时长", async () => {
+  const ws = await freshWorkspace("Asia/Ho_Chi_Minh");
+  const file = join(tmp(), "sleep.health.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      type: "sleep_analysis",
+      values: "在床上\n核心\n深度\n清醒\n快速动眼",
+      starts: [
+        "2026-10-14T22:00:00+07:00",
+        "2026-10-14T23:30:00+07:00",
+        "2026-10-15T00:30:00+07:00",
+        "2026-10-15T02:30:00+07:00",
+        "2026-10-15T03:00:00+07:00",
+      ].join("\n"),
+      ends: [
+        "2026-10-15T07:00:00+07:00",
+        "2026-10-15T01:00:00+07:00",
+        "2026-10-15T02:30:00+07:00",
+        "2026-10-15T03:00:00+07:00",
+        "2026-10-15T06:00:00+07:00",
+      ].join("\n"),
+    }),
+  );
+  await importHealthShortcut(ws, file);
+  expect(readRecords(ws, "sleep")).toMatchObject([
+    { start: "2026-10-14T23:30:00+07:00", end: "2026-10-15T06:00:00+07:00", duration_min: 360 },
+  ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });

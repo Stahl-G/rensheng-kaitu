@@ -145,6 +145,8 @@
 
 ### 2026-10-15：工作区升级与健康收件箱
 
+- 快捷指令新增换行字符串并列列表（type / values / starts），与 samples 数组并存；复用健康映射，支持每日累计更新、分类型活动合并与中文睡眠阶段。
+- 并列列长不一致时整文件附原因转待整理笔记；格式见 `docs/guides/health-shortcut-format.md`。
 - `kaitu upgrade [--dry-run]` 按模板哈希升级：补内置模块与新增 records / views / sources / tabs，保留用户字段与自建技能。
 - 两处内置技能覆盖更新，重新生成 AGENTS / AGENT-README / OVERVIEW；整次升级一个版本，随后 validate 与 doctor。当前版本重复运行不写入。
 - 初始化记录 template_version；旧模板在 doctor 与工作台提示升级，预览不执行工作区迁移或维护写入。

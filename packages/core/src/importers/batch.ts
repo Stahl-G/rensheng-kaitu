@@ -9,6 +9,7 @@ export interface Candidate {
   type: ImportType;
   data: Record<string, unknown>;
   key: string;
+  activityTotals?: { basalKcal?: number };
 }
 export interface Counts {
   added: number;
@@ -89,11 +90,22 @@ export async function importBatch(
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
     for (const item of group.values()) {
       const previous = existing.get(item.key);
-      if (!previous) added.push(item.data);
-      else if (isDeepStrictEqual(content(previous), content(item.data))) counts.skipped++;
+      let data = item.data;
+      if (previous && item.activityTotals) {
+        data = { ...content(previous), ...data };
+        if (item.data.total_kcal !== undefined) {
+          const basal =
+            item.activityTotals.basalKcal ??
+            Number(previous.total_kcal ?? 0) - Number(previous.active_kcal ?? 0);
+          data.total_kcal = Number(data.active_kcal ?? 0) + basal;
+        }
+        group.set(item.key, { ...item, data });
+      }
+      if (!previous) added.push(data);
+      else if (isDeepStrictEqual(content(previous), content(data))) counts.skipped++;
       else {
         const patch = Object.fromEntries(Object.keys(content(previous)).map((key) => [key, undefined]));
-        updated.push({ id: previous.id, patch: { ...patch, ...item.data } });
+        updated.push({ id: previous.id, patch: { ...patch, ...data } });
       }
     }
     const deleted = opts.deleteMissing

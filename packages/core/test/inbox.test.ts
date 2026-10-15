@@ -196,3 +196,82 @@ it("健康快捷指令稳定后才整批导入，重复投递无版本，失败�
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+it("健康并列列表：+07:00 的八天累计按本地日期导入，重复无版本，当天累计追加修订", async () => {
+  const ws = await freshWorkspace("Asia/Ho_Chi_Minh");
+  try {
+    const file = "inbox/health/steps.health.json";
+    const payload = {
+      values: "2288\n7930\n1774\n4081\n6189\n3241\n4820\n383",
+      starts: [
+        "2026-10-08T06:44:25+07:00",
+        "2026-10-09T06:41:36+07:00",
+        "2026-10-10T06:14:17+07:00",
+        "2026-10-11T08:52:02+07:00",
+        "2026-10-12T06:38:49+07:00",
+        "2026-10-13T00:02:34+07:00",
+        "2026-10-14T06:36:28+07:00",
+        "2026-10-15T06:41:39+07:00",
+      ].join("\n"),
+      type: "step_count",
+    };
+    ws.writeJson(file, payload);
+    expect((await processInbox(ws, { stableMs: 0 })).processed).toEqual([file]);
+    const records = readRecords(ws, "activity");
+    expect(records.map(({ date, steps, ts }) => ({ date, steps, ts }))).toEqual([
+      { date: "2026-10-08", steps: 2288, ts: "2026-10-08T00:00:00+07:00" },
+      { date: "2026-10-09", steps: 7930, ts: "2026-10-09T00:00:00+07:00" },
+      { date: "2026-10-10", steps: 1774, ts: "2026-10-10T00:00:00+07:00" },
+      { date: "2026-10-11", steps: 4081, ts: "2026-10-11T00:00:00+07:00" },
+      { date: "2026-10-12", steps: 6189, ts: "2026-10-12T00:00:00+07:00" },
+      { date: "2026-10-13", steps: 3241, ts: "2026-10-13T00:00:00+07:00" },
+      { date: "2026-10-14", steps: 4820, ts: "2026-10-14T00:00:00+07:00" },
+      { date: "2026-10-15", steps: 383, ts: "2026-10-15T00:00:00+07:00" },
+    ]);
+    const versions = await history(ws);
+    ws.writeJson(file, payload);
+    await processInbox(ws, { stableMs: 0 });
+    expect(await history(ws)).toEqual(versions);
+    ws.writeJson(file, {
+      type: "step_count",
+      values: "1260",
+      starts: "2026-10-15T06:41:39+07:00",
+    });
+    await processInbox(ws, { stableMs: 0 });
+    const updated = readRecords(ws, "activity");
+    expect(updated).toHaveLength(8);
+    expect(updated.slice(0, 7)).toEqual(records.slice(0, 7));
+    expect(updated[7]).toMatchObject({ id: records[7]?.id, date: "2026-10-15", steps: 1260, rev: 2 });
+    expect(await history(ws)).toHaveLength(versions.length + 1);
+    const empty = "inbox/health/sleep.health.json";
+    ws.writeJson(empty, { type: "sleep_analysis", values: "", starts: "", ends: "" });
+    const quiet = await processInbox(ws, { stableMs: 0 });
+    expect(quiet.processed).toEqual([empty]);
+    expect(quiet.notes).toEqual([]);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("健康并列列表行数不一致时整份作为附件转笔记，不写入前面的有效行", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const file = "inbox/health/mismatch.health.json";
+    const payload = {
+      type: "body_mass",
+      values: "70\n71",
+      starts: "2026-10-14T08:00:00+07:00\n2026-10-15T08:00:00+07:00",
+      units: "kg",
+    };
+    ws.writeJson(file, payload);
+    const result = await processInbox(ws, { stableMs: 0 });
+    expect(result.processed).toEqual([]);
+    expect(result.notes).toHaveLength(1);
+    expect(readRecords(ws, "metric")).toEqual([]);
+    expect(ws.exists(file)).toBe(false);
+    const note = parseFrontmatter<{ attachment: string }>(ws.readText(result.notes[0] as string));
+    expect(ws.readJson(note.data.attachment)).toEqual(payload);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
