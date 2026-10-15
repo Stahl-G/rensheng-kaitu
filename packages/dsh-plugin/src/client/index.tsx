@@ -48,6 +48,21 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadNews: async () => {
+                const result = await ctx.remote.kaitu.news();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              tryNews: async (id: string) => {
+                const result = await ctx.remote.kaitu.tryNews(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              dismissNews: async (id: string) => {
+                const result = await ctx.remote.kaitu.dismissNews(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadMe: async () => {
                 const result = await ctx.remote.kaitu.me();
                 if (!result.ok) throw new Error(result.error.message);

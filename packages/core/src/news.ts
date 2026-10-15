@@ -33,6 +33,9 @@ export interface NewsData {
   trends: Trend[];
   others: NewsItem[];
   sources: Partial<Record<NewsVia, number>>;
+  keywords: string[] | null;
+  feedCount: number | null;
+  moduleNames: Record<string, string>;
 }
 
 function newsUrl(value: string): string {
@@ -71,7 +74,9 @@ export function mergeNewsRecord(
 }
 
 function feedSettings(ws: Workspace) {
-  return ws.readJson<{ muted?: string[]; [key: string]: unknown }>("feed/feeds.json");
+  return ws.exists("feed/feeds.json")
+    ? ws.readJson<{ feeds?: unknown[]; keywords?: string[]; muted?: string[] }>("feed/feeds.json")
+    : {};
 }
 
 export function readNews(ws: Workspace, now = new Date()): NewsData {
@@ -86,7 +91,8 @@ export function readNews(ws: Workspace, now = new Date()): NewsData {
       return localDate(published, zone) >= firstDay && published <= now;
     })
     .sort((a, b) => Date.parse(b.published_at ?? b.ts) - Date.parse(a.published_at ?? a.ts));
-  const muted = (feedSettings(ws).muted ?? []).map((word) => word.trim().toLowerCase()).filter(Boolean);
+  const settings = feedSettings(ws);
+  const muted = (settings.muted ?? []).map((word) => word.trim().toLowerCase()).filter(Boolean);
   const fresh = recent.filter((row) => row.status === "new");
   const picked = fresh
     .filter(
@@ -106,6 +112,14 @@ export function readNews(ws: Workspace, now = new Date()): NewsData {
     trends: (readRecords(ws, "trend", { from: date, to: date }) as Trend[]).reverse().slice(0, 4),
     others: fresh.filter((row) => !chosen.has(row.id)),
     sources,
+    keywords: settings.keywords ?? null,
+    feedCount: settings.feeds?.length ?? null,
+    moduleNames: Object.fromEntries(
+      listModules(ws).flatMap(({ dir, def }) => [
+        [dir, def.name],
+        [def.id, def.name],
+      ]),
+    ),
   };
 }
 

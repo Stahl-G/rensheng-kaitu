@@ -43,6 +43,9 @@ export interface NewsData {
   trends: NewsTrend[];
   others: NewsItem[];
   sources: Partial<Record<NewsVia, number>>;
+  keywords: string[] | null;
+  feedCount: number | null;
+  moduleNames: Record<string, string>;
 }
 export interface NewsAction {
   id: string;
