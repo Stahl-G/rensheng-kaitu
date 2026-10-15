@@ -129,7 +129,9 @@ if (brandedMain.split("app.setAppLogsPath();").length !== 2)
   throw new Error("日志目录结构已变化，请核对本地 DSH 构建");
 // 欢迎页：DSH 标语换成「Powered by DSH 版本」，顶部标志换成开图标志。
 const poweredBy = `Powered by DSH ${dshVersion}`;
-const slogans = ["'组装无限可能，共探智能上限'", "'Build potential. Explore intelligence.'"];
+const slogans = ["组装无限可能，共探智能上限", "Build potential. Explore intelligence."].map((text) =>
+  JSON.stringify(text),
+);
 for (const slogan of slogans) {
   if (brandedMain.split(slogan).length !== 2) throw new Error(`欢迎页标语结构已变化：${slogan}`);
 }

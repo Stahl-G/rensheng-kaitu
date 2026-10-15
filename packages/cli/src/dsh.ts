@@ -85,7 +85,8 @@ export function renderDshPatch(
   // The default DSH profile is an empty flow sequence. Insert *inside* its
   // brackets so every original byte outside the managed block is preserved.
   const emptyFlow = /^\[[ \t]*\](?=[ \t]*(?:#.*)?$)/m.exec(text);
-  const flow = start >= 0 ? text.slice(0, start).trimEnd().endsWith("[") : emptyFlow !== null;
+  // 受管段前面也可能有别的条目（如 Kaitu.app 的 webserver 行，以逗号结尾），仍属 flow 序列。
+  const flow = start >= 0 ? /[[,]$/.test(text.slice(0, start).trimEnd()) : emptyFlow !== null;
   const outside = start >= 0 ? text.slice(0, start) + text.slice(end + END.length) : text;
   const schedules = schedulePackages(join(options.home, "profiles", "desktop"), outside);
   const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, schedules).trimEnd()}\n${END}`;
