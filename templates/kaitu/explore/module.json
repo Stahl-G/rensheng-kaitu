@@ -1,0 +1,17 @@
+{
+  "id": "explore",
+  "name": "探索",
+  "version": 1,
+  "visibility": "agent",
+  "description": "城市经历与人生地图",
+  "records": {
+    "experience": {
+      "path": "data/experiences/{YYYY-MM}.jsonl",
+      "schema": "schemas/experience.schema.json",
+      "label": "地点经历"
+    }
+  },
+  "agent": {
+    "instructions": "地点经历通过 experience_add 或 kaitu_add_experience 提交，只给城市名和国家代码，坐标由城市表解析。计划用 planned，歧义交给用户核对。"
+  }
+}

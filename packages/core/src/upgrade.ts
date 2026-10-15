@@ -30,7 +30,12 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
 
 export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
   const version = templateVersion();
-  if (!templateOutdated(ws) && ws.exists("ORGANIZER.md") && ws.exists("handoffs/daily"))
+  if (
+    !templateOutdated(ws) &&
+    ws.exists("ORGANIZER.md") &&
+    ws.exists("handoffs/daily") &&
+    ws.exists("explore/module.json")
+  )
     return { templateVersion: version, changes: [], version: null };
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();

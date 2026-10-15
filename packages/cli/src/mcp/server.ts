@@ -1,11 +1,13 @@
 import {
   type Workspace,
+  addExperiences,
   addMemory,
   addTask,
   assertPublicProject,
   completeTask,
   inboxNoteDone,
   inboxNotes,
+  lifeMap,
   listMemories,
   listProjects,
   listTasks,
@@ -18,6 +20,7 @@ import {
   readStatus,
   recordReferences,
   removeMemory,
+  resolvePlace,
   searchChats,
   searchMemories,
   snapshot,
@@ -131,6 +134,33 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
     (input) => listTasks(ws, input),
   );
+  const experience = z
+    .object({
+      place: z.object({ name: text, country: text.optional() }).strict(),
+      event_type: z.enum(["lived", "worked", "studied", "travel", "visit", "other"]),
+      fact_status: z.enum(["observed", "user_reported", "inferred", "planned", "suggested"]),
+      start: text.optional(),
+      end: text.optional(),
+      time_precision: z.enum(["year", "month", "day", "unknown"]),
+      title: text.optional(),
+      notes: text.optional(),
+      source: text,
+    })
+    .strict();
+  register(
+    "place_resolve",
+    "按城市名和国家代码查询城市候选，只读。",
+    { name: text, country: text.optional() },
+    ({ name, country }) => resolvePlace(name, country),
+  );
+  register(
+    "experience_add",
+    "批量记录地点经历，只给城市名和国家代码，不给坐标；计划用 planned。",
+    { items: z.array(experience).min(1) },
+    ({ items }) => addExperiences(ws, items, "agent"),
+    true,
+  );
+  register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     searchMemories(ws, query),

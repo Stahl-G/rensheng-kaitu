@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/experience.schema.json",
+  "title": "地点经历",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "required": ["place", "event_type", "fact_status", "time_precision", "source"],
+  "unevaluatedProperties": false,
+  "properties": {
+    "place": {
+      "type": "object",
+      "required": ["name", "precision"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "examples": ["胡志明市"]
+        },
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$"
+        },
+        "geonameid": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lng": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "precision": {
+          "enum": ["city", "region", "country", "unknown"]
+        }
+      }
+    },
+    "event_type": {
+      "enum": ["lived", "worked", "studied", "travel", "visit", "other"]
+    },
+    "fact_status": {
+      "enum": ["observed", "user_reported", "inferred", "planned", "suggested"]
+    },
+    "start": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}$"
+        },
+        {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+        },
+        {
+          "format": "date"
+        }
+      ]
+    },
+    "end": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}$"
+        },
+        {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+        },
+        {
+          "format": "date"
+        }
+      ]
+    },
+    "time_precision": {
+      "enum": ["year", "month", "day", "unknown"]
+    },
+    "title": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review": {
+      "type": "object",
+      "required": ["reason", "candidates"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "candidates": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["geonameid", "name", "country", "lat", "lng"],
+            "properties": {
+              "geonameid": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "lat": {
+                "type": "number"
+              },
+              "lng": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

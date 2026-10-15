@@ -21,6 +21,7 @@ import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories } from "./memory.js";
+import { type ExperienceInput, addExperiences } from "./places.js";
 import { assertPublicProject } from "./projects.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
@@ -91,7 +92,9 @@ async function prepare(ws: Workspace, file: string, text: string) {
         const { date: _date, ...withoutDate } = data;
         if (["project_metric", "github_snapshot"].includes(type)) assertPublicProject(ws, data.project);
         const record = fields.includes("date") ? data : withoutDate;
-        addRecords(ws, type, [record], { dryRun: true });
+        if (type === "experience")
+          await addExperiences(ws, [record as unknown as ExperienceInput], "agent", { dryRun: true });
+        else addRecords(ws, type, [record], { dryRun: true });
         const group = groups.get(type) ?? [];
         group.push(record);
         groups.set(type, group);
@@ -105,7 +108,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
       agent: agents,
       message: `Agent（Drive 收件箱：${agents}）新增了 ${[...groups.values()].flat().length} 条记录`,
       apply: async () => {
-        for (const [type, rows] of groups) addRecords(ws, type, rows);
+        for (const [type, rows] of groups) {
+          if (type === "experience") await addExperiences(ws, rows as unknown as ExperienceInput[], "agent");
+          else addRecords(ws, type, rows);
+        }
       },
     };
   }

@@ -5,6 +5,7 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { findRecordType } from "./modules.js";
 import { removePhoto } from "./photos.js";
+import { type ExperienceInput, addExperiences } from "./places.js";
 import { assertPublicProject } from "./projects.js";
 import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
@@ -45,6 +46,8 @@ export async function writeAgentRecord(
   data: Record<string, unknown> = {},
   id = "",
 ) {
+  if (type === "experience" && operation === "add")
+    return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
   if (["project_metric", "github_snapshot"].includes(type)) {
     const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
     assertPublicProject(ws, data.project ?? current?.project);

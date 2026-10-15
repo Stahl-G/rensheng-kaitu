@@ -1,8 +1,15 @@
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
-import { Workspace, defaultRoot, listProjects, readOverviewPage } from "@kaitu/core";
+import {
+  Workspace,
+  defaultRoot,
+  lifeMap,
+  listProjects,
+  readOverviewPage,
+  resolveExperience,
+} from "@kaitu/core";
 import type { Config } from "./tools.js";
-import type { DoingProject, OverviewData } from "./types.js";
+import type { DoingProject, LifeMapData, OverviewData } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -10,7 +17,7 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-/** 工作区只读总览，不激活 Agent 或触发同步。 */
+/** 工作区总览与地点核对，不激活 Agent。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
 
@@ -23,6 +30,17 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("lifeMap")
+  async lifeMap(): Promise<LifeMapData> {
+    return lifeMap(this.workspace);
+  }
+
+  @Remote("resolveExperience")
+  async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
+    const result = await resolveExperience(this.workspace, id, geonameid);
+    return { id: result.record.id, version: result.version };
   }
 
   @Remote("projects")
