@@ -1,9 +1,55 @@
 # 交接说明：人生开图（开图 Kaitu）
 
 - 交接日期：2026-10-15
-- 交出方：云端 Claude Code 会话（产品讨论与调研）
-- 接收方：本地 Claude Code（负责开发）
-- 当前状态：**只有文档，没有代码。** 仓库内容是本次讨论的全部产出。
+- 最近更新：2026-10-15，本地 Claude Code 会话交给后续 Claude Code / Codex 会话。
+- 当前状态：阶段 1 基本完成，已有健康同步、手机通道、DeepSeek Harness 插件；下一步是阶段 2 验证。**先读 §0。**
+
+---
+
+## 0. 当前交接（最新，先读）
+
+### 0.1 现在能用什么（均已真机实测）
+
+| 能力 | 入口 | 实测结果 |
+|---|---|---|
+| 工作区 | Drive 模式：`~/Library/CloudStorage/GoogleDrive-…/我的云端硬盘/kaitu`；程序状态在 `~/Library/Application Support/kaitu/<uuid>/` | `kaitu validate` 通过 |
+| 本机 `kaitu` 命令 | 指向独立 worktree `~/Developer/rensheng-kaitu-runtime`（detached），改完代码要在那里 `git fetch ~/Developer/rensheng-kaitu feat/t1-t5-foundation && git checkout --detach FETCH_HEAD && pnpm build` | — |
+| Apple 健康同步 | iPhone 快捷指令每晚 22:00 → Apps Script → `inbox/health/` → 工作台或 `kaitu inbox process` 导入；安装页 `docs/guides/apple-health.html`，分享链接 `https://www.icloud.com/shortcuts/3e47eb2c6bae4714a08f340f8f444fd8` | 步数已入库；不戴表睡觉的空睡眠数据直接归档 |
+| 手机通道 | `kaitu ui --channels`（前台进程，电脑休眠或关终端即停） | Telegram、微信：配对、「处理中」回执、Codex 写入、版本均通过；飞书、QQ 未实测 |
+| DeepSeek Harness | 桌面应用 0.2.0-rc.2；`kaitu dsh --install` 把插件写进 `~/.dsh/profiles/desktop/cordis.patch.yml` 的 `# kaitu:start…end` 段 | 新会话里调用 `kaitu_status` / `kaitu_add_record` 写入饮食并存版本；默认模型是 opencode-go |
+| 浏览器导入 | 工作台设置 → 导入 | 预览 → 确认 → 撤销已补验（M4-06） |
+
+仓库：`Stahl-G/rensheng-kaitu`（公开，2026-10-15 由 `Stahl-G/-` 改名），默认分支 `claude/zen-tesla-n3ot1p`，开发分支 `feat/t1-t5-foundation`（PR #1 已合并）。访谈逐字稿已移出仓库（`.gitignore`），只在原开发机本地；旧提交里仍可见，是否改写历史未决。
+
+### 0.2 分工与工作方式
+
+- **Codex 写代码**：`codex exec -s workspace-write -C ~/Developer/rensheng-kaitu -o <结果文件> - < <任务说明>`。Codex 沙箱不联网，需要新 npm 依赖时由 Claude 先装好。
+- **Claude**：写任务说明（中文、带完成标准）、审查、删无用测试和多余文字、跑 `pnpm build && pnpm typecheck && pnpm lint && pnpm test`、提交推送。
+- 用户偏好：回复用中文；不用问，选最简单、最有用户价值的方案；轻量优先、能复用开源就复用。
+- 安全：不替用户输入密钥 / token（用户自己粘贴）；Apps Script 脚本属性等密钥存储由用户操作；测试只用临时目录和合成数据，不碰真实工作区和 Drive；分享 / 发布前给用户确认。
+
+### 0.3 已知问题与小待办
+
+- Agent 在 dsh 里有时用 shell 直接读文件而不是开图工具（阶段 2 的 kaitu profile 关掉 shell 后解决）。
+- `dsh web` 的 `--no-open` 放在 `--patch` 前会报 `unknown option '--patch'`；直接不加 `--no-open`。
+- 本机 dsh 的外部插件 `dsh-vision-toolkit@0.1.2` 与 rc.2 不兼容被跳过（用户自己的插件，与开图无关）。
+- `kaitu ui --channels` 没有后台常驻（launchd）方案；电脑休眠消息就没人处理。
+- 原生 `window.confirm` 会阻塞浏览器自动化，验收时用 JS 覆盖 `confirm` 或让用户点。
+- M4 剩余两项是设计问题（自定义模块导航入口、恢复前预览），留给阶段 3 的 Claude Design。
+
+### 0.4 下一步：阶段 2「DeepSeek Harness 验证」（PRD §10）
+
+按顺序做，每项一个 Codex 任务；任务说明草稿在 [`docs/briefs/`](briefs/)：
+
+1. **定时任务**（[stage2-schedule.md](briefs/stage2-schedule.md)）：用 dsh 的 schedule 跑早间计划 07:30、晚间复盘 22:00，通过 MCP 接日历。这是 PRD §13「作者连续用 30 天」的前提，优先级最高。
+2. **kaitu profile**（[stage2-profile.md](briefs/stage2-profile.md)）：单独的 dsh profile，禁用埋点、shell、浏览器 / 电脑操控等；文件读写限定在工作区。
+3. **「今天」页面插件**（[stage2-page.md](briefs/stage2-page.md)）：最小前端插件，验证能注册全局页面、换品牌与导航；样式不打磨。
+4. **npm 安装**：插件以固定 peer 版本发布到 npm 后能被 dsh 插件管理器安装加载（发布前问用户）。
+5. 新用户首次启动与填 API Key 的完整流程走一遍。
+
+全部通过后进入阶段 3：Claude Design 设计 4 个页面，直接做成 dsh 插件页面。不通过时按 PRD §10 的退路（自建薄外壳 + Pi 引擎）。
+
+并行：用户开始 30 天自用（健康同步 + Telegram / 微信 + dsh 对话），使用中暴露的问题优先修。
 
 ---
 
@@ -11,7 +57,7 @@
 
 1. 本文件：背景、已定决策、调研结论、未核实事项、第一批任务。
 2. [`docs/PRD.md`](PRD.md)：完整需求。**数据规范（PRD §6）是整个项目的核心，所有阶段都遵守它。**
-3. [`docs/reference/interview-transcript.md`](reference/interview-transcript.md)：访谈全文（docx 原件在同目录）。PRD §4 的每条功能都标了时间戳，需要确认「孙宇晨原话怎么说」时按时间戳搜索。文件开头有使用注意事项，先读。
+3. `docs/reference/interview-transcript.md`（不进仓库，只在原开发机本地）：访谈全文。PRD §4 的每条功能都标了时间戳，需要确认「孙宇晨原话怎么说」时按时间戳搜索。文件开头有使用注意事项，先读。
 
 ---
 
@@ -137,13 +183,13 @@
 - 密钥与个人数据不进仓库、不进日志。测试与示例只用合成数据。
 - 数据只写工作区，程序状态可写配置指定的本机状态目录；Drive 迁移另写本机工作区指针与旧位置说明。测试用临时目录。
 - 外部代码保留许可证与来源说明，记在 `THIRD_PARTY_NOTICES.md`。
-- `docs/reference/` 中的访谈逐字稿仅供内部参考，**仓库公开前必须移除或确认授权**。
+- `docs/reference/` 中的访谈逐字稿仅供内部参考，已加入 `.gitignore`，不要重新提交。
 
 ---
 
 ## 8.1 进展记录
 
-- dsh 插件原型：四工具、提示注入、`kaitu dsh` 已实现，四项检查（100 测试）及 CLI / 工作台 SSE 冒烟通过；npm 加载与真实对话待实测，见 [dsh.md](dsh.md)。
+- dsh 插件：四工具、提示注入、`kaitu dsh [--install]`；桌面应用 0.2.0-rc.2 中真实对话写入已实测，见 [dsh.md](dsh.md)。
 
 ### 2026-10-15：M5 第一部分——手机通道
 
@@ -153,9 +199,9 @@
 
 ### 2026-10-15：工作区升级与健康收件箱
 
-- 快捷指令 iCloud 链接（ec325763…）已填入安装页。重新分享前：清空「文本」动作与导入问题的「默认回答」——默认回答会随链接一起分享，曾因此泄露密钥（已轮换）。分享后在 Mac 打开链接核对无密钥。
+- 快捷指令 iCloud 链接（3e47eb2c…）已填入安装页。重新分享前：清空「文本」动作与导入问题的「默认回答」——默认回答会随链接一起分享，曾因此泄露密钥（已轮换）。分享后在 Mac 打开链接核对无密钥。
 - 健康同步改为一页三步安装：Apps Script 自动生成密钥，仅本人设置页显示同步地址与收件状态，`showSyncUrl()` 供编辑器备用；个人 Gmail 身份识别待实测。
-- 改 `.gs` 后运行 `pnpm guide:health` 更新安装页内嵌代码，一项一致性测试防遗漏；快捷指令 iCloud 链接仍为空，按钮待提供。
+- 改 `.gs` 后运行 `pnpm guide:health` 更新安装页内嵌代码，一项一致性测试防遗漏。
 - 快捷指令新增换行字符串并列列表（type / values / starts），与 samples 数组并存；复用健康映射，支持每日累计更新、分类型活动合并与中文睡眠阶段。
 - 并列列长不一致时整文件附原因转待整理笔记；格式见 `docs/guides/health-shortcut-format.md`。
 - `kaitu upgrade [--dry-run]` 按模板哈希升级：补内置模块与新增 records / views / sources / tabs，保留用户字段与自建技能。
@@ -241,7 +287,7 @@
 1. 仓库许可证：Apache-2.0（倾向，便于参考 Open Design）还是 MIT。
 2. 目标用户以国内为主还是海外：影响默认模型预置、健康设备支持（华为、小米）。
 3. 记忆自动提取用主模型，还是单独配置一个便宜的小模型。
-4. 仓库是否改名为 `rensheng-kaitu`。
+4. 访谈逐字稿是否从 git 历史中彻底清除（需改写历史并强推）。
 
 
 ### 2026-10-15：体态照片、M3 实现与 MCP
