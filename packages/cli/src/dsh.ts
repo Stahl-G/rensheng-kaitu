@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KaituError, type Workspace } from "@kaitu/core";
 
@@ -24,12 +24,15 @@ function schedulePackages(profile: string, outside = "") {
   ];
 }
 
-function entry(ws: Workspace, flow: boolean, schedules: { id: string; name: string }[]): string {
-  const plugin = fileURLToPath(new URL("../../dsh-plugin/dist/index.js", import.meta.url));
-  if (
-    !existsSync(plugin) ||
-    !existsSync(fileURLToPath(new URL("../../dsh-plugin/dist/client.js", import.meta.url)))
-  )
+const defaultPlugin = () => fileURLToPath(new URL("../../dsh-plugin/dist/index.js", import.meta.url));
+
+function entry(
+  workspace: string,
+  plugin: string,
+  flow: boolean,
+  schedules: { id: string; name: string }[],
+): string {
+  if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
   const disabled = [
     "ui-brand-official",
@@ -50,7 +53,7 @@ function entry(ws: Workspace, flow: boolean, schedules: { id: string; name: stri
       ...disabled.map((id) => ({ id, disabled: true })),
       { id: "tool-skill", disabled: false },
       {
-        insert: [...schedules, { id: "kaitu", name: plugin, config: { workspace: ws.root } }],
+        insert: [...schedules, { id: "kaitu", name: plugin, config: { workspace } }],
       },
     ]
       .map((row) => JSON.stringify(row))
@@ -65,18 +68,16 @@ function entry(ws: Workspace, flow: boolean, schedules: { id: string; name: stri
     "    - id: kaitu",
     `      name: ${JSON.stringify(plugin)}`,
     "      config:",
-    `        workspace: ${JSON.stringify(ws.root)}`,
+    `        workspace: ${JSON.stringify(workspace)}`,
     "",
   ].join("\n");
 }
 
-// 写进 DeepSeek Harness 桌面应用的 profile；重复运行只替换开图这一段。
-export function installDsh(ws: Workspace): string {
-  const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
-  const patch = join(home, "profiles", "desktop", "cordis.patch.yml");
-  if (!existsSync(patch))
-    throw new KaituError(`没找到 ${patch}，请先安装并打开一次 DeepSeek Harness 桌面应用`, "NO_DSH");
-  const text = readFileSync(patch, "utf8");
+// CLI 与独立桌面应用共用受管段，包括定时任务包的去重逻辑。
+export function renderDshPatch(
+  text: string,
+  options: { home: string; workspace: string; plugin?: string },
+): string {
   const start = text.indexOf(START);
   const end = text.indexOf(END);
   if (start >= 0 !== end >= 0 || (start >= 0 && end <= start))
@@ -86,8 +87,8 @@ export function installDsh(ws: Workspace): string {
   const emptyFlow = /^\[[ \t]*\](?=[ \t]*(?:#.*)?$)/m.exec(text);
   const flow = start >= 0 ? text.slice(0, start).trimEnd().endsWith("[") : emptyFlow !== null;
   const outside = start >= 0 ? text.slice(0, start) + text.slice(end + END.length) : text;
-  const schedules = schedulePackages(join(home, "profiles", "desktop"), outside);
-  const block = `${START}\n${entry(ws, flow, schedules).trimEnd()}\n${END}`;
+  const schedules = schedulePackages(join(options.home, "profiles", "desktop"), outside);
+  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, schedules).trimEnd()}\n${END}`;
   let next: string;
   if (start >= 0) {
     next = text.slice(0, start) + block + text.slice(end + END.length);
@@ -97,7 +98,16 @@ export function installDsh(ws: Workspace): string {
   } else {
     next = `${text}${text.endsWith("\n") ? "" : "\n"}${block}\n`;
   }
-  writeFileSync(patch, next);
+  return next;
+}
+
+// 写进 DeepSeek Harness 桌面应用的 profile；重复运行只替换开图这一段。
+export function installDsh(ws: Workspace): string {
+  const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
+  const patch = join(home, "profiles", "desktop", "cordis.patch.yml");
+  if (!existsSync(patch))
+    throw new KaituError(`没找到 ${patch}，请先安装并打开一次 DeepSeek Harness 桌面应用`, "NO_DSH");
+  writeFileSync(patch, renderDshPatch(readFileSync(patch, "utf8"), { home, workspace: ws.root }));
   return `已把开图插件写入 ${patch}。重启 DeepSeek Harness 桌面应用后，侧栏点「开图」查看总览，新建会话可记录（桌面应用需为 ${DSH_VERSION}）。`;
 }
 
@@ -106,7 +116,9 @@ export function dshCommand(ws: Workspace): string {
   const profile = join(process.env.DSH_HOME ?? join(homedir(), ".dsh"), "profiles", "web");
   const profilePatch = join(profile, "cordis.patch.yml");
   const outside = existsSync(profilePatch) ? readFileSync(profilePatch, "utf8") : "";
-  ws.writeText(file, entry(ws, false, schedulePackages(profile, outside)), { internal: true });
+  ws.writeText(file, entry(ws.root, defaultPlugin(), false, schedulePackages(profile, outside)), {
+    internal: true,
+  });
   const patch = ws.resolve(file, { internal: true }).replace(/'/g, "'\\''");
   return `npx @deepseek-ai/dsh@${DSH_VERSION} web --patch '${patch}'`;
 }
