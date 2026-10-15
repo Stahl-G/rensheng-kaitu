@@ -12,7 +12,11 @@ export * from "./runtime.js";
 export { channelStatus, credentials, pair, saveCredentials } from "./state.js";
 export { loginWeixin } from "./weixin/login.js";
 
-export function configuredChannels(ws: Workspace, only?: ChannelName, onError: ChannelError = report): Channel[] {
+export function configuredChannels(
+  ws: Workspace,
+  only?: ChannelName,
+  onError: ChannelError = report,
+): Channel[] {
   const stored = credentials(ws);
   const channels: Channel[] = [];
   if ((!only || only === "telegram") && stored.telegram) {
@@ -36,5 +40,7 @@ function report(name: ChannelName, detail: string): void {
 }
 
 export function createChannelRuntime(ws: Workspace, only?: ChannelName): ChannelRuntime {
-  return new ChannelRuntime(ws, configuredChannels(ws, only));
+  const channels = configuredChannels(ws, only);
+  if (!channels.length) throw new Error("尚未配置通道，先运行 kaitu channels setup <通道>");
+  return new ChannelRuntime(ws, channels);
 }

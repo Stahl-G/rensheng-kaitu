@@ -339,11 +339,11 @@ async function run(argv: string[]): Promise<number> {
     }
     case "ui": {
       const ws = workspace(values);
+      const channels = values.channels ? createChannelRuntime(ws) : undefined;
       const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],
       });
-      const channels = values.channels ? createChannelRuntime(ws) : undefined;
       installShutdown(async () => {
         await channels?.stop();
         await ui.close();

@@ -212,6 +212,8 @@ export function ignoredWorkspaceChange(file: string): boolean {
   return (
     file === "OVERVIEW.md" ||
     file === ".kaitu/inbox-state.json" ||
+    file === ".kaitu/channels" ||
+    file.startsWith(".kaitu/channels/") ||
     file.startsWith("inbox/processed/") ||
     file.startsWith("inbox/rejected/") ||
     file.split(/[\\/]/).includes(".git") ||

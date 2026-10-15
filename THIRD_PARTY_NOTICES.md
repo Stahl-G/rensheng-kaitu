@@ -14,3 +14,7 @@
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
+| grammy | MIT | https://github.com/grammyjs/grammY |
+| @larksuiteoapi/node-sdk | MIT | https://github.com/larksuite/node-sdk |
+| @tencent-connect/qqbot-nodejs | MIT | https://github.com/tencent-connect/qqbot-nodejs |
+| @tencent-weixin/openclaw-weixin 2.4.10（文本通道抽取） | MIT | [来源、改动与原始许可证](packages/channels/src/weixin/README.md) |
