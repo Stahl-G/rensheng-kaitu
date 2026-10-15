@@ -9,6 +9,7 @@ import type {
 } from "../types.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import { MapPage, type MapPageProps } from "./MapPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import css from "./OverviewPage.module.css";
@@ -17,6 +18,7 @@ export interface OverviewPageProps
   extends MePageProps,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
+    Omit<MapPageProps, "onPrompt">,
     Omit<HealthPageProps, "onPrompt"> {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
@@ -25,6 +27,7 @@ const sections = [
   { id: "today", name: "今天", tip: "今天的安排、下一步和要你确认的事" },
   { id: "health", name: "健康", tip: "训练、饮食、睡眠和身体数据" },
   { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
+  { id: "map", name: "地图", tip: "走过的、现在的和计划去的城市" },
   { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
   { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
 ];
@@ -230,6 +233,8 @@ export function OverviewPage({
   loadDoing,
   loadHealth,
   loadHealthPhoto,
+  loadLifeMap,
+  resolveExperience,
   ...me
 }: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
@@ -335,7 +340,7 @@ export function OverviewPage({
             </>
           )}
         </nav>
-        {current !== "feed" && current !== "projects" && current !== "health" && (
+        {current !== "feed" && current !== "projects" && current !== "health" && current !== "map" && (
           <header className={css.header}>
             <div>
               <h1>
@@ -387,6 +392,8 @@ export function OverviewPage({
         ))}
         {current === "me" ? (
           <MePage key={meRevision} {...me} />
+        ) : current === "map" ? (
+          <MapPage loadLifeMap={loadLifeMap} resolveExperience={resolveExperience} onPrompt={me.onPrompt} />
         ) : current === "feed" ? (
           <NewsPage loadNews={loadNews} tryNews={tryNews} dismissNews={dismissNews} onPrompt={me.onPrompt} />
         ) : current === "projects" ? (

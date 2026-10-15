@@ -79,6 +79,13 @@ await build({
   packages: "external",
 });
 const css = [];
+const worker = await build({
+  entryPoints: [resolve(pkg, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs")],
+  bundle: true,
+  format: "iife",
+  minify: true,
+  write: false,
+});
 await build({
   entryPoints: [resolve(pkg, "src/client/index.tsx")],
   outfile: resolve(pkg, "dist/client.js"),
@@ -92,6 +99,14 @@ await build({
     {
       name: "kaitu-css-modules",
       setup(builder) {
+        builder.onLoad({ filter: /maplibre-gl-worker\.mjs$/ }, () => ({
+          contents: `export default ${JSON.stringify(worker.outputFiles[0].text)}`,
+          loader: "js",
+        }));
+        builder.onLoad({ filter: /maplibre-gl\.css$/ }, ({ path }) => {
+          css.push(readFileSync(path, "utf8"));
+          return { contents: "", loader: "js" };
+        });
         builder.onLoad({ filter: /\.module\.css$/ }, async ({ path }) => {
           const { readFileSync } = await import("node:fs");
           const result = transform({

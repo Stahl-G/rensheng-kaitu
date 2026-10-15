@@ -19,3 +19,4 @@
 | @tencent-connect/qqbot-nodejs | MIT | https://github.com/tencent-connect/qqbot-nodejs |
 | @tencent-weixin/openclaw-weixin 2.4.10（文本通道抽取） | MIT | [来源、改动与原始许可证](packages/channels/src/weixin/README.md) |
 | GeoNames cities15000（城市表精简版） | CC BY 4.0 | https://download.geonames.org/export/dump/cities15000.zip （https://www.geonames.org/） |
+| maplibre-gl 6.11.2（打进插件前端） | BSD-3-Clause | https://github.com/maplibre/maplibre-gl-js |
