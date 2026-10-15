@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "$id": "https://kaitu.local/schemas/finance-holding-snapshot.schema.json",
+  "title": "finance holding-snapshot",
+  "required": [
+    "account",
+    "security_code",
+    "name",
+    "quantity",
+    "cost",
+    "price",
+    "market_value",
+    "currency",
+    "source"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "visibility": {
+      "enum": ["private", "shared"]
+    },
+    "corrected_by_user": {
+      "type": "boolean"
+    },
+    "account": {
+      "type": "string",
+      "minLength": 1
+    },
+    "security_code": {
+      "type": ["string", "null"]
+    },
+    "name": {
+      "type": ["string", "null"]
+    },
+    "quantity": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "cost": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "每单位成本价，乘数量得到总成本；未知为 null"
+    },
+    "price": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "market_value": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "currency": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "examples": ["CNY"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "imported_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

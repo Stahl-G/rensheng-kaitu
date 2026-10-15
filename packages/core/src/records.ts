@@ -201,3 +201,23 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
     .filter((r) => (!opts.from || day(r) >= opts.from) && (!opts.to || day(r) <= opts.to))
     .sort((a, b) => parseTs(a.ts).getTime() - parseTs(b.ts).getTime() || a.id.localeCompare(b.id));
 }
+
+/** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
+export function appendPreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  const plans = entries.map(({ type, record }) => {
+    const ref = findRecordType(ws, type);
+    parseTs(record.ts);
+    validateRecord(ws, ref, record);
+    return { file: recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone())), record };
+  });
+  const files = new Map<string, string[]>();
+  for (const { file, record } of plans) {
+    const lines = files.get(file) ?? [];
+    lines.push(JSON.stringify(record));
+    files.set(file, lines);
+  }
+  for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
+}

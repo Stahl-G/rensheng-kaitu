@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "$id": "https://kaitu.local/schemas/finance-account.schema.json",
+  "title": "finance account",
+  "required": ["name", "kind", "currency", "source"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "visibility": {
+      "enum": ["private", "shared"]
+    },
+    "corrected_by_user": {
+      "type": "boolean"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": ["cash", "bank", "wallet", "securities", "credit", "loan"]
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["CNY"]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "balance": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "balance_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

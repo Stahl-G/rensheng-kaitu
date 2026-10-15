@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "$id": "https://kaitu.local/schemas/finance-transaction.schema.json",
+  "title": "finance transaction",
+  "required": [
+    "account",
+    "amount",
+    "currency",
+    "category",
+    "counterparty",
+    "description",
+    "source",
+    "source_transaction_id",
+    "related_ids",
+    "reconciliation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "visibility": {
+      "enum": ["private", "shared"]
+    },
+    "corrected_by_user": {
+      "type": "boolean"
+    },
+    "account": {
+      "type": "string",
+      "minLength": 1
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^-?\\d+(?:\\.\\d+)?$",
+      "examples": ["12.3400"],
+      "description": "带方向原币金额，流入正、流出负，保留小数原精度"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$",
+      "examples": ["CNY"]
+    },
+    "category": {
+      "enum": [
+        "income",
+        "expense",
+        "transfer",
+        "buy",
+        "sale",
+        "principal",
+        "realized_gain",
+        "dividend",
+        "tax",
+        "fee",
+        "refund",
+        "loan_in",
+        "loan_repay",
+        "interest"
+      ]
+    },
+    "counterparty": {
+      "type": ["string", "null"]
+    },
+    "description": {
+      "type": ["string", "null"]
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_transaction_id": {
+      "type": ["string", "null"]
+    },
+    "related_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "reconciliation": {
+      "enum": ["ok", "pending_review", "candidate_duplicate"]
+    },
+    "cost": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^-?\\d+(?:\\.\\d+)?$",
+          "examples": ["12.3400"]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "卖出对应的总成本；未知为 null"
+    },
+    "fees_included": {
+      "type": ["boolean", "null"]
+    },
+    "review_reason": {
+      "type": ["string", "null"]
+    },
+    "imported_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "direction_unknown": {
+      "type": "boolean"
+    },
+    "original_source_transaction_id": {
+      "type": ["string", "null"]
+    }
+  }
+}

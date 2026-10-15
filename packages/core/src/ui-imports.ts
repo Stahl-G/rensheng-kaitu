@@ -8,12 +8,13 @@ import { importIcs } from "./importers/ics.js";
 import { importNutAi } from "./importers/nut-ai.js";
 import type { Workspace } from "./workspace.js";
 
-export type ImportSource = "chatgpt-conversations" | "apple-health" | "ics" | "nut-ai";
+export type ImportSource = "chatgpt-conversations" | "apple-health" | "ics" | "nut-ai" | "finance";
 const EXTENSIONS: Record<ImportSource, string[]> = {
   "chatgpt-conversations": [".json", ".zip"],
   "apple-health": [".zip", ".xml"],
   ics: [".ics"],
   "nut-ai": [".json"],
+  finance: [".csv"],
 };
 export function stageUpload(ws: Workspace, source: ImportSource, name: string, bytes: Uint8Array): string {
   const ext = extname(name).toLowerCase();
@@ -29,7 +30,7 @@ export function discardUpload(ws: Workspace, file: string): void {
   rmSync(ws.resolve(file, { internal: true }), { force: true });
 }
 function assertUpload(file: string): void {
-  if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(json|zip|xml|ics)$/.test(file)) {
+  if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(json|zip|xml|ics|csv)$/.test(file)) {
     throw new KaituError("无效的上传文件", "BAD_ARGS");
   }
 }
