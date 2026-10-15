@@ -103,7 +103,7 @@
 | 侧栏底部动态插件 / Cordis 面板 | `ui-cordis`，`packages/extensions/ui-cordis/src/client/index.ts:86` | patch 禁用 |
 | 侧栏「设置」 | `ui-settings-general`，`packages/client/ui-settings-general/src/client/index.ts:175`；区段契约由 `ui-settings` 提供 | 保留通用、外观、语言、模型等设置 |
 | 设置中的内置插件区与清单 | `ui-settings-plugins`、`ui-settings-plugin-inventory` | patch 禁用两个界面插件 |
-| 设置账号 / 登录、额度提示与账号引导 | `ui-settings-account`，`packages/client/ui-settings-account/src/client/index.ts` | patch 禁用界面与三个账号后端，保留 API Key 模型 |
+| 设置账号 / 登录、额度提示与账号引导 | `ui-settings-account`，`packages/client/ui-settings-account/src/client/index.ts` | patch 只禁用界面；三个账号后端保留，桌面欢迎页启动时要查询登录状态（`apps/desktop/src/welcome-backend.ts:117`），禁用会导致应用无法启动 |
 | 设置日志上传 | `ui-settings-session-log`，`packages/client/ui-settings-session-log/src/client/index.ts:36` | patch 禁用 |
 | 顶栏会话标题、祖先会话跳转、对话视图页签 | `ui-conversation`，`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx` | 保留 |
 | 顶栏子 Agent 目录与谱系菜单 | `ui-subagent`，`packages/client/ui-subagent/src/client/index.ts:76` | patch 禁用界面 |
