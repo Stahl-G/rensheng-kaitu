@@ -11,7 +11,7 @@ kaitu mcp token --dir /你的工作区
 ```
 
 服务只监听 `127.0.0.1:4871`，地址为 `http://127.0.0.1:4871/mcp`，使用 Streamable HTTP。
-请求必须带 `Authorization: Bearer <token>`。token 存在 `.kaitu/secrets.json`（权限 600），不进版本历史。
+请求必须带 `Authorization: Bearer <token>`。token 存在状态目录的 `secrets.json`（本地模式为 `.kaitu/secrets.json`，Drive 模式留在本机；权限 600），不进版本历史。
 用 `kaitu mcp token --rotate` 轮换；正在运行的服务会在后续请求中拒绝旧 token。
 
 HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档；新增记录、记忆、简报和待确认日程建议。

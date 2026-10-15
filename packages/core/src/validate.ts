@@ -18,7 +18,7 @@ function walk(root: string, dir: string, out: string[]): void {
   for (const name of readdirSync(join(root, dir))) {
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
-    if (rel === ".kaitu/cache") continue;
+    if (rel === ".kaitu/cache" || rel === ".kaitu/history.git") continue;
     if (statSync(join(root, rel)).isDirectory()) walk(root, rel, out);
     else out.push(rel);
   }

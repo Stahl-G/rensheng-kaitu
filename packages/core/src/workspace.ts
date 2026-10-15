@@ -11,15 +11,45 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { ScopeError } from "./errors.js";
+import { currentWorkspace } from "./drive.js";
+import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import { maintainHistoryIgnore } from "./history.js";
+import { overviewDeferred, refreshOverview } from "./overview.js";
 import { assertTimeZone } from "./time.js";
 
 export const STATE_DIR = ".kaitu";
 
 /** 默认数据目录：--dir > KAITU_DIR > ~/kaitu */
 export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.KAITU_DIR || join(homedir(), "kaitu"));
+  return resolve(env.KAITU_DIR || currentWorkspace(env) || join(env.HOME || homedir(), "kaitu"));
+}
+
+export function stateDirectory(root: string): string {
+  const config = join(root, STATE_DIR, "config.json");
+  const state = existsSync(config) ? JSON.parse(readFileSync(config, "utf8")).state_dir : undefined;
+  if (state !== undefined && (typeof state !== "string" || !isAbsolute(state))) {
+    throw new KaituError("state_dir 必须是本机绝对路径", "INVALID_STATE_DIR");
+  }
+  return state ?? join(root, STATE_DIR);
+}
+
+function migrateHistory(root: string): void {
+  const old = join(root, ".git");
+  const target = join(stateDirectory(root), "history.git");
+  if (!existsSync(join(root, STATE_DIR, "config.json")) || !existsSync(old)) return;
+  if (existsSync(target)) {
+    throw new KaituError(`发现两个版本库，请先核对 ${old} 与 ${target}，未改动历史`, "HISTORY_MIGRATION");
+  }
+  try {
+    mkdirSync(dirname(target), { recursive: true });
+    renameSync(old, target);
+  } catch (error) {
+    throw new KaituError(
+      `无法把版本历史从 ${old} 迁移到 ${target}：${(error as Error).message}`,
+      "HISTORY_MIGRATION",
+    );
+  }
 }
 
 function isSymlink(p: string): boolean {
@@ -40,10 +70,15 @@ function isInside(root: string, target: string): boolean {
  * `.kaitu/` 只允许程序内部通过 { internal: true } 写入。
  */
 export class Workspace {
-  readonly root: string;
+  root: string;
 
   constructor(root: string) {
     this.root = resolve(root);
+    migrateHistory(this.root);
+    if (this.exists(".kaitu/config.json")) {
+      maintainHistoryIgnore(this);
+      refreshOverview(this);
+    }
   }
 
   /** 把相对路径解析为绝对路径，并检查是否在工作区内（含符号链接逃逸）。 */
@@ -55,13 +90,27 @@ export class Workspace {
     if (top === STATE_DIR && !opts.internal) throw new ScopeError(`.kaitu/ 由程序管理，不能直接写入：${rel}`);
     if (top === ".git") throw new ScopeError(`不能写入版本库目录：${rel}`);
     this.assertNoSymlinkEscape(abs);
+    if (
+      top === STATE_DIR &&
+      abs !== join(this.root, STATE_DIR) &&
+      relative(this.root, abs) !== join(STATE_DIR, "config.json")
+    ) {
+      const state = stateDirectory(this.root);
+      const target = resolve(state, relative(join(this.root, STATE_DIR), abs));
+      this.assertNoSymlinkEscapeAt(state, target);
+      return target;
+    }
     return abs;
   }
 
   /** 从目标向上找到第一个已存在的路径，确认其真实位置仍在工作区内。 */
   private assertNoSymlinkEscape(abs: string): void {
-    if (!existsSync(this.root)) return;
-    const realRoot = realpathSync(this.root);
+    this.assertNoSymlinkEscapeAt(this.root, abs);
+  }
+
+  private assertNoSymlinkEscapeAt(root: string, abs: string): void {
+    if (!existsSync(root)) return;
+    const realRoot = realpathSync(root);
     let probe = abs;
     while (!existsSync(probe) && !isSymlink(probe)) {
       const parent = dirname(probe);
@@ -75,7 +124,7 @@ export class Workspace {
   }
 
   exists(rel: string): boolean {
-    return existsSync(join(this.root, rel));
+    return existsSync(this.resolve(rel, { internal: true }));
   }
 
   readText(rel: string): string {
@@ -97,6 +146,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    this.refreshAfterWrite(rel);
   }
 
   writeJson(rel: string, value: unknown, opts: { internal?: boolean; mode?: number } = {}): void {
@@ -107,6 +157,18 @@ export class Workspace {
     const abs = this.resolve(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
+    this.refreshAfterWrite(rel);
+  }
+
+  private refreshAfterWrite(rel: string): void {
+    if (
+      overviewDeferred(this) ||
+      rel.startsWith(".kaitu/") ||
+      ["AGENT-README.md", "OVERVIEW.md"].includes(rel) ||
+      !this.exists("AGENT-README.md")
+    )
+      return;
+    refreshOverview(this);
   }
 
   /** 用户时区：me/rules.md 的 timezone，缺省用系统时区。 */

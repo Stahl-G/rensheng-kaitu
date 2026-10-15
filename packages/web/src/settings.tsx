@@ -47,6 +47,14 @@ export function Settings({
   tell: (message: string) => void;
   copy: (text: string) => void;
 }) {
+  const [drive, setDrive] = useState<{
+    mode: string;
+    stateDir: string;
+    drivePath: string | null;
+    lastInboxProcessed: string | null;
+  } | null>(null);
+  const [driveDir, setDriveDir] = useState("");
+  const [localDir, setLocalDir] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
   const [historyError, setHistoryError] = useState("");
   const [source, setSource] = useState(sources[0]?.id ?? "chatgpt-conversations");
@@ -59,6 +67,9 @@ export function Settings({
   const blocked = busy || loading;
   // biome-ignore lint/correctness/useExhaustiveDependencies: 文件刷新后同步版本列表。
   useEffect(() => {
+    void request<NonNullable<typeof drive>>("drive")
+      .then(setDrive)
+      .catch((e) => setError(e.message));
     request<Version[]>("history")
       .then((versions) => {
         setVersions(versions);
@@ -123,6 +134,48 @@ export function Settings({
         <p class="eyebrow">你的本地工作区</p>
         <h1>设置</h1>
       </header>
+      <Panel title="同步到 Google Drive">
+        <p>当前模式：{drive?.mode === "drive" ? "Google Drive" : "本地"}</p>
+        {drive && <p class="muted path">状态目录：{drive.stateDir}</p>}
+        {drive?.drivePath && <p class="muted path">Drive 工作区：{drive.drivePath}</p>}
+        <p class="muted">上次处理收件箱：{drive?.lastInboxProcessed ?? "尚未处理"}</p>
+        {drive?.mode === "drive" ? (
+          <>
+            <label>
+              本机目标（留空使用 ~/kaitu）
+              <input value={localDir} onInput={(e) => setLocalDir(e.currentTarget.value)} />
+            </label>
+            <button
+              type="button"
+              disabled={blocked}
+              onClick={() => {
+                if (window.confirm("关闭同步并把工作区搬回本机？"))
+                  void act("drive/disable", { to: localDir }, "已搬回本机");
+              }}
+            >
+              关闭同步
+            </button>
+          </>
+        ) : (
+          <>
+            <label>
+              我的云端硬盘目录（留空自动查找）
+              <input value={driveDir} onInput={(e) => setDriveDir(e.currentTarget.value)} />
+            </label>
+            <button
+              type="button"
+              disabled={blocked}
+              onClick={() => {
+                if (window.confirm("个人数据会存到 Google Drive，版本历史与密钥留在本机。开启同步？")) {
+                  void act("drive/enable", { driveDir }, "已开启 Google Drive 同步");
+                }
+              }}
+            >
+              开启同步
+            </button>
+          </>
+        )}
+      </Panel>
       <Panel title="导入记录">
         <div class="import-controls">
           <label>
@@ -273,7 +326,7 @@ export function Settings({
         ))}
       </Panel>
       <Panel title="隐私">
-        <p>数据只在本机，默认放在 ~/kaitu。</p>
+        <p>默认放在本机 ~/kaitu；开启同步后，数据文件存到你的 Google Drive。</p>
         <p class="muted path">当前工作区：{data.root}</p>
         <p>对话内容会发给你自己选择的模型服务。</p>
       </Panel>

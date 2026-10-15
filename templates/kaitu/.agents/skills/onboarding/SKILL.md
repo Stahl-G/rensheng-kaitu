@@ -23,7 +23,12 @@ description: 首次使用开图或用户说开始使用时，引导建立档案�
 14. Claude Code 读取工作区 `.mcp.json`，其中已配置 `kaitu mcp`。
 15. Codex 在工作区运行 `codex mcp add kaitu -- kaitu mcp` 注册本机 MCP。
 16. 若工作区不在默认目录，运行前设置 `KAITU_DIR` 为工作区绝对路径。
-17. 不要把 HTTP token 写入档案、技能或对话记录。
+17. 用户要让云端 Agent 访问时，介绍 Google Drive 模式：个人数据会存到 Drive，版本历史与密钥留在本机。
+18. 用户决定开启后，运行 `kaitu drive enable`；自动查找有歧义时用 `--drive-dir <我的云端硬盘路径>`。
+19. 让云端 Agent 从 `AGENT-README.md`、`OVERVIEW.md` 进入，只在 `inbox/agents/` 新建唯一文件。
+20. 收件箱接受 digest.md、records.jsonl、memory.json、proposal.json，不能删除、恢复或修改规则与目标。
+21. 工作台运行时自动处理，也可 `kaitu inbox process`；`kaitu drive disable` 搬回本机。
+22. 不要把 HTTP token 写入档案、技能或对话记录。
 
 ## 确认点
 

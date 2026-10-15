@@ -5,6 +5,7 @@ import { stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { addMemory } from "./memory.js";
 import { listModules } from "./modules.js";
+import { batchOverview } from "./overview.js";
 import { addRecords } from "./records.js";
 import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import { discardUpload, importUpload, stageUpload } from "./ui-imports.js";
@@ -12,6 +13,10 @@ import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
 
 export async function populateSample(ws: Workspace, now = new Date()): Promise<void> {
+  return batchOverview(ws, () => writeSample(ws, now));
+}
+
+async function writeSample(ws: Workspace, now: Date): Promise<void> {
   const zone = ws.timeZone();
   const today = localDate(now, zone);
   const day = (offset: number) =>

@@ -1,6 +1,6 @@
 # Google Drive 模式（给 Grok Bot / ChatGPT Dots 用户）
 
-状态：规格已定（2026-10-15，决策 D20），待实现。
+状态：已实现（2026-10-15，决策 D20）。临时目录迁移、收件箱与工作台自动保存已验证；真实 Drive / 云端连接器仍待实测。
 
 ## 为什么
 
@@ -13,7 +13,13 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 3. 在 Grok Bot / Dots 里连上 Google Drive，告诉它「读 `kaitu/AGENT-README.md`」。
 4. `kaitu drive disable`：搬回本机，状态目录合并回去。
 
-默认关闭。开启前界面明确提示：健康等个人数据会存到 Google Drive。
+默认关闭。开启前界面明确提示：个人数据会存到 Google Drive，版本历史与密钥留在本机。
+
+- `kaitu drive enable [--drive-dir <我的云端硬盘目录>] [--name kaitu]`；目标已存在时报错，不覆盖。
+- `kaitu drive disable [--to <本机目录>]`，默认搬到 `~/kaitu`；允许回到此前只留下迁移说明的目录。
+- `kaitu drive status` 显示模式、路径、状态目录与上次处理收件箱的时间。
+- 旧位置留下 `WORKSPACE-MOVED.md`；本机状态根目录的 `current-workspace.json` 供 `defaultRoot()` 找到当前位置，
+  显式 `--dir` 与 `KAITU_DIR` 优先。迁移后运行 doctor 与 validate。
 
 ## 目录：哪些上云，哪些留在本机
 
@@ -24,12 +30,15 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 | 版本库（git 目录） | **本机**状态目录 `history.git`（isomorphic-git 的 `gitdir` 与 `dir` 分开）。同步盘与 git 目录放一起会产生冲突副本、损坏版本库 |
 | `secrets.json`、`index.sqlite`、`cache/`、上传暂存 | **本机**状态目录。Google Drive 电脑版不支持排除规则，所以不能靠忽略文件 |
 
+本地版本库为 `.kaitu/history.git/`，打开旧工作区时自动迁移 `.git`，失败明确报错并保留历史。
+版本写入遇权限或磁盘空间问题时，数据保持已保存，提示稍后运行 `kaitu ui` 或 `kaitu snapshot` 补存版本。
+
 本机状态目录：macOS `~/Library/Application Support/kaitu/<工作区 id>/`，Linux `$XDG_STATE_HOME/kaitu/<id>/`，Windows `%LOCALAPPDATA%\kaitu\<id>\`。本地模式下状态目录仍是 `<工作区>/.kaitu/`，行为不变。
 
 ## 云端 Agent 怎么读
 
 - 根目录生成 `AGENT-README.md`：给云端 Agent 的简短入口（这是谁的工作区、先读哪几个文件、怎么把结果放回来、不能做什么）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
-- 根目录生成 `OVERVIEW.md`：`kaitu status` 的 Markdown 版（今天的安排与待确认、各模块进度与下一步、最近 7 天关键数据）。每次写入后与晚间复盘时刷新。云端 Agent 读这一个文件就能「一眼看到情况」。
+- 根目录生成 `OVERVIEW.md`：`kaitu status` 的 Markdown 版（今天的安排与待确认、各模块进度与下一步、最近 7 天关键数据）。每次 core 写入、晚间复盘保存版本及工作台检测到外部改动后刷新；内容不变不重写，派生文件事件不触发自动版本。云端 Agent 读这一个文件就能「一眼看到情况」。
 
 ## 云端 Agent 怎么写：收件箱（不直接改文件）
 
@@ -45,6 +54,11 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 | `*.proposal.json`（`title`、`start`、`end`、`module?`） | 追加到今天 NOW.md 的 proposal，等人在工作台确认 |
 
 版本说明带来源，如「Agent（Drive 收件箱：grok-bot）写入了今天的动态简报」；来源取文件 frontmatter / 字段里的 `agent`，没有就写「云端 Agent」。不接受删除、恢复、改规则与目标。
+
+处理前间隔 1.5 秒核对大小与修改时间，写入仍在变化时留待下一轮；JSONL 需要末尾换行。
+整批记录、记忆先校验再写；只接受新增操作。来源可写在简报 frontmatter、每行记录、每条记忆或建议的 `agent` 字段。
+未处理与被拒绝的文件不进版本，成功原件随数据一起归档进该次版本；处理时间与进程锁留在本机状态目录。
+本地模式同样生成 `AGENT-README.md`、`OVERVIEW.md` 与 `inbox/agents/`。
 
 谁来处理收件箱：`kaitu ui` 运行时自动处理（复用文件监听）；也可以手动 `kaitu inbox process`。
 

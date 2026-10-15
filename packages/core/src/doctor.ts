@@ -1,6 +1,5 @@
 import { existsSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { NEVER_TRACK, hasHistory, isTracked } from "./history.js";
+import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
 import { CONFIG_VERSION } from "./init.js";
 import { listModules } from "./modules.js";
 import { validateWorkspace } from "./validate.js";
@@ -67,7 +66,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     add("时区有效", false, (e as Error).message);
   }
 
-  const secrets = join(ws.root, ".kaitu", "secrets.json");
+  const secrets = ws.resolve(".kaitu/secrets.json", { internal: true });
   if (!existsSync(secrets)) add("密钥文件", false, "缺少 .kaitu/secrets.json");
   else {
     const mode = statSync(secrets).mode & 0o777;
@@ -80,7 +79,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
 
   if (!hasHistory(ws)) add("版本历史已启用", false, "缺少版本库");
   else {
-    add("版本历史已启用", true);
+    add("版本历史已启用", true, historyDirectory(ws));
     const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
     const notIgnored = NEVER_TRACK.filter((p) => !ignore.split("\n").includes(p));
     add(

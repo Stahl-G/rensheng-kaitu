@@ -1,7 +1,16 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { addRecord, history, isTracked, readRecords, restore, snapshot } from "../src/index.js";
+import {
+  Workspace,
+  addRecord,
+  doctor,
+  history,
+  isTracked,
+  readRecords,
+  restore,
+  snapshot,
+} from "../src/index.js";
 import { freshWorkspace, workout } from "./helpers.js";
 
 describe("版本历史", () => {
@@ -81,4 +90,21 @@ describe("版本历史", () => {
     await restore(ws, init?.oid as string);
     expect(ws.readJson(".kaitu/secrets.json")).toEqual({ oura: "t" });
   });
+});
+
+it("旧版本库打开即迁移，历史不丢且可恢复，版本库不跟踪自身", async () => {
+  const ws = await freshWorkspace();
+  const [initial] = await history(ws);
+  ws.writeText("me/profile.md", "迁移前修改\n");
+  await snapshot(ws, "迁移前");
+  const before = await history(ws);
+  writeFileSync(join(ws.root, ".gitignore"), ".kaitu/secrets.json\n.kaitu/index.sqlite\n.kaitu/cache/\n");
+  renameSync(join(ws.root, ".kaitu/history.git"), join(ws.root, ".git"));
+  const opened = new Workspace(ws.root);
+  expect(existsSync(join(ws.root, ".git"))).toBe(false);
+  expect(await history(opened)).toEqual(before);
+  expect((await doctor(opened)).every((check) => check.ok)).toBe(true);
+  await restore(opened, initial?.oid as string);
+  expect(opened.readText("me/profile.md")).toMatch(/^# 档案/);
+  expect(await isTracked(opened, ".kaitu/history.git/HEAD")).toBe(false);
 });

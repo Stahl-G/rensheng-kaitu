@@ -13,7 +13,10 @@ import {
   addRecord,
   defaultRoot,
   deleteRecord,
+  disableDrive,
   doctor,
+  driveStatus,
+  enableDrive,
   findRecordType,
   history,
   importAppleHealth,
@@ -24,6 +27,7 @@ import {
   initWorkspace,
   listMemories,
   mcpToken,
+  processInbox,
   readRecords,
   readStatus,
   reindexChats,
@@ -48,6 +52,10 @@ const HELP = `开图 kaitu
 
 用法：
   kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
+  kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
+  kaitu drive disable [--to <目录>]                  搬回本机
+  kaitu drive status                                查看同步状态
+  kaitu inbox process                               处理云端 Agent 收件箱
   kaitu ui [--port 4870] [--no-open]                打开本地工作台
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
@@ -85,6 +93,7 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  "drive-dir": { type: "string" },
   sample: { type: "boolean" },
   http: { type: "boolean" },
   rotate: { type: "boolean" },
@@ -167,6 +176,35 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "drive": {
+      const ws = workspace(values);
+      const action = args[0];
+      const result =
+        action === "enable"
+          ? await enableDrive(ws, { driveDir: values["drive-dir"], name: values.name })
+          : action === "disable"
+            ? await disableDrive(ws, { to: values.to })
+            : action === "status"
+              ? driveStatus(ws)
+              : undefined;
+      if (!result) throw new KaituError("使用 drive enable / disable / status", "BAD_ARGS");
+      out(
+        values,
+        result,
+        `模式：${result.mode}\n工作区：${result.root}\nDrive：${result.drivePath ?? "未开启"}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}`,
+      );
+      return 0;
+    }
+    case "inbox": {
+      if (args[0] !== "process") throw new KaituError("使用 inbox process", "BAD_ARGS");
+      const result = await processInbox(workspace(values));
+      out(
+        values,
+        result,
+        `已处理 ${result.processed.length}，已拒绝 ${result.rejected.length}，待同步完成 ${result.pending.length}`,
+      );
+      return 0;
+    }
     case "init": {
       const root = resolve(args[0] ?? values.dir ?? defaultRoot());
       const ws = await initWorkspace(root, { timeZone: values.timezone, sample: values.sample });

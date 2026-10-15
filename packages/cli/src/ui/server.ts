@@ -13,13 +13,18 @@ import {
   addPhotoBytes,
   completeNext,
   decideProposal,
+  disableDrive,
   discardUpload,
+  driveStatus,
+  enableDrive,
   history,
   ignoredWorkspaceChange,
   importUpload,
   pendingWorkspaceFiles,
+  processInbox,
   readPhoto,
   readWorkbench,
+  refreshOverview,
   removeMemory,
   removePhoto,
   restore,
@@ -33,6 +38,7 @@ export interface UiOptions {
   open?: boolean;
   snapshotDelayMs?: number;
   refreshDelayMs?: number;
+  inboxStableMs?: number;
 }
 const WEB_ROOT = fileURLToPath(new URL("../../../web/dist/", import.meta.url));
 const MIME: Record<string, string> = {
@@ -79,6 +85,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     queue = result.catch(() => {});
     return result;
   }
+  let inboxTimer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let closed = false;
@@ -95,21 +102,49 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   };
   async function saveExternal() {
     clearTimeout(saveTimer);
+    refreshOverview(ws);
     const files = await pendingWorkspaceFiles(ws);
-    if (!files.length) return;
-    await snapshot(
+    if (!files.length) {
+      watchError = "";
+      return;
+    }
+    const version = await snapshot(
       ws,
       `文件夹有改动：${files
         .slice(0, 3)
         .map((file) => file.split("/").at(-1))
         .join("、")}等 ${files.length} 个文件`,
     );
-    watchError = "";
+    if (!version && (await pendingWorkspaceFiles(ws)).length) {
+      reportError();
+      if (!closed)
+        saveTimer = setTimeout(
+          () => void exclusive(saveExternal).catch(reportError),
+          options.snapshotDelayMs ?? 30000,
+        );
+    } else watchError = "";
+  }
+  function scheduleInbox() {
+    clearTimeout(inboxTimer);
+    inboxTimer = setTimeout(() => {
+      if (closed) return;
+      void exclusive(async () => {
+        const result = await processInbox(ws, { stableMs: options.inboxStableMs });
+        if (result.processed.length || result.rejected.length) notify();
+        if (result.pending.length && !closed) scheduleInbox();
+      }).catch(reportError);
+    }, options.refreshDelayMs ?? 300);
   }
   function changedFile(file: string) {
     if (closed || ignoredWorkspaceChange(file)) return;
+    if (file === "inbox" || file.startsWith("inbox/agents")) scheduleInbox();
     clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(notify, options.refreshDelayMs ?? 300);
+    refreshTimer = setTimeout(() => {
+      void exclusive(async () => {
+        refreshOverview(ws);
+        notify();
+      }).catch(reportError);
+    }, options.refreshDelayMs ?? 300);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(
       () => void exclusive(saveExternal).catch(reportError),
@@ -137,14 +172,22 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
       Math.max(50, options.refreshDelayMs ?? 1000),
     );
   };
-  try {
-    watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
-      changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
-    });
-    watcher.on("error", startPolling);
-  } catch {
-    startPolling();
+  function startWatching() {
+    watcher?.close();
+    clearInterval(polling);
+    polling = undefined;
+    stamps = workspaceFileStamps(ws);
+    try {
+      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
+        changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
+      });
+      watcher.on("error", startPolling);
+    } catch {
+      startPolling();
+    }
+    scheduleInbox();
   }
+  startWatching();
   const heartbeat = setInterval(() => {
     for (const client of clients) client.write(": heartbeat\n\n");
     for (const [id, upload] of uploads) {
@@ -180,6 +223,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           res.writeHead(200, { "Content-Type": photo.contentType });
           return res.end(photo.bytes);
         }
+        if (url.pathname === "/api/drive") return json(res, 200, driveStatus(ws));
         if (url.pathname === "/api/state") return json(res, 200, { ...readWorkbench(ws), watchError });
         if (url.pathname === "/api/history") return json(res, 200, await exclusive(() => history(ws)));
         if (url.pathname === "/api/events") {
@@ -251,6 +295,20 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         }
         await saveExternal();
         switch (url.pathname) {
+          case "/api/drive/enable":
+          case "/api/drive/disable": {
+            try {
+              return url.pathname.endsWith("enable")
+                ? await enableDrive(ws, {
+                    driveDir: typeof data.driveDir === "string" && data.driveDir ? data.driveDir : undefined,
+                  })
+                : await disableDrive(ws, {
+                    to: typeof data.to === "string" && data.to ? data.to : undefined,
+                  });
+            } finally {
+              startWatching();
+            }
+          }
           case "/api/photos/delete":
             return removePhoto(ws, field(data, "id"), { by: "user" });
           case "/api/proposal":
@@ -299,6 +357,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const close = async () => {
     closed = true;
     watcher?.close();
+    clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
@@ -319,6 +378,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     watcher?.close();
     clearInterval(heartbeat);
     clearInterval(polling);
+    clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     throw error;

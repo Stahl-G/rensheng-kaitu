@@ -133,7 +133,17 @@ ${skills()
 运行 \`kaitu ui\` 打开今天、健康、动态、我的；在工作台确认建议、导入与查看历史。
 工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
 
-## 11. MCP
+## 11. Google Drive 与收件箱
+
+- 默认本地模式；用户可用 \`kaitu drive enable [--drive-dir <我的云端硬盘路径>]\` 开启 Drive 同步。
+- 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
+- 云端 Agent 先读 \`AGENT-README.md\` 与 \`OVERVIEW.md\`，只在 \`inbox/agents/\` 新建唯一文件。
+- 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
+- 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
+- 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；失败在 \`inbox/rejected/\` 附原因。
+- 本地模式同样维护入口与现状文件；晚间复盘最后运行 snapshot 会刷新现状。
+
+## 12. MCP
 
 - 本机：\`kaitu mcp\` 用 stdio。Claude Code 读取本目录 \`.mcp.json\`。
 - Codex：在工作区运行 \`codex mcp add kaitu -- kaitu mcp\`；非默认目录先设置 \`KAITU_DIR\`。
@@ -142,7 +152,7 @@ ${skills()
 - MCP 可读状态、记录、记忆和对话，可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
 - 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
 
-## 12. 安全
+## 13. 安全
 
 - 不执行与本文件夹无关的命令。
 - 不把密钥写进任何文件。

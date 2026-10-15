@@ -2,17 +2,30 @@ import fs from "node:fs";
 import { join } from "node:path";
 import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
+import { batchOverview, refreshOverview } from "./overview.js";
 import { isoInZone } from "./time.js";
-import type { Workspace } from "./workspace.js";
+import { type Workspace, stateDirectory } from "./workspace.js";
 
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
-export const NEVER_TRACK = [".kaitu/secrets.json", ".kaitu/index.sqlite", ".kaitu/cache/"];
+export const NEVER_TRACK = [
+  ".kaitu/secrets.json",
+  ".kaitu/index.sqlite",
+  ".kaitu/cache/",
+  ".kaitu/history.git/",
+  ".kaitu/inbox-state.json",
+  "inbox/agents/",
+  "inbox/rejected/",
+];
 
 export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
 .kaitu/index.sqlite
 .kaitu/index.sqlite-*
 .kaitu/cache/
+.kaitu/history.git/
+.kaitu/inbox-state.json
+inbox/agents/
+inbox/rejected/
 *.tmp
 .DS_Store
 `;
@@ -25,49 +38,98 @@ function neverTrack(path: string): boolean {
   );
 }
 
+export function historyDirectory(ws: Workspace): string {
+  return join(stateDirectory(ws.root), "history.git");
+}
+
 export function hasHistory(ws: Workspace): boolean {
-  return fs.existsSync(join(ws.root, ".git"));
+  return fs.existsSync(historyDirectory(ws));
 }
 
 export async function ensureHistory(ws: Workspace): Promise<void> {
-  if (!hasHistory(ws)) await git.init({ fs, dir: ws.root, defaultBranch: "main" });
-  if (!ws.exists(".gitignore")) ws.writeText(".gitignore", GITIGNORE);
+  if (!hasHistory(ws))
+    await git.init({ fs, dir: ws.root, gitdir: historyDirectory(ws), defaultBranch: "main" });
+  maintainHistoryIgnore(ws);
+}
+
+export function maintainHistoryIgnore(ws: Workspace): void {
+  const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
+  const missing = GITIGNORE.split("\n").filter(
+    (line) => line && !line.startsWith("#") && !ignore.split("\n").includes(line),
+  );
+  if (missing.length)
+    ws.writeText(".gitignore", `${ignore}${ignore.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
 }
 
 async function headOid(ws: Workspace): Promise<string | null> {
   try {
-    return await git.resolveRef({ fs, dir: ws.root, ref: "HEAD" });
+    return await git.resolveRef({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
   } catch {
     return null;
   }
 }
 
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
-  const matrix = await git.statusMatrix({ fs, dir: ws.root });
+  const matrix = await git.statusMatrix({ fs, dir: ws.root, gitdir: historyDirectory(ws) });
   return matrix
     .filter(
-      ([file, head, workdir, stage]) => !neverTrack(file) && !(head === 1 && workdir === 1 && stage === 1),
+      ([file, head, workdir, stage]) =>
+        file !== "OVERVIEW.md" &&
+        !file.startsWith("inbox/") &&
+        !neverTrack(file) &&
+        !(head === 1 && workdir === 1 && stage === 1),
     )
     .map(([file]) => file);
 }
 
 /** 把工作区当前状态记为一个版本；没有改动时返回 null。 */
+const batchDepth = new WeakMap<Workspace, number>();
+
+export async function batchSnapshot<T>(
+  ws: Workspace,
+  message: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  batchDepth.set(ws, (batchDepth.get(ws) ?? 0) + 1);
+  let result: T;
+  try {
+    result = await batchOverview(ws, operation);
+  } finally {
+    batchDepth.set(ws, (batchDepth.get(ws) ?? 1) - 1);
+  }
+  await snapshot(ws, message);
+  return result;
+}
+
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
+  if (batchDepth.get(ws)) return null;
+  refreshOverview(ws, now);
+  try {
+    return await saveSnapshot(ws, message, now);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
+    console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
+    return null;
+  }
+}
+
+async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
   await ensureHistory(ws);
   const dir = ws.root;
-  const matrix = await git.statusMatrix({ fs, dir });
+  const matrix = await git.statusMatrix({ fs, dir, gitdir: historyDirectory(ws) });
   let changed = 0;
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
       if (head !== 0 || stage !== 0) {
-        await git.remove({ fs, dir, filepath });
+        await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
         changed++;
       }
       continue;
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
-    if (workdir === 0) await git.remove({ fs, dir, filepath });
-    else await git.add({ fs, dir, filepath });
+    if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
+    else await git.add({ fs, dir, gitdir: historyDirectory(ws), filepath });
     changed++;
   }
   if (changed === 0) return null;
@@ -75,6 +137,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   return git.commit({
     fs,
     dir,
+    gitdir: historyDirectory(ws),
     message,
     author: { ...AUTHOR, timestamp, timezoneOffset: now.getTimezoneOffset() },
   });
@@ -97,7 +160,7 @@ export async function history(
   const filepath = opts.path?.replace(/\/+$/, "") || undefined;
   let entries: Awaited<ReturnType<typeof git.log>>;
   try {
-    entries = await git.log({ fs, dir: ws.root, depth: opts.limit, filepath });
+    entries = await git.log({ fs, dir: ws.root, gitdir: historyDirectory(ws), depth: opts.limit, filepath });
   } catch (e) {
     if ((e as { code?: string }).code === "NotFoundError") return [];
     throw e;
@@ -113,7 +176,7 @@ export async function history(
 
 async function resolveVersion(ws: Workspace, version: string): Promise<string> {
   try {
-    return await git.expandOid({ fs, dir: ws.root, oid: version });
+    return await git.expandOid({ fs, dir: ws.root, gitdir: historyDirectory(ws), oid: version });
   } catch {
     throw new KaituError(`找不到版本 ${version}`, "NOT_FOUND");
   }
@@ -135,15 +198,19 @@ export async function restore(
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
   const target = await resolveVersion(ws, version);
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
-  await snapshot(ws, "恢复前自动保存", opts.now);
+  await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
 
   const dir = ws.root;
   const head = await headOid(ws);
   const targetFiles = new Set(
-    (await git.listFiles({ fs, dir, ref: target })).filter((f) => under(prefix, f)),
+    (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target })).filter((f) =>
+      under(prefix, f),
+    ),
   );
   const currentFiles = head
-    ? (await git.listFiles({ fs, dir, ref: head })).filter((f) => under(prefix, f))
+    ? (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: head })).filter((f) =>
+        under(prefix, f),
+      )
     : [];
   if (prefix && targetFiles.size === 0 && currentFiles.length === 0) {
     throw new KaituError(`版本 ${version.slice(0, 7)} 中没有 ${prefix}`, "NOT_FOUND");
@@ -158,14 +225,20 @@ export async function restore(
   }
   for (const f of targetFiles) {
     if (neverTrack(f)) continue;
-    const { blob } = await git.readBlob({ fs, dir, oid: target, filepath: f });
+    const { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     const abs = ws.resolve(f, { internal: true });
     if (fs.existsSync(abs) && Buffer.compare(fs.readFileSync(abs), Buffer.from(blob)) === 0) continue;
-    ws.writeText(f, blob, { internal: true });
+    if (f === ".kaitu/config.json") {
+      const current = ws.readJson<{ state_dir?: string }>(f);
+      const config = JSON.parse(Buffer.from(blob).toString("utf8"));
+      if (current.state_dir) config.state_dir = current.state_dir;
+      else config.state_dir = undefined;
+      ws.writeJson(f, config, { internal: true });
+    } else ws.writeText(f, blob, { internal: true });
     changed++;
   }
 
-  const { commit } = await git.readCommit({ fs, dir, oid: target });
+  const { commit } = await git.readCommit({ fs, dir, gitdir: historyDirectory(ws), oid: target });
   const what = prefix ? `${prefix} ` : "";
   const oid = await snapshot(
     ws,
@@ -178,5 +251,5 @@ export async function restore(
 export async function isTracked(ws: Workspace, path: string): Promise<boolean> {
   const head = await headOid(ws);
   if (!head) return false;
-  return (await git.listFiles({ fs, dir: ws.root, ref: head })).includes(path);
+  return (await git.listFiles({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: head })).includes(path);
 }

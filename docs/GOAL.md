@@ -28,6 +28,12 @@
 
 延后：Oura / CalorieMate 同步（T8）、桌面打包。MCP（T12）已提前实现。旧 T13 静态 dashboard 由 M2 工作台取代。
 
+## 后端补充进度（2026-10-15）
+
+状态目录、`.git` 迁移与 Google Drive 模式已实现：本地历史放 `.kaitu/history.git`，Drive 模式下程序状态全部留在本机。
+CLI / 工作台提供开关与状态，云端 Agent 通过收件箱写入；入口与现状文件自动维护。
+临时目录迁移往返、历史恢复、只读降级、收件箱与工作台防循环已验证；真实 Drive / Grok Bot / ChatGPT Dots 待实测。
+
 ## 工作台技术选择（M2）
 
 - 前端：Vite + Preact（轻、MIT），图表 ECharts（Apache-2.0），全部打包进本地静态文件，不用 CDN。

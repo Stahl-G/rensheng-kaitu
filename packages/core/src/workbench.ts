@@ -188,7 +188,13 @@ export function completeNext(ws: Workspace, file: string, id: string, now = new 
 
 export function ignoredWorkspaceChange(file: string): boolean {
   return (
+    file === "OVERVIEW.md" ||
+    file === ".kaitu/inbox-state.json" ||
+    file.startsWith("inbox/processed/") ||
+    file.startsWith("inbox/rejected/") ||
     file.split(/[\\/]/).includes(".git") ||
+    file === ".kaitu/history.git" ||
+    file.startsWith(".kaitu/history.git/") ||
     file === ".kaitu/cache" ||
     file.startsWith(".kaitu/cache/") ||
     file.startsWith(".kaitu/index.sqlite") ||
