@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { createChannelRuntime } from "@kaitu/channels";
 import {
   type By,
   KaituError,
@@ -65,6 +66,7 @@ import {
 } from "@kaitu/core";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { channelsCommand, installShutdown } from "./channels.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
 import { startUi } from "./ui/server.js";
@@ -78,7 +80,11 @@ const HELP = `开图 kaitu
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
-  kaitu ui [--port 4870] [--no-open]                打开本地工作台
+  kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
+  kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
+  kaitu channels pair <通道>                       生成本人配对码
+  kaitu channels start [--only <通道>]             前台启动手机通道
+  kaitu channels status                            查看配置、配对与进程状态
   kaitu upgrade [--dry-run]                         升级内置模板与技能
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
@@ -126,6 +132,8 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  channels: { type: "boolean" },
+  only: { type: "string" },
   title: { type: "string" },
   due: { type: "string" },
   "remind-at": { type: "string" },
@@ -223,6 +231,10 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "channels": {
+      await channelsCommand(workspace(values), args, values.only, values["json-out"]);
+      return 0;
+    }
     case "project": {
       const ws = workspace(values);
       const [action, slug, path] = args;
@@ -326,19 +338,23 @@ async function run(argv: string[]): Promise<number> {
       return 0;
     }
     case "ui": {
-      const ui = await startUi(workspace(values), {
+      const ws = workspace(values);
+      const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],
       });
+      const channels = values.channels ? createChannelRuntime(ws) : undefined;
+      installShutdown(async () => {
+        await channels?.stop();
+        await ui.close();
+      });
+      try {
+        await channels?.start();
+      } catch (error) {
+        await ui.close();
+        throw error;
+      }
       console.log(`开图工作台：${ui.url}\n按 Ctrl+C 关闭。`);
-      const stop = () => {
-        void ui.close().then(
-          () => process.exit(0),
-          () => process.exit(1),
-        );
-      };
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
       return 0;
     }
     case "mcp": {
