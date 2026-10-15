@@ -8,6 +8,7 @@ import type {
   OverviewVersion,
 } from "../types.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
+import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
@@ -17,7 +18,8 @@ export interface OverviewPageProps
   extends MePageProps,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
-    Omit<HealthPageProps, "onPrompt"> {
+    Omit<HealthPageProps, "onPrompt">,
+    Omit<FinancePageProps, "onPrompt" | "today" | "timeZone"> {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
 }
@@ -26,6 +28,7 @@ const sections = [
   { id: "health", name: "健康", tip: "训练、饮食、睡眠和身体数据" },
   { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
   { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
+  { id: "finance", name: "财务", tip: "收支、投资和账户 · 明细只在本机" },
   { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
 ];
 const collapseKey = "kaitu.overview.sectionsCollapsed";
@@ -230,6 +233,13 @@ export function OverviewPage({
   loadDoing,
   loadHealth,
   loadHealthPhoto,
+  loadFinanceOverview,
+  loadFinanceCashflow,
+  loadFinanceInvestments,
+  loadFinanceAccounts,
+  previewFinanceImport,
+  commitFinanceImport,
+  discardFinanceImport,
   ...me
 }: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
@@ -335,7 +345,7 @@ export function OverviewPage({
             </>
           )}
         </nav>
-        {current !== "feed" && current !== "projects" && current !== "health" && (
+        {current !== "feed" && current !== "projects" && current !== "health" && current !== "finance" && (
           <header className={css.header}>
             <div>
               <h1>
@@ -387,6 +397,19 @@ export function OverviewPage({
         ))}
         {current === "me" ? (
           <MePage key={meRevision} {...me} />
+        ) : current === "finance" ? (
+          <FinancePage
+            loadFinanceOverview={loadFinanceOverview}
+            loadFinanceCashflow={loadFinanceCashflow}
+            loadFinanceInvestments={loadFinanceInvestments}
+            loadFinanceAccounts={loadFinanceAccounts}
+            previewFinanceImport={previewFinanceImport}
+            commitFinanceImport={commitFinanceImport}
+            discardFinanceImport={discardFinanceImport}
+            onPrompt={me.onPrompt}
+            today={data?.today}
+            timeZone={data?.timeZone}
+          />
         ) : current === "feed" ? (
           <NewsPage loadNews={loadNews} tryNews={tryNews} dismissNews={dismissNews} onPrompt={me.onPrompt} />
         ) : current === "projects" ? (

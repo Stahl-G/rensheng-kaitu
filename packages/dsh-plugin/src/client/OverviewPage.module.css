@@ -24,6 +24,9 @@
   --kt-feed: #c47a12;
   --kt-feed-tint: #faeedc;
   --kt-feed-ink: #8a520a;
+  --kt-finance: #087f9b;
+  --kt-finance-tint: #e1f2f7;
+  --kt-finance-ink: #076078;
   --kt-me: #c2507a;
   --kt-me-tint: #f8e6ed;
   --kt-me-ink: #93345a;
@@ -69,6 +72,9 @@ body[data-ds-dark-theme] .page {
   --kt-feed: #e5ad57;
   --kt-feed-tint: #45341e;
   --kt-feed-ink: #f2cb8d;
+  --kt-finance: #67cce0;
+  --kt-finance-tint: #203b43;
+  --kt-finance-ink: #a1e3ef;
   --kt-me: #e08eae;
   --kt-me-tint: #472b37;
   --kt-me-ink: #f3b7cd;
@@ -570,6 +576,11 @@ body[data-ds-dark-theme] .page {
   --kt-section: var(--kt-feed);
   --kt-section-tint: var(--kt-feed-tint);
   --kt-section-ink: var(--kt-feed-ink);
+}
+.page [data-section="finance"] {
+  --kt-section: var(--kt-finance);
+  --kt-section-tint: var(--kt-finance-tint);
+  --kt-section-ink: var(--kt-finance-ink);
 }
 .page [data-section="me"] {
   --kt-section: var(--kt-me);

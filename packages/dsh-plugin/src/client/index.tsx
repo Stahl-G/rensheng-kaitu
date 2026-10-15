@@ -4,6 +4,11 @@ import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import contribution from "../../lib/typert.remote-client.js";
+import type {
+  FinanceRemoteCommitOptions,
+  FinanceRemoteImportOptions,
+  FinanceRemoteViewOptions,
+} from "../types.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { OverviewPage } from "./OverviewPage.js";
 import { prefillAgent } from "./agent-prompt.js";
@@ -24,7 +29,7 @@ export async function apply(ctx: Context) {
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
-    inject: ["slots", "remote.kaitu", "layout", "sessions", "conversation"],
+    inject: ["slots", "remote.kaitu", "remote.kaituFinance", "layout", "sessions", "conversation"],
     apply(ctx: Context) {
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
@@ -62,6 +67,44 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.dismissNews(id);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              loadFinanceOverview: async (options?: FinanceRemoteViewOptions) => {
+                const result = await ctx.remote.kaituFinance.financeOverview(options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadFinanceCashflow: async (from: string, to: string, options?: FinanceRemoteViewOptions) => {
+                const result = await ctx.remote.kaituFinance.financeCashflow(from, to, options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadFinanceInvestments: async (options?: FinanceRemoteViewOptions) => {
+                const result = await ctx.remote.kaituFinance.financeInvestments(options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadFinanceAccounts: async (options?: FinanceRemoteViewOptions) => {
+                const result = await ctx.remote.kaituFinance.financeAccounts(options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              previewFinanceImport: async (
+                name: string,
+                base64: string,
+                options?: FinanceRemoteImportOptions,
+              ) => {
+                const result = await ctx.remote.kaituFinance.financeImportPreview(name, base64, options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              commitFinanceImport: async (file: string, options: FinanceRemoteCommitOptions) => {
+                const result = await ctx.remote.kaituFinance.financeImportCommit(file, options);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              discardFinanceImport: async (file: string) => {
+                const result = await ctx.remote.kaituFinance.financeImportDiscard(file);
+                if (!result.ok) throw new Error(result.error.message);
               },
               loadMe: async () => {
                 const result = await ctx.remote.kaitu.me();
