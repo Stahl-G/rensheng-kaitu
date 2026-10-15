@@ -68,6 +68,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadProjects: async () => {
+                const result = await ctx.remote.kaitu.projects();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadDoing: async () => {
+                const result = await ctx.remote.kaitu.doing();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               setAvatar: async (base64: string) => {
                 const result = await ctx.remote.kaitu.setAvatar(base64);
                 if (!result.ok) throw new Error(result.error.message);

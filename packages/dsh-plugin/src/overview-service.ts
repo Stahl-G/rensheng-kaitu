@@ -8,6 +8,7 @@ import {
   lifeMap,
   listProjects,
   readAvatar,
+  readDoing,
   readNews,
   readOverviewPage,
   removeAvatar,
@@ -17,7 +18,33 @@ import {
 } from "@kaitu/core";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
-import type { DoingProject, LifeMapData, MeData, NewsAction, NewsData, OverviewData } from "./types.js";
+import type {
+  DoingData,
+  DoingProject,
+  LifeMapData,
+  MeData,
+  NewsAction,
+  NewsData,
+  OverviewData,
+} from "./types.js";
+
+function recentLog(log: string, date: string | null) {
+  const section = log
+    .split(/^##[ \t]+/m)
+    .slice(1)
+    .find((part) => part.split(/\r?\n/)[0]?.trim() === date);
+  const text = section
+    ?.split(/\r?\n/)
+    .slice(1)
+    .map((line) =>
+      line
+        .replace(/<!--.*?-->/g, "")
+        .replace(/^\s*[-*+]\s+/, "")
+        .trim(),
+    )
+    .find(Boolean);
+  return date && text ? { date, text } : null;
+}
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -91,40 +118,54 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("projects")
   async projects(): Promise<DoingProject[]> {
-    return listProjects(this.workspace).map(({ slug, title, stage, kind, next, completion, github }) => ({
-      slug,
-      title,
-      stage,
-      kind,
-      next,
-      completion,
-      github: github
-        ? {
-            repo: github.repo,
-            url: github.url,
-            stale: github.stale,
-            problem: github.problem,
-            ok_at: github.ok_at,
-            since: github.since,
-            history: github.history,
-            latest: github.latest
-              ? {
-                  stars: github.latest.stars,
-                  forks: github.latest.forks,
-                  open_issues: github.latest.open_issues,
-                  open_prs: github.latest.open_prs,
-                  default_branch: github.latest.default_branch,
-                  archived: github.latest.archived,
-                  pushed_at: github.latest.pushed_at,
-                  latest_release: github.latest.latest_release,
-                  commits: github.latest.commits,
-                  ci: github.latest.ci,
-                  ts: github.latest.ts,
-                }
-              : null,
-          }
-        : null,
-    }));
+    return listProjects(this.workspace).map(
+      ({ slug, title, stage, kind, next, completion, github, links, log, lastLogDate, recent7 }) => ({
+        slug,
+        title,
+        stage,
+        kind,
+        next,
+        completion,
+        links,
+        recentLog: recentLog(log, lastLogDate),
+        recent7: {
+          words: recent7.words,
+          commits: recent7.commitsRecorded ? recent7.commits : null,
+          daily: recent7.daily,
+        },
+        github: github
+          ? {
+              repo: github.repo,
+              url: github.url,
+              stale: github.stale,
+              problem: github.problem,
+              ok_at: github.ok_at,
+              since: github.since,
+              history: github.history,
+              latest: github.latest
+                ? {
+                    stars: github.latest.stars,
+                    forks: github.latest.forks,
+                    open_issues: github.latest.open_issues,
+                    open_prs: github.latest.open_prs,
+                    default_branch: github.latest.default_branch,
+                    archived: github.latest.archived,
+                    pushed_at: github.latest.pushed_at,
+                    latest_release: github.latest.latest_release,
+                    commits: github.latest.commits,
+                    ci: github.latest.ci,
+                    ts: github.latest.ts,
+                  }
+                : null,
+            }
+          : null,
+      }),
+    );
+  }
+
+  @Remote("doing")
+  async doing(): Promise<DoingData> {
+    return readDoing(this.workspace);
   }
 
   /** 返回当前工作区的计划、历史、项目与带记录覆盖信息的指标。 */

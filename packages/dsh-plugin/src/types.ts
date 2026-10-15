@@ -8,7 +8,7 @@ import type {
   financeOverview,
   previewFinanceImport,
 } from "@kaitu/core";
-export type { LifeMapData, LifeMapFeature, Experience, City } from "@kaitu/core";
+export type { LifeMapData, LifeMapFeature, Experience, City, DoingData } from "@kaitu/core";
 
 /** 浏览器与 Host 的只读总览契约。 */
 export interface OverviewSource {
@@ -137,6 +137,13 @@ export interface DoingProject {
   title: string;
   stage: "idea" | "active" | "paused" | "done";
   kind: "work" | "personal";
+  links: { path: string; role: "manuscript" | "repo" | "folder" }[];
+  recentLog: { date: string; text: string } | null;
+  recent7: {
+    words: number | null;
+    commits: number | null;
+    daily: { date: string; words: number | null; commits: number | null }[];
+  };
   next: { id: string; title: string; status: "todo" | "proposed" | "done" | "skipped" }[];
   completion: { done: number; total: number; basis: "progress" | "tasks" } | null;
   github: {

@@ -7,18 +7,22 @@ import type {
   OverviewSource,
   OverviewVersion,
 } from "../types.js";
+import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import css from "./OverviewPage.module.css";
 
-export interface OverviewPageProps extends MePageProps, Omit<NewsPageProps, "onPrompt"> {
+export interface OverviewPageProps
+  extends MePageProps,
+    Omit<NewsPageProps, "onPrompt">,
+    Omit<DoingPageProps, "onPrompt"> {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
 }
 const sections = [
   { id: "today", name: "今天", tip: "今天的安排、下一步和要你确认的事" },
   { id: "health", name: "健康", tip: "训练、饮食、睡眠和身体数据" },
-  { id: "projects", name: "在做的事", tip: "你的项目和长期计划，以及进度" },
+  { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
   { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
   { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
 ];
@@ -214,7 +218,16 @@ function Section({
   );
 }
 
-export function OverviewPage({ load, onAgent, loadNews, tryNews, dismissNews, ...me }: OverviewPageProps) {
+export function OverviewPage({
+  load,
+  onAgent,
+  loadNews,
+  tryNews,
+  dismissNews,
+  loadProjects,
+  loadDoing,
+  ...me
+}: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
   const [meRevision, setMeRevision] = useState(0);
   const [collapsed, setCollapsed] = useState(() => {
@@ -318,7 +331,7 @@ export function OverviewPage({ load, onAgent, loadNews, tryNews, dismissNews, ..
             </>
           )}
         </nav>
-        {current !== "feed" && (
+        {current !== "feed" && current !== "projects" && (
           <header className={css.header}>
             <div>
               <h1>
@@ -372,6 +385,13 @@ export function OverviewPage({ load, onAgent, loadNews, tryNews, dismissNews, ..
           <MePage key={meRevision} {...me} />
         ) : current === "feed" ? (
           <NewsPage loadNews={loadNews} tryNews={tryNews} dismissNews={dismissNews} onPrompt={me.onPrompt} />
+        ) : current === "projects" ? (
+          <DoingPage
+            loadProjects={loadProjects}
+            loadDoing={loadDoing}
+            onPrompt={me.onPrompt}
+            timeZone={data?.timeZone}
+          />
         ) : current !== "today" ? (
           <section className={css.placeholder}>
             <p>这一页还在做</p>

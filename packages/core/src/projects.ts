@@ -163,6 +163,7 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
         kind: project.data.kind,
         stage: project.data.stage,
         local_only: project.data.local_only,
+        links: project.data.links,
         progress: project.data.progress,
         next: project.data.next ?? [],
         github: projectGithub(ws, slug, now),
@@ -203,7 +204,10 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
               commits: commits.length ? commits.reduce((sum, r) => sum + Number(r.value), 0) : null,
             };
           }),
-          words: last && baseline && recentWords.length ? Number(last.value) - Number(baseline.value) : null,
+          words:
+            last && baseline && last !== baseline && recentWords.length
+              ? Number(last.value) - Number(baseline.value)
+              : null,
           commits: metrics
             .filter((r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) >= from)
             .reduce((total, r) => total + Number(r.value), 0),
