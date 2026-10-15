@@ -9,8 +9,10 @@ import {
   listProjects,
   readAvatar,
   readDoing,
+  readHealthPage,
   readNews,
   readOverviewPage,
+  readPhoto,
   removeAvatar,
   resolveExperience,
   saveAvatar,
@@ -21,6 +23,7 @@ import type { Config } from "./tools.js";
 import type {
   DoingData,
   DoingProject,
+  HealthData,
   LifeMapData,
   MeData,
   NewsAction,
@@ -98,6 +101,17 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("me")
   async me(): Promise<MeData> {
     return readMe(this.workspace);
+  }
+
+  @Remote("health")
+  async health(): Promise<HealthData> {
+    return readHealthPage(this.workspace);
+  }
+
+  @Remote("healthPhoto")
+  async healthPhoto(id: string): Promise<string> {
+    const photo = readPhoto(this.workspace, id);
+    return `data:${photo.contentType};base64,${photo.bytes.toString("base64")}`;
   }
 
   @Remote("setAvatar")

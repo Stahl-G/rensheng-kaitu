@@ -8,6 +8,7 @@ import type {
   OverviewVersion,
 } from "../types.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
+import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import css from "./OverviewPage.module.css";
@@ -15,7 +16,8 @@ import css from "./OverviewPage.module.css";
 export interface OverviewPageProps
   extends MePageProps,
     Omit<NewsPageProps, "onPrompt">,
-    Omit<DoingPageProps, "onPrompt"> {
+    Omit<DoingPageProps, "onPrompt">,
+    Omit<HealthPageProps, "onPrompt"> {
   load: () => Promise<OverviewData>;
   onAgent: () => void;
 }
@@ -226,6 +228,8 @@ export function OverviewPage({
   dismissNews,
   loadProjects,
   loadDoing,
+  loadHealth,
+  loadHealthPhoto,
   ...me
 }: OverviewPageProps) {
   const [current, setCurrent] = useState("today");
@@ -331,7 +335,7 @@ export function OverviewPage({
             </>
           )}
         </nav>
-        {current !== "feed" && current !== "projects" && (
+        {current !== "feed" && current !== "projects" && current !== "health" && (
           <header className={css.header}>
             <div>
               <h1>
@@ -392,6 +396,8 @@ export function OverviewPage({
             onPrompt={me.onPrompt}
             timeZone={data?.timeZone}
           />
+        ) : current === "health" ? (
+          <HealthPage loadHealth={loadHealth} loadHealthPhoto={loadHealthPhoto} onPrompt={me.onPrompt} />
         ) : current !== "today" ? (
           <section className={css.placeholder}>
             <p>这一页还在做</p>
