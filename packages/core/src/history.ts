@@ -11,6 +11,7 @@ import { type Workspace, stateDirectory } from "./workspace.js";
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [
   ".kaitu/secrets.json",
+  ".kaitu/github-state.json",
   ".kaitu/index.sqlite",
   ".kaitu/cache/",
   ".kaitu/local-projects/",
@@ -24,6 +25,7 @@ export const NEVER_TRACK = [
 
 export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
+.kaitu/github-state.json
 .kaitu/index.sqlite
 .kaitu/index.sqlite-*
 .kaitu/cache/
@@ -250,7 +252,7 @@ export async function restore(
       }
     }
     for (const file of allTargetFiles.filter((file) =>
-      /^projects\/data\/metrics\/[^/]+\.jsonl$/.test(file),
+      /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(file),
     )) {
       const { blob } = await git.readBlob({
         fs,
@@ -278,7 +280,7 @@ export async function restore(
     if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f))
       continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
-    if (privateSlugs.size && /^projects\/data\/metrics\/[^/]+\.jsonl$/.test(f)) {
+    if (privateSlugs.size && /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(f)) {
       const rows = Buffer.from(blob)
         .toString("utf8")
         .split("\n")

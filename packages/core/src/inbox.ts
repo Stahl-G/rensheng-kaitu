@@ -89,7 +89,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
           data.ts = isoInZone(localTimeToInstant(`${data.date}T12:00:00`, ws.timeZone()), ws.timeZone());
         }
         const { date: _date, ...withoutDate } = data;
-        if (type === "project_metric") assertPublicProject(ws, data.project);
+        if (["project_metric", "github_snapshot"].includes(type)) assertPublicProject(ws, data.project);
         const record = fields.includes("date") ? data : withoutDate;
         addRecords(ws, type, [record], { dryRun: true });
         const group = groups.get(type) ?? [];

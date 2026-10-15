@@ -15,6 +15,7 @@ import {
   addPhoto,
   addRecord,
   addTask,
+  bindGithub,
   cancelTask,
   completeTask,
   createProject,
@@ -54,6 +55,7 @@ import {
   restore,
   searchChats,
   searchMemories,
+  setGithubToken,
   setProject,
   snapshot,
   syncProject,
@@ -97,6 +99,8 @@ const HELP = `开图 kaitu
   kaitu project new --title <标题> --kind work|personal [--local-only] [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
+  kaitu project github <slug> <url>
+  kaitu project github-token [--clear]  从 stdin 读取 token，仅保存在本机
   kaitu project sync [<slug>]
   kaitu project set <slug> [--stage idea|active|paused|done] [--local-only|--no-local-only] [--next-json <数组>]
   kaitu task add --title <标题> [--due <日期或时间>] [--remind-at <时间>] [--project <slug>]
@@ -155,6 +159,7 @@ const options = {
   sample: { type: "boolean" },
   http: { type: "boolean" },
   rotate: { type: "boolean" },
+  clear: { type: "boolean" },
   tools: { type: "string" },
   pose: { type: "string" },
   ts: { type: "string" },
@@ -274,6 +279,17 @@ async function run(argv: string[]): Promise<number> {
           role: (values.role ?? "folder") as ProjectLink["role"],
           include: values.include,
         });
+      else if (action === "github-token") {
+        if (slug || path) throw new KaituError("GitHub token 请通过 stdin 输入", "BAD_ARGS");
+        let token = "";
+        if (!values.clear) {
+          process.stdin.setEncoding("utf8");
+          for await (const chunk of process.stdin) token += chunk;
+        }
+        setGithubToken(ws, values.clear ? null : token);
+        console.log("已保存");
+        return 0;
+      } else if (action === "github") result = await bindGithub(ws, need(slug, "slug"), need(path, "url"));
       else if (action === "sync") result = slug ? await syncProject(ws, slug) : await syncProjects(ws);
       else if (action === "set")
         result = await setProject(ws, need(slug, "slug"), {
@@ -285,7 +301,11 @@ async function run(argv: string[]): Promise<number> {
               ? { local_only: false }
               : {}),
         });
-      else throw new KaituError("使用 project new / list / show / log / link / sync / set", "BAD_ARGS");
+      else
+        throw new KaituError(
+          "使用 project new / list / show / log / link / github / github-token / sync / set",
+          "BAD_ARGS",
+        );
       out(values, result, JSON.stringify(result, null, 2));
       return 0;
     }

@@ -43,3 +43,4 @@ export * from "./upgrade.js";
 export * from "./template-version.js";
 
 export * from "./overview-page.js";
+export * from "./github.js";

@@ -45,7 +45,7 @@ export async function writeAgentRecord(
   data: Record<string, unknown> = {},
   id = "",
 ) {
-  if (type === "project_metric") {
+  if (["project_metric", "github_snapshot"].includes(type)) {
     const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
     assertPublicProject(ws, data.project ?? current?.project);
   }

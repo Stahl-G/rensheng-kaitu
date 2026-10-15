@@ -34,7 +34,7 @@ export interface WriteResult {
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
-  if (ref.type === "project_metric" && driveProjects(ws) && !record.deleted)
+  if (["project_metric", "github_snapshot"].includes(ref.type) && driveProjects(ws) && !record.deleted)
     assertPublicProject(ws, record.project);
   const reg = schemas();
   const fn = record.deleted
