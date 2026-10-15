@@ -7,7 +7,9 @@ import type {
   financeInvestments,
   financeOverview,
   previewFinanceImport,
+  readHealthPage,
 } from "@kaitu/core";
+export type HealthData = ReturnType<typeof readHealthPage>;
 export type { LifeMapData, LifeMapFeature, Experience, City } from "@kaitu/core";
 
 /** 浏览器与 Host 的只读总览契约。 */

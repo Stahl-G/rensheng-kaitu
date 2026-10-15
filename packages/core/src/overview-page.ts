@@ -4,7 +4,7 @@ import { inboxNotes } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { latestDaily } from "./overview.js";
 import type { StoredRecord } from "./records.js";
-import { summarizeStatus } from "./status.js";
+import { dailyRecordTotals, summarizeStatus, workoutSessions } from "./status.js";
 import { localDate, localMonth, parseTs } from "./time.js";
 import { readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -90,14 +90,10 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const dates = Array.from({ length: 7 }, (_, i) =>
     new Date(Date.parse(`${status.recent7.from}T12:00:00Z`) + i * 86400000).toISOString().slice(0, 10),
   );
-  const dailyValues = (records: StoredRecord[], field: string, dateField = "ts", divisor = 1) =>
-    dates.map((date) => {
-      const values = records.filter((r) => day(r[dateField]) === date && typeof r[field] === "number");
-      return {
-        date,
-        value: values.length ? values.reduce((sum, r) => sum + Number(r[field]), 0) / divisor : null,
-      };
-    });
+  const dailyValues = (records: StoredRecord[], field: string, dateField = "ts", divisor = 1) => {
+    const totals = dailyRecordTotals(records, data.timeZone, field, dateField, divisor);
+    return dates.map((date) => ({ date, value: totals.get(date) ?? null }));
+  };
   const sleepRule = data.rules.data.sleep;
   const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3));
   const sleepTarget = sleepRule
@@ -186,9 +182,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         key: "workouts",
         label: "训练",
         unit: "次",
-        value: workouts.length
-          ? new Set(workouts.map((r) => `${day(r.ts)}:${r.session_id ?? r.id}`)).size
-          : null,
+        value: workouts.length ? workoutSessions(workouts, data.timeZone).length : null,
         days: new Set(workouts.map((r) => day(r.ts))).size,
         estimated: false,
         from: status.recent7.from,
@@ -200,7 +194,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
           const sessions = workouts.filter((r) => day(r.ts) === date);
           return {
             date,
-            value: sessions.length ? new Set(sessions.map((r) => r.session_id ?? r.id)).size : null,
+            value: sessions.length ? workoutSessions(sessions, data.timeZone).length : null,
           };
         }),
         target: null,
