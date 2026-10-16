@@ -7,6 +7,7 @@ import { expect, it, vi } from "vitest";
 import {
   Workspace,
   addRecord,
+  addTask,
   createProject,
   defaultRoot,
   disableSync,
@@ -29,6 +30,7 @@ import {
   syncStatus,
   validateWorkspace,
 } from "../src/index.js";
+import { requestICloudDownload, syncInventory } from "../src/sync-files.js";
 import { tmp, workout } from "./helpers.js";
 
 it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录仍可识别且拒绝跨云迁移", async () => {
@@ -48,6 +50,8 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     const token = mcpToken(ws);
     const added = addRecord(ws, "workout", workout);
     const project = await createProject(ws, { title: "本机项目", kind: "personal", local_only: true });
+    const privateMarker = "synthetic-icloud-private-task";
+    const task = await addTask(ws, { title: privateMarker, project: project.slug });
     await snapshot(ws, "迁移前");
     const before = await history(ws);
     await expect(enableSync(ws, "icloud")).rejects.toThrow();
@@ -55,6 +59,18 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     mkdirSync(cloud, { recursive: true });
     const result = await enableSync(ws, "icloud");
     expect(result.mode).toBe("icloud");
+    const syncedText = syncInventory(ws.root)
+      .files.map((file) => ws.readBytes(file).toString("utf8"))
+      .join("\n");
+    expect(syncedText).not.toContain(privateMarker);
+    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(privateMarker);
+    const crafted = join(home, `--option space'";\n$(touch injected)`);
+    requestICloudDownload(crafted);
+    expect(download).toHaveBeenLastCalledWith(
+      "/usr/bin/brctl",
+      ["download", crafted],
+      expect.objectContaining({ shell: false }),
+    );
     expect(ws.root).toBe(join(cloud, "kaitu"));
     expect(defaultRoot()).toBe(ws.root);
     expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
@@ -85,6 +101,7 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     expect(syncStatus(new Workspace(ws.root)).mode).toBe("icloud");
     await disableSync(ws);
     expect(syncStatus(ws).mode).toBe("local");
+    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(privateMarker);
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);
   } finally {
     download.mockRestore();

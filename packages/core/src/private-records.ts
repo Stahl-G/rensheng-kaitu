@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { findRecordType, listRecordTypes, recordFilePattern } from "./modules.js";
 import type { RecordTypeRef } from "./modules.js";
@@ -85,7 +86,10 @@ export function relocateProjectRecords(ws: Workspace, slug?: string, toPrivate =
       if (!moving.length) continue;
       const existing = target.exists(file) ? target.readText(file).split("\n").filter(Boolean) : [];
       const merged = toPrivate ? [...moving, ...existing] : [...existing, ...moving];
-      target.writeText(file, `${[...new Set(merged)].join("\n")}\n`);
+      const copied = `${[...new Set(merged)].join("\n")}\n`;
+      target.writeText(file, copied);
+      if (target.readText(file) !== copied)
+        throw new KaituError("本机记录副本验证失败，保留原件", "PRIVATE_MIGRATION");
       const remaining = lines.filter((line) => !ids.has(JSON.parse(line).id));
       if (remaining.length) source.writeText(file, `${remaining.join("\n")}\n`);
       else rmSync(source.resolve(file));

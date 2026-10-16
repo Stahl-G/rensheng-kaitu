@@ -30,7 +30,7 @@ import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { type ModuleStatus, readWorkbench } from "./workbench.js";
-import { type Workspace, stateDirectory } from "./workspace.js";
+import type { Workspace } from "./workspace.js";
 
 export const ONBOARDING = {
   welcome: {
@@ -331,6 +331,7 @@ export interface OnboardingChoiceResult {
 }
 export interface OnboardingOptions {
   stateRoot?: string;
+  publicOnly?: boolean;
 }
 
 function localDirectory(ws: Workspace, options: OnboardingOptions): string {
@@ -734,7 +735,7 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       .filter((m) => m.def.id === module)
       .flatMap((m) => Object.keys(m.def.records ?? {}))
       .reduce((n, type) => n + (data.records[type]?.length ?? 0), 0);
-  const calendarFile = join(stateDirectory(ws.root), "calendar-subscriptions.json");
+  const calendarFile = ws.resolve(".kaitu/calendar-subscriptions.json", { internal: true });
   const calendars: CalendarSubscription[] = existsSync(calendarFile)
     ? JSON.parse(readFileSync(calendarFile, "utf8"))
     : [];
@@ -764,7 +765,9 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
-  const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
+  const adopted = listTasks(ws, { status: "all", includePrivate: !options.publicOnly }).filter(
+    isOnboardingTask,
+  );
   const latest = adopted
     .filter((task) => task.status !== "cancelled")
     .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))[0];

@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { localRecordStore } from "./private-records.js";
 import { type PrivacyIndex, privacyIndex, privateBlock } from "./record-privacy.js";
@@ -43,6 +44,8 @@ export function readPlan(ws: Workspace, publicOnly = false, index?: PrivacyIndex
 function put(ws: Workspace, text: string, projected = false): void {
   if (ws.exists("NOW.md") && ws.readBytes("NOW.md").toString("utf8") === text) return;
   ws.writeText("NOW.md", text, { projected });
+  if (ws.readBytes("NOW.md").toString("utf8") !== text)
+    throw new KaituError("计划副本验证失败，保留原件", "PRIVATE_MIGRATION");
 }
 export function writePlan(ws: Workspace, text: string): void {
   const plan = parseFrontmatter<Plan>(text);
@@ -52,9 +55,9 @@ export function writePlan(ws: Workspace, text: string): void {
   }
   const attention = plan.data.attention ?? [];
   if (!plan.data.blocks.length && !attention.length) {
+    put(ws, text, true);
     if (ws.exists(".kaitu/local-projects/NOW.md"))
       rmSync(ws.resolve(".kaitu/local-projects/NOW.md", { internal: true }));
-    put(ws, text, true);
     return;
   }
   const privacy = privacyIndex(ws);
@@ -68,9 +71,9 @@ export function writePlan(ws: Workspace, text: string): void {
   const notices = split(attention);
   if (blocks.local.length || notices.local.length)
     put(localRecordStore(ws), stringifyFrontmatter(collections(plan.data, blocks.local, notices.local), ""));
-  else if (ws.exists(".kaitu/local-projects/NOW.md"))
-    rmSync(ws.resolve(".kaitu/local-projects/NOW.md", { internal: true }));
   put(ws, stringifyFrontmatter(collections(plan.data, blocks.shared, notices.shared), plan.body), true);
+  if (!blocks.local.length && !notices.local.length && ws.exists(".kaitu/local-projects/NOW.md"))
+    rmSync(ws.resolve(".kaitu/local-projects/NOW.md", { internal: true }));
 }
 export function relocatePlan(ws: Workspace): void {
   if (!ws.privateRecords && ws.exists("NOW.md")) writePlan(ws, readPlan(ws));

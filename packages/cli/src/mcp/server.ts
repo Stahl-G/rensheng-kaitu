@@ -111,7 +111,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     sensitive: z.boolean().optional(),
   };
   register("onboarding_status", "读取首次使用内容、待核对草稿、已采纳下一步和实时开始清单。", {}, () =>
-    onboardingStatus(ws),
+    onboardingStatus(ws, { publicOnly: tools === "remote" }),
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),

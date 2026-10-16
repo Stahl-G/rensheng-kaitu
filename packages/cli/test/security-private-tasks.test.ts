@@ -1,11 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   Workspace,
   addTask,
+  adoptOnboardingMatter,
   createProject,
+  deleteRecord,
   enableDrive,
   exportWorkspace,
   history,
@@ -17,6 +19,7 @@ import {
   readRecords,
   readStatus,
   restore,
+  saveOnboardingMatter,
   setProject,
   snapshot,
   stateDirectory,
@@ -27,7 +30,7 @@ import {
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 const { unzipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { syncInventory } from "../../core/src/sync-files.js";
 import { createMcpServer } from "../src/mcp/server.js";
 
@@ -105,9 +108,34 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
         plan.body,
       ),
     );
+    const deleted = await addTask(ws, { title: "synthetic-deleted-private", project: project.slug });
+    updateRecord(ws, "task", deleted.record.id, { notes: "deleted-revision" });
+    deleteRecord(ws, "task", deleted.record.id);
+    const deletedRows = readRecordRevisions(ws, "task").filter((row) => row.id === deleted.record.id);
     const beforePrivate = (await snapshot(ws, "synthetic-before-private")) ?? (await history(ws))[0]?.oid;
     await addTask(ws, { title: "shared-task", due: "2026-10-16" });
-    await setProject(ws, project.slug, { local_only: true });
+    const readText = Workspace.prototype.readText;
+    let failVerification = true;
+    const verification = vi.spyOn(Workspace.prototype, "readText").mockImplementation(function (file) {
+      const text = readText.call(this, file);
+      if (this.privateRecords && /^me\/data\/tasks\/.*\.jsonl$/.test(file) && failVerification) {
+        failVerification = false;
+        return "synthetic-corrupted-copy";
+      }
+      return text;
+    });
+    try {
+      await expect(setProject(ws, project.slug, { local_only: true })).rejects.toThrow();
+      expect(readFileSync(join(ws.root, "me/data/tasks/2026-10.jsonl"), "utf8")).toContain(marker);
+    } finally {
+      verification.mockRestore();
+    }
+    new Workspace(ws.root);
+    expect(ws.exists(".kaitu/project-visibility.json")).toBe(false);
+    expect(readRecordRevisions(ws, "task").filter((row) => row.id === deleted.record.id)).toEqual(
+      deletedRows,
+    );
+    expect(readRecords(ws, "task").some((row) => row.id === deleted.record.id)).toBe(false);
     const revisions = readRecordRevisions(ws, "task").filter((row) => row.id === task.record.id);
     expect(revisions.map((row) => row.notes)).toEqual(["original-notes", "revised-notes"]);
     expect(readRecords(ws, "task").some((row) => row.title === marker)).toBe(true);
@@ -115,6 +143,13 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
     expect(readRecordRevisions(ws, "task").filter((row) => row.id === reassociated.record.id)).toHaveLength(
       2,
     );
+    const matter = await saveOnboardingMatter(ws, "synthetic ordinary original");
+    const next = await adoptOnboardingMatter(ws, matter.source, {
+      goal: "synthetic-private-onboarding-goal",
+      current: "unknown",
+      next: "synthetic-private-onboarding-task",
+    });
+    updateRecord(ws, "task", next.id, { project: project.slug });
     const newMarker = "synthetic-local-new-9348";
     const newTask = await addTask(ws, {
       title: newMarker,
@@ -147,6 +182,9 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
     expect(sharedText()).not.toContain(marker);
     expect(sharedText()).not.toContain(newMarker);
     for (const value of [
+      "synthetic-private-onboarding-task",
+      "synthetic-private-onboarding-goal",
+      "synthetic-deleted-private",
       "synthetic-direction-681",
       "synthetic-question-681",
       "synthetic-evidence-681",
@@ -197,6 +235,7 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
     await server.connect(a);
     await client.connect(b);
     for (const [name, args] of [
+      ["onboarding_status", {}],
       ["task_list", { status: "all" }],
       ["record_list", { type: "task" }],
       ["status", {}],
@@ -213,6 +252,9 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
       expect(JSON.stringify(result)).not.toContain(leaked.title);
       expect(JSON.stringify(result)).not.toContain(stale.title);
       for (const value of [
+        "synthetic-private-onboarding-task",
+        "synthetic-private-onboarding-goal",
+        "synthetic-deleted-private",
         "synthetic-direction-681",
         "synthetic-question-681",
         "synthetic-evidence-681",
@@ -250,7 +292,30 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
     expect(sharedText()).not.toContain(stale.title);
     expect(readRecords(reopened, "task").find((row) => row.id === newTask.record.id)?.title).toBe(newMarker);
     expect(sharedText()).not.toContain("synthetic-question-681");
-    await setProject(reopened, project.slug, { local_only: false });
+    const writeText = Workspace.prototype.writeText;
+    let interrupt = true;
+    const interrupted = vi
+      .spyOn(Workspace.prototype, "writeText")
+      .mockImplementation(function (file, text, options) {
+        const result = writeText.call(this, file, text, options);
+        if (!this.privateRecords && /^me\/data\/tasks\/.*\.jsonl$/.test(file) && interrupt) {
+          interrupt = false;
+          throw new Error("synthetic interruption after copy");
+        }
+        return result;
+      });
+    try {
+      await expect(setProject(reopened, project.slug, { local_only: false })).rejects.toThrow();
+      expect(existsSync(reopened.resolve(".kaitu/project-visibility.json", { internal: true }))).toBe(true);
+    } finally {
+      interrupted.mockRestore();
+    }
+    new Workspace(reopened.root);
+    expect(reopened.exists(".kaitu/project-visibility.json")).toBe(false);
+    expect(readRecordRevisions(reopened, "task").filter((row) => row.id === deleted.record.id)).toEqual(
+      deletedRows,
+    );
+    expect(readRecords(reopened, "task").some((row) => row.id === deleted.record.id)).toBe(false);
     expect(sharedText()).toContain(marker);
     expect(readRecordRevisions(reopened, "task").filter((row) => row.id === task.record.id)).toHaveLength(2);
     await setProject(reopened, project.slug, { local_only: true });

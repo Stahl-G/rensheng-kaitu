@@ -19,6 +19,7 @@ import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
 import { readPlan, relocatePlan, writePlan } from "./private-plan.js";
 import { relocateProjectRecords } from "./private-records.js";
+import { resumeProjectVisibility } from "./projects.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
@@ -116,6 +117,7 @@ export class Workspace {
     if (this.exists(".kaitu/config.json")) {
       for (const maintain of [
         ensureTaskModule,
+        resumeProjectVisibility,
         quarantineBankNotes,
         relocateProjectRecords,
         relocatePlan,
