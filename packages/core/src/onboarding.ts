@@ -13,19 +13,21 @@ import {
 import { isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import { templateDir } from "./assets.js";
+import type { CalendarSubscription } from "./calendar.js";
 import { type ImportResult, listChatFiles, readChat } from "./chats.js";
 import { localStateRoot } from "./drive.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "./github.js";
 import { history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
-import { type ProjectInput, createProject, driveProjects, listProjects } from "./projects.js";
+import { type ProjectInput, createProject, driveProjects, listProjects, projectVersion } from "./projects.js";
 import { schemas } from "./schema.js";
 import { isoInZone } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { type ModuleStatus, readWorkbench } from "./workbench.js";
-import type { Workspace } from "./workspace.js";
+import { type Workspace, stateDirectory } from "./workspace.js";
 
 export const ONBOARDING = {
   steps: ["搬来记忆", "先管哪些", "接上数据", "选一个 AI"],
@@ -129,9 +131,9 @@ export const ONBOARDING = {
     {
       id: "calendar",
       title: "日历",
-      description: "导入 Google 日历、iCloud 或 Outlook 导出的 ICS 文件。",
-      action: "选择日历文件",
-      target: "import:ics",
+      description: "订阅 Google 日历、iCloud 或 Outlook 的 ICS 地址，自动更新日程。",
+      action: "添加日历订阅",
+      target: "calendar",
       available: true,
     },
     {
@@ -153,7 +155,7 @@ export const ONBOARDING = {
     {
       id: "projects",
       title: "项目",
-      description: "先选一个本机文件夹，确认后建立项目。已有项目可在项目设置中连接 GitHub。",
+      description: "接上本机文件夹或 GitHub 仓库，确认后建立项目。",
       action: "选择项目",
       target: "setup:projects",
       available: true,
@@ -161,9 +163,9 @@ export const ONBOARDING = {
     {
       id: "mail",
       title: "邮件和聊天",
-      description: "可以先导入 ChatGPT 数据导出包。邮箱与聊天账号连接尚未提供。",
-      action: "导入聊天记录",
-      target: "import:chatgpt-conversations",
+      description: "在「AI 与连接」里接上邮箱或聊天账号，接收摘录与原文链接。",
+      action: "设置邮件和聊天",
+      target: "connections",
       available: true,
     },
     {
@@ -378,7 +380,7 @@ interface FilePreview {
   expires: number;
 }
 export type OnboardingSetupInput =
-  | { source: "projects"; project: ProjectInput }
+  | { source: "projects"; project: ProjectInput; github?: string }
   | { source: "news"; keywords: string[] };
 export interface OnboardingSetupPreview {
   token: string;
@@ -388,6 +390,7 @@ export interface OnboardingSetupResult {
   version: string | null;
   before: string | null;
   slug?: string;
+  github?: { repo: string; ok: boolean; problem: GithubProblem; error?: string };
 }
 interface SetupPreview {
   kind: "setup";
@@ -400,6 +403,7 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
   z
     .object({
       source: z.literal("projects"),
+      github: z.string().trim().min(1).optional(),
       project: z
         .object({
           title: z.string().trim().min(1).max(200),
@@ -415,11 +419,12 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
                 })
                 .strict(),
             )
-            .min(1),
+            .default([]),
         })
         .strict(),
     })
-    .strict(),
+    .strict()
+    .refine((input) => input.project.links.length > 0 || !!input.github),
   z
     .object({
       source: z.literal("news"),
@@ -433,10 +438,11 @@ export function previewOnboardingSetup(
   options: OnboardingOptions = {},
 ): OnboardingSetupPreview {
   const parsed = onboardingSetupSchema.safeParse(value);
-  if (!parsed.success) throw new KaituError("请提供项目文件夹或关注方向", "BAD_ARGS");
+  if (!parsed.success) throw new KaituError("请提供项目文件夹、GitHub 仓库或关注方向", "BAD_ARGS");
   const input = parsed.data;
   if (input.source === "projects") {
     if (!ws.exists("projects/module.json")) throw new KaituError("请先升级工作区以启用项目", "BAD_ARGS");
+    if (input.github) input.github = parseGithubRepo(input.github);
     for (const link of input.project.links) {
       if (!isAbsolute(link.path) || !existsSync(link.path) || !statSync(link.path).isDirectory())
         throw new KaituError("项目链接必须是本机已有文件夹的绝对路径", "BAD_ARGS");
@@ -465,21 +471,46 @@ export async function confirmOnboardingSetup(
   let result: OnboardingSetupResult;
   if (preview.input.source === "projects") {
     const input = preview.input.project;
-    if (!input.links?.every((link) => existsSync(link.path) && statSync(link.path).isDirectory()))
+    const github = preview.input.github;
+    input.links ??= [];
+    if (!input.links.every((link) => existsSync(link.path) && statSync(link.path).isDirectory()))
       throw new KaituError("项目文件夹已变化，请重新预览", "CONFLICT");
     const existing = listProjects(ws).find(
       (project) =>
         project.title === input.title &&
         project.kind === input.kind &&
         project.local_only === (input.local_only ?? false) &&
+        (!github || !project.github || project.github.repo.toLowerCase() === github.toLowerCase()) &&
         JSON.stringify(project.links) === JSON.stringify(input.links),
     );
     result = existing
-      ? { slug: existing.slug, version: null, before }
+      ? { slug: existing.slug, version: null, before: input.local_only && driveProjects(ws) ? null : before }
       : {
           ...(await createProject(ws, input)),
           before: input.local_only && driveProjects(ws) ? null : before,
         };
+    if (github && result.slug) {
+      try {
+        const bound = await bindGithub(ws, result.slug, github);
+        result.github = {
+          repo: bound.repo,
+          ok: bound.ok,
+          problem: bound.problem,
+          ...(bound.ok ? {} : { error: projectGithub(ws, result.slug)?.error ?? "GitHub 同步失败" }),
+        };
+        result.version = bound.version ?? result.version;
+      } catch (error) {
+        result.github = {
+          repo: github,
+          ok: false,
+          problem:
+            error instanceof KaituError && "problem" in error ? (error.problem as GithubProblem) : "network",
+          error: error instanceof Error ? error.message : "GitHub 连接失败",
+        };
+      }
+      result.version =
+        (await projectVersion(ws, result.slug, "新手引导：保存项目与 GitHub 连接")) ?? result.version;
+    }
   } else {
     const current = ws.exists("feed/feeds.json") ? ws.readText("feed/feeds.json") : null;
     if (current !== preview.previousFeeds) throw new KaituError("关注方向已变化，请重新预览", "CONFLICT");
@@ -490,7 +521,7 @@ export async function confirmOnboardingSetup(
     if (changed) ws.writeJson("feed/feeds.json", { ...feeds, keywords });
     result = { before, version: changed ? await snapshot(ws, "新手引导：保存关注方向") : null };
   }
-  cancelOnboardingPreview(ws, token, options);
+  if (!result.github || result.github.ok) cancelOnboardingPreview(ws, token, options);
   return result;
 }
 function previewFile(token: string) {
@@ -628,13 +659,24 @@ function hasUserFiles(ws: Workspace): boolean {
       if (entry.isDirectory()) return walk(file);
       const template = join(templateDir(), file);
       if (!existsSync(template)) return statSync(ws.resolve(file)).size > 0;
-      const text = ws.readText(file);
+      const text = ws.scanText(file);
+      if (text === undefined) return true;
       const normalize = (value: string) =>
         file === "me/rules.md" ? value.replace(/^timezone:.*$/m, "") : value;
       return normalize(text) !== normalize(readFileSync(template, "utf8"));
     });
   }
   return walk("");
+}
+function hasCollectedMessages(ws: Workspace, dir = "inbox"): boolean {
+  if (!ws.exists(dir)) return false;
+  return readdirSync(ws.resolve(dir), { withFileTypes: true }).some((entry) => {
+    if (entry.isSymbolicLink()) return false;
+    const file = `${dir}/${entry.name}`;
+    return entry.isDirectory()
+      ? hasCollectedMessages(ws, file)
+      : entry.isFile() && /^channel-[a-f0-9]{64}\.note\.md$/.test(entry.name);
+  });
 }
 export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {}): OnboardingStatus {
   const choices = localRead<LocalOnboardingChoices | null>(ws, "choices.json", null, options);
@@ -644,12 +686,17 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       .filter((m) => m.def.id === module)
       .flatMap((m) => Object.keys(m.def.records ?? {}))
       .reduce((n, type) => n + (data.records[type]?.length ?? 0), 0);
+  const calendarFile = join(stateDirectory(ws.root), "calendar-subscriptions.json");
+  const calendars: CalendarSubscription[] = existsSync(calendarFile)
+    ? JSON.parse(readFileSync(calendarFile, "utf8"))
+    : [];
+  const collected = hasCollectedMessages(ws);
   const sourceData: Record<OnboardingSource, boolean> = {
-    calendar: !!data.records.event?.length,
+    calendar: !!data.records.event?.length || calendars.some((subscription) => !!subscription.syncedAt),
     health: count("health") + data.labs.length > 0,
     finance: count("finance") > 0,
     projects: data.projects.some((p) => p.links.length > 0 || !!p.github?.latest),
-    mail: listChatFiles(ws).some((file) => readChat(ws, file).messages.length > 0),
+    mail: collected || listChatFiles(ws).some((file) => readChat(ws, file).messages.length > 0),
     news: data.feeds.feeds.length + data.feeds.keywords.length > 0 || count("feed") > 0,
   };
   const required = new Set(
@@ -658,9 +705,8 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     ]),
   );
   const sources = ONBOARDING.sources.filter((source) => required.has(source.id));
-  const plan = ws.exists("NOW.md")
-    ? parseFrontmatter<{ generated_at?: string | null }>(ws.readText("NOW.md")).data
-    : {};
+  const planText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
+  const plan = planText ? parseFrontmatter<{ generated_at?: string | null }>(planText).data : {};
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
@@ -696,6 +742,9 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   }));
   const completed = items.filter((item) => item.done).length;
   const hasUserData =
+    calendars.length > 0 ||
+    collected ||
+    ws.unavailableFiles().length > 0 ||
     data.projects.length > 0 ||
     Object.values(data.records).some((rows) => rows.length > 0) ||
     hasUserFiles(ws);
