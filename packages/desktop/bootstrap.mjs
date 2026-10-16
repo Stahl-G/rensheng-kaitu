@@ -7,7 +7,7 @@ import { desktopPaths } from "./kaitu-environment.mjs";
 const { state } = desktopPaths();
 const embedded = process.env.KAITU_EMBEDDED_AI === "1";
 process.env.DSH_HOME = state;
-app.setName("Kaitu");
+app.setName("人生开图");
 for (const name of ["userData", "sessionData", "logs", "crashDumps"]) {
   const directory = join(
     state,

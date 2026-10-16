@@ -58,5 +58,5 @@ writeFileSync(
 );
 writeFileSync(
   resolve(output, "index.html"),
-  '<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>开图</title><link rel="stylesheet" href="/assets/product.css"></head><body><p id="startup-error" role="alert" hidden></p><div id="root"></div><script type="module" src="/assets/product.js"></script></body></html>',
+  '<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>人生开图</title><link rel="stylesheet" href="/assets/product.css"></head><body><p id="startup-error" role="alert" hidden></p><div id="root"></div><script type="module" src="/assets/product.js"></script></body></html>',
 );

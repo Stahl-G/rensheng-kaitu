@@ -1,5 +1,6 @@
 import { lstatSync, readdirSync } from "node:fs";
 import { zipSync } from "fflate";
+import kaituPackage from "../../cli/package.json" with { type: "json" };
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readAutomation } from "./automation.js";
 import { driveStatus } from "./drive.js";
@@ -29,7 +30,7 @@ export async function readSettings(ws: Workspace) {
     automation: readAutomation(ws),
     storage: driveStatus(ws),
     versions: await history(ws),
-    version: process.env.KAITU_APP_VERSION ?? null,
+    version: kaituPackage.version,
     dshVersion: process.env.DSH_CLIENT_VERSION ?? null,
     timeZone: ws.timeZone(),
     ai: null as {

@@ -1,0 +1,18 @@
+# brand：应用名称与关于版本
+- 范围：反馈第 1、12 条。
+- 现象：窗口、菜单、安装包显示名不一致；关于页把 DSH 版本当成开图版本。
+- 原因：桌面品牌仍用旧名称，关于数据来自 DSH 的 app.getVersion()。
+- 改动：显示名、窗口、菜单、页面标题、欢迎页标志统一为「人生开图」。
+- 改动：开图版本从 CLI 包读取，定为 0.1.0；打包版本同步使用它。
+- 改动：独立 App 从内置 DSH 包读取运行时版本，插件继续使用 Host 提供的版本。
+- 改动：关于页显示「人生开图 0.1.0 · Powered by DeepSeek Harness <运行时版本> · 时区 …」。
+- 保留：ai.kaitu.app、Kaitu.app 文件名及欢迎页 Powered by DSH 换标逻辑。
+- 验证：打包预演、桌面入口打包通过；临时工作区页面标题与设置接口均返回正确名称和 0.1.0。
+- 手动：运行 `kaitu ui --dir <临时工作区>`，打开设置的关于区域，检查名称、开图版本和时区。
+- 手动：重新打包 Kaitu.app，检查访达显示名、窗口和菜单，关于页同时显示开图与 DSH 版本。
+- 手动：在 DSH 插件的设置页核对相同的双版本显示；切换明暗主题并缩窄至 375px。
+- 检查退出码：build=0、typecheck=0、lint=0；test=1（162 通过、13 失败）。
+- 测试失败：12 项超时，1 项桌面 providers 用例解析 helper 日志时报 JSON 错误；没有扩大本条修改范围。
+- 文件：packages/cli/package.json、packages/core/src/settings.ts。
+- 文件：packages/desktop/{bootstrap.mjs,local.mjs,package-kaitu.mjs}。
+- 文件：packages/dsh-plugin/{scripts/build-standalone.mjs,src/client/PersonalPages.tsx}、packages/web/index.html。

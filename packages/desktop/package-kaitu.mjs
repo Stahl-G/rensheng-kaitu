@@ -62,11 +62,11 @@ if (notaryProfile && !identity) throw new Error("KAITU_NOTARY_PROFILE 需要同�
 const dmg = join(dirname(output), "Kaitu.dmg");
 if (values.dmg && existsSync(dmg)) throw new Error(`输出已存在，请另选目录：${dmg}`);
 const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
-const version = `${kaituVersion}+dsh.0.2.0-rc.2`;
+const version = kaituVersion;
 const plan = [
   `COPY ${source} → ${output}；校验 DSH 0.2.0-rc.2 / arm64 / 主入口`,
-  `Info.plist: Kaitu / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
-  "Frameworks: 按实际 helper 应用重命名 Kaitu Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
+  `Info.plist: 人生开图 / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
+  "Frameworks: 按实际 helper 应用重命名 人生开图 Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
   "Resources: 移除 app-update.yml；从 SVG 生成 PNG / ICNS；内置插件、初始化器、schemas、templates、data 与 DSH 协议转接包",
   "MacOS: xcrun clang 构建原生 Kaitu 启动入口 → Electron Node 初始化资料 → 独立本地工作台",
@@ -124,12 +124,12 @@ for (const path of asar.listPackage(archive)) {
   const before = asar.extractFile(archive, name).toString();
   const count = before.split("DeepSeek Harness").length - 1;
   if (count) {
-    changes.set(name, Buffer.from(before.replaceAll("DeepSeek Harness", "Kaitu")));
+    changes.set(name, Buffer.from(before.replaceAll("DeepSeek Harness", "人生开图")));
     replacements += count;
   }
 }
 // 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 rc.2。
-// 对用户展示的组合版本写入 Info.plist 和关于面板，不改内部 release identity。
+// 开图版本只用于 Info.plist 和关于面板。
 const about = "applicationVersion: app.getVersion()";
 const brandedMain = changes.get("lib/main.js").toString();
 if (brandedMain.split(about).length !== 2) throw new Error("关于面板结构已变化，请核对本地 DSH 构建");
@@ -158,7 +158,7 @@ changes.set(
 changes.set("renderer/assets/welcome-brand.svg", Buffer.from(welcomeBrand()));
 const packagedManifest = {
   ...manifest,
-  productName: "Kaitu",
+  productName: "人生开图",
   dshDesktopAppId: "ai.kaitu.app",
   main: "kaitu-bootstrap.mjs",
 };
@@ -200,14 +200,14 @@ async function packageApplication() {
     const set = (key, value) => {
       execFileSync("/usr/bin/plutil", ["-replace", key, "-string", value, outputPlist]);
     };
-    for (const key of ["CFBundleName", "CFBundleDisplayName"]) set(key, "Kaitu");
+    for (const key of ["CFBundleName", "CFBundleDisplayName"]) set(key, "人生开图");
     set("CFBundleIdentifier", "ai.kaitu.app");
     set("CFBundleShortVersionString", version);
     set("CFBundleVersion", version);
     set("CFBundleExecutable", "Kaitu");
     set("CFBundleIconFile", "Kaitu.icns");
     set("NSAppleEventsUsageDescription", "开图将你确认的时间段加入日历，并同步改期和取消。");
-    set("NSMicrophoneUsageDescription", "Kaitu 使用麦克风将语音转为消息草稿。");
+    set("NSMicrophoneUsageDescription", "人生开图使用麦克风将语音转为消息草稿。");
     // 取消 dsh:// 协议声明，避免抢占原 DSH 应用的链接。
     execFileSync("/usr/bin/plutil", ["-remove", "CFBundleURLTypes", outputPlist]);
     const { ElectronAsarIntegrity: integrity } = JSON.parse(
@@ -276,7 +276,7 @@ function renameHelpers() {
   for (const entry of readdirSync(frameworks, { withFileTypes: true })) {
     const match = /^.+ Helper( \(([^)]+)\))?\.app$/.exec(entry.name);
     if (!entry.isDirectory() || !match) continue;
-    const name = `Kaitu Helper${match[1] ?? ""}`;
+    const name = `人生开图 Helper${match[1] ?? ""}`;
     const helper = join(frameworks, entry.name);
     const plist = join(helper, "Contents/Info.plist");
     const executable = execFileSync("/usr/libexec/PlistBuddy", ["-c", "Print CFBundleExecutable", plist], {
@@ -555,8 +555,8 @@ function welcomeBrand() {
   @media (prefers-color-scheme: dark) { :root { color: #f9fafb; } }
   text { font: 600 30px -apple-system, "SF Pro Display", "PingFang SC", sans-serif; letter-spacing: -0.5px; }
 </style>
-<g transform="translate(176 1) scale(0.79)">${mark}</g>
-<text x="222" y="31" fill="currentColor">Kaitu</text>
+<g transform="translate(150 1) scale(0.79)">${mark}</g>
+<text x="196" y="31" fill="currentColor">人生开图</text>
 </svg>
 `;
 }

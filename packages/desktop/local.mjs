@@ -1,8 +1,9 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAskService } from "../cli/dist/ui/ask.js";
 import { startUi } from "../cli/dist/ui/server.js";
+import kaituPackage from "../cli/package.json" with { type: "json" };
 import {
   Workspace,
   configureAutomation,
@@ -38,7 +39,14 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
       KAITU_APP_PORT: "0",
     });
   let ai = makeBackgroundAi();
-  process.env.KAITU_APP_VERSION = app.getVersion();
+  process.env.DSH_CLIENT_VERSION = JSON.parse(
+    readFileSync(join(dirname(resources), "app.asar/package.json"), "utf8"),
+  ).version;
+  app.setAboutPanelOptions({
+    applicationName: "人生开图",
+    applicationVersion: kaituPackage.version,
+    version: `Powered by DeepSeek Harness ${process.env.DSH_CLIENT_VERSION}`,
+  });
   const makeSdk = () =>
     createSdkRuntime({
       executable: join(dirname(app.getPath("exe")), "DSH"),
@@ -84,7 +92,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     },
   });
   const window = new BrowserWindow({
-    title: "开图",
+    title: "人生开图",
     width: 1180,
     height: 820,
     minWidth: 360,
@@ -118,9 +126,9 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         {
-          label: "开图",
+          label: "人生开图",
           submenu: [
-            { role: "about", label: "关于开图" },
+            { role: "about", label: "关于人生开图" },
             {
               label: "设置",
               submenu: [
@@ -139,8 +147,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
               })),
             },
             { type: "separator" },
-            { role: "hide", label: "隐藏开图" },
-            { role: "quit", label: "退出开图" },
+            { role: "hide", label: "隐藏人生开图" },
+            { role: "quit", label: "退出人生开图" },
           ],
         },
         { role: "editMenu", label: "编辑" },

@@ -576,8 +576,9 @@ export function PersonalPages(
             <section className={css.sec}>
               <h2 className={css.eyebrow}>关于</h2>
               <p className={css.small}>
-                人生开图 · {data.version ?? "本地工作台"}
-                {data.dshVersion ? ` · Powered by DSH ${data.dshVersion}` : ""} · 时区 {data.timeZone}
+                人生开图 {data.version ?? "本地工作台"}
+                {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} · 时区{" "}
+                {data.timeZone}
               </p>
             </section>
           </>
