@@ -30,6 +30,8 @@ interface ImageInput {
   name: string;
 }
 interface Settings {
+  /** 浏览器工作台没有内置 AI 时为 false。 */
+  available?: boolean;
   configured: boolean;
   choice?: "builtin" | "external";
   model: string;
@@ -385,6 +387,20 @@ export function AskPage({
     !events
       .slice(lastUser + 1)
       .some((event) => event.type === "assistant/message" || event.type === "tool/call");
+  if (settings?.available === false)
+    return (
+      <div className={css.unavailable}>
+        <div className={css.welcome}>
+          <h1>问问在开图桌面应用里用</h1>
+          <p>浏览器里的工作台没有内置 AI。想接着聊，可以在「AI 与连接」复制资料包，带到你常用的 AI。</p>
+          {onConnections && (
+            <button type="button" onClick={onConnections}>
+              打开 AI 与连接
+            </button>
+          )}
+        </div>
+      </div>
+    );
   return (
     <div className={css.chat}>
       <nav className={css.threads} aria-label="对话">

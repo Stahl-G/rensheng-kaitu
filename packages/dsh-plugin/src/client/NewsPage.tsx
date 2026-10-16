@@ -78,10 +78,10 @@ export function NewsPage(props: NewsPageProps) {
               {item.title}
             </a>
           </h3>
-          <p>{item.summary || "这条资讯还没有摘要"}</p>
-          <p className={css.comment}>{item.comment || "还没有对你的点评"}</p>
+          {item.summary && <p>{item.summary}</p>}
+          {item.comment && <p className={css.comment}>{item.comment}</p>}
           <div className={css["news-foot"]}>
-            <span className={css.chip}>和你有关：{related || "尚未标明具体关联"}</span>
+            {related && <span className={css.chip}>和你有关：{related}</span>}
             <button
               type="button"
               className={css.link}

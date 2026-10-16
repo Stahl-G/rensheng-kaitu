@@ -183,7 +183,22 @@ export async function productRequest(
   const locale = (i: number): Locale => normalizeLocale(args[i]);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
-    if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
+    if (!ask) {
+      // 浏览器工作台没有内置 AI：读取类接口如实说不可用，界面据此提示，不当成错误。
+      if (method === "askSettings")
+        return {
+          available: false,
+          configured: false,
+          model: "",
+          provider: "",
+          providerName: "",
+          protocols: [],
+          supportsImages: false,
+          providers: [],
+        };
+      if (method === "askList") return [];
+      throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
+    }
     switch (method) {
       case "askSearchConfigure":
         return ask.configure({ search: args[0] });

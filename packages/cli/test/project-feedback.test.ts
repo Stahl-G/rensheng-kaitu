@@ -77,7 +77,7 @@ it("卡片显示关联待办和简短日志，详情保留完整进展，错误�
       recentLog: { text: string };
     }[];
     expect(cards[0]?.next.map((item) => item.id)).toContain(task.record.id);
-    expect(cards[0]?.recentLog.text).toBe("- 4 次提交：第一条；第二条");
+    expect(cards[0]?.recentLog.text).toBe("4 次提交：第一条；第二条");
     const detail = (await productRequest(ws, "projectDetail", [slug])) as { logs: { text: string }[] };
     expect(detail.logs[0]?.text).toContain("第三条；第四条");
     expect(detail.logs[0]?.text).not.toContain("<!--");

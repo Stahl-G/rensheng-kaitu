@@ -79,8 +79,8 @@ export function HandoverPanel({
       </h2>
       <p className={css.small}>
         {t(
-          "复制下面的资料包，粘贴到 ChatGPT、豆包、Kimi、DeepSeek 等任何 AI 的对话里。聊完对它说「整理给开图」，再把回答贴回来。这是手动接续：不需要 API Key，也不算「已连接」。",
-          'Copy the context pack below into a chat with ChatGPT, Claude, Gemini or any other AI. When you are done, say "update Kaitu" and paste its answer back here. This is a manual handover: no API key, and it does not count as "connected".',
+          "复制下面的资料包，粘贴到 ChatGPT、豆包、Kimi、DeepSeek 等任何 AI 的对话里。聊完对它说「整理给开图」，再把回答贴回来。不需要 API Key。",
+          'Copy the context pack below into a chat with ChatGPT, Claude, Gemini or any other AI. When you are done, say "update Kaitu" and paste its answer back here. No API key needed.',
         )}
       </p>
       {error && (

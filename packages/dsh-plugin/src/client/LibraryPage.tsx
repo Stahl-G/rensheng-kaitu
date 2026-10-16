@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import css from "./Prototype.module.css";
@@ -40,22 +40,32 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
             {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
             <span>›</span>
           </span>
-          <span className={`${css.big} ${css.num}`}>
-            {section.count
-              ? t(
-                  `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                  `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
-                )
-              : t("还没有资料", "Nothing yet")}
-          </span>
+          {section.count ? (
+            <span className={`${css.big} ${css.num}`}>
+              {t(
+                `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
+                `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
+              )}
+            </span>
+          ) : (
+            <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
+          )}
           <span className={css.small}>
-            {section.sources.join(t("、", ", ")) || t("还没有来源", "No sources yet")}
-            {section.latest
-              ? t(
-                  ` · ${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
-                  ` · ${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
-                )
-              : ""}
+            {section.sources.map((source, index) => (
+              <Fragment key={source}>
+                {index ? t("、", ", ") : ""}
+                <span className={css.nowrap}>{source}</span>
+              </Fragment>
+            ))}
+            {section.latest && (
+              <span className={css.nowrap}>
+                {section.sources.length ? " · " : ""}
+                {t(
+                  `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
+                  `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                )}
+              </span>
+            )}
           </span>
         </button>
       )) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}

@@ -22,7 +22,11 @@ export function projectLogs(log: string) {
 }
 
 export function projectSummary(text: string) {
-  const lines = clean(text).split(/\r?\n/).filter(Boolean).slice(0, 2);
+  const lines = clean(text)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*+]\s+/, "").trim())
+    .filter(Boolean)
+    .slice(0, 2);
   return lines
     .map((line) => {
       const commits = line.match(/^(.*?\d+ 次提交)：(.*)$/);

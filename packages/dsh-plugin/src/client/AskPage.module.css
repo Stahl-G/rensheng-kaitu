@@ -530,3 +530,17 @@ output.progress,
     line-height: 1.4;
   }
 }
+.unavailable {
+  display: flex;
+  justify-content: center;
+  padding: 96px 16px;
+}
+.unavailable button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+  font: inherit;
+  cursor: pointer;
+}

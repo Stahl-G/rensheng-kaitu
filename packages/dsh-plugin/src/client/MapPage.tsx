@@ -880,9 +880,12 @@ export function MapPage({
           </h1>
           <p className={css.secondary}>从家乡出发，记录走过的城市和现在的生活</p>
         </div>
-        <button type="button" className={css.primary} onClick={() => ask(prompt)}>
-          从记忆生成
-        </button>
+        {/* 还没有经历时，下方空白处已有同一个入口。 */}
+        {!(data && !data.experiences.length && !home) && (
+          <button type="button" className={css.primary} onClick={() => ask(prompt)}>
+            从记忆生成
+          </button>
+        )}
       </header>
       <div className={css.tools}>
         <ExperienceImportControls

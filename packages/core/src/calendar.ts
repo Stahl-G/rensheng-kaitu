@@ -99,7 +99,7 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     end: String(row.end),
     source:
       labels.get(String(row.calendar)) ??
-      (/^[0-9a-f-]{36}$/i.test(String(row.calendar)) ? "导入日历 · 名称未记录" : String(row.calendar)),
+      (/^[0-9a-f-]{36}$/i.test(String(row.calendar)) ? "导入日历" : String(row.calendar)),
     pending: false,
   }));
   let planDate: string | null = null;

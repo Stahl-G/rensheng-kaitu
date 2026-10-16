@@ -378,6 +378,9 @@
   gap: 12px;
   min-width: 0;
 }
+.sections {
+  gap: 28px;
+}
 .sec-head {
   display: flex;
   flex-wrap: wrap;
@@ -526,7 +529,8 @@
   color: var(--ink);
   font-weight: 400;
 }
-.sum:hover {
+/* 只有能点的卡片才在悬停时描边，纯展示的统计卡不像按钮。 */
+:is(a, button).sum:hover {
   text-decoration: none;
   box-shadow: 0 0 0 1px var(--muted);
 }
@@ -542,10 +546,31 @@
   font-size: 13px;
   color: var(--muted);
 }
+.app input[type="checkbox"],
+.app input[type="radio"] {
+  accent-color: var(--primary);
+}
+.app select {
+  min-height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
 .big {
   font-size: 26px;
   line-height: 32px;
   font-weight: 600;
+}
+.mod-empty {
+  font-size: 15px;
+  line-height: 32px;
+  color: var(--muted);
+}
+.nowrap {
+  white-space: nowrap;
 }
 .small {
   font-size: 13px;

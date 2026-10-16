@@ -67,7 +67,7 @@ function ruleRows(r: MeRules): [string, string | undefined][] {
   ];
 }
 function sourceLabel(source: string | null) {
-  if (!source) return "来源未记录";
+  if (!source) return "";
   if (/chatgpt/i.test(source)) return "ChatGPT 导入";
   if (/^(user|manual|你)$/.test(source)) return "你";
   if (/^(agent|local-agent|本机 Agent)$/.test(source)) return "本机 Agent";
@@ -98,8 +98,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
     <div className={css.fact} key={memory.file}>
       <p>{memory.text}</p>
       <span className={css.src}>
-        {sourceLabel(memory.source)}
-        {memory.sensitive ? " · 仅本机" : ""}
+        {[sourceLabel(memory.source), memory.sensitive ? "仅本机" : ""].filter(Boolean).join(" · ")}
       </span>
       <span className={css["fact-acts"]}>
         <button

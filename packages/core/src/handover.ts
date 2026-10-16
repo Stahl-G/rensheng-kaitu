@@ -433,8 +433,8 @@ export function handoverPack(ws: Workspace, localeInput?: Locale, now = new Date
   );
   const excluded = pick(
     locale,
-    "不含健康记录、财务明细和标为敏感的记忆；认得出的密钥和本机文件路径会换成「已去掉」。复制前请再看一眼。",
-    "Never included: health records, finance details and memories marked sensitive. Recognizable keys and local file paths are replaced with “removed”. Take a quick look before copying.",
+    "不含健康记录、财务明细和敏感记忆，密钥和本机路径会自动去掉。",
+    "Health records, finance details and sensitive memories stay out; keys and local paths are removed automatically.",
   );
   const list = sections(locale, now, handoverData(ws, now));
   const pack = { header, sections: list, footer };

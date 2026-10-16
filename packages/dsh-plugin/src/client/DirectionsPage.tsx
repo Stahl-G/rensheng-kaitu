@@ -871,22 +871,24 @@ export function DirectionsPage(props: DirectionsPageProps) {
               );
             })}
           </div>
-          <details>
-            <summary className={v2.link}>{t("筛选方向", "Filter")}</summary>{" "}
-            <nav className={base.secondaryNav} aria-label={t("方向筛选", "Direction filter")}>
-              {(
-                [
-                  ["current", t("当前", "Current")],
-                  ["favorites", t("收藏", "Saved")],
-                  ["history", t("已归档", "Archived")],
-                ] as const
-              ).map(([id, title]) => (
-                <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                  {title}
-                </button>
-              ))}
-            </nav>
-          </details>
+          {!!data.directions.length && (
+            <details>
+              <summary className={v2.link}>{t("筛选方向", "Filter")}</summary>{" "}
+              <nav className={base.secondaryNav} aria-label={t("方向筛选", "Direction filter")}>
+                {(
+                  [
+                    ["current", t("当前", "Current")],
+                    ["favorites", t("收藏", "Saved")],
+                    ["history", t("已归档", "Archived")],
+                  ] as const
+                ).map(([id, title]) => (
+                  <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+                    {title}
+                  </button>
+                ))}
+              </nav>
+            </details>
+          )}
           {!data.directions.length && (
             <div className={base.focus}>
               <h2>{t("一个值得探索的问题", "A question worth exploring")}</h2>

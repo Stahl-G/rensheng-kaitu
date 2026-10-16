@@ -34,7 +34,7 @@ export function HealthLibrary(props: HealthPageProps & { sources: string[] }) {
   const recorded = data?.sleep.filter((day) => day.value !== null) ?? [];
   const training = heat.reduce((count, day) => count + (day.sessions ?? 0), 0);
   return (
-    <div className={css.sec}>
+    <div className={`${css.sec} ${css.sections}`}>
       {error && <p role="alert">{error}</p>}
       {!data ? (
         <p className={css.small}>正在读取健康记录…</p>

@@ -333,6 +333,16 @@ function Overview({
     </div>
   );
   const focus = data?.next[0];
+  // 规划放在「现在最该做的」之后：先看今天，再看各个目标。
+  const plansCard = data?.plans && (
+    <PlansCard
+      plans={data.plans}
+      addGoalNext={props.addGoalNext}
+      changeNext={props.changeOnboardingNext}
+      refresh={refresh}
+      open={(section) => (section === "projects" ? openRecord("projects") : openSection("explore"))}
+    />
+  );
   const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
   return (
     <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
@@ -499,15 +509,6 @@ function Overview({
                 refresh={refresh}
               />
             )}
-            {data?.plans && (
-              <PlansCard
-                plans={data.plans}
-                addGoalNext={props.addGoalNext}
-                changeNext={props.changeOnboardingNext}
-                refresh={refresh}
-                open={(section) => (section === "projects" ? openRecord("projects") : openSection("explore"))}
-              />
-            )}
             <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
           </>
         )}
@@ -540,6 +541,7 @@ function Overview({
                   "Once you have real notes, your data and recent changes show up here.",
                 )}
               </p>
+              {plansCard}
             </>
           ) : (
             <>
@@ -660,6 +662,7 @@ function Overview({
                   )}
                 </section>
               )}
+              {plansCard}
               <Agenda data={calendar} open={() => openRecord("calendar")} />
               {push &&
                 data.blocks
