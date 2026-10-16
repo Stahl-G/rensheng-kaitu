@@ -1,6 +1,7 @@
 import {
   type AutomationKey,
   type BankMail,
+  CalendarPush,
   type ExperienceChanges,
   type ExplorationCommand,
   type FinanceImportOptions,
@@ -19,6 +20,8 @@ import {
   addCalendarSubscription,
   adoptOnboardingMatter,
   bankNotificationCandidates,
+  calendarPushEntries,
+  calendarPushStore,
   cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
@@ -33,6 +36,7 @@ import {
   discardFinanceImport,
   dismissNews,
   draftOnboardingMatter,
+  editCalendarBlock,
   editExperience,
   exportWorkspace,
   financeAccounts,
@@ -76,6 +80,7 @@ import {
   saveAvatar,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  scheduleNext,
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
@@ -89,6 +94,11 @@ import type { AskMode, AskService } from "./ask.js";
 
 export const productMutations = new Set([
   "configureAutomation",
+  "configureCalendarPush",
+  "retryCalendarPush",
+  "removeCalendarPush",
+  "scheduleNext",
+  "editCalendarBlock",
   "restoreVersion",
   "moveStorage",
   "addCalendarSubscription",
@@ -127,6 +137,7 @@ export async function productRequest(
   method: string,
   args: unknown[],
   ask?: AskService,
+  calendarPush = new CalendarPush(calendarPushStore(ws)),
 ): Promise<unknown> {
   const text = (i: number) => {
     if (typeof args[i] !== "string") throw new KaituError("缺少有效参数", "BAD_ARGS");
@@ -166,6 +177,23 @@ export async function productRequest(
       return readLibrary(ws);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
+    case "calendarPush":
+      return calendarPush.settings();
+    case "configureCalendarPush":
+      if (typeof args[0] !== "boolean") throw new KaituError("缺少开关状态", "BAD_ARGS");
+      return calendarPush.configure(args[0]);
+    case "retryCalendarPush":
+      return calendarPush.sync(calendarPushEntries(ws), text(0));
+    case "removeCalendarPush":
+      return calendarPush.removeAll();
+    case "editCalendarBlock": {
+      const result = await editCalendarBlock(ws, text(0), text(1), text(2));
+      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+    }
+    case "scheduleNext": {
+      const result = await scheduleNext(ws, text(0), text(1), text(2), text(3));
+      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+    }
     case "calendar":
       return readCalendar(ws);
     case "addCalendarSubscription":
@@ -261,8 +289,10 @@ export async function productRequest(
       );
     case "overview":
       return readOverviewPage(ws);
-    case "decideProposal":
-      return decideProposal(ws, text(0), text(1) as "confirmed" | "rejected");
+    case "decideProposal": {
+      const result = await decideProposal(ws, text(0), text(1) as "confirmed" | "rejected");
+      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+    }
     case "capture":
       return captureNote(ws, text(0));
     case "me":

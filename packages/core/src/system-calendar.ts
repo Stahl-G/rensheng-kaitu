@@ -1,0 +1,219 @@
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import ICAL from "ical.js";
+import { parseFrontmatter } from "./frontmatter.js";
+import { localStateRoot } from "./local-state.js";
+import { stateBinding } from "./state-binding.js";
+import { listTasks } from "./tasks.js";
+import { localTimeToInstant } from "./time.js";
+import { type ModuleStatus, type TodayPlan, statusFiles } from "./workbench.js";
+import type { Workspace } from "./workspace.js";
+
+export interface CalendarPushEntry {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  notes: string;
+}
+export interface CalendarPushReceipt {
+  status: "added" | "file" | "deleted" | "removed" | "error";
+  reason?: string;
+  ics?: string;
+}
+export interface CalendarPushSettings {
+  enabled: boolean;
+  entries: Record<string, CalendarPushReceipt>;
+}
+export interface CalendarPushResult {
+  version: string | null;
+  calendarPush: CalendarPushSettings;
+}
+interface Mapping {
+  suppressed?: boolean;
+  uid?: string;
+  entry: CalendarPushEntry;
+  receipt: CalendarPushReceipt;
+  sequence: number;
+}
+export interface CalendarPushState {
+  enabled: boolean;
+  entries: Record<string, Mapping>;
+}
+export interface CalendarPushStore {
+  read(): CalendarPushState;
+  write(state: CalendarPushState): void;
+}
+export interface CalendarExecutor {
+  upsert(entry: CalendarPushEntry, uid?: string, changed?: boolean): Promise<string | null>;
+  remove(uid: string, entry: CalendarPushEntry): Promise<void>;
+}
+export function calendarPushStore(ws: Workspace): CalendarPushStore {
+  const file = () => join(localStateRoot(), "system-calendar", `${stateBinding(ws.root).id}.json`);
+  return {
+    read: () =>
+      existsSync(file()) ? JSON.parse(readFileSync(file(), "utf8")) : { enabled: true, entries: {} },
+    write: (state) => {
+      const path = file();
+      mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+      const temp = `${path}.${randomUUID()}.tmp`;
+      writeFileSync(temp, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+      renameSync(temp, path);
+    },
+  };
+}
+export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
+  if (!ws.exists("NOW.md")) return [];
+  const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+  if (!data.date) return [];
+  const previous = calendarPushStore(ws).read().entries;
+  const taskIds = new Set(
+    listTasks(ws, { status: "all", includePrivate: true })
+      .filter((task) => task.status !== "cancelled")
+      .map((task) => task.id),
+  );
+  for (const { file } of statusFiles(ws)) {
+    for (const item of parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next ?? [])
+      if (item.status !== "skipped") taskIds.add(item.id);
+  }
+  return data.blocks.flatMap((block) => {
+    if (block.kind === "task" && block.id.startsWith("next-") && block.ref && !taskIds.has(block.ref))
+      return [];
+    if (
+      !(block.status === "confirmed" || (block.status === "done" && previous[block.id])) ||
+      !["proposal", "task"].includes(block.kind) ||
+      !block.start ||
+      !block.end
+    )
+      return [];
+    const start = localTimeToInstant(`${data.date}T${block.start}:00`, ws.timeZone()).toISOString();
+    const nextDate = new Date(Date.parse(`${data.date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+    const end = localTimeToInstant(
+      block.end === "24:00" ? `${nextDate}T00:00:00` : `${data.date}T${block.end}:00`,
+      ws.timeZone(),
+    ).toISOString();
+    if (Date.parse(end) <= Date.parse(start)) return [];
+    return [
+      {
+        id: block.id,
+        title: block.title,
+        start,
+        end,
+        notes: `关联目标：${block.title}｜做完后回开图记一句结果\n开图记录：${block.id}${block.ref ? `（${block.ref}）` : ""}`,
+      },
+    ];
+  });
+}
+export function calendarPushIcs(entry: CalendarPushEntry, sequence = 0, cancelled = false): string {
+  const calendar = new ICAL.Component(["vcalendar", [], []]);
+  calendar.updatePropertyWithValue("version", "2.0");
+  calendar.updatePropertyWithValue("prodid", "-//Kaitu//Calendar//ZH");
+  const component = new ICAL.Component("vevent");
+  const event = new ICAL.Event(component);
+  event.uid = `kaitu-block-${entry.id}`;
+  event.summary = entry.title;
+  event.description = entry.notes;
+  event.startDate = ICAL.Time.fromDateTimeString(entry.start.replace(/\.\d{3}Z$/, "Z"));
+  event.endDate = ICAL.Time.fromDateTimeString(entry.end.replace(/\.\d{3}Z$/, "Z"));
+  component.updatePropertyWithValue("dtstamp", ICAL.Time.fromJSDate(new Date(), true));
+  component.updatePropertyWithValue("sequence", sequence);
+  if (cancelled) component.updatePropertyWithValue("status", "CANCELLED");
+  if (!cancelled) {
+    const alarm = new ICAL.Component("valarm");
+    alarm.updatePropertyWithValue("action", "DISPLAY");
+    alarm.updatePropertyWithValue("description", entry.title);
+    alarm.updatePropertyWithValue("trigger", ICAL.Duration.fromString("-PT10M"));
+    component.addSubcomponent(alarm);
+  }
+  calendar.addSubcomponent(component);
+  return `${calendar.toString()}\r\n`;
+}
+export class CalendarPush {
+  constructor(
+    readonly store: CalendarPushStore,
+    readonly executor?: CalendarExecutor,
+  ) {}
+  settings(): CalendarPushSettings {
+    const state = this.store.read();
+    return {
+      enabled: state.enabled,
+      entries: Object.fromEntries(Object.entries(state.entries).map(([id, row]) => [id, row.receipt])),
+    };
+  }
+  configure(enabled: boolean) {
+    const state = this.store.read();
+    state.enabled = enabled;
+    this.store.write(state);
+    return this.settings();
+  }
+  async sync(entries: CalendarPushEntry[], retryId?: string, removeAll = false) {
+    const state = this.store.read();
+    if (!state.enabled && !removeAll) return this.settings();
+    const desired = new Map(entries.map((entry) => [entry.id, entry]));
+    for (const [id, row] of Object.entries(state.entries)) {
+      if (!removeAll && desired.has(id)) continue;
+      if (["removed", "deleted"].includes(row.receipt.status)) continue;
+      try {
+        if (row.uid) {
+          if (!this.executor) throw new Error("请在 Kaitu.app 中移除已写入的日历事件");
+          await this.executor.remove(row.uid, row.entry);
+        }
+        row.suppressed = removeAll;
+        row.sequence++;
+        row.receipt = {
+          status: "removed",
+          ...(!row.uid
+            ? {
+                ics: calendarPushIcs(row.entry, row.sequence, true),
+                reason: "请导入取消文件以移除之前导入的事件",
+              }
+            : {}),
+        };
+      } catch (error) {
+        row.receipt = {
+          status: "error",
+          reason: error instanceof Error ? error.message : String(error),
+          ics: calendarPushIcs(row.entry, row.sequence + 1, true),
+        };
+      }
+      this.store.write(state);
+    }
+    if (removeAll) return this.settings();
+    for (const entry of entries) {
+      let old = state.entries[entry.id];
+      if (old?.receipt.status === "deleted" || old?.suppressed) continue;
+      if (old?.receipt.status === "removed") {
+        old.uid = undefined;
+        old = { ...old, receipt: { status: "error" }, entry: { ...old.entry, start: "" } };
+      }
+      const changed = !old || JSON.stringify(old.entry) !== JSON.stringify(entry);
+      if (!changed && old?.receipt.status === "file" && retryId !== entry.id) continue;
+      if (!changed && old?.receipt.status === "error" && retryId !== entry.id) continue;
+      const row: Mapping = old ?? { entry, sequence: -1, receipt: { status: "error" } };
+      if (changed) row.sequence++;
+      row.entry = entry;
+      state.entries[entry.id] = row;
+      try {
+        if (!this.executor) throw new Error("当前为浏览器、DSH 插件或非 macOS 环境，请导入日历文件");
+        const uid = await this.executor.upsert(entry, row.uid, changed);
+        if (uid === null) row.receipt = { status: "deleted" };
+        else {
+          row.uid = uid;
+          row.receipt = { status: "added" };
+        }
+      } catch (error) {
+        row.receipt = {
+          status: "file",
+          ics: calendarPushIcs(entry, row.sequence),
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+      this.store.write(state);
+    }
+    return this.settings();
+  }
+  removeAll() {
+    return this.sync([], undefined, true);
+  }
+}

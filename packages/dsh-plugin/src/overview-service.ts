@@ -6,6 +6,9 @@ import {
   type AutomationKey,
   type AutomationSettings,
   type CalendarData,
+  CalendarPush,
+  type CalendarPushResult,
+  type CalendarPushSettings,
   type ImportSource,
   KaituError,
   type LibraryData,
@@ -30,6 +33,8 @@ import {
   Workspace,
   addCalendarSubscription,
   adoptOnboardingMatter,
+  calendarPushEntries,
+  calendarPushStore,
   cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
@@ -43,6 +48,7 @@ import {
   defaultRoot,
   dismissNews,
   draftOnboardingMatter,
+  editCalendarBlock,
   editExperience,
   exportWorkspace,
   hideExperience,
@@ -78,6 +84,7 @@ import {
   saveAvatar,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  scheduleNext,
   setExperienceSource,
   setNewsFeedback,
   tryNews,
@@ -338,9 +345,53 @@ export class KaituOverviewService extends TypertRemoteService {
     });
   }
 
+  private get calendarWriter() {
+    return new CalendarPush(calendarPushStore(this.workspace));
+  }
+
+  @Remote("calendarPush")
+  async calendarPush(): Promise<CalendarPushSettings> {
+    return this.calendarWriter.settings();
+  }
+
+  @Remote("configureCalendarPush")
+  async configureCalendarPush(enabled: boolean): Promise<CalendarPushSettings> {
+    if (typeof enabled !== "boolean") throw new KaituError("缺少开关状态", "BAD_ARGS");
+    return this.write(async () => this.calendarWriter.configure(enabled));
+  }
+
+  @Remote("retryCalendarPush")
+  async retryCalendarPush(id: string): Promise<CalendarPushSettings> {
+    return this.write(() => this.calendarWriter.sync(calendarPushEntries(this.workspace), id));
+  }
+
+  @Remote("removeCalendarPush")
+  async removeCalendarPush(): Promise<CalendarPushSettings> {
+    return this.write(() => this.calendarWriter.removeAll());
+  }
+
+  @Remote("editCalendarBlock")
+  async editCalendarBlock(id: string, start: string, end: string): Promise<CalendarPushResult> {
+    return this.write(async () => {
+      const result = await editCalendarBlock(this.workspace, id, start, end);
+      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+    });
+  }
+
+  @Remote("scheduleNext")
+  async scheduleNext(file: string, id: string, start: string, end: string): Promise<CalendarPushResult> {
+    return this.write(async () => {
+      const result = await scheduleNext(this.workspace, file, id, start, end);
+      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+    });
+  }
+
   @Remote("decideProposal")
-  async decideProposal(id: string, decision: "confirmed" | "rejected"): Promise<{ version: string | null }> {
-    return this.write(() => decideProposal(this.workspace, id, decision));
+  async decideProposal(id: string, decision: "confirmed" | "rejected"): Promise<CalendarPushResult> {
+    return this.write(async () => {
+      const result = await decideProposal(this.workspace, id, decision);
+      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+    });
   }
 
   @Remote("capture")
