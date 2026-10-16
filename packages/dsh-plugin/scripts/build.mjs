@@ -146,3 +146,5 @@ await build({
     result.outputFiles[0].text.replace("var exports=module.exports;", `var exports=module.exports;${style}`),
   );
 });
+
+await import("./build-standalone.mjs");

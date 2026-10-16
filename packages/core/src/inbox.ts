@@ -101,6 +101,8 @@ async function prepare(ws: Workspace, file: string, text: string) {
             throw new KaituError(`缺少字段 ${missing.join("、")}（见 collect-news 技能）`, "BAD_INBOX");
         }
         const record = fields.includes("date") ? data : withoutDate;
+        if (["experience_source", "experience_batch"].includes(type))
+          throw new KaituError("收件箱只提交经历，来源与批次由开图管理", "BAD_INBOX");
         if (type === "experience")
           await addExperiences(ws, [record as unknown as ExperienceInput], "agent", { dryRun: true });
         else addRecords(ws, type, [record], { dryRun: true });

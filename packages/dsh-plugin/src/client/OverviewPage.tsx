@@ -1,12 +1,6 @@
-import { Button } from "@deepseek-ai/dsh-client-ui-primitives";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type {
-  OverviewData,
-  OverviewMetric,
-  OverviewProject,
-  OverviewSource,
-  OverviewVersion,
-} from "../types.js";
+import type { MeData, OverviewData, OverviewVersion } from "../types.js";
+import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -14,652 +8,677 @@ import { MapPage, type MapPageProps } from "./MapPage.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import css from "./OverviewPage.module.css";
+import { RecordSummary } from "./RecordSummary.js";
 
 export interface OverviewPageProps
   extends MePageProps,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
+    Omit<DirectionsPageProps, "onPrompt" | "goals">,
     Omit<MapPageProps, "onPrompt">,
     Omit<HealthPageProps, "onPrompt">,
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone"> {
   load: () => Promise<OverviewData>;
+  subscribe?: (refresh: () => void) => () => void;
+  decideProposal: (id: string, decision: "confirmed" | "rejected") => Promise<unknown>;
+  capture: (text: string) => Promise<unknown>;
   onAgent: () => void;
+  onAdvanced?: () => void;
 }
-const sections = [
-  { id: "today", name: "今天", tip: "今天的安排、下一步和要你确认的事" },
-  { id: "health", name: "健康", tip: "训练、饮食、睡眠和身体数据" },
-  { id: "projects", name: "在做的事", tip: "项目、学习和正在做的决定" },
-  { id: "map", name: "地图", tip: "走过的、现在的和计划去的城市" },
-  { id: "feed", name: "资讯", tip: "你关注的领域每天的新消息" },
-  { id: "finance", name: "财务", tip: "收支、投资和账户 · 明细只在本机" },
-  { id: "me", name: "关于我", tip: "目标、作息规则和 AI 记住的你" },
+type View = "overview" | "explore" | "records" | "profile" | "connections" | "advanced";
+type RecordView = "all" | "projects" | "health" | "finance" | "knowledge" | "memory";
+const navigation: { id: View; title: string; subtitle: string }[] = [
+  { id: "overview", title: "总览", subtitle: "我的现状" },
+  { id: "explore", title: "开图", subtitle: "人生探索" },
+  { id: "records", title: "记录", subtitle: "全部资料" },
 ];
-const collapseKey = "kaitu.overview.sectionsCollapsed";
-function Actor({ source, name }: { source: OverviewVersion["source"]; name?: string | null }) {
-  if (source === "unknown")
-    return (
-      <>
-        <span aria-hidden="true" className={css.avatar} style={{ visibility: "hidden" }} />
-        <span aria-hidden="true" className={css.actor} />
-      </>
-    );
-  const label =
-    source === "user" ? "你" : source === "agent" ? "本机 Agent" : name ? `${name} · 云端` : "云端 Agent";
-  const initial = source === "user" ? "你" : source === "agent" ? "本" : (name?.[0]?.toUpperCase() ?? "云");
-  return (
-    <>
-      <span aria-hidden="true" className={css.avatar} data-source={source}>
-        {initial}
-      </span>
-      <span className={css.actor}>{label}</span>
-    </>
-  );
-}
-function MetricChart({ metric }: { metric: OverviewMetric }) {
-  const { daily, target } = metric;
-  const description = daily
-    .map((d) => `${d.date}：${d.value === null ? "未记录" : `${d.value} ${metric.unit}`}`)
-    .join("，");
-  if (metric.key === "workouts")
-    return (
-      <div className={css.week} role="img" aria-label={description}>
-        {daily.map((d) => (
-          <span
-            className={css.trainingDay}
-            key={d.date}
-            title={`${d.date}：${d.value === null ? "未记录" : `${d.value} 次`}`}
-          >
-            <span className={d.value !== null && d.value > 0 ? css.trained : css.untrained} />
-            <span className={css.muted}>
-              {new Intl.DateTimeFormat("zh-CN", { weekday: "narrow", timeZone: "UTC" }).format(
-                new Date(`${d.date}T12:00:00Z`),
-              )}
-            </span>
-          </span>
-        ))}
-      </div>
-    );
-  if (metric.key === "sleep") {
-    const goal = target?.[0];
-    const max = Math.max(9, goal ?? 0, ...daily.map((d) => d.value ?? 0)) * 1.05;
-    return (
-      <>
-        <div className={`${css.week} ${css.sleepChart}`} role="img" aria-label={description}>
-          {goal !== undefined && (
-            <span className={css.targetLine} style={{ bottom: `${(goal / max) * 100}%` }} />
-          )}
-          {daily.map((d) => (
-            <span
-              key={d.date}
-              title={`${d.date}：${d.value === null ? "未记录" : `${d.value} 小时`}`}
-              className={d.value === null ? css.missingBar : css.sleepBar}
-              style={d.value === null ? undefined : { height: `${(d.value / max) * 100}%` }}
-            />
-          ))}
-        </div>
-        <span className={css.muted}>虚线 = 没记录{goal !== undefined ? ` · 目标 ${goal} 小时` : ""}</span>
-      </>
-    );
-  }
-  if (metric.key === "protein") {
-    const low = target?.[0];
-    const high = target?.[1] ?? low;
-    const max = Math.max(1, (high ?? metric.value ?? 150) * 1.15, metric.value ?? 0);
-    const valueLabel =
-      metric.value === null ? "暂无记录" : `${metric.estimated ? "约 " : ""}${metric.value} g`;
-    return (
-      <>
-        <div
-          className={css.proteinTrack}
-          role="img"
-          aria-label={`${valueLabel}${low !== undefined ? `，目标 ${low}–${high} g` : ""}`}
-        >
-          {metric.value !== null && (
-            <span
-              className={`${css.proteinFill} ${metric.estimated ? css.estimated : ""}`}
-              style={{ width: `${(metric.value / max) * 100}%` }}
-            />
-          )}
-          {low !== undefined && high !== undefined && (
-            <span
-              className={css.proteinTarget}
-              style={{ left: `${(low / max) * 100}%`, width: `${((high - low) / max) * 100}%` }}
-            />
-          )}
-        </div>
-        <span className={css.chartLegend}>
-          <span>
-            {metric.estimated
-              ? "斜纹 = 估算"
-              : metric.value === null
-                ? "暂无记录"
-                : `记录了 ${metric.days} 天`}
-          </span>
-          {low !== undefined && (
-            <span>
-              目标 {low}–{high} g
-            </span>
-          )}
-        </span>
-      </>
-    );
-  }
-  return metric.latest ? <span className={css.muted}>测量于 {metric.from}</span> : null;
-}
-function ProjectChart({ project }: { project: OverviewProject }) {
-  const kind = project.words === null ? "commits" : "words";
-  const unit = kind === "words" ? "字" : "次提交";
-  const max = Math.max(1, ...project.daily.map((d) => Math.max(0, d[kind] ?? 0)));
-  const description = project.daily
-    .map((d) => `${d.date}：${d[kind] === null ? "未记录" : `${d[kind]} ${unit}`}`)
-    .join("，");
-  return (
-    <span className={css.projectChart} role="img" aria-label={`近 7 天每日产出，${description}`}>
-      {project.daily.map((d) => (
-        <span
-          key={d.date}
-          className={css.projectSlot}
-          title={`${d.date}：${d[kind] === null ? "未记录" : `${d[kind]} ${unit}`}`}
-        >
-          <span style={{ height: `${(Math.max(0, d[kind] ?? 0) / max) * 100}%` }} />
-        </span>
-      ))}
-    </span>
-  );
-}
-const starts = [
-  {
-    title: "导入 ChatGPT 记忆",
-    body: "把 ChatGPT 记得的你粘贴进来，开图整理成档案和目标。",
-    cta: "开始导入",
-    help: "在 ChatGPT 中导出记忆，回到对话中说「帮我导入 ChatGPT 记忆」，粘贴内容并核对导入预览后确认。",
-  },
-  {
-    title: "连上 Apple 健康",
-    body: "每晚自动同步步数、睡眠和训练，不用手记。",
-    cta: "查看设置方法",
-    help: "在开图仓库打开 docs/guides/apple-health.html，按三步说明设置 iPhone 快捷指令与自己的同步收件箱。",
-  },
-  { title: "随口说一句", body: "比如「今天深蹲 3×12 60kg」，Agent 会记下来。", cta: "去对话" },
+const modules: { id: Exclude<RecordView, "all">; title: string; subtitle: string }[] = [
+  { id: "projects", title: "项目", subtitle: "目标、作品和进展" },
+  { id: "health", title: "健康", subtitle: "活动、趋势和身体记录" },
+  { id: "finance", title: "财务", subtitle: "收支、资产和账目" },
+  { id: "knowledge", title: "知识与决策", subtitle: "学习、依据和选择" },
+  { id: "memory", title: "记忆", subtitle: "AI 了解的你" },
 ];
-const empties = [
-  { label: "今天", hint: "连上日历或说一句「安排今天」" },
-  { label: "下一步", hint: "设一个目标后自动生成" },
-  { label: "健康", hint: "记一次训练或连上 Apple 健康" },
-  { label: "在做的事", hint: "说「新建项目：小说二稿」" },
-];
-
-function noteLine(text = "") {
-  const body = text.replace(/^---\n[\s\S]*?\n---\n?/, "");
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    body
-      .split("\n")
-      .find((line) => line.trim())
-      ?.trim() ?? "（空笔记）"
-  );
-}
-function Row({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <div className={`${css.row} ${className}`}>{children}</div>;
-}
-function Section({
-  title,
-  source,
-  children,
-  id,
-}: {
-  title: string;
-  source?: string;
-  children: ReactNode;
-  id?: string;
-}) {
-  return (
-    <section id={id} className={css.section} aria-label={title}>
-      <div className={css.sectionHeader}>
-        <h2 data-section={title === "进行中的项目" ? "projects" : "today"}>
-          {title === "进行中的项目" && <span className={css.sectionDot} aria-hidden="true" />}
-          {title}
-        </h2>
-        {source && <span className={css.muted}>{source}</span>}
-      </div>
+    <section className={css.section} aria-label={title}>
+      <h2>{title}</h2>
       {children}
     </section>
   );
 }
+function Actor({ version }: { version: OverviewVersion }) {
+  return (
+    <span className={css.muted}>
+      {version.source === "user"
+        ? "你"
+        : version.source === "cloud"
+          ? (version.actor ?? "云端 AI")
+          : version.source === "agent"
+            ? "本机 AI"
+            : ""}
+    </span>
+  );
+}
+function noteText(text: string) {
+  return text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+}
 
-export function OverviewPage({
-  load,
-  onAgent,
-  loadNews,
-  tryNews,
-  dismissNews,
-  loadProjects,
-  loadDoing,
-  loadHealth,
-  loadHealthPhoto,
-  loadLifeMap,
-  resolveExperience,
-  loadFinanceOverview,
-  loadFinanceCashflow,
-  loadFinanceInvestments,
-  loadFinanceAccounts,
-  previewFinanceImport,
-  commitFinanceImport,
-  discardFinanceImport,
-  ...me
-}: OverviewPageProps) {
-  const [current, setCurrent] = useState("today");
-  const [meRevision, setMeRevision] = useState(0);
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(collapseKey) === "true";
-    } catch {
-      return false;
-    }
-  });
-  const toggleSections = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    try {
-      localStorage.setItem(collapseKey, String(next));
-    } catch {
-      /* 本次会话仍可收起。 */
-    }
-  };
-  const currentName = sections.find((s) => s.id === current)?.name ?? "今天";
+export function OverviewPage(props: OverviewPageProps) {
+  const [view, setView] = useState<View>("overview");
+  const [recordDetails, setRecordDetails] = useState(false);
+  const [recordView, setRecordView] = useState<RecordView>("all");
+  const [exploreView, setExploreView] = useState("directions");
   const [data, setData] = useState<OverviewData | null>(null);
+  const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [receipt, setReceipt] = useState<string | null>(null);
+  const [allChanges, setAllChanges] = useState(false);
+  const [pins, setPins] = useState<string[]>(["projects", "health"]);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
-    const current = ++sequence.current;
+    const seq = ++sequence.current;
     setLoading(true);
-    setError(null);
     try {
-      const result = await load();
-      if (current === sequence.current) setData(result);
+      const result = await props.load();
+      if (seq === sequence.current) {
+        setData(result);
+        setError(null);
+      }
     } catch (err) {
-      if (current === sequence.current) setError(err instanceof Error ? err.message : String(err));
+      if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     } finally {
-      if (current === sequence.current) setLoading(false);
+      if (seq === sequence.current) setLoading(false);
     }
-  }, [load]);
+  }, [props.load]);
   useEffect(() => {
     void refresh();
     return () => {
       sequence.current++;
     };
   }, [refresh]);
-  const format = (value: string, options: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat("zh-CN", { timeZone: data?.timeZone, ...options }).format(new Date(value));
-  const time = (value: string) => format(value, { hour: "2-digit", minute: "2-digit", hour12: false });
+  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(() => {
+    if (!data?.root) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem(`kaitu.summary.pins:${data.root}`) ?? "null");
+      if (Array.isArray(stored)) setPins(stored.filter((id) => modules.some((m) => m.id === id)));
+    } catch {
+      /* 本次会话仍能固定模块。 */
+    }
+  }, [data?.root]);
+  useEffect(() => {
+    let active = true;
+    void props
+      .loadMe()
+      .then((value) => {
+        if (active) setPersonal(value);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [props.loadMe]);
+  const [deciding, setDeciding] = useState(false);
+  const decide = async (id: string, decision: "confirmed" | "rejected") => {
+    setDeciding(true);
+    try {
+      await props.decideProposal(id, decision);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeciding(false);
+    }
+  };
+  const openRecord = (id: RecordView) => {
+    setView("records");
+    setRecordView(id);
+    setRecordDetails(false);
+  };
+  const openNext = (item: OverviewData["next"][number]) => {
+    if (item.section === "me") setView("profile");
+    else if (item.section === "feed") {
+      setExploreView("discoveries");
+      setView("explore");
+    } else
+      openRecord(item.section === "health" ? "health" : item.section === "projects" ? "projects" : "all");
+  };
+  const prompt = (text: string) => {
+    setDraft(text);
+    setView("connections");
+  };
+  const childProps = { ...props, onPrompt: prompt };
+  const togglePin = (id: string) => {
+    const next = pins.includes(id) ? pins.filter((p) => p !== id) : [...pins, id];
+    setPins(next);
+    try {
+      localStorage.setItem(`kaitu.summary.pins:${data?.root}`, JSON.stringify(next));
+    } catch {
+      /* 保留当前视图。 */
+    }
+  };
   const stamp = (value: string) =>
-    format(value, { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
-  return (
-    <main
-      className={`${css.page} ${data?.empty && current === "today" ? css.emptyPage : ""}`}
-      aria-busy={loading}
+    new Intl.DateTimeFormat("zh-CN", {
+      timeZone: data?.timeZone,
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(value));
+  const syncLabel = !data
+    ? "正在读取…"
+    : data.sync.needsReview
+      ? `需要核对 ${data.sync.needsReview} 条`
+      : data.sync.received
+        ? `已收到 ${data.sync.received} 条，等待整理`
+        : data.sync.updatedAt
+          ? `已更新 ${stamp(data.sync.updatedAt)}`
+          : "本机资料 · 还没有记录";
+  const recordSummary = (id: string) =>
+    id === "projects"
+      ? data?.projects
+          .map((p) => p.title)
+          .slice(0, 2)
+          .join("、")
+      : id === "health"
+        ? data?.metrics
+            .filter((m) => m.value !== null)
+            .map(
+              (m) =>
+                `${m.label} ${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(m.value as number)} ${m.unit}`,
+            )
+            .slice(0, 2)
+            .join(" · ")
+        : null;
+  const quickCapture = (
+    <form
+      className={css.capture}
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setSaving(true);
+        setReceipt(null);
+        try {
+          await props.capture(draft);
+          setDraft("");
+          setReceipt("已保存原文，等待 AI 整理");
+          await refresh();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setSaving(false);
+        }
+      }}
     >
+      <label htmlFor="kaitu-capture">记录一件事</label>
+      <textarea
+        id="kaitu-capture"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="今天发生了什么？"
+        rows={3}
+        maxLength={100000}
+        disabled={saving}
+      />
+      <div className={css.captureActions}>
+        <button type="button" className={css.link} onClick={() => setView("connections")}>
+          和开图聊聊
+        </button>
+        <button type="submit" className={`${css.button} ${css.primary}`} disabled={saving || !draft.trim()}>
+          {saving ? "保存中…" : "记录"}
+        </button>
+      </div>
+      {receipt && <output className={css.muted}>{receipt}</output>}
+    </form>
+  );
+  const nextRows = (items: OverviewData["next"]) =>
+    items.map((item) => (
+      <div className={css.row} key={`${item.file}:${item.id}`}>
+        <div className={css.grow}>
+          <strong>{item.title}</strong>
+          <p className={css.muted}>
+            来自{item.module}
+            {item.proposed ? " · 建议，待确认" : ""}
+          </p>
+        </div>
+        <button type="button" className={css.link} onClick={() => openNext(item)}>
+          查看
+        </button>
+      </div>
+    ));
+  return (
+    <main className={css.page} aria-busy={loading}>
       <div className={css.content}>
-        <nav className={`${css.sectionNav} ${collapsed ? css.collapsedNav : ""}`} aria-label="开图板块">
-          {collapsed ? (
+        <header className={css.topbar}>
+          <strong className={css.wordmark}>开图</strong>
+          <div className={css.accountArea}>
+            <details className={css.sync}>
+              <summary>{syncLabel}</summary>
+              <p>
+                {data?.sync.needsReview
+                  ? "有资料需要核对，可在总览查看处理入口。"
+                  : data?.sync.received
+                    ? "已收到的资料还在等待整理。正式记录更新后才会进入对应图表。"
+                    : "资料已更新到本机视图。"}
+              </p>
+              <button type="button" className={css.link} onClick={() => void refresh()}>
+                刷新状态
+              </button>
+            </details>
+            <details className={css.personalMenu}>
+              <summary>{personal?.name || "个人与设置"}</summary>
+              <div>
+                <button type="button" onClick={() => setView("profile")}>
+                  个人档案
+                </button>
+                <button type="button" onClick={() => setView("connections")}>
+                  AI 与连接
+                </button>
+                <button type="button" onClick={() => setView("advanced")}>
+                  高级设置
+                </button>
+              </div>
+            </details>
+          </div>
+        </header>
+        <nav className={css.primaryNav} aria-label="主要导航">
+          {navigation.map((item) => (
             <button
               type="button"
-              className={css.expandSections}
-              onClick={toggleSections}
-              aria-expanded={false}
+              key={item.id}
+              aria-current={view === item.id ? "page" : undefined}
+              onClick={() => {
+                setView(item.id);
+                if (item.id === "records") setRecordView("all");
+              }}
             >
-              {currentName} · 展开板块
+              <strong>{item.title}</strong>
+              <span>{item.subtitle}</span>
             </button>
-          ) : (
-            <>
-              <div className={css.tabs}>
-                {sections.map((section) => (
+          ))}
+        </nav>
+        {error && (
+          <p className={css.notice} role="alert">
+            {error}{" "}
+            <button type="button" className={css.link} onClick={() => void refresh()}>
+              重新读取
+            </button>
+          </p>
+        )}
+        {data?.warnings.length ? (
+          <details className={css.muted}>
+            <summary>{data.warnings.length} 项资料需要检查</summary>
+            {data.warnings.map((w) => (
+              <p key={w}>{w}</p>
+            ))}
+          </details>
+        ) : null}
+        {view === "overview" && data && (
+          <>
+            <header>
+              <h1>今天</h1>
+              <p className={css.subtitle}>你正在推进的事情，以及值得注意的变化</p>
+            </header>
+            {data.next[0] ? (
+              <section className={css.focus} aria-label="现在最重要的一件事">
+                <span className={css.muted}>现在最重要的一件事</span>
+                <h2>{data.next[0].title}</h2>
+                <p className={css.muted}>
+                  来自{data.next[0].module} · {data.next[0].proposed ? "建议，待确认" : "当前下一步"}
+                </p>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => data.next[0] && openNext(data.next[0])}
+                >
+                  查看相关记录 →
+                </button>
+              </section>
+            ) : (
+              <section className={css.focus}>
+                <h2>{data.empty ? "从今天的一件事开始" : "今天，留一点空间给下一步"}</h2>
+                <p className={css.subtitle}>
+                  {data.empty
+                    ? "记下一次训练、一个想法，或导入已有资料。"
+                    : "先看看最近的变化，或记下一件值得持续跟进的事。"}
+                </p>
+              </section>
+            )}
+            {!!(data.pending || data.sync.needsReview || data.daily?.unresolved) && (
+              <Section title="需要你处理">
+                {data.blocks
+                  .filter((b) => b.kind === "proposal" && b.status === "pending")
+                  .map((b) => (
+                    <div className={css.row} key={b.id}>
+                      <div className={css.grow}>
+                        <strong>{b.title}</strong>
+                        <p className={css.muted}>
+                          {b.start}
+                          {b.end ? `–${b.end}` : ""} · 日程建议
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={deciding}
+                        onClick={() => void decide(b.id, "confirmed")}
+                      >
+                        确认
+                      </button>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={deciding}
+                        onClick={() => void decide(b.id, "rejected")}
+                      >
+                        不采用
+                      </button>
+                    </div>
+                  ))}
+                {data.inboxNotes > 0 && (
+                  <button type="button" className={css.link} onClick={() => openRecord("all")}>
+                    {data.inboxNotes} 条资料需要核对
+                  </button>
+                )}
+                {data.sync.mapPendingImports > 0 && (
                   <button
                     type="button"
-                    key={section.id}
-                    title={section.tip}
-                    aria-pressed={current === section.id}
-                    className={css.tab}
-                    data-section={section.id}
-                    onClick={() => setCurrent(section.id)}
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("footprints");
+                      setView("explore");
+                    }}
                   >
-                    <span className={css.sectionDot} aria-hidden="true" />
-                    {section.name}
+                    {data.sync.mapPendingImports} 次足迹导入需要继续完成
                   </button>
+                )}
+                {data.sync.mapNeedsReview > 0 && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("footprints");
+                      setView("explore");
+                    }}
+                  >
+                    {data.sync.mapNeedsReview} 段地点经历需要核对
+                  </button>
+                )}
+                {data.sync.directionSuggestions > 0 && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("directions");
+                      setView("explore");
+                    }}
+                  >
+                    {data.sync.directionSuggestions} 个探索方向建议
+                  </button>
+                )}
+                {!!data.daily?.unresolved && <p>{data.daily.unresolved} 项未决事项，见近期回顾</p>}
+              </Section>
+            )}
+            {data.next.length > 1 && <Section title="接下来">{nextRows(data.next.slice(1))}</Section>}
+            {data.allNext.length > 3 && (
+              <details>
+                <summary className={css.link}>查看全部下一步（{data.allNext.length}）</summary>
+                {nextRows(data.allNext)}
+              </details>
+            )}
+            {data.blocks.length > 0 && (
+              <details>
+                <summary className={css.link}>今天的日程（{data.blocks.length}）</summary>
+                {data.blocks.map((b) => (
+                  <div className={css.row} key={b.id}>
+                    <time>
+                      {b.start}
+                      {b.end ? `–${b.end}` : ""}
+                    </time>
+                    <span>{b.title}</span>
+                    <span className={css.muted}>
+                      {b.status === "pending" ? "建议，待确认" : b.status === "done" ? "已完成" : ""}
+                    </span>
+                  </div>
                 ))}
-              </div>
-              <button
-                type="button"
-                className={css.collapseSections}
-                aria-label="收起板块栏"
-                aria-expanded={true}
-                onClick={toggleSections}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  aria-hidden="true"
-                >
-                  <path d="m4 10 4-4 4 4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </>
-          )}
-        </nav>
-        {current !== "feed" &&
-          current !== "projects" &&
-          current !== "health" &&
-          current !== "map" &&
-          current !== "finance" && (
+              </details>
+            )}
+            {pins.some((id) => recordSummary(id)) && (
+              <Section title="我的生活">
+                <div className={css.lifeGrid}>
+                  {modules
+                    .filter((m) => pins.includes(m.id) && recordSummary(m.id))
+                    .map((m) => (
+                      <button
+                        type="button"
+                        className={css.lifeItem}
+                        key={m.id}
+                        onClick={() => openRecord(m.id)}
+                      >
+                        <strong>{m.title}</strong>
+                        <span>{recordSummary(m.id)}</span>
+                        <small>查看趋势与下一步 →</small>
+                      </button>
+                    ))}
+                </div>
+              </Section>
+            )}
+            {(data.versions.length > 0 || data.daily) && (
+              <Section title="最近变化">
+                {(allChanges ? data.versions : data.versions.slice(0, 3)).map((v) => (
+                  <div className={css.row} key={v.oid}>
+                    <time className={css.muted}>{stamp(v.time)}</time>
+                    <Actor version={v} />
+                    <span>{v.text}</span>
+                  </div>
+                ))}
+                {data.versions.length > 3 && (
+                  <button type="button" className={css.link} onClick={() => setAllChanges((v) => !v)}>
+                    {allChanges ? "收起" : "查看全部变化"}
+                  </button>
+                )}
+                {data.daily && (
+                  <details className={css.dailyDetails}>
+                    <summary className={css.link}>近期回顾 · {data.daily.date}</summary>
+                    <div className={css.dailyBody}>{data.daily.body}</div>
+                  </details>
+                )}
+              </Section>
+            )}
+            {quickCapture}
+          </>
+        )}
+        {view === "records" && (
+          <>
             <header className={css.header}>
               <div>
-                <h1>
-                  {current === "me" && <span className={css.meDot} aria-hidden="true" />}
-                  {currentName}
-                </h1>
-                <p className={css.subtitle}>
-                  {current === "me"
-                    ? "目标、作息规则和 AI 记住的你 · 改目标和规则前会先问你"
-                    : data
-                      ? data.empty
-                        ? `工作区在 ${data.root} · 还没有记录`
-                        : `${new Intl.DateTimeFormat("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${data.today}T12:00:00Z`))} · 数据截至 ${time(data.cutoff)} · 工作区在 ${data.drive ? "Google Drive" : data.root}`
-                      : "正在读取工作区…"}
-                </p>
+                <h1>{recordView === "all" ? "全部资料" : modules.find((m) => m.id === recordView)?.title}</h1>
+                <p className={css.subtitle}>每次记录、每份资料，都留在你的工作区</p>
               </div>
-              <div className={css.actions}>
-                <Button
-                  size="sm"
+              {recordView !== "all" && (
+                <button type="button" className={css.link} onClick={() => setRecordView("all")}>
+                  ← 全部资料
+                </button>
+              )}
+            </header>
+            {recordView === "all" ? (
+              <>
+                <div className={css.moduleList}>
+                  {modules.map((m) => (
+                    <article key={m.id}>
+                      <button
+                        type="button"
+                        className={css.moduleOpen}
+                        onClick={() => {
+                          setRecordView(m.id);
+                          setRecordDetails(false);
+                        }}
+                      >
+                        <strong>{m.title}</strong>
+                        <span>{recordSummary(m.id) || m.subtitle}</span>
+                      </button>
+                      {["projects", "health"].includes(m.id) && (
+                        <button
+                          type="button"
+                          className={css.pin}
+                          aria-pressed={pins.includes(m.id)}
+                          onClick={() => togglePin(m.id)}
+                        >
+                          {pins.includes(m.id) ? "已固定到总览" : "固定到总览"}
+                        </button>
+                      )}
+                    </article>
+                  ))}
+                </div>
+                {data?.notes.length ? (
+                  <Section title="最近记录">
+                    {data.notes.map((note) => (
+                      <details key={note.file} className={css.rawNote}>
+                        <summary>
+                          <strong>{noteText(note.text).split("\n").find(Boolean)?.slice(0, 90)}</strong>
+                          <span className={css.muted}>
+                            {note.status === "received" ? "已收到 · 等待整理" : "需要核对"}
+                          </span>
+                        </summary>
+                        <div className={css.dailyBody}>{noteText(note.text)}</div>
+                      </details>
+                    ))}
+                  </Section>
+                ) : null}
+                {quickCapture}
+              </>
+            ) : recordView === "projects" || recordView === "knowledge" ? (
+              <DoingPage {...childProps} timeZone={data?.timeZone} />
+            ) : recordView === "health" ? (
+              recordDetails ? (
+                <HealthPage {...childProps} />
+              ) : (
+                <RecordSummary
+                  kind="health"
+                  data={data}
+                  loadFinance={props.loadFinanceOverview}
+                  openDetails={() => setRecordDetails(true)}
+                />
+              )
+            ) : recordView === "finance" ? (
+              recordDetails ? (
+                <FinancePage {...childProps} today={data?.today} timeZone={data?.timeZone} />
+              ) : (
+                <RecordSummary
+                  kind="finance"
+                  data={data}
+                  loadFinance={props.loadFinanceOverview}
+                  openDetails={() => setRecordDetails(true)}
+                />
+              )
+            ) : (
+              <MePage {...childProps} />
+            )}
+          </>
+        )}
+        {view === "explore" && (
+          <>
+            <header>
+              <h1>开图</h1>
+              <p className={css.subtitle}>看看走过的路，也看看接下来值得探索什么</p>
+            </header>
+            <nav className={css.secondaryNav} aria-label="探索视图">
+              {[
+                ["directions", "方向"],
+                ["footprints", "足迹"],
+                ["discoveries", "发现"],
+              ].map(([id, title]) => (
+                <button
+                  type="button"
+                  key={id}
+                  aria-pressed={exploreView === id}
+                  onClick={() => setExploreView(id as string)}
+                >
+                  {title}
+                </button>
+              ))}
+            </nav>
+            {exploreView === "footprints" ? (
+              <MapPage {...childProps} />
+            ) : exploreView === "discoveries" ? (
+              <NewsPage {...childProps} />
+            ) : (
+              <DirectionsPage {...childProps} goals={personal?.goals} />
+            )}
+          </>
+        )}
+        {view === "profile" && (
+          <>
+            <h1>个人档案</h1>
+            <MePage {...childProps} />
+          </>
+        )}
+        {view === "connections" && (
+          <>
+            <header>
+              <h1>AI 与连接</h1>
+              <p className={css.subtitle}>先用你熟悉的 AI，或者选择开图内置 AI</p>
+            </header>
+            <Section title="连接已有 AI">
+              <p>让现有 AI 读取你的开图工作区，接着整理已有记录。资料浏览和原文记录都不需要配置模型。</p>
+              <details>
+                <summary className={css.link}>查看给 AI 的接手说明</summary>
+                <textarea
+                  className={css.connectionText}
+                  readOnly
+                  value={`请接续我的开图工作区：${data?.root ?? ""}\n先读 AGENT-README.md 和 OVERVIEW.md，再读相关交接。${draft ? `\n这次要处理：${draft}` : ""}`}
+                  rows={5}
+                />
+                <button
+                  type="button"
                   className={css.button}
-                  disabled={loading}
-                  onClick={() => {
-                    void refresh();
-                    setMeRevision((n) => n + 1);
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `请接续我的开图工作区：${data?.root ?? ""}\n先读 AGENT-README.md 和 OVERVIEW.md，再读相关交接。${draft ? `\n这次要处理：${draft}` : ""}`,
+                      );
+                      setReceipt("接手说明已复制");
+                    } catch {
+                      setReceipt("请选中并复制上面的接手说明");
+                    }
                   }}
                 >
-                  {loading ? "刷新中…" : "刷新"}
-                </Button>
-                {!data?.empty && (
-                  <Button size="sm" className={`${css.button} ${css.primary}`} onClick={onAgent}>
-                    问问开图
-                  </Button>
-                )}
-              </div>
-            </header>
-          )}
-        {error && (
-          <div role="alert" className={css.notice}>
-            读取失败：{error}{" "}
-            <button className={css.link} type="button" onClick={() => void refresh()}>
-              重试
-            </button>
-          </div>
-        )}
-        {data?.warnings.map((warning) => (
-          <p key={warning} className={css.notice}>
-            {warning}
-          </p>
-        ))}
-        {current === "me" ? (
-          <MePage key={meRevision} {...me} />
-        ) : current === "map" ? (
-          <MapPage loadLifeMap={loadLifeMap} resolveExperience={resolveExperience} onPrompt={me.onPrompt} />
-        ) : current === "finance" ? (
-          <FinancePage
-            loadFinanceOverview={loadFinanceOverview}
-            loadFinanceCashflow={loadFinanceCashflow}
-            loadFinanceInvestments={loadFinanceInvestments}
-            loadFinanceAccounts={loadFinanceAccounts}
-            previewFinanceImport={previewFinanceImport}
-            commitFinanceImport={commitFinanceImport}
-            discardFinanceImport={discardFinanceImport}
-            onPrompt={me.onPrompt}
-            today={data?.today}
-            timeZone={data?.timeZone}
-          />
-        ) : current === "feed" ? (
-          <NewsPage loadNews={loadNews} tryNews={tryNews} dismissNews={dismissNews} onPrompt={me.onPrompt} />
-        ) : current === "projects" ? (
-          <DoingPage
-            loadProjects={loadProjects}
-            loadDoing={loadDoing}
-            onPrompt={me.onPrompt}
-            timeZone={data?.timeZone}
-          />
-        ) : current === "health" ? (
-          <HealthPage loadHealth={loadHealth} loadHealthPhoto={loadHealthPhoto} onPrompt={me.onPrompt} />
-        ) : current !== "today" ? (
-          <section className={css.placeholder}>
-            <p>这一页还在做</p>
-            <button type="button" className={css.link} onClick={() => setCurrent("today")}>
-              回到「今天」
-            </button>
-          </section>
-        ) : data?.empty ? (
-          <>
-            <section className={css.welcome} aria-label="先让开图认识你">
-              <div>
-                <h2>先让开图认识你</h2>
-                <p>选一件你最想让 AI 持续跟进的事。做完这一步，这里就会出现今天的安排和下一步。</p>
-              </div>
-              <div className={css.starts}>
-                {starts.map((item) =>
-                  item.help ? (
-                    <details key={item.title} className={css.start}>
-                      <summary>
-                        <strong>{item.title}</strong>
-                        <span>{item.body}</span>
-                        <span className={css.cta}>{item.cta}</span>
-                      </summary>
-                      <p>{item.help}</p>
-                      <button type="button" className={css.link} onClick={onAgent}>
-                        去对话
-                      </button>
-                    </details>
-                  ) : (
-                    <button key={item.title} type="button" className={css.start} onClick={onAgent}>
-                      <strong>{item.title}</strong>
-                      <span>{item.body}</span>
-                      <span className={css.cta}>{item.cta}</span>
-                    </button>
-                  ),
-                )}
-              </div>
-            </section>
-            <div className={css.emptyGrid}>
-              {empties.map((item) => (
-                <div className={css.emptyTile} key={item.label}>
-                  <span className={css.muted}>{item.label}</span>
-                  <strong>暂无记录</strong>
-                  <span>{item.hint}</span>
-                </div>
-              ))}
-            </div>
+                  复制接手说明
+                </button>
+              </details>
+            </Section>
+            <Section title="使用内置 AI">
+              <p>主动启用后，可以选择模型并配置账户。</p>
+              <button
+                type="button"
+                className={css.button}
+                onClick={() => (draft ? props.onPrompt(draft) : props.onAgent())}
+              >
+                使用内置 AI
+              </button>
+            </Section>
+            {receipt && <output>{receipt}</output>}
           </>
-        ) : (
-          data && (
-            <>
-              {(data.pending > 0 || (data.daily?.unresolved ?? 0) > 0 || data.inboxNotes > 0) && (
-                <section className={css.attention} aria-label="需要你处理">
-                  <strong>
-                    <span className={css.dot} aria-hidden="true" />
-                    需要你处理
-                  </strong>
-                  {data.pending > 0 && <a href="#kt-today">{data.pending} 条日程建议待确认</a>}
-                  {(data.daily?.unresolved ?? 0) > 0 && (
-                    <a href="#kt-daily">
-                      {data.daily?.unresolved ?? 0} 条未决
-                      {data.daily ? `（${data.daily.date} 的每日整理）` : ""}
-                    </a>
-                  )}
-                  {data.inboxNotes > 0 && (
-                    <details>
-                      <summary className={css.link}>{data.inboxNotes} 条待整理笔记</summary>
-                      <ul className={css.noteList}>
-                        {data.notes.map((note) => (
-                          <li key={note.file}>{noteLine(note.text)}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                </section>
-              )}
-              <div className={css.columns}>
-                <div className={css.mainColumn}>
-                  <Section title="日程" id="kt-today">
-                    {data.blocks.map((block) => (
-                      <Row
-                        key={block.id}
-                        className={block.kind === "proposal" && block.status === "pending" ? css.pending : ""}
-                      >
-                        <span className={css.blockTime}>
-                          {block.start ? block.start : "待安排"}
-                          {block.end ? `–${block.end}` : ""}
-                        </span>
-                        <span className={css.blockTitle}>{block.title}</span>
-                        <span className={css.muted}>
-                          {block.kind === "proposal" && block.status === "pending"
-                            ? "建议 · 待确认"
-                            : block.status === "done"
-                              ? "已完成"
-                              : block.kind === "event"
-                                ? "日历"
-                                : block.status === "rejected"
-                                  ? "已拒绝"
-                                  : block.status === "skipped"
-                                    ? "已跳过"
-                                    : ""}
-                        </span>
-                      </Row>
-                    ))}
-                    {!data.blocks.length && <p className={css.emptyHint}>连上日历或说一句「安排今天」</p>}
-                    {data.pending > 0 && (
-                      <p className={css.help}>
-                        在对话中确认或调整日程建议。
-                        <button type="button" className={css.link} onClick={onAgent}>
-                          问问开图
-                        </button>
-                      </p>
-                    )}
-                  </Section>
-                  <Section
-                    title="下一步"
-                    source={data.next.length > 5 ? `共 ${data.next.length} 条` : undefined}
-                  >
-                    {data.next.map((item) => (
-                      <Row key={`${item.file}:${item.id}`}>
-                        <span className={css.checkCircle} aria-hidden="true" />
-                        <span className={css.blockTitle}>{item.title}</span>
-                        <span className={css.tag} data-section={item.section}>
-                          <span className={css.sectionDot} aria-hidden="true" />
-                          {item.module}
-                        </span>
-                        {item.proposed && <span className={css.muted}>建议 · 待确认</span>}
-                      </Row>
-                    ))}
-                    {!data.next.length && <p className={css.emptyHint}>设一个目标后自动生成</p>}
-                  </Section>
-                  <Section title="近期变化" source="版本历史">
-                    <div id="kt-daily">
-                      {data.daily ? (
-                        <details className={css.dailyDetails}>
-                          <summary className={`${css.row} ${css.daily}`}>
-                            <strong>
-                              {data.daily.date === data.today
-                                ? "今天的每日整理"
-                                : `${data.daily.date} 的每日整理`}
-                            </strong>
-                            <span className={css.blockTitle}>
-                              {data.daily.organizer} 整理 · {data.daily.unresolved} 条未决等你确认
-                            </span>
-                            <span className={css.cta}>打开</span>
-                          </summary>
-                          <div className={css.dailyBody}>{data.daily.body.trim()}</div>
-                        </details>
-                      ) : (
-                        <p className={css.emptyHint}>暂无每日整理</p>
-                      )}
-                    </div>
-                    {data.versions.map((version) => (
-                      <Row key={version.oid}>
-                        <span className={css.versionTime}>{stamp(version.time)}</span>
-                        <Actor source={version.source} name={version.actor} />
-                        <span className={css.versionText}>{version.text}</span>
-                      </Row>
-                    ))}
-                    {!data.versions.length && <p className={css.emptyHint}>暂无版本记录</p>}
-                  </Section>
-                </div>
-                <aside className={css.aside}>
-                  <section className={css.health} aria-label="健康">
-                    <div className={css.sectionHeader}>
-                      <h2 data-section="health">
-                        <span className={css.sectionDot} aria-hidden="true" />
-                        健康
-                      </h2>
-                      <span className={css.muted}>
-                        近 7 天 · {data.metrics[0]?.from?.slice(5)}–{data.today.slice(5)}
-                      </span>
-                    </div>
-                    {data.metrics.map((metric) =>
-                      metric.key === "weight" && metric.value === null ? (
-                        <div key={metric.key} className={css.weightEmpty}>
-                          <div className={css.metricHeading}>
-                            <span className={css.muted}>体重</span>
-                            <span className={css.noValue}>暂无记录</span>
-                          </div>
-                          <div className={css.weightPrompt}>
-                            <span>说一句「今天 72kg」</span>
-                            <button type="button" className={css.button} onClick={onAgent}>
-                              记一次
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Row key={metric.key} className={css.metric}>
-                          <span className={css.metricHeading}>
-                            <span className={css.muted}>{metric.label}</span>
-                            <strong
-                              className={`${css.metricValue} ${metric.value === null ? css.noValue : ""}`}
-                            >
-                              {metric.value === null
-                                ? "暂无记录"
-                                : `${metric.estimated ? "约 " : ""}${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: metric.key === "workouts" ? 0 : 1 }).format(metric.value)} ${metric.unit}`}
-                            </strong>
-                          </span>
-                          <MetricChart metric={metric} />
-                        </Row>
-                      ),
-                    )}
-                  </section>
-                  <Section title="进行中的项目">
-                    {data.projects.map((project) => (
-                      <Row key={project.slug} className={css.project}>
-                        <strong>{project.title}</strong>
-                        <span>下一步：{project.next[0] ?? "暂无记录"}</span>
-                        <span className={css.projectFooter}>
-                          <span className={css.muted}>
-                            近 7 天{" "}
-                            {project.words !== null
-                              ? `${project.words >= 0 ? "+" : ""}${project.words.toLocaleString()} 字`
-                              : project.commits !== null
-                                ? `${project.commits} 次提交`
-                                : "暂无产出记录"}
-                          </span>
-                          <ProjectChart project={project} />
-                        </span>
-                      </Row>
-                    ))}
-                    {!data.projects.length && <p className={css.emptyHint}>说「新建项目：小说二稿」</p>}
-                  </Section>
-                </aside>
-              </div>
-            </>
-          )
+        )}
+        {view === "advanced" && (
+          <>
+            <h1>高级设置</h1>
+            <p className={css.subtitle}>连接、运行环境与开发者能力按需使用</p>
+            <button type="button" className={css.button} onClick={props.onAdvanced}>
+              插件与运行环境
+            </button>
+            <button type="button" className={css.link} onClick={() => setView("connections")}>
+              管理 AI 连接
+            </button>
+            <details>
+              <summary>工作区位置</summary>
+              <p>{data?.root}</p>
+            </details>
+          </>
         )}
       </div>
     </main>

@@ -1,5 +1,24 @@
 # 交接说明：人生开图（开图 Kaitu）
 
+## 当前产品裁决（2026-10-16）
+
+以 [PRODUCT.md](PRODUCT.md) 为唯一当前产品定义：总览、开图、记录三个默认入口，先精简默认体验。
+本文件以下四页/七板块描述为历史实施记录，不作为恢复旧导航的依据。
+实现状态及验收见 [prd-completion.md](prd-completion.md)。
+独立本地桌面入口和 DSH 插件共用三个导航的 React 页面；默认不启动 AI Runtime。
+新工作区没有私人健康目标和默认自动化，已有配置保留。运行与隔离验收见 [desktop.md](desktop.md)。
+轻量方向与尝试见 [第 4 轮验收](acceptance/prd-completion-2026-10-16/run-04.md)：
+方向决策由用户保存，AI 通过专用 exploration 工具提议与补资料，通用记录工具不能绕过采纳步骤。
+当前隔离桌面包为 `dist/prd-explore-final/Kaitu.app`，锁屏尚未完成原生窗口验收。
+
+## 本轮后端交审（2026-10-16）
+
+第 5 轮来源控制和可恢复批次已提交为 `a38a665`。
+自动任务、API Key 引导范围、总览数据和 AI 进程生命周期见 [第 6 轮](acceptance/prd-completion-2026-10-16/run-06.md)。
+最终四项检查通过，128 项测试通过；原生启动、设置、单实例与退出已回归。
+桌面产物为 `dist/prd-backend-review-fixed/Kaitu.app`。当前分支仅本地提交，交用户审阅，不推送、不合并 main。
+本次后端分工不继续修改页面或扩展其他功能。
+
 - 交接日期：2026-10-15
 - 最近更新：2026-10-15，本地 Claude Code 会话交给后续 Claude Code / Codex 会话。
 - 当前状态：阶段 1 基本完成，已有健康同步、手机通道、DeepSeek Harness 插件；下一步是阶段 2 验证。**先读 §0。**

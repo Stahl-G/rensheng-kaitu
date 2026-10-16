@@ -40,13 +40,13 @@ export async function apply(ctx: Context) {
       "uiWorkspace",
     ],
     apply(ctx: Context) {
-      let opening: Promise<void> | undefined;
+      let opening: Promise<boolean> | undefined;
       const open = (text?: string) => {
         if (opening) return opening;
         opening = (async () => {
           const result = await ctx.remote.kaitu.workspacePath();
           if (!result.ok) throw new Error(result.error.message);
-          await openKaituSession(
+          return openKaituSession(
             {
               workspaces: ctx.get("workspaces"),
               sessions: ctx.get("sessions"),
@@ -62,6 +62,30 @@ export async function apply(ctx: Context) {
         });
         return opening;
       };
+      ctx.effect(() => {
+        let checking = false;
+        const check = async () => {
+          if (checking || opening) return;
+          checking = true;
+          try {
+            const draftId =
+              new URLSearchParams(window.location.hash.slice(1)).get("kaitu-draft") ?? undefined;
+            const draft = await ctx.remote.kaitu.aiDraft(draftId);
+            if (draft.ok && draft.value && (await open(draft.value.text))) {
+              await ctx.remote.kaitu.ackAiDraft(draft.value.id);
+              if (draftId)
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+          } catch {
+            /* Host 重新连接后继续读取尚未领取的草稿。 */
+          } finally {
+            checking = false;
+          }
+        };
+        const timer = setInterval(() => void check(), 3000);
+        void check();
+        return () => clearInterval(timer);
+      });
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
         if (!result.ok) throw new Error(result.error.message);
@@ -79,11 +103,32 @@ export async function apply(ctx: Context) {
             name: "main",
             key: panel,
             inject: () => ({
+              subscribe: (refresh: () => void) => {
+                const update = () => {
+                  if (document.visibilityState === "visible") refresh();
+                };
+                const timer = setInterval(update, 5000);
+                document.addEventListener("visibilitychange", update);
+                return () => {
+                  clearInterval(timer);
+                  document.removeEventListener("visibilitychange", update);
+                };
+              },
               load: async () => {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              decideProposal: async (id: string, decision: "confirmed" | "rejected") => {
+                const result = await ctx.remote.kaitu.decideProposal(id, decision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              capture: async (text: string) => {
+                const result = await ctx.remote.kaitu.capture(text);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              onAdvanced: () => ctx.layout.selectPanel("plugins" as MainPanelId),
               loadNews: async () => {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);
@@ -142,8 +187,56 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadExperienceSource: async (id: string) => {
+                const result = await ctx.remote.kaitu.experienceSource(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadExploration: async () => {
+                const result = await ctx.remote.kaitu.exploration();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              writeExploration: async (command: import("../types.js").ExplorationCommand) => {
+                const result = await ctx.remote.kaitu.explorationWrite(command);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadExplorationSource: async (
+                owner: "direction" | "direction_note" | "exploration_experiment",
+                id: string,
+                reference?: number,
+              ) => {
+                const result = await ctx.remote.kaitu.explorationSource(owner, id, reference);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadLifeMap: async () => {
                 const result = await ctx.remote.kaitu.lifeMap();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadExperienceImports: async () => {
+                const result = await ctx.remote.kaitu.experienceImports();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              previewExperienceBatch: async (id: string, operation: "undo" | "restore") => {
+                const result = await ctx.remote.kaitu.experienceBatchPreview(id, operation);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              setExperienceSource: async (locator: string, excluded: boolean, revision: number) => {
+                const result = await ctx.remote.kaitu.setExperienceSource(locator, excluded, revision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              changeExperienceBatch: async (id: string, operation: "undo" | "restore", revision: number) => {
+                const result = await ctx.remote.kaitu.changeExperienceBatch(id, operation, revision);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              recoverExperienceImports: async () => {
+                const result = await ctx.remote.kaitu.recoverExperienceImports();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
@@ -151,6 +244,23 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.resolveExperience(id, geonameid);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              editExperience: async (
+                id: string,
+                changes: import("../types.js").ExperienceChanges,
+                revision: number,
+              ) => {
+                const result = await ctx.remote.kaitu.editExperience(id, changes, revision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              hideExperience: async (id: string, revision: number) => {
+                const result = await ctx.remote.kaitu.hideExperience(id, revision);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              unhideExperience: async (id: string, revision: number) => {
+                const result = await ctx.remote.kaitu.unhideExperience(id, revision);
+                if (!result.ok) throw new Error(result.error.message);
               },
               loadProjects: async () => {
                 const result = await ctx.remote.kaitu.projects();

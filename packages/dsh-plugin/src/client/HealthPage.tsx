@@ -320,7 +320,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
             <span aria-hidden="true" />
             健康
           </h1>
-          <p>近 30 天 · 只做记录和趋势，不代替医生的建议</p>
+          <p>近 30 天的记录与趋势</p>
         </div>
         <div className={css.actions}>
           <button type="button" className={css.button} onClick={() => ask("帮我导入 Apple 健康数据")}>

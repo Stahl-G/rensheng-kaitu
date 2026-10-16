@@ -6,6 +6,7 @@ import {
   assertPublicProject,
   completeTask,
   dismissNews,
+  explorationCommandSchema,
   findRecordType,
   inboxNoteDone,
   inboxNotes,
@@ -18,6 +19,8 @@ import {
   proposeBlock,
   publicProject,
   readAgentFile,
+  readExperienceImports,
+  readExploration,
   readNews,
   readRecords,
   readStatus,
@@ -33,6 +36,7 @@ import {
   updateMemory,
   writeAgentRecord,
   writeDigest,
+  writeExploration,
 } from "@kaitu/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -115,7 +119,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   );
   register(
     "news_dismiss",
-    "标记新闻不相关并静音来源，保存版本。",
+    "标记单条新闻不相关，保存版本。",
     { id: text },
     ({ id }) => dismissNews(ws, id),
     true,
@@ -183,7 +187,21 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     ({ items }) => addExperiences(ws, items, "agent"),
     true,
   );
+  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
+  register(
+    "exploration_write",
+    "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户采纳、暂停或归档。",
+    { command: explorationCommandSchema },
+    ({ command }) => writeExploration(ws, command, "agent"),
+    true,
+  );
   register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
+  register(
+    "experience_imports",
+    "读取足迹来源开关、导入批次及待恢复状态。来源与批次控制由用户在界面处理。",
+    {},
+    () => readExperienceImports(ws),
+  );
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     searchMemories(ws, query),

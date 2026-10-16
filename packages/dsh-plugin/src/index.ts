@@ -40,13 +40,13 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.inject(["schedule", "sessionController", "sessions"], (services) => {
     services.effect(() => {
       let pending: Promise<void> | undefined;
-      let complete = false;
       const run = () => {
-        if (pending || complete) return;
-        pending = setupSchedules(services as unknown as Parameters<typeof setupSchedules>[0], ws)
-          .then(() => {
-            complete = true;
-          })
+        if (pending) return;
+        pending = setupSchedules(
+          services as unknown as Parameters<typeof setupSchedules>[0],
+          ws,
+          config.enableAutomation,
+        )
           .catch((error: unknown) => {
             services.logger.warn(`开图自动化初始化失败：${String(error)}`);
           })
@@ -54,7 +54,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
             pending = undefined;
           });
       };
-      const timer = setInterval(run, 60000);
+      const timer = setInterval(run, 5000);
       timer.unref();
       run();
       return async () => {

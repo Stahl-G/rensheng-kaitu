@@ -1,12 +1,29 @@
 import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { basename, dirname, relative } from "node:path";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
-import { localDate } from "./time.js";
+import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
+
+/** 无需模型的原文记录，供任意 Agent 后续整理。 */
+export async function captureNote(ws: Workspace, text: string) {
+  if (typeof text !== "string" || !text.trim() || text.length > 100000)
+    throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
+  const now = new Date();
+  const date = localDate(now, ws.timeZone());
+  const path = `inbox/notes/${date}/${ulid().toLowerCase()}.md`;
+  ws.writeText(
+    path,
+    stringifyFrontmatter(
+      { agent: "你", date, created: isoInZone(now, ws.timeZone()), kind: "capture" },
+      text.trim(),
+    ),
+  );
+  return { path, version: await snapshot(ws, "你保存了一条原文记录，等待整理") };
+}
 
 export function noteAgent(value: unknown): string {
   return typeof value === "string" && value.trim()

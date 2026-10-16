@@ -82,7 +82,7 @@ it("不同 Agent 重复投递带 utm 的新闻只保留一条并补全缺失信�
   }
 });
 
-it("试一下把新闻变成对应模块的下一步，不相关后同来源不再入选", async () => {
+it("试一下生成待确认的下一步，不相关只影响该条新闻并保留来源设置", async () => {
   const ws = await freshWorkspace();
   try {
     const now = new Date("2026-10-15T12:00:00+08:00");
@@ -136,12 +136,15 @@ it("试一下把新闻变成对应模块的下一步，不相关后同来源不�
     await tryNews(ws, first.id);
     expect(steps()).toHaveLength(1);
     expect(readNews(ws, now).picked.map((row) => row.id)).toEqual([second.id]);
+    const settings = { feeds: [], keywords: ["训练"], muted: ["广告"] };
+    ws.writeJson("feed/feeds.json", settings);
     const dismissed = await dismissNews(ws, first.id);
     expect(dismissed.version).toBeTruthy();
-    expect(readNews(ws, now).picked).toEqual([]);
-    expect(readNews(ws, now).others.map((row) => row.id)).toContain(second.id);
+    expect(readRecords(ws, "news_item").find((row) => row.id === first.id)?.status).toBe("dismissed");
+    expect(readNews(ws, now).picked.map((row) => row.id)).toEqual([second.id]);
+    expect(readNews(ws, now).others.map((row) => row.id)).not.toContain(first.id);
     await dismissNews(ws, first.id);
-    expect(ws.readJson<{ muted: string[] }>("feed/feeds.json").muted).toEqual(["训练周刊"]);
+    expect(ws.readJson("feed/feeds.json")).toEqual(settings);
     await tryNews(ws, third.id);
     expect(parseFrontmatter<{ next: unknown[] }>(ws.readText("me/STATUS.md")).data.next).toEqual([
       expect.objectContaining({ title: "其他新闻", status: "proposed", ref: third.id }),

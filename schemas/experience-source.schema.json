@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$id": "https://kaitu.local/schemas/experience-source.schema.json",
+  "title": "足迹来源设置",
+  "required": ["locator", "excluded", "updated_at"],
+  "properties": {
+    "locator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "excluded": {
+      "type": "boolean"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

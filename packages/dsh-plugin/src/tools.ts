@@ -6,6 +6,7 @@ import {
   addRecord,
   defaultRoot,
   history,
+  isExplorationType,
   listRecordTypes,
   readStatus,
   recordReference,
@@ -21,6 +22,7 @@ export const inject = ["tools", "systemPrompt"];
 
 export interface Config {
   workspace?: string;
+  enableAutomation?: boolean;
 }
 
 const instructions = [
@@ -128,6 +130,9 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     ),
     async (args) => {
       if (typeof args.type !== "string" || !args.type.trim()) throw new Error("type 必须是非空字符串");
+      if (["experience_source", "experience_batch"].includes(String(args.type)))
+        throw new Error("来源与导入控制由用户在界面处理");
+      if (isExplorationType(args.type)) throw new Error("方向与实验使用 kaitu_exploration_write");
       if (args.type === "experience")
         return {
           ok: true,

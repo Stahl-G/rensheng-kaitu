@@ -18,7 +18,10 @@ int main(int argc, char **argv) {
       snprintf(initializer, sizeof(initializer), "%s/../Resources/kaitu/dist/initialize.mjs", resolved) >= (int)sizeof(initializer)) return 1;
   char state[PATH_MAX];
   const char *home = getenv("HOME");
-  if (!home || snprintf(state, sizeof(state), "%s/.kaitu-app", home) >= (int)sizeof(state)) return 1;
+  const char *custom_state = getenv("KAITU_APP_HOME");
+  if (custom_state && custom_state[0]) {
+    if (custom_state[0] != '/' || snprintf(state, sizeof(state), "%s", custom_state) >= (int)sizeof(state)) return 1;
+  } else if (!home || snprintf(state, sizeof(state), "%s/.kaitu-app", home) >= (int)sizeof(state)) return 1;
   if (setenv("DSH_HOME", state, 1) != 0) return 1;
   // 使用原生入口，使签名无需依赖脚本的扩展属性；参数通过 exec 原样传递。
   pid_t child = fork();

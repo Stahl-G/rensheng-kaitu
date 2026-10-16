@@ -35,6 +35,16 @@ export interface WriteResult {
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
+  if (ref.type === "experience_source" && record.by !== "user")
+    throw new KaituError("足迹来源设置由用户决定", "USER_DECISION");
+  if (
+    ref.type === "direction" &&
+    record.by !== "user" &&
+    !record.deleted &&
+    ((record.rev ?? 1) !== 1 || record.status !== "suggested" || record.favorite !== false)
+  ) {
+    throw new KaituError("AI 只能新增方向建议，方向状态由用户决定", "USER_DECISION");
+  }
   if (["project_metric", "github_snapshot"].includes(ref.type) && driveProjects(ws) && !record.deleted)
     assertPublicProject(ws, record.project);
   const reg = schemas();
@@ -198,16 +208,21 @@ export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
   return out;
 }
 
+/** 读取已有追加历史，包含修正前的原始记录与删除标记。 */
+export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[] {
+  return recordLines(ws, findRecordType(ws, type)).map((line) => {
+    try {
+      return JSON.parse(line.raw) as StoredRecord;
+    } catch {
+      throw new KaituError(`${line.file}:${line.line} 不是合法 JSON`, "CORRUPT");
+    }
+  });
+}
+
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
 function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord> {
   const latest = new Map<string, StoredRecord>();
-  for (const l of recordLines(ws, ref)) {
-    let rec: StoredRecord;
-    try {
-      rec = JSON.parse(l.raw);
-    } catch {
-      throw new KaituError(`${l.file}:${l.line} 不是合法 JSON`, "CORRUPT");
-    }
+  for (const rec of readRecordRevisions(ws, ref.type)) {
     const prev = latest.get(rec.id);
     if (!prev || (rec.rev ?? 1) >= (prev.rev ?? 1)) latest.set(rec.id, rec);
   }
@@ -232,16 +247,27 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
 }
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
-export function appendPreparedRecords(
-  ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
-): void {
-  const plans = entries.map(({ type, record }) => {
+function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+  return entries.map(({ type, record }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
     validateRecord(ws, ref, record);
     return { file: recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone())), record };
   });
+}
+
+export function validatePreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  preparedRecords(ws, entries);
+}
+
+export function appendPreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  const plans = preparedRecords(ws, entries);
   const files = new Map<string, string[]>();
   for (const { file, record } of plans) {
     const lines = files.get(file) ?? [];

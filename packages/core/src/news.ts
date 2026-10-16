@@ -206,10 +206,6 @@ export async function tryNews(ws: Workspace, id: string) {
 
 export async function dismissNews(ws: Workspace, id: string) {
   const item = findNews(ws, id);
-  const settings = feedSettings(ws);
-  const muted = settings.muted ?? [];
-  if (!muted.includes(item.source))
-    ws.writeJson("feed/feeds.json", { ...settings, muted: [...muted, item.source] });
   const result =
     item.status === "dismissed"
       ? { record: item }

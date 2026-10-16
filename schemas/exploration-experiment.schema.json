@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/exploration-experiment.schema.json",
+  "title": "方向尝试",
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "required": [
+    "direction_id",
+    "question",
+    "action",
+    "budget",
+    "deadline",
+    "criteria",
+    "status",
+    "conclusion"
+  ],
+  "properties": {
+    "direction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "budget": {
+      "type": "string",
+      "minLength": 1,
+      "description": "投入上限，包含单位"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date"
+    },
+    "criteria": {
+      "type": "string",
+      "minLength": 1,
+      "description": "事先约定的观察标准"
+    },
+    "status": {
+      "enum": ["planned", "active", "completed", "cancelled"]
+    },
+    "result": {
+      "type": "string"
+    },
+    "conclusion": {
+      "enum": ["unassessed", "supports", "refutes", "inconclusive"]
+    },
+    "source": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "unevaluatedProperties": false
+}

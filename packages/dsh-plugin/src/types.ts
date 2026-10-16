@@ -10,7 +10,23 @@ import type {
   readHealthPage,
 } from "@kaitu/core";
 export type HealthData = ReturnType<typeof readHealthPage>;
-export type { LifeMapData, LifeMapFeature, Experience, City, DoingData } from "@kaitu/core";
+export type {
+  ExperienceImportsData,
+  ExperienceBatchPreview,
+  ExplorationData,
+  ExplorationCommand,
+  Direction,
+  ExplorationExperiment,
+  DirectionNote,
+  ExplorationReference,
+  ExperienceSource,
+  LifeMapData,
+  LifeMapFeature,
+  Experience,
+  ExperienceChanges,
+  City,
+  DoingData,
+} from "@kaitu/core";
 
 /** 浏览器与 Host 的只读总览契约。 */
 export interface OverviewSource {
@@ -103,6 +119,7 @@ export interface OverviewProject {
   to: string;
 }
 export interface OverviewData {
+  sections: { id: string; label: string; count: number; latest: string | null }[];
   root: string;
   timeZone: string;
   today: string;
@@ -111,13 +128,22 @@ export interface OverviewData {
   empty: boolean;
   blocks: OverviewBlock[];
   next: OverviewNext[];
+  allNext: OverviewNext[];
+  sync: {
+    received: number;
+    needsReview: number;
+    mapNeedsReview: number;
+    mapPendingImports: number;
+    directionSuggestions: number;
+    updatedAt: string | null;
+  };
   versions: OverviewVersion[];
   daily: OverviewDaily | null;
   projects: OverviewProject[];
   metrics: OverviewMetric[];
   pending: number;
   inboxNotes: number;
-  notes: OverviewSource[];
+  notes: (OverviewSource & { status: "received" | "needs_review" })[];
   warnings: string[];
 }
 
@@ -175,35 +201,4 @@ export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
 export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
 export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
 export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;
-export interface MeGoal {
-  id: string;
-  title: string;
-  area?: string;
-  metric?: string;
-  target?: string;
-  due?: string;
-  approach?: string;
-  actual?: string;
-}
-export interface MeRules {
-  timezone?: string;
-  sleep?: { start: string; end: string };
-  work_hours?: { start: string; end: string; days?: number[] };
-  training?: { pattern?: string; duration_min?: number; preferred?: string };
-  nutrition?: { protein_g?: number[] };
-  no_tasks_after?: string;
-}
-export interface MeData {
-  name: string | null;
-  bio: string | null;
-  avatar: string | null;
-  goals: MeGoal[];
-  rules: MeRules;
-  memories: {
-    file: string;
-    type: "preference" | "fact" | "context" | "person" | "decision";
-    text: string;
-    source: string | null;
-    sensitive: boolean;
-  }[];
-}
+export type { MeGoal, MeRules, MeData } from "@kaitu/core";

@@ -1,0 +1,14 @@
+{
+  "scope": "Kaitu direction view within existing app",
+  "authority": "docs/PRODUCT.md",
+  "framework": "React 18 shared native/DSH UI",
+  "font": "system stack inherited from existing host",
+  "palette": {
+    "canvas": "#fcfcfb",
+    "text": "#1f1e1d",
+    "link": "#2f5fc4"
+  },
+  "spacing": "existing 8px multiples",
+  "motion": "existing focus and pressed feedback",
+  "structure": "list, detail and on-demand forms"
+}

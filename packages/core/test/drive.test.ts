@@ -86,4 +86,4 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });
   }
-}, 10000);
+});

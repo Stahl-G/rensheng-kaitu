@@ -31,6 +31,7 @@ function entry(
   plugin: string,
   flow: boolean,
   schedules: { id: string; name: string }[],
+  standalone = false,
 ): string {
   if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
@@ -52,6 +53,7 @@ function entry(
     return [
       ...disabled.map((id) => ({ id, disabled: true })),
       { id: "tool-skill", disabled: false },
+      { id: "ui-settings-models", config: { credentialOnboarding: !standalone } },
       {
         insert: [...schedules, { id: "kaitu", name: plugin, config: { workspace } }],
       },
@@ -63,6 +65,9 @@ function entry(
     ...disabled.flatMap((id) => [`- id: ${id}`, "  disabled: true"]),
     "- id: tool-skill",
     "  disabled: false",
+    "- id: ui-settings-models",
+    "  config:",
+    `    credentialOnboarding: ${!standalone}`,
     "- insert:",
     ...schedules.flatMap(({ id, name }) => [`    - id: ${id}`, `      name: ${JSON.stringify(name)}`]),
     "    - id: kaitu",
@@ -76,7 +81,7 @@ function entry(
 // CLI 与独立桌面应用共用受管段，包括定时任务包的去重逻辑。
 export function renderDshPatch(
   text: string,
-  options: { home: string; workspace: string; plugin?: string },
+  options: { home: string; workspace: string; plugin?: string; standalone?: boolean },
 ): string {
   const start = text.indexOf(START);
   const end = text.indexOf(END);
@@ -89,7 +94,7 @@ export function renderDshPatch(
   const flow = start >= 0 ? /[[,]$/.test(text.slice(0, start).trimEnd()) : emptyFlow !== null;
   const outside = start >= 0 ? text.slice(0, start) + text.slice(end + END.length) : text;
   const schedules = schedulePackages(join(options.home, "profiles", "desktop"), outside);
-  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, schedules).trimEnd()}\n${END}`;
+  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, schedules, options.standalone).trimEnd()}\n${END}`;
   let next: string;
   if (start >= 0) {
     next = text.slice(0, start) + block + text.slice(end + END.length);

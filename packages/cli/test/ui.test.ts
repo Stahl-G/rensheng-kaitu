@@ -155,3 +155,48 @@ it("工作台自动导入健康 zip，归档原件，重复投递不增加记录
   expect(await history(ws)).toHaveLength(before + 1);
   expect(readRecords(ws, "metric")).toHaveLength(6);
 });
+
+it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读后才主动开启 AI", async () => {
+  const { ws } = await setup();
+  let launches = 0;
+  const ui = await startUi(ws, {
+    port: 0,
+    open: false,
+    openAi: async () => {
+      launches++;
+      return {};
+    },
+  });
+  cleanup.push(ui.close);
+  const call = async (method: string, args: unknown[] = []) => {
+    const response = await fetch(`${ui.url}/api/product/${method}`, {
+      method: "POST",
+      headers: { "X-Kaitu": "1", Origin: ui.url },
+      body: JSON.stringify(args),
+    });
+    expect(response.status).toBe(200);
+    return response.json();
+  };
+  const initial = await call("overview");
+  expect(initial.metrics.every((metric: { target: unknown }) => metric.target === null)).toBe(true);
+  const finance = await call("financeOverview", [null]);
+  expect(finance.currencies).toEqual([]);
+  expect(finance.records).toEqual([]);
+  for (const method of ["financeAccounts", "financeInvestments"]) await call(method, [null]);
+  await call("capture", ["今天散步四十分钟。"]);
+  const overview = await call("overview");
+  expect(overview.notes.some((note: { text: string }) => note.text.includes("今天散步四十分钟。"))).toBe(
+    true,
+  );
+  expect(overview.sync.received).toBe(1);
+  await call("decideProposal", ["p1", "confirmed"]);
+  const plan = parseFrontmatter<{ blocks: { id: string; status: string }[] }>(ws.readText("NOW.md"));
+  expect(plan.data.blocks.find((block) => block.id === "p1")?.status).toBe("confirmed");
+  expect(launches).toBe(0);
+  await call("openAi", ["一起回顾我的近期目标"]);
+  expect(launches).toBe(1);
+  expect(ws.readJson(".kaitu/cache/ai-draft.json", { internal: true })).toEqual({
+    id: expect.any(String),
+    text: "一起回顾我的近期目标",
+  });
+});

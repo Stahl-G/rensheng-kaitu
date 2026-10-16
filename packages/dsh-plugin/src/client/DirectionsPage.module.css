@@ -1,0 +1,178 @@
+/* Hallmark · existing Kaitu system · calm personal workbench · list → evidence → experiment. */
+.page {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  color: var(--kt-text);
+}
+.page h3 {
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 600;
+  margin: 0;
+}
+.page p {
+  line-height: 1.7;
+}
+.listHeader,
+.detailHeader,
+.heading,
+.itemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.page .heading h2 {
+  font-size: 23px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+.directionRow {
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  align-items: start;
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--kt-control);
+  background: transparent;
+  color: var(--kt-text);
+  text-align: left;
+  width: 100%;
+}
+.directionRow > div {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.page .directionRow h2 {
+  font-size: 19px;
+}
+.directionRow p {
+  color: var(--kt-secondary);
+}
+.directionRow:hover {
+  background: var(--kt-subtle);
+}
+.statement {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0;
+}
+.statement h3:not(:first-child) {
+  margin-top: 12px;
+}
+.statement p,
+.prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.item {
+  display: grid;
+  gap: 12px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--kt-control);
+}
+.reference {
+  padding: 8px 0;
+  overflow-wrap: anywhere;
+}
+.form {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--kt-subtle);
+}
+.form > fieldset,
+.referenceFields {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  color: var(--kt-secondary);
+}
+.form input,
+.form textarea,
+.form select {
+  width: 100%;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--kt-control);
+  border-radius: 7px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  font: inherit;
+  line-height: 1.6;
+}
+.form textarea {
+  resize: vertical;
+}
+.form .check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.form .check input {
+  width: auto;
+}
+.fieldsRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.referenceFields {
+  margin-top: 16px;
+}
+.referenceFields fieldset {
+  border: 0;
+  padding: 0;
+}
+.timeline {
+  display: grid;
+  gap: 0;
+}
+.timeline article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  padding: 20px 0 20px 16px;
+  border-left: 1px solid var(--kt-control);
+}
+.timeline p {
+  grid-column: 1 / -1;
+}
+.timeline time {
+  font-size: 13px;
+  color: var(--kt-muted);
+}
+@container (max-width: 600px) {
+  .fieldsRow {
+    grid-template-columns: 1fr;
+  }
+  .directionRow {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .form {
+    padding: 16px;
+  }
+}

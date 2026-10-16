@@ -15,13 +15,9 @@ it("总览 Remote 按天区分缺失与零值，汇总训练、睡眠、营养�
     const ws = await initWorkspace(root);
     const service = new KaituOverviewService(ctx, { workspace: root });
     const empty = await service.overview();
-    expect(empty.metrics.map((m) => m.value)).toEqual([null, null, null, null]);
+    expect(empty.metrics).toEqual([]);
+    expect(empty.sections).toEqual([]);
     expect(empty.empty).toBe(true);
-    for (const key of ["workouts", "sleep", "protein"]) {
-      expect(empty.metrics.find((m) => m.key === key)?.daily).toEqual(
-        Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${10 + i}`, value: null })),
-      );
-    }
     ws.writeText(
       "NOW.md",
       stringifyFrontmatter(
@@ -96,6 +92,8 @@ it("总览 Remote 按天区分缺失与零值，汇总训练、睡眠、营养�
       addRecord(ws, "project_metric", { ts, project: slug, kind, value });
     const data = await service.overview();
     expect(data.empty).toBe(false);
+    expect(data.sections.map((section) => section.id)).toEqual(["health", "projects"]);
+    expect(data.metrics.some((metric) => metric.value === null)).toBe(false);
     const protein = data.metrics.find((m) => m.key === "protein");
     expect(protein?.value).toBe(15);
     expect(protein?.daily.map((d) => d.value)).toEqual([null, null, null, null, 30, null, 0]);

@@ -1,22 +1,41 @@
+import { rmSync } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
+  type AutomationKey,
+  type AutomationSettings,
   KaituError,
   Workspace,
+  captureNote,
+  changeExperienceBatch,
+  configureAutomation,
+  decideProposal,
   defaultRoot,
   dismissNews,
+  editExperience,
+  hideExperience,
   lifeMap,
   listProjects,
+  previewExperienceBatch,
+  readAutomation,
   readAvatar,
   readDoing,
+  readExperienceImports,
+  readExperienceSource,
+  readExploration,
+  readExplorationSource,
   readHealthPage,
   readNews,
   readOverviewPage,
   readPhoto,
+  recoverExperienceImports,
   removeAvatar,
   resolveExperience,
   saveAvatar,
+  setExperienceSource,
   tryNews,
+  unhideExperience,
+  writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
 import { readMe } from "./me-data.js";
@@ -24,6 +43,12 @@ import type { Config } from "./tools.js";
 import type {
   DoingData,
   DoingProject,
+  ExperienceBatchPreview,
+  ExperienceChanges,
+  ExperienceImportsData,
+  ExperienceSource,
+  ExplorationCommand,
+  ExplorationData,
   HealthData,
   LifeMapData,
   MeData,
@@ -76,9 +101,52 @@ export class KaituOverviewService extends TypertRemoteService {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
   }
 
+  @Remote("automation")
+  async automation(): Promise<AutomationSettings> {
+    return readAutomation(this.workspace);
+  }
+
+  @Remote("configureAutomation")
+  async configureAutomation(tasks: Partial<Record<AutomationKey, boolean>>): Promise<AutomationSettings> {
+    return this.write(async () => configureAutomation(this.workspace, tasks));
+  }
+
   @Remote("workspacePath")
   async workspacePath(): Promise<string> {
     return this.workspace.root;
+  }
+
+  @Remote("aiDraft")
+  async aiDraft(id?: string): Promise<{ id: string; text: string } | null> {
+    return this.write(async () => {
+      const file = ".kaitu/cache/ai-draft.json";
+      if (!this.workspace.exists(file)) return null;
+      const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
+      if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
+      const value = draft.text;
+      if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
+        throw new KaituError("会话草稿不合法", "BAD_ARGS");
+      return { id: draft.id, text: value };
+    });
+  }
+
+  @Remote("ackAiDraft")
+  async ackAiDraft(id: string): Promise<void> {
+    await this.write(async () => {
+      const file = ".kaitu/cache/ai-draft.json";
+      if (this.workspace.exists(file) && this.workspace.readJson<{ id?: string }>(file).id === id)
+        rmSync(this.workspace.resolve(file, { internal: true }));
+    });
+  }
+
+  @Remote("decideProposal")
+  async decideProposal(id: string, decision: "confirmed" | "rejected"): Promise<{ version: string | null }> {
+    return this.write(() => decideProposal(this.workspace, id, decision));
+  }
+
+  @Remote("capture")
+  async capture(text: string): Promise<{ path: string; version: string | null }> {
+    return this.write(() => captureNote(this.workspace, text));
   }
 
   @Remote("news")
@@ -98,15 +166,81 @@ export class KaituOverviewService extends TypertRemoteService {
     return { id: result.record.id, status: "dismissed", version: result.version };
   }
 
+  @Remote("exploration")
+  async exploration(): Promise<ExplorationData> {
+    return readExploration(this.workspace);
+  }
+  @Remote("explorationWrite")
+  async explorationWrite(command: ExplorationCommand): Promise<{ id: string; version: string | null }> {
+    return this.write(async () => {
+      const { id, version } = await writeExploration(this.workspace, command, "user");
+      return { id, version };
+    });
+  }
+  @Remote("explorationSource")
+  async explorationSource(
+    owner: "direction" | "direction_note" | "exploration_experiment",
+    id: string,
+    reference?: number,
+  ): Promise<ExperienceSource> {
+    return readExplorationSource(this.workspace, owner, id, reference);
+  }
+
+  @Remote("experienceSource")
+  async experienceSource(id: string): Promise<ExperienceSource> {
+    return readExperienceSource(this.workspace, id);
+  }
+
   @Remote("lifeMap")
   async lifeMap(): Promise<LifeMapData> {
     return lifeMap(this.workspace);
+  }
+
+  @Remote("experienceImports")
+  async experienceImports(): Promise<ExperienceImportsData> {
+    return readExperienceImports(this.workspace);
+  }
+  @Remote("experienceBatchPreview")
+  async experienceBatchPreview(id: string, operation: "undo" | "restore"): Promise<ExperienceBatchPreview> {
+    return previewExperienceBatch(this.workspace, id, operation);
+  }
+  @Remote("setExperienceSource")
+  async setExperienceSource(locator: string, excluded: boolean, revision: number): Promise<void> {
+    await this.write(() => setExperienceSource(this.workspace, locator, excluded, revision));
+  }
+  @Remote("changeExperienceBatch")
+  async changeExperienceBatch(
+    id: string,
+    operation: "undo" | "restore",
+    revision: number,
+  ): Promise<{ affected: number; preserved: number; version: string | null }> {
+    return this.write(() => changeExperienceBatch(this.workspace, id, operation, revision));
+  }
+  @Remote("recoverExperienceImports")
+  async recoverExperienceImports(): Promise<{ recovered: number }> {
+    return this.write(async () => ({ recovered: (await recoverExperienceImports(this.workspace)).length }));
   }
 
   @Remote("resolveExperience")
   async resolveExperience(id: string, geonameid: number): Promise<{ id: string; version: string | null }> {
     const result = await this.write(() => resolveExperience(this.workspace, id, geonameid));
     return { id: result.record.id, version: result.version };
+  }
+
+  @Remote("editExperience")
+  async editExperience(id: string, changes: ExperienceChanges, revision: number): Promise<void> {
+    await this.write(() => editExperience(this.workspace, id, changes, revision));
+  }
+
+  @Remote("hideExperience")
+  async hideExperience(id: string, revision: number): Promise<number> {
+    const result = await this.write(() => hideExperience(this.workspace, id, revision));
+    return result.record.rev as number;
+  }
+
+  @Remote("unhideExperience")
+  async unhideExperience(id: string, revision: number): Promise<void> {
+    await this.write(() => unhideExperience(this.workspace, id, revision));
   }
 
   @Remote("me")
