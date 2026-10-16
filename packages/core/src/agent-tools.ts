@@ -5,10 +5,10 @@ import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
-import { findRecordType, listModules } from "./modules.js";
+import { findRecordType, listModules, recordFilePattern, resolveRecordPath } from "./modules.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
-import { assertPublicProject } from "./projects.js";
+import { assertPublicProject, publicProject } from "./projects.js";
 import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -144,4 +144,16 @@ export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: s
   if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");
   ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
   return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
+}
+
+export function publicRecord(ws: Workspace, type: string, row?: Record<string, unknown>): boolean {
+  const ref = findRecordType(ws, type);
+  resolveRecordPath(ws, ref, recordFilePattern(ref).dir);
+  const path = relative(realpathSync(ws.root), realpathSync(ws.resolve(ref.module.dir)))
+    .split(sep)
+    .join("/");
+  if (ref.module.def.id === "finance" || ref.module.dir === "finance" || path.startsWith("finance/"))
+    return false;
+  if (path.split("/").some((part) => part === ".kaitu" || part === ".git")) return false;
+  return row?.project === undefined || publicProject(ws, row.project);
 }

@@ -1,7 +1,13 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
-import { type RecordTypeRef, findRecordType, recordFileFor, recordFilePattern } from "./modules.js";
+import {
+  type RecordTypeRef,
+  findRecordType,
+  recordFileFor,
+  recordFilePattern,
+  resolveRecordPath,
+} from "./modules.js";
 import { mergeNewsRecord } from "./news.js";
 import { assertPublicProject, driveProjects } from "./projects.js";
 import { formatErrors, schemas } from "./schema.js";
@@ -47,6 +53,8 @@ function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord)
   }
   if (["project_metric", "github_snapshot"].includes(ref.type) && driveProjects(ws) && !record.deleted)
     assertPublicProject(ws, record.project);
+  if (existsSync(join(ws.root, ref.module.dir, ref.def.schema)))
+    resolveRecordPath(ws, ref, `${ref.module.dir}/${ref.def.schema}`);
   const reg = schemas();
   const fn = record.deleted
     ? reg.builtin("tombstone.schema.json")
@@ -75,6 +83,7 @@ function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
 function write(ws: Workspace, ref: RecordTypeRef, record: StoredRecord, tz: string): WriteResult {
   validateRecord(ws, ref, record);
   const file = recordFileFor(ref, localMonth(parseTs(record.ts), tz));
+  resolveRecordPath(ws, ref, file);
   ws.appendLine(file, JSON.stringify(record));
   return { type: ref.type, module: ref.module.dir, file, record };
 }
@@ -134,6 +143,7 @@ export function addRecords(
     }
     return result;
   });
+  for (const result of pending) resolveRecordPath(ws, ref, result.file);
   if (!opts.dryRun) {
     const files = new Map<string, string[]>();
     for (const { file, record } of pending) {
@@ -195,13 +205,14 @@ export interface RecordLine {
 /** 该类型的全部数据行（按文件月份升序）。 */
 export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
   const { dir, match } = recordFilePattern(ref);
-  const abs = join(ws.root, dir);
+  const abs = resolveRecordPath(ws, ref, dir);
   if (!existsSync(abs)) return [];
   const out: RecordLine[] = [];
   for (const f of readdirSync(abs)
     .filter((n) => match.test(n))
     .sort()) {
     const file = `${dir}/${f}`;
+    resolveRecordPath(ws, ref, file);
     ws.scanText(file)
       ?.split("\n")
       .forEach((raw, i) => {
@@ -213,7 +224,11 @@ export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
 
 /** 读取已有追加历史，包含修正前的原始记录与删除标记。 */
 export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[] {
-  return recordLines(ws, findRecordType(ws, type)).map((line) => {
+  return revisionsFor(ws, findRecordType(ws, type));
+}
+
+function revisionsFor(ws: Workspace, ref: RecordTypeRef): StoredRecord[] {
+  return recordLines(ws, ref).map((line) => {
     try {
       return JSON.parse(line.raw) as StoredRecord;
     } catch {
@@ -225,7 +240,7 @@ export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[]
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
 function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord> {
   const latest = new Map<string, StoredRecord>();
-  for (const rec of readRecordRevisions(ws, ref.type)) {
+  for (const rec of revisionsFor(ws, ref)) {
     const prev = latest.get(rec.id);
     if (!prev || (rec.rev ?? 1) >= (prev.rev ?? 1)) latest.set(rec.id, rec);
   }
@@ -255,7 +270,9 @@ function preparedRecords(ws: Workspace, entries: { type: string; record: StoredR
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
     validateRecord(ws, ref, record);
-    return { file: recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone())), record };
+    const file = recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
+    resolveRecordPath(ws, ref, file);
+    return { file, record };
   });
 }
 

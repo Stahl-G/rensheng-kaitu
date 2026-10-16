@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import addFormatsModule from "ajv-formats";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { schemasDir } from "./assets.js";
@@ -50,8 +50,15 @@ export class SchemaRegistry {
    * 自定义 schema 挂在同一个 base URI 下，所以可以直接 $ref "record-base.schema.json"。
    */
   forModule(moduleId: string, moduleDirAbs: string, ref: string): ValidateFunction {
-    const custom = join(moduleDirAbs, ref);
+    const custom = resolve(moduleDirAbs, ref);
+    const confined = (base: string, path: string) => {
+      const rel = relative(base, path);
+      if (isAbsolute(rel) || rel === ".." || rel.startsWith("../"))
+        throw new Error("schema 路径超出模块目录");
+    };
+    confined(moduleDirAbs, custom);
     if (existsSync(custom)) {
+      confined(realpathSync(moduleDirAbs), realpathSync(custom));
       const key = custom;
       let fn: ValidateFunction | undefined = this.cache.get(key);
       if (!fn) {

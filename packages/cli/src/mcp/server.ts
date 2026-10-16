@@ -7,7 +7,6 @@ import {
   completeTask,
   dismissNews,
   explorationCommandSchema,
-  findRecordType,
   inboxNoteDone,
   inboxNotes,
   lifeMap,
@@ -18,7 +17,7 @@ import {
   onboardingStatus,
   projectGithub,
   proposeBlock,
-  publicProject,
+  publicRecord,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -136,16 +135,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) =>
-      tools === "remote" &&
-      (findRecordType(ws, type).module.def.id === "finance" ||
-        findRecordType(ws, type).module.dir === "finance")
-        ? []
-        : readRecords(ws, type, { from, to }).filter(
-            (row) =>
-              tools !== "remote" ||
-              !["project_metric", "github_snapshot"].includes(type) ||
-              publicProject(ws, row.project),
-          ),
+      readRecords(ws, type, { from, to }).filter((row) => tools !== "remote" || publicRecord(ws, type, row)),
   );
   register(
     "task_add",
