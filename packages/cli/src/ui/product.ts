@@ -5,17 +5,25 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
+  type ImportSource,
   KaituError,
   type NewsFeedback,
+  type OnboardingAi,
+  type OnboardingChoices,
+  type OnboardingSetupInput,
   type SettingsData,
   type Workspace,
   addCalendarSubscription,
   bankNotificationCandidates,
+  cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
   completeNext,
   configureAutomation,
+  confirmOnboardingImport,
+  confirmOnboardingMemory,
+  confirmOnboardingSetup,
   decideProposal,
   discardFinanceImport,
   dismissNews,
@@ -29,8 +37,12 @@ import {
   listProjects,
   loadFinanceInvestments,
   moveWorkspace,
+  onboardingStatus,
   previewExperienceBatch,
   previewFinanceImport,
+  previewOnboardingImport,
+  previewOnboardingMemory,
+  previewOnboardingSetup,
   readAutomation,
   readAvatar,
   readCalendar,
@@ -48,11 +60,13 @@ import {
   readPhoto,
   readSettings,
   receiveBankNotification,
+  recordOnboardingAiConnection,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
   restore,
   saveAvatar,
+  saveOnboardingChoices,
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
@@ -69,6 +83,10 @@ export const productMutations = new Set([
   "moveStorage",
   "addCalendarSubscription",
   "completeNext",
+  "onboardingChoose",
+  "onboardingSetupConfirm",
+  "onboardingMemoryConfirm",
+  "onboardingImportConfirm",
   "setExperienceSource",
   "changeExperienceBatch",
   "recoverExperienceImports",
@@ -107,10 +125,16 @@ export async function productRequest(
     switch (method) {
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
-      case "askSettings":
-        return ask.settings();
-      case "askConfigure":
-        return ask.configure((args[0] ?? {}) as Record<string, unknown>);
+      case "askSettings": {
+        const settings = await ask.settings();
+        if (settings.configured) recordOnboardingAiConnection(ws, "问问");
+        return settings;
+      }
+      case "askConfigure": {
+        const result = await ask.configure((args[0] ?? {}) as Record<string, unknown>);
+        if ((await ask.settings()).configured) recordOnboardingAiConnection(ws, "问问");
+        return result;
+      }
       case "askList":
         return ask.list();
       case "askCreate":
@@ -145,6 +169,31 @@ export async function productRequest(
       if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
       return moveWorkspace(ws, text(0), args[1]);
     }
+    case "onboarding":
+      return onboardingStatus(ws);
+    case "onboardingMemoryPreview":
+      return previewOnboardingMemory(ws, text(0), text(1) as OnboardingAi);
+    case "onboardingMemoryConfirm":
+      return confirmOnboardingMemory(ws, text(0), args[1] as string[]);
+    case "onboardingCancel":
+      return cancelOnboardingPreview(ws, text(0));
+    case "onboardingSetupPreview":
+      return previewOnboardingSetup(ws, args[0] as OnboardingSetupInput);
+    case "onboardingSetupConfirm":
+      return confirmOnboardingSetup(ws, text(0));
+    case "onboardingChoose":
+      return saveOnboardingChoices(ws, args[0] as OnboardingChoices);
+    case "onboardingImportPreview": {
+      const base64 = text(2);
+      if (
+        base64.length > 48 * 1024 * 1024 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
+      )
+        throw new KaituError("文件过大或格式不合法", "BAD_ARGS");
+      return previewOnboardingImport(ws, text(0) as ImportSource, text(1), Buffer.from(base64, "base64"));
+    }
+    case "onboardingImportConfirm":
+      return confirmOnboardingImport(ws, text(0));
     case "automation":
       return readAutomation(ws);
     case "configureAutomation":

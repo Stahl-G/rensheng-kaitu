@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { schemasDir, templateDir } from "./assets.js";
+import { ONBOARDING } from "./onboarding.js";
 import type { Workspace } from "./workspace.js";
 
 let current: string | undefined;
@@ -24,6 +25,7 @@ export function templateVersion(): string {
           .update("\0");
     }
   }
+  hash.update(JSON.stringify(ONBOARDING));
   walk(templateDir());
   walk(schemasDir());
   current = hash.digest("hex").slice(0, 12);

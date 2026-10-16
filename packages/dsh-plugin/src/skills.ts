@@ -12,6 +12,7 @@ import type {
 
 export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径都相对于开图工作区，与会话 cwd 无关。
 技能中的 CLI 步骤用下列开图工具完成，无需运行 shell、安装 CLI、注册 MCP 或另开 kaitu ui。
+- onboarding status/choose/preview/confirm/setup-preview/setup-confirm/cancel → kaitu_onboarding（action）；引导内容取 status 的 content。
 - status / record schema → kaitu_status；record add → kaitu_add_record；地点经历 → kaitu_add_experience。
 - record list / update / delete → kaitu_records；chats search → kaitu_search_chats。
 - 读取、列目录、写 Markdown/JSON → kaitu_workspace（read/list/write）；创建模块时一次提交 module.json、STATUS.md 和 schema。

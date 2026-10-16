@@ -68,3 +68,4 @@ export * from "./library.js";
 export * from "./news-feedback.js";
 export * from "./settings.js";
 export * from "./sync-location.js";
+export * from "./onboarding.js";

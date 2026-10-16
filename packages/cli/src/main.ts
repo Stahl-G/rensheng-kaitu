@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { createChannelRuntime } from "@kaitu/channels";
@@ -7,6 +8,9 @@ import {
   KaituError,
   type MemoryInput,
   type MemoryPatch,
+  type OnboardingAi,
+  type OnboardingChoices,
+  type OnboardingSetupInput,
   type Pose,
   type ProjectLink,
   type ProjectStatus,
@@ -16,8 +20,11 @@ import {
   addRecord,
   addTask,
   bindGithub,
+  cancelOnboardingPreview,
   cancelTask,
   completeTask,
+  confirmOnboardingMemory,
+  confirmOnboardingSetup,
   createProject,
   defaultRoot,
   deleteRecord,
@@ -40,6 +47,9 @@ import {
   listTasks,
   logProject,
   mcpToken,
+  onboardingStatus,
+  previewOnboardingMemory,
+  previewOnboardingSetup,
   processInbox,
   readProject,
   readRecords,
@@ -51,7 +61,9 @@ import {
   removeMemory,
   removePhoto,
   renderRecordReference,
+  resetOnboarding,
   restore,
+  saveOnboardingChoices,
   searchChats,
   searchMemories,
   setGithubToken,
@@ -97,6 +109,13 @@ const HELP = `开图 kaitu
   kaitu agents-md                                  重新生成 AGENTS.md
   kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
   kaitu mcp token [--rotate]                      查看或轮换 HTTP token
+  kaitu onboarding status | reset                  查看引导 / 重置本机选择
+  kaitu onboarding choose --json '<选择对象>'        保存引导选择
+  kaitu onboarding preview --file <文本> --source <ai>  预览粘贴记忆
+  kaitu onboarding confirm <token> --json '{"selected":["line-1"]}'  确认所选候选
+  kaitu onboarding setup-preview --json '<项目或关注方向>'  预览数据源设置
+  kaitu onboarding setup-confirm <token>           确认数据源设置
+  kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
   kaitu project new --title <标题> --kind work|personal [--local-only] [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
@@ -479,6 +498,52 @@ async function run(argv: string[]): Promise<number> {
       writeAgentsMd(ws);
       await snapshot(ws, "重新生成了 AGENTS.md");
       out(values, { ok: true }, "已重新生成 AGENTS.md。");
+      return 0;
+    }
+    case "onboarding": {
+      const ws = workspace(values);
+      let result: unknown;
+      switch (args[0]) {
+        case "status":
+          result = onboardingStatus(ws);
+          break;
+        case "reset":
+          result = resetOnboarding(ws);
+          break;
+        case "choose":
+          result = await saveOnboardingChoices(ws, parseJson(values.json) as OnboardingChoices);
+          break;
+        case "setup-preview":
+          result = previewOnboardingSetup(ws, parseJson(values.json) as OnboardingSetupInput);
+          break;
+        case "setup-confirm":
+          result = await confirmOnboardingSetup(ws, need(args[1], "token"));
+          break;
+        case "preview":
+          result = previewOnboardingMemory(
+            ws,
+            readFileSync(need(values.file, "--file"), "utf8"),
+            need(values.source, "--source") as OnboardingAi,
+          );
+          break;
+        case "confirm":
+          result = await confirmOnboardingMemory(
+            ws,
+            need(args[1], "token"),
+            parseJson(values.json).selected as string[],
+          );
+          break;
+        case "cancel":
+          cancelOnboardingPreview(ws, need(args[1], "token"));
+          result = { ok: true };
+          break;
+        default:
+          throw new KaituError(
+            "用法：kaitu onboarding status|reset|choose|preview|confirm|setup-preview|setup-confirm|cancel",
+            "BAD_ARGS",
+          );
+      }
+      console.log(JSON.stringify(result, null, 2));
       return 0;
     }
     case "status": {

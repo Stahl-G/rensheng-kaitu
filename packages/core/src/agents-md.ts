@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { templateDir } from "./assets.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { listModules } from "./modules.js";
+import { ONBOARDING } from "./onboarding.js";
 import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
@@ -120,13 +121,22 @@ ${renderRecordReference(ws)}
 - 有对应模块的内容写进模块，不进记忆。健康诊断等敏感信息仅在用户明确要求时保存，并加 \`--sensitive\`。
 - 晚间复盘合并重复、处理矛盾并刷新档案摘要。用 \`kaitu chats search <词>\` 检索历史对话。
 
+### 首次使用
+
+- 四步：${ONBOARDING.steps.join(" → ")}。
+- 起步选项：${ONBOARDING.starts.map((item) => item.title).join("、")}。
+- 先运行 \`kaitu onboarding status\`，或 MCP \`onboarding_status\`；DSH 使用 \`kaitu_onboarding\` 的 status。
+- AI 列表、记忆位置提示、提示词与所需数据源取返回值 content，按 onboarding 技能带用户完成四步，每步均可跳过。
+- 记忆先 preview 展示候选，确认后传 token 与 selected；数据源先预览再确认，来源、版本与撤销点以工具回执为准。
+- 选择用 onboarding choose 保存，完成情况实时计算；reset 只重置本机选择，不删除资料。不要手改配置或打勾完成状态。
+
 ## 8. 日常节奏
 
 - 早间（morning-plan）：读规则、目标、日程、下一步、今天到期与提醒的待办和昨晚睡眠，按训练频率排今天，建议保留 pending。
 - 晚间（evening-review）：把笔记待办整理为 task、提醒过期项、核对完成情况、更新模块状态、写日报、整理记忆，最后保存版本。
 - 周复盘（weekly-review）：汇总本周进展和障碍，更新下周下一步。
 - 月复盘（monthly-review）：汇总整月，满两个月后做有数据支持的现状分析；规则和目标变更仍须确认。
-- 阶段 1 手动触发这些技能，不会自动设置定时任务。
+- 自动任务由用户在问问或设置中确认启用；首次使用选择不自动创建定时任务。
 
 ## 9. 技能与常用命令
 
@@ -146,7 +156,7 @@ ${skills()
 
 ## 10. 工作台
 
-开图产品只设总览、开图、记录三个入口。运行 \`kaitu ui\` 可直接浏览资料与保存原文，无需模型；详情、连接与高级设置按需进入。
+独立 Kaitu.app 有总览、开图、记录、问问四个入口；DSH 插件保留三个资料入口与原生会话。运行 \`kaitu ui\` 可直接浏览资料与保存原文，无需模型；详情、连接与高级设置按需进入。
 工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
 
 ## 11. 存放位置与云端接力

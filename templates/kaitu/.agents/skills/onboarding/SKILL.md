@@ -1,39 +1,27 @@
 ---
 name: onboarding
-description: 首次使用开图或用户说开始使用时，引导建立档案、导入资料并连接本地 Agent。
+description: 首次使用开图或用户要求重新开始时，按四步搬记忆、选事情、接数据并选择 AI。
 ---
 
 # 开始使用开图
 
-## 步骤
+先运行 `kaitu onboarding status`。DSH 使用 `kaitu_onboarding` 的 status，MCP 可读 `onboarding_status`。
+运行结果的 content 是界面与助手共用的引导内容，使用其中的 steps、ais、prompt、starts、sources、aiChoices。
+先看现有 choices、sources 和 checklist，不重复询问已有资料。showGuide 为 false 时，仅在用户主动要求后重走。
 
-1. 先运行 `kaitu status --json-out`，确认当前工作区是否已有资料。
-2. 读取 `me/profile.md`、`me/rules.md` 和 `me/goals.json`，避免重问已知信息。
-3. 用一次简短交流补充称呼、时区、当前重点与已有数据文件。
-4. 问用户目前在做哪些工作与个人项目，按 project 技能补齐是否仅本机、链接文件夹和正文子目录；把尚不明确的内容列为待补，不填想象的数据。
-5. 用户有 ChatGPT 记忆时，转到 import-chatgpt-memory 技能。
-6. 先给出档案草稿，按用户提供的事实写 `me/profile.md`。
-7. 逐项提出规则与目标的修改建议，用户确认后再改对应文件。
-8. 询问已有 Apple Health、Nut AI 或日历导出，转 health-import。
-9. 没有导出文件也能开始，不要求部署服务。
-10. 用 morning-plan 生成第一份今天计划，等用户确认建议。
-11. 运行 `kaitu validate` 检查已写文件。
-12. 运行 `kaitu snapshot -m "建立了个人档案与首份计划"`。
-13. 运行 `kaitu ui`，让用户在工作台查看今天、健康和动态。
-14. Claude Code 读取工作区 `.mcp.json`，其中已配置 `kaitu mcp`。
-15. Codex 在工作区运行 `codex mcp add kaitu -- kaitu mcp` 注册本机 MCP。
-16. 若工作区不在默认目录，运行前设置 `KAITU_DIR` 为工作区绝对路径。
-17. 用户要让云端 Agent 访问时，介绍 Google Drive 模式：个人数据会存到 Drive，版本历史与密钥留在本机。
-18. 用户决定开启后，运行 `kaitu drive enable`；自动查找有歧义时用 `--drive-dir <我的云端硬盘路径>`。
-19. 让云端 Agent 从 `AGENT-README.md`、`OVERVIEW.md` 进入，只在 `inbox/agents/` 新建唯一文件。
-20. 收件箱接受 digest.md、records.jsonl、memory.json、proposal.json，不能删除、恢复或修改规则与目标。
-21. 工作台运行时自动处理，也可 `kaitu inbox process`；`kaitu drive disable` 搬回本机。
-22. 不要把 HTTP token 写入档案、技能或对话记录。
+1. 搬来记忆：让用户选常用 AI，展示该项 hint 与原样 prompt。收到粘贴文本后按 import-chatgpt-memory 技能预览、勾选和确认。
+   也可导入 ChatGPT 对话导出包，或跳过。
+2. 先管哪些：展示 content.starts，允许多选和跳过。
+   用 `kaitu onboarding choose --json '<选择对象>'` 保存 seen:true、starts 和 memoryAi，固定 ID 的下一步由程序写入。
+3. 接上数据：只使用 status.sources 返回的所需来源。文件导入走已有导入器的 dry-run → 确认。
+   本机项目或关注方向用 `kaitu onboarding setup-preview --json '<设置对象>'`，展示返回的 input 后，确认执行 setup-confirm <token>。
+   设置对象分别为 source:projects + project，或 source:news + keywords。项目至少提供一个用户指定的本机文件夹链接。
+   财务复用现有财务预览。未准备好的来源存入 skipped，跳过不会计为完成。
+4. 选一个 AI：展示 content.aiChoices。builtin 进入「问问」填 DeepSeek API Key，mine 进入「AI 与连接」，none 直接使用记录与导入。
+   保存 aiChoice，不把选择视为实际连接。用户若要首份计划，再运行 morning-plan。
 
-## 确认点
+选择对象是部分更新，starts 和 skipped 传入时替换本机所选列表。重新选择不会删除已写入的下一步。
+DSH 的 choose、preview、confirm、setup-preview、setup-confirm、cancel 使用同名 action。
 
-规则与目标变更先确认；资料批量导入先展示一屏候选。
-
-## 交付
-
-交代已建立的档案、待确认计划与尚未提供的数据源。
+最后再查询 status，以 checklist 交代已经有的资料、仍需接的数据和下一步。实际完成由数据计算，无须手动打勾。
+不要求把每项都做完才能使用，也不把同一份资料重新导入。

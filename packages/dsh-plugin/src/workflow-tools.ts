@@ -2,12 +2,16 @@ import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import {
+  ONBOARDING,
   type Workspace,
   addMemory,
   addPhoto,
   addTask,
+  cancelOnboardingPreview,
   cancelTask,
   completeTask,
+  confirmOnboardingMemory,
+  confirmOnboardingSetup,
   createProject,
   disableDrive,
   driveStatus,
@@ -26,6 +30,10 @@ import {
   listProjects,
   listTasks,
   logProject,
+  onboardingSetupSchema,
+  onboardingStatus,
+  previewOnboardingMemory,
+  previewOnboardingSetup,
   processInbox,
   projectDirectory,
   projectVersion,
@@ -34,10 +42,12 @@ import {
   readExploration,
   readProject,
   readRecords,
+  recordOnboardingAiConnection,
   removeMemory,
   removePhoto,
   resolvePlace,
   restore,
+  saveOnboardingChoices,
   searchChats,
   searchMemories,
   setProject,
@@ -112,6 +122,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         queue(async () => {
           try {
             exec.signal.throwIfAborted();
+            recordOnboardingAiConnection(ws, "DSH");
             return { ok: true, result: await run(schema.parse(args)) };
           } catch (error) {
             return { ok: false, error: (error as Error).message };
@@ -119,6 +130,57 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         }),
     });
   }
+  register(
+    "kaitu_onboarding",
+    "四步首次使用：查询内容与清单、记录选择、预览记忆、确认所选或放弃。确认前先给用户看候选。",
+    z.discriminatedUnion("action", [
+      z.object({ action: z.literal("status") }).strict(),
+      z
+        .object({
+          action: z.literal("choose"),
+          choices: z
+            .object({
+              seen: z.boolean().optional(),
+              starts: z.array(z.enum(ONBOARDING.starts.map((item) => item.id))).optional(),
+              skipped: z
+                .array(
+                  z.enum(["memory", "ai", "plan", ...ONBOARDING.sources.map((item) => item.id)] as const),
+                )
+                .optional(),
+              memoryAi: z.enum(ONBOARDING.ais.map((item) => item.id)).optional(),
+              aiChoice: z.enum(ONBOARDING.aiChoices.map((item) => item.id)).optional(),
+            })
+            .strict(),
+        })
+        .strict(),
+      z
+        .object({ action: z.literal("preview"), text, ai: z.enum(ONBOARDING.ais.map((item) => item.id)) })
+        .strict(),
+      z.object({ action: z.literal("confirm"), token: text, selected: z.array(text) }).strict(),
+      z.object({ action: z.literal("cancel"), token: text }).strict(),
+      z.object({ action: z.literal("setup-preview"), input: onboardingSetupSchema }).strict(),
+      z.object({ action: z.literal("setup-confirm"), token: text }).strict(),
+    ]),
+    (input) => {
+      switch (input.action) {
+        case "setup-preview":
+          return previewOnboardingSetup(ws, input.input);
+        case "setup-confirm":
+          return confirmOnboardingSetup(ws, input.token);
+        case "status":
+          return onboardingStatus(ws);
+        case "choose":
+          return saveOnboardingChoices(ws, input.choices);
+        case "preview":
+          return previewOnboardingMemory(ws, input.text, input.ai);
+        case "confirm":
+          return confirmOnboardingMemory(ws, input.token, input.selected);
+        case "cancel":
+          cancelOnboardingPreview(ws, input.token);
+          return { ok: true };
+      }
+    },
+  );
   register("kaitu_exploration_read", "读取方向、依据、尝试与认识变化。", z.object({}).strict(), () =>
     readExploration(ws),
   );
