@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { importIcs } from "./importers/ics.js";
 import { readRecords } from "./records.js";
 import { localDate, localTimeToInstant } from "./time.js";
 import type { TodayPlan } from "./workbench.js";
-import type { Workspace } from "./workspace.js";
+import { type Workspace, stateDirectory } from "./workspace.js";
 
 export interface CalendarSubscription {
   id: string;
@@ -32,11 +32,15 @@ export interface CalendarData {
   events: CalendarEntry[];
   subscriptions: Omit<CalendarSubscription, "url">[];
 }
-const file = ".kaitu/calendar-subscriptions.json";
+// 私有日历的订阅地址本身就是凭据，只存本机状态目录，不进同步盘。
+const file = (ws: Workspace) => join(stateDirectory(ws.root), "calendar-subscriptions.json");
 const interval = 15 * 60 * 1000;
-const subscriptions = (ws: Workspace): CalendarSubscription[] => (ws.exists(file) ? ws.readJson(file) : []);
-const save = (ws: Workspace, rows: CalendarSubscription[]) =>
-  ws.writeJson(file, rows, { internal: true, mode: 0o600 });
+const subscriptions = (ws: Workspace): CalendarSubscription[] =>
+  existsSync(file(ws)) ? JSON.parse(readFileSync(file(ws), "utf8")) : [];
+const save = (ws: Workspace, rows: CalendarSubscription[]) => {
+  mkdirSync(dirname(file(ws)), { recursive: true });
+  writeFileSync(file(ws), `${JSON.stringify(rows, null, 2)}\n`, { mode: 0o600 });
+};
 
 export async function addCalendarSubscription(ws: Workspace, address: string, name: string) {
   let url: URL;
