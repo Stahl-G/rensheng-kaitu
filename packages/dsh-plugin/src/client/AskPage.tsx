@@ -230,6 +230,14 @@ export function AskPage({
     };
   }, []);
   useEffect(() => {
+    const refresh = () =>
+      void call<Settings>("askSettings")
+        .then(setSettings)
+        .catch((err) => setError(err.message));
+    window.addEventListener("kaitu-ai-changed", refresh);
+    return () => window.removeEventListener("kaitu-ai-changed", refresh);
+  }, []);
+  useEffect(() => {
     if (step) dialog.current?.showModal();
     else dialog.current?.close();
   }, [step]);
@@ -644,7 +652,7 @@ export function AskPage({
                         onClick={() => void changeMode("scoped")}
                       >
                         <b>只读写开图资料</b>
-                        <span>默认。只能读写你的开图资料，不能运行命令、不能上网。</span>
+                        <span>只读写开图资料，可以搜索和打开网页；不能运行命令</span>
                       </button>
                       <button
                         type="button"

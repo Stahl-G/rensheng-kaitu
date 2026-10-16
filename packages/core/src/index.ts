@@ -73,3 +73,6 @@ export * from "./onboarding.js";
 export * from "./agent-file-policy.js";
 
 export * from "./bank-mail.js";
+
+export { fetchPublicResource } from "./public-fetch.js";
+export { AI_NETWORK_RULES } from "./ai-instructions.js";

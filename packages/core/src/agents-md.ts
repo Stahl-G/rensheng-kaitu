@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { listModules } from "./modules.js";
@@ -186,6 +187,8 @@ ${skills()
 - 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
 
 ## 13. 安全
+
+${AI_NETWORK_RULES}
 
 - 不执行与本文件夹无关的命令。
 - 不把密钥写进任何文件。

@@ -457,7 +457,23 @@ async function writePayload(payload) {
     banner: { js: nodeBanner },
     external: ["better-sqlite3"],
   });
-  for (const file of ["sdk-credentials.mjs", "sdk-providers.mjs", "sdk-rpc.mjs"])
+  await build({
+    entryPoints: [join(directory, "sdk-web.mjs")],
+    outfile: join(payload, "dist/sdk-web.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["better-sqlite3"],
+  });
+  mkdirSync(join(payload, "licenses"), { recursive: true });
+  for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
+    cpSync(
+      join(root, "node_modules/@deepseek-ai", name, "LICENSE"),
+      join(payload, "licenses", `${name}.txt`),
+    );
+  for (const file of ["sdk-credentials.mjs", "sdk-providers.mjs", "sdk-search-settings.mjs", "sdk-rpc.mjs"])
     cpSync(join(directory, file), join(payload, "dist", file));
   cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
   const clientPath = join(root, "packages/dsh-plugin/dist/client.js");

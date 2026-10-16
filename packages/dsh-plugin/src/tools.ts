@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path";
 import {
+  AI_NETWORK_RULES,
   type ExperienceInput,
   Workspace,
   addExperiences,
@@ -52,7 +53,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
   ctx.systemPrompt?.section({
     name: "kaitu:workspace",
     order: 3000,
-    text: `${instructions}\n${skillToolGuide}`,
+    text: `${instructions}\n${skillToolGuide}\n${AI_NETWORK_RULES}`,
     interpolate: false,
   });
 

@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { KaituError } from "@kaitu/core";
+import { KaituError, type NetworkSearchSettings } from "@kaitu/core";
 
 export type AskEventType =
   | "user/message"
@@ -41,6 +41,7 @@ export interface AskService {
   send(id: string, text: string, images?: AskImage[]): Promise<unknown>;
   settings(): Promise<{
     configured: boolean;
+    search?: NetworkSearchSettings;
     supportsImages?: boolean;
     providerName?: string;
     choice?: "builtin" | "external";

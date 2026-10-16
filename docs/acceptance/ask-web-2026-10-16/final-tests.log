@@ -1,0 +1,10 @@
+$ vitest run --maxWorkers=2
+
+ RUN  v4.1.11 /Users/yihongguo/Developer/rensheng-kaitu-providers
+
+
+ Test Files  69 passed (69)
+      Tests  170 passed (170)
+   Start at  14:51:33
+   Duration  233.61s (transform 3.14s, setup 677ms, import 30.42s, tests 421.99s, environment 6ms)
+

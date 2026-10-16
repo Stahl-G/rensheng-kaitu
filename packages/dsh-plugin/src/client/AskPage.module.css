@@ -464,3 +464,17 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+@media (max-width: 700px) {
+  .composerRow {
+    position: relative;
+  }
+  .composerRow > span:has(dialog) {
+    position: static;
+  }
+  .composerRow dialog {
+    left: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

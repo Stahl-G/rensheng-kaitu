@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { validateConnection } from "./sdk-providers.mjs";
+import { searchProviders } from "./sdk-search-settings.mjs";
 
 const load = (name) => import(pathToFileURL(join(process.env.KAITU_DSH_MODULES, name, "lib/index.js")).href);
 try {
@@ -25,7 +26,10 @@ try {
     const init = provider[Service.init]();
     await init.next();
     await init.next();
-    if (process.argv[2] === "validate") {
+    if (process.argv[2] === "unset") {
+      await provider.unset(ref);
+      process.stdout.write('{"configured":false}');
+    } else if (process.argv[2] === "validate") {
       const apiKey = input.apiKey ?? (await provider.resolve(ref))?.value;
       const result = apiKey
         ? await validateConnection(input.settings, apiKey)
@@ -33,7 +37,18 @@ try {
       process.stdout.write(JSON.stringify(result));
     } else {
       const info = await provider.describe(ref);
-      process.stdout.write(JSON.stringify({ configured: info.configured }));
+      const search =
+        process.argv[2] === "search-status" || input.search
+          ? Object.fromEntries(
+              await Promise.all(
+                searchProviders.map(async (entry) => [
+                  entry.id,
+                  (await provider.describe(entry.ref)).configured,
+                ]),
+              ),
+            )
+          : undefined;
+      process.stdout.write(JSON.stringify({ configured: info.configured, ...(search ? { search } : {}) }));
     }
     await init.return();
   }

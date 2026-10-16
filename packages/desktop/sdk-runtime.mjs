@@ -6,10 +6,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { KaituError } from "../core/dist/index.js";
 import { assertDesktopIsolation } from "./environment.mjs";
 import { connectionInfo, credentialRef, providerPatch, selection } from "./sdk-providers.mjs";
+import { searchProviders, searchSettings, webRuntimePatch } from "./sdk-search-settings.mjs";
 
 export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
+  const web = webRuntimePatch(hostPlugin);
   if (mode === "full")
     return [
+      ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
       { id: "sandbox-policy", config: { mode: "danger-full-access", workspaceRoot: workspace } },
       { id: "approval", config: { policy: "never" } },
@@ -21,6 +24,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
       },
     ];
   return [
+    ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
     { id: "sandbox", disabled: true },
     { id: "fs-sandbox", disabled: true },
@@ -28,9 +32,6 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
       "tool-bash",
       "tool-pwsh",
       "tool-jobs",
-      "tool-web",
-      "web-fetch-http",
-      "web-search-deepseek",
       "tool-subagent",
       "tool-subagent-fork",
       "tool-subagent-control",
@@ -53,7 +54,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
     },
     {
       id: "agent-instructions",
-      config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: [".kaitu"] },
+      config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: ["AGENTS.md"] },
     },
     { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
     { id: "approval", config: { policy: "never" } },
@@ -113,13 +114,38 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       child.stdin.on("error", () => {});
       child.stdin.end(input ? JSON.stringify(input) : "");
     });
+  const searchFile = join(home, "kaitu-search.json");
+  const preferredSearch = () =>
+    existsSync(searchFile) ? JSON.parse(readFileSync(searchFile, "utf8")).provider : undefined;
+  const describeSearch = async () =>
+    searchSettings((await credential("search-status")).search, preferredSearch());
+  const configureSearch = async (input) => {
+    const entry = searchProviders.find((item) => item.id === input?.provider);
+    if (!entry) throw new KaituError("请选择网络搜索服务", "AI_CONFIG");
+    if (input.remove === true) await credential("unset", { ref: entry.ref });
+    else if (input.apiKey !== undefined) {
+      if (typeof input.apiKey !== "string" || !input.apiKey.trim() || input.apiKey.length > 4096)
+        throw new KaituError("请输入有效的搜索 API Key", "AI_KEY");
+      await credential("save", { ref: entry.ref, apiKey: input.apiKey.trim() });
+    } else if (!(await credential("status", { ref: entry.ref })).configured)
+      throw new KaituError("请先添加这个搜索服务的 API Key", "AI_SEARCH_KEY");
+    if (entry.id !== "deepseek") {
+      mkdirSync(home, { recursive: true, mode: 0o700 });
+      writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
+    }
+    return describeSearch();
+  };
   return {
     async settings() {
       const settings = loadSettings();
-      const info = await credential("status", { ref: credentialRef(settings.provider) });
-      return connectionInfo({ ...settings, configured: settings.choice !== "external" && info.configured });
+      const info = await credential("status", { ref: credentialRef(settings.provider), search: true });
+      return {
+        ...connectionInfo({ ...settings, configured: settings.choice === "builtin" && info.configured }),
+        search: searchSettings(info.search, preferredSearch()),
+      };
     },
     async configure(input) {
+      if (input.search !== undefined) return configureSearch(input.search);
       if (input.choice !== "builtin" && input.choice !== "external")
         throw new KaituError("请选择 AI 连接方式", "AI_CONFIG");
       let settings;
@@ -153,7 +179,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       const settings = loadSettings();
       if (
-        settings.choice === "external" ||
+        settings.choice !== "builtin" ||
         !(await credential("status", { ref: credentialRef(settings.provider) })).configured
       )
         throw new KaituError("请先连接内置 AI", "AI_CONNECTION");

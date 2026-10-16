@@ -1184,7 +1184,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       '<p class="small">只对这个对话生效，新对话仍是只读写开图资料。</p>' +
       '<div class="dialog-foot"><button type="button" class="btn btn-quiet" data-mode="cancel">取消</button><button type="button" class="btn btn-strong" data-mode="full">开启</button></div></div>';
     return '<div class="mode-pop" role="dialog" aria-label="这个对话能做什么">' +
-      '<button type="button" class="mode-opt" data-mode="safe" aria-pressed="' + !full + '"><b>只读写开图资料</b><span>默认。只能读写你的开图资料，不能运行命令、不能上网。</span></button>' +
+      '<button type="button" class="mode-opt" data-mode="safe" aria-pressed="' + !full + '"><b>只读写开图资料</b><span>只读写开图资料，可以搜索和打开网页；不能运行命令</span></button>' +
       '<button type="button" class="mode-opt" data-mode="ask-full" aria-pressed="' + full + '"><b>完整 Agent</b><span>开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。</span></button></div>';
   }
   function ask() {
