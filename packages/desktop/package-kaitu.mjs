@@ -439,13 +439,25 @@ async function writePayload(payload) {
     },
     external: ["better-sqlite3"],
   });
-  for (const file of [
-    "sdk-host.mjs",
-    "sdk-filesystem.mjs",
-    "sdk-credentials.mjs",
-    "sdk-providers.mjs",
-    "sdk-rpc.mjs",
-  ])
+  await build({
+    entryPoints: [join(directory, "sdk-host.mjs")],
+    outfile: join(payload, "dist/sdk-host.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+  });
+  await build({
+    entryPoints: [join(root, "packages/core/dist/health-import-worker.js")],
+    outfile: join(payload, "dist/health-import-worker.js"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["better-sqlite3"],
+  });
+  for (const file of ["sdk-credentials.mjs", "sdk-providers.mjs", "sdk-rpc.mjs"])
     cpSync(join(directory, file), join(payload, "dist", file));
   cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
   const clientPath = join(root, "packages/dsh-plugin/dist/client.js");

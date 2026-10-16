@@ -38,7 +38,7 @@ kaitu sync disable --to /本机目录/kaitu
 - 旧位置留下 `WORKSPACE-MOVED.md`，本机状态根目录的 `current-workspace.json` 记录当前位置。
   迁移后运行 doctor 与 validate。
 
-模式不写入 config.json：先按工作区真实路径识别标准 iCloud 目录，无需读取配置；其他路径没有 `state_dir` 是本机，有 `state_dir` 时再识别 Google Drive。
+同步模式和状态位置以本机状态根目录下的工作区映射为准，标准 iCloud 路径也参与识别。旧 `state_dir` 仅用于首次迁移，不再动态决定程序状态位置。
 自定义同步目录的类型写在本机状态目录 `sync-location.json`。旧版自定义 Drive 目录没有此文件时仍按 Drive 识别。
 config schema 与 PRD §6 保持不变。
 

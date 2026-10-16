@@ -284,7 +284,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("exportWorkspace")
   async exportWorkspace(): Promise<{ name: string; base64: string }> {
-    return exportWorkspace(this.workspace);
+    return exportWorkspace(this.workspace, { includePrivate: true });
   }
 
   @Remote("restoreVersion")

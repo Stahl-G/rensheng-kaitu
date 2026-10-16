@@ -1,3 +1,4 @@
+import { Unzip, UnzipInflate } from "fflate";
 import readXlsx from "read-excel-file/node";
 import { readXls } from "xls-reader";
 import { KaituError } from "../errors.js";
@@ -6,8 +7,28 @@ import { clean } from "./providers/shared.js";
 import { detectFinanceTable, supportedFinanceSources } from "./providers/tables.js";
 
 export async function readFinanceDocument(bytes: Buffer, sheet?: string) {
+  if (bytes.length > 32 * 1024 * 1024) throw new KaituError("账单超过 32 MiB，请分批导入", "IMPORT_LIMIT");
   const zip = bytes[0] === 0x50 && bytes[1] === 0x4b;
   const ole = bytes.subarray(0, 8).equals(Buffer.from("d0cf11e0a1b11ae1", "hex"));
+  if (zip) {
+    let expanded = 0;
+    let declared = 0;
+    let entries = 0;
+    const unzip = new Unzip((file) => {
+      declared += file.originalSize ?? 0;
+      if (++entries > 10000 || declared > 128 * 1024 * 1024)
+        throw new KaituError("账单压缩包内容过大", "IMPORT_LIMIT");
+      file.ondata = (error, data) => {
+        if (error) throw error;
+        expanded += data.byteLength;
+        if (expanded > 128 * 1024 * 1024) throw new KaituError("账单解压内容过大", "IMPORT_LIMIT");
+      };
+      file.start();
+    });
+    unzip.register(UnzipInflate);
+    for (let offset = 0; offset < bytes.length; offset += 16384)
+      unzip.push(bytes.subarray(offset, offset + 16384), offset + 16384 >= bytes.length);
+  }
   if (zip || ole) {
     const sheets: ReadonlyArray<{ name: string; rows: ReadonlyArray<ReadonlyArray<unknown>> }> = zip
       ? (await readXlsx(bytes, { parseNumber: (value) => value })).map((s) => ({

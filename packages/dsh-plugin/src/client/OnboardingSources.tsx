@@ -340,6 +340,7 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
             />
             仅保存在本机
           </label>
+          {localOnly && <p>这个项目的待办以后只在这台电脑上，以前同步过的副本请到云盘清理</p>}
         </>
       ) : (
         <label>

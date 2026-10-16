@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { templateDir } from "./assets.js";
 import { snapshot } from "./history.js";
 import { type ModuleDef, listRecordTypes } from "./modules.js";
+import { localRecordStore } from "./private-records.js";
 import { type StoredRecord, type WriteOptions, addRecord, readRecords, updateRecord } from "./records.js";
 import { localDate, parseTs } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -33,12 +34,12 @@ function dueDay(due: string, timeZone: string): string {
 
 export function listTasks(
   ws: Workspace,
-  options: { status?: TaskStatus | "all"; dueBefore?: string } = {},
+  options: { status?: TaskStatus | "all"; dueBefore?: string; includePrivate?: boolean } = {},
 ): Task[] {
   const status = options.status ?? "open";
   const bound = options.dueBefore;
   const zone = ws.timeZone();
-  return (readRecords(ws, "task") as Task[]).filter((task) => {
+  return (readRecords(ws, "task", { includePrivate: options.includePrivate }) as Task[]).filter((task) => {
     if (status !== "all" && task.status !== status) return false;
     if (!bound) return true;
     if (!task.due) return false;
@@ -70,14 +71,20 @@ export async function addTask(ws: Workspace, input: TaskInput, options: TaskWrit
     { ...input, status: "open" },
     { ...options, by: options.by ?? "user" },
   );
-  const version = await snapshot(ws, `${options.actor ?? "你"}记下了待办：${result.record.title}`);
+  const version = await snapshot(
+    result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
+    `${options.actor ?? "你"}记下了待办：${result.record.title}`,
+  );
   return { ...result, version };
 }
 
 async function setTaskStatus(ws: Workspace, id: string, status: TaskStatus, options: TaskWriteOptions) {
   const result = updateRecord(ws, "task", id, { status }, { ...options, by: options.by ?? "user" });
   const action = status === "done" ? "完成" : "取消";
-  const version = await snapshot(ws, `${options.actor ?? "你"}${action}了待办：${result.record.title}`);
+  const version = await snapshot(
+    result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
+    `${options.actor ?? "你"}${action}了待办：${result.record.title}`,
+  );
   return { ...result, version };
 }
 

@@ -16,19 +16,16 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { doctor } from "./doctor.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
+import { localStateRoot } from "./local-state.js";
 import { refreshOverview } from "./overview.js";
 import { rebaseProjectLinks, relocateProjects } from "./projects.js";
+import { setStateBinding, stateBinding } from "./state-binding.js";
 import { requestICloudDownload } from "./sync-files.js";
 import { type SyncMode, iCloudDirectory, syncMode } from "./sync-location.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
-export function localStateRoot(env: NodeJS.ProcessEnv = process.env): string {
-  const home = env.HOME || homedir();
-  if (process.platform === "darwin") return join(home, "Library/Application Support/kaitu");
-  if (process.platform === "win32") return join(env.LOCALAPPDATA || join(home, "AppData/Local"), "kaitu");
-  return join(env.XDG_STATE_HOME || join(home, ".local/state"), "kaitu");
-}
+export { localStateRoot } from "./local-state.js";
 
 export function currentWorkspace(env: NodeJS.ProcessEnv = process.env): string | undefined {
   const pointer = join(localStateRoot(env), "current-workspace.json");
@@ -165,6 +162,7 @@ export async function enableSync(
   refreshOverview(ws);
   move(join(old, ".kaitu"), state);
   try {
+    setStateBinding(old, state, mode);
     mkdirSync(join(old, ".kaitu"));
     ws.writeJson(".kaitu/config.json", { ...config, state_dir: state }, { internal: true });
     writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode })}\n`);
@@ -174,15 +172,18 @@ export async function enableSync(
   } catch (error) {
     rmSync(join(old, ".kaitu"), { recursive: true, force: true });
     move(state, join(old, ".kaitu"));
+    setStateBinding(old, join(old, ".kaitu"), "local");
     ws.writeJson(".kaitu/config.json", config, { internal: true });
     relocateProjects(ws, false);
     refreshOverview(ws);
     throw error;
   }
+  setStateBinding(target, state, mode, stateBinding(old).id);
   ws.root = target;
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
+  setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   if (mode === "icloud") requestICloudDownload(target);
   await snapshot(ws, `开启 ${mode === "icloud" ? "iCloud" : "Google Drive"} 同步`);
   await verify(ws);
@@ -218,6 +219,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   const extras = readdirSync(join(old, ".kaitu")).filter((file) => file !== "config.json");
   if (extras.length) throw new KaituError("同步文件夹的 .kaitu/ 有额外文件，请先核对再迁移", "CONFLICT");
   move(old, target);
+  setStateBinding(target, join(target, ".kaitu"), "local", stateBinding(old).id);
   ws.root = target;
   try {
     rmSync(join(target, ".kaitu"), { recursive: true });
@@ -226,6 +228,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
     mkdirSync(join(target, ".kaitu"), { recursive: true });
     ws.writeJson(".kaitu/config.json", config, { internal: true });
     move(target, old);
+    setStateBinding(old, state, syncMode(old));
     ws.root = old;
     throw error;
   }
@@ -236,6 +239,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
+  setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   await snapshot(ws, "关闭同步，搬回本机");
   await verify(ws);
   return syncStatus(ws);
@@ -265,11 +269,19 @@ export async function moveWorkspace(ws: Workspace, target: string, drive: boolea
   const old = ws.root;
   separate(old, destination);
   await snapshot(ws, "迁移资料前保存");
+  const state = stateDirectory(old);
   move(old, destination);
+  setStateBinding(
+    destination,
+    mode === "local" ? join(destination, ".kaitu") : state,
+    mode,
+    stateBinding(old).id,
+  );
   ws.root = destination;
   rebaseProjectLinks(ws, old, destination);
   remember(destination);
   relocationNote(old, destination);
+  setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   await snapshot(ws, "你更换了资料存放位置");
   await verify(ws);
   return driveStatus(ws);

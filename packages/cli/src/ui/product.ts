@@ -178,7 +178,7 @@ export async function productRequest(
       return data;
     }
     case "exportWorkspace":
-      return exportWorkspace(ws);
+      return exportWorkspace(ws, { includePrivate: true });
     case "restoreVersion":
       return restore(ws, text(0));
     case "moveStorage": {
@@ -364,6 +364,9 @@ export async function productRequest(
       }
     }
     case "financeImportCommit":
+      if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(text(0)))
+        throw new KaituError("无效的财务上传文件", "BAD_ARGS");
+      ws.resolve(text(0), { internal: true });
       return commitFinanceImport(ws, text(0), args[1] as FinanceImportOptions & { account: string });
     case "financeImportDiscard":
       return discardFinanceImport(ws, text(0));

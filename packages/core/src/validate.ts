@@ -92,8 +92,10 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
   }
   // 顶层有 module.json 但读不出来的目录
   for (const f of files) {
-    if (/^[^/]+\/module\.json$/.test(f) && !listModules(ws).some((m) => `${m.dir}/module.json` === f))
-      json(f);
+    if (/^[^/]+\/module\.json$/.test(f) && !listModules(ws).some((m) => `${m.dir}/module.json` === f)) {
+      const value = json(f);
+      if (value !== undefined) check(reg.builtin("module.schema.json"), value, f, issues);
+    }
   }
 
   // 记录：逐行校验，并检查是否放在 ts 本地月份对应的文件
@@ -114,13 +116,24 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
     }
     const tomb = reg.builtin("tombstone.schema.json");
     const { match } = recordFilePattern(ref);
-    for (const l of recordLines(ws, ref)) {
+    let lines: ReturnType<typeof recordLines>;
+    try {
+      lines = recordLines(ws, ref);
+    } catch (error) {
+      issues.push({ file: `${ref.module.dir}/module.json`, message: (error as Error).message });
+      continue;
+    }
+    for (const l of lines) {
       if (!inScope(l.file)) continue;
       let rec: Record<string, unknown>;
       try {
         rec = JSON.parse(l.raw);
       } catch {
         issues.push({ file: l.file, line: l.line, message: "不是合法 JSON" });
+        continue;
+      }
+      if (!rec || typeof rec !== "object" || Array.isArray(rec)) {
+        check(reg.builtin("record-base.schema.json"), rec, l.file, issues, l.line);
         continue;
       }
       if (rec.deleted === true) {

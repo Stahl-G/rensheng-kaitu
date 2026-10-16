@@ -86,6 +86,14 @@ export function createAskService(options: {
   let runtimeMode: AskMode | undefined;
   let starting: Promise<AskRuntime> | undefined;
   let closed = false;
+  let changing = false;
+  let relocating = false;
+  let generation = 0;
+  const clients = new Set<AskRuntime>();
+  const ready = () => {
+    if (closed || changing || relocating)
+      throw new KaituError("AI 正在切换或搬迁，请稍后重试", "AI_CONNECTION");
+  };
   const thread = (id: string) => {
     const value = threads.find((item) => item.id === id);
     if (!value) throw new KaituError("对话不存在", "AI_CONNECTION");
@@ -125,21 +133,41 @@ export function createAskService(options: {
     for (const listener of listeners.get(id) ?? []) listener(event);
   };
   const stopRuntime = async () => {
-    await starting?.catch(() => {});
-    await runtime?.close();
+    generation++;
+    const pending = starting;
     runtime = undefined;
     starting = undefined;
     runtimeMode = undefined;
+    await pending?.catch(() => {});
+    for (const client of clients) {
+      await client.close();
+      clients.delete(client);
+    }
   };
   const start = async (mode: AskMode) => {
     if (closed) throw new KaituError("开图正在退出", "AI_CONNECTION");
-    if (runtimeMode && runtimeMode !== mode) await stopRuntime();
+    if ((runtimeMode && runtimeMode !== mode) || (!runtime && clients.size)) {
+      changing = true;
+      try {
+        await stopRuntime();
+      } finally {
+        changing = false;
+      }
+    }
     runtimeMode = mode;
+    const epoch = generation;
     starting ??= options
       .runtime(mode)
-      .then((value) => {
+      .then(async (value) => {
+        clients.add(value);
+        if (epoch !== generation || closed) {
+          await value.close();
+          clients.delete(value);
+          throw new KaituError("AI 状态已变化", "AI_CONNECTION");
+        }
         runtime = value;
         value.onNotification((method, params) => {
+          if (epoch !== generation) return;
           const id = params.sessionId;
           if (typeof id !== "string" || !threads.some((row) => row.id === id)) return;
           if (method === "session.status") {
@@ -180,6 +208,7 @@ export function createAskService(options: {
         return value;
       })
       .catch((error) => {
+        if (epoch !== generation) throw new KaituError("AI 状态已变化", "AI_CONNECTION");
         starting = undefined;
         if (error instanceof KaituError) throw error;
         throw new KaituError("内置 AI 未能启动，请检查 AI 连接后重试", "AI_CONNECTION");
@@ -197,6 +226,7 @@ export function createAskService(options: {
   return {
     list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
     create() {
+      ready();
       const now = new Date().toISOString();
       const row: AskThread = {
         id: `session-${randomUUID()}`,
@@ -221,6 +251,7 @@ export function createAskService(options: {
       };
     },
     async send(id, text, images = []) {
+      ready();
       const row = thread(id);
       if ((row.workspace ?? options.workspaceKey ?? options.workspace) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");
@@ -245,6 +276,7 @@ export function createAskService(options: {
         throw new KaituError("请选择一张不超过 2MB 的 JPG、PNG、WebP 或 GIF 图片", "AI_IMAGE");
       if (images.length && !(await options.settings()).supportsImages)
         throw new KaituError("当前模型不支持图片，请在 AI 与连接中切换到支持图片的模型", "AI_IMAGE");
+      ready();
       busy.add(id);
       append(id, "session.status", { status: "running" });
       try {
@@ -267,33 +299,54 @@ export function createAskService(options: {
       }
     },
     async setMode(id, mode, confirmed) {
+      ready();
       const row = thread(id);
       if (mode !== "scoped" && mode !== "full") throw new KaituError("无效模式", "AI_CONNECTION");
       if (mode === "full" && confirmed !== true)
         throw new KaituError("开启完整 Agent 需要确认", "AI_CONNECTION");
       if (busy.size) throw new KaituError("请等回复完成后切换模式", "AI_CONNECTION");
-      if (runtimeMode !== mode) await stopRuntime();
-      row.mode = mode;
-      saveIndex();
-      return mode;
+      changing = true;
+      try {
+        row.mode = "scoped";
+        saveIndex();
+        if (runtimeMode !== mode || (clients.size && !runtime)) await stopRuntime();
+        row.mode = mode;
+        saveIndex();
+        return mode;
+      } finally {
+        changing = false;
+      }
     },
     async prepareRelocation() {
+      ready();
       if (busy.size) throw new KaituError("请等回复完成后更换资料位置或恢复版本", "AI_CONNECTION");
-      await stopRuntime();
+      relocating = true;
+      try {
+        await stopRuntime();
+      } catch (error) {
+        relocating = false;
+        throw error;
+      }
     },
     relocate(workspace) {
       options.workspace = workspace;
+      relocating = false;
     },
     settings: options.settings,
     async configure(input) {
+      ready();
       if (busy.size) throw new KaituError("请等回复完成后修改连接", "AI_CONNECTION");
-      await stopRuntime();
-      return options.configure(input);
+      changing = true;
+      try {
+        await stopRuntime();
+        return await options.configure(input);
+      } finally {
+        changing = false;
+      }
     },
     async close() {
       closed = true;
-      await starting?.catch(() => {});
-      await runtime?.close();
+      await stopRuntime();
       listeners.clear();
     },
   };
