@@ -137,3 +137,13 @@
   - 状态（读资料、搜索中、调用工具）作为对话流里的一行进度，放在助手消息位置，可以展开看步骤；
   - 空状态的示例问题按用户实际资料生成（PRD L4 已有这一条），样式更轻；
   - 先改原型 `docs/design/kaitu-v2-prototype.html`，再按原型实现。浅色 / 深色 / 窄屏各截一张图。
+
+## 12. 「关于」里的版本号写错了
+
+- 现在独立 App 显示「人生开图 · 0.2.0-rc.2 · 时区 …」。0.2.0-rc.2 是 DSH 的版本，被当成了开图的版本。
+  `PersonalPages.tsx:579` 本来就有「Powered by DSH x」这一段，但独立 App 里 `data.version` 拿到的是 DSH 版本，`dshVersion` 是空的。
+- 开图自己的版本是 `packages/cli/package.json` 里的 `0.0.0`，还没定过号。
+- 要做：
+  - 显示为「人生开图 <开图版本> · Powered by DeepSeek Harness 0.2.0-rc.2 · 时区 …」；
+  - 两个版本分别从开图的包版本和 DSH 运行时读取，DSH 插件和独立 App 显示一致；
+  - 给开图定首发前的版本号（建议 `0.1.0`），打包脚本里 `CFBundleShortVersionString` 也改用它（现在是 `0.0.0+dsh.0.2.0-rc.2`）。
