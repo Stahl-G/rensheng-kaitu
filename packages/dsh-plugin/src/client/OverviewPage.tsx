@@ -26,7 +26,7 @@ export interface OverviewPageProps
     OnboardingServices,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
-    Omit<DirectionsPageProps, "onPrompt" | "goals">,
+    Omit<DirectionsPageProps, "onPrompt" | "goals" | "onConnect">,
     Omit<MapPageProps, "onPrompt">,
     Omit<HealthPageProps, "onPrompt">,
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
@@ -737,7 +737,7 @@ export function OverviewPage(props: OverviewPageProps) {
             </div>
             <div className={css.child}>
               {explore === "directions" ? (
-                <DirectionsPage {...child} goals={personal?.goals} />
+                <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
               ) : explore === "footprints" ? (
                 <MapPage {...child} />
               ) : (

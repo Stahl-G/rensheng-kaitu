@@ -79,7 +79,10 @@ export const defaultSchedules = [
     title: "开图每日整理",
     time: "03:00:00",
     prompt:
-      "读取并执行开图 ORGANIZER.md。先检查今天是否已有每日整理，有则结束。只整理已发生的交接，不猜测完成情况。",
+      "读取并执行开图 ORGANIZER.md。先检查今天是否已有每日整理，有则结束。只整理已发生的交接，不猜测完成情况。" +
+      "整理后可用 exploration_read 检查最近七天是否已有 AI 方向建议（含已拒绝的），有则不再提。没有时，结合档案、目标、项目、足迹、资讯反馈，" +
+      "只用主题词联网搜索，不能发送个人资料原文。通过 exploration_write 提议一批 3–5 个不同方向，自动保持 suggested，不能采纳。" +
+      "motivation 引用个人资料、外部来源及日期，references 附资料路径与链接，unknowns 写未知，hypothesis 附一周内低成本小实验。避开已有与不感兴趣的方向；搜索不可用则跳过。",
   },
   {
     key: "news",

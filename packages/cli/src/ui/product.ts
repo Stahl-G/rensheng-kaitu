@@ -95,6 +95,7 @@ import {
   unhideExperience,
   writeExploration,
 } from "@kaitu/core";
+import { directionGeneration } from "./directions-ai.js";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
 import { suggestProjectGoal } from "./project-ai.js";
@@ -164,6 +165,7 @@ export async function productRequest(
     if (!Number.isInteger(args[i])) throw new KaituError("缺少记录版本", "BAD_ARGS");
     return args[i] as number;
   };
+  if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
     switch (method) {

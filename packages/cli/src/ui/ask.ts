@@ -34,6 +34,7 @@ export interface AskImage {
   mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
 }
 export interface AskService {
+  background(): AskService;
   list(): AskThread[];
   create(): AskThread;
   events(id: string): AskEvent[];
@@ -63,6 +64,7 @@ const visible = new Set<AskEventType>([
 ]);
 
 export function createAskService(options: {
+  transient?: boolean;
   state: string;
   workspace: string;
   workspaceKey?: string;
@@ -80,7 +82,10 @@ export function createAskService(options: {
   );
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const index = join(directory, "index.json");
-  const threads: AskThread[] = existsSync(index) ? JSON.parse(readFileSync(index, "utf8")) : [];
+  const threads: AskThread[] =
+    !options.transient && existsSync(index) ? JSON.parse(readFileSync(index, "utf8")) : [];
+  const temporaryEvents = new Map<string, AskEvent[]>();
+  const backgrounds = new Set<AskService>();
   const listeners = new Map<string, Set<(event: AskEvent) => void>>();
   const busy = new Set<string>();
   let runtime: AskRuntime | undefined;
@@ -101,11 +106,13 @@ export function createAskService(options: {
     return value;
   };
   const saveIndex = () => {
+    if (options.transient) return;
     writeFileSync(`${index}.tmp`, JSON.stringify(threads), { mode: 0o600 });
     renameSync(`${index}.tmp`, index);
   };
   const events = (id: string): AskEvent[] => {
     thread(id);
+    if (options.transient) return temporaryEvents.get(id) ?? [];
     const file = join(directory, `${id}.jsonl`);
     return existsSync(file)
       ? readFileSync(file, "utf8")
@@ -119,7 +126,8 @@ export function createAskService(options: {
     const row = thread(id);
     const previous = events(id);
     const event = { id: (previous.at(-1)?.id ?? 0) + 1, type, data };
-    appendFileSync(join(directory, `${id}.jsonl`), `${JSON.stringify(event)}\n`, { mode: 0o600 });
+    if (options.transient) temporaryEvents.set(id, [...previous, event]);
+    else appendFileSync(join(directory, `${id}.jsonl`), `${JSON.stringify(event)}\n`, { mode: 0o600 });
     row.updated = new Date().toISOString();
     if (type === "user/message" && row.title === "新对话") {
       const content = data.content as { type: string; text?: string }[] | undefined;
@@ -225,6 +233,20 @@ export function createAskService(options: {
       append(row.id, "session.status", { status: "idle", error: "上次对话已中断，可以继续发送" });
   }
   return {
+    background() {
+      ready();
+      const service = createAskService({ ...options, transient: true });
+      backgrounds.add(service);
+      const close = service.close.bind(service);
+      service.close = async () => {
+        try {
+          await close();
+        } finally {
+          backgrounds.delete(service);
+        }
+      };
+      return service;
+    },
     list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
     create() {
       ready();
@@ -320,7 +342,8 @@ export function createAskService(options: {
     },
     async prepareRelocation() {
       ready();
-      if (busy.size) throw new KaituError("请等回复完成后更换资料位置或恢复版本", "AI_CONNECTION");
+      if (busy.size || backgrounds.size)
+        throw new KaituError("请等回复完成后更换资料位置或恢复版本", "AI_CONNECTION");
       relocating = true;
       try {
         await stopRuntime();
@@ -336,7 +359,7 @@ export function createAskService(options: {
     settings: options.settings,
     async configure(input) {
       ready();
-      if (busy.size) throw new KaituError("请等回复完成后修改连接", "AI_CONNECTION");
+      if (busy.size || backgrounds.size) throw new KaituError("请等回复完成后修改连接", "AI_CONNECTION");
       changing = true;
       try {
         await stopRuntime();
@@ -347,6 +370,7 @@ export function createAskService(options: {
     },
     async close() {
       closed = true;
+      if (backgrounds.size) await Promise.all([...backgrounds].map((service) => service.close()));
       await stopRuntime();
       listeners.clear();
     },

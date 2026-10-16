@@ -16,6 +16,12 @@ import v2 from "./Prototype.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
 
 export interface DirectionsPageProps {
+  generateDirections?: (start: boolean) => Promise<{
+    status: "idle" | "running" | "done" | "error";
+    stage: string;
+    error?: string;
+  }>;
+  onConnect?: () => void;
   loadExploration: () => Promise<ExplorationData>;
   writeExploration: (command: ExplorationCommand) => Promise<{ id: string; version: string | null }>;
   loadExplorationSource: (
@@ -86,6 +92,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [generation, setGeneration] = useState<{ status: string; stage: string; error?: string }>();
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const seq = ++sequence.current;
@@ -106,6 +113,43 @@ export function DirectionsPage(props: DirectionsPageProps) {
     };
   }, [refresh]);
   useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(() => {
+    if (!props.generateDirections) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const result = await props.generateDirections?.(false);
+        if (!active || !result) return;
+        setGeneration(result);
+        if (result.status === "done") await refresh();
+        if (result.status === "running") timer = setTimeout(poll, 1000);
+      } catch (error) {
+        if (active) setError(error instanceof Error ? error.message : String(error));
+      }
+    };
+    if (generation?.status === "running") timer = setTimeout(poll, 1000);
+    else void poll();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [props.generateDirections, generation?.status, refresh]);
+  const generate = async () => {
+    setError(null);
+    setGeneration({ status: "running", stage: "读资料" });
+    try {
+      if (!props.generateDirections) {
+        setGeneration(undefined);
+        props.onConnect?.();
+        return;
+      }
+      setGeneration(await props.generateDirections(true));
+    } catch (error) {
+      setGeneration(undefined);
+      setError(error instanceof Error ? error.message : String(error));
+    }
+  };
   const direction = data?.directions.find((d) => d.id === selected);
   const experiments = data?.experiments.filter((e) => e.direction_id === selected) ?? [];
   const notes = data?.notes.filter((n) => n.direction_id === selected) ?? [];
@@ -218,6 +262,17 @@ export function DirectionsPage(props: DirectionsPageProps) {
         <p role="alert" className={base.notice}>
           {error}
         </p>
+      )}
+      {generation && generation.status !== "idle" && (
+        <output aria-live="polite">
+          {generation.error ?? generation.stage}
+          {generation.status === "running" ? "…" : ""}
+        </output>
+      )}
+      {(error || generation?.error) && props.onConnect && (
+        <button type="button" className={base.link} onClick={props.onConnect}>
+          AI 与连接
+        </button>
       )}
       {receipt && <output className={base.muted}>{receipt}</output>}
       {form === "direction" ? (
@@ -360,7 +415,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         className={base.link}
                         onClick={() => void update({ status: "dismissed" })}
                       >
-                        忽略建议
+                        不感兴趣
                       </button>
                     </>
                   ) : (
@@ -481,6 +536,14 @@ export function DirectionsPage(props: DirectionsPageProps) {
         <>
           <header className={css.listHeader}>
             <h2 className={v2.eyebrow}>你在探索的方向</h2>
+            <button
+              type="button"
+              className={v2.btn}
+              disabled={generation?.status === "running"}
+              onClick={() => void generate()}
+            >
+              让 AI 提几个方向
+            </button>
             <button type="button" className={v2.link} onClick={() => openForm("direction")}>
               写下一个新方向
             </button>
@@ -537,7 +600,20 @@ export function DirectionsPage(props: DirectionsPageProps) {
                     </button>
                   </h3>
                   {d.status === "suggested" ? (
-                    <p>{d.motivation || "这条建议还没有写明依据"}</p>
+                    <div className={css.prose}>
+                      <p>{d.motivation || "这条建议还没有写明依据"}</p>
+                      <p>{d.hypothesis}</p>
+                      {d.unknowns && <p>还不清楚：{d.unknowns}</p>}
+                      {d.references
+                        ?.filter((ref) => ref.kind === "source" && /^https?:\/\//.test(ref.ref))
+                        .map((ref) => (
+                          <p key={ref.ref}>
+                            <a href={ref.ref} target="_blank" rel="noreferrer">
+                              {ref.ref}
+                            </a>
+                          </p>
+                        ))}
+                    </div>
                   ) : (
                     <dl>
                       <dt>当前猜想</dt>
@@ -588,7 +664,15 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           disabled={busy}
                           onClick={() => void change("dismissed")}
                         >
-                          先不用
+                          不感兴趣
+                        </button>
+                        <button
+                          type="button"
+                          className={v2.link}
+                          disabled={generation?.status === "running"}
+                          onClick={() => void generate()}
+                        >
+                          换一批
                         </button>
                       </>
                     ) : (

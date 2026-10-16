@@ -91,6 +91,7 @@ const props: OverviewPageProps = {
   syncProject: (slug) => call("projectSync", slug),
   loadDoing: () => call("doing"),
   loadExperienceSource: (id) => call("experienceSource", id),
+  generateDirections: (start) => call("directionGeneration", start),
   loadExploration: () => call("exploration"),
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
