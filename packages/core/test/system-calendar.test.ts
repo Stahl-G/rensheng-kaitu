@@ -64,6 +64,11 @@ describe("confirmed system calendar", () => {
         "",
       ),
     );
+    const goal = { id: "goal-materials", title: "完成作品集", status: "active" };
+    ws.writeJson("me/goals.json", [goal]);
+    const linked = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+    linked.data.blocks[0].ref = goal.id;
+    ws.writeText("NOW.md", stringifyFrontmatter(linked.data, linked.body));
     const calendar = fakeCalendar();
     const store = calendarPushStore(ws);
     const sync = () => new CalendarPush(store, calendar.executor).sync(calendarPushEntries(ws));
@@ -73,6 +78,8 @@ describe("confirmed system calendar", () => {
     await sync();
     const uid = [...calendar.events.keys()][0];
     expect(calendar.events.size).toBe(1);
+    expect(calendar.events.get(uid)?.notes).toContain(goal.title);
+    expect(calendar.events.get(uid)?.notes).not.toContain(linked.data.blocks[0].title);
     expect(calendar.events.get(uid)?.start).toBe("2026-10-16T02:00:00.000Z");
     await decideProposal(ws, "slot", "confirmed");
     await sync();
@@ -96,7 +103,7 @@ describe("confirmed system calendar", () => {
     await sync();
     calendar.events.clear();
     await sync();
-    expect(store.read().entries.later.receipt.status).toBe("deleted");
+    expect(store.read().entries["2026-10-16/later"].receipt.status).toBe("deleted");
     await sync();
     expect(calendar.created()).toBe(2);
     expect(calendar.events.size).toBe(0);
@@ -106,6 +113,44 @@ describe("confirmed system calendar", () => {
     expect(calendar.events.size).toBe(1);
     await cancelTask(ws, task.record.id);
     await sync();
+    expect(calendar.events.size).toBe(0);
+    await decideProposal(ws, "slot", "confirmed");
+    await sync();
+    const yesterdayUid = [...calendar.events.keys()][0];
+    const yesterday = structuredClone(calendar.events.get(yesterdayUid));
+    ws.writeText("NOW.md", stringifyFrontmatter({ date: "2026-10-17", blocks: [] }, ""));
+    await sync();
+    expect(calendar.events.get(yesterdayUid)).toEqual(yesterday);
+    ws.writeText(
+      "NOW.md",
+      stringifyFrontmatter(
+        {
+          date: "2026-10-17",
+          blocks: [
+            {
+              id: "slot",
+              title: "新一天的安排",
+              kind: "proposal",
+              status: "confirmed",
+              start: "10:00",
+              end: "11:00",
+            },
+          ],
+        },
+        "",
+      ),
+    );
+    await sync();
+    expect(calendar.events.size).toBe(2);
+    expect(calendar.events.get(yesterdayUid)).toEqual(yesterday);
+    const todayUid = store.read().entries["2026-10-17/slot"].uid;
+    expect(todayUid).not.toBe(yesterdayUid);
+    expect(writer.settings().entries.slot.status).toBe("added");
+    await decideProposal(ws, "slot", "rejected");
+    await sync();
+    expect(calendar.events.has(todayUid ?? "")).toBe(false);
+    expect(calendar.events.get(yesterdayUid)).toEqual(yesterday);
+    await writer.removeAll();
     expect(calendar.events.size).toBe(0);
   });
 
@@ -144,8 +189,9 @@ describe("confirmed system calendar", () => {
     const parse = (ics = "") =>
       new ICAL.Event(new ICAL.Component(ICAL.parse(ics)).getFirstSubcomponent("vevent") ?? undefined);
     const event = parse(first.ics);
-    expect(event.uid).toBe("kaitu-block-ics-slot");
+    expect(event.uid).toBe("kaitu-block-2026-10-16/ics-slot");
     expect(event.summary).toBe('测试 "引号"\n换行');
+    expect(event.description).not.toContain(event.summary);
     expect(event.startDate.toJSDate().toISOString()).toBe("2026-10-16T02:00:00.000Z");
     const next = calendarPushEntries(ws);
     next[0].end = "2026-10-16T04:00:00.000Z";
@@ -157,5 +203,18 @@ describe("confirmed system calendar", () => {
     const cancelled = (await writer.sync(calendarPushEntries(ws))).entries["ics-slot"];
     expect(parse(cancelled.ics).uid).toBe(event.uid);
     expect(parse(cancelled.ics).component.getFirstPropertyValue("status")).toBe("CANCELLED");
+    await decideProposal(ws, "ics-slot", "confirmed");
+    await writer.sync(calendarPushEntries(ws));
+    const yesterday = calendarPushStore(ws).read().entries["2026-10-16/ics-slot"];
+    const plan = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+    plan.data.date = "2026-10-17";
+    plan.data.blocks[0].status = "confirmed";
+    ws.writeText("NOW.md", stringifyFrontmatter(plan.data, plan.body));
+    const today = (await writer.sync(calendarPushEntries(ws))).entries["ics-slot"];
+    expect(parse(today.ics).uid).not.toBe(event.uid);
+    expect(parse(today.ics).startDate.toJSDate().toISOString()).toBe("2026-10-17T02:00:00.000Z");
+    expect(calendarPushStore(ws).read().entries["2026-10-16/ics-slot"]).toEqual(yesterday);
+    const retry = (await writer.sync(calendarPushEntries(ws), "ics-slot")).entries["ics-slot"];
+    expect(parse(retry.ics).uid).toBe(parse(today.ics).uid);
   });
 });

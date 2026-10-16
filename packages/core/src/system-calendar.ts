@@ -7,7 +7,7 @@ import { localStateRoot } from "./local-state.js";
 import { stateBinding } from "./state-binding.js";
 import { listTasks } from "./tasks.js";
 import { localTimeToInstant } from "./time.js";
-import { type ModuleStatus, type TodayPlan, statusFiles } from "./workbench.js";
+import { type Goal, type ModuleStatus, type TodayPlan, statusFiles } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export interface CalendarPushEntry {
@@ -42,6 +42,7 @@ export interface CalendarPushState {
   entries: Record<string, Mapping>;
 }
 export interface CalendarPushStore {
+  date(): string | null;
   read(): CalendarPushState;
   write(state: CalendarPushState): void;
 }
@@ -52,6 +53,7 @@ export interface CalendarExecutor {
 export function calendarPushStore(ws: Workspace): CalendarPushStore {
   const file = () => join(localStateRoot(), "system-calendar", `${stateBinding(ws.root).id}.json`);
   return {
+    date: () => (ws.exists("NOW.md") ? parseFrontmatter<TodayPlan>(ws.readText("NOW.md")).data.date : null),
     read: () =>
       existsSync(file()) ? JSON.parse(readFileSync(file(), "utf8")) : { enabled: true, entries: {} },
     write: (state) => {
@@ -68,20 +70,25 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
   if (!data.date) return [];
   const previous = calendarPushStore(ws).read().entries;
-  const taskIds = new Set(
-    listTasks(ws, { status: "all", includePrivate: true })
-      .filter((task) => task.status !== "cancelled")
-      .map((task) => task.id),
-  );
+  const tasks = listTasks(ws, { status: "all", includePrivate: true });
+  const related = new Map(tasks.map((task) => [task.id, task.title]));
+  const taskIds = new Set(tasks.filter((task) => task.status !== "cancelled").map((task) => task.id));
   for (const { file } of statusFiles(ws)) {
-    for (const item of parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next ?? [])
+    for (const item of parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next ?? []) {
+      related.set(item.id, item.title);
       if (item.status !== "skipped") taskIds.add(item.id);
+    }
+  }
+  if (ws.exists("me/goals.json")) {
+    for (const goal of ws.readJson<Goal[]>("me/goals.json")) related.set(goal.id, goal.title);
   }
   return data.blocks.flatMap((block) => {
+    const id = `${data.date}/${block.id}`;
+    const linkedTitle = block.ref ? related.get(block.ref) : undefined;
     if (block.kind === "task" && block.id.startsWith("next-") && block.ref && !taskIds.has(block.ref))
       return [];
     if (
-      !(block.status === "confirmed" || (block.status === "done" && previous[block.id])) ||
+      !(block.status === "confirmed" || (block.status === "done" && previous[id])) ||
       !["proposal", "task"].includes(block.kind) ||
       !block.start ||
       !block.end
@@ -96,11 +103,11 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
     if (Date.parse(end) <= Date.parse(start)) return [];
     return [
       {
-        id: block.id,
+        id,
         title: block.title,
         start,
         end,
-        notes: `关联目标：${block.title}｜做完后回开图记一句结果\n开图记录：${block.id}${block.ref ? `（${block.ref}）` : ""}`,
+        notes: `${linkedTitle ? `关联目标：${linkedTitle}｜` : ""}做完后回开图记一句结果\n开图记录：${id}${block.ref ? `（${block.ref}）` : ""}`,
       },
     ];
   });
@@ -136,9 +143,16 @@ export class CalendarPush {
   ) {}
   settings(): CalendarPushSettings {
     const state = this.store.read();
+    const prefix = `${this.store.date()}/`;
+    const rows = Object.entries(state.entries);
     return {
       enabled: state.enabled,
-      entries: Object.fromEntries(Object.entries(state.entries).map(([id, row]) => [id, row.receipt])),
+      entries: Object.fromEntries([
+        ...rows.filter(([id]) => !id.startsWith(prefix)).map(([id, row]) => [id, row.receipt]),
+        ...rows
+          .filter(([id]) => id.startsWith(prefix))
+          .map(([id, row]) => [id.slice(prefix.length), row.receipt]),
+      ]),
     };
   }
   configure(enabled: boolean) {
@@ -150,9 +164,12 @@ export class CalendarPush {
   async sync(entries: CalendarPushEntry[], retryId?: string, removeAll = false) {
     const state = this.store.read();
     if (!state.enabled && !removeAll) return this.settings();
-    const desired = new Map(entries.map((entry) => [entry.id, entry]));
+    const date = this.store.date();
+    const prefix = `${date}/`;
+    const current = date ? entries.filter((entry) => entry.id.startsWith(prefix)) : [];
+    const desired = new Map(current.map((entry) => [entry.id, entry]));
     for (const [id, row] of Object.entries(state.entries)) {
-      if (!removeAll && desired.has(id)) continue;
+      if (!removeAll && (!date || !id.startsWith(prefix) || desired.has(id))) continue;
       if (["removed", "deleted"].includes(row.receipt.status)) continue;
       try {
         if (row.uid) {
@@ -180,7 +197,7 @@ export class CalendarPush {
       this.store.write(state);
     }
     if (removeAll) return this.settings();
-    for (const entry of entries) {
+    for (const entry of current) {
       let old = state.entries[entry.id];
       if (old?.receipt.status === "deleted" || old?.suppressed) continue;
       if (old?.receipt.status === "removed") {
@@ -188,8 +205,13 @@ export class CalendarPush {
         old = { ...old, receipt: { status: "error" }, entry: { ...old.entry, start: "" } };
       }
       const changed = !old || JSON.stringify(old.entry) !== JSON.stringify(entry);
-      if (!changed && old?.receipt.status === "file" && retryId !== entry.id) continue;
-      if (!changed && old?.receipt.status === "error" && retryId !== entry.id) continue;
+      if (
+        !changed &&
+        ["file", "error"].includes(old?.receipt.status ?? "") &&
+        retryId !== entry.id &&
+        retryId !== entry.id.slice(prefix.length)
+      )
+        continue;
       const row: Mapping = old ?? { entry, sequence: -1, receipt: { status: "error" } };
       if (changed) row.sequence++;
       row.entry = entry;
