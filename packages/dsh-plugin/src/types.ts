@@ -133,8 +133,11 @@ export interface OverviewData {
   blocks: OverviewBlock[];
   next: OverviewNext[];
   allNext: OverviewNext[];
+  plans: PlansData;
   sync: {
     received: number;
+    /** 开了每日整理才说「等待整理」，否则原文只是已保存。 */
+    organizer: boolean;
     needsReview: number;
     mapNeedsReview: number;
     mapPendingImports: number;
@@ -217,7 +220,7 @@ export type { CalendarData, CalendarEntry, AutomationSettings, AutomationKey } f
 export type { LibraryData, InboxEntry } from "@kaitu/core";
 
 export type { NewsFeedback } from "@kaitu/core";
-import type { NewsFeedback } from "@kaitu/core";
+import type { NewsFeedback, PlansData } from "@kaitu/core";
 
 export type { SettingsData } from "@kaitu/core";
 

@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { readAutomation } from "./automation.js";
 import { driveStatus } from "./drive.js";
 import { committedExperiences, pendingExperienceImports } from "./experience-imports.js";
 import { type TimedExperience, experienceLayer } from "./experience-time.js";
@@ -6,6 +7,7 @@ import { history } from "./history.js";
 import { inboxNotes, noteMetadata } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { latestDaily } from "./overview.js";
+import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, summarizeStatus, workoutSessions } from "./status.js";
 import { localDate, localMonth, parseTs } from "./time.js";
@@ -45,6 +47,15 @@ function versionSource(message: string): "user" | "agent" | "cloud" | "unknown" 
   if (/DeepSeek 对话|Agent|agent/i.test(message)) return "agent";
   if (/^你|^手动/.test(message)) return "user";
   return "unknown";
+}
+
+function organizerOn(ws: Workspace): boolean {
+  try {
+    const automation = readAutomation(ws);
+    return automation.asked && automation.tasks.organizer;
+  } catch {
+    return false;
+  }
 }
 
 /** 总览只做查询与投影，文件和记录均通过现有 core 接口读取。 */
@@ -228,8 +239,11 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     next: allNext.slice(0, 3),
     allNext,
     versions,
+    plans: readPlans(data),
     sync: {
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
+      // 只有开了每日整理才说「等待整理」；没开时原文就是已保存，不暗示后台在处理。
+      organizer: organizerOn(ws),
       needsReview:
         mapNeedsReview +
         mapPendingImports +
@@ -238,7 +252,8 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       directionSuggestions,
       mapPendingImports,
       mapNeedsReview,
-      updatedAt: versions.find((v) => !/等待整理|待整理笔记/.test(v.message))?.time ?? null,
+      updatedAt:
+        versions.find((v) => !/保存了一条原文记录|等待整理|待整理笔记/.test(v.message))?.time ?? null,
     },
     daily: daily ? { ...daily, unresolved: dailyItems.length } : null,
     projects: status.projects

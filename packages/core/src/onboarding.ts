@@ -17,20 +17,74 @@ import type { CalendarSubscription } from "./calendar.js";
 import { type ImportResult, listChatFiles, readChat } from "./chats.js";
 import { localStateRoot } from "./drive.js";
 import { KaituError } from "./errors.js";
+import { writeExploration } from "./exploration.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "./github.js";
 import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
-import { captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
+import { archiveInboxNote, captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
+import {
+  type Locale,
+  type Preferences,
+  normalizeLocale,
+  pick,
+  readPreferences,
+  savePreferences,
+} from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
+import { ONBOARDING_EN } from "./onboarding-en.js";
+import { type GoalOrigin, noteLine, upsertGoal } from "./plans.js";
 import { type ProjectInput, createProject, listProjects } from "./projects.js";
-import { updateRecord } from "./records.js";
+import { readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { type Task, addTask, listTasks } from "./tasks.js";
-import { isoInZone } from "./time.js";
+import { isoInZone, localDate } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
-import { type ModuleStatus, readWorkbench } from "./workbench.js";
+import { type Goal, type ModuleStatus, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
+
+/** 搬来记忆时的类别：中英文标签都认；目标、项目、在考虑的事默认进对应模块，其余进记忆。 */
+export type OnboardingTarget = "memory" | "goal" | "project" | "direction";
+const CATEGORY_GROUPS = [
+  {
+    type: "preference",
+    zh: "偏好和规则",
+    en: "Preferences and rules",
+    tags: ["偏好", "指令", "preference", "preferences", "instruction", "instructions"],
+  },
+  { type: "person", zh: "重要的人", en: "People", tags: ["人物", "person", "people"] },
+  { type: "fact", zh: "事实", en: "Facts", tags: ["事实", "fact", "facts"] },
+  { type: "decision", zh: "决定", en: "Decisions", tags: ["决定", "决策", "decision", "decisions"] },
+  { type: "context", zh: "背景", en: "Background", tags: ["背景", "context", "background"] },
+  { type: "context", zh: "工作", en: "Work", tags: ["工作", "work", "job", "career"] },
+  {
+    type: "context",
+    zh: "在做的事",
+    en: "Projects",
+    tags: ["项目", "project", "projects"],
+    target: "project",
+  },
+  { type: "context", zh: "目标", en: "Goals", tags: ["目标", "goal", "goals"], target: "goal" },
+  {
+    type: "context",
+    zh: "在考虑的事",
+    en: "Still deciding",
+    tags: ["在考虑", "考虑", "待决定", "considering", "deciding"],
+    target: "direction",
+  },
+  { type: "context", zh: "健康", en: "Health", tags: ["健康", "作息", "health", "routine", "sleep"] },
+  { type: "preference", zh: "兴趣", en: "Interests", tags: ["兴趣", "interest", "interests"] },
+  { type: "fact", zh: "地点", en: "Places", tags: ["地点", "place", "places", "location"] },
+] as const;
+function categoryMap(locale: Locale): Record<string, readonly [string, string]> {
+  return Object.fromEntries(
+    CATEGORY_GROUPS.flatMap((group) =>
+      group.tags
+        .filter((tag) => (locale === "en") === /^[a-z]/.test(tag))
+        .map((tag) => [tag, [group.type, pick(locale, group.zh, group.en)] as const]),
+    ),
+  );
+}
 
 export const ONBOARDING = {
   welcome: {
@@ -73,29 +127,10 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
 1. 你保存的记忆条目
 2. 我设置的自定义指令或个性化偏好
 3. 你从我们的对话里了解到的我的情况：工作、目标、健康、作息、兴趣、正在做的项目、重要的人
-按下面的格式输出，每条一行：
+4. 我还没决定、正在考虑的事（比如要不要换工作、换城市）
+按下面的格式输出，每条一行，类别从「工作、目标、项目、在考虑、健康、偏好、人物、事实、兴趣、地点」里选：
 [类别] 内容 （如果知道记下的时间，写在最后）`,
-  categories: {
-    偏好: ["preference", "偏好和规则"],
-    指令: ["preference", "偏好和规则"],
-    preference: ["preference", "偏好和规则"],
-    人物: ["person", "重要的人"],
-    person: ["person", "重要的人"],
-    事实: ["fact", "事实"],
-    fact: ["fact", "事实"],
-    决定: ["decision", "决定"],
-    决策: ["decision", "决定"],
-    decision: ["decision", "决定"],
-    背景: ["context", "背景"],
-    context: ["context", "背景"],
-    工作: ["context", "工作"],
-    项目: ["context", "在做的事"],
-    目标: ["context", "目标"],
-    健康: ["context", "健康"],
-    作息: ["context", "健康"],
-    兴趣: ["preference", "兴趣"],
-    地点: ["fact", "地点"],
-  },
+  categories: categoryMap("zh-CN"),
   starts: [
     {
       id: "me",
@@ -214,7 +249,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     {
       id: "mine",
       title: "在原来的 AI 里继续",
-      description: "进入「AI 与连接」，设置你已有的 AI",
+      description: "复制一份简短的资料包给你常用的 AI，再把它的回答贴回来，不用 API Key",
       target: "connections",
     },
     { id: "none", title: "先不用 AI", description: "随手记和导入都能用，等你连上再整理", target: "today" },
@@ -284,7 +319,11 @@ export interface OnboardingContent {
     action: string;
   };
 }
+export function onboardingContent(locale: Locale = "zh-CN"): OnboardingContent {
+  return locale === "en" ? { ...ONBOARDING_EN, categories: categoryMap("en") } : ONBOARDING;
+}
 export interface OnboardingStatus {
+  locale: Locale;
   content: OnboardingContent;
   choices: LocalOnboardingChoices | null;
   showGuide: boolean;
@@ -316,6 +355,9 @@ export interface OnboardingMemoryResult {
   version: string | null;
   before: string | null;
   skipped: number;
+  goals: number;
+  projects: number;
+  directions: number;
 }
 export interface OnboardingImportPreview {
   token: string;
@@ -331,6 +373,8 @@ export interface OnboardingChoiceResult {
 }
 export interface OnboardingOptions {
   stateRoot?: string;
+  /** 界面语言：决定返回的引导文字与搬入时写下的来源说明。 */
+  locale?: Locale;
 }
 
 function localDirectory(ws: Workspace, options: OnboardingOptions): string {
@@ -362,48 +406,52 @@ export interface MemoryCandidate extends MemoryInput {
   when: string | null;
   raw: boolean;
   original: string;
+  /** 确认时默认写到哪里：目标、项目、在考虑的方向，或记忆。 */
+  target: OnboardingTarget;
 }
 const withoutPrefix = (line: string) => line.replace(/^(?:[-*+]\s+|\d+[.)、]\s*)/, "").trim();
+const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
 
 export function parseMemoryPaste(
   text: string,
   existing: readonly Pick<MemoryInput, "text">[] = [],
+  locale: Locale = "zh-CN",
 ): MemoryCandidate[] {
   if (typeof text !== "string") throw new KaituError("请粘贴记忆文本", "BAD_ARGS");
   const seen = new Set(existing.map((entry) => withoutPrefix(entry.text.trim())));
   return text.split(/\r?\n/).flatMap((line, index) => {
     const original = line.trim();
     if (!original) return [];
-    const match = /^\[([^\]]+)\]\s*(.+)$/.exec(withoutPrefix(original));
-    const category = match?.[1]?.trim();
-    let mapping =
-      category && Object.hasOwn(ONBOARDING.categories, category)
-        ? ONBOARDING.categories[category as keyof typeof ONBOARDING.categories]
-        : undefined;
-    let body = mapping ? (match?.[2]?.trim() ?? original) : original;
-    let time = mapping ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
+    const match = /^[[【]([^\]】]+)[\]】]\s*[:：]?\s*(.+)$/.exec(withoutPrefix(original));
+    const category = match?.[1]?.trim().toLowerCase();
+    let group = category
+      ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
+      : undefined;
+    let body = group ? (match?.[2]?.trim() ?? original) : original;
+    let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
     let content = time ? body.slice(0, time.index).trim() : body;
     if (!content) {
-      mapping = undefined;
+      group = undefined;
       body = original;
       content = original;
       time = null;
     }
-    const raw = !mapping;
+    const raw = !group;
     const key = withoutPrefix(body);
     if (seen.has(key)) return [];
     seen.add(key);
     return [
       {
         id: `line-${index + 1}`,
-        type: (mapping?.[0] ?? "context") as MemoryType,
+        type: (group?.type ?? "context") as MemoryType,
         name: content.slice(0, 60),
         text: body,
         content,
         when: time?.[1] ?? null,
-        category: mapping?.[1] ?? "其他",
+        category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
         raw,
         original,
+        target: group && "target" in group ? group.target : "memory",
       },
     ];
   });
@@ -412,6 +460,7 @@ export function parseMemoryPaste(
 interface MemoryPreview {
   kind: "memory";
   ai: OnboardingAi;
+  locale?: Locale;
   candidates: MemoryCandidate[];
   expires: number;
 }
@@ -598,10 +647,11 @@ export function previewOnboardingMemory(
   options: OnboardingOptions = {},
 ): OnboardingMemoryPreview {
   aiInfo(ai);
-  const candidates = parseMemoryPaste(text, listMemories(ws));
+  const locale = normalizeLocale(options.locale);
+  const candidates = parseMemoryPaste(text, listMemories(ws), locale);
   const token = savePreview(
     ws,
-    { kind: "memory", ai, candidates, expires: Date.now() + 30 * 60000 },
+    { kind: "memory", ai, locale, candidates, expires: Date.now() + 30 * 60000 },
     options,
   );
   return { token, candidates };
@@ -610,26 +660,92 @@ export async function confirmOnboardingMemory(
   ws: Workspace,
   token: string,
   selected: string[],
-  options: OnboardingOptions = {},
+  options: OnboardingOptions & { targets?: Record<string, OnboardingTarget> } = {},
 ): Promise<OnboardingMemoryResult> {
   const preview = readPreview(ws, token, options);
+  const targets = options.targets ?? {};
   if (
     preview.kind !== "memory" ||
     !Array.isArray(selected) ||
-    selected.some((id) => !preview.candidates.some((item) => item.id === id))
+    selected.some((id) => !preview.candidates.some((item) => item.id === id)) ||
+    typeof targets !== "object" ||
+    Object.entries(targets).some(
+      ([id, target]) => !selected.includes(id) || !onboardingTargets.includes(target),
+    )
   )
     throw new KaituError("确认范围不在预览内", "BAD_ARGS");
+  const locale = normalizeLocale(preview.locale);
+  const name = aiInfo(preview.ai).name;
+  const chosen = preview.candidates.filter((entry) => selected.includes(entry.id));
+  const route = (entry: MemoryCandidate) => targets[entry.id] ?? entry.target ?? "memory";
   const existing = new Set(listMemories(ws).map((entry) => withoutPrefix(entry.text.trim())));
-  const inputs = preview.candidates
-    .filter((entry) => selected.includes(entry.id) && !existing.has(withoutPrefix(entry.text)))
-    .map(({ type, name, text }) => ({ type, name, text, source: `从 ${aiInfo(preview.ai).name} 搬来` }));
+  const inputs = chosen
+    .filter((entry) => route(entry) === "memory" && !existing.has(withoutPrefix(entry.text)))
+    .map(({ type, name: title, text }) => ({
+      type,
+      name: title,
+      text,
+      source: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
+    }));
+  const date = localDate(new Date(), ws.timeZone());
+  const goalsBefore = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json").length : 0;
   const before = (await history(ws, { limit: 1 }))[0]?.oid ?? null;
-  const result = await importMemories(ws, inputs, {
-    by: `import:${preview.ai}`,
-    actor: `从 ${aiInfo(preview.ai).name} 搬来：`,
-  });
+  let result: { entries: Memory[]; version: string | null } = { entries: [], version: null };
+  let projects = 0;
+  let directions = 0;
+  await batchSnapshot(
+    ws,
+    () => pick(locale, `从 ${name} 搬来资料`, `Imported from ${name}`),
+    async () => {
+      result = await importMemories(ws, inputs, { by: `import:${preview.ai}`, actor: `从 ${name} 搬来：` });
+      for (const entry of chosen.filter((item) => route(item) === "goal"))
+        upsertGoal(ws, entry.content, preview.ai as GoalOrigin, date);
+      const projectTitles = new Set(listProjects(ws).map((project) => project.title));
+      for (const entry of chosen.filter((item) => route(item) === "project")) {
+        const title = entry.content.slice(0, 80);
+        if (projectTitles.has(title)) continue;
+        projectTitles.add(title);
+        const { slug } = await createProject(ws, { title, kind: "personal" });
+        const notes = `projects/${slug}/notes.md`;
+        ws.writeText(
+          notes,
+          `${ws.readText(notes).trimEnd()}\n\n${pick(locale, `来源：从 ${name} 搬来（${date}）`, `Source: imported from ${name} (${date})`)}\n\n${entry.content}\n`,
+        );
+        projects++;
+      }
+      const titles = new Set(readRecords(ws, "direction").map((row) => String(row.title).trim()));
+      for (const entry of chosen.filter((item) => route(item) === "direction")) {
+        if (titles.has(entry.content)) continue;
+        titles.add(entry.content);
+        await writeExploration(
+          ws,
+          {
+            operation: "create_direction",
+            data: {
+              title: entry.content,
+              motivation: pick(locale, `从 ${name} 搬来的记忆`, `Imported from ${name}`),
+              hypothesis: "",
+            },
+          },
+          // 用户已在搬入预览里确认这是自己在考虑的事，来源写在动机里。
+          "user",
+        );
+        directions++;
+      }
+    },
+  );
+  const goals = (ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json").length : 0) - goalsBefore;
+  const latest = (await history(ws, { limit: 1 }))[0]?.oid ?? null;
   cancelOnboardingPreview(ws, token, options);
-  return { ...result, before, skipped: new Set(selected).size - inputs.length };
+  return {
+    ...result,
+    version: latest !== before ? latest : null,
+    before,
+    skipped: chosen.filter((item) => route(item) === "memory").length - inputs.length,
+    goals,
+    projects,
+    directions,
+  };
 }
 export function cancelOnboardingPreview(ws: Workspace, token: string, options: OnboardingOptions = {}) {
   const file = previewFile(token);
@@ -724,6 +840,8 @@ function hasCollectedMessages(ws: Workspace, dir = "inbox"): boolean {
   });
 }
 export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {}): OnboardingStatus {
+  const locale = normalizeLocale(options.locale);
+  const content = onboardingContent(locale);
   const choices = localRead<LocalOnboardingChoices | null>(ws, "choices.json", null, options);
   const data = readWorkbench(ws);
   const count = (module: string) =>
@@ -749,12 +867,12 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       ...(ONBOARDING.starts.find((item) => item.id === id)?.sources ?? []),
     ]),
   );
-  const sources = ONBOARDING.sources
-    .filter((source) => required.has(source.id))
+  const sources = content.sources
+    .filter((source) => required.has(source.id as OnboardingSource))
     .map((source) => ({
       ...source,
-      done: sourceData[source.id],
-      skipped: choices?.skipped?.includes(source.id) ?? false,
+      done: sourceData[source.id as OnboardingSource],
+      skipped: choices?.skipped?.includes(source.id as OnboardingSource) ?? false,
     }));
   const planText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
   const plan = planText ? parseFrontmatter<{ generated_at?: string | null }>(planText).data : {};
@@ -768,37 +886,37 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const items = [
     {
       id: "matter",
-      title: ONBOARDING.checklist.matter,
+      title: content.checklist.matter,
       done: adopted.length > 0,
       action: { kind: "matter", target: "matter" },
     },
     {
       id: "memory",
-      title: ONBOARDING.checklist.memory,
+      title: content.checklist.memory,
       done: data.memories.length > 0,
       action: { kind: "memory", target: "memory" },
     },
     {
       id: "starts",
-      title: ONBOARDING.checklist.starts,
+      title: content.checklist.starts,
       done: !!choices?.starts?.length,
       action: { kind: "starts", target: "starts" },
     },
     {
       id: "sources",
-      title: ONBOARDING.checklist.sources,
+      title: content.checklist.sources,
       done: !!choices?.starts?.length && sources.every((source) => source.done),
       action: { kind: "source", target: "sources" },
     },
     {
       id: "ai",
-      title: ONBOARDING.checklist.ai,
+      title: content.checklist.ai,
       done: ai || !!plan.generated_at,
       action: { kind: "ai", target: "ai" },
     },
     {
       id: "plan",
-      title: ONBOARDING.checklist.plan,
+      title: content.checklist.plan,
       done:
         !!plan.generated_at ||
         data.now.data.blocks.some((block) => block.status === "confirmed" || block.status === "done"),
@@ -807,7 +925,7 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   ].map((item) => ({
     ...item,
     disabled: item.id === "sources" && !choices?.starts?.length,
-    action: { ...item.action, label: ONBOARDING.checklist.action },
+    action: { ...item.action, label: content.checklist.action },
     skipped: choices?.skipped?.includes(item.id as OnboardingSource | "memory" | "ai" | "plan") ?? false,
   }));
   const completed = items.filter((item) => item.done).length;
@@ -819,7 +937,8 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     Object.values(data.records).some((rows) => rows.length > 0) ||
     hasUserFiles(ws);
   return {
-    content: ONBOARDING,
+    locale,
+    content,
     choices,
     showGuide: !choices && !hasUserData,
     hasUserData,
@@ -834,6 +953,24 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       visible: !!choices?.seenAt && completed < items.length,
     },
   };
+}
+
+/**
+ * 读界面偏好；还没选过语言时只决定一次并存下：已有资料的工作区保持中文，
+ * 新用户按系统语言（hint）选中文或英文，避免老用户因系统语言改变界面。
+ */
+export function resolvePreferences(
+  ws: Workspace,
+  hint?: unknown,
+  options: OnboardingOptions = {},
+): Preferences {
+  const saved = readPreferences();
+  if (saved.locale) return saved;
+  const locale: Locale =
+    onboardingStatus(ws, options).hasUserData || typeof hint !== "string" || /^zh\b/i.test(hint)
+      ? "zh-CN"
+      : "en";
+  return savePreferences({ locale });
 }
 
 export async function saveOnboardingChoices(
@@ -913,9 +1050,11 @@ export interface OnboardingMatter {
   draft: OnboardingMatterSuggestion | null;
 }
 export interface OnboardingNext extends OnboardingMatterDraft {
-  kind: "conversation" | "note";
+  /** goal：从「你带来的规划」里为某个目标定的下一步，依据是这个目标本身。 */
+  kind: "conversation" | "note" | "goal";
   id: string;
   source: string;
+  goalId: string | null;
   status: string;
   due: string | null;
   result: string;
@@ -962,9 +1101,12 @@ export const onboardingMatterSuggestionSchema = onboardingMatterSchema
   })
   .refine((input) => (input.paths ? !input.next : !!input.next), "路径先由用户选择，不预填下一步");
 function inputKind(text: string): "conversation" | "note" {
-  return /(?:^|\n)\s*(?:[-*>]\s*)?(?:ChatGPT|Claude|Gemini|DeepSeek|豆包|Kimi|通义|助手|assistant|AI|你)\s*[:：]/i.test(
+  // 带角色标记的对话，或 AI 按开图格式（【目标】…【下一步】/【路径】）回复的整理结果，都算来自 AI。
+  return /(?:^|\n)\s*(?:[-*>]\s*)?(?:ChatGPT|Claude|Gemini|DeepSeek|豆包|Kimi|通义|元宝|千问|助手|assistant|AI|你)\s*[:：]/i.test(
     text,
-  )
+  ) ||
+    (/(?:^|\n)\s*(?:【目标】|\[Goal\])/i.test(text) &&
+      /(?:^|\n)\s*(?:【下一步】|【路径】|\[Next\]|\[Path\])/i.test(text))
     ? "conversation"
     : "note";
 }
@@ -992,30 +1134,26 @@ const matterId = (source: string) =>
 function matterNotes(draft: OnboardingMatterDraft) {
   return `当前目标：${draft.goal}\n已知现状：${draft.current}\n`;
 }
-function noteLine(notes: string, label: string) {
-  return (
-    notes
-      .split("\n")
-      .find((line) => line.startsWith(`${label}：`))
-      ?.slice(label.length + 1) ?? ""
-  );
-}
+const goalSource = /^me\/goals\.json#([a-z0-9-]+)$/;
 function isOnboardingTask(task: Task): boolean {
   return (
     typeof task.source === "string" &&
-    /^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) &&
+    (/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) ||
+      goalSource.test(task.source)) &&
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
 function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
-  let kind: OnboardingMatter["kind"] = "note";
-  try {
-    kind = readOnboardingMatter(ws, task.source ?? "").kind;
-  } catch {}
+  let kind: OnboardingNext["kind"] = goalSource.test(task.source ?? "") ? "goal" : "note";
+  if (kind !== "goal")
+    try {
+      kind = readOnboardingMatter(ws, task.source ?? "").kind;
+    } catch {}
   return {
     kind,
     id: task.id,
     source: task.source ?? "",
+    goalId: noteLine(task.notes ?? "", "目标编号") || goalSource.exec(task.source ?? "")?.[1] || null,
     next: task.title,
     goal: noteLine(task.notes ?? "", "当前目标"),
     current: noteLine(task.notes ?? "", "已知现状"),
@@ -1138,12 +1276,39 @@ export async function adoptOnboardingMatter(
       : "");
   let task: Task | undefined;
   await batchSnapshot(ws, "你从原文采纳了一个下一步", async () => {
-    task = (await addTask(ws, { title: draft.next, source, notes })).record as Task;
+    // 采纳即确认目标：登记进 goals.json，下一步用目标编号关联。
+    const goal = upsertGoal(ws, draft.goal, matter.kind, localDate(new Date(), ws.timeZone()));
+    task = (await addTask(ws, { title: draft.next, source, notes: `${notes}目标编号：${goal.id}\n` }))
+      .record as Task;
     const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
     doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
     ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+    // 原文已经整理成下一步，归档后不再算待整理，依据仍可按原路径读回。
+    const file = findInboxNote(ws, basename(source));
+    if (file && !file.startsWith("inbox/notes/done/")) archiveInboxNote(ws, file);
   });
   if (!task) throw new KaituError("下一步未保存", "WRITE_FAILED");
+  return onboardingNext(ws, task);
+}
+
+/** 为「你带来的规划」里的一个目标定下一步。每个目标同时只留一个未完成的下一步。 */
+export async function addGoalNext(ws: Workspace, goalId: string, title: string): Promise<OnboardingNext> {
+  const goals = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [];
+  const goal = goals.find((item) => item.id === goalId);
+  if (!goal) throw new KaituError("目标不存在，请刷新", "NOT_FOUND");
+  const parsed = onboardingMatterSchema.shape.next.safeParse(title);
+  if (!parsed.success) throw new KaituError("请用一行文字写下一步", "BAD_ARGS");
+  const open = listTasks(ws).find(
+    (task) => isOnboardingTask(task) && onboardingNext(ws, task).goalId === goalId,
+  );
+  if (open) throw new KaituError("这个目标已有一个下一步，先完成或改期", "CONFLICT");
+  const task = (
+    await addTask(ws, {
+      title: parsed.data,
+      source: `me/goals.json#${goalId}`,
+      notes: `当前目标：${goal.title}\n已知现状：\n目标编号：${goalId}\n`,
+    })
+  ).record as Task;
   return onboardingNext(ws, task);
 }
 export async function changeOnboardingNext(

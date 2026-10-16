@@ -22,7 +22,7 @@ export async function captureNote(ws: Workspace, text: string) {
       text.trim(),
     ),
   );
-  return { path, version: await snapshot(ws, "你保存了一条原文记录，等待整理") };
+  return { path, version: await snapshot(ws, "你保存了一条原文记录") };
 }
 
 export function noteAgent(value: unknown): string {
@@ -91,6 +91,19 @@ export function moveInboxFile(ws: Workspace, file: string, directory: string) {
   return target;
 }
 
+/** 把一条笔记（连同附件）移到 done/ 归档，不单独存版本，由调用方决定。 */
+export function archiveInboxNote(ws: Workspace, file: string): string {
+  const attachment = noteMetadata(ws.readText(file)).attachment;
+  const directory = `inbox/notes/done/${localDate(new Date(), ws.timeZone())}`;
+  if (typeof attachment === "string" && dirname(attachment) === `${dirname(file)}/files`) {
+    // 附件和笔记一起归档。
+    const moved = moveInboxFile(ws, attachment, `${directory}/files`);
+    const text = ws.readText(file).replaceAll(attachment, moved);
+    ws.writeText(file, text);
+  }
+  return moveInboxFile(ws, file, directory);
+}
+
 export async function inboxNoteDone(ws: Workspace, path: string, actor = "Agent") {
   const file = relative(ws.root, ws.resolve(path)).split("\\").join("/");
   if (!inboxNotes(ws).some((note) => note.path === file)) {
@@ -98,15 +111,7 @@ export async function inboxNoteDone(ws: Workspace, path: string, actor = "Agent"
   }
   let target = "";
   await batchOverview(ws, async () => {
-    const attachment = noteMetadata(ws.readText(file)).attachment;
-    const directory = `inbox/notes/done/${localDate(new Date(), ws.timeZone())}`;
-    if (typeof attachment === "string" && dirname(attachment) === `${dirname(file)}/files`) {
-      // 附件和笔记一起归档。
-      const moved = moveInboxFile(ws, attachment, `${directory}/files`);
-      const text = ws.readText(file).replaceAll(attachment, moved);
-      ws.writeText(file, text);
-    }
-    target = moveInboxFile(ws, file, directory);
+    target = archiveInboxNote(ws, file);
   });
   const version = await snapshot(ws, `${actor}整理了一条收件箱笔记：${basename(file)}`);
   return { path: target, version };

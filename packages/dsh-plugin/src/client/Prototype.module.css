@@ -2534,3 +2534,51 @@
   align-items: center;
   gap: 12px;
 }
+
+/* 今天页「你带来的规划」与「在原来的 AI 里继续」的资料包 */
+.plans > div + div,
+.plans details {
+  border-top: 1px solid var(--line);
+}
+.plans .row {
+  padding-left: 0;
+  padding-right: 0;
+}
+.plans summary {
+  padding: 12px 0;
+}
+.handover h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+.handover textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.handoverSections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.handoverSections label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.handoverSections label[data-empty="true"] {
+  color: var(--muted);
+}

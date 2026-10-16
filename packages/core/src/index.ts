@@ -69,6 +69,9 @@ export * from "./news-feedback.js";
 export * from "./settings.js";
 export * from "./sync-location.js";
 export * from "./onboarding.js";
+export * from "./locale.js";
+export * from "./plans.js";
+export * from "./handover.js";
 
 export * from "./agent-file-policy.js";
 

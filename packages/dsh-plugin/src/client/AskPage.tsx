@@ -829,7 +829,7 @@ export function AskPage({
               onClick={() => setChoice("external")}
             >
               <b>用你已经在用的 AI</b>
-              <span>把开图接到 Claude / ChatGPT / Grok</span>
+              <span>复制资料包给豆包、Kimi、ChatGPT 等任意 AI，再把回答贴回来，不用 API Key</span>
             </button>
             <button
               type="button"
@@ -933,18 +933,28 @@ export function AskPage({
             ) : (
               <div className={css.external}>
                 <p>
-                  在能访问此文件夹的 Claude、ChatGPT 或 Grok 中，复制下面的接手说明。云端 AI 可通过已有的
-                  Drive 或 MCP 连接读取资料。
+                  在「AI 与连接」复制一份资料包，贴到你常用的 AI
+                  里继续聊；聊完对它说「整理给开图」，再把回答贴回开图核对。这是手动接续，不算「已连接」。
                 </p>
-                <textarea aria-label="AI 接手说明" readOnly rows={4} value={handover} />
-                <button
-                  type="button"
-                  onClick={() =>
-                    void navigator.clipboard.writeText(handover).catch(() => setError("请选中并复制接手说明"))
-                  }
-                >
-                  复制连接说明
-                </button>
+                {onConnections && (
+                  <button type="button" onClick={onConnections}>
+                    去复制资料包
+                  </button>
+                )}
+                <details>
+                  <summary>进阶：本机支持 MCP 的客户端（Claude Desktop、Claude Code、Codex）</summary>
+                  <textarea aria-label="AI 接手说明" readOnly rows={4} value={handover} />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void navigator.clipboard
+                        .writeText(handover)
+                        .catch(() => setError("请选中并复制接手说明"))
+                    }
+                  >
+                    复制连接说明
+                  </button>
+                </details>
               </div>
             )}
             {error && <p role="alert">{error}</p>}

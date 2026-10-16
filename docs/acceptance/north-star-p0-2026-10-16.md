@@ -1,0 +1,113 @@
+# 北极星首批交审（2026-10-16）
+
+分支 `claude/product-analysis-north-star-z6g5gu`，基于 `main d00584f`。
+依据：[PRODUCT.md](../PRODUCT.md)「北极星」「本轮优先级与验收」，[launch](../prd/launch.md) L3–L5、L10、L11 与 §9 第 6–8 项，[北极星复盘](../research/north-star-2026-10-16.md) §5。
+
+## 做了什么
+
+| # | 内容 | 主要位置 |
+|---|---|---|
+| 1 | 搬进来就看得见：搬记忆预览里 `[目标]` `[项目]` `[在考虑]` 默认去目标、项目、方向，每条可改去处，一屏确认、整批一个版本。今天页新增「你带来的规划」：进行中的目标、来源 AI 与日期、记过几次结果、下一步，没有下一步的目标可直接「定下一步」。个人档案目标在先 | core `onboarding.ts`、`plans.ts`、`overview-page.ts`；界面 `Plans.tsx`、`OnboardingPage.tsx`、`MePage.tsx` |
+| 2 | 不填 Key，用常用的 AI 整理：复制整理提示词 → 任意 AI → 贴回，解析成同一份待核对草稿（含 2–3 条路径）。方向页「用你常用的 AI 提」贴回的是待采纳建议 | core `handover.ts`；界面 `OnboardingMatter.tsx`、`DirectionsPage.tsx` |
+| 3 | 在原来的 AI 里继续（L3.1）：「AI 与连接」的资料包，七段可勾选、可改文字；人物默认不勾；健康、财务、敏感记忆、密钥、本机路径不带。回答贴回后进核对页 | core `handover.ts`；界面 `Handover.tsx`、`AskPage.tsx`（选外部 AI 时直接给资料包） |
+| 4 | 状态如实：没开每日整理时右上角只说「已保存 N 条原文」；采纳后原文归档，不再算待整理；没连 AI 时草稿页标题为「写下你的目标和一个下一步」；版本说明与资料页不再写「等待整理」 | core `overview-page.ts`、`inbox-notes.ts`；界面 `OverviewPage.tsx`、`LibraryPage.tsx` |
+| 5 | 英文界面（L10 第一批）：本机 `preferences.json` 记界面语言，首次按已有资料与系统语言定一次，设置可改；首次价值路径的页面、提示词与解析双语 | core `locale.ts`、`onboarding-en.ts`；界面 `i18n.tsx` 及上列页面 |
+| 6 | 坚果云（L11）：设置 →「由谁同步」与 `kaitu sync enable nutstore [--dir]`；资料进坚果云文件夹，版本库、密钥、索引留本机；坚果云冲突副本不进版本 | core `sync-location.ts`、`drive.ts`、`sync-files.ts`；CLI `main.ts`、`ui/server.ts`；界面 `PersonalPages.tsx` |
+
+未改 PRD §6 与 `schemas/`。来源只写在既有字段里：目标 id 为 `<来源>-<YYYYMMDD>-<6 位摘要>`，待办 notes 加 `目标编号：` 一行，搬来的项目在 notes.md 写来源，搬来的方向在动机里写「从 X 搬来的记忆」。
+
+## 浏览器走查
+
+`kaitu ui` + Playwright（Chromium），每种语言一个新的临时工作区，不配 API Key。
+中文：时区 Asia/Shanghai，浏览器 zh-CN；英文：America/Los_Angeles，浏览器 en-US。两遍都是 0 个问题（脚本检查文字、页面报错与横向溢出）。
+
+1. 写一件想改变的事 → 保存并整理：没有 AI，标题是「写下你的目标和一个下一步」，下面是剪贴板整理。
+2. 复制整理提示词，贴回一段带客套话的合成回答 → 草稿三项正确 → 采纳 → 今天页出现下一步和「你带来的规划」，右上角不说「等待整理」。
+3. 搬记忆：6 行（工作、2 个目标、项目、在考虑、偏好）→ 预览带去处 → 确认 → 规划里 3 个目标，标「从 ChatGPT 搬来」，下方「1 件在做的事 · 1 个在探索的方向」。
+4. 为搬来的目标定下一步 → 完成并记一句结果 → 规划里显示「记下 1 次结果 · 最近：…」。
+5. 个人档案目标在先；「AI 与连接」的资料包含目标、结果、下一步与贴回格式。
+6. 资料包回答贴回 → 核对页标题「开图从这段对话里看到的」→ 采纳 → 规划里第 4 个目标标「来自一段对话」。
+7. 开图 →「用你常用的 AI 提」→ 贴回两条方向 → 两张「AI 建议 · 待采纳」卡片。
+8. 设置：界面语言；存放位置选「坚果云」，没找到文件夹时说明怎么做。
+9. 今天页 390 px 窄屏与深色。
+
+| | 中文 | English |
+|---|---|---|
+| 没连 AI 的草稿页 | [zh-no-ai-draft](north-star-p0-2026-10-16/zh-no-ai-draft.png) | [en-no-ai-draft](north-star-p0-2026-10-16/en-no-ai-draft.png) |
+| 贴回后的草稿 | [zh-clipboard-draft](north-star-p0-2026-10-16/zh-clipboard-draft.png) | [en-clipboard-draft](north-star-p0-2026-10-16/en-clipboard-draft.png) |
+| 搬记忆预览（去处） | [zh-memory-preview](north-star-p0-2026-10-16/zh-memory-preview.png) | [en-memory-preview](north-star-p0-2026-10-16/en-memory-preview.png) |
+| 今天页「你带来的规划」 | [zh-today-plans](north-star-p0-2026-10-16/zh-today-plans.png) | [en-today-plans](north-star-p0-2026-10-16/en-today-plans.png) |
+| 资料包 | [zh-handover](north-star-p0-2026-10-16/zh-handover.png) | [en-handover](north-star-p0-2026-10-16/en-handover.png) |
+| 方向贴回 | [zh-directions](north-star-p0-2026-10-16/zh-directions.png) | [en-directions](north-star-p0-2026-10-16/en-directions.png) |
+| 坚果云 | [zh-nutstore](north-star-p0-2026-10-16/zh-nutstore.png) | [en-nutstore](north-star-p0-2026-10-16/en-nutstore.png) |
+| 窄屏 / 深色 | [zh-narrow](north-star-p0-2026-10-16/zh-narrow.png) · [zh-dark](north-star-p0-2026-10-16/zh-dark.png) | [en-narrow](north-star-p0-2026-10-16/en-narrow.png) · [en-dark](north-star-p0-2026-10-16/en-dark.png) |
+
+## 实测耗时
+
+### 小工作区：点击到结果出现
+
+| 操作 | 中文 | English |
+|---|---|---|
+| 贴回回答 → 草稿 | 44 ms | 49 ms |
+| 采纳下一步 | 41 ms | 45 ms |
+| 搬记忆确认（6 条） | 40 ms | 45 ms |
+| 为目标定下一步 | 42 ms | 37 ms |
+| 资料包回答贴回 | 46 ms | 31 ms |
+
+### 合成大工作区：本机接口往返
+
+109 个目标、12,021 条待办（分布在 24 个月）、885 条记忆、356 个方向、6,000 条饮食（24 个月）、248 条原文、42 个项目，约 11 MB。
+4 核 Xeon 2.1 GHz，Node 22；`kaitu ui` 本机接口，每项 7 次取中位数与最慢。
+
+| 操作 | 中位数 | 最慢 |
+|---|---|---|
+| 资料包 | 253 ms | 311 ms |
+| 方向研究提示词 | 290 ms | 342 ms |
+| 界面语言 | 2 ms | 2 ms |
+| 保存一件事 | 6 ms | 9 ms |
+| 整理提示词 | 2 ms | 4 ms |
+| 贴回回答 → 草稿 | 80 ms | 567 ms |
+| 采纳下一步 | 108 ms | 142 ms |
+| 搬记忆：预览 30 行 | 137 ms | 443 ms |
+| 搬记忆：确认 30 条（6 个目标、6 个项目、6 个方向、12 条记忆） | 189 ms | 225 ms |
+| 为目标定下一步 | 103 ms | 153 ms |
+| 贴回方向建议（2 条） | 3 ms | 4 ms |
+
+最慢一次多半与后台存版本撞在一起。交审前按大工作区改了三处：资料包和方向提示词只读用得到的几类（方向提示词原来扫两遍整个工作区，646 → 约 280 ms）；搬记忆确认只列一次项目（约 830 → 190 ms）；规划按目标编号建索引（22 → 11 ms）。
+
+已有接口与 main 对比（同一工作区，进程内 5 次中位数）：
+
+| | main | 本分支 |
+|---|---|---|
+| 总览 | 872–889 ms | 894–1008 ms |
+| 开始使用状态 | 361–395 ms | 355–429 ms |
+
+两者差别在机器波动内（规划约 11 ms）。总览和开始使用状态在大工作区超过 0.3 s，main 也一样：每次请求都 `readWorkbench` 全量读（约 300 ms），总览的 `sources()` 还对每条记录查一次记录类型、逐条换算本地日期。需要单独处理：在界面进程里缓存、由文件监听失效。
+
+## 测试
+
+新增 4 个行为测试，全部用临时目录和合成数据：
+
+- `sync.test.ts`：坚果云文件夹迁移往返，冲突副本不进版本，版本库与密钥留本机。
+- `onboarding.test.ts`：搬记忆按去处写入目标、项目、方向与记忆，今天页规划显示来源与下一步。
+- `handover.test.ts`：贴回回答的标签行、英文路径与 JSON 都能读成草稿，缺项报原因，采纳后校验通过；资料包只带该带的内容，方向贴回为待采纳且不重复。
+
+四项检查：build、typecheck、lint 通过；test 180 通过、2 跳过、1 失败。
+`packages/cli/test/status.test.ts`「版本库只读时 record add 仍保存数据」在本容器失败：容器以 root 运行，chmod 只读挡不住写入；main 上同样失败，与本分支无关。
+
+## 没有验证的
+
+- Kaitu.app 原生窗口与 DSH 插件里的同一流程；DSH 的整理仍走原生会话。
+- 真实模型和真实 AI 的回答格式；解析只用合成回答验证。
+- 坚果云真机：默认同步目录和冲突副本命名都没在官方帮助里查到（[HANDOFF §6](../HANDOFF.md)）。
+- launch §5 的 5 人观察。
+- L10 第二批：健康、财务、足迹地图、资讯、项目详情、日历页、问问、接数据面板、方向详情、资料页、服务端错误信息，以及「最近变化」里的版本说明，目前仍是中文。
+- 设置页的「每日整理」在没连任何 AI 时也显示为开启（main 已如此），留给 L7。
+
+## 坚果云真机验收步骤
+
+1. 电脑 A 装坚果云并登录，在客户端里设好一个同步文件夹。
+2. 开图 → 设置 → 换一个存放位置 →「由谁同步」选坚果云，确认文件夹后迁移。坚果云文件夹里应只有资料，没有 `.kaitu/history.git`、密钥和索引。
+3. 电脑 B 登录同一账号，同步完成后用开图打开同一个资料文件夹，回读一致。
+4. A、B 各记一条随手记，互相回读。
+5. 两边断网，同时改同一个目标的标题，联网后看冲突副本的文件名。开图应提示核对，版本里没有冲突副本。把实际命名记进 HANDOFF §6，并按需修正 `sync-files.ts`。

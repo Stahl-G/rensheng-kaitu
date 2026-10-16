@@ -5,6 +5,7 @@ import type { Workspace } from "./workspace.js";
 export interface MeGoal {
   id: string;
   title: string;
+  status?: string;
   area?: string;
   metric?: string;
   target?: string;

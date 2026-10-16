@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import type { MeData, MeRules } from "../types.js";
 import { AvatarCropDialog } from "./AvatarCropDialog.js";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
+
+const GOAL_SOURCES: Record<string, [string, string]> = {
+  chatgpt: ["从 ChatGPT 搬来", "From ChatGPT"],
+  claude: ["从 Claude 搬来", "From Claude"],
+  gemini: ["从 Gemini 搬来", "From Gemini"],
+  doubao: ["从豆包搬来", "From Doubao"],
+  other: ["从 AI 搬来", "From an AI"],
+  note: ["你写下的", "You wrote it"],
+  conversation: ["来自一段对话", "From a conversation"],
+};
 
 export interface MePageProps {
   loadMe: () => Promise<MeData>;
@@ -64,6 +75,7 @@ function sourceLabel(source: string | null) {
 }
 
 export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProps) {
+  const t = useT();
   const [data, setData] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,7 +109,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
             onPrompt(`请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type]}，保留出处。`)
           }
         >
-          修改
+          {t("修改", "Edit")}
         </button>
       </span>
     </div>
@@ -105,6 +117,8 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
   const facts = data?.memories.filter((memory) => memory.type === "fact") ?? [];
   const preferences = data?.memories.filter((memory) => memory.type === "preference") ?? [];
   const other = data?.memories.filter((memory) => !["fact", "preference"].includes(memory.type)) ?? [];
+  const goals =
+    data?.goals.filter((goal) => !goal.status || ["active", "paused"].includes(goal.status)) ?? [];
   return (
     <div className={css["me-body"]}>
       {error && (
@@ -128,7 +142,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
         />
       )}
       {!data ? (
-        <p className={css.small}>正在读取档案…</p>
+        <p className={css.small}>{t("正在读取档案…", "Loading profile…")}</p>
       ) : (
         <>
           <section className={`${css.card} ${css["me-avatar"]}`} aria-label="头像">
@@ -185,19 +199,48 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
             )}
           </section>
           <section className={css.sec}>
-            <h2 className={css.eyebrow}>要你确认的推测</h2>
-            <p className={css.small}>还没有可显示的推测</p>
-          </section>
-          <section className={css.sec}>
-            <h2 className={css.eyebrow}>事实</h2>
-            {facts.length ? (
-              <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>{facts.map(fact)}</div>
+            <h2 className={css.eyebrow}>{t("我的目标", "My goals")}</h2>
+            {goals.length ? (
+              <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>
+                {goals.map((goal) => {
+                  const origin =
+                    /^(chatgpt|claude|gemini|doubao|other|note|conversation)-(\d{4})(\d{2})(\d{2})-/.exec(
+                      goal.id,
+                    );
+                  const source = origin ? GOAL_SOURCES[origin[1] as string] : undefined;
+                  return (
+                    <div className={css.fact} key={goal.id}>
+                      <p>{goal.title}</p>
+                      <span className={css.src}>
+                        {goal.area ? `${areas[goal.area] ?? goal.area} · ` : ""}
+                        {source
+                          ? `${t(source[0], source[1])} · ${origin?.[2]}-${origin?.[3]}-${origin?.[4]}`
+                          : t("来自 me/goals.json", "From me/goals.json")}
+                        {goal.due ? t(` · ${goal.due} 回看`, ` · review on ${goal.due}`) : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <p className={css.small}>还没有保存的事实</p>
+              <p className={css.small}>
+                {t(
+                  "还没有目标。从今天页带来一件想改变的事，或从常用的 AI 搬来记忆。",
+                  "No goals yet. Bring one thing you want to change from Today, or bring memories from your AI.",
+                )}
+              </p>
             )}
           </section>
           <section className={css.sec}>
-            <h2 className={css.eyebrow}>偏好和规则</h2>
+            <h2 className={css.eyebrow}>{t("事实", "Facts")}</h2>
+            {facts.length ? (
+              <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>{facts.map(fact)}</div>
+            ) : (
+              <p className={css.small}>{t("还没有保存的事实", "No facts saved yet")}</p>
+            )}
+          </section>
+          <section className={css.sec}>
+            <h2 className={css.eyebrow}>{t("偏好和规则", "Preferences and rules")}</h2>
             <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>
               {preferences.map(fact)}
               {ruleRows(data.rules)
@@ -207,7 +250,9 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
                     <p>
                       {label} · {value}
                     </p>
-                    <span className={css.src}>来自 作息与规则 · me/rules.md</span>
+                    <span className={css.src}>
+                      {t("来自 作息与规则 · me/rules.md", "From routines and rules · me/rules.md")}
+                    </span>
                     <span className={css["fact-acts"]}>
                       <button
                         type="button"
@@ -216,30 +261,18 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
                           onPrompt(`请读取 me/rules.md，和我修改${label}的规则，等我确认再保存。`)
                         }
                       >
-                        修改
+                        {t("修改", "Edit")}
                       </button>
                     </span>
                   </div>
                 ))}
             </div>
           </section>
-          {data.goals.length > 0 && (
-            <details>
-              <summary className={css.link}>我的目标 · {data.goals.length} 项</summary>
-              {data.goals.map((goal) => (
-                <div className={css.fact} key={goal.id}>
-                  <p>{goal.title}</p>
-                  <span className={css.src}>
-                    {goal.area ? `${areas[goal.area] ?? goal.area} · ` : ""}来自 me/goals.json
-                    {goal.due ? ` · ${goal.due} 回看` : ""}
-                  </span>
-                </div>
-              ))}
-            </details>
-          )}
           {other.length > 0 && (
             <details>
-              <summary className={css.link}>其他记忆</summary>
+              <summary className={css.link}>
+                {t(`其他记忆 · ${other.length} 条`, `Other memories · ${other.length}`)}
+              </summary>
               {other.map(fact)}
             </details>
           )}
@@ -248,7 +281,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
             className={css.link}
             onClick={() => onPrompt("请读取 me/profile.md，和我更新名字和简介，确认后保存。")}
           >
-            编辑名字和简介
+            {t("编辑名字和简介", "Edit name and bio")}
           </button>
         </>
       )}

@@ -4,10 +4,12 @@ import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { startUi } from "../../cli/src/ui/server.js";
 import {
+  addGoalNext,
   addMemory,
   addRecord,
   adoptOnboardingMatter,
   changeOnboardingNext,
+  configureAutomation,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
   draftOnboardingMatter,
@@ -16,13 +18,17 @@ import {
   initWorkspace,
   keepOnboardingMatter,
   listMemories,
+  listProjects,
   listTasks,
   onboardingStatus,
   parseFrontmatter,
   parseMemoryPaste,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  readExploration,
+  readMe,
   readOnboardingMatter,
+  readOverviewPage,
   recordOnboardingAiConnection,
   resetOnboarding,
   restore,
@@ -263,8 +269,15 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
     const conversation = await saveOnboardingMatter(ws, "我：想准备展览。\nChatGPT：先挑作品。");
     expect(conversation.kind).toBe("conversation");
     expect(listTasks(ws)).toHaveLength(1);
-    await inboxNoteDone(ws, matter.source);
+    // 采纳后原文已归档：不再算待整理，依据仍按原路径读回；目标登记进 goals.json。
+    await expect(inboxNoteDone(ws, matter.source)).rejects.toThrow();
     expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe(original);
+    // 没开每日整理时，原文只是「已保存」，界面不说「等待整理」。
+    expect((await readOverviewPage(ws)).sync).toMatchObject({ received: 1, organizer: false });
+    configureAutomation(ws, { organizer: true });
+    expect((await readOverviewPage(ws)).sync.organizer).toBe(true);
+    expect(readMe(ws).goals.map((goal) => goal.title)).toEqual([selected.goal]);
+    expect(next.goalId).toBe(readMe(ws).goals[0]?.id);
     const later = await changeOnboardingNext(ws, next.id, next.rev, "defer", "2026-12-01");
     const done = await changeOnboardingNext(ws, next.id, later.rev, "complete", "选出了三件作品");
     expect(done).toMatchObject({
@@ -279,6 +292,78 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
         (item) => item.id === "matter",
       )?.done,
     ).toBe(true);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("搬来的目标、项目和在考虑的事进对应模块，今天页列出目标并能定下一步、记结果", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-plans-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const pasted = [
+      "[工作] 在上海做了 4 年运营 （2026-08）",
+      "[目标] 2027 年 3 月前转岗做产品",
+      "[Goal] Run a half marathon",
+      "[项目] 求职作品集",
+      "[在考虑] 明年要不要搬去杭州",
+      "[偏好] 喜欢被直接指出问题",
+    ].join("\n");
+    const english = previewOnboardingMemory(ws, pasted, "chatgpt", { ...options, locale: "en" });
+    expect(english.candidates.find((item) => item.content === "Run a half marathon")?.category).toBe("Goals");
+    const preview = previewOnboardingMemory(ws, pasted, "chatgpt", options);
+    expect(preview.candidates.map((item) => item.target)).toEqual([
+      "memory",
+      "goal",
+      "goal",
+      "project",
+      "direction",
+      "memory",
+    ]);
+    const work = preview.candidates[0]?.id as string;
+    const result = await confirmOnboardingMemory(
+      ws,
+      preview.token,
+      preview.candidates.map((item) => item.id),
+      { ...options, targets: { [work]: "memory" } },
+    );
+    expect(result).toMatchObject({ goals: 2, projects: 1, directions: 1, skipped: 0 });
+    expect(
+      listMemories(ws)
+        .map((entry) => entry.text)
+        .sort(),
+    ).toEqual(["喜欢被直接指出问题", "在上海做了 4 年运营 （2026-08）"]);
+    expect(listProjects(ws).map((project) => project.title)).toEqual(["求职作品集"]);
+    expect(readExploration(ws).directions).toEqual([
+      expect.objectContaining({
+        title: "明年要不要搬去杭州",
+        status: "active",
+        motivation: "从 ChatGPT 搬来的记忆",
+      }),
+    ]);
+    const plans = (await readOverviewPage(ws)).plans;
+    expect(plans.goals.map((goal) => [goal.title, goal.origin?.source, goal.next])).toEqual([
+      ["2027 年 3 月前转岗做产品", "chatgpt", null],
+      ["Run a half marathon", "chatgpt", null],
+    ]);
+    expect(plans).toMatchObject({ projects: 1, directions: 1 });
+    const goal = plans.goals[0]?.id as string;
+    const next = await addGoalNext(ws, goal, "这周写一份产品分析初稿");
+    expect(next).toMatchObject({ kind: "goal", goalId: goal, goal: "2027 年 3 月前转岗做产品" });
+    expect(onboardingStatus(ws, options).next?.id).toBe(next.id);
+    await expect(addGoalNext(ws, goal, "再加一步")).rejects.toThrow();
+    await changeOnboardingNext(ws, next.id, next.rev, "complete", "写完了门店排班的复盘");
+    const after = (await readOverviewPage(ws)).plans.goals.find((item) => item.id === goal);
+    expect(after).toMatchObject({ next: null, results: 1, lastResult: "写完了门店排班的复盘" });
+    const again = await confirmOnboardingMemory(
+      ws,
+      previewOnboardingMemory(ws, "[目标] 2027 年 3 月前转岗做产品", "claude", options).token,
+      ["line-1"],
+      options,
+    );
+    expect(again.goals).toBe(0);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });

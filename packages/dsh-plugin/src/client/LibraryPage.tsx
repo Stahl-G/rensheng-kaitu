@@ -2,12 +2,22 @@ import { useEffect, useState } from "react";
 import type { LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
+const LIBRARY_EN: Record<string, string> = {
+  calendar: "Schedule",
+  projects: "Projects",
+  health: "Health",
+  finance: "Finance",
+  notes: "Notes and decisions",
+  inbox: "Inbox",
+};
 export interface LibraryProps {
   loadLibrary: () => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
 export function LibraryPage({ data, open }: { data: LibraryData | null; open: (id: string) => void }) {
+  const t = useT();
   const colors: Record<string, string> = {
     calendar: "news",
     projects: "doing",
@@ -17,7 +27,7 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
     inbox: "me",
   };
   return (
-    <section className={css.mods} aria-label="各类资料">
+    <section className={css.mods} aria-label={t("各类资料", "Library sections")}>
       {data?.sections.map((section) => (
         <button
           type="button"
@@ -27,20 +37,28 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
         >
           <span className={css["sum-h"]}>
             <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
-            {section.title}
+            {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
             <span>›</span>
           </span>
           <span className={`${css.big} ${css.num}`}>
-            {section.count ? `${section.count} ${section.id === "projects" ? "个项目" : "条"}` : "还没有资料"}
+            {section.count
+              ? t(
+                  `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
+                  `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
+                )
+              : t("还没有资料", "Nothing yet")}
           </span>
           <span className={css.small}>
-            {section.sources.join("、") || "还没有来源"}
+            {section.sources.join(t("、", ", ")) || t("还没有来源", "No sources yet")}
             {section.latest
-              ? ` · ${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`
+              ? t(
+                  ` · ${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
+                  ` · ${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                )
               : ""}
           </span>
         </button>
-      )) ?? <p className={css.small}>正在读取资料…</p>}
+      )) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
     </section>
   );
 }
@@ -131,7 +149,7 @@ export function InboxPage({
                 ? (row.destination ?? "整理去向未记录")
                 : row.status === "review"
                   ? "请核对原文与相关资料"
-                  : "等待整理"}
+                  : "还没整理"}
             </span>
           </div>
         ))

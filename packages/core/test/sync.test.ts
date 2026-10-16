@@ -213,3 +213,55 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+it("坚果云往返：资料进同步文件夹、状态留本机，-NSConflict / -冲突 副本只报告、不进版本", async () => {
+  const home = tmp();
+  vi.stubEnv("HOME", home);
+  vi.stubEnv("KAITU_DIR", "");
+  try {
+    const ws = await initWorkspace(join(home, "kaitu"));
+    const added = addRecord(ws, "workout", workout);
+    const token = mcpToken(ws);
+    await snapshot(ws, "迁移前");
+    await expect(enableSync(ws, "drive", { provider: "nutstore" })).rejects.toThrow("坚果云");
+    const nutstore = join(home, "Nutstore Files/我的坚果云");
+    mkdirSync(nutstore, { recursive: true });
+    expect(syncStatus(ws).suggested.nutstore).toBe(nutstore);
+    const result = await enableSync(ws, "drive", { provider: "nutstore" });
+    expect(result).toMatchObject({ mode: "drive", provider: "nutstore", root: join(nutstore, "kaitu") });
+    expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
+    expect(historyDirectory(ws).startsWith(nutstore)).toBe(false);
+    expect(mcpToken(ws)).toBe(token);
+    expect(syncStatus(new Workspace(ws.root)).provider).toBe("nutstore");
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
+    const handoff = (agent: string) =>
+      `---\nagent: ${agent}\nat: ${new Date().toISOString()}\n---\n## 当前下一步\n- 合成下一步\n`;
+    ws.writeText("handoffs/relay.md", handoff("retained-agent"));
+    await snapshot(ws, "交接");
+    const conflicts = ["handoffs/relay-NSConflict-甲-20261016.md", "handoffs/relay-冲突-1.md"];
+    for (const file of conflicts) writeFileSync(join(ws.root, file), handoff("conflict-agent"));
+    const reported = (await doctor(ws)).filter((check) => !check.ok).flatMap((check) => check.files ?? []);
+    expect(reported).toEqual(expect.arrayContaining(conflicts));
+    expect(validateWorkspace(ws)).toEqual([]);
+    refreshOverview(ws);
+    expect(ws.readText("OVERVIEW.md")).not.toContain("conflict-agent");
+    ws.writeText("handoffs/relay.md", `${handoff("retained-agent")}\n正常更新\n`);
+    const oid = await snapshot(ws, "冲突副本不进版本");
+    const tracked = await git.listFiles({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      ref: oid as string,
+    });
+    for (const file of conflicts) expect(tracked).not.toContain(file);
+    for (const file of conflicts) rmSync(join(ws.root, file));
+    await disableSync(ws, { to: join(home, "back") });
+    expect(syncStatus(ws)).toMatchObject({ mode: "local", provider: "local" });
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
+    expect(mcpToken(ws)).toBe(token);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    vi.unstubAllEnvs();
+    rmSync(home, { recursive: true, force: true });
+  }
+});

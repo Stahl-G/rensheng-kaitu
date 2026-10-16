@@ -16,8 +16,10 @@ import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingChecklist, OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
+import { PlansCard } from "./Plans.js";
 import css from "./Prototype.module.css";
 import { CalendarPushResult, CalendarSlotForm, DataSummaries, TodayFinance } from "./TodayPage.js";
+import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
@@ -48,14 +50,40 @@ export interface OverviewPageProps
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
 const modules = [
-  ["calendar", "日程"],
-  ["projects", "在做的事"],
-  ["health", "健康"],
-  ["finance", "财务"],
-  ["notes", "笔记与决策"],
-  ["inbox", "收件箱"],
+  ["calendar", "日程", "Schedule"],
+  ["projects", "在做的事", "Projects"],
+  ["health", "健康", "Health"],
+  ["finance", "财务", "Finance"],
+  ["notes", "笔记与决策", "Notes and decisions"],
+  ["inbox", "收件箱", "Inbox"],
 ];
+/** 先读本机语言偏好（第一次打开时由服务端决定一次），再用它渲染整个应用。 */
 export function OverviewPage(props: OverviewPageProps) {
+  const [locale, setLocale] = useState<Locale | null>(null);
+  useEffect(() => {
+    let active = true;
+    // 已有资料的工作区保持中文，新用户按系统语言。
+    void props
+      .loadPreferences(browserLocale())
+      .then((value) => active && setLocale(value.locale === "en" ? "en" : "zh-CN"))
+      .catch(() => active && setLocale("zh-CN"));
+    return () => {
+      active = false;
+    };
+  }, [props.loadPreferences]);
+  return (
+    <LocaleContext.Provider value={locale ?? "zh-CN"}>
+      <Overview {...props} locale={locale} setLocale={setLocale} />
+    </LocaleContext.Provider>
+  );
+}
+
+function Overview({
+  locale,
+  setLocale,
+  ...props
+}: OverviewPageProps & { locale: Locale | null; setLocale: (locale: Locale) => void }) {
+  const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();
   const [guideKey, setGuideKey] = useState(0);
@@ -86,6 +114,7 @@ export function OverviewPage(props: OverviewPageProps) {
   const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
+    if (!locale) return;
     const seq = ++sequence.current;
     try {
       const [overview, agenda, files, me, introduction, calendarPush] = await Promise.all([
@@ -93,7 +122,7 @@ export function OverviewPage(props: OverviewPageProps) {
         props.loadCalendar(),
         props.loadLibrary(),
         props.loadMe(),
-        props.loadOnboarding(),
+        props.loadOnboarding(locale),
         props.loadCalendarPush(),
       ]);
       if (seq !== sequence.current) return;
@@ -109,6 +138,7 @@ export function OverviewPage(props: OverviewPageProps) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
   }, [
+    locale,
     props.load,
     props.loadCalendar,
     props.loadLibrary,
@@ -216,7 +246,24 @@ export function OverviewPage(props: OverviewPageProps) {
     else if (item.id === "starts") startGuide(2);
     else if (item.id === "sources") startGuide(3);
     else if (item.id === "ai") startGuide(4);
-    else if (item.id === "plan") prompt("请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。");
+    else if (item.id === "plan")
+      prompt(
+        t(
+          "请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。",
+          "Based on where I am, my schedule and my next steps, plan my day. Propose a plan for me to confirm first.",
+        ),
+      );
+  };
+  /** 「在原来的 AI 里继续」贴回的回答：先存原文，再读成待核对草稿，打开核对页。 */
+  const handoverAnswer = async (answer: string) => {
+    const matter = await props.saveOnboardingMatter(answer);
+    await props.pasteOnboardingMatter(matter.source, answer, locale ?? "zh-CN");
+    await refresh();
+    startGuide(1);
+  };
+  const changeLocale = async (next: Locale) => {
+    await props.savePreferences({ locale: next });
+    setLocale(next);
   };
   const child = {
     ...props,
@@ -232,7 +279,7 @@ export function OverviewPage(props: OverviewPageProps) {
     },
   };
   const stamp = (value: string) =>
-    new Intl.DateTimeFormat("zh-CN", {
+    dateFormat(locale ?? "zh-CN", {
       timeZone: data?.timeZone,
       month: "numeric",
       day: "numeric",
@@ -249,51 +296,59 @@ export function OverviewPage(props: OverviewPageProps) {
           void run(async () => {
             await props.capture(draft);
             setDraft("");
-            setReceipt("已收到");
+            setReceipt(
+              data?.sync.organizer
+                ? t("已收到，会在每日整理时处理", "Received; the daily organizer will process it")
+                : t("已保存原文", "Saved"),
+            );
           });
         }}
       >
         <label className={css.sr} htmlFor="capture-text">
-          随手记一句
+          {t("随手记一句", "Quick note")}
         </label>
         <input
           id="capture-text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder="随手记一句，比如「今晚跑了 5 公里，有点累」"
+          placeholder={t(
+            "随手记一句，比如「今晚跑了 5 公里，有点累」",
+            'A quick note, like "Ran 5 km tonight, a bit tired"',
+          )}
           disabled={busy}
         />
         <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !draft.trim()}>
-          记下
+          {t("记下", "Add note")}
         </button>
       </form>
       {receipt && (
         <output className={css.saved}>
           {receipt}
           <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
-            去收件箱看
+            {t("去收件箱看", "Open inbox")}
           </button>
         </output>
       )}
     </div>
   );
   const focus = data?.next[0];
+  const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
   return (
-    <div className={css.app} data-theme={theme}>
+    <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
       <header className={css.top}>
         <div className={css.brand}>
           <KaituMark size={26} />
-          人生开图
+          {t("人生开图", "Kaitu")}
         </div>
-        <nav className={css.tabs} aria-label="主要导航">
+        <nav className={css.tabs} aria-label={t("主要导航", "Main navigation")}>
           {[
             ...[
-              ["overview", "今天"],
-              ["explore", "开图"],
-              ["records", "资料"],
+              ["overview", t("今天", "Today")],
+              ["explore", t("开图", "Explore")],
+              ["records", t("资料", "Library")],
             ],
-            ...(props.renderAsk ? [["ask", "问问"]] : []),
+            ...(props.renderAsk ? [["ask", t("问问", "Ask")]] : []),
           ].map(([id, label]) => (
             <button
               type="button"
@@ -311,25 +366,34 @@ export function OverviewPage(props: OverviewPageProps) {
           ))}
         </nav>
         <div className={css.tools}>
-          <button type="button" className={`${css.link} ${css.sync}`} onClick={() => void refresh()}>
+          <button
+            type="button"
+            className={`${css.link} ${css.sync}`}
+            onClick={() => (savedOnly ? openRecord("inbox") : void refresh())}
+          >
             <i className={css.dot} style={{ background: error ? "var(--news)" : "var(--health)" }} />
             {error
-              ? "读取失败"
+              ? t("读取失败", "Couldn't load")
               : !data
-                ? "正在读取…"
+                ? t("正在读取…", "Loading…")
                 : data.sync.needsReview
-                  ? `${data.sync.needsReview} 条要核对`
+                  ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
                   : data.sync.received
-                    ? "已收到，等待整理"
+                    ? data.sync.organizer
+                      ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
+                      : t(
+                          `已保存 ${data.sync.received} 条原文`,
+                          `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
+                        )
                     : data.sync.updatedAt
-                      ? `已更新 ${stamp(data.sync.updatedAt)}`
-                      : "本机资料"}
+                      ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
+                      : t("本机资料", "On this computer")}
           </button>
           <div className={css.account} ref={account}>
             <button
               type="button"
               className={css.avatar}
-              aria-label="个人档案、AI 与连接、设置"
+              aria-label={t("个人档案、AI 与连接、设置", "Profile, AI & connections, settings")}
               aria-haspopup="menu"
               aria-expanded={menu}
               onClick={() => setMenu(!menu)}
@@ -337,15 +401,15 @@ export function OverviewPage(props: OverviewPageProps) {
               {personal?.avatar ? (
                 <img src={personal.avatar} alt="" />
               ) : (
-                Array.from(personal?.name || "我")[0]
+                Array.from(personal?.name || t("我", "Me"))[0]
               )}
             </button>
             {menu && (
               <div className={css.menu} role="menu">
                 {[
-                  ["profile", "个人档案"],
-                  ["connections", "AI 与连接"],
-                  ["settings", "设置"],
+                  ["profile", t("个人档案", "Profile")],
+                  ["connections", t("AI 与连接", "AI & connections")],
+                  ["settings", t("设置", "Settings")],
                 ].map(([id, title]) => (
                   <button
                     type="button"
@@ -360,7 +424,7 @@ export function OverviewPage(props: OverviewPageProps) {
                   </button>
                 ))}
                 <button type="button" role="menuitem" onClick={() => startGuide()}>
-                  开始使用
+                  {t("开始使用", "Get started")}
                 </button>
               </div>
             )}
@@ -375,13 +439,17 @@ export function OverviewPage(props: OverviewPageProps) {
         )}
         {data?.warnings.length ? (
           <details className={css.small}>
-            <summary>{data.warnings.length} 项资料需要检查</summary>
+            <summary>
+              {t(`${data.warnings.length} 项资料需要检查`, `${data.warnings.length} items need checking`)}
+            </summary>
             {data.warnings.map((warning) => (
               <p key={warning}>{warning}</p>
             ))}
           </details>
         ) : null}
-        {guide === undefined && !error && <output className={css.small}>正在读取开图…</output>}
+        {guide === undefined && !error && (
+          <output className={css.small}>{t("正在读取开图…", "Loading Kaitu…")}</output>
+        )}
         {guideVisible && view !== "overview" && (
           <div className={css["sec-head"]}>
             <button
@@ -393,7 +461,7 @@ export function OverviewPage(props: OverviewPageProps) {
                 void refresh();
               }}
             >
-              ← 回到今天
+              {t("← 回到今天", "← Back to Today")}
             </button>
           </div>
         )}
@@ -431,12 +499,20 @@ export function OverviewPage(props: OverviewPageProps) {
                 refresh={refresh}
               />
             )}
+            {data?.plans && (
+              <PlansCard
+                plans={data.plans}
+                addGoalNext={props.addGoalNext}
+                refresh={refresh}
+                open={(section) => (section === "projects" ? openRecord("projects") : openSection("explore"))}
+              />
+            )}
             <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
           </>
         )}
         {view === "overview" && slot && (
           <CalendarSlotForm
-            date={calendar?.planDate ?? calendar?.today ?? "今天"}
+            date={calendar?.planDate ?? calendar?.today ?? t("今天", "Today")}
             close={() => setSlot(null)}
             save={async (start, end) => {
               await props.scheduleNext(slot.file, slot.id, start, end);
@@ -451,38 +527,54 @@ export function OverviewPage(props: OverviewPageProps) {
           (data.empty ? (
             <>
               <div className={css.head}>
-                <h1>今天</h1>
-                <span className={css.sub}>先记下一句，开图就开始认识你</span>
+                <h1>{t("今天", "Today")}</h1>
+                <span className={css.sub}>
+                  {t("先记下一句，开图就开始认识你", "Write one line and Kaitu starts getting to know you")}
+                </span>
               </div>
               {capture}
-              <p className={css.small}>有了真实记录后，你的数据和最近变化会出现在这里。</p>
+              <p className={css.small}>
+                {t(
+                  "有了真实记录后，你的数据和最近变化会出现在这里。",
+                  "Once you have real notes, your data and recent changes show up here.",
+                )}
+              </p>
             </>
           ) : (
             <>
               <div className={css.sec}>
                 <div className={css.head}>
                   <h1>
-                    {new Intl.DateTimeFormat("zh-CN", {
+                    {dateFormat(locale ?? "zh-CN", {
                       timeZone: "UTC",
                       month: "long",
                       day: "numeric",
                       weekday: "long",
                     }).format(new Date(`${data.today}T12:00:00Z`))}
                   </h1>
-                  <span className={css.sub}>今天的事，一件一件来</span>
+                  <span className={css.sub}>{t("今天的事，一件一件来", "One thing at a time today")}</span>
                 </div>
                 {capture}
               </div>
               {(!onboarding?.next || focus) && (
                 <section className={css.sec}>
-                  <h2 className={css.eyebrow}>现在最该做的</h2>
+                  <h2 className={css.eyebrow}>{t("现在最该做的", "Most important now")}</h2>
                   <div className={`${css.focus} ${css.card}`}>
                     <div className={css["focus-body"]}>
-                      <h2 className={css["focus-title"]}>{focus?.title ?? "今天，留一点空间给下一步"}</h2>
+                      <h2 className={css["focus-title"]}>
+                        {focus?.title ??
+                          t("今天，留一点空间给下一步", "Leave some room today for a next step")}
+                      </h2>
                       <p className={css.small}>
                         {focus
-                          ? `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`
-                          : "看看最近的变化，或记下一件值得跟进的事。"}
+                          ? t(
+                              `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`,
+                              `From ${focus.module}${focus.proposed ? " · suggestion, needs confirming" : ""}`,
+                            )
+                          : t(
+                              "看看最近的变化，或记下一件值得跟进的事。",
+                              "Look at recent changes, or note something worth following up.",
+                            )}
                       </p>
                     </div>
                     {focus && (
@@ -494,7 +586,7 @@ export function OverviewPage(props: OverviewPageProps) {
                             disabled={busy}
                             onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
                           >
-                            完成
+                            {t("完成", "Done")}
                           </button>
                         )}
                         {!focus.proposed && (
@@ -503,7 +595,7 @@ export function OverviewPage(props: OverviewPageProps) {
                             className={css.link}
                             onClick={() => setSlot({ file: focus.file, id: focus.id })}
                           >
-                            安排时间段
+                            {t("安排时间段", "Schedule a time")}
                           </button>
                         )}
                         <button
@@ -511,7 +603,7 @@ export function OverviewPage(props: OverviewPageProps) {
                           className={`${css.btn} ${css["btn-quiet"]}`}
                           onClick={() => openSection(focus.section)}
                         >
-                          查看相关资料
+                          {t("查看相关资料", "Related notes")}
                         </button>
                       </>
                     )}
@@ -521,7 +613,7 @@ export function OverviewPage(props: OverviewPageProps) {
                       <button
                         type="button"
                         className={css.check}
-                        aria-label={`完成：${item.title}`}
+                        aria-label={t(`完成：${item.title}`, `Done: ${item.title}`)}
                         disabled={busy || item.proposed}
                         onClick={() => void run(() => props.completeNext(item.file, item.id))}
                       >
@@ -530,7 +622,7 @@ export function OverviewPage(props: OverviewPageProps) {
                       <span className={css["row-title"]}>{item.title}</span>
                       <span className={css.chip}>
                         {item.module}
-                        {item.proposed ? " · 待确认" : ""}
+                        {item.proposed ? t(" · 待确认", " · to confirm") : ""}
                       </span>
                       {!item.proposed && (
                         <button
@@ -538,17 +630,19 @@ export function OverviewPage(props: OverviewPageProps) {
                           className={css.link}
                           onClick={() => setSlot({ file: item.file, id: item.id })}
                         >
-                          安排时间段
+                          {t("安排时间段", "Schedule a time")}
                         </button>
                       )}
                       <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                        查看
+                        {t("查看", "View")}
                       </button>
                     </div>
                   ))}
                   {data.allNext.length > 3 && (
                     <details>
-                      <summary className={css.link}>全部 {data.allNext.length} 条下一步</summary>
+                      <summary className={css.link}>
+                        {t(`全部 ${data.allNext.length} 条下一步`, `All ${data.allNext.length} next steps`)}
+                      </summary>
                       {data.allNext.map((item) => (
                         <div className={css.row} key={item.id}>
                           <span className={css["row-title"]}>{item.title}</span>
@@ -557,7 +651,7 @@ export function OverviewPage(props: OverviewPageProps) {
                             className={css.link}
                             onClick={() => openSection(item.section)}
                           >
-                            查看
+                            {t("查看", "View")}
                           </button>
                         </div>
                       ))}
@@ -587,7 +681,7 @@ export function OverviewPage(props: OverviewPageProps) {
                 .filter((b) => b.status === "pending" && b.kind === "proposal")
                 .map((b) => (
                   <section className={css.ask} key={b.id}>
-                    <h2 className={css.eyebrow}>要你确认</h2>
+                    <h2 className={css.eyebrow}>{t("要你确认", "Needs your confirmation")}</h2>
                     <p>
                       {b.title} · {b.start}
                       {b.end ? `–${b.end}` : ""}
@@ -598,7 +692,7 @@ export function OverviewPage(props: OverviewPageProps) {
                       disabled={busy}
                       onClick={() => void run(() => props.decideProposal(b.id, "confirmed"))}
                     >
-                      确认
+                      {t("确认", "Confirm")}
                     </button>
                     <button
                       type="button"
@@ -606,16 +700,19 @@ export function OverviewPage(props: OverviewPageProps) {
                       disabled={busy}
                       onClick={() => void run(() => props.decideProposal(b.id, "rejected"))}
                     >
-                      不用
+                      {t("不用", "No thanks")}
                     </button>
                   </section>
                 ))}
               {data.sync.needsReview > 0 && (
                 <section className={css.ask}>
-                  <b>要你确认</b>
+                  <b>{t("要你确认", "Needs your confirmation")}</b>
                   {data.sync.directionSuggestions > 0 && (
                     <button type="button" className={css.link} onClick={() => openSection("explore")}>
-                      {data.sync.directionSuggestions} 个方向建议
+                      {t(
+                        `${data.sync.directionSuggestions} 个方向建议`,
+                        `${data.sync.directionSuggestions} direction suggestions`,
+                      )}
                     </button>
                   )}
                   {(data.sync.mapNeedsReview > 0 || data.sync.mapPendingImports > 0) && (
@@ -627,12 +724,12 @@ export function OverviewPage(props: OverviewPageProps) {
                         setExplore("footprints");
                       }}
                     >
-                      足迹需要核对
+                      {t("足迹需要核对", "Footprints to review")}
                     </button>
                   )}
                   {data.inboxNotes > 0 && (
                     <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
-                      {data.inboxNotes} 条原文需要核对
+                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
                     </button>
                   )}
                 </section>
@@ -643,10 +740,12 @@ export function OverviewPage(props: OverviewPageProps) {
               )}
               <section className={css.sec}>
                 <div className={css["sec-head"]}>
-                  <h2 className={css.eyebrow}>最近的变化</h2>
+                  <h2 className={css.eyebrow}>{t("最近的变化", "Recent changes")}</h2>
                   {data.daily && (
                     <details>
-                      <summary className={css.link}>近期回顾 · {data.daily.date}</summary>
+                      <summary className={css.link}>
+                        {t("近期回顾", "Recent review")} · {data.daily.date}
+                      </summary>
                       <div className={css.detailBody}>{data.daily.body}</div>
                     </details>
                   )}
@@ -654,13 +753,15 @@ export function OverviewPage(props: OverviewPageProps) {
                 {data.versions.slice(0, 3).map((version) => (
                   <div className={css["feed-row"]} key={version.oid}>
                     <span className={css.ini}>
-                      {version.source === "user" ? "我" : (version.actor?.[0] ?? "图")}
+                      {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
                     </span>
                     <p>{version.text}</p>
                     <time className={css.small}>{stamp(version.time)}</time>
                   </div>
                 ))}
-                {!data.versions.length && <p className={css.small}>还没有新的变化</p>}
+                {!data.versions.length && (
+                  <p className={css.small}>{t("还没有新的变化", "No changes yet")}</p>
+                )}
               </section>
             </>
           ))}
@@ -669,13 +770,23 @@ export function OverviewPage(props: OverviewPageProps) {
             <div className={css.sec}>
               {record && (
                 <button type="button" className={css.link} onClick={() => setRecord("")}>
-                  ← 资料
+                  {t("← 资料", "← Library")}
                 </button>
               )}
               <div className={css.head}>
-                <h1>{modules.find(([id]) => id === record)?.[1] ?? "资料"}</h1>
+                <h1>
+                  {(() => {
+                    const item = modules.find(([id]) => id === record);
+                    return item ? t(item[1] as string, item[2] as string) : t("资料", "Library");
+                  })()}
+                </h1>
                 <span className={css.sub}>
-                  {record ? "完整的记录和来源" : "开图里的全部资料，都存在你自己的文件夹"}
+                  {record
+                    ? t("完整的记录和来源", "Full records and sources")
+                    : t(
+                        "开图里的全部资料，都存在你自己的文件夹",
+                        "Everything in Kaitu, kept in your own folder",
+                      )}
                 </span>
               </div>
             </div>
@@ -715,14 +826,19 @@ export function OverviewPage(props: OverviewPageProps) {
           <>
             <div className={css.sec}>
               <div className={css.head}>
-                <h1>开图</h1>
-                <span className={css.sub}>想试的方向、走过的地方、值得看的新东西</span>
+                <h1>{t("开图", "Explore")}</h1>
+                <span className={css.sub}>
+                  {t(
+                    "想试的方向、走过的地方、值得看的新东西",
+                    "Directions to try, places you've been, new things worth a look",
+                  )}
+                </span>
               </div>
-              <div className={css.subtabs} role="toolbar" aria-label="开图里的内容">
+              <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
                 {[
-                  ["directions", "方向"],
-                  ["footprints", "足迹"],
-                  ["news", "资讯"],
+                  ["directions", t("方向", "Directions")],
+                  ["footprints", t("足迹", "Footprints")],
+                  ["news", t("资讯", "News")],
                 ].map(([id, title]) => (
                   <button
                     type="button"
@@ -761,6 +877,9 @@ export function OverviewPage(props: OverviewPageProps) {
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
+            onHandoverAnswer={handoverAnswer}
+            locale={locale ?? "zh-CN"}
+            onLocale={changeLocale}
           />
         )}
         {guideVisible && view !== "overview" && (
@@ -775,7 +894,7 @@ export function OverviewPage(props: OverviewPageProps) {
                 void refresh();
               }}
             >
-              完成
+              {t("完成", "Done")}
             </button>
           </div>
         )}

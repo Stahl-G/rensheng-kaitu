@@ -21,7 +21,16 @@ import { refreshOverview } from "./overview.js";
 import { rebaseProjectLinks } from "./projects.js";
 import { setStateBinding, stateBinding } from "./state-binding.js";
 import { requestICloudDownload } from "./sync-files.js";
-import { type SyncMode, iCloudDirectory, syncMode } from "./sync-location.js";
+import {
+  type SyncMode,
+  type SyncProvider,
+  folderProvider,
+  iCloudDirectory,
+  nutstoreDirectory,
+  syncMode,
+  syncProvider,
+  syncProviders,
+} from "./sync-location.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -118,12 +127,28 @@ async function verify(ws: Workspace) {
   }
 }
 
+/** 设置页可直接选的默认同步目录：找不到或无法唯一确定时为 null。 */
+function suggestedFolders() {
+  let drive: string | null = null;
+  try {
+    drive = findDriveDirectory();
+  } catch {}
+  const icloud = iCloudDirectory();
+  return {
+    icloud: process.platform === "darwin" && existsSync(icloud) ? icloud : null,
+    drive,
+    nutstore: nutstoreDirectory(),
+  };
+}
+
 export function syncStatus(ws: Workspace) {
   const state = stateDirectory(ws.root, ws.isICloud);
   const mode = syncMode(ws.root);
   const file = ".kaitu/inbox-state.json";
   return {
     mode,
+    provider: syncProvider(ws.root, mode, state),
+    suggested: suggestedFolders(),
     path: ws.root,
     drivePath: mode === "drive" ? ws.root : null,
     hint: mode === "icloud" ? `在 Finder 里对 ${basename(ws.root)} 文件夹选『始终保留下载』` : null,
@@ -133,10 +158,18 @@ export function syncStatus(ws: Workspace) {
   };
 }
 
+const PROVIDER_NAMES: Record<SyncProvider, string> = {
+  local: "本机",
+  icloud: "iCloud",
+  "google-drive": "Google Drive",
+  nutstore: "坚果云",
+  folder: "同步文件夹",
+};
+
 export async function enableSync(
   ws: Workspace,
   mode: Exclude<SyncMode, "local">,
-  options: { dir?: string; name?: string } = {},
+  options: { dir?: string; name?: string; provider?: SyncProvider } = {},
 ) {
   if (mode !== "icloud" && mode !== "drive") throw new KaituError("请选择 icloud 或 drive", "BAD_ARGS");
   if (syncStatus(ws).mode !== "local")
@@ -149,7 +182,18 @@ export async function enableSync(
   const cloud = mode === "icloud" ? iCloudDirectory() : undefined;
   if (cloud && !existsSync(cloud))
     throw new KaituError("在系统设置 → Apple 账户 → iCloud 里打开 iCloud 云盘", "ICLOUD_DIRECTORY");
-  const folder = resolve(options.dir ?? cloud ?? findDriveDirectory());
+  if (mode === "drive" && (options.provider === "local" || options.provider === "icloud"))
+    throw new KaituError("同步方式与云盘不一致", "BAD_ARGS");
+  const nutstore = options.provider === "nutstore" && !options.dir ? nutstoreDirectory() : undefined;
+  if (options.provider === "nutstore" && !options.dir && !nutstore)
+    throw new KaituError(
+      "未找到坚果云同步文件夹，请先在坚果云里设好同步文件夹，再用 --dir 指定它",
+      "NUTSTORE_DIRECTORY",
+    );
+  if (options.provider === "folder" && !options.dir)
+    throw new KaituError("请指定同步文件夹 --dir <路径>", "BAD_ARGS");
+  const folder = resolve(options.dir ?? cloud ?? nutstore ?? findDriveDirectory());
+  const provider: SyncProvider = mode === "icloud" ? "icloud" : (options.provider ?? folderProvider(folder));
   accessSync(folder, constants.W_OK);
   const old = ws.root;
   const target = join(folder, name);
@@ -165,7 +209,7 @@ export async function enableSync(
     setStateBinding(old, state, mode);
     mkdirSync(join(old, ".kaitu"));
     ws.writeJson(".kaitu/config.json", { ...config, state_dir: state }, { internal: true });
-    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode })}\n`);
+    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode, provider })}\n`);
     // 配置留在同步文件夹，其他状态留在本机。
     rmSync(join(state, "config.json"));
     move(old, target);
@@ -184,7 +228,7 @@ export async function enableSync(
   relocationNote(old, target);
   setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   if (mode === "icloud") requestICloudDownload(target);
-  await snapshot(ws, `开启 ${mode === "icloud" ? "iCloud" : "Google Drive"} 同步`);
+  await snapshot(ws, `开启 ${PROVIDER_NAMES[provider]} 同步`);
   await verify(ws);
   return syncStatus(ws);
 }
@@ -250,8 +294,10 @@ export function enableDrive(ws: Workspace, options: { driveDir?: string; name?: 
   return enableSync(ws, "drive", { dir: options.driveDir, name: options.name });
 }
 
-export async function moveWorkspace(ws: Workspace, target: string, drive: boolean) {
+export async function moveWorkspace(ws: Workspace, target: string, drive: boolean, provider?: SyncProvider) {
   if (!isAbsolute(target)) throw new KaituError("请选择绝对路径", "BAD_ARGS");
+  if (provider !== undefined && !syncProviders.includes(provider))
+    throw new KaituError("不支持的同步方式", "BAD_ARGS");
   if (ws.exists(".kaitu/dsh-setup.json")) {
     const setup = ws.readJson<{ root?: string }>(".kaitu/dsh-setup.json");
     if (!setup.root) {
@@ -262,7 +308,11 @@ export async function moveWorkspace(ws: Workspace, target: string, drive: boolea
   const destination = resolve(target);
   const mode = driveStatus(ws).mode;
   if (drive && mode === "local")
-    return enableDrive(ws, { driveDir: dirname(destination), name: destination.split(/[\\/]/).at(-1) });
+    return enableSync(ws, provider === "icloud" ? "icloud" : "drive", {
+      dir: dirname(destination),
+      name: destination.split(/[\\/]/).at(-1),
+      ...(provider === undefined || provider === "icloud" || provider === "local" ? {} : { provider }),
+    });
   if (!drive && mode === "drive") return disableDrive(ws, { to: destination });
   const old = ws.root;
   separate(old, destination);

@@ -9,6 +9,9 @@ import type {
   OnboardingMatterDraft,
   OnboardingPath,
   OnboardingSetupInput,
+  OnboardingTarget,
+  Preferences,
+  SyncProvider,
 } from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
 import type {
@@ -148,6 +151,46 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error);
                 return r.value;
               },
+              promptOnboardingMatter: async (source: string, locale?: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterPrompt(source, locale);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              pasteOnboardingMatter: async (source: string, answer: string, locale?: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterPaste(source, answer, locale);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              addGoalNext: async (goalId: string, title: string) => {
+                const r = await ctx.remote.kaitu.goalNextAdd(goalId, title);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadHandover: async (locale?: string) => {
+                const r = await ctx.remote.kaitu.handoverPack(locale);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadPreferences: async (hint?: string) => {
+                const r = await ctx.remote.kaitu.preferences(hint);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              savePreferences: async (input: Preferences) => {
+                const r = await ctx.remote.kaitu.savePreferences(input);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              directionsPrompt: async (locale?: string) => {
+                const r = await ctx.remote.kaitu.directionsPrompt(locale);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              pasteDirections: async (answer: string, locale?: string) => {
+                const r = await ctx.remote.kaitu.directionsPaste(answer, locale);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               adoptOnboardingMatter: async (
                 source: string,
                 draft: OnboardingMatterDraft,
@@ -162,8 +205,8 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error);
                 return r.value;
               },
-              loadOnboarding: async () => {
-                const r = await ctx.remote.kaitu.onboarding();
+              loadOnboarding: async (locale?: string) => {
+                const r = await ctx.remote.kaitu.onboarding(locale);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
@@ -172,13 +215,17 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              previewOnboardingMemory: async (text: string, ai: OnboardingAi) => {
-                const r = await ctx.remote.kaitu.onboardingMemoryPreview(text, ai);
+              previewOnboardingMemory: async (text: string, ai: OnboardingAi, locale?: string) => {
+                const r = await ctx.remote.kaitu.onboardingMemoryPreview(text, ai, locale);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              confirmOnboardingMemory: async (token: string, selected: string[]) => {
-                const r = await ctx.remote.kaitu.onboardingMemoryConfirm(token, selected);
+              confirmOnboardingMemory: async (
+                token: string,
+                selected: string[],
+                targets?: Record<string, OnboardingTarget>,
+              ) => {
+                const r = await ctx.remote.kaitu.onboardingMemoryConfirm(token, selected, targets);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
@@ -264,8 +311,8 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              moveStorage: async (path: string, drive: boolean) => {
-                const r = await ctx.remote.kaitu.moveStorage(path, drive);
+              moveStorage: async (path: string, drive: boolean, provider?: SyncProvider) => {
+                const r = await ctx.remote.kaitu.moveStorage(path, drive, provider);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },

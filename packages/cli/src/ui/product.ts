@@ -8,6 +8,7 @@ import {
   type FinanceViewOptions,
   type ImportSource,
   KaituError,
+  type Locale,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoices,
@@ -15,10 +16,13 @@ import {
   type OnboardingMatterSuggestion,
   type OnboardingPath,
   type OnboardingSetupInput,
+  type OnboardingTarget,
   type ProjectGoal,
   type SettingsData,
+  type SyncProvider,
   type Workspace,
   addCalendarSubscription,
+  addGoalNext,
   adoptOnboardingMatter,
   bankNotificationCandidates,
   bindGithub,
@@ -36,6 +40,7 @@ import {
   confirmOnboardingSetup,
   createProject,
   decideProposal,
+  directionsPrompt,
   discardFinanceImport,
   dismissNews,
   draftOnboardingMatter,
@@ -45,12 +50,17 @@ import {
   financeAccounts,
   financeCashflow,
   financeOverview,
+  handoverPack,
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
   loadFinanceInvestments,
+  matterPrompt,
   moveWorkspace,
+  normalizeLocale,
   onboardingStatus,
+  pasteDirections,
+  pasteOnboardingMatter,
   previewExperienceBatch,
   previewFinanceImport,
   previewOnboardingImport,
@@ -80,11 +90,13 @@ import {
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  resolvePreferences,
   restore,
   saveAvatar,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  savePreferences,
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
@@ -126,7 +138,10 @@ export const productMutations = new Set([
   "onboardingMatterDraft",
   "onboardingMatterOrganize",
   "onboardingMatterAdopt",
+  "onboardingMatterPaste",
   "onboardingNextChange",
+  "goalNextAdd",
+  "directionsPaste",
   "onboardingSetupConfirm",
   "onboardingMemoryConfirm",
   "onboardingImportConfirm",
@@ -165,6 +180,7 @@ export async function productRequest(
     if (!Number.isInteger(args[i])) throw new KaituError("缺少记录版本", "BAD_ARGS");
     return args[i] as number;
   };
+  const locale = (i: number): Locale => normalizeLocale(args[i]);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
@@ -232,7 +248,7 @@ export async function productRequest(
       return restore(ws, text(0));
     case "moveStorage": {
       if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
-      return moveWorkspace(ws, text(0), args[1]);
+      return moveWorkspace(ws, text(0), args[1], (args[2] ?? undefined) as SyncProvider | undefined);
     }
     case "onboardingMatterKeep":
       return keepOnboardingMatter(ws, text(0));
@@ -241,7 +257,11 @@ export async function productRequest(
     case "onboardingMatterRead":
       return readOnboardingMatter(ws, text(0));
     case "onboardingMatterOrganize":
-      return organizeOnboardingMatter(ws, text(0), ask);
+      return organizeOnboardingMatter(ws, text(0), ask, locale(1));
+    case "onboardingMatterPrompt":
+      return matterPrompt(readOnboardingMatter(ws, text(0)).text, locale(1));
+    case "onboardingMatterPaste":
+      return pasteOnboardingMatter(ws, text(0), text(1), { locale: locale(2) });
     case "onboardingMatterDraft":
       return draftOnboardingMatter(ws, text(0), args[1] as OnboardingMatterSuggestion);
     case "onboardingMatterAdopt":
@@ -254,11 +274,25 @@ export async function productRequest(
     case "onboardingNextChange":
       return changeOnboardingNext(ws, text(0), revision(1), text(2), text(3));
     case "onboarding":
-      return onboardingStatus(ws);
+      return onboardingStatus(ws, { locale: locale(0) });
     case "onboardingMemoryPreview":
-      return previewOnboardingMemory(ws, text(0), text(1) as OnboardingAi);
+      return previewOnboardingMemory(ws, text(0), text(1) as OnboardingAi, { locale: locale(2) });
     case "onboardingMemoryConfirm":
-      return confirmOnboardingMemory(ws, text(0), args[1] as string[]);
+      return confirmOnboardingMemory(ws, text(0), args[1] as string[], {
+        targets: (args[2] ?? undefined) as Record<string, OnboardingTarget> | undefined,
+      });
+    case "goalNextAdd":
+      return addGoalNext(ws, text(0), text(1));
+    case "handoverPack":
+      return handoverPack(ws, locale(0));
+    case "directionsPrompt":
+      return directionsPrompt(ws, locale(0));
+    case "directionsPaste":
+      return pasteDirections(ws, text(0), { locale: locale(1) });
+    case "preferences":
+      return resolvePreferences(ws, args[0]);
+    case "savePreferences":
+      return savePreferences(args[0] as Parameters<typeof savePreferences>[0]);
     case "onboardingCancel":
       return cancelOnboardingPreview(ws, text(0));
     case "onboardingSetupPreview":

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { CalendarData, CalendarEntry } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices, CalendarSlotForm } from "./CalendarPush.js";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
 export interface CalendarPageProps extends CalendarPushServices {
   loadCalendar: () => Promise<CalendarData>;
@@ -31,6 +32,7 @@ export function calendarTime(value: string, zone: string) {
       }).format(new Date(value));
 }
 export function Agenda({ data, open }: { data: CalendarData | null; open: () => void }) {
+  const t = useT();
   const today =
     data?.events.filter(
       (event) =>
@@ -43,16 +45,16 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
   return (
     <section className={css.sec}>
       <div className={css["sec-head"]}>
-        <h2 className={css.eyebrow}>今天的日程</h2>
+        <h2 className={css.eyebrow}>{t("今天的日程", "Today's schedule")}</h2>
         <button type="button" className={css.link} onClick={open}>
-          看全部日程
+          {t("看全部日程", "Full schedule")}
         </button>
       </div>
       <div className={`${css.card} ${css.agenda}`}>
         {!data ? (
-          <p className={css.emptyState}>正在读取日程…</p>
+          <p className={css.emptyState}>{t("正在读取日程…", "Loading schedule…")}</p>
         ) : !today.length ? (
-          <p className={css.emptyState}>今天还没有日程</p>
+          <p className={css.emptyState}>{t("今天还没有日程", "Nothing scheduled today")}</p>
         ) : (
           today
             .sort((a, b) => a.start.localeCompare(b.start))
@@ -62,7 +64,7 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
                 <span>{event.title}</span>
                 <span className={css.small}>
                   {event.source}
-                  {event.pending ? " · 建议，待确认" : ""}
+                  {event.pending ? t(" · 建议，待确认", " · suggestion, to confirm") : ""}
                 </span>
               </div>
             ))
