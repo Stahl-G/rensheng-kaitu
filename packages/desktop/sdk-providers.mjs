@@ -88,8 +88,17 @@ export const providers = [
       { id: "qwen-vl-plus", image: true },
     ],
   },
-  { id: "kaitu-custom", name: "自定义（OpenAI 兼容）", api: "openai-completions", models: [] },
+  { id: "kaitu-custom", name: "自定义服务", api: "openai-completions", models: [] },
 ];
+export const protocols = [
+  { id: "openai-completions", name: "Chat Completions" },
+  { id: "openai-responses", name: "Responses" },
+  { id: "anthropic-messages", name: "Anthropic Messages" },
+  { id: "google-generative-ai", name: "Gemini" },
+];
+export function messagesPath(root) {
+  return root.endsWith("/v1") ? "/messages" : "/v1/messages";
+}
 export function credentialRef(provider) {
   return provider === "deepseek-official"
     ? "DEEPSEEK_API_KEY"
@@ -124,7 +133,12 @@ export function selection(input, previous = {}) {
       throw new Error("Base URL 请填写 HTTPS 地址，本机服务可用 HTTP；不要包含 Key 或登录信息");
     }
   }
-  return { provider, model, ...(provider === "kaitu-custom" ? { baseURL } : {}) };
+  const api =
+    provider === "kaitu-custom"
+      ? (input.api ?? (previous.provider === provider ? previous.api : undefined) ?? entry.api)
+      : entry.api;
+  if (!protocols.some((item) => item.id === api)) throw new Error("请选择支持的 API 协议");
+  return { provider, model, ...(provider === "kaitu-custom" ? { baseURL, api } : {}) };
 }
 export function connectionInfo(settings) {
   const entry = providers.find((item) => item.id === settings.provider) ?? providers[0];
@@ -133,6 +147,7 @@ export function connectionInfo(settings) {
     providerName: entry.name,
     supportsImages: entry.models.find((item) => item.id === settings.model)?.image ?? false,
     providers,
+    protocols,
   };
 }
 export function providerPatch(settings) {
@@ -148,7 +163,7 @@ export function providerPatch(settings) {
     apiKeyEnv,
     ...(declared
       ? {
-          api: entry.api,
+          api: settings.api ?? entry.api,
           baseURL: settings.baseURL ?? entry.baseURL,
           models: [
             {
@@ -184,20 +199,21 @@ export function connectionFailure(status, body = "") {
 export async function validateConnection(settings, apiKey) {
   const entry = providers.find((item) => item.id === settings.provider);
   const root = settings.baseURL ?? entry.baseURL;
+  const api = settings.api ?? entry.api;
   const headers = { "Content-Type": "application/json" };
   let path = "/chat/completions";
   let body = { model: settings.model, messages: [{ role: "user", content: "Reply OK" }], max_tokens: 16 };
-  if (entry.api === "anthropic-messages") {
-    path = "/v1/messages";
+  if (api === "anthropic-messages") {
+    path = messagesPath(root);
     headers["x-api-key"] = apiKey;
     headers["anthropic-version"] = "2023-06-01";
-  } else if (entry.api === "google-generative-ai") {
+  } else if (api === "google-generative-ai") {
     path = `/models/${encodeURIComponent(settings.model)}:generateContent`;
     headers["x-goog-api-key"] = apiKey;
     body = { contents: [{ parts: [{ text: "Reply OK" }] }], generationConfig: { maxOutputTokens: 16 } };
   } else {
     headers.Authorization = `Bearer ${apiKey}`;
-    if (entry.api === "openai-responses") {
+    if (api === "openai-responses") {
       path = "/responses";
       body = { model: settings.model, input: "Reply OK", max_output_tokens: 16 };
     }

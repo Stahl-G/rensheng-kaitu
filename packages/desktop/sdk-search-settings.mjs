@@ -1,11 +1,6 @@
 import { dirname, join } from "node:path";
+import { providers } from "./sdk-providers.mjs";
 export const searchProviders = [
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    ref: "DEEPSEEK_API_KEY",
-    keyUrl: "https://platform.deepseek.com/api_keys",
-  },
   {
     id: "perplexity",
     name: "Perplexity",
@@ -14,18 +9,39 @@ export const searchProviders = [
   },
   { id: "exa", name: "Exa", ref: "KAITU_SEARCH_EXA_API_KEY", keyUrl: "https://dashboard.exa.ai/api-keys" },
 ];
-export function searchSettings(statuses, preferred) {
+export function nativeSearchInfo(settings = {}, configured = false) {
+  const entry = providers.find((item) => item.id === settings.provider);
+  const api = settings.api ?? entry?.api;
+  const reason =
+    entry?.id === "openrouter"
+      ? "OpenRouter 搜索可能回落到其他搜索商，当前未接入。"
+      : entry?.id === "kaitu-qwen" && settings.model === "qwen-vl-plus"
+        ? "当前通义多模态模型的搜索需要流式接口，请换用 qwen-plus 或添加搜索服务。"
+        : undefined;
+  const supported = !!entry && !reason;
+  return {
+    provider: entry?.id ?? null,
+    name: entry?.name ?? "当前 AI 服务",
+    api,
+    supported,
+    ...(reason ? { reason } : {}),
+    configured: settings.choice === "builtin" && configured && supported,
+  };
+}
+export function searchSettings(statuses, preferred, native = nativeSearchInfo()) {
   const available = (id) => statuses[id] === true;
-  const provider = available("deepseek")
-    ? "deepseek"
-    : available(preferred)
-      ? preferred
-      : (searchProviders.find((item) => available(item.id))?.id ?? null);
+  const fallback = available(preferred)
+    ? preferred
+    : (searchProviders.find((item) => available(item.id))?.id ?? null);
+  const provider = native.configured ? native.provider : fallback;
   return {
     provider,
     configured: provider !== null,
-    name: searchProviders.find((item) => item.id === provider)?.name ?? null,
-    preferred: preferred ?? "perplexity",
+    name: native.configured
+      ? native.name
+      : (searchProviders.find((item) => item.id === provider)?.name ?? null),
+    native,
+    preferred: searchProviders.some((item) => item.id === preferred) ? preferred : "perplexity",
     providers: searchProviders.map(({ ref: _ref, ...item }) => ({ ...item, configured: available(item.id) })),
   };
 }
@@ -35,7 +51,7 @@ export function webRuntimePatch(hostPlugin) {
     { id: "web", config: { searchProvider: "kaitu-search", fetchProvider: "kaitu-public-http" } },
     { id: "tool-web", disabled: false },
     { id: "web-fetch-http", disabled: false },
-    { id: "web-search-deepseek", disabled: false, config: { apiKeyEnv: "DEEPSEEK_API_KEY" } },
+    { id: "web-search-deepseek", disabled: true },
     { insert: [{ id: "kaitu-sdk-web", name: webPlugin }] },
   ];
 }
