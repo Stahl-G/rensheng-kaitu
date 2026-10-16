@@ -10,6 +10,7 @@ import { findRecordType, listModules, recordFilePattern, resolveRecordPath } fro
 import { refreshOverview } from "./overview.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
+import { recordReference } from "./record-reference.js";
 import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -65,9 +66,15 @@ export async function writeAgentRecord(
     return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
   const ref = findRecordType(ws, type);
   if (type === "photo" && operation === "delete") return removePhoto(ws, id, { by: "agent", actor });
+  // 来源没写就记成交来的这个 Agent，和收件箱的做法一致。
+  const source = /MCP:(.+)）$/.exec(actor)?.[1] ?? actor;
+  const needsSource =
+    operation === "add" &&
+    data.source === undefined &&
+    recordReference(ws, type).required.some((field) => field.name === "source");
   const result =
     operation === "add"
-      ? addRecord(ws, type, data)
+      ? addRecord(ws, type, needsSource ? { ...data, source } : data)
       : operation === "update"
         ? updateRecord(ws, type, id, data)
         : deleteRecord(ws, type, id);

@@ -141,8 +141,11 @@ describe("时区与日期切分", () => {
     );
   });
 
-  it("拒绝不带时区偏移的时间", async () => {
-    const ws = await freshWorkspace();
-    expect(() => addRecord(ws, "workout", { ...workout, ts: "2026-10-15T20:00:00" })).toThrow(/时区偏移/);
+  it("不带时区偏移的时间按工作区时区的当地时间保存，读不出的仍拒绝", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    expect(addRecord(ws, "workout", { ...workout, ts: "2026-10-15T20:00:00" }).record.ts).toBe(
+      "2026-10-15T20:00:00+08:00",
+    );
+    expect(() => addRecord(ws, "workout", { ...workout, ts: "昨晚八点" })).toThrow(/时区偏移/);
   });
 });

@@ -91,7 +91,9 @@ export function formatErrors(errors: ErrorObject[] | null | undefined): SchemaIs
         ? `缺少字段 ${(e.params as { missingProperty: string }).missingProperty}`
         : e.keyword === "additionalProperties"
           ? `多余字段 ${(e.params as { additionalProperty: string }).additionalProperty}`
-          : `${e.message ?? e.keyword}`,
+          : e.keyword === "enum"
+            ? `只能是 ${(e.params as { allowedValues: unknown[] }).allowedValues.join("、")}`
+            : `${e.message ?? e.keyword}`,
   }));
 }
 

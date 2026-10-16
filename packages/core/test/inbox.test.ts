@@ -103,6 +103,15 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
       },
       { type: "activity", date: "2026-07-01", steps: 100 },
       { type: "task", title: "给妈妈买生日礼物", status: "open", due: "2026-07-08" },
+      // AI 常见写法：英文餐次、带单位的数字、一道菜名、不带时区的时间。
+      {
+        type: "meal",
+        meal: "dinner",
+        items: "釜山猪肉汤饭",
+        kcal: "约 1050 kcal",
+        protein_g: "35 g",
+        ts: "2026-07-01 19:30",
+      },
     ];
     ws.writeText("inbox/agents/dot.records.jsonl", `${input.map((r) => JSON.stringify(r)).join("\n")}\n`);
     const result = await processInbox(ws, { stableMs: 0 });
@@ -115,6 +124,14 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
         source: "dot",
       }),
     ]);
+    expect(readRecords(ws, "meal")[0]).toMatchObject({
+      meal: "晚",
+      items: [{ name: "釜山猪肉汤饭" }],
+      kcal: 1050,
+      protein_g: 35,
+      ts: "2026-07-01T19:30:00-04:00",
+      source: "dot",
+    });
     const rows = readRecords(ws, "metric");
     expect(rows.map(({ source, ts }) => ({ source, ts }))).toEqual([
       { source: "scale", ts: "2026-01-01T12:00:00-05:00" },

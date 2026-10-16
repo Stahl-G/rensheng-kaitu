@@ -10,6 +10,7 @@ import {
   resolveRecordPath,
 } from "./modules.js";
 import { mergeNewsRecord } from "./news.js";
+import { normalizeRecordInput } from "./record-input.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -51,12 +52,8 @@ function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord)
   ) {
     throw new KaituError("AI 只能新增方向建议，方向状态由用户决定", "USER_DECISION");
   }
-  if (existsSync(join(ws.root, ref.module.dir, ref.def.schema)))
-    resolveRecordPath(ws, ref, `${ref.module.dir}/${ref.def.schema}`);
   const reg = schemas();
-  const fn = record.deleted
-    ? reg.builtin("tombstone.schema.json")
-    : reg.forModule(ref.module.def.id, join(ws.root, ref.module.dir), ref.def.schema);
+  const fn = record.deleted ? reg.builtin("tombstone.schema.json") : validatorFor(ws, ref);
   if (!fn(record)) {
     const issues = formatErrors(fn.errors)
       .map((i) => `${i.path} ${i.message}`)
@@ -70,6 +67,12 @@ function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord)
       `记录公共字段不合法：${JSON.stringify(formatErrors(base.errors))}`,
       "INVALID_RECORD",
     );
+}
+
+function validatorFor(ws: Workspace, ref: RecordTypeRef) {
+  if (existsSync(join(ws.root, ref.module.dir, ref.def.schema)))
+    resolveRecordPath(ws, ref, `${ref.module.dir}/${ref.def.schema}`);
+  return schemas().forModule(ref.module.def.id, join(ws.root, ref.module.dir), ref.def.schema);
 }
 
 function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
@@ -113,7 +116,9 @@ export function addRecords(
   if (news && !opts.dryRun) ws.assertDownloaded(recordFilePattern(ref).dir);
   const existing = news ? readRecords(ws, type) : [];
   const pending: WriteResult[] = [];
-  const results = data.map((item) => {
+  const schema = validatorFor(ws, ref).schema;
+  const results = data.map((raw) => {
+    const item = normalizeRecordInput(schema, raw, tz, opts.now ?? new Date());
     const ts = typeof item.ts === "string" ? item.ts : isoInZone(opts.now ?? new Date(), tz);
     parseTs(ts);
     const { ts: _ts, ...rest } = stripReserved(item);
