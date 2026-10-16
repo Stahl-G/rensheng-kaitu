@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import addFormatsModule from "ajv-formats";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { schemasDir } from "./assets.js";
@@ -50,15 +51,27 @@ export class SchemaRegistry {
    * 自定义 schema 挂在同一个 base URI 下，所以可以直接 $ref "record-base.schema.json"。
    */
   forModule(moduleId: string, moduleDirAbs: string, ref: string): ValidateFunction {
-    const custom = join(moduleDirAbs, ref);
+    const custom = resolve(moduleDirAbs, ref);
+    const confined = (base: string, path: string) => {
+      const rel = relative(base, path);
+      if (
+        isAbsolute(rel) ||
+        rel === ".." ||
+        rel.startsWith(`..${sep}`) ||
+        rel.split(sep).some((part) => part === ".kaitu" || part === ".git")
+      )
+        throw new Error("schema 路径超出模块目录");
+    };
+    confined(moduleDirAbs, custom);
     if (existsSync(custom)) {
+      confined(realpathSync(moduleDirAbs), realpathSync(custom));
       const key = custom;
       let fn: ValidateFunction | undefined = this.cache.get(key);
       if (!fn) {
         if (isICloudPath(dirname(moduleDirAbs))) assertCloudDownloaded(custom);
         const schema = JSON.parse(readFileSync(custom, "utf8"));
         const base = ref.split("/").pop() ?? ref;
-        schema.$id = `${SCHEMA_BASE}${moduleId}--${base}`;
+        schema.$id = `${SCHEMA_BASE}${moduleId}-${createHash("sha256").update(custom).digest("hex")}--${base}`;
         fn = this.ajv.compile(schema);
         this.cache.set(key, fn);
       }

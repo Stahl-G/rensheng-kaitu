@@ -69,3 +69,7 @@ export * from "./news-feedback.js";
 export * from "./settings.js";
 export * from "./sync-location.js";
 export * from "./onboarding.js";
+
+export * from "./agent-file-policy.js";
+
+export * from "./bank-mail.js";

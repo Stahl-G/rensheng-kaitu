@@ -36,6 +36,14 @@ const save = (ws: Workspace, rows: BankNotificationCandidate[]) => {
 };
 const file = (ws: Workspace) => join(stateDirectory(ws.root), "finance-notifications.json");
 
+export function isBankNotificationMail(mail: BankMail): boolean {
+  return (
+    /(?:@|\.)(?:cmbchina\.com|icbc\.com\.cn|ccb\.(?:com|cn|com\.cn)|boc\.(?:cn|com))>?$/i.test(
+      mail.sender.trim(),
+    ) && /动账|交易|消费|账户变动|收支|入账|扣款/.test(mail.subject)
+  );
+}
+
 export function parseBankNotification(mail: BankMail): BankNotification | null {
   try {
     const received = parseTs(mail.time);

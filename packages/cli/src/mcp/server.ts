@@ -3,11 +3,11 @@ import {
   addExperiences,
   addMemory,
   addTask,
+  assertPublicInput,
   assertPublicProject,
   completeTask,
   dismissNews,
   explorationCommandSchema,
-  findRecordType,
   inboxNoteDone,
   inboxNotes,
   lifeMap,
@@ -18,7 +18,7 @@ import {
   onboardingStatus,
   projectGithub,
   proposeBlock,
-  publicProject,
+  publicRecords,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -111,7 +111,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     sensitive: z.boolean().optional(),
   };
   register("onboarding_status", "读取首次使用内容、待核对草稿、已采纳下一步和实时开始清单。", {}, () =>
-    onboardingStatus(ws),
+    onboardingStatus(ws, { publicOnly: tools === "remote" }),
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),
@@ -137,17 +137,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "record_list",
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
-    ({ type, from, to }) =>
-      tools === "remote" &&
-      (findRecordType(ws, type).module.def.id === "finance" ||
-        findRecordType(ws, type).module.dir === "finance")
-        ? []
-        : readRecords(ws, type, { from, to }).filter(
-            (row) =>
-              tools !== "remote" ||
-              !["project_metric", "github_snapshot"].includes(type) ||
-              publicProject(ws, row.project),
-          ),
+    ({ type, from, to }) => {
+      const rows = readRecords(ws, type, { from, to, includePrivate: tools !== "remote" });
+      return tools === "remote" ? publicRecords(ws, type, rows) : rows;
+    },
   );
   register(
     "task_add",
@@ -160,14 +153,20 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       notes: text.optional(),
       source: text.optional(),
     },
-    (input) => addTask(ws, input, { by: "agent", actor: actor() }),
+    (input) => {
+      if (tools === "remote") assertPublicInput(ws, input);
+      return addTask(ws, input, { by: "agent", actor: actor() });
+    },
     true,
   );
   register(
     "task_list",
     "查询待办，默认 open；dueBefore 日期含当天，时间截止按用户时区判断。",
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
-    (input) => listTasks(ws, input),
+    (input) => {
+      const rows = listTasks(ws, { ...input, includePrivate: tools !== "remote" });
+      return tools === "remote" ? publicRecords(ws, "task", rows) : rows;
+    },
   );
   const experience = z
     .object({
@@ -195,12 +194,22 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     ({ items }) => addExperiences(ws, items, "agent"),
     true,
   );
-  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
+  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () =>
+    readExploration(ws, tools === "remote"),
+  );
   register(
     "exploration_write",
     "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户采纳、暂停或归档。",
     { command: explorationCommandSchema },
-    ({ command }) => writeExploration(ws, command, "agent"),
+    async ({ command }) => {
+      if (tools === "remote") {
+        if ("id" in command) assertPublicInput(ws, { id: command.id });
+        assertPublicInput(ws, command.data as unknown as Record<string, unknown>);
+      }
+      const result = await writeExploration(ws, command, "agent");
+      if (tools === "remote") assertPublicInput(ws, result.record);
+      return result;
+    },
     true,
   );
   register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
@@ -230,7 +239,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "record_add",
     "新增一条日常记录，无需确认，可从历史撤销；批量导入须先由用户确认。",
     { type, data },
-    ({ type, data }) => writeAgentRecord(ws, "add", type, actor(), data),
+    ({ type, data }) => {
+      if (tools === "remote") assertPublicInput(ws, data);
+      return writeAgentRecord(ws, "add", type, actor(), data);
+    },
     true,
   );
   register(
@@ -258,7 +270,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       module: text.optional(),
       ref: text.optional(),
     },
-    (input) => proposeBlock(ws, input, actor()),
+    (input) => {
+      if (tools === "remote") assertPublicInput(ws, input);
+      return proposeBlock(ws, input, actor());
+    },
     true,
   );
   register("project_list", "列出项目进度与下一步。", {}, () =>

@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
+import { readPlan } from "./private-plan.js";
 import { renderRecordReference } from "./record-reference.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
@@ -180,7 +181,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
       const plan = parseFrontmatter<{
         date: string;
         blocks: { start?: string; end?: string; title: string; status: string }[];
-      }>(ws.readText("NOW.md")).data;
+      }>(readPlan(ws, true)).data;
       lines.push("", `## 最近计划（${plan.date}）`, "");
       for (const block of plan.blocks)
         lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);

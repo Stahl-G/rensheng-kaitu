@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fetchCalendar } from "./calendar-fetch.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { importIcs } from "./importers/ics.js";
@@ -72,25 +73,9 @@ export async function pullCalendarSubscriptions(ws: Workspace, now = new Date())
     row.attemptedAt = now.toISOString();
     const directory = mkdtempSync(join(tmpdir(), "kaitu-calendar-"));
     try {
-      const response = await fetch(row.url, { signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw new Error();
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error();
-      const chunks: Uint8Array[] = [];
-      let size = 0;
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          size += value.byteLength;
-          if (size > 10 * 1024 * 1024) throw new Error();
-          chunks.push(value);
-        }
-      } finally {
-        await reader.cancel();
-      }
+      const bytes = await fetchCalendar(row.url);
       const input = join(directory, "calendar.ics");
-      writeFileSync(input, Buffer.concat(chunks), { mode: 0o600 });
+      writeFileSync(input, bytes, { mode: 0o600 });
       await importIcs(ws, input, { calendar: `subscription:${row.id}`, now });
       row.syncedAt = now.toISOString();
       row.error = null;

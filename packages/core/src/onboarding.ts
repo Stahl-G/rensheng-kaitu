@@ -30,7 +30,7 @@ import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { type ModuleStatus, readWorkbench } from "./workbench.js";
-import { type Workspace, stateDirectory } from "./workspace.js";
+import type { Workspace } from "./workspace.js";
 
 export const ONBOARDING = {
   welcome: {
@@ -331,6 +331,7 @@ export interface OnboardingChoiceResult {
 }
 export interface OnboardingOptions {
   stateRoot?: string;
+  publicOnly?: boolean;
 }
 
 function localDirectory(ws: Workspace, options: OnboardingOptions): string {
@@ -417,6 +418,7 @@ interface MemoryPreview {
 }
 interface FilePreview {
   kind: "file";
+  digest: string;
   source: ImportSource;
   file: string;
   name: string;
@@ -648,12 +650,13 @@ export async function previewOnboardingImport(
 ): Promise<OnboardingImportPreview> {
   if (!["ics", "apple-health", "chatgpt-conversations"].includes(source))
     throw new KaituError("请使用对应数据源的导入预览", "BAD_ARGS");
+  const digest = createHash("sha256").update(bytes).digest("hex");
   const file = stageUpload(ws, source, name, bytes);
   try {
     const preview = await importUpload(ws, source, file, true, name);
     const token = savePreview(
       ws,
-      { kind: "file", source, file, name, preview, expires: Date.now() + 30 * 60000 },
+      { kind: "file", digest, source, file, name, preview, expires: Date.now() + 30 * 60000 },
       options,
     );
     return { token, preview };
@@ -669,6 +672,8 @@ export async function confirmOnboardingImport(
 ): Promise<OnboardingImportResult> {
   const preview = readPreview(ws, token, options);
   if (preview.kind !== "file") throw new KaituError("不是文件导入预览", "BAD_ARGS");
+  if (createHash("sha256").update(ws.readBytes(preview.file)).digest("hex") !== preview.digest)
+    throw new KaituError("文件已变化，请重新预览", "CONFLICT");
   const current = await importUpload(ws, preview.source, preview.file, true, preview.name);
   if (JSON.stringify(current) !== JSON.stringify(preview.preview))
     throw new KaituError("数据已变化，请重新预览", "CONFLICT");
@@ -730,7 +735,7 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       .filter((m) => m.def.id === module)
       .flatMap((m) => Object.keys(m.def.records ?? {}))
       .reduce((n, type) => n + (data.records[type]?.length ?? 0), 0);
-  const calendarFile = join(stateDirectory(ws.root), "calendar-subscriptions.json");
+  const calendarFile = ws.resolve(".kaitu/calendar-subscriptions.json", { internal: true });
   const calendars: CalendarSubscription[] = existsSync(calendarFile)
     ? JSON.parse(readFileSync(calendarFile, "utf8"))
     : [];
@@ -760,7 +765,9 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
-  const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
+  const adopted = listTasks(ws, { status: "all", includePrivate: !options.publicOnly }).filter(
+    isOnboardingTask,
+  );
   const latest = adopted
     .filter((task) => task.status !== "cancelled")
     .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))[0];

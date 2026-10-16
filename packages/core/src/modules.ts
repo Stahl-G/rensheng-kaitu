@@ -1,6 +1,7 @@
-import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
+import { schemas } from "./schema.js";
 import type { Workspace } from "./workspace.js";
 
 export interface RecordDef {
@@ -36,9 +37,12 @@ export function listModules(ws: Workspace): LoadedModule[] {
     if (ws.conflictCopy(name)) continue;
     if (NOT_MODULES.has(name) || name.startsWith(".")) continue;
     const full = join(ws.root, name);
-    if (!statSync(full).isDirectory() || !ws.exists(`${name}/module.json`)) continue;
+    if (!lstatSync(full).isDirectory()) continue;
     try {
-      out.push({ dir: name, def: ws.readJson<ModuleDef>(`${name}/module.json`) });
+      if (!ws.exists(`${name}/module.json`)) continue;
+      const def = ws.readJson<ModuleDef>(`${name}/module.json`);
+      if (!schemas().builtin("module.schema.json")(def)) continue;
+      out.push({ dir: name, def });
     } catch {
       // 损坏的 module.json 由 validate 报告，这里跳过
     }
@@ -84,4 +88,23 @@ export function recordFilePattern(ref: RecordTypeRef): { dir: string; match: Reg
 
 export function recordFileFor(ref: RecordTypeRef, month: string): string {
   return `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`;
+}
+
+export function resolveRecordPath(ws: Workspace, ref: RecordTypeRef, file: string): string {
+  const base = ws.resolve(ref.module.dir);
+  const target = ws.resolve(file);
+  const inside = (root: string, path: string) => {
+    const rel = relative(root, path);
+    return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
+  };
+  if (!inside(base, target)) throw new KaituError("记录路径超出模块目录", "OUT_OF_SCOPE");
+  let probe = target;
+  while (!existsSync(probe)) {
+    const parent = dirname(probe);
+    if (parent === probe) break;
+    probe = parent;
+  }
+  if (!inside(realpathSync(base), realpathSync(probe)))
+    throw new KaituError("记录路径经符号链接超出模块目录", "OUT_OF_SCOPE");
+  return target;
 }

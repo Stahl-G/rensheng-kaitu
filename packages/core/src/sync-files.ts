@@ -1,6 +1,6 @@
 import childProcess from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { KaituError } from "./errors.js";
 import { isICloudPath } from "./sync-location.js";
 
@@ -31,7 +31,8 @@ export function cloudPlaceholder(root: string, file: string): boolean {
 const downloads = new Map<string, number>();
 let lastPruned = 0;
 
-export function requestICloudDownload(path: string): void {
+export function requestICloudDownload(inputPath: string): void {
+  const path = resolve(inputPath);
   const now = Date.now();
   const previous = downloads.get(path);
   if (previous !== undefined && now - previous < 30000) return;
@@ -41,7 +42,11 @@ export function requestICloudDownload(path: string): void {
   }
   downloads.set(path, now);
   try {
-    const child = childProcess.spawn("brctl", ["download", path], { detached: true, stdio: "ignore" });
+    const child = childProcess.spawn("/usr/bin/brctl", ["download", path], {
+      detached: true,
+      stdio: "ignore",
+      shell: false,
+    });
     child.on("error", () => {});
     child.unref();
   } catch {}

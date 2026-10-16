@@ -10,18 +10,22 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { currentWorkspace, localStateRoot } from "./drive.js";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { quarantineBankNotes } from "./bank-mail.js";
+import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import { readPlan, relocatePlan, writePlan } from "./private-plan.js";
+import { relocateProjectRecords } from "./private-records.js";
+import { resumeProjectVisibility } from "./projects.js";
+import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
   conflictOriginal,
   isEvictedICloudFile,
   placeholderOriginal as placeholderName,
-  readWorkspaceConfig,
   syncInventory,
 } from "./sync-files.js";
 import { isICloudPath } from "./sync-location.js";
@@ -36,12 +40,7 @@ export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function stateDirectory(root: string, icloud?: boolean): string {
-  const state = readWorkspaceConfig(root, icloud).state_dir;
-  if (state !== undefined && (typeof state !== "string" || !isAbsolute(state))) {
-    throw new KaituError("state_dir 必须是本机绝对路径", "INVALID_STATE_DIR");
-  }
-  if (state && !existsSync(state)) return join(localStateRoot(), basename(state));
-  return state ?? join(root, STATE_DIR);
+  return stateBinding(root, icloud).state;
 }
 
 export function migrateHistory(root: string, icloud?: boolean): void {
@@ -80,6 +79,7 @@ function isInside(root: string, target: string): boolean {
  * `.kaitu/` 只允许程序内部通过 { internal: true } 写入。
  */
 export class Workspace {
+  readonly privateRecords: boolean;
   private location = "";
   private icloud = false;
   private unread = new Set<string>();
@@ -94,15 +94,17 @@ export class Workspace {
 
   set root(value: string) {
     this.location = value;
-    this.icloud = isICloudPath(value);
+    this.icloud = isICloudPath(value) || stateBinding(value).mode === "icloud";
     this.unread.clear();
   }
 
-  constructor(root: string, options: { maintain?: boolean } = {}) {
+  constructor(root: string, options: { maintain?: boolean; privateRecords?: boolean } = {}) {
+    this.privateRecords = options.privateRecords ?? false;
     this.root = resolve(root);
     if (options.maintain === false) return;
     try {
       const state = stateDirectory(this.root, this.icloud);
+      migrateWorkspaceState(this.root);
       if (state !== join(this.root, STATE_DIR) && !existsSync(state)) {
         mkdirSync(state, { recursive: true });
         writeFileSync(join(state, "secrets.json"), "{}\n", { mode: 0o600 });
@@ -113,7 +115,15 @@ export class Workspace {
       return;
     }
     if (this.exists(".kaitu/config.json")) {
-      for (const maintain of [ensureTaskModule, maintainHistoryIgnore, refreshOverview]) {
+      for (const maintain of [
+        ensureTaskModule,
+        resumeProjectVisibility,
+        quarantineBankNotes,
+        relocateProjectRecords,
+        relocatePlan,
+        maintainHistoryIgnore,
+        refreshOverview,
+      ]) {
         try {
           maintain(this);
         } catch (error) {
@@ -128,10 +138,12 @@ export class Workspace {
     if (isAbsolute(rel)) throw new ScopeError(`只接受工作区内的相对路径：${rel}`);
     const abs = resolve(this.root, rel);
     if (!isInside(this.root, abs)) throw new ScopeError(`路径超出工作区：${rel}`);
-    const top = relative(this.root, abs).split(sep)[0];
-    if (top === STATE_DIR && !opts.internal) throw new ScopeError(`.kaitu/ 由程序管理，不能直接写入：${rel}`);
-    if (top === ".git") throw new ScopeError(`不能写入版本库目录：${rel}`);
-    this.assertNoSymlinkEscape(abs);
+    const parts = relative(this.root, abs).split(sep);
+    const top = parts[0];
+    if (parts.includes(STATE_DIR) && !opts.internal)
+      throw new ScopeError(`.kaitu/ 由程序管理，不能直接写入：${rel}`);
+    if (parts.includes(".git")) throw new ScopeError(`不能写入版本库目录：${rel}`);
+    this.assertNoSymlinkEscape(abs, Boolean(opts.internal));
     if (
       top === STATE_DIR &&
       abs !== join(this.root, STATE_DIR) &&
@@ -146,11 +158,11 @@ export class Workspace {
   }
 
   /** 从目标向上找到第一个已存在的路径，确认其真实位置仍在工作区内。 */
-  private assertNoSymlinkEscape(abs: string): void {
-    this.assertNoSymlinkEscapeAt(this.root, abs);
+  private assertNoSymlinkEscape(abs: string, internal = true): void {
+    this.assertNoSymlinkEscapeAt(this.root, abs, internal);
   }
 
-  private assertNoSymlinkEscapeAt(root: string, abs: string): void {
+  private assertNoSymlinkEscapeAt(root: string, abs: string, internal = true): void {
     if (!existsSync(root)) return;
     const realRoot = realpathSync(root);
     let probe = abs;
@@ -163,6 +175,9 @@ export class Workspace {
     if (real === null || !isInside(realRoot, real)) {
       throw new ScopeError(`路径经符号链接指向工作区外：${relative(this.root, abs)}`);
     }
+    const parts = relative(realRoot, real).split(sep);
+    if (parts.includes(".git") || (!internal && parts.includes(STATE_DIR)))
+      throw new ScopeError("不能通过别名访问程序目录");
   }
 
   exists(rel: string): boolean {
@@ -178,6 +193,7 @@ export class Workspace {
   }
 
   readText(rel: string): string {
+    if (!this.privateRecords && rel === "NOW.md") return readPlan(this);
     return this.readBytes(rel).toString("utf8");
   }
 
@@ -249,9 +265,13 @@ export class Workspace {
   writeText(
     rel: string,
     content: string | Uint8Array,
-    opts: { internal?: boolean; mode?: number } = {},
+    opts: { internal?: boolean; mode?: number; projected?: boolean } = {},
   ): void {
     const abs = this.resolve(rel, opts);
+    if (!this.privateRecords && abs === join(this.root, "NOW.md") && !opts.projected) {
+      writePlan(this, typeof content === "string" ? content : Buffer.from(content).toString("utf8"));
+      return;
+    }
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;

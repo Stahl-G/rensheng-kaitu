@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { join } from "node:path";
 import { localStateRoot } from "../drive.js";
 import { localDate, parseTs } from "../time.js";
-import type { Workspace } from "../workspace.js";
+import { type Workspace, stateDirectory } from "../workspace.js";
 import { decimal, mul, sub } from "./decimal.js";
 import { type FinanceViewOptions, financeInvestments } from "./views.js";
 
@@ -39,11 +39,8 @@ export function yahooSymbol(code: string | null, currency: string | null): strin
 }
 function cacheDirectory(ws: Workspace, override?: string) {
   if (override) return override;
-  const state = ws.readJson<{ state_dir?: string }>(".kaitu/config.json").state_dir;
-  if (state && isAbsolute(state)) {
-    const rel = relative(ws.root, state);
-    if (rel.startsWith("..") || isAbsolute(rel)) return join(state, "finance");
-  }
+  const state = stateDirectory(ws.root);
+  if (state !== join(ws.root, ".kaitu")) return ws.resolve(".kaitu/finance", { internal: true });
   const identity = createHash("sha256").update(ws.root).digest("hex").slice(0, 24);
   return join(localStateRoot(), "finance", identity);
 }

@@ -12,6 +12,8 @@ import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { type ModuleDef, findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
+import { relocatePlan } from "./private-plan.js";
+import { relocateProjectRecords } from "./private-records.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
@@ -79,7 +81,7 @@ export function assertPublicProject(ws: Workspace, slug: unknown): void {
 function privateStore(ws: Workspace): Workspace {
   const root = ws.resolve(".kaitu/local-projects", { internal: true });
   fs.mkdirSync(root, { recursive: true });
-  const store = new Workspace(root);
+  const store = new Workspace(root, { privateRecords: true });
   store.timeZone = () => ws.timeZone();
   if (!store.exists("projects/module.json")) {
     store.writeText(
@@ -98,7 +100,10 @@ function privateStore(ws: Workspace): Workspace {
 export function metricStore(ws: Workspace, data: ProjectStatus, readonly = false): Workspace {
   if (!driveProjects(ws) || !data.local_only) return ws;
   if (!readonly) return privateStore(ws);
-  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { maintain: false });
+  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), {
+    maintain: false,
+    privateRecords: true,
+  });
   store.timeZone = () => ws.timeZone();
   return store;
 }
@@ -146,7 +151,7 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
     if (options.publicOnly && project.data.local_only) return [];
     const store =
       driveProjects(ws) && project.data.local_only
-        ? new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }))
+        ? new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { privateRecords: true })
         : ws;
     if (store !== ws) store.timeZone = () => ws.timeZone();
     const metrics = store.exists("projects/module.json")
@@ -343,15 +348,34 @@ export async function logProject(
 function moveDirectory(ws: Workspace, source: string, target: string) {
   const from = ws.resolve(source, { internal: true });
   const to = ws.resolve(target, { internal: true });
-  if (fs.existsSync(to)) throw new KaituError("项目目标目录已存在", "CONFLICT");
   fs.mkdirSync(dirname(to), { recursive: true });
-  try {
-    fs.renameSync(from, to);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
-    fs.rmSync(from, { recursive: true });
+  if (!fs.existsSync(to)) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    }
   }
+  const copy = (src: string, dst: string) => {
+    const origin = ws.resolve(src, { internal: true });
+    const destination = ws.resolve(dst, { internal: true });
+    const info = fs.lstatSync(origin);
+    if (info.isSymbolicLink() || (!info.isFile() && !info.isDirectory()))
+      throw new KaituError("项目迁移遇到非普通文件，保留原件", "PRIVATE_MIGRATION");
+    if (info.isDirectory()) {
+      fs.mkdirSync(destination, { recursive: true });
+      for (const name of fs.readdirSync(origin)) copy(`${src}/${name}`, `${dst}/${name}`);
+      fs.rmdirSync(origin);
+    } else {
+      const bytes = ws.readBytes(src);
+      if (!fs.existsSync(destination)) ws.writeText(dst, bytes, { internal: true });
+      if (!ws.readBytes(dst).equals(bytes))
+        throw new KaituError("项目副本与原件冲突，保留原件", "PRIVATE_MIGRATION");
+      fs.rmSync(origin);
+    }
+  };
+  copy(source, target);
 }
 function transferMetrics(source: Workspace, target: Workspace, slug: string) {
   for (const dir of ["projects/data/metrics", "projects/data/github"])
@@ -374,13 +398,17 @@ function transferProjectRecords(source: Workspace, target: Workspace, slug: stri
     if (!moving.length) continue;
     // 重试时按完整行去重，保留修订版本与 id。
     const existing = target.exists(path) ? target.readText(path).split("\n").filter(Boolean) : [];
-    target.writeText(path, `${[...new Set([...existing, ...moving])].join("\n")}\n`);
+    const copied = `${[...new Set([...existing, ...moving])].join("\n")}\n`;
+    target.writeText(path, copied);
+    if (target.readText(path) !== copied)
+      throw new KaituError("项目记录副本验证失败，保留原件", "PRIVATE_MIGRATION");
     const remaining = rows.filter((line) => !ids.has(JSON.parse(line).id));
     if (remaining.length) source.writeText(path, `${remaining.join("\n")}\n`);
     else fs.rmSync(source.resolve(path));
   }
 }
 export function relocateProjects(ws: Workspace, toPrivate: boolean) {
+  relocateProjectRecords(ws);
   for (const slug of slugs(ws)) {
     const project = readProject(ws, slug);
     if (!project.data.local_only) continue;
@@ -391,6 +419,35 @@ export function relocateProjects(ws: Workspace, toPrivate: boolean) {
     moveDirectory(ws, project.dir, target);
   }
 }
+const VISIBILITY_MIGRATION = ".kaitu/project-visibility.json";
+
+export function resumeProjectVisibility(ws: Workspace): void {
+  if (ws.privateRecords || !ws.exists(VISIBILITY_MIGRATION)) return;
+  const intent = ws.readJson<{ slug: string; source: string; data: ProjectStatus; body: string }>(
+    VISIBILITY_MIGRATION,
+  );
+  slugCheck(intent.slug);
+  checkStatus(intent.data);
+  if (typeof intent.body !== "string" || typeof intent.data.local_only !== "boolean")
+    throw new KaituError("项目迁移状态不合法", "PRIVATE_MIGRATION");
+  if (![`projects/${intent.slug}`, `.kaitu/local-projects/${intent.slug}`].includes(intent.source))
+    throw new KaituError("项目迁移来源不合法", "PRIVATE_MIGRATION");
+  const project = readProject(ws, intent.slug);
+  const toPrivate = intent.data.local_only;
+  ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(intent.data, intent.body), {
+    internal: true,
+  });
+  if (driveProjects(ws)) {
+    const store = privateStore(ws);
+    transferMetrics(toPrivate ? ws : store, toPrivate ? store : ws, intent.slug);
+    const target = toPrivate ? `.kaitu/local-projects/${intent.slug}` : `projects/${intent.slug}`;
+    if (intent.source !== target && ws.exists(intent.source)) moveDirectory(ws, intent.source, target);
+  }
+  relocateProjectRecords(ws, intent.slug, toPrivate);
+  relocatePlan(ws);
+  fs.rmSync(ws.resolve(VISIBILITY_MIGRATION, { internal: true }));
+}
+
 export async function setProject(
   ws: Workspace,
   slug: string,
@@ -399,14 +456,20 @@ export async function setProject(
   >,
 ) {
   return batchOverview(ws, async () => {
+    resumeProjectVisibility(ws);
     const project = readProject(ws, slug);
     const data = { ...project.data, ...patch, updated: isoInZone(new Date(), ws.timeZone()) };
     checkStatus(data);
-    ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body), { internal: true });
-    if (driveProjects(ws) && data.local_only !== project.data.local_only) {
-      const store = privateStore(ws);
-      transferMetrics(data.local_only ? ws : store, data.local_only ? store : ws, slug);
-      moveDirectory(ws, project.dir, data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`);
+    if (data.local_only !== project.data.local_only) {
+      ws.writeJson(
+        VISIBILITY_MIGRATION,
+        { slug, source: project.dir, data, body: project.body },
+        { internal: true, mode: 0o600 },
+      );
+      resumeProjectVisibility(ws);
+    } else {
+      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body), { internal: true });
+      relocatePlan(ws);
     }
     const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
     // 共享目录移除也需要在工作区历史中保存。
