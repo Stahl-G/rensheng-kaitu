@@ -691,14 +691,15 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   function obTabs() {
     var e = state.obEntry || 'bring';
     return '<div class="subtabs" role="group" aria-label="从哪里开始">' +
-      '<button type="button" data-obentry="bring" aria-pressed="' + (e === 'bring') + '">带来一件正在推进的事</button>' +
+      '<button type="button" data-obentry="bring" aria-pressed="' + (e === 'bring') + '">说出想改变的一件事</button>' +
       '<button type="button" data-obentry="memory" aria-pressed="' + (e === 'memory') + '">从常用的 AI 搬来记忆</button></div>';
   }
   function obBring() {
-    return '<h1 class="ob-h">带来一件你正在推进的事</h1>' +
-      '<p class="ob-lead">粘贴最近和 AI 讨论的一段对话，或者直接写下想推进的事。开图先原样保存，再帮你整理出一个下一步，采不采纳由你定。</p>' +
-      '<textarea id="ob-bring" rows="8" placeholder="比如：我想六周内做完作品集……">' + esc(state.obBring || '') + '</textarea>' +
-      '<span class="small">没有现成的对话？<button type="button" class="link-btn" data-ob="sample-bring">用一段示例试试</button></span>' +
+    var ex = [['吃饭和训练总坚持不了', '我想吃得健康点、每周练三次，但每次坚持不到两周就断了。'], ['不想再做现在的工作，又不知道能做什么', '现在的工作做了四年，越来越没意思，但不知道自己还能做什么。'], ['六周内做完作品集', OB_CONVO]];
+    return '<h1 class="ob-h">最近有什么想改变，却一直没推进？</h1>' +
+      '<p class="ob-lead">直接写就行，也可以粘贴一段和 AI 聊过的对话。开图先原样保存，再帮你理出一个下一步，采不采纳由你定。</p>' +
+      '<div class="ob-ais" aria-label="示例">' + ex.map(function (x, i) { return '<button type="button" data-obex="' + i + '">' + x[0] + '</button>'; }).join('') + '</div>' +
+      '<textarea id="ob-bring" rows="7" placeholder="写下来，或粘贴一段和 AI 的对话">' + esc(state.obBring || '') + '</textarea>' +
       obFoot(false, 'bring', '保存并整理', '先随便看看');
   }
   function obMemory() {
@@ -733,6 +734,8 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   }
   function obDraftDefaults() {
     var t = state.obBring || '';
+    if (/坚持不到/.test(t)) return { goal: '吃得健康点，每周练三次', now: '每次坚持不到两周；还不清楚是时间、累还是没看到效果导致断掉', next: '这周先记三天吃了什么和哪天练了，不改别的' };
+    if (/没意思/.test(t)) return { goal: '找到下一份更想做的工作方向', now: '现在的工作做了四年；还不清楚自己最想保留哪部分工作内容', next: '在下面三条路径里选一条先试', paths: true };
     if (/作品集/.test(t)) return { goal: '六周内做完作品集，转岗去做产品设计', now: '手上有 4 个项目可选；「门店排班」还缺上线后的数据；每周能投入两个晚上', next: '本周挑出两个最能说明能力的项目，列出缺的材料' };
     return { goal: t.split('\n')[0].slice(0, 40), now: '', next: '' };
   }
@@ -742,10 +745,16 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       return '<label class="ob-field"><span class="eyebrow">' + label + '</span><input id="ob-draft-' + k + '" data-obdraft="' + k + '" value="' + esc(d[k]) + '" placeholder="' + hint + '"></label>';
     };
     return '<div style="display:flex;gap:8px;flex-wrap:wrap">' + plain('原文已保存', 'var(--health-tint)', 'var(--health-ink)') + plain('需要你核对', 'var(--explore-tint)', 'var(--explore-ink)') + '</div>' +
-      '<h1 class="ob-h">开图从这段对话里看到的</h1>' +
+      '<h1 class="ob-h">开图从' + (/ChatGPT：/.test(state.obBring || '') ? '这段对话' : '你写的这件事') + '里看到的</h1>' +
       '<p class="ob-lead">每一项都能改。对话里其他建议没有变成你的待办，需要时再加。</p>' +
-      field('goal', '当前目标', '你想推进的事') + field('now', '已知现状', '现在进行到哪、缺什么') + field('next', '一个下一步', '这周能做完的一件事') +
-      '<span class="small">依据：你粘贴的对话第 2、4 段 · <a href="#">查看原文</a> · 没连 AI 时，这三项由你自己填</span>' +
+      field('goal', '当前目标', '你想推进的事') + field('now', '已知现状', '现在进行到哪、缺什么') +
+      (d.paths ? '<div class="ob-goals" role="radiogroup" aria-label="可能的路径">' + [
+        ['转产品经理', '你提过喜欢和用户打交道；还不清楚：你对写需求文档的耐受度', '小实验：花两个晚上，给你常用的一个 App 写一页改进方案'],
+        ['在现公司换岗', '风险最小，保留四年积累；还不清楚：内部有没有空缺', '小实验：这周约一位想去的部门同事喝咖啡聊 30 分钟'],
+        ['做一段副业试水', '能先验证兴趣再决定；还不清楚：每周实际能挤出多少时间', '小实验：接一个 500 元以内的小单，记录投入和感受']
+      ].map(function (x, i) { return '<button type="button" class="ob-goal" role="radio" aria-pressed="' + (d.pick === i) + '" aria-checked="' + (d.pick === i) + '" data-obpath="' + i + '"><b>' + x[0] + '</b><span>' + x[1] + '</span><span>' + x[2] + '</span></button>'; }).join('') + '</div><span class="small">AI 给的是可能性，选不选、选哪条由你定。</span>' : '') +
+      field('next', '一个下一步', '这周能做完的一件事') +
+      '<span class="small">依据：' + (/ChatGPT：/.test(state.obBring || '') ? '你粘贴的对话第 2、4 段' : '你写下的原文') + ' · <a href="#">查看原文</a> · 没连 AI 时，这几项由你自己填</span>' +
       obFoot(true, 'adopt', '采纳这个下一步', '只保存原文');
   }
   function obGoals() {
@@ -806,14 +815,14 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     var did = state.obNextDone;
     return '<section class="card" style="display:flex;flex-direction:column;gap:10px;padding:18px 20px" aria-labelledby="h-obnext"><span class="eyebrow" id="h-obnext">现在最该做的一件事</span>' +
       '<b style="font-size:19px;font-weight:600">' + esc(state.obNext) + '</b>' +
-      '<span class="small">为了「' + esc((state.obDraft || {}).goal || '你的目标') + '」 · 依据来自你粘贴的对话 · <a href="#">查看原文</a></span>' +
+      '<span class="small">为了「' + esc((state.obDraft || {}).goal || '你的目标') + '」 · 依据来自你写下的原文 · <a href="#">查看原文</a></span>' +
       (did ? plain('已完成 · 结果已记下', 'var(--health-tint)', 'var(--health-ink)') :
         '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary" data-ob="next-done">完成并记一句结果</button><button type="button" class="btn btn-quiet" data-ob="next-later">改到以后</button></div>') + '</section>';
   }
   function firstRun() {
     if (!state.ob) {
-      return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎来到人生开图</span><h1 id="h-wel">把你和 AI 聊过的计划，变成能持续推进、随时查回的个人进度</h1>' +
-        '<div class="ob-how"><div><b>1 · 带来一件事</b><span>粘贴和 AI 聊过的一段对话，或写下想推进的事</span></div>' +
+      return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎来到人生开图</span><h1 id="h-wel">让 AI 持续了解你，把想改变的事变成能推进、能查回的个人进度</h1>' +
+        '<div class="ob-how"><div><b>1 · 说出想改变的一件事</b><span>直接写，或粘贴一段和 AI 聊过的对话</span></div>' +
         '<div><b>2 · 核对，选一个下一步</b><span>开图整理出现状和下一步，你确认了才算数</span></div>' +
         '<div><b>3 · 记下结果，换个 AI 也能接着</b><span>资料存在你自己的文件夹里，人生进度不会丢</span></div></div>' +
         '<div class="ob-foot"><span class="small">大约 3 分钟</span><div class="ob-foot-r"><button type="button" class="link-btn" data-ob="later">先随便看看</button><button type="button" class="btn btn-primary" data-ob="start">开始</button></div></div></section>';
@@ -1417,9 +1426,11 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; state.ob = 0; state.obPreview = false; state.obNext = null; state.obNextDone = false; state.obDraft = null; go('overview'); });
 
   view.addEventListener('click', function (e) {
-    var ob = e.target.closest('[data-ob],[data-obai],[data-obgoal],[data-obsrc],[data-obaipick],[data-obentry]');
+    var ob = e.target.closest('[data-ob],[data-obai],[data-obgoal],[data-obsrc],[data-obaipick],[data-obentry],[data-obex],[data-obpath]');
     if (ob) {
       var top = function () { render(); window.scrollTo(0, 0); };
+      if (ob.dataset.obex) { var exs = ['我想吃得健康点、每周练三次，但每次坚持不到两周就断了。', '现在的工作做了四年，越来越没意思，但不知道自己还能做什么。', OB_CONVO]; state.obBring = exs[+ob.dataset.obex]; return render(); }
+      if (ob.dataset.obpath) { var nexts = ['花两个晚上，给常用的一个 App 写一页改进方案', '这周约一位想去部门的同事聊 30 分钟', '接一个 500 元以内的小单，记下投入和感受']; state.obDraft.pick = +ob.dataset.obpath; state.obDraft.next = nexts[state.obDraft.pick]; return render(); }
       if (ob.dataset.obentry) { state.obEntry = ob.dataset.obentry; state.obPreview = false; return render(); }
       if (ob.dataset.obai) { state.obAi = ob.dataset.obai; return render(); }
       if (ob.dataset.obgoal) { state.obGoals = state.obGoals || {}; state.obGoals[ob.dataset.obgoal] = !state.obGoals[ob.dataset.obgoal]; return render(); }
