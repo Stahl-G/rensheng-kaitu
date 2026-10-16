@@ -1,4 +1,6 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
+
+import { receiveBankNotification } from "@kaitu/core";
 import { type FetchMessageObject, ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { receiveMessage } from "../inbox.js";
@@ -207,6 +209,14 @@ export class ImapCollector implements Collector {
         : `imap://${encodeURIComponent(this.config.user)}@${this.config.host}/${encodeURIComponent(this.config.mailbox)};UIDVALIDITY=${validity}/;UID=${message.uid}`,
       authentication: verdict.reason,
     });
+    // 只认 DMARC 通过的银行动账通知，识别出的交易进本机待核对，不直接记账。
+    if ("strength" in verdict && verdict.strength === "verified" && mail.text)
+      receiveBankNotification(this.context.ws, {
+        sender: verdict.sender,
+        subject: mail.subject ?? "",
+        text: mail.text,
+        time: date.toISOString(),
+      });
     if (mail.messageId) this.state.remember(mail.messageId);
     return true;
   }
