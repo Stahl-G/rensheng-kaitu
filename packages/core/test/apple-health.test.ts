@@ -227,3 +227,38 @@ it("健康并列列表中文睡眠阶段跨午夜合并，重叠只计一次，�
   ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });
+
+it("快捷指令样本写法不一时照常导入，不支持的类型和坏样本只跳过那一条", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "loose.health.json");
+  writeFileSync(
+    file,
+    JSON.stringify([
+      {
+        type: "HKQuantityTypeIdentifierStepCount",
+        start: "2026-10-15 08:00",
+        end: "2026-10-15 09:00",
+        value: "8,532 步",
+      },
+      {
+        type: "heart_rate",
+        start: "2026-10-15T08:00:00+08:00",
+        end: "2026-10-15T08:00:00+08:00",
+        value: 72,
+        unit: "count/min",
+        source: "Watch",
+      },
+      {
+        type: "sleep_analysis",
+        start: "2026-10-14T23:30:00+08:00",
+        end: "2026-10-15T06:30:00+08:00",
+        value: "Core",
+      },
+      { type: "body_mass", start: "2026-10-15T07:00:00+08:00", value: null },
+    ]),
+  );
+  const result = await importHealthShortcut(ws, file);
+  expect(result.ignored).toMatchObject({ unsupported: 1, invalid: 1 });
+  expect(readRecords(ws, "activity")).toMatchObject([{ date: "2026-10-15", steps: 8532 }]);
+  expect(readRecords(ws, "sleep")).toMatchObject([{ duration_min: 420 }]);
+});

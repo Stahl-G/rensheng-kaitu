@@ -101,8 +101,11 @@
 }
 ```
 
-此格式的 `format`、`exported_at`、`device`、`samples` 必填。每条样本包含 `type`、`start`、`end`、`value`、`unit`、`source`。
-所有时间均为 ISO 8601，带 `Z` 或 `±HH:MM` 偏移；瞬时测量的 `start` 与 `end` 相同。
+`samples` 必填，也可以直接导出样本数组；`format`、`exported_at`、`device` 可省略。
+每条样本至少有 `type`、`start`、`value`：`end` 省略时取 `start`，`unit` 省略时用下表单位，`source` 省略时用 `device`，再没有就是「快捷指令」。
+时间用 ISO 8601，带 `Z` 或 `±HH:MM` 偏移；不带偏移时按用户时区的当地时间读。瞬时测量的 `start` 与 `end` 相同。
+数值可带单位和千分位（如 `8,532 步`、`65.2 公斤`）；类型也可用官方标识（如 `HKQuantityTypeIdentifierStepCount`）或中文名（如 步数）。
+单条样本读不出（没有数值、时间不对）或类型不支持时只跳过这一条并计数，其余照常导入；整份都读不出时才转为待整理笔记。
 日期归属以 `me/rules.md` 的用户时区为准，文件名和 `exported_at` 不决定记录日期。
 
 | type | value / unit | 整理结果 |

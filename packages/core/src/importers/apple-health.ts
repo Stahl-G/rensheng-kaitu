@@ -531,65 +531,152 @@ function parallelSamples(raw: Record<string, unknown>) {
   });
 }
 
+/** 快捷指令里常见的类型叫法（官方标识、驼峰、中文）→ 本文件的 type。 */
+const SHORTCUT_TYPE_NAMES: Record<string, string> = {
+  stepcount: "step_count",
+  steps: "step_count",
+  步数: "step_count",
+  bodymass: "body_mass",
+  weight: "body_mass",
+  体重: "body_mass",
+  bodyfatpercentage: "body_fat_percentage",
+  bodyfat: "body_fat_percentage",
+  体脂率: "body_fat_percentage",
+  restingheartrate: "resting_heart_rate",
+  静息心率: "resting_heart_rate",
+  heartratevariabilitysdnn: "hrv_sdnn",
+  hrv: "hrv_sdnn",
+  心率变异性: "hrv_sdnn",
+  sleepanalysis: "sleep_analysis",
+  sleep: "sleep_analysis",
+  睡眠: "sleep_analysis",
+  activeenergyburned: "active_energy",
+  activeenergy: "active_energy",
+  活动能量: "active_energy",
+  basalenergyburned: "basal_energy",
+  restingenergy: "basal_energy",
+  静息能量: "basal_energy",
+  基础能量: "basal_energy",
+  体能训练: "workout",
+};
+const SHORTCUT_UNITS: Record<string, string> = {
+  步: "count",
+  steps: "count",
+  Cal: "kcal",
+  千卡: "kcal",
+  大卡: "kcal",
+  公斤: "kg",
+  千克: "kg",
+  磅: "lb",
+  毫秒: "ms",
+  秒: "s",
+  "次/分": "bpm",
+  "次/分钟": "bpm",
+  分钟: "min",
+};
+
+function shortcutType(value: unknown): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (SHORTCUT_TYPES[text] || healthEventType(text)) return text;
+  const key = text
+    .replace(/^HK(?:Quantity|Category)TypeIdentifier/, "")
+    .toLowerCase()
+    .replace(/[\s_-]/g, "");
+  return SHORTCUT_TYPE_NAMES[key] ?? SHORTCUT_TYPE_NAMES[text] ?? text;
+}
+
+function shortcutTime(value: unknown, zone: string): string {
+  const text = typeof value === "string" ? value.trim().replace(/([+-]\d{2})(\d{2})$/, "$1:$2") : "";
+  const local = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/.exec(text);
+  return local
+    ? isoInZone(localTimeToInstant(`${local[1]}T${local[2]}:${local[3]}:${local[4] ?? "00"}`, zone), zone)
+    : text;
+}
+
+/** 补齐快捷指令常漏的来源、单位，换掉「8,532 步」这类写法；类型不认识的交给后面计为不支持。 */
+function shortcutSample(input: unknown, device: string, zone: string): HealthSample {
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("样本必须是对象");
+  const raw = input as Record<string, unknown>;
+  const type = shortcutType(raw.type);
+  const definition = SHORTCUT_TYPES[type];
+  const start = shortcutTime(raw.start ?? raw.startDate ?? raw.date, zone);
+  const end = shortcutTime(raw.end ?? raw.endDate, zone) || start;
+  let value = raw.value as number | string | undefined;
+  let unit = typeof raw.unit === "string" ? raw.unit.trim() : undefined;
+  const quantity = definition && !["sleep_analysis", "workout"].includes(type);
+  if (quantity && typeof value === "string") {
+    const match = /^\s*(-?[\d,]+(?:\.\d+)?)\s*(.*)$/.exec(value);
+    if (match) {
+      value = Number(match[1]?.replace(/,/g, ""));
+      if (!unit && match[2]) unit = match[2].trim();
+    }
+  }
+  if (value === undefined || value === null || value === "") throw new Error("没有数值");
+  if (typeof value !== "number" && typeof value !== "string") throw new Error("数值格式不对");
+  unit = SHORTCUT_UNITS[unit ?? ""] ?? unit ?? definition?.unit ?? "";
+  if (!unit && definition) unit = definition.unit;
+  const source = typeof raw.source === "string" && raw.source.trim() ? raw.source.trim() : device;
+  parseTs(start);
+  parseTs(end);
+  let workout: HealthSample["workout"];
+  if (type === "workout") {
+    const data = (raw.workout ?? {}) as Record<string, unknown>;
+    const duration = Number(data.duration_min ?? value);
+    if (!Number.isFinite(duration) || duration <= 0) throw new Error("训练没有时长");
+    workout = {
+      activity: typeof data.activity === "string" ? data.activity : "other",
+      duration_min: duration,
+    };
+    for (const key of ["distance_km", "kcal", "avg_hr"] as const) {
+      const amount = Number(data[key]);
+      if (data[key] !== undefined && Number.isFinite(amount)) workout[key] = amount;
+    }
+  }
+  return {
+    type: definition?.type ?? type,
+    start,
+    end,
+    source,
+    unit,
+    value: type === "sleep_analysis" ? (SLEEP_VALUES[String(value).trim().toLowerCase()] ?? value) : value,
+    workout,
+  };
+}
+
 export function parseHealthShortcut(inputFile: string, zone: string) {
   checkInput(inputFile);
   try {
-    const raw = JSON.parse(readFileSync(inputFile, "utf8"));
-    if (!raw || typeof raw !== "object" || Array.isArray(raw))
-      throw new Error("Invalid health shortcut envelope");
+    const parsed = JSON.parse(readFileSync(inputFile, "utf8"));
+    // 也接受直接导出的样本数组。
+    const raw = Array.isArray(parsed) ? { samples: parsed } : parsed;
+    if (!raw || typeof raw !== "object") throw new Error("Invalid health shortcut envelope");
     const parallel = "values" in raw && "starts" in raw && "type" in raw;
-    let samples = raw.samples;
-    if (parallel) {
-      if (raw.format !== undefined && raw.format !== "kaitu.health.v1")
-        throw new Error("Invalid health shortcut format");
-      samples = parallelSamples(raw);
-    } else {
-      if (raw.format !== "kaitu.health.v1" || typeof raw.device !== "string" || !Array.isArray(samples))
-        throw new Error("Invalid health shortcut envelope");
-      parseTs(raw.exported_at);
-    }
+    if (raw.format !== undefined && raw.format !== "kaitu.health.v1")
+      throw new Error("Invalid health shortcut format");
+    const device = typeof raw.device === "string" && raw.device.trim() ? raw.device.trim() : "快捷指令";
+    const samples: unknown[] = parallel ? parallelSamples(raw) : raw.samples;
+    if (!Array.isArray(samples)) throw new Error("缺少 samples 样本数组");
     if (samples.length > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
     const collector = healthCandidates(zone);
-    for (const sample of samples) {
-      const type =
-        SHORTCUT_TYPES[sample.type]?.type ??
-        (typeof sample.type === "string" && healthEventType(sample.type) ? sample.type : undefined);
-      if (
-        !type ||
-        typeof sample.source !== "string" ||
-        typeof sample.unit !== "string" ||
-        !["number", "string"].includes(typeof sample.value)
-      )
-        throw new Error("Invalid health sample");
-      parseTs(sample.start);
-      parseTs(sample.end);
-      let workout: HealthSample["workout"];
-      if (type === "workout") {
-        const data = sample.workout;
-        if (!data || typeof data.activity !== "string" || typeof data.duration_min !== "number")
-          throw new Error("Invalid workout");
-        workout = { activity: data.activity, duration_min: data.duration_min };
-        for (const key of ["distance_km", "kcal", "avg_hr"] as const) {
-          if (data[key] !== undefined) {
-            if (typeof data[key] !== "number") throw new Error("Invalid workout quantity");
-            workout[key] = data[key];
-          }
-        }
+    // 单条样本有问题只跳过这一条，其余照常导入；全部读不出时才整份转待整理。
+    const skipped: string[] = [];
+    for (const [index, input] of samples.entries()) {
+      try {
+        collector.add(shortcutSample(input, device, zone));
+      } catch (error) {
+        if (error instanceof KaituError) throw error;
+        skipped.push(`第 ${index + 1} 条${(error as Error).message}`);
       }
-      collector.add({
-        type,
-        start: sample.start,
-        end: sample.end,
-        source: sample.source,
-        unit: sample.unit,
-        value:
-          type === "HKCategoryTypeIdentifierSleepAnalysis"
-            ? (SLEEP_VALUES[String(sample.value).toLowerCase()] ?? sample.value)
-            : sample.value,
-        workout,
-      });
     }
-    return collector.finish();
+    const result = collector.finish();
+    if (skipped.length) {
+      if (!result.candidates.length)
+        throw new Error(
+          `没有能导入的样本：${skipped.slice(0, 3).join("；")}${skipped.length > 3 ? ` 等 ${skipped.length} 条` : ""}`,
+        );
+      result.ignored.invalid = skipped.length;
+    }
+    return result;
   } catch (error) {
     if (error instanceof KaituError) throw error;
     throw new KaituError(`无法解析快捷指令健康文件：${(error as Error).message}`, "INVALID_IMPORT");
