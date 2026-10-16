@@ -34,10 +34,19 @@ export function readLibrary(ws: Workspace): LibraryData {
   const doing = readDoing(ws);
   const entry = (file: string, organized: boolean): InboxEntry => {
     const { data, body } = parseFrontmatter(ws.readText(file));
+    const channelSource =
+      typeof data.agent === "string"
+        ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
+        : undefined;
     return {
       file,
       text: body.trim(),
-      source: data.kind === "capture" ? "me" : "other",
+      source:
+        data.kind === "capture"
+          ? "me"
+          : channelSource === "gmail" || channelSource === "imap"
+            ? "mail"
+            : (channelSource ?? "other"),
       date:
         typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
       status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",

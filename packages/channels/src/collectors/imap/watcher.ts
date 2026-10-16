@@ -1,6 +1,6 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
 
-import { archiveBankMail, isBankNotificationMail, receiveBankNotification } from "@kaitu/core";
+import { KaituError, archiveBankMail, isBankNotificationMail, receiveBankNotification } from "@kaitu/core";
 import { type FetchMessageObject, ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { receiveMessage } from "../inbox.js";
@@ -69,7 +69,9 @@ export class ImapCollector implements Collector {
         if (auth) this.authFailures++;
         this.context.status({
           connected: false,
-          error: auth ? "邮箱认证失败，请更新密码或 token" : "邮件连接失败，将自动重试",
+          error: auth
+            ? "密码或授权码错误，请重新填写；也请确认邮箱已开启 IMAP"
+            : "网络连接失败，请检查网络及 IMAP 是否开启，将自动重试",
         });
         const client = this.client;
         this.client = undefined;
@@ -247,6 +249,15 @@ export class ImapCollector implements Collector {
     try {
       await client.connect();
       await client.mailboxOpen(this.config.mailbox, { readOnly: true });
+    } catch (error) {
+      const auth =
+        !!error && typeof error === "object" && "authenticationFailed" in error && error.authenticationFailed;
+      throw new KaituError(
+        auth
+          ? "密码或授权码错误，请重新填写；也请确认邮箱已开启 IMAP"
+          : "无法连接邮箱，请检查网络、服务器和 IMAP 是否开启",
+        "CHANNEL",
+      );
     } finally {
       client.close();
     }

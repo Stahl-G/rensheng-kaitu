@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { LibraryData } from "../types.js";
+import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import css from "./Prototype.module.css";
 
 export interface LibraryProps {
@@ -43,7 +44,17 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
     </section>
   );
 }
-export function InboxPage({ data }: { data: LibraryData | null }) {
+export function InboxPage({
+  data,
+  channelSettings,
+  connect,
+}: { data: LibraryData | null; channelSettings?: ChannelRequest; connect: () => void }) {
+  const [channels, setChannels] = useState<ChannelState>();
+  useEffect(() => {
+    void channelSettings?.("list")
+      .then((value) => setChannels(value as ChannelState))
+      .catch(() => {});
+  }, [channelSettings]);
   const [source, setSource] = useState("all");
   const filters = [
     ["all", "全部"],
@@ -51,19 +62,32 @@ export function InboxPage({ data }: { data: LibraryData | null }) {
     ["mail", "邮件"],
     ["slack", "Slack"],
     ["feishu", "飞书"],
-    ["ding", "钉钉"],
     ["other", "其他原文"],
   ];
   const entries = data?.inbox.filter((row) => source === "all" || row.source === source);
   return (
     <div className={css.sec}>
       <div className={css["conn-strip"]}>
-        {["Gmail", "Slack", "飞书", "钉钉"].map((name) => (
-          <span className={css["conn-pill"]} key={name}>
-            <b>{name}</b>
-            <span className={css.small}>还没连接</span>
-          </span>
-        ))}
+        {[
+          ["gmail", "Gmail"],
+          ["imap", "其他邮箱"],
+          ["slack", "Slack"],
+          ["feishu", "飞书"],
+        ].map(([kind, name]) => {
+          const account = channels?.accounts.find((item) => item.kind === kind);
+          return (
+            <span className={css["conn-pill"]} key={kind}>
+              <b>{name}</b>
+              {account?.connected ? (
+                <span className={css.small}>已连接</span>
+              ) : (
+                <button className={css.link} type="button" onClick={connect}>
+                  去连接
+                </button>
+              )}
+            </span>
+          );
+        })}
       </div>
       <div className={css.subtabs} role="toolbar" aria-label="来源">
         {filters.map(([id, label]) => (
@@ -76,7 +100,9 @@ export function InboxPage({ data }: { data: LibraryData | null }) {
         <p className={css.small}>正在读取收件箱…</p>
       ) : !entries?.length ? (
         <p className={css.emptyState}>
-          {["mail", "slack", "feishu", "ding"].includes(source) ? "这个渠道还没连接" : "这里还没有原文记录"}
+          {["mail", "slack", "feishu", "ding"].includes(source)
+            ? "这个来源还没有原文记录"
+            : "这里还没有原文记录"}
         </p>
       ) : (
         entries.map((row) => (
@@ -84,7 +110,17 @@ export function InboxPage({ data }: { data: LibraryData | null }) {
             <time>
               {row.date?.slice(0, 16).replace("T", " ") ?? "时间未记录"}
               <br />
-              <span className={css.small}>{row.source === "me" ? "随手记" : "其他原文"}</span>
+              <span className={css.small}>
+                {row.source === "me"
+                  ? "随手记"
+                  : row.source === "mail"
+                    ? "邮件"
+                    : row.source === "slack"
+                      ? "Slack"
+                      : row.source === "feishu"
+                        ? "飞书"
+                        : "其他原文"}
+              </span>
             </time>
             <blockquote>{row.text}</blockquote>
             <span className={css.st}>

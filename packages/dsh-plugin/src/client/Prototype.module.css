@@ -2427,3 +2427,104 @@
 .switch[aria-checked="true"] i::after {
   background: var(--on-health);
 }
+
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.channelTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.channelLogo {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--explore-tint);
+  color: var(--explore-ink);
+  font-weight: 600;
+}
+.channelAccount {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.channelError {
+  color: var(--news-ink);
+  font-size: 14px;
+}
+.channelDialog {
+  margin: auto;
+  color: var(--ink);
+  border: 0;
+  max-height: calc(100dvh - 32px);
+  width: min(560px, calc(100vw - 32px));
+}
+.channelDialog:not([open]) {
+  display: none;
+}
+.channelDialog::backdrop {
+  background: var(--scrim);
+}
+.channelForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.channelForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink2);
+}
+.channelForm input,
+.channelForm select {
+  min-width: 0;
+  width: 100%;
+  height: 42px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.channelForm .channelCheck {
+  flex-direction: row;
+  align-items: center;
+}
+.channelCheck input {
+  width: 18px;
+  height: 18px;
+}
+.channelSteps {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.channelFallback summary {
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .channelGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.channelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}

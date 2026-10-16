@@ -24,6 +24,13 @@ export interface Collector {
   test(): Promise<void>;
 }
 export interface CollectorProvider {
+  configured?: boolean;
+  authorize?(
+    store: LocalStore,
+    complete: (settings: Record<string, unknown>, label: string) => Promise<void>,
+    fail: (error: string) => void,
+  ): Promise<() => void>;
+  disconnect?(context: CollectorContext): Promise<void>;
   normalize(input: Record<string, unknown>): Record<string, unknown> | Promise<Record<string, unknown>>;
   identity(settings: Record<string, unknown>): string;
   create(context: CollectorContext): Collector;
