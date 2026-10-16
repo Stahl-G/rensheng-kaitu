@@ -36,6 +36,7 @@ import {
   workspaceFileStamps,
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
+import type { AskService } from "./ask.js";
 import { productMutations, productRequest } from "./product.js";
 
 export interface UiOptions {
@@ -45,6 +46,8 @@ export interface UiOptions {
   refreshDelayMs?: number;
   inboxStableMs?: number;
   webRoot?: string;
+  ask?: AskService;
+  onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
 }
 const PRODUCT_ROOT = fileURLToPath(new URL("../../../dsh-plugin/dist/standalone/", import.meta.url));
@@ -127,6 +130,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     throw new KaituError("端口必须是 1–65535 的整数", "BAD_ARGS");
   }
   const clients = new Set<ServerResponse>();
+  const askClients = new Set<ServerResponse>();
   const uploads = new Map<
     string,
     { source: ImportSource; file: string; name: string; preview: unknown; expires: number }
@@ -291,13 +295,16 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         const result =
           method === "openAi"
             ? await openAi()
-            : await exclusive(async () => {
-                const mutates = productMutations.has(method);
-                if (mutates) await saveExternal();
-                const value = await productRequest(ws, method, args);
-                if (mutates) notify();
-                return value;
-              });
+            : method.startsWith("ask")
+              ? await productRequest(ws, method, args, options.ask)
+              : await exclusive(async () => {
+                  const mutates = productMutations.has(method);
+                  if (mutates) await saveExternal();
+                  const value = await productRequest(ws, method, args, options.ask);
+                  if (method === "configureAutomation") await options.onAutomationChanged?.();
+                  if (mutates) notify();
+                  return value;
+                });
         if (
           method === "openAi" &&
           draftId &&
@@ -310,6 +317,25 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         return json(res, 200, result ?? null);
       }
       if (req.method === "GET") {
+        if (url.pathname === "/api/ask/events" && options.ask) {
+          const id = url.searchParams.get("session") ?? "";
+          const history = options.ask.events(id);
+          const cursor = Number(req.headers["last-event-id"] ?? url.searchParams.get("after") ?? 0);
+          res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive" });
+          res.write(": connected\n\n");
+          const send = (event: { id: number }) =>
+            res.write(`id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`);
+          const unsubscribe = options.ask.subscribe(id, send);
+          for (const event of history) if (event.id > cursor) send(event);
+          const timer = setInterval(() => res.write(": heartbeat\n\n"), 15000);
+          askClients.add(res);
+          req.on("close", () => {
+            unsubscribe();
+            clearInterval(timer);
+            askClients.delete(res);
+          });
+          return;
+        }
         if (url.pathname.startsWith("/api/photos/")) {
           const photo = readPhoto(ws, decodeURIComponent(url.pathname.slice("/api/photos/".length)));
           res.writeHead(200, { "Content-Type": photo.contentType });
@@ -468,7 +494,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
     clearInterval(polling);
-    for (const client of clients) client.end();
+    for (const client of [...clients, ...askClients]) client.end();
+    await options.ask?.close();
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>

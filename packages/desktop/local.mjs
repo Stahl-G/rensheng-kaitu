@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createAskService } from "../cli/dist/ui/ask.js";
 import { startUi } from "../cli/dist/ui/server.js";
 import {
   Workspace,
@@ -11,6 +12,7 @@ import {
 } from "../core/dist/index.js";
 import { createAiProcess } from "./ai-process.mjs";
 import { desktopPaths } from "./environment.mjs";
+import { createSdkRuntime } from "./sdk-runtime.mjs";
 
 export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) {
   if (!app.requestSingleInstanceLock()) {
@@ -33,42 +35,31 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     KAITU_DIR: ws.root,
     KAITU_APP_PORT: "0",
   });
+  const sdk = createSdkRuntime({
+    executable: join(dirname(app.getPath("exe")), "DSH"),
+    archive: join(dirname(resources), "app.asar"),
+    home: aiHome,
+    workspace: ws.root,
+    plugin: join(resources, "dist/sdk-plugin.mjs"),
+    hostPlugin: join(resources, "dist/sdk-host.mjs"),
+    helper: join(resources, "dist/sdk-credentials.mjs"),
+  });
+  const ask = createAskService({ state, workspace: ws.root, ...sdk });
   const startAutomation = async () => {
     const settings = readAutomation(ws);
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
-  };
-  // 第一次主动打开 AI 时问一次；资讯搜索默认不开，可在设置里单独打开。
-  let asking;
-  const askAutomation = () => {
-    if (readAutomation(ws).asked) return Promise.resolve();
-    asking ??= dialog
-      .showMessageBox(window, {
-        type: "question",
-        title: "开启自动任务",
-        message: "要开图每天自动帮你整理吗？",
-        detail:
-          "每天 07:30 排好今天的计划，每晚 03:00 整理当天的记录。会用你连接的 AI 运行，可在开图 → 设置中随时开关。",
-        buttons: ["开启", "暂不开启"],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then(({ response }) => {
-        configureAutomation(ws, { morning: response === 0, organizer: response === 0, news: false });
-        updateMenu();
-      })
-      .finally(() => {
-        asking = undefined;
-      });
-    return asking;
   };
   const server = await startUi(ws, {
     port: 0,
     open: false,
     webRoot: join(resources, "web"),
+    ask,
+    onAutomationChanged: async () => {
+      updateMenu();
+      await startAutomation();
+    },
     openAi: async () => {
-      await askAutomation();
-      await ai.open();
-      return {};
+      throw new Error("请在问问页面连接内置 AI");
     },
   });
   const window = new BrowserWindow({

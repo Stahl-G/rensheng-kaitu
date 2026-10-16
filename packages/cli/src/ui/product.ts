@@ -46,6 +46,8 @@ import {
   writeExploration,
 } from "@kaitu/core";
 
+import type { AskService } from "./ask.js";
+
 export const productMutations = new Set([
   "configureAutomation",
   "setExperienceSource",
@@ -65,7 +67,12 @@ export const productMutations = new Set([
   "financeImportCommit",
 ]);
 
-export async function productRequest(ws: Workspace, method: string, args: unknown[]): Promise<unknown> {
+export async function productRequest(
+  ws: Workspace,
+  method: string,
+  args: unknown[],
+  ask?: AskService,
+): Promise<unknown> {
   const text = (i: number) => {
     if (typeof args[i] !== "string") throw new KaituError("缺少有效参数", "BAD_ARGS");
     return args[i] as string;
@@ -74,6 +81,23 @@ export async function productRequest(ws: Workspace, method: string, args: unknow
     if (!Number.isInteger(args[i])) throw new KaituError("缺少记录版本", "BAD_ARGS");
     return args[i] as number;
   };
+  if (method.startsWith("ask")) {
+    if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
+    switch (method) {
+      case "askSettings":
+        return ask.settings();
+      case "askConfigure":
+        return ask.configure((args[0] ?? {}) as Record<string, unknown>);
+      case "askList":
+        return ask.list();
+      case "askCreate":
+        return ask.create();
+      case "askEvents":
+        return ask.events(text(0));
+      case "askSend":
+        return ask.send(text(0), text(1));
+    }
+  }
   switch (method) {
     case "automation":
       return readAutomation(ws);

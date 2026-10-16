@@ -396,6 +396,18 @@ async function writePayload(payload) {
     external: ["@deepseek-ai/*", "better-sqlite3"],
   });
   await build({
+    entryPoints: [join(root, "packages/dsh-plugin/dist/index.js")],
+    outfile: join(payload, "dist/sdk-plugin.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: {
+      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+    },
+    external: ["@deepseek-ai/*", "better-sqlite3"],
+  });
+  await build({
     entryPoints: [join(directory, "initialize.mjs")],
     outfile: join(payload, "dist/initialize.mjs"),
     bundle: true,
@@ -419,6 +431,8 @@ async function writePayload(payload) {
     },
     external: ["better-sqlite3"],
   });
+  for (const file of ["sdk-host.mjs", "sdk-credentials.mjs", "sdk-rpc.mjs"])
+    cpSync(join(directory, file), join(payload, "dist", file));
   cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
   const clientPath = join(root, "packages/dsh-plugin/dist/client.js");
   const client = readFileSync(clientPath, "utf8");
