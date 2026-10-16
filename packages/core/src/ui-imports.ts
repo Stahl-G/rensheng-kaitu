@@ -14,7 +14,7 @@ const EXTENSIONS: Record<ImportSource, string[]> = {
   "apple-health": [".zip", ".xml"],
   ics: [".ics"],
   "nut-ai": [".json"],
-  finance: [".csv", ".xml"],
+  finance: [".csv", ".xml", ".xls", ".xlsx"],
 };
 export function stageUpload(ws: Workspace, source: ImportSource, name: string, bytes: Uint8Array): string {
   const ext = extname(name).toLowerCase();
@@ -30,7 +30,7 @@ export function discardUpload(ws: Workspace, file: string): void {
   rmSync(ws.resolve(file, { internal: true }), { force: true });
 }
 function assertUpload(file: string): void {
-  if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(json|zip|xml|ics|csv)$/.test(file)) {
+  if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(json|zip|xml|ics|csv|xls|xlsx)$/.test(file)) {
     throw new KaituError("无效的上传文件", "BAD_ARGS");
   }
 }

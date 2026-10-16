@@ -212,7 +212,11 @@ export async function productRequest(
       try {
         return {
           file,
-          preview: previewFinanceImport(ws, file, (args[2] ?? undefined) as FinanceImportOptions | undefined),
+          preview: await previewFinanceImport(
+            ws,
+            file,
+            (args[2] ?? undefined) as FinanceImportOptions | undefined,
+          ),
         };
       } catch (err) {
         discardFinanceImport(ws, file);

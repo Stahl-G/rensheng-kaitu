@@ -10,9 +10,9 @@ import { isoInZone } from "../time.js";
 import { discardUpload, stageUpload } from "../ui-imports.js";
 import type { Workspace } from "../workspace.js";
 import { financeEffects, reconcileFinance, transactionKey } from "./accounting.js";
-import { parseFinanceCsv } from "./csv.js";
+import { readFinanceDocument } from "./document.js";
 import { parseIbkr } from "./providers/ibkr.js";
-import { clean, currency } from "./providers/shared.js";
+import { currency } from "./providers/shared.js";
 import { type FinanceFormat, type FinanceMapping, parseFinanceTable } from "./providers/tables.js";
 import type { FinanceTransaction } from "./types.js";
 
@@ -20,12 +20,14 @@ export type { FinanceFormat, FinanceMapping } from "./providers/tables.js";
 export interface FinanceImportOptions {
   format?: FinanceFormat;
   mapping?: FinanceMapping;
+  sheet?: string;
+  tradeDate?: string;
   account?: string;
 }
-const staged = (file: string) => /^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml)$/.test(file);
+const staged = (file: string) => /^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file);
 const filePath = (ws: Workspace, file: string) =>
   isAbsolute(file) ? file : ws.resolve(file, { internal: true });
-const receiptPath = (file: string) => file.replace(/\.(csv|xml)$/, ".receipt.json");
+const receiptPath = (file: string) => file.replace(/\.(csv|xml|xls|xlsx)$/, ".receipt.json");
 const queues = new Map<string, Promise<unknown>>();
 export function stageFinanceUpload(ws: Workspace, name: string, bytes: Uint8Array): string {
   return stageUpload(ws, "finance", name, bytes);
@@ -33,31 +35,14 @@ export function stageFinanceUpload(ws: Workspace, name: string, bytes: Uint8Arra
 export function discardFinanceImport(ws: Workspace, file: string): void {
   discardUpload(ws, file);
 }
-function parse(ws: Workspace, file: string, options: FinanceImportOptions) {
+async function parse(ws: Workspace, file: string, options: FinanceImportOptions) {
   const path = filePath(ws, file);
   const bytes = readFileSync(path);
-  let text: string;
-  let encoding = "utf-8";
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    text = new TextDecoder("gbk", { fatal: true }).decode(bytes);
-    encoding = "gbk";
-  }
-  text = text.replace(/^\uFEFF/, "");
+  const document = await readFinanceDocument(bytes, options.sheet);
+  const { text, encoding } = document;
   const snapshotAt = isoInZone(statSync(path).mtime, ws.timeZone());
   const isXml = /^\s*(?:<\?xml[^>]*>\s*)?<FlexQueryResponse[\s>]/.test(text);
-  const csv =
-    text.split(/\r?\n/).some((line) => line.includes("\t") && !line.includes(",")) && !text.includes(",")
-      ? {
-          rows: text
-            .split(/\r?\n/)
-            .map((line, index) => ({ line: index + 1, cells: line.split("\t").map(clean) }))
-            .filter((r) => r.cells.some(Boolean)),
-          errors: [],
-        }
-      : parseFinanceCsv(text);
-  const parsed = isXml ? parseIbkr(text) : parseFinanceTable(csv.rows, options, snapshotAt);
+  const parsed = isXml ? parseIbkr(text) : parseFinanceTable(document.rows, options, snapshotAt);
   if (options.format && options.format !== parsed.format)
     throw new KaituError("文件列结构与指定格式不匹配", "INVALID_IMPORT");
   const now = new Date().toISOString();
@@ -83,9 +68,15 @@ function parse(ws: Workspace, file: string, options: FinanceImportOptions) {
         : {}),
     },
   }));
-  return { ...parsed, candidates, encoding, errors: [...(isXml ? [] : csv.errors), ...parsed.errors] };
+  return {
+    ...parsed,
+    candidates,
+    encoding,
+    sheet: document.sheet,
+    errors: [...(isXml ? [] : document.errors), ...parsed.errors],
+  };
 }
-function plan(ws: Workspace, parsed: ReturnType<typeof parse>, account?: string) {
+function plan(ws: Workspace, parsed: Awaited<ReturnType<typeof parse>>, account?: string) {
   const type = parsed.kind;
   const existing = readRecords(ws, type);
   const key = (r: StoredRecord) =>
@@ -151,8 +142,8 @@ function plan(ws: Workspace, parsed: ReturnType<typeof parse>, account?: string)
   }
   return { type, records, updates, skipped };
 }
-export function previewFinanceImport(ws: Workspace, file: string, options: FinanceImportOptions = {}) {
-  const parsed = parse(ws, file, options);
+export async function previewFinanceImport(ws: Workspace, file: string, options: FinanceImportOptions = {}) {
+  const parsed = await parse(ws, file, options);
   const batch = plan(ws, parsed, options.account);
   const timestamps = parsed.candidates
     .map((r) => String(r.data.ts))
@@ -160,6 +151,7 @@ export function previewFinanceImport(ws: Workspace, file: string, options: Finan
   return {
     format: parsed.format,
     encoding: parsed.encoding,
+    sheet: parsed.sheet,
     columns: parsed.columns,
     mapping: parsed.mapping,
     account: options.account ?? null,
@@ -207,7 +199,7 @@ async function commit(ws: Workspace, file: string, options: FinanceImportOptions
       throw new KaituError("已提交文件的参数不能修改，请重新上传", "INVALID_IMPORT");
     return { added: 0, skipped: saved.added + saved.skipped, updated: 0, version: null };
   }
-  const parsed = parse(ws, file, options);
+  const parsed = await parse(ws, file, options);
   if (parsed.errors.length)
     throw new KaituError(
       `整批未写入：${parsed.errors.map((r) => `${r.line} 行 ${r.reason}`).join("；")}`,

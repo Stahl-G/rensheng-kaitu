@@ -199,6 +199,9 @@ export type FinanceOverviewData = ReturnType<typeof financeOverview>;
 export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
 export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
 export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
-export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
+export type FinanceImportPreviewData = {
+  file: string;
+  preview: Awaited<ReturnType<typeof previewFinanceImport>>;
+};
 export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;
 export type { MeGoal, MeRules, MeData } from "@kaitu/core";

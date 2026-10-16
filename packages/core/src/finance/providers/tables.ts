@@ -29,7 +29,7 @@ export const supportedFinanceSources = [
   "中国银行",
   "京东",
   "美团",
-  "华鑫证券",
+  "华西证券",
   "海通证券",
   "IBKR Flex XML",
   "同花顺持仓/成交",
@@ -85,7 +85,7 @@ export function detectFinanceTable(rows: CsvRow[]) {
 }
 export function parseFinanceTable(
   rows: CsvRow[],
-  options: { format?: FinanceFormat; mapping?: FinanceMapping },
+  options: { format?: FinanceFormat; mapping?: FinanceMapping; tradeDate?: string },
   snapshotAt: string,
 ) {
   const { index, columns, format } = detectFinanceTable(rows);
@@ -110,7 +110,9 @@ export function parseFinanceTable(
   const fileTail = last4(
     preamble.match(/(?:卡号|账号|帐[号戶]|账[号户])[:：\s]*([\d* -]{4,})/)?.[1]?.trim() ?? "",
   );
-  for (const row of rows.slice(index + 1)) {
+  const body =
+    format === "htsec" ? mergeHtsecAllotments(rows.slice(index + 1), columns) : rows.slice(index + 1);
+  for (const row of body) {
     if (
       /^(?:[-=]{3,}|说明|注[:：]|统计|合计|人民币合计|共[:：\s]*\d|以上数据|具体内容|导出|账单|收入[:：]|支出[:：]|不计收支[:：]|温馨提示|特别提示|注意事项)/.test(
         row.cells[0] ?? "",
@@ -154,7 +156,7 @@ export function parseFinanceTable(
         }
         if (
           format !== "mt" &&
-          !/交易成功|退款成功|支付成功|已支付|已收钱|已到账|已存入|已转账|已退款|已全额退款|对方已收钱|朋友已确认收钱|充值成功|提现成功|还款成功/.test(
+          !/交易成功|退款成功|支付成功|已支付|已收钱|已到账|已存入|已转账|已退款|已全额退款|对方已收钱|朋友已确认收钱|充值成功|充值完成|提现成功|提现完成|还款成功|还款完成|等待确认收货|已付款|已发货/.test(
             status,
           )
         )
@@ -180,6 +182,7 @@ export function parseFinanceTable(
           last4: last4(field("account_last4")) ?? last4(field("method")),
           ...(refund ? { category: "refund" as const } : {}),
         });
+        data.source_direction = direction;
         if (refund) data.amount = abs(value);
       } else if (["cmb", "icbc", "ccb", "boc"].includes(format)) {
         let at = get("记账日期", "交易日期", "记账日", "银行记账日");
@@ -217,7 +220,7 @@ export function parseFinanceTable(
           id: get("交易流水号", "流水号"),
           status: get("交易状态"),
         });
-      } else data = parseSecurity(get, format, snapshotAt);
+      } else data = parseSecurity(get, format, options.tradeDate);
       if (data) candidates.push({ line: row.line, data });
       else ignored++;
     } catch (error) {
@@ -234,9 +237,9 @@ export function parseFinanceTable(
     ignored,
   };
 }
-function parseSecurity(get: (...names: string[]) => string, format: FinanceFormat, snapshotAt: string) {
+function parseSecurity(get: (...names: string[]) => string, format: FinanceFormat, tradeDate?: string) {
   const op = get("业务名称", "操作", "买卖标志");
-  if (["指定交易", "新增证券"].includes(op)) return null;
+  if (["指定交易", "新增证券"].includes(op) || get("证券名称") === "新增证券") return null;
   const categories: Record<string, FinanceCategory> = {
     买: "buy",
     卖: "sale",
@@ -269,11 +272,10 @@ function parseSecurity(get: (...names: string[]) => string, format: FinanceForma
       ? money(get("总费用"))
       : ["手续费", "印花税", "过户费", "其他费"].reduce((sum, key) => add(sum, money(get(key)) ?? "0"), "0");
   if (!settled && fees && fees !== "0") value = add(value, neg(abs(fees)));
-  const date = get("交收日期", "成交日期", "日期");
+  const date = get("交收日期", "成交日期", "日期") || tradeDate || "";
   const time = get("成交时间");
   const ts = date ? timestamp(date, time) : "";
-  if (!ts)
-    throw new Error(`成交表缺少日期，请导出含日期的表格（文件时间 ${snapshotAt.slice(0, 10)} 不作为成交日）`);
+  if (!ts) throw new Error("成交表缺少日期，请填写成交日或导出含日期的表格");
   const description = [
     op,
     get("证券代码"),
@@ -294,6 +296,47 @@ function parseSecurity(get: (...names: string[]) => string, format: FinanceForma
     id: get("成交编号", "成交号"),
     last4: last4(get("资金帐号", "资金账号")),
     direction: outgoing ? "支出" : "收入",
-    feesIncluded: !!settled || fees !== null,
+    feesIncluded:
+      !!settled ||
+      (format === "hxsec"
+        ? fees !== null
+        : ["手续费", "印花税", "过户费", "其他费"].every((column) => get(column) !== "")),
   });
+}
+
+function mergeHtsecAllotments(rows: CsvRow[], columns: string[]): CsvRow[] {
+  const at = (row: CsvRow, name: string) => clean(row.cells[columns.indexOf(name)] ?? "");
+  const zero = (row: CsvRow, name: string) => {
+    try {
+      return decimal(money(at(row, name)) ?? "0").units === 0n;
+    } catch {
+      return false;
+    }
+  };
+  const removed = new Set<number>();
+  const replacements = new Map<number, CsvRow>();
+  for (const row of rows) {
+    if (zero(row, "成交价格") || zero(row, "成交数量") || !zero(row, "成交金额")) continue;
+    const peers = rows.filter(
+      (other) =>
+        other !== row &&
+        at(other, "证券代码") === at(row, "证券代码") &&
+        Math.abs(Date.parse(timestamp(at(other, "成交日期"))) - Date.parse(timestamp(at(row, "成交日期")))) <=
+          7 * 86400000,
+    );
+    const pay = peers.filter(
+      (other) => zero(other, "成交价格") && zero(other, "成交数量") && !zero(other, "成交金额"),
+    );
+    if (pay.length !== 1 || peers.some((other) => !zero(other, "成交数量"))) continue;
+    const counterpart = pay[0];
+    if (!counterpart || removed.has(counterpart.line)) continue;
+    const cells = [...row.cells];
+    for (const name of ["成交金额", "发生金额"]) {
+      const i = columns.indexOf(name);
+      if (i >= 0) cells[i] = at(counterpart, name);
+    }
+    replacements.set(row.line, { ...row, cells });
+    removed.add(counterpart.line);
+  }
+  return rows.filter((row) => !removed.has(row.line)).map((row) => replacements.get(row.line) ?? row);
 }

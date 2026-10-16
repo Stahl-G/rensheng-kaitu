@@ -75,7 +75,7 @@ export class KaituFinanceService extends TypertRemoteService {
       throw new Error("上传内容不是有效的 base64 或超过大小限制");
     const file = stageFinanceUpload(this.workspace, name, Buffer.from(base64, "base64"));
     try {
-      return { file, preview: previewFinanceImport(this.workspace, file, options) };
+      return { file, preview: await previewFinanceImport(this.workspace, file, options) };
     } catch (error) {
       discardFinanceImport(this.workspace, file);
       throw error;
@@ -95,6 +95,7 @@ export class KaituFinanceService extends TypertRemoteService {
     discardFinanceImport(this.workspace, file);
   }
   private assertUpload(file: string): void {
-    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml)$/.test(file)) throw new Error("无效的财务上传文件");
+    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file))
+      throw new Error("无效的财务上传文件");
   }
 }

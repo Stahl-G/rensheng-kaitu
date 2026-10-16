@@ -259,6 +259,8 @@ function ImportPanel({
   stamp: (value: string) => string;
 }) {
   const [account, setAccount] = useState("");
+  const [tradeDate, setTradeDate] = useState("");
+  const [sheet, setSheet] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -274,8 +276,8 @@ function ImportPanel({
   }, [discardFinanceImport]);
   const upload = async (file?: File) => {
     if (!file || !account) return;
-    if (file.size > 36 * 1024 * 1024 || !/\.csv$/i.test(file.name)) {
-      setError("请选择不超过 36MB 的 CSV 文件。");
+    if (file.size > 36 * 1024 * 1024 || !/\.(csv|xml|xls|xlsx)$/i.test(file.name)) {
+      setError("请选择不超过 36MB 的 CSV、XML、XLS 或 XLSX 文件。");
       return;
     }
     setBusy(true);
@@ -287,7 +289,11 @@ function ImportPanel({
         reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(file);
       });
-      const result = await previewFinanceImport(file.name, base64, { account });
+      const result = await previewFinanceImport(file.name, base64, {
+        account,
+        tradeDate: tradeDate || undefined,
+        sheet: sheet || undefined,
+      });
       if (!alive.current) {
         await discardFinanceImport(result.file);
         return;
@@ -322,7 +328,11 @@ function ImportPanel({
     setError(null);
     try {
       committing.current = true;
-      const result = await commitFinanceImport(preview.file, { account });
+      const result = await commitFinanceImport(preview.file, {
+        account,
+        tradeDate: tradeDate || undefined,
+        sheet: sheet || undefined,
+      });
       staged.current = null;
       if (alive.current) onImported(result);
     } catch (err) {
@@ -370,18 +380,40 @@ function ImportPanel({
               </select>
             </label>
             {!preview && (
-              <label>
-                选择 CSV 文件
-                <input
-                  type="file"
-                  accept=".csv,.xml,text/csv,application/xml"
-                  disabled={!account || busy}
-                  onChange={(e) => {
-                    void upload(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <>
+                <details>
+                  <summary>表格选项</summary>
+                  <label>
+                    成交日（成交表缺少日期时填写）
+                    <input
+                      type="date"
+                      value={tradeDate}
+                      disabled={busy || !!preview}
+                      onChange={(e) => setTradeDate(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    工作表名称（多张账单时填写）
+                    <input
+                      value={sheet}
+                      disabled={busy || !!preview}
+                      onChange={(e) => setSheet(e.target.value)}
+                    />
+                  </label>
+                </details>
+                <label>
+                  选择账单或持仓文件
+                  <input
+                    type="file"
+                    accept=".csv,.xml,.xls,.xlsx"
+                    disabled={!account || busy}
+                    onChange={(e) => {
+                      void upload(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              </>
             )}
           </div>
           {!account && <p className={css.muted}>选好账户后，即可选择账单或持仓文件。</p>}

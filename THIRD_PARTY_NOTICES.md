@@ -233,3 +233,8 @@ Adapted from double-entry-generator (Apache-2.0), Copyright deb-sig contributors
    limitations under the License.
 
 ```
+
+## 本机表格读取
+
+- read-excel-file 9.3.12（MIT）：https://github.com/catamphetamine/read-excel-file ，读取 XLSX。
+- xls-reader 0.7.0（MIT）：https://github.com/zanlucathiago/xls-reader ，读取 BIFF8 XLS。
