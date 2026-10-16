@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/symptom.schema.json",
+  "title": "症状",
+  "description": "普通症状填写 severity；食欲变化只填 appetite_change。只记录用户或设备提供的信息。",
+  "allOf": [{ "$ref": "record-base.schema.json" }],
+  "required": ["kind", "source"],
+  "properties": {
+    "kind": {
+      "enum": [
+        "abdominal_cramps",
+        "appetite_changes",
+        "chest_tightness_or_pain",
+        "coughing",
+        "dizziness",
+        "fatigue",
+        "headache",
+        "nausea",
+        "shortness_of_breath",
+        "sore_throat",
+        "chills"
+      ]
+    },
+    "severity": { "enum": ["unspecified", "mild", "moderate", "severe"] },
+    "appetite_change": { "enum": ["unspecified", "decreased", "increased"] },
+    "source": { "type": "string", "minLength": 1, "examples": ["apple-health"] }
+  },
+  "if": { "properties": { "kind": { "const": "appetite_changes" } }, "required": ["kind"] },
+  "then": { "required": ["appetite_change"], "not": { "required": ["severity"] } },
+  "else": { "required": ["severity"], "not": { "required": ["appetite_change"] } },
+  "unevaluatedProperties": false,
+  "examples": [
+    { "kind": "headache", "severity": "mild", "source": "apple-health" },
+    { "kind": "appetite_changes", "appetite_change": "increased", "source": "apple-health" }
+  ]
+}

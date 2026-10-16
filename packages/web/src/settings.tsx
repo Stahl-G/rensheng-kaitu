@@ -224,6 +224,9 @@ export function Settings({
                       meal: "饮食",
                       workout: "训练",
                       event: "日程",
+                      symptom: "症状",
+                      mood: "心理状态",
+                      heart_notification: "心率通知",
                     }[type] ?? type}
                   </strong>
                   <CountsView value={counts} />

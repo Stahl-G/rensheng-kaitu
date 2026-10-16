@@ -19,6 +19,10 @@
 合成导入样例：[Apple Health](examples/apple-health/export.xml)、[日历](examples/calendar.ics)、
 [ChatGPT 记忆](examples/chatgpt-memory.md)、[Nut AI](examples/nut-ai-backup.json)。
 
+健康收件箱支持 HRV(SDNN)，并支持 KaituSync samples 中的 11 类症状、七级心理状态和三类心率通知。
+旧工作区先执行 `kaitu upgrade`；格式与范围见 [健康扩展规范](docs/proposals/kaitu-health-v2.md)。
+通用 MCP `record_list` 可查询新记录；[四个健康专用工具](docs/proposals/mcp-health-tools.md)仍为提案。
+
 需要 Node 22.19+ 与 pnpm。
 
 ```bash
