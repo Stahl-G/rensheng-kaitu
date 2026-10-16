@@ -113,6 +113,10 @@ Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 
 成功归档的健康原件不进版本历史，整理后的记录按来源与自然键去重，有变化才存一个版本。
 快捷指令只需输出原始样本，格式见 [health-shortcut-format.md](guides/health-shortcut-format.md)。
 旧工作区先运行 `kaitu upgrade` 更新内置模块与技能，`kaitu upgrade --dry-run` 可预览。
+KaituSync 也可改用「iCloud Drive 文件夹」收件：在 app 里选择一个 iCloud Drive 文件夹后，
+Mac 端把该文件夹的绝对路径写进 `.kaitu/config.json` 的 `health_inbox_external` 数组
+（如 `"/Users/<你>/Library/Mobile Documents/com~apple~CloudDocs/开图收件箱"`），
+`kaitu ui` 运行时自动拉取入库，原件移入工作区归档；无需 Google 账号或任何部署。
 
 谁来处理收件箱：`kaitu ui` 运行时自动处理（复用文件监听）；也可以手动 `kaitu inbox process`。
 

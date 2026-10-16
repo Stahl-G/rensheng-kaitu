@@ -1,6 +1,8 @@
 import { isUtf8 } from "node:buffer";
 import {
   closeSync,
+  copyFileSync,
+  type Dirent,
   existsSync,
   mkdirSync,
   openSync,
@@ -11,7 +13,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { proposeBlock, writeDigest } from "./agent-tools.js";
 import { clockTime } from "./doc-input.js";
@@ -334,8 +336,45 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
   return target;
 }
 
+/// 外部健康收件箱来源（.kaitu/config.json 的 health_inbox_external，绝对路径数组）。
+/// KaituSync 的「iCloud Drive 文件夹」收件方式写入的位置；文件拉入工作区后原件移除。
+export function externalHealthPaths(ws: Workspace): string[] {
+  try {
+    const config = ws.readJson(".kaitu/config.json") as { health_inbox_external?: unknown };
+    const list = Array.isArray(config.health_inbox_external) ? config.health_inbox_external : [];
+    return list.filter((item): item is string => typeof item === "string" && item.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+function pullExternalHealthInbox(ws: Workspace) {
+  for (const dir of externalHealthPaths(ws)) {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".health.json")) continue;
+      const source = join(dir, entry.name);
+      try {
+        JSON.parse(readFileSync(source, "utf8"));
+        mkdirSync(ws.resolve("inbox/health"), { recursive: true });
+        const target = ws.resolve(`inbox/health/${entry.name}`);
+        if (!existsSync(target)) copyFileSync(source, target);
+        rmSync(source);
+      } catch {
+        // 同步盘可能仍在写入或下载未完成，留待下一轮
+      }
+    }
+  }
+}
+
 export async function processInbox(ws: Workspace, options: { stableMs?: number } = {}) {
   const result = { processed: [] as string[], notes: [] as string[], pending: [] as string[] };
+  pullExternalHealthInbox(ws);
   if (!["inbox/agents", "inbox/health", "inbox/rejected"].some((dir) => ws.exists(dir))) return result;
   const lock = ws.resolve(".kaitu/cache/inbox.lock", { internal: true });
   mkdirSync(dirname(lock), { recursive: true });

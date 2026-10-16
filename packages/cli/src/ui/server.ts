@@ -26,6 +26,7 @@ import {
   discardUpload,
   dshFiles,
   enableSync,
+  externalHealthPaths,
   history,
   holdOverview,
   ignoredWorkspaceChange,
@@ -276,6 +277,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   }
   for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
   let watcher: FSWatcher | undefined;
+  let externalWatchers: FSWatcher[] = [];
   const startPolling = () => {
     watcher?.close();
     if (polling) return;
@@ -307,6 +309,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       watcher.on("error", startPolling);
     } catch {
       startPolling();
+    }
+    // 外部健康收件箱（iCloud Drive 等）：文件事件触发一轮拉取
+    for (const external of externalWatchers) external.close();
+    externalWatchers = [];
+    for (const dir of externalHealthPaths(ws)) {
+      try {
+        const external = watch(dir, () => scheduleInbox());
+        external.on("error", () => external.close());
+        externalWatchers.push(external);
+      } catch {
+        // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试
+      }
     }
     scheduleInbox();
   }
@@ -672,6 +686,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     closed = true;
     watcher?.close();
+    for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
@@ -697,6 +712,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   } catch (error) {
     watcher?.close();
     clearInterval(calendarTimer);
+    for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
     clearInterval(polling);
     clearTimeout(inboxTimer);
