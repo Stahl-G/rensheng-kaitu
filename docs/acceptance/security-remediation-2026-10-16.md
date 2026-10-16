@@ -13,7 +13,7 @@
 | P1-3 私有项目任务 | 成立，task.project 未参与公开过滤，任务统一存 me/data/tasks | 已修，见下文 |
 | P2 DSH 文件保护 | 成立，检查原始路径，confirmed 来自模型参数 | 已修，见下文 |
 | P2 健康导入 | 成立，样本跨度、数量、展开输出与 ZIP 解压量无上限 | 已修，见下文 |
-| 开发依赖 | vitest 3.2.7 / tinypool 1.1.1 仍在锁文件中 | 待升级 |
+| 开发依赖 | vitest 3.2.7 / tinypool 1.1.1 仍在锁文件中 | 已升级，见下文 |
 
 ## P1-1
 
@@ -110,3 +110,18 @@ ZIP 对所有条目累计检查声明与实际解压字节，最多 128 MiB，�
 原有 XML、ZIP、快捷指令与自动收件箱用例一并回归。
 
 健康资源限制提交前：build、typecheck、lint 全部通过，62 个测试文件 / 160 项测试通过。
+
+## 开发依赖
+
+升级 Vitest / mocker 到 4.1.11；新工具链不再依赖 tinypool，旧 1.1.1 已从锁文件移除，未设置 override。
+核对三个原公告的修复范围及 npm 版本依赖后升级，完整 pnpm audit 当前为 0。
+Vitest 4 使用 Vite 8，测试配置为插件 TS 源码使用已有 TypeScript 编译器转换标准装饰器，
+保留实际 Remote 服务的执行测试，没有跳过失败用例。
+
+公告：[Vitest](https://github.com/advisories/GHSA-82fw-gwwq-j7x9)、
+[tinypool worker options](https://github.com/advisories/GHSA-5gmw-xhrv-c9v3)、
+[tinypool run options](https://github.com/advisories/GHSA-85c8-ppgw-ccpr)。
+
+依赖升级提交前：build、typecheck、lint 全部通过，62 个测试文件 / 160 项测试通过；完整 audit 为 0。
+另以本机已安装的实际 DSH 0.2.0-rc.2 LocalFileSystem 和 SDK 随附 ripgrep 做离线合成冒烟：
+正常笔记读写通过，直接及别名访问程序文件被拒绝，搜索返回正常笔记且不含合成密钥。
