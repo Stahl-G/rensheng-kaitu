@@ -23,6 +23,14 @@ import { parseArgs } from "node:util";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
+const nodeBanner = [
+  'import { createRequire as kaituRequire } from "node:module";',
+  'import { dirname as kaituDirname } from "node:path";',
+  'import { fileURLToPath as kaituFileURLToPath } from "node:url";',
+  "const require = kaituRequire(import.meta.url);",
+  "const __filename = kaituFileURLToPath(import.meta.url);",
+  "const __dirname = kaituDirname(__filename);",
+].join("\n");
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -391,7 +399,7 @@ async function writePayload(payload) {
     format: "esm",
     target: "node22",
     banner: {
-      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+      js: nodeBanner,
     },
     external: ["@deepseek-ai/*", "better-sqlite3"],
   });
@@ -403,7 +411,7 @@ async function writePayload(payload) {
     format: "esm",
     target: "node22",
     banner: {
-      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+      js: nodeBanner,
     },
     external: ["@deepseek-ai/*", "better-sqlite3"],
   });
@@ -415,7 +423,7 @@ async function writePayload(payload) {
     format: "esm",
     target: "node22",
     banner: {
-      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+      js: nodeBanner,
     },
     external: ["better-sqlite3"],
   });
@@ -427,7 +435,7 @@ async function writePayload(payload) {
     format: "esm",
     target: "node22",
     banner: {
-      js: 'import { createRequire as kaituRequire } from "node:module"; const require = kaituRequire(import.meta.url);',
+      js: nodeBanner,
     },
     external: ["better-sqlite3"],
   });

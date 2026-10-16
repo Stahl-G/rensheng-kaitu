@@ -14,6 +14,16 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 let workspace = "";
 const props: OverviewPageProps = {
+  channelSettings: async (operation, input = {}) => {
+    const response = await fetch(`/api/channels/${operation}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
+      body: JSON.stringify(input),
+    });
+    const value = await response.json();
+    if (!response.ok) throw new Error(value.error ?? "采集设置失败");
+    return value;
+  },
   renderAsk: (prompt) => <AskPage workspace={workspace} initialPrompt={prompt} />,
   subscribe: (refresh) => {
     const events = new EventSource("/api/events");

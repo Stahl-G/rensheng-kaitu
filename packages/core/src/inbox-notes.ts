@@ -60,6 +60,17 @@ export function inboxNotes(ws: Workspace) {
     .sort((a, b) => b.path.localeCompare(a.path));
 }
 
+export function findInboxNote(ws: Workspace, name: string, directory = "inbox/notes"): string | undefined {
+  if (!ws.exists(directory)) return;
+  for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+    const file = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) {
+      const found = findInboxNote(ws, name, file);
+      if (found) return found;
+    } else if (entry.isFile() && entry.name === name) return file;
+  }
+}
+
 export function availableInboxPath(ws: Workspace, directory: string, name: string) {
   let target = `${directory}/${name}`;
   while (ws.exists(target)) {

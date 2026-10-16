@@ -1,69 +1,69 @@
-# 手机通道
+# 邮件与聊天收件箱
 
-电脑保持开机，先在电脑上安装并登录 Codex CLI。通道均主动连接平台，不监听端口。
+开图 → 右上角 → AI 与连接 → 邮件与聊天收件箱。添加账号后，开图保持运行即可自动接收。
+不需要 Codex CLI 或另装服务；只保存来源、发件人、时间、标题、最多 280 字摘录与原文链接。
+消息作为不可信资料进入现有收件箱，后续整理为待确认建议。
 
-## 第一次使用
+## IMAP 邮件
 
-1. `kaitu channels setup telegram`（通道可换为 `feishu`、`qq`、`weixin`）。
-2. `kaitu channels pair telegram`：记下 6 位一次性配对码，10 分钟有效。
-3. `kaitu channels start --only telegram`：前台运行，用手机**私聊**机器人发送配对码。
-4. 收到配对成功回复后，发「今天深蹲 3×12 60kg」。先收到处理回执，随后收到 Agent 的结果。
-5. `kaitu ui --channels` 同时打开工作台和所有已配置通道；文件变化沿用现有监听实时刷新。
-   单独运行通道也会在消息处理后保存工作区版本。
+选择邮箱服务，填写账号名称、邮箱账号、应用专用密码 / 授权码，点击添加，再测试连接。
+支持自填服务器和文件夹，默认 TLS 993、INBOX。首次连接只记录当前位置；重新连接从本机游标续接。
+UIDVALIDITY 改变时重新建立当前位置，不回灌历史邮件。超过 1 MiB 的邮件跳过，附件不保存。
 
-`kaitu channels start` 启动所有已配置通道，Ctrl+C 停止通道及正在运行的回答命令。
-`kaitu channels status` 查看配置、配对和进程状态；进程运行中不代表平台连接已验证。
-所有命令支持 `--dir <工作区>`，也可设置 `KAITU_DIR`。
-已配对的通道不能再次生成配对码；未配对时再次执行 pair 会替换旧码。非主人消息静默忽略。
-文本以外的内容暂不处理。
+| 邮箱 | 预置服务器 | 凭据入口 |
+|---|---|---|
+| Gmail | imap.gmail.com | [Google 账户应用专用密码](https://support.google.com/mail/answer/185833)，先开启两步验证；组织策略可能禁用 |
+| iCloud | imap.mail.me.com | [Apple 账户](https://support.apple.com/102654) → 登录和安全 → App 专用密码 |
+| Outlook | outlook.office365.com | [Microsoft 要求 OAuth2](https://support.microsoft.com/en-us/outlook/pop-imap-and-smtp-settings-for-outlook-com)；手填 IMAP access token，应用密码不可用 |
+| QQ | imap.qq.com | [网页版邮箱](https://service.mail.qq.com/detail/0/75) → 设置 → 账号与安全 → 开启 IMAP → 生成授权码 |
+| 163 | imap.163.com | [网页版邮箱](https://mail.163.com/) → 设置 → POP3/SMTP/IMAP → 开启 IMAP → 获取授权码 |
 
-## Telegram
+Outlook token 到期后需断开并重新添加；本轮没有 Microsoft OAuth 登录与自动续期。
+邮件用 mailauth 校验 DKIM、SPF/DMARC 证据并标注结果；未验证的邮件仍只是外部资料。
+缺少原始 SMTP 会话时无法完整重演 SPF，不能把邮件头里的认证声明当作可信身份。
+认证临时错误最多尝试三次，持续失败的邮件跳过。所有读取均不改未读标记，也不移动邮件。
 
-1. 在 Telegram 找到 `@BotFather`，发送 `/newbot`，按提示创建机器人。
-2. 把返回的 bot token 填入 `kaitu channels setup telegram`。
-3. 手机打开机器人私聊并点击 Start，再按上面的步骤配对。
-4. 电脑需能访问 Telegram；同一个 token 只运行一个长轮询程序。
+## Slack
+
+1. 在 [Slack 应用页面](https://api.slack.com/apps) 选择 Create New App → From a manifest，
+   导入 [slack-app-manifest.json](slack-app-manifest.json)，选择自己的工作区，作为内部应用安装。
+2. 在 OAuth & Permissions 复制 **User OAuth Token**（xoxp- 开头），在开图添加 Slack 账号。
+3. 从 Slack 会话详情或浏览器地址复制 C / G / D 开头的会话 ID，填入新增会话 ID 并保存。
+   勾选的频道、群组私信、私信才会采集。取消所有勾选可停止拉取该账号的会话。
+
+默认每 5 分钟轮询，本地接口 `add` 可设 `intervalMinutes` 为 5–15。
+从选择会话的时刻开始收新消息，也分页扫描旧线程的新回复；一次最多扫描 10 页频道历史，长历史会跨轮续拉。
+每个分页进度保存在本机，网络失败或限流后下轮重试，不推进未完成页。重新勾选从新的选择时刻开始。
+
+manifest 只有 `channels:history`、`groups:history`、`im:history`、`mpim:history`、`users:read`。
+这些 scope 不允许列出全部频道目录，因此需粘贴会话 ID，不额外申请目录或发送权限。
+[Slack 官方读取规则](https://docs.slack.dev/reference/methods/conversations.history/) 和
+[线程读取规则](https://docs.slack.dev/reference/methods/conversations.replies/) 适用于用户有权访问的会话。
 
 ## 飞书
 
-1. 打开飞书开放平台，创建企业自建应用，记下 App ID 和 App Secret。
-2. 添加「机器人」能力，开通接收用户私聊消息和发送消息权限（如 `im:message.p2p_msg:readonly`、`im:message:send_as_bot`）。
-3. 事件订阅选择「使用长连接接收事件」，添加 `im.message.receive_v1`。
-4. 发布应用版本，把本人加入可用范围，填入 `kaitu channels setup feishu`。
-5. 启动通道，在飞书找到机器人并私聊配对。无需配置公网回调地址。
+1. 在 [飞书开放平台](https://open.feishu.cn/app) 创建企业自建应用，启用机器人能力。
+2. 开通 `im:message.p2p_msg:readonly` 接收发给机器人的私信，群聊使用 `im:message.group_at_msg:readonly`。
+   若需要所在群的全部用户消息，需企业批准 `im:message.group_msg` 权限；不申请发送权限。
+3. 事件与回调 → 使用长连接接收事件 → 订阅 `im.message.receive_v1`，发布应用版本并设置可用范围。
+4. 在开图添加 App ID / App Secret，测试连接；把机器人加入要接收的测试群，或直接私聊机器人。
 
-## QQ
+**只能收到机器人所在群和发给机器人的私信，无法读取个人的其他聊天。**
+只开群 @权限时，群里必须 @机器人。参见 [官方事件说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)。
+只接收平台推送，不回灌离线期间的历史消息；平台可能重推，按 message_id 去重。
+支持文本、富文本 post 与提及；图片 / 文件 / 音频仅留类型占位，不下载附件。
+原文链接打开所在会话，笔记同时保留 message_id；尚不能直接定位原消息。
 
-1. 在 QQ 开放平台创建机器人，取得 App ID 和 App Secret。
-2. 开通 C2C 私聊消息能力；开发阶段把本人 QQ 加入平台提供的测试 / 沙箱范围。
-3. 填入 `kaitu channels setup qq`，启动通道后通过平台入口添加机器人并私聊配对。
-4. 使用 SDK 的 WebSocket 传输和 C2C 收发；平台准入、测试范围、消息频次和长文本回复限制需实测。
+## 本机设置与接口
 
-## 微信
+账号配置、凭据、游标、状态在 `localStateRoot/collectors/`，JSON 文件权限 600。
+工作区中没有凭据；同账号由本机锁保护。关闭开图会停止采集，另一运行中的开图进程可接手。
+另一进程修改设置后最多 10 秒同步生效。断开删除本机配置与凭据，保留已接收的笔记。
 
-1. 执行 `kaitu channels setup weixin`，终端会打印腾讯 iLink 登录链接。
-2. 用手机微信打开链接，或在另一块屏幕上打开链接后扫码，在手机上确认连接。
-3. 若提示数字验证，把手机显示的数字输入电脑终端；扫码过期会刷新，最多生成 3 次。
-4. 登录完成后仍需 `kaitu channels pair weixin`，启动通道并从手机私聊发配对码。
-5. 登录失效时重新 setup。此通道是从腾讯官方包抽取的文本实现，源码来源和差异见
-   [微信抽取说明](../packages/channels/src/weixin/README.md)。
+独立 App / 本地工作台：`POST /api/channels/{list,add,test,disconnect,select}`，请求体为 JSON 对象，
+带现有工作台的 `X-Kaitu: 1` 与同源 Origin。`list` 返回渠道、连接状态、上次拉取、错误原因和选择范围。
+`add` 使用设置表单同名字段；`test` / `disconnect` 使用 `{id}`；`select` 使用 `{id, ids: [...]}`。
+DSH 对应 `kaitu.channelSettings(operation, JSON.stringify(input))`，返回同一结果的 JSON 字符串。
+接口不会返回密码、token 或应用密钥。不要把凭据写在 URL 或工作区文件里。
 
-## 回答命令与本机状态
-
-默认执行 `codex exec -s workspace-write`，在当前工作区运行，读取工作区 AGENTS.md。
-每个「通道 + 聊天」保存独立 Codex 会话 ID，后续执行 `codex exec resume <ID>`；不使用 `--last`。
-默认 3 分钟超时，同一会话排队，不同会话可同时处理，长结果分段发送。
-
-可在工作区 `.kaitu/config.json` 增加下面的配置（保留其他已有字段）：
-
-```json
-{
-  "channels": { "agent_command": "claude -p" }
-}
-```
-
-自定义命令通过本机 shell 启动，在工作区运行，提示词从 stdin 输入，stdout 作为回答。
-自定义命令每次新建进程，提示词带最近 5 轮对话；无需在命令中插入消息占位符。
-
-凭据在本机状态目录的 `secrets.json`（权限 600）；配对、会话、微信游标在同目录 `channels/`。
-默认状态目录为工作区 `.kaitu/`，Drive 模式使用已配置的本机 `state_dir`；上述状态不进版本历史和 Drive。
+原有会回复消息的手机通道是另一项功能，见 [手机通道](phone-channels.md)，不会由此入口启动。

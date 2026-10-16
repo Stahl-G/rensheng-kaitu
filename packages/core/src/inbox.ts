@@ -6,6 +6,7 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -19,7 +20,7 @@ import { batchSnapshot } from "./history.js";
 import { parseAppleHealth, parseHealthShortcut } from "./importers/apple-health.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
-import { availableInboxPath, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
+import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories } from "./memory.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
 import { assertPublicProject } from "./projects.js";
@@ -181,6 +182,25 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
   const bytes = attach ? Buffer.alloc(0) : readFileSync(ws.resolve(file));
   const directory = `inbox/notes/${localDate(new Date(), ws.timeZone())}`;
   if (file.endsWith(".note.md") && !errors.length && isUtf8(bytes) && !bytes.includes(0)) {
+    if (/^channel-[a-f0-9]{64}\.note\.md$/.test(basename(file))) {
+      const existing = findInboxNote(ws, basename(file));
+      if (existing) {
+        rmSync(ws.resolve(file));
+        return existing;
+      }
+      const date = noteMetadata(bytes.toString("utf8")).date;
+      if (
+        typeof date === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+        Number.isFinite(Date.parse(date)) &&
+        new Date(date).toISOString().slice(0, 10) === date
+      ) {
+        const target = `inbox/notes/${date}/${basename(file)}`;
+        mkdirSync(dirname(ws.resolve(target)), { recursive: true });
+        renameSync(ws.resolve(file), ws.resolve(target));
+        return target;
+      }
+    }
     return moveInboxFile(ws, file, directory);
   }
   const text = !attach && isUtf8(bytes) && !bytes.includes(0) ? bytes.toString("utf8") : null;
