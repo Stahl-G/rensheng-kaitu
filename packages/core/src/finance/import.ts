@@ -10,6 +10,7 @@ import { isoInZone } from "../time.js";
 import { discardUpload, stageUpload } from "../ui-imports.js";
 import type { Workspace } from "../workspace.js";
 import { financeEffects, reconcileFinance, transactionKey } from "./accounting.js";
+import { refreshBankNotificationMatches } from "./bank-notifications.js";
 import { readFinanceDocument } from "./document.js";
 import { parseIbkr } from "./providers/ibkr.js";
 import { currency } from "./providers/shared.js";
@@ -22,6 +23,7 @@ export interface FinanceImportOptions {
   mapping?: FinanceMapping;
   sheet?: string;
   tradeDate?: string;
+  accountLast4?: string;
   account?: string;
 }
 const staged = (file: string) => /^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file);
@@ -36,6 +38,11 @@ export function discardFinanceImport(ws: Workspace, file: string): void {
   discardUpload(ws, file);
 }
 async function parse(ws: Workspace, file: string, options: FinanceImportOptions) {
+  if (
+    options.accountLast4 !== undefined &&
+    (typeof options.accountLast4 !== "string" || !/^\d{4}$/.test(options.accountLast4))
+  )
+    throw new KaituError("银行卡尾号须为四位数字", "INVALID_IMPORT");
   const path = filePath(ws, file);
   const bytes = readFileSync(path);
   const document = await readFinanceDocument(bytes, options.sheet);
@@ -60,6 +67,9 @@ async function parse(ws: Workspace, file: string, options: FinanceImportOptions)
       account: options.account ?? "preview-account",
       imported_at: now,
       ...row.data,
+      ...(parsed.kind === "finance_transaction"
+        ? { account_last4: row.data.account_last4 ?? options.accountLast4 ?? null }
+        : {}),
       ...(parsed.kind === "finance_holding_snapshot"
         ? {
             currency: row.data.currency ? currency(String(row.data.currency)) : null,
@@ -216,6 +226,7 @@ async function commit(ws: Workspace, file: string, options: FinanceImportOptions
     );
     version = await snapshot(ws, `导入财务（${parsed.format}）${batch.records.length} 条`);
   }
+  refreshBankNotificationMatches(ws);
   const result = {
     added: batch.records.length,
     skipped: batch.skipped,

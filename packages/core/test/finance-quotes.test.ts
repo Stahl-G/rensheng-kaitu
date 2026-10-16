@@ -26,13 +26,14 @@ it("参考价和汇率独立于导入记录，失败保留时间，每小时与�
       ["00700", "HKD"],
       ["SYNTH", "USD"],
       ["unknown-code", "CNY"],
+      ["600001", null],
     ])
       addRecord(ws, "finance_holding_snapshot", {
         account,
         security_code: code,
         name: "Synthetic Security",
         quantity: "2",
-        cost: null,
+        cost: code === "600001" ? "8" : null,
         price: "8",
         market_value: null,
         currency,
@@ -45,6 +46,7 @@ it("参考价和汇率独立于导入记录，失败保留时间，每小时与�
     const at = "2026-10-15T00:00:00Z";
     const prices: Record<string, [string, string]> = {
       "600000.SS": ["12.5", "CNY"],
+      "600001.SS": ["13", "CNY"],
       "000001.SZ": ["10", "CNY"],
       "0700.HK": ["20", "HKD"],
       SYNTH: ["30", "USD"],
@@ -81,6 +83,10 @@ it("参考价和汇率独立于导入记录，失败保留时间，每小时与�
     expect(first.holdings.find((h) => h.security_code === "unknown-code")?.reference).toMatchObject({
       price: null,
       status: "unavailable",
+    });
+    expect(first.holdings.find((h) => h.security_code === "600001")?.reference).toMatchObject({
+      value: "26",
+      unrealized_gain: null,
     });
     await load(0.5);
     expect(requests).toBe(1);

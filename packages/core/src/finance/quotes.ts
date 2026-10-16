@@ -198,8 +198,9 @@ export async function loadFinanceInvestments(
         cached && (!holding.currency || holding.currency === cached.currency) ? cached : undefined;
       const value =
         quote && holding.quantity.amount !== null ? mul(holding.quantity.amount, quote.price) : null;
-      const fx =
+      const rate =
         quote && quote.currency !== target ? cache.quotes[`${quote.currency}${target}=X`] : undefined;
+      const fx = rate?.currency === target ? rate : undefined;
       const reference = {
         source: "Yahoo" as const,
         symbol,
@@ -213,7 +214,9 @@ export async function loadFinanceInvestments(
             : ("ok" as const),
         value,
         unrealized_gain:
-          value !== null && holding.cost.amount !== null ? sub(value, holding.cost.amount) : null,
+          value !== null && holding.cost.amount !== null && holding.currency === quote?.currency
+            ? sub(value, holding.cost.amount)
+            : null,
         converted_value:
           value === null ? null : quote?.currency === target ? value : fx ? mul(value, fx.price) : null,
         target_currency: target,

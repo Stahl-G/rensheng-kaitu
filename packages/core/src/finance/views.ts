@@ -2,6 +2,7 @@ import { readRecords } from "../records.js";
 import { localDate, parseTs } from "../time.js";
 import type { Workspace } from "../workspace.js";
 import { financeEffects, reconcileFinance } from "./accounting.js";
+import { bankNotificationCandidates } from "./bank-notifications.js";
 import { add, decimal, div, mul, neg, sub } from "./decimal.js";
 import type {
   FinanceAccount,
@@ -246,17 +247,30 @@ export function financeOverview(ws: Workspace, options: FinanceViewOptions = {})
         amount: holdingValue(h).amount,
       })),
     ],
-    pending: ctx.transactions
-      .filter((r) => r.reconciliation !== "ok")
-      .map((r) => ({
-        id: r.id,
-        date: r.ts,
-        amount: r.amount,
-        currency: r.currency,
-        description: [r.counterparty, r.description].filter(Boolean).join(" · ") || "交易记录",
-        status: r.reconciliation,
-        reason: r.review_reason ?? null,
-      })),
+    pending: [
+      ...ctx.transactions
+        .filter((r) => r.reconciliation !== "ok")
+        .map((r) => ({
+          id: r.id,
+          date: r.ts,
+          amount: r.amount,
+          currency: r.currency,
+          description: [r.counterparty, r.description].filter(Boolean).join(" · ") || "交易记录",
+          status: r.reconciliation,
+          reason: r.review_reason ?? null,
+        })),
+      ...bankNotificationCandidates(ws, ctx.asOf)
+        .filter((candidate) => !candidate.transaction_id)
+        .map((candidate) => ({
+          id: candidate.id,
+          date: candidate.ts,
+          amount: candidate.amount,
+          currency: candidate.currency,
+          description: `${{ cmb: "招商银行", icbc: "工商银行", ccb: "建设银行", boc: "中国银行" }[candidate.bank]}动账通知 · ${candidate.counterparty ?? "待核对"}`,
+          status: "pending_review" as const,
+          reason: "bank_notification",
+        })),
+    ],
     converted: options.targetCurrency
       ? {
           cash: convert(cash, options.targetCurrency, ctx.rates),

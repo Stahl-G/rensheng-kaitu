@@ -2,6 +2,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
   Workspace,
+  bankNotificationCandidates,
   commitFinanceImport,
   defaultRoot,
   discardFinanceImport,
@@ -10,6 +11,7 @@ import {
   financeOverview,
   loadFinanceInvestments,
   previewFinanceImport,
+  receiveBankNotification,
   stageFinanceUpload,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
@@ -20,7 +22,10 @@ import type {
   FinanceImportCommitData,
   FinanceImportPreviewData,
   FinanceInvestmentsData,
+  FinanceNotificationCandidatesData,
+  FinanceNotificationReceiveData,
   FinanceOverviewData,
+  FinanceRemoteBankMail,
   FinanceRemoteCommitOptions,
   FinanceRemoteImportOptions,
   FinanceRemoteViewOptions,
@@ -41,6 +46,14 @@ export class KaituFinanceService extends TypertRemoteService {
   ) {
     super(ctx, "kaituFinance");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot(), { maintain: false });
+  }
+  @Remote("financeNotificationReceive")
+  async financeNotificationReceive(mail: FinanceRemoteBankMail): Promise<FinanceNotificationReceiveData> {
+    return this.write(async () => receiveBankNotification(this.workspace, mail));
+  }
+  @Remote("financeNotificationCandidates")
+  async financeNotificationCandidates(): Promise<FinanceNotificationCandidatesData> {
+    return bankNotificationCandidates(this.workspace);
   }
   @Remote("financeOverview")
   async financeOverview(options?: FinanceRemoteViewOptions): Promise<FinanceOverviewData> {

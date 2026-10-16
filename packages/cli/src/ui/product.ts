@@ -1,11 +1,13 @@
 import {
   type AutomationKey,
+  type BankMail,
   type ExperienceChanges,
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
   KaituError,
   type Workspace,
+  bankNotificationCandidates,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
@@ -35,6 +37,7 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  receiveBankNotification,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
@@ -65,6 +68,7 @@ export const productMutations = new Set([
   "setAvatar",
   "removeAvatar",
   "financeImportCommit",
+  "financeNotificationReceive",
 ]);
 
 export async function productRequest(
@@ -193,6 +197,10 @@ export async function productRequest(
     }
     case "removeAvatar":
       return removeAvatar(ws);
+    case "financeNotificationReceive":
+      return receiveBankNotification(ws, args[0] as BankMail);
+    case "financeNotificationCandidates":
+      return bankNotificationCandidates(ws);
     case "financeOverview":
       return financeOverview(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeCashflow":

@@ -70,7 +70,23 @@ const categories: Record<string, string> = {
   loan_in: "借入本金",
   loan_repay: "偿还本金",
 };
+const importSourceNames: Record<string, string> = {
+  "alipay-csv": "支付宝",
+  "holdings-csv": "持仓表",
+  wechat: "微信",
+  cmb: "招商银行",
+  icbc: "工商银行",
+  ccb: "建设银行",
+  boc: "中国银行",
+  jd: "京东",
+  mt: "美团",
+  hxsec: "华西证券",
+  htsec: "海通证券 / 同花顺成交",
+  ibkr: "IBKR",
+};
 const fields: Record<string, string> = {
+  account_last4: "银行卡尾号",
+  method: "支付方式",
   ts: "日期",
   direction: "收支方向",
   amount: "金额",
@@ -90,6 +106,7 @@ const fields: Record<string, string> = {
   classification: "交易分类",
 };
 const reasons: Record<string, string> = {
+  bank_notification: "银行动账通知，等待账单核对",
   fx_missing: "缺少汇率",
   currency_missing: "币种缺失",
   balance_snapshot_missing: "缺少余额基准",
@@ -261,6 +278,7 @@ function ImportPanel({
   const [account, setAccount] = useState("");
   const [tradeDate, setTradeDate] = useState("");
   const [sheet, setSheet] = useState("");
+  const [accountLast4, setAccountLast4] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -293,6 +311,7 @@ function ImportPanel({
         account,
         tradeDate: tradeDate || undefined,
         sheet: sheet || undefined,
+        accountLast4: accountLast4 || undefined,
       });
       if (!alive.current) {
         await discardFinanceImport(result.file);
@@ -332,6 +351,7 @@ function ImportPanel({
         account,
         tradeDate: tradeDate || undefined,
         sheet: sheet || undefined,
+        accountLast4: accountLast4 || undefined,
       });
       staged.current = null;
       if (alive.current) onImported(result);
@@ -384,6 +404,16 @@ function ImportPanel({
                 <details>
                   <summary>表格选项</summary>
                   <label>
+                    银行卡尾号（账单未提供时）
+                    <input
+                      inputMode="numeric"
+                      maxLength={4}
+                      value={accountLast4}
+                      disabled={busy || !!preview}
+                      onChange={(e) => setAccountLast4(e.target.value)}
+                    />
+                  </label>
+                  <label>
                     成交日（成交表缺少日期时填写）
                     <input
                       type="date"
@@ -421,7 +451,7 @@ function ImportPanel({
           {p && (
             <div className={css.preview}>
               <p>
-                {p.format} · {p.encoding.toUpperCase()}
+                {importSourceNames[p.format] ?? p.format} · {p.encoding.toUpperCase()}
               </p>
               <p className={css.muted}>
                 期间：{p.period.from ? stamp(p.period.from) : "暂无记录"} –{" "}
