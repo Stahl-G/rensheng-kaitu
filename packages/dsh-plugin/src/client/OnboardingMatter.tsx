@@ -1,4 +1,11 @@
-import type { OnboardingMatter as Matter, OnboardingMatterDraft, OnboardingNext } from "@kaitu/core";
+import type {
+  OnboardingMatter as Matter,
+  OnboardingContent,
+  OnboardingMatterDraft,
+  OnboardingMatterSuggestion,
+  OnboardingNext,
+  OnboardingPath,
+} from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import css from "./Onboarding.module.css";
 import v2 from "./Prototype.module.css";
@@ -6,9 +13,15 @@ import type { OnboardingServices } from "./onboarding-services.js";
 
 const primary = `${v2.btn} ${v2["btn-primary"]}`;
 const quiet = `${v2.btn} ${v2["btn-quiet"]}`;
+const editable = (draft: OnboardingMatterSuggestion): OnboardingMatterDraft => ({
+  goal: draft.goal,
+  current: draft.current,
+  next: draft.next,
+});
 export function OnboardingMatter(
   props: OnboardingServices & {
     initial: Matter | null;
+    content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
     onDone: () => Promise<void>;
@@ -18,9 +31,13 @@ export function OnboardingMatter(
   const [text, setText] = useState("");
   const [matter, setMatter] = useState<Matter | null>(props.initial);
   const [draft, setDraft] = useState<OnboardingMatterDraft>(
-    props.initial?.draft ?? { goal: "", current: "", next: "" },
+    props.initial?.draft ? editable(props.initial.draft) : { goal: "", current: "", next: "" },
   );
+  const [paths, setPaths] = useState<OnboardingPath[]>(props.initial?.draft?.paths ?? []);
+  const [path, setPath] = useState(-1);
+  const input = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
+  const [organizing, setOrganizing] = useState(false);
   const [error, setError] = useState("");
   const [raw, setRaw] = useState(false);
   const [externalRequested, setExternalRequested] = useState(false);
@@ -38,7 +55,9 @@ export function OnboardingMatter(
     const receipt = JSON.stringify(props.initial?.draft ?? null);
     if (props.initial?.source === matter?.source && props.initial?.draft && receipt !== applied.current) {
       applied.current = receipt;
-      setDraft(props.initial.draft);
+      setDraft(editable(props.initial.draft));
+      setPaths(props.initial.draft.paths ?? []);
+      setPath(-1);
       setManual(false);
     }
   }, [props.initial, matter?.source]);
@@ -69,7 +88,7 @@ export function OnboardingMatter(
   };
   const external = (saved: Matter) => {
     props.onPrompt(
-      `请用 kaitu_onboarding 的 matter-read 读取原文 ${saved.source}，整理为 goal（当前目标）、current（已知现状）、next（仅一个下一步），调用 matter-draft 保存供我核对的草稿。不要创建待办或采纳其他建议。我会回到开图核对并采纳。`,
+      `请用 kaitu_onboarding 的 matter-read 读取原文 ${saved.source}，整理当前目标和已知现状；已有明确的事时给一个下一步，不知道做什么时给 2–3 条可能路径（为什么适合、还有哪些不清楚、一个低成本小实验），不要预选路径或下一步。调用 matter-draft 保存供我核对的草稿。不要创建待办或采纳其他建议。我会回到开图核对并采纳。`,
     );
     setExternalRequested(true);
   };
@@ -79,24 +98,47 @@ export function OnboardingMatter(
       external(saved);
       return;
     }
-    const result = await props.organizeOnboardingMatter(saved.source);
-    if (!alive.current) return;
-    setMatter(result);
-    if (result.draft) {
-      setDraft(result.draft);
-      setManual(false);
-    } else {
-      setManual(true);
-      setNoAi(true);
+    setOrganizing(true);
+    try {
+      const result = await props.organizeOnboardingMatter(saved.source);
+      if (!alive.current) return;
+      setMatter(result);
+      if (result.draft) {
+        applied.current = JSON.stringify(result.draft);
+        setDraft(editable(result.draft));
+        setPaths(result.draft.paths ?? []);
+        setPath(-1);
+        setManual(false);
+      } else {
+        setManual(true);
+        setNoAi(true);
+      }
+    } finally {
+      if (alive.current) setOrganizing(false);
     }
   };
+  const subject = matter?.kind === "conversation" ? "这段对话" : "你写的这件事";
+  const field = (key: keyof OnboardingMatterDraft, title: string) => (
+    <label key={key}>
+      <b>{title}</b>
+      <input
+        value={draft[key]}
+        disabled={busy || (key === "next" && paths.length > 0 && path < 0)}
+        maxLength={key === "current" ? 4000 : 2000}
+        placeholder={
+          key === "next" && paths.length > 0 && path < 0 ? "先选一条可能路径，再修改小实验" : undefined
+        }
+        onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+      />
+    </label>
+  );
   return (
     <div className={css.matter} aria-busy={busy}>
-      <h1 className={css.title}>{matter ? "开图从这段对话里看到的" : "带来一件正在推进的事"}</h1>
+      <h1 className={css.title}>{matter ? `开图从${subject}里看到的` : props.content.question}</h1>
       <p className={css.lead}>
         {matter
-          ? "每一项都能改。只有你采纳的这一个下一步会成为待办，对话里的其他建议会留在原文里。"
-          : "把最近和 AI 聊的一段计划粘贴过来，或直接写下你想推进的事。先保存原文，再一起核对。"}
+          ? "每一项都能改。只有你采纳的这一个下一步会成为待办，其他建议会留在原文里。"
+          : "直接写就行，也可以粘贴一段和 AI 聊过的对话。开图先原样保存，再帮你理出一个下一步，采不采纳由你定。"}
       </p>
       {error && (
         <p role="alert" className={v2.error}>
@@ -105,15 +147,33 @@ export function OnboardingMatter(
       )}
       {!matter ? (
         <>
-          <label htmlFor="onboarding-original">对话或想推进的事</label>
+          <fieldset className={css.examples} disabled={busy}>
+            <legend className={v2.sr}>从一个示例开始</legend>
+            {props.content.examples.map((example) => (
+              <button
+                type="button"
+                className={quiet}
+                key={example.title}
+                disabled={busy}
+                onClick={() => {
+                  setText(example.text);
+                  input.current?.focus();
+                }}
+              >
+                {example.title}
+              </button>
+            ))}
+          </fieldset>
+          <label htmlFor="onboarding-original">想改变的事或 AI 对话</label>
           <textarea
+            ref={input}
             id="onboarding-original"
             rows={8}
             maxLength={100000}
             value={text}
             disabled={busy}
             onChange={(event) => setText(event.target.value)}
-            placeholder="最近在推进什么？已经聊到了哪一步？"
+            placeholder="写下来，或粘贴一段和 AI 的对话"
           />
           <div className={css.footerActions}>
             <button
@@ -140,7 +200,9 @@ export function OnboardingMatter(
             <span>原文已保存</span>
             <span>需要你核对</span>
           </div>
-          {busy && <output className={v2.small}>正在请 AI 整理，原文已保存…</output>}
+          {busy && (
+            <output className={v2.small}>{organizing ? "正在请 AI 整理，原文已保存…" : "正在保存…"}</output>
+          )}
           {manual && (
             <p className={v2.small}>
               {props.builtin
@@ -153,26 +215,37 @@ export function OnboardingMatter(
             </p>
           )}
           <div className={css.draftFields}>
-            {(
-              [
-                ["goal", "当前目标"],
-                ["current", "已知现状"],
-                ["next", "一个下一步"],
-              ] as const
-            ).map(([key, title]) => (
-              <label key={key}>
-                <b>{title}</b>
-                <input
-                  value={draft[key]}
-                  disabled={busy}
-                  maxLength={key === "current" ? 4000 : 2000}
-                  onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
-                />
-              </label>
-            ))}
+            {field("goal", "当前目标")}
+            {field("current", "已知现状")}
+            {paths.length > 0 && (
+              <fieldset className={css.paths} disabled={busy}>
+                <legend>可能的路径</legend>
+                <div className={css.pathOptions}>
+                  {paths.map((item, index) => (
+                    <label className={css.pathCard} data-selected={path === index} key={item.name}>
+                      <input
+                        type="radio"
+                        name="onboarding-path"
+                        checked={path === index}
+                        onChange={() => {
+                          setPath(index);
+                          setDraft((current) => ({ ...current, next: item.experiment }));
+                        }}
+                      />
+                      <b>{item.name}</b>
+                      <span>为什么适合：{item.fit}</span>
+                      <span>还有哪些不清楚：{item.unknown}</span>
+                      <strong>小实验：{item.experiment}</strong>
+                    </label>
+                  ))}
+                </div>
+                <p className={v2.small}>AI 给的是可能性，选不选、选哪条由你定</p>
+              </fieldset>
+            )}
+            {field("next", "一个下一步")}
           </div>
           <button type="button" className={v2.link} onClick={() => setRaw((value) => !value)}>
-            {raw ? "收起原文" : "依据 · 查看原文"}
+            {raw ? "收起原文" : `依据 · 查看${subject}`}
           </button>
           {raw && <pre className={css.original}>{matter.text}</pre>}
           <div className={css.footerActions}>
@@ -191,10 +264,10 @@ export function OnboardingMatter(
             <button
               type="button"
               className={primary}
-              disabled={busy || !draft.goal.trim() || !draft.next.trim()}
+              disabled={busy || !draft.goal.trim() || !draft.next.trim() || (paths.length > 0 && path < 0)}
               onClick={() =>
                 void run(async () => {
-                  await props.adoptOnboardingMatter(matter.source, draft);
+                  await props.adoptOnboardingMatter(matter.source, draft, paths[path] ?? null);
                   await props.onDone();
                 })
               }
@@ -246,7 +319,7 @@ export function OnboardingNextCard(
           })
         }
       >
-        依据 · {original ? "收起原文" : "查看原文"}
+        依据 · {original ? "收起原文" : next.kind === "conversation" ? "查看这段对话" : "查看你写的这件事"}
       </button>
       {original && <pre className={css.original}>{original.text}</pre>}
       {next.status === "done" ? (

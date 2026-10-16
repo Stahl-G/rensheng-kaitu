@@ -123,7 +123,8 @@ ${renderRecordReference(ws)}
 
 ### 首次使用
 
-- 首次先带来一件事：保存原文，核对当前目标、已知现状和一个下一步，由用户采纳；也可并列选择搬来记忆。
+- 首次入口「${ONBOARDING.matter.entry}」：直接写或粘贴对话，保存原文后核对目标、现状和一个下一步。也可搬来记忆。
+- 已连 AI 且不知道做什么时，给 2–3 条可能路径及理由、未知、小实验，不预选。用户选中并核对后才采纳成待办。
 - 起步选项：${ONBOARDING.starts.map((item) => item.title).join("、")}。
 - 先运行 \`kaitu onboarding status\`，或 MCP \`onboarding_status\`；DSH 使用 \`kaitu_onboarding\` 的 status。
 - AI 列表、记忆位置提示、提示词与所需数据源取返回值 content，按 onboarding 技能先得到一个下一步，其余设置从今天清单按需完成。

@@ -7,12 +7,13 @@ description: 首次使用开图时，先保存一件事的原文，核对并采�
 
 先运行 `kaitu onboarding status`。DSH 使用 `kaitu_onboarding` 的 status，MCP 可读 `onboarding_status`。
 content 是界面与助手共用的 AI 列表、记忆提示词、起步选项、数据源与 AI 选择。查看 choices、draft、next 和 checklist，避免重复导入。
-showGuide 为 false 时，只在用户主动要求后重走。欢迎说明约三分钟：带来一件事，核对一个下一步，记下结果后继续推进。
+showGuide 为 false 时，只在用户主动要求后重走。欢迎说明约三分钟：说出想改变的一件事，核对一个下一步，记下结果后继续推进。
 
-默认请用户带来一段和 AI 聊过的计划，或写下正在推进的事。界面先保存到原文记录，再整理「当前目标 / 已知现状 / 一个下一步」。
+默认问「最近有什么想改变，却一直没推进？」。用户可以直接写，或带来一段和 AI 聊过的计划；示例取 content.matter.examples。界面先保存到原文记录，再整理「当前目标 / 已知现状 / 一个下一步」。
 已保存的原文可以用 `kaitu onboarding matter-read <source>` 读取；DSH 用 matter-read（source）。
-AI 整理只生成待核对草稿：用 `kaitu onboarding matter-draft <source> --json '<草稿>'`，草稿字段为 goal、current、next，均为单行文本。
-DSH 用 matter-draft（source、draft）。核对目标和已知现状，不确定的信息写明未知，只提出一个可执行的下一步。
+AI 整理只生成待核对草稿：用 `kaitu onboarding matter-draft <source> --json '<草稿>'`，草稿字段为 goal、current、next，均为单行文本。明确要推进的事只给一个 next。
+不知道能做什么时，next 留空，另给 paths（2–3 条）；每条含 name、fit、unknown、experiment：名称、为什么可能适合、还有哪些不清楚、一个低成本且能观察结果的小实验。
+DSH 用 matter-draft（source、draft）。核对目标和已知现状，不确定的信息写明未知。路径不预选，由用户选中并核对小实验后再采纳。AI 给的是可能性，重要选择由用户决定。
 用户在界面采纳才生成待办，来源指向原文。不要把对话里的其他建议自动写成待办；用户选择只保存原文时，到此结束。
 未连接 AI 的用户可以在界面自己填写这三项，不要求先连接模型。
 

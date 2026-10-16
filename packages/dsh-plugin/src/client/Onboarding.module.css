@@ -465,3 +465,79 @@
     flex-wrap: wrap;
   }
 }
+
+.examples {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.examples button {
+  text-align: left;
+}
+.paths {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.paths legend {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.pathOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.draftFields .pathCard {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  cursor: pointer;
+  color: var(--ink2);
+  font-size: 13px;
+}
+.pathCard > input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  accent-color: var(--primary);
+}
+.pathCard b {
+  color: var(--ink);
+  font-size: 15px;
+}
+.pathCard > span,
+.pathCard > strong {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+}
+.pathCard > strong {
+  font-weight: 500;
+  color: var(--ink);
+}
+.pathCard:hover {
+  border-color: var(--muted);
+}
+.pathCard:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.pathCard:active,
+.pathCard[data-selected="true"] {
+  background: var(--ask);
+  border-color: var(--primary);
+}
+.paths:disabled {
+  opacity: 0.6;
+}

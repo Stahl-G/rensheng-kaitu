@@ -1,5 +1,7 @@
 # 首发引导调整交审
 
+后续 `92edcf3` 的两类用户与可能路径调整已完成，见 [本轮交审](onboarding-paths.md)。以下保留上一轮执行记录。
+
 依据 `origin/main 4cb2c3a` 的 launch PRD L4、L6、§9 与同版原型。本分支先合入 main，原型没有本地覆盖。
 产品定义、引导 PRD、助手技能和 AGENTS.md 生成说明同步为新的流程。
 

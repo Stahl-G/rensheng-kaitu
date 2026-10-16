@@ -208,12 +208,12 @@ export function OnboardingPage(props: Props) {
       <section className={`${v2.welcome} ${css.welcome}`} aria-label="欢迎来到人生开图" aria-busy={busy}>
         <span className={v2.eyebrow}>欢迎来到人生开图</span>
         <h1 key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
-          把你和 AI 聊过的计划，变成能持续推进、随时查回的个人进度
+          {content.welcome.title}
         </h1>
         <div className={css.how}>
           <div>
-            <b>1 · 带来一件事</b>
-            <span>粘贴最近和 AI 聊的一段计划，或直接写下想推进的事</span>
+            <b>1 · {content.welcome.first}</b>
+            <span>{content.welcome.firstDescription}</span>
           </div>
           <div>
             <b>2 · 核对，选一个下一步</b>
@@ -249,7 +249,7 @@ export function OnboardingPage(props: Props) {
             disabled={busy}
             onClick={() => setEntry("matter")}
           >
-            带来一件正在推进的事
+            {content.matter.entry}
           </button>
           <button
             type="button"
@@ -268,6 +268,7 @@ export function OnboardingPage(props: Props) {
             {...props}
             onBusy={setBusy}
             initial={status.draft}
+            content={content.matter}
             onDone={async () => {
               await save({ seen: true });
               await props.refresh();
