@@ -1,4 +1,5 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
+import { KaituError } from "@kaitu/core";
 import type { LocalStore } from "../store.js";
 export interface ImapCursor {
   uidValidity: string;
@@ -28,7 +29,7 @@ export class ImapStateStore {
     this.save();
   }
   advance(uid: number) {
-    if (!this.value.cursor) throw new Error("IMAP 游标未初始化");
+    if (!this.value.cursor) throw new KaituError("IMAP 游标未初始化", "CHANNEL");
     this.value.cursor.lastSeenUid = uid;
     this.value.cursor.updatedAt = Date.now();
     delete this.value.attempts[String(uid)];

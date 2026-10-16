@@ -1,5 +1,5 @@
 import { isAbsolute, join, relative, sep } from "node:path";
-import { type Workspace, localStateRoot } from "@kaitu/core";
+import { KaituError, type Workspace, localStateRoot } from "@kaitu/core";
 import { feishuProvider } from "./feishu.js";
 import { imapPresets } from "./imap/config.js";
 import { imapProvider } from "./imap/watcher.js";
@@ -31,7 +31,7 @@ export class CollectorService {
   ) {
     const rel = relative(ws.root, root);
     if (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
-      throw new Error("采集状态目录必须在工作区外");
+      throw new KaituError("采集状态目录必须在工作区外", "CHANNEL");
     this.store = new LocalStore(root);
     this.configKey = `accounts:${hash(ws.root)}`;
   }
@@ -56,7 +56,7 @@ export class CollectorService {
   }
   private create(account: CollectorAccount) {
     const provider = this.providers[account.kind];
-    if (!provider) throw new Error("不支持的采集渠道");
+    if (!provider) throw new KaituError("不支持的采集渠道", "CHANNEL");
     return provider.create({
       ws: this.ws,
       account,
@@ -99,7 +99,7 @@ export class CollectorService {
   }
   async request(operation: string, input: Record<string, unknown> = {}): Promise<unknown> {
     return this.exclusive(async () => {
-      if (this.closed) throw new Error("采集服务已关闭");
+      if (this.closed) throw new KaituError("采集服务已关闭", "CHANNEL");
       if (operation === "list") {
         const accounts: CollectorView[] = this.accounts().map((account) => ({
           id: account.id,
@@ -111,24 +111,24 @@ export class CollectorService {
         return { kinds: Object.keys(this.providers), presets: imapPresets, accounts };
       }
       const releaseConfig = this.store.lock(`config:${this.configKey}`);
-      if (!releaseConfig) throw new Error("另一窗口正在修改设置，请稍后重试");
+      if (!releaseConfig) throw new KaituError("另一窗口正在修改设置，请稍后重试", "CHANNEL");
       try {
         const accounts = this.accounts();
         if (operation === "add") {
           const kind = typeof input.kind === "string" ? input.kind : "";
           const provider = this.providers[kind];
-          if (!provider) throw new Error("不支持的采集渠道");
+          if (!provider) throw new KaituError("不支持的采集渠道", "CHANNEL");
           const settings = await provider.normalize(input);
           const id = hash(`${kind}:${provider.identity(settings)}`);
-          if (accounts.some((a) => a.id === id)) throw new Error("该账号已添加");
+          if (accounts.some((a) => a.id === id)) throw new KaituError("该账号已添加", "CHANNEL");
           const label = typeof input.label === "string" ? input.label.trim() : "";
-          if (!label || label.length > 80) throw new Error("请填写账号名称（最多 80 字）");
+          if (!label || label.length > 80) throw new KaituError("请填写账号名称（最多 80 字）", "CHANNEL");
           this.store.write(this.configKey, [...accounts, { id, kind, label, settings }]);
           await this.reconcile();
           return { id };
         }
         const account = accounts.find((a) => a.id === input.id);
-        if (!account) throw new Error("找不到采集账号");
+        if (!account) throw new KaituError("找不到采集账号", "CHANNEL");
         if (operation === "disconnect") {
           this.store.write(
             this.configKey,
@@ -142,7 +142,8 @@ export class CollectorService {
         if (operation === "test") {
           await this.stopAccount(account.id);
           const release = this.store.lock(`account:${account.id}`);
-          if (!release) throw new Error("该账号正在另一进程中采集，请在那里测试或先退出该进程");
+          if (!release)
+            throw new KaituError("该账号正在另一进程中采集，请在那里测试或先退出该进程", "CHANNEL");
           const collector = this.create(account);
           try {
             await collector.test();
@@ -160,14 +161,14 @@ export class CollectorService {
         }
         if (operation === "select") {
           const provider = this.providers[account.kind];
-          if (!provider?.select) throw new Error("该渠道不支持频道选择");
+          if (!provider?.select) throw new KaituError("该渠道不支持频道选择", "CHANNEL");
           account.settings = provider.select(account.settings, input.ids);
           await this.stopAccount(account.id);
           this.store.write(this.configKey, accounts);
           await this.reconcile();
           return { selected: provider.selection?.(account.settings) ?? [] };
         }
-        throw new Error("不支持的采集操作");
+        throw new KaituError("不支持的采集操作", "CHANNEL");
       } finally {
         releaseConfig();
       }

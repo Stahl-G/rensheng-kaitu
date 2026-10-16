@@ -1,3 +1,4 @@
+import { KaituError } from "@kaitu/core";
 import { LogLevel, WebClient } from "@slack/web-api";
 import { plain, receiveMessage } from "./inbox.js";
 import type { Collector, CollectorContext, CollectorProvider } from "./types.js";
@@ -53,7 +54,7 @@ const createTransport: SlackFactory = (token) => {
   return {
     async authenticate() {
       const result = await client.auth.test();
-      if (!result.team_id || !result.user_id) throw new Error("Slack 账号不可用");
+      if (!result.team_id || !result.user_id) throw new KaituError("Slack 账号不可用", "CHANNEL");
       return { team: result.team_id, user: result.user_id };
     },
     async history(input) {
@@ -70,7 +71,7 @@ const createTransport: SlackFactory = (token) => {
     },
     async permalink(channel, ts) {
       const result = await client.chat.getPermalink({ channel, message_ts: ts });
-      if (!result.permalink) throw new Error("Slack 原文链接不可用");
+      if (!result.permalink) throw new KaituError("Slack 原文链接不可用", "CHANNEL");
       return result.permalink;
     },
   };
@@ -127,7 +128,7 @@ function channelIds(value: unknown): string[] {
     value.length > 100 ||
     value.some((id) => typeof id !== "string" || !/^[CGD][A-Z0-9]+$/.test(id))
   )
-    throw new Error("请填写有效的 Slack 会话 ID（最多 100 个）");
+    throw new KaituError("请填写有效的 Slack 会话 ID（最多 100 个）", "CHANNEL");
   return [...new Set(value)] as string[];
 }
 
@@ -174,7 +175,7 @@ export class SlackCollector implements Collector {
   async test() {
     const identity = await this.api.authenticate();
     if (identity.team !== this.config.team || identity.user !== this.config.user)
-      throw new Error("Slack 账号身份改变");
+      throw new KaituError("Slack 账号身份改变", "CHANNEL");
   }
   private async user(id: string) {
     if (!this.users.has(id)) {
@@ -276,7 +277,8 @@ export class SlackCollector implements Collector {
             if (this.stopped) return;
             await this.receive(channel, reply, state.since, scan.latest);
           }
-          if (replies.cursor && replies.cursor === cursor) throw new Error("Slack 分页未前进");
+          if (replies.cursor && replies.cursor === cursor)
+            throw new KaituError("Slack 分页未前进", "CHANNEL");
           cursor = replies.cursor;
           scan.reply = cursor ? { root: message.ts, cursor } : undefined;
           this.save();
@@ -291,7 +293,7 @@ export class SlackCollector implements Collector {
         this.save();
         break;
       }
-      if (page.cursor === scan.cursor) throw new Error("Slack 分页未前进");
+      if (page.cursor === scan.cursor) throw new KaituError("Slack 分页未前进", "CHANNEL");
       scan.cursor = page.cursor;
       scan.doneThreads = [];
       this.save();
@@ -307,11 +309,11 @@ export function makeSlackProvider(factory = createTransport): CollectorProvider 
   return {
     async normalize(input) {
       if (typeof input.token !== "string" || !/^xoxp-[A-Za-z0-9-]+$/.test(input.token))
-        throw new Error("请填写 Slack user token");
+        throw new KaituError("请填写 Slack user token", "CHANNEL");
       const identity = await factory(input.token)
         .authenticate()
         .catch(() => {
-          throw new Error("Slack 连接失败，请检查 user token 与网络");
+          throw new KaituError("Slack 连接失败，请检查 user token 与网络", "CHANNEL");
         });
       return {
         token: input.token,

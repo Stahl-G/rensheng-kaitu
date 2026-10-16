@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Workspace } from "@kaitu/core";
+import { KaituError, type Workspace } from "@kaitu/core";
 import { hash } from "./store.js";
 import type { CollectedMessage } from "./types.js";
 
@@ -22,7 +22,7 @@ function hasNote(directory: string, name: string): boolean {
 }
 export function receiveMessage(ws: Workspace, message: CollectedMessage): boolean {
   if (!Number.isFinite(Date.parse(message.time)) || !message.externalId)
-    throw new Error("消息标识或时间无效");
+    throw new KaituError("消息标识或时间无效", "CHANNEL");
   const name = `channel-${hash(`${message.source}:${message.externalId}`)}.note.md`;
   if (hasNote(ws.resolve("inbox"), name)) return false;
   const file = ws.resolve(`inbox/agents/${name}`);

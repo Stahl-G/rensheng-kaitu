@@ -1,4 +1,5 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
+import { KaituError } from "@kaitu/core";
 export type IdentifierAuthentication = "mutable" | "unverified" | "asserted" | "verified";
 export interface ImapAccountConfig {
   host: string;
@@ -59,10 +60,11 @@ export function resolveImapAccount(input: Record<string, unknown>): ImapAccountC
     user.length > 320 ||
     !((typeof password === "string" && password) || (typeof accessToken === "string" && accessToken))
   ) {
-    throw new Error("请填写服务器、邮箱账号与应用专用密码或 OAuth2 token");
+    throw new KaituError("请填写服务器、邮箱账号与应用专用密码或 OAuth2 token", "CHANNEL");
   }
   const port = input.port ?? 993;
-  if (!Number.isInteger(port) || Number(port) < 1 || Number(port) > 65535) throw new Error("IMAP 端口无效");
+  if (!Number.isInteger(port) || Number(port) < 1 || Number(port) > 65535)
+    throw new KaituError("IMAP 端口无效", "CHANNEL");
   const watch = input.watch as Partial<ImapAccountConfig["watch"]> | undefined;
   return {
     host: host.toLowerCase(),

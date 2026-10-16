@@ -283,7 +283,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           throw new KaituError("参数必须是对象", "BAD_ARGS");
         try {
           return json(res, 200, await collectors.request(url.pathname.slice("/api/channels/".length), input));
-        } catch {
+        } catch (error) {
+          if (error instanceof KaituError) throw error;
           return json(res, 400, { error: "采集设置未完成，请检查参数或稍后重试" });
         }
       }

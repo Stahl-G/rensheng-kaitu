@@ -1,4 +1,5 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
+import { KaituError } from "@kaitu/core";
 import { EventDispatcher, LoggerLevel, WSClient } from "@larksuiteoapi/node-sdk";
 import { plain, receiveMessage } from "./inbox.js";
 import type { Collector, CollectorContext, CollectorProvider } from "./types.js";
@@ -194,7 +195,7 @@ export class FeishuCollector implements Collector {
         return;
       const text = feishuText(event);
       const time = new Date(Number(message.create_time));
-      if (!Number.isFinite(time.getTime())) throw new Error("飞书消息时间无效");
+      if (!Number.isFinite(time.getTime())) throw new KaituError("飞书消息时间无效", "CHANNEL");
       receiveMessage(this.context.ws, {
         source: "feishu",
         account: this.context.account.label,
@@ -242,7 +243,7 @@ function normalize(input: Record<string, unknown>): FeishuConfig {
     typeof input.appSecret !== "string" ||
     !input.appSecret
   )
-    throw new Error("请填写飞书 App ID 与 App Secret");
+    throw new KaituError("请填写飞书 App ID 与 App Secret", "CHANNEL");
   return { appId: input.appId, appSecret: input.appSecret };
 }
 export const feishuProvider: CollectorProvider = {
