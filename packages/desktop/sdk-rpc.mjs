@@ -8,16 +8,7 @@ const [{ JsonRpcLineTransport }, { HarnessSdkJsonRpcServer }, { createUserMessag
   load("@deepseek-ai/dsh-llm"),
 ]);
 export const name = "kaitu-sdk-rpc";
-export const inject = [
-  "sdkAppStartup",
-  "loader",
-  "agents",
-  "sessionPersistence",
-  "kaitu",
-  "permissionPresets",
-  "fs",
-  "sandbox",
-];
+export const inject = ["sdkAppStartup", "loader", "agents", "sessionPersistence", "kaitu", "fs"];
 export function apply(ctx) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const sdk = new HarnessSdkJsonRpcServer(ctx, transport);

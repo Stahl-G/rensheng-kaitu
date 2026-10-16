@@ -65,7 +65,9 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 不迁移或删除登录凭据、会话和 DSH 的 `~/.dsh`。资料窗口使用单独的 `workbench-userData`，避免争用 AI 的 Electron 存储。
 问问使用无界面的 SDK profile，通过 initialize / session/prompt 与原生事件通知工作，不打开 DSH 窗口。
 会话索引与展示事件在本机 `~/.kaitu-app/ask/`，原生日志在 AI home 的 sdk profile，均不写入工作区。
-SDK 专用权限预设为 workspace-write / never，文件与 shell 的写入仅放行工作区（shell 另放行 `/dev/null`）。
+问问的文件读写与搜索仅放行当前工作区，解析符号链接后再检查；禁用命令、作业、网页抓取/搜索、子代理、工作流及插件管理。
+不挂载 shell / Seatbelt 执行器；保留 workspace-write 文件能力与 approval/never，禁用硬依赖 shell 的权限预设服务。
+导入和照片原件须先放入工作区，问问不执行项目外部链接访问/同步或工作区迁移。
 已有会话通过 DSH 公开 agents.resume 恢复；原生注入的指令和运行时上下文不作为用户消息展示。
 定时任务保留隐藏的 Electron 进程，因为 rc.2 SDK profile 不含 schedule 需要的 sessionController。
 重复启动复用原后台进程；退出会关闭 SDK 与后台任务进程。

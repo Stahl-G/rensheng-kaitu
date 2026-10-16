@@ -1,0 +1,78 @@
+import { realpathSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import { isAbsolute, join, relative } from "node:path";
+
+export function confinedFileSystem(LocalFileSystem, FsError, root) {
+  const contains = (path) => {
+    const value = relative(root, path);
+    return value === "" || (!isAbsolute(value) && value !== ".." && !value.startsWith("../"));
+  };
+  return class KaituFileSystem extends LocalFileSystem {
+    get sandboxMode() {
+      return "workspace-write";
+    }
+    async resolve(path, options) {
+      const target = await super.resolve(path, options);
+      if (!contains(target.targetKey)) throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
+      return target;
+    }
+    async checked(target) {
+      return this.resolve(target.displayPath);
+    }
+    async lstat(path, options, signal) {
+      await this.resolve(path, options);
+      return super.lstat(path, options, signal);
+    }
+    async listDir(target, signal) {
+      const fresh = await this.checked(target);
+      signal?.throwIfAborted();
+      const entries = [];
+      for (const name of await readdir(fresh.targetKey)) {
+        try {
+          const child = await this.resolve(join(fresh.targetKey, name));
+          const info = await this.stat(child, signal);
+          if (info) entries.push({ name, target: child, ...info });
+        } catch (error) {
+          if (error.code !== "FS_SANDBOX_DENIED") throw error;
+        }
+      }
+      return entries;
+    }
+    processPath(target) {
+      if (!contains(target.targetKey)) throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
+      return super.processPath(target);
+    }
+    processPathFromHostPath(path) {
+      try {
+        const real = realpathSync(path);
+        return contains(real) ? real : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    async stat(target, ...args) {
+      return super.stat(await this.checked(target), ...args);
+    }
+    async readText(target, ...args) {
+      return super.readText(await this.checked(target), ...args);
+    }
+    async streamText(target, ...args) {
+      return super.streamText(await this.checked(target), ...args);
+    }
+    async readBytes(target, ...args) {
+      return super.readBytes(await this.checked(target), ...args);
+    }
+    async readByteRange(target, ...args) {
+      return super.readByteRange(await this.checked(target), ...args);
+    }
+    async watch(target, ...args) {
+      return super.watch(await this.checked(target), ...args);
+    }
+    async writeText(target, ...args) {
+      return super.writeText(await this.checked(target), ...args);
+    }
+    async editText(target, ...args) {
+      return super.editText(await this.checked(target), ...args);
+    }
+  };
+}
