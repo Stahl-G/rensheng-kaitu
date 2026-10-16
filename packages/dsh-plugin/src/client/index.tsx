@@ -3,7 +3,12 @@ import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
-import type { OnboardingAi, OnboardingChoices, OnboardingSetupInput } from "@kaitu/core";
+import type {
+  OnboardingAi,
+  OnboardingChoices,
+  OnboardingMatterDraft,
+  OnboardingSetupInput,
+} from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
 import type {
   AutomationKey,
@@ -121,6 +126,36 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              keepOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterKeep(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              saveOnboardingMatter: async (text: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterSave(text);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              readOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterRead(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              organizeOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterOrganize(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              adoptOnboardingMatter: async (source: string, draft: OnboardingMatterDraft) => {
+                const r = await ctx.remote.kaitu.onboardingMatterAdopt(source, draft);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              changeOnboardingNext: async (id: string, rev: number, action: string, value: string) => {
+                const r = await ctx.remote.kaitu.onboardingNextChange(id, rev, action, value);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
               },
               loadOnboarding: async () => {
                 const r = await ctx.remote.kaitu.onboarding();

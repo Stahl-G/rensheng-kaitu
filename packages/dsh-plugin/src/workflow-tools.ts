@@ -14,6 +14,7 @@ import {
   confirmOnboardingSetup,
   createProject,
   disableDrive,
+  draftOnboardingMatter,
   driveStatus,
   enableDrive,
   explorationCommandSchema,
@@ -30,6 +31,7 @@ import {
   listProjects,
   listTasks,
   logProject,
+  onboardingMatterSchema,
   onboardingSetupSchema,
   onboardingStatus,
   previewOnboardingMemory,
@@ -40,6 +42,7 @@ import {
   readAgentFile,
   readExperienceImports,
   readExploration,
+  readOnboardingMatter,
   readProject,
   readRecords,
   recordOnboardingAiConnection,
@@ -132,8 +135,10 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
   }
   register(
     "kaitu_onboarding",
-    "四步首次使用：查询内容与清单、记录选择、预览记忆、确认所选或放弃。确认前先给用户看候选。",
+    "首次使用：保存原文后的整理草稿、内容与清单、选择和记忆预览。草稿只进待核对，用户采纳才生成待办。",
     z.discriminatedUnion("action", [
+      z.object({ action: z.literal("matter-read"), source: text }).strict(),
+      z.object({ action: z.literal("matter-draft"), source: text, draft: onboardingMatterSchema }).strict(),
       z.object({ action: z.literal("status") }).strict(),
       z
         .object({
@@ -163,6 +168,10 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     ]),
     (input) => {
       switch (input.action) {
+        case "matter-read":
+          return readOnboardingMatter(ws, input.source);
+        case "matter-draft":
+          return draftOnboardingMatter(ws, input.source, input.draft);
         case "setup-preview":
           return previewOnboardingSetup(ws, input.input);
         case "setup-confirm":

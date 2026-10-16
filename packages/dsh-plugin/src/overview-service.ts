@@ -15,8 +15,11 @@ import {
   type OnboardingChoices,
   type OnboardingImportPreview,
   type OnboardingImportResult,
+  type OnboardingMatter,
+  type OnboardingMatterDraft,
   type OnboardingMemoryPreview,
   type OnboardingMemoryResult,
+  type OnboardingNext,
   type OnboardingSetupInput,
   type OnboardingSetupPreview,
   type OnboardingSetupResult,
@@ -24,9 +27,11 @@ import {
   type SettingsData,
   Workspace,
   addCalendarSubscription,
+  adoptOnboardingMatter,
   cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
+  changeOnboardingNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -35,9 +40,11 @@ import {
   decideProposal,
   defaultRoot,
   dismissNews,
+  draftOnboardingMatter,
   editExperience,
   exportWorkspace,
   hideExperience,
+  keepOnboardingMatter,
   lifeMap,
   listProjects,
   moveWorkspace,
@@ -58,6 +65,7 @@ import {
   readLibrary,
   readLibraryDocument,
   readNews,
+  readOnboardingMatter,
   readOverviewPage,
   readPhoto,
   readSettings,
@@ -67,6 +75,7 @@ import {
   restore,
   saveAvatar,
   saveOnboardingChoices,
+  saveOnboardingMatter,
   setExperienceSource,
   setNewsFeedback,
   tryNews,
@@ -138,6 +147,40 @@ export class KaituOverviewService extends TypertRemoteService {
     const parsed: unknown = JSON.parse(input);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("采集参数必须是对象");
     return JSON.stringify(await this.collectors.request(operation, parsed as Record<string, unknown>));
+  }
+
+  @Remote("onboardingMatterKeep")
+  async onboardingMatterKeep(source: string): Promise<OnboardingMatter> {
+    return this.write(() => keepOnboardingMatter(this.workspace, source));
+  }
+  @Remote("onboardingMatterSave")
+  async onboardingMatterSave(text: string): Promise<OnboardingMatter> {
+    return this.write(() => saveOnboardingMatter(this.workspace, text));
+  }
+  @Remote("onboardingMatterRead")
+  async onboardingMatterRead(source: string): Promise<OnboardingMatter> {
+    return this.write(async () => readOnboardingMatter(this.workspace, source));
+  }
+  @Remote("onboardingMatterOrganize")
+  async onboardingMatterOrganize(source: string): Promise<OnboardingMatter> {
+    return this.write(async () => readOnboardingMatter(this.workspace, source));
+  }
+  @Remote("onboardingMatterDraft")
+  async onboardingMatterDraft(source: string, input: OnboardingMatterDraft): Promise<OnboardingMatter> {
+    return this.write(() => draftOnboardingMatter(this.workspace, source, input));
+  }
+  @Remote("onboardingMatterAdopt")
+  async onboardingMatterAdopt(source: string, input: OnboardingMatterDraft): Promise<OnboardingNext> {
+    return this.write(() => adoptOnboardingMatter(this.workspace, source, input));
+  }
+  @Remote("onboardingNextChange")
+  async onboardingNextChange(
+    id: string,
+    rev: number,
+    action: string,
+    value: string,
+  ): Promise<OnboardingNext> {
+    return this.write(() => changeOnboardingNext(this.workspace, id, rev, action, value));
   }
 
   @Remote("onboarding")
