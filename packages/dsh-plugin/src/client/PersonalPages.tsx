@@ -187,7 +187,7 @@ export function PersonalPages(
                     <summary className={css.link}>改用专门的搜索服务</summary>
                     <div className={css["sub-form"]}>
                       <p className={css.small}>
-                        没有可用的自带搜索时，使用已添加的 Perplexity 或 Exa；搜索词会发给所选服务。
+                        没有可用的自带搜索时，使用已添加的 Perplexity、Exa 或 Tavily；搜索词会发给所选服务。
                       </p>
                       <label className={css.small} htmlFor="search-provider">
                         搜索服务

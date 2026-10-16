@@ -8,6 +8,7 @@ export const searchProviders = [
     keyUrl: "https://www.perplexity.ai/settings/api",
   },
   { id: "exa", name: "Exa", ref: "KAITU_SEARCH_EXA_API_KEY", keyUrl: "https://dashboard.exa.ai/api-keys" },
+  { id: "tavily", name: "Tavily", ref: "KAITU_SEARCH_TAVILY_API_KEY", keyUrl: "https://app.tavily.com/home" },
 ];
 export function nativeSearchInfo(settings = {}, configured = false) {
   const entry = providers.find((item) => item.id === settings.provider);

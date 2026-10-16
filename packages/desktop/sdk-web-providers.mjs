@@ -118,7 +118,7 @@ export async function searchNative(settings, apiKey, request, signal) {
   }
   if (!Array.isArray(items) || items.length === 0)
     throw new KaituError(
-      "这个服务或模型没有返回结构化搜索来源。请检查服务端搜索支持，或到「AI 与连接 → 网络搜索」配置 Perplexity / Exa。",
+      "这个服务或模型没有返回结构化搜索来源。请检查服务端搜索支持，或到「AI 与连接 → 网络搜索」配置 Perplexity / Exa / Tavily。",
       "AI_SEARCH_UNSUPPORTED",
     );
   const sources = [];
@@ -137,6 +137,30 @@ export async function searchNative(settings, apiKey, request, signal) {
   }
   if (!sources.length) throw new KaituError("服务商没有返回可用的搜索来源，请换一个查询词。", "AI_SEARCH");
   const limit = request.maxResults ?? 8;
+  return { sources: sources.slice(0, limit), truncated: sources.length > limit };
+}
+async function searchTavily(apiKey, request, signal, root = "https://api.tavily.com") {
+  const limit = request.maxResults ?? 8;
+  const response = await fetch(`${root}/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ query: request.query, max_results: Math.min(limit, 20), search_depth: "basic" }),
+    redirect: "error",
+    signal,
+  });
+  if (!response.ok) {
+    const failure = connectionFailure(response.status, await response.text());
+    throw new KaituError(failure.message.replace("验证", "搜索"), failure.code);
+  }
+  const sources = ((await response.json()).results ?? [])
+    .filter((item) => typeof item?.url === "string" && /^https?:\/\//i.test(item.url))
+    .map((item) => ({
+      url: item.url,
+      ...(typeof item.title === "string" ? { title: item.title } : {}),
+      ...(typeof item.content === "string" ? { snippet: item.content } : {}),
+      ...(typeof item.published_date === "string" ? { publishedAt: item.published_date } : {}),
+    }));
+  if (!sources.length) throw new KaituError("Tavily 没有返回可用的搜索来源，请换一个查询词。", "AI_SEARCH");
   return { sources: sources.slice(0, limit), truncated: sources.length > limit };
 }
 export function createSearchRouter({ resolve, preferred, current, endpoints = {} }) {
@@ -171,9 +195,10 @@ export function createSearchRouter({ resolve, preferred, current, endpoints = {}
         if (!selected && nativeError) throw nativeError;
         if (!selected)
           throw new KaituError(
-            "请先到「问问 → 连接 AI」连接支持搜索的服务，或在「AI 与连接 → 网络搜索」添加 Perplexity / Exa 的 Key。",
+            "请先到「问问 → 连接 AI」连接支持搜索的服务，或在「AI 与连接 → 网络搜索」添加 Perplexity / Exa / Tavily 的 Key。",
             "AI_SEARCH_KEY",
           );
+        if (selected === "tavily") return await searchTavily(keys.tavily, request, bounded, endpoints.tavily);
         const backend =
           selected === "exa"
             ? new ExaSearchProvider({

@@ -76,7 +76,15 @@ test("search prefers the current chat service then configured specialist service
                 ],
               }
             : req.url === "/search"
-              ? { results: [{ url: "https://source.example/exa", highlights: ["synthetic source"] }] }
+              ? {
+                  results: [
+                    {
+                      url: "https://source.example/exa",
+                      highlights: ["synthetic source"],
+                      content: "synthetic source",
+                    },
+                  ],
+                }
               : {
                   choices: [{ message: { content: "synthetic answer" } }],
                   citations: ["https://source.example/perplexity"],
@@ -110,6 +118,17 @@ test("search prefers the current chat service then configured specialist service
     const exa = await router.search({ query: "another public topic" });
     expect(exa.sources[0].url).toBe("https://source.example/exa");
     expect(requests.map((request) => request.url)).toEqual(["/chat/completions", "/search"]);
+    const tavily = await createSearchRouter({
+      preferred: "tavily",
+      resolve: async (ref: string) => (ref === "KAITU_SEARCH_TAVILY_API_KEY" ? key : undefined),
+      endpoints: { tavily: url },
+      current: () => settings,
+    }).search({ query: "tavily topic" });
+    expect(tavily.sources[0]).toMatchObject({
+      url: "https://source.example/exa",
+      snippet: "synthetic source",
+    });
+    expect(requests.pop()?.body).toMatchObject({ query: "tavily topic", search_depth: "basic" });
     expect(requests.every((request) => request.auth === `Bearer ${key}`)).toBe(true);
     expect(JSON.stringify({ perplexity, exa })).not.toContain(key);
     keys.set("DEEPSEEK_API_KEY", "unused-deepseek-key");
@@ -121,7 +140,7 @@ test("search prefers the current chat service then configured specialist service
     expect(requests).toHaveLength(3);
     fail = true;
     await expect(router.search({ query: "public topic" })).rejects.toMatchObject({ code: "AI_KEY" });
-    expect(requests).toHaveLength(4);
+    expect(requests).toHaveLength(5);
     keys.delete("KAITU_KAITU_CUSTOM_API_KEY");
     const error = await router.search({ query: "public topic" }).catch((value: Error) => value);
     expect(error.code).toBe("AI_KEY");
