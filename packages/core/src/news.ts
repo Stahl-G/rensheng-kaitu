@@ -203,7 +203,7 @@ export async function tryNews(ws: Workspace, id: string) {
     item.status === "tried"
       ? { record: item }
       : updateRecord(ws, "news_item", id, { status: "tried" }, { by: "user" });
-  const version = await snapshot(ws, `你准备试一下：${item.title}`);
+  const version = await snapshot(ws, `你把资讯加到下一步，等待确认：${item.title}`);
   return { ...result, version };
 }
 

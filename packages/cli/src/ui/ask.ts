@@ -14,7 +14,10 @@ export interface AskEvent {
   type: AskEventType;
   data: Record<string, unknown>;
 }
+export type AskMode = "scoped" | "full";
 export interface AskThread {
+  mode?: AskMode;
+  workspace?: string;
   id: string;
   title: string;
   created: string;
@@ -38,6 +41,9 @@ export interface AskService {
     model: string;
   }>;
   configure(input: Record<string, unknown>): Promise<unknown>;
+  setMode(id: string, mode: AskMode, confirmed: boolean): Promise<AskMode>;
+  prepareRelocation(): Promise<void>;
+  relocate(workspace: string): void;
   close(): Promise<void>;
 }
 const visible = new Set<AskEventType>([
@@ -51,14 +57,18 @@ const visible = new Set<AskEventType>([
 export function createAskService(options: {
   state: string;
   workspace: string;
-  runtime: () => Promise<AskRuntime>;
+  workspaceKey?: string;
+  runtime: (mode: AskMode) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
 }): AskService {
   const directory = join(
     options.state,
     "ask",
-    createHash("sha256").update(options.workspace).digest("hex").slice(0, 20),
+    createHash("sha256")
+      .update(options.workspaceKey ?? options.workspace)
+      .digest("hex")
+      .slice(0, 20),
   );
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const index = join(directory, "index.json");
@@ -66,6 +76,7 @@ export function createAskService(options: {
   const listeners = new Map<string, Set<(event: AskEvent) => void>>();
   const busy = new Set<string>();
   let runtime: AskRuntime | undefined;
+  let runtimeMode: AskMode | undefined;
   let starting: Promise<AskRuntime> | undefined;
   let closed = false;
   const thread = (id: string) => {
@@ -106,10 +117,19 @@ export function createAskService(options: {
     saveIndex();
     for (const listener of listeners.get(id) ?? []) listener(event);
   };
-  const start = () => {
-    if (closed) return Promise.reject(new Error("开图正在退出"));
+  const stopRuntime = async () => {
+    await starting?.catch(() => {});
+    await runtime?.close();
+    runtime = undefined;
+    starting = undefined;
+    runtimeMode = undefined;
+  };
+  const start = async (mode: AskMode) => {
+    if (closed) throw new Error("开图正在退出");
+    if (runtimeMode && runtimeMode !== mode) await stopRuntime();
+    runtimeMode = mode;
     starting ??= options
-      .runtime()
+      .runtime(mode)
       .then((value) => {
         runtime = value;
         value.onNotification((method, params) => {
@@ -170,7 +190,14 @@ export function createAskService(options: {
     list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
     create() {
       const now = new Date().toISOString();
-      const row = { id: `session-${randomUUID()}`, title: "新对话", created: now, updated: now };
+      const row: AskThread = {
+        id: `session-${randomUUID()}`,
+        title: "新对话",
+        created: now,
+        updated: now,
+        mode: "scoped",
+        workspace: options.workspace,
+      };
       threads.push(row);
       saveIndex();
       return row;
@@ -186,14 +213,18 @@ export function createAskService(options: {
       };
     },
     async send(id, text) {
-      thread(id);
+      const row = thread(id);
+      if ((row.workspace ?? options.workspaceKey ?? options.workspace) !== options.workspace)
+        throw new Error("资料已迁移，请新建对话继续；原对话记录仍可查看");
+      const mode = row.mode ?? "scoped";
+      if (busy.size && runtimeMode !== mode) throw new Error("请等当前回复完成后切换模式");
       if (typeof text !== "string" || !text.trim() || text.length > 100000)
         throw new Error("请输入有效消息（最多十万字）");
       if (busy.has(id)) throw new Error("请等这次回复完成");
       busy.add(id);
       append(id, "session.status", { status: "running" });
       try {
-        const client = await start();
+        const client = await start(mode);
         return await client.request("session/prompt", {
           sessionId: id,
           contentBlocks: [{ type: "text", text: text.trim() }],
@@ -204,12 +235,27 @@ export function createAskService(options: {
         throw new Error("消息未发送，请检查 AI 连接后重试");
       }
     },
+    async setMode(id, mode, confirmed) {
+      const row = thread(id);
+      if (mode !== "scoped" && mode !== "full") throw new Error("无效模式");
+      if (mode === "full" && confirmed !== true) throw new Error("开启完整 Agent 需要确认");
+      if (busy.size) throw new Error("请等回复完成后切换模式");
+      if (runtimeMode !== mode) await stopRuntime();
+      row.mode = mode;
+      saveIndex();
+      return mode;
+    },
+    async prepareRelocation() {
+      if (busy.size) throw new Error("请等回复完成后更换资料位置或恢复版本");
+      await stopRuntime();
+    },
+    relocate(workspace) {
+      options.workspace = workspace;
+    },
     settings: options.settings,
     async configure(input) {
       if (busy.size) throw new Error("请等回复完成后修改连接");
-      await runtime?.close();
-      runtime = undefined;
-      starting = undefined;
+      await stopRuntime();
       return options.configure(input);
     },
     async close() {

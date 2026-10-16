@@ -28,23 +28,37 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   await app.whenReady();
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
-  const ai = createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
-    ...process.env,
-    KAITU_EMBEDDED_AI: "1",
-    KAITU_APP_HOME: aiHome,
-    KAITU_DIR: ws.root,
-    KAITU_APP_PORT: "0",
-  });
-  const sdk = createSdkRuntime({
-    executable: join(dirname(app.getPath("exe")), "DSH"),
-    archive: join(dirname(resources), "app.asar"),
-    home: aiHome,
+  const makeBackgroundAi = () =>
+    createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
+      ...process.env,
+      KAITU_EMBEDDED_AI: "1",
+      KAITU_APP_HOME: aiHome,
+      KAITU_DIR: ws.root,
+      KAITU_APP_PORT: "0",
+    });
+  let ai = makeBackgroundAi();
+  process.env.KAITU_APP_VERSION = app.getVersion();
+  const makeSdk = () =>
+    createSdkRuntime({
+      executable: join(dirname(app.getPath("exe")), "DSH"),
+      archive: join(dirname(resources), "app.asar"),
+      home: aiHome,
+      workspace: ws.root,
+      plugin: join(resources, "dist/sdk-plugin.mjs"),
+      hostPlugin: join(resources, "dist/sdk-host.mjs"),
+      helper: join(resources, "dist/sdk-credentials.mjs"),
+    });
+  const askKeyFile = ".kaitu/ask-workspace.json";
+  const workspaceKey = ws.exists(askKeyFile) ? ws.readJson(askKeyFile).key : ws.root;
+  if (!ws.exists(askKeyFile)) ws.writeJson(askKeyFile, { key: workspaceKey }, { internal: true });
+  const ask = createAskService({
+    state,
     workspace: ws.root,
-    plugin: join(resources, "dist/sdk-plugin.mjs"),
-    hostPlugin: join(resources, "dist/sdk-host.mjs"),
-    helper: join(resources, "dist/sdk-credentials.mjs"),
+    workspaceKey,
+    runtime: (mode) => makeSdk().runtime(mode),
+    settings: () => makeSdk().settings(),
+    configure: (input) => makeSdk().configure(input),
   });
-  const ask = createAskService({ state, workspace: ws.root, ...sdk });
   const startAutomation = async () => {
     const settings = readAutomation(ws);
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
@@ -54,6 +68,11 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
+    onWorkspaceChanging: () => ai.close(),
+    onWorkspaceChanged: async () => {
+      ai = makeBackgroundAi();
+      await startAutomation();
+    },
     onAutomationChanged: async () => {
       updateMenu();
       await startAutomation();

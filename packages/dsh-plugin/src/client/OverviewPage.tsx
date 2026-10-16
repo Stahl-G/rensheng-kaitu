@@ -2,19 +2,21 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
-import { DoingPage, type DoingPageProps } from "./DoingPage.js";
+import type { DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
-import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import type { HealthPageProps } from "./HealthPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
+import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
-import { MePage, type MePageProps } from "./MePage.js";
+import type { MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
+import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import css from "./Prototype.module.css";
 import { DataSummaries, TodayFinance } from "./TodayPage.js";
-import { aiHandover } from "./connections.js";
 
 export interface OverviewPageProps
   extends MePageProps,
+    PersonalServices,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals">,
@@ -29,7 +31,7 @@ export interface OverviewPageProps
   completeNext: (file: string, id: string) => Promise<unknown>;
   onAgent: () => void;
   onAdvanced?: () => void;
-  renderAsk?: (prompt: string) => ReactNode;
+  renderAsk?: (prompt: string, configureRequest: number) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
 const modules = [
@@ -55,7 +57,9 @@ export function OverviewPage(props: OverviewPageProps) {
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
+  const [configureRequest, setConfigureRequest] = useState(0);
   const [theme, setTheme] = useState("light");
+  const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const seq = ++sequence.current;
@@ -73,7 +77,7 @@ export function OverviewPage(props: OverviewPageProps) {
       setPersonal(me);
       setError("");
     } catch (err) {
-      if (seq === sequence.current) setError(String(err));
+      if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
   }, [props.load, props.loadCalendar, props.loadLibrary, props.loadMe]);
   useEffect(() => {
@@ -99,6 +103,21 @@ export function OverviewPage(props: OverviewPageProps) {
       observer.disconnect();
     };
   }, []);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: PointerEvent) => {
+      if (event.target instanceof Node && !account.current?.contains(event.target)) setMenu(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenu(false);
+    };
+    document.addEventListener("pointerdown", close);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", close);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menu]);
   const run = async (operation: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
@@ -106,7 +125,7 @@ export function OverviewPage(props: OverviewPageProps) {
       await operation();
       await refresh();
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -125,7 +144,7 @@ export function OverviewPage(props: OverviewPageProps) {
     else if (id === "explore" || id === "feed") {
       setExplore(id === "feed" ? "news" : "directions");
       setView("explore");
-    } else openRecord(id);
+    } else openRecord(["learning", "decisions"].includes(id) ? "notes" : id);
   };
   const child = {
     ...props,
@@ -192,9 +211,20 @@ export function OverviewPage(props: OverviewPageProps) {
     <div className={css.app} data-theme={theme}>
       <header className={css.top}>
         <div className={css.brand}>
-          <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <path d="M6 24V8l10 5 10-5v16l-10 5-10-5Z" stroke="currentColor" strokeWidth="2" />
-            <path d="M16 13v16" stroke="currentColor" strokeWidth="2" />
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+            <circle cx="12" cy="12" r="2.1" fill="var(--explore)" />
           </svg>
           人生开图
         </div>
@@ -236,7 +266,7 @@ export function OverviewPage(props: OverviewPageProps) {
                       ? `已更新 ${stamp(data.sync.updatedAt)}`
                       : "本机资料"}
           </button>
-          <div className={css.account}>
+          <div className={css.account} ref={account}>
             <button
               type="button"
               className={css.avatar}
@@ -275,7 +305,7 @@ export function OverviewPage(props: OverviewPageProps) {
           </div>
         </div>
       </header>
-      <main className={css.content}>
+      <main className={`${css.content} ${view === "ask" ? css.askContent : ""}`}>
         {error && (
           <p className={css.error} role="alert">
             {error}
@@ -515,9 +545,12 @@ export function OverviewPage(props: OverviewPageProps) {
             ) : record === "calendar" ? (
               <CalendarPage {...props} />
             ) : record === "projects" ? (
-              <DoingPage {...child} timeZone={data?.timeZone} />
+              <ProjectsLibrary {...child} timeZone={data?.timeZone} />
             ) : record === "health" ? (
-              <HealthPage {...child} />
+              <HealthLibrary
+                {...child}
+                sources={library?.sections.find((s) => s.id === "health")?.sources ?? []}
+              />
             ) : record === "finance" ? (
               <FinancePage {...child} today={data?.today} timeZone={data?.timeZone} />
             ) : record === "inbox" ? (
@@ -562,65 +595,22 @@ export function OverviewPage(props: OverviewPageProps) {
             </div>
           </>
         )}
-        {view === "profile" && (
-          <>
-            <div className={css.head}>
-              <h1>个人档案</h1>
-            </div>
-            <MePage {...child} />
-          </>
-        )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div hidden={view !== "ask"}>{props.renderAsk(promptDraft)}</div>
+          <div hidden={view !== "ask"}>{props.renderAsk(promptDraft, configureRequest)}</div>
         )}
-        {view === "connections" && (
-          <>
-            <div className={css.head}>
-              <h1>AI 与连接</h1>
-            </div>
-            <section className={css.sec}>
-              <h2 className={css.eyebrow}>「问问」用的 AI</h2>
-              <button
-                type="button"
-                className={`${css.btn} ${css["btn-quiet"]}`}
-                onClick={() => (props.renderAsk ? setView("ask") : props.onAgent())}
-              >
-                连接或管理内置 AI
-              </button>
-            </section>
-            <section className={css.sec}>
-              <h2 className={css.eyebrow}>这台电脑上的 AI</h2>
-              <p>通过 MCP 直接读写你的开图资料</p>
-              <textarea
-                aria-label="AI 接手说明"
-                className={css.detailBody}
-                readOnly
-                rows={5}
-                value={aiHandover(data?.root ?? "", promptDraft)}
-              />
-            </section>
-            <section className={css.sec}>
-              <h2 className={css.eyebrow}>云端的 AI</h2>
-              <p>Google Drive 接力 · {data?.drive ? "已开启" : "还没连接"}</p>
-            </section>
-            <section className={css.sec}>
-              <h2 className={css.eyebrow}>资料存在哪里</h2>
-              <p>{data?.root ?? "正在读取…"}</p>
-            </section>
-          </>
-        )}
-        {view === "settings" && (
-          <>
-            <div className={css.head}>
-              <h1>设置</h1>
-            </div>
-            <p className={css.small}>工作区：{data?.root}</p>
-            {props.onAdvanced && (
-              <button type="button" className={css.link} onClick={props.onAdvanced}>
-                插件与运行环境
-              </button>
-            )}
-          </>
+        {["profile", "connections", "settings"].includes(view) && (
+          <PersonalPages
+            {...child}
+            view={view as "profile" | "connections" | "settings"}
+            navigate={setView}
+            refreshWorkspace={refresh}
+            manageAi={() => {
+              if (props.renderAsk) {
+                setConfigureRequest((n) => n + 1);
+                setView("ask");
+              } else props.onAgent();
+            }}
+          />
         )}
       </main>
     </div>

@@ -210,3 +210,5 @@ export type { LibraryData, InboxEntry } from "@kaitu/core";
 
 export type { NewsFeedback } from "@kaitu/core";
 import type { NewsFeedback } from "@kaitu/core";
+
+export type { SettingsData } from "@kaitu/core";

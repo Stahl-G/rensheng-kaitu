@@ -85,7 +85,7 @@ export function CalendarPage(props: CalendarPageProps) {
         if (active) setData(value);
       })
       .catch((err) => {
-        if (active) setError(String(err));
+        if (active) setError(err instanceof Error ? err.message : String(err));
       });
     return () => {
       active = false;
@@ -104,7 +104,7 @@ export function CalendarPage(props: CalendarPageProps) {
       setData(await props.loadCalendar());
       setSelected(null);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -135,7 +135,7 @@ export function CalendarPage(props: CalendarPageProps) {
               setUrl("");
               setName("");
             } catch (err) {
-              setError(String(err));
+              setError(err instanceof Error ? err.message : String(err));
             } finally {
               setBusy(false);
             }

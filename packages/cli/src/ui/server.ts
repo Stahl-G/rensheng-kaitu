@@ -48,6 +48,8 @@ export interface UiOptions {
   inboxStableMs?: number;
   webRoot?: string;
   ask?: AskService;
+  onWorkspaceChanging?: () => Promise<void>;
+  onWorkspaceChanged?: () => Promise<void>;
   onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
 }
@@ -309,7 +311,20 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
               : await exclusive(async () => {
                   const mutates = productMutations.has(method);
                   if (mutates) await saveExternal();
-                  const value = await productRequest(ws, method, args, options.ask);
+                  if (method === "moveStorage" || method === "restoreVersion")
+                    await options.ask?.prepareRelocation();
+                  if (method === "moveStorage") await options.onWorkspaceChanging?.();
+                  const oldRoot = ws.root;
+                  let value: unknown;
+                  try {
+                    value = await productRequest(ws, method, args, options.ask);
+                  } finally {
+                    if (ws.root !== oldRoot) {
+                      startWatching();
+                      options.ask?.relocate(ws.root);
+                    }
+                    if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                  }
                   if (method === "configureAutomation") await options.onAutomationChanged?.();
                   if (mutates) notify();
                   return value;

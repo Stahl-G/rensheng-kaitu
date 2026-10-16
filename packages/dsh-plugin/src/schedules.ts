@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type AutomationKey, type Workspace, readAutomation } from "@kaitu/core";
+import { type AutomationKey, type Workspace, configuredAutomationTimes, readAutomation } from "@kaitu/core";
 
 interface ScheduleInput {
   title: string;
@@ -53,9 +53,18 @@ export interface ScheduleContext {
   sessions: { flush(session: unknown): Promise<boolean> };
 }
 interface Setup {
+  root?: string;
+  relocation?: {
+    sessionId: string;
+    oldSession: string;
+    oldTasks: Record<string, string>;
+    inputs: Partial<Record<AutomationKey, ScheduleInput>>;
+  };
   sessionId: string;
   tasks: Record<string, string>;
   applied?: Partial<Record<AutomationKey, boolean>>;
+  appliedTimes?: Partial<Record<AutomationKey, string>>;
+  observedTimes?: Partial<Record<AutomationKey, string>>;
   saved?: Partial<Record<AutomationKey, ScheduleInput>>;
 }
 export const defaultSchedules = [
@@ -81,7 +90,6 @@ export const defaultSchedules = [
   },
 ] as const;
 
-/** 已有回执不重建；只有明确的开关变化才删除或重启任务，保留用户改过的时间与内容。 */
 export async function setupSchedules(
   ctx: ScheduleContext,
   ws: Workspace,
@@ -90,56 +98,119 @@ export async function setupSchedules(
   const file = ".kaitu/dsh-setup.json";
   const settings = readAutomation(ws);
   if (!settings.asked && !legacyEnabled) return;
+  const requested = configuredAutomationTimes(ws);
   const setup: Setup = ws.exists(file)
     ? ws.readJson(file)
     : { sessionId: `session-${randomUUID()}`, tasks: {} };
   setup.applied ??= {};
-  const changes = defaultSchedules.filter(({ key }) => {
-    const previous = setup.applied?.[key] ?? (setup.tasks[key] ? true : undefined);
-    return previous !== settings.tasks[key];
-  });
-  if (!changes.length) return;
-  ws.writeJson(file, setup, { internal: true });
-  let current: ScheduleTask[] | undefined;
-  for (const task of changes) {
-    if (!settings.tasks[task.key]) {
-      const id = setup.tasks[task.key];
-      if (id) {
-        const record = (await ctx.schedule.list({ sessionId: setup.sessionId })).find((row) => row.id === id);
-        if (record) {
-          setup.saved ??= {};
-          setup.saved[task.key] = savedInput(record);
-          ws.writeJson(file, setup, { internal: true });
-        }
-        await ctx.schedule.delete({ sessionId: setup.sessionId, id });
-      }
-    } else {
-      if (!current) {
-        await ctx.sessionController.create({
-          sessionId: setup.sessionId,
-          cwd: ws.root,
-          agentPreset: "standard",
-        });
-        const resolved = await ctx.sessionController.resolveAgent(setup.sessionId);
-        if ("error" in resolved) throw resolved.error;
-        if (!(await ctx.sessions.flush(resolved.agent.session)))
-          throw new Error("自动整理会话未获得持久化回执");
-        current = await ctx.schedule.list({ sessionId: setup.sessionId });
-      }
-      const existing = current.find((row) => row.title === task.title);
-      const result =
-        existing ??
-        (await ctx.schedule.create(
-          setup.sessionId,
-          setup.saved?.[task.key] ?? {
-            title: task.title,
-            prompt: task.prompt,
-            daily: { time: task.time, time_zone: ws.timeZone() },
-          },
-        ));
-      setup.tasks[task.key] = result.id;
-    }
-    setup.applied[task.key] = settings.tasks[task.key];
+  setup.appliedTimes ??= {};
+  setup.observedTimes ??= {};
+  const before = JSON.stringify(setup);
+  let current = Object.keys(setup.tasks).length
+    ? await ctx.schedule.list({ sessionId: setup.sessionId })
+    : [];
+  if (setup.root && setup.root !== ws.root) {
+    setup.relocation ??= {
+      sessionId: `session-${randomUUID()}`,
+      oldSession: setup.sessionId,
+      oldTasks: { ...setup.tasks },
+      inputs: {},
+    };
     ws.writeJson(file, setup, { internal: true });
+    const move = setup.relocation;
+    await ctx.sessionController.create({ sessionId: move.sessionId, cwd: ws.root, agentPreset: "standard" });
+    const resolved = await ctx.sessionController.resolveAgent(move.sessionId);
+    if ("error" in resolved) throw resolved.error;
+    if (!(await ctx.sessions.flush(resolved.agent.session)))
+      throw new Error("新位置的自动整理会话未获得保存回执");
+    const oldTasks = await ctx.schedule.list({ sessionId: move.oldSession });
+    for (const task of defaultSchedules) {
+      const prior = oldTasks.find((row) => row.id === move.oldTasks[task.key]);
+      if (prior && !move.inputs[task.key]) {
+        move.inputs[task.key] = savedInput(prior);
+        ws.writeJson(file, setup, { internal: true });
+      }
+      const input = move.inputs[task.key];
+      if (!input) continue;
+      const existing = (await ctx.schedule.list({ sessionId: move.sessionId })).find(
+        (row) => row.title === input.title,
+      );
+      const moved = existing ?? (await ctx.schedule.create(move.sessionId, input));
+      setup.tasks[task.key] = moved.id;
+      ws.writeJson(file, setup, { internal: true });
+      if (prior) await ctx.schedule.delete({ sessionId: move.oldSession, id: prior.id });
+    }
+    setup.sessionId = move.sessionId;
+    setup.root = ws.root;
+    setup.relocation = undefined;
+    ws.writeJson(file, setup, { internal: true });
+    current = await ctx.schedule.list({ sessionId: setup.sessionId });
   }
+  setup.root = ws.root;
+  let ready = false;
+  for (const task of defaultSchedules) {
+    const key = task.key;
+    const previous = setup.applied[key] ?? (setup.tasks[key] ? true : undefined);
+    const timeChanged = requested[key] !== undefined && requested[key] !== setup.appliedTimes[key];
+    const existing = current.find((row) => row.id === setup.tasks[key]);
+    if (previous !== settings.tasks[key] || timeChanged) {
+      if (!settings.tasks[key]) {
+        if (existing) {
+          setup.saved ??= {};
+          setup.saved[key] = savedInput(existing);
+          ws.writeJson(file, setup, { internal: true });
+          await ctx.schedule.delete({ sessionId: setup.sessionId, id: existing.id });
+        }
+        if (timeChanged) {
+          setup.observedTimes[key] = requested[key];
+          const saved = setup.saved?.[key];
+          if (saved?.daily) saved.daily.time = `${requested[key]}:00`;
+          if (saved?.weekly) saved.weekly.time = `${requested[key]}:00`;
+        }
+      } else {
+        if (!ready) {
+          await ctx.sessionController.create({
+            sessionId: setup.sessionId,
+            cwd: ws.root,
+            agentPreset: "standard",
+          });
+          const resolved = await ctx.sessionController.resolveAgent(setup.sessionId);
+          if ("error" in resolved) throw resolved.error;
+          if (!(await ctx.sessions.flush(resolved.agent.session)))
+            throw new Error("自动整理会话未获得持久化回执");
+          ready = true;
+        }
+        const prior = existing ?? current.find((row) => row.title === task.title);
+        const input = prior
+          ? savedInput(prior)
+          : (setup.saved?.[key] ?? {
+              title: task.title,
+              prompt: task.prompt,
+              daily: { time: task.time, time_zone: ws.timeZone() },
+            });
+        if (timeChanged && requested[key]) {
+          const time = `${requested[key]}:00`;
+          if (input.daily) input.daily.time = time;
+          else if (input.weekly) input.weekly.time = time;
+          else if (timeChanged) throw new Error("这个自动任务使用自定义周期，请在 DSH 中调整时间");
+        }
+        let result = prior;
+        if (!prior || timeChanged) {
+          setup.saved ??= {};
+          setup.saved[key] = input;
+          ws.writeJson(file, setup, { internal: true });
+          if (prior) await ctx.schedule.delete({ sessionId: setup.sessionId, id: prior.id });
+          result = (await ctx.schedule.create(setup.sessionId, input)) as ScheduleTask;
+        }
+        if (result) setup.tasks[key] = result.id;
+      }
+      setup.applied[key] = settings.tasks[key];
+      if (requested[key]) setup.appliedTimes[key] = requested[key];
+      ws.writeJson(file, setup, { internal: true });
+      current = await ctx.schedule.list({ sessionId: setup.sessionId });
+    }
+    const actual = current.find((row) => row.id === setup.tasks[key]);
+    if (actual?.time) setup.observedTimes[key] = actual.time.slice(0, 5);
+  }
+  if (JSON.stringify(setup) !== before) ws.writeJson(file, setup, { internal: true });
 }

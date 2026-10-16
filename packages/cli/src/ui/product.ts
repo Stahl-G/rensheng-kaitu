@@ -6,6 +6,7 @@ import {
   type FinanceViewOptions,
   KaituError,
   type NewsFeedback,
+  type SettingsData,
   type Workspace,
   addCalendarSubscription,
   captureNote,
@@ -17,6 +18,7 @@ import {
   discardFinanceImport,
   dismissNews,
   editExperience,
+  exportWorkspace,
   financeAccounts,
   financeCashflow,
   financeInvestments,
@@ -24,6 +26,7 @@ import {
   hideExperience,
   lifeMap,
   listProjects,
+  moveWorkspace,
   previewExperienceBatch,
   previewFinanceImport,
   readAutomation,
@@ -41,9 +44,11 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  readSettings,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  restore,
   saveAvatar,
   setExperienceSource,
   setNewsFeedback,
@@ -53,10 +58,12 @@ import {
   writeExploration,
 } from "@kaitu/core";
 
-import type { AskService } from "./ask.js";
+import type { AskMode, AskService } from "./ask.js";
 
 export const productMutations = new Set([
   "configureAutomation",
+  "restoreVersion",
+  "moveStorage",
   "addCalendarSubscription",
   "completeNext",
   "setExperienceSource",
@@ -94,6 +101,8 @@ export async function productRequest(
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
     switch (method) {
+      case "askSetMode":
+        return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings":
         return ask.settings();
       case "askConfigure":
@@ -119,10 +128,27 @@ export async function productRequest(
       return addCalendarSubscription(ws, text(0), text(1));
     case "completeNext":
       return completeNext(ws, text(0), text(1));
+    case "settings": {
+      const data: SettingsData = await readSettings(ws);
+      data.ai = ask ? await ask.settings() : null;
+      return data;
+    }
+    case "exportWorkspace":
+      return exportWorkspace(ws);
+    case "restoreVersion":
+      return restore(ws, text(0));
+    case "moveStorage": {
+      if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
+      return moveWorkspace(ws, text(0), args[1]);
+    }
     case "automation":
       return readAutomation(ws);
     case "configureAutomation":
-      return configureAutomation(ws, args[0] as Partial<Record<AutomationKey, boolean>>);
+      return configureAutomation(
+        ws,
+        args[0] as Partial<Record<AutomationKey, boolean>>,
+        (args[1] ?? undefined) as Partial<Record<AutomationKey, string>> | undefined,
+      );
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":

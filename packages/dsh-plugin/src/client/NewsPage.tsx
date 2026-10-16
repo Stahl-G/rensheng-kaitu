@@ -39,7 +39,7 @@ export function NewsPage(props: NewsPageProps) {
       setData(await props.loadNews());
       setError("");
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     }
   }, [props.loadNews]);
   useEffect(() => {
@@ -53,7 +53,7 @@ export function NewsPage(props: NewsPageProps) {
       const feedback = await props.feedbackNews(id, value);
       setData((current) => (current ? { ...current, feedback } : current));
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(null);
     }
@@ -91,7 +91,7 @@ export function NewsPage(props: NewsPageProps) {
                   await props.tryNews(item.id);
                   setAdded((list) => [...list, item.id]);
                 } catch (err) {
-                  setError(String(err));
+                  setError(err instanceof Error ? err.message : String(err));
                 } finally {
                   setBusy(null);
                 }

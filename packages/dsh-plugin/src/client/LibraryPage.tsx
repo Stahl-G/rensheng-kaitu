@@ -34,7 +34,9 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
           </span>
           <span className={css.small}>
             {section.sources.join("、") || "还没有来源"}
-            {section.latest ? ` · 最近更新 ${section.latest.slice(0, 10)}` : ""}
+            {section.latest
+              ? ` · ${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`
+              : ""}
           </span>
         </button>
       )) ?? <p className={css.small}>正在读取资料…</p>}
@@ -118,7 +120,7 @@ export function NotesPage({
           if (active) setBody(text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, ""));
         })
         .catch((err) => {
-          if (active) setError(String(err));
+          if (active) setError(err instanceof Error ? err.message : String(err));
         });
     return () => {
       active = false;

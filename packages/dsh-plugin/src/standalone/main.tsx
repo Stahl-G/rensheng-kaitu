@@ -14,7 +14,9 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 let workspace = "";
 const props: OverviewPageProps = {
-  renderAsk: (prompt) => <AskPage workspace={workspace} initialPrompt={prompt} />,
+  renderAsk: (prompt, configureRequest) => (
+    <AskPage workspace={workspace} initialPrompt={prompt} configureRequest={configureRequest} />
+  ),
   subscribe: (refresh) => {
     const events = new EventSource("/api/events");
     events.onmessage = refresh;
@@ -25,6 +27,11 @@ const props: OverviewPageProps = {
     workspace = data.root;
     return data;
   },
+  loadSettings: () => call("settings"),
+  configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
+  exportWorkspace: () => call("exportWorkspace"),
+  restoreVersion: (oid) => call("restoreVersion", oid),
+  moveStorage: (path, drive) => call("moveStorage", path, drive),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
   loadLibrary: () => call("library"),

@@ -38,7 +38,7 @@ export function TodayFinance({
         if (active) setData({ overview, flow, investment });
       })
       .catch((err) => {
-        if (active) setError(String(err));
+        if (active) setError(err instanceof Error ? err.message : String(err));
       });
     return () => {
       active = false;
@@ -129,7 +129,18 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
             onClick={() => open(section.id)}
           >
             <span className={css["sum-h"]}>
-              {section.label}
+              <i
+                className={css.dot}
+                style={{
+                  background: `var(--${({ health: "health", projects: "doing", feed: "news", calendar: "news", me: "me" } as Record<string, string>)[section.id] ?? "explore"})`,
+                }}
+              />
+              {(
+                { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
+                  string,
+                  string
+                >
+              )[section.id] ?? section.label}
               <span>{section.count} 条</span>
             </span>
             {section.id === "health" && data.metrics.length ? (
@@ -171,7 +182,7 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
               ))
             ) : (
               <span className={css.small}>
-                {section.latest ? `最近更新 ${section.latest.slice(0, 10)}` : "查看全部资料与来源"}
+                {section.latest ? `记录日期 ${section.latest.slice(0, 10)}` : "查看全部资料与来源"}
               </span>
             )}
           </button>

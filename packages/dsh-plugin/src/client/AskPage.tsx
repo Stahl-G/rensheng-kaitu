@@ -1,8 +1,11 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import css from "./AskPage.module.css";
+import v2 from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 
+type AskMode = "scoped" | "full";
 interface Thread {
+  mode?: AskMode;
   id: string;
   title: string;
   created: string;
@@ -112,7 +115,11 @@ function Tool({ event, result, finished }: { event: ChatEvent; result?: ChatEven
   );
 }
 
-export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; initialPrompt?: string }) {
+export function AskPage({
+  workspace,
+  initialPrompt = "",
+  configureRequest = 0,
+}: { workspace: string; initialPrompt?: string; configureRequest?: number }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<ChatEvent[]>([]);
@@ -122,6 +129,17 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
   }, [initialPrompt]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
+  useEffect(() => {
+    if (configureRequest) setStep(1);
+  }, [configureRequest]);
+  const [modeMenu, setModeMenu] = useState<"select" | "confirm" | null>(null);
+  const [modeSaving, setModeSaving] = useState(false);
+  const selectThread = (id: string | null) => {
+    setSelected(id);
+    setModeMenu(null);
+  };
+  const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
+
   const [choice, setChoice] = useState<"builtin" | "external">("external");
   const [key, setKey] = useState("");
   const [automation, setAutomation] = useState({ morning: true, organizer: true, news: false });
@@ -209,7 +227,7 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
         const thread = await call<Thread>("askCreate");
         id = thread.id;
         activeSession.current = id;
-        setSelected(id);
+        selectThread(id);
         await refreshThreads();
       }
       await call("askSend", id, value);
@@ -218,6 +236,26 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
+    }
+  };
+  const changeMode = async (value: AskMode) => {
+    if (busy || modeSaving) return;
+    setModeSaving(true);
+    setError("");
+    try {
+      let id = selected;
+      if (!id) {
+        const thread = await call<Thread>("askCreate");
+        id = thread.id;
+        selectThread(id);
+      }
+      await call("askSetMode", id, value, value === "full");
+      await refreshThreads();
+      setModeMenu(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setModeSaving(false);
     }
   };
   const next = async () => {
@@ -261,7 +299,7 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
           type="button"
           className={css.newThread}
           onClick={() => {
-            setSelected(null);
+            selectThread(null);
             setDraft("");
             setError("");
           }}
@@ -277,7 +315,7 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
                 key={thread.id}
                 aria-current={thread.id === selected ? "true" : undefined}
                 onClick={() => {
-                  setSelected(thread.id);
+                  selectThread(thread.id);
                   setError("");
                 }}
               >
@@ -292,7 +330,7 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
           <button
             type="button"
             onClick={() => {
-              setSelected(null);
+              selectThread(null);
               setDraft("");
             }}
           >
@@ -431,6 +469,76 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
             }}
           />
           <div className={css.composerRow}>
+            <span className={v2["mode-wrap"]}>
+              <button
+                type="button"
+                className={`${v2["c-btn"]} ${mode === "full" ? v2["is-full"] : ""}`}
+                disabled={busy || modeSaving}
+                aria-haspopup="dialog"
+                aria-expanded={modeMenu !== null}
+                onClick={() => setModeMenu(modeMenu ? null : "select")}
+              >
+                {mode === "full" ? "完整 Agent" : "只读写开图资料"}
+              </button>
+              {modeMenu && (
+                <dialog
+                  open
+                  className={v2["mode-pop"]}
+                  aria-label={modeMenu === "confirm" ? "开启完整 Agent" : "这个对话能做什么"}
+                >
+                  {modeMenu === "confirm" ? (
+                    <>
+                      <b>给这个对话开启完整 Agent？</b>
+                      <p className={v2.small}>
+                        它可以运行命令、读写这台电脑上的任何文件、上网。资讯、邮件或网页里的内容可能诱导它做你不想做的事，只在你信任这次任务时开启。
+                      </p>
+                      <p className={v2.small}>只对这个对话生效，新对话仍是只读写开图资料。</p>
+                      <div className={v2["dialog-foot"]}>
+                        <button
+                          type="button"
+                          className={`${v2.btn} ${v2["btn-quiet"]}`}
+                          disabled={modeSaving}
+                          onClick={() => setModeMenu(null)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className={`${v2.btn} ${v2["btn-strong"]}`}
+                          disabled={modeSaving}
+                          onClick={() => void changeMode("full")}
+                        >
+                          开启
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={v2["mode-opt"]}
+                        aria-pressed={mode === "scoped"}
+                        onClick={() => void changeMode("scoped")}
+                      >
+                        <b>只读写开图资料</b>
+                        <span>默认。只能读写你的开图资料，不能运行命令、不能上网。</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={v2["mode-opt"]}
+                        aria-pressed={mode === "full"}
+                        onClick={() => (mode === "full" ? setModeMenu(null) : setModeMenu("confirm"))}
+                      >
+                        <b>完整 Agent</b>
+                        <span>
+                          开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。
+                        </span>
+                      </button>
+                    </>
+                  )}
+                </dialog>
+              )}
+            </span>
             <button type="button" className={css.model} disabled={busy} onClick={() => setStep(1)}>
               {settings?.configured
                 ? settings.model === "deepseek-flash"
@@ -448,7 +556,6 @@ export function AskPage({ workspace, initialPrompt = "" }: { workspace: string; 
             </button>
           </div>
         </form>
-        <p className={css.scope}>只读写开图资料</p>
       </section>
       <dialog
         ref={dialog}

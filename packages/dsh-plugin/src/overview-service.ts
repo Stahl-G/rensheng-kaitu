@@ -8,6 +8,7 @@ import {
   KaituError,
   type LibraryData,
   type NewsFeedback,
+  type SettingsData,
   Workspace,
   addCalendarSubscription,
   captureNote,
@@ -18,9 +19,11 @@ import {
   defaultRoot,
   dismissNews,
   editExperience,
+  exportWorkspace,
   hideExperience,
   lifeMap,
   listProjects,
+  moveWorkspace,
   previewExperienceBatch,
   readAutomation,
   readAvatar,
@@ -36,9 +39,11 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  readSettings,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  restore,
   saveAvatar,
   setExperienceSource,
   setNewsFeedback,
@@ -135,14 +140,37 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.write(() => completeNext(this.workspace, file, id));
   }
 
+  @Remote("settings")
+  async settings(): Promise<SettingsData> {
+    return readSettings(this.workspace);
+  }
+
+  @Remote("exportWorkspace")
+  async exportWorkspace(): Promise<{ name: string; base64: string }> {
+    return exportWorkspace(this.workspace);
+  }
+
+  @Remote("restoreVersion")
+  async restoreVersion(oid: string): Promise<{ oid: string | null; changed: number }> {
+    return this.write(() => restore(this.workspace, oid));
+  }
+
+  @Remote("moveStorage")
+  async moveStorage(path: string, drive: boolean): Promise<SettingsData["storage"]> {
+    return this.write(() => moveWorkspace(this.workspace, path, drive));
+  }
+
   @Remote("automation")
   async automation(): Promise<AutomationSettings> {
     return readAutomation(this.workspace);
   }
 
   @Remote("configureAutomation")
-  async configureAutomation(tasks: Partial<Record<AutomationKey, boolean>>): Promise<AutomationSettings> {
-    return this.write(async () => configureAutomation(this.workspace, tasks));
+  async configureAutomation(
+    tasks: Partial<Record<AutomationKey, boolean>>,
+    times?: Partial<Record<AutomationKey, string>>,
+  ): Promise<AutomationSettings> {
+    return this.write(async () => configureAutomation(this.workspace, tasks, times));
   }
 
   @Remote("workspacePath")

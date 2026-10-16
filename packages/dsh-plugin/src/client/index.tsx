@@ -5,6 +5,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import contribution from "../../lib/typert.remote-client.js";
 import type {
+  AutomationKey,
   FinanceRemoteCommitOptions,
   FinanceRemoteImportOptions,
   FinanceRemoteViewOptions,
@@ -119,6 +120,34 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              loadSettings: async () => {
+                const r = await ctx.remote.kaitu.settings();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              configureAutomation: async (
+                tasks: Partial<Record<AutomationKey, boolean>>,
+                times?: Partial<Record<AutomationKey, string>>,
+              ) => {
+                const r = await ctx.remote.kaitu.configureAutomation(tasks, times);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              exportWorkspace: async () => {
+                const r = await ctx.remote.kaitu.exportWorkspace();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              restoreVersion: async (oid: string) => {
+                const r = await ctx.remote.kaitu.restoreVersion(oid);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              moveStorage: async (path: string, drive: boolean) => {
+                const r = await ctx.remote.kaitu.moveStorage(path, drive);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
               },
               loadCalendar: async () => {
                 const r = await ctx.remote.kaitu.calendar();

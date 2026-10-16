@@ -1,8 +1,8 @@
 .chat {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
-  height: calc(100dvh - 204px);
-  min-height: 460px;
+  height: calc(100dvh - 112px);
+  min-height: 560px;
 }
 .threads {
   display: flex;
@@ -424,5 +424,15 @@
   }
   .thinking::after {
     display: none;
+  }
+}
+
+.composerRow {
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .chat {
+    height: calc(100dvh - 168px);
+    min-height: 460px;
   }
 }

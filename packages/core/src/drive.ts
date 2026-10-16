@@ -216,3 +216,30 @@ export async function disableDrive(ws: Workspace, options: { to?: string } = {})
   await verify(ws);
   return driveStatus(ws);
 }
+
+export async function moveWorkspace(ws: Workspace, target: string, drive: boolean) {
+  if (!isAbsolute(target)) throw new KaituError("请选择绝对路径", "BAD_ARGS");
+  if (ws.exists(".kaitu/dsh-setup.json")) {
+    const setup = ws.readJson<{ root?: string }>(".kaitu/dsh-setup.json");
+    if (!setup.root) {
+      setup.root = ws.root;
+      ws.writeJson(".kaitu/dsh-setup.json", setup, { internal: true });
+    }
+  }
+  const destination = resolve(target);
+  const mode = driveStatus(ws).mode;
+  if (drive && mode === "local")
+    return enableDrive(ws, { driveDir: dirname(destination), name: destination.split(/[\\/]/).at(-1) });
+  if (!drive && mode === "drive") return disableDrive(ws, { to: destination });
+  const old = ws.root;
+  separate(old, destination);
+  await snapshot(ws, "迁移资料前保存");
+  move(old, destination);
+  ws.root = destination;
+  rebaseProjectLinks(ws, old, destination);
+  remember(destination);
+  relocationNote(old, destination);
+  await snapshot(ws, "你更换了资料存放位置");
+  await verify(ws);
+  return driveStatus(ws);
+}

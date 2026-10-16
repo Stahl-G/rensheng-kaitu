@@ -4,6 +4,7 @@ import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
+import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
 import type { Workspace } from "./workspace.js";
@@ -55,10 +56,32 @@ export function readLibrary(ws: Workspace): LibraryData {
     }
   inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const records = (types: string[]) => types.flatMap((type) => readRecords(ws, type));
-  const health = records(["workout", "meal", "sleep", "metric", "activity", "photo"]);
+  const health = records(
+    listRecordTypes(ws)
+      .filter((r) => r.module.def.id === "health")
+      .map((r) => r.type),
+  );
   const finance = records(["finance_account", "finance_transaction", "finance_holding_snapshot"]);
   const fromRecords = (rows: ReturnType<typeof records>) => ({
-    sources: [...new Set(rows.map((row) => String(row.source ?? row.by)))],
+    sources: [
+      ...new Set(
+        rows.map((row) => {
+          const source = String(row.source ?? row.by);
+          return (
+            (
+              {
+                user: "你记录的",
+                agent: "本机 AI",
+                "apple-health": "Apple 健康",
+                "nut-ai": "Nut AI",
+                "import:apple-health": "Apple 健康导入",
+                "import:ics": "日历导入",
+              } as Record<string, string>
+            )[source] ?? source
+          );
+        }),
+      ),
+    ],
     latest:
       rows
         .map((row) => row.ts)
