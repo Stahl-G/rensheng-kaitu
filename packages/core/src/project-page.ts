@@ -1,4 +1,5 @@
 import { KaituError } from "./errors.js";
+import { readProjectView } from "./project-view.js";
 import { listProjects, readProject, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
@@ -58,6 +59,7 @@ export function readProjectPage(ws: Workspace, slug: string) {
   const metrics = readRecords(ws, "project_metric").filter((row) => row.project === slug);
   return {
     ...summary,
+    ...readProjectView(ws, slug),
     body: clean(project.body),
     progress: project.data.progress ?? null,
     logs: projectLogs(project.log),

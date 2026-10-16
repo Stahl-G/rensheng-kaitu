@@ -128,9 +128,13 @@ function GoalForm({
   );
 }
 
-function Curve({ project }: { project: ProjectDetailData }) {
-  const kind =
-    project.progress?.unit === "字" ? "words" : project.progress?.unit === "次提交" ? "commits" : null;
+function Curve({
+  project,
+  kind = project.progress?.unit === "字" ? "words" : project.progress?.unit === "次提交" ? "commits" : null,
+}: {
+  project: ProjectDetailData;
+  kind?: "words" | "commits" | null;
+}) {
   let total = 0;
   const points = project.metrics
     .filter((row) => row.kind === kind)
@@ -171,7 +175,8 @@ function Curve({ project }: { project: ProjectDetailData }) {
             ))}
           </svg>
           <p className={css.muted}>
-            {points[0]?.date} — {points.at(-1)?.date} · 最近 {points.at(-1)?.value} {project.progress?.unit}
+            {points[0]?.date} — {points.at(-1)?.date} · 最近 {points.at(-1)?.value}{" "}
+            {kind === "words" ? "字" : "次提交"}
           </p>
         </>
       ) : (
@@ -181,7 +186,97 @@ function Curve({ project }: { project: ProjectDetailData }) {
   );
 }
 
-export function ProjectsPage(props: DoingPageProps & { timeZone?: string }) {
+function CustomView({ project }: { project: ProjectDetailData }) {
+  const view = project.view;
+  if (!view) return null;
+  if ("html" in view)
+    return (
+      <iframe
+        className={css.viewFrame}
+        title={view.title ?? project.title}
+        sandbox=""
+        srcDoc={`<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"><meta name="viewport" content="width=device-width, initial-scale=1"><style>:root{color-scheme:light dark}body{font:16px system-ui;margin:16px;overflow-wrap:anywhere}img,table{max-width:100%}</style></head><body>${view.html}</body></html>`}
+      />
+    );
+  return view.blocks.map((block) => (
+    <section key={block.id} className={css.card}>
+      {block.title && <h3>{block.title}</h3>}
+      {block.type === "progress" &&
+        (project.progress ? (
+          <div>
+            <p>
+              {project.progress.label}：{project.progress.current.toLocaleString("zh-CN")} /{" "}
+              {project.progress.target.toLocaleString("zh-CN")} {project.progress.unit}
+            </p>
+            <progress
+              className={css.progress}
+              value={project.progress.current}
+              max={project.progress.target}
+            />
+          </div>
+        ) : (
+          <p className={css.muted}>还没有量化目标。</p>
+        ))}
+      {block.type === "curve" && <Curve project={project} kind={block.kind} />}
+      {block.type === "checklist" &&
+        block.items.map((item, index) => (
+          <p key={`${block.id}-${index}`}>
+            <span aria-label={item.checked ? "已完成" : "未完成"}>{item.checked ? "☑" : "☐"}</span>{" "}
+            {item.text}
+          </p>
+        ))}
+      {block.type === "milestones" && (
+        <ol className={css.milestones}>
+          {block.items.map((item, index) => (
+            <li key={`${block.id}-${index}`}>
+              <span>
+                {item.done ? "已完成" : "待完成"} · {item.title}
+              </span>
+              {item.date && <time className={css.muted}>{item.date}</time>}
+            </li>
+          ))}
+        </ol>
+      )}
+      {block.type === "links" &&
+        block.items.map((item, index) => (
+          <p key={`${block.id}-${index}`}>
+            <a className={css.link} href={item.url} target="_blank" rel="noreferrer">
+              {item.title}
+            </a>
+          </p>
+        ))}
+      {block.type === "note" && <p className={css.body}>{block.text}</p>}
+      {block.type === "table" && (
+        <div className={css.viewTable}>
+          <table>
+            <thead>
+              <tr>
+                {block.columns.map((column) => (
+                  <th key={column.key} scope="col">
+                    {column.title}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, index) => (
+                <tr key={`${block.id}-${index}`}>
+                  {block.columns.map((column) => (
+                    <td key={column.key}>{row[column.key]}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  ));
+}
+
+export function ProjectsPage(
+  props: DoingPageProps & { timeZone?: string; subscribe?: (refresh: () => void) => () => void },
+) {
   const [projects, setProjects] = useState<DoingProject[] | null>(null);
   const [project, setProject] = useState<ProjectDetailData | null>(null);
   const [error, setError] = useState("");
@@ -204,6 +299,22 @@ export function ProjectsPage(props: DoingPageProps & { timeZone?: string }) {
       active = false;
     };
   }, [props.loadProjects]);
+  const selectedSlug = project?.slug;
+  useEffect(
+    () =>
+      props.subscribe?.(() => {
+        void props
+          .loadProjects()
+          .then(setProjects)
+          .catch((err) => setError(String(err.message ?? err)));
+        if (selectedSlug)
+          void props
+            .loadProject(selectedSlug)
+            .then(setProject)
+            .catch((err) => setError(String(err.message ?? err)));
+      }),
+    [props.subscribe, props.loadProjects, props.loadProject, selectedSlug],
+  );
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
     setError("");
@@ -237,7 +348,7 @@ export function ProjectsPage(props: DoingPageProps & { timeZone?: string }) {
             ← 全部项目
           </button>
           <header className={css.header}>
-            <h2>{project.title}</h2>
+            <h2>{project.view?.title ?? project.title}</h2>
             <button
               type="button"
               className={css.primary}
@@ -256,129 +367,152 @@ export function ProjectsPage(props: DoingPageProps & { timeZone?: string }) {
               {busy ? "正在处理…" : "同步进度"}
             </button>
           </header>
-          <section className={css.card}>
-            <h3>目标与现状</h3>
-            <p className={css.body}>
-              {project.body.replace(/^#\s+.*\n?/, "") || "记下项目目标，让下一步更明确。"}
-            </p>
-            <Progress project={project} />
-            <GoalForm
-              key={`${project.slug}:${JSON.stringify(project.progress)}`}
-              project={project}
-              busy={busy}
-              save={(goal) =>
-                void run(async () => {
-                  await props.saveProjectGoal(project.slug, goal);
-                  await refresh();
-                })
-              }
-              suggest={
-                props.suggestProjectGoal
-                  ? () => props.suggestProjectGoal?.(project.slug) as Promise<ProjectGoal>
-                  : undefined
-              }
-              ask={() =>
-                props.onPrompt(
-                  `请为项目「${project.title}」提议一个可量化目标，说明当前值、目标值和单位，不要写入，等我在项目详情确认。`,
-                )
-              }
-            />
-          </section>
-          <section className={css.card}>
-            <h3>下一步</h3>
-            {project.next.length ? (
-              project.next.map((item) => (
-                <p key={item.id}>
-                  {item.title} ·{" "}
-                  {{ todo: "待做", proposed: "待确认", done: "已完成", skipped: "已跳过" }[item.status]}
+          <button
+            type="button"
+            className={css.link}
+            onClick={() =>
+              props.onPrompt(
+                `请按 project 技能为项目「${project.title}」（${project.slug}）设计视图，读取现有项目资料并写入 projects/${project.slug}/view.json。`,
+              )
+            }
+          >
+            让 AI 设计这个项目的视图
+          </button>
+          {project.viewError && <p className={css.muted}>{project.viewError}</p>}
+          {project.view ? (
+            <CustomView project={project} />
+          ) : (
+            <>
+              <section className={css.card}>
+                <h3>目标与现状</h3>
+                <p className={css.body}>
+                  {project.body.replace(/^#\s+.*\n?/, "") || "记下项目目标，让下一步更明确。"}
                 </p>
-              ))
-            ) : (
-              <p className={css.muted}>还没有下一步，和开图聊聊接下来做什么。</p>
-            )}
-          </section>
-          <div className={css.card}>
-            <Curve project={project} />
-            <Output project={project} />
-          </div>
-          <section className={css.card}>
-            <h3>GitHub</h3>
-            {github(project)}
-            <button type="button" className={css.link} disabled={busy} onClick={() => setBinding(!binding)}>
-              {project.github ? "更换 GitHub 仓库" : "绑定 GitHub 仓库"}
-            </button>
-            {binding && (
-              <form
-                className={css.form}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(async () => {
-                    await props.bindProjectGithub(project.slug, repo);
-                    await refresh();
-                  });
-                }}
-              >
-                <label>
-                  仓库地址
-                  <input
-                    placeholder="owner/repo"
-                    required
-                    value={repo}
-                    onChange={(event) => setRepo(event.target.value)}
-                  />
-                </label>
-                <button type="submit" className={css.primary} disabled={busy}>
-                  校验并绑定
+                <Progress project={project} />
+                <GoalForm
+                  key={`${project.slug}:${JSON.stringify(project.progress)}`}
+                  project={project}
+                  busy={busy}
+                  save={(goal) =>
+                    void run(async () => {
+                      await props.saveProjectGoal(project.slug, goal);
+                      await refresh();
+                    })
+                  }
+                  suggest={
+                    props.suggestProjectGoal
+                      ? () => props.suggestProjectGoal?.(project.slug) as Promise<ProjectGoal>
+                      : undefined
+                  }
+                  ask={() =>
+                    props.onPrompt(
+                      `请为项目「${project.title}」提议一个可量化目标，说明当前值、目标值和单位，不要写入，等我在项目详情确认。`,
+                    )
+                  }
+                />
+              </section>
+              <section className={css.card}>
+                <h3>下一步</h3>
+                {project.next.length ? (
+                  project.next.map((item) => (
+                    <p key={item.id}>
+                      {item.title} ·{" "}
+                      {{ todo: "待做", proposed: "待确认", done: "已完成", skipped: "已跳过" }[item.status]}
+                    </p>
+                  ))
+                ) : (
+                  <p className={css.muted}>还没有下一步，和开图聊聊接下来做什么。</p>
+                )}
+              </section>
+              <div className={css.card}>
+                <Curve project={project} />
+                <Output project={project} />
+              </div>
+              <section className={css.card}>
+                <h3>GitHub</h3>
+                {github(project)}
+                <button
+                  type="button"
+                  className={css.link}
+                  disabled={busy}
+                  onClick={() => setBinding(!binding)}
+                >
+                  {project.github ? "更换 GitHub 仓库" : "绑定 GitHub 仓库"}
                 </button>
-              </form>
-            )}
-            {!!project.github?.latest?.commits.length && (
-              <details>
-                <summary>最近 {project.github.latest.commits.length} 条提交</summary>
-                {project.github.latest.commits.map((commit) => (
-                  <p key={commit.sha}>
-                    {commit.date.slice(0, 10)} · {commit.title}
+                {binding && (
+                  <form
+                    className={css.form}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void run(async () => {
+                        await props.bindProjectGithub(project.slug, repo);
+                        await refresh();
+                      });
+                    }}
+                  >
+                    <label>
+                      仓库地址
+                      <input
+                        placeholder="owner/repo"
+                        required
+                        value={repo}
+                        onChange={(event) => setRepo(event.target.value)}
+                      />
+                    </label>
+                    <button type="submit" className={css.primary} disabled={busy}>
+                      校验并绑定
+                    </button>
+                  </form>
+                )}
+                {!!project.github?.latest?.commits.length && (
+                  <details>
+                    <summary>最近 {project.github.latest.commits.length} 条提交</summary>
+                    {project.github.latest.commits.map((commit) => (
+                      <p key={commit.sha}>
+                        {commit.date.slice(0, 10)} · {commit.title}
+                      </p>
+                    ))}
+                  </details>
+                )}
+              </section>
+              <section className={css.card}>
+                <h3>最近日志</h3>
+                {project.logs.length ? (
+                  project.logs.slice(0, 20).map((log) => (
+                    <div key={log.date}>
+                      <h4>{log.date}</h4>
+                      <p className={css.body}>{log.text}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className={css.muted}>还没有日志，记下一次实际进展。</p>
+                )}
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => props.onPrompt(`帮我给项目「${project.title}」记一次进展：`)}
+                >
+                  记一次进展
+                </button>
+              </section>
+              <section className={css.card}>
+                <h3>来源</h3>
+                {project.links.map((link) => (
+                  <p key={link.path}>
+                    <span className={css.role}>
+                      {{ repo: "仓库", manuscript: "手稿", folder: "文件夹" }[link.role]}
+                    </span>{" "}
+                    {link.path}
                   </p>
                 ))}
-              </details>
-            )}
-          </section>
-          <section className={css.card}>
-            <h3>最近日志</h3>
-            {project.logs.length ? (
-              project.logs.slice(0, 20).map((log) => (
-                <div key={log.date}>
-                  <h4>{log.date}</h4>
-                  <p className={css.body}>{log.text}</p>
-                </div>
-              ))
-            ) : (
-              <p className={css.muted}>还没有日志，记下一次实际进展。</p>
-            )}
-            <button
-              type="button"
-              className={css.link}
-              onClick={() => props.onPrompt(`帮我给项目「${project.title}」记一次进展：`)}
-            >
-              记一次进展
-            </button>
-          </section>
-          <section className={css.card}>
-            <h3>来源</h3>
-            {project.links.map((link) => (
-              <p key={link.path}>
-                <span className={css.role}>
-                  {{ repo: "仓库", manuscript: "手稿", folder: "文件夹" }[link.role]}
-                </span>{" "}
-                {link.path}
-              </p>
-            ))}
-            {project.sources.map((file) => (
-              <p key={file} className={css.muted}>
-                {file}
-              </p>
-            ))}
-          </section>
+                {project.sources.map((file) => (
+                  <p key={file} className={css.muted}>
+                    {file}
+                  </p>
+                ))}
+              </section>
+            </>
+          )}
         </>
       ) : (
         <>

@@ -238,6 +238,7 @@ export class Workspace {
   private refreshAfterWrite(rel: string): void {
     if (
       overviewDeferred(this) ||
+      /^projects\/[a-z0-9-]+\/view\.json$/.test(rel) ||
       rel.startsWith(".kaitu/") ||
       ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
       !this.exists("OVERVIEW.md")

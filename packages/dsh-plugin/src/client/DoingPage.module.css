@@ -326,3 +326,40 @@
   max-height: 180px;
   color: var(--kt-projects);
 }
+
+.viewFrame {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 65vh;
+  min-height: 360px;
+  border: 1px solid var(--kt-control);
+  border-radius: 16px;
+  background: var(--kt-card);
+  color-scheme: light dark;
+}
+.viewTable {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.viewTable table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--kt-text);
+}
+.viewTable th,
+.viewTable td {
+  padding: 10px;
+  border-bottom: 1px solid var(--kt-control);
+  text-align: left;
+}
+.milestones {
+  padding-left: 22px;
+  margin: 0;
+}
+.milestones li {
+  padding: 8px 0;
+}
+.milestones time {
+  display: block;
+}

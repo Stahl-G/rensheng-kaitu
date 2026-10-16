@@ -79,3 +79,5 @@ export { AI_NETWORK_RULES } from "./ai-instructions.js";
 export * from "./system-calendar.js";
 
 export * from "./project-page.js";
+
+export * from "./project-view.js";

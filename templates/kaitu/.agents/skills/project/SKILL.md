@@ -31,3 +31,12 @@ description: 新建个人或工作项目、记录进展、更新下一步，或�
 结合 STATUS、日志与近 7 天字数变化 / 提交数，说明进展、障碍、下一步及链接读取问题。
 字数和提交数只代表对应活动量，完成判断以 STATUS、日志和用户说明为准。
 每周项目回顾先 `kaitu project sync`，逐项核对工作与个人项目，保留未解决的障碍与未完成的下一步。
+
+## 自定义项目视图
+
+可直接写 `projects/<slug>/view.json`，或用 MCP `project_view_write`（slug、view）；顶层 `{title?, blocks:[...]}` 或 `{title?, html}`。
+积木公共字段 `id,type,title?`；progress 用 `source:"progress"`（现有目标），curve 用 `source:"metrics",kind:"words"|"commits"`（仅本项目指标）。
+checklist 用 `items:[{text,checked,source?}]`；milestones 用 `items:[{title,date?,done,source?}]`；links 用 `items:[{title,url}]`（HTTP/HTTPS）。
+note 用 `text,source?`（纯文本）；table 用 `columns:[{key,title}],rows:[{字段:字符串或数值}],source?`。
+可选 source 指向本项目内已有相对文件，可用 `STATUS.md#progress` 引用字段；不写表达式或越界路径。HTML 在隔离 iframe 内显示。
+例：`{"title":"写作进度","blocks":[{"id":"goal","type":"progress","source":"progress"},{"id":"next","type":"note","text":"本周写完下一节"}]}`。
