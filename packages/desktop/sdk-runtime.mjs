@@ -6,7 +6,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { KaituError } from "../core/dist/index.js";
 import { assertDesktopIsolation } from "./environment.mjs";
 import { connectionInfo, credentialRef, providerPatch, selection } from "./sdk-providers.mjs";
-import { searchProviders, searchSettings, webRuntimePatch } from "./sdk-search-settings.mjs";
+import {
+  nativeSearchInfo,
+  searchProviders,
+  searchSettings,
+  webRuntimePatch,
+} from "./sdk-search-settings.mjs";
 
 export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
   const web = webRuntimePatch(hostPlugin);
@@ -117,8 +122,11 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
   const searchFile = join(home, "kaitu-search.json");
   const preferredSearch = () =>
     existsSync(searchFile) ? JSON.parse(readFileSync(searchFile, "utf8")).provider : undefined;
-  const describeSearch = async () =>
-    searchSettings((await credential("search-status")).search, preferredSearch());
+  const describeSearch = async () => {
+    const settings = loadSettings();
+    const info = await credential("search-status", { ref: credentialRef(settings.provider) });
+    return searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured));
+  };
   const configureSearch = async (input) => {
     const entry = searchProviders.find((item) => item.id === input?.provider);
     if (!entry) throw new KaituError("请选择网络搜索服务", "AI_CONFIG");
@@ -129,10 +137,8 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       await credential("save", { ref: entry.ref, apiKey: input.apiKey.trim() });
     } else if (!(await credential("status", { ref: entry.ref })).configured)
       throw new KaituError("请先添加这个搜索服务的 API Key", "AI_SEARCH_KEY");
-    if (entry.id !== "deepseek") {
-      mkdirSync(home, { recursive: true, mode: 0o700 });
-      writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
-    }
+    mkdirSync(home, { recursive: true, mode: 0o700 });
+    writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
     return describeSearch();
   };
   return {
@@ -141,7 +147,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       const info = await credential("status", { ref: credentialRef(settings.provider), search: true });
       return {
         ...connectionInfo({ ...settings, configured: settings.choice === "builtin" && info.configured }),
-        search: searchSettings(info.search, preferredSearch()),
+        search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
       };
     },
     async configure(input) {

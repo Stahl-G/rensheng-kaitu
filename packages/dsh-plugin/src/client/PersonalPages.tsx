@@ -33,7 +33,7 @@ export function PersonalPages(
 ) {
   const [calendarPush, setCalendarPush] = useState<CalendarPushSettings | null>(null);
   const [data, setData] = useState<SettingsData | null>(null);
-  const [searchProvider, setSearchProvider] = useState("deepseek");
+  const [searchProvider, setSearchProvider] = useState("perplexity");
   const [searchKey, setSearchKey] = useState("");
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
@@ -168,74 +168,87 @@ export function PersonalPages(
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>网络搜索</h2>
                 <div className={`${css.card} ${css.sum} ${css["sub-form"]}`}>
-                  <b>{search.configured ? `当前使用 ${search.name}` : "还没有网络搜索 Key"}</b>
+                  <b>
+                    {search.native?.configured
+                      ? `使用 ${search.native.name} 自带搜索`
+                      : search.configured
+                        ? `当前使用 ${search.name}`
+                        : "先连接 AI，就能使用它自带的搜索"}
+                  </b>
                   <p className={css.small}>
-                    有 DeepSeek Key 时优先使用，否则使用已添加的 Perplexity 或 Exa，与对话模型无关。
+                    默认把搜索词发给当前对话的服务商，无需另申请搜索 Key，不新增接收方。
                   </p>
-                  {!search.configured && (
+                  {search.native && !search.native.supported && (
                     <p className={css.small}>
-                      在这里添加一个搜索服务的 Key，就能搜索；不加 Key 也能打开公开网页。
+                      {search.native.reason ?? "当前服务尚未接入自带搜索，可在下面添加专门的搜索服务。"}
                     </p>
                   )}
-                  <label className={css.small} htmlFor="search-provider">
-                    搜索服务
-                  </label>
-                  <select
-                    id="search-provider"
-                    value={searchProvider}
-                    disabled={busy}
-                    onChange={(event) => {
-                      setSearchProvider(event.target.value);
-                      setSearchKey("");
-                    }}
-                  >
-                    {search.providers.map((item) => (
-                      <option value={item.id} key={item.id}>
-                        {item.name}
-                        {item.configured ? " · 已保存 Key" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <label className={css.small} htmlFor="search-api-key">
-                    搜索 API Key
-                  </label>
-                  <input
-                    id="search-api-key"
-                    type="password"
-                    autoComplete="off"
-                    value={searchKey}
-                    disabled={busy}
-                    placeholder={selectedSearch?.configured ? "留空保留已存 Key" : "粘贴这个搜索服务的 Key"}
-                    onChange={(event) => setSearchKey(event.target.value)}
-                  />
-                  {selectedSearch && (
-                    <a className={css.link} href={selectedSearch.keyUrl} target="_blank" rel="noreferrer">
-                      去 {selectedSearch.name} 官方申请 Key ↗
-                    </a>
-                  )}
-                  {searchProvider === "deepseek" && (
-                    <p className={css.small}>DeepSeek 的 Key 与 DeepSeek 模型连接共用。</p>
-                  )}
-                  <div className={css["dialog-foot"]}>
-                    {selectedSearch?.configured && (
-                      <button
-                        type="button"
-                        className={`${css.btn} ${css["btn-quiet"]}`}
+                  <details>
+                    <summary className={css.link}>改用专门的搜索服务</summary>
+                    <div className={css["sub-form"]}>
+                      <p className={css.small}>
+                        没有可用的自带搜索时，使用已添加的 Perplexity 或 Exa；搜索词会发给所选服务。
+                      </p>
+                      <label className={css.small} htmlFor="search-provider">
+                        搜索服务
+                      </label>
+                      <select
+                        id="search-provider"
+                        value={searchProvider}
                         disabled={busy}
-                        onClick={() => void saveSearch(true)}
+                        onChange={(event) => {
+                          setSearchProvider(event.target.value);
+                          setSearchKey("");
+                        }}
                       >
-                        移除{searchProvider === "deepseek" ? "共用 " : " "}Key
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={`${css.btn} ${css["btn-primary"]}`}
-                      disabled={busy}
-                      onClick={() => void saveSearch()}
-                    >
-                      保存搜索设置
-                    </button>
-                  </div>
+                        {search.providers.map((item) => (
+                          <option value={item.id} key={item.id}>
+                            {item.name}
+                            {item.configured ? " · 已保存 Key" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <label className={css.small} htmlFor="search-api-key">
+                        搜索 API Key
+                      </label>
+                      <input
+                        id="search-api-key"
+                        type="password"
+                        autoComplete="off"
+                        value={searchKey}
+                        disabled={busy}
+                        placeholder={
+                          selectedSearch?.configured ? "留空保留已存 Key" : "粘贴这个搜索服务的 Key"
+                        }
+                        onChange={(event) => setSearchKey(event.target.value)}
+                      />
+                      {selectedSearch && (
+                        <a className={css.link} href={selectedSearch.keyUrl} target="_blank" rel="noreferrer">
+                          去 {selectedSearch.name} 官方申请 Key ↗
+                        </a>
+                      )}
+                      <div className={css["dialog-foot"]}>
+                        {selectedSearch?.configured && (
+                          <button
+                            type="button"
+                            className={`${css.btn} ${css["btn-quiet"]}`}
+                            disabled={busy}
+                            onClick={() => void saveSearch(true)}
+                          >
+                            移除 Key
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={`${css.btn} ${css["btn-primary"]}`}
+                          disabled={busy}
+                          onClick={() => void saveSearch()}
+                        >
+                          保存搜索设置
+                        </button>
+                      </div>
+                    </div>
+                  </details>
                 </div>
               </section>
             )}

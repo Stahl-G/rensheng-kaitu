@@ -14,6 +14,13 @@ export interface NetworkSearchSettings {
   name: string | null;
   configured: boolean;
   preferred: string;
+  native?: {
+    provider: string | null;
+    name: string;
+    supported: boolean;
+    configured: boolean;
+    reason?: string;
+  };
   providers: { id: string; name: string; configured: boolean; keyUrl: string }[];
 }
 

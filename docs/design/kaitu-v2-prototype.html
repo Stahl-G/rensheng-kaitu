@@ -591,6 +591,16 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
         <p style="color: var(--ink2)">看资料、随手记都不需要 AI。连接之后，开图可以帮你整理记录、排日程、回答关于你自己的问题。</p>
         <button type="button" class="choice" data-choice="own" aria-pressed="true"><span class="radio" aria-hidden="true"></span><span><b>用你已经在用的 AI</b><span>Claude、ChatGPT、Grok 都可以。开图给你一段连接说明，复制给它就行。</span></span></button>
         <button type="button" class="choice" data-choice="built" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span><b>用开图里的 AI</b><span>填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）</span></span></button>
+        <div id="ai-service-demo" hidden>
+          <label>AI 服务 <select id="ai-service"><option>DeepSeek</option><option>OpenAI</option><option>Anthropic Claude</option><option>Gemini</option><option>自定义服务</option></select></label>
+          <div id="ai-custom-demo" hidden>
+            <label>协议 <select><option>Chat Completions</option><option>Responses</option><option>Anthropic Messages</option><option>Gemini</option></select></label>
+            <label>Base URL <input type="url" placeholder="https://api.example.com/v1"></label>
+            <label>模型 ID <input placeholder="服务提供的模型 ID"></label>
+            <label>API Key <input type="password" autocomplete="off" placeholder="服务提供的 Key"></label>
+          </div>
+          <p class="small">搜索默认使用当前对话服务商，无需另申请搜索 Key。</p>
+        </div>
         <div class="dialog-foot">
           <button type="button" class="btn btn-quiet" data-close>以后再说</button>
           <button type="button" class="btn btn-primary" id="ai-next">下一步</button>
@@ -1312,6 +1322,11 @@ function openChannelDemo(index) {
         '<section class="sec" aria-labelledby="h-built"><h2 id="h-built" class="eyebrow">「问问」用的 AI</h2><div class="card list-card"><div class="conn">' +
         '<span class="logo" style="background:var(--explore)">D</span><b>DeepSeek · deepseek-flash</b><span class="small">已连接 · API Key 只存在这台电脑的开图目录里，不会同步到云端</span>' +
         '<span style="display:flex;gap:8px"><button type="button" class="btn btn-quiet" style="height:34px">换模型</button></span></div></div></section>' +
+        '<section class="sec" aria-labelledby="h-search"><h2 id="h-search" class="eyebrow">网络搜索</h2><div class="card sum">' +
+        '<b>使用 DeepSeek 自带搜索</b><p class="small">搜索词发给当前对话的服务商，不新增接收方，无需另申请搜索 Key。</p>' +
+        '<details><summary>改用专门的搜索服务</summary><p class="small">没有可用的自带搜索时，使用另配的 Perplexity 或 Exa。</p>' +
+        '<label>搜索服务 <select><option>Perplexity</option><option>Exa</option></select></label>' +
+        '<label>搜索 API Key <input type="password" autocomplete="off"></label><button type="button" class="btn btn-quiet">保存搜索设置</button></details></div></section>' +
         '<section class="sec" aria-labelledby="h-local"><div class="sec-head"><h2 id="h-local" class="eyebrow">这台电脑上的 AI</h2><span class="small">通过 MCP 直接读写，电脑开着时可用</span></div><div class="card list-card">' + connRows(local) + '</div></section>' +
         '<section class="sec" aria-labelledby="h-cloud"><div class="sec-head"><h2 id="h-cloud" class="eyebrow">云端的 AI</h2><span class="small">通过 Google Drive 里的文件接力，电脑关着也能用</span></div><div class="card list-card">' + connRows(cloud) + '</div>' +
         '<p class="note">云端 AI 也可以走 MCP：开图在本机开一个带密钥的 MCP 地址，你用隧道把它公开出去后填给云端 AI。这种方式只在电脑开着时可用，而且看不到财务明细。</p></section>' +
@@ -1640,6 +1655,9 @@ function openChannelDemo(index) {
     dlg.querySelector('.choice').focus();
   }
   function closeAi() { dlg.hidden = true; if (lastFocus) lastFocus.focus(); }
+  document.getElementById('ai-service').addEventListener('change', function (e) {
+    document.getElementById('ai-custom-demo').hidden = e.target.value !== '自定义服务';
+  });
   document.getElementById('demo-ai').addEventListener('click', function () { state.connected = false; go('ask'); });
   document.getElementById('ai-next').addEventListener('click', function () { s1.hidden = true; s2.hidden = false; document.getElementById('auto-morning').focus(); });
   view.addEventListener('input', function (e) { if (e.target.id === 'ob-text') { state.obText = e.target.value; return; } if (e.target.id === 'ob-bring') { state.obBring = e.target.value; return; } if (e.target.dataset && e.target.dataset.obdraft) { state.obDraft = state.obDraft || {}; state.obDraft[e.target.dataset.obdraft] = e.target.value; return; } if (e.target.dataset && e.target.dataset.obpick) { state.obPick[e.target.dataset.obpick] = e.target.checked; var sv = view.querySelector('[data-ob="save"]'); if (sv) sv.textContent = '记下这 ' + obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length + ' 条'; return; } if (e.target.id === 'map-year') { state.mapYear = +e.target.value; render(); var r = document.getElementById('map-year'); if (r) r.focus(); } });
@@ -1666,6 +1684,7 @@ function openChannelDemo(index) {
     if (e.target === dlg || e.target.closest('[data-close]')) return closeAi();
     var c = e.target.closest('.choice');
     if (c) dlg.querySelectorAll('.choice').forEach(function (x) { x.setAttribute('aria-pressed', String(x === c)); });
+    if (c) document.getElementById('ai-service-demo').hidden = c.dataset.choice !== 'built';
   });
   dlg.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAi(); });
 
