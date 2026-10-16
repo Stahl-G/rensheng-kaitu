@@ -89,6 +89,16 @@ ${instructions}
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
 - 项目改回公开会搬回关联记录的全部修订与删除标记；只在用户明确选择后操作。迁移可在重新打开时继续，既有云端副本须由用户清理。
 - 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。
+
+## 自定义项目视图
+
+可直接写 \`projects/<slug>/view.json\`，或用 MCP \`project_view_write\`（slug、view）；顶层 \`{title?, blocks:[...]}\` 或 \`{title?, html}\`。
+积木公共字段 \`id,type,title?\`；progress 用 \`source:"progress"\`（现有目标），curve 用 \`source:"metrics",kind:"words"|"commits"\`（仅本项目指标）。
+checklist 用 \`items:[{text,checked,source?}]\`；milestones 用 \`items:[{title,date?,done,source?}]\`；links 用 \`items:[{title,url}]\`（HTTP/HTTPS）。
+note 用 \`text,source?\`（纯文本）；table 用 \`columns:[{key,title}],rows:[{字段:字符串或数值}],source?\`。
+可选 source 指向本项目内已有相对文件，可用 \`STATUS.md#progress\` 引用字段；不写表达式或越界路径。HTML 在隔离 iframe 内显示。
+例：\`{"title":"写作进度","blocks":[{"id":"goal","type":"progress","source":"progress"},{"id":"next","type":"note","text":"本周写完下一节"}]}\`。
+
 - 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
 - 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
 - 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。

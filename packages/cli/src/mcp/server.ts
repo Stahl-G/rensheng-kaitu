@@ -37,6 +37,7 @@ import {
   writeAgentRecord,
   writeDigest,
   writeExploration,
+  writeProjectView,
 } from "@kaitu/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -263,6 +264,15 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       return proposeBlock(ws, input, actor());
     },
     true,
+  );
+  server.registerTool(
+    "project_view_write",
+    {
+      description: "写入项目 view.json，按项目视图 schema 校验。",
+      inputSchema: { slug: text, view: z.unknown().describe("项目视图 JSON 对象，blocks 或 html 二选一") },
+      annotations: { readOnlyHint: false },
+    },
+    ({ slug, view }) => wrap(() => writeProjectView(ws, slug, view)),
   );
   register("project_list", "列出项目进度与下一步。", {}, () => listProjects(ws));
   register("project_github", "读取项目 GitHub 快照与同步状态。", { slug: text }, ({ slug }) => {

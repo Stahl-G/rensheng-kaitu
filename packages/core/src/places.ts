@@ -11,6 +11,7 @@ import {
 } from "./experience-imports.js";
 import { experienceInterval, experienceLayer } from "./experience-time.js";
 import { snapshot } from "./history.js";
+import { type Hometown, readHometown } from "./hometown.js";
 import { listRecordTypes } from "./modules.js";
 import {
   type By,
@@ -75,6 +76,7 @@ export interface LifeMapData {
   importsPending: number;
   experiences: Experience[];
   hidden: { item: Experience; revision: number }[];
+  hometown?: Hometown;
 }
 
 let cities: City[] | undefined;
@@ -344,6 +346,7 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   return {
     type: "FeatureCollection",
     asOf,
+    hometown: readHometown(ws),
     features: [...groups.values()],
     review: rows.filter((item) => item.review || !experienceLayer(item, asOf)),
     undated: rows.filter((item) => !experienceInterval(item)).length,

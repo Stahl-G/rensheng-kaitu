@@ -282,8 +282,56 @@ async function writeSample(ws: Workspace, now: Date): Promise<void> {
     kind: "work",
     links: [{ path: repo, role: "repo" }],
   });
-  await setProject(ws, writing.slug, { next: [{ id: "story-next", title: "写完下一节", status: "todo" }] });
+  await setProject(ws, writing.slug, {
+    progress: { label: "初稿", current: 0, target: 10000, unit: "字" },
+    next: [{ id: "story-next", title: "写完下一节", status: "todo" }],
+  });
   await setProject(ws, coding.slug, { next: [{ id: "code-next", title: "整理示例说明", status: "todo" }] });
+  ws.writeJson(`projects/${writing.slug}/view.json`, {
+    title: "我的写作工作台",
+    blocks: [
+      { id: "goal", type: "progress", source: "progress" },
+      { id: "intro", type: "note", title: "本周重点", text: "让故事继续往前走，每天留一点写作时间。" },
+      { id: "curve", type: "curve", title: "手稿字数", source: "metrics", kind: "words" },
+      {
+        id: "tasks",
+        type: "checklist",
+        title: "创作清单",
+        items: [
+          { text: "写下第一章", checked: true },
+          { text: "写完下一节", checked: false },
+        ],
+      },
+      {
+        id: "stages",
+        type: "milestones",
+        title: "创作里程碑",
+        items: [
+          { title: "故事开篇", date: today, done: true },
+          { title: "完成初稿", done: false },
+        ],
+      },
+      {
+        id: "chapters",
+        type: "table",
+        title: "章节计划",
+        columns: [
+          { key: "chapter", title: "章节" },
+          { key: "status", title: "状态" },
+        ],
+        rows: [
+          { chapter: "第一章", status: "已开始" },
+          { chapter: "第二章", status: "构思中" },
+        ],
+      },
+      {
+        id: "reading",
+        type: "links",
+        title: "写作参考",
+        items: [{ title: "示例资料", url: "https://example.com" }],
+      },
+    ],
+  });
   await syncProject(ws, writing.slug, { now });
   await syncProject(ws, coding.slug, { now });
   const issues = validateWorkspace(ws);

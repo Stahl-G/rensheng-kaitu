@@ -60,6 +60,7 @@ import {
   writeAgentRecord,
   writeAgentsMd,
   writeExploration,
+  writeProjectView,
 } from "@kaitu/core";
 import { z } from "zod";
 import type { Context, MutationQueue } from "./dsh.js";
@@ -415,6 +416,12 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     ({ name, country }) => (name ? resolvePlace(name, country) : lifeMap(ws)),
   );
   register(
+    "project_view_write",
+    "写入项目自定义 view.json，按 schema 校验。",
+    z.object({ slug: text, view: z.unknown() }).strict(),
+    ({ slug, view }) => writeProjectView(ws, slug, view),
+  );
+  register(
     "kaitu_projects",
     "项目建档、链接、进度同步和文档读写。链接目录只读。",
     z.discriminatedUnion("operation", [
@@ -482,8 +489,8 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         case "log":
           return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
         case "project-read": {
-          if (!["STATUS.md", "notes.md", "log.md"].includes(input.path))
-            throw new Error("只读取项目状态、笔记和日志");
+          if (!["STATUS.md", "notes.md", "log.md", "view.json"].includes(input.path))
+            throw new Error("只读取项目状态、笔记、日志和视图");
           return { content: ws.readText(`${projectDirectory(ws, input.slug)}/${input.path}`) };
         }
         case "project-write": {
