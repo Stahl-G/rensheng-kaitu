@@ -53,7 +53,8 @@ AI 草稿复用 me/STATUS.md 的 proposed 下一步与 ref，目标和现状放 
 时间保留在记忆正文中，导入日期使用现有 created/updated 字段，不新增数据字段。
 与已有记忆正文完全相同的候选和本批重复项去重。
 
-确认只接受这次预览的候选 ID，记忆调用现有 importMemories；目标写入 me/goals.json（id 前缀为所选 AI），项目用 createProject 并在 notes.md 写来源，方向用 create_direction（用户已在预览确认，by 为 user，动机写「从 X 搬来的记忆」）。同名的目标、项目、方向不重复建。全部在一个 batchSnapshot 里，整批一个版本。
+行尾括号只有像日期时才当作「记下的时间」，「（优先 macOS）」「（取决于孩子入学）」这类条件留在正文里。已有记忆只和要记成记忆的条目去重，同样的话仍可设为目标、项目或方向。
+确认只接受这次预览的候选 ID，记忆调用现有 importMemories；进目标、项目、方向的原文行整段存进 `inbox/notes/done/<日期>/`（kind 为 import），日期和条件都能查回；项目按完整内容判断重复，截短的标题撞名时加序号；目标写入 me/goals.json（id 前缀为所选 AI），项目用 createProject 并在 notes.md 写来源，方向用 create_direction（用户已在预览确认，by 为 user，动机写「从 X 搬来：」加完整原文）。同名的目标、方向不重复建。工作区没有方向模块时，「在考虑」默认记为记忆，确认前先检查，不会写一半报错。全部在一个 batchSnapshot 里，整批一个版本。
 来源为「从 ChatGPT 搬来」等用户所选 AI，预览后的取消勾选不会被重新加入。
 确认时再次剔除已经写入的相同正文。返回 before 和 version，可从历史恢复导入前版本。
 预览令牌 30 分钟后失效，成功后消费，取消时清理暂存。

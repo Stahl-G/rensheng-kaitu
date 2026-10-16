@@ -12,11 +12,11 @@ import {
   readOnboardingMatter,
   recordOnboardingAiConnection,
 } from "./onboarding.js";
-import { goalOrigin, noteLine, readPlans, taskGoal } from "./plans.js";
+import { completedAt, goalOrigin, noteLine, readPlans, taskGoal } from "./plans.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
 import type { Task } from "./tasks.js";
-import { localDate, parseTs } from "./time.js";
+import { localDate } from "./time.js";
 import type { Goal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -251,8 +251,43 @@ export interface HandoverPack {
   text: string;
 }
 
-const clip = (value: string, size = 200) => {
-  const line = singleLine(value);
+/**
+ * 发给外部 AI 前去掉认得出的密钥和本机路径，其余文字照常保留。
+ * 只靠记忆有没有标「敏感」不够：普通记忆、待办和方向里也可能写着 Key 或文件路径。
+ */
+const KEY_PATTERNS = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+  /\b(?:sk|pk|rk)-(?:[a-z]+-)?[A-Za-z0-9_-]{16,}/g,
+  /\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{10,}/g,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
+  /\bAIza[0-9A-Za-z_-]{30,}/g,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g,
+  /\bbearer\s+[A-Za-z0-9._~+/-]{16,}=*/gi,
+];
+/** 「密码是 abc123」「token: …」：只换掉后面像凭据的那一段（至少 6 个可见 ASCII 字符）。 */
+const KEY_ASSIGNMENT =
+  /((?:api[\s_-]?key|access[\s_-]?key|secret|token|password|passwd|pwd|密钥|密码|口令|令牌)\s*(?:[:：=]|是|为)\s*)[!-~]{6,}/gi;
+const PATH_PATTERNS = [
+  /file:\/\/\S+/gi,
+  /(?<![\w.:/~-])(?:~|\/(?:Users|home|root|Volumes|private|var|tmp|opt|etc|mnt|media|Library|Applications|System))\/[^\s，。、；;,)）"'”’]+/g,
+  /(?<![\w])[A-Za-z]:\\[^\s，。、；;,)）"'”’]+/g,
+];
+function redact(text: string, locale: Locale): string {
+  const key = pick(locale, "（密钥已去掉）", "(key removed)");
+  const path = pick(locale, "（本机路径已去掉）", "(local path removed)");
+  let out = text;
+  for (const pattern of KEY_PATTERNS) out = out.replace(pattern, key);
+  out = out.replace(KEY_ASSIGNMENT, (_match, label: string) => `${label}${key}`);
+  for (const pattern of PATH_PATTERNS) out = out.replace(pattern, path);
+  return out;
+}
+
+/** 资料包里的每一行：先去掉密钥和路径，再截短，免得截剩半个 Key。 */
+const clip = (value: string, locale: Locale, size = 200) => {
+  const line = singleLine(redact(value, locale));
   return line.length > size ? `${line.slice(0, size - 1)}…` : line;
 };
 
@@ -284,7 +319,6 @@ function sections(locale: Locale, now: Date, data: ReturnType<typeof handoverDat
   const plans = readPlans(data);
   const since = now.getTime() - 30 * 86400000;
   const tasks = (data.records.task ?? []) as Task[];
-  const recent = (ts: string) => parseTs(ts).getTime() >= since;
   const t = (zh: string, en: string) => pick(locale, zh, en);
   const origin = (id: string) => {
     const value = goalOrigin(id);
@@ -298,26 +332,30 @@ function sections(locale: Locale, now: Date, data: ReturnType<typeof handoverDat
     return t(`（${from}，${value.date}）`, ` (${from}, ${value.date})`);
   };
   const goals = plans.goals.slice(0, 10).map((goal) => {
-    const next = goal.next ? ` · ${clip(t(`下一步：${goal.next.title}`, `next: ${goal.next.title}`))}` : "";
-    return `- ${clip(goal.title)}${origin(goal.id)}${next}`;
+    const next = goal.next
+      ? ` · ${clip(t(`下一步：${goal.next.title}`, `next: ${goal.next.title}`), locale)}`
+      : "";
+    return `- ${clip(goal.title, locale)}${origin(goal.id)}${next}`;
   });
   const directions = (data.records.direction ?? []) as unknown as Direction[];
   const experiments = (data.records.exploration_experiment ?? []) as unknown as ExplorationExperiment[];
+  // 按完成时间算「最近 30 天」并排序：待办的 ts 是创建时间，完成时间记在备注里。
   const results = [
     ...tasks
-      .filter((task) => task.status === "done" && recent(task.ts) && noteLine(task.notes ?? "", "完成结果"))
+      .filter((task) => task.status === "done" && noteLine(task.notes ?? "", "完成结果"))
       .map((task) => ({
-        at: task.ts,
-        line: `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`)}`,
+        at: completedAt(task),
+        line: `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`, locale)}`,
       })),
     ...experiments
-      .filter((item) => item.status === "completed" && item.result && recent(item.updated_at ?? item.ts))
+      .filter((item) => item.status === "completed" && item.result)
       .map((item) => ({
-        at: item.updated_at ?? item.ts,
-        line: `- ${clip(`${item.action}${t("：", ": ")}${item.result}`)}`,
+        at: Date.parse(item.updated_at ?? item.ts),
+        line: `- ${clip(`${item.action}${t("：", ": ")}${item.result}`, locale)}`,
       })),
   ]
-    .sort((a, b) => b.at.localeCompare(a.at))
+    .filter((item) => item.at >= since)
+    .sort((a, b) => b.at - a.at)
     .slice(0, 8)
     .map((item) => item.line);
   const open = tasks
@@ -327,27 +365,28 @@ function sections(locale: Locale, now: Date, data: ReturnType<typeof handoverDat
       const goal = taskGoal(task, data.goals);
       const due = task.due ? t(`（${task.due} 前）`, ` (by ${task.due})`) : "";
       const why = goal ? t(` · 为了：${goal.title}`, ` · for: ${goal.title}`) : "";
-      return `- ${clip(`${task.title}${due}${why}`)}`;
+      return `- ${clip(`${task.title}${due}${why}`, locale)}`;
     });
   const projects = data.projects
     .filter((project) => project.stage === "active")
     .slice(0, 8)
-    .map((project) => `- ${clip(project.title)}`);
+    .map((project) => `- ${clip(project.title, locale)}`);
   const active = directions
     .filter((item) => item.status === "active")
     .slice(0, 6)
     .map(
-      (item) => `- ${clip(item.hypothesis ? `${item.title}${t("：", ": ")}${item.hypothesis}` : item.title)}`,
+      (item) =>
+        `- ${clip(item.hypothesis ? `${item.title}${t("：", ": ")}${item.hypothesis}` : item.title, locale)}`,
     );
   const memories = data.memories.filter((memory) => !memory.sensitive);
   const about = memories
     .filter((memory) => ["preference", "fact", "context"].includes(memory.type))
     .slice(0, 12)
-    .map((memory) => `- ${clip(memory.text)}`);
+    .map((memory) => `- ${clip(memory.text, locale)}`);
   const people = memories
     .filter((memory) => memory.type === "person")
     .slice(0, 6)
-    .map((memory) => `- ${clip(memory.text)}`);
+    .map((memory) => `- ${clip(memory.text, locale)}`);
   return [
     { id: "goals", title: t("正在推进的目标", "Goals I'm working on"), lines: goals, defaultOn: true },
     {
@@ -395,8 +434,8 @@ export function handoverPack(ws: Workspace, localeInput?: Locale, now = new Date
   );
   const excluded = pick(
     locale,
-    "不含：健康记录、财务明细、标为敏感的记忆、密钥和本机文件路径。",
-    "Never included: health records, finance details, memories marked sensitive, keys and local file paths.",
+    "不含健康记录、财务明细和标为敏感的记忆；认得出的密钥和本机文件路径会换成「已去掉」。复制前请再看一眼。",
+    "Never included: health records, finance details and memories marked sensitive. Recognizable keys and local file paths are replaced with “removed”. Take a quick look before copying.",
   );
   const list = sections(locale, now, handoverData(ws, now));
   const pack = { header, sections: list, footer };
@@ -419,7 +458,7 @@ export function directionsPrompt(ws: Workspace, localeInput?: Locale, now = new 
   const avoid = ((data.records.direction ?? []) as unknown as Direction[])
     .filter((item) => item.status !== "active")
     .slice(-20)
-    .map((item) => `- ${clip(item.title)}`);
+    .map((item) => `- ${clip(item.title, locale)}`);
   const extra = avoid.length
     ? [
         {

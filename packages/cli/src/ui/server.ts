@@ -514,23 +514,24 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             const oldRoot = ws.root;
             try {
               await options.onWorkspaceChanging?.();
+              if (!url.pathname.endsWith("enable"))
+                return await disableSync(ws, {
+                  to: typeof data.to === "string" && data.to ? data.to : undefined,
+                });
+              // 只有开启同步才要说明同步方式；关闭沿用原来的 {to}。
               const mode = url.pathname === "/api/drive/enable" ? "drive" : field(data, "mode");
-              if (url.pathname.endsWith("enable") && !["icloud", "drive", "nutstore"].includes(mode))
+              if (!["icloud", "drive", "nutstore"].includes(mode))
                 throw new KaituError("请选择 icloud、drive 或 nutstore", "BAD_ARGS");
-              return url.pathname.endsWith("enable")
-                ? await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
-                    dir:
-                      typeof data.dir === "string" && data.dir
-                        ? data.dir
-                        : typeof data.driveDir === "string" && data.driveDir
-                          ? data.driveDir
-                          : undefined,
-                    name: typeof data.name === "string" ? data.name : undefined,
-                    ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
-                  })
-                : await disableSync(ws, {
-                    to: typeof data.to === "string" && data.to ? data.to : undefined,
-                  });
+              return await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
+                dir:
+                  typeof data.dir === "string" && data.dir
+                    ? data.dir
+                    : typeof data.driveDir === "string" && data.driveDir
+                      ? data.driveDir
+                      : undefined,
+                name: typeof data.name === "string" ? data.name : undefined,
+                ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
+              });
             } finally {
               try {
                 startWatching();

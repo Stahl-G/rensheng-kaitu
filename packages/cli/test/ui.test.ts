@@ -199,3 +199,32 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
     text: "一起回顾我的近期目标",
   });
 });
+
+it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
+  const { ws, ui } = await setup();
+  const post = (path: string, body: unknown) =>
+    fetch(`${ui.url}${path}`, {
+      method: "POST",
+      headers: { "X-Kaitu": "1", Origin: ui.url },
+      body: JSON.stringify(body),
+    });
+  for (const [enable, disable, body] of [
+    ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
+    ["/api/drive/enable", "/api/drive/disable", {}],
+  ] as const) {
+    const folder = mkdtempSync(join(tmpdir(), "kaitu-ui-sync-"));
+    const back = mkdtempSync(join(tmpdir(), "kaitu-ui-back-"));
+    // 放到最前面：先关掉服务（后台存版本），再删目录。
+    cleanup.unshift(async () => {
+      rmSync(folder, { recursive: true, force: true });
+      rmSync(back, { recursive: true, force: true });
+    });
+    const enabled = await post(enable, { ...body, dir: folder });
+    expect(enabled.status).toBe(200);
+    expect((await enabled.json()).mode).toBe("drive");
+    const disabled = await post(disable, { to: join(back, "kaitu") });
+    expect(disabled.status).toBe(200);
+    expect((await disabled.json()).mode).toBe("local");
+    expect(ws.root).toBe(join(back, "kaitu"));
+  }
+});

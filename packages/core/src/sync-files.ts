@@ -6,13 +6,12 @@ import { isICloudPath } from "./sync-location.js";
 
 export function conflictOriginal(root: string, file: string): string | undefined {
   const name = basename(file);
-  const original = name
-    .replace(
-      / (?:\d+|\(\d+\)|\(conflict(?:ed)?(?: copy)?[^)]*\)|\[conflict(?:ed)?(?: copy)?[^\]]*\])(?=(?:\.[^/]*)?$)/i,
-      "",
-    )
-    // 坚果云冲突副本按「-NSConflict…」「-冲突…」识别；命名尚未真机核对，见 HANDOFF §6。
-    .replace(/-(?:NSConflict|冲突)[^/]*?(?=\.[^./]+$|$)/i, "");
+  // 坚果云冲突副本的命名还没真机核对（HANDOFF §6），核对前只认通用写法，不猜「-冲突」之类的后缀，
+  // 否则「沟通-冲突解决」这样的普通名字会被当成副本。
+  const original = name.replace(
+    / (?:\d+|\(\d+\)|\(conflict(?:ed)?(?: copy)?[^)]*\)|\[conflict(?:ed)?(?: copy)?[^\]]*\])(?=(?:\.[^/]*)?$)/i,
+    "",
+  );
   if (original === name) return;
   const path = join(dirname(file), original);
   return existsSync(join(root, path)) || cloudPlaceholder(root, path) ? path : undefined;

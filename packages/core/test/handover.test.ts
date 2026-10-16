@@ -6,6 +6,7 @@ import {
   addGoalNext,
   addMemory,
   addRecord,
+  addTask,
   adoptOnboardingMatter,
   changeOnboardingNext,
   confirmOnboardingMemory,
@@ -125,6 +126,83 @@ it("资料包只带目标、结果、下一步和非敏感记忆；方向建议�
     expect(await pasteDirections(ws, answer, options)).toEqual({ ids: [], skipped: 2 });
     await expect(pasteDirections(ws, "随便聊聊", options)).rejects.toThrow("方向");
     expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("普通记忆里写着 Key 或本机路径时，资料包和方向提示词都去掉它们，其余内容照常带上", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-redact-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const secrets = [
+      "sk-proj-SyntheticKey0123456789abcdef",
+      "Hunter2!synthetic",
+      "/Users/synthetic/Customers/private.csv",
+    ];
+    const preview = previewOnboardingMemory(
+      ws,
+      [
+        `[事实] 我的 OpenAI key 是 ${secrets[0]}`,
+        `[事实] 数据库密码是 ${secrets[1]}`,
+        `[事实] 客户名单在 ${secrets[2]} 里`,
+        "[偏好] 喜欢早上运动",
+        "[目标] 半年内跑完半马",
+      ].join("\n"),
+      "chatgpt",
+      options,
+    );
+    await confirmOnboardingMemory(
+      ws,
+      preview.token,
+      preview.candidates.map((item) => item.id),
+      options,
+    );
+    const pack = handoverPack(ws, "zh-CN");
+    const outbound = [
+      pack.text,
+      directionsPrompt(ws, "zh-CN"),
+      ...pack.sections.flatMap((section) => section.lines),
+    ];
+    for (const text of outbound) for (const secret of secrets) expect(text).not.toContain(secret);
+    expect(pack.text).toContain("（密钥已去掉）");
+    expect(pack.text).toContain("客户名单在 （本机路径已去掉） 里");
+    expect(pack.text).toContain("喜欢早上运动");
+    expect(handoverPack(ws, "en").text).toContain("(key removed)");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("最近 30 天的结果按完成时间算：两个月前定下、今天完成的一步也算，按完成先后排列", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-results-"));
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    ws.writeJson("me/goals.json", [
+      { id: "note-20260801-abc123", title: "半年内跑完半马", status: "active" },
+    ]);
+    const step = (title: string, now: Date) =>
+      addTask(
+        ws,
+        {
+          title,
+          source: "me/goals.json#note-20260801-abc123",
+          notes: "当前目标：半年内跑完半马\n已知现状：\n目标编号：note-20260801-abc123\n",
+        },
+        { now },
+      );
+    const early = (await step("先跑 5 公里", new Date(Date.now() - 60 * 86400000))).record;
+    const fresh = (await step("再跑 8 公里", new Date())).record;
+    await changeOnboardingNext(ws, fresh.id, fresh.rev ?? 1, "complete", "8 公里跑完了");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await changeOnboardingNext(ws, early.id, early.rev ?? 1, "complete", "5 公里补跑完了");
+    const results = handoverPack(ws, "zh-CN").sections.find((section) => section.id === "results")?.lines;
+    expect(results).toEqual(["- 先跑 5 公里：5 公里补跑完了", "- 再跑 8 公里：8 公里跑完了"]);
+    expect((await readOverviewPage(ws)).plans.goals[0]).toMatchObject({
+      results: 2,
+      lastResult: "5 公里补跑完了",
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

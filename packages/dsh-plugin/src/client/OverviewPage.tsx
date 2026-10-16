@@ -503,6 +503,7 @@ function Overview({
               <PlansCard
                 plans={data.plans}
                 addGoalNext={props.addGoalNext}
+                changeNext={props.changeOnboardingNext}
                 refresh={refresh}
                 open={(section) => (section === "projects" ? openRecord("projects") : openSection("explore"))}
               />

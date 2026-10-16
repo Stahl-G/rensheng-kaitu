@@ -2551,6 +2551,13 @@
 .plans summary {
   padding: 12px 0;
 }
+.planNext {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 12px;
+}
 .handover h2 {
   margin: 0;
   font-size: 19px;

@@ -41,6 +41,7 @@ export function HandoverPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [area, setArea] = useState<HTMLTextAreaElement | null>(null);
+  const [pending, setPending] = useState<{ id: string; on: boolean } | null>(null);
   useEffect(() => {
     let active = true;
     void loadHandover(locale)
@@ -56,12 +57,19 @@ export function HandoverPanel({
       active = false;
     };
   }, [loadHandover, locale]);
-  const toggle = (id: string, on: boolean) => {
+  // 用户删改过文字后，换勾选不能悄悄按原始资料重写：删掉的私人内容会回来。
+  const edited = !!pack && text !== compose(pack, include);
+  const apply = (id: string, on: boolean) => {
     if (!pack) return;
     const next = on ? [...include, id] : include.filter((item) => item !== id);
     setInclude(next);
     setText(compose(pack, next));
     setCopied("");
+    setPending(null);
+  };
+  const toggle = (id: string, on: boolean) => {
+    if (edited) setPending({ id, on });
+    else apply(id, on);
   };
   return (
     <section className={`${css.card} ${css["sub-form"]} ${css.handover}`} aria-labelledby="handover-title">
@@ -104,6 +112,28 @@ export function HandoverPanel({
               </label>
             ))}
           </fieldset>
+          {pending && (
+            <div role="alertdialog" aria-labelledby="handover-rebuild" className={css["sub-form"]}>
+              <p id="handover-rebuild" className={css.small}>
+                {t(
+                  "你改过下面的文字。换勾选会按勾选重新生成资料包，你的删改会丢掉。",
+                  "You edited the text below. Changing what to bring rebuilds the pack from your choices and drops your edits.",
+                )}
+              </p>
+              <div className={css["dialog-foot"]}>
+                <button type="button" className={css.link} onClick={() => setPending(null)}>
+                  {t("保留我的修改", "Keep my edits")}
+                </button>
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  onClick={() => apply(pending.id, pending.on)}
+                >
+                  {t("重新生成", "Rebuild")}
+                </button>
+              </div>
+            </div>
+          )}
           <p className={css.small}>{pack.excluded}</p>
           <label htmlFor="handover-text" className={css.small}>
             {t("可以在这里删改后再复制", "You can edit it here before copying")}

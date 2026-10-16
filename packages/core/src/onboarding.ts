@@ -32,6 +32,7 @@ import {
   savePreferences,
 } from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
+import { listRecordTypes } from "./modules.js";
 import { ONBOARDING_EN } from "./onboarding-en.js";
 import { type GoalOrigin, noteLine, upsertGoal } from "./plans.js";
 import { type ProjectInput, createProject, listProjects } from "./projects.js";
@@ -40,6 +41,7 @@ import { schemas } from "./schema.js";
 import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone, localDate } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
+import { ulid } from "./ulid.js";
 import { type Goal, type ModuleStatus, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -410,6 +412,20 @@ export interface MemoryCandidate extends MemoryInput {
   target: OnboardingTarget;
 }
 const withoutPrefix = (line: string) => line.replace(/^(?:[-*+]\s+|\d+[.)、]\s*)/, "").trim();
+/** 行尾括号只有像日期时才当作「记下的时间」；「（优先 macOS）」这类条件留在正文里。 */
+const WHEN = new RegExp(
+  `^(?:(?:记于|记下于|记录于|更新于|截至|约|大约|as of|recorded|saved|noted|updated|around|since)\\s*)?(?:${[
+    "\\d{4}(?:[-/.年]\\d{1,2}(?:[-/.月]\\d{1,2}[日号]?)?月?)?年?",
+    "\\d{1,2}月(?:\\d{1,2}[日号])?",
+    "去年|今年|前年|明年|年初|年中|年底|上个?月|这个?月|本月|下个?月|上周|这周|本周|下周|昨天|今天|前天|最近|刚刚|近期",
+    "\\d+\\s*(?:天|周|个月|年)前",
+    "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?(?:\\s+\\d{1,2},?)?(?:\\s+\\d{4})?",
+    "(?:last|this|next)\\s+(?:week|month|year)",
+    "\\d+\\s+(?:days?|weeks?|months?|years?)\\s+ago",
+    "recently|today|yesterday",
+  ].join("|")})$`,
+  "i",
+);
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
 
 export function parseMemoryPaste(
@@ -418,7 +434,9 @@ export function parseMemoryPaste(
   locale: Locale = "zh-CN",
 ): MemoryCandidate[] {
   if (typeof text !== "string") throw new KaituError("请粘贴记忆文本", "BAD_ARGS");
-  const seen = new Set(existing.map((entry) => withoutPrefix(entry.text.trim())));
+  // 已有记忆只和要记成记忆的条目去重：同样的话也可以设为目标、项目或方向。
+  const known = new Set(existing.map((entry) => withoutPrefix(entry.text.trim())));
+  const seen = new Set<string>();
   return text.split(/\r?\n/).flatMap((line, index) => {
     const original = line.trim();
     if (!original) return [];
@@ -429,6 +447,7 @@ export function parseMemoryPaste(
       : undefined;
     let body = group ? (match?.[2]?.trim() ?? original) : original;
     let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
+    if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
     let content = time ? body.slice(0, time.index).trim() : body;
     if (!content) {
       group = undefined;
@@ -437,9 +456,11 @@ export function parseMemoryPaste(
       time = null;
     }
     const raw = !group;
+    const target: OnboardingTarget = group && "target" in group ? group.target : "memory";
     const key = withoutPrefix(body);
-    if (seen.has(key)) return [];
-    seen.add(key);
+    if (target === "memory" && known.has(key)) return [];
+    if (seen.has(`${target}\0${key}`)) return [];
+    seen.add(`${target}\0${key}`);
     return [
       {
         id: `line-${index + 1}`,
@@ -451,7 +472,7 @@ export function parseMemoryPaste(
         category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
         raw,
         original,
-        target: group && "target" in group ? group.target : "memory",
+        target,
       },
     ];
   });
@@ -648,7 +669,11 @@ export function previewOnboardingMemory(
 ): OnboardingMemoryPreview {
   aiInfo(ai);
   const locale = normalizeLocale(options.locale);
-  const candidates = parseMemoryPaste(text, listMemories(ws), locale);
+  // 旧工作区没有方向模块时，「在考虑」默认记为记忆，确认时不会因为缺模块失败。
+  const directions = listRecordTypes(ws).some((ref) => ref.type === "direction");
+  const candidates = parseMemoryPaste(text, listMemories(ws), locale).map((entry) =>
+    entry.target === "direction" && !directions ? { ...entry, target: "memory" as const } : entry,
+  );
   const token = savePreview(
     ws,
     { kind: "memory", ai, locale, candidates, expires: Date.now() + 30 * 60000 },
@@ -688,6 +713,20 @@ export async function confirmOnboardingMemory(
       source: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
     }));
   const date = localDate(new Date(), ws.timeZone());
+  const routed = chosen.filter((entry) => route(entry) !== "memory");
+  // 先确认能写到方向，再动手写，免得一半写进去一半报错。
+  if (
+    routed.some((entry) => route(entry) === "direction") &&
+    !listRecordTypes(ws).some((ref) => ref.type === "direction")
+  )
+    throw new KaituError(
+      pick(
+        locale,
+        "这个工作区还没有开图（方向）模块。运行 kaitu upgrade 后再搬，或把「在考虑」改为记为记忆",
+        "This workspace has no Explore (directions) module yet. Run kaitu upgrade, or save the “still deciding” lines as memories",
+      ),
+      "BAD_ARGS",
+    );
   const goalsBefore = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json").length : 0;
   const before = (await history(ws, { limit: 1 }))[0]?.oid ?? null;
   let result: { entries: Memory[]; version: string | null } = { entries: [], version: null };
@@ -698,32 +737,68 @@ export async function confirmOnboardingMemory(
     () => pick(locale, `从 ${name} 搬来资料`, `Imported from ${name}`),
     async () => {
       result = await importMemories(ws, inputs, { by: `import:${preview.ai}`, actor: `从 ${name} 搬来：` });
+      // 搬进目标、项目、方向的原文整段留档：括号里的条件和记下的时间都能查回。
+      if (routed.length)
+        ws.writeText(
+          `inbox/notes/done/${date}/${ulid().toLowerCase()}.md`,
+          stringifyFrontmatter(
+            {
+              agent: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
+              date,
+              created: isoInZone(new Date(), ws.timeZone()),
+              kind: "import",
+            },
+            routed.map((entry) => entry.original).join("\n"),
+          ),
+        );
       for (const entry of chosen.filter((item) => route(item) === "goal"))
         upsertGoal(ws, entry.content, preview.ai as GoalOrigin, date);
-      const projectTitles = new Set(listProjects(ws).map((project) => project.title));
+      // 项目按完整内容判断是否重复；标题可以截短，但截短后撞名就加序号，不吞掉另一项。
+      const known = listProjects(ws);
+      const titles = new Set(known.map((project) => project.title));
+      const imported = new Set<string>();
+      const notesOf = (slug: string) =>
+        ws.exists(`projects/${slug}/notes.md`) ? ws.readText(`projects/${slug}/notes.md`) : "";
       for (const entry of chosen.filter((item) => route(item) === "project")) {
-        const title = entry.content.slice(0, 80);
-        if (projectTitles.has(title)) continue;
-        projectTitles.add(title);
+        const full = entry.content;
+        if (imported.has(full)) continue;
+        imported.add(full);
+        const short = full.length > 80 ? `${full.slice(0, 79)}…` : full;
+        // 同名即同一项；截短过的标题（含加了序号的）要再看备注里的完整原文。
+        if (
+          known.some(
+            (project) =>
+              project.title === full ||
+              (short !== full && project.title.startsWith(short) && notesOf(project.slug).includes(full)),
+          )
+        )
+          continue;
+        let title = short;
+        for (let n = 2; titles.has(title); n++) title = `${short}（${n}）`;
+        titles.add(title);
         const { slug } = await createProject(ws, { title, kind: "personal" });
         const notes = `projects/${slug}/notes.md`;
         ws.writeText(
           notes,
-          `${ws.readText(notes).trimEnd()}\n\n${pick(locale, `来源：从 ${name} 搬来（${date}）`, `Source: imported from ${name} (${date})`)}\n\n${entry.content}\n`,
+          `${ws.readText(notes).trimEnd()}\n\n${pick(locale, `来源：从 ${name} 搬来（${date}）`, `Source: imported from ${name} (${date})`)}\n\n${entry.text}\n`,
         );
         projects++;
       }
-      const titles = new Set(readRecords(ws, "direction").map((row) => String(row.title).trim()));
+      const directionTitles = new Set(readRecords(ws, "direction").map((row) => String(row.title).trim()));
       for (const entry of chosen.filter((item) => route(item) === "direction")) {
-        if (titles.has(entry.content)) continue;
-        titles.add(entry.content);
+        if (directionTitles.has(entry.content)) continue;
+        directionTitles.add(entry.content);
         await writeExploration(
           ws,
           {
             operation: "create_direction",
             data: {
               title: entry.content,
-              motivation: pick(locale, `从 ${name} 搬来的记忆`, `Imported from ${name}`),
+              motivation: pick(
+                locale,
+                `从 ${name} 搬来：${entry.text}`,
+                `Imported from ${name}: ${entry.text}`,
+              ),
               hypothesis: "",
             },
           },
@@ -880,9 +955,11 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
   const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
-  const latest = adopted
+  const live = adopted
     .filter((task) => task.status !== "cancelled")
-    .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))[0];
+    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts) || b.id.localeCompare(a.id));
+  // 「现在最该做的一件事」优先给还没做完的；都做完了才显示最近完成的那一步和结果。
+  const latest = live.find((task) => task.status === "open") ?? live[0];
   const items = [
     {
       id: "matter",
@@ -1326,7 +1403,13 @@ export async function changeOnboardingNext(
   let patch: Record<string, unknown>;
   if (action === "complete") {
     if (value.length > 2000 || /[\r\n]/.test(value)) throw new KaituError("请用一句话记录结果", "BAD_ARGS");
-    patch = { status: "done", notes: `${task.notes ?? ""}完成结果：${value.trim()}\n` };
+    // 完成时间写进备注（当地时间，精确到毫秒）：记录的 ts 是创建时间，「最近的结果」要按真正完成的时间排。
+    const now = new Date();
+    const at = isoInZone(now, ws.timeZone()).replace(
+      /(Z|[+-]\d{2}:\d{2})$/,
+      `.${String(now.getMilliseconds()).padStart(3, "0")}$1`,
+    );
+    patch = { status: "done", notes: `${task.notes ?? ""}完成结果：${value.trim()}\n完成时间：${at}\n` };
   } else if (action === "defer" && /^\d{4}-\d{2}-\d{2}$/.test(value)) patch = { due: value };
   else throw new KaituError("操作或日期不合法", "BAD_ARGS");
   const result = updateRecord(ws, "task", id, patch, { by: "user" });

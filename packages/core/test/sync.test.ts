@@ -214,7 +214,7 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
   }
 });
 
-it("坚果云往返：资料进同步文件夹、状态留本机，-NSConflict / -冲突 副本只报告、不进版本", async () => {
+it("坚果云往返：资料进同步文件夹、状态留本机；冲突副本不进版本，「沟通-冲突解决」这类普通名字照常保存", async () => {
   const home = tmp();
   vi.stubEnv("HOME", home);
   vi.stubEnv("KAITU_DIR", "");
@@ -238,7 +238,7 @@ it("坚果云往返：资料进同步文件夹、状态留本机，-NSConflict /
       `---\nagent: ${agent}\nat: ${new Date().toISOString()}\n---\n## 当前下一步\n- 合成下一步\n`;
     ws.writeText("handoffs/relay.md", handoff("retained-agent"));
     await snapshot(ws, "交接");
-    const conflicts = ["handoffs/relay-NSConflict-甲-20261016.md", "handoffs/relay-冲突-1.md"];
+    const conflicts = ["handoffs/relay (conflicted copy 2026-10-16).md", "handoffs/relay 2.md"];
     for (const file of conflicts) writeFileSync(join(ws.root, file), handoff("conflict-agent"));
     const reported = (await doctor(ws)).filter((check) => !check.ok).flatMap((check) => check.files ?? []);
     expect(reported).toEqual(expect.arrayContaining(conflicts));
@@ -246,6 +246,9 @@ it("坚果云往返：资料进同步文件夹、状态留本机，-NSConflict /
     refreshOverview(ws);
     expect(ws.readText("OVERVIEW.md")).not.toContain("conflict-agent");
     ws.writeText("handoffs/relay.md", `${handoff("retained-agent")}\n正常更新\n`);
+    ws.writeText("learning/沟通/notes.md", "# 沟通\n");
+    ws.writeText("learning/沟通-冲突解决/notes.md", "# 冲突解决\n先复述对方的意思\n");
+    expect(ws.scanText("learning/沟通-冲突解决/notes.md")).toContain("先复述对方的意思");
     const oid = await snapshot(ws, "冲突副本不进版本");
     const tracked = await git.listFiles({
       fs,
@@ -254,6 +257,7 @@ it("坚果云往返：资料进同步文件夹、状态留本机，-NSConflict /
       ref: oid as string,
     });
     for (const file of conflicts) expect(tracked).not.toContain(file);
+    expect(tracked).toContain("learning/沟通-冲突解决/notes.md");
     for (const file of conflicts) rmSync(join(ws.root, file));
     await disableSync(ws, { to: join(home, "back") });
     expect(syncStatus(ws)).toMatchObject({ mode: "local", provider: "local" });

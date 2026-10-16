@@ -77,6 +77,12 @@ export function taskGoal(task: Task, goals: Goal[]): Goal | undefined {
     : goals.find((goal) => sameTitle(goal.title, ref.title));
 }
 
+/** 完成时间：备注里的「完成时间」，旧记录没有时退回创建时间。 */
+export function completedAt(task: Task): number {
+  const at = Date.parse(noteLine(task.notes ?? "", "完成时间"));
+  return Number.isFinite(at) ? at : Date.parse(task.ts);
+}
+
 export interface PlanGoal {
   id: string;
   title: string;
@@ -94,7 +100,8 @@ export interface PlansData {
 
 /** 今天页「你带来的规划」：进行中的目标、各自的下一步和已记下的结果。只读已加载的数据。 */
 export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "projects">): PlansData {
-  const goals = data.goals.filter(isOpenGoal);
+  // 只列正在推进的目标；暂停的不算「进行中」。
+  const goals = data.goals.filter((goal) => !goal.status || goal.status === "active");
   const tasks = (data.records.task ?? []) as Task[];
   const byId = new Map(goals.map((goal) => [goal.id, goal]));
   const byTitle = new Map<string, Goal>();
@@ -119,7 +126,9 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
     goals: goals.map((goal) => {
       const own = linked.get(goal.id) ?? [];
       const open = own.filter((task) => task.status === "open").at(-1);
-      const results = own.filter((task) => task.status === "done" && noteLine(task.notes ?? "", "完成结果"));
+      const results = own
+        .filter((task) => task.status === "done" && noteLine(task.notes ?? "", "完成结果"))
+        .sort((a, b) => completedAt(a) - completedAt(b));
       return {
         id: goal.id,
         title: goal.title,

@@ -11,24 +11,46 @@ const AI_NAMES: Record<string, string> = {
   other: "AI",
 };
 
-/** 「你带来的规划」：所有进行中的目标放在一张卡上，每个目标都能直接定下一步。 */
+type Mode = "next" | "complete" | "defer";
+
+/**
+ * 「你带来的规划」：所有进行中的目标放在一张卡上。没有下一步的目标可以直接定一个；
+ * 已有下一步的目标可以直接完成并记一句结果，或改到以后，不只最新的那一步能处理。
+ */
 export function PlansCard({
   plans,
   addGoalNext,
+  changeNext,
   refresh,
   open,
 }: {
   plans: PlansData;
   addGoalNext: (goalId: string, title: string) => Promise<unknown>;
+  changeNext: (id: string, rev: number, action: string, value: string) => Promise<unknown>;
   refresh: () => Promise<void>;
   open: (section: "projects" | "explore") => void;
 }) {
   const t = useT();
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ goal: string; mode: Mode } | null>(null);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!plans.goals.length) return null;
+  const start = (goal: string, mode: Mode, initial = "") => {
+    const same = editing?.goal === goal && editing.mode === mode;
+    setEditing(same ? null : { goal, mode });
+    setValue(initial);
+    setError("");
+  };
+  const save = (goal: PlansData["goals"][number], mode: Mode) =>
+    mode === "next"
+      ? addGoalNext(goal.id, value.trim())
+      : changeNext(
+          goal.next?.id ?? "",
+          goal.next?.rev ?? 1,
+          mode,
+          mode === "complete" ? value.trim() : value,
+        );
   const origin = (goal: PlansData["goals"][number]) => {
     if (!goal.origin) return t("你的目标", "Your goal");
     const date = goal.origin.date.slice(5).replace("-", "/");
@@ -55,33 +77,48 @@ export function PlansCard({
           </span>
         </span>
         {goal.next ? (
-          <span className={css.chip}>
-            {t("下一步：", "Next: ")}
-            {goal.next.title}
+          <span className={css.planNext}>
+            <span className={css.chip}>
+              {t("下一步：", "Next: ")}
+              {goal.next.title}
+              {goal.next.due ? t(` · ${goal.next.due}`, ` · ${goal.next.due}`) : ""}
+            </span>
+            <button
+              type="button"
+              className={css.link}
+              disabled={busy}
+              onClick={() => start(goal.id, "complete")}
+            >
+              {t("完成", "Done")}
+            </button>
+            <button
+              type="button"
+              className={css.link}
+              disabled={busy}
+              onClick={() => start(goal.id, "defer", goal.next?.due ?? "")}
+            >
+              {t("改期", "Later")}
+            </button>
           </span>
         ) : (
           <button
             type="button"
             className={`${css.btn} ${css["btn-quiet"]}`}
             disabled={busy}
-            onClick={() => {
-              setEditing(editing === goal.id ? null : goal.id);
-              setValue("");
-              setError("");
-            }}
+            onClick={() => start(goal.id, "next")}
           >
             {t("定下一步", "Set a next step")}
           </button>
         )}
       </div>
-      {editing === goal.id && (
+      {editing?.goal === goal.id && (
         <form
           className={css["sub-form"]}
           onSubmit={(event) => {
             event.preventDefault();
             setBusy(true);
             setError("");
-            void addGoalNext(goal.id, value.trim())
+            void save(goal, editing.mode)
               .then(async () => {
                 setEditing(null);
                 await refresh();
@@ -90,11 +127,19 @@ export function PlansCard({
               .finally(() => setBusy(false));
           }}
         >
-          <label className={css.small} htmlFor={`goal-next-${goal.id}`}>
-            {t("一个今天或这周就能做的下一步", "One next step you can take today or this week")}
+          <label className={css.small} htmlFor={`goal-${editing.mode}-${goal.id}`}>
+            {editing.mode === "next"
+              ? t("一个今天或这周就能做的下一步", "One next step you can take today or this week")
+              : editing.mode === "complete"
+                ? t(
+                    `「${goal.next?.title ?? ""}」怎么样了？记一句结果`,
+                    `How did “${goal.next?.title ?? ""}” go? One line`,
+                  )
+                : t("安排到哪一天", "Which day")}
           </label>
           <input
-            id={`goal-next-${goal.id}`}
+            id={`goal-${editing.mode}-${goal.id}`}
+            type={editing.mode === "defer" ? "date" : "text"}
             value={value}
             maxLength={2000}
             disabled={busy}
