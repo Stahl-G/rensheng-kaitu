@@ -15,11 +15,13 @@ import {
   type OnboardingMatterSuggestion,
   type OnboardingPath,
   type OnboardingSetupInput,
+  type ProjectGoal,
   type SettingsData,
   type Workspace,
   addCalendarSubscription,
   adoptOnboardingMatter,
   bankNotificationCandidates,
+  bindGithub,
   calendarPushEntries,
   calendarPushStore,
   cancelOnboardingPreview,
@@ -32,6 +34,7 @@ import {
   confirmOnboardingImport,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
+  createProject,
   decideProposal,
   discardFinanceImport,
   dismissNews,
@@ -45,7 +48,6 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
-  listProjects,
   loadFinanceInvestments,
   moveWorkspace,
   onboardingStatus,
@@ -70,6 +72,8 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectPage,
+  readProjectsPage,
   readSettings,
   receiveBankNotification,
   recordOnboardingAiConnection,
@@ -81,16 +85,19 @@ import {
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  saveProjectGoal,
   scheduleNext,
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
+  syncProject,
   tryNews,
   unhideExperience,
   writeExploration,
 } from "@kaitu/core";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
+import { suggestProjectGoal } from "./project-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -98,6 +105,10 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "projectCreate",
+  "projectBindGithub",
+  "projectGoalSave",
+  "projectSync",
   "configureAutomation",
   "configureCalendarPush",
   "retryCalendarPush",
@@ -310,23 +321,20 @@ export async function productRequest(
     case "doing":
       return readDoing(ws);
     case "projects":
-      return listProjects(ws).map((p) => ({
-        ...p,
-        recentLog: p.lastLogDate
-          ? {
-              date: p.lastLogDate,
-              text:
-                p.log
-                  .split(/^##[ \t]+/m)
-                  .find((part) => part.startsWith(p.lastLogDate as string))
-                  ?.split(/\r?\n/)
-                  .slice(1)
-                  .join("\n")
-                  .trim() ?? "",
-            }
-          : null,
-        recent7: { ...p.recent7, commits: p.recent7.commitsRecorded ? p.recent7.commits : null },
-      }));
+      return readProjectsPage(ws);
+    case "projectDetail":
+      return readProjectPage(ws, text(0));
+    case "projectCreate":
+      return createProject(ws, { title: text(0), kind: "personal" });
+    case "projectGoalSuggest":
+      return suggestProjectGoal(ws, text(0), ask);
+    case "projectGoalSave":
+      return saveProjectGoal(ws, text(0), args[1] as ProjectGoal);
+    case "projectBindGithub":
+      await bindGithub(ws, text(0), text(1));
+      return readProjectPage(ws, text(0));
+    case "projectSync":
+      return syncProject(ws, text(0));
     case "experienceSource":
       return readExperienceSource(ws, text(0));
     case "lifeMap":

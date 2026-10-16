@@ -366,7 +366,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         const result =
           method === "openAi"
             ? await openAi()
-            : method.startsWith("ask")
+            : method.startsWith("ask") || method === "projectGoalSuggest"
               ? await productRequest(ws, method, args, options.ask, calendarPush)
               : method === "moveStorage" || method === "restoreVersion"
                 ? await exclusive(async () => {

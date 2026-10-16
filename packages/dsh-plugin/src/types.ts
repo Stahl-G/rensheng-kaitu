@@ -152,6 +152,7 @@ export interface OverviewData {
 }
 
 export interface DoingProject {
+  progress?: { label: string; current: number; target: number; unit?: string } | null;
   slug: string;
   title: string;
   stage: "idea" | "active" | "paused" | "done";
@@ -219,3 +220,12 @@ export type { NewsFeedback } from "@kaitu/core";
 import type { NewsFeedback } from "@kaitu/core";
 
 export type { SettingsData } from "@kaitu/core";
+
+export interface ProjectDetailData extends DoingProject {
+  local_only: boolean;
+  body: string;
+  progress: { label: string; current: number; target: number; unit?: string } | null;
+  logs: { date: string; text: string }[];
+  metrics: { date: string; kind: string; value: number }[];
+  sources: string[];
+}

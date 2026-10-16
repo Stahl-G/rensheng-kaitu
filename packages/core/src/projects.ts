@@ -142,11 +142,14 @@ export function projectStatusFiles(ws: Workspace, publicOnly = false) {
     }
   });
 }
-export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now?: Date } = {}) {
+export function listProjects(
+  ws: Workspace,
+  options: { publicOnly?: boolean; now?: Date; slug?: string } = {},
+) {
   const now = options.now ?? new Date();
   const today = localDate(now, ws.timeZone());
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-  return slugs(ws).flatMap((slug) => {
+  return (options.slug ? [options.slug] : slugs(ws)).flatMap((slug) => {
     const project = readProject(ws, slug);
     if (options.publicOnly && project.data.local_only) return [];
     const store =
@@ -255,7 +258,7 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
   }
   const data: ProjectStatus = {
     ...input,
-    title: input.title.trim(),
+    title: typeof input.title === "string" ? input.title.trim() : "",
     stage: "active",
     local_only: input.local_only ?? false,
     links: input.links ?? [],
@@ -692,6 +695,14 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       } catch (error) {
         issues.push({ path: link.path, message: (error as Error).message });
       }
+    }
+    const progress = project.data.progress;
+    if (progress?.unit === "字" && wordsOk) progress.current = words;
+    if (progress?.unit === "次提交" && reposOk) {
+      const all = readRecords(store, "project_metric").filter(
+        (row) => row.project === slug && row.kind === "commits",
+      );
+      progress.current = all.reduce((sum, row) => sum + Number(row.value), 0);
     }
     project.data.updated = isoInZone(now, tz);
     ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {

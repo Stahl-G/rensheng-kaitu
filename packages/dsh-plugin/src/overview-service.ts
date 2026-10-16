@@ -29,10 +29,12 @@ import {
   type OnboardingSetupPreview,
   type OnboardingSetupResult,
   type OnboardingStatus,
+  type ProjectGoal,
   type SettingsData,
   Workspace,
   addCalendarSubscription,
   adoptOnboardingMatter,
+  bindGithub,
   calendarPushEntries,
   calendarPushStore,
   cancelOnboardingPreview,
@@ -44,6 +46,7 @@ import {
   confirmOnboardingImport,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
+  createProject,
   decideProposal,
   defaultRoot,
   dismissNews,
@@ -54,7 +57,6 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
-  listProjects,
   moveWorkspace,
   onboardingStatus,
   previewExperienceBatch,
@@ -76,6 +78,8 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectPage,
+  readProjectsPage,
   readSettings,
   recoverExperienceImports,
   removeAvatar,
@@ -85,9 +89,11 @@ import {
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  saveProjectGoal,
   scheduleNext,
   setExperienceSource,
   setNewsFeedback,
+  syncProject,
   tryNews,
   unhideExperience,
   writeExploration,
@@ -110,25 +116,8 @@ import type {
   NewsAction,
   NewsData,
   OverviewData,
+  ProjectDetailData,
 } from "./types.js";
-
-function recentLog(log: string, date: string | null) {
-  const section = log
-    .split(/^##[ \t]+/m)
-    .slice(1)
-    .find((part) => part.split(/\r?\n/)[0]?.trim() === date);
-  const text = section
-    ?.split(/\r?\n/)
-    .slice(1)
-    .map((line) =>
-      line
-        .replace(/<!--.*?-->/g, "")
-        .replace(/^\s*[-*+]\s+/, "")
-        .trim(),
-    )
-    .find(Boolean);
-  return date && text ? { date, text } : null;
-}
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -538,49 +527,33 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("projects")
   async projects(): Promise<DoingProject[]> {
-    return listProjects(this.workspace).map(
-      ({ slug, title, stage, kind, next, completion, github, links, log, lastLogDate, recent7 }) => ({
-        slug,
-        title,
-        stage,
-        kind,
-        next,
-        completion,
-        links,
-        recentLog: recentLog(log, lastLogDate),
-        recent7: {
-          words: recent7.words,
-          commits: recent7.commitsRecorded ? recent7.commits : null,
-          daily: recent7.daily,
-        },
-        github: github
-          ? {
-              repo: github.repo,
-              url: github.url,
-              stale: github.stale,
-              problem: github.problem,
-              ok_at: github.ok_at,
-              since: github.since,
-              history: github.history,
-              latest: github.latest
-                ? {
-                    stars: github.latest.stars,
-                    forks: github.latest.forks,
-                    open_issues: github.latest.open_issues,
-                    open_prs: github.latest.open_prs,
-                    default_branch: github.latest.default_branch,
-                    archived: github.latest.archived,
-                    pushed_at: github.latest.pushed_at,
-                    latest_release: github.latest.latest_release,
-                    commits: github.latest.commits,
-                    ci: github.latest.ci,
-                    ts: github.latest.ts,
-                  }
-                : null,
-            }
-          : null,
-      }),
-    );
+    return readProjectsPage(this.workspace);
+  }
+
+  @Remote("projectDetail")
+  async projectDetail(slug: string): Promise<ProjectDetailData> {
+    return readProjectPage(this.workspace, slug);
+  }
+
+  @Remote("projectCreate")
+  async projectCreate(title: string): Promise<{ slug: string }> {
+    return this.write(() => createProject(this.workspace, { title, kind: "personal" }));
+  }
+
+  @Remote("projectGoalSave")
+  async projectGoalSave(slug: string, goal: ProjectGoal): Promise<ProjectDetailData> {
+    return this.write(() => saveProjectGoal(this.workspace, slug, goal));
+  }
+
+  @Remote("projectBindGithub")
+  async projectBindGithub(slug: string, repo: string): Promise<ProjectDetailData> {
+    await bindGithub(this.workspace, slug, repo);
+    return readProjectPage(this.workspace, slug);
+  }
+
+  @Remote("projectSync")
+  async projectSync(slug: string): Promise<void> {
+    await syncProject(this.workspace, slug);
   }
 
   @Remote("doing")

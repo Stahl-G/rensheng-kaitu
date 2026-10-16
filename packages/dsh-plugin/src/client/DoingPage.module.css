@@ -273,3 +273,56 @@
 .empty p {
   color: var(--kt-muted);
 }
+
+.form {
+  display: grid;
+  gap: 12px;
+}
+.form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--kt-muted);
+}
+.form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  color: var(--kt-text);
+  background: var(--kt-card);
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+}
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--kt-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.role {
+  white-space: nowrap;
+}
+.body {
+  white-space: pre-wrap;
+}
+.curve {
+  width: 100%;
+  max-height: 180px;
+  color: var(--kt-projects);
+}

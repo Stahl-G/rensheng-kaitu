@@ -452,6 +452,30 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.unhideExperience(id, revision);
                 if (!result.ok) throw new Error(result.error.message);
               },
+              loadProject: async (slug: string) => {
+                const result = await ctx.remote.kaitu.projectDetail(slug);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              createProject: async (title: string) => {
+                const result = await ctx.remote.kaitu.projectCreate(title);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              bindProjectGithub: async (slug: string, repo: string) => {
+                const result = await ctx.remote.kaitu.projectBindGithub(slug, repo);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              saveProjectGoal: async (slug: string, goal: import("@kaitu/core").ProjectGoal) => {
+                const result = await ctx.remote.kaitu.projectGoalSave(slug, goal);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              syncProject: async (slug: string) => {
+                const result = await ctx.remote.kaitu.projectSync(slug);
+                if (!result.ok) throw new Error(result.error.message);
+              },
               loadProjects: async () => {
                 const result = await ctx.remote.kaitu.projects();
                 if (!result.ok) throw new Error(result.error.message);

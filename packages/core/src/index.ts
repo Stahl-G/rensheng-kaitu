@@ -77,3 +77,5 @@ export * from "./bank-mail.js";
 export { fetchPublicResource } from "./public-fetch.js";
 export { AI_NETWORK_RULES } from "./ai-instructions.js";
 export * from "./system-calendar.js";
+
+export * from "./project-page.js";

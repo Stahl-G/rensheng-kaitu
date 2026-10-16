@@ -1,10 +1,17 @@
+import type { ProjectGoal } from "@kaitu/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { DoingData, DoingProject } from "../types.js";
+import type { DoingData, DoingProject, ProjectDetailData } from "../types.js";
 import css from "./DoingPage.module.css";
 
 export interface DoingPageProps {
   loadProjects: () => Promise<DoingProject[]>;
   loadDoing: () => Promise<DoingData>;
+  loadProject: (slug: string) => Promise<ProjectDetailData>;
+  createProject: (title: string) => Promise<{ slug: string }>;
+  bindProjectGithub: (slug: string, repo: string) => Promise<ProjectDetailData>;
+  saveProjectGoal: (slug: string, goal: ProjectGoal) => Promise<ProjectDetailData>;
+  suggestProjectGoal?: (slug: string) => Promise<ProjectGoal>;
+  syncProject: (slug: string) => Promise<unknown>;
   onPrompt: (text: string) => void;
 }
 const stages = { active: "进行中", paused: "暂停", idea: "想法", done: "完成" };
@@ -25,7 +32,7 @@ function dateLabel(date: string, today: string) {
   return date === yesterday.toISOString().slice(0, 10) ? "昨天" : date.slice(5).replace("-", "/");
 }
 
-function Output({ project }: { project: DoingProject }) {
+export function Output({ project }: { project: DoingProject }) {
   const kind = project.recent7.words !== null ? "words" : "commits";
   const value = project.recent7[kind];
   const unit = kind === "words" ? "字" : "次提交";
@@ -42,7 +49,8 @@ function Output({ project }: { project: DoingProject }) {
         {project.links.length ? (
           project.links.map((link) => (
             <span key={`${link.role}:${link.path}`}>
-              {roles[link.role]}：{link.path}
+              <span className={css.role}>{roles[link.role]}：</span>
+              {link.path}
             </span>
           ))
         ) : (
@@ -76,7 +84,7 @@ function Output({ project }: { project: DoingProject }) {
   );
 }
 
-function Repository({
+export function Repository({
   github,
   today,
   timeZone,
@@ -120,6 +128,11 @@ function Repository({
           )}
         </span>
       </div>
+      <p>
+        最近推送{" "}
+        {latest?.pushed_at ? new Date(latest.pushed_at).toLocaleString("zh-CN", { timeZone }) : "暂无记录"}
+      </p>
+      {github.problem && <p className={css.stale}>GitHub 更新失败，请检查仓库地址或稍后重试。</p>}
       {github.stale && <p className={css.stale}>数据过期 · 上次更新 {updated}</p>}
     </div>
   );
