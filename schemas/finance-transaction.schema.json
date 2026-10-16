@@ -124,6 +124,9 @@
       "type": "string",
       "format": "date-time"
     },
+    "source_status": { "type": ["string", "null"] },
+    "source_direction": { "type": ["string", "null"] },
+    "account_last4": { "type": ["string", "null"], "pattern": "^[0-9]{4}$" },
     "direction_unknown": {
       "type": "boolean"
     },

@@ -78,6 +78,7 @@ ${instructions}
   - 修改：\`kaitu record update <类型> <id> --json '{...}'\`
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
+- 财务流水可选保留 source_status、source_direction、account_last4；退款关联原交易号。银行通知只进入本机待核对候选，不直接记入流水。
 - 健康症状写 \`symptom\`（普通症状填 severity，食欲变化只填 appetite_change）；心理状态写 \`mood\`（七级 valence）；设备心率通知写 \`heart_notification\`，不写日历 event。
 - 地点经历用 MCP \`experience_add\` 或 dsh \`kaitu_add_experience\`，只给城市名和国家代码；计划用 planned，坐标由城市表提供。
 - 方向与实验通过 MCP \`exploration_read\` / \`exploration_write\`（dsh 加 kaitu_ 前缀），修改带预期版本；AI 提议先标 suggested，用户采纳后才是 active。行动完成不自动支持假设。

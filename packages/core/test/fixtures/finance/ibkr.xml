@@ -1,0 +1,3 @@
+<?xml version="1.0"?><FlexQueryResponse><FlexStatements><FlexStatement><Trades>
+<Trade assetCategory="STK" currency="USD" symbol="SYNTH" description="Synthetic security" tradeID="s-ib" tradeDate="2026-10-01" dateTime="2026-10-01,12:00:00 EDT" quantity="2" tradePrice="10" tradeMoney="20" ibCommission="-0.35" ibCommissionCurrency="USD" netCash="-20.35" buySell="BUY" />
+</Trades></FlexStatement></FlexStatements></FlexQueryResponse>

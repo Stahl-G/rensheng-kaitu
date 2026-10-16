@@ -1,11 +1,13 @@
 import {
   type AutomationKey,
+  type BankMail,
   type ExperienceChanges,
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
   KaituError,
   type Workspace,
+  bankNotificationCandidates,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
@@ -16,11 +18,11 @@ import {
   editExperience,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
   hideExperience,
   lifeMap,
   listProjects,
+  loadFinanceInvestments,
   previewExperienceBatch,
   previewFinanceImport,
   readAutomation,
@@ -35,6 +37,7 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  receiveBankNotification,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
@@ -65,6 +68,7 @@ export const productMutations = new Set([
   "setAvatar",
   "removeAvatar",
   "financeImportCommit",
+  "financeNotificationReceive",
 ]);
 
 export async function productRequest(
@@ -193,12 +197,16 @@ export async function productRequest(
     }
     case "removeAvatar":
       return removeAvatar(ws);
+    case "financeNotificationReceive":
+      return receiveBankNotification(ws, args[0] as BankMail);
+    case "financeNotificationCandidates":
+      return bankNotificationCandidates(ws);
     case "financeOverview":
       return financeOverview(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeCashflow":
       return financeCashflow(ws, text(0), text(1), (args[2] ?? undefined) as FinanceViewOptions | undefined);
     case "financeInvestments":
-      return financeInvestments(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
+      return loadFinanceInvestments(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeAccounts":
       return financeAccounts(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeImportPreview": {
@@ -212,7 +220,11 @@ export async function productRequest(
       try {
         return {
           file,
-          preview: previewFinanceImport(ws, file, (args[2] ?? undefined) as FinanceImportOptions | undefined),
+          preview: await previewFinanceImport(
+            ws,
+            file,
+            (args[2] ?? undefined) as FinanceImportOptions | undefined,
+          ),
         };
       } catch (err) {
         discardFinanceImport(ws, file);

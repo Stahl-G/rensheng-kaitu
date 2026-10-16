@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
   type FinanceTransaction,
@@ -69,7 +69,7 @@ it("AC03：GBK 账单预览无写入，跨来源保留候选，重复提交没�
     const file = stageFinanceUpload(ws, "synthetic.csv", bytes);
     const stamps = workspaceFileStamps(ws);
     const versions = await history(ws);
-    const preview = previewFinanceImport(ws, file, { account: id });
+    const preview = await previewFinanceImport(ws, file, { account: id });
     expect(preview).toMatchObject({
       encoding: "gbk",
       added: 2,
@@ -204,7 +204,7 @@ it("持仓导入保留缺值、校验整批、弃用删除原件；升级补模�
       '证券代码,证券名称,持仓数量,市价,币种\r\n000001,"Synthetic, A",3.0000,7.10,人民币\r\n',
     );
     const file = stageFinanceUpload(ws, "holdings.csv", bytes);
-    const preview = previewFinanceImport(ws, file, { account: id });
+    const preview = await previewFinanceImport(ws, file, { account: id });
     expect(preview).toMatchObject({ format: "holdings-csv", encoding: "utf-8", added: 1, errors: [] });
     expect(preview.rows[0]).toMatchObject({
       cost: null,
@@ -212,6 +212,22 @@ it("持仓导入保留缺值、校验整批、弃用删除原件；升级补模�
       quantity: "3.0000",
       security_code: "000001",
     });
+    for (const extension of ["xls", "xlsx"]) {
+      const table = stageFinanceUpload(
+        ws,
+        `holdings.${extension}`,
+        readFileSync(new URL(`./fixtures/finance/holdings.${extension}`, import.meta.url)),
+      );
+      const parsed = await previewFinanceImport(ws, table, { account: id });
+      expect(parsed.rows[0]).toMatchObject({
+        security_code: "000001",
+        quantity: "3.0000",
+        price: "7.10",
+        cost: null,
+      });
+      expect(parsed.errors).toEqual([]);
+      discardFinanceImport(ws, table);
+    }
     const before = await history(ws);
     await commitFinanceImport(ws, file, { account: id });
     expect(await history(ws)).toHaveLength(before.length + 1);
@@ -249,7 +265,7 @@ it("持仓导入保留缺值、校验整批、弃用删除原件；升级补模�
       Buffer.from("证券代码,持仓数量\n000002,1\n000003,invalid\n"),
     );
     const records = readRecords(ws, "finance_holding_snapshot");
-    expect(previewFinanceImport(ws, bad).errors).toHaveLength(1);
+    expect((await previewFinanceImport(ws, bad)).errors).toHaveLength(1);
     await expect(commitFinanceImport(ws, bad, { account: id })).rejects.toThrow();
     expect(readRecords(ws, "finance_holding_snapshot")).toEqual(records);
     discardFinanceImport(ws, bad);

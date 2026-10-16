@@ -26,7 +26,10 @@
     "fflate": "^0.8.3",
     "ical.js": "^2.2.1",
     "isomorphic-git": "^1.27.0",
+    "read-excel-file": "9.3.12",
     "saxes": "^6.0.0",
+    "xls-reader": "0.7.0",
+    "yahoo-finance2": "4.0.3",
     "yaml": "^2.6.0",
     "zod": "^4.6.7"
   },

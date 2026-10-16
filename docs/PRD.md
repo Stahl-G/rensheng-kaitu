@@ -377,6 +377,12 @@ Apple 健康导入中，症状与心率通知按 kind + UTC 时刻去重，心�
 手机发送的 symptom_* / state_of_mind / heart_notification 字符串样本映射到上述记录，使用空单位。
 普通症状与食欲变化的字段互斥；未知类型或非法值保留整份原件为待整理笔记，不导入文件的部分内容。
 
+#### 财务流水补充（2026-10-16 用户批准）
+
+finance_transaction 可选保留 source_status（来源交易状态）、source_direction（来源原始收支方向）、
+account_last4（本方银行卡尾四位，四位数字或 null）；原交易号仍用 original_source_transaction_id，金额仍为带方向十进制字符串。
+银行通知候选只存本机状态目录，不作为 finance_transaction，不进入现金流；与账单唯一匹配后关联，歧义继续保留候选。
+
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。
 
 ---

@@ -2,14 +2,16 @@ import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
   Workspace,
+  bankNotificationCandidates,
   commitFinanceImport,
   defaultRoot,
   discardFinanceImport,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
+  loadFinanceInvestments,
   previewFinanceImport,
+  receiveBankNotification,
   stageFinanceUpload,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
@@ -20,7 +22,10 @@ import type {
   FinanceImportCommitData,
   FinanceImportPreviewData,
   FinanceInvestmentsData,
+  FinanceNotificationCandidatesData,
+  FinanceNotificationReceiveData,
   FinanceOverviewData,
+  FinanceRemoteBankMail,
   FinanceRemoteCommitOptions,
   FinanceRemoteImportOptions,
   FinanceRemoteViewOptions,
@@ -42,6 +47,14 @@ export class KaituFinanceService extends TypertRemoteService {
     super(ctx, "kaituFinance");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot(), { maintain: false });
   }
+  @Remote("financeNotificationReceive")
+  async financeNotificationReceive(mail: FinanceRemoteBankMail): Promise<FinanceNotificationReceiveData> {
+    return this.write(async () => receiveBankNotification(this.workspace, mail));
+  }
+  @Remote("financeNotificationCandidates")
+  async financeNotificationCandidates(): Promise<FinanceNotificationCandidatesData> {
+    return bankNotificationCandidates(this.workspace);
+  }
   @Remote("financeOverview")
   async financeOverview(options?: FinanceRemoteViewOptions): Promise<FinanceOverviewData> {
     return financeOverview(this.workspace, options);
@@ -56,7 +69,7 @@ export class KaituFinanceService extends TypertRemoteService {
   }
   @Remote("financeInvestments")
   async financeInvestments(options?: FinanceRemoteViewOptions): Promise<FinanceInvestmentsData> {
-    return financeInvestments(this.workspace, options);
+    return loadFinanceInvestments(this.workspace, options);
   }
   @Remote("financeAccounts")
   async financeAccounts(options?: FinanceRemoteViewOptions): Promise<FinanceAccountsData> {
@@ -75,7 +88,7 @@ export class KaituFinanceService extends TypertRemoteService {
       throw new Error("上传内容不是有效的 base64 或超过大小限制");
     const file = stageFinanceUpload(this.workspace, name, Buffer.from(base64, "base64"));
     try {
-      return { file, preview: previewFinanceImport(this.workspace, file, options) };
+      return { file, preview: await previewFinanceImport(this.workspace, file, options) };
     } catch (error) {
       discardFinanceImport(this.workspace, file);
       throw error;
@@ -95,6 +108,7 @@ export class KaituFinanceService extends TypertRemoteService {
     discardFinanceImport(this.workspace, file);
   }
   private assertUpload(file: string): void {
-    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.csv$/.test(file)) throw new Error("无效的财务上传文件");
+    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file))
+      throw new Error("无效的财务上传文件");
   }
 }

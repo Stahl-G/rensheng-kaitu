@@ -1,13 +1,16 @@
 import type {
+  BankMail,
   FinanceImportOptions,
   FinanceViewOptions,
+  bankNotificationCandidates,
   commitFinanceImport,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
+  loadFinanceInvestments,
   previewFinanceImport,
   readHealthPage,
+  receiveBankNotification,
 } from "@kaitu/core";
 export type HealthData = ReturnType<typeof readHealthPage>;
 export type {
@@ -197,8 +200,15 @@ export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {
 }
 export type FinanceOverviewData = ReturnType<typeof financeOverview>;
 export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
-export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
+export type FinanceInvestmentsData = Awaited<ReturnType<typeof loadFinanceInvestments>>;
 export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
-export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
+export type FinanceImportPreviewData = {
+  file: string;
+  preview: Awaited<ReturnType<typeof previewFinanceImport>>;
+};
 export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;
 export type { MeGoal, MeRules, MeData } from "@kaitu/core";
+
+export interface FinanceRemoteBankMail extends BankMail {}
+export type FinanceNotificationReceiveData = ReturnType<typeof receiveBankNotification>;
+export type FinanceNotificationCandidatesData = ReturnType<typeof bankNotificationCandidates>;
