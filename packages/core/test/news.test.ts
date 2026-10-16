@@ -154,27 +154,30 @@ it("试一下生成待确认的下一步，不相关只影响该条新闻并保�
   }
 });
 
-it("缺摘要的 Agent 新闻转待整理，并保留缺失字段原因", async () => {
+it("Agent 新闻只交标题和链接也收下：发布方按网址补，via 记成交来的 Agent", async () => {
   const ws = await freshWorkspace();
   try {
     ws.writeText(
-      "inbox/agents/incomplete.news.jsonl",
+      "inbox/agents/grok-bot-20261017T0647.news.jsonl",
       `${JSON.stringify({
         type: "news_item",
-        agent: "grok",
-        via: "grok",
-        title: "合成新闻",
-        url: "https://example.com/incomplete",
-        source: "合成来源",
-        details: ["第一点", "第二点", "第三点"],
-        comment: "值得关注。",
-        published_at: "2026-10-15T06:00:00+08:00",
+        agent: "grok-bot",
+        title: "合成新闻：本地人生档案 App 上架",
+        url: "https://www.example.com/life-archive",
+        summary: "免费，全部在手机本地处理。",
       })}\n`,
     );
     const result = await processInbox(ws, { stableMs: 0 });
-    expect(readRecords(ws, "news_item")).toEqual([]);
-    expect(result.notes).toHaveLength(1);
-    expect(ws.readText(result.notes[0] as string)).toContain("缺少字段 summary");
+    expect(result.notes).toEqual([]);
+    expect(readRecords(ws, "news_item")).toMatchObject([
+      {
+        source: "example.com",
+        via: "grok",
+        kind: "article",
+        status: "new",
+        summary: "免费，全部在手机本地处理。",
+      },
+    ]);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

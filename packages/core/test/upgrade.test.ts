@@ -46,6 +46,7 @@ it("旧模板升级补类型和模块、覆盖内置技能，保留用户内容�
     original.writeJson("health/module.json", health);
     rmSync(original.resolve("projects"), { recursive: true });
     rmSync(original.resolve("inbox/health"), { recursive: true });
+    rmSync(original.resolve("feed/COLLECT.md"));
     const config = original.readJson<Record<string, unknown>>(".kaitu/config.json");
     config.template_version = undefined;
     original.writeJson(".kaitu/config.json", config, { internal: true });
@@ -72,6 +73,8 @@ it("旧模板升级补类型和模块、覆盖内置技能，保留用户内容�
     expect(upgraded.checks?.filter((check) => !check.ok)).toEqual([]);
     expect(await history(ws)).toHaveLength(beforeHistory.length + 1);
     expect(ws.readJson<ModuleDef>("me/module.json").name).toBe(me.name);
+    // 资讯采集规则补进资讯文件夹，不只在隐藏的技能目录里。
+    expect(ws.readText("feed/COLLECT.md")).toContain("# 资讯采集规则");
     const after = ws.readJson<ModuleDef>("health/module.json");
     expect(after.agent).toEqual(health.agent);
     expect(after.visibility).toBe(health.visibility);

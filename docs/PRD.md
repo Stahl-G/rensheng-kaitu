@@ -369,7 +369,7 @@ trend 新增 summary、samples（结构同 post 的代表性原帖数组）、di
 news_item 的 via 非 rss/user 时，summary、details、comment、published_at 必填且非空；
 x_post 必须有 post.url，release 必须有 version，paper 必须有非空 authors。
 读不到全文时摘要须注明「只读到标题和导语」。不合格行按现有收件箱规则转待整理笔记，并写明缺失字段。
-所有采集遵守 `.agents/skills/collect-news/SKILL.md`：数字、引语、图片来自原文，图片只存 URL、不下载，事实与看法分开。
+所有采集遵守工作区的 `feed/COLLECT.md`（技能 collect-news 指向它）：数字、引语、图片来自原文，图片只存 URL、不下载，事实与看法分开。
 只有能读取 X 的 Agent（如 Grok）采集 X，其他 Agent 跳过，不得编造。
 
 2026-10-16 经用户批准扩展健康记录：symptom / mood / heart_notification 继承记录公共字段，按 ts 的本地月份存储。

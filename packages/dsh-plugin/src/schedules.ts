@@ -89,7 +89,7 @@ export const defaultSchedules = [
     title: "开图资讯搜索",
     time: "08:00:00",
     prompt:
-      "使用 collect-news 技能，按 feed/feeds.json 中用户已确认的 keywords 搜索近期资讯，结合目标和项目判断关联；没有关注方向时请用户先设置。保留原始来源与发布时间，按链接去重。只投递有实际关联的新资料，没有新结果就不生成报告。",
+      "按开图 feed/COLLECT.md 的采集规则，围绕 feed/feeds.json 中用户已确认的 keywords 搜索近期资讯，结合目标和项目判断关联；没有关注方向时请用户先设置。保留原始来源与发布时间，按链接去重，只投递有实际关联的新资料。结束前留交接记录，没有新结果也写一句。",
   },
 ] as const;
 

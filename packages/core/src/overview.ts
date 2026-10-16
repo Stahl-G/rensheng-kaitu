@@ -59,10 +59,9 @@ ${INBOX_FORMATS}
 
 ## 资讯投递
 
-先读 [collect-news](.agents/skills/collect-news/SKILL.md)，所有 Agent 遵守通用规则，再按来源补充采集。
-Agent 新闻必填 summary、details、comment、published_at；X 仅由能读取 X 的 Agent 采集，其他 Agent 跳过。
-news_item 的 kind 缺省 article；X 热门用 trend.samples 放原帖，posts 仍为数量。
-可交 *.news.jsonl 或 *.records.jsonl，缺字段转待整理并注明原因。
+采集规则在 [feed/COLLECT.md](feed/COLLECT.md)，关注方向在 feed/feeds.json，采集前先读这两个文件。
+新闻只有 title、url 是硬要求，summary、details、comment、published_at、relevance 尽量交全；X 仅由能读取 X 的 Agent 采集。
+可交 *.news.jsonl 或 *.records.jsonl；采集结束前留交接记录，没有新结果也写一句。
 
 ## 记录格式
 

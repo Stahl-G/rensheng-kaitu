@@ -81,25 +81,19 @@ async function prepare(ws: Workspace, file: string, text: string) {
         }
         const reference = recordReference(ws, type);
         const fields = [...reference.required, ...reference.optional].map((field) => field.name);
-        if (fields.includes("source") && data.source === undefined) {
+        const news = type === "news_item" || type === "trend";
+        // 新闻的 source 是发布方，不是 Agent；没写时由开图按网址补。via 没写就记成交来的 Agent。
+        if (fields.includes("source") && data.source === undefined && !news) {
           const source = agent ?? fileAgent;
           data.source = typeof source === "string" && source.trim() ? source.trim() : "cloud-agent";
         }
+        if (news && data.via === undefined) data.via = agent ?? fileAgent ?? "agent";
         if (data.ts !== undefined && typeof data.ts !== "string")
           throw new KaituError("ts 必须是带时区偏移的字符串", "BAD_INBOX");
         if (data.ts === undefined && data.date !== undefined) {
           data.ts = isoInZone(localTimeToInstant(`${data.date}T12:00:00`, ws.timeZone()), ws.timeZone());
         }
         const { date: _date, ...withoutDate } = data;
-        // 采集规范（collect-news）只约束新投递的 Agent 新闻；已入库的旧新闻不受影响。
-        if (type === "news_item" && !["rss", "user"].includes(String(data.via))) {
-          const missing = ["summary", "details", "comment", "published_at"].filter(
-            (key) =>
-              data[key] === undefined || data[key] === "" || (Array.isArray(data[key]) && !data[key].length),
-          );
-          if (missing.length)
-            throw new KaituError(`缺少字段 ${missing.join("、")}（见 collect-news 技能）`, "BAD_INBOX");
-        }
         const record = fields.includes("date") ? data : withoutDate;
         if (["experience_source", "experience_batch"].includes(type))
           throw new KaituError("收件箱只提交经历，来源与批次由开图管理", "BAD_INBOX");

@@ -75,6 +75,15 @@ function validatorFor(ws: Workspace, ref: RecordTypeRef) {
   return schemas().forModule(ref.module.def.id, join(ws.root, ref.module.dir), ref.def.schema);
 }
 
+/** 新闻没写发布方时用网址的域名，如 www.theverge.com → theverge.com。 */
+function publisher(url: unknown): string | undefined {
+  try {
+    return new URL(String(url)).hostname.replace(/^www\./, "") || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
   const out = { ...data };
   for (const k of RESERVED) delete out[k];
@@ -127,7 +136,10 @@ export function addRecords(
       ts,
       by: opts.by ?? "agent",
       ...rest,
-      ...(type === "news_item" ? { kind: rest.kind ?? "article", status: "new" } : {}),
+      ...(news && rest.via === undefined ? { via: "agent" } : {}),
+      ...(type === "news_item"
+        ? { kind: rest.kind ?? "article", status: "new", source: rest.source ?? publisher(rest.url) }
+        : {}),
     };
     validateRecord(ws, ref, record);
     if (news) {

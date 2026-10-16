@@ -67,7 +67,7 @@ export function NewsRules(props: NewsRulesProps) {
           onClick={() => {
             if (!props.suggest) {
               props.onPrompt(
-                "请按 collect-news 技能，读取我的目标、项目、方向、所在地、当前关注方向和资讯反馈，提出 5–10 个关注关键词。只在对话里给草稿，不修改采集规则。我会复制到资讯的采集规则，查看差异后确认保存。",
+                "请按开图 feed/COLLECT.md 的采集规则，读取我的目标、项目、方向、所在地、当前关注方向和资讯反馈，提出 5–10 个关注关键词。只在对话里给草稿，不修改采集规则。我会复制到资讯的采集规则，查看差异后确认保存。",
               );
               return;
             }
