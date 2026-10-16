@@ -1,0 +1,92 @@
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  box-sizing: border-box;
+  padding: 24px;
+  border: 1px solid var(--kt-control);
+  border-radius: 16px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  box-shadow: var(--kt-shadow);
+}
+.dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+.dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.hint {
+  margin: 8px 0 18px;
+  color: var(--kt-secondary);
+  font-size: 13px;
+}
+.viewport {
+  position: relative;
+  height: min(340px, 45vh);
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--kt-control);
+}
+.cropArea {
+  /* biome-ignore lint/correctness/noUnknownProperty: Keep DSH's global corners from reshaping the circle. */
+  corner-shape: round;
+}
+.loading {
+  display: grid;
+  height: 100%;
+  margin: 0;
+  place-items: center;
+  color: var(--kt-secondary);
+}
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px 0;
+  font-size: 13px;
+}
+.zoom input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--kt-accent);
+}
+.error {
+  color: var(--kt-me-ink);
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.actions button {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--kt-control);
+  color: var(--kt-text);
+  cursor: pointer;
+}
+.actions .save {
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+}
+.actions button:hover {
+  filter: brightness(0.92);
+}
+.actions button:active {
+  transform: translateY(1px);
+}
+.dialog :focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 3px;
+}
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+  filter: none;
+}

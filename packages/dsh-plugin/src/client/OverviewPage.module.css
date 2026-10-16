@@ -908,11 +908,46 @@ body[data-ds-dark-theme] .page {
   position: relative;
   color: var(--kt-text);
 }
+.accountAvatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  list-style: none;
+  border-radius: 50%; /* biome-ignore lint/correctness/noUnknownProperty: dsh requires round markers. */
+  corner-shape: round;
+  background: var(--kt-me-tint);
+  color: var(--kt-me-ink);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.accountAvatar::-webkit-details-marker {
+  display: none;
+}
+.accountAvatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.accountAvatar:hover {
+  opacity: 0.85;
+}
+.accountAvatar:active {
+  transform: scale(0.96);
+}
+.accountAvatar:focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 3px;
+}
 .personalMenu > div {
   position: absolute;
   z-index: 4;
   right: 0;
-  top: 30px;
+  top: calc(100% + 8px);
   width: 180px;
   padding: 8px;
   display: grid;

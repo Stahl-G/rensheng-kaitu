@@ -157,7 +157,19 @@ export function OverviewPage(props: OverviewPageProps) {
     setDraft(text);
     setView(props.renderAsk ? "ask" : "connections");
   };
-  const childProps = { ...props, onPrompt: prompt };
+  const childProps = {
+    ...props,
+    onPrompt: prompt,
+    setAvatar: async (base64: string) => {
+      const avatar = await props.setAvatar(base64);
+      setPersonal((current) => (current ? { ...current, avatar } : current));
+      return avatar;
+    },
+    removeAvatar: async () => {
+      await props.removeAvatar();
+      setPersonal((current) => (current ? { ...current, avatar: null } : current));
+    },
+  };
   const togglePin = (id: string) => {
     const next = pins.includes(id) ? pins.filter((p) => p !== id) : [...pins, id];
     setPins(next);
@@ -276,7 +288,17 @@ export function OverviewPage(props: OverviewPageProps) {
               </button>
             </details>
             <details className={css.personalMenu}>
-              <summary>{personal?.name || "个人与设置"}</summary>
+              <summary
+                className={css.accountAvatar}
+                aria-label="个人与设置"
+                title={personal?.name || "个人与设置"}
+              >
+                {personal?.avatar ? (
+                  <img src={personal.avatar} alt="" />
+                ) : (
+                  Array.from(personal?.name?.trim() || "?")[0]?.toUpperCase()
+                )}
+              </summary>
               <div>
                 <button type="button" onClick={() => setView("profile")}>
                   个人档案

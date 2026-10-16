@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MeData, MeRules } from "../types.js";
+import { AvatarCropDialog } from "./AvatarCropDialog.js";
 import css from "./MePage.module.css";
-import { avatarBase64 } from "./avatar.js";
 
 export interface MePageProps {
   loadMe: () => Promise<MeData>;
@@ -67,6 +67,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
   const [data, setData] = useState<MeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [expanded, setExpanded] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
@@ -93,15 +94,12 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const changeAvatar = async (file?: File) => {
-    if (!file) return;
+  const changeAvatar = async (base64: string) => {
     setBusy(true);
     setError(null);
     try {
-      const avatar = await setAvatar(await avatarBase64(file));
+      const avatar = await setAvatar(base64);
       setData((d) => (d ? { ...d, avatar } : d));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }
@@ -120,6 +118,9 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
   };
   return (
     <div className={css.page} aria-busy={(!data && !error) || busy}>
+      {cropFile && (
+        <AvatarCropDialog file={cropFile} onSave={changeAvatar} onCancel={() => setCropFile(null)} />
+      )}
       {error && (
         <p className={css.notice} role="alert">
           {error}{" "}
@@ -139,7 +140,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
               accept="image/jpeg,image/png,image/webp"
               hidden
               onChange={(e) => {
-                void changeAvatar(e.target.files?.[0]);
+                setCropFile(e.target.files?.[0] ?? null);
                 e.target.value = "";
               }}
             />
@@ -153,7 +154,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
               {data.avatar ? (
                 <img src={data.avatar} alt="你的头像" />
               ) : (
-                Array.from(data.name ?? "?")[0]?.toUpperCase()
+                Array.from(data.name?.trim() || "?")[0]?.toUpperCase()
               )}
               <span className={css.camera} aria-hidden="true">
                 <svg
@@ -184,7 +185,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
                 </button>
               )}
               <span className={css.hint}>
-                {busy ? "正在保存头像…" : "点头像可更换 · JPG / PNG · 只存在本机"}
+                {busy ? "正在保存头像…" : "点头像可更换 · JPG / PNG / WebP · 只存在本机"}
               </span>
             </div>
           </section>
