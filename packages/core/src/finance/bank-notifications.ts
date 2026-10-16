@@ -1,8 +1,10 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { readRecords } from "../records.js";
 import { isoInZone, localTimeToInstant, parseTs } from "../time.js";
 import { ulid } from "../ulid.js";
-import type { Workspace } from "../workspace.js";
+import { type Workspace, stateDirectory } from "../workspace.js";
 import { abs, decimal, equal, neg } from "./decimal.js";
 import type { FinanceTransaction } from "./types.js";
 
@@ -27,7 +29,12 @@ export interface BankNotificationCandidate extends BankNotification {
   id: string;
   transaction_id: string | null;
 }
-const file = ".kaitu/finance-notifications.json";
+// 待核对的银行通知只存本机状态目录，不进同步盘。
+const save = (ws: Workspace, rows: BankNotificationCandidate[]) => {
+  mkdirSync(dirname(file(ws)), { recursive: true });
+  writeFileSync(file(ws), `${JSON.stringify(rows, null, 2)}\n`, { mode: 0o600 });
+};
+const file = (ws: Workspace) => join(stateDirectory(ws.root), "finance-notifications.json");
 
 export function parseBankNotification(mail: BankMail): BankNotification | null {
   try {
@@ -113,7 +120,9 @@ export function parseBankNotification(mail: BankMail): BankNotification | null {
   }
 }
 function savedCandidates(ws: Workspace): BankNotificationCandidate[] {
-  return ws.exists(file) ? ws.readJson<BankNotificationCandidate[]>(file) : [];
+  return existsSync(file(ws))
+    ? (JSON.parse(readFileSync(file(ws), "utf8")) as BankNotificationCandidate[])
+    : [];
 }
 function key(c: BankNotification) {
   return JSON.stringify([c.bank, c.account_last4, c.currency, c.amount, c.ts, c.counterparty]);
@@ -147,10 +156,10 @@ export function bankNotificationCandidates(ws: Workspace, asOf?: string): BankNo
   );
 }
 export function refreshBankNotificationMatches(ws: Workspace): void {
-  if (!ws.exists(file)) return;
+  if (!existsSync(file(ws))) return;
   const old = savedCandidates(ws);
   const matched = bankNotificationCandidates(ws);
-  if (!isDeepStrictEqual(old, matched)) ws.writeJson(file, matched, { internal: true, mode: 0o600 });
+  if (!isDeepStrictEqual(old, matched)) save(ws, matched);
 }
 export function receiveBankNotification(ws: Workspace, mail: BankMail) {
   const parsed = parseBankNotification(mail);
@@ -166,7 +175,7 @@ export function receiveBankNotification(ws: Workspace, mail: BankMail) {
   const candidate: BankNotificationCandidate = { ...parsed, id: ulid(), transaction_id: null };
   rows.push(candidate);
   const matched = matchCandidates(rows, readRecords(ws, "finance_transaction") as FinanceTransaction[]);
-  ws.writeJson(file, matched, { internal: true, mode: 0o600 });
+  save(ws, matched);
   return {
     recognized: true,
     added: true,
