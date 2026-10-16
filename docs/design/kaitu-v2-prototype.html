@@ -16,7 +16,8 @@
   --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
   --radius: 14px;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+@media (prefers---brand-fold0: #4C8E99; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #102E35;
+  color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
   --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #8FB0F5;
   --primary: #4C7BE6; --on-primary: #FFFFFF; --strong: #ECEBE8; --on-strong: #171716;
@@ -24,6 +25,7 @@
   --health-tint: #1C3226; --health-ink: #8FD3AC; --doing-tint: #2A2547; --doing-ink: #B9AFF5;
   --explore-tint: #1E2A45; --explore-ink: #A9C1F7; --news-tint: #3A2A12; --news-ink: #EBC27F;
   --finance-tint: #173333; --finance-ink: #8ED1D1; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E; --map-sea: #1A1C1D; --map-dot: #343D36;
+  --brand-fold0: #4C8E99; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #102E35;
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
@@ -33,6 +35,7 @@
   --health-tint: #1C3226; --health-ink: #8FD3AC; --doing-tint: #2A2547; --doing-ink: #B9AFF5;
   --explore-tint: #1E2A45; --explore-ink: #A9C1F7; --news-tint: #3A2A12; --news-ink: #EBC27F;
   --finance-tint: #173333; --finance-ink: #8ED1D1; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E; --map-sea: #1A1C1D; --map-dot: #343D36;
+  --brand-fold0: #4C8E99; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #102E35;
   color-scheme: dark }
 
 * { box-sizing: border-box }
@@ -54,6 +57,11 @@ h1, h2, h3 { text-wrap: balance }
 .demo button[aria-pressed="true"] { border-style: solid; border-color: var(--ink); color: var(--ink); background: var(--surface) }
 
 .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg); border-bottom: 1px solid var(--line) }
+.brand-mark path[fill="#0F4C5C"] { fill: var(--brand-fold0, #0F4C5C); stroke: var(--brand-fold0, #0F4C5C) }
+.brand-mark path[fill="#2E7F86"] { fill: var(--brand-fold1, #2E7F86); stroke: var(--brand-fold1, #2E7F86) }
+.brand-mark path[fill="#9FD3CF"] { fill: var(--brand-fold2, #9FD3CF); stroke: var(--brand-fold2, #9FD3CF) }
+.brand-mark path[stroke="#FFFFFF"] { stroke: var(--brand-route, #FFFFFF) }
+
 .brand { flex: 1 1 120px; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600 }
 .tabs { flex: 0 1 auto; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--control) }
 .tabs button { height: 40px; padding: 0 22px; border: 0; border-radius: 9px; background: transparent; color: var(--ink2); font-size: 15px; font-weight: 500 }
@@ -494,7 +502,17 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
 </div>
 
 <header class="top">
-  <span class="brand"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.1" fill="#3D6FE0"/></svg>开图</span>
+  <span class="brand"><svg width="26" height="26" aria-hidden="true" class="brand-mark" viewBox="0 0 48 48">
+  <defs>
+    <clipPath id="kaitu-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
+    <clipPath id="kaitu-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
+  </defs>
+  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#0F4C5C" stroke="#0F4C5C" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2E7F86" stroke="#2E7F86" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#9FD3CF" stroke="#9FD3CF" stroke-width="1.5" stroke-linejoin="round"/>
+  <g clip-path="url(#kaitu-folded)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#0F4C5C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>开图</span>
   <nav class="tabs" aria-label="主导航">
     <button type="button" data-view="overview" aria-current="page">今天</button>
     <button type="button" data-view="explore">开图</button>

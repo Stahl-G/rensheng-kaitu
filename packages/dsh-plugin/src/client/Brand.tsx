@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import css from "./Brand.module.css";
 
 // rc.2 ui-conversation/src/client/contract/slots.ts. Only the owner contract is needed here.
@@ -12,23 +12,48 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
   }
 }
 
-/** docs/design/kaitu-mark.svg, shared by both brand seats and the navigation row. */
+const FOLDED = ["M4 10L17.33 6L17.33 38L4 42Z", "M17.33 6L30.67 10L30.67 42L17.33 38Z"] as const;
+const OPENED = "M30.67 10L44 6L44 38L30.67 42Z";
+const ROUTE = "M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16";
+
+/** docs/design/kaitu-mark.svg: a three-fold map opening left to right, a route crossing all folds.
+ *  Shared by both brand seats and the navigation row; colours live in Brand.module.css. */
 export function KaituMark({ size, className }: { size: number; className?: string | undefined }) {
+  const id = useId().replace(/:/g, "");
   return (
-    <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <circle className={css.dot} cx="12" cy="12" r="2.1" />
+    <svg width={size} height={size} className={className} viewBox="0 0 48 48" aria-hidden="true">
+      <defs>
+        <clipPath id={`${id}-folded`}>
+          <path d={FOLDED[0]} />
+          <path d={FOLDED[1]} />
+        </clipPath>
+        <clipPath id={`${id}-open`}>
+          <path d={OPENED} />
+        </clipPath>
+      </defs>
+      <path className={css.fold0} d={FOLDED[0]} strokeWidth="1.5" strokeLinejoin="round" />
+      <path className={css.fold1} d={FOLDED[1]} strokeWidth="1.5" strokeLinejoin="round" />
+      <path className={css.fold2} d={OPENED} strokeWidth="1.5" strokeLinejoin="round" />
+      <g clipPath={`url(#${id}-folded)`}>
+        <path
+          className={css.routeFolded}
+          d={ROUTE}
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
+      <g clipPath={`url(#${id}-open)`}>
+        <path
+          className={css.routeOpen}
+          d={ROUTE}
+          fill="none"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </g>
     </svg>
   );
 }

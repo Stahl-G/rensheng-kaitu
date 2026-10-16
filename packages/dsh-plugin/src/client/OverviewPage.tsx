@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
+import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
@@ -213,21 +214,7 @@ export function OverviewPage(props: OverviewPageProps) {
     <div className={css.app} data-theme={theme}>
       <header className={css.top}>
         <div className={css.brand}>
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-            <circle cx="12" cy="12" r="2.1" fill="var(--explore)" />
-          </svg>
+          <KaituMark size={26} />
           人生开图
         </div>
         <nav className={css.tabs} aria-label="主要导航">
