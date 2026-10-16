@@ -85,7 +85,7 @@ it("四种收件箱各一个带来源版本，混合记录保留合法行与错�
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }
-}, 10000);
+});
 
 it("记录补齐来源和本地日期，剥离传输字段，保留未知类型为笔记", async () => {
   const ws = await freshWorkspace("America/New_York");

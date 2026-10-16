@@ -151,6 +151,7 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 .ob-prompt { position: relative; border-radius: 12px; background: var(--control) }
 .ob-prompt pre { margin: 0; padding: 14px 16px; padding-right: 84px; white-space: pre-wrap; font: 13px/1.7 inherit; color: var(--ink) }
 .ob-prompt .btn { position: absolute; top: 8px; right: 8px; height: 32px; background: var(--surface) }
+.ob textarea, .ob-field input { box-sizing: border-box }
 .ob textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; resize: vertical }
 .ob-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px }
 .ob-foot-r { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-left: auto }
@@ -162,6 +163,8 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 .ob-goals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px }
 .ob-goal { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left }
 .ob-goal b { font-weight: 600; font-size: 15px }
+.ob-field { display: flex; flex-direction: column; gap: 6px }
+.ob-field input { height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 15px }
 .ob-goal span { font-size: 13px; color: var(--ink2) }
 .ob-goal[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); background: var(--control) }
 .ob-srcs { display: flex; flex-direction: column; padding: 4px 18px }
@@ -678,17 +681,26 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       return m ? { i: i, cat: cats[m[1]] || '其他', text: m[2], when: m[3] || '' } : { i: i, cat: '其他', text: l, when: '', raw: true };
     });
   }
-  function obSteps() {
-    var names = ['搬来记忆', '先管哪些', '接上数据', '选一个 AI'];
-    return '<ol class="ob-steps" aria-label="开始使用的步骤">' + names.map(function (n, i) {
-      var k = i + 1, cls = state.ob === k ? ' is-now' : state.ob > k ? ' is-done' : '';
-      return '<li class="' + cls.trim() + '"' + (state.ob === k ? ' aria-current="step"' : '') + '><span class="num">' + k + '</span>' + n + '</li>';
-    }).join('') + '</ol>';
-  }
+  /* 第一次打开（PRD L4）：先带来一件正在推进的事，拿到一个下一步；搬记忆并列。选事情、接数据、选 AI 放进开始使用清单 */
+  var OB_CONVO = '我：我想六周内做完作品集，转岗去做产品设计。\nChatGPT：可以先挑 2–3 个最能体现你解决问题能力的项目，每个写清背景、你的决策和结果。\nChatGPT：建议每周固定两个晚上推进，第一周先选项目、列出缺的材料。\n我：我手上有 4 个项目，其中「门店排班」那个还缺上线后的数据。\nChatGPT：那可以先选另外两个，排班项目等补到数据再加。';
   function obFoot(back, next, nextLabel, skipLabel) {
     return '<div class="ob-foot">' + (back ? '<button type="button" class="btn btn-quiet" data-ob="back">上一步</button>' : '<span></span>') +
       '<div class="ob-foot-r">' + (skipLabel ? '<button type="button" class="link-btn" data-ob="skip">' + skipLabel + '</button>' : '') +
       '<button type="button" class="btn btn-primary" data-ob="' + next + '">' + nextLabel + '</button></div></div>';
+  }
+  function obTabs() {
+    var e = state.obEntry || 'bring';
+    return '<div class="subtabs" role="group" aria-label="从哪里开始">' +
+      '<button type="button" data-obentry="bring" aria-pressed="' + (e === 'bring') + '">说出想改变的一件事</button>' +
+      '<button type="button" data-obentry="memory" aria-pressed="' + (e === 'memory') + '">从常用的 AI 搬来记忆</button></div>';
+  }
+  function obBring() {
+    var ex = [['吃饭和训练总坚持不了', '我想吃得健康点、每周练三次，但每次坚持不到两周就断了。'], ['不想再做现在的工作，又不知道能做什么', '现在的工作做了四年，越来越没意思，但不知道自己还能做什么。'], ['六周内做完作品集', OB_CONVO]];
+    return '<h1 class="ob-h">最近有什么想改变，却一直没推进？</h1>' +
+      '<p class="ob-lead">直接写就行，也可以粘贴一段和 AI 聊过的对话。开图先原样保存，再帮你理出一个下一步，采不采纳由你定。</p>' +
+      '<div class="ob-ais" aria-label="示例">' + ex.map(function (x, i) { return '<button type="button" data-obex="' + i + '">' + x[0] + '</button>'; }).join('') + '</div>' +
+      '<textarea id="ob-bring" rows="7" placeholder="写下来，或粘贴一段和 AI 的对话">' + esc(state.obBring || '') + '</textarea>' +
+      obFoot(false, 'bring', '保存并整理', '先随便看看');
   }
   function obMemory() {
     var ai = OB_AIS.filter(function (a) { return a[0] === (state.obAi || 'chatgpt'); })[0];
@@ -707,7 +719,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
         }).join('') + '</div>' +
         obFoot(true, 'save', '记下这 ' + n + ' 条', '');
     }
-    return '<h1 class="ob-h">先让开图认识你</h1>' +
+    return '<h1 class="ob-h">从常用的 AI 搬来记忆</h1>' +
       '<p class="ob-lead">你常用的 AI 已经记住了不少关于你的事。复制下面这段话发给它，再把回答粘贴回来，不用从头填档案。</p>' +
       '<div class="ob-ais" role="radiogroup" aria-label="你最常用的 AI">' + OB_AIS.map(function (a) {
         return '<button type="button" role="radio" aria-checked="' + (a === ai) + '" data-obai="' + a[0] + '">' + a[1] + '</button>';
@@ -718,14 +730,39 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       '<div class="ob-step"><span class="ob-n">2</span><div class="ob-body"><b>把它的回答粘贴到这里</b>' +
       '<textarea id="ob-text" rows="7" placeholder="[工作] 独立开发者……">' + esc(state.obText || '') + '</textarea>' +
       '<span class="small">没有现成的回答？<button type="button" class="link-btn" data-ob="sample">用一段示例试试</button> · 想连完整聊天记录一起搬：<a href="#">导入 ChatGPT 数据导出包</a></span></div></div>' +
-      obFoot(false, 'preview', '看看认出了什么', '我没有常用的 AI，跳过');
+      obFoot(false, 'preview', '看看认出了什么', '先随便看看');
+  }
+  function obDraftDefaults() {
+    var t = state.obBring || '';
+    if (/坚持不到/.test(t)) return { goal: '吃得健康点，每周练三次', now: '每次坚持不到两周；还不清楚是时间、累还是没看到效果导致断掉', next: '这周先记三天吃了什么和哪天练了，不改别的' };
+    if (/没意思/.test(t)) return { goal: '找到下一份更想做的工作方向', now: '现在的工作做了四年；还不清楚自己最想保留哪部分工作内容', next: '在下面三条路径里选一条先试', paths: true };
+    if (/作品集/.test(t)) return { goal: '六周内做完作品集，转岗去做产品设计', now: '手上有 4 个项目可选；「门店排班」还缺上线后的数据；每周能投入两个晚上', next: '本周挑出两个最能说明能力的项目，列出缺的材料' };
+    return { goal: t.split('\n')[0].slice(0, 40), now: '', next: '' };
+  }
+  function obDraft() {
+    var d = state.obDraft || (state.obDraft = obDraftDefaults());
+    var field = function (k, label, hint) {
+      return '<label class="ob-field"><span class="eyebrow">' + label + '</span><input id="ob-draft-' + k + '" data-obdraft="' + k + '" value="' + esc(d[k]) + '" placeholder="' + hint + '"></label>';
+    };
+    return '<div style="display:flex;gap:8px;flex-wrap:wrap">' + plain('原文已保存', 'var(--health-tint)', 'var(--health-ink)') + plain('需要你核对', 'var(--explore-tint)', 'var(--explore-ink)') + '</div>' +
+      '<h1 class="ob-h">开图从' + (/ChatGPT：/.test(state.obBring || '') ? '这段对话' : '你写的这件事') + '里看到的</h1>' +
+      '<p class="ob-lead">每一项都能改。对话里其他建议没有变成你的待办，需要时再加。</p>' +
+      field('goal', '当前目标', '你想推进的事') + field('now', '已知现状', '现在进行到哪、缺什么') +
+      (d.paths ? '<div class="ob-goals" role="radiogroup" aria-label="可能的路径">' + [
+        ['转产品经理', '你提过喜欢和用户打交道；还不清楚：你对写需求文档的耐受度', '小实验：花两个晚上，给你常用的一个 App 写一页改进方案'],
+        ['在现公司换岗', '风险最小，保留四年积累；还不清楚：内部有没有空缺', '小实验：这周约一位想去的部门同事喝咖啡聊 30 分钟'],
+        ['做一段副业试水', '能先验证兴趣再决定；还不清楚：每周实际能挤出多少时间', '小实验：接一个 500 元以内的小单，记录投入和感受']
+      ].map(function (x, i) { return '<button type="button" class="ob-goal" role="radio" aria-pressed="' + (d.pick === i) + '" aria-checked="' + (d.pick === i) + '" data-obpath="' + i + '"><b>' + x[0] + '</b><span>' + x[1] + '</span><span>' + x[2] + '</span></button>'; }).join('') + '</div><span class="small">AI 给的是可能性，选不选、选哪条由你定。</span>' : '') +
+      field('next', '一个下一步', '这周能做完的一件事') +
+      '<span class="small">依据：' + (/ChatGPT：/.test(state.obBring || '') ? '你粘贴的对话第 2、4 段' : '你写下的原文') + ' · <a href="#">查看原文</a> · 没连 AI 时，这几项由你自己填</span>' +
+      obFoot(true, 'adopt', '采纳这个下一步', '只保存原文');
   }
   function obGoals() {
     var g = state.obGoals || {};
-    return '<h1 class="ob-h">你最想先管好哪几件事？</h1><p class="ob-lead">选几个就行，下一步只请你接这几件需要的数据。以后随时能加。</p>' +
+    return '<h1 class="ob-h">你最想先管好哪几件事？</h1><p class="ob-lead">选几个就行，接下来只请你接这几件需要的数据。以后随时能改。</p>' +
       '<div class="ob-goals">' + OB_GOALS.map(function (o) {
         return '<button type="button" class="ob-goal" aria-pressed="' + !!g[o[0]] + '" data-obgoal="' + o[0] + '"><b>' + o[1] + '</b><span>' + o[2] + '</span></button>';
-      }).join('') + '</div>' + obFoot(true, 'next', '下一步', '先随便看看');
+      }).join('') + '</div>' + obFoot(false, 'panel-done', '完成', '');
   }
   function obSourceList() {
     var g = state.obGoals || {}, seen = {}, out = [];
@@ -738,49 +775,66 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       var s = OB_SOURCES[k], d = done[k];
       return '<div class="ob-src"><div class="ob-src-t"><b>' + s[0] + '</b><span class="small">' + s[1] + '</span></div>' +
         (d ? plain('已接上', 'var(--health-tint)', 'var(--health-ink)') : '<button type="button" class="btn btn-quiet" data-obsrc="' + k + '">' + s[2] + '</button>') + '</div>';
-    }).join('') : '<p class="note">你选的事不需要先接数据，直接下一步。</p>';
-    return '<h1 class="ob-h">把数据接进来</h1><p class="ob-lead">导入前都会先给你看预览，确认后才写入。没准备好的先跳过，以后在「资料」里接。</p>' +
-      '<div class="ob-srcs card">' + rows + '</div>' + obFoot(true, 'next', '下一步', list.length ? '都先跳过' : '');
+    }).join('') : '<p class="note">你选的事不需要先接数据。</p>';
+    return '<h1 class="ob-h">把数据接进来</h1><p class="ob-lead">导入前都会先给你看预览，确认后才写入。没准备好的先放着，以后在「资料」里接。</p>' +
+      '<div class="ob-srcs card">' + rows + '</div>' + obFoot(false, 'panel-done', '完成', '');
   }
   function obAi() {
     var c = state.obAiPick || 'builtin';
     var opt = function (id, t, d) { return '<button type="button" role="radio" class="ob-goal" aria-checked="' + (c === id) + '" aria-pressed="' + (c === id) + '" data-obaipick="' + id + '"><b>' + t + '</b><span>' + d + '</span></button>'; };
-    return '<h1 class="ob-h">选一个 AI 帮你整理</h1><p class="ob-lead">开图负责把资料存好，AI 负责每天整理、排计划。AI 随时能换，资料都在。</p>' +
+    return '<h1 class="ob-h">选一个 AI 帮你整理</h1><p class="ob-lead">开图负责把资料存好，AI 负责整理和排计划。AI 随时能换，资料都在。</p>' +
       '<div class="ob-goals ob-ai-opts" role="radiogroup" aria-label="用哪个 AI">' +
-      opt('builtin', '用开图里的「问问」', '填一个 DeepSeek 的 API Key 就能用，按用量付费，几块钱能用很久') +
-      opt('mine', '用我已有的 AI', 'Claude、ChatGPT、Codex、Grok 都能接，在「AI 与连接」里一步步带你连') +
-      opt('none', '先不用 AI', '随手记和导入都能用，原文会先存着，等你连上再整理') + '</div>' +
-      obFoot(true, 'finish', c === 'none' ? '完成' : c === 'builtin' ? '去填 API Key' : '去连接', '');
+      opt('builtin', '用开图里的「问问」', '填一个 DeepSeek 的 API Key 就能用，按用量付费') +
+      opt('mine', '在原来的 AI 里继续', '复制一份筛选过的资料包给 ChatGPT、Claude，再把回答贴回开图核对；也能连 Claude、Codex 自动读写') +
+      opt('none', '先不用 AI', '随手记和导入都能用，原文先存着') + '</div>' +
+      obFoot(false, 'finish', c === 'none' ? '完成' : c === 'builtin' ? '去填 API Key' : '去 AI 与连接', '');
   }
   function obChecklist() {
-    var g = state.obGoals || {}, items = [
-      ['记住你的情况', state.obSaved ? state.obSaved + ' 条，来自 ' + (OB_AIS.filter(function (a) { return a[0] === (state.obAi || 'chatgpt'); })[0][1]) : '从常用的 AI 搬过来', !!state.obSaved, 'mem']
+    var src = obSourceList(), done = state.obDone || {}, srcDone = src.filter(function (k) { return done[k]; }).length;
+    var anyGoal = Object.keys(state.obGoals || {}).some(function (k) { return state.obGoals[k]; });
+    var aiName = OB_AIS.filter(function (a) { return a[0] === (state.obAi || 'chatgpt'); })[0][1];
+    var items = [
+      ['带来一件事，采纳第一个下一步', state.obNext ? '「' + state.obNext + '」' : '粘贴一段和 AI 的对话，或写下想推进的事', !!state.obNext, 'bring'],
+      ['让开图认识你（可选）', state.obSaved ? state.obSaved + ' 条，来自 ' + aiName : '从常用的 AI 搬来记忆', !!state.obSaved, 'memory'],
+      ['选你想先管的事', anyGoal ? '已选 ' + Object.keys(state.obGoals).filter(function (k) { return state.obGoals[k]; }).length + ' 件' : '项目、健康、钱、日程……选几件', anyGoal, 'goals'],
+      ['接上数据', !anyGoal ? '先选想管的事，再看要接哪些' : src.length ? '已接 ' + srcDone + ' / ' + src.length : '你选的事不需要接数据', anyGoal && srcDone === src.length, 'data'],
+      ['选一个 AI 帮你整理', state.obAiPick === 'none' ? '先不用也没关系' : '问问，或在原来的 AI 里继续', false, 'ai'],
+      ['拿到第一份今天计划', '连上 AI 后，第二天早上 7:30 自动排好', false, 'plan']
     ];
-    obSourceList().forEach(function (k) { items.push(['接上' + (/^[A-Za-z]/.test(OB_SOURCES[k][0]) ? ' ' : '') + OB_SOURCES[k][0], (state.obDone || {})[k] ? '已接上' : '还没接', !!(state.obDone || {})[k], 'src-' + k]); });
-    items.push(['连上一个 AI', state.obAiPick === 'none' ? '先不用也没关系' : '还没连上', false, 'ai']);
-    items.push(['拿到第一份今天计划', '连上 AI 后，第二天早上 7:30 自动排好', false, 'plan']);
     var n = items.filter(function (x) { return x[2]; }).length;
-    return '<section class="card ob-check" aria-labelledby="h-chk"><div class="sec-head"><h2 id="h-chk" style="font-size:17px;font-weight:600">开始使用 · ' + n + '/' + items.length + '</h2><button type="button" class="link-btn" data-ob="restart">重新走一遍</button></div>' +
+    return '<section class="card ob-check" aria-labelledby="h-chk"><div class="sec-head"><h2 id="h-chk" style="font-size:17px;font-weight:600">开始使用 · ' + n + '/' + items.length + '</h2></div>' +
       '<div class="bar" style="height:6px"><i style="width:' + Math.round(n / items.length * 100) + '%;background:var(--primary)"></i></div>' +
       items.map(function (x) {
-        return '<div class="ob-chk' + (x[2] ? ' is-done' : '') + '"><span class="ob-tick" aria-hidden="true">' + (x[2] ? '✓' : '') + '</span><div class="stack"><b>' + x[0] + '</b><span class="small">' + x[1] + '</span></div>' +
-          (x[2] ? '' : x[3] === 'ai' ? '<button type="button" class="btn btn-quiet" data-open-ai>去连接</button>' : x[3] === 'plan' ? '' : '<button type="button" class="btn btn-quiet" data-ob="goto" data-obto="' + (x[3] === 'mem' ? 1 : 3) + '">去做</button>') + '</div>';
+        var disabled = x[3] === 'data' && !anyGoal;
+        return '<div class="ob-chk' + (x[2] ? ' is-done' : '') + '"><span class="ob-tick" aria-hidden="true">' + (x[2] ? '✓' : '') + '</span><div class="stack"><b>' + x[0] + '</b><span class="small">' + esc(x[1]) + '</span></div>' +
+          (x[2] || x[3] === 'plan' || disabled ? '' : '<button type="button" class="btn btn-quiet" data-ob="goto" data-obto="' + x[3] + '">去做</button>') + '</div>';
       }).join('') + '</section>';
+  }
+  function obNextCard() {
+    if (!state.obNext) return '';
+    var did = state.obNextDone;
+    return '<section class="card" style="display:flex;flex-direction:column;gap:10px;padding:18px 20px" aria-labelledby="h-obnext"><span class="eyebrow" id="h-obnext">现在最该做的一件事</span>' +
+      '<b style="font-size:19px;font-weight:600">' + esc(state.obNext) + '</b>' +
+      '<span class="small">为了「' + esc((state.obDraft || {}).goal || '你的目标') + '」 · 依据来自你写下的原文 · <a href="#">查看原文</a></span>' +
+      (did ? plain('已完成 · 结果已记下', 'var(--health-tint)', 'var(--health-ink)') :
+        '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary" data-ob="next-done">完成并记一句结果</button><button type="button" class="btn btn-quiet" data-ob="next-later">改到以后</button></div>') + '</section>';
   }
   function firstRun() {
     if (!state.ob) {
-      return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎来到人生开图</span><h1 id="h-wel">把你的生活交给 AI 打理，你只看结果、做决定</h1>' +
-        '<div class="ob-how"><div><b>1 · 资料放进开图</b><span>记忆、日历、健康、账单、项目，都存在你自己的文件夹里</span></div>' +
-        '<div><b>2 · AI 每天整理</b><span>早上排好今天，晚上整理当天，有变动先问你</span></div>' +
-        '<div><b>3 · 你只确认</b><span>换哪个 AI 都能接着用，人生进度不会丢</span></div></div>' +
-        '<div class="ob-foot"><span class="small">大约 5 分钟，每一步都能跳过</span><div class="ob-foot-r"><button type="button" class="link-btn" data-ob="later">先随便看看</button><button type="button" class="btn btn-primary" data-ob="start">开始</button></div></div></section>';
+      return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎来到人生开图</span><h1 id="h-wel">让 AI 持续了解你，把想改变的事变成能推进、能查回的个人进度</h1>' +
+        '<div class="ob-how"><div><b>1 · 说出想改变的一件事</b><span>直接写，或粘贴一段和 AI 聊过的对话</span></div>' +
+        '<div><b>2 · 核对，选一个下一步</b><span>开图整理出现状和下一步，你确认了才算数</span></div>' +
+        '<div><b>3 · 记下结果，换个 AI 也能接着</b><span>资料存在你自己的文件夹里，人生进度不会丢</span></div></div>' +
+        '<div class="ob-foot"><span class="small">大约 3 分钟</span><div class="ob-foot-r"><button type="button" class="link-btn" data-ob="later">先随便看看</button><button type="button" class="btn btn-primary" data-ob="start">开始</button></div></div></section>';
     }
     if (state.ob === 'done') {
-      return '<div class="sec" style="gap:14px"><div class="head"><h1>10 月 16 日，周五</h1><span class="sub">' + (state.obSaved ? '开图已经记住了 ' + state.obSaved + ' 件关于你的事' : '先记下一句，开图就开始认识你') + '</span></div>' + captureForm() + '</div>' + obChecklist() +
+      return '<div class="sec" style="gap:14px"><div class="head"><h1>10 月 16 日，周五</h1><span class="sub">' + (state.obNext ? '你有一个刚采纳的下一步' : '先记下一句，开图就开始认识你') + '</span></div>' + captureForm() + '</div>' + obNextCard() + obChecklist() +
         '<p class="note">这里暂时没有图表：等有了真实记录才会出现，开图不会把「没记」当成 0。</p>';
     }
-    var body = state.ob === 1 ? obMemory() : state.ob === 2 ? obGoals() : state.ob === 3 ? obData() : obAi();
-    return '<section class="ob card" aria-label="开始使用">' + obSteps() + body + '</section>';
+    var panel = state.ob === 'goals' || state.ob === 'data' || state.ob === 'ai';
+    var body = state.ob === 'draft' ? obDraft() : state.ob === 'goals' ? obGoals() : state.ob === 'data' ? obData() : state.ob === 'ai' ? obAi() : (state.obEntry === 'memory' ? obMemory() : obBring());
+    var head = panel ? '<button type="button" class="link-btn" data-ob="panel-done" style="align-self:flex-start">← 回到今天</button>' : state.ob === 'start' && !state.obPreview ? obTabs() : '';
+    return '<section class="ob card" aria-label="开始使用">' + head + body + '</section>';
   }
 
   var dirs = [
@@ -1369,12 +1423,15 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     var b = e.target.closest('button[data-view]'); if (b) { if (b.dataset.view === 'records') state.rec = ''; go(b.dataset.view); }
   });
   document.getElementById('demo-data').addEventListener('click', function () { state.first = false; state.saved = ''; go('overview'); });
-  document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; state.ob = 0; state.obPreview = false; go('overview'); });
+  document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; state.ob = 0; state.obPreview = false; state.obNext = null; state.obNextDone = false; state.obDraft = null; go('overview'); });
 
   view.addEventListener('click', function (e) {
-    var ob = e.target.closest('[data-ob],[data-obai],[data-obgoal],[data-obsrc],[data-obaipick]');
+    var ob = e.target.closest('[data-ob],[data-obai],[data-obgoal],[data-obsrc],[data-obaipick],[data-obentry],[data-obex],[data-obpath]');
     if (ob) {
       var top = function () { render(); window.scrollTo(0, 0); };
+      if (ob.dataset.obex) { var exs = ['我想吃得健康点、每周练三次，但每次坚持不到两周就断了。', '现在的工作做了四年，越来越没意思，但不知道自己还能做什么。', OB_CONVO]; state.obBring = exs[+ob.dataset.obex]; return render(); }
+      if (ob.dataset.obpath) { var nexts = ['花两个晚上，给常用的一个 App 写一页改进方案', '这周约一位想去部门的同事聊 30 分钟', '接一个 500 元以内的小单，记下投入和感受']; state.obDraft.pick = +ob.dataset.obpath; state.obDraft.next = nexts[state.obDraft.pick]; return render(); }
+      if (ob.dataset.obentry) { state.obEntry = ob.dataset.obentry; state.obPreview = false; return render(); }
       if (ob.dataset.obai) { state.obAi = ob.dataset.obai; return render(); }
       if (ob.dataset.obgoal) { state.obGoals = state.obGoals || {}; state.obGoals[ob.dataset.obgoal] = !state.obGoals[ob.dataset.obgoal]; return render(); }
       if (ob.dataset.obsrc) { state.obDone = state.obDone || {}; state.obDone[ob.dataset.obsrc] = true; return render(); }
@@ -1386,15 +1443,26 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
         return;
       }
       if (act === 'sample') { state.obText = OB_SAMPLE; return render(); }
-      if (act === 'start') { state.ob = 1; return top(); }
-      if (act === 'later') { state.ob = 'done'; return top(); }
-      if (act === 'restart') { state.ob = 1; state.obPreview = false; return top(); }
-      if (act === 'goto') { state.ob = +ob.dataset.obto; return top(); }
+      if (act === 'sample-bring') { state.obBring = OB_CONVO; return render(); }
+      if (act === 'start') { state.ob = 'start'; state.obEntry = state.obEntry || 'bring'; return top(); }
+      if (act === 'later' || act === 'skip') {
+        if (act === 'skip' && state.ob === 'draft') state.obRawOnly = true;
+        state.ob = 'done'; return top();
+      }
+      if (act === 'goto') {
+        var to = ob.dataset.obto;
+        if (to === 'bring' || to === 'memory') { state.ob = 'start'; state.obEntry = to; state.obPreview = false; }
+        else state.ob = to;
+        return top();
+      }
+      if (act === 'bring') { if (!(state.obBring || '').trim()) { var tb = document.getElementById('ob-bring'); if (tb) tb.focus(); return; } state.obDraft = null; state.ob = 'draft'; return top(); }
+      if (act === 'adopt') { var nx = ((state.obDraft || {}).next || '').trim(); if (!nx) { var ni = document.getElementById('ob-draft-next'); if (ni) ni.focus(); return; } state.obNext = nx; state.ob = 'done'; return top(); }
       if (act === 'preview') { if (!(state.obText || '').trim()) { var ta = document.getElementById('ob-text'); if (ta) ta.focus(); return; } state.obPreview = true; state.obPick = {}; return top(); }
-      if (act === 'save') { state.obSaved = obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length; state.obPreview = false; state.ob = 2; return top(); }
-      if (act === 'back') { if (state.ob === 1 && state.obPreview) state.obPreview = false; else state.ob = Math.max(1, state.ob - 1); return top(); }
-      if (act === 'skip') { state.ob = state.ob === 2 ? 'done' : state.ob + 1; return top(); }
-      if (act === 'next') { state.ob += 1; return top(); }
+      if (act === 'save') { state.obSaved = obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length; state.obPreview = false; state.ob = 'done'; return top(); }
+      if (act === 'back') { if (state.ob === 'start' && state.obPreview) state.obPreview = false; else if (state.ob === 'draft') state.ob = 'start'; return top(); }
+      if (act === 'panel-done') { state.ob = 'done'; return top(); }
+      if (act === 'next-done') { state.obNextDone = true; return render(); }
+      if (act === 'next-later') { state.obNext = null; return render(); }
       if (act === 'finish') { var pick = state.obAiPick || 'builtin'; state.ob = 'done'; top(); if (pick !== 'none') openAi(); return; }
     }
     var rc = e.target.closest('[data-rec],[data-fin],[data-src]');
@@ -1478,7 +1546,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   function closeAi() { dlg.hidden = true; if (lastFocus) lastFocus.focus(); }
   document.getElementById('demo-ai').addEventListener('click', function () { state.connected = false; go('ask'); });
   document.getElementById('ai-next').addEventListener('click', function () { s1.hidden = true; s2.hidden = false; document.getElementById('auto-morning').focus(); });
-  view.addEventListener('input', function (e) { if (e.target.id === 'ob-text') { state.obText = e.target.value; return; } if (e.target.dataset && e.target.dataset.obpick) { state.obPick[e.target.dataset.obpick] = e.target.checked; var sv = view.querySelector('[data-ob="save"]'); if (sv) sv.textContent = '记下这 ' + obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length + ' 条'; return; } if (e.target.id === 'map-year') { state.mapYear = +e.target.value; render(); var r = document.getElementById('map-year'); if (r) r.focus(); } });
+  view.addEventListener('input', function (e) { if (e.target.id === 'ob-text') { state.obText = e.target.value; return; } if (e.target.id === 'ob-bring') { state.obBring = e.target.value; return; } if (e.target.dataset && e.target.dataset.obdraft) { state.obDraft = state.obDraft || {}; state.obDraft[e.target.dataset.obdraft] = e.target.value; return; } if (e.target.dataset && e.target.dataset.obpick) { state.obPick[e.target.dataset.obpick] = e.target.checked; var sv = view.querySelector('[data-ob="save"]'); if (sv) sv.textContent = '记下这 ' + obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length + ' 条'; return; } if (e.target.id === 'map-year') { state.mapYear = +e.target.value; render(); var r = document.getElementById('map-year'); if (r) r.focus(); } });
   view.addEventListener('change', function (e) {
     if (e.target.dataset && e.target.dataset.auto) { state.auto[e.target.dataset.auto] = e.target.checked; render(); var sw = document.getElementById(e.target.id); if (sw) sw.focus(); }
     if (e.target.dataset && e.target.dataset.time && e.target.value) state.times[e.target.dataset.time] = e.target.value;

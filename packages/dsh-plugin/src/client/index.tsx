@@ -3,6 +3,13 @@ import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
+import type {
+  OnboardingAi,
+  OnboardingChoices,
+  OnboardingMatterDraft,
+  OnboardingPath,
+  OnboardingSetupInput,
+} from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
 import type {
   AutomationKey,
@@ -120,6 +127,89 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.overview();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              keepOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterKeep(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              saveOnboardingMatter: async (text: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterSave(text);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              readOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterRead(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              organizeOnboardingMatter: async (source: string) => {
+                const r = await ctx.remote.kaitu.onboardingMatterOrganize(source);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              adoptOnboardingMatter: async (
+                source: string,
+                draft: OnboardingMatterDraft,
+                path: OnboardingPath | null = null,
+              ) => {
+                const r = await ctx.remote.kaitu.onboardingMatterAdopt(source, draft, path);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              changeOnboardingNext: async (id: string, rev: number, action: string, value: string) => {
+                const r = await ctx.remote.kaitu.onboardingNextChange(id, rev, action, value);
+                if (!r.ok) throw new Error(r.error);
+                return r.value;
+              },
+              loadOnboarding: async () => {
+                const r = await ctx.remote.kaitu.onboarding();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              chooseOnboarding: async (choices: OnboardingChoices) => {
+                const r = await ctx.remote.kaitu.onboardingChoose(choices);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              previewOnboardingMemory: async (text: string, ai: OnboardingAi) => {
+                const r = await ctx.remote.kaitu.onboardingMemoryPreview(text, ai);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              confirmOnboardingMemory: async (token: string, selected: string[]) => {
+                const r = await ctx.remote.kaitu.onboardingMemoryConfirm(token, selected);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              cancelOnboarding: async (token: string) => {
+                const r = await ctx.remote.kaitu.onboardingCancel(token);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              previewOnboardingImport: async (
+                source: "apple-health" | "chatgpt-conversations",
+                name: string,
+                base64: string,
+              ) => {
+                const r = await ctx.remote.kaitu.onboardingImportPreview(source, name, base64);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              confirmOnboardingImport: async (token: string) => {
+                const r = await ctx.remote.kaitu.onboardingImportConfirm(token);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              previewOnboardingSetup: async (input: OnboardingSetupInput) => {
+                const r = await ctx.remote.kaitu.onboardingSetupPreview(input);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              confirmOnboardingSetup: async (token: string) => {
+                const r = await ctx.remote.kaitu.onboardingSetupConfirm(token);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
               },
               loadSettings: async () => {
                 const r = await ctx.remote.kaitu.settings();

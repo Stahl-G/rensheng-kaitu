@@ -6,20 +6,28 @@ import { startUi } from "../../cli/src/ui/server.js";
 import {
   addMemory,
   addRecord,
+  adoptOnboardingMatter,
+  changeOnboardingNext,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
+  draftOnboardingMatter,
   history,
+  inboxNoteDone,
   initWorkspace,
+  keepOnboardingMatter,
   listMemories,
+  listTasks,
   onboardingStatus,
   parseFrontmatter,
   parseMemoryPaste,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  readOnboardingMatter,
   recordOnboardingAiConnection,
   resetOnboarding,
   restore,
   saveOnboardingChoices,
+  saveOnboardingMatter,
   stringifyFrontmatter,
   validateWorkspace,
 } from "../src/index.js";
@@ -138,8 +146,8 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
     expect(ws.readText(".kaitu/config.json")).toBe(config);
     const initial = onboardingStatus(ws, options);
     expect(initial.sources.map((source) => source.id)).toEqual(["calendar", "health", "projects", "news"]);
-    expect(initial.checklist.completed).toBe(0);
-    expect(initial.checklist.items.find((item) => item.id === "health")).toMatchObject({
+    expect(initial.checklist.completed).toBe(1);
+    expect(initial.sources.find((item) => item.id === "health")).toMatchObject({
       done: false,
       skipped: true,
     });
@@ -181,15 +189,97 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
     expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
     await confirmOnboardingSetup(ws, projectPreview.token, options);
     await confirmOnboardingSetup(ws, newsPreview.token, options);
-    expect(onboardingStatus(ws, options).checklist.completed).toBe(6);
+    expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
     expect(onboardingStatus(ws, { stateRoot: join(root, "another-computer") }).showGuide).toBe(false);
     await restore(ws, before[0]?.oid as string);
     const restored = onboardingStatus(ws, options);
     expect(restored.checklist.items.find((item) => item.id === "memory")?.done).toBe(false);
-    expect(restored.checklist.items.find((item) => item.id === "health")?.done).toBe(false);
+    expect(restored.sources.find((item) => item.id === "health")?.done).toBe(false);
     expect(restored.checklist.items.find((item) => item.id === "plan")?.done).toBe(false);
     expect(restored.checklist.items.find((item) => item.id === "ai")?.done).toBe(true);
     expect(resetOnboarding(ws, options).showGuide).toBe(false);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来源的下一步并可记结果", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-matter-"));
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Ho_Chi_Minh" });
+    const original = "我在准备一个合成展览。AI 建议整理作品、联系场地、制作海报。";
+    const matter = await saveOnboardingMatter(ws, original);
+    expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe(original);
+    expect(() =>
+      readOnboardingMatter(ws, matter.source.replace(/\d{4}-\d{2}-\d{2}/, "2000-01-01")),
+    ).toThrow();
+    expect(listTasks(ws)).toHaveLength(0);
+    const input = { goal: "准备合成展览", current: "还没确定作品", next: "列出三件候选作品" };
+    await draftOnboardingMatter(ws, matter.source, input);
+    expect(listTasks(ws)).toHaveLength(0);
+    expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).draft?.draft).toEqual(input);
+    await keepOnboardingMatter(ws, matter.source);
+    expect(listTasks(ws)).toHaveLength(0);
+    expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).draft).toBeNull();
+    await draftOnboardingMatter(ws, matter.source, input);
+    const paths = [
+      {
+        name: "整理已有作品",
+        fit: "已有素材可用",
+        unknown: "哪些作品适合展出",
+        experiment: "挑出两件作品请朋友看",
+      },
+      {
+        name: "先找观众反馈",
+        fit: "能低成本验证主题",
+        unknown: "谁对主题感兴趣",
+        experiment: "找两位朋友各聊十分钟",
+      },
+    ];
+    await draftOnboardingMatter(ws, matter.source, { ...input, next: "", paths });
+    expect(readOnboardingMatter(ws, matter.source).draft?.paths).toEqual(paths);
+    expect(listTasks(ws)).toHaveLength(0);
+    await expect(adoptOnboardingMatter(ws, matter.source, input)).rejects.toThrow();
+    const selected = { ...input, next: "先和一位朋友聊主题" };
+    await expect(
+      adoptOnboardingMatter(ws, matter.source, selected, {
+        name: "旧的路径",
+        fit: "旧的理由",
+        unknown: "旧的未知",
+        experiment: "旧的实验",
+      }),
+    ).rejects.toThrow();
+    const next = await adoptOnboardingMatter(ws, matter.source, selected, paths[1]);
+    await adoptOnboardingMatter(ws, matter.source, selected, paths[1]);
+    expect(listTasks(ws)).toHaveLength(1);
+    expect(listTasks(ws)[0]).toMatchObject({
+      id: next.id,
+      source: matter.source,
+      title: selected.next,
+      status: "open",
+    });
+    expect(listTasks(ws)[0]?.notes).toContain(paths[1]?.name);
+    expect(matter.kind).toBe("note");
+    const conversation = await saveOnboardingMatter(ws, "我：想准备展览。\nChatGPT：先挑作品。");
+    expect(conversation.kind).toBe("conversation");
+    expect(listTasks(ws)).toHaveLength(1);
+    await inboxNoteDone(ws, matter.source);
+    expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe(original);
+    const later = await changeOnboardingNext(ws, next.id, next.rev, "defer", "2026-12-01");
+    const done = await changeOnboardingNext(ws, next.id, later.rev, "complete", "选出了三件作品");
+    expect(done).toMatchObject({
+      status: "done",
+      result: "选出了三件作品",
+      source: matter.source,
+      due: "2026-12-01",
+    });
+    await expect(changeOnboardingNext(ws, next.id, next.rev, "complete", "重试")).rejects.toThrow();
+    expect(
+      onboardingStatus(ws, { stateRoot: join(root, "state") }).checklist.items.find(
+        (item) => item.id === "matter",
+      )?.done,
+    ).toBe(true);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });

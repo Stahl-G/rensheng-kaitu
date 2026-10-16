@@ -33,6 +33,7 @@ export interface TodayPlan {
 }
 export interface NextItem {
   id: string;
+  ref?: string;
   title: string;
   status: "todo" | "proposed" | "done" | "skipped";
   priority?: "high" | "normal" | "low";

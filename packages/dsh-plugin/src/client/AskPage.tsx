@@ -119,7 +119,8 @@ export function AskPage({
   workspace,
   initialPrompt = "",
   configureRequest = 0,
-}: { workspace: string; initialPrompt?: string; configureRequest?: number }) {
+  configureBuiltin = false,
+}: { workspace: string; initialPrompt?: string; configureRequest?: number; configureBuiltin?: boolean }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<ChatEvent[]>([]);
@@ -129,9 +130,14 @@ export function AskPage({
   }, [initialPrompt]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
+  const configurationRequested = useRef(false);
   useEffect(() => {
-    if (configureRequest) setStep(1);
-  }, [configureRequest]);
+    if (configureRequest) {
+      configurationRequested.current = true;
+      setStep(1);
+      if (configureBuiltin) setChoice("builtin");
+    }
+  }, [configureRequest, configureBuiltin]);
   const [modeMenu, setModeMenu] = useState<"select" | "confirm" | null>(null);
   const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
@@ -172,13 +178,15 @@ export function AskPage({
       .then(([ai, auto, list]) => {
         if (!active) return;
         setSettings(ai);
-        setChoice(ai.choice ?? "external");
+        if (!configurationRequested.current) setChoice(ai.choice ?? "external");
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
         setThreads(list);
         setLoaded(true);
-        if (!ai.choice && !ai.configured) setStep(1);
-        else if (ai.configured && !auto.asked) setStep(2);
+        if (!configurationRequested.current) {
+          if (!ai.choice && !ai.configured) setStep(1);
+          else if (ai.configured && !auto.asked) setStep(2);
+        }
       })
       .catch((err) => {
         if (active) setError(err.message);

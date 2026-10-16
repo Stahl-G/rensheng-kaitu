@@ -5,6 +5,8 @@ description: 从 ChatGPT 或其他常用 AI 搬来记忆时，使用共用内容
 
 # 从常用 AI 搬来记忆
 
+搬记忆是首次使用的并列入口，也可从今天页的「让开图认识你（可选）」进入，不阻挡保存一件事并采纳下一步。
+
 读取 `kaitu onboarding status` 返回的 content，选择 ais 中的来源，展示对应 hint 和 prompt。
 DSH 用 `kaitu_onboarding` 的 status，MCP 可用 `onboarding_status` 读内容。
 提示词、AI 列表和记忆位置提示以这份结果为准，不在技能内维护副本。
