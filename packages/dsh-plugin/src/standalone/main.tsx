@@ -14,6 +14,7 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 let workspace = "";
 const props: OverviewPageProps = {
+  phoneChannels: true,
   loadCalendarPush: () => call("calendarPush"),
   retryCalendarPush: (id) => call("retryCalendarPush", id),
   configureCalendarPush: (enabled) => call("configureCalendarPush", enabled),

@@ -2,7 +2,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { createChannelRuntime } from "@kaitu/channels";
 import {
   type By,
   KaituError,
@@ -403,21 +402,13 @@ async function run(argv: string[]): Promise<number> {
     }
     case "ui": {
       const ws = workspace(values);
-      const channels = values.channels ? createChannelRuntime(ws) : undefined;
       const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],
       });
       installShutdown(async () => {
-        await channels?.stop();
         await ui.close();
       });
-      try {
-        await channels?.start();
-      } catch (error) {
-        await ui.close();
-        throw error;
-      }
       console.log(`开图工作台：${ui.url}\n按 Ctrl+C 关闭。`);
       return 0;
     }

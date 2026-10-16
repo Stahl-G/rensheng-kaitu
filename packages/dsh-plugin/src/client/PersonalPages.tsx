@@ -4,10 +4,12 @@ import type { AutomationKey, AutomationSettings, SettingsData } from "../types.j
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { MePage, type MePageProps } from "./MePage.js";
+import { PhoneChannels } from "./PhoneChannels.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 
 export interface PersonalServices extends CalendarPushServices {
+  phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
   configureAutomation: (
     tasks: Partial<Record<AutomationKey, boolean>>,
@@ -315,6 +317,9 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
+            {props.phoneChannels && props.channelSettings && (
+              <PhoneChannels request={props.channelSettings} />
+            )}
             {props.channelSettings && (
               <ChannelSettings
                 request={props.channelSettings}

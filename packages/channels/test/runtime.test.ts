@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initWorkspace, isTracked } from "@kaitu/core";
@@ -23,41 +23,29 @@ class FakeChannel implements Channel {
   }
 }
 
-it("一次性配对隔离主人，消息调用本机命令并按会话排队，状态不进历史", async () => {
+it("一次性配对隔离主人，消息使用已连接的 AI并按会话排队，状态不进历史", async () => {
   const directory = mkdtempSync(join(tmpdir(), "kaitu-channels-"));
   const ws = await initWorkspace(join(directory, "workspace"));
-  const script = join(directory, "agent.cjs");
-  writeFileSync(
-    script,
-    `
-const fs = require('node:fs');
-let input = '';
-process.stdin.on('data', chunk => input += chunk);
-process.stdin.on('end', async () => {
-  const value = input.trim().split('\\n').at(-1).split('：').at(-1);
-  fs.appendFileSync('me/processed.txt', 'start:' + value + '\\n');
-  if (value === 'first') {
-    while (!fs.existsSync('release')) await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  fs.appendFileSync('me/processed.txt', 'end:' + value + '\\n');
-  process.stdout.write('result:' + value);
-});
-`,
-  );
-  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-  const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
-  ws.writeJson(
-    ".kaitu/config.json",
-    {
-      ...config,
-      channels: { agent_command: `${quote(process.execPath)} ${quote(script)}` },
-    },
-    { internal: true },
-  );
   saveCredentials(ws, "telegram", { token: "synthetic-token" });
   const channel = new FakeChannel();
   const errors: string[] = [];
-  const runtime = new ChannelRuntime(ws, [channel], (_name, detail) => errors.push(detail));
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const runtime = new ChannelRuntime(
+    ws,
+    [channel],
+    (_name, detail) => errors.push(detail),
+    async (prompt) => {
+      const value = prompt.trim().split("\n").at(-1)?.split("：").at(-1);
+      const prior = ws.exists("me/processed.txt") ? ws.readText("me/processed.txt") : "";
+      ws.writeText("me/processed.txt", `${prior}start:${value}\n`);
+      if (value === "first") await released;
+      ws.writeText("me/processed.txt", `${ws.readText("me/processed.txt")}end:${value}\n`);
+      return `result:${value}`;
+    },
+  );
   try {
     await runtime.start();
     const expired = pair(ws, "telegram", Date.now() - 601_000);
@@ -79,7 +67,7 @@ process.stdin.on('end', async () => {
     const second = channel.receive("owner", "second");
     expect(channel.sent).toHaveLength(2);
     expect(readFileSync(join(ws.root, "me/processed.txt"), "utf8")).toBe("start:first\n");
-    writeFileSync(join(ws.root, "release"), "");
+    release();
     await Promise.all([first, second]);
     expect(channel.sent).toHaveLength(4);
     expect(channel.sent.slice(2).map((reply) => reply.text)).toEqual(["result:first", "result:second"]);

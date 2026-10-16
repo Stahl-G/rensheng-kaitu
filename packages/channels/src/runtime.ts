@@ -1,5 +1,5 @@
 import { type Workspace, snapshot } from "@kaitu/core";
-import { AgentRunner } from "./agent.js";
+import { AgentRunner, type ChannelAnswer } from "./agent.js";
 import type { Channel, ChannelError, ChannelMessage } from "./channel.js";
 import { acquireChannel, authorize } from "./state.js";
 
@@ -14,8 +14,9 @@ export class ChannelRuntime {
     private ws: Workspace,
     private channels: Channel[],
     private onError: ChannelError = (name, detail) => console.error(`${name}：${detail}`),
+    answer?: ChannelAnswer,
   ) {
-    this.agent = new AgentRunner(ws);
+    this.agent = new AgentRunner(ws, answer);
   }
 
   async start(): Promise<void> {

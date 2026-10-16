@@ -4,6 +4,7 @@ import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
 import {
   type CalendarExecutor,
@@ -46,6 +47,7 @@ import {
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
+import { phoneAnswer } from "./phone-answer.js";
 import { planMutations, productMutations, productRequest } from "./product.js";
 
 export interface UiOptions {
@@ -98,6 +100,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const WEB_ROOT = options.webRoot ?? (existsSync(`${PRODUCT_ROOT}/index.html`) ? PRODUCT_ROOT : LEGACY_ROOT);
   const calendarPush = new CalendarPush(calendarPushStore(ws), options.calendarExecutor);
   const collectors = new CollectorService(ws, options.collectorStateRoot);
+  const phones = new PhoneService(ws, phoneAnswer(options.ask));
   let aiChild: ReturnType<typeof spawn> | undefined;
   let aiReady: Promise<{ url?: string }> | undefined;
   const openAi = () => {
@@ -326,7 +329,12 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         if (!input || typeof input !== "object" || Array.isArray(input))
           throw new KaituError("参数必须是对象", "BAD_ARGS");
         try {
-          return json(res, 200, await collectors.request(url.pathname.slice("/api/channels/".length), input));
+          const operation = url.pathname.slice("/api/channels/".length);
+          return json(
+            res,
+            200,
+            await (operation.startsWith("phone-") ? phones : collectors).request(operation, input),
+          );
         } catch (error) {
           if (error instanceof KaituError) throw error;
           return json(res, 400, { error: "采集设置未完成，请检查参数或稍后重试" });
@@ -364,6 +372,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                 ? await exclusive(async () => {
                     await saveExternal();
                     await options.ask?.prepareRelocation();
+                    await phones.stop();
                     const oldRoot = ws.root;
                     try {
                       if (method === "moveStorage") await options.onWorkspaceChanging?.();
@@ -374,6 +383,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                         if (method === "moveStorage") await options.onWorkspaceChanged?.();
                       } finally {
                         options.ask?.relocate(ws.root);
+                        phones.start();
                         notify();
                       }
                     }
@@ -500,6 +510,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           case "/api/drive/enable":
           case "/api/drive/disable": {
             await options.ask?.prepareRelocation();
+            await phones.stop();
             const oldRoot = ws.root;
             try {
               await options.onWorkspaceChanging?.();
@@ -533,6 +544,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                 await options.onWorkspaceChanged?.();
               } finally {
                 options.ask?.relocate(ws.root);
+                phones.start();
               }
             }
           }
@@ -556,10 +568,12 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             return removeMemory(ws, field(data, "file"), { by: "user" });
           case "/api/restore": {
             await options.ask?.prepareRelocation();
+            await phones.stop();
             try {
               return await restore(ws, field(data, "version"));
             } finally {
               options.ask?.relocate(ws.root);
+              phones.start();
             }
           }
           case "/api/import/confirm": {
@@ -624,6 +638,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearInterval(heartbeat);
     clearInterval(polling);
     for (const client of [...clients, ...askClients]) client.end();
+    await phones.stop();
     await collectors.stop();
     clearInterval(calendarTimer);
     await options.ask?.close();
@@ -649,6 +664,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     throw error;
   }
   collectors.start();
+  phones.start();
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;

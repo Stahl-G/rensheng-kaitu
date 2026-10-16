@@ -44,3 +44,5 @@ export function createChannelRuntime(ws: Workspace, only?: ChannelName): Channel
   if (!channels.length) throw new Error("尚未配置通道，先运行 kaitu channels setup <通道>");
   return new ChannelRuntime(ws, channels);
 }
+
+export { PhoneService } from "./phone-service.js";
