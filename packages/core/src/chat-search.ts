@@ -81,7 +81,7 @@ function syncIndex(db: DatabaseSync, ws: Workspace): void {
       }
       indexDocument(db, ws, readChat(ws, file));
     }
-    const unavailable = ws.unavailableFiles();
+    const unavailable = ws.unavailableFiles("chats");
     for (const file of indexed.keys()) {
       if (unavailable.some((path) => file === path || file.startsWith(`${path}/`))) continue;
       db.prepare("DELETE FROM chats WHERE file = ?").run(file);
@@ -153,7 +153,7 @@ export function searchChats(ws: Workspace, query: string, opts: { limit?: number
           ORDER BY bm25(chats), julianday(date) DESC, file LIMIT ?`)
         .all(phrase, limit);
     }
-    const unavailable = ws.unavailableFiles();
+    const unavailable = ws.unavailableFiles("chats");
     return rows
       .filter(
         (row) => !unavailable.some((file) => row.file === file || String(row.file).startsWith(`${file}/`)),

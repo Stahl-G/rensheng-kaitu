@@ -26,7 +26,7 @@ kaitu sync disable --to /本机目录/kaitu
 - `sync enable --dir` 指同步目标的父目录；原工作区从 `KAITU_DIR` 或 current-workspace 指针读取，缺省 `~/kaitu`。
 - iCloud 仅支持 macOS，默认目标为 `~/Library/Mobile Documents/com~apple~CloudDocs/kaitu/`。
   iCloud 根目录不存在时，先在系统设置 → Apple 账户 → iCloud 里打开 iCloud 云盘。
-  开启时尽力调用 `brctl download`，最多等待两秒，失败不阻止迁移。
+  开启时在后台请求 `brctl download`，不等待，失败不阻止迁移。
   返回提示：在 Finder 里对 kaitu 文件夹选『始终保留下载』。
 - Drive 自动查找唯一 Google Drive 账号下的可写目录；多账号或目录不明确时用 `--dir` 指定。
 - `--name` 缺省 `kaitu`，目标已存在时不覆盖。
@@ -38,7 +38,7 @@ kaitu sync disable --to /本机目录/kaitu
 - 旧位置留下 `WORKSPACE-MOVED.md`，本机状态根目录的 `current-workspace.json` 记录当前位置。
   迁移后运行 doctor 与 validate。
 
-模式不写入 config.json：没有 `state_dir` 是本机；有 `state_dir` 时，按工作区真实路径识别标准 iCloud / Google Drive 目录。
+模式不写入 config.json：先按工作区真实路径识别标准 iCloud 目录，无需读取配置；其他路径没有 `state_dir` 是本机，有 `state_dir` 时再识别 Google Drive。
 自定义同步目录的类型写在本机状态目录 `sync-location.json`。旧版自定义 Drive 目录没有此文件时仍按 Drive 识别。
 config schema 与 PRD §6 保持不变。
 
@@ -123,15 +123,17 @@ Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 
 
 ## iCloud 未下载文件与冲突副本
 
-- 识别旧式 `.文件名.icloud` 占位文件。对普通 iCloud 文件，在独立 `/bin/cat` 进程读取内容，最多等待两秒。
-  超时、离线或读取失败统一作为“还没从 iCloud 下载”报告；不会把失败读成空字符串。
-  使用实际读取而非“大小为零”或某一版本的扩展属性，是因为空文件可以合法存在，File Provider 的占位表示也会变化。
-  小文件按 size / mtime / ctime 缓存，文件变化后重新读取；失败会在五秒后重试。
-- `doctor` 列出所有不可读文件，JSON 输出的对应检查含 `files` 列表。扫描跳过这些文件，汇总携带未下载提示。
-  配置、NOW 或时区规则未下载时，不自动维护派生文件。覆盖或追加未下载的原文件会报错。
-  依赖完整追加历史的修改、删除、记忆索引更新与对话导入也先检查相应目录，避免根据不完整数据写回。
-- 存版本前检查整个共享文件夹；有任何未下载文件时延后整个版本，下载后再由监听或 `kaitu snapshot` 补存。
-  版本扫描和暂存也使用同一个有限时读取，防止读取失败生成删除版本。恢复和搬回本机须先下载完整。
+- 只有真实路径位于 iCloud 云盘目录下的工作区才启用未下载判断，不先读取 config。
+  仅用 `lstat`：文件 `size > 0 && blocks === 0`，或同目录存在 `.文件名.icloud`，就视为未下载。
+  同时在后台请求 `brctl download <路径>`，失败忽略，同一路径三十秒内不重复请求。
+  其他文件直接 `readFileSync`，没有逐文件读取子进程或内容缓存；本机与 Drive 的读取路径保持原样。
+- `doctor` 仅遍历元数据并列出未下载文件，对应 JSON 检查含 `files` 列表。扫描跳过它们，汇总携带已遇到文件的下载提示。
+  构造函数不做全量下载检查；config 本身没下载时跳过维护。覆盖或追加未下载的原文件会报错。
+  修改、删除、记忆索引更新与对话导入只检查各自前缀目录，不扫描整个工作区。
+- 版本扫描过滤未下载文件、`.icloud` 占位文件和冲突副本，它们不算改动或删除，已有版本中的内容保留。
+  其余文件照常生成版本，不因某个文件未下载而暂停全部版本历史。
+  恢复只检查本次范围内实际会覆盖或移除的文件，列出其中未下载的路径并拒绝；无关文件不阻止局部恢复。
+  搬回本机仍需共享文件全部下载完成。
 - 识别 `NOW 2.md`、`xxx 2.jsonl`、`xxx (1).jsonl` 及带 `(Conflicted Copy)` / `[Conflict]` 显式标记的同步副本，包括冲突目录中的文件。
   仅当去掉数字后缀或显式冲突标记后原文件仍存在（或有占位文件）才判作副本，避免误判合法数字文件名。
   doctor 只列出供人工处理；校验、总览、记录/记忆/对话/收件箱扫描与版本暂存均跳过副本，不合并、不删除。
@@ -144,7 +146,7 @@ Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 
 
 - Grok Bot / Dots 的 Google Drive 连接器能否读取、创建 `.md` / `.json` / `.jsonl` 纯文本文件（有的连接器只处理 Google 文档格式）。需要用户用真实账号试一次；不行的话，`OVERVIEW.md` 另存一份 Google 文档格式由 Drive 自动转换不在本地可控，届时再定。
 - Google Drive 电脑版（File Provider）下文件监听是否可靠；不可靠时用已有的轮询回退。
-- 真实 iCloud / Drive 的「仅在线」占位行为与文件监听时序。iCloud 读取已有有限等待与延后版本保护，仍需实际云盘验证。
+- 真实 iCloud / Drive 的「仅在线」占位行为与文件监听时序。iCloud 已有元数据识别与逐文件版本过滤，仍需实际云盘验证。
 
 ## 本机端到端测试（开发机已具备：Google Drive 电脑版已登录、ChatGPT 与 Grok Bot 桌面应用已安装）
 

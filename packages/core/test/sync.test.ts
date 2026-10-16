@@ -1,6 +1,8 @@
 import childProcess from "node:child_process";
+import fs from "node:fs";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import git from "isomorphic-git";
 import { expect, it, vi } from "vitest";
 import {
   Workspace,
@@ -15,6 +17,7 @@ import {
   historyDirectory,
   initWorkspace,
   mcpToken,
+  pendingWorkspaceFiles,
   processInbox,
   readProject,
   readRecords,
@@ -34,10 +37,10 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
   Object.defineProperty(process, "platform", { value: "darwin" });
   vi.stubEnv("HOME", home);
   vi.stubEnv("KAITU_DIR", "");
-  const execute = childProcess.execFileSync;
-  const download = vi.spyOn(childProcess, "execFileSync").mockImplementation((file, args, options) => {
-    if (file === "brctl") throw new Error("模拟下载服务不可用");
-    return execute(file, args, options);
+  const download = vi.spyOn(childProcess, "spawn").mockImplementation(() => {
+    const child = new childProcess.ChildProcess();
+    queueMicrotask(() => child.emit("error", new Error("模拟下载服务不可用")));
+    return child;
   });
   try {
     const cloud = join(home, "Library/Mobile Documents/com~apple~CloudDocs");
@@ -96,14 +99,7 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
   const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
   Object.defineProperty(process, "platform", { value: "darwin" });
   vi.stubEnv("HOME", home);
-  const execute = childProcess.execFileSync;
-  let offline = "";
-  const io = vi.spyOn(childProcess, "execFileSync").mockImplementation((file, args, options) => {
-    if (file === "brctl") return Buffer.alloc(0);
-    if (file === "/bin/cat" && args?.[0] === offline)
-      throw Object.assign(new Error("offline"), { code: "ETIMEDOUT" });
-    return execute(file, args, options);
-  });
+  const io = vi.spyOn(childProcess, "spawn").mockImplementation(() => new childProcess.ChildProcess());
   try {
     const cloud = join(home, "Library/Mobile Documents/com~apple~CloudDocs");
     mkdirSync(cloud, { recursive: true });
@@ -113,7 +109,10 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
     const stamp = new Date().toISOString();
     const handoff = (agent: string) =>
       `---\nagent: ${agent}\nat: ${stamp}\n---\n## 当前下一步\n- 合成下一步\n`;
-    ws.writeText("handoffs/relay.md", handoff("retained-agent"));
+    const retained = handoff("retained-agent");
+    const offline = handoff("offline-agent");
+    ws.writeText("handoffs/relay.md", retained);
+    ws.writeText("handoffs/offline.md", offline);
     await snapshot(ws, "同步前");
     const versions = await history(ws);
     const conflicts = [
@@ -125,8 +124,9 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
     ];
     writeFileSync(join(ws.root, conflicts[0] as string), "损坏的冲突数据");
     for (const file of conflicts.slice(1)) writeFileSync(join(ws.root, file), handoff("conflict-agent"));
-    offline = join(ws.root, "handoffs/offline.md");
-    writeFileSync(offline, handoff("offline-agent"));
+    rmSync(join(ws.root, "handoffs/offline.md"));
+    const offlinePlaceholder = "handoffs/.offline.md.icloud";
+    writeFileSync(join(ws.root, offlinePlaceholder), "");
     const original = readFileSync(join(ws.root, added.file));
     rmSync(join(ws.root, added.file));
     const slash = added.file.lastIndexOf("/");
@@ -150,17 +150,48 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
     expect(ws.readText("OVERVIEW.md")).not.toContain("offline-agent");
     expect(() => ws.writeText(added.file, "")).toThrow();
     expect(() => addRecord(ws, "workout", workout)).toThrow();
-    expect(await snapshot(ws, "不应删除未下载数据")).toBeNull();
-    expect(await history(ws)).toEqual(versions);
+    ws.writeText("handoffs/relay.md", `${retained}\n正常更新\n`);
+    const pending = await pendingWorkspaceFiles(ws);
+    expect(pending).toContain("handoffs/relay.md");
+    expect(pending).not.toContain(added.file);
+    expect(pending).not.toContain("handoffs/offline.md");
+    const oid = await snapshot(ws, "保存已下载文件，不删除未下载数据");
+    expect(oid).not.toBeNull();
+    expect(await history(ws)).toHaveLength(versions.length + 1);
+    for (const [file, bytes] of [
+      [added.file, original],
+      ["handoffs/offline.md", Buffer.from(offline)],
+    ] as const) {
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: oid as string,
+        filepath: file,
+      });
+      expect(Buffer.from(blob)).toEqual(bytes);
+    }
+    const tracked = await git.listFiles({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      ref: oid as string,
+    });
+    for (const file of [...conflicts, placeholder, offlinePlaceholder, healthPlaceholder])
+      expect(tracked).not.toContain(file);
+    await restore(ws, versions[0]?.oid as string, { path: "handoffs/relay.md" });
+    expect(ws.readText("handoffs/relay.md")).toBe(retained);
+    await expect(restore(ws, versions[0]?.oid as string, { path: added.file })).rejects.toThrow();
     await expect(restore(ws, versions[0]?.oid as string)).rejects.toThrow();
+    expect(io.mock.calls.filter(([, args]) => args?.[1] === join(ws.root, added.file))).toHaveLength(1);
     await expect(disableSync(ws)).rejects.toThrow();
     expect(existsSync(join(ws.root, placeholder))).toBe(true);
     expect(existsSync(join(ws.root, added.file))).toBe(false);
     expect(conflicts.every((file) => existsSync(join(ws.root, file)))).toBe(true);
     rmSync(join(ws.root, placeholder));
+    rmSync(join(ws.root, offlinePlaceholder));
     rmSync(join(ws.root, healthPlaceholder));
     writeFileSync(join(ws.root, added.file), original);
-    offline = "";
     writeFileSync(join(ws.root, "handoffs/offline.md"), handoff("downloaded-agent"));
     expect(readRecords(new Workspace(ws.root), "workout")[0]).toEqual(added.record);
   } finally {

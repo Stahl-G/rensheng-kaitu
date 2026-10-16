@@ -1,4 +1,3 @@
-import childProcess from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   constants,
@@ -19,6 +18,7 @@ import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { refreshOverview } from "./overview.js";
 import { rebaseProjectLinks, relocateProjects } from "./projects.js";
+import { requestICloudDownload } from "./sync-files.js";
 import { type SyncMode, iCloudDirectory, syncMode } from "./sync-location.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
@@ -121,7 +121,7 @@ async function verify(ws: Workspace) {
 }
 
 export function syncStatus(ws: Workspace) {
-  const state = stateDirectory(ws.root);
+  const state = stateDirectory(ws.root, ws.isICloud);
   const mode = syncMode(ws.root);
   const file = ".kaitu/inbox-state.json";
   return {
@@ -183,11 +183,7 @@ export async function enableSync(
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
-  if (mode === "icloud") {
-    try {
-      childProcess.execFileSync("brctl", ["download", target], { timeout: 2000, stdio: "ignore" });
-    } catch {}
-  }
+  if (mode === "icloud") requestICloudDownload(target);
   await snapshot(ws, `开启 ${mode === "icloud" ? "iCloud" : "Google Drive"} 同步`);
   await verify(ws);
   return syncStatus(ws);
@@ -204,7 +200,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   const old = ws.root;
   const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu"));
   separate(old, target);
-  const state = stateDirectory(old);
+  const state = stateDirectory(old, ws.isICloud);
   separate(state, target);
   const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
   // 只允许替换开图自己留下的迁移说明目录。

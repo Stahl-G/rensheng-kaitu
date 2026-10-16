@@ -250,7 +250,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       if (!readdirSync(ws.resolve("inbox/rejected")).length)
         rmSync(ws.resolve("inbox/rejected"), { recursive: true });
     }
-    const unavailable = ws.unavailableFiles();
+    const unavailable = ws.unavailableFiles("inbox");
     const observed = new Map<string, string>();
     for (const dir of ["inbox/agents", "inbox/health"]) {
       if (!ws.exists(dir)) continue;
@@ -275,7 +275,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         continue;
       }
       if (file.startsWith("inbox/health/")) {
-        if (ws.unavailableFiles().includes(file)) {
+        if (ws.isUnavailable(file)) {
           result.pending.push(file);
           continue;
         }

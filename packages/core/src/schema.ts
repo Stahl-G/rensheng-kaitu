@@ -3,8 +3,8 @@ import { dirname, join } from "node:path";
 import addFormatsModule from "ajv-formats";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { schemasDir } from "./assets.js";
-import { readCloudFile } from "./sync-files.js";
-import { syncMode } from "./sync-location.js";
+import { assertCloudDownloaded } from "./sync-files.js";
+import { isICloudPath } from "./sync-location.js";
 
 // ajv-formats 是 CommonJS，NodeNext 下 default 导入拿到的是整个 exports 对象
 const addFormats = addFormatsModule.default;
@@ -55,11 +55,8 @@ export class SchemaRegistry {
       const key = custom;
       let fn: ValidateFunction | undefined = this.cache.get(key);
       if (!fn) {
-        const schema = JSON.parse(
-          syncMode(dirname(moduleDirAbs)) === "icloud"
-            ? readCloudFile(custom).toString("utf8")
-            : readFileSync(custom, "utf8"),
-        );
+        if (isICloudPath(dirname(moduleDirAbs))) assertCloudDownloaded(custom);
+        const schema = JSON.parse(readFileSync(custom, "utf8"));
         const base = ref.split("/").pop() ?? ref;
         schema.$id = `${SCHEMA_BASE}${moduleId}--${base}`;
         fn = this.ajv.compile(schema);

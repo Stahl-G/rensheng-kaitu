@@ -4,8 +4,8 @@ import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { driveProjects, projectStatusFiles, readProject } from "./projects.js";
-import { syncMode } from "./sync-location.js";
+import { driveProjects, projectStatusFiles } from "./projects.js";
+import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -58,7 +58,7 @@ function neverTrack(path: string): boolean {
 }
 
 export function historyDirectory(ws: Workspace): string {
-  return join(stateDirectory(ws.root), "history.git");
+  return join(stateDirectory(ws.root, ws.isICloud), "history.git");
 }
 
 export function hasHistory(ws: Workspace): boolean {
@@ -72,7 +72,8 @@ export async function ensureHistory(ws: Workspace): Promise<void> {
 }
 
 export function maintainHistoryIgnore(ws: Workspace): void {
-  const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
+  const ignore = ws.exists(".gitignore") ? ws.scanText(".gitignore") : "";
+  if (ignore === undefined) return;
   const missing = GITIGNORE.split("\n").filter(
     (line) => line && !line.startsWith("#") && !ignore.split("\n").includes(line),
   );
@@ -89,7 +90,7 @@ async function headOid(ws: Workspace): Promise<string | null> {
 }
 
 function historyFs(ws: Workspace) {
-  if (syncMode(ws.root) !== "icloud") return fs;
+  if (!ws.isICloud) return fs;
   const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
     if (typeof path === "string") {
       const rel = relative(ws.root, path);
@@ -104,17 +105,16 @@ function historyFs(ws: Workspace) {
   return { ...fs, promises: { ...fs.promises, readFile } };
 }
 
-function deferredCloudSnapshot(ws: Workspace): boolean {
-  return ws.unavailableFiles().length > 0;
+function snapshotFile(ws: Workspace, file: string): boolean {
+  return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
-  if (deferredCloudSnapshot(ws)) return [];
   const matrix = await git.statusMatrix({
     fs: historyFs(ws),
     dir: ws.root,
     gitdir: historyDirectory(ws),
-    filter: (file) => !ws.conflictCopy(file),
+    filter: (file) => snapshotFile(ws, file),
   });
   return matrix
     .filter(
@@ -148,7 +148,6 @@ export async function batchSnapshot<T>(
 
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   if (batchDepth.get(ws)) return null;
-  if (deferredCloudSnapshot(ws)) return null;
   refreshOverview(ws, now);
   try {
     return await saveSnapshot(ws, message, now);
@@ -162,7 +161,6 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
 }
 
 async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
-  if (deferredCloudSnapshot(ws)) return null;
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
@@ -170,7 +168,7 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     fs: io,
     dir,
     gitdir: historyDirectory(ws),
-    filter: (file) => !ws.conflictCopy(file),
+    filter: (file) => snapshotFile(ws, file),
   });
   let changed = 0;
   for (const [filepath, head, workdir, stage] of matrix) {
@@ -250,13 +248,8 @@ export async function restore(
   opts: { path?: string; now?: Date } = {},
 ): Promise<{ oid: string | null; changed: number }> {
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
-  const unavailable = ws.unavailableFiles();
-  if (unavailable.length)
-    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
   const target = await resolveVersion(ws, version);
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
-  await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
-
   const dir = ws.root;
   const head = await headOid(ws);
   const targetFiles = new Set(
@@ -264,7 +257,7 @@ export async function restore(
       under(prefix, f),
     ),
   );
-  const currentFiles = head
+  let currentFiles = head
     ? (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: head })).filter((f) =>
         under(prefix, f),
       )
@@ -273,13 +266,31 @@ export async function restore(
     throw new KaituError(`版本 ${version.slice(0, 7)} 中没有 ${prefix}`, "NOT_FOUND");
   }
 
+  const unavailable = [...new Set([...targetFiles, ...currentFiles])].filter(
+    (file) =>
+      !neverTrack(file) &&
+      !ws.conflictCopy(file) &&
+      !["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(file) &&
+      ws.isUnavailable(file),
+  );
+  if (unavailable.length)
+    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+  await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
+  if (await headOid(ws))
+    currentFiles = (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: "HEAD" })).filter(
+      (file) => under(prefix, file),
+    );
+
   // Drive 中的工作区历史只恢复共享项目；本机项目保留在独立的本机版本库。
   const privateSlugs = new Set<string>();
   const privateMetricIds = new Set<string>();
-  if (driveProjects(ws)) {
+  if ((!prefix || prefix === "projects" || prefix.startsWith("projects/")) && driveProjects(ws)) {
     for (const { file } of projectStatusFiles(ws)) {
+      const projectDir = file.slice(0, file.lastIndexOf("/"));
+      if (prefix && !under(prefix, projectDir) && !under(projectDir, prefix)) continue;
       const slug = file.split("/").at(-2) as string;
-      if (readProject(ws, slug).data.local_only) privateSlugs.add(slug);
+      if (parseFrontmatter<{ local_only?: boolean }>(ws.readText(file)).data.local_only)
+        privateSlugs.add(slug);
     }
     const allTargetFiles = await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target });
     for (const file of allTargetFiles.filter((file) => /^projects\/[^/]+\/STATUS\.md$/.test(file))) {

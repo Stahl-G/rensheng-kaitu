@@ -1,7 +1,8 @@
 import childProcess from "node:child_process";
-import { type Dirent, existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { KaituError } from "./errors.js";
+import { isICloudPath } from "./sync-location.js";
 
 export function conflictOriginal(root: string, file: string): string | undefined {
   const name = basename(file);
@@ -14,8 +15,49 @@ export function conflictOriginal(root: string, file: string): string | undefined
   return existsSync(join(root, path)) || cloudPlaceholder(root, path) ? path : undefined;
 }
 
+function fileStat(path: string) {
+  try {
+    return lstatSync(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return;
+  }
+}
+
 export function cloudPlaceholder(root: string, file: string): boolean {
-  return existsSync(join(root, dirname(file), `.${basename(file)}.icloud`));
+  return !!fileStat(join(root, dirname(file), `.${basename(file)}.icloud`));
+}
+
+const downloads = new Map<string, number>();
+let lastPruned = 0;
+
+export function requestICloudDownload(path: string): void {
+  const now = Date.now();
+  const previous = downloads.get(path);
+  if (previous !== undefined && now - previous < 30000) return;
+  if (now - lastPruned >= 30000) {
+    for (const [file, requested] of downloads) if (now - requested >= 30000) downloads.delete(file);
+    lastPruned = now;
+  }
+  downloads.set(path, now);
+  try {
+    const child = childProcess.spawn("brctl", ["download", path], { detached: true, stdio: "ignore" });
+    child.on("error", () => {});
+    child.unref();
+  } catch {}
+}
+
+export function isEvictedICloudFile(path: string): boolean {
+  const stat = fileStat(path);
+  const evicted =
+    !!(stat?.isFile() && stat.size > 0 && stat.blocks === 0) ||
+    cloudPlaceholder(dirname(path), basename(path));
+  if (evicted) requestICloudDownload(path);
+  return evicted;
+}
+
+export function assertCloudDownloaded(path: string): void {
+  if (isEvictedICloudFile(path)) throw new KaituError(`还没从 iCloud 下载：${path}`, "CLOUD_UNAVAILABLE");
 }
 
 export function placeholderOriginal(file: string): string | undefined {
@@ -24,74 +66,42 @@ export function placeholderOriginal(file: string): string | undefined {
   return join(dirname(file), name.slice(1, -7));
 }
 
-export function syncInventory(root: string) {
+export function syncInventory(root: string, prefix = "", icloud = false) {
   const files: string[] = [];
   const conflicts: string[] = [];
   const unavailable: string[] = [];
-  function walk(dir: string) {
-    let entries: Dirent[];
-    try {
-      entries = readdirSync(join(root, dir), { withFileTypes: true });
-    } catch {
-      unavailable.push(dir);
+  function walk(file: string) {
+    const placeholder = placeholderOriginal(file);
+    if (placeholder) {
+      if (icloud && !conflictOriginal(root, placeholder) && isEvictedICloudFile(join(root, placeholder)))
+        unavailable.push(placeholder);
       return;
     }
-    for (const entry of entries) {
+    if (file && conflictOriginal(root, file)) {
+      conflicts.push(file);
+      return;
+    }
+    if (icloud && isEvictedICloudFile(join(root, file))) {
+      unavailable.push(file);
+      return;
+    }
+    const stat = fileStat(join(root, file));
+    if (!stat || stat.isSymbolicLink()) return;
+    if (!stat.isDirectory()) {
+      if (stat.isFile()) files.push(file);
+      return;
+    }
+    for (const entry of readdirSync(join(root, file), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || [".git", ".kaitu", "node_modules"].includes(entry.name)) continue;
-      const file = dir ? `${dir}/${entry.name}` : entry.name;
-      const placeholder = placeholderOriginal(file);
-      if (placeholder) unavailable.push(placeholder);
-      else if (conflictOriginal(root, file)) conflicts.push(file);
-      else if (entry.isDirectory()) walk(file);
-      else if (entry.isFile()) files.push(file);
+      walk(file ? `${file}/${entry.name}` : entry.name);
     }
   }
-  walk("");
-  return { files, conflicts, unavailable };
+  walk(prefix);
+  return { files, conflicts, unavailable: [...new Set(unavailable)] };
 }
 
-const cache = new Map<string, { stamp: string; bytes?: Buffer; error?: KaituError; retryAt?: number }>();
-
-export function cacheWrittenFile(path: string, content: string | Uint8Array): void {
-  const bytes = Buffer.from(content);
-  if (bytes.length > 1024 * 1024) return;
-  const stat = lstatSync(path);
-  if (cache.size > 256) cache.clear();
-  cache.set(path, { stamp: `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`, bytes });
-}
-
-export function readCloudFile(path: string): Buffer {
-  let stamp = "";
-  try {
-    if (cloudPlaceholder(dirname(path), basename(path))) throw new Error("iCloud 占位文件");
-    const stat = lstatSync(path);
-    stamp = `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
-    const previous = cache.get(path);
-    if (previous?.stamp === stamp) {
-      if (previous.bytes) return previous.bytes;
-      if (previous.error && Date.now() < (previous.retryAt ?? 0)) throw previous.error;
-    }
-    if (!stat.isFile()) throw new Error("不是普通文件");
-    const bytes = childProcess.execFileSync("/bin/cat", [path], {
-      timeout: 2000,
-      maxBuffer: Number.MAX_SAFE_INTEGER,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    if (cache.size > 256) cache.clear();
-    if (bytes.length <= 1024 * 1024) cache.set(path, { stamp, bytes });
-    return bytes;
-  } catch (error) {
-    if (error instanceof KaituError) throw error;
-    const unavailable = new KaituError(`还没从 iCloud 下载：${path}`, "CLOUD_UNAVAILABLE");
-    cache.set(path, { stamp, error: unavailable, retryAt: Date.now() + 5000 });
-    throw unavailable;
-  }
-}
-
-export function readWorkspaceConfig(root: string): Record<string, unknown> {
+export function readWorkspaceConfig(root: string, icloud = isICloudPath(root)): Record<string, unknown> {
   const path = join(root, ".kaitu/config.json");
-  if (!existsSync(path) && !cloudPlaceholder(root, ".kaitu/config.json")) return {};
-  const text =
-    process.platform === "darwin" ? readCloudFile(path).toString("utf8") : readFileSync(path, "utf8");
-  return JSON.parse(text);
+  if (icloud) assertCloudDownloaded(path);
+  return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
 }
