@@ -31,7 +31,7 @@ import {
   listProjects,
   listTasks,
   logProject,
-  onboardingMatterSchema,
+  onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
   previewOnboardingMemory,
@@ -138,7 +138,9 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     "首次使用：保存原文后的整理草稿、内容与清单、选择和记忆预览。草稿只进待核对，用户采纳才生成待办。",
     z.discriminatedUnion("action", [
       z.object({ action: z.literal("matter-read"), source: text }).strict(),
-      z.object({ action: z.literal("matter-draft"), source: text, draft: onboardingMatterSchema }).strict(),
+      z
+        .object({ action: z.literal("matter-draft"), source: text, draft: onboardingMatterSuggestionSchema })
+        .strict(),
       z.object({ action: z.literal("status") }).strict(),
       z
         .object({

@@ -17,9 +17,11 @@ import {
   type OnboardingImportResult,
   type OnboardingMatter,
   type OnboardingMatterDraft,
+  type OnboardingMatterSuggestion,
   type OnboardingMemoryPreview,
   type OnboardingMemoryResult,
   type OnboardingNext,
+  type OnboardingPath,
   type OnboardingSetupInput,
   type OnboardingSetupPreview,
   type OnboardingSetupResult,
@@ -166,12 +168,16 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.write(async () => readOnboardingMatter(this.workspace, source));
   }
   @Remote("onboardingMatterDraft")
-  async onboardingMatterDraft(source: string, input: OnboardingMatterDraft): Promise<OnboardingMatter> {
+  async onboardingMatterDraft(source: string, input: OnboardingMatterSuggestion): Promise<OnboardingMatter> {
     return this.write(() => draftOnboardingMatter(this.workspace, source, input));
   }
   @Remote("onboardingMatterAdopt")
-  async onboardingMatterAdopt(source: string, input: OnboardingMatterDraft): Promise<OnboardingNext> {
-    return this.write(() => adoptOnboardingMatter(this.workspace, source, input));
+  async onboardingMatterAdopt(
+    source: string,
+    input: OnboardingMatterDraft,
+    path: OnboardingPath | null,
+  ): Promise<OnboardingNext> {
+    return this.write(() => adoptOnboardingMatter(this.workspace, source, input, path));
   }
   @Remote("onboardingNextChange")
   async onboardingNextChange(

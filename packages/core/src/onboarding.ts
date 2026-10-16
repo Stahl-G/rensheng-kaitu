@@ -33,6 +33,30 @@ import { type ModuleStatus, readWorkbench } from "./workbench.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
 export const ONBOARDING = {
+  welcome: {
+    title: "让 AI 持续了解你，把想改变的事变成能推进、能查回的个人进度",
+    first: "说出想改变的一件事",
+    firstDescription: "直接写，或粘贴一段和 AI 聊过的对话",
+  },
+  matter: {
+    entry: "说出想改变的一件事",
+    question: "最近有什么想改变，却一直没推进？",
+    examples: [
+      { title: "吃饭和训练总坚持不了", text: "我想吃得健康点、每周练三次，但每次坚持不到两周就断了。" },
+      {
+        title: "不想再做现在的工作又不知道能做什么",
+        text: "现在的工作做了四年，越来越没意思，但不知道自己还能做什么。",
+      },
+      {
+        title: "六周内做完作品集",
+        text: `我：我想六周内做完作品集，转岗去做产品设计。
+ChatGPT：可以先挑 2–3 个最能体现你解决问题能力的项目，每个写清背景、你的决策和结果。
+ChatGPT：建议每周固定两个晚上推进，第一周先选项目、列出缺的材料。
+我：我手上有 4 个项目，其中「门店排班」那个还缺上线后的数据。
+ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
+      },
+    ],
+  },
   steps: ["带来一件事", "先管哪些", "接上数据", "选一个 AI"],
   ais: [
     {
@@ -233,6 +257,8 @@ export interface OnboardingSourceInfo {
   available: boolean;
 }
 export interface OnboardingContent {
+  welcome: { title: string; first: string; firstDescription: string };
+  matter: { entry: string; question: string; examples: readonly { title: string; text: string }[] };
   steps: readonly string[];
   ais: readonly { id: string; name: string; hint: string }[];
   prompt: string;
@@ -797,7 +823,7 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     showGuide: !choices && !hasUserData,
     hasUserData,
     sources,
-    next: latest ? onboardingNext(latest) : null,
+    next: latest ? onboardingNext(ws, latest) : null,
     draft: pendingOnboardingMatter(ws),
     checklist: {
       items,
@@ -870,12 +896,23 @@ export interface OnboardingMatterDraft {
   current: string;
   next: string;
 }
+export interface OnboardingPath {
+  name: string;
+  fit: string;
+  unknown: string;
+  experiment: string;
+}
+export interface OnboardingMatterSuggestion extends OnboardingMatterDraft {
+  paths?: OnboardingPath[];
+}
 export interface OnboardingMatter {
   source: string;
   text: string;
-  draft: OnboardingMatterDraft | null;
+  kind: "conversation" | "note";
+  draft: OnboardingMatterSuggestion | null;
 }
 export interface OnboardingNext extends OnboardingMatterDraft {
+  kind: "conversation" | "note";
   id: string;
   source: string;
   status: string;
@@ -904,6 +941,51 @@ export const onboardingMatterSchema = z
       .regex(/^[^\r\n]+$/),
   })
   .strict();
+const pathText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2000)
+  .regex(/^[^\r\n]+$/);
+export const onboardingPathSchema = z
+  .object({ name: pathText, fit: pathText, unknown: pathText, experiment: pathText })
+  .strict();
+export const onboardingMatterSuggestionSchema = onboardingMatterSchema
+  .extend({
+    next: z
+      .string()
+      .trim()
+      .max(2000)
+      .regex(/^[^\r\n]*$/),
+    paths: z.array(onboardingPathSchema).min(2).max(3).optional(),
+  })
+  .refine((input) => (input.paths ? !input.next : !!input.next), "路径先由用户选择，不预填下一步");
+function inputKind(text: string): "conversation" | "note" {
+  return /(?:^|\n)\s*(?:[-*>]\s*)?(?:ChatGPT|Claude|Gemini|DeepSeek|豆包|Kimi|通义|助手|assistant|AI|你)\s*[:：]/i.test(
+    text,
+  )
+    ? "conversation"
+    : "note";
+}
+function pathNotes(paths: OnboardingPath[]) {
+  return paths
+    .map(
+      (path, index) =>
+        `\n#### 可能路径 ${index + 1}\n名称：${path.name}\n为什么适合：${path.fit}\n还有哪些不清楚：${path.unknown}\n小实验：${path.experiment}\n`,
+    )
+    .join("");
+}
+function readPaths(section: string): OnboardingPath[] {
+  return section
+    .split(/\n#### 可能路径 \d+\n/)
+    .slice(1)
+    .map((part) => ({
+      name: noteLine(part, "名称"),
+      fit: noteLine(part, "为什么适合"),
+      unknown: noteLine(part, "还有哪些不清楚"),
+      experiment: noteLine(part, "小实验"),
+    }));
+}
 const matterId = (source: string) =>
   `onboarding-matter-${createHash("sha256").update(source).digest("hex").slice(0, 20)}`;
 function matterNotes(draft: OnboardingMatterDraft) {
@@ -924,8 +1006,13 @@ function isOnboardingTask(task: Task): boolean {
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
-function onboardingNext(task: Task): OnboardingNext {
+function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
+  let kind: OnboardingMatter["kind"] = "note";
+  try {
+    kind = readOnboardingMatter(ws, task.source ?? "").kind;
+  } catch {}
   return {
+    kind,
     id: task.id,
     source: task.source ?? "",
     next: task.title,
@@ -948,10 +1035,17 @@ export function readOnboardingMatter(ws: Workspace, source: string): OnboardingM
   const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
   const item = doc.data.next?.find((item) => item.id === matterId(source) && item.status === "proposed");
   const section = doc.body.split(`### ${matterId(source)}\n`)[1]?.split("\n### ")[0] ?? "";
+  const paths = readPaths(section);
   const draft = item
-    ? { goal: noteLine(section, "当前目标"), current: noteLine(section, "已知现状"), next: item.title }
+    ? {
+        goal: noteLine(section, "当前目标"),
+        current: noteLine(section, "已知现状"),
+        next: paths.length ? "" : item.title,
+        ...(paths.length ? { paths } : {}),
+      }
     : null;
-  return { source, text: parseFrontmatter(text).body, draft };
+  const original = parseFrontmatter(text).body;
+  return { source, text: original, kind: inputKind(original), draft };
 }
 function pendingOnboardingMatter(ws: Workspace): OnboardingMatter | null {
   const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
@@ -972,10 +1066,10 @@ export async function saveOnboardingMatter(ws: Workspace, text: string): Promise
 export async function draftOnboardingMatter(
   ws: Workspace,
   source: string,
-  input: OnboardingMatterDraft,
+  input: OnboardingMatterSuggestion,
 ): Promise<OnboardingMatter> {
   readOnboardingMatter(ws, source);
-  const parsed = onboardingMatterSchema.safeParse(input);
+  const parsed = onboardingMatterSuggestionSchema.safeParse(input);
   if (!parsed.success)
     throw new KaituError("请填写当前目标、已知现状和一个下一步，均使用单行文本", "BAD_ARGS");
   const draft = parsed.data;
@@ -985,10 +1079,10 @@ export async function draftOnboardingMatter(
     throw new KaituError("这段原文已有采纳的下一步", "CONFLICT");
   doc.data.next = [
     ...(doc.data.next ?? []).filter((item) => item.id !== id),
-    { id, title: draft.next, status: "proposed", ref: source },
+    { id, title: draft.paths ? "从可能路径中选择一个小实验" : draft.next, status: "proposed", ref: source },
   ];
   doc.data.updated = isoInZone(new Date(), ws.timeZone());
-  const section = `### ${id}\n${matterNotes(draft)}`;
+  const section = `### ${id}\n${matterNotes(draft)}${pathNotes(draft.paths ?? [])}`;
   const old = doc.body.indexOf(`### ${id}\n`);
   const end = old < 0 ? -1 : doc.body.indexOf("\n### ", old + 4);
   doc.body =
@@ -1012,23 +1106,44 @@ export async function adoptOnboardingMatter(
   ws: Workspace,
   source: string,
   input: OnboardingMatterDraft,
+  path: OnboardingPath | null = null,
 ): Promise<OnboardingNext> {
-  readOnboardingMatter(ws, source);
+  const matter = readOnboardingMatter(ws, source);
   const parsed = onboardingMatterSchema.safeParse(input);
   if (!parsed.success)
     throw new KaituError("请填写当前目标、已知现状和一个下一步，均使用单行文本", "BAD_ARGS");
   const draft = parsed.data;
   const existing = listTasks(ws, { status: "all" }).find((task) => task.source === source);
-  if (existing) return onboardingNext(existing);
+  if (existing) return onboardingNext(ws, existing);
+  const paths = matter.draft?.paths;
+  const selected = onboardingPathSchema.safeParse(path);
+  const chosen = paths?.find(
+    (item) =>
+      selected.success &&
+      item.name === selected.data.name &&
+      item.fit === selected.data.fit &&
+      item.unknown === selected.data.unknown &&
+      item.experiment === selected.data.experiment,
+  );
+  if (paths?.length && !chosen)
+    throw new KaituError(
+      path ? "路径已经变化，请重新核对" : "请先选一条可能路径，再核对小实验",
+      path ? "CONFLICT" : "USER_DECISION",
+    );
+  const notes =
+    matterNotes(draft) +
+    (chosen
+      ? `所选路径：${chosen.name}\n为什么适合：${chosen.fit}\n还有哪些不清楚：${chosen.unknown}\n原建议小实验：${chosen.experiment}\n`
+      : "");
   let task: Task | undefined;
   await batchSnapshot(ws, "你从原文采纳了一个下一步", async () => {
-    task = (await addTask(ws, { title: draft.next, source, notes: matterNotes(draft) })).record as Task;
+    task = (await addTask(ws, { title: draft.next, source, notes })).record as Task;
     const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
     doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
     ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
   });
   if (!task) throw new KaituError("下一步未保存", "WRITE_FAILED");
-  return onboardingNext(task);
+  return onboardingNext(ws, task);
 }
 export async function changeOnboardingNext(
   ws: Workspace,
@@ -1050,5 +1165,5 @@ export async function changeOnboardingNext(
   else throw new KaituError("操作或日期不合法", "BAD_ARGS");
   const result = updateRecord(ws, "task", id, patch, { by: "user" });
   await snapshot(ws, action === "complete" ? "你完成下一步并记下结果" : "你调整了下一步的日期");
-  return onboardingNext(result.record as Task);
+  return onboardingNext(ws, result.record as Task);
 }

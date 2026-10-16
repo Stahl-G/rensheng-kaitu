@@ -223,15 +223,47 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
     expect(listTasks(ws)).toHaveLength(0);
     expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).draft).toBeNull();
     await draftOnboardingMatter(ws, matter.source, input);
-    const next = await adoptOnboardingMatter(ws, matter.source, input);
-    await adoptOnboardingMatter(ws, matter.source, input);
+    const paths = [
+      {
+        name: "整理已有作品",
+        fit: "已有素材可用",
+        unknown: "哪些作品适合展出",
+        experiment: "挑出两件作品请朋友看",
+      },
+      {
+        name: "先找观众反馈",
+        fit: "能低成本验证主题",
+        unknown: "谁对主题感兴趣",
+        experiment: "找两位朋友各聊十分钟",
+      },
+    ];
+    await draftOnboardingMatter(ws, matter.source, { ...input, next: "", paths });
+    expect(readOnboardingMatter(ws, matter.source).draft?.paths).toEqual(paths);
+    expect(listTasks(ws)).toHaveLength(0);
+    await expect(adoptOnboardingMatter(ws, matter.source, input)).rejects.toThrow();
+    const selected = { ...input, next: "先和一位朋友聊主题" };
+    await expect(
+      adoptOnboardingMatter(ws, matter.source, selected, {
+        name: "旧的路径",
+        fit: "旧的理由",
+        unknown: "旧的未知",
+        experiment: "旧的实验",
+      }),
+    ).rejects.toThrow();
+    const next = await adoptOnboardingMatter(ws, matter.source, selected, paths[1]);
+    await adoptOnboardingMatter(ws, matter.source, selected, paths[1]);
     expect(listTasks(ws)).toHaveLength(1);
     expect(listTasks(ws)[0]).toMatchObject({
       id: next.id,
       source: matter.source,
-      title: input.next,
+      title: selected.next,
       status: "open",
     });
+    expect(listTasks(ws)[0]?.notes).toContain(paths[1]?.name);
+    expect(matter.kind).toBe("note");
+    const conversation = await saveOnboardingMatter(ws, "我：想准备展览。\nChatGPT：先挑作品。");
+    expect(conversation.kind).toBe("conversation");
+    expect(listTasks(ws)).toHaveLength(1);
     await inboxNoteDone(ws, matter.source);
     expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe(original);
     const later = await changeOnboardingNext(ws, next.id, next.rev, "defer", "2026-12-01");

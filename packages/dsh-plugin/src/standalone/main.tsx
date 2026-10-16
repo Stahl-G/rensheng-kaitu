@@ -18,7 +18,7 @@ const props: OverviewPageProps = {
   saveOnboardingMatter: (text) => call("onboardingMatterSave", text),
   readOnboardingMatter: (source) => call("onboardingMatterRead", source),
   organizeOnboardingMatter: (source) => call("onboardingMatterOrganize", source),
-  adoptOnboardingMatter: (source, draft) => call("onboardingMatterAdopt", source, draft),
+  adoptOnboardingMatter: (source, draft, path = null) => call("onboardingMatterAdopt", source, draft, path),
   changeOnboardingNext: (id, rev, action, value) => call("onboardingNextChange", id, rev, action, value),
   loadOnboarding: () => call("onboarding"),
   chooseOnboarding: (choices) => call("onboardingChoose", choices),

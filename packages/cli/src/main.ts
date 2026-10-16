@@ -10,7 +10,7 @@ import {
   type MemoryPatch,
   type OnboardingAi,
   type OnboardingChoices,
-  type OnboardingMatterDraft,
+  type OnboardingMatterSuggestion,
   type OnboardingSetupInput,
   type Pose,
   type ProjectLink,
@@ -516,7 +516,7 @@ async function run(argv: string[]): Promise<number> {
           result = await draftOnboardingMatter(
             ws,
             need(args[1], "source"),
-            parseJson(values.json) as unknown as OnboardingMatterDraft,
+            parseJson(values.json) as unknown as OnboardingMatterSuggestion,
           );
           break;
         case "status":

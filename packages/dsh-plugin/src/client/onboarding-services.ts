@@ -9,6 +9,7 @@ import type {
   OnboardingMemoryPreview,
   OnboardingMemoryResult,
   OnboardingNext,
+  OnboardingPath,
   OnboardingSetupInput,
   OnboardingSetupPreview,
   OnboardingSetupResult,
@@ -20,7 +21,11 @@ export interface OnboardingServices {
   saveOnboardingMatter: (text: string) => Promise<OnboardingMatter>;
   readOnboardingMatter: (source: string) => Promise<OnboardingMatter>;
   organizeOnboardingMatter: (source: string) => Promise<OnboardingMatter>;
-  adoptOnboardingMatter: (source: string, draft: OnboardingMatterDraft) => Promise<OnboardingNext>;
+  adoptOnboardingMatter: (
+    source: string,
+    draft: OnboardingMatterDraft,
+    path?: OnboardingPath | null,
+  ) => Promise<OnboardingNext>;
   changeOnboardingNext: (id: string, rev: number, action: string, value: string) => Promise<OnboardingNext>;
   loadOnboarding: () => Promise<OnboardingStatus>;
   chooseOnboarding: (choices: OnboardingChoices) => Promise<OnboardingChoiceResult>;

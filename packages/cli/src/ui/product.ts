@@ -11,6 +11,8 @@ import {
   type OnboardingAi,
   type OnboardingChoices,
   type OnboardingMatterDraft,
+  type OnboardingMatterSuggestion,
+  type OnboardingPath,
   type OnboardingSetupInput,
   type SettingsData,
   type Workspace,
@@ -192,9 +194,14 @@ export async function productRequest(
     case "onboardingMatterOrganize":
       return organizeOnboardingMatter(ws, text(0), ask);
     case "onboardingMatterDraft":
-      return draftOnboardingMatter(ws, text(0), args[1] as OnboardingMatterDraft);
+      return draftOnboardingMatter(ws, text(0), args[1] as OnboardingMatterSuggestion);
     case "onboardingMatterAdopt":
-      return adoptOnboardingMatter(ws, text(0), args[1] as OnboardingMatterDraft);
+      return adoptOnboardingMatter(
+        ws,
+        text(0),
+        args[1] as OnboardingMatterDraft,
+        (args[2] ?? null) as OnboardingPath | null,
+      );
     case "onboardingNextChange":
       return changeOnboardingNext(ws, text(0), revision(1), text(2), text(3));
     case "onboarding":

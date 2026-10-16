@@ -7,6 +7,7 @@ import type {
   OnboardingAi,
   OnboardingChoices,
   OnboardingMatterDraft,
+  OnboardingPath,
   OnboardingSetupInput,
 } from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
@@ -147,8 +148,12 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error);
                 return r.value;
               },
-              adoptOnboardingMatter: async (source: string, draft: OnboardingMatterDraft) => {
-                const r = await ctx.remote.kaitu.onboardingMatterAdopt(source, draft);
+              adoptOnboardingMatter: async (
+                source: string,
+                draft: OnboardingMatterDraft,
+                path: OnboardingPath | null = null,
+              ) => {
+                const r = await ctx.remote.kaitu.onboardingMatterAdopt(source, draft, path);
                 if (!r.ok) throw new Error(r.error);
                 return r.value;
               },
