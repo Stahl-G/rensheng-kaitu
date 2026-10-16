@@ -261,7 +261,6 @@ function ImportPanel({
   previewFinanceImport,
   commitFinanceImport,
   discardFinanceImport,
-  onPrompt,
   onClose,
   onImported,
   stamp,
@@ -270,12 +269,13 @@ function ImportPanel({
   previewFinanceImport: FinancePageProps["previewFinanceImport"];
   commitFinanceImport: FinancePageProps["commitFinanceImport"];
   discardFinanceImport: FinancePageProps["discardFinanceImport"];
-  onPrompt: FinancePageProps["onPrompt"];
   onClose: () => void;
   onImported: (result: FinanceImportCommitData) => void;
   stamp: (value: string) => string;
 }) {
   const [account, setAccount] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const selectedFile = useRef<File>();
   const [tradeDate, setTradeDate] = useState("");
   const [sheet, setSheet] = useState("");
   const [accountLast4, setAccountLast4] = useState("");
@@ -292,8 +292,8 @@ function ImportPanel({
       if (staged.current && !committing.current) void discardFinanceImport(staged.current).catch(() => {});
     };
   }, [discardFinanceImport]);
-  const upload = async (file?: File) => {
-    if (!file || !account) return;
+  const upload = async (file?: File, target?: string, name?: string) => {
+    if (!file) return;
     if (file.size > 36 * 1024 * 1024 || !/\.(csv|xml|xls|xlsx)$/i.test(file.name)) {
       setError("请选择不超过 36MB 的 CSV、XML、XLS 或 XLSX 文件。");
       return;
@@ -308,7 +308,8 @@ function ImportPanel({
         reader.readAsDataURL(file);
       });
       const result = await previewFinanceImport(file.name, base64, {
-        account,
+        account: target || undefined,
+        accountName: target ? undefined : name,
         tradeDate: tradeDate || undefined,
         sheet: sheet || undefined,
         accountLast4: accountLast4 || undefined,
@@ -317,8 +318,13 @@ function ImportPanel({
         await discardFinanceImport(result.file);
         return;
       }
+      const previous = staged.current;
       staged.current = result.file;
+      selectedFile.current = file;
+      setAccount(result.preview.account ?? "");
+      setAccountName(result.preview.suggestedAccount.name);
       setPreview(result);
+      if (previous) await discardFinanceImport(previous);
     } catch (err) {
       if (alive.current) setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -342,13 +348,14 @@ function ImportPanel({
     }
   };
   const commit = async () => {
-    if (!preview || !account) return;
+    if (!preview || (!account && !accountName.trim())) return;
     setBusy(true);
     setError(null);
     try {
       committing.current = true;
       const result = await commitFinanceImport(preview.file, {
-        account,
+        account: account || undefined,
+        accountName: account ? undefined : accountName,
         tradeDate: tradeDate || undefined,
         sheet: sheet || undefined,
         accountLast4: accountLast4 || undefined,
@@ -374,24 +381,22 @@ function ImportPanel({
           {error}
         </p>
       )}
-      {!accounts.length ? (
-        <div className={css.empty}>
-          <p>先在对话里说：帮我建一个支付宝账户</p>
-          <button type="button" className={css.button} onClick={() => onPrompt("帮我建一个支付宝账户")}>
-            回到对话
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className={css.importFields}>
+      <>
+        <div className={css.importFields}>
+          {preview && (
             <label>
-              选择账户
+              导入到账户
               <select
                 value={account}
-                disabled={busy || !!preview}
-                onChange={(e) => setAccount(e.target.value)}
+                disabled={busy}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setAccount(value);
+                  if (value) void upload(selectedFile.current, value);
+                  else setAccountName("");
+                }}
               >
-                <option value="">请选择账户</option>
+                <option value="">新建账户</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name} · {a.currency}
@@ -399,142 +404,158 @@ function ImportPanel({
                 ))}
               </select>
             </label>
-            {!preview && (
-              <>
-                <details>
-                  <summary>表格选项</summary>
-                  <label>
-                    银行卡尾号（账单未提供时）
-                    <input
-                      inputMode="numeric"
-                      maxLength={4}
-                      value={accountLast4}
-                      disabled={busy || !!preview}
-                      onChange={(e) => setAccountLast4(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    成交日（成交表缺少日期时填写）
-                    <input
-                      type="date"
-                      value={tradeDate}
-                      disabled={busy || !!preview}
-                      onChange={(e) => setTradeDate(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    工作表名称（多张账单时填写）
-                    <input
-                      value={sheet}
-                      disabled={busy || !!preview}
-                      onChange={(e) => setSheet(e.target.value)}
-                    />
-                  </label>
-                </details>
+          )}
+          {preview && !account && (
+            <label>
+              账户名
+              <input value={accountName} disabled={busy} onChange={(e) => setAccountName(e.target.value)} />
+              {accountName.trim() && accountName.trim() !== preview.preview.suggestedAccount.name && (
+                <button
+                  type="button"
+                  className={css.button}
+                  disabled={busy}
+                  onClick={() => void upload(selectedFile.current, "", accountName)}
+                >
+                  更新预览
+                </button>
+              )}
+            </label>
+          )}
+          {!preview && (
+            <>
+              <details>
+                <summary>表格选项</summary>
                 <label>
-                  选择账单或持仓文件
+                  银行卡尾号（账单未提供时）
                   <input
-                    type="file"
-                    accept=".csv,.xml,.xls,.xlsx"
-                    disabled={!account || busy}
-                    onChange={(e) => {
-                      void upload(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
+                    inputMode="numeric"
+                    maxLength={4}
+                    value={accountLast4}
+                    disabled={busy || !!preview}
+                    onChange={(e) => setAccountLast4(e.target.value)}
                   />
                 </label>
-              </>
+                <label>
+                  成交日（成交表缺少日期时填写）
+                  <input
+                    type="date"
+                    value={tradeDate}
+                    disabled={busy || !!preview}
+                    onChange={(e) => setTradeDate(e.target.value)}
+                  />
+                </label>
+                <label>
+                  工作表名称（多张账单时填写）
+                  <input
+                    value={sheet}
+                    disabled={busy || !!preview}
+                    onChange={(e) => setSheet(e.target.value)}
+                  />
+                </label>
+              </details>
+              <label>
+                选择账单或持仓文件
+                <input
+                  type="file"
+                  accept=".csv,.xml,.xls,.xlsx"
+                  disabled={busy}
+                  onChange={(e) => {
+                    void upload(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </>
+          )}
+        </div>
+
+        {busy && <output className={css.muted}>{preview ? "正在处理…" : "正在读取文件并生成预览…"}</output>}
+        {p && (
+          <div className={css.preview}>
+            <p>
+              {importSourceNames[p.format] ?? p.format} · {p.encoding.toUpperCase()}
+            </p>
+            <p className={css.muted}>
+              期间：{p.period.from ? stamp(p.period.from) : "暂无记录"} –{" "}
+              {p.period.to ? stamp(p.period.to) : "暂无记录"} · 币种：
+              {p.currencies.map((c) => c ?? "未知").join("、") || "暂无记录"}
+            </p>
+            <details>
+              <summary className={css.link}>查看列映射</summary>
+              <dl className={css.mapping}>
+                {Object.entries(p.mapping).map(([field, column]) => (
+                  <div key={field}>
+                    <dt>{fields[field] ?? "其他字段"}</dt>
+                    <dd>{column ?? "忽略"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+            <div className={css.counts}>
+              {[
+                ["新增", p.added],
+                ["已存在", p.skipped],
+                ["疑似重复", p.candidate_duplicate],
+                ["待核对", p.pending_review],
+              ].map(([label, count]) => (
+                <span key={label}>
+                  <strong>{count}</strong> {label}
+                </span>
+              ))}
+            </div>
+            {!!p.ignored && <p className={css.muted}>另跳过 {p.ignored} 行关闭交易或说明。</p>}
+            <h3>前 {p.rows.length} 行</h3>
+            <table className={css.table}>
+              <thead>
+                <tr>
+                  {["行号", "日期", "对手方 / 证券", "原币金额 / 持仓", "说明"].map((label) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {p.rows.map((r) => (
+                  <tr key={r.line}>
+                    <td data-label="行号">{r.line}</td>
+                    <td data-label="日期">{stamp(r.ts)}</td>
+                    <td data-label="对手方 / 证券">
+                      {[r.counterparty, r.security_code, r.name].filter(Boolean).join(" · ") || "暂无记录"}
+                    </td>
+                    <td data-label="原币金额 / 持仓">
+                      {r.amount !== null ? (
+                        money(r.amount, r.currency)
+                      ) : (
+                        <>
+                          <span>数量 {decimal(r.quantity)}</span>
+                          <br />
+                          <span>单位成本 {r.cost === null ? "暂无成本" : money(r.cost, r.currency)}</span>
+                          <br />
+                          <span>市值 {money(r.market_value, r.currency)}</span>
+                        </>
+                      )}
+                    </td>
+                    <td data-label="说明">
+                      {r.description ?? (r.category ? categories[r.category] : null) ?? "暂无记录"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!!p.errors.length && (
+              <div role="alert" className={css.notice}>
+                <h3>问题行 · 请修正文件后重新选择</h3>
+                <ul>
+                  {p.errors.map((r, i) => (
+                    <li key={`${r.line}-${i}`}>
+                      第 {r.line} 行：{r.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
-          {!account && <p className={css.muted}>选好账户后，即可选择账单或持仓文件。</p>}
-          {busy && <output className={css.muted}>{preview ? "正在处理…" : "正在读取文件并生成预览…"}</output>}
-          {p && (
-            <div className={css.preview}>
-              <p>
-                {importSourceNames[p.format] ?? p.format} · {p.encoding.toUpperCase()}
-              </p>
-              <p className={css.muted}>
-                期间：{p.period.from ? stamp(p.period.from) : "暂无记录"} –{" "}
-                {p.period.to ? stamp(p.period.to) : "暂无记录"} · 币种：
-                {p.currencies.map((c) => c ?? "未知").join("、") || "暂无记录"}
-              </p>
-              <details>
-                <summary className={css.link}>查看列映射</summary>
-                <dl className={css.mapping}>
-                  {Object.entries(p.mapping).map(([field, column]) => (
-                    <div key={field}>
-                      <dt>{fields[field] ?? "其他字段"}</dt>
-                      <dd>{column ?? "忽略"}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </details>
-              <div className={css.counts}>
-                {[
-                  ["新增", p.added],
-                  ["已存在", p.skipped],
-                  ["疑似重复", p.candidate_duplicate],
-                  ["待核对", p.pending_review],
-                ].map(([label, count]) => (
-                  <span key={label}>
-                    <strong>{count}</strong> {label}
-                  </span>
-                ))}
-              </div>
-              {!!p.ignored && <p className={css.muted}>另跳过 {p.ignored} 行关闭交易或说明。</p>}
-              <h3>前 {p.rows.length} 行</h3>
-              <table className={css.table}>
-                <thead>
-                  <tr>
-                    {["行号", "日期", "对手方 / 证券", "原币金额 / 持仓", "说明"].map((label) => (
-                      <th key={label}>{label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.rows.map((r) => (
-                    <tr key={r.line}>
-                      <td data-label="行号">{r.line}</td>
-                      <td data-label="日期">{stamp(r.ts)}</td>
-                      <td data-label="对手方 / 证券">
-                        {[r.counterparty, r.security_code, r.name].filter(Boolean).join(" · ") || "暂无记录"}
-                      </td>
-                      <td data-label="原币金额 / 持仓">
-                        {r.amount !== null ? (
-                          money(r.amount, r.currency)
-                        ) : (
-                          <>
-                            <span>数量 {decimal(r.quantity)}</span>
-                            <br />
-                            <span>单位成本 {r.cost === null ? "暂无成本" : money(r.cost, r.currency)}</span>
-                            <br />
-                            <span>市值 {money(r.market_value, r.currency)}</span>
-                          </>
-                        )}
-                      </td>
-                      <td data-label="说明">
-                        {r.description ?? (r.category ? categories[r.category] : null) ?? "暂无记录"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!!p.errors.length && (
-                <div role="alert" className={css.notice}>
-                  <h3>问题行 · 请修正文件后重新选择</h3>
-                  <ul>
-                    {p.errors.map((r, i) => (
-                      <li key={`${r.line}-${i}`}>
-                        第 {r.line} 行：{r.reason}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
+        )}
+      </>
       <div className={css.actions}>
         {preview && (
           <button type="button" className={css.button} disabled={busy} onClick={() => void discard(false)}>
@@ -545,7 +566,13 @@ function ImportPanel({
           <button
             type="button"
             className={`${css.button} ${css.primary}`}
-            disabled={busy || !!p?.errors.length}
+            disabled={
+              busy ||
+              !!error ||
+              !!p?.errors.length ||
+              p?.account !== (account || null) ||
+              (!account && (!accountName.trim() || accountName.trim() !== p?.suggestedAccount.name))
+            }
             onClick={() => void commit()}
           >
             确认导入
@@ -690,7 +717,6 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
           {...props}
           accounts={data.accounts.accounts}
           stamp={stamp}
-          onPrompt={ask}
           onClose={() => setImporting(false)}
           onImported={(result) => {
             setImporting(false);

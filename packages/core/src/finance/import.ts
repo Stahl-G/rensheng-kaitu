@@ -15,7 +15,7 @@ import { readFinanceDocument } from "./document.js";
 import { parseIbkr } from "./providers/ibkr.js";
 import { currency } from "./providers/shared.js";
 import { type FinanceFormat, type FinanceMapping, parseFinanceTable } from "./providers/tables.js";
-import type { FinanceTransaction } from "./types.js";
+import type { FinanceAccount, FinanceTransaction } from "./types.js";
 
 export type { FinanceFormat, FinanceMapping } from "./providers/tables.js";
 export interface FinanceImportOptions {
@@ -25,6 +25,7 @@ export interface FinanceImportOptions {
   tradeDate?: string;
   accountLast4?: string;
   account?: string;
+  accountName?: string;
 }
 const staged = (file: string) => /^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file);
 const filePath = (ws: Workspace, file: string) =>
@@ -154,9 +155,61 @@ function plan(ws: Workspace, parsed: Awaited<ReturnType<typeof parse>>, account?
   }
   return { type, records, updates, skipped };
 }
+function importAccount(
+  ws: Workspace,
+  parsed: Awaited<ReturnType<typeof parse>>,
+  options: FinanceImportOptions,
+) {
+  const names: Record<FinanceFormat, string> = {
+    "alipay-csv": "支付宝",
+    wechat: "微信",
+    "holdings-csv": "券商持仓",
+    ibkr: "IBKR",
+    cmb: "招商银行",
+    icbc: "工商银行",
+    ccb: "建设银行",
+    boc: "中国银行",
+    jd: "京东",
+    mt: "美团",
+    hxsec: "华西证券",
+    htsec: "海通证券",
+  };
+  const kind: FinanceAccount["kind"] = ["holdings-csv", "hxsec", "htsec", "ibkr"].includes(parsed.format)
+    ? "securities"
+    : ["cmb", "icbc", "ccb", "boc"].includes(parsed.format)
+      ? "bank"
+      : "wallet";
+  const suggestion = {
+    name: options.accountName?.trim() ?? names[parsed.format],
+    kind,
+    currency: String(parsed.candidates.find((r) => r.data.currency)?.data.currency ?? "CNY"),
+    source: parsed.format,
+  };
+  if (!suggestion.name) throw new KaituError("请填写账户名", "INVALID_IMPORT");
+  const accounts = readRecords(ws, "finance_account");
+  const matches = accounts.filter(
+    (a) =>
+      a.source === suggestion.source &&
+      a.kind === kind &&
+      a.currency === suggestion.currency &&
+      (options.accountName === undefined || a.name === suggestion.name),
+  );
+  const account = options.account
+    ? accounts.find((a) => a.id === options.account)
+    : matches.length === 1
+      ? matches[0]
+      : undefined;
+  if (options.account && !account) throw new KaituError("请选择已存在的财务账户", "INVALID_IMPORT");
+  return { suggestion, account };
+}
+function assignAccount(parsed: Awaited<ReturnType<typeof parse>>, account: string) {
+  for (const row of parsed.candidates) row.data.account = account;
+}
 export async function previewFinanceImport(ws: Workspace, file: string, options: FinanceImportOptions = {}) {
   const parsed = await parse(ws, file, options);
-  const batch = plan(ws, parsed, options.account);
+  const target = importAccount(ws, parsed, options);
+  if (target.account) assignAccount(parsed, target.account.id);
+  const batch = plan(ws, parsed, target.account?.id ?? "preview-account");
   const timestamps = parsed.candidates
     .map((r) => String(r.data.ts))
     .sort((a, b) => Date.parse(a) - Date.parse(b));
@@ -166,7 +219,8 @@ export async function previewFinanceImport(ws: Workspace, file: string, options:
     sheet: parsed.sheet,
     columns: parsed.columns,
     mapping: parsed.mapping,
-    account: options.account ?? null,
+    account: target.account?.id ?? null,
+    suggestedAccount: target.suggestion,
     period: { from: timestamps[0] ?? null, to: timestamps.at(-1) ?? null },
     currencies: [...new Set(parsed.candidates.map((r) => r.data.currency as string | null))],
     rows: parsed.candidates.slice(0, 20).map((r) => ({
@@ -201,9 +255,7 @@ export async function previewFinanceImport(ws: Workspace, file: string, options:
     errors: parsed.errors,
   };
 }
-async function commit(ws: Workspace, file: string, options: FinanceImportOptions & { account: string }) {
-  if (!readRecords(ws, "finance_account").some((a) => a.id === options.account))
-    throw new KaituError("请先选择已存在的财务账户", "INVALID_IMPORT");
+async function commit(ws: Workspace, file: string, options: FinanceImportOptions) {
   const receipt = staged(file) ? receiptPath(file) : null;
   if (!existsSync(filePath(ws, file)) && receipt && ws.exists(receipt)) {
     const saved = ws.readJson<{ options: FinanceImportOptions; added: number; skipped: number }>(receipt);
@@ -217,14 +269,21 @@ async function commit(ws: Workspace, file: string, options: FinanceImportOptions
       `整批未写入：${parsed.errors.map((r) => `${r.line} 行 ${r.reason}`).join("；")}`,
       "INVALID_IMPORT",
     );
-  const batch = plan(ws, parsed, options.account);
+  const target = importAccount(ws, parsed, options);
+  const newAccount = target.account
+    ? []
+    : addRecords(ws, "finance_account", [target.suggestion], { by: "user", dryRun: true });
+  const account = target.account?.id ?? newAccount[0]?.record.id;
+  if (!account) throw new KaituError("无法建立财务账户", "INVALID_IMPORT");
+  assignAccount(parsed, account);
+  const batch = plan(ws, parsed, account);
   let version: string | null = null;
   if (batch.records.length) {
     await batchOverview(ws, async () =>
-      appendPreparedRecords(
-        ws,
-        [...batch.records, ...batch.updates].map((record) => ({ type: batch.type, record })),
-      ),
+      appendPreparedRecords(ws, [
+        ...newAccount.map(({ record }) => ({ type: "finance_account", record })),
+        ...[...batch.records, ...batch.updates].map((record) => ({ type: batch.type, record })),
+      ]),
     );
     version = await snapshot(ws, `导入财务（${parsed.format}）${batch.records.length} 条`);
   }
@@ -241,11 +300,7 @@ async function commit(ws: Workspace, file: string, options: FinanceImportOptions
   }
   return result;
 }
-export async function commitFinanceImport(
-  ws: Workspace,
-  file: string,
-  options: FinanceImportOptions & { account: string },
-) {
+export async function commitFinanceImport(ws: Workspace, file: string, options: FinanceImportOptions) {
   const previous = queues.get(ws.root) ?? Promise.resolve();
   const operation = previous.catch(() => {}).then(() => commit(ws, file, options));
   queues.set(ws.root, operation);

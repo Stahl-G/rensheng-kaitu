@@ -409,7 +409,7 @@ export async function productRequest(
       if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(text(0)))
         throw new KaituError("无效的财务上传文件", "BAD_ARGS");
       ws.resolve(text(0), { internal: true });
-      return commitFinanceImport(ws, text(0), args[1] as FinanceImportOptions & { account: string });
+      return commitFinanceImport(ws, text(0), args[1] as FinanceImportOptions);
     case "financeImportDiscard":
       return discardFinanceImport(ws, text(0));
     default:

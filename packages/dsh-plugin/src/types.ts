@@ -196,9 +196,7 @@ export interface DoingProject {
 /** 财务边界类型从 core 派生，供生成器为浏览器导入具名契约。 */
 export interface FinanceRemoteViewOptions extends FinanceViewOptions {}
 export interface FinanceRemoteImportOptions extends FinanceImportOptions {}
-export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {
-  account: string;
-}
+export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {}
 export type FinanceOverviewData = ReturnType<typeof financeOverview>;
 export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
 export type FinanceInvestmentsData = Awaited<ReturnType<typeof loadFinanceInvestments>>;

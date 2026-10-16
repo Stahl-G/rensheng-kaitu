@@ -5,7 +5,8 @@
 持仓识别证券代码、名称、数量、每单位成本价、市价、市值和币种；缺列保留 null，证券代码保留前导零。
 没有快照时间列时采用上传文件时间；同文件再次上传仍按内容去重。新工作区自带 finance，旧工作区运行 `kaitu upgrade`。
 
-导入顺序：先用 `finance_account` 建立账户，再上传文件并调用 `previewFinanceImport` / `financeImportPreview`。
+导入顺序：直接上传文件并调用 `previewFinanceImport` / `financeImportPreview`，按格式识别账户。
+预览可改选已有账户，或修改新账户名（`accountName`）；账户与账单在确认时一起写入，已有账户可继续传 `account`。
 预览返回编码、列映射、期间、币种、前 20 行、新增 / 跳过 / 候选重复 / 待核对计数及错误行，不修改业务数据。
 预览传 account 可准确核对无交易 ID 的记录；未选账户时计数供初筛，提交会按最终账户重新计算。
 映射为「字段名 → 列名」，null 忽略列；修改映射后可重新预览，提交时也可覆盖。
