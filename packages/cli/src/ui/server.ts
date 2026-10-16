@@ -23,6 +23,7 @@ import {
   importUpload,
   pendingWorkspaceFiles,
   processInbox,
+  pullCalendarSubscriptions,
   readPhoto,
   readWorkbench,
   refreshOverview,
@@ -141,6 +142,13 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     queue = result.catch(() => {});
     return result;
   }
+  const pullCalendars = () =>
+    exclusive(async () => {
+      await pullCalendarSubscriptions(ws);
+      notify();
+    });
+  const calendarTimer = setInterval(() => void pullCalendars().catch(() => {}), 60000);
+  calendarTimer.unref();
   let inboxTimer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -152,6 +160,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
+  void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
     notify();
@@ -495,6 +504,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearInterval(heartbeat);
     clearInterval(polling);
     for (const client of [...clients, ...askClients]) client.end();
+    clearInterval(calendarTimer);
     await options.ask?.close();
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);

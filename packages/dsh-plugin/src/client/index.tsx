@@ -119,6 +119,31 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadCalendar: async () => {
+                const r = await ctx.remote.kaitu.calendar();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              addCalendar: async (url: string, name: string) => {
+                const r = await ctx.remote.kaitu.addCalendarSubscription(url, name);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLibrary: async () => {
+                const r = await ctx.remote.kaitu.library();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLibraryDocument: async (file: string) => {
+                const r = await ctx.remote.kaitu.libraryDocument(file);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              completeNext: async (file: string, id: string) => {
+                const r = await ctx.remote.kaitu.completeNext(file, id);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               decideProposal: async (id: string, decision: "confirmed" | "rejected") => {
                 const result = await ctx.remote.kaitu.decideProposal(id, decision);
                 if (!result.ok) throw new Error(result.error.message);

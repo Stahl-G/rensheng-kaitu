@@ -4,10 +4,14 @@ import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
   type AutomationKey,
   type AutomationSettings,
+  type CalendarData,
   KaituError,
+  type LibraryData,
   Workspace,
+  addCalendarSubscription,
   captureNote,
   changeExperienceBatch,
+  completeNext,
   configureAutomation,
   decideProposal,
   defaultRoot,
@@ -19,12 +23,15 @@ import {
   previewExperienceBatch,
   readAutomation,
   readAvatar,
+  readCalendar,
   readDoing,
   readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLibrary,
+  readLibraryDocument,
   readNews,
   readOverviewPage,
   readPhoto,
@@ -99,6 +106,31 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("library")
+  async library(): Promise<LibraryData> {
+    return readLibrary(this.workspace);
+  }
+
+  @Remote("libraryDocument")
+  async libraryDocument(file: string): Promise<string> {
+    return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("calendar")
+  async calendar(): Promise<CalendarData> {
+    return readCalendar(this.workspace);
+  }
+
+  @Remote("addCalendarSubscription")
+  async addCalendarSubscription(url: string, name: string): Promise<CalendarData> {
+    return this.write(() => addCalendarSubscription(this.workspace, url, name));
+  }
+
+  @Remote("completeNext")
+  async completeNext(file: string, id: string): Promise<{ version: string | null }> {
+    return this.write(() => completeNext(this.workspace, file, id));
   }
 
   @Remote("automation")

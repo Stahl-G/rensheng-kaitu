@@ -3,6 +3,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry";
 import { Workspace, defaultRoot, initWorkspace, upgradeWorkspace } from "@kaitu/core";
 import { TYPERT as contribution } from "../lib/typert.host.js";
+import { startCalendarLoop } from "./calendar-loop.js";
 import type { SkillContext, Context as ToolContext } from "./dsh.js";
 import { KaituFinanceService } from "./finance-service.js";
 import { startInboxLoop } from "./inbox-loop.js";
@@ -35,6 +36,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.typert.register(contribution as TypertContribution);
   new KaituOverviewService(ctx, config, ws, queue);
   new KaituFinanceService(ctx, config, ws, queue);
+  ctx.effect(() => startCalendarLoop(ws, queue));
   const stop = startInboxLoop(ws, 60000, queue);
   ctx.effect(() => stop);
   ctx.inject(["schedule", "sessionController", "sessions"], (services) => {

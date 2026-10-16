@@ -25,6 +25,11 @@ const props: OverviewPageProps = {
     workspace = data.root;
     return data;
   },
+  loadCalendar: () => call("calendar"),
+  addCalendar: (url, name) => call("addCalendarSubscription", url, name),
+  loadLibrary: () => call("library"),
+  loadLibraryDocument: (file) => call("libraryDocument", file),
+  completeNext: (file, id) => call("completeNext", file, id),
   decideProposal: (id, decision) => call("decideProposal", id, decision),
   capture: (text) => call("capture", text),
   loadMe: () => call("me"),

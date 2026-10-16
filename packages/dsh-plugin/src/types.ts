@@ -202,3 +202,7 @@ export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
 export type FinanceImportPreviewData = { file: string; preview: ReturnType<typeof previewFinanceImport> };
 export type FinanceImportCommitData = Awaited<ReturnType<typeof commitFinanceImport>>;
 export type { MeGoal, MeRules, MeData } from "@kaitu/core";
+
+export type { CalendarData, CalendarEntry, AutomationSettings, AutomationKey } from "@kaitu/core";
+
+export type { LibraryData, InboxEntry } from "@kaitu/core";

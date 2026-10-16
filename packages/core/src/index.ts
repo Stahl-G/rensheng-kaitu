@@ -63,3 +63,5 @@ export * from "./exploration.js";
 export * from "./exploration-contract.js";
 
 export * from "./automation.js";
+export * from "./calendar.js";
+export * from "./library.js";

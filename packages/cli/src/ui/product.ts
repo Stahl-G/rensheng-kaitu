@@ -6,9 +6,11 @@ import {
   type FinanceViewOptions,
   KaituError,
   type Workspace,
+  addCalendarSubscription,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
+  completeNext,
   configureAutomation,
   decideProposal,
   discardFinanceImport,
@@ -25,12 +27,15 @@ import {
   previewFinanceImport,
   readAutomation,
   readAvatar,
+  readCalendar,
   readDoing,
   readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLibrary,
+  readLibraryDocument,
   readMe,
   readNews,
   readOverviewPage,
@@ -50,6 +55,8 @@ import type { AskService } from "./ask.js";
 
 export const productMutations = new Set([
   "configureAutomation",
+  "addCalendarSubscription",
+  "completeNext",
   "setExperienceSource",
   "changeExperienceBatch",
   "recoverExperienceImports",
@@ -99,6 +106,16 @@ export async function productRequest(
     }
   }
   switch (method) {
+    case "library":
+      return readLibrary(ws);
+    case "libraryDocument":
+      return readLibraryDocument(ws, text(0));
+    case "calendar":
+      return readCalendar(ws);
+    case "addCalendarSubscription":
+      return addCalendarSubscription(ws, text(0), text(1));
+    case "completeNext":
+      return completeNext(ws, text(0), text(1));
     case "automation":
       return readAutomation(ws);
     case "configureAutomation":
