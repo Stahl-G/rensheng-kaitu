@@ -17,7 +17,7 @@ import {
   onboardingStatus,
   projectGithub,
   proposeBlock,
-  publicRecord,
+  publicRecords,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -134,8 +134,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "record_list",
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
-    ({ type, from, to }) =>
-      readRecords(ws, type, { from, to }).filter((row) => tools !== "remote" || publicRecord(ws, type, row)),
+    ({ type, from, to }) => {
+      const rows = readRecords(ws, type, { from, to, includePrivate: tools !== "remote" });
+      return tools === "remote" ? publicRecords(ws, type, rows) : rows;
+    },
   );
   register(
     "task_add",
@@ -148,14 +150,20 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       notes: text.optional(),
       source: text.optional(),
     },
-    (input) => addTask(ws, input, { by: "agent", actor: actor() }),
+    (input) => {
+      if (tools === "remote" && input.project) assertPublicProject(ws, input.project);
+      return addTask(ws, input, { by: "agent", actor: actor() });
+    },
     true,
   );
   register(
     "task_list",
     "查询待办，默认 open；dueBefore 日期含当天，时间截止按用户时区判断。",
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
-    (input) => listTasks(ws, input),
+    (input) => {
+      const rows = listTasks(ws, { ...input, includePrivate: tools !== "remote" });
+      return tools === "remote" ? publicRecords(ws, "task", rows) : rows;
+    },
   );
   const experience = z
     .object({

@@ -1,11 +1,13 @@
 import { readdirSync, statSync } from "node:fs";
+import { publicRecords } from "./agent-tools.js";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
-import { listProjects, projectStatusFiles, projectVersion, publicProject } from "./projects.js";
+import { localRecordIds } from "./private-records.js";
+import { listProjects, projectStatusFiles, projectVersion } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { tasksForToday } from "./tasks.js";
@@ -120,18 +122,17 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     }
   }
   const modules = listModules(ws);
+  const localIds = publicOnly ? localRecordIds(ws) : undefined;
   const records = Object.fromEntries(
     listRecordTypes(ws).map(({ type }) => [
       type,
       read(
         type,
-        () =>
-          readRecords(ws, type).filter(
-            (r) =>
-              !publicOnly ||
-              !["project_metric", "github_snapshot"].includes(type) ||
-              publicProject(ws, r.project),
-          ),
+        () => {
+          const rows = readRecords(ws, type, { includePrivate: !publicOnly });
+          return publicOnly ? publicRecords(ws, type, rows, localIds) : rows;
+        },
+
         [],
       ),
     ]),

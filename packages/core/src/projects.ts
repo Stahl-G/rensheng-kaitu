@@ -12,6 +12,7 @@ import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { type ModuleDef, findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
+import { relocateProjectRecords } from "./private-records.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
@@ -79,7 +80,7 @@ export function assertPublicProject(ws: Workspace, slug: unknown): void {
 function privateStore(ws: Workspace): Workspace {
   const root = ws.resolve(".kaitu/local-projects", { internal: true });
   fs.mkdirSync(root, { recursive: true });
-  const store = new Workspace(root);
+  const store = new Workspace(root, { privateRecords: true });
   store.timeZone = () => ws.timeZone();
   if (!store.exists("projects/module.json")) {
     store.writeText(
@@ -98,7 +99,10 @@ function privateStore(ws: Workspace): Workspace {
 export function metricStore(ws: Workspace, data: ProjectStatus, readonly = false): Workspace {
   if (!driveProjects(ws) || !data.local_only) return ws;
   if (!readonly) return privateStore(ws);
-  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { maintain: false });
+  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), {
+    maintain: false,
+    privateRecords: true,
+  });
   store.timeZone = () => ws.timeZone();
   return store;
 }
@@ -146,7 +150,7 @@ export function listProjects(ws: Workspace, options: { publicOnly?: boolean; now
     if (options.publicOnly && project.data.local_only) return [];
     const store =
       driveProjects(ws) && project.data.local_only
-        ? new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }))
+        ? new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { privateRecords: true })
         : ws;
     if (store !== ws) store.timeZone = () => ws.timeZone();
     const metrics = store.exists("projects/module.json")
@@ -381,6 +385,7 @@ function transferProjectRecords(source: Workspace, target: Workspace, slug: stri
   }
 }
 export function relocateProjects(ws: Workspace, toPrivate: boolean) {
+  relocateProjectRecords(ws);
   for (const slug of slugs(ws)) {
     const project = readProject(ws, slug);
     if (!project.data.local_only) continue;
@@ -408,6 +413,7 @@ export async function setProject(
       transferMetrics(data.local_only ? ws : store, data.local_only ? store : ws, slug);
       moveDirectory(ws, project.dir, data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`);
     }
+    if (data.local_only !== project.data.local_only) relocateProjectRecords(ws, slug, data.local_only);
     const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
     // 共享目录移除也需要在工作区历史中保存。
     if (driveProjects(ws) && data.local_only !== project.data.local_only)

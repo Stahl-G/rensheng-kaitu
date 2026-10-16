@@ -4,7 +4,8 @@ import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { driveProjects, projectStatusFiles } from "./projects.js";
+import { localRecordIds } from "./private-records.js";
+import { projectStatusFiles } from "./projects.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
@@ -289,13 +290,11 @@ export async function restore(
       (file) => under(prefix, file),
     );
 
-  // Drive 中的工作区历史只恢复共享项目；本机项目保留在独立的本机版本库。
+  // 恢复共享历史时保留私有项目与记录的本机版本。
   const privateSlugs = new Set<string>();
-  const privateMetricIds = new Set<string>();
-  if ((!prefix || prefix === "projects" || prefix.startsWith("projects/")) && driveProjects(ws)) {
+  const privateMetricIds = localRecordIds(ws);
+  if (!ws.privateRecords) {
     for (const { file } of projectStatusFiles(ws)) {
-      const projectDir = file.slice(0, file.lastIndexOf("/"));
-      if (prefix && !under(prefix, projectDir) && !under(projectDir, prefix)) continue;
       const slug = file.split("/").at(-2) as string;
       if (parseFrontmatter<{ local_only?: boolean }>(ws.readText(file)).data.local_only)
         privateSlugs.add(slug);
@@ -313,9 +312,7 @@ export async function restore(
         privateSlugs.add(file.split("/")[1] as string);
       }
     }
-    for (const file of allTargetFiles.filter((file) =>
-      /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(file),
-    )) {
+    for (const file of allTargetFiles.filter((file) => /\.jsonl$/.test(file))) {
       const { blob } = await git.readBlob({
         fs,
         dir,
@@ -347,7 +344,7 @@ export async function restore(
     )
       continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
-    if (privateSlugs.size && /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(f)) {
+    if ((privateSlugs.size || privateMetricIds.size) && /\.jsonl$/.test(f)) {
       const rows = Buffer.from(blob)
         .toString("utf8")
         .split("\n")

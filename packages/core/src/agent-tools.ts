@@ -9,8 +9,9 @@ import { snapshot } from "./history.js";
 import { findRecordType, listModules, recordFilePattern, resolveRecordPath } from "./modules.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
+import { localRecordIds, localRecordStore } from "./private-records.js";
 import { assertPublicProject, publicProject } from "./projects.js";
-import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
+import { addRecord, deleteRecord, readRecords, recordIsLocal, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -64,7 +65,7 @@ export async function writeAgentRecord(
     throw new KaituError("方向与实验使用 exploration_write，保留版本与用户决定", "USE_EXPLORATION_API");
   if (type === "experience" && operation === "add")
     return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
-  if (["project_metric", "github_snapshot"].includes(type)) {
+  if (["project_metric", "github_snapshot"].includes(type) || data.project !== undefined) {
     const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
     assertPublicProject(ws, data.project ?? current?.project);
   }
@@ -78,7 +79,7 @@ export async function writeAgentRecord(
         : deleteRecord(ws, type, id);
   const message = operation === "add" ? "记录了" : operation === "update" ? "修改了" : "删除了";
   const version = await snapshot(
-    ws,
+    result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
     `${actor}在${ref.module.def.name}模块${message} 1 条${ref.def.label ?? type}`,
   );
   return { ...result, version };
@@ -148,14 +149,25 @@ export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: s
   return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
 }
 
-export function publicRecord(ws: Workspace, type: string, row?: Record<string, unknown>): boolean {
+export function publicRecords<T extends Record<string, unknown>>(
+  ws: Workspace,
+  type: string,
+  rows: T[],
+  localIds = localRecordIds(ws),
+): T[] {
   const ref = findRecordType(ws, type);
   resolveRecordPath(ws, ref, recordFilePattern(ref).dir);
   const path = relative(realpathSync(ws.root), realpathSync(ws.resolve(ref.module.dir)))
     .split(sep)
     .join("/");
   if (ref.module.def.id === "finance" || ref.module.dir === "finance" || path.startsWith("finance/"))
-    return false;
-  if (path.split("/").some((part) => part === ".kaitu" || part === ".git")) return false;
-  return row?.project === undefined || publicProject(ws, row.project);
+    return [];
+  if (path.split("/").some((part) => part === ".kaitu" || part === ".git")) return [];
+  const visibility = new Map<unknown, boolean>();
+  return rows.filter((row) => {
+    if (recordIsLocal(row) || localIds.has(String(row.id))) return false;
+    if (row.project === undefined) return true;
+    if (!visibility.has(row.project)) visibility.set(row.project, publicProject(ws, row.project));
+    return visibility.get(row.project);
+  });
 }

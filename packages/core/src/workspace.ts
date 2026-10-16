@@ -16,6 +16,7 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import { relocateProjectRecords } from "./private-records.js";
 import { stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
@@ -75,6 +76,7 @@ function isInside(root: string, target: string): boolean {
  * `.kaitu/` 只允许程序内部通过 { internal: true } 写入。
  */
 export class Workspace {
+  readonly privateRecords: boolean;
   private location = "";
   private icloud = false;
   private unread = new Set<string>();
@@ -93,7 +95,8 @@ export class Workspace {
     this.unread.clear();
   }
 
-  constructor(root: string, options: { maintain?: boolean } = {}) {
+  constructor(root: string, options: { maintain?: boolean; privateRecords?: boolean } = {}) {
+    this.privateRecords = options.privateRecords ?? false;
     this.root = resolve(root);
     if (options.maintain === false) return;
     try {
@@ -108,7 +111,12 @@ export class Workspace {
       return;
     }
     if (this.exists(".kaitu/config.json")) {
-      for (const maintain of [ensureTaskModule, maintainHistoryIgnore, refreshOverview]) {
+      for (const maintain of [
+        ensureTaskModule,
+        relocateProjectRecords,
+        maintainHistoryIgnore,
+        refreshOverview,
+      ]) {
         try {
           maintain(this);
         } catch (error) {
