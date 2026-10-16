@@ -4,6 +4,7 @@ import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
+import { syncMode } from "./sync-location.js";
 import { timeZoneNotice } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -96,6 +97,7 @@ function recentHandoffs(ws: Workspace) {
   for (const entry of readdirSync(ws.resolve("handoffs"), { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const file = `handoffs/${entry.name}`;
+    if (ws.scanText(file) === undefined) continue;
     try {
       const { data, body } = parseFrontmatter<{ agent: string; at: string }>(ws.readText(file));
       if (!schemas().builtin("handoff.schema.json")(data)) continue;
@@ -117,6 +119,7 @@ export function latestDaily(ws: Workspace) {
   for (const entry of readdirSync(ws.resolve("handoffs/daily"), { withFileTypes: true })) {
     if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
     const file = `handoffs/daily/${entry.name}`;
+    if (ws.scanText(file) === undefined) continue;
     try {
       const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(ws.readText(file));
       if (schemas().builtin("daily.schema.json")(data)) {
@@ -146,11 +149,13 @@ export async function batchOverview<T>(ws: Workspace, operation: () => Promise<T
 }
 
 function put(ws: Workspace, file: string, text: string) {
+  if (ws.exists(file) && ws.scanText(file) === undefined) return;
   if (!ws.exists(file) || ws.readText(file) !== text) ws.writeText(file, text);
 }
 
 export function refreshOverview(ws: Workspace, now = new Date()): void {
   if (!ws.exists(".kaitu/config.json") || !ws.exists("NOW.md") || !ws.exists("me/rules.md")) return;
+  if ([".kaitu/config.json", "NOW.md", "me/rules.md"].some((file) => ws.scanText(file) === undefined)) return;
   const data = readStatus(ws, now, true);
   const lines = [
     `# 开图现状 · ${data.today}`,
@@ -238,12 +243,14 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     ...data.warnings.map((warning) => `- ${warning}`),
     "",
   );
-  put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
-  put(ws, "ORGANIZER.md", renderOrganizer());
+  if (syncMode(ws.root) === "drive") {
+    put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
+    put(ws, "ORGANIZER.md", renderOrganizer());
+  }
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
   const withoutTime = (value: string) => value.replace(/^生成时间：.*$/m, "");
-  if (!ws.exists("OVERVIEW.md") || withoutTime(ws.readText("OVERVIEW.md")) !== withoutTime(text)) {
+  if (!ws.exists("OVERVIEW.md") || withoutTime(ws.scanText("OVERVIEW.md") ?? "") !== withoutTime(text)) {
     put(ws, "OVERVIEW.md", text);
   }
 }

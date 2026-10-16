@@ -6,6 +6,7 @@ import { doctor } from "./doctor.js";
 import { GITIGNORE, snapshot } from "./history.js";
 import { type ModuleDef, listModules } from "./modules.js";
 import { batchOverview } from "./overview.js";
+import { syncMode } from "./sync-location.js";
 import { templateOutdated, templateVersion } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, migrateHistory } from "./workspace.js";
@@ -32,11 +33,12 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   const version = templateVersion();
   if (
     !templateOutdated(ws) &&
-    ws.exists("ORGANIZER.md") &&
+    (syncMode(ws.root) !== "drive" || ws.exists("ORGANIZER.md")) &&
     ws.exists("handoffs/daily") &&
     ws.exists("explore/module.json")
   )
     return { templateVersion: version, changes: [], version: null };
+  if (!options.dryRun) ws.assertDownloaded();
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();
   const deletes: string[] = [];
@@ -88,7 +90,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
         if (!file.startsWith(`${skillRoot}${name}/`)) continue;
         const target = file.replace(".agents/", `${base}/`);
         desired.add(target);
-        if (!ws.exists(target) || !readFileSync(ws.resolve(target)).equals(bytes)) writes.set(target, bytes);
+        if (!ws.exists(target) || !ws.readBytes(target).equals(bytes)) writes.set(target, bytes);
       }
       if (ws.exists(directory)) {
         for (const path of templateFiles(ws.resolve(directory)).keys()) {
@@ -108,8 +110,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     ...writes.keys(),
     ...deletes.map((file) => `删除 ${file}`),
     "AGENTS.md",
-    "AGENT-README.md",
-    "ORGANIZER.md",
+    ...(syncMode(ws.root) === "drive" ? ["AGENT-README.md", "ORGANIZER.md"] : []),
     "OVERVIEW.md",
     ".kaitu/config.json",
   ];

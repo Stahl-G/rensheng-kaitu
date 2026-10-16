@@ -149,9 +149,9 @@ ${skills()
 开图产品只设总览、开图、记录三个入口。运行 \`kaitu ui\` 可直接浏览资料与保存原文，无需模型；详情、连接与高级设置按需进入。
 工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
 
-## 11. Google Drive 与云端接力
+## 11. 存放位置与云端接力
 
-- 默认本地模式；用户可用 \`kaitu drive enable [--drive-dir <我的云端硬盘路径>]\` 开启 Drive 同步。
+- 本机、iCloud、Google Drive 三选一；用 \`kaitu sync enable icloud|drive [--dir <同步目录>]\` 开启，换云盘前先 disable。
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
 - 云端 Agent 白天只追加（规则见 \`AGENT-README.md\`）；整理员每天整理一次（规则见 \`ORGANIZER.md\`）。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
@@ -159,7 +159,7 @@ ${skills()
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
 - Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
 - 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
-- 本地模式同样维护入口与现状文件；晚间复盘最后运行 snapshot 会刷新现状。
+- 只有 Drive 模式维护云端接力入口；本机与 iCloud 同样维护 OVERVIEW.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
 
 ## 12. MCP
 

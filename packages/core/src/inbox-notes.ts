@@ -49,7 +49,10 @@ export function inboxNotes(ws: Workspace) {
     .flatMap((entry) => {
       const dir = `inbox/notes/${entry.name}`;
       return readdirSync(ws.resolve(dir), { withFileTypes: true })
-        .filter((file) => file.isFile() && file.name.endsWith(".md"))
+        .filter(
+          (file) =>
+            file.isFile() && file.name.endsWith(".md") && ws.scanText(`${dir}/${file.name}`) !== undefined,
+        )
         .map((file) => {
           const path = `${dir}/${file.name}`;
           const content = ws.readText(path);

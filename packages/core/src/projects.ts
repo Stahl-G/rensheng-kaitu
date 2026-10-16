@@ -37,7 +37,7 @@ export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
   Partial<Pick<ProjectStatus, "local_only" | "links">>;
 
 export function driveProjects(ws: Workspace): boolean {
-  return stateDirectory(ws.root) !== join(ws.root, ".kaitu");
+  return stateDirectory(ws.root, ws.isICloud) !== join(ws.root, ".kaitu");
 }
 function slugCheck(slug: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ["data", "projects"].includes(slug)) {
@@ -114,7 +114,9 @@ function slugs(ws: Workspace): string[] {
       if (
         entry.isDirectory() &&
         !entry.name.startsWith(".") &&
-        ws.exists(`${base}/${entry.name}/STATUS.md`)
+        !ws.conflictCopy(`${base}/${entry.name}`) &&
+        ws.exists(`${base}/${entry.name}/STATUS.md`) &&
+        ws.scanText(`${base}/${entry.name}/STATUS.md`) !== undefined
       ) {
         names.add(entry.name);
       }

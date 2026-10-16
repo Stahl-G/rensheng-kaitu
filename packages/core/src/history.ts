@@ -1,10 +1,11 @@
 import fs from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { driveProjects, projectStatusFiles, readProject } from "./projects.js";
+import { driveProjects, projectStatusFiles } from "./projects.js";
+import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -65,7 +66,7 @@ function neverTrack(path: string): boolean {
 }
 
 export function historyDirectory(ws: Workspace): string {
-  return join(stateDirectory(ws.root), "history.git");
+  return join(stateDirectory(ws.root, ws.isICloud), "history.git");
 }
 
 export function hasHistory(ws: Workspace): boolean {
@@ -79,7 +80,8 @@ export async function ensureHistory(ws: Workspace): Promise<void> {
 }
 
 export function maintainHistoryIgnore(ws: Workspace): void {
-  const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
+  const ignore = ws.exists(".gitignore") ? ws.scanText(".gitignore") : "";
+  if (ignore === undefined) return;
   const missing = GITIGNORE.split("\n").filter(
     (line) => line && !line.startsWith("#") && !ignore.split("\n").includes(line),
   );
@@ -95,8 +97,33 @@ async function headOid(ws: Workspace): Promise<string | null> {
   }
 }
 
+function historyFs(ws: Workspace) {
+  if (!ws.isICloud) return fs;
+  const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
+    if (typeof path === "string") {
+      const rel = relative(ws.root, path);
+      if (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) {
+        const bytes = ws.readBytes(rel);
+        const encoding = typeof options === "string" ? options : options?.encoding;
+        return encoding ? bytes.toString(encoding) : bytes;
+      }
+    }
+    return fs.promises.readFile(path, options);
+  }) as typeof fs.promises.readFile;
+  return { ...fs, promises: { ...fs.promises, readFile } };
+}
+
+function snapshotFile(ws: Workspace, file: string): boolean {
+  return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
+}
+
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
-  const matrix = await git.statusMatrix({ fs, dir: ws.root, gitdir: historyDirectory(ws) });
+  const matrix = await git.statusMatrix({
+    fs: historyFs(ws),
+    dir: ws.root,
+    gitdir: historyDirectory(ws),
+    filter: (file) => snapshotFile(ws, file),
+  });
   return matrix
     .filter(
       ([file, head, workdir, stage]) =>
@@ -134,6 +161,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
     return await saveSnapshot(ws, message, now);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
+    if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
     if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
     return null;
@@ -143,7 +171,13 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
 async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
   await ensureHistory(ws);
   const dir = ws.root;
-  const matrix = await git.statusMatrix({ fs, dir, gitdir: historyDirectory(ws) });
+  const io = historyFs(ws);
+  const matrix = await git.statusMatrix({
+    fs: io,
+    dir,
+    gitdir: historyDirectory(ws),
+    filter: (file) => snapshotFile(ws, file),
+  });
   let changed = 0;
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
@@ -155,7 +189,7 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
     if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-    else await git.add({ fs, dir, gitdir: historyDirectory(ws), filepath });
+    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
     changed++;
   }
   if (changed === 0) return null;
@@ -224,8 +258,6 @@ export async function restore(
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
   const target = await resolveVersion(ws, version);
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
-  await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
-
   const dir = ws.root;
   const head = await headOid(ws);
   const targetFiles = new Set(
@@ -233,7 +265,7 @@ export async function restore(
       under(prefix, f),
     ),
   );
-  const currentFiles = head
+  let currentFiles = head
     ? (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: head })).filter((f) =>
         under(prefix, f),
       )
@@ -242,13 +274,31 @@ export async function restore(
     throw new KaituError(`版本 ${version.slice(0, 7)} 中没有 ${prefix}`, "NOT_FOUND");
   }
 
+  const unavailable = [...new Set([...targetFiles, ...currentFiles])].filter(
+    (file) =>
+      !neverTrack(file) &&
+      !ws.conflictCopy(file) &&
+      !["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(file) &&
+      ws.isUnavailable(file),
+  );
+  if (unavailable.length)
+    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+  await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
+  if (await headOid(ws))
+    currentFiles = (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: "HEAD" })).filter(
+      (file) => under(prefix, file),
+    );
+
   // Drive 中的工作区历史只恢复共享项目；本机项目保留在独立的本机版本库。
   const privateSlugs = new Set<string>();
   const privateMetricIds = new Set<string>();
-  if (driveProjects(ws)) {
+  if ((!prefix || prefix === "projects" || prefix.startsWith("projects/")) && driveProjects(ws)) {
     for (const { file } of projectStatusFiles(ws)) {
+      const projectDir = file.slice(0, file.lastIndexOf("/"));
+      if (prefix && !under(prefix, projectDir) && !under(projectDir, prefix)) continue;
       const slug = file.split("/").at(-2) as string;
-      if (readProject(ws, slug).data.local_only) privateSlugs.add(slug);
+      if (parseFrontmatter<{ local_only?: boolean }>(ws.readText(file)).data.local_only)
+        privateSlugs.add(slug);
     }
     const allTargetFiles = await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target });
     for (const file of allTargetFiles.filter((file) => /^projects\/[^/]+\/STATUS\.md$/.test(file))) {
@@ -283,13 +333,18 @@ export async function restore(
     privateSlugs.has(file.split("/")[0] === "projects" ? (file.split("/")[1] ?? "") : "");
   let changed = 0;
   for (const f of currentFiles) {
-    if (!targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
+    if (!ws.conflictCopy(f) && !targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
       fs.rmSync(ws.resolve(f, { internal: true }), { force: true });
       changed++;
     }
   }
   for (const f of targetFiles) {
-    if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f))
+    if (
+      ws.conflictCopy(f) ||
+      neverTrack(f) ||
+      privateFile(f) ||
+      ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f)
+    )
       continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     if (privateSlugs.size && /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(f)) {

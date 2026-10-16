@@ -91,7 +91,9 @@ export function listMemories(ws: Workspace): MemoryEntry[] {
   if (!ws.exists("memory")) return [];
   const order = Object.keys(TYPES);
   return readdirSync(ws.resolve("memory"))
-    .filter((file) => file.endsWith(".md") && file !== "MEMORY.md")
+    .filter(
+      (file) => file.endsWith(".md") && file !== "MEMORY.md" && ws.scanText(`memory/${file}`) !== undefined,
+    )
     .map((file) => ({ ...readMemory(ws, file).data, file }))
     .sort(
       (a, b) =>
@@ -123,6 +125,7 @@ export async function addMemory(
   input: MemoryInput,
   opts: MemoryOptions = {},
 ): Promise<MemoryEntry> {
+  ws.assertDownloaded("memory");
   const now = opts.now ?? new Date();
   const date = isoInZone(now, ws.timeZone()).slice(0, 10);
   const data: Memory = { ...input, sensitive: input.sensitive ?? false, created: date, updated: date };
@@ -141,6 +144,7 @@ export async function updateMemory(
   opts: MemoryOptions = {},
 ): Promise<MemoryEntry> {
   const current = readMemory(ws, file);
+  ws.assertDownloaded("memory");
   const now = opts.now ?? new Date();
   const data: Memory = { ...current.data, ...patch, updated: isoInZone(now, ws.timeZone()).slice(0, 10) };
   validateMemory(data);
@@ -158,6 +162,7 @@ export async function removeMemory(
   file: string,
   opts: MemoryOptions = {},
 ): Promise<MemoryEntry> {
+  ws.assertDownloaded("memory");
   const { data } = readMemory(ws, file);
   rmSync(ws.resolve(memoryPath(file)));
   rewriteIndex(ws);
@@ -178,6 +183,7 @@ export async function importMemories(
     return data;
   });
   if (opts.dryRun) return { entries: candidates, version: null };
+  ws.assertDownloaded("memory");
   const entries = candidates.map((data) => {
     const file = availableFile(ws, data.type, data.name);
     ws.writeText(memoryPath(file), stringifyFrontmatter(data));

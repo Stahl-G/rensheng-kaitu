@@ -81,7 +81,9 @@ function syncIndex(db: DatabaseSync, ws: Workspace): void {
       }
       indexDocument(db, ws, readChat(ws, file));
     }
+    const unavailable = ws.unavailableFiles("chats");
     for (const file of indexed.keys()) {
+      if (unavailable.some((path) => file === path || file.startsWith(`${path}/`))) continue;
       db.prepare("DELETE FROM chats WHERE file = ?").run(file);
       db.prepare("DELETE FROM files WHERE file = ?").run(file);
     }
@@ -100,6 +102,7 @@ export function updateChatIndex(ws: Workspace, documents: ChatDocument[]): void 
 }
 
 export function reindexChats(ws: Workspace): number {
+  ws.assertDownloaded("chats");
   const db = openIndex(ws);
   try {
     const files = listChatFiles(ws);
@@ -150,13 +153,18 @@ export function searchChats(ws: Workspace, query: string, opts: { limit?: number
           ORDER BY bm25(chats), julianday(date) DESC, file LIMIT ?`)
         .all(phrase, limit);
     }
-    return rows.map((row) => ({
-      id: row.id as string,
-      title: row.title as string,
-      date: row.date as string,
-      file: row.file as string,
-      snippet: excerpt(`${row.title}\n${row.text}`, term),
-    }));
+    const unavailable = ws.unavailableFiles("chats");
+    return rows
+      .filter(
+        (row) => !unavailable.some((file) => row.file === file || String(row.file).startsWith(`${file}/`)),
+      )
+      .map((row) => ({
+        id: row.id as string,
+        title: row.title as string,
+        date: row.date as string,
+        file: row.file as string,
+        snippet: excerpt(`${row.title}\n${row.text}`, term),
+      }));
   } finally {
     db.close();
   }

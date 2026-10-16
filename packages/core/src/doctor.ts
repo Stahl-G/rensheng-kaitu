@@ -1,7 +1,8 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
 import { CONFIG_VERSION } from "./init.js";
 import { listModules } from "./modules.js";
+import { syncInventory } from "./sync-files.js";
 import { templateOutdated } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
@@ -10,6 +11,7 @@ export interface Check {
   name: string;
   ok: boolean;
   detail?: string;
+  files?: string[];
 }
 
 const REQUIRED_FILES = [
@@ -35,7 +37,8 @@ const BUILTIN_MODULES = [
 
 export async function doctor(ws: Workspace): Promise<Check[]> {
   const checks: Check[] = [];
-  const add = (name: string, ok: boolean, detail?: string) => checks.push({ name, ok, detail });
+  const add = (name: string, ok: boolean, detail?: string, files?: string[]) =>
+    checks.push({ name, ok, detail, files });
 
   if (!existsSync(ws.root)) {
     add("工作区存在", false, `${ws.root} 不存在，先运行 kaitu init`);
@@ -45,6 +48,14 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     add("工作区已初始化", false, "缺少 .kaitu/config.json，先运行 kaitu init");
     return checks;
   }
+  const unavailable = ws.unavailableFiles();
+  add(
+    "iCloud 文件已下载",
+    !unavailable.length,
+    unavailable.length ? `还没从 iCloud 下载：${unavailable.join("、")}` : undefined,
+    unavailable,
+  );
+  if (ws.scanText(".kaitu/config.json") === undefined) return checks;
   try {
     const outdated = templateOutdated(ws);
     add("内置模板版本", !outdated, outdated ? "运行 kaitu upgrade" : undefined);
@@ -61,7 +72,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   const missing = REQUIRED_FILES.filter((f) => !ws.exists(f));
   add("必需文件齐全", missing.length === 0, missing.length ? `缺少：${missing.join("、")}` : undefined);
 
-  if (ws.exists("memory/MEMORY.md")) {
+  if (ws.exists("memory/MEMORY.md") && ws.scanText("memory/MEMORY.md") !== undefined) {
     // 中文约每字一个 token，其他字符约四个一个，仅用于提醒整理。
     const text = ws.readText("memory/MEMORY.md");
     const chinese = [...text].filter((char) => /[\u3400-\u9fff]/.test(char)).length;
@@ -70,7 +81,9 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   }
 
   const have = new Set(listModules(ws).map((m) => m.dir));
-  const lacking = BUILTIN_MODULES.filter((m) => !have.has(m));
+  const lacking = BUILTIN_MODULES.filter(
+    (m) => !have.has(m) && !unavailable.some((file) => file === m || file === `${m}/module.json`),
+  );
   add("内置模块齐全", lacking.length === 0, lacking.length ? `缺少：${lacking.join("、")}` : undefined);
 
   try {
@@ -93,7 +106,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   if (!hasHistory(ws)) add("版本历史已启用", false, "缺少版本库");
   else {
     add("版本历史已启用", true, historyDirectory(ws));
-    const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
+    const ignore = ws.exists(".gitignore") ? (ws.scanText(".gitignore") ?? "") : "";
     const notIgnored = NEVER_TRACK.filter((p) => !ignore.split("\n").includes(p));
     add(
       "密钥与索引不进版本历史",
@@ -106,17 +119,8 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     if (leaked.length) add("版本历史中没有密钥", false, `已被记录：${leaked.join("、")}`);
   }
 
-  const conflicts: string[] = [];
-  function findConflicts(dir: string) {
-    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
-      if (entry.isSymbolicLink() || [".git", ".kaitu", "node_modules"].includes(entry.name)) continue;
-      const file = dir ? `${dir}/${entry.name}` : entry.name;
-      if (/ \(\d+\)(?:\.[^/]+)?$/.test(entry.name)) conflicts.push(file);
-      if (entry.isDirectory()) findConflicts(file);
-    }
-  }
-  findConflicts("");
-  add("无 Drive 同名冲突副本", !conflicts.length, conflicts.length ? conflicts.join("、") : undefined);
+  const { conflicts } = syncInventory(ws.root);
+  add("无同步冲突副本", !conflicts.length, conflicts.length ? conflicts.join("、") : undefined, conflicts);
   const issues = validateWorkspace(ws);
   add(
     "数据格式校验",

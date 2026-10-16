@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
 import { type RecordTypeRef, findRecordType, recordFileFor, recordFilePattern } from "./modules.js";
@@ -98,6 +98,7 @@ export function addRecords(
   const ref = findRecordType(ws, type);
   const tz = ws.timeZone();
   const news = type === "news_item" || type === "trend";
+  if (news && !opts.dryRun) ws.assertDownloaded(recordFilePattern(ref).dir);
   const existing = news ? readRecords(ws, type) : [];
   const pending: WriteResult[] = [];
   const results = data.map((item) => {
@@ -154,6 +155,7 @@ export function updateRecord(
   opts: WriteOptions = {},
 ): WriteResult {
   const ref = findRecordType(ws, type);
+  ws.assertDownloaded(recordFilePattern(ref).dir);
   const current = latestById(ws, ref).get(id);
   if (!current || current.deleted) throw new KaituError(`找不到「${type}」记录 ${id}`, "NOT_FOUND");
   const merged: StoredRecord = {
@@ -170,6 +172,7 @@ export function updateRecord(
 /** 删除：追加删除标记。标记写在删除时刻所在月份的文件里，读取时按 rev 全局取最新。 */
 export function deleteRecord(ws: Workspace, type: string, id: string, opts: WriteOptions = {}): WriteResult {
   const ref = findRecordType(ws, type);
+  ws.assertDownloaded(recordFilePattern(ref).dir);
   const current = latestById(ws, ref).get(id);
   if (!current || current.deleted) throw new KaituError(`找不到「${type}」记录 ${id}`, "NOT_FOUND");
   const tz = ws.timeZone();
@@ -199,8 +202,8 @@ export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
     .filter((n) => match.test(n))
     .sort()) {
     const file = `${dir}/${f}`;
-    readFileSync(join(abs, f), "utf8")
-      .split("\n")
+    ws.scanText(file)
+      ?.split("\n")
       .forEach((raw, i) => {
         if (raw.trim()) out.push({ file, line: i + 1, raw });
       });

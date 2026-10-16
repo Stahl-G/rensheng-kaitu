@@ -9,7 +9,7 @@ let current: string | undefined;
 export function templateVersion(): string {
   if (current) return current;
   // 生成器行为变化但模板文件未变时，递增此版本。
-  const hash = createHash("sha256").update("kaitu-template-1");
+  const hash = createHash("sha256").update("kaitu-template-2");
   function walk(root: string, path = "") {
     for (const entry of readdirSync(join(root, path), { withFileTypes: true }).sort((a, b) =>
       a.name.localeCompare(b.name),

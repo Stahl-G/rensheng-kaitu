@@ -99,13 +99,15 @@ function photoPath(ws: Workspace, file: string): string {
 
 export function readPhoto(ws: Workspace, id: string) {
   const record = photoRecord(ws, id);
-  const bytes = readFileSync(photoPath(ws, String(record.file)));
+  photoPath(ws, String(record.file));
+  const bytes = ws.readBytes(`health/${record.file}`);
   const format = imageFormat(bytes);
   if (format === "heic") throw new KaituError("请先导出为 JPG", "INVALID_PHOTO");
   return { bytes, contentType: { jpg: "image/jpeg", png: "image/png", webp: "image/webp" }[format] };
 }
 
 export async function removePhoto(ws: Workspace, id: string, options: { by?: By; actor?: string } = {}) {
+  ws.assertDownloaded("health");
   const record = photoRecord(ws, id);
   const path = `health/${record.file}`;
   if (ws.exists(path)) rmSync(photoPath(ws, String(record.file)));

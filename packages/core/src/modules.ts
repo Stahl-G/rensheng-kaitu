@@ -33,6 +33,7 @@ const NOT_MODULES = new Set([".kaitu", ".git", "memory", "chats", "inbox", "node
 export function listModules(ws: Workspace): LoadedModule[] {
   const out: LoadedModule[] = [];
   for (const name of readdirSync(ws.root).sort()) {
+    if (ws.conflictCopy(name)) continue;
     if (NOT_MODULES.has(name) || name.startsWith(".")) continue;
     const full = join(ws.root, name);
     if (!statSync(full).isDirectory() || !ws.exists(`${name}/module.json`)) continue;

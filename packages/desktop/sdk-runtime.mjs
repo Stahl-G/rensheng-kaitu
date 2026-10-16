@@ -73,7 +73,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
     ELECTRON_RUN_AS_NODE: "1",
     DSH_HOME: home,
     KAITU_DSH_MODULES: modules,
-    KAITU_DIR: workspace,
+
     DSH_PRIMARY_RUNTIME: "",
     DSH_PERMISSION_MODE: "workspace-write",
   };
@@ -153,6 +153,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
             ...env,
             DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
             KAITU_AGENT_MODE: mode,
+            KAITU_DIR: workspace,
           },
           detached: true,
           stdio: ["pipe", "pipe", "ignore"],
@@ -219,7 +220,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       try {
         await rpc.request(
           "initialize",
-          { cwd: workspace, provider: settings.provider, model: settings.model },
+          { cwd: root, provider: settings.provider, model: settings.model },
           AbortSignal.timeout(20000),
         );
       } catch {

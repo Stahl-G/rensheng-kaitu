@@ -15,10 +15,9 @@ import {
   completeNext,
   completeTask,
   decideProposal,
-  disableDrive,
+  disableSync,
   discardUpload,
-  driveStatus,
-  enableDrive,
+  enableSync,
   history,
   ignoredWorkspaceChange,
   importUpload,
@@ -35,6 +34,7 @@ import {
   stageUpload,
   syncProject,
   syncProjects,
+  syncStatus,
   workspaceFileStamps,
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
@@ -180,7 +180,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }
     const version = await snapshot(
       ws,
-      `${driveStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+      `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
         .slice(0, 3)
         .map((file) => file.split("/").at(-1))
         .join("、")}等 ${files.length} 个文件`,
@@ -379,7 +379,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           res.writeHead(200, { "Content-Type": photo.contentType });
           return res.end(photo.bytes);
         }
-        if (url.pathname === "/api/drive") return json(res, 200, driveStatus(ws));
+        if (["/api/drive", "/api/sync"].includes(url.pathname)) return json(res, 200, syncStatus(ws));
         if (url.pathname === "/api/state") return json(res, 200, { ...readWorkbench(ws), watchError });
         if (url.pathname === "/api/history") return json(res, 200, await exclusive(() => history(ws)));
         if (url.pathname === "/api/events") {
@@ -451,18 +451,42 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         }
         await saveExternal();
         switch (url.pathname) {
+          case "/api/sync/enable":
+          case "/api/sync/disable":
           case "/api/drive/enable":
           case "/api/drive/disable": {
+            await options.ask?.prepareRelocation();
+            const oldRoot = ws.root;
             try {
+              await options.onWorkspaceChanging?.();
               return url.pathname.endsWith("enable")
-                ? await enableDrive(ws, {
-                    driveDir: typeof data.driveDir === "string" && data.driveDir ? data.driveDir : undefined,
-                  })
-                : await disableDrive(ws, {
+                ? await enableSync(
+                    ws,
+                    url.pathname === "/api/drive/enable"
+                      ? "drive"
+                      : (field(data, "mode") as "icloud" | "drive"),
+                    {
+                      dir:
+                        typeof data.dir === "string" && data.dir
+                          ? data.dir
+                          : typeof data.driveDir === "string" && data.driveDir
+                            ? data.driveDir
+                            : undefined,
+                      name: typeof data.name === "string" ? data.name : undefined,
+                    },
+                  )
+                : await disableSync(ws, {
                     to: typeof data.to === "string" && data.to ? data.to : undefined,
                   });
             } finally {
               startWatching();
+              if (ws.root !== oldRoot) {
+                options.ask?.relocate(ws.root);
+                aiChild?.kill();
+                aiChild = undefined;
+                aiReady = undefined;
+              }
+              await options.onWorkspaceChanged?.();
             }
           }
           case "/api/projects/sync":
