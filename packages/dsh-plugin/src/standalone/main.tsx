@@ -42,6 +42,12 @@ const props: OverviewPageProps = {
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
+  loadExperienceImports: () => call("experienceImports"),
+  previewExperienceBatch: (id, operation) => call("experienceBatchPreview", id, operation),
+  setExperienceSource: (locator, excluded, revision) =>
+    call("setExperienceSource", locator, excluded, revision),
+  changeExperienceBatch: (id, operation, revision) => call("changeExperienceBatch", id, operation, revision),
+  recoverExperienceImports: () => call("recoverExperienceImports"),
   resolveExperience: (id, city) => call("resolveExperience", id, city),
   editExperience: (id, changes, revision) => call("editExperience", id, changes, revision),
   hideExperience: (id, revision) => call("hideExperience", id, revision),

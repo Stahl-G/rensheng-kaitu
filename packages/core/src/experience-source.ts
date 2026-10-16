@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { extname, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
-import { readRecords } from "./records.js";
+import { committedExperiences } from "./experience-imports.js";
 import type { Workspace } from "./workspace.js";
 
 export type ExperienceSource =
@@ -20,7 +20,7 @@ export type ExperienceSource =
 
 /** 入口只接受经历 ID，解析该记录已有的来源，不成为任意文件读取接口。 */
 export async function readExperienceSource(ws: Workspace, id: string): Promise<ExperienceSource> {
-  const record = readRecords(ws, "experience").find((item) => item.id === id);
+  const record = committedExperiences(ws).find((item) => item.id === id);
   if (!record) throw new KaituError("经历不存在或已隐藏", "NOT_FOUND");
   return readSourceContent(ws, String(record.source));
 }

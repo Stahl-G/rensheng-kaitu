@@ -6,6 +6,7 @@ import {
   KaituError,
   type Workspace,
   captureNote,
+  changeExperienceBatch,
   commitFinanceImport,
   decideProposal,
   discardFinanceImport,
@@ -18,9 +19,11 @@ import {
   hideExperience,
   lifeMap,
   listProjects,
+  previewExperienceBatch,
   previewFinanceImport,
   readAvatar,
   readDoing,
+  readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
@@ -29,9 +32,11 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  recoverExperienceImports,
   removeAvatar,
   resolveExperience,
   saveAvatar,
+  setExperienceSource,
   stageFinanceUpload,
   tryNews,
   unhideExperience,
@@ -39,6 +44,9 @@ import {
 } from "@kaitu/core";
 
 export const productMutations = new Set([
+  "setExperienceSource",
+  "changeExperienceBatch",
+  "recoverExperienceImports",
   "explorationWrite",
   "capture",
   "decideProposal",
@@ -63,6 +71,17 @@ export async function productRequest(ws: Workspace, method: string, args: unknow
     return args[i] as number;
   };
   switch (method) {
+    case "experienceImports":
+      return readExperienceImports(ws);
+    case "experienceBatchPreview":
+      return previewExperienceBatch(ws, text(0), text(1) as "undo" | "restore");
+    case "setExperienceSource":
+      if (typeof args[1] !== "boolean") throw new KaituError("缺少来源开关", "BAD_ARGS");
+      return setExperienceSource(ws, text(0), args[1], revision(2));
+    case "changeExperienceBatch":
+      return changeExperienceBatch(ws, text(0), text(1) as "undo" | "restore", revision(2));
+    case "recoverExperienceImports":
+      return { recovered: (await recoverExperienceImports(ws)).length };
     case "exploration":
       return readExploration(ws);
     case "explorationWrite":

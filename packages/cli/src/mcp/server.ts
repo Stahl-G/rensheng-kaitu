@@ -19,6 +19,7 @@ import {
   proposeBlock,
   publicProject,
   readAgentFile,
+  readExperienceImports,
   readExploration,
   readNews,
   readRecords,
@@ -195,6 +196,12 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     true,
   );
   register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
+  register(
+    "experience_imports",
+    "读取足迹来源开关、导入批次及待恢复状态。来源与批次控制由用户在界面处理。",
+    {},
+    () => readExperienceImports(ws),
+  );
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     searchMemories(ws, query),

@@ -35,6 +35,8 @@ export interface WriteResult {
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
+  if (ref.type === "experience_source" && record.by !== "user")
+    throw new KaituError("足迹来源设置由用户决定", "USER_DECISION");
   if (
     ref.type === "direction" &&
     record.by !== "user" &&
@@ -245,16 +247,27 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
 }
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
-export function appendPreparedRecords(
-  ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
-): void {
-  const plans = entries.map(({ type, record }) => {
+function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+  return entries.map(({ type, record }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
     validateRecord(ws, ref, record);
     return { file: recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone())), record };
   });
+}
+
+export function validatePreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  preparedRecords(ws, entries);
+}
+
+export function appendPreparedRecords(
+  ws: Workspace,
+  entries: { type: string; record: StoredRecord }[],
+): void {
+  const plans = preparedRecords(ws, entries);
   const files = new Map<string, string[]>();
   for (const { file, record } of plans) {
     const lines = files.get(file) ?? [];

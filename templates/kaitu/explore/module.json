@@ -10,6 +10,16 @@
       "schema": "schemas/experience.schema.json",
       "label": "地点经历"
     },
+    "experience_batch": {
+      "path": "data/imports/{YYYY-MM}.jsonl",
+      "schema": "schemas/experience-batch.schema.json",
+      "label": "足迹导入批次"
+    },
+    "experience_source": {
+      "path": "data/sources/{YYYY-MM}.jsonl",
+      "schema": "schemas/experience-source.schema.json",
+      "label": "足迹来源设置"
+    },
     "direction": {
       "path": "data/directions/{YYYY-MM}.jsonl",
       "schema": "schemas/direction.schema.json",
@@ -27,6 +37,6 @@
     }
   },
   "agent": {
-    "instructions": "地点经历通过 experience_add 或 kaitu_add_experience 提交，只给城市名和国家代码，坐标由城市表解析。计划用 planned，歧义交给用户核对。 方向与实验通过 exploration_read / exploration_write（DSH 加 kaitu_ 前缀）读写，保留预期版本。AI 新方向只作 suggested，采纳、暂停和归档由用户决定。记录行动完成与假设结论两件事，负面证据和历史不删除。"
+    "instructions": "地点经历通过 experience_add 或 kaitu_add_experience 提交，只给城市名和国家代码，坐标由城市表解析。计划用 planned，歧义交给用户核对。 方向与实验通过 exploration_read / exploration_write（DSH 加 kaitu_ 前缀）读写，保留预期版本。AI 新方向只作 suggested，采纳、暂停和归档由用户决定。记录行动完成与假设结论两件事，负面证据和历史不删除。 来源排除与批次撤销由用户在足迹的来源与导入中操作，Agent 可用 experience_imports 查询状态。经历提交结果的 excluded 表示来源被排除，不改名来源或定位符重试绕过。"
   }
 }

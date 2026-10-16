@@ -1,5 +1,14 @@
 import { readFileSync } from "node:fs";
 import { KaituError } from "./errors.js";
+import {
+  commitExperienceImport,
+  committedExperienceRevisions,
+  committedExperiences,
+  excludedExperienceSources,
+  experienceSourceKey,
+  pendingExperienceImports,
+  recoverExperienceImports,
+} from "./experience-imports.js";
 import { experienceInterval, experienceLayer } from "./experience-time.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
@@ -10,7 +19,6 @@ import {
   appendPreparedRecords,
   deleteRecord,
   readRecordRevisions,
-  readRecords,
   updateRecord,
 } from "./records.js";
 import { localDate } from "./time.js";
@@ -64,6 +72,7 @@ export interface LifeMapData {
   features: LifeMapFeature[];
   review: Experience[];
   undated: number;
+  importsPending: number;
   experiences: Experience[];
   hidden: { item: Experience; revision: number }[];
 }
@@ -118,14 +127,12 @@ function cityPlace(city: City): Experience["place"] {
 }
 
 function experiences(ws: Workspace): Experience[] {
-  return listRecordTypes(ws).some((ref) => ref.type === "experience")
-    ? (readRecords(ws, "experience") as unknown as Experience[])
-    : [];
+  return committedExperiences(ws);
 }
 
 function key(item: ExperienceInput & { place: Experience["place"] }): string {
   const place = item.place.geonameid ?? [item.place.name.toLowerCase(), item.place.country ?? ""];
-  return JSON.stringify([item.source, place, item.start ?? "", item.event_type]);
+  return JSON.stringify([experienceSourceKey(item.source), place, item.start ?? "", item.event_type]);
 }
 
 function importedKeys(ws: Workspace): Set<string> {
@@ -232,7 +239,11 @@ export async function addExperiences(
   options: { dryRun?: boolean } = {},
 ) {
   if (!Array.isArray(items)) throw new KaituError("经历必须是数组", "BAD_ARGS");
-  const data = items.map(prepareExperience);
+  if (!options.dryRun) await recoverExperienceImports(ws);
+  const excluded = excludedExperienceSources(ws);
+  const accepted = items.filter((item) => !excluded.has(experienceSourceKey(item?.source)));
+  const excluded_count = items.length - accepted.length;
+  const data = accepted.map(prepareExperience);
   const prepared = addRecords(ws, "experience", data, { by, dryRun: true });
   const seen = importedKeys(ws);
   const freshIndices = new Set<number>();
@@ -253,15 +264,29 @@ export async function addExperiences(
         .filter((_, index) => freshIndices.has(index))
         .map((row) => row.record as unknown as Experience),
       added: fresh.length,
+      excluded: excluded_count,
+      duplicates: data.length - fresh.length,
+      batch_id: null,
       version: null,
     };
-  const entries = addRecords(ws, "experience", fresh, { by }).map(
-    (row) => row.record as unknown as Experience,
+  const entries = prepared.filter((_, index) => freshIndices.has(index)).map((row) => row.record);
+  const receipt = await commitExperienceImport(
+    ws,
+    entries,
+    {
+      input_count: items.length,
+      duplicate_count: data.length - fresh.length,
+      excluded_count,
+    },
+    by,
   );
-  const version = entries.length
-    ? await snapshot(ws, `${by === "user" ? "你" : "Agent"}记录了 ${entries.length} 条地点经历`)
-    : null;
-  return { entries, added: entries.length, version };
+  return {
+    entries: entries as unknown as Experience[],
+    added: entries.length,
+    excluded: excluded_count,
+    duplicates: data.length - fresh.length,
+    ...receipt,
+  };
 }
 
 export async function resolveExperience(ws: Workspace, id: string, geonameid: number) {
@@ -290,7 +315,7 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   const groups = new Map<string, LifeMapFeature>();
   const hidden = new Map<string, { item?: Experience; revision: number; deleted: boolean }>();
   if (listRecordTypes(ws).some((ref) => ref.type === "experience")) {
-    const revisions = readRecordRevisions(ws, "experience").sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1));
+    const revisions = committedExperienceRevisions(ws).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1));
     for (const record of revisions) {
       hidden.set(record.id, {
         item: record.deleted ? hidden.get(record.id)?.item : (record as unknown as Experience),
@@ -322,6 +347,7 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
     features: [...groups.values()],
     review: rows.filter((item) => item.review || !experienceLayer(item, asOf)),
     undated: rows.filter((item) => !experienceInterval(item)).length,
+    importsPending: pendingExperienceImports(ws).length,
     experiences: rows,
     hidden: [...hidden.values()]
       .filter(

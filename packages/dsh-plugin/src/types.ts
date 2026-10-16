@@ -11,6 +11,8 @@ import type {
 } from "@kaitu/core";
 export type HealthData = ReturnType<typeof readHealthPage>;
 export type {
+  ExperienceImportsData,
+  ExperienceBatchPreview,
   ExplorationData,
   ExplorationCommand,
   Direction,
@@ -130,6 +132,7 @@ export interface OverviewData {
     received: number;
     needsReview: number;
     mapNeedsReview: number;
+    mapPendingImports: number;
     directionSuggestions: number;
     updatedAt: string | null;
   };

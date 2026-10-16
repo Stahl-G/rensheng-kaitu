@@ -1,4 +1,5 @@
 import { driveStatus } from "./drive.js";
+import { committedExperiences, pendingExperienceImports } from "./experience-imports.js";
 import { type TimedExperience, experienceLayer } from "./experience-time.js";
 import { history } from "./history.js";
 import { inboxNotes, noteMetadata } from "./inbox-notes.js";
@@ -151,7 +152,8 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const directionSuggestions = (data.records.direction ?? []).filter(
     (row) => row.status === "suggested",
   ).length;
-  const mapNeedsReview = (data.records.experience ?? []).filter(
+  const mapPendingImports = pendingExperienceImports(ws).length;
+  const mapNeedsReview = committedExperiences(ws).filter(
     (row) => row.review || !experienceLayer(row as unknown as TimedExperience, data.today),
   ).length;
   const pendingFiles = ["inbox/agents", "inbox/health"].reduce(
@@ -200,8 +202,12 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     sync: {
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
       needsReview:
-        mapNeedsReview + directionSuggestions + notes.filter((note) => note.status === "needs_review").length,
+        mapNeedsReview +
+        mapPendingImports +
+        directionSuggestions +
+        notes.filter((note) => note.status === "needs_review").length,
       directionSuggestions,
+      mapPendingImports,
       mapNeedsReview,
       updatedAt: versions.find((v) => !/等待整理|待整理笔记/.test(v.message))?.time ?? null,
     },

@@ -384,6 +384,18 @@ export function OverviewPage(props: OverviewPageProps) {
                     {data.inboxNotes} 条资料需要核对
                   </button>
                 )}
+                {data.sync.mapPendingImports > 0 && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setExploreView("footprints");
+                      setView("explore");
+                    }}
+                  >
+                    {data.sync.mapPendingImports} 次足迹导入需要继续完成
+                  </button>
+                )}
                 {data.sync.mapNeedsReview > 0 && (
                   <button
                     type="button"

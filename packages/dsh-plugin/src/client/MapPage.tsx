@@ -16,10 +16,11 @@ import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Experience, ExperienceChanges, LifeMapData } from "../types.js";
 import { ExperienceEditor } from "./ExperienceEditor.js";
+import { type ExperienceImportControlProps, ExperienceImportControls } from "./ExperienceImportControls.js";
 import css from "./MapPage.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
 
-export interface MapPageProps {
+export interface MapPageProps extends ExperienceImportControlProps {
   subscribe?: (refresh: () => void) => () => void;
   loadExperienceSource: (id: string) => Promise<import("../types.js").ExperienceSource>;
   loadLifeMap: () => Promise<LifeMapData>;
@@ -429,6 +430,7 @@ export function MapPage({
   hideExperience,
   unhideExperience,
   onPrompt,
+  ...importControls
 }: MapPageProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; revision: number } | null>(null);
@@ -641,6 +643,12 @@ export function MapPage({
           从记忆生成
         </button>
       </header>
+      <ExperienceImportControls
+        {...importControls}
+        subscribe={subscribe}
+        onChanged={refresh}
+        pending={data?.importsPending ?? 0}
+      />
       {error && (
         <p className={css.notice} role="alert">
           {error}{" "}

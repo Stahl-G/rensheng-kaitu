@@ -216,6 +216,30 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadExperienceImports: async () => {
+                const result = await ctx.remote.kaitu.experienceImports();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              previewExperienceBatch: async (id: string, operation: "undo" | "restore") => {
+                const result = await ctx.remote.kaitu.experienceBatchPreview(id, operation);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              setExperienceSource: async (locator: string, excluded: boolean, revision: number) => {
+                const result = await ctx.remote.kaitu.setExperienceSource(locator, excluded, revision);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              changeExperienceBatch: async (id: string, operation: "undo" | "restore", revision: number) => {
+                const result = await ctx.remote.kaitu.changeExperienceBatch(id, operation, revision);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              recoverExperienceImports: async () => {
+                const result = await ctx.remote.kaitu.recoverExperienceImports();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               resolveExperience: async (id: string, geonameid: number) => {
                 const result = await ctx.remote.kaitu.resolveExperience(id, geonameid);
                 if (!result.ok) throw new Error(result.error.message);

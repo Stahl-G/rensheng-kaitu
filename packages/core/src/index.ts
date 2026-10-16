@@ -55,6 +55,7 @@ export * from "./places.js";
 export * from "./me-page.js";
 
 export * from "./experience-source.js";
+export * from "./experience-imports.js";
 export * from "./experience-time.js";
 
 export * from "./exploration.js";

@@ -5,6 +5,7 @@ import {
   KaituError,
   Workspace,
   captureNote,
+  changeExperienceBatch,
   decideProposal,
   defaultRoot,
   dismissNews,
@@ -12,8 +13,10 @@ import {
   hideExperience,
   lifeMap,
   listProjects,
+  previewExperienceBatch,
   readAvatar,
   readDoing,
+  readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
@@ -21,9 +24,11 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  recoverExperienceImports,
   removeAvatar,
   resolveExperience,
   saveAvatar,
+  setExperienceSource,
   tryNews,
   unhideExperience,
   writeExploration,
@@ -34,7 +39,9 @@ import type { Config } from "./tools.js";
 import type {
   DoingData,
   DoingProject,
+  ExperienceBatchPreview,
   ExperienceChanges,
+  ExperienceImportsData,
   ExperienceSource,
   ExplorationCommand,
   ExplorationData,
@@ -173,6 +180,31 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("lifeMap")
   async lifeMap(): Promise<LifeMapData> {
     return lifeMap(this.workspace);
+  }
+
+  @Remote("experienceImports")
+  async experienceImports(): Promise<ExperienceImportsData> {
+    return readExperienceImports(this.workspace);
+  }
+  @Remote("experienceBatchPreview")
+  async experienceBatchPreview(id: string, operation: "undo" | "restore"): Promise<ExperienceBatchPreview> {
+    return previewExperienceBatch(this.workspace, id, operation);
+  }
+  @Remote("setExperienceSource")
+  async setExperienceSource(locator: string, excluded: boolean, revision: number): Promise<void> {
+    await this.write(() => setExperienceSource(this.workspace, locator, excluded, revision));
+  }
+  @Remote("changeExperienceBatch")
+  async changeExperienceBatch(
+    id: string,
+    operation: "undo" | "restore",
+    revision: number,
+  ): Promise<{ affected: number; preserved: number; version: string | null }> {
+    return this.write(() => changeExperienceBatch(this.workspace, id, operation, revision));
+  }
+  @Remote("recoverExperienceImports")
+  async recoverExperienceImports(): Promise<{ recovered: number }> {
+    return this.write(async () => ({ recovered: (await recoverExperienceImports(this.workspace)).length }));
   }
 
   @Remote("resolveExperience")

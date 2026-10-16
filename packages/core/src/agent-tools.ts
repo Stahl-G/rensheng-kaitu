@@ -1,6 +1,7 @@
 import { realpathSync } from "node:fs";
 import { extname, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
+import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
@@ -55,6 +56,8 @@ export async function writeAgentRecord(
   data: Record<string, unknown> = {},
   id = "",
 ) {
+  if (isExperienceControlType(type))
+    throw new KaituError("足迹来源与导入控制由用户在界面处理", "USER_DECISION");
   if (isExplorationType(type))
     throw new KaituError("方向与实验使用 exploration_write，保留版本与用户决定", "USE_EXPLORATION_API");
   if (type === "experience" && operation === "add")
