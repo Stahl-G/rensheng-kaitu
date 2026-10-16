@@ -152,7 +152,15 @@ export function createSearchRouter({ resolve, preferred, current, endpoints = {}
             ? await resolve(credentialRef(settings.provider))
             : undefined;
         const bounded = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(30000)]);
-        if (key) return await searchNative(settings, key, request, bounded);
+        let nativeError;
+        if (key) {
+          try {
+            return await searchNative(settings, key, request, bounded);
+          } catch (error) {
+            if (signal?.aborted) throw error;
+            nativeError = error;
+          }
+        }
         const keys = Object.fromEntries(
           await Promise.all(searchProviders.map(async ({ id, ref }) => [id, await resolve(ref)])),
         );
@@ -160,6 +168,7 @@ export function createSearchRouter({ resolve, preferred, current, endpoints = {}
           Object.fromEntries(Object.entries(keys).map(([id, value]) => [id, !!value])),
           preferred,
         ).provider;
+        if (!selected && nativeError) throw nativeError;
         if (!selected)
           throw new KaituError(
             "请先到「问问 → 连接 AI」连接支持搜索的服务，或在「AI 与连接 → 网络搜索」添加 Perplexity / Exa 的 Key。",
