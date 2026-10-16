@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { publicRecords } from "./agent-tools.js";
+import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
@@ -105,8 +106,9 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
       : file.endsWith("STATUS.md")
         ? "status.schema.json"
         : "rules.schema.json";
-  if (!schemas().builtin(schema)(parsed.data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
-  return parsed;
+  const data = normalizeDocument(schema, parsed.data, ws.timeZone()) as T;
+  if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
+  return { ...parsed, data };
 }
 
 export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
@@ -176,7 +178,8 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
 export type WorkbenchData = ReturnType<typeof readWorkbench>;
 
 async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, edit: (data: T) => string) {
-  const parsed = parseFrontmatter<T>(ws.readText(file));
+  const raw = parseFrontmatter<T>(ws.readText(file));
+  const parsed = { ...raw, data: normalizeDocument(schema, raw.data, ws.timeZone()) as T };
   const message = edit(parsed.data);
   const validate = schemas().builtin(schema);
   if (!validate(parsed.data)) {

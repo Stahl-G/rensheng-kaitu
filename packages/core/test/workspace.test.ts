@@ -33,7 +33,8 @@ describe("init / doctor / validate", () => {
     );
     ws.writeText(
       "health/STATUS.md",
-      "---\nupdated: 2026-10-15T21:00:00+08:00\nnext:\n  - { id: a, title: b, status: doing }\n---\n",
+      // 状态写成 doing 这类会自动认成待办；YAML 本身写坏了才报告。
+      "---\nupdated: 2026-10-15T21:00:00+08:00\nnext: [ { id: a, title: b\n---\n",
     );
 
     const issues = validateWorkspace(ws);

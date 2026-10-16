@@ -31,6 +31,8 @@ import {
   listProjects,
   listTasks,
   logProject,
+  memoryInput,
+  memoryType,
   onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
@@ -73,15 +75,14 @@ function inputPath(ws: Workspace, path: string): string {
   return isAbsolute(path) ? path : ws.resolve(path);
 }
 const fields = z.record(z.string(), z.unknown());
-const memory = z
-  .object({
-    type: z.enum(["preference", "fact", "context", "person", "decision"]),
-    name: text,
-    text,
-    source: z.string().optional(),
-    sensitive: z.boolean().optional(),
-  })
-  .strict();
+// 类型也认复数和中文，名字不写时取正文开头；多余字段忽略，不因为写法退回。
+const memory = z.object({
+  type: z.string().describe("preference、fact、context、person、decision，也认复数和中文"),
+  name: z.string().optional(),
+  text,
+  source: z.string().optional(),
+  sensitive: z.boolean().optional(),
+});
 const task = z
   .object({
     title: text,
@@ -309,14 +310,22 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         case "search":
           return searchMemories(ws, input.query);
         case "add":
-          return addMemory(ws, input.entry, { by: "agent", actor: "DeepSeek" });
-        case "update":
-          return updateMemory(ws, input.file, input.patch, { actor: "DeepSeek" });
+          return addMemory(ws, memoryInput(input.entry), { by: "agent", actor: "DeepSeek" });
+        case "update": {
+          const type = input.patch.type === undefined ? undefined : memoryType(input.patch.type);
+          if (input.patch.type !== undefined && !type)
+            throw new Error("记忆类型只能是 preference、fact、context、person、decision");
+          return updateMemory(ws, input.file, { ...input.patch, type }, { actor: "DeepSeek" });
+        }
         case "delete":
           return removeMemory(ws, input.file, { actor: "DeepSeek" });
         case "import":
           if (!input.dryRun && !input.confirmed) throw new Error("批量导入须先预览并获得用户确认");
-          return importMemories(ws, input.entries, { dryRun: input.dryRun, by: "agent", actor: "DeepSeek" });
+          return importMemories(ws, input.entries.map(memoryInput), {
+            dryRun: input.dryRun,
+            by: "agent",
+            actor: "DeepSeek",
+          });
       }
     },
   );

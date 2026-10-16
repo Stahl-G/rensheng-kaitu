@@ -5,6 +5,8 @@ import {
   history,
   initWorkspace,
   parseFrontmatter,
+  readStatus,
+  refreshOverview,
   snapshot,
   stringifyFrontmatter,
   validateWorkspace,
@@ -50,6 +52,28 @@ describe("工作台写入", () => {
     for (const item of status.next) if (item.id === "n1") item.status = "done";
     expect(parseFrontmatter(ws.readText("health/STATUS.md"))).toEqual({ data: status, body });
     expect((await history(ws)).length).toBe(++count);
+    expect(validateWorkspace(ws)).toEqual([]);
+  });
+
+  it("Agent 手写的 STATUS.md 缺 id、状态写成完成、updated 只写日期也能读，今天页能完成那一步；无 frontmatter 的交接也算", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    ws.writeText(
+      "health/STATUS.md",
+      "---\nupdated: 2026-10-17\nnext:\n  - 晚上 40 分钟力量训练\n  - { title: 买蛋白粉, status: 完成 }\n---\n",
+    );
+    const health = readStatus(ws).modules.find((module) => module.file === "health/STATUS.md");
+    const next = health?.next ?? [];
+    expect(next.map((item) => [item.title, item.status])).toEqual([
+      ["晚上 40 分钟力量训练", "todo"],
+      ["买蛋白粉", "done"],
+    ]);
+    await completeNext(ws, "health/STATUS.md", next[0]?.id as string);
+    expect(
+      readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next?.[0]?.status,
+    ).toBe("done");
+    ws.writeText("handoffs/20261017T0647-grok-bot.md", "## 做了什么\n- 采集资讯\n## 当前下一步\n- 写小说\n");
+    refreshOverview(ws);
+    expect(ws.readText("OVERVIEW.md")).toContain("grok-bot");
     expect(validateWorkspace(ws)).toEqual([]);
   });
 

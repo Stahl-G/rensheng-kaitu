@@ -1,3 +1,4 @@
+import { normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
@@ -208,9 +209,11 @@ export async function tryNews(ws: Workspace, id: string) {
   const module = listModules(ws).find((entry) => entry.def.id === moduleId || entry.dir === moduleId);
   if (!module) throw new KaituError(`找不到模块「${moduleId}」`, "NOT_FOUND");
   const file = `${module.dir}/STATUS.md`;
-  const { data, body } = ws.exists(file)
+  const parsed = ws.exists(file)
     ? parseFrontmatter(ws.readText(file))
     : { data: { updated: null } as Record<string, unknown>, body: "" };
+  const body = parsed.body;
+  const data = normalizeStatus(parsed.data, ws.timeZone());
   const validate = schemas().builtin("status.schema.json");
   if (!validate(data)) throw new KaituError("模块现状格式不合法", "BAD_STATUS");
   const next = (data.next ?? []) as { id: string; ref?: string }[];

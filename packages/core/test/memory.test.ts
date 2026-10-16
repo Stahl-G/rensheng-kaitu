@@ -9,6 +9,17 @@ import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
 describe("记忆", () => {
+  it("自己放进 memory/ 的普通 Markdown 也当记忆读：名字取标题，类型认中文", async () => {
+    const ws = await freshWorkspace();
+    ws.writeText("memory/我的训练习惯.md", "---\ntype: 偏好\n---\n# 训练时间\n\n喜欢晚上练，早上没精神。\n");
+    ws.writeText("memory/notes.md", "住在杭州，在做产品经理。\n");
+    expect(listMemories(ws).map((memory) => [memory.type, memory.name, memory.text])).toEqual([
+      ["preference", "训练时间", "喜欢晚上练，早上没精神。"],
+      ["context", "notes", "住在杭州，在做产品经理。"],
+    ]);
+    expect(() => readMe(ws)).not.toThrow();
+  });
+
   it("记忆文件夹里有同步冲突副本时，其余记忆、个人档案和资料包照常读取", async () => {
     const ws = await freshWorkspace();
     const city = await addMemory(ws, { type: "fact", name: "city", text: "住在上海" });

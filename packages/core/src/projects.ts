@@ -6,6 +6,7 @@ import git from "isomorphic-git";
 import { SaxesParser } from "saxes";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
+import { normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
@@ -44,6 +45,17 @@ export function projectDirectory(ws: Workspace, slug: string): string {
   slugCheck(slug);
   return `projects/${slug}`;
 }
+/** 项目 STATUS.md 缺标题、类型或阶段时用目录名、个人、进行中补上，不让整个项目消失。 */
+function projectStatus(data: ProjectStatus, slug: string, timeZone: string): ProjectStatus {
+  const out = normalizeStatus(
+    data as unknown as Record<string, unknown>,
+    timeZone,
+  ) as unknown as ProjectStatus;
+  if (typeof out.title !== "string" || !out.title.trim()) out.title = slug;
+  if (out.kind !== "work" && out.kind !== "personal") out.kind = "personal";
+  if (!["idea", "active", "paused", "done"].includes(out.stage)) out.stage = "active";
+  return out;
+}
 function checkStatus(data: ProjectStatus) {
   if (!schemas().builtin("status.schema.json")(data) || !data.title || !data.kind || !data.stage) {
     throw new KaituError("项目状态格式不合法", "INVALID_DOCUMENT");
@@ -52,7 +64,8 @@ function checkStatus(data: ProjectStatus) {
 export function readProject(ws: Workspace, slug: string) {
   const dir = projectDirectory(ws, slug);
   if (!ws.exists(`${dir}/STATUS.md`)) throw new KaituError("找不到项目", "NOT_FOUND");
-  const parsed = parseFrontmatter<ProjectStatus>(ws.readText(`${dir}/STATUS.md`));
+  const raw = parseFrontmatter<ProjectStatus>(ws.readText(`${dir}/STATUS.md`));
+  const parsed = { ...raw, data: projectStatus(raw.data, slug, ws.timeZone()) };
   parsed.data.links ??= [];
   checkStatus(parsed.data);
   return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
@@ -61,7 +74,8 @@ export function readProject(ws: Workspace, slug: string) {
 function projectSnapshot(ws: Workspace, slug: string) {
   const dir = projectDirectory(ws, slug);
   const status = ws.scanParsed(`${dir}/STATUS.md`, "project", (text) => {
-    const parsed = parseFrontmatter<ProjectStatus>(text);
+    const raw = parseFrontmatter<ProjectStatus>(text);
+    const parsed = { ...raw, data: projectStatus(raw.data, slug, ws.timeZone()) };
     parsed.data.links ??= [];
     checkStatus(parsed.data);
     return deepFreeze(parsed);

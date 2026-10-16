@@ -292,3 +292,53 @@ it("健康并列列表行数不一致时整份作为附件转笔记，不写入�
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字段的记忆和日程建议、没写日期的简报都照常处理", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  try {
+    const today = localDate(new Date(), ws.timeZone());
+    const files = {
+      // 没用约定后缀、带了 id、类型写成复数
+      "grok-meals.json": JSON.stringify([
+        {
+          type: "meals",
+          id: "abc",
+          meal: "lunch",
+          items: ["牛肉面"],
+          kcal: 650,
+          protein_g: 30,
+          agent: "grok-bot",
+        },
+      ]),
+      "grok-idea.md": "# 想法\n\n周末去爬山。\n",
+      "grok.memory.json": JSON.stringify([
+        { type: "preferences", text: "喜欢晚上训练", confidence: 0.9, agent: "grok-bot" },
+      ]),
+      "grok.proposal.json": JSON.stringify({
+        title: "散步",
+        start: "9:00",
+        end: "9:30",
+        reason: "天气好",
+        agent: "grok-bot",
+      }),
+      "grok.digest.md": "---\nagent: grok-bot\n---\n今天的简报。\n",
+    };
+    for (const [name, text] of Object.entries(files)) ws.writeText(`inbox/agents/${name}`, text);
+    const result = await processInbox(ws, { stableMs: 0 });
+    // 只有 .md 笔记进待整理，而且不带错误说明
+    expect(result.notes).toHaveLength(1);
+    expect(ws.readText(result.notes[0] as string)).not.toContain("不支持");
+    expect(readRecords(ws, "meal")).toMatchObject([
+      { meal: "午", items: [{ name: "牛肉面" }], source: "grok-bot" },
+    ]);
+    expect(listMemories(ws).map((memory) => [memory.type, memory.text])).toEqual([
+      ["preference", "喜欢晚上训练"],
+    ]);
+    expect(
+      parseFrontmatter<{ blocks: { title: string; start: string }[] }>(ws.readText("NOW.md")).data.blocks,
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ title: "散步", start: "09:00" })]));
+    expect(ws.readText(`feed/digests/${today}.md`)).toContain("今天的简报。");
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});

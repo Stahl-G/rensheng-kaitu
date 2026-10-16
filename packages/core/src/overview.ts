@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { normalizeHandoff } from "./doc-input.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
@@ -98,7 +99,9 @@ function recentHandoffs(ws: Workspace) {
     const file = `handoffs/${entry.name}`;
     if (ws.scanText(file) === undefined) continue;
     try {
-      const { data, body } = parseFrontmatter<{ agent: string; at: string }>(ws.readText(file));
+      const parsed = parseFrontmatter<{ agent: string; at: string }>(ws.readText(file));
+      const body = parsed.body;
+      const data = normalizeHandoff(parsed.data, file, ws.timeZone()) as { agent: string; at: string };
       if (!schemas().builtin("handoff.schema.json")(data)) continue;
       const section = body.split(/^## (?:当前)?下一步[^\S\n]*\r?\n/m)[1]?.split(/^## /m)[0] ?? "";
       const next = /^\s*(?:[-*+]|\d+[.)]) (.+)$/m.exec(section)?.[1] ?? "待补";

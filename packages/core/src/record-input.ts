@@ -85,7 +85,8 @@ function numberValue(value: string): number | undefined {
   return found?.length === 1 ? Number(found[0]) : undefined;
 }
 
-function dateTime(value: string, timeZone: string): string {
+/** 补上时区偏移：+0800 → +08:00，不带偏移的按当地时间；读不出原样返回。 */
+export function dateTime(value: string, timeZone: string): string {
   const offset = value.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
   if (HAS_OFFSET.test(offset)) return offset;
   const match = /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?)?$/.exec(value);
@@ -152,12 +153,12 @@ function normalizeValue(schema: Schema | undefined, raw: unknown, timeZone: stri
   return value;
 }
 
-function normalizeObject(schema: Schema, data: Record<string, unknown>, timeZone: string) {
+function normalizeObject(schema: Schema, data: Record<string, unknown>, timeZone: string, keepEmpty = false) {
   const out: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(data)) {
     const property = schema.properties?.[key];
-    // 可选字段交了空值（null、""）等于没交。
-    if (property && (raw === null || raw === "") && !schema.required?.includes(key)) continue;
+    // 新增时可选字段交了空值（null、""）等于没交；修改时空值可能是要清空，原样保留。
+    if (!keepEmpty && property && (raw === null || raw === "") && !schema.required?.includes(key)) continue;
     out[key] = normalizeValue(property, raw, timeZone, key);
   }
   return out;
@@ -168,10 +169,12 @@ export function normalizeRecordInput(
   data: Record<string, unknown>,
   timeZone: string,
   now: Date,
+  options: { patch?: boolean } = {},
 ): Record<string, unknown> {
   const root = (schema ?? {}) as Schema;
-  const out = normalizeObject(root, data, timeZone);
+  const out = normalizeObject(root, data, timeZone, options.patch);
   if (typeof out.ts === "string") out.ts = dateTime(out.ts.trim(), timeZone);
+  if (options.patch) return out;
   // 餐次没写或认不出时按吃饭时间推断，和导入营养 App 时的规则一致。
   const meal = root.properties?.meal?.enum;
   if (meal?.includes("加餐") && !meal.includes(out.meal)) {

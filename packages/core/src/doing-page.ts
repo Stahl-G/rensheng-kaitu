@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { schemas } from "./schema.js";
@@ -30,9 +31,12 @@ function topics(ws: Workspace, dir: string) {
     .filter((file) => ws.exists(file))
     .sort()
     .map((file) => {
-      const { data, body } = parseFrontmatter<ModuleStatus & { title?: string; due?: string }>(
-        ws.readText(file),
-      );
+      const parsed = parseFrontmatter<ModuleStatus & { title?: string; due?: string }>(ws.readText(file));
+      const body = parsed.body;
+      const data = normalizeStatus(
+        parsed.data as unknown as Record<string, unknown>,
+        ws.timeZone(),
+      ) as unknown as typeof parsed.data;
       if (!schemas().builtin("status.schema.json")(data))
         throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");
       const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();

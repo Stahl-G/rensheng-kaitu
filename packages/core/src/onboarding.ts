@@ -15,6 +15,7 @@ import { z } from "zod";
 import { templateDir } from "./assets.js";
 import type { CalendarSubscription } from "./calendar.js";
 import { type ImportResult, listChatFiles, readChat } from "./chats.js";
+import { normalizeStatus } from "./doc-input.js";
 import { localStateRoot } from "./drive.js";
 import { KaituError } from "./errors.js";
 import { writeExploration } from "./exploration.js";
@@ -1089,9 +1090,16 @@ export async function saveOnboardingChoices(
     const start = ONBOARDING.starts.find((item) => item.id === id);
     if (!start) throw new KaituError("引导选项不合法", "BAD_ARGS");
     const file = `${start.module}/STATUS.md`;
-    const doc = ws.exists(file)
+    const raw = ws.exists(file)
       ? parseFrontmatter<ModuleStatus>(ws.readText(file))
       : { data: { updated: null } as ModuleStatus, body: "" };
+    const doc = {
+      ...raw,
+      data: normalizeStatus(
+        raw.data as unknown as Record<string, unknown>,
+        ws.timeZone(),
+      ) as unknown as ModuleStatus,
+    };
     if (doc.data.next?.some((item) => item.id === `onboarding-${id}`)) return [];
     doc.data.next = [...(doc.data.next ?? []), { id: `onboarding-${id}`, title: start.next, status: "todo" }];
     doc.data.updated = isoInZone(new Date(), ws.timeZone());

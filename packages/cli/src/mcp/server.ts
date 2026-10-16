@@ -13,6 +13,8 @@ import {
   listProjects,
   listTasks,
   logProject,
+  memoryInput,
+  memoryType,
   onboardingStatus,
   projectGithub,
   proposeBlock,
@@ -103,8 +105,12 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   const type = text.describe("module.json 中已定义的记录类型，如 workout、meal");
   const data = z.record(z.string(), z.unknown()).describe("记录字段，按工作区 schema 校验");
   const memory = {
-    type: z.enum(["preference", "fact", "context", "person", "decision"]),
-    name: text,
+    type: z
+      .string()
+      .describe(
+        "preference、fact、context、person、decision，也认复数和中文（偏好、事实、背景、人物、决定）",
+      ),
+    name: z.string().optional().describe("不写时取正文开头"),
     text,
     source: z.string().optional(),
     sensitive: z.boolean().optional(),
@@ -239,7 +245,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "memory_save",
     "保存一条记忆，无需确认；有对应模块的内容写模块，敏感信息仅在用户明确要求时保存。",
     memory,
-    (input) => addMemory(ws, input, { actor: actor() }),
+    (input) => addMemory(ws, memoryInput(input), { actor: actor() }),
     true,
   );
   register(
@@ -335,7 +341,12 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
           sensitive: z.boolean().optional(),
         }),
       },
-      ({ file, patch }) => updateMemory(ws, file, patch, { actor: actor() }),
+      ({ file, patch }) => {
+        const type = patch.type === undefined ? undefined : memoryType(patch.type);
+        if (patch.type !== undefined && !type)
+          throw new Error("记忆类型只能是 preference、fact、context、person、decision");
+        return updateMemory(ws, file, { ...patch, type }, { actor: actor() });
+      },
       true,
     );
     register(

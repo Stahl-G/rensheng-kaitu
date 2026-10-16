@@ -14,6 +14,7 @@ import {
 import { basename, dirname } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { proposeBlock, writeDigest } from "./agent-tools.js";
+import { clockTime } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { parseHealthInWorker } from "./health-import.js";
@@ -21,7 +22,8 @@ import { batchSnapshot } from "./history.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
-import { type MemoryInput, importMemories } from "./memory.js";
+import { type MemoryInput, importMemories, memoryInput, memoryType } from "./memory.js";
+import { listRecordTypes } from "./modules.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
@@ -35,9 +37,93 @@ function object(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 const sourceAgent = noteAgent;
+/** 只留认得的字段，多余的忽略，不因为多写了一个字段整条退回。 */
 function only(data: Record<string, unknown>, fields: string[]) {
-  if (Object.keys(data).some((key) => !fields.includes(key)))
-    throw new KaituError("收件箱包含不支持的字段", "BAD_INBOX");
+  return Object.fromEntries(Object.entries(data).filter(([key]) => fields.includes(key)));
+}
+
+const TYPE_ALIASES: Record<string, string> = {
+  news: "news_item",
+  article: "news_item",
+  articles: "news_item",
+  新闻: "news_item",
+  资讯: "news_item",
+  饮食: "meal",
+  吃饭: "meal",
+  food: "meal",
+  训练: "workout",
+  运动: "workout",
+  exercise: "workout",
+  睡眠: "sleep",
+  todo: "task",
+  todos: "task",
+  待办: "task",
+  心情: "mood",
+};
+/** 记录类型的常见写法：大小写、连字符、复数、中文 → 工作区里的类型名。 */
+function recordType(ws: Workspace, value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const known = new Set(listRecordTypes(ws).map((ref) => ref.type));
+  if (known.has(value)) return value;
+  const key = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  for (const candidate of [key, TYPE_ALIASES[key], key.replace(/ies$/, "y"), key.replace(/e?s$/, "")])
+    if (candidate && known.has(candidate)) return candidate;
+  return value;
+}
+
+type InboxContent =
+  | { kind: "records"; rows: (Record<string, unknown> | null)[] }
+  | { kind: "memory"; rows: unknown[] }
+  | { kind: "proposal"; row: Record<string, unknown> }
+  | { kind: "note" };
+
+/**
+ * 认文件名约定的后缀；没有约定后缀的 .json / .jsonl 看内容：
+ * 带 type 的对象当记录，带正文的偏好、事实等当记忆，有起止时间的当日程建议，其余收成待整理笔记。
+ */
+function inboxContent(file: string, text: string): InboxContent {
+  const parseLines = () =>
+    text
+      .split(/\r?\n/)
+      .filter((line) => line.trim())
+      .map((line) => {
+        try {
+          const value = JSON.parse(line);
+          return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+        } catch {
+          return null;
+        }
+      });
+  if (file.endsWith(".jsonl")) return { kind: "records", rows: parseLines() };
+  if (!file.endsWith(".json") || file.endsWith(".health.json")) return { kind: "note" };
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    // 也可能是没改后缀的 JSONL。
+    const rows = parseLines();
+    return rows.length > 1 && rows.every(Boolean) ? { kind: "records", rows } : { kind: "note" };
+  }
+  const object =
+    value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+  if (file.endsWith(".memory.json") || Array.isArray(object?.memories))
+    return {
+      kind: "memory",
+      rows: Array.isArray(value) ? value : Array.isArray(object?.memories) ? object.memories : [value],
+    };
+  if (file.endsWith(".proposal.json")) return { kind: "proposal", row: object ?? {} };
+  const list = Array.isArray(value) ? value : Array.isArray(object?.records) ? object.records : [value];
+  const rows = list.filter(
+    (row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row),
+  );
+  if (!rows.length || rows.length !== list.length) return { kind: "note" };
+  if (rows.every((row) => memoryType(row.type) && (row.text ?? row.content))) return { kind: "memory", rows };
+  if (rows.every((row) => typeof row.type === "string")) return { kind: "records", rows };
+  if (object?.title && object.start && object.end) return { kind: "proposal", row: object };
+  return { kind: "note" };
 }
 
 async function prepare(ws: Workspace, file: string, text: string) {
@@ -45,40 +131,41 @@ async function prepare(ws: Workspace, file: string, text: string) {
     if (text.startsWith("---") && !hasFrontmatter(text))
       throw new KaituError("简报 frontmatter 尚未写完", "INCOMPLETE_INBOX");
     const { data } = parseFrontmatter(text);
-    const date = typeof data.date === "string" ? data.date : "";
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
-      Number.isNaN(Date.parse(date)) ||
-      new Date(date).toISOString().slice(0, 10) !== date
-    ) {
-      throw new KaituError("简报必须有合法 date frontmatter", "BAD_INBOX");
-    }
+    const valid = (value: unknown) =>
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(value).toISOString().slice(0, 10) === value;
+    // 没写日期时取文件名里的日期，再没有就是今天。
+    const named = /(\d{4}-\d{2}-\d{2})/.exec(basename(file))?.[1];
+    const date = valid(data.date)
+      ? (data.date as string)
+      : valid(named)
+        ? (named as string)
+        : localDate(new Date(), ws.timeZone());
     const actor = `Agent（Drive 收件箱：${sourceAgent(data.agent)}）`;
     return {
       message: `${actor}写入了 ${date} 的动态简报`,
       apply: () => writeDigest(ws, date, text, actor, sourceAgent(data.agent)),
     };
   }
-  if (file.endsWith(".records.jsonl") || file.endsWith(".news.jsonl")) {
-    const lines = text.split(/\r?\n/).filter((line) => line.trim());
-    const rows = lines.map((line) => {
-      try {
-        return object(JSON.parse(line));
-      } catch {
-        return null;
-      }
-    });
+  const content = inboxContent(file, text);
+  if (content.kind === "records") {
+    const rows = content.rows;
     const errors: string[] = [];
-    if (!lines.length) errors.push(`记录文件为空\n\n${recordRejectionHelp(ws, undefined)}`);
+    if (!rows.length) errors.push(`记录文件为空\n\n${recordRejectionHelp(ws, undefined)}`);
     const groups = new Map<string, Record<string, unknown>[]>();
     const fileAgent = rows.find((row) => row && typeof row.agent === "string" && row.agent.trim())?.agent;
     for (const [index, row] of rows.entries()) {
-      const { type, agent, ...data } = row ?? {};
+      const { type: rawType, agent, id: _id, by: _by, rev: _rev, ...data } = row ?? {};
+      const type = recordType(ws, rawType);
       try {
         if (!row) throw new KaituError("必须是合法 JSON 对象", "BAD_INBOX");
-        if (typeof type !== "string" || ["id", "by", "rev", "deleted"].some((key) => key in data)) {
-          throw new KaituError("只接受新增记录，不能修改或删除", "BAD_INBOX");
-        }
+        if (typeof type !== "string") throw new KaituError("缺少 type（记录类型）", "BAD_INBOX");
+        // 收件箱只新增：带了 id、by、rev 就当新记录收下，删除标记不接受。
+        if ("deleted" in data) throw new KaituError("收件箱只新增记录，不能删除", "BAD_INBOX");
+        if (typeof data.ts === "number" && Number.isFinite(data.ts))
+          data.ts = isoInZone(new Date(data.ts > 1e12 ? data.ts : data.ts * 1000), ws.timeZone());
         const reference = recordReference(ws, type);
         const fields = [...reference.required, ...reference.optional].map((field) => field.name);
         const news = type === "news_item" || type === "trend";
@@ -120,9 +207,9 @@ async function prepare(ws: Workspace, file: string, text: string) {
       },
     };
   }
-  if (file.endsWith(".memory.json")) {
-    const raw: unknown = JSON.parse(text);
-    if (!Array.isArray(raw) || !raw.length) throw new KaituError("记忆文件必须是非空候选数组", "BAD_INBOX");
+  if (content.kind === "memory") {
+    const raw = content.rows;
+    if (!raw.length) throw new KaituError("记忆文件是空的", "BAD_INBOX");
     const inputs: MemoryInput[] = [];
     const agents: string[] = [];
     const errors: string[] = [];
@@ -130,10 +217,9 @@ async function prepare(ws: Workspace, file: string, text: string) {
       try {
         const row = object(value);
         agents.push(sourceAgent(row.agent));
-        only(row, ["type", "name", "text", "source", "sensitive", "agent"]);
-        const { agent: _agent, ...input } = row;
-        await importMemories(ws, [input as unknown as MemoryInput], { dryRun: true });
-        inputs.push(input as unknown as MemoryInput);
+        const input = memoryInput(row);
+        await importMemories(ws, [input], { dryRun: true });
+        inputs.push(input);
       } catch (error) {
         errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${INBOX_FORMATS}`);
       }
@@ -147,14 +233,22 @@ async function prepare(ws: Workspace, file: string, text: string) {
       apply: () => importMemories(ws, inputs, { actor }),
     };
   }
-  if (file.endsWith(".proposal.json")) {
-    const row = object(JSON.parse(text));
-    only(row, ["title", "start", "end", "module", "agent"]);
+  if (content.kind === "proposal") {
+    const raw = content.row;
+    const row = only(
+      {
+        ...raw,
+        title: raw.title ?? raw.name,
+        start: clockTime(raw.start) ?? raw.start,
+        end: clockTime(raw.end) ?? raw.end,
+      },
+      ["title", "start", "end", "module", "agent"],
+    );
     if (
       !["title", "start", "end"].every((key) => typeof row[key] === "string") ||
       (row.module !== undefined && typeof row.module !== "string")
     )
-      throw new KaituError("日程建议字段不合法", "BAD_INBOX");
+      throw new KaituError("日程建议需要 title、start、end（如 18:00）", "BAD_INBOX");
     const { agent, ...input } = row;
     const actor = `Agent（Drive 收件箱：${sourceAgent(agent)}）`;
     // proposeBlock 在写入前校验完整 NOW 文档。
@@ -163,7 +257,8 @@ async function prepare(ws: Workspace, file: string, text: string) {
       apply: () => proposeBlock(ws, input as unknown as Parameters<typeof proposeBlock>[1], actor),
     };
   }
-  throw new KaituError("不支持的收件箱文件类型", "BAD_INBOX");
+  // 其余文字（.md、.txt、读不出结构的 JSON）当待整理笔记收下，不算出错。
+  return undefined;
 }
 
 function stamp(ws: Workspace, file: string) {
@@ -174,7 +269,14 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
   const size = statSync(ws.resolve(file)).size;
   const bytes = attach ? Buffer.alloc(0) : ws.readBytes(file);
   const directory = `inbox/notes/${localDate(new Date(), ws.timeZone())}`;
-  if (file.endsWith(".note.md") && !errors.length && isUtf8(bytes) && !bytes.includes(0)) {
+  // .md 笔记原样收下（.note.md 是旧写法，也认）；简报读不出时才包成待整理笔记。
+  if (
+    file.endsWith(".md") &&
+    !file.endsWith(".digest.md") &&
+    !errors.length &&
+    isUtf8(bytes) &&
+    !bytes.includes(0)
+  ) {
     if (/^channel-[a-f0-9]{64}\.note\.md$/.test(basename(file))) {
       const existing = findInboxNote(ws, basename(file));
       if (existing) {
@@ -292,15 +394,19 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
           continue;
         }
         let parsed: Awaited<ReturnType<typeof parseHealthInWorker>> | undefined;
-        const shortcut = file.endsWith(".health.json");
+        // 快捷指令导出的任何 .json，以及任何名字的 Apple 健康 .zip / .xml。
+        const shortcut = /\.json$/i.test(file);
         const errors: string[] = [];
         try {
           parsed =
-            shortcut || /^export\.(zip|xml)$/i.test(basename(file))
+            shortcut || /\.(zip|xml)$/i.test(file)
               ? await parseHealthInWorker(ws.resolve(file), ws.timeZone(), shortcut)
               : undefined;
           if (!parsed)
-            throw new KaituError("健康收件箱接受 export.zip、export.xml 或 *.health.json", "BAD_INBOX");
+            throw new KaituError(
+              "健康收件箱接受 Apple 健康导出的 .zip / .xml，或快捷指令的 .json",
+              "BAD_INBOX",
+            );
         } catch (error) {
           errors.push((error as Error).message);
         }
@@ -338,10 +444,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       const text = ws.readText(file);
       let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
       let errors: string[] = [];
-      if (!file.endsWith(".note.md")) {
+      if (!file.endsWith(".md") || file.endsWith(".digest.md")) {
         try {
           prepared = await prepare(ws, file, text);
-          errors = prepared.errors ?? [];
+          errors = prepared?.errors ?? [];
         } catch (error) {
           errors = [`${(error as Error).message}\n\n${INBOX_FORMATS}`];
         }

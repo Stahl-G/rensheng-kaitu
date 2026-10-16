@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ValidateFunction } from "ajv";
+import { normalizeHandoff, normalizeNow, normalizeStatus } from "./doc-input.js";
 import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
 import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { projectStatusFiles } from "./projects.js";
@@ -163,6 +164,7 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
     if (file.startsWith(".kaitu/") && !files.includes(file)) files.push(file);
   }
 
+  const zone = tz ?? "UTC";
   // 其余已知格式的文件
   for (const f of files.filter(inScope)) {
     const name = f.split("/").pop() ?? "";
@@ -170,14 +172,23 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
       const d = fm(f);
       if (d) check(reg.builtin("daily.schema.json"), d, f, issues);
     } else if (/^handoffs\/[^/]+\.md$/.test(f)) {
-      const d = fm(f);
-      if (d) check(reg.builtin("handoff.schema.json"), d, f, issues);
+      // 交接记录可以没有 frontmatter：agent 和时间从文件名补。只报告补完仍读不出的。
+      const text = ws.scanText(f);
+      if (text === undefined) continue;
+      let d: Record<string, unknown> = {};
+      try {
+        d = parseFrontmatter(text).data;
+      } catch (e) {
+        issues.push({ file: f, message: `frontmatter 不是合法 YAML：${(e as Error).message}` });
+        continue;
+      }
+      check(reg.builtin("handoff.schema.json"), normalizeHandoff(d, f, zone), f, issues);
     } else if (name === "STATUS.md") {
       const d = fm(f);
-      if (d) check(reg.builtin("status.schema.json"), d, f, issues);
+      if (d) check(reg.builtin("status.schema.json"), normalizeStatus(d, zone), f, issues);
     } else if (f === "NOW.md") {
       const d = fm(f);
-      if (d) check(reg.builtin("now.schema.json"), d, f, issues);
+      if (d) check(reg.builtin("now.schema.json"), normalizeNow(d, zone), f, issues);
     } else if (f === "me/rules.md") {
       const d = fm(f);
       if (d) check(reg.builtin("rules.schema.json"), d, f, issues);
