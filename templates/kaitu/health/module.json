@@ -11,21 +11,13 @@
       "schema": "schemas/workout.schema.json",
       "label": "训练"
     },
-    "meal": {
-      "path": "data/meals/{YYYY-MM}.jsonl",
-      "schema": "schemas/meal.schema.json",
-      "label": "饮食"
-    },
+    "meal": { "path": "data/meals/{YYYY-MM}.jsonl", "schema": "schemas/meal.schema.json", "label": "饮食" },
     "supplement": {
       "path": "data/supplements/{YYYY-MM}.jsonl",
       "schema": "schemas/supplement.schema.json",
       "label": "补充剂"
     },
-    "sleep": {
-      "path": "data/sleep/{YYYY-MM}.jsonl",
-      "schema": "schemas/sleep.schema.json",
-      "label": "睡眠"
-    },
+    "sleep": { "path": "data/sleep/{YYYY-MM}.jsonl", "schema": "schemas/sleep.schema.json", "label": "睡眠" },
     "activity": {
       "path": "data/activity/{YYYY-MM}.jsonl",
       "schema": "schemas/activity.schema.json",
@@ -41,16 +33,8 @@
       "schema": "schemas/photo.schema.json",
       "label": "体态照片"
     },
-    "symptom": {
-      "path": "data/symptoms/{YYYY-MM}.jsonl",
-      "schema": "schemas/symptom.schema.json",
-      "label": "症状"
-    },
-    "mood": {
-      "path": "data/moods/{YYYY-MM}.jsonl",
-      "schema": "schemas/mood.schema.json",
-      "label": "心理状态"
-    },
+    "symptom": { "path": "data/symptoms/{YYYY-MM}.jsonl", "schema": "schemas/symptom.schema.json", "label": "症状" },
+    "mood": { "path": "data/moods/{YYYY-MM}.jsonl", "schema": "schemas/mood.schema.json", "label": "心理状态" },
     "heart_notification": {
       "path": "data/heart-notifications/{YYYY-MM}.jsonl",
       "schema": "schemas/heart-notification.schema.json",
@@ -62,9 +46,7 @@
       "type": "chart",
       "title": "体重趋势",
       "record": "metric",
-      "filter": {
-        "kind": "weight"
-      },
+      "filter": { "kind": "weight" },
       "x": "ts",
       "y": "value"
     },
@@ -80,36 +62,16 @@
       "record": "meal",
       "columns": ["ts", "meal", "kcal", "protein_g"]
     },
-    {
-      "type": "chart",
-      "title": "睡眠时长",
-      "record": "sleep",
-      "x": "ts",
-      "y": "duration_min"
-    }
+    { "type": "chart", "title": "睡眠时长", "record": "sleep", "x": "ts", "y": "duration_min" }
   ],
   "sources": [
-    {
-      "type": "import",
-      "id": "apple-health"
-    },
-    {
-      "type": "api",
-      "id": "oura"
-    },
-    {
-      "type": "import",
-      "id": "nut-ai"
-    },
-    {
-      "type": "api",
-      "id": "caloriemate"
-    },
-    {
-      "type": "manual"
-    }
+    { "type": "import", "id": "apple-health" },
+    { "type": "api", "id": "oura" },
+    { "type": "import", "id": "nut-ai" },
+    { "type": "api", "id": "caloriemate" },
+    { "type": "manual" }
   ],
   "agent": {
-    "instructions": "记录训练时按 workout schema 写入，同一次训练的各个动作用同一个 session_id；力量训练对比上次同动作的重量，给出下次加重建议。有氧用 modality: cardio，填写 exercise、duration_min 和已知的 distance_km，不要求组次重量或 session_id；对比同项目配速或时长，不给加重建议。饮食写 meal，蛋白粉、肌酸等写 supplement。体检报告抽取结果写 data/labs/YYYY-MM-DD-<slug>.json，原件放 files/。只做记录、趋势与提醒，不做医疗诊断。 症状用 symptom；普通症状填 severity，食欲变化只填 appetite_change。心理状态用 mood，保留七级 valence。设备心率通知用 heart_notification，不写入日历 event。"
+    "instructions": "记录训练时按 workout schema 写入，同一次训练的各个动作用同一个 session_id；力量训练对比上次同动作的重量，给出下次加重建议。有氧用 modality: cardio，填写 exercise、duration_min 和已知的 distance_km，不要求组次重量或 session_id；对比同项目配速或时长，不给加重建议。饮食写 meal，蛋白粉、肌酸等写 supplement。体检报告抽取结果写 data/labs/YYYY-MM-DD-<slug>.json，原件放 files/。只做记录、趋势与提醒，不做医疗诊断。症状用 symptom；普通症状填 severity，食欲变化只填 appetite_change。心理状态用 mood，保留七级 valence。设备心率通知用 heart_notification，不写入日历 event。"
   }
 }

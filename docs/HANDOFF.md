@@ -33,9 +33,8 @@
 - 用户已批准三类独立健康记录：symptom、mood、heart_notification，心率通知不复用日历 event。
 - 本分支已接入 KaituSync samples 的 11 类症状、七级心理状态、三类心率通知与 HRV。
 - 已同步 schema、PRD §6、内置健康模块、生成的 Agent 说明和旧工作区升级；新域暂不扩展 XML / 并列列表。
-- 当前改动在 codex/health-hrv 独立工作区，未合入 main，未修改真实用户工作区或运行时。
+- 已合入 main（合并提交 `d2b50d5`）。
 - 四个健康专用 MCP 工具仍为提案；已有 record_list 可读新类型。格式入口：docs/proposals/kaitu-health-v2.md。
-
 
 ### 0.0 2026-10-15 晚：开图 App（dsh 插件）进度
 
