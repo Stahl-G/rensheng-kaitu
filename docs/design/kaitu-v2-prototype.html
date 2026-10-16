@@ -4,12 +4,12 @@
 /* 布局：顶栏三入口居中，内容单列 1040px；摘要卡片自动成网格，窄屏全部单列 */
 :root {
   --bg: #FCFCFB; --surface: #FFFFFF; --sunken: #F5F5F3; --control: #F0EFEC; --line: #ECEBE7;
-  --ink: #1F1E1D; --ink2: #4D4C48; --muted: #6B6A66; --link: #1f6f78;
-  --primary: #2e7f86; --on-primary: #FFFFFF; --strong: #1F1E1D; --on-strong: #FFFFFF;
-  --ask: #edf4f3; --ask-line: #cedfdd; --scrim: rgba(31,30,29,0.42);
+  --ink: #1F1E1D; --ink2: #4D4C48; --muted: #6B6A66; --link: #a33325;
+  --primary: #b23a2a; --on-primary: #FFFFFF; --strong: #1F1E1D; --on-strong: #FFFFFF;
+  --ask: #f9eeeb; --ask-line: #ecd3cc; --scrim: rgba(31,30,29,0.42);
   --health: #3e8a5a; --health-tint: #e5f1e9; --health-ink: #2a6a41;
   --doing: #4a6a8f; --doing-tint: #e7edf4; --doing-ink: #344e6e;
-  --explore: #0f4c5c; --explore-tint: #e3f0ef; --explore-ink: #0f4c5c;
+  --explore: #7c2a1e; --explore-tint: #f6e8e4; --explore-ink: #7c2a1e;
   --news: #b5711a; --news-tint: #f7ecdc; --news-ink: #84520f;
   --finance: #5f6f2a; --finance-tint: #eef1e2; --finance-ink: #4a5720;
   --me: #b5577a; --empty: #F0EFEC; --map-land: #EEF1EC; --map-grid: #DDE2DA; --map-sea: #F4F6F7; --map-dot: #D3DAD4;
@@ -22,18 +22,17 @@
   --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
   --radius: 14px;
 }
-@media (prefers---badge-ink: #112228; --brand-fold0: #2B6E7E; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #FFFFFF;
-  color-scheme: dark) { :root:not([data-theme="light"]) {
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
-  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #8fcac6;
-  --primary: #4c9aa0; --on-primary: #0b252a; --strong: #ECEBE8; --on-strong: #171716;
-  --ask: #202e2f; --ask-line: #3a5353; --scrim: rgba(0,0,0,0.6);
+  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #f2a493;
+  --primary: #e98571; --on-primary: #2b0d08; --strong: #ECEBE8; --on-strong: #171716;
+  --ask: #33221f; --ask-line: #5a3a33; --scrim: rgba(0,0,0,0.6);
   --health-tint: #203a2b; --health-ink: #a2d9b6; --doing-tint: #263243; --doing-ink: #bfd0e4;
-  --explore-tint: #1e3a3c; --explore-ink: #a8dad6; --news-tint: #43331e; --news-ink: #f0ca8f;
+  --explore-tint: #3c2420; --explore-ink: #f2b4a6; --news-tint: #43331e; --news-ink: #f0ca8f;
   --finance-tint: #2f3420; --finance-ink: #cbd69a; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E; --map-sea: #1A1C1D; --map-dot: #343D36;
   --health: #6dba8a;
   --doing: #93adcb;
-  --explore: #6fb3b4;
+  --explore: #e0907f;
   --news: #ddaa5e;
   --finance: #a9b86a;
   --me: #dc92ae;
@@ -42,20 +41,20 @@
   --on-health: #020d05;
   --on-news: #191005;
   --on-me: #361525;
-  --on-explore: #102e35;
-  --badge-ink: #112228; --brand-fold0: #2B6E7E; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #FFFFFF;
+  --on-explore: #2e0f0a;
+  --badge-ink: #1F1E1D; --brand-fold0: #A8402F; --brand-fold1: #D9694F; --brand-fold2: #F7D0C5; --brand-route: #FFFFFF;
   color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
-  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #8fcac6;
-  --primary: #4c9aa0; --on-primary: #0b252a; --strong: #ECEBE8; --on-strong: #171716;
-  --ask: #202e2f; --ask-line: #3a5353; --scrim: rgba(0,0,0,0.6);
+  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #f2a493;
+  --primary: #e98571; --on-primary: #2b0d08; --strong: #ECEBE8; --on-strong: #171716;
+  --ask: #33221f; --ask-line: #5a3a33; --scrim: rgba(0,0,0,0.6);
   --health-tint: #203a2b; --health-ink: #a2d9b6; --doing-tint: #263243; --doing-ink: #bfd0e4;
-  --explore-tint: #1e3a3c; --explore-ink: #a8dad6; --news-tint: #43331e; --news-ink: #f0ca8f;
+  --explore-tint: #3c2420; --explore-ink: #f2b4a6; --news-tint: #43331e; --news-ink: #f0ca8f;
   --finance-tint: #2f3420; --finance-ink: #cbd69a; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E; --map-sea: #1A1C1D; --map-dot: #343D36;
   --health: #6dba8a;
   --doing: #93adcb;
-  --explore: #6fb3b4;
+  --explore: #e0907f;
   --news: #ddaa5e;
   --finance: #a9b86a;
   --me: #dc92ae;
@@ -64,8 +63,8 @@
   --on-health: #020d05;
   --on-news: #191005;
   --on-me: #361525;
-  --on-explore: #102e35;
-  --badge-ink: #112228; --brand-fold0: #2B6E7E; --brand-fold1: #4C9AA0; --brand-fold2: #B5E0DC; --brand-route: #FFFFFF;
+  --on-explore: #2e0f0a;
+  --badge-ink: #1F1E1D; --brand-fold0: #A8402F; --brand-fold1: #D9694F; --brand-fold2: #F7D0C5; --brand-route: #FFFFFF;
   color-scheme: dark }
 
 * { box-sizing: border-box }
@@ -88,9 +87,9 @@ h1, h2, h3 { text-wrap: balance }
 
 .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg); border-bottom: 1px solid var(--line) }
 
-.brand-mark path[fill="#0F4C5C"] { fill: var(--brand-fold0, #0F4C5C); stroke: var(--brand-fold0, #0F4C5C) }
-.brand-mark path[fill="#2E7F86"] { fill: var(--brand-fold1, #2E7F86); stroke: var(--brand-fold1, #2E7F86) }
-.brand-mark path[fill="#9FD3CF"] { fill: var(--brand-fold2, #9FD3CF); stroke: var(--brand-fold2, #9FD3CF) }
+.brand-mark path[fill="#7C2A1E"] { fill: var(--brand-fold0, #7C2A1E); stroke: var(--brand-fold0, #7C2A1E) }
+.brand-mark path[fill="#B23A2A"] { fill: var(--brand-fold1, #B23A2A); stroke: var(--brand-fold1, #B23A2A) }
+.brand-mark path[fill="#F0C2B5"] { fill: var(--brand-fold2, #F0C2B5); stroke: var(--brand-fold2, #F0C2B5) }
 .brand-mark path[stroke="#FFFFFF"] { stroke: var(--brand-route, #FFFFFF) }
 
 .brand { flex: 1 1 120px; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600 }
@@ -558,11 +557,11 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     <clipPath id="kaitu-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
     <clipPath id="kaitu-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
   </defs>
-  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#0F4C5C" stroke="#0F4C5C" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2E7F86" stroke="#2E7F86" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#9FD3CF" stroke="#9FD3CF" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#7C2A1E" stroke="#7C2A1E" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#B23A2A" stroke="#B23A2A" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#F0C2B5" stroke="#F0C2B5" stroke-width="1.5" stroke-linejoin="round"/>
   <g clip-path="url(#kaitu-folded)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#0F4C5C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#7C2A1E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
 </svg>开图</span>
   <nav class="tabs" aria-label="主导航">
     <button type="button" data-view="overview" aria-current="page">今天</button>

@@ -1,36 +1,36 @@
 .fold0 {
-  fill: #0f4c5c;
-  stroke: #0f4c5c;
+  fill: #7c2a1e;
+  stroke: #7c2a1e;
 }
 .fold1 {
-  fill: #2e7f86;
-  stroke: #2e7f86;
+  fill: #b23a2a;
+  stroke: #b23a2a;
 }
 .fold2 {
-  fill: #9fd3cf;
-  stroke: #9fd3cf;
+  fill: #f0c2b5;
+  stroke: #f0c2b5;
 }
 .routeFolded {
   stroke: #fff;
 }
 .routeOpen {
-  stroke: #0f4c5c;
+  stroke: #7c2a1e;
 }
 
 body[data-ds-dark-theme] .fold0,
 [data-theme="dark"] .fold0 {
-  fill: #2b6e7e;
-  stroke: #2b6e7e;
+  fill: #a8402f;
+  stroke: #a8402f;
 }
 body[data-ds-dark-theme] .fold1,
 [data-theme="dark"] .fold1 {
-  fill: #4c9aa0;
-  stroke: #4c9aa0;
+  fill: #d9694f;
+  stroke: #d9694f;
 }
 body[data-ds-dark-theme] .fold2,
 [data-theme="dark"] .fold2 {
-  fill: #b5e0dc;
-  stroke: #b5e0dc;
+  fill: #f7d0c5;
+  stroke: #f7d0c5;
 }
 
 .powered {
