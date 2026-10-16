@@ -3,7 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
-import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
+import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
@@ -636,7 +636,14 @@ export function OverviewPage(props: OverviewPageProps) {
                 timeZone={data?.timeZone}
               />
             ) : record === "inbox" ? (
-              <InboxPage data={library} />
+              <InboxPage
+                data={library}
+                channelSettings={props.channelSettings}
+                connect={() => {
+                  setView("connections");
+                  setChannelFocus(true);
+                }}
+              />
             ) : (
               <NotesPage data={library} loadLibraryDocument={props.loadLibraryDocument} />
             )}
@@ -688,20 +695,11 @@ export function OverviewPage(props: OverviewPageProps) {
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             refreshWorkspace={refresh}
+            channelSettings={props.channelSettings}
+            channelFocus={channelFocus}
+            onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
           />
-        )}
-        {view === "connections" && props.channelSettings && (
-          <div
-            ref={(element) => {
-              if (element && channelFocus) {
-                element.scrollIntoView({ block: "start" });
-                setChannelFocus(false);
-              }
-            }}
-          >
-            <ChannelSettings request={props.channelSettings} />
-          </div>
         )}
         {guideVisible && view !== "overview" && (
           <div className={css["sec-head"]}>

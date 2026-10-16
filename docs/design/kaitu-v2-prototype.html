@@ -530,6 +530,16 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   .scrim { animation: fade .16s ease-out }
   @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
 }
+.channel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px }
+.channel-title { display: flex; align-items: center; gap: 12px }
+.channel-logo { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--explore-tint); color: var(--explore-ink) }
+.channel-demo { margin: auto; border: 0; color: var(--ink); width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px) }
+.channel-demo:not([open]) { display: none }
+.channel-demo::backdrop { background: var(--scrim) }
+.channel-demo label { display: flex; flex-direction: column; gap: 6px; font-size: 14px }
+.channel-demo input, .channel-demo select { height: 42px; border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; background: var(--surface); color: var(--ink); font: inherit }
+.channel-demo-form { display: flex; flex-direction: column; gap: 16px }
+@media (max-width: 760px) { .channel-grid { grid-template-columns: minmax(0, 1fr) } }
 </style>
 
 <div class="demo" role="region" aria-label="原型演示开关">
@@ -619,6 +629,29 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
 
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script>
+function openChannelDemo(index) {
+  var dialog = document.getElementById('channel-demo');
+  var names = ['Gmail', '其他邮箱', 'Slack', '飞书'];
+  var content;
+  if (index === 0) {
+    content = '<button class="btn btn-primary" type="button" onclick="this.textContent=\'请在系统浏览器中完成 Google 授权（原型示意）\'">用 Google 账号登录</button>' +
+      '<p class="small">只读取邮件，不会发送、删除或标记已读</p><details><summary class="link">使用应用专用密码</summary>' +
+      '<p class="small">Google 账户 → 安全 → 两步验证 → 应用专用密码</p><div class="channel-demo-form"><label>邮箱<input type="email"></label><label>应用专用密码<input type="password"></label></div></details>';
+  } else if (index === 1) {
+    content = '<div class="channel-demo-form"><label>邮箱服务商<select onchange="document.getElementById(\'mail-demo-help\').textContent=this.value===\'Outlook\'?\'Outlook 需要 Microsoft OAuth，这一版暂不支持\':\'到服务商设置中开启 IMAP，再取得应用专用密码或授权码\'"><option>iCloud</option><option>QQ</option><option>163</option><option>Outlook</option><option>自定义 IMAP</option></select></label>' +
+      '<p id="mail-demo-help" class="small">Apple 账户 → 登录和安全 → App 专用密码 → 生成密码</p><label>邮箱<input type="email"></label><label>授权码 / 应用专用密码<input type="password"></label>' +
+      '<details><summary class="link">高级</summary><div class="channel-demo-form"><label>服务器<input placeholder="imap.mail.me.com"></label><label>端口<input placeholder="993"></label><label>文件夹<input placeholder="INBOX"></label></div></details></div>';
+  } else if (index === 2) {
+    content = '<p class="small">1. 从 manifest 创建应用并安装到工作区。<br>2. 复制 User OAuth Token。<br>3. 连接后选择要收的频道。</p><a class="link" href="https://api.slack.com/apps" target="_blank" rel="noreferrer">打开 Slack 应用页面 ↗</a>' +
+      '<div class="channel-demo-form"><label>账号名称<input></label><label>User OAuth Token<input type="password" placeholder="xoxp-…"></label></div>';
+  } else {
+    content = '<p class="small">1. 创建自建应用并启用机器人。<br>2. 开启只读消息权限和长连接事件，发布应用。<br>3. 填入凭据，把机器人加入要接收的群。</p><a class="link" href="https://open.feishu.cn/app" target="_blank" rel="noreferrer">飞书开放平台 ↗</a>' +
+      '<div class="channel-demo-form"><label>App ID<input placeholder="cli_…"></label><label>App Secret<input type="password"></label></div><p class="small">只能接收机器人所在群与发给机器人的私信。</p>';
+  }
+  dialog.innerHTML = '<h2>连接' + names[index] + '</h2>' + content + '<button class="btn btn-quiet" onclick="this.closest(\'dialog\').close()">关闭</button>';
+  dialog.showModal();
+}
+
 (function () {
   var state = { view: 'overview', first: false, done: {}, focusDone: false, asked: false, saved: '', sub: 'directions', dirs: {}, connected: false, thread: 'week', busy: false, me: 'profile', facts: {}, avatar: null, rec: '', fin: '', src: '', auto: { morning: true, organizer: true, news: false }, times: { morning: '07:30', organizer: '03:00', news: '08:00' }, calView: '', calEvent: '', addCal: false, cals: [['工作', 'Google 日历订阅', 'ev-work'], ['个人', 'iCloud 订阅', 'ev-life']], sugg: {} };
   try { var s = localStorage.getItem('kaitu-proto-view'); if (s) state.view = s; } catch (e) {}
@@ -1282,6 +1315,12 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
         '<section class="sec" aria-labelledby="h-local"><div class="sec-head"><h2 id="h-local" class="eyebrow">这台电脑上的 AI</h2><span class="small">通过 MCP 直接读写，电脑开着时可用</span></div><div class="card list-card">' + connRows(local) + '</div></section>' +
         '<section class="sec" aria-labelledby="h-cloud"><div class="sec-head"><h2 id="h-cloud" class="eyebrow">云端的 AI</h2><span class="small">通过 Google Drive 里的文件接力，电脑关着也能用</span></div><div class="card list-card">' + connRows(cloud) + '</div>' +
         '<p class="note">云端 AI 也可以走 MCP：开图在本机开一个带密钥的 MCP 地址，你用隧道把它公开出去后填给云端 AI。这种方式只在电脑开着时可用，而且看不到财务明细。</p></section>' +
+        '<section class="sec" aria-labelledby="h-channels"><div class="sec-head"><h2 id="h-channels" class="eyebrow">邮件与聊天</h2><span class="small">只读接收摘录 · 凭据存在这台电脑</span></div>' +
+        '<div class="channel-grid">' + ['Gmail', '其他邮箱', 'Slack', '飞书'].map(function (name, index) {
+          return '<article class="card sum"><div class="channel-title"><span class="channel-logo">' + ['G', '邮', 'S', '飞'][index] + '</span><b>' + name + '</b></div><p class="small">未连接 · 上次拉取：尚无</p>' +
+            '<button type="button" class="btn btn-quiet" onclick="openChannelDemo(' + index + ')">连接</button></article>';
+        }).join('') + '</div><p class="note">摘录进入开图资料，随资料设置同步到你的云盘；整理时会发送给你选择的 AI。</p>' +
+        '<dialog id="channel-demo" class="dialog channel-demo" aria-label="连接渠道"></dialog></section>' +
         '<section class="sec" aria-labelledby="h-sync"><h2 id="h-sync" class="eyebrow">资料存在哪里</h2><div class="card list-card"><div class="conn">' +
         '<span class="logo" style="background:var(--health)"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 5.5h4l1.5 1.5h5.5v6h-11z" stroke-linejoin="round"/></svg></span><b>Google Drive · 我的云端硬盘 / kaitu</b><span class="small">已同步 08:12 · 电脑关着时，云端 AI 也能接着记</span>' +
         '<button type="button" class="btn btn-quiet" style="height:34px">在访达中显示</button></div></div></section>';

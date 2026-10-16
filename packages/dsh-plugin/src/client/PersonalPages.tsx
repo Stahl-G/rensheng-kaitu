@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
+import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
@@ -18,6 +19,9 @@ export type PersonalView = "profile" | "connections" | "settings";
 export function PersonalPages(
   props: PersonalServices &
     MePageProps & {
+      channelSettings?: ChannelRequest;
+      channelFocus?: boolean;
+      onChannelFocused?: () => void;
       view: PersonalView;
       navigate: (view: PersonalView) => void;
       manageAi: () => void;
@@ -190,6 +194,13 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
+            {props.channelSettings && (
+              <ChannelSettings
+                request={props.channelSettings}
+                focus={props.channelFocus}
+                onFocused={props.onChannelFocused}
+              />
+            )}
             <section className={css.sec}>
               <h2 className={css.eyebrow}>资料存在哪里</h2>
               <div className={`${css.card} ${css.sum}`}>
