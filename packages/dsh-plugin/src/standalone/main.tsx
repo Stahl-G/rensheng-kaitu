@@ -14,6 +14,12 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 let workspace = "";
 const props: OverviewPageProps = {
+  loadCalendarPush: () => call("calendarPush"),
+  retryCalendarPush: (id) => call("retryCalendarPush", id),
+  configureCalendarPush: (enabled) => call("configureCalendarPush", enabled),
+  removeCalendarPush: () => call("removeCalendarPush"),
+  scheduleNext: (file, id, start, end) => call("scheduleNext", file, id, start, end),
+  editCalendarBlock: (id, start, end) => call("editCalendarBlock", id, start, end),
   keepOnboardingMatter: (source) => call("onboardingMatterKeep", source),
   saveOnboardingMatter: (text) => call("onboardingMatterSave", text),
   readOnboardingMatter: (source) => call("onboardingMatterRead", source),

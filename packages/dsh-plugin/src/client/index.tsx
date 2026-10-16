@@ -211,6 +211,36 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              loadCalendarPush: async () => {
+                const r = await ctx.remote.kaitu.calendarPush();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              retryCalendarPush: async (id: string) => {
+                const r = await ctx.remote.kaitu.retryCalendarPush(id);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              configureCalendarPush: async (enabled: boolean) => {
+                const r = await ctx.remote.kaitu.configureCalendarPush(enabled);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              removeCalendarPush: async () => {
+                const r = await ctx.remote.kaitu.removeCalendarPush();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              scheduleNext: async (file: string, id: string, start: string, end: string) => {
+                const r = await ctx.remote.kaitu.scheduleNext(file, id, start, end);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              editCalendarBlock: async (id: string, start: string, end: string) => {
+                const r = await ctx.remote.kaitu.editCalendarBlock(id, start, end);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               loadSettings: async () => {
                 const r = await ctx.remote.kaitu.settings();
                 if (!r.ok) throw new Error(r.error.message);

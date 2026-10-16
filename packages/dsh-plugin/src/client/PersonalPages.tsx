@@ -1,11 +1,13 @@
+import type { CalendarPushSettings } from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
+import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 
-export interface PersonalServices {
+export interface PersonalServices extends CalendarPushServices {
   loadSettings: () => Promise<SettingsData>;
   configureAutomation: (
     tasks: Partial<Record<AutomationKey, boolean>>,
@@ -29,6 +31,7 @@ export function PersonalPages(
       subscribe?: (refresh: () => void) => () => void;
     },
 ) {
+  const [calendarPush, setCalendarPush] = useState<CalendarPushSettings | null>(null);
   const [data, setData] = useState<SettingsData | null>(null);
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
@@ -40,12 +43,14 @@ export function PersonalPages(
   const [drive, setDrive] = useState(false);
   const refresh = useCallback(async () => {
     try {
-      setData(await props.loadSettings());
+      const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
+      setData(settings);
+      setCalendarPush(calendar);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [props.loadSettings]);
+  }, [props.loadSettings, props.loadCalendarPush]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -260,6 +265,64 @@ export function PersonalPages(
                 ))}
               </div>
               <p className={css.note}>时间按你的时区（{data.timeZone}）算</p>
+            </section>
+            <section className={css.sec}>
+              <div className={`${css.card} ${css["list-card"]}`}>
+                <div className={css["switch-row"]}>
+                  <label htmlFor="calendar-push">
+                    <b>确认日程时加入系统日历</b>
+                    <span className={css.small}>只加入你确认的时间段。关闭后已写入的保持不动。</span>
+                  </label>
+                  <span className={css.switch}>
+                    <input
+                      aria-checked={calendarPush?.enabled ?? true}
+                      id="calendar-push"
+                      type="checkbox"
+                      role="switch"
+                      checked={calendarPush?.enabled ?? true}
+                      disabled={busy || !calendarPush}
+                      onChange={(event) =>
+                        void run(async () => {
+                          setCalendarPush(await props.configureCalendarPush(event.target.checked));
+                        })
+                      }
+                    />
+                    <i />
+                  </span>
+                </div>
+                {calendarPush && !calendarPush.enabled && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        const result = await props.removeCalendarPush();
+                        setCalendarPush(result);
+                        if (Object.values(result.entries).some((receipt) => receipt.status === "error"))
+                          throw new Error("部分事件未移除，请查看下方原因并重试");
+                      }, "已处理移除请求")
+                    }
+                  >
+                    移除开图已写入的日历事件
+                  </button>
+                )}
+                {calendarPush &&
+                  Object.entries(calendarPush.entries)
+                    .filter(
+                      ([, value]) => value.status === "error" || (value.status === "removed" && value.ics),
+                    )
+                    .map(([id]) => (
+                      <CalendarPushResult
+                        key={id}
+                        id={id}
+                        state={calendarPush}
+                        retry={async () => {
+                          setCalendarPush(await props.removeCalendarPush());
+                        }}
+                      />
+                    ))}
+              </div>
             </section>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>资料</h2>

@@ -282,7 +282,7 @@ export function OnboardingMatter(
 }
 
 export function OnboardingNextCard(
-  props: OnboardingServices & { next: OnboardingNext; refresh: () => Promise<void> },
+  props: OnboardingServices & { next: OnboardingNext; refresh: () => Promise<void>; onSchedule?: () => void },
 ) {
   const { next } = props;
   const [action, setAction] = useState<"complete" | "defer" | null>(null);
@@ -328,6 +328,11 @@ export function OnboardingNextCard(
         <>
           {!action ? (
             <div className={css.footerActions}>
+              {props.onSchedule && (
+                <button type="button" className={quiet} onClick={props.onSchedule}>
+                  安排时间段
+                </button>
+              )}
               <button
                 type="button"
                 className={primary}

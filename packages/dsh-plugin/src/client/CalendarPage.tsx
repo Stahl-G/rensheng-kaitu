@@ -3,11 +3,13 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
+import type { CalendarPushSettings } from "@kaitu/core";
 import { useEffect, useState } from "react";
 import type { CalendarData, CalendarEntry } from "../types.js";
+import { CalendarPushResult, type CalendarPushServices, CalendarSlotForm } from "./CalendarPush.js";
 import css from "./Prototype.module.css";
 
-export interface CalendarPageProps {
+export interface CalendarPageProps extends CalendarPushServices {
   loadCalendar: () => Promise<CalendarData>;
   addCalendar: (url: string, name: string) => Promise<CalendarData>;
   decideProposal: (id: string, decision: "confirmed" | "rejected") => Promise<unknown>;
@@ -70,6 +72,8 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
   );
 }
 export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolean }) {
+  const [push, setPush] = useState<CalendarPushSettings | null>(null);
+  const [editing, setEditing] = useState(false);
   const [data, setData] = useState<CalendarData | null>(null);
   const [selected, setSelected] = useState<CalendarEntry | null>(null);
   const [adding, setAdding] = useState(props.initialAdding ?? false);
@@ -79,10 +83,12 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
   const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    void props
-      .loadCalendar()
-      .then((value) => {
-        if (active) setData(value);
+    void Promise.all([props.loadCalendar(), props.loadCalendarPush()])
+      .then(([value, status]) => {
+        if (active) {
+          setData(value);
+          setPush(status);
+        }
       })
       .catch((err) => {
         if (active) setError(err instanceof Error ? err.message : String(err));
@@ -90,7 +96,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
     return () => {
       active = false;
     };
-  }, [props.loadCalendar]);
+  }, [props.loadCalendar, props.loadCalendarPush]);
   const sources = [...new Set(data?.events.filter((event) => !event.pending).map((event) => event.source))];
   const colors = ["explore", "doing", "health", "finance", "me"];
   const colorFor = (source: string) =>
@@ -101,8 +107,10 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
     setError("");
     try {
       await props.decideProposal(selected.id, decision);
-      setData(await props.loadCalendar());
-      setSelected(null);
+      const fresh = await props.loadCalendar();
+      setData(fresh);
+      setPush(await props.loadCalendarPush());
+      setSelected(fresh.events.find((event) => event.id === selected.id) ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -210,7 +218,10 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
                 classNames: event.pending ? ["suggestion"] : [],
               };
             })}
-            eventClick={({ event }) => setSelected(data.events.find((row) => row.id === event.id) ?? null)}
+            eventClick={({ event }) => {
+              setEditing(false);
+              setSelected(data.events.find((row) => row.id === event.id) ?? null);
+            }}
           />
         )}
       </div>
@@ -231,6 +242,13 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
               {selected.start} · {selected.source}
             </span>
           </span>
+          <CalendarPushResult
+            id={selected.id}
+            state={push}
+            retry={async (id) =>
+              setPush(await (push?.enabled ? props.retryCalendarPush(id) : props.removeCalendarPush()))
+            }
+          />
           {selected.pending && (
             <>
               <button
@@ -239,7 +257,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
                 disabled={busy}
                 onClick={() => void decide("confirmed")}
               >
-                放进日程
+                确认
               </button>
               <button
                 type="button"
@@ -251,8 +269,55 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
               </button>
             </>
           )}
+          {!selected.pending && selected.source === "开图" && !!push?.entries[selected.id] && (
+            <>
+              <button type="button" className={css.link} disabled={busy} onClick={() => setEditing(!editing)}>
+                调整时间
+              </button>
+              <button
+                type="button"
+                className={css.link}
+                disabled={busy}
+                onClick={() => void decide("rejected")}
+              >
+                取消日程
+              </button>
+            </>
+          )}
+          {editing && (
+            <CalendarSlotForm
+              key={selected.id}
+              date={selected.start.slice(0, 10)}
+              start={selected.start.slice(11, 16)}
+              end={selected.end?.slice(11, 16)}
+              close={() => setEditing(false)}
+              save={async (start, end) => {
+                await props.editCalendarBlock(selected.id, start, end);
+                const fresh = await props.loadCalendar();
+                setData(fresh);
+                setSelected(fresh.events.find((event) => event.id === selected.id) ?? null);
+                setPush(await props.loadCalendarPush());
+              }}
+            />
+          )}
         </div>
       )}
+      {push &&
+        Object.entries(push.entries)
+          .filter(
+            ([id, receipt]) =>
+              !data?.events.some((event) => event.id === id) && ["removed", "error"].includes(receipt.status),
+          )
+          .map(([id]) => (
+            <CalendarPushResult
+              key={id}
+              id={id}
+              state={push}
+              retry={async (key) =>
+                setPush(await (push?.enabled ? props.retryCalendarPush(key) : props.removeCalendarPush()))
+              }
+            />
+          ))}
       {data?.subscriptions.map((sub) => (
         <div key={sub.id} className={css.small}>
           {sub.name} ·{" "}
