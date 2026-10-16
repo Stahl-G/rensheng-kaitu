@@ -13,6 +13,7 @@ import { ExperienceEditor } from "./ExperienceEditor.js";
 import { type ExperienceImportControlProps, ExperienceImportControls } from "./ExperienceImportControls.js";
 import css from "./MapPage.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
+import { atlasStyle, cityKey, journeyRoutes } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
   subscribe?: (refresh: () => void) => () => void;
@@ -25,7 +26,13 @@ export interface MapPageProps extends ExperienceImportControlProps {
   onPrompt: (text: string) => void;
 }
 type Layer = LifeMapData["features"][number]["properties"]["layer"];
-type CityGroup = { id: string; place: Experience["place"]; experiences: Experience[]; layers: Layer[] };
+type CityGroup = {
+  id: string;
+  place: Experience["place"];
+  experiences: Experience[];
+  layers: Layer[];
+  home?: boolean;
+};
 const layers: { id: Layer; name: string }[] = [
   { id: "been", name: "走过的地方" },
   { id: "now", name: "现在的生活" },
@@ -46,9 +53,10 @@ const statuses = {
   planned: "计划",
   suggested: "建议",
 };
-const prompt = "用 build-life-map 技能，从我的记忆里整理去过和住过的城市";
-const cityId = (place: Experience["place"]) =>
-  String(place.geonameid ?? `${place.country ?? ""}:${place.name}`);
+const homePrompt =
+  "请用 build-life-map 技能，从我的档案、记忆和对话识别家乡，列出原文依据，必要时向我核对。确认后在 me/profile.md 基本情况中维护一条家乡：城市名，保留其他内容。没有依据不要猜，不把籍贯、出生地或当前居住地直接当家乡。";
+const prompt = `${homePrompt}然后整理去过和住过的城市；间接推断和计划保持待核对，不补造日期。`;
+const cityId = cityKey;
 function dateLabel(value: string | undefined, precision: Experience["time_precision"]) {
   if (!value || precision === "unknown") return "暂无记录";
   const [year, month, day] = value.split("-");
@@ -163,13 +171,36 @@ function ExperienceDetails({
   );
 }
 
-function markerImage(ids: Layer[], ink: string, paper: string) {
+function markerImage(ids: Layer[], ink: string, paper: string, home = false) {
   const canvas = document.createElement("canvas");
-  canvas.width = ids.length * 48;
+  canvas.width = (home ? 1 : ids.length) * 48;
   canvas.height = 48;
   const context = canvas.getContext("2d");
   if (!context) return null;
   context.scale(2, 2);
+  if (home) {
+    context.fillStyle = ink;
+    context.strokeStyle = paper;
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(12, 12, 10, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(6, 12);
+    context.lineTo(12, 6);
+    context.lineTo(18, 12);
+    context.moveTo(8, 11);
+    context.lineTo(8, 18);
+    context.lineTo(16, 18);
+    context.lineTo(16, 11);
+    context.moveTo(11, 18);
+    context.lineTo(11, 13);
+    context.lineTo(13, 13);
+    context.lineTo(13, 18);
+    context.lineWidth = 1.5;
+    context.stroke();
+  }
   ids.forEach((id, i) => {
     const x = i * 24 + 12;
     context.strokeStyle = paper;
@@ -199,16 +230,22 @@ function CityMap({
   selected,
   onSelect,
   onShowList,
+  showRoutes,
+  home,
+  asOf,
 }: {
   cities: CityGroup[];
   selected: string | null;
   onSelect: (id: string) => void;
   onShowList: () => void;
+  showRoutes: boolean;
+  home?: Experience["place"];
+  asOf: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
-  const latest = useRef({ cities, onSelect });
-  latest.current = { cities, onSelect };
+  const latest = useRef({ cities, onSelect, selected });
+  latest.current = { cities, onSelect, selected };
   const fitted = useRef(false);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const geojson = useMemo(
@@ -217,7 +254,7 @@ function CityMap({
       features: cities
         .filter(
           (city) =>
-            city.layers.length &&
+            (city.layers.length || city.home) &&
             city.place.precision === "city" &&
             city.place.lng !== undefined &&
             city.place.lat !== undefined,
@@ -226,54 +263,35 @@ function CityMap({
           type: "Feature" as const,
           geometry: {
             type: "Point" as const,
-            coordinates: [city.place.lng as number, city.place.lat as number],
+            coordinates: [city.place.lng as number, city.place.lat as number] as [number, number],
           },
-          properties: { id: city.id, name: city.place.name, icon: city.layers.join("-") },
+          properties: {
+            id: city.id,
+            name: city.place.name,
+            home: !!city.home,
+            icon: city.home
+              ? "home"
+              : city.layers.includes("now")
+                ? "now"
+                : city.layers.includes("been")
+                  ? "been"
+                  : "planned",
+          },
         })),
     }),
     [cities],
   );
-  const routes = useMemo(() => {
-    const visits = cities
-      .flatMap((city) =>
-        city.place.precision === "city" && city.place.lng !== undefined && city.place.lat !== undefined
-          ? city.experiences
-              .filter(
-                (item) =>
-                  item.start &&
-                  item.time_precision !== "unknown" &&
-                  ["observed", "user_reported"].includes(item.fact_status),
-              )
-              .map((item) => ({ city, start: item.start as string }))
-          : [],
-      )
-      .sort((a, b) => a.start.localeCompare(b.start));
-    return {
-      type: "FeatureCollection" as const,
-      features: visits.slice(1).flatMap((visit, index) => {
-        const previous = visits[index];
-        if (!previous || previous.city.id === visit.city.id || previous.start === visit.start) return [];
-        const from = previous.city.place;
-        const to = visit.city.place;
-        let longitude = to.lng as number;
-        while (longitude - (from.lng as number) > 180) longitude -= 360;
-        while (longitude - (from.lng as number) < -180) longitude += 360;
-        return [
-          {
-            type: "Feature" as const,
-            properties: {},
-            geometry: {
-              type: "LineString" as const,
-              coordinates: [
-                [from.lng as number, from.lat as number],
-                [longitude, to.lat as number],
-              ],
-            },
-          },
-        ];
-      }),
-    };
-  }, [cities]);
+  const routes = useMemo(
+    () =>
+      showRoutes && home
+        ? journeyRoutes(
+            cities.flatMap((city) => city.experiences),
+            asOf,
+            home,
+          )
+        : { type: "FeatureCollection" as const, features: [] },
+    [cities, asOf, home, showRoutes],
+  );
   const latestRoutes = useRef(routes);
   latestRoutes.current = routes;
   const fitCities = useCallback((duration = 600) => {
@@ -291,7 +309,25 @@ function CityMap({
       return;
     }
     const bounds = new LngLatBounds();
-    for (const point of points) bounds.extend(point.geometry.coordinates as [number, number]);
+    const longitudes = points
+      .map((point) => (point.geometry.coordinates[0] + 360) % 360)
+      .sort((a, b) => a - b);
+    let start = longitudes[0] ?? 0;
+    let largestGap = -1;
+    for (let i = 0; i < longitudes.length; i++) {
+      const current = longitudes[i] as number;
+      const next =
+        (longitudes[(i + 1) % longitudes.length] as number) + (i === longitudes.length - 1 ? 360 : 0);
+      if (next - current > largestGap) {
+        largestGap = next - current;
+        start = next % 360;
+      }
+    }
+    for (const point of points) {
+      let longitude = (point.geometry.coordinates[0] + 360) % 360;
+      if (longitude < start) longitude += 360;
+      bounds.extend([longitude, point.geometry.coordinates[1]]);
+    }
     instance.fitBounds(bounds, { padding: 64, maxZoom: 5, duration });
     fitted.current = true;
   }, []);
@@ -309,6 +345,17 @@ function CityMap({
       timer = setTimeout(() => setState("failed"), 8000);
     };
     const themeRoot = container.current.closest("[data-theme]") ?? document.body;
+    const styleTransform = (_previous: unknown, next: Parameters<typeof atlasStyle>[0]) => {
+      const theme = getComputedStyle(container.current as HTMLDivElement);
+      const value = (name: string) => theme.getPropertyValue(name).trim();
+      return atlasStyle(next, {
+        water: value("--atlas-water"),
+        land: value("--atlas-land"),
+        border: value("--atlas-border"),
+        muted: value("--atlas-muted"),
+        green: value("--atlas-green"),
+      });
+    };
     const styleUrl = () => {
       const theme = themeRoot.getAttribute("data-theme");
       const dark = theme === "dark" || (!theme && document.body.hasAttribute("data-ds-dark-theme"));
@@ -317,7 +364,6 @@ function CityMap({
     try {
       instance = new LibreMap({
         container: container.current,
-        style: styleUrl(),
         center: [20, 25],
         zoom: 1,
         cooperativeGestures: false,
@@ -345,6 +391,8 @@ function CityMap({
         const ink = theme.getPropertyValue("--kt-map").trim();
         const paper = theme.getPropertyValue("--kt-card").trim();
         const text = theme.getPropertyValue("--kt-text").trim();
+        const house = markerImage([], ink, paper, true);
+        if (house) m.addImage("home", house, { pixelRatio: 2 });
         for (let mask = 1; mask < 8; mask++) {
           const ids = layers.filter((_, i) => mask & (1 << i)).map((layer) => layer.id);
           const image = markerImage(ids, ink, paper);
@@ -355,7 +403,12 @@ function CityMap({
           id: "experience-order",
           type: "line",
           source: "experience-order",
-          paint: { "line-color": ink, "line-width": 2, "line-opacity": 1 },
+          paint: {
+            "line-color": ink,
+            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 1.5, 6, 2.5],
+            "line-opacity": 0.8,
+          },
+          layout: { "line-cap": "round", "line-join": "round" },
         });
         m.addSource("cities", {
           type: "geojson",
@@ -388,16 +441,30 @@ function CityMap({
           paint: { "text-color": paper },
         });
         m.addLayer({
+          id: "selected-city",
+          type: "circle",
+          source: "cities",
+          filter: ["==", ["get", "id"], latest.current.selected ?? ""],
+          paint: {
+            "circle-radius": 20,
+            "circle-color": ink,
+            "circle-opacity": 0.13,
+            "circle-stroke-color": ink,
+            "circle-stroke-width": 1,
+          },
+        });
+        m.addLayer({
           id: "places",
           type: "symbol",
           source: "cities",
           filter: ["!", ["has", "point_count"]],
           layout: {
             "icon-image": ["get", "icon"],
-            "icon-allow-overlap": true,
+            "icon-allow-overlap": false,
+            "symbol-sort-key": ["case", ["get", "home"], 0, 1],
             "text-field": ["get", "name"],
             "text-font": ["Noto Sans Regular"],
-            "text-size": 14,
+            "text-size": ["interpolate", ["linear"], ["zoom"], 1, 12, 5, 15],
             "text-anchor": "left",
             "text-offset": [1.2, 0],
             "text-optional": true,
@@ -440,6 +507,7 @@ function CityMap({
           m.getCanvas().style.cursor = "";
         });
       }
+      m.setStyle(styleUrl(), { diff: false, transformStyle: styleTransform });
     } catch {
       clearTimeout(timer);
       setState("failed");
@@ -447,7 +515,7 @@ function CityMap({
     const observer = new MutationObserver(() => {
       if (!instance) return;
       waitForMap();
-      instance.setStyle(styleUrl(), { diff: false });
+      instance.setStyle(styleUrl(), { diff: false, transformStyle: styleTransform });
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     if (themeRoot !== document.body)
@@ -473,11 +541,34 @@ function CityMap({
     source?.setData(routes);
   }, [routes]);
   useEffect(() => {
-    const city = cities.find((city) => city.id === selected);
-    if (city?.place.precision === "city" && city.place.lng !== undefined && city.place.lat !== undefined) {
-      map.current?.flyTo({ center: [city.place.lng, city.place.lat], zoom: 7 });
+    const instance = map.current;
+    const city = latest.current.cities.find((city) => city.id === selected);
+    if (
+      instance &&
+      fitted.current &&
+      instance.isStyleLoaded() &&
+      city?.place.lng !== undefined &&
+      city.place.lat !== undefined
+    ) {
+      const position = instance.project([city.place.lng, city.place.lat]);
+      const canvas = instance.getCanvas();
+      const outside =
+        position.x < 48 ||
+        position.y < 48 ||
+        position.x > canvas.clientWidth - 48 ||
+        position.y > canvas.clientHeight - 48;
+      if (outside) {
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        instance.easeTo({
+          center: [city.place.lng, city.place.lat],
+          zoom: Math.max(2.5, Math.min(instance.getZoom(), 5)),
+          duration: reduced ? 0 : 500,
+        });
+      }
     }
-  }, [selected, cities]);
+    if (instance?.getLayer("selected-city"))
+      instance.setFilter("selected-city", ["==", ["get", "id"], selected ?? ""]);
+  }, [selected]);
   return (
     <section className={css.mapPane} aria-label="城市地图">
       <div ref={container} className={css.map} />
@@ -520,7 +611,10 @@ function CityMap({
           全世界
         </button>
       </fieldset>
-      <span className={css.precision}>城市级位置{routes.features.length > 0 && " · 连线：经历顺序"}</span>
+      <span className={css.precision}>
+        {home ? `⌂ ${home.name} · 家乡起点` : "城市级位置"}
+        {routes.features.length > 0 && " · 连线表示经历顺序"}
+      </span>
     </section>
   );
 }
@@ -547,6 +641,9 @@ export function MapPage({
   const [enabled, setEnabled] = useState<Layer[]>(["been", "now", "planned"]);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState("map");
+  const [showRoutes, setShowRoutes] = useState(true);
+  const [chapterLimit, setChapterLimit] = useState(30);
+  const [detailLimit, setDetailLimit] = useState(30);
   const [compact, setCompact] = useState(false);
   const showMapList = useCallback(() => setView("list"), []);
   const page = useRef<HTMLDivElement>(null);
@@ -619,13 +716,36 @@ export function MapPage({
         if (!group.layers.includes(feature.properties.layer)) group.layers.push(feature.properties.layer);
       }
     }
+    const home = data.hometown?.status === "ready" ? data.hometown.place : undefined;
+    if (home) {
+      const id = cityId(home);
+      const group = groups.get(id);
+      if (group) group.home = true;
+      else groups.set(id, { id, place: home, experiences: [], layers: [], home: true });
+    }
     for (const group of groups.values())
       group.layers.sort((a, b) => layers.findIndex((l) => l.id === a) - layers.findIndex((l) => l.id === b));
-    return [...groups.values()];
+    return [...groups.values()].sort((a, b) => Number(!!b.home) - Number(!!a.home));
   }, [data, enabled, year, from, to]);
+  const home = data?.hometown?.status === "ready" ? data.hometown.place : undefined;
+  const homeId = home ? cityId(home) : null;
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (data && !initialized.current) {
+      initialized.current = true;
+      if (homeId && !compact) setSelected(homeId);
+    }
+  }, [data, homeId, compact]);
+  const timeline = cities
+    .flatMap((city) => city.experiences.map((item) => ({ city, item })))
+    .sort(
+      (a, b) =>
+        (a.item.start ?? "9999").localeCompare(b.item.start ?? "9999") || a.item.id.localeCompare(b.item.id),
+    );
   const city = cities.find((item) => item.id === selected);
   const selectedId = city?.id;
   useEffect(() => {
+    setDetailLimit(30);
     if (!selectedId || !page.current) return;
     const previous = document.activeElement as HTMLElement;
     close.current?.focus({ preventScroll: compact });
@@ -712,14 +832,26 @@ export function MapPage({
           <div>
             <h2 id="city-title">{city.place.name}</h2>
             <p className={css.secondary}>
-              {city.place.country || "暂无记录"} · {city.experiences.length} 段经历
+              {city.home
+                ? "家乡 · 人生地图的起点"
+                : `${city.place.country || "暂无记录"} · ${city.experiences.length} 段经历`}
             </p>
           </div>
           <button ref={close} type="button" className={css.control} onClick={dismiss}>
             关闭
           </button>
         </div>
-        {city.experiences.map((item) => (
+        {city.home && (
+          <section className={css.homeStory}>
+            <span className={css.homeBadge}>⌂ 从这里出发</span>
+            <p>{data.hometown?.evidence}</p>
+            <p className={css.source}>依据：{data.hometown?.source}</p>
+            <button type="button" className={css.link} onClick={() => ask(homePrompt)}>
+              核对或修正家乡
+            </button>
+          </section>
+        )}
+        {city.experiences.slice(0, detailLimit).map((item) => (
           <ExperienceDetails
             key={`${item.id}:${item.rev ?? 1}`}
             item={item}
@@ -730,6 +862,11 @@ export function MapPage({
             hide={hide}
           />
         ))}
+        {city.experiences.length > detailLimit && (
+          <button type="button" className={css.link} onClick={() => setDetailLimit((value) => value + 30)}>
+            更多经历（{city.experiences.length - detailLimit}）
+          </button>
+        )}
       </div>
     </>
   );
@@ -739,20 +876,29 @@ export function MapPage({
         <div>
           <h1>
             <span className={css.dot} aria-hidden="true" />
-            足迹
+            人生地图
           </h1>
-          <p className={css.secondary}>走过的、现在的和计划去的城市 · 由 Agent 从你的记忆整理</p>
+          <p className={css.secondary}>从家乡出发，记录走过的城市和现在的生活</p>
         </div>
         <button type="button" className={css.primary} onClick={() => ask(prompt)}>
           从记忆生成
         </button>
       </header>
-      <ExperienceImportControls
-        {...importControls}
-        subscribe={subscribe}
-        onChanged={refresh}
-        pending={data?.importsPending ?? 0}
-      />
+      <div className={css.tools}>
+        <ExperienceImportControls
+          {...importControls}
+          subscribe={subscribe}
+          onChanged={refresh}
+          pending={data?.importsPending ?? 0}
+        />
+        <button
+          type="button"
+          className={css.control}
+          onClick={() => (homeId ? setSelected(homeId) : ask(homePrompt))}
+        >
+          {home ? `⌂ 家乡：${home.name}` : data?.hometown?.status === "review" ? "核对家乡" : "识别我的家乡"}
+        </button>
+      </div>
       {error && (
         <p className={css.notice} role="alert">
           {error}{" "}
@@ -799,7 +945,7 @@ export function MapPage({
       )}
       {!data ? (
         <output className={css.empty}>{error ? "经历读取失败，请重试。" : "正在读取经历…"}</output>
-      ) : !data.experiences.length ? (
+      ) : !data.experiences.length && !home ? (
         <div className={css.empty}>
           <h2>让开图从你的记忆里生成地图</h2>
           <p>和开图聊聊，整理去过和住过的城市。</p>
@@ -812,6 +958,14 @@ export function MapPage({
           <details className={css.review}>
             <summary>地图工具 · 图层与时间</summary>
             <div className={css.toolbar}>
+              <label className={css.routeToggle}>
+                <input
+                  type="checkbox"
+                  checked={showRoutes}
+                  onChange={(event) => setShowRoutes(event.target.checked)}
+                />
+                经历连线
+              </label>
               <fieldset className={css.legend} aria-label="地图图层">
                 {layers.map((layer) => (
                   <button
@@ -950,6 +1104,9 @@ export function MapPage({
               selected={city?.id ?? null}
               onSelect={setSelected}
               onShowList={showMapList}
+              showRoutes={showRoutes}
+              home={home}
+              asOf={data.asOf}
             />
             <section className={css.listPane} aria-label="城市列表">
               {!!data.review.length && (
@@ -1005,8 +1162,17 @@ export function MapPage({
                   ))}
                 </details>
               )}
+              {!home && (
+                <section className={css.homeStory}>
+                  <h2>{data.hometown?.status === "review" ? "家乡待核对" : "从家乡开始"}</h2>
+                  <p>{data.hometown?.evidence ?? "让开图从已有资料识别家乡，为人生地图找到起点。"}</p>
+                  <button type="button" className={css.link} onClick={() => ask(homePrompt)}>
+                    识别与核对家乡
+                  </button>
+                </section>
+              )}
               <div className={css.listHeading}>
-                <h2>城市</h2>
+                <h2>我的城市</h2>
                 <span>{cities.length} 个</span>
               </div>
               {!compact && details}
@@ -1023,7 +1189,9 @@ export function MapPage({
                   <span>
                     <strong>{item.place.name}</strong>
                     <span className={css.secondary}>
-                      {item.place.country || "暂无记录"} · {item.experiences.length} 段经历
+                      {item.home
+                        ? "⌂ 家乡 · 起点"
+                        : `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`}
                     </span>
                   </span>
                   <span className={css.cityShapes}>
@@ -1043,6 +1211,56 @@ export function MapPage({
             </section>
           </div>
 
+          {(timeline.length > 0 || home) && (
+            <section className={css.timeline} aria-label="经历时间轴">
+              <h2>生活的章节</h2>
+              <div className={css.timelineCards}>
+                {home && (
+                  <button
+                    type="button"
+                    className={css.chapter}
+                    aria-pressed={selected === homeId}
+                    onClick={() => setSelected(homeId)}
+                  >
+                    <span>人生起点</span>
+                    <strong>⌂ {home.name} · 家乡</strong>
+                    <small>查看家乡依据</small>
+                  </button>
+                )}
+                {timeline.slice(0, chapterLimit).map(({ city, item }) => (
+                  <button
+                    type="button"
+                    className={css.chapter}
+                    key={item.id}
+                    aria-pressed={selected === city.id}
+                    onClick={() => setSelected(city.id)}
+                  >
+                    <span>{dateLabel(item.start, item.time_precision)}</span>
+                    <strong>
+                      {city.place.name} · {item.title || eventTypes[item.event_type]}
+                    </strong>
+                    <small>{statuses[item.fact_status]}</small>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          {timeline.length > chapterLimit && (
+            <button type="button" className={css.link} onClick={() => setChapterLimit((value) => value + 30)}>
+              更多时间轴经历（{timeline.length - chapterLimit}）
+            </button>
+          )}
+          <div className={css.mapFooter}>
+            <button
+              type="button"
+              className={css.link}
+              aria-pressed={showRoutes}
+              onClick={() => setShowRoutes((value) => !value)}
+            >
+              {showRoutes ? "隐藏经历连线" : "显示经历连线"}
+            </button>
+          </div>
+          <p className={css.mapFootnote}>城市级位置 · 连线只表示经历顺序，不代表实际交通路线</p>
           {compact && details}
         </>
       )}
