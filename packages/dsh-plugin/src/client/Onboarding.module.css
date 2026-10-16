@@ -541,3 +541,8 @@
 .paths:disabled {
   opacity: 0.6;
 }
+
+/* 换步时把焦点移到标题供读屏，鼠标用户不需要看到焦点框。 */
+h1[tabindex="-1"]:focus {
+  outline: none;
+}
