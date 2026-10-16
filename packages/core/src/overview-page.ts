@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { driveStatus } from "./drive.js";
 import { committedExperiences, pendingExperienceImports } from "./experience-imports.js";
 import { type TimedExperience, experienceLayer } from "./experience-time.js";
@@ -181,13 +182,41 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         : [];
     })
     .slice(0, 30);
+  const sections = data.modules.flatMap(({ dir, def }) => {
+    const records = Object.keys(def.records ?? {}).flatMap<{ ts: string }>((type) => {
+      if (["experience_batch", "experience_source", "finance_fx_rate"].includes(type)) return [];
+      return type === "experience" ? committedExperiences(ws) : (data.records[type] ?? []);
+    });
+    const topics = data.statuses.filter(
+      (item) => item.file.startsWith(`${dir}/`) && item.file !== `${dir}/STATUS.md`,
+    );
+    const count =
+      def.id === "projects"
+        ? data.projects.length
+        : def.id === "health"
+          ? records.length + data.labs.length
+          : def.id === "feed"
+            ? records.length + data.digests.length
+            : def.id === "me"
+              ? data.memories.length + data.goals.length
+              : records.length + topics.length;
+    if (!count) return [];
+    const timestamps = [
+      ...records.map((record) => record.ts),
+      ...topics.map((topic) => topic.data.updated),
+    ].filter((value): value is string => !!value && Number.isFinite(Date.parse(value)));
+    timestamps.sort((a, b) => Date.parse(b) - Date.parse(a));
+    return [{ id: def.id, label: def.name, count, latest: timestamps[0] ?? null }];
+  });
   return {
     root: data.root,
     timeZone: data.timeZone,
     today: data.today,
     cutoff,
     drive: driveStatus(ws).mode === "drive",
+    sections,
     empty:
+      !sections.length &&
       !Object.values(data.records).some((r) => r.length) &&
       !data.now.data.blocks.length &&
       !next.length &&
@@ -265,11 +294,10 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         daily: [],
         target: null,
       },
-    ],
+    ].filter((item) => item.value !== null),
     pending: status.now.pending,
     inboxNotes: notes.filter((note) => note.status === "needs_review").length,
     notes,
     warnings: data.warnings,
   };
 }
-import { readdirSync } from "node:fs";

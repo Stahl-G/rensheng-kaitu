@@ -56,10 +56,15 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 
 工作区优先使用 `~/Library/Application Support/kaitu/current-workspace.json` 指向的有效目录，
 否则使用 `~/kaitu`，空目录会自动初始化。默认资料服务只监听本机随机端口，退出应用时停止。
-应用移动后会自动更新内置插件路径。已存在的健康目标和任务保留，新用户不预填私人健康数值、不自动创建多种定时任务。
+应用移动后会自动更新内置插件路径。已存在的健康目标和任务保留，新用户不预填私人健康数值。首次启动询问一次三个自动任务，默认开启：每日整理 03:00、早间计划 07:30、资讯搜索 08:00，按工作区时区执行。
+「开图 → 设置」可分别开关，已有用户不重新询问，已有任务不覆盖时间、内容或手动删除决定。
+自动任务由内置 AI 执行，应用运行时按需在后台启动该进程。
 
 应用状态和 Electron 数据保存在 `~/.kaitu-app/`，开图文件保留在原工作区。
-按需启动的内置 AI 使用 `~/.kaitu-app/ai/` 隔离会话与凭据，与资料服务分开运行。
+内置 AI 复用当前安装已经使用的状态目录：有旧 `ai/profiles/desktop` 时沿用 `~/.kaitu-app/ai/`，否则使用原 `~/.kaitu-app/`。
+不迁移或删除登录凭据、会话和 DSH 的 `~/.dsh`。资料窗口使用单独的 `workbench-userData`，避免争用 AI 的 Electron 存储。
+AI 子进程隐藏 Dock 图标；重复打开复用同一进程，主窗口退出会等待 AI 正常保存退出，超时清理其进程组。
+API Key 自动引导只在 Kaitu.app 关闭；`kaitu dsh --install` 和 `kaitu dsh` 的 DSH 入口恢复引导。
 插件市场和运行时配置只通过高级设置进入。
 
 ## 隔离验收

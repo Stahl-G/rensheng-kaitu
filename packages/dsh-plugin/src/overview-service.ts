@@ -2,10 +2,13 @@ import { rmSync } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
+  type AutomationKey,
+  type AutomationSettings,
   KaituError,
   Workspace,
   captureNote,
   changeExperienceBatch,
+  configureAutomation,
   decideProposal,
   defaultRoot,
   dismissNews,
@@ -14,6 +17,7 @@ import {
   lifeMap,
   listProjects,
   previewExperienceBatch,
+  readAutomation,
   readAvatar,
   readDoing,
   readExperienceImports,
@@ -95,6 +99,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("dshVersion")
   async dshVersion(): Promise<string | null> {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
+  }
+
+  @Remote("automation")
+  async automation(): Promise<AutomationSettings> {
+    return readAutomation(this.workspace);
+  }
+
+  @Remote("configureAutomation")
+  async configureAutomation(tasks: Partial<Record<AutomationKey, boolean>>): Promise<AutomationSettings> {
+    return this.write(async () => configureAutomation(this.workspace, tasks));
   }
 
   @Remote("workspacePath")

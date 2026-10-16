@@ -119,7 +119,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   );
   register(
     "news_dismiss",
-    "标记新闻不相关并静音来源，保存版本。",
+    "标记单条新闻不相关，保存版本。",
     { id: text },
     ({ id }) => dismissNews(ws, id),
     true,

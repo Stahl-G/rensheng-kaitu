@@ -1,4 +1,5 @@
 import {
+  type AutomationKey,
   type ExperienceChanges,
   type ExplorationCommand,
   type FinanceImportOptions,
@@ -8,6 +9,7 @@ import {
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
+  configureAutomation,
   decideProposal,
   discardFinanceImport,
   dismissNews,
@@ -21,6 +23,7 @@ import {
   listProjects,
   previewExperienceBatch,
   previewFinanceImport,
+  readAutomation,
   readAvatar,
   readDoing,
   readExperienceImports,
@@ -44,6 +47,7 @@ import {
 } from "@kaitu/core";
 
 export const productMutations = new Set([
+  "configureAutomation",
   "setExperienceSource",
   "changeExperienceBatch",
   "recoverExperienceImports",
@@ -71,6 +75,10 @@ export async function productRequest(ws: Workspace, method: string, args: unknow
     return args[i] as number;
   };
   switch (method) {
+    case "automation":
+      return readAutomation(ws);
+    case "configureAutomation":
+      return configureAutomation(ws, args[0] as Partial<Record<AutomationKey, boolean>>);
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":

@@ -1,11 +1,18 @@
-import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startUi } from "../cli/dist/ui/server.js";
-import { Workspace, initWorkspace, upgradeWorkspace } from "../core/dist/index.js";
+import {
+  Workspace,
+  configureAutomation,
+  initWorkspace,
+  readAutomation,
+  upgradeWorkspace,
+} from "../core/dist/index.js";
+import { createAiProcess } from "./ai-process.mjs";
 import { desktopPaths } from "./environment.mjs";
 
-export async function startDesktop({ app, BrowserWindow, Menu, shell }) {
+export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return;
@@ -17,27 +24,25 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell }) {
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   else await upgradeWorkspace(ws);
   await app.whenReady();
+  // Retain the AI home already used by this installation, including its login and sessions.
+  const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
+  const ai = createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
+    ...process.env,
+    KAITU_EMBEDDED_AI: "1",
+    KAITU_APP_HOME: aiHome,
+    KAITU_DIR: ws.root,
+    KAITU_APP_PORT: "0",
+  });
+  const startAutomation = async () => {
+    const settings = readAutomation(ws);
+    if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
+  };
   const server = await startUi(ws, {
     port: 0,
     open: false,
     webRoot: join(resources, "web"),
     openAi: async () => {
-      const child = spawn(join(dirname(app.getPath("exe")), "Kaitu"), [], {
-        env: {
-          ...process.env,
-          KAITU_EMBEDDED_AI: "1",
-          KAITU_APP_HOME: join(state, "ai"),
-          KAITU_DIR: ws.root,
-          KAITU_APP_PORT: "0",
-        },
-        detached: true,
-        stdio: "ignore",
-      });
-      await new Promise((resolve, reject) => {
-        child.once("spawn", resolve);
-        child.once("error", reject);
-      });
-      child.unref();
+      await ai.open();
       return {};
     },
   });
@@ -62,36 +67,57 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell }) {
   });
   window.once("ready-to-show", () => window.show());
   app.on("second-instance", () => {
+    if (window.isDestroyed()) return;
     if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
   });
   app.on("activate", () => {
+    if (window.isDestroyed()) return;
     window.show();
     window.focus();
   });
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([
-      {
-        label: "开图",
-        submenu: [
-          { role: "about", label: "关于开图" },
-          { type: "separator" },
-          { role: "hide", label: "隐藏开图" },
-          { role: "quit", label: "退出开图" },
-        ],
-      },
-      { role: "editMenu", label: "编辑" },
-      {
-        label: "视图",
-        submenu: [
-          { role: "reload", label: "刷新" },
-          { role: "togglefullscreen", label: "全屏" },
-        ],
-      },
-      { role: "windowMenu", label: "窗口" },
-    ]),
-  );
+  const updateMenu = () =>
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: "开图",
+          submenu: [
+            { role: "about", label: "关于开图" },
+            {
+              label: "设置",
+              submenu: [
+                ["morning", "早间计划"],
+                ["organizer", "每日整理"],
+                ["news", "资讯搜索"],
+              ].map(([key, label]) => ({
+                label,
+                type: "checkbox",
+                checked: readAutomation(ws).tasks[key],
+                click: async (item) => {
+                  configureAutomation(ws, { [key]: item.checked });
+                  updateMenu();
+                  await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));
+                },
+              })),
+            },
+            { type: "separator" },
+            { role: "hide", label: "隐藏开图" },
+            { role: "quit", label: "退出开图" },
+          ],
+        },
+        { role: "editMenu", label: "编辑" },
+        {
+          label: "视图",
+          submenu: [
+            { role: "reload", label: "刷新" },
+            { role: "togglefullscreen", label: "全屏" },
+          ],
+        },
+        { role: "windowMenu", label: "窗口" },
+      ]),
+    );
+  updateMenu();
   await window.loadURL(server.url);
   app.on("window-all-closed", () => app.quit());
   let closing = false;
@@ -99,6 +125,20 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell }) {
     if (closing) return;
     event.preventDefault();
     closing = true;
-    void server.close().finally(() => app.quit());
+    void Promise.allSettled([server.close(), ai.close()]).finally(() => app.quit());
   });
+  if (!readAutomation(ws).asked) {
+    const { response } = await dialog.showMessageBox(window, {
+      type: "question",
+      title: "开启自动任务",
+      message: "为你开启每日整理、早间计划和资讯搜索？",
+      detail: "默认每天 03:00 整理、07:30 计划、08:00 搜索资讯。可在开图 → 设置中随时开关。任务使用内置 AI。",
+      buttons: ["开启", "暂不开启"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    configureAutomation(ws, { morning: response === 0, organizer: response === 0, news: response === 0 });
+    updateMenu();
+  }
+  await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));
 }

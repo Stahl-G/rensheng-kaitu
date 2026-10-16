@@ -62,7 +62,7 @@ const plan = [
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
   "Resources: 移除 app-update.yml；从 SVG 生成 PNG / ICNS；内置插件、初始化器、schemas、templates、data 与 DSH 协议转接包",
   "MacOS: xcrun clang 构建原生 Kaitu 启动入口 → Electron Node 初始化资料 → 独立本地工作台",
-  "首次启动：读取 current-workspace.json，否则 ~/kaitu；默认三个导航，无模型也能记录与查看；主动选择内置 AI 后才启动 DSH",
+  "首次启动：读取 current-workspace.json，否则 ~/kaitu；无模型也能记录与查看；确认自动任务后后台启动 AI，或主动打开 AI",
   "数据目录：DSH_HOME、Electron userData / 日志 / 崩溃记录均在 ~/.kaitu-app/",
   identity
     ? `SIGN ${identity}：逐层签名 Electron / 内置 Mach-O / 应用，hardened runtime + DSH entitlements + timestamp`
@@ -138,10 +138,13 @@ for (const slogan of slogans) {
 changes.set(
   "lib/main.js",
   Buffer.from(
-    slogans
+    `${slogans
       .reduce((text, slogan) => text.replace(slogan, JSON.stringify(poweredBy)), brandedMain)
       .replace(about, `applicationVersion: ${JSON.stringify(version)}`)
-      .replace("app.setAppLogsPath();", 'app.setAppLogsPath(join(process.env.DSH_HOME, "logs"));'),
+      .replace(
+        "app.setAppLogsPath();",
+        'app.setAppLogsPath(join(process.env.DSH_HOME, "logs"));',
+      )}\napp.on("kaitu:quit", quitWithoutConfirmation);\n`,
   ),
 );
 changes.set("renderer/assets/welcome-brand.svg", Buffer.from(welcomeBrand()));

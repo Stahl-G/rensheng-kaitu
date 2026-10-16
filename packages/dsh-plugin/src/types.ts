@@ -119,6 +119,7 @@ export interface OverviewProject {
   to: string;
 }
 export interface OverviewData {
+  sections: { id: string; label: string; count: number; latest: string | null }[];
   root: string;
   timeZone: string;
   today: string;

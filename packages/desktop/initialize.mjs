@@ -16,7 +16,7 @@ mkdirSync(profile, { recursive: true, mode: 0o700 });
 const patch = join(profile, "cordis.patch.yml");
 const before = existsSync(patch) ? readFileSync(patch, "utf8") : "[]\n";
 const plugin = join(resources, "dist/index.js");
-let after = renderDshPatch(before, { home: state, workspace, plugin });
+let after = renderDshPatch(before, { home: state, workspace, plugin, standalone: true });
 // DSH 桌面版固定监听 19387；Kaitu 换一个端口，才能和已安装的 DeepSeek Harness 同时运行。
 // 只在用户没自己配置 webserver 时加，配置与 DSH bundle 默认值一致，仅端口不同。
 if (!/["\s]id["]?\s*:\s*["']?webserver\b/.test(after)) {

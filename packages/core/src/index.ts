@@ -61,3 +61,5 @@ export * from "./experience-time.js";
 export * from "./exploration.js";
 
 export * from "./exploration-contract.js";
+
+export * from "./automation.js";

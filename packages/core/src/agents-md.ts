@@ -167,7 +167,7 @@ ${skills()
 - \`kaitu mcp token\` 查看 token，\`kaitu mcp token --rotate\` 轮换；不把 token 放进版本文件或日志。
 - MCP 可读状态、记录、记忆和对话，可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
 - 资讯采集先读 \`.agents/skills/collect-news/SKILL.md\`，遵守通用规则与来源补充。Agent 新闻须有 summary/details/comment/published_at。
-- 新闻用 \`news_item\` 投递并写明 \`relevance.reason\`，X 热门用 \`trend\`；复用新增记录工具或收件箱。\`news_read\` 读取资讯，\`news_try\` 生成 proposed 下一步，\`news_dismiss\` 静音来源。
+- 新闻用 \`news_item\` 投递并写明 \`relevance.reason\`，X 热门用 \`trend\`；复用新增记录工具或收件箱。\`news_read\` 读取资讯，\`news_try\` 生成 proposed 下一步，\`news_dismiss\` 标记单条新闻不相关。
 - 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
 
 ## 13. 安全
