@@ -1,6 +1,7 @@
 import { isAbsolute, join, relative, sep } from "node:path";
 import { KaituError, type Workspace, localStateRoot } from "@kaitu/core";
 import { feishuProvider } from "./feishu.js";
+import { makeGmailProvider } from "./gmail.js";
 import { imapPresets } from "./imap/config.js";
 import { imapProvider } from "./imap/watcher.js";
 import { makeSlackProvider } from "./slack.js";
@@ -19,11 +20,14 @@ export class CollectorService {
   private runners = new Map<string, { collector: Collector; release: () => void; configuration: string }>();
   private timer?: NodeJS.Timeout;
   private closed = false;
+  private cancelOAuth?: () => void;
+  private oauthError = "";
   private pending: Promise<unknown> = Promise.resolve();
   constructor(
     private ws: Workspace,
     root = join(localStateRoot(), "collectors"),
     private providers: Record<string, CollectorProvider> = {
+      gmail: makeGmailProvider(),
       imap: imapProvider,
       slack: makeSlackProvider(),
       feishu: feishuProvider,
@@ -108,7 +112,42 @@ export class CollectorService {
           ...this.store.read<CollectorStatus>(`${account.id}:status`, { connected: false }),
           selected: this.providers[account.kind]?.selection?.(account.settings) ?? [],
         }));
-        return { kinds: Object.keys(this.providers), presets: imapPresets, accounts };
+        return {
+          kinds: Object.keys(this.providers),
+          presets: imapPresets,
+          accounts,
+          gmailConfigured: this.providers.gmail?.configured ?? false,
+          oauthError: this.oauthError,
+        };
+      }
+      if (operation === "gmail-login") {
+        const provider = this.providers.gmail;
+        if (!provider?.authorize) throw new KaituError("Google 登录不可用", "CHANNEL");
+        this.cancelOAuth?.();
+        this.oauthError = "";
+        this.cancelOAuth = await provider.authorize(
+          this.store,
+          async (settings, label) => {
+            await this.exclusive(async () => {
+              if (this.closed) throw new KaituError("采集服务已关闭", "CHANNEL");
+              const release = this.store.lock(`config:${this.configKey}`);
+              if (!release) throw new KaituError("设置正在修改，请重试", "CHANNEL");
+              try {
+                const accounts = this.accounts();
+                const id = hash(`gmail:${provider.identity(settings)}`);
+                if (accounts.some((a) => a.id === id)) throw new KaituError("该账号已连接", "CHANNEL");
+                this.store.write(this.configKey, [...accounts, { id, kind: "gmail", label, settings }]);
+                await this.reconcile();
+              } finally {
+                release();
+              }
+            });
+          },
+          (error) => {
+            this.oauthError = error;
+          },
+        );
+        return { pending: true };
       }
       const releaseConfig = this.store.lock(`config:${this.configKey}`);
       if (!releaseConfig) throw new KaituError("另一窗口正在修改设置，请稍后重试", "CHANNEL");
@@ -130,14 +169,34 @@ export class CollectorService {
         const account = accounts.find((a) => a.id === input.id);
         if (!account) throw new KaituError("找不到采集账号", "CHANNEL");
         if (operation === "disconnect") {
+          await this.stopAccount(account.id);
+          let revokeFailed = false;
+          try {
+            await this.providers[account.kind]?.disconnect?.({
+              ws: this.ws,
+              account,
+              store: this.store,
+              status: () => {},
+            });
+          } catch {
+            revokeFailed = true;
+          }
           this.store.write(
             this.configKey,
             accounts.filter((a) => a.id !== account.id),
           );
           await this.stopAccount(account.id);
-          for (const suffix of ["status", "imap-state", "slack-state", "feishu-state"])
+          for (const suffix of ["status", "imap-state", "slack-state", "feishu-state", "gmail-state"])
             this.store.remove(`${account.id}:${suffix}`);
-          return { disconnected: true };
+          return {
+            disconnected: true,
+            ...(revokeFailed
+              ? {
+                  ok: false,
+                  error: "本机令牌已删除，Google 撤销未成功，请到 Google 账户的第三方连接中移除开图",
+                }
+              : {}),
+          };
         }
         if (operation === "test") {
           await this.stopAccount(account.id);
@@ -149,8 +208,9 @@ export class CollectorService {
             await collector.test();
             this.status(account.id, { error: "" });
             return { ok: true };
-          } catch {
-            const error = "连接测试失败，请检查凭据、权限和网络";
+          } catch (cause) {
+            const error =
+              cause instanceof KaituError ? cause.message : "连接测试失败，请检查凭据、权限和网络";
             this.status(account.id, { connected: false, error });
             return { ok: false, error };
           } finally {
@@ -176,6 +236,7 @@ export class CollectorService {
   }
   async stop() {
     this.closed = true;
+    this.cancelOAuth?.();
     clearInterval(this.timer);
     await this.exclusive(() => this.reconcile());
   }
