@@ -5,6 +5,7 @@ import {
   type FinanceImportOptions,
   type FinanceViewOptions,
   KaituError,
+  type NewsFeedback,
   type Workspace,
   addCalendarSubscription,
   captureNote,
@@ -45,6 +46,7 @@ import {
   resolveExperience,
   saveAvatar,
   setExperienceSource,
+  setNewsFeedback,
   stageFinanceUpload,
   tryNews,
   unhideExperience,
@@ -68,6 +70,7 @@ export const productMutations = new Set([
   "hideExperience",
   "unhideExperience",
   "tryNews",
+  "feedbackNews",
   "dismissNews",
   "setAvatar",
   "removeAvatar",
@@ -186,6 +189,8 @@ export async function productRequest(
       return unhideExperience(ws, text(0), revision(1));
     case "news":
       return readNews(ws);
+    case "feedbackNews":
+      return setNewsFeedback(ws, text(0), args[1] as NewsFeedback | null);
     case "tryNews": {
       const result = await tryNews(ws, text(0));
       return { id: result.record.id, status: "tried", version: result.version };

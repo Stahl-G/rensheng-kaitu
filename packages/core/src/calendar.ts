@@ -6,7 +6,7 @@ import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { importIcs } from "./importers/ics.js";
 import { readRecords } from "./records.js";
-import { localDate } from "./time.js";
+import { localDate, localTimeToInstant } from "./time.js";
 import type { TodayPlan } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -107,7 +107,9 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     title: String(row.title),
     start: String(row.start),
     end: String(row.end),
-    source: labels.get(String(row.calendar)) ?? String(row.calendar),
+    source:
+      labels.get(String(row.calendar)) ??
+      (/^[0-9a-f-]{36}$/i.test(String(row.calendar)) ? "导入日历 · 名称未记录" : String(row.calendar)),
     pending: false,
   }));
   if (ws.exists("NOW.md")) {
@@ -115,7 +117,18 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     const date = data.date;
     for (const block of data.blocks ?? []) {
       if (!date || !block.start || ["rejected", "skipped"].includes(block.status)) continue;
+      const start = block.start;
       if (block.ref && events.some((event) => event.id === block.ref)) continue;
+      if (
+        block.kind === "event" &&
+        events.some(
+          (event) =>
+            event.title === block.title &&
+            Date.parse(event.start) ===
+              +localTimeToInstant(`${date}T${start.length === 5 ? `${start}:00` : start}`, ws.timeZone()),
+        )
+      )
+        continue;
       events.push({
         id: block.id,
         title: block.title,

@@ -65,3 +65,4 @@ export * from "./exploration-contract.js";
 export * from "./automation.js";
 export * from "./calendar.js";
 export * from "./library.js";
+export * from "./news-feedback.js";

@@ -93,6 +93,8 @@ export function CalendarPage(props: CalendarPageProps) {
   }, [props.loadCalendar]);
   const sources = [...new Set(data?.events.filter((event) => !event.pending).map((event) => event.source))];
   const colors = ["explore", "doing", "health", "finance", "me"];
+  const colorFor = (source: string) =>
+    colors[Array.from(source).reduce((sum, c) => sum + (c.codePointAt(0) ?? 0), 0) % colors.length];
   const decide = async (decision: "confirmed" | "rejected") => {
     if (!selected) return;
     setBusy(true);
@@ -189,9 +191,10 @@ export function CalendarPage(props: CalendarPageProps) {
             firstDay={1}
             slotMinTime="06:00:00"
             slotMaxTime="24:00:00"
-            timeZone={data.timeZone === Intl.DateTimeFormat().resolvedOptions().timeZone ? "local" : "UTC"}
+            timeZone="UTC"
+            now={`${calendarDay(new Date().toISOString(), data.timeZone)}T${calendarTime(new Date().toISOString(), data.timeZone)}:00`}
             events={data.events.map((event) => {
-              const color = colors[sources.indexOf(event.source) % colors.length] ?? "explore";
+              const color = colorFor(event.source) ?? "explore";
               // Floating plan times belong to the workspace timezone; render their wall times alongside imported instants.
               const wall = (value: string) =>
                 value.length === 10
@@ -212,9 +215,9 @@ export function CalendarPage(props: CalendarPageProps) {
         )}
       </div>
       <div className={css["cal-legend"]}>
-        {sources.map((source, index) => (
+        {sources.map((source) => (
           <span key={source}>
-            <i className={css.dot} style={{ background: `var(--${colors[index % colors.length]})` }} />
+            <i className={css.dot} style={{ background: `var(--${colorFor(source)})` }} />
             {source}
           </span>
         ))}

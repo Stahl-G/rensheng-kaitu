@@ -7,6 +7,7 @@ import {
   type CalendarData,
   KaituError,
   type LibraryData,
+  type NewsFeedback,
   Workspace,
   addCalendarSubscription,
   captureNote,
@@ -40,6 +41,7 @@ import {
   resolveExperience,
   saveAvatar,
   setExperienceSource,
+  setNewsFeedback,
   tryNews,
   unhideExperience,
   writeExploration,
@@ -184,6 +186,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("news")
   async news(): Promise<NewsData> {
     return readNews(this.workspace);
+  }
+
+  @Remote("feedbackNews")
+  async feedbackNews(id: string, value: NewsFeedback | null): Promise<Record<string, NewsFeedback>> {
+    return this.write(() => setNewsFeedback(this.workspace, id, value));
   }
 
   @Remote("tryNews")

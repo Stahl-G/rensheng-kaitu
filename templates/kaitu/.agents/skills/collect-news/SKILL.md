@@ -8,11 +8,13 @@ description: 为开图采集新闻、论文、发布、视频播客与 X 热门�
 ## 通用规则（所有 Agent）
 
 先读 me/profile.md、me/goals.json、各模块 STATUS.md 与 feed/feeds.json，按用户目标、项目、所在地和关注点筛选。
+feed/feeds.json 的 keywords 包含用户标记有用的来源，后续优先采集；muted 是用户不相关反馈，减少这类来源。
 让用户不必点开原文也能理解发生了什么、为什么相关、可做什么。记录字段以工作区 schema 为准。
 
 - news_item 保留 title、url、source、via、status。kind 缺省 article，可选 x_post、paper、release、video、podcast、rss。
 - Agent 采集（via 非 rss/user）必须交 summary、details（3–5 条要点）、comment（1–2 句看法）、published_at（原文发布时间）。
-  summary 概括事件与背景，relevance 写相关模块及具体原因；看法只写 comment，界面单独标「AI 分析」。
+  summary 概括事件与背景，relevance.ref 写具体目标、项目或方向，reason 解释实际关联，不只写模块名。
+  comment 用第二人称对用户说「你」，结合用户的具体情况点评。
 - 读原文后再写。读不到全文时 summary 明确注明「只读到标题和导语」，只概括实际读到的内容。
   发布时间无法核实时写待整理笔记，不能用采集时间冒充。
 - 数字、引语、作者、互动数和图片只能来自实际读到的原文。引语保留原话且不超过 60 字，不把转述放进 quote。

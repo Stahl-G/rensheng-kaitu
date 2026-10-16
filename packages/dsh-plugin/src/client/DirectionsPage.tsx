@@ -12,6 +12,7 @@ import type {
 import { DirectionForm, ExperimentForm, NoteForm } from "./DirectionForms.js";
 import css from "./DirectionsPage.module.css";
 import base from "./OverviewPage.module.css";
+import v2 from "./Prototype.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
 
 export interface DirectionsPageProps {
@@ -27,8 +28,8 @@ export interface DirectionsPageProps {
   onPrompt: (text: string) => void;
 }
 const states = {
-  suggested: "AI 建议",
-  active: "正在探索",
+  suggested: "AI 建议 · 待采纳",
+  active: "在试",
   paused: "已暂停",
   archived: "已归档",
   dismissed: "已忽略",
@@ -110,13 +111,19 @@ export function DirectionsPage(props: DirectionsPageProps) {
   const notes = data?.notes.filter((n) => n.direction_id === selected) ?? [];
   const timeline = data?.timeline.filter((e) => e.direction_id === selected) ?? [];
   const listedDirections =
-    data?.directions.filter((d) =>
-      filter === "favorites"
-        ? d.favorite
-        : filter === "history"
-          ? ["paused", "archived", "dismissed"].includes(d.status)
-          : ["active", "suggested"].includes(d.status),
-    ) ?? [];
+    data?.directions
+      .filter((d) =>
+        filter === "favorites"
+          ? d.favorite
+          : filter === "history"
+            ? ["archived", "dismissed"].includes(d.status)
+            : ["active", "suggested", "paused"].includes(d.status),
+      )
+      .sort(
+        (a, b) =>
+          ["active", "suggested", "paused", "archived", "dismissed"].indexOf(a.status) -
+          ["active", "suggested", "paused", "archived", "dismissed"].indexOf(b.status),
+      ) ?? [];
   const closeForm = () => {
     setForm(null);
     setEditing(null);
@@ -473,55 +480,160 @@ export function DirectionsPage(props: DirectionsPageProps) {
       ) : (
         <>
           <header className={css.listHeader}>
-            <p className={base.muted}>把关心的问题、依据和实际尝试放在一起</p>
-            <button type="button" className={base.button} onClick={() => openForm("direction")}>
-              记下一个方向
+            <h2 className={v2.eyebrow}>你在探索的方向</h2>
+            <button type="button" className={v2.link} onClick={() => openForm("direction")}>
+              写下一个新方向
             </button>
           </header>
-          <nav className={base.secondaryNav} aria-label="方向筛选">
-            {(
-              [
-                ["current", "当前"],
-                ["favorites", "收藏"],
-                ["history", "暂停与归档"],
-              ] as const
-            ).map(([id, title]) => (
-              <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                {title}
-              </button>
-            ))}
-          </nav>
-          {listedDirections.map((d) => (
-            <button
-              type="button"
-              key={d.id}
-              className={css.directionRow}
-              onClick={() => {
-                setSelected(d.id);
-                setTab("overview");
-                setReceipt(null);
-              }}
-            >
-              <div>
-                <h2>{d.title}</h2>
-                <p>{d.hypothesis || d.motivation || "还在形成自己的看法"}</p>
-                <span className={base.muted}>
-                  {data.experiments.find(
-                    (e) => e.direction_id === d.id && ["planned", "active"].includes(e.status),
-                  )?.action ??
-                    data.notes
-                      .filter((n) => n.direction_id === d.id)
-                      .at(-1)
-                      ?.text.slice(0, 80) ??
-                    "先看看依据，再选一次小尝试"}
-                </span>
-              </div>
-              <span className={base.muted}>
-                {d.favorite ? "已收藏 · " : ""}
-                {states[d.status]}
-              </span>
-            </button>
-          ))}
+          <div className={`${v2.grid} ${css.cards}`}>
+            {listedDirections.map((d) => {
+              const attempt = data.experiments.filter((e) => e.direction_id === d.id).at(-1);
+              const evidence = data.notes.filter((n) => n.direction_id === d.id);
+              const change = async (status: Direction["status"]) => {
+                setBusy(true);
+                setError(null);
+                try {
+                  await save({
+                    operation: "update_direction",
+                    id: d.id,
+                    expected_revision: d.rev ?? 1,
+                    data: { status },
+                  });
+                } catch (err) {
+                  setError(String(err));
+                } finally {
+                  setBusy(false);
+                }
+              };
+              return (
+                <article
+                  key={d.id}
+                  className={`${v2.dir} ${v2.card} ${d.status === "paused" ? v2["is-paused"] : ""}`}
+                >
+                  <div className={v2["sec-head"]}>
+                    <span
+                      className={v2.chip}
+                      style={{
+                        background: d.status === "suggested" ? "var(--news-tint)" : "var(--explore-tint)",
+                        color: d.status === "suggested" ? "var(--news-ink)" : "var(--explore-ink)",
+                      }}
+                    >
+                      {states[d.status]}
+                    </span>
+                    {d.favorite && <span className={v2.small}>已收藏</span>}
+                  </div>
+                  <h3>
+                    <button
+                      type="button"
+                      className={v2.link}
+                      style={{ color: "inherit", font: "inherit" }}
+                      onClick={() => {
+                        setSelected(d.id);
+                        setTab("overview");
+                        setReceipt(null);
+                      }}
+                    >
+                      {d.title}
+                    </button>
+                  </h3>
+                  {d.status === "suggested" ? (
+                    <p>{d.motivation || "这条建议还没有写明依据"}</p>
+                  ) : (
+                    <dl>
+                      <dt>当前猜想</dt>
+                      <dd>{d.hypothesis || "还没有写下猜想"}</dd>
+                      <dt>还不清楚</dt>
+                      <dd>{d.unknowns || "尚未记录"}</dd>
+                    </dl>
+                  )}
+                  {attempt && (
+                    <div className={v2.attempt}>
+                      <span className={v2.small}>{d.status === "paused" ? "上次尝试" : "这次尝试"}</span>
+                      <b>{attempt.action}</b>
+                      <span className={v2.small}>
+                        投入：{attempt.budget} · 期限：{attempt.deadline}
+                      </span>
+                      {attempt.result && <p>{attempt.result}</p>}
+                    </div>
+                  )}
+                  {d.status !== "suggested" && (
+                    <div className={v2.evidence}>
+                      {(
+                        [
+                          ["supports", "支持"],
+                          ["refutes", "反对"],
+                          ["unclear", "还说不准"],
+                        ] as const
+                      ).map(([stance, label]) => (
+                        <span key={stance} className={v2.chip}>
+                          {label} {evidence.filter((n) => n.stance === stance).length}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={v2["dir-foot"]}>
+                    {d.status === "suggested" ? (
+                      <>
+                        <button
+                          type="button"
+                          className={`${v2.btn} ${v2["btn-primary"]}`}
+                          disabled={busy}
+                          onClick={() => void change("active")}
+                        >
+                          采纳
+                        </button>
+                        <button
+                          type="button"
+                          className={v2.link}
+                          disabled={busy}
+                          onClick={() => void change("dismissed")}
+                        >
+                          先不用
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={v2.link}
+                          onClick={() => {
+                            setSelected(d.id);
+                            setTab("overview");
+                          }}
+                        >
+                          打开方向 →
+                        </button>
+                        <button
+                          type="button"
+                          className={v2.link}
+                          disabled={busy}
+                          onClick={() => void change(d.status === "active" ? "paused" : "active")}
+                        >
+                          {d.status === "active" ? "暂停" : "继续探索"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          <details>
+            <summary className={v2.link}>筛选方向</summary>{" "}
+            <nav className={base.secondaryNav} aria-label="方向筛选">
+              {(
+                [
+                  ["current", "当前"],
+                  ["favorites", "收藏"],
+                  ["history", "已归档"],
+                ] as const
+              ).map(([id, title]) => (
+                <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+                  {title}
+                </button>
+              ))}
+            </nav>
+          </details>
           {!data.directions.length && (
             <div className={base.focus}>
               <h2>一个值得探索的问题</h2>

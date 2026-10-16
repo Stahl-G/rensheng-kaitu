@@ -55,6 +55,7 @@ const props: OverviewPageProps = {
   hideExperience: (id, revision) => call("hideExperience", id, revision),
   unhideExperience: (id, revision) => call("unhideExperience", id, revision),
   loadNews: () => call("news"),
+  feedbackNews: (id, value) => call("feedbackNews", id, value),
   tryNews: (id) => call("tryNews", id),
   dismissNews: (id) => call("dismissNews", id),
   loadFinanceOverview: (options) => call("financeOverview", options),

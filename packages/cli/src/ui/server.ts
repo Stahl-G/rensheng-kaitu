@@ -519,6 +519,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    clearInterval(calendarTimer);
     clearInterval(heartbeat);
     clearInterval(polling);
     clearTimeout(inboxTimer);

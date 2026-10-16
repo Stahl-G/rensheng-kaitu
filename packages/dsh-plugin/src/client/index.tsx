@@ -8,6 +8,7 @@ import type {
   FinanceRemoteCommitOptions,
   FinanceRemoteImportOptions,
   FinanceRemoteViewOptions,
+  NewsFeedback,
 } from "../types.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { SessionPage } from "./SessionPage.js";
@@ -158,6 +159,11 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              feedbackNews: async (id: string, value: NewsFeedback | null) => {
+                const r = await ctx.remote.kaitu.feedbackNews(id, value);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
               },
               tryNews: async (id: string) => {
                 const result = await ctx.remote.kaitu.tryNews(id);

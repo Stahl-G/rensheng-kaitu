@@ -2,6 +2,7 @@ import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { listModules } from "./modules.js";
+import { type NewsFeedback, readNewsFeedback } from "./news-feedback.js";
 import { type StoredRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, parseTs } from "./time.js";
@@ -64,6 +65,7 @@ export interface TrendContent {
 }
 export interface Trend extends StoredRecord, TrendContent {}
 export interface NewsData {
+  feedback: Record<string, NewsFeedback>;
   date: string;
   picked: NewsItem[];
   trends: Trend[];
@@ -158,6 +160,7 @@ export function readNews(ws: Workspace, now = new Date()): NewsData {
   for (const row of recent) sources[row.via] = (sources[row.via] ?? 0) + 1;
   return {
     date,
+    feedback: readNewsFeedback(ws),
     picked,
     trends: (readRecords(ws, "trend", { from: date, to: date }) as Trend[]).reverse(),
     others: fresh.filter((row) => !chosen.has(row.id)),

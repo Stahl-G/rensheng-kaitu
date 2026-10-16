@@ -43,6 +43,7 @@ export interface NewsTrend extends TrendContent {
   id: string;
 }
 export interface NewsData {
+  feedback: Record<string, NewsFeedback>;
   date: string;
   picked: NewsItem[];
   trends: NewsTrend[];
@@ -206,3 +207,6 @@ export type { MeGoal, MeRules, MeData } from "@kaitu/core";
 export type { CalendarData, CalendarEntry, AutomationSettings, AutomationKey } from "@kaitu/core";
 
 export type { LibraryData, InboxEntry } from "@kaitu/core";
+
+export type { NewsFeedback } from "@kaitu/core";
+import type { NewsFeedback } from "@kaitu/core";

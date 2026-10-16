@@ -176,3 +176,9 @@
     padding: 16px;
   }
 }
+
+.page .cards h3 {
+  font-size: 19px;
+  line-height: 27px;
+  font-weight: 600;
+}
