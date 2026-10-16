@@ -20,7 +20,7 @@ description: 用户说早上好或要求安排今天时，按规则和已有日�
 9. 没有历史训练时，提出从哪天起算的建议，别声称今天必然是训练日。
 10. daily、weekdays 按对应频率；custom 缺少具体规则时只提出候选。
 11. 运行 `kaitu project list --json-out`，按 rules.md 的 work_hours（含工作日）把 work 项目排在工作时间内、personal 排在工作时间外。
-    仅本机项目的细节留在项目中，不写进共享 NOW.md；按目标优先级与 next 的 priority、due、estimate 选择可执行任务。
+    按目标优先级与 next 的 priority、due、estimate 选择可执行任务。
 12. 开始不早于规则起床时间、实际醒来时间和当前时间中的最晚值。
 13. 结束不晚于 no_tasks_after，避开已有日程和规则中固定占用时间。
 14. 保留今天已有的 confirmed、done 与拒绝记录，避免重复提议。

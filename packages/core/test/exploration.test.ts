@@ -155,7 +155,7 @@ it("真实尝试的完成与假设判断分开，负面结果可暂停方向，�
   }
 });
 
-it("AI 提议不替用户采纳，旧版本不能覆盖新状态，错方向或私有项目的关联不产生写入", async () => {
+it("AI 提议不替用户采纳，旧版本不能覆盖新状态，错方向的关联不产生写入", async () => {
   const ws = await freshWorkspace();
   try {
     const first = await writeExploration(
@@ -241,19 +241,6 @@ it("AI 提议不替用户采纳，旧版本不能覆盖新状态，错方向或�
         "agent",
       ),
     ).rejects.toMatchObject({ code: "BAD_REFERENCE" });
-    const privateProject = await createProject(ws, { title: "Private", kind: "work", local_only: true });
-    await expect(
-      writeExploration(
-        ws,
-        {
-          operation: "update_direction",
-          id: first.id,
-          expected_revision: 2,
-          data: { references: [{ kind: "project", ref: privateProject.slug }] },
-        },
-        "user",
-      ),
-    ).rejects.toThrow();
     expect(readExploration(ws).directions.find((d) => d.id === first.id)?.status).toBe("active");
     expect(readExploration(ws).notes).toHaveLength(0);
   } finally {

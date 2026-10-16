@@ -10,18 +10,14 @@ import { findRecordType, listModules, recordFilePattern, resolveRecordPath } fro
 import { refreshOverview } from "./overview.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
-import { readPlan } from "./private-plan.js";
-import { localRecordIds, localRecordStore } from "./private-records.js";
-import { assertPublicProject, publicProject } from "./projects.js";
-import { privacyIndex, privateBlock, privateInput } from "./record-privacy.js";
-import { addRecord, deleteRecord, readRecords, recordIsLocal, updateRecord } from "./records.js";
+import { addRecord, deleteRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { TodayPlan } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-export function readAgentFile(ws: Workspace, file: string, publicOnly = false): string {
+export function readAgentFile(ws: Workspace, file: string, remote = false): string {
   assertAgentPath(ws.root, file);
   const abs = ws.resolve(file);
   // 同时检查请求路径和真实路径，不能借工作区内链接读取程序状态。
@@ -37,7 +33,7 @@ export function readAgentFile(ws: Workspace, file: string, publicOnly = false): 
       throw new KaituError("只允许读取工作区内的 .md / .json，不读 .kaitu/ 或版本库目录", "OUT_OF_SCOPE");
     }
   }
-  if (publicOnly) {
+  if (remote) {
     const financialModules = [
       "finance",
       ...listModules(ws)
@@ -47,12 +43,9 @@ export function readAgentFile(ws: Workspace, file: string, publicOnly = false): 
     for (const path of paths) {
       if (financialModules.some((dir) => path === dir || path.startsWith(`${dir}/`)))
         throw new KaituError("财务明细只允许在本机读取", "OUT_OF_SCOPE");
-      const slug = /^projects\/([^/]+)\//.exec(path)?.[1];
-      if (slug && !["data", "module.json"].includes(slug)) assertPublicProject(ws, slug);
     }
   }
-  if (publicOnly && paths.includes("NOW.md")) return readPlan(ws, true);
-  if (publicOnly && paths.includes("OVERVIEW.md")) refreshOverview(ws);
+  if (remote && paths.includes("OVERVIEW.md")) refreshOverview(ws);
   return ws.readText(file);
 }
 
@@ -70,10 +63,6 @@ export async function writeAgentRecord(
     throw new KaituError("方向与实验使用 exploration_write，保留版本与用户决定", "USE_EXPLORATION_API");
   if (type === "experience" && operation === "add")
     return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
-  if (["project_metric", "github_snapshot"].includes(type) || data.project !== undefined) {
-    const current = operation === "add" ? undefined : readRecords(ws, type).find((row) => row.id === id);
-    assertPublicProject(ws, data.project ?? current?.project);
-  }
   const ref = findRecordType(ws, type);
   if (type === "photo" && operation === "delete") return removePhoto(ws, id, { by: "agent", actor });
   const result =
@@ -84,7 +73,7 @@ export async function writeAgentRecord(
         : deleteRecord(ws, type, id);
   const message = operation === "add" ? "记录了" : operation === "update" ? "修改了" : "删除了";
   const version = await snapshot(
-    result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
+    ws,
     `${actor}在${ref.module.def.name}模块${message} 1 条${ref.def.label ?? type}`,
   );
   return { ...result, version };
@@ -153,10 +142,7 @@ export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: s
   ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
   return {
     block,
-    version: await snapshot(
-      privateBlock(ws, block, privacyIndex(ws)) ? localRecordStore(ws) : ws,
-      `${actor}提出了日程建议：${block.title}`,
-    ),
+    version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`),
   };
 }
 
@@ -164,7 +150,6 @@ export function publicRecords<T extends Record<string, unknown>>(
   ws: Workspace,
   type: string,
   rows: T[],
-  localIds = localRecordIds(ws),
 ): T[] {
   const ref = findRecordType(ws, type);
   resolveRecordPath(ws, ref, recordFilePattern(ref).dir);
@@ -174,21 +159,5 @@ export function publicRecords<T extends Record<string, unknown>>(
   if (ref.module.def.id === "finance" || ref.module.dir === "finance" || path.startsWith("finance/"))
     return [];
   if (path.split("/").some((part) => part === ".kaitu" || part === ".git")) return [];
-  const visibility = new Map<unknown, boolean>();
-  return rows.filter((row) => {
-    if (recordIsLocal(row) || localIds.has(String(row.id))) return false;
-    if (row.project === undefined) return true;
-    if (!visibility.has(row.project)) visibility.set(row.project, publicProject(ws, row.project));
-    return visibility.get(row.project);
-  });
-}
-
-export function assertPublicInput(ws: Workspace, row: Record<string, unknown>): void {
-  const privacy = privacyIndex(ws);
-  if (
-    (typeof row.id === "string" && (privacy.privateIds.has(row.id) || privacy.localIds.has(row.id))) ||
-    privateInput(ws, row, privacy) ||
-    privateBlock(ws, row, privacy)
-  )
-    throw new KaituError("找不到可共享记录", "NOT_FOUND");
+  return rows;
 }

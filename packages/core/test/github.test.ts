@@ -14,7 +14,6 @@ import {
   projectGithub,
   readProject,
   readRecords,
-  relocateProjects,
   setGithubToken,
   setProject,
   stringifyFrontmatter,
@@ -29,10 +28,10 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 });
 const at = (day: number, hour = 4) => new Date(`2026-10-${day}T${String(hour).padStart(2, "0")}:00:00Z`);
-async function fixture(local_only = false) {
+async function fixture() {
   const ws = await freshWorkspace();
   cleanups.push(() => fs.rmSync(dirname(ws.root), { recursive: true, force: true }));
-  const { slug } = await createProject(ws, { title: "demo", kind: "personal", local_only });
+  const { slug } = await createProject(ws, { title: "demo", kind: "personal" });
   const requests: { url: string; headers: IncomingHttpHeaders }[] = [];
   const data = {
     repo: {

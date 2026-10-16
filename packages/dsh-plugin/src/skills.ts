@@ -19,7 +19,7 @@ export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径�
 - validate → kaitu_validate；snapshot / agents-md → kaitu_workspace（snapshot/agents-md）；history → kaitu_history；确认恢复 → kaitu_restore。
 - memory list/search/add/update/rm/import → kaitu_memory；批量 import 先 dryRun，用户确认后使用完全相同的候选。
 - task add/list/done/cancel → kaitu_tasks；inbox notes/done/process → kaitu_inbox。
-- project list/new/show/link/set/log/sync → kaitu_projects；项目内文件用 project-read/project-write，支持仅本机项目。
+- project list/new/show/link/set/log/sync → kaitu_projects；项目内文件用 project-read/project-write。
 - import apple-health/nut-ai/ics/chatgpt-conversations → kaitu_import，先 dryRun，再确认执行；文件用用户指定的本机绝对路径或工作区内相对路径。
 - photo add/list/rm → kaitu_photos；头像用「关于我」的上传入口。
 - drive status/enable/disable → kaitu_drive。迁移后工具和技能自动切换到新工作区。

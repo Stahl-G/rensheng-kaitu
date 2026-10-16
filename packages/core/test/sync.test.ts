@@ -33,7 +33,7 @@ import {
 import { requestICloudDownload, syncInventory } from "../src/sync-files.js";
 import { tmp, workout } from "./helpers.js";
 
-it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录仍可识别且拒绝跨云迁移", async () => {
+it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可识别且拒绝跨云迁移", async () => {
   const home = tmp();
   const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
   Object.defineProperty(process, "platform", { value: "darwin" });
@@ -49,9 +49,9 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     const ws = await initWorkspace(join(home, "kaitu"));
     const token = mcpToken(ws);
     const added = addRecord(ws, "workout", workout);
-    const project = await createProject(ws, { title: "本机项目", kind: "personal", local_only: true });
-    const privateMarker = "synthetic-icloud-private-task";
-    const task = await addTask(ws, { title: privateMarker, project: project.slug });
+    const project = await createProject(ws, { title: "项目", kind: "personal" });
+    const taskMarker = "synthetic-icloud-task";
+    const task = await addTask(ws, { title: taskMarker, project: project.slug });
     await snapshot(ws, "迁移前");
     const before = await history(ws);
     await expect(enableSync(ws, "icloud")).rejects.toThrow();
@@ -59,11 +59,7 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     mkdirSync(cloud, { recursive: true });
     const result = await enableSync(ws, "icloud");
     expect(result.mode).toBe("icloud");
-    const syncedText = syncInventory(ws.root)
-      .files.map((file) => ws.readBytes(file).toString("utf8"))
-      .join("\n");
-    expect(syncedText).not.toContain(privateMarker);
-    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(privateMarker);
+    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(taskMarker);
     const crafted = join(home, `--option space'";\n$(touch injected)`);
     requestICloudDownload(crafted);
     expect(download).toHaveBeenLastCalledWith(
@@ -77,7 +73,6 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     expect(historyDirectory(ws).startsWith(ws.root)).toBe(false);
     expect(existsSync(historyDirectory(ws))).toBe(true);
     expect(mcpToken(ws)).toBe(token);
-    expect(readProject(ws, project.slug).dir.startsWith(".kaitu/local-projects/")).toBe(true);
     expect(ws.exists("AGENT-README.md")).toBe(false);
     expect(ws.exists("ORGANIZER.md")).toBe(false);
     expect(ws.exists("OVERVIEW.md")).toBe(true);
@@ -101,7 +96,7 @@ it("iCloud 往返保持数据、历史、密钥与本机项目，自定义目录
     expect(syncStatus(new Workspace(ws.root)).mode).toBe("icloud");
     await disableSync(ws);
     expect(syncStatus(ws).mode).toBe("local");
-    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(privateMarker);
+    expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(taskMarker);
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);
   } finally {
     download.mockRestore();

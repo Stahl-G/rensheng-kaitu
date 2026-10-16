@@ -1,5 +1,5 @@
 import { KaituError } from "./errors.js";
-import { listProjects, metricStore, readProject, setProject } from "./projects.js";
+import { listProjects, readProject, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
 import type { ModuleStatus } from "./workbench.js";
@@ -31,7 +31,7 @@ export function projectSummary(text: string) {
 }
 
 export function readProjectsPage(ws: Workspace, slug?: string) {
-  const tasks = listTasks(ws, { includePrivate: true });
+  const tasks = listTasks(ws);
   return listProjects(ws, { slug }).map((project) => {
     const next = [...project.next];
     for (const task of tasks.filter((task) => task.project === project.slug)) {
@@ -55,9 +55,7 @@ export function readProjectPage(ws: Workspace, slug: string) {
   const project = readProject(ws, slug);
   const summary = readProjectsPage(ws, slug).find((item) => item.slug === slug);
   if (!summary) throw new KaituError("找不到项目", "NOT_FOUND");
-  const metrics = readRecords(metricStore(ws, project.data, true), "project_metric").filter(
-    (row) => row.project === slug,
-  );
+  const metrics = readRecords(ws, "project_metric").filter((row) => row.project === slug);
   return {
     ...summary,
     body: clean(project.body),

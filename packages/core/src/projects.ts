@@ -10,16 +10,14 @@ import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
-import { type ModuleDef, findRecordType, recordFileFor } from "./modules.js";
+import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
-import { relocatePlan } from "./private-plan.js";
-import { relocateProjectRecords } from "./private-records.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { ModuleStatus } from "./workbench.js";
-import { Workspace, stateDirectory } from "./workspace.js";
+import type { Workspace } from "./workspace.js";
 
 export interface ProjectLink {
   path: string;
@@ -30,17 +28,12 @@ export interface ProjectStatus extends ModuleStatus {
   title: string;
   kind: "work" | "personal";
   stage: "idea" | "active" | "paused" | "done";
-  local_only: boolean;
   links: ProjectLink[];
   github?: { repo: string };
   blocked?: unknown[];
 }
-export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
-  Partial<Pick<ProjectStatus, "local_only" | "links">>;
+export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> & Partial<Pick<ProjectStatus, "links">>;
 
-export function driveProjects(ws: Workspace): boolean {
-  return stateDirectory(ws.root, ws.isICloud) !== join(ws.root, ".kaitu");
-}
 function slugCheck(slug: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ["data", "projects"].includes(slug)) {
     throw new KaituError("项目 slug 不合法", "BAD_ARGS");
@@ -48,8 +41,7 @@ function slugCheck(slug: string) {
 }
 export function projectDirectory(ws: Workspace, slug: string): string {
   slugCheck(slug);
-  const local = `.kaitu/local-projects/${slug}`;
-  return ws.exists(`${local}/STATUS.md`) ? local : `projects/${slug}`;
+  return `projects/${slug}`;
 }
 function checkStatus(data: ProjectStatus) {
   if (!schemas().builtin("status.schema.json")(data) || !data.title || !data.kind || !data.stage) {
@@ -60,60 +52,13 @@ export function readProject(ws: Workspace, slug: string) {
   const dir = projectDirectory(ws, slug);
   if (!ws.exists(`${dir}/STATUS.md`)) throw new KaituError("找不到项目", "NOT_FOUND");
   const parsed = parseFrontmatter<ProjectStatus>(ws.readText(`${dir}/STATUS.md`));
-  parsed.data.local_only ??= false;
   parsed.data.links ??= [];
   checkStatus(parsed.data);
   return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
 }
-export function publicProject(ws: Workspace, slug: unknown): boolean {
-  if (typeof slug !== "string") return false;
-  try {
-    return !readProject(ws, slug).data.local_only;
-  } catch {
-    return false;
-  }
-}
-export function assertPublicProject(ws: Workspace, slug: unknown): void {
-  if (!publicProject(ws, slug)) throw new KaituError("找不到可共享项目", "NOT_FOUND");
-}
-
-// 本机项目复用同一套记录修订与版本机制，根目录不在 Drive 内。
-function privateStore(ws: Workspace): Workspace {
-  const root = ws.resolve(".kaitu/local-projects", { internal: true });
-  fs.mkdirSync(root, { recursive: true });
-  const store = new Workspace(root, { privateRecords: true });
-  store.timeZone = () => ws.timeZone();
-  if (!store.exists("projects/module.json")) {
-    store.writeText(
-      "projects/module.json",
-      fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
-    );
-  }
-  const module = store.readJson<ModuleDef>("projects/module.json");
-  if (!module.records?.github_snapshot) {
-    const template = JSON.parse(fs.readFileSync(join(templateDir(), "projects/module.json"), "utf8"));
-    module.records = { ...module.records, github_snapshot: template.records.github_snapshot };
-    store.writeJson("projects/module.json", module);
-  }
-  return store;
-}
-export function metricStore(ws: Workspace, data: ProjectStatus, readonly = false): Workspace {
-  if (!driveProjects(ws) || !data.local_only) return ws;
-  if (!readonly) return privateStore(ws);
-  const store = new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), {
-    maintain: false,
-    privateRecords: true,
-  });
-  store.timeZone = () => ws.timeZone();
-  return store;
-}
-export async function projectVersion(ws: Workspace, slug: string, message: string, now = new Date()) {
-  const { data } = readProject(ws, slug);
-  return snapshot(driveProjects(ws) && data.local_only ? privateStore(ws) : ws, message, now);
-}
 function slugs(ws: Workspace): string[] {
   const names = new Set<string>();
-  for (const base of ["projects", ".kaitu/local-projects"]) {
+  for (const base of ["projects"]) {
     if (!ws.exists(base)) continue;
     for (const entry of fs.readdirSync(ws.resolve(base, { internal: true }), { withFileTypes: true })) {
       if (
@@ -129,36 +74,25 @@ function slugs(ws: Workspace): string[] {
   }
   return [...names].sort();
 }
-export function projectStatusFiles(ws: Workspace, publicOnly = false) {
+export function projectStatusFiles(ws: Workspace) {
   return slugs(ws).flatMap((slug) => {
     const dir = projectDirectory(ws, slug);
     try {
       const { data } = parseFrontmatter<Partial<ProjectStatus>>(ws.readText(`${dir}/STATUS.md`));
-      return publicOnly && data.local_only
-        ? []
-        : [{ file: `${dir}/STATUS.md`, module: data.title || "项目" }];
+      return [{ file: `${dir}/STATUS.md`, module: data.title || "项目" }];
     } catch {
-      return publicOnly ? [] : [{ file: `${dir}/STATUS.md`, module: "项目" }];
+      return [{ file: `${dir}/STATUS.md`, module: "项目" }];
     }
   });
 }
-export function listProjects(
-  ws: Workspace,
-  options: { publicOnly?: boolean; now?: Date; slug?: string } = {},
-) {
+export function listProjects(ws: Workspace, options: { now?: Date; slug?: string } = {}) {
   const now = options.now ?? new Date();
   const today = localDate(now, ws.timeZone());
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   return (options.slug ? [options.slug] : slugs(ws)).flatMap((slug) => {
     const project = readProject(ws, slug);
-    if (options.publicOnly && project.data.local_only) return [];
-    const store =
-      driveProjects(ws) && project.data.local_only
-        ? new Workspace(ws.resolve(".kaitu/local-projects", { internal: true }), { privateRecords: true })
-        : ws;
-    if (store !== ws) store.timeZone = () => ws.timeZone();
-    const metrics = store.exists("projects/module.json")
-      ? readRecords(store, "project_metric").filter(
+    const metrics = ws.exists("projects/module.json")
+      ? readRecords(ws, "project_metric").filter(
           (r) => r.project === slug && Date.parse(r.ts) <= now.getTime(),
         )
       : [];
@@ -173,7 +107,6 @@ export function listProjects(
         title: project.data.title,
         kind: project.data.kind,
         stage: project.data.stage,
-        local_only: project.data.local_only,
         links: project.data.links,
         progress: project.data.progress,
         next: project.data.next ?? [],
@@ -234,10 +167,10 @@ export function listProjects(
           ...new Set(
             metrics.map((r) => {
               const file = recordFileFor(
-                findRecordType(store, "project_metric"),
+                findRecordType(ws, "project_metric"),
                 localMonth(parseTs(r.ts), ws.timeZone()),
               );
-              return store === ws ? file : `.kaitu/local-projects/${file}`;
+              return file;
             }),
           ),
         ],
@@ -260,7 +193,6 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
     ...input,
     title: typeof input.title === "string" ? input.title.trim() : "",
     stage: "active",
-    local_only: input.local_only ?? false,
     links: input.links ?? [],
     updated: isoInZone(new Date(), ws.timeZone()),
     next: [],
@@ -274,13 +206,13 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
       .replace(/-+/g, "-") || ulid().slice(-8).toLowerCase();
   let slug = ["data", "projects"].includes(base) ? `${base}-project` : base;
   while (slugs(ws).includes(slug)) slug = `${base}-${ulid().slice(-8).toLowerCase()}`;
-  const dir = driveProjects(ws) && data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
+  const dir = `projects/${slug}`;
   await batchOverview(ws, async () => {
     ws.writeText(`${dir}/STATUS.md`, stringifyFrontmatter(data, `# ${data.title}\n`), { internal: true });
     ws.writeText(`${dir}/notes.md`, "# 背景、要点、相关人\n", { internal: true });
     ws.writeText(`${dir}/log.md`, "# 项目进展\n", { internal: true });
   });
-  return { slug, version: await projectVersion(ws, slug, `你新建了项目：${data.title}`) };
+  return { slug, version: await snapshot(ws, `你新建了项目：${data.title}`) };
 }
 function validDate(date: string) {
   if (
@@ -339,145 +271,25 @@ export async function logProject(
       internal: true,
     });
     return {
-      version: await projectVersion(
+      version: await snapshot(
         ws,
-        slug,
         `${options.by === "user" ? "你" : "Agent "}记录了项目进展：${project.data.title}`,
       ),
     };
   });
 }
 
-function moveDirectory(ws: Workspace, source: string, target: string) {
-  const from = ws.resolve(source, { internal: true });
-  const to = ws.resolve(target, { internal: true });
-  fs.mkdirSync(dirname(to), { recursive: true });
-  if (!fs.existsSync(to)) {
-    try {
-      fs.renameSync(from, to);
-      return;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
-    }
-  }
-  const copy = (src: string, dst: string) => {
-    const origin = ws.resolve(src, { internal: true });
-    const destination = ws.resolve(dst, { internal: true });
-    const info = fs.lstatSync(origin);
-    if (info.isSymbolicLink() || (!info.isFile() && !info.isDirectory()))
-      throw new KaituError("项目迁移遇到非普通文件，保留原件", "PRIVATE_MIGRATION");
-    if (info.isDirectory()) {
-      fs.mkdirSync(destination, { recursive: true });
-      for (const name of fs.readdirSync(origin)) copy(`${src}/${name}`, `${dst}/${name}`);
-      fs.rmdirSync(origin);
-    } else {
-      const bytes = ws.readBytes(src);
-      if (!fs.existsSync(destination)) ws.writeText(dst, bytes, { internal: true });
-      if (!ws.readBytes(dst).equals(bytes))
-        throw new KaituError("项目副本与原件冲突，保留原件", "PRIVATE_MIGRATION");
-      fs.rmSync(origin);
-    }
-  };
-  copy(source, target);
-}
-function transferMetrics(source: Workspace, target: Workspace, slug: string) {
-  for (const dir of ["projects/data/metrics", "projects/data/github"])
-    transferProjectRecords(source, target, slug, dir);
-}
-function transferProjectRecords(source: Workspace, target: Workspace, slug: string, dir: string) {
-  if (!source.exists(dir)) return;
-  const files = fs.readdirSync(source.resolve(dir)).filter((file) => /^\d{4}-\d{2}\.jsonl$/.test(file));
-  const ids = new Set<string>();
-  for (const file of files) {
-    for (const line of source.readText(`${dir}/${file}`).split("\n").filter(Boolean)) {
-      const row = JSON.parse(line);
-      if (row.project === slug) ids.add(row.id);
-    }
-  }
-  for (const file of files) {
-    const path = `${dir}/${file}`;
-    const rows = source.readText(path).split("\n").filter(Boolean);
-    const moving = rows.filter((line) => ids.has(JSON.parse(line).id));
-    if (!moving.length) continue;
-    // 重试时按完整行去重，保留修订版本与 id。
-    const existing = target.exists(path) ? target.readText(path).split("\n").filter(Boolean) : [];
-    const copied = `${[...new Set([...existing, ...moving])].join("\n")}\n`;
-    target.writeText(path, copied);
-    if (target.readText(path) !== copied)
-      throw new KaituError("项目记录副本验证失败，保留原件", "PRIVATE_MIGRATION");
-    const remaining = rows.filter((line) => !ids.has(JSON.parse(line).id));
-    if (remaining.length) source.writeText(path, `${remaining.join("\n")}\n`);
-    else fs.rmSync(source.resolve(path));
-  }
-}
-export function relocateProjects(ws: Workspace, toPrivate: boolean) {
-  relocateProjectRecords(ws);
-  for (const slug of slugs(ws)) {
-    const project = readProject(ws, slug);
-    if (!project.data.local_only) continue;
-    const target = toPrivate ? `.kaitu/local-projects/${slug}` : `projects/${slug}`;
-    if (project.dir === target) continue;
-    const store = privateStore(ws);
-    transferMetrics(toPrivate ? ws : store, toPrivate ? store : ws, slug);
-    moveDirectory(ws, project.dir, target);
-  }
-}
-const VISIBILITY_MIGRATION = ".kaitu/project-visibility.json";
-
-export function resumeProjectVisibility(ws: Workspace): void {
-  if (ws.privateRecords || !ws.exists(VISIBILITY_MIGRATION)) return;
-  const intent = ws.readJson<{ slug: string; source: string; data: ProjectStatus; body: string }>(
-    VISIBILITY_MIGRATION,
-  );
-  slugCheck(intent.slug);
-  checkStatus(intent.data);
-  if (typeof intent.body !== "string" || typeof intent.data.local_only !== "boolean")
-    throw new KaituError("项目迁移状态不合法", "PRIVATE_MIGRATION");
-  if (![`projects/${intent.slug}`, `.kaitu/local-projects/${intent.slug}`].includes(intent.source))
-    throw new KaituError("项目迁移来源不合法", "PRIVATE_MIGRATION");
-  const project = readProject(ws, intent.slug);
-  const toPrivate = intent.data.local_only;
-  ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(intent.data, intent.body), {
-    internal: true,
-  });
-  if (driveProjects(ws)) {
-    const store = privateStore(ws);
-    transferMetrics(toPrivate ? ws : store, toPrivate ? store : ws, intent.slug);
-    const target = toPrivate ? `.kaitu/local-projects/${intent.slug}` : `projects/${intent.slug}`;
-    if (intent.source !== target && ws.exists(intent.source)) moveDirectory(ws, intent.source, target);
-  }
-  relocateProjectRecords(ws, intent.slug, toPrivate);
-  relocatePlan(ws);
-  fs.rmSync(ws.resolve(VISIBILITY_MIGRATION, { internal: true }));
-}
-
 export async function setProject(
   ws: Workspace,
   slug: string,
-  patch: Partial<
-    Pick<ProjectStatus, "stage" | "local_only" | "links" | "next" | "github" | "progress" | "blocked">
-  >,
+  patch: Partial<Pick<ProjectStatus, "stage" | "links" | "next" | "github" | "progress" | "blocked">>,
 ) {
   return batchOverview(ws, async () => {
-    resumeProjectVisibility(ws);
     const project = readProject(ws, slug);
     const data = { ...project.data, ...patch, updated: isoInZone(new Date(), ws.timeZone()) };
     checkStatus(data);
-    if (data.local_only !== project.data.local_only) {
-      ws.writeJson(
-        VISIBILITY_MIGRATION,
-        { slug, source: project.dir, data, body: project.body },
-        { internal: true, mode: 0o600 },
-      );
-      resumeProjectVisibility(ws);
-    } else {
-      ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body), { internal: true });
-      relocatePlan(ws);
-    }
-    const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
-    // 共享目录移除也需要在工作区历史中保存。
-    if (driveProjects(ws) && data.local_only !== project.data.local_only)
-      await snapshot(ws, "更新了项目的本机存储设置");
+    ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(data, project.body));
+    const version = await snapshot(ws, `更新了项目：${data.title}`);
     return { version };
   });
 }
@@ -573,8 +385,7 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     const tz = ws.timeZone();
     const today = localDate(now, tz);
     const firstDay = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-    const store = metricStore(ws, project.data);
-    const existing = readRecords(store, "project_metric").filter((r) => r.project === slug);
+    const existing = readRecords(ws, "project_metric").filter((r) => r.project === slug);
     const issues: { path: string; message: string }[] = [];
     const written: StoredRecord[] = [];
     function metric(kind: "words" | "commits", date: string, value: number, detail?: string[]) {
@@ -590,8 +401,8 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
         ),
       };
       const record = previous
-        ? updateRecord(store, "project_metric", previous.id, data).record
-        : addRecord(store, "project_metric", data).record;
+        ? updateRecord(ws, "project_metric", previous.id, data).record
+        : addRecord(ws, "project_metric", data).record;
       written.push(record);
       return record;
     }
@@ -699,7 +510,7 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     const progress = project.data.progress;
     if (progress?.unit === "字" && wordsOk) progress.current = words;
     if (progress?.unit === "次提交" && reposOk) {
-      const all = readRecords(store, "project_metric").filter(
+      const all = readRecords(ws, "project_metric").filter(
         (row) => row.project === slug && row.kind === "commits",
       );
       progress.current = all.reduce((sum, row) => sum + Number(row.value), 0);
@@ -714,9 +525,7 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       slug,
       metrics: written,
       issues,
-      version: github?.ok
-        ? github.version
-        : await projectVersion(ws, slug, `同步了项目进度：${project.data.title}`, now),
+      version: github?.ok ? github.version : await snapshot(ws, `同步了项目进度：${project.data.title}`, now),
     };
   });
 }

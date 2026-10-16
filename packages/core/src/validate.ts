@@ -24,8 +24,7 @@ function walk(ws: Workspace, dir: string, out: string[]): void {
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
     if (ws.conflictCopy(rel) || placeholderOriginal(rel)) continue;
-    if ([".kaitu/cache", ".kaitu/history.git", ".kaitu/local-projects", "handoffs/archive"].includes(rel))
-      continue;
+    if ([".kaitu/cache", ".kaitu/history.git", "handoffs/archive"].includes(rel)) continue;
     if (entry.isDirectory()) walk(ws, rel, out);
     else out.push(rel);
   }

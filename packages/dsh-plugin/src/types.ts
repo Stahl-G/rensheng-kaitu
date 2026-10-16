@@ -222,7 +222,6 @@ import type { NewsFeedback } from "@kaitu/core";
 export type { SettingsData } from "@kaitu/core";
 
 export interface ProjectDetailData extends DoingProject {
-  local_only: boolean;
   body: string;
   progress: { label: string; current: number; target: number; unit?: string } | null;
   logs: { date: string; text: string }[];

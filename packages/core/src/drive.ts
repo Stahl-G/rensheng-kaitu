@@ -18,7 +18,7 @@ import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { localStateRoot } from "./local-state.js";
 import { refreshOverview } from "./overview.js";
-import { rebaseProjectLinks, relocateProjects } from "./projects.js";
+import { rebaseProjectLinks } from "./projects.js";
 import { setStateBinding, stateBinding } from "./state-binding.js";
 import { requestICloudDownload } from "./sync-files.js";
 import { type SyncMode, iCloudDirectory, syncMode } from "./sync-location.js";
@@ -159,7 +159,6 @@ export async function enableSync(
   separate(state, target);
   separate(state, old);
   const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
-  relocateProjects(ws, true);
   refreshOverview(ws);
   move(join(old, ".kaitu"), state);
   try {
@@ -175,7 +174,6 @@ export async function enableSync(
     move(state, join(old, ".kaitu"));
     setStateBinding(old, join(old, ".kaitu"), "local");
     ws.writeJson(".kaitu/config.json", config, { internal: true });
-    relocateProjects(ws, false);
     refreshOverview(ws);
     throw error;
   }
@@ -236,7 +234,6 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   const { state_dir: _state, ...local } = config;
   ws.writeJson(".kaitu/config.json", local, { internal: true });
   rmSync(join(target, ".kaitu/sync-location.json"), { force: true });
-  relocateProjects(ws, false);
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);

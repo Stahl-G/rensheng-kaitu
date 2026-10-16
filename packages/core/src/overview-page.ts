@@ -137,7 +137,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     file: item.file,
     section: item.file.startsWith("health/")
       ? "health"
-      : /^(?:projects|\.kaitu\/local-projects)\//.test(item.file)
+      : /^projects\//.test(item.file)
         ? "projects"
         : item.file.startsWith("feed/")
           ? "feed"

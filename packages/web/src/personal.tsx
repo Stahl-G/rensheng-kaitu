@@ -123,7 +123,6 @@ export function Me({ data, act, busy }: { data: WorkbenchData; act: Act; busy: b
             <h3>
               {project.title} · {project.kind === "work" ? "工作" : "个人"} ·{" "}
               {{ idea: "构想", active: "进行中", paused: "暂停", done: "完成" }[project.stage]}
-              {project.local_only ? " · 仅本机" : ""}
             </h3>
             <p>
               近 7 天字数变化：{project.recent7.words ?? "—"} · 提交：{project.recent7.commits}

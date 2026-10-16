@@ -13,7 +13,6 @@ export async function suggestProjectGoal(
   ask?: AskService,
 ): Promise<ProjectGoal> {
   const project = readProjectPage(ws, slug);
-  if (project.local_only) throw new KaituError("仅本机项目请手动设置目标", "PRIVATE_PROJECT");
   if (!ask || !(await ask.settings()).configured)
     throw new KaituError("请先到「AI 与连接」连接 AI，也可以手动填写目标", "AI_NOT_CONFIGURED");
   const thread = ask.create();

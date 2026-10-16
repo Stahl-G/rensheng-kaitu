@@ -11,7 +11,7 @@
 | Google Drive | 同步资料，并让 Grok Bot / ChatGPT Dots 通过 Drive 连接器接力 | 唯一支持的云端接力途径 |
 
 三选一。已启用一种同步模式时，开启另一种会报错，先搬回本机再选择。
-两种同步模式都把版本、密钥、索引、cache、上传暂存与本机项目留在本机状态目录。
+两种同步模式都把版本、密钥、索引、cache、上传暂存留在本机状态目录。
 
 ## 命令
 
@@ -58,7 +58,6 @@ Kaitu.app 的 `local.mjs` 与 `kaitu ui` 共用 `packages/cli/src/ui/server.ts`�
 | 内容 | 位置 |
 |---|---|
 | 数据文件（模块、记录、记忆、对话、NOW.md、AGENTS.md……） | 所选同步文件夹内的 `kaitu/` |
-| 仅本机项目与进度 | **本机**状态目录 `local-projects/<slug>/`；metric 在 `local-projects/projects/data/metrics/`，不会进入 OVERVIEW 或 MCP remote |
 | `.kaitu/config.json`（不含密钥） | 同步文件夹内，保留现有 `"state_dir"` |
 | 版本库（git 目录） | **本机**状态目录 `history.git`（isomorphic-git 的 `gitdir` 与 `dir` 分开）。同步盘与 git 目录放一起会产生冲突副本、损坏版本库 |
 | `secrets.json`、`index.sqlite`、`cache/`、上传暂存 | **本机**状态目录。这些程序状态不依赖云盘忽略规则 |

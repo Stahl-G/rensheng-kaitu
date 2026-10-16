@@ -23,7 +23,7 @@ import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
 import { captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
-import { type ProjectInput, createProject, driveProjects, listProjects, projectVersion } from "./projects.js";
+import { type ProjectInput, createProject, listProjects } from "./projects.js";
 import { updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { type Task, addTask, listTasks } from "./tasks.js";
@@ -331,7 +331,6 @@ export interface OnboardingChoiceResult {
 }
 export interface OnboardingOptions {
   stateRoot?: string;
-  publicOnly?: boolean;
 }
 
 function localDirectory(ws: Workspace, options: OnboardingOptions): string {
@@ -454,7 +453,6 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
         .object({
           title: z.string().trim().min(1).max(200),
           kind: z.enum(["work", "personal"]),
-          local_only: z.boolean().optional(),
           links: z
             .array(
               z
@@ -525,15 +523,14 @@ export async function confirmOnboardingSetup(
       (project) =>
         project.title === input.title &&
         project.kind === input.kind &&
-        project.local_only === (input.local_only ?? false) &&
         (!github || !project.github || project.github.repo.toLowerCase() === github.toLowerCase()) &&
         JSON.stringify(project.links) === JSON.stringify(input.links),
     );
     result = existing
-      ? { slug: existing.slug, version: null, before: input.local_only && driveProjects(ws) ? null : before }
+      ? { slug: existing.slug, version: null, before: before }
       : {
           ...(await createProject(ws, input)),
-          before: input.local_only && driveProjects(ws) ? null : before,
+          before: before,
         };
     if (github && result.slug) {
       try {
@@ -554,8 +551,7 @@ export async function confirmOnboardingSetup(
           error: error instanceof Error ? error.message : "GitHub 连接失败",
         };
       }
-      result.version =
-        (await projectVersion(ws, result.slug, "新手引导：保存项目与 GitHub 连接")) ?? result.version;
+      result.version = (await snapshot(ws, "新手引导：保存项目与 GitHub 连接")) ?? result.version;
     }
   } else {
     const current = ws.exists("feed/feeds.json") ? ws.readText("feed/feeds.json") : null;
@@ -765,9 +761,7 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
-  const adopted = listTasks(ws, { status: "all", includePrivate: !options.publicOnly }).filter(
-    isOnboardingTask,
-  );
+  const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
   const latest = adopted
     .filter((task) => task.status !== "cancelled")
     .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))[0];

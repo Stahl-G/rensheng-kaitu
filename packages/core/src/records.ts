@@ -9,9 +9,6 @@ import {
   resolveRecordPath,
 } from "./modules.js";
 import { mergeNewsRecord } from "./news.js";
-import { relocatePlan } from "./private-plan.js";
-import { existingLocalStore, recordStore, relocateProjectRecords } from "./private-records.js";
-import { assertPublicProject, driveProjects } from "./projects.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -40,11 +37,6 @@ export interface WriteResult {
   record: StoredRecord;
 }
 
-const localRows = new WeakSet<object>();
-export function recordIsLocal(row: object): boolean {
-  return localRows.has(row);
-}
-
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
 function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
@@ -58,8 +50,6 @@ function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord)
   ) {
     throw new KaituError("AI 只能新增方向建议，方向状态由用户决定", "USER_DECISION");
   }
-  if (["project_metric", "github_snapshot"].includes(ref.type) && driveProjects(ws) && !record.deleted)
-    assertPublicProject(ws, record.project);
   if (existsSync(join(ws.root, ref.module.dir, ref.def.schema)))
     resolveRecordPath(ws, ref, `${ref.module.dir}/${ref.def.schema}`);
   const reg = schemas();
@@ -87,23 +77,15 @@ function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function relocatePrivateWrites(ws: Workspace): void {
-  if (ws.privateRecords) return;
-  relocateProjectRecords(ws);
-  relocatePlan(ws);
-}
-
 function write(ws: Workspace, ref: RecordTypeRef, record: StoredRecord, tz: string): WriteResult {
   validateRecord(ws, ref, record);
   const file = recordFileFor(ref, localMonth(parseTs(record.ts), tz));
-  const store = recordStore(ws, ref, record);
-  resolveRecordPath(store, ref, file);
-  store.appendLine(file, JSON.stringify(record));
-  if (store !== ws) relocatePrivateWrites(ws);
+  resolveRecordPath(ws, ref, file);
+  ws.appendLine(file, JSON.stringify(record));
   return {
     type: ref.type,
     module: ref.module.dir,
-    file: store === ws ? file : `.kaitu/local-projects/${file}`,
+    file,
     record,
   };
 }
@@ -130,7 +112,6 @@ export function addRecords(
   if (news && !opts.dryRun) ws.assertDownloaded(recordFilePattern(ref).dir);
   const existing = news ? readRecords(ws, type) : [];
   const pending: WriteResult[] = [];
-  const locations = new Map<WriteResult, { store: Workspace; file: string }>();
   const results = data.map((item) => {
     const ts = typeof item.ts === "string" ? item.ts : isoInZone(opts.now ?? new Date(), tz);
     parseTs(ts);
@@ -148,15 +129,13 @@ export function addRecords(
       validateRecord(ws, ref, record);
     }
     const changed = !existing.includes(record);
-    const store = opts.dryRun ? ws : recordStore(ws, ref, record, false);
     const file = recordFileFor(ref, localMonth(parseTs(record.ts), tz));
     const result = {
       type,
       module: ref.module.dir,
-      file: store === ws ? file : `.kaitu/local-projects/${file}`,
+      file,
       record,
     };
-    locations.set(result, { store, file });
     if (changed) {
       pending.push(result);
       if (news) {
@@ -168,19 +147,17 @@ export function addRecords(
     return result;
   });
   if (!opts.dryRun) {
-    const groups = new Map<Workspace, Map<string, string[]>>();
+    const files = new Map<string, string[]>();
     for (const result of pending) {
-      const { store, file } = locations.get(result) as { store: Workspace; file: string };
-      resolveRecordPath(store, ref, file);
-      const files = groups.get(store) ?? new Map<string, string[]>();
+      const { file } = result;
+      resolveRecordPath(ws, ref, file);
       const lines = files.get(file) ?? [];
       lines.push(JSON.stringify(result.record));
       files.set(file, lines);
-      groups.set(store, files);
     }
-    for (const [store, files] of groups)
-      for (const [file, lines] of files) store.appendLine(file, lines.join("\n"));
+    for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
   }
+
   return results;
 }
 
@@ -255,32 +232,22 @@ export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[]
   return revisionsFor(ws, findRecordType(ws, type));
 }
 
-function revisionsFor(ws: Workspace, ref: RecordTypeRef, includePrivate = true): StoredRecord[] {
-  const local =
-    !includePrivate || ["project_metric", "github_snapshot"].includes(ref.type)
-      ? undefined
-      : existingLocalStore(ws, ref.type);
-  return [
-    { store: ws, ref },
-    ...(local ? [{ store: local, ref: findRecordType(local, ref.type) }] : []),
-  ].flatMap(({ store, ref }) =>
-    recordLines(store, ref).map((line) => {
-      try {
-        const row = JSON.parse(line.raw) as StoredRecord;
-        if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
-        if (store.privateRecords) localRows.add(row);
-        return row;
-      } catch {
-        throw new KaituError(`${line.file}:${line.line} 记录格式不合法`, "CORRUPT");
-      }
-    }),
-  );
+function revisionsFor(ws: Workspace, ref: RecordTypeRef): StoredRecord[] {
+  return recordLines(ws, ref).map((line) => {
+    try {
+      const row = JSON.parse(line.raw) as StoredRecord;
+      if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
+      return row;
+    } catch {
+      throw new KaituError(`${line.file}:${line.line} 记录格式不合法`, "CORRUPT");
+    }
+  });
 }
 
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
-function latestById(ws: Workspace, ref: RecordTypeRef, includePrivate = true): Map<string, StoredRecord> {
+function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord> {
   const latest = new Map<string, StoredRecord>();
-  for (const rec of revisionsFor(ws, ref, includePrivate)) {
+  for (const rec of revisionsFor(ws, ref)) {
     const prev = latest.get(rec.id);
     if (!prev || (rec.rev ?? 1) >= (prev.rev ?? 1)) latest.set(rec.id, rec);
   }
@@ -288,7 +255,6 @@ function latestById(ws: Workspace, ref: RecordTypeRef, includePrivate = true): M
 }
 
 export interface ReadOptions {
-  includePrivate?: boolean;
   /** 本地日期 YYYY-MM-DD（含） */
   from?: string;
   /** 本地日期 YYYY-MM-DD（含） */
@@ -299,7 +265,7 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
   const ref = findRecordType(ws, type);
   const tz = ws.timeZone();
   const day = (r: StoredRecord) => isoInZone(parseTs(r.ts), tz).slice(0, 10);
-  return [...latestById(ws, ref, opts.includePrivate !== false).values()]
+  return [...latestById(ws, ref).values()]
     .filter((r) => !r.deleted)
     .filter((r) => (!opts.from || day(r) >= opts.from) && (!opts.to || day(r) <= opts.to))
     .sort((a, b) => parseTs(a.ts).getTime() - parseTs(b.ts).getTime() || a.id.localeCompare(b.id));
@@ -329,17 +295,12 @@ export function appendPreparedRecords(
   entries: { type: string; record: StoredRecord }[],
 ): void {
   const plans = preparedRecords(ws, entries);
-  const groups = new Map<Workspace, Map<string, string[]>>();
+  const files = new Map<string, string[]>();
   for (const { file, record, ref } of plans) {
-    const store = recordStore(ws, ref, record);
-    resolveRecordPath(store, ref, file);
-    const files = groups.get(store) ?? new Map<string, string[]>();
+    resolveRecordPath(ws, ref, file);
     const lines = files.get(file) ?? [];
     lines.push(JSON.stringify(record));
     files.set(file, lines);
-    groups.set(store, files);
   }
-  for (const [store, files] of groups)
-    for (const [file, lines] of files) store.appendLine(file, lines.join("\n"));
-  if ([...groups.keys()].some((store) => store !== ws)) relocatePrivateWrites(ws);
+  for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
 }

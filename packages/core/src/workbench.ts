@@ -6,9 +6,7 @@ import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
-import { readPlan } from "./private-plan.js";
-import { listProjects, projectStatusFiles, projectVersion } from "./projects.js";
-import { type PrivacyIndex, privacyIndex } from "./record-privacy.js";
+import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { listTasks, tasksForToday } from "./tasks.js";
@@ -78,7 +76,7 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
     .reverse();
 }
 
-export function statusFiles(ws: Workspace, publicOnly = false): { file: string; module: string }[] {
+export function statusFiles(ws: Workspace): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
@@ -94,21 +92,13 @@ export function statusFiles(ws: Workspace, publicOnly = false): { file: string; 
     else if (ws.exists("projects/STATUS.md"))
       out.push({ file: "projects/STATUS.md", module: module.def.name });
   }
-  out.push(...projectStatusFiles(ws, publicOnly));
+  out.push(...projectStatusFiles(ws));
   return out;
 }
 
-function document<T>(
-  ws: Workspace,
-  file: string,
-  fallback: T,
-  publicOnly = false,
-  privacy?: PrivacyIndex,
-): Frontmatter<T> {
+function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   if (!ws.exists(file)) return { data: fallback, body: "" };
-  const parsed = parseFrontmatter<T>(
-    file === "NOW.md" ? readPlan(ws, publicOnly, privacy) : ws.readText(file),
-  );
+  const parsed = parseFrontmatter<T>(ws.readText(file));
   const schema =
     file === "NOW.md"
       ? "now.schema.json"
@@ -119,7 +109,7 @@ function document<T>(
   return parsed;
 }
 
-export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = false) {
+export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
   if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
@@ -132,16 +122,14 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     }
   }
   const modules = listModules(ws);
-  const privacy = publicOnly ? privacyIndex(ws) : undefined;
-  const localIds = privacy ? new Set([...privacy.privateIds, ...privacy.localIds]) : undefined;
   const records = Object.fromEntries(
     listRecordTypes(ws).map(({ type }) => [
       type,
       read(
         type,
         () => {
-          const rows = readRecords(ws, type, { includePrivate: !publicOnly });
-          return publicOnly ? publicRecords(ws, type, rows, localIds) : rows;
+          const rows = readRecords(ws, type);
+          return remote ? publicRecords(ws, type, rows) : rows;
         },
 
         [],
@@ -154,16 +142,12 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     today,
     inboxNotes: inboxNotes(ws).length,
     timeZone: ws.timeZone(),
-    now: read(
-      "今天的计划",
-      () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }, publicOnly, privacy),
-      {
-        data: { date: null, blocks: [] } as TodayPlan,
-        body: "",
-      },
-    ),
-    projects: read("项目", () => listProjects(ws, { now, publicOnly }), []),
-    statuses: statusFiles(ws, publicOnly).flatMap(({ file, module }) =>
+    now: read("今天的计划", () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }), {
+      data: { date: null, blocks: [] } as TodayPlan,
+      body: "",
+    }),
+    projects: read("项目", () => listProjects(ws, { now }), []),
+    statuses: statusFiles(ws).flatMap(({ file, module }) =>
       read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
     ),
     modules,
@@ -204,8 +188,7 @@ async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, e
     );
   }
   ws.writeText(file, stringifyFrontmatter(parsed.data, parsed.body), { internal: true });
-  const slug = /^(?:projects|\.kaitu\/local-projects)\/([^/]+)\/STATUS\.md$/.exec(file)?.[1];
-  return { version: slug ? await projectVersion(ws, slug, message) : await snapshot(ws, message) };
+  return { version: await snapshot(ws, message) };
 }
 
 export function decideProposal(ws: Workspace, id: string, decision: "confirmed" | "rejected") {
@@ -237,7 +220,7 @@ export function scheduleNext(ws: Workspace, file: string, id: string, start: str
     throw new KaituError("找不到模块状态", "NOT_FOUND");
   const item =
     file === "task"
-      ? listTasks(ws, { includePrivate: true }).find((row) => row.id === id)
+      ? listTasks(ws).find((row) => row.id === id)
       : parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next?.find(
           (row) => row.id === id && row.status === "todo",
         );

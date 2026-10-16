@@ -3,9 +3,10 @@ import { join } from "node:path";
 import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
+import { snapshot } from "./history.js";
 import type { ModuleDef } from "./modules.js";
 import { batchOverview } from "./overview.js";
-import { appendLog, metricStore, projectVersion, readProject } from "./projects.js";
+import { appendLog, readProject } from "./projects.js";
 import { type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, parseTs } from "./time.js";
@@ -200,13 +201,12 @@ function requester(ws: Workspace, state: GithubState, options: GithubOptions, no
   };
 }
 function snapshots(ws: Workspace, slug: string, now: Date): GithubSnapshot[] {
-  const store = metricStore(ws, readProject(ws, slug).data, true);
   if (
-    !store.exists("projects/module.json") ||
-    !store.readJson<ModuleDef>("projects/module.json").records?.github_snapshot
+    !ws.exists("projects/module.json") ||
+    !ws.readJson<ModuleDef>("projects/module.json").records?.github_snapshot
   )
     return [];
-  return readRecords(store, "github_snapshot").filter(
+  return readRecords(ws, "github_snapshot").filter(
     (r) => r.project === slug && parseTs(r.ts) <= now,
   ) as GithubSnapshot[];
 }
@@ -327,8 +327,7 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
         Object.entries(data).every(([key, value]) => JSON.stringify(current[key]) === JSON.stringify(value));
       let record = current ?? null;
       if (!same) {
-        const store = metricStore(ws, project.data);
-        const module = store.readJson<ModuleDef>("projects/module.json");
+        const module = ws.readJson<ModuleDef>("projects/module.json");
         if (!module.records?.github_snapshot) {
           const template: ModuleDef = JSON.parse(
             readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
@@ -337,12 +336,12 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
             ...module.records,
             github_snapshot: template.records?.github_snapshot as NonNullable<ModuleDef["records"]>[string],
           };
-          store.writeJson("projects/module.json", module);
+          ws.writeJson("projects/module.json", module);
         }
         record = (
           current
-            ? updateRecord(store, "github_snapshot", current.id, { ...data, ts: checked_at })
-            : addRecord(store, "github_snapshot", data, { now })
+            ? updateRecord(ws, "github_snapshot", current.id, { ...data, ts: checked_at })
+            : addRecord(ws, "github_snapshot", data, { now })
         ).record as GithubSnapshot;
         const previous = existing.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < today).at(-1);
         const delta = previous ? data.stars - previous.stars : null;
@@ -383,10 +382,7 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
         ok: true,
         problem,
         snapshot: record,
-        version:
-          same && !renamed
-            ? null
-            : await projectVersion(ws, slug, `同步了 GitHub：${project.data.title}`, now),
+        version: same && !renamed ? null : await snapshot(ws, `同步了 GitHub：${project.data.title}`, now),
       };
     } catch (error) {
       problem = error instanceof GithubFailure ? error.problem : "network";

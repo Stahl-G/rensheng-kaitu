@@ -149,7 +149,7 @@
 | D18 | **轻量优先**：默认安装不要求 Docker 或其他服务；能当库嵌入的开源项目直接嵌入，要部署服务的只做可选连接；我们只做现状文件夹 + 本地工作台（见 `docs/GOAL.md`） | 用户裁决（2026-10-15）；与北极星「任何人、尽量简单」一致 |
 | D19 | 体态照片：健康模块新增 `photo` 记录，照片原件存在 `health/files/photos/`，只在本机，进版本历史；身体指标页提供按日期并排对比 | 用户确认（2026-10-15）；覆盖访谈中「6 个月、一年的体态对比照片」 |
 | D20 | Google Drive 模式：数据进 Drive，版本库 / 密钥 / 索引留本机；云端 Agent 读 OVERVIEW.md、写 inbox/agents/（见 `docs/drive-sync.md`） | 用户选择先服务 Grok Bot / ChatGPT Dots 用户（2026-10-15） |
-| D21 | 新增内置模块「项目」（`projects/`，个人项目与工作）：每个项目一个子目录（STATUS / notes / log），`kind: work|personal`；`local_only: true` 的项目不进 Google Drive、不出现在 OVERVIEW.md | 用户认可（2026-10-15）；工作内容可能保密 |
+| D21 | 新增内置模块「项目」（`projects/`，个人项目与工作）：每个项目一个子目录（STATUS / notes / log），`kind: work|personal` | 用户认可（2026-10-15） |
 | D22 | workout 扩展有氧，旧力量兼容；me 新增 task 待办 / 提醒，沿用追加修订与版本。提醒先在早间计划与今天页列出，推送留 M5 | 用户 2026-10-15 确认；来源：ChatGPT Dot 收件箱实测跑步与生日礼物待办 |
 
 ---
@@ -266,10 +266,8 @@
 
 ### 2026-10-15：项目模块（D21）
 
-- core / CLI 支持项目建档、链接、日志、阶段与本机设置，工作台「我的」与「今天」汇总项目和下一步。
+- core / CLI 支持项目建档、链接、日志与阶段，工作台「我的」与「今天」汇总项目和下一步。
 - 正文与普通仓库只读；字数按天修订，提交按作者日期同步已结束的日期，首次回看最近 7 天；只保存计数与最多 10 条、80 字的标题。
-- Drive 开关与 local_only 切换迁移项目及全部进度修订；本机项目在状态目录 local-projects/<slug>/，其 metric 在 local-projects/projects/data/metrics/，独立本机版本也在此目录内。
-- OVERVIEW、MCP remote、收件箱及 Drive 下的旧工作区恢复过滤本机项目；项目技能及日常回顾已接入。
 - build、typecheck、lint、test 全过（80 项，仅新增 3 项）；临时 CLI / sample、工作台接口与 MCP 冒烟通过。真实 Drive、真实链接目录、浏览器与完整 Agent 工作流待实测。
 
 

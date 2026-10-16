@@ -3,11 +3,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
 import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { localRecordIds, localRecordStore } from "./private-records.js";
-import { projectStatusFiles } from "./projects.js";
-import { privacyIndex } from "./record-privacy.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
@@ -24,8 +20,6 @@ export const NEVER_TRACK = [
   ".kaitu/ask-workspace.json",
   ".kaitu/index.sqlite",
   ".kaitu/cache/",
-  ".kaitu/local-projects/",
-  ".kaitu/project-visibility.json",
   ".kaitu/history.git/",
   ".kaitu/inbox-state.json",
   ".kaitu/finance-notifications.json",
@@ -47,8 +41,6 @@ export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/index.sqlite
 .kaitu/index.sqlite-*
 .kaitu/cache/
-.kaitu/local-projects/
-.kaitu/project-visibility.json
 .kaitu/history.git/
 .kaitu/inbox-state.json
 .kaitu/finance-notifications.json
@@ -178,12 +170,9 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
 
 /** 立刻存版本，不经过后台。 */
 export async function snapshotNow(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
-  let localVersion: string | null = null;
-  if (!ws.privateRecords && ws.exists(".kaitu/local-projects"))
-    localVersion = await snapshot(localRecordStore(ws), "更新了本机资料", now);
   refreshOverview(ws, now);
   try {
-    return (await saveSnapshot(ws, message, now)) ?? localVersion;
+    return await saveSnapshot(ws, message, now);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
@@ -281,24 +270,7 @@ export async function restore(
   opts: { path?: string; now?: Date } = {},
 ): Promise<{ oid: string | null; changed: number }> {
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
-  let target: string;
-  try {
-    target = await resolveVersion(ws, version);
-  } catch (error) {
-    if (ws.privateRecords || !ws.exists(".kaitu/local-projects")) throw error;
-    const local = localRecordStore(ws);
-    try {
-      await resolveVersion(local, version);
-    } catch {
-      throw error;
-    }
-    const result = await restore(local, version, {
-      ...opts,
-      path: opts.path?.replace(/^\.kaitu\/local-projects\//, ""),
-    });
-    refreshOverview(ws);
-    return result;
-  }
+  const target = await resolveVersion(ws, version);
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
   const dir = ws.root;
   const head = await headOid(ws);
@@ -331,77 +303,20 @@ export async function restore(
       (file) => under(prefix, file),
     );
 
-  // 恢复共享历史时保留私有项目与记录的本机版本。
-  const privateSlugs = new Set<string>();
-  const privateMetricIds = localRecordIds(ws);
-  if (!ws.privateRecords) {
-    for (const { file } of projectStatusFiles(ws)) {
-      const slug = file.split("/").at(-2) as string;
-      if (parseFrontmatter<{ local_only?: boolean }>(ws.readText(file)).data.local_only)
-        privateSlugs.add(slug);
-    }
-    const allTargetFiles = await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target });
-    const targetRows: import("./records.js").StoredRecord[] = [];
-    for (const file of allTargetFiles.filter((file) => /^projects\/[^/]+\/STATUS\.md$/.test(file))) {
-      const { blob } = await git.readBlob({
-        fs,
-        dir,
-        gitdir: historyDirectory(ws),
-        oid: target,
-        filepath: file,
-      });
-      if (parseFrontmatter<{ local_only?: boolean }>(Buffer.from(blob).toString("utf8")).data.local_only) {
-        privateSlugs.add(file.split("/")[1] as string);
-      }
-    }
-    for (const file of allTargetFiles.filter((file) => /\.jsonl$/.test(file))) {
-      const { blob } = await git.readBlob({
-        fs,
-        dir,
-        gitdir: historyDirectory(ws),
-        oid: target,
-        filepath: file,
-      });
-      for (const line of Buffer.from(blob).toString("utf8").split("\n").filter(Boolean)) {
-        const row = JSON.parse(line);
-        targetRows.push(row);
-        if (privateSlugs.has(row.project)) privateMetricIds.add(row.id);
-      }
-    }
-    for (const id of privacyIndex(ws, targetRows, privateSlugs).privateIds) privateMetricIds.add(id);
-  }
-  const privateFile = (file: string) =>
-    privateSlugs.has(file.split("/")[0] === "projects" ? (file.split("/")[1] ?? "") : "");
   let changed = 0;
   for (const f of currentFiles) {
-    if (!ws.conflictCopy(f) && !targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
+    if (!ws.conflictCopy(f) && !targetFiles.has(f) && !neverTrack(f)) {
       fs.rmSync(ws.resolve(f, { internal: true }), { force: true });
       changed++;
     }
   }
   for (const f of targetFiles) {
-    if (
-      ws.conflictCopy(f) ||
-      neverTrack(f) ||
-      privateFile(f) ||
-      ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f)
-    )
+    if (ws.conflictCopy(f) || neverTrack(f) || ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f))
       continue;
-    let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
+    const { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     if (quarantineBankContent(ws, f, blob)) {
       fs.rmSync(ws.resolve(f), { force: true });
       continue;
-    }
-    if ((privateSlugs.size || privateMetricIds.size) && /\.jsonl$/.test(f)) {
-      const rows = Buffer.from(blob)
-        .toString("utf8")
-        .split("\n")
-        .filter(Boolean)
-        .filter((line) => {
-          const row = JSON.parse(line);
-          return !privateSlugs.has(row.project) && !privateMetricIds.has(row.id);
-        });
-      blob = Buffer.from(rows.length ? `${rows.join("\n")}\n` : "");
     }
     const abs = ws.resolve(f, { internal: true });
     if (fs.existsSync(abs) && Buffer.compare(fs.readFileSync(abs), Buffer.from(blob)) === 0) continue;

@@ -70,7 +70,7 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
   if (!data.date) return [];
   const previous = calendarPushStore(ws).read().entries;
-  const tasks = listTasks(ws, { status: "all", includePrivate: true });
+  const tasks = listTasks(ws, { status: "all" });
   const related = new Map(tasks.map((task) => [task.id, task.title]));
   const taskIds = new Set(tasks.filter((task) => task.status !== "cancelled").map((task) => task.id));
   for (const { file } of statusFiles(ws)) {

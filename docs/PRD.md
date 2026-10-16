@@ -183,7 +183,7 @@
 ├─ projects/                # 个人项目与工作（D21）
 │  ├─ module.json
 │  └─ <slug>/
-│     ├─ STATUS.md           # frontmatter 另含 kind: work | personal、local_only: bool
+│     ├─ STATUS.md           # frontmatter 另含 kind: work | personal
 │     ├─ notes.md            # 背景、要点、相关人
 │     └─ log.md              # 按日期记的进展
 ├─ decisions/
@@ -280,26 +280,9 @@ blocked: []
 ```
 
 项目 `projects/<slug>/STATUS.md` 在通用字段之外包含 `title`（显示名）、`kind: work|personal`、
-`stage: idea|active|paused|done`、`local_only`（默认 false）和 `links` 数组。
+`stage: idea|active|paused|done`和 `links` 数组。
 每条链接包含本机绝对路径或 `~/` 开头的 `path`、`role: manuscript|repo|folder`，可用 `include` 指定相对路径 glob。
 正文与代码留在链接文件夹内，只读；项目目录只存 STATUS、背景笔记 `notes.md` 与按 `## YYYY-MM-DD` 分节的 `log.md`。
-Drive / iCloud 模式下，仅本机项目在可信本机状态目录 `local-projects/<slug>/`，进度记录也留本机，core 透明解析位置。
-
-项目关联记录继承项目可见性，包括 `task.project`、结构化项目引用及方向 / 尝试的父子关联。
-公开任务仍在 `me/data/tasks/{YYYY-MM}.jsonl`；仅本机任务存入本机私有库
-`<本机状态目录>/local-projects/me/data/tasks/{YYYY-MM}.jsonl`，其余关联记录在该库中保留原模块相对路径。
-本机模式使用 `.kaitu/local-projects/`；同步模式的状态根由本机可信映射确定，私有库不进入同步目录。
-ID、字段、月份、追加修订与删除标记的语义不变，CLI / 本机业务入口透明合并读取。
-私有记录及其计划投影不进入 MCP remote、公开 status、OVERVIEW、共享导出或新的共享历史。
-
-项目从公开改为仅本机时，迁移关联记录的全部修订及删除标记，逐文件写入并回读验证后才清除原件。
-迁移意图保存在本机状态中，中断后下次打开继续，按完整行去重；同版本冲突以本机副本为准。
-打开已有工作区时也迁回共享目录中的私有记录。项目改回公开是明确的再次共享操作：
-搬回该项目的全部记录修订和删除标记，包括私有期间新增的修订，并恢复当前计划的公开投影；
-仍关联其他仅本机项目、关联失效或循环关系的记录继续留在本机。
-共享版本库不重写旧提交，本机私有历史保留；已同步到云端、其他设备及备份的副本需要用户另行清理。
-界面在选择仅本机时提示：「这个项目的待办以后只在这台电脑上，以前同步过的副本请到云盘清理」。
-
 ### 6.4 `NOW.md`
 
 ```markdown

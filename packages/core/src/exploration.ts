@@ -1,13 +1,11 @@
 import { isAbsolute } from "node:path";
-import { publicRecords } from "./agent-tools.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { type ExperienceSource, readSourceContent } from "./experience-source.js";
 import { explorationCommandSchema } from "./exploration-contract.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
-import { localRecordIds, localRecordStore } from "./private-records.js";
-import { assertPublicProject, listProjects, projectDirectory } from "./projects.js";
+import { listProjects, projectDirectory, readProject } from "./projects.js";
 import { type StoredRecord, addRecord, readRecordRevisions, readRecords, updateRecord } from "./records.js";
 import { isoInZone } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -91,10 +89,10 @@ const types = ["direction", "exploration_experiment", "direction_note"];
 export function isExplorationType(type: string): boolean {
   return types.includes(type);
 }
-function rows<T>(ws: Workspace, type: string, publicOnly = false, privateIds?: Set<string>): T[] {
+function rows<T>(ws: Workspace, type: string): T[] {
   if (!listRecordTypes(ws).some((r) => r.type === type)) return [];
-  const records = readRecords(ws, type, { includePrivate: !publicOnly });
-  return (publicOnly ? publicRecords(ws, type, records, privateIds) : records) as unknown as T[];
+  const records = readRecords(ws, type);
+  return records as unknown as T[];
 }
 function current<T extends ExplorationRecord>(ws: Workspace, type: string, id: string, revision?: number): T {
   const record = rows<T>(ws, type).find((r) => r.id === id);
@@ -108,7 +106,7 @@ function references(ws: Workspace, items: ExplorationReference[] | undefined) {
   if (!Array.isArray(items)) throw new KaituError("关联资料必须是列表", "BAD_ARGS");
   for (const item of items) {
     if (!item || typeof item.ref !== "string") throw new KaituError("关联资料不完整", "BAD_ARGS");
-    if (item.kind === "project") assertPublicProject(ws, item.ref);
+    if (item.kind === "project") readProject(ws, item.ref);
     else if (item.kind === "decision") {
       if (!/^decisions\/[a-z0-9-]+\/decision\.md$/.test(item.ref) || !ws.exists(item.ref))
         throw new KaituError("找不到关联决策", "NOT_FOUND");
@@ -122,7 +120,7 @@ function references(ws: Workspace, items: ExplorationReference[] | undefined) {
           throw new KaituError("关联来源超出范围", "OUT_OF_SCOPE");
         ws.resolve(file);
         const project = /^projects\/([^/]+)\//.exec(file)?.[1];
-        if (project) assertPublicProject(ws, project);
+        if (project) readProject(ws, project);
       }
     } else throw new KaituError("未知的关联资料类型", "BAD_ARGS");
   }
@@ -220,21 +218,17 @@ export async function writeExploration(
   return {
     id: result.record.id,
     record: result.record,
-    version: await snapshot(
-      result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
-      message,
-    ),
+    version: await snapshot(ws, message),
   };
 }
 
-export function readExploration(ws: Workspace, publicOnly = false) {
-  const privateIds = publicOnly ? localRecordIds(ws) : new Set<string>();
-  const directions = rows<Direction>(ws, "direction", publicOnly, privateIds).sort(
+export function readExploration(ws: Workspace) {
+  const directions = rows<Direction>(ws, "direction").sort(
     (a, b) =>
       Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
   );
-  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment", publicOnly, privateIds);
-  const notes = rows<DirectionNote>(ws, "direction_note", publicOnly, privateIds);
+  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment");
+  const notes = rows<DirectionNote>(ws, "direction_note");
   const timeline: {
     id: string;
     record_id: string;
@@ -250,7 +244,7 @@ export function readExploration(ws: Workspace, publicOnly = false) {
     if (!listRecordTypes(ws).some((r) => r.type === type)) continue;
     const previous = new Map<string, StoredRecord>();
     for (const record of readRecordRevisions(ws, type).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1))) {
-      if (record.deleted || (publicOnly && privateIds.has(record.id))) continue;
+      if (record.deleted) continue;
       const old = previous.get(record.id);
       const id = type === "direction" ? record.id : String(record.direction_id);
       let text: string;
@@ -292,7 +286,7 @@ export function readExploration(ws: Workspace, publicOnly = false) {
   }
   return {
     references: {
-      projects: listProjects(ws, { publicOnly: true }).map((p) => ({ id: p.slug, title: p.title })),
+      projects: listProjects(ws).map((p) => ({ id: p.slug, title: p.title })),
       decisions: readDoing(ws)
         .decisions.map((d) => ({ path: d.file.replace(/STATUS\.md$/, "decision.md"), title: d.title }))
         .filter((d) => ws.exists(d.path)),
@@ -320,7 +314,7 @@ export async function readExplorationSource(
       throw new KaituError("找不到关联资料", "NOT_FOUND");
     const item = items[reference];
     if (item.kind === "project") {
-      assertPublicProject(ws, item.ref);
+      readProject(ws, item.ref);
       locator = `${projectDirectory(ws, item.ref)}/STATUS.md`;
     } else locator = item.ref;
   } else locator = "source" in record ? String(record.source ?? "") : "";

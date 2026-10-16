@@ -90,7 +90,7 @@ Saner.AI、Capacities、Sunsama、Rosebud 可纳入下一轮实际体验，分�
 
 你最关心客户信息泄露。这里既是安全问题，也是用户能否信任产品的体验问题。“只读写开图资料”描述访问范围，不代表资料不会发给远端模型；“存本地”“同步到个人云盘”“本次发给模型”必须分开表达。
 
-建议在连接和实际使用处显示发送对象、资料范围、来源与排除项；首次扩大范围时清楚提示，已授权的日常操作保持流畅。先修复[前轮安全审查](/workspace/security-review-rensheng-kaitu.md)发现的文件边界和 `local_only` 关联资料外发等问题，再对外承诺“仅本机”。
+建议在连接和实际使用处显示发送对象、资料范围、来源与排除项；首次扩大范围时清楚提示，已授权的日常操作保持流畅。先修复[前轮安全审查](/workspace/security-review-rensheng-kaitu.md)发现的文件边界等问题。
 
 可借鉴 [Reflect 隐私说明](https://github.com/team-reflect/reflect-open/blob/master/docs/privacy.md)逐项说明何时、向哪里、发送什么。但其 `private: true` 笔记仍进入 Git 备份，也说明“私密”不能替代精确的数据去向说明。
 

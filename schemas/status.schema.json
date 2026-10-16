@@ -73,10 +73,6 @@
     "stage": {
       "enum": ["idea", "active", "paused", "done"]
     },
-    "local_only": {
-      "type": "boolean",
-      "default": false
-    },
     "links": {
       "type": "array",
       "items": {

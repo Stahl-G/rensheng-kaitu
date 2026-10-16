@@ -3,8 +3,6 @@ import {
   addExperiences,
   addMemory,
   addTask,
-  assertPublicInput,
-  assertPublicProject,
   completeTask,
   dismissNews,
   explorationCommandSchema,
@@ -111,7 +109,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     sensitive: z.boolean().optional(),
   };
   register("onboarding_status", "读取首次使用内容、待核对草稿、已采纳下一步和实时开始清单。", {}, () =>
-    onboardingStatus(ws, { publicOnly: tools === "remote" }),
+    onboardingStatus(ws),
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),
@@ -138,7 +136,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "按用户时区的日期范围查询记录，无需确认。",
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) => {
-      const rows = readRecords(ws, type, { from, to, includePrivate: tools !== "remote" });
+      const rows = readRecords(ws, type, { from, to });
       return tools === "remote" ? publicRecords(ws, type, rows) : rows;
     },
   );
@@ -154,7 +152,6 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       source: text.optional(),
     },
     (input) => {
-      if (tools === "remote") assertPublicInput(ws, input);
       return addTask(ws, input, { by: "agent", actor: actor() });
     },
     true,
@@ -164,7 +161,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "查询待办，默认 open；dueBefore 日期含当天，时间截止按用户时区判断。",
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
     (input) => {
-      const rows = listTasks(ws, { ...input, includePrivate: tools !== "remote" });
+      const rows = listTasks(ws, { ...input });
       return tools === "remote" ? publicRecords(ws, "task", rows) : rows;
     },
   );
@@ -194,20 +191,13 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     ({ items }) => addExperiences(ws, items, "agent"),
     true,
   );
-  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () =>
-    readExploration(ws, tools === "remote"),
-  );
+  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
   register(
     "exploration_write",
     "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户采纳、暂停或归档。",
     { command: explorationCommandSchema },
     async ({ command }) => {
-      if (tools === "remote") {
-        if ("id" in command) assertPublicInput(ws, { id: command.id });
-        assertPublicInput(ws, command.data as unknown as Record<string, unknown>);
-      }
       const result = await writeExploration(ws, command, "agent");
-      if (tools === "remote") assertPublicInput(ws, result.record);
       return result;
     },
     true,
@@ -240,7 +230,6 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "新增一条日常记录，无需确认，可从历史撤销；批量导入须先由用户确认。",
     { type, data },
     ({ type, data }) => {
-      if (tools === "remote") assertPublicInput(ws, data);
       return writeAgentRecord(ws, "add", type, actor(), data);
     },
     true,
@@ -271,16 +260,12 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       ref: text.optional(),
     },
     (input) => {
-      if (tools === "remote") assertPublicInput(ws, input);
       return proposeBlock(ws, input, actor());
     },
     true,
   );
-  register("project_list", "列出项目进度与下一步。", {}, () =>
-    listProjects(ws, { publicOnly: tools === "remote" }),
-  );
+  register("project_list", "列出项目进度与下一步。", {}, () => listProjects(ws));
   register("project_github", "读取项目 GitHub 快照与同步状态。", { slug: text }, ({ slug }) => {
-    if (tools === "remote") assertPublicProject(ws, slug);
     return projectGithub(ws, slug);
   });
   register(
@@ -288,7 +273,6 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "记录项目进展。",
     { slug: text, text, date: date.optional() },
     async (input) => {
-      if (tools === "remote") assertPublicProject(ws, input.slug);
       return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
     },
     true,

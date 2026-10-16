@@ -66,7 +66,7 @@
 | 记录与查询 | 已在本次补上 | 保留原工具，补记录查询 / 修订、对话检索、记忆、待办、项目、导入、文档读写、照片和地点查询；全部复用 core |
 | 每日整理、早间计划 | 已在本次补上 | 安装 patch 加载 schedule 与其界面；首次启动创建专用持久会话及 03:00 每日整理、07:30 早间计划，使用工作区当时时区；回执存本机 `.kaitu/dsh-setup.json`，重启保留用户对任务的修改和删除 |
 | 头像 | 现在可用 | 「关于我」选择文件，经 Remote 存入本机状态目录；不依赖会话目录或 CLI |
-| 本机文件 | 已在本次补上 | 文档读写限定开图工作区；导入与体态照片支持用户指定的本机绝对路径，项目链接目录只读；仅本机项目由 core 解析与保存 |
+| 本机文件 | 已在本次补上 | 文档读写限定开图工作区；导入与体态照片支持用户指定的本机绝对路径，项目链接目录只读 |
 | 云端入口 AGENT-README / ORGANIZER | 已在本次补上 | 初始化、升级与 core refreshOverview 自动生成 / 维护，同时生成 OVERVIEW；不依赖用户启动其他程序 |
 | Drive 开关与迁移 | 已在本次补上 | 对话调用 core enableDrive / disableDrive，页面、工具与 provider 共用同一 Workspace；重启跟随 core 的 WORKSPACE-MOVED 入口 |
 | 模型密钥、外部账号与云端 Agent 授权 | 做不到自动代填 | 密钥与授权属于用户，模型在 dsh 设置填写；Drive 需要用户已安装并登录自己的同步客户端，云端连接器仍需本人授权 |
@@ -113,7 +113,7 @@
 | learn-topic / decision | search_chats、workspace 创建主题 / 决策文档与状态 |
 | add-module | workspace 批量写 module.json / STATUS / schema，校验成功后刷新 Agent 入口 |
 | log-photo | photos 保存原件 / 查询 / 删除；健康页读取已有照片 |
-| project | projects 建档 / 链接 / 同步 / 日志 / 设置；project-read / project-write 支持仅本机项目 |
+| project | projects 建档 / 链接 / 同步 / 日志 / 设置；project-read / project-write |
 | build-life-map | memory、search_chats、workspace 读档案，add_experience；life_map 查地点候选和结果 |
 
 新增自动测试仅一项：临时工作区技能跨 cwd 发现、加载正文、外部更新刷新及卸载停止监听。

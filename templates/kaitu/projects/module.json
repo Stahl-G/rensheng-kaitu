@@ -17,6 +17,6 @@
     }
   },
   "agent": {
-    "instructions": "每个项目一个子目录，含 STATUS.md、notes.md、log.md。用 kaitu project 管理与同步；项目内容在链接的文件夹里，只读。next 会出现在今天。仅本机项目通过 project 命令访问，不写入共享文件。"
+    "instructions": "每个项目一个子目录，含 STATUS.md、notes.md、log.md。用 kaitu project 管理与同步；项目内容在链接的文件夹里，只读。next 会出现在今天。"
   }
 }

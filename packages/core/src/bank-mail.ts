@@ -38,7 +38,7 @@ export function quarantineBankContent(ws: Workspace, file: string, bytes: Uint8A
   return true;
 }
 export function quarantineBankNotes(ws: Workspace): void {
-  if (ws.privateRecords || !ws.exists("inbox")) return;
+  if (!ws.exists("inbox")) return;
   function walk(directory: string) {
     for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
       if (entry.isSymbolicLink()) continue;

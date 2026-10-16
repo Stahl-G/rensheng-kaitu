@@ -38,7 +38,6 @@ import {
   previewOnboardingSetup,
   processInbox,
   projectDirectory,
-  projectVersion,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -417,7 +416,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
   );
   register(
     "kaitu_projects",
-    "项目建档、链接、进度同步和文档读写。链接目录只读，项目写入支持仅本机存储。",
+    "项目建档、链接、进度同步和文档读写。链接目录只读。",
     z.discriminatedUnion("operation", [
       z.object({ operation: z.literal("list") }).strict(),
       z
@@ -425,7 +424,6 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
           operation: z.literal("new"),
           title: text,
           kind: z.enum(["work", "personal"]),
-          local_only: z.boolean().optional(),
         })
         .strict(),
       z.object({ operation: z.literal("show"), slug: text }).strict(),
@@ -438,7 +436,6 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
           patch: z
             .object({
               stage: z.enum(["idea", "active", "paused", "done"]).optional(),
-              local_only: z.boolean().optional(),
               next: z.array(next).optional(),
               progress: z
                 .object({ label: text, current: z.number(), target: z.number(), unit: text.optional() })
@@ -493,7 +490,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
           ws.writeText(`${projectDirectory(ws, input.slug)}/${input.path}`, input.content, {
             internal: true,
           });
-          return { version: await projectVersion(ws, input.slug, "DeepSeek 更新了项目文档") };
+          return { version: await snapshot(ws, "DeepSeek 更新了项目文档") };
         }
         case "linked-read": {
           const item = readProject(ws, input.slug).data.links[input.linkIndex];

@@ -23,7 +23,6 @@ import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories } from "./memory.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
-import { assertPublicProject } from "./projects.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
 import { placeholderOriginal } from "./sync-files.js";
@@ -92,7 +91,6 @@ async function prepare(ws: Workspace, file: string, text: string) {
           data.ts = isoInZone(localTimeToInstant(`${data.date}T12:00:00`, ws.timeZone()), ws.timeZone());
         }
         const { date: _date, ...withoutDate } = data;
-        if (["project_metric", "github_snapshot"].includes(type)) assertPublicProject(ws, data.project);
         // 采集规范（collect-news）只约束新投递的 Agent 新闻；已入库的旧新闻不受影响。
         if (type === "news_item" && !["rss", "user"].includes(String(data.via))) {
           const missing = ["summary", "details", "comment", "published_at"].filter(

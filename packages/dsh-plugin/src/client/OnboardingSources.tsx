@@ -193,7 +193,6 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
   const [kind, setKind] = useState<"work" | "personal">("work");
   const [path, setPath] = useState("");
   const [github, setGithub] = useState("");
-  const [localOnly, setLocalOnly] = useState(false);
   const [keywords, setKeywords] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -212,7 +211,6 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
             project: {
               title: title.trim(),
               kind,
-              local_only: localOnly,
               links: mode === "folder" ? [{ path: path.trim(), role: "folder" }] : [],
             },
             ...(mode === "github" ? { github: github.trim() } : {}),
@@ -331,16 +329,6 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
               />
             </label>
           )}
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={localOnly}
-              disabled={locked}
-              onChange={(event) => setLocalOnly(event.target.checked)}
-            />
-            仅保存在本机
-          </label>
-          {localOnly && <p>这个项目的待办以后只在这台电脑上，以前同步过的副本请到云盘清理</p>}
         </>
       ) : (
         <label>

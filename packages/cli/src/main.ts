@@ -121,13 +121,13 @@ const HELP = `开图 kaitu
   kaitu onboarding setup-confirm <token>           确认数据源设置
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
-  kaitu project new --title <标题> --kind work|personal [--local-only] [--link <路径>[:manuscript|repo|folder]]...
+  kaitu project new --title <标题> --kind work|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
   kaitu project github <slug> <url>
   kaitu project github-token [--clear]  从 stdin 读取 token，仅保存在本机
   kaitu project sync [<slug>]
-  kaitu project set <slug> [--stage idea|active|paused|done] [--local-only|--no-local-only] [--next-json <数组>]
+  kaitu project set <slug> [--stage idea|active|paused|done] [--next-json <数组>]
   kaitu task add --title <标题> [--due <日期或时间>] [--remind-at <时间>] [--project <slug>]
   kaitu task list [--all]                          列出未完成待办（--all 含已完成 / 取消）
   kaitu task done <id> | cancel <id>               完成 / 取消待办
@@ -178,8 +178,6 @@ const options = {
   link: { type: "string", multiple: true },
   include: { type: "string", multiple: true },
   "next-json": { type: "string" },
-  "local-only": { type: "boolean" },
-  "no-local-only": { type: "boolean" },
   "drive-dir": { type: "string" },
   sample: { type: "boolean" },
   http: { type: "boolean" },
@@ -279,7 +277,6 @@ async function run(argv: string[]): Promise<number> {
     case "project": {
       const ws = workspace(values);
       const [action, slug, path] = args;
-      if (values["local-only"] && values["no-local-only"]) throw new KaituError("本机选项冲突", "BAD_ARGS");
       let result: unknown;
       if (action === "new") {
         const links = (values.link ?? []).map((input) => {
@@ -292,7 +289,6 @@ async function run(argv: string[]): Promise<number> {
         result = await createProject(ws, {
           title: need(values.title, "--title"),
           kind: need(values.kind, "--kind") as ProjectStatus["kind"],
-          local_only: values["local-only"],
           links,
         });
       } else if (action === "list") result = listProjects(ws);
@@ -324,11 +320,6 @@ async function run(argv: string[]): Promise<number> {
         result = await setProject(ws, need(slug, "slug"), {
           ...(values["next-json"] ? { next: JSON.parse(values["next-json"]) } : {}),
           ...(values.stage ? { stage: values.stage as ProjectStatus["stage"] } : {}),
-          ...(values["local-only"]
-            ? { local_only: true }
-            : values["no-local-only"]
-              ? { local_only: false }
-              : {}),
         });
       else
         throw new KaituError(
@@ -588,7 +579,7 @@ async function run(argv: string[]): Promise<number> {
           ...moduleLines,
           "项目：",
           ...result.projects.flatMap((project) => [
-            `${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}${project.local_only ? " / 仅本机" : ""}）：近 7 天字数变化 ${project.recent7.words ?? "—"}，${project.recent7.commits} 次提交`,
+            `${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}）：近 7 天字数变化 ${project.recent7.words ?? "—"}，${project.recent7.commits} 次提交`,
             ...project.next.map((item) => `  ${item.title}（${item.status}）`),
           ]),
           recentSummary,

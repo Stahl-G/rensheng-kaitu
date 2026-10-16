@@ -1,7 +1,6 @@
 import { readdirSync } from "node:fs";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
-import { readPlan } from "./private-plan.js";
 import { renderRecordReference } from "./record-reference.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
@@ -69,7 +68,7 @@ news_item 的 kind 缺省 article；X 热门用 trend.samples 放原帖，posts 
 
 ${renderRecordReference(ws)}
 
-project_metric 的 project 填已存在的共享项目 slug；不接受仅本机项目。photo 只记录已有文件引用，上传原件用本机 kaitu photo add。
+project_metric 的 project 填已存在的项目 slug。photo 只记录已有文件引用，上传原件用本机 kaitu photo add。
 `;
 }
 
@@ -186,7 +185,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
       const plan = parseFrontmatter<{
         date: string;
         blocks: { start?: string; end?: string; title: string; status: string }[];
-      }>(readPlan(ws, true)).data;
+      }>(ws.readText("NOW.md")).data;
       lines.push("", `## 最近计划（${plan.date}）`, "");
       for (const block of plan.blocks)
         lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);

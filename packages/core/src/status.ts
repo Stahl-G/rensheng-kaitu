@@ -32,8 +32,8 @@ export function dailyRecordTotals(
   return totals;
 }
 
-export function readStatus(ws: Workspace, now = new Date(), publicOnly = false) {
-  const data = readWorkbench(ws, now, publicOnly);
+export function readStatus(ws: Workspace, now = new Date(), remote = false) {
+  const data = readWorkbench(ws, now, remote);
   return summarizeStatus(data);
 }
 

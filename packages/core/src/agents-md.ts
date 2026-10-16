@@ -87,9 +87,8 @@ ${instructions}
 - 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--project slug]\`，新建为 open。
 - \`kaitu task list [--all]\` 查询，\`kaitu task done <id>\` 完成，\`kaitu task cancel <id>\` 取消；状态变化追加修订并保存版本。
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
-- 仅本机项目的待办、关联探索及全部修订由命令自动存入本机 local-projects 私有库，ID 与追加语义不变，不直接编辑或读取程序目录。
 - 项目改回公开会搬回关联记录的全部修订与删除标记；只在用户明确选择后操作。迁移可在重新打开时继续，既有云端副本须由用户清理。
-- 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。仅本机项目不写进共享计划、复盘或记忆。
+- 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。
 - 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
 - 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
 - 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。

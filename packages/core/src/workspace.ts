@@ -8,9 +8,6 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
-import { readPlan, relocatePlan, writePlan } from "./private-plan.js";
-import { relocateProjectRecords } from "./private-records.js";
-import { resumeProjectVisibility } from "./projects.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
@@ -62,7 +59,6 @@ function isInside(root: string, target: string): boolean {
  * `.kaitu/` 只允许程序内部通过 { internal: true } 写入。
  */
 export class Workspace {
-  readonly privateRecords: boolean;
   private location = "";
   private icloud = false;
   private unread = new Set<string>();
@@ -81,8 +77,7 @@ export class Workspace {
     this.unread.clear();
   }
 
-  constructor(root: string, options: { maintain?: boolean; privateRecords?: boolean } = {}) {
-    this.privateRecords = options.privateRecords ?? false;
+  constructor(root: string, options: { maintain?: boolean } = {}) {
     this.root = resolve(root);
     if (options.maintain === false) return;
     try {
@@ -100,10 +95,7 @@ export class Workspace {
     if (this.exists(".kaitu/config.json")) {
       for (const maintain of [
         ensureTaskModule,
-        resumeProjectVisibility,
         quarantineBankNotes,
-        relocateProjectRecords,
-        relocatePlan,
         maintainHistoryIgnore,
         refreshOverview,
       ]) {
@@ -150,7 +142,6 @@ export class Workspace {
   }
 
   readText(rel: string): string {
-    if (!this.privateRecords && rel === "NOW.md") return readPlan(this);
     return this.readBytes(rel).toString("utf8");
   }
 
@@ -221,13 +212,9 @@ export class Workspace {
   writeText(
     rel: string,
     content: string | Uint8Array,
-    opts: { internal?: boolean; mode?: number; projected?: boolean } = {},
+    opts: { internal?: boolean; mode?: number } = {},
   ): void {
     const abs = this.resolve(rel, opts);
-    if (!this.privateRecords && abs === join(this.root, "NOW.md") && !opts.projected) {
-      writePlan(this, typeof content === "string" ? content : Buffer.from(content).toString("utf8"));
-      return;
-    }
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
