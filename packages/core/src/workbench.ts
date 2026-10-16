@@ -85,6 +85,8 @@ export function statusFiles(ws: Workspace, publicOnly = false): { file: string; 
   }
   for (const module of listModules(ws)) {
     if (module.dir !== "projects") walk(module.dir, module.def.name);
+    else if (ws.exists("projects/STATUS.md"))
+      out.push({ file: "projects/STATUS.md", module: module.def.name });
   }
   out.push(...projectStatusFiles(ws, publicOnly));
   return out;

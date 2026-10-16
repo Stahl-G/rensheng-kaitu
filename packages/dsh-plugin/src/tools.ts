@@ -9,6 +9,7 @@ import {
   isExplorationType,
   listRecordTypes,
   readStatus,
+  recordOnboardingAiConnection,
   recordReference,
   snapshot,
   validateWorkspace,
@@ -81,6 +82,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
         const result = pending.then(async () => {
           try {
             exec.signal.throwIfAborted();
+            recordOnboardingAiConnection(ws, "DSH");
             const input = object(args);
             for (const key of Object.keys(input)) {
               if (!Object.hasOwn(schema.properties, key)) throw new Error(`未知参数：${key}`);

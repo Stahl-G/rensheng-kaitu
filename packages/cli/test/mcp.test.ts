@@ -13,6 +13,7 @@ import { startMcpHttp } from "../src/mcp/http.js";
 it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源，不能调用删除", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-"));
   const client = new Client({ name: "grok-bot", version: "1" });
+  const localState = mkdtempSync(join(tmpdir(), "kaitu-mcp-state-"));
   try {
     const ws = await initWorkspace(root);
     const before = (await history(ws)).length;
@@ -28,6 +29,7 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
           "remote",
         ],
         stderr: "pipe",
+        env: { KAITU_LOCAL_STATE_DIR: localState },
       }),
     );
     const { tools } = await client.listTools();
@@ -54,6 +56,7 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
   } finally {
     await client.close();
     rmSync(root, { recursive: true, force: true });
+    rmSync(localState, { recursive: true, force: true });
   }
 });
 

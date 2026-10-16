@@ -21,6 +21,7 @@ import {
   history,
   ignoredWorkspaceChange,
   importUpload,
+  onboardingStatus,
   pendingWorkspaceFiles,
   processInbox,
   readPhoto,
@@ -278,7 +279,12 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         const method = url.pathname.slice("/api/product/".length);
         const args = JSON.parse(
           (
-            await body(req, method === "financeImportPreview" ? 49 * 1024 * 1024 : 3 * 1024 * 1024)
+            await body(
+              req,
+              ["financeImportPreview", "onboardingImportPreview"].includes(method)
+                ? 49 * 1024 * 1024
+                : 3 * 1024 * 1024,
+            )
           ).toString(),
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
@@ -341,6 +347,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           res.writeHead(200, { "Content-Type": photo.contentType });
           return res.end(photo.bytes);
         }
+        if (url.pathname === "/api/onboarding")
+          return json(res, 200, await exclusive(async () => onboardingStatus(ws)));
         if (url.pathname === "/api/drive") return json(res, 200, driveStatus(ws));
         if (url.pathname === "/api/state") return json(res, 200, { ...readWorkbench(ws), watchError });
         if (url.pathname === "/api/history") return json(res, 200, await exclusive(() => history(ws)));

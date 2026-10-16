@@ -15,6 +15,7 @@ import {
   listProjects,
   listTasks,
   logProject,
+  onboardingStatus,
   projectGithub,
   proposeBlock,
   publicProject,
@@ -24,6 +25,7 @@ import {
   readNews,
   readRecords,
   readStatus,
+  recordOnboardingAiConnection,
   recordReferences,
   removeMemory,
   resolvePlace,
@@ -54,6 +56,9 @@ export function writeQueue() {
 
 export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = writeQueue()) {
   const server = new McpServer({ name: "kaitu", version: "0.0.0" });
+  server.server.oninitialized = () => {
+    recordOnboardingAiConnection(ws, server.server.getClientVersion()?.name ?? "MCP");
+  };
   const actor = () => {
     const name = (server.server.getClientVersion()?.name ?? "unknown")
       .replace(/[\p{Cc}\p{Cf}]/gu, "")
@@ -105,6 +110,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     source: z.string().optional(),
     sensitive: z.boolean().optional(),
   };
+  register("onboarding_status", "读取四步引导内容、已选事情和实时开始清单。", {}, () => onboardingStatus(ws));
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), tools === "remote"),
   );

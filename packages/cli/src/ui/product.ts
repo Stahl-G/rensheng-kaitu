@@ -4,12 +4,20 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
+  type ImportSource,
   KaituError,
+  type OnboardingAi,
+  type OnboardingChoices,
+  type OnboardingSetupInput,
   type Workspace,
+  cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
   configureAutomation,
+  confirmOnboardingImport,
+  confirmOnboardingMemory,
+  confirmOnboardingSetup,
   decideProposal,
   discardFinanceImport,
   dismissNews,
@@ -21,8 +29,12 @@ import {
   hideExperience,
   lifeMap,
   listProjects,
+  onboardingStatus,
   previewExperienceBatch,
   previewFinanceImport,
+  previewOnboardingImport,
+  previewOnboardingMemory,
+  previewOnboardingSetup,
   readAutomation,
   readAvatar,
   readDoing,
@@ -35,10 +47,12 @@ import {
   readNews,
   readOverviewPage,
   readPhoto,
+  recordOnboardingAiConnection,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
   saveAvatar,
+  saveOnboardingChoices,
   setExperienceSource,
   stageFinanceUpload,
   tryNews,
@@ -50,6 +64,10 @@ import type { AskService } from "./ask.js";
 
 export const productMutations = new Set([
   "configureAutomation",
+  "onboardingChoose",
+  "onboardingSetupConfirm",
+  "onboardingMemoryConfirm",
+  "onboardingImportConfirm",
   "setExperienceSource",
   "changeExperienceBatch",
   "recoverExperienceImports",
@@ -84,10 +102,16 @@ export async function productRequest(
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
     switch (method) {
-      case "askSettings":
-        return ask.settings();
-      case "askConfigure":
-        return ask.configure((args[0] ?? {}) as Record<string, unknown>);
+      case "askSettings": {
+        const settings = await ask.settings();
+        if (settings.configured) recordOnboardingAiConnection(ws, "问问");
+        return settings;
+      }
+      case "askConfigure": {
+        const result = await ask.configure((args[0] ?? {}) as Record<string, unknown>);
+        if ((await ask.settings()).configured) recordOnboardingAiConnection(ws, "问问");
+        return result;
+      }
       case "askList":
         return ask.list();
       case "askCreate":
@@ -99,6 +123,31 @@ export async function productRequest(
     }
   }
   switch (method) {
+    case "onboarding":
+      return onboardingStatus(ws);
+    case "onboardingMemoryPreview":
+      return previewOnboardingMemory(ws, text(0), text(1) as OnboardingAi);
+    case "onboardingMemoryConfirm":
+      return confirmOnboardingMemory(ws, text(0), args[1] as string[]);
+    case "onboardingCancel":
+      return cancelOnboardingPreview(ws, text(0));
+    case "onboardingSetupPreview":
+      return previewOnboardingSetup(ws, args[0] as OnboardingSetupInput);
+    case "onboardingSetupConfirm":
+      return confirmOnboardingSetup(ws, text(0));
+    case "onboardingChoose":
+      return saveOnboardingChoices(ws, args[0] as OnboardingChoices);
+    case "onboardingImportPreview": {
+      const base64 = text(2);
+      if (
+        base64.length > 48 * 1024 * 1024 ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
+      )
+        throw new KaituError("文件过大或格式不合法", "BAD_ARGS");
+      return previewOnboardingImport(ws, text(0) as ImportSource, text(1), Buffer.from(base64, "base64"));
+    }
+    case "onboardingImportConfirm":
+      return confirmOnboardingImport(ws, text(0));
     case "automation":
       return readAutomation(ws);
     case "configureAutomation":

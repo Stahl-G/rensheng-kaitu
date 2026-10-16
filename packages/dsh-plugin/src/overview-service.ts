@@ -4,11 +4,27 @@ import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import {
   type AutomationKey,
   type AutomationSettings,
+  type ImportSource,
   KaituError,
+  type OnboardingAi,
+  type OnboardingChoiceResult,
+  type OnboardingChoices,
+  type OnboardingImportPreview,
+  type OnboardingImportResult,
+  type OnboardingMemoryPreview,
+  type OnboardingMemoryResult,
+  type OnboardingSetupInput,
+  type OnboardingSetupPreview,
+  type OnboardingSetupResult,
+  type OnboardingStatus,
   Workspace,
+  cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
   configureAutomation,
+  confirmOnboardingImport,
+  confirmOnboardingMemory,
+  confirmOnboardingSetup,
   decideProposal,
   defaultRoot,
   dismissNews,
@@ -16,7 +32,11 @@ import {
   hideExperience,
   lifeMap,
   listProjects,
+  onboardingStatus,
   previewExperienceBatch,
+  previewOnboardingImport,
+  previewOnboardingMemory,
+  previewOnboardingSetup,
   readAutomation,
   readAvatar,
   readDoing,
@@ -32,6 +52,7 @@ import {
   removeAvatar,
   resolveExperience,
   saveAvatar,
+  saveOnboardingChoices,
   setExperienceSource,
   tryNews,
   unhideExperience,
@@ -93,6 +114,63 @@ export class KaituOverviewService extends TypertRemoteService {
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
+  }
+
+  @Remote("onboarding")
+  async onboarding(): Promise<OnboardingStatus> {
+    return this.write(async () => onboardingStatus(this.workspace));
+  }
+
+  @Remote("onboardingMemoryPreview")
+  async onboardingMemoryPreview(text: string, ai: OnboardingAi): Promise<OnboardingMemoryPreview> {
+    return this.write(async () => previewOnboardingMemory(this.workspace, text, ai));
+  }
+
+  @Remote("onboardingMemoryConfirm")
+  async onboardingMemoryConfirm(token: string, selected: string[]): Promise<OnboardingMemoryResult> {
+    return this.write(() => confirmOnboardingMemory(this.workspace, token, selected));
+  }
+
+  @Remote("onboardingCancel")
+  async onboardingCancel(token: string): Promise<void> {
+    await this.write(async () => cancelOnboardingPreview(this.workspace, token));
+  }
+
+  @Remote("onboardingSetupPreview")
+  async onboardingSetupPreview(input: OnboardingSetupInput): Promise<OnboardingSetupPreview> {
+    return this.write(async () => previewOnboardingSetup(this.workspace, input));
+  }
+
+  @Remote("onboardingSetupConfirm")
+  async onboardingSetupConfirm(token: string): Promise<OnboardingSetupResult> {
+    return this.write(() => confirmOnboardingSetup(this.workspace, token));
+  }
+
+  @Remote("onboardingChoose")
+  async onboardingChoose(choices: OnboardingChoices): Promise<OnboardingChoiceResult> {
+    return this.write(() => saveOnboardingChoices(this.workspace, choices));
+  }
+
+  @Remote("onboardingImportPreview")
+  async onboardingImportPreview(
+    source: ImportSource,
+    name: string,
+    base64: string,
+  ): Promise<OnboardingImportPreview> {
+    if (
+      typeof base64 !== "string" ||
+      base64.length > 48 * 1024 * 1024 ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
+    )
+      throw new KaituError("文件过大或格式不合法", "BAD_ARGS");
+    return this.write(() =>
+      previewOnboardingImport(this.workspace, source, name, Buffer.from(base64, "base64")),
+    );
+  }
+
+  @Remote("onboardingImportConfirm")
+  async onboardingImportConfirm(token: string): Promise<OnboardingImportResult> {
+    return this.write(() => confirmOnboardingImport(this.workspace, token));
   }
 
   /** Desktop passes its installed release version to the running Host (apps/desktop/src/main.ts). */
