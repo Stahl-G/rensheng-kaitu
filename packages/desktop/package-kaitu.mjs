@@ -439,7 +439,13 @@ async function writePayload(payload) {
     },
     external: ["better-sqlite3"],
   });
-  for (const file of ["sdk-host.mjs", "sdk-filesystem.mjs", "sdk-credentials.mjs", "sdk-rpc.mjs"])
+  for (const file of [
+    "sdk-host.mjs",
+    "sdk-filesystem.mjs",
+    "sdk-credentials.mjs",
+    "sdk-providers.mjs",
+    "sdk-rpc.mjs",
+  ])
     cpSync(join(directory, file), join(payload, "dist", file));
   cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
   const clientPath = join(root, "packages/dsh-plugin/dist/client.js");

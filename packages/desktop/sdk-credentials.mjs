@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { validateConnection } from "./sdk-providers.mjs";
 
 const load = (name) => import(pathToFileURL(join(process.env.KAITU_DSH_MODULES, name, "lib/index.js")).href);
 try {
@@ -9,11 +10,14 @@ try {
   ]);
   const ctx = new Context();
   const provider = new LocalCredentialProvider(ctx, { dshHome: process.env.DSH_HOME, watch: false });
+  let raw = "";
+  for await (const chunk of process.stdin) raw += chunk;
+  const input = raw ? JSON.parse(raw) : {};
+  raw = "";
+  const ref = input.ref ?? "DEEPSEEK_API_KEY";
+  if (!/^(?:DEEPSEEK_API_KEY|KAITU_[A-Z_]+_API_KEY)$/.test(ref)) throw new Error();
   if (process.argv[2] === "save") {
-    let input = "";
-    for await (const chunk of process.stdin) input += chunk;
-    await provider.set("DEEPSEEK_API_KEY", JSON.parse(input).apiKey);
-    input = "";
+    await provider.set(ref, input.apiKey);
     process.stdout.write('{"configured":true}');
   } else {
     // Initialize through Cordis so the provider reads its managed store.
@@ -21,8 +25,16 @@ try {
     const init = provider[Service.init]();
     await init.next();
     await init.next();
-    const info = await provider.describe("DEEPSEEK_API_KEY");
-    process.stdout.write(JSON.stringify({ configured: info.configured }));
+    if (process.argv[2] === "validate") {
+      const apiKey = input.apiKey ?? (await provider.resolve(ref))?.value;
+      const result = apiKey
+        ? await validateConnection(input.settings, apiKey)
+        : { code: "AI_KEY", message: "请先填入这个 AI 服务的 API Key" };
+      process.stdout.write(JSON.stringify(result));
+    } else {
+      const info = await provider.describe(ref);
+      process.stdout.write(JSON.stringify({ configured: info.configured }));
+    }
     await init.return();
   }
   await ctx.fiber.dispose();

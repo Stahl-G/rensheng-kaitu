@@ -158,7 +158,7 @@ export async function productRequest(
       case "askEvents":
         return ask.events(text(0));
       case "askSend":
-        return ask.send(text(0), text(1));
+        return ask.send(text(0), text(1), args[2] as import("./ask.js").AskImage[] | undefined);
     }
   }
   switch (method) {

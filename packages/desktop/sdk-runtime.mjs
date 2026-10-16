@@ -3,6 +3,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { KaituError } from "../core/dist/index.js";
+import { connectionInfo, credentialRef, providerPatch, selection } from "./sdk-providers.mjs";
+
 export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
   if (mode === "full")
     return [
@@ -79,10 +82,14 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
   };
   // A desktop launch must not inherit a developer shell's model credential.
   for (const key of Object.keys(env)) if (/(?:API_KEY|AUTH_TOKEN)$/.test(key)) delete env[key];
-  const loadSettings = () =>
+  const readSettings = () =>
     existsSync(settingsFile)
       ? JSON.parse(readFileSync(settingsFile, "utf8"))
       : { choice: undefined, provider: "deepseek-official", model: "deepseek-flash" };
+  const loadSettings = () => {
+    const stored = readSettings();
+    return { choice: stored.choice, ...selection(stored) };
+  };
   const credential = (operation, input) =>
     new Promise((resolve, reject) => {
       const child = spawn(executable, [helper, operation], { env, stdio: ["pipe", "pipe", "ignore"] });
@@ -90,14 +97,14 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       child.stdout.on("data", (chunk) => {
         output += chunk;
       });
-      child.once("error", () => reject(new Error("无法访问 AI 凭据存储")));
+      child.once("error", () => reject(new KaituError("无法访问 AI 凭据存储", "AI_CREDENTIALS")));
       child.once("exit", (code) => {
-        if (code !== 0) reject(new Error("无法访问 AI 凭据存储"));
+        if (code !== 0) reject(new KaituError("无法访问 AI 凭据存储", "AI_CREDENTIALS"));
         else {
           try {
             resolve(JSON.parse(output));
           } catch {
-            reject(new Error("无法访问 AI 凭据存储"));
+            reject(new KaituError("无法访问 AI 凭据存储", "AI_CREDENTIALS"));
           }
         }
       });
@@ -107,33 +114,59 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
   return {
     async settings() {
       const settings = loadSettings();
-      const info = await credential("status");
-      return { ...settings, configured: settings.choice !== "external" && info.configured };
+      const info = await credential("status", { ref: credentialRef(settings.provider) });
+      return connectionInfo({ ...settings, configured: settings.choice !== "external" && info.configured });
     },
     async configure(input) {
-      if (input.choice !== "builtin" && input.choice !== "external") throw new Error("请选择 AI 连接方式");
-      if (input.choice === "builtin" && input.apiKey !== undefined) {
-        if (typeof input.apiKey !== "string" || !input.apiKey.trim() || input.apiKey.length > 4096)
-          throw new Error("请输入有效 API Key");
-        await credential("save", { apiKey: input.apiKey.trim() });
+      if (input.choice !== "builtin" && input.choice !== "external")
+        throw new KaituError("请选择 AI 连接方式", "AI_CONFIG");
+      let settings;
+      try {
+        settings = { choice: input.choice, ...selection(input, loadSettings()) };
+      } catch (error) {
+        throw new KaituError(error.message, "AI_CONFIG");
       }
-      const settings = { choice: input.choice, provider: "deepseek-official", model: "deepseek-flash" };
-      if (settings.choice === "builtin" && !(await credential("status")).configured)
-        throw new Error("请先填入 API Key");
+      if (input.choice === "builtin") {
+        if (
+          input.apiKey !== undefined &&
+          (typeof input.apiKey !== "string" || !input.apiKey.trim() || input.apiKey.length > 4096)
+        )
+          throw new KaituError("请输入有效 API Key", "AI_KEY");
+        if (
+          settings.provider === "kaitu-custom" &&
+          settings.baseURL !== loadSettings().baseURL &&
+          !input.apiKey
+        )
+          throw new KaituError("更换 Base URL 后请填入该服务的 API Key", "AI_KEY");
+        const ref = credentialRef(settings.provider);
+        const result = await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
+        if (!result.configured) throw new KaituError(result.message, result.code);
+        if (input.apiKey) await credential("save", { ref, apiKey: input.apiKey.trim() });
+      }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
-      return { ...settings, configured: settings.choice === "builtin" };
+      return connectionInfo({ ...settings, configured: settings.choice === "builtin" });
     },
     async runtime(mode = "scoped") {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       const settings = loadSettings();
-      if (settings.choice === "external" || !(await credential("status")).configured)
-        throw new Error("请先连接内置 AI");
+      if (
+        settings.choice === "external" ||
+        !(await credential("status", { ref: credentialRef(settings.provider) })).configured
+      )
+        throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
       const profile = join(home, `kaitu-sdk-${mode}.patch.json`);
       mkdirSync(home, { recursive: true, mode: 0o700 });
-      writeFileSync(profile, JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode })), {
-        mode: 0o600,
-      });
+      writeFileSync(
+        profile,
+        JSON.stringify([
+          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }),
+          ...providerPatch(settings),
+        ]),
+        {
+          mode: 0o600,
+        },
+      );
       const { JsonRpcLineTransport } = await import(
         pathToFileURL(join(modules, "@deepseek-ai/dsh-sdk-protocol/lib/index.js")).href
       );
@@ -225,7 +258,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
         );
       } catch {
         await close();
-        throw new Error("内置 AI 未能初始化");
+        throw new KaituError("内置 AI 未能初始化，请检查连接设置后重试", "AI_CONNECTION");
       }
       return {
         request(method, params) {

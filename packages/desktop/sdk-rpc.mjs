@@ -8,12 +8,14 @@ const [
   { createUserMessage },
   { setSandboxMode },
   { setApprovalPolicy },
+  { admitEncodedImages },
 ] = await Promise.all([
   load("@deepseek-ai/dsh-sdk-protocol"),
   load("@deepseek-ai/dsh-sdk-jsonrpc-server"),
   load("@deepseek-ai/dsh-llm"),
   load("@deepseek-ai/dsh-sandbox-policy"),
   load("@deepseek-ai/dsh-user-approval"),
+  load("@deepseek-ai/dsh-attachment"),
 ]);
 export const name = "kaitu-sdk-rpc";
 export const inject = ["sdkAppStartup", "loader", "agents", "sessionPersistence", "kaitu", "fs"];
@@ -65,10 +67,29 @@ export function apply(ctx) {
       }
       if (
         !Array.isArray(params.contentBlocks) ||
-        params.contentBlocks.some((block) => block.type !== "text" || typeof block.text !== "string")
+        params.contentBlocks.some(
+          (block) =>
+            !(block.type === "text" && typeof block.text === "string") &&
+            !(
+              block.type === "image" &&
+              typeof block.data === "string" &&
+              ["image/png", "image/jpeg", "image/webp", "image/gif"].includes(block.mimeType)
+            ),
+        )
       )
-        throw new Error("请输入文字消息");
-      const message = createUserMessage({ content: params.contentBlocks, source: { kind: "user" } });
+        throw new Error("消息内容无效");
+      const images = params.contentBlocks.filter((block) => block.type === "image");
+      const refs = images.length
+        ? await admitEncodedImages(
+            ctx.get("attachments"),
+            images.map((image) => ({ data: image.data, mediaType: image.mimeType })),
+          )
+        : [];
+      let next = 0;
+      const content = params.contentBlocks.map((block) =>
+        block.type === "image" ? { type: "image", attachment: refs[next++] } : block,
+      );
+      const message = createUserMessage({ content, source: { kind: "user" } });
       handle.agent.followup(message);
       return { messageId: message.id };
     }
