@@ -561,7 +561,13 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
       const status =
         code === "CONFLICT" ? 409 : code === "TOO_LARGE" ? 413 : code === "NOT_FOUND" ? 404 : 400;
       json(res, status, {
-        error: error instanceof KaituError ? error.message : "请求未完成，请检查文件格式后重试",
+        ...(req.url?.startsWith("/api/product/ask") ? { code } : {}),
+        error:
+          error instanceof KaituError
+            ? error.message
+            : req.url?.startsWith("/api/product/ask")
+              ? "AI 连接未完成，请检查连接设置后重试"
+              : "请求未完成，请检查文件格式后重试",
       });
     }
   });

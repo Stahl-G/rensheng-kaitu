@@ -1214,7 +1214,8 @@
   color: var(--ink2);
   min-width: 0;
 }
-.sub-form input {
+.sub-form input,
+.sub-form select {
   height: 40px;
   padding: 0 12px;
   border-radius: 9px;

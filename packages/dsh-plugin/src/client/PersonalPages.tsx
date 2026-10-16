@@ -30,6 +30,8 @@ export function PersonalPages(
     },
 ) {
   const [data, setData] = useState<SettingsData | null>(null);
+  const [searchProvider, setSearchProvider] = useState("deepseek");
+  const [searchKey, setSearchKey] = useState("");
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -72,6 +74,28 @@ export function PersonalPages(
       const automation = await props.configureAutomation(tasks, times);
       setData((current) => (current ? { ...current, automation } : current));
     });
+  const search = data?.ai?.search;
+  const selectedSearch = search?.providers.find((item) => item.id === searchProvider);
+  const saveSearch = (remove = false) =>
+    run(
+      async () => {
+        const response = await fetch("/api/product/askSearchConfigure", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
+          body: JSON.stringify([
+            {
+              provider: searchProvider,
+              ...(remove ? { remove: true } : searchKey ? { apiKey: searchKey } : {}),
+            },
+          ]),
+        });
+        const value = await response.json();
+        if (!response.ok) throw new Error(value.error ?? "搜索设置未保存，请重试");
+        setSearchKey("");
+        window.dispatchEvent(new Event("kaitu-ai-changed"));
+      },
+      remove ? "已移除 Key，下一次搜索生效" : "搜索设置已保存，下一次搜索生效",
+    );
   const title = props.view === "profile" ? "个人档案" : props.view === "connections" ? "AI 与连接" : "设置";
   return (
     <div className={css.me}>
@@ -112,12 +136,16 @@ export function PersonalPages(
           <>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>「问问」用的 AI</h2>
+              <p className={css.small}>
+                填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）
+              </p>
+              <p className={css.small}>更换服务或模型后，下一条消息生效。</p>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css.conn}>
                   <span className={css.logo} style={{ background: "var(--explore)" }}>
                     AI
                   </span>
-                  <b>{data.ai?.model ?? "由 DSH 管理"}</b>
+                  <b>{data.ai ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}` : "由 DSH 管理"}</b>
                   <span className={css.small}>
                     {data.ai
                       ? data.ai.configured
@@ -131,6 +159,81 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
+            {search && (
+              <section className={css.sec}>
+                <h2 className={css.eyebrow}>网络搜索</h2>
+                <div className={`${css.card} ${css.sum} ${css["sub-form"]}`}>
+                  <b>{search.configured ? `当前使用 ${search.name}` : "还没有网络搜索 Key"}</b>
+                  <p className={css.small}>
+                    有 DeepSeek Key 时优先使用，否则使用已添加的 Perplexity 或 Exa，与对话模型无关。
+                  </p>
+                  {!search.configured && (
+                    <p className={css.small}>
+                      在这里添加一个搜索服务的 Key，就能搜索；不加 Key 也能打开公开网页。
+                    </p>
+                  )}
+                  <label className={css.small} htmlFor="search-provider">
+                    搜索服务
+                  </label>
+                  <select
+                    id="search-provider"
+                    value={searchProvider}
+                    disabled={busy}
+                    onChange={(event) => {
+                      setSearchProvider(event.target.value);
+                      setSearchKey("");
+                    }}
+                  >
+                    {search.providers.map((item) => (
+                      <option value={item.id} key={item.id}>
+                        {item.name}
+                        {item.configured ? " · 已保存 Key" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <label className={css.small} htmlFor="search-api-key">
+                    搜索 API Key
+                  </label>
+                  <input
+                    id="search-api-key"
+                    type="password"
+                    autoComplete="off"
+                    value={searchKey}
+                    disabled={busy}
+                    placeholder={selectedSearch?.configured ? "留空保留已存 Key" : "粘贴这个搜索服务的 Key"}
+                    onChange={(event) => setSearchKey(event.target.value)}
+                  />
+                  {selectedSearch && (
+                    <a className={css.link} href={selectedSearch.keyUrl} target="_blank" rel="noreferrer">
+                      去 {selectedSearch.name} 官方申请 Key ↗
+                    </a>
+                  )}
+                  {searchProvider === "deepseek" && (
+                    <p className={css.small}>DeepSeek 的 Key 与 DeepSeek 模型连接共用。</p>
+                  )}
+                  <div className={css["dialog-foot"]}>
+                    {selectedSearch?.configured && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-quiet"]}`}
+                        disabled={busy}
+                        onClick={() => void saveSearch(true)}
+                      >
+                        移除{searchProvider === "deepseek" ? "共用 " : " "}Key
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css["btn-primary"]}`}
+                      disabled={busy}
+                      onClick={() => void saveSearch()}
+                    >
+                      保存搜索设置
+                    </button>
+                  </div>
+                </div>
+              </section>
+            )}
             <section className={css.sec}>
               <div className={css["sec-head"]}>
                 <h2 className={css.eyebrow}>这台电脑上的 AI</h2>

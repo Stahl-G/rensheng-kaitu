@@ -9,6 +9,14 @@ import { localRecordIds } from "./private-records.js";
 import { publicProject } from "./projects.js";
 import type { Workspace } from "./workspace.js";
 
+export interface NetworkSearchSettings {
+  provider: string | null;
+  name: string | null;
+  configured: boolean;
+  preferred: string;
+  providers: { id: string; name: string; configured: boolean; keyUrl: string }[];
+}
+
 export async function readSettings(ws: Workspace) {
   return {
     automation: readAutomation(ws),
@@ -17,7 +25,12 @@ export async function readSettings(ws: Workspace) {
     version: process.env.KAITU_APP_VERSION ?? null,
     dshVersion: process.env.DSH_CLIENT_VERSION ?? null,
     timeZone: ws.timeZone(),
-    ai: null as { configured: boolean; model: string } | null,
+    ai: null as {
+      configured: boolean;
+      model: string;
+      providerName?: string;
+      search?: NetworkSearchSettings;
+    } | null,
   };
 }
 export type SettingsData = Awaited<ReturnType<typeof readSettings>>;

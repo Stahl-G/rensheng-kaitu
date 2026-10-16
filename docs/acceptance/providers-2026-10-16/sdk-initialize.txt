@@ -1,0 +1,9 @@
+deepseek-official initialize OK
+openai initialize OK
+anthropic initialize OK
+google initialize OK
+openrouter initialize OK
+moonshotai-cn initialize OK
+kaitu-zhipu initialize OK
+kaitu-qwen initialize OK
+kaitu-custom initialize OK

@@ -1,0 +1,9 @@
+{
+  "surface": "kaitu ui, synthetic workspace; ask/settings forwarded to local SDK API",
+  "savedAndRemoved": ["Exa", "DeepSeek", "Perplexity"],
+  "deepseekPriority": true,
+  "chatNotAutoConnected": true,
+  "keyAbsentFromSettingsResponsesAndConfig": true,
+  "mobileOverflow": false,
+  "pageErrors": []
+}

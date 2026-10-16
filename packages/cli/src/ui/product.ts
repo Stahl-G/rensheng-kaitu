@@ -139,6 +139,8 @@ export async function productRequest(
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
     switch (method) {
+      case "askSearchConfigure":
+        return ask.configure({ search: args[0] });
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {
@@ -158,7 +160,7 @@ export async function productRequest(
       case "askEvents":
         return ask.events(text(0));
       case "askSend":
-        return ask.send(text(0), text(1));
+        return ask.send(text(0), text(1), args[2] as import("./ask.js").AskImage[] | undefined);
     }
   }
   switch (method) {

@@ -16,10 +16,27 @@ interface ChatEvent {
   type: string;
   data: Record<string, unknown>;
 }
+interface Provider {
+  id: string;
+  name: string;
+  recommended?: boolean;
+  keyUrl?: string;
+  models: { id: string; image: boolean }[];
+}
+interface ImageInput {
+  data: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  name: string;
+}
 interface Settings {
   configured: boolean;
   choice?: "builtin" | "external";
   model: string;
+  provider: string;
+  providerName: string;
+  baseURL?: string;
+  supportsImages: boolean;
+  providers: Provider[];
 }
 interface Automation {
   asked: boolean;
@@ -120,7 +137,14 @@ export function AskPage({
   initialPrompt = "",
   configureRequest = 0,
   configureBuiltin = false,
-}: { workspace: string; initialPrompt?: string; configureRequest?: number; configureBuiltin?: boolean }) {
+  onConnections,
+}: {
+  workspace: string;
+  initialPrompt?: string;
+  configureRequest?: number;
+  configureBuiltin?: boolean;
+  onConnections?: () => void;
+}) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<ChatEvent[]>([]);
@@ -148,6 +172,13 @@ export function AskPage({
 
   const [choice, setChoice] = useState<"builtin" | "external">("external");
   const [key, setKey] = useState("");
+  const [provider, setProvider] = useState("deepseek-official");
+  const [model, setModel] = useState("deepseek-flash");
+  const [baseURL, setBaseURL] = useState("");
+  const [image, setImage] = useState<ImageInput | null>(null);
+  const upload = useRef<HTMLInputElement>(null);
+  const selectedProvider = settings?.providers.find((item) => item.id === provider);
+  const custom = provider === "kaitu-custom";
   const [automation, setAutomation] = useState({ morning: true, organizer: true, news: false });
   const [asked, setAsked] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -178,6 +209,9 @@ export function AskPage({
       .then(([ai, auto, list]) => {
         if (!active) return;
         setSettings(ai);
+        setProvider(ai.provider);
+        setModel(ai.model);
+        setBaseURL(ai.baseURL ?? "");
         if (!configurationRequested.current) setChoice(ai.choice ?? "external");
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
@@ -194,6 +228,14 @@ export function AskPage({
     return () => {
       active = false;
     };
+  }, []);
+  useEffect(() => {
+    const refresh = () =>
+      void call<Settings>("askSettings")
+        .then(setSettings)
+        .catch((err) => setError(err.message));
+    window.addEventListener("kaitu-ai-changed", refresh);
+    return () => window.removeEventListener("kaitu-ai-changed", refresh);
   }, []);
   useEffect(() => {
     if (step) dialog.current?.showModal();
@@ -225,7 +267,7 @@ export function AskPage({
     if (nearBottom.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   });
   const send = async () => {
-    const value = draft.trim();
+    const value = draft.trim() || (image ? "请看看这张图片" : "");
     if (!value || busy || !settings?.configured) return;
     setError("");
     setSending(true);
@@ -238,8 +280,11 @@ export function AskPage({
         selectThread(id);
         await refreshThreads();
       }
-      await call("askSend", id, value);
-      if (activeSession.current === id) setDraft("");
+      await call("askSend", id, value, image ? [{ data: image.data, mimeType: image.mimeType }] : []);
+      if (activeSession.current === id) {
+        setDraft("");
+        setImage(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -272,10 +317,18 @@ export function AskPage({
     try {
       const ai = await call<Settings>("askConfigure", {
         choice,
-        ...(choice === "builtin" && key ? { apiKey: key } : {}),
+        ...(choice === "builtin"
+          ? {
+              provider,
+              model,
+              ...(custom ? { baseURL } : {}),
+              ...(key ? { apiKey: key } : {}),
+            }
+          : {}),
       });
       setKey("");
       setSettings(ai);
+      if (!ai.supportsImages) setImage(null);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
     } catch (err) {
@@ -309,6 +362,7 @@ export function AskPage({
           onClick={() => {
             selectThread(null);
             setDraft("");
+            setImage(null);
             setError("");
           }}
         >
@@ -340,6 +394,7 @@ export function AskPage({
             onClick={() => {
               selectThread(null);
               setDraft("");
+              setImage(null);
             }}
           >
             ＋ 新对话
@@ -383,6 +438,9 @@ export function AskPage({
               return (
                 <div key={event.id} className={css.user}>
                   {text(data.content)}
+                  {Array.isArray(data.content) && data.content.some((block) => block.type === "image") && (
+                    <span> · 已附图片</span>
+                  )}
                 </div>
               );
             if (event.type === "assistant/message" && text(message?.content))
@@ -438,6 +496,13 @@ export function AskPage({
             </button>
           </div>
         )}
+        {settings?.configured && !settings.supportsImages && (
+          <p id="ask-image-hint" className={css.scope}>
+            {settings.provider === "kaitu-custom"
+              ? "自定义模型尚未确认图片能力，当前仅支持文字。"
+              : "当前模型仅支持文字，可在 AI 与连接中切换图片模型。"}
+          </p>
+        )}
         <form
           className={css.composer}
           onSubmit={(event) => {
@@ -476,7 +541,65 @@ export function AskPage({
               }
             }}
           />
+          {image && (
+            <div className={css.attachment}>
+              <img src={`data:${image.mimeType};base64,${image.data}`} alt={image.name} />
+              <span>{image.name}</span>
+              <button type="button" onClick={() => setImage(null)} aria-label="移除图片">
+                ×
+              </button>
+            </div>
+          )}
           <div className={css.composerRow}>
+            <input
+              ref={upload}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = "";
+                if (!file) return;
+                if (
+                  file.size > 2 * 1024 * 1024 ||
+                  !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)
+                ) {
+                  setError("请选择一张不超过 2MB 的 JPG、PNG、WebP 或 GIF 图片");
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = () =>
+                  setImage({
+                    data: String(reader.result).split(",")[1] ?? "",
+                    mimeType: file.type as ImageInput["mimeType"],
+                    name: file.name,
+                  });
+                reader.onerror = () => setError("图片读取失败，请重新选择");
+                reader.readAsDataURL(file);
+              }}
+            />
+            <span
+              title={
+                !settings?.configured
+                  ? "请先连接 AI"
+                  : !settings.supportsImages
+                    ? "当前模型不支持图片，请在 AI 与连接中切换模型"
+                    : "上传一张图片（最多 2MB）"
+              }
+            >
+              <button
+                type="button"
+                className={css.model}
+                aria-label="上传图片"
+                aria-describedby={
+                  settings?.configured && !settings.supportsImages ? "ask-image-hint" : undefined
+                }
+                disabled={busy || !settings?.configured || !settings.supportsImages}
+                onClick={() => upload.current?.click()}
+              >
+                ＋ 图片
+              </button>
+            </span>
             <span className={v2["mode-wrap"]}>
               <button
                 type="button"
@@ -529,7 +652,7 @@ export function AskPage({
                         onClick={() => void changeMode("scoped")}
                       >
                         <b>只读写开图资料</b>
-                        <span>默认。只能读写你的开图资料，不能运行命令、不能上网。</span>
+                        <span>只读写开图资料，可以搜索和打开网页；不能运行命令</span>
                       </button>
                       <button
                         type="button"
@@ -547,18 +670,20 @@ export function AskPage({
                 </dialog>
               )}
             </span>
-            <button type="button" className={css.model} disabled={busy} onClick={() => setStep(1)}>
-              {settings?.configured
-                ? settings.model === "deepseek-flash"
-                  ? "DeepSeek Flash"
-                  : settings.model
-                : "连接 AI"}
+            <button
+              type="button"
+              className={css.model}
+              disabled={busy}
+              title="在设置 → AI 与连接中切换，下一条消息生效"
+              onClick={() => (settings?.configured && onConnections ? onConnections() : setStep(1))}
+            >
+              {settings?.configured ? `${settings.providerName} · ${settings.model}` : "连接 AI"}
             </button>
             <button
               type="submit"
               className={css.send}
               aria-label="发送"
-              disabled={busy || !draft.trim() || !settings?.configured}
+              disabled={busy || (!draft.trim() && !image) || !settings?.configured}
             >
               ↑
             </button>
@@ -586,6 +711,7 @@ export function AskPage({
               type="button"
               className={css.choice}
               aria-pressed={choice === "external"}
+              disabled={saving}
               onClick={() => setChoice("external")}
             >
               <b>用你已经在用的 AI</b>
@@ -595,22 +721,91 @@ export function AskPage({
               type="button"
               className={css.choice}
               aria-pressed={choice === "builtin"}
+              disabled={saving}
               onClick={() => setChoice("builtin")}
             >
               <b>用开图里的 AI</b>
-              <span>直接在开图里聊天，使用 DeepSeek API Key</span>
+              <span>填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）</span>
             </button>
             {choice === "builtin" ? (
-              <label className={css.key}>
-                DeepSeek API Key
-                <input
-                  type="password"
-                  autoComplete="off"
-                  value={key}
-                  placeholder={settings?.configured ? "已连接，留空保留" : "粘贴你的 API Key"}
-                  onChange={(event) => setKey(event.target.value)}
-                />
-              </label>
+              <fieldset className={css.fields} disabled={saving}>
+                <label className={css.key}>
+                  AI 服务
+                  <select
+                    value={provider}
+                    onChange={(event) => {
+                      const id = event.target.value;
+                      const next = settings?.providers.find((item) => item.id === id);
+                      setProvider(id);
+                      setModel(next?.models[0]?.id ?? "");
+                      setKey("");
+                      setError("");
+                    }}
+                  >
+                    {settings?.providers.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                        {item.recommended ? "（推荐）" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {custom && (
+                  <label className={css.key}>
+                    Base URL
+                    <input
+                      type="url"
+                      value={baseURL}
+                      placeholder="https://api.example.com/v1"
+                      onChange={(event) => setBaseURL(event.target.value)}
+                    />
+                  </label>
+                )}
+                <label className={css.key} htmlFor="ask-model">
+                  {custom ? "模型 ID" : "模型"}
+                  {custom ? (
+                    <input
+                      id="ask-model"
+                      value={model}
+                      placeholder="服务提供的模型 ID"
+                      onChange={(event) => setModel(event.target.value)}
+                    />
+                  ) : (
+                    <select id="ask-model" value={model} onChange={(event) => setModel(event.target.value)}>
+                      {selectedProvider?.models.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.id}
+                          {item.image ? " · 支持图片" : " · 仅文字"}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </label>
+                <label className={css.key}>
+                  API Key
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={key}
+                    placeholder={
+                      settings?.configured && settings.provider === provider
+                        ? "已连接，留空保留"
+                        : "粘贴这个 AI 服务的 API Key"
+                    }
+                    onChange={(event) => setKey(event.target.value)}
+                  />
+                </label>
+                {selectedProvider?.keyUrl ? (
+                  <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
+                    去 {selectedProvider.name} 官方申请 API Key ↗
+                  </a>
+                ) : (
+                  <p>
+                    请从你的 OpenAI 兼容服务获取 Base URL、模型 ID 和 API Key。自定义模型当前按仅文字连接。
+                  </p>
+                )}
+                <p>下一步会发送一次最小请求验证连接。切换后下一条消息生效。</p>
+              </fieldset>
             ) : (
               <div className={css.external}>
                 <p>
