@@ -14,6 +14,7 @@
   "dependencies": {
     "@kaitu/core": "workspace:*",
     "@larksuiteoapi/node-sdk": "^1.75.0",
+    "@slack/web-api": "^8.2.0",
     "@tencent-connect/qqbot-nodejs": "^1.0.5",
     "grammy": "^1.46.0",
     "imapflow": "2.2.10",

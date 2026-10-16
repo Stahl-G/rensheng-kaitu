@@ -14,6 +14,7 @@
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
+| @slack/web-api | MIT | https://github.com/slackapi/node-slack-sdk |
 | imapflow | MIT | https://github.com/postalsys/imapflow |
 | mailauth | MIT | https://github.com/postalsys/mailauth |
 | mailparser | MIT | https://github.com/nodemailer/mailparser |
