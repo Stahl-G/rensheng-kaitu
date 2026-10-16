@@ -69,10 +69,10 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
     </section>
   );
 }
-export function CalendarPage(props: CalendarPageProps) {
+export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolean }) {
   const [data, setData] = useState<CalendarData | null>(null);
   const [selected, setSelected] = useState<CalendarEntry | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(props.initialAdding ?? false);
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);

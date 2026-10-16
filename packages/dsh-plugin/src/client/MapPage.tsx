@@ -4,13 +4,7 @@ import {
   experienceOverlaps,
   experienceYears,
 } from "@kaitu/core/experience-time";
-import {
-  type GeoJSONSource,
-  Map as LibreMap,
-  LngLatBounds,
-  NavigationControl,
-  setWorkerUrl,
-} from "maplibre-gl";
+import { type GeoJSONSource, Map as LibreMap, LngLatBounds, setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -204,21 +198,19 @@ function CityMap({
   cities,
   selected,
   onSelect,
-  onUnavailable,
+  onShowList,
 }: {
   cities: CityGroup[];
   selected: string | null;
   onSelect: (id: string) => void;
-  onUnavailable: () => void;
+  onShowList: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const latest = useRef({ cities, onSelect });
   latest.current = { cities, onSelect };
+  const fitted = useRef(false);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
-  useEffect(() => {
-    if (state === "failed") onUnavailable();
-  }, [state, onUnavailable]);
   const geojson = useMemo(
     () => ({
       type: "FeatureCollection" as const,
@@ -236,11 +228,73 @@ function CityMap({
             type: "Point" as const,
             coordinates: [city.place.lng as number, city.place.lat as number],
           },
-          properties: { id: city.id, icon: city.layers.join("-") },
+          properties: { id: city.id, name: city.place.name, icon: city.layers.join("-") },
         })),
     }),
     [cities],
   );
+  const routes = useMemo(() => {
+    const visits = cities
+      .flatMap((city) =>
+        city.place.precision === "city" && city.place.lng !== undefined && city.place.lat !== undefined
+          ? city.experiences
+              .filter(
+                (item) =>
+                  item.start &&
+                  item.time_precision !== "unknown" &&
+                  ["observed", "user_reported"].includes(item.fact_status),
+              )
+              .map((item) => ({ city, start: item.start as string }))
+          : [],
+      )
+      .sort((a, b) => a.start.localeCompare(b.start));
+    return {
+      type: "FeatureCollection" as const,
+      features: visits.slice(1).flatMap((visit, index) => {
+        const previous = visits[index];
+        if (!previous || previous.city.id === visit.city.id || previous.start === visit.start) return [];
+        const from = previous.city.place;
+        const to = visit.city.place;
+        let longitude = to.lng as number;
+        while (longitude - (from.lng as number) > 180) longitude -= 360;
+        while (longitude - (from.lng as number) < -180) longitude += 360;
+        return [
+          {
+            type: "Feature" as const,
+            properties: {},
+            geometry: {
+              type: "LineString" as const,
+              coordinates: [
+                [from.lng as number, from.lat as number],
+                [longitude, to.lat as number],
+              ],
+            },
+          },
+        ];
+      }),
+    };
+  }, [cities]);
+  const latestRoutes = useRef(routes);
+  latestRoutes.current = routes;
+  const fitCities = useCallback((duration = 600) => {
+    const instance = map.current;
+    if (!instance) return;
+    const points = latestGeojson.current.features;
+    if (!points.length) {
+      instance.fitBounds(
+        [
+          [-180, -60],
+          [180, 80],
+        ],
+        { padding: 24, duration },
+      );
+      return;
+    }
+    const bounds = new LngLatBounds();
+    for (const point of points) bounds.extend(point.geometry.coordinates as [number, number]);
+    instance.fitBounds(bounds, { padding: 64, maxZoom: 5, duration });
+    fitted.current = true;
+  }, []);
   const latestGeojson = useRef(geojson);
   latestGeojson.current = geojson;
   useEffect(() => {
@@ -249,22 +303,24 @@ function CityMap({
     setWorkerUrl(workerUrl);
     let instance: LibreMap | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let failed = false;
     const waitForMap = () => {
-      failed = false;
       setState("loading");
       clearTimeout(timer);
       timer = setTimeout(() => setState("failed"), 8000);
     };
-    const styleUrl = () =>
-      `https://tiles.openfreemap.org/styles/${document.body.hasAttribute("data-ds-dark-theme") ? "dark" : "positron"}`;
+    const themeRoot = container.current.closest("[data-theme]") ?? document.body;
+    const styleUrl = () => {
+      const theme = themeRoot.getAttribute("data-theme");
+      const dark = theme === "dark" || (!theme && document.body.hasAttribute("data-ds-dark-theme"));
+      return `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
+    };
     try {
       instance = new LibreMap({
         container: container.current,
         style: styleUrl(),
         center: [20, 25],
         zoom: 1,
-        cooperativeGestures: true,
+        cooperativeGestures: false,
         attributionControl: {
           compact: true,
           customAttribution:
@@ -281,19 +337,26 @@ function CityMap({
         },
       });
       map.current = instance;
+      fitted.current = false;
       const m = instance;
-      m.addControl(new NavigationControl({ showCompass: false }), "top-left");
       waitForMap();
-      let fitted = false;
       m.on("style.load", () => {
         const theme = getComputedStyle(container.current as HTMLDivElement);
         const ink = theme.getPropertyValue("--kt-map").trim();
         const paper = theme.getPropertyValue("--kt-card").trim();
+        const text = theme.getPropertyValue("--kt-text").trim();
         for (let mask = 1; mask < 8; mask++) {
           const ids = layers.filter((_, i) => mask & (1 << i)).map((layer) => layer.id);
           const image = markerImage(ids, ink, paper);
           if (image) m.addImage(ids.join("-"), image, { pixelRatio: 2 });
         }
+        m.addSource("experience-order", { type: "geojson", data: latestRoutes.current });
+        m.addLayer({
+          id: "experience-order",
+          type: "line",
+          source: "experience-order",
+          paint: { "line-color": text, "line-width": 2, "line-opacity": 0.55 },
+        });
         m.addSource("cities", {
           type: "geojson",
           data: latestGeojson.current,
@@ -332,24 +395,24 @@ function CityMap({
           layout: {
             "icon-image": ["get", "icon"],
             "icon-allow-overlap": true,
+            "text-field": ["get", "name"],
+            "text-font": ["Noto Sans Regular"],
+            "text-size": 14,
+            "text-anchor": "left",
+            "text-offset": [1.2, 0],
+            "text-optional": true,
           },
+          paint: { "text-color": text, "text-halo-color": paper, "text-halo-width": 2 },
         });
-        if (!fitted && latestGeojson.current.features.length) {
-          const bounds = new LngLatBounds();
-          for (const point of latestGeojson.current.features)
-            bounds.extend(point.geometry.coordinates as [number, number]);
-          m.fitBounds(bounds, { padding: 56, maxZoom: 5, duration: 0 });
-          fitted = true;
-        }
+        if (!fitted.current && latestGeojson.current.features.length) fitCities(0);
       });
       m.on("idle", () => {
-        if (failed || !m.isStyleLoaded() || !m.areTilesLoaded()) return;
+        if (!m.isStyleLoaded() || !m.areTilesLoaded()) return;
         clearTimeout(timer);
         setState("ready");
       });
       m.on("error", (event) => {
         if ("sourceId" in event && event.sourceId === "cities") return;
-        failed = true;
         clearTimeout(timer);
         setState("failed");
       });
@@ -387,6 +450,8 @@ function CityMap({
       instance.setStyle(styleUrl());
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+    if (themeRoot !== document.body)
+      observer.observe(themeRoot, { attributes: true, attributeFilter: ["data-theme"] });
     const resize = new ResizeObserver(() => instance?.resize());
     resize.observe(container.current);
     return () => {
@@ -397,11 +462,16 @@ function CityMap({
       instance?.remove();
       URL.revokeObjectURL(workerUrl);
     };
-  }, []);
+  }, [fitCities]);
   useEffect(() => {
     const source = map.current?.getSource("cities") as GeoJSONSource | undefined;
     source?.setData(geojson);
-  }, [geojson]);
+    if (source && !fitted.current && geojson.features.length) fitCities(0);
+  }, [geojson, fitCities]);
+  useEffect(() => {
+    const source = map.current?.getSource("experience-order") as GeoJSONSource | undefined;
+    source?.setData(routes);
+  }, [routes]);
   useEffect(() => {
     const city = cities.find((city) => city.id === selected);
     if (city?.place.precision === "city" && city.place.lng !== undefined && city.place.lat !== undefined) {
@@ -413,10 +483,44 @@ function CityMap({
       <div ref={container} className={css.map} />
       {state !== "ready" && (
         <output className={css.mapNotice}>
-          {state === "failed" ? "地图暂时加载不了，下面的列表照常可用" : "正在加载地图…"}
+          {state === "failed" ? (
+            <>
+              底图暂时不可用，仍可查看城市记录。
+              <button type="button" className={css.control} onClick={onShowList}>
+                显示城市列表
+              </button>
+            </>
+          ) : (
+            "正在加载地图…"
+          )}
         </output>
       )}
-      <span className={css.precision}>城市级位置</span>
+      <fieldset className={css.mapControls} aria-label="地图视野">
+        <button type="button" aria-label="放大" onClick={() => map.current?.zoomIn()}>
+          +
+        </button>
+        <button type="button" aria-label="缩小" onClick={() => map.current?.zoomOut()}>
+          −
+        </button>
+        <button type="button" onClick={() => fitCities()}>
+          我的足迹
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            map.current?.fitBounds(
+              [
+                [-180, -60],
+                [180, 80],
+              ],
+              { padding: 24, duration: 600 },
+            )
+          }
+        >
+          全世界
+        </button>
+      </fieldset>
+      <span className={css.precision}>城市级位置{routes.features.length > 0 && " · 连线：经历顺序"}</span>
     </section>
   );
 }
@@ -444,7 +548,7 @@ export function MapPage({
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState("map");
   const [compact, setCompact] = useState(false);
-  const mapUnavailable = useCallback(() => setView("list"), []);
+  const showMapList = useCallback(() => setView("list"), []);
   const page = useRef<HTMLDivElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
@@ -845,7 +949,7 @@ export function MapPage({
               cities={cities}
               selected={city?.id ?? null}
               onSelect={setSelected}
-              onUnavailable={mapUnavailable}
+              onShowList={showMapList}
             />
             <section className={css.listPane} aria-label="城市列表">
               {!!data.review.length && (

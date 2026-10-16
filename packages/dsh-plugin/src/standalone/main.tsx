@@ -14,6 +14,21 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
 }
 let workspace = "";
 const props: OverviewPageProps = {
+  keepOnboardingMatter: (source) => call("onboardingMatterKeep", source),
+  saveOnboardingMatter: (text) => call("onboardingMatterSave", text),
+  readOnboardingMatter: (source) => call("onboardingMatterRead", source),
+  organizeOnboardingMatter: (source) => call("onboardingMatterOrganize", source),
+  adoptOnboardingMatter: (source, draft, path = null) => call("onboardingMatterAdopt", source, draft, path),
+  changeOnboardingNext: (id, rev, action, value) => call("onboardingNextChange", id, rev, action, value),
+  loadOnboarding: () => call("onboarding"),
+  chooseOnboarding: (choices) => call("onboardingChoose", choices),
+  previewOnboardingMemory: (text, ai) => call("onboardingMemoryPreview", text, ai),
+  confirmOnboardingMemory: (token, selected) => call("onboardingMemoryConfirm", token, selected),
+  cancelOnboarding: (token) => call("onboardingCancel", token),
+  previewOnboardingImport: (source, name, base64) => call("onboardingImportPreview", source, name, base64),
+  confirmOnboardingImport: (token) => call("onboardingImportConfirm", token),
+  previewOnboardingSetup: (input) => call("onboardingSetupPreview", input),
+  confirmOnboardingSetup: (token) => call("onboardingSetupConfirm", token),
   channelSettings: async (operation, input = {}) => {
     const response = await fetch(`/api/channels/${operation}`, {
       method: "POST",
@@ -24,8 +39,13 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest) => (
-    <AskPage workspace={workspace} initialPrompt={prompt} configureRequest={configureRequest} />
+  renderAsk: (prompt, configureRequest, configureBuiltin) => (
+    <AskPage
+      workspace={workspace}
+      initialPrompt={prompt}
+      configureRequest={configureRequest}
+      configureBuiltin={configureBuiltin}
+    />
   ),
   subscribe: (refresh) => {
     const events = new EventSource("/api/events");
