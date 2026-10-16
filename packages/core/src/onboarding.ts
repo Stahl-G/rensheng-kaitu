@@ -37,11 +37,6 @@ export const ONBOARDING = {
     },
     { id: "claude", name: "Claude", hint: "开了记忆的话，把「设置」里的记忆内容也一起复制过来。" },
     { id: "gemini", name: "Gemini", hint: "把「保存的信息」页面里的内容也一起复制过来。" },
-    {
-      id: "deepseek",
-      name: "DeepSeek",
-      hint: "把当前对话里关于你的回答复制过来，也可以补充其他对话里你想保留的内容。",
-    },
     { id: "doubao", name: "豆包", hint: "开了记忆的话，把设置里的记忆列表也一起复制过来。" },
     { id: "other", name: "其他", hint: "任何 AI 都可以，回答格式对不上也没关系，对不上的行会原样留着。" },
   ],

@@ -19,7 +19,7 @@
 
 ### 1. 搬来记忆
 
-先选最常用的 AI：ChatGPT、Claude、Gemini、DeepSeek、豆包、其他。
+先选最常用的 AI：ChatGPT、Claude、Gemini、豆包、其他（只列有长期记忆的 AI；DeepSeek 聊天不跨对话记忆，不单列）。
 界面展示该 AI 的「记忆在哪」提示，以及 PRD 附录 A 的提示词，支持复制。
 用户发给原来的 AI，把回答粘贴回来，也可以同时粘贴 ChatGPT「管理记忆」列表。
 
