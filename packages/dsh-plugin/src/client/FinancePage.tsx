@@ -189,7 +189,7 @@ function NumberDetail({
     <details className={css.metric}>
       <summary aria-label={`${label}，展开记录`}>
         <span className={css.muted}>{label}</span>
-        <strong>{money(metric.amount, currency)}</strong>
+        <strong>{money(metric.record_ids.length ? metric.amount : null, currency)}</strong>
         {note && <small>{note}</small>}
         {!!metric.missing.length && <small>{reason(metric.missing.join(","), "资料不完整")}</small>}
         <span className={css.link}>查看组成记录</span>

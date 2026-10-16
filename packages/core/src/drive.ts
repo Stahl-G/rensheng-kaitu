@@ -104,7 +104,8 @@ function relocationNote(old: string, target: string) {
 
 async function verify(ws: Workspace) {
   refreshOverview(ws);
-  const checks = await doctor(ws);
+  // 冲突副本只提示用户处理，不算迁移失败。
+  const checks = (await doctor(ws)).filter((c) => c.name !== "无同步冲突副本");
   const issues = validateWorkspace(ws);
   if (checks.some((c) => !c.ok) || issues.length) {
     throw new KaituError(
