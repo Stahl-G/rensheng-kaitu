@@ -3,6 +3,7 @@ import {
   addExperiences,
   addMemory,
   addTask,
+  assertPublicInput,
   assertPublicProject,
   completeTask,
   dismissNews,
@@ -191,12 +192,22 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     ({ items }) => addExperiences(ws, items, "agent"),
     true,
   );
-  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
+  register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () =>
+    readExploration(ws, tools === "remote"),
+  );
   register(
     "exploration_write",
     "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户采纳、暂停或归档。",
     { command: explorationCommandSchema },
-    ({ command }) => writeExploration(ws, command, "agent"),
+    async ({ command }) => {
+      if (tools === "remote") {
+        if ("id" in command) assertPublicInput(ws, { id: command.id });
+        assertPublicInput(ws, command.data as unknown as Record<string, unknown>);
+      }
+      const result = await writeExploration(ws, command, "agent");
+      if (tools === "remote") assertPublicInput(ws, result.record);
+      return result;
+    },
     true,
   );
   register("life_map", "读取人生地图、待核对经历与未知时间数量，只读。", {}, () => lifeMap(ws));
@@ -226,7 +237,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "record_add",
     "新增一条日常记录，无需确认，可从历史撤销；批量导入须先由用户确认。",
     { type, data },
-    ({ type, data }) => writeAgentRecord(ws, "add", type, actor(), data),
+    ({ type, data }) => {
+      if (tools === "remote") assertPublicInput(ws, data);
+      return writeAgentRecord(ws, "add", type, actor(), data);
+    },
     true,
   );
   register(
@@ -254,7 +268,13 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       module: text.optional(),
       ref: text.optional(),
     },
-    (input) => proposeBlock(ws, input, actor()),
+    (input) => {
+      if (tools === "remote" && input.ref) {
+        assertPublicInput(ws, { id: input.ref });
+        if (input.ref.startsWith("projects/")) assertPublicProject(ws, input.ref.split("/")[1]);
+      }
+      return proposeBlock(ws, input, actor());
+    },
     true,
   );
   register("project_list", "列出项目进度与下一步。", {}, () =>

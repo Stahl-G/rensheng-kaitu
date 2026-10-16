@@ -1,12 +1,18 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ScopeError } from "./errors.js";
 import { localStateRoot } from "./local-state.js";
 
 export function assertAgentPath(root: string, path: string): string {
   const target = resolve(root, path);
-  const state = relative(localStateRoot(), target);
-  if (state === "" || (!isAbsolute(state) && state !== ".." && !state.startsWith(`..${sep}`)))
+  const home = resolve(process.env.KAITU_APP_HOME || join(process.env.HOME || homedir(), ".kaitu-app"));
+  const inside = (base: string, path: string) => {
+    const rel = relative(base, path);
+    return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
+  };
+  const managed = [localStateRoot(), ...(inside(root, home) ? [home] : [])];
+  if (managed.some((directory) => inside(directory, target)))
     throw new ScopeError("本机程序状态不对 AI 开放");
   const check = (base: string, value: string) => {
     const rel = relative(base, value);
@@ -32,7 +38,7 @@ export function assertAgentPath(root: string, path: string): string {
   }
   const realTarget = realpathSync(probe);
   check(realpathSync(root), realTarget);
-  for (const directory of [localStateRoot(), join(root, ".kaitu"), join(root, ".git")]) {
+  for (const directory of [...managed, join(root, ".kaitu"), join(root, ".git")]) {
     if (!existsSync(directory)) continue;
     const rel = relative(realpathSync(directory), realTarget);
     if (rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`)))
@@ -50,9 +56,10 @@ export function agentRelativePath(root: string, file: string): string {
     .join("/");
 }
 
-export function assertAgentWrite(root: string, file: string, confirmed = false): string {
+export function assertAgentWrite(root: string, file: string, confirmed = false, managedPlan = false): string {
   const path = agentRelativePath(root, file);
   if (
+    (path === "NOW.md" && !managedPlan) ||
     ["AGENTS.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
     path.startsWith("memory/") ||
     path.startsWith("chats/") ||

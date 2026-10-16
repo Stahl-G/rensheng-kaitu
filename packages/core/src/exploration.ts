@@ -1,10 +1,12 @@
 import { isAbsolute } from "node:path";
+import { publicRecords } from "./agent-tools.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { type ExperienceSource, readSourceContent } from "./experience-source.js";
 import { explorationCommandSchema } from "./exploration-contract.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
+import { localRecordIds, localRecordStore } from "./private-records.js";
 import { assertPublicProject, listProjects, projectDirectory } from "./projects.js";
 import { type StoredRecord, addRecord, readRecordRevisions, readRecords, updateRecord } from "./records.js";
 import { isoInZone } from "./time.js";
@@ -89,8 +91,10 @@ const types = ["direction", "exploration_experiment", "direction_note"];
 export function isExplorationType(type: string): boolean {
   return types.includes(type);
 }
-function rows<T>(ws: Workspace, type: string): T[] {
-  return listRecordTypes(ws).some((r) => r.type === type) ? (readRecords(ws, type) as unknown as T[]) : [];
+function rows<T>(ws: Workspace, type: string, publicOnly = false, privateIds?: Set<string>): T[] {
+  if (!listRecordTypes(ws).some((r) => r.type === type)) return [];
+  const records = readRecords(ws, type, { includePrivate: !publicOnly });
+  return (publicOnly ? publicRecords(ws, type, records, privateIds) : records) as unknown as T[];
 }
 function current<T extends ExplorationRecord>(ws: Workspace, type: string, id: string, revision?: number): T {
   const record = rows<T>(ws, type).find((r) => r.id === id);
@@ -213,16 +217,24 @@ export async function writeExploration(
     default:
       throw new KaituError("未知探索操作", "BAD_ARGS");
   }
-  return { id: result.record.id, record: result.record, version: await snapshot(ws, message) };
+  return {
+    id: result.record.id,
+    record: result.record,
+    version: await snapshot(
+      result.file.startsWith(".kaitu/local-projects/") ? localRecordStore(ws) : ws,
+      message,
+    ),
+  };
 }
 
-export function readExploration(ws: Workspace) {
-  const directions = rows<Direction>(ws, "direction").sort(
+export function readExploration(ws: Workspace, publicOnly = false) {
+  const privateIds = publicOnly ? localRecordIds(ws) : new Set<string>();
+  const directions = rows<Direction>(ws, "direction", publicOnly, privateIds).sort(
     (a, b) =>
       Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
   );
-  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment");
-  const notes = rows<DirectionNote>(ws, "direction_note");
+  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment", publicOnly, privateIds);
+  const notes = rows<DirectionNote>(ws, "direction_note", publicOnly, privateIds);
   const timeline: {
     id: string;
     record_id: string;
@@ -238,7 +250,7 @@ export function readExploration(ws: Workspace) {
     if (!listRecordTypes(ws).some((r) => r.type === type)) continue;
     const previous = new Map<string, StoredRecord>();
     for (const record of readRecordRevisions(ws, type).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1))) {
-      if (record.deleted) continue;
+      if (record.deleted || (publicOnly && privateIds.has(record.id))) continue;
       const old = previous.get(record.id);
       const id = type === "direction" ? record.id : String(record.direction_id);
       let text: string;

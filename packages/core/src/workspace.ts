@@ -16,6 +16,7 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import { readPlan, relocatePlan, writePlan } from "./private-plan.js";
 import { relocateProjectRecords } from "./private-records.js";
 import { stateBinding } from "./state-binding.js";
 import {
@@ -114,6 +115,7 @@ export class Workspace {
       for (const maintain of [
         ensureTaskModule,
         relocateProjectRecords,
+        relocatePlan,
         maintainHistoryIgnore,
         refreshOverview,
       ]) {
@@ -181,6 +183,7 @@ export class Workspace {
   }
 
   readText(rel: string): string {
+    if (!this.privateRecords && rel === "NOW.md") return readPlan(this);
     return this.readBytes(rel).toString("utf8");
   }
 
@@ -252,9 +255,13 @@ export class Workspace {
   writeText(
     rel: string,
     content: string | Uint8Array,
-    opts: { internal?: boolean; mode?: number } = {},
+    opts: { internal?: boolean; mode?: number; projected?: boolean } = {},
   ): void {
     const abs = this.resolve(rel, opts);
+    if (!this.privateRecords && abs === join(this.root, "NOW.md") && !opts.projected) {
+      writePlan(this, typeof content === "string" ? content : Buffer.from(content).toString("utf8"));
+      return;
+    }
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;

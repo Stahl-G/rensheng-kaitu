@@ -6,8 +6,9 @@ import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes } from "./modules.js";
-import { localRecordIds } from "./private-records.js";
+import { readPlan } from "./private-plan.js";
 import { listProjects, projectStatusFiles, projectVersion } from "./projects.js";
+import { type PrivacyIndex, privacyIndex } from "./record-privacy.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { tasksForToday } from "./tasks.js";
@@ -96,9 +97,17 @@ export function statusFiles(ws: Workspace, publicOnly = false): { file: string; 
   return out;
 }
 
-function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
+function document<T>(
+  ws: Workspace,
+  file: string,
+  fallback: T,
+  publicOnly = false,
+  privacy?: PrivacyIndex,
+): Frontmatter<T> {
   if (!ws.exists(file)) return { data: fallback, body: "" };
-  const parsed = parseFrontmatter<T>(ws.readText(file));
+  const parsed = parseFrontmatter<T>(
+    file === "NOW.md" ? readPlan(ws, publicOnly, privacy) : ws.readText(file),
+  );
   const schema =
     file === "NOW.md"
       ? "now.schema.json"
@@ -122,7 +131,8 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     }
   }
   const modules = listModules(ws);
-  const localIds = publicOnly ? localRecordIds(ws) : undefined;
+  const privacy = publicOnly ? privacyIndex(ws) : undefined;
+  const localIds = privacy ? new Set([...privacy.privateIds, ...privacy.localIds]) : undefined;
   const records = Object.fromEntries(
     listRecordTypes(ws).map(({ type }) => [
       type,
@@ -143,10 +153,14 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     today,
     inboxNotes: inboxNotes(ws).length,
     timeZone: ws.timeZone(),
-    now: read("今天的计划", () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }), {
-      data: { date: null, blocks: [] } as TodayPlan,
-      body: "",
-    }),
+    now: read(
+      "今天的计划",
+      () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }, publicOnly, privacy),
+      {
+        data: { date: null, blocks: [] } as TodayPlan,
+        body: "",
+      },
+    ),
     projects: read("项目", () => listProjects(ws, { now, publicOnly }), []),
     statuses: statusFiles(ws, publicOnly).flatMap(({ file, module }) =>
       read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),

@@ -12,6 +12,7 @@ import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { type ModuleDef, findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
+import { relocatePlan } from "./private-plan.js";
 import { relocateProjectRecords } from "./private-records.js";
 import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
@@ -414,6 +415,7 @@ export async function setProject(
       moveDirectory(ws, project.dir, data.local_only ? `.kaitu/local-projects/${slug}` : `projects/${slug}`);
     }
     if (data.local_only !== project.data.local_only) relocateProjectRecords(ws, slug, data.local_only);
+    relocatePlan(ws);
     const version = await projectVersion(ws, slug, `更新了项目：${data.title}`);
     // 共享目录移除也需要在工作区历史中保存。
     if (driveProjects(ws) && data.local_only !== project.data.local_only)

@@ -4,8 +4,9 @@ import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { localRecordIds } from "./private-records.js";
+import { localRecordIds, localRecordStore } from "./private-records.js";
 import { projectStatusFiles } from "./projects.js";
+import { privacyIndex } from "./record-privacy.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
@@ -157,9 +158,12 @@ export async function batchSnapshot<T>(
 
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   if (batchDepth.get(ws)) return null;
+  let localVersion: string | null = null;
+  if (!ws.privateRecords && ws.exists(".kaitu/local-projects"))
+    localVersion = await snapshot(localRecordStore(ws), "更新了本机资料", now);
   refreshOverview(ws, now);
   try {
-    return await saveSnapshot(ws, message, now);
+    return (await saveSnapshot(ws, message, now)) ?? localVersion;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
@@ -257,7 +261,24 @@ export async function restore(
   opts: { path?: string; now?: Date } = {},
 ): Promise<{ oid: string | null; changed: number }> {
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
-  const target = await resolveVersion(ws, version);
+  let target: string;
+  try {
+    target = await resolveVersion(ws, version);
+  } catch (error) {
+    if (ws.privateRecords || !ws.exists(".kaitu/local-projects")) throw error;
+    const local = localRecordStore(ws);
+    try {
+      await resolveVersion(local, version);
+    } catch {
+      throw error;
+    }
+    const result = await restore(local, version, {
+      ...opts,
+      path: opts.path?.replace(/^\.kaitu\/local-projects\//, ""),
+    });
+    refreshOverview(ws);
+    return result;
+  }
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
   const dir = ws.root;
   const head = await headOid(ws);
@@ -300,6 +321,7 @@ export async function restore(
         privateSlugs.add(slug);
     }
     const allTargetFiles = await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: target });
+    const targetRows: import("./records.js").StoredRecord[] = [];
     for (const file of allTargetFiles.filter((file) => /^projects\/[^/]+\/STATUS\.md$/.test(file))) {
       const { blob } = await git.readBlob({
         fs,
@@ -322,9 +344,11 @@ export async function restore(
       });
       for (const line of Buffer.from(blob).toString("utf8").split("\n").filter(Boolean)) {
         const row = JSON.parse(line);
+        targetRows.push(row);
         if (privateSlugs.has(row.project)) privateMetricIds.add(row.id);
       }
     }
+    for (const id of privacyIndex(ws, targetRows, privateSlugs).privateIds) privateMetricIds.add(id);
   }
   const privateFile = (file: string) =>
     privateSlugs.has(file.split("/")[0] === "projects" ? (file.split("/")[1] ?? "") : "");

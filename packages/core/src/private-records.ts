@@ -4,6 +4,7 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { findRecordType, listRecordTypes, recordFilePattern } from "./modules.js";
 import type { RecordTypeRef } from "./modules.js";
 import { projectStatusFiles, publicProject } from "./projects.js";
+import { privacyIndex, privateInput } from "./record-privacy.js";
 import { recordLines } from "./records.js";
 import type { StoredRecord } from "./records.js";
 import { Workspace, stateDirectory } from "./workspace.js";
@@ -38,7 +39,7 @@ export function recordStore(
   existing = true,
 ): Workspace {
   if (ws.privateRecords || ["project_metric", "github_snapshot"].includes(ref.type)) return ws;
-  if (record.project !== undefined && !publicProject(ws, record.project)) return localRecordStore(ws, ref);
+  if (privateInput(ws, record)) return localRecordStore(ws, ref);
   if (!existing) return ws;
   const store = existingLocalStore(ws, ref.type);
   if (
@@ -53,37 +54,22 @@ export function recordStore(
 
 export function relocateProjectRecords(ws: Workspace, slug?: string, toPrivate = true): void {
   if (ws.privateRecords) return;
-  if (
-    !slug &&
-    !ws.exists(".kaitu/local-projects") &&
-    !projectStatusFiles(ws).some(
-      ({ file }) => parseFrontmatter<{ local_only?: boolean }>(ws.readText(file)).data.local_only,
-    )
-  )
-    return;
   const local = ws.exists(".kaitu/local-projects") ? localRecordStore(ws) : undefined;
   const source = toPrivate ? ws : local;
-  const knownLocal = !slug && toPrivate ? localRecordIds(ws) : new Set<string>();
+  const privacy = privacyIndex(ws);
   if (!source) return;
   for (const ref of listRecordTypes(source)) {
     if (["project_metric", "github_snapshot"].includes(ref.type)) continue;
     const { dir } = recordFilePattern(ref);
     if (!existsSync(join(source.root, dir))) continue;
     const rows = recordLines(source, ref);
-    const projects = new Map<string, Set<unknown>>();
-    for (const line of rows) {
-      const row = JSON.parse(line.raw) as StoredRecord;
-      const linked = projects.get(row.id) ?? new Set<unknown>();
-      if (row.project !== undefined) linked.add(row.project);
-      projects.set(row.id, linked);
-    }
     const ids = new Set(
-      [...projects].flatMap(([id, linked]) => {
-        const selected = slug
-          ? linked.has(slug)
-          : knownLocal.has(id) || [...linked].some((project) => !publicProject(ws, project));
-        const shareable = [...linked].every((project) => publicProject(ws, project));
-        return selected && (toPrivate || shareable) ? [id] : [];
+      rows.flatMap((line) => {
+        const row = JSON.parse(line.raw) as StoredRecord;
+        const selected = toPrivate
+          ? privacy.privateIds.has(row.id) || privacy.localIds.has(row.id)
+          : !!slug && privacy.projects.get(row.id)?.has(slug) && !privacy.privateIds.has(row.id);
+        return selected ? [row.id] : [];
       }),
     );
     if (!ids.size) continue;
@@ -107,11 +93,7 @@ export function relocateProjectRecords(ws: Workspace, slug?: string, toPrivate =
 }
 
 export function localRecordIds(ws: Workspace): Set<string> {
-  if (ws.privateRecords || !ws.exists(".kaitu/local-projects")) return new Set();
-  const store = localRecordStore(ws);
-  return new Set(
-    listRecordTypes(store).flatMap((ref) =>
-      recordLines(store, ref).map((line) => (JSON.parse(line.raw) as StoredRecord).id),
-    ),
-  );
+  if (ws.privateRecords) return new Set();
+  const privacy = privacyIndex(ws);
+  return new Set([...privacy.localIds, ...privacy.privateIds]);
 }

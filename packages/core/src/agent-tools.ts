@@ -7,10 +7,13 @@ import { isExplorationType } from "./exploration.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { findRecordType, listModules, recordFilePattern, resolveRecordPath } from "./modules.js";
+import { refreshOverview } from "./overview.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
+import { readPlan } from "./private-plan.js";
 import { localRecordIds, localRecordStore } from "./private-records.js";
 import { assertPublicProject, publicProject } from "./projects.js";
+import { privacyIndex, privateBlock, privateInput } from "./record-privacy.js";
 import { addRecord, deleteRecord, readRecords, recordIsLocal, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -48,6 +51,8 @@ export function readAgentFile(ws: Workspace, file: string, publicOnly = false): 
       if (slug && !["data", "module.json"].includes(slug)) assertPublicProject(ws, slug);
     }
   }
+  if (publicOnly && paths.includes("NOW.md")) return readPlan(ws, true);
+  if (publicOnly && paths.includes("OVERVIEW.md")) refreshOverview(ws);
   return ws.readText(file);
 }
 
@@ -146,7 +151,13 @@ export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: s
   const data = { ...parsed.data, generated_at: isoInZone(now, ws.timeZone()) };
   if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");
   ws.writeText("NOW.md", stringifyFrontmatter(data, parsed.body));
-  return { block, version: await snapshot(ws, `${actor}提出了日程建议：${block.title}`) };
+  return {
+    block,
+    version: await snapshot(
+      privateBlock(ws, block, privacyIndex(ws)) ? localRecordStore(ws) : ws,
+      `${actor}提出了日程建议：${block.title}`,
+    ),
+  };
 }
 
 export function publicRecords<T extends Record<string, unknown>>(
@@ -170,4 +181,13 @@ export function publicRecords<T extends Record<string, unknown>>(
     if (!visibility.has(row.project)) visibility.set(row.project, publicProject(ws, row.project));
     return visibility.get(row.project);
   });
+}
+
+export function assertPublicInput(ws: Workspace, row: Record<string, unknown>): void {
+  const privacy = privacyIndex(ws);
+  if (
+    (typeof row.id === "string" && (privacy.privateIds.has(row.id) || privacy.localIds.has(row.id))) ||
+    privateInput(ws, row, privacy)
+  )
+    throw new KaituError("找不到可共享记录", "NOT_FOUND");
 }

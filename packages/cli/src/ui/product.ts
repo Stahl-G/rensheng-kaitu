@@ -162,7 +162,7 @@ export async function productRequest(
       return data;
     }
     case "exportWorkspace":
-      return exportWorkspace(ws);
+      return exportWorkspace(ws, { includePrivate: true });
     case "restoreVersion":
       return restore(ws, text(0));
     case "moveStorage": {

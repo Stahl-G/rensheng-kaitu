@@ -259,10 +259,11 @@ function revisionsFor(ws: Workspace, ref: RecordTypeRef, includePrivate = true):
     recordLines(store, ref).map((line) => {
       try {
         const row = JSON.parse(line.raw) as StoredRecord;
+        if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
         if (store.privateRecords) localRows.add(row);
         return row;
       } catch {
-        throw new KaituError(`${line.file}:${line.line} 不是合法 JSON`, "CORRUPT");
+        throw new KaituError(`${line.file}:${line.line} 记录格式不合法`, "CORRUPT");
       }
     }),
   );

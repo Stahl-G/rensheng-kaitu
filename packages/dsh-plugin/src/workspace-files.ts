@@ -32,7 +32,7 @@ export async function writeFiles(
 ) {
   const files = inputFiles.map((file) => ({
     ...file,
-    path: assertAgentWrite(ws.root, file.path, confirmed),
+    path: assertAgentWrite(ws.root, file.path, confirmed, true),
   }));
   const previous = new Map<string, string | undefined>();
   for (const { path, content } of files) {
