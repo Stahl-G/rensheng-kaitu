@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { assertDesktopIsolation } from "./environment.mjs";
+
 export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
   if (mode === "full")
     return [
@@ -66,6 +68,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
 }
 
 export function createSdkRuntime({ executable, archive, home, workspace, plugin, hostPlugin, helper }) {
+  assertDesktopIsolation(workspace, home);
   const modules = join(archive, "dsh/node_modules");
   const settingsFile = join(home, "kaitu-ai.json");
   const env = {

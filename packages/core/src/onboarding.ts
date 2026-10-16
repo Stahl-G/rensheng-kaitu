@@ -371,6 +371,7 @@ interface MemoryPreview {
 }
 interface FilePreview {
   kind: "file";
+  digest: string;
   source: ImportSource;
   file: string;
   name: string;
@@ -573,12 +574,13 @@ export async function previewOnboardingImport(
 ): Promise<OnboardingImportPreview> {
   if (!["ics", "apple-health", "chatgpt-conversations"].includes(source))
     throw new KaituError("请使用对应数据源的导入预览", "BAD_ARGS");
+  const digest = createHash("sha256").update(bytes).digest("hex");
   const file = stageUpload(ws, source, name, bytes);
   try {
     const preview = await importUpload(ws, source, file, true, name);
     const token = savePreview(
       ws,
-      { kind: "file", source, file, name, preview, expires: Date.now() + 30 * 60000 },
+      { kind: "file", digest, source, file, name, preview, expires: Date.now() + 30 * 60000 },
       options,
     );
     return { token, preview };
@@ -594,6 +596,8 @@ export async function confirmOnboardingImport(
 ): Promise<OnboardingImportResult> {
   const preview = readPreview(ws, token, options);
   if (preview.kind !== "file") throw new KaituError("不是文件导入预览", "BAD_ARGS");
+  if (createHash("sha256").update(ws.readBytes(preview.file)).digest("hex") !== preview.digest)
+    throw new KaituError("文件已变化，请重新预览", "CONFLICT");
   const current = await importUpload(ws, preview.source, preview.file, true, preview.name);
   if (JSON.stringify(current) !== JSON.stringify(preview.preview))
     throw new KaituError("数据已变化，请重新预览", "CONFLICT");

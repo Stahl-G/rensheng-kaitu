@@ -136,7 +136,7 @@ export function privateInput(ws: Workspace, row: Record<string, unknown>, index?
   const links = associations(ws, row);
   if (links.invalid || [...links.projects].some((project) => !publicProject(ws, project))) return true;
   if (!links.parents.size) return false;
-  const privacy = index ?? privacyIndex(ws);
+  const privacy = index ?? privacyIndex(ws, typeof row.id === "string" ? [row as StoredRecord] : []);
   return [...links.parents].some(
     (id) => !privacy.known.has(id) || privacy.privateIds.has(id) || privacy.localIds.has(id),
   );

@@ -187,7 +187,8 @@ export function assertPublicInput(ws: Workspace, row: Record<string, unknown>): 
   const privacy = privacyIndex(ws);
   if (
     (typeof row.id === "string" && (privacy.privateIds.has(row.id) || privacy.localIds.has(row.id))) ||
-    privateInput(ws, row, privacy)
+    privateInput(ws, row, privacy) ||
+    privateBlock(ws, row, privacy)
   )
     throw new KaituError("找不到可共享记录", "NOT_FOUND");
 }

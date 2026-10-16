@@ -9,7 +9,8 @@ import {
   resolveRecordPath,
 } from "./modules.js";
 import { mergeNewsRecord } from "./news.js";
-import { existingLocalStore, recordStore } from "./private-records.js";
+import { relocatePlan } from "./private-plan.js";
+import { existingLocalStore, recordStore, relocateProjectRecords } from "./private-records.js";
 import { assertPublicProject, driveProjects } from "./projects.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
@@ -86,12 +87,19 @@ function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
+function relocatePrivateWrites(ws: Workspace): void {
+  if (ws.privateRecords) return;
+  relocateProjectRecords(ws);
+  relocatePlan(ws);
+}
+
 function write(ws: Workspace, ref: RecordTypeRef, record: StoredRecord, tz: string): WriteResult {
   validateRecord(ws, ref, record);
   const file = recordFileFor(ref, localMonth(parseTs(record.ts), tz));
   const store = recordStore(ws, ref, record);
   resolveRecordPath(store, ref, file);
   store.appendLine(file, JSON.stringify(record));
+  if (store !== ws) relocatePrivateWrites(ws);
   return {
     type: ref.type,
     module: ref.module.dir,
@@ -333,4 +341,5 @@ export function appendPreparedRecords(
   }
   for (const [store, files] of groups)
     for (const [file, lines] of files) store.appendLine(file, lines.join("\n"));
+  if ([...groups.keys()].some((store) => store !== ws)) relocatePrivateWrites(ws);
 }

@@ -40,7 +40,7 @@ export function yahooSymbol(code: string | null, currency: string | null): strin
 function cacheDirectory(ws: Workspace, override?: string) {
   if (override) return override;
   const state = stateDirectory(ws.root);
-  if (state !== join(ws.root, ".kaitu")) return join(state, "finance");
+  if (state !== join(ws.root, ".kaitu")) return ws.resolve(".kaitu/finance", { internal: true });
   const identity = createHash("sha256").update(ws.root).digest("hex").slice(0, 24);
   return join(localStateRoot(), "finance", identity);
 }

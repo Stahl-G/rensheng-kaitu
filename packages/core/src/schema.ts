@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import addFormatsModule from "ajv-formats";
 import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import { schemasDir } from "./assets.js";
@@ -53,7 +54,12 @@ export class SchemaRegistry {
     const custom = resolve(moduleDirAbs, ref);
     const confined = (base: string, path: string) => {
       const rel = relative(base, path);
-      if (isAbsolute(rel) || rel === ".." || rel.startsWith("../"))
+      if (
+        isAbsolute(rel) ||
+        rel === ".." ||
+        rel.startsWith(`..${sep}`) ||
+        rel.split(sep).some((part) => part === ".kaitu" || part === ".git")
+      )
         throw new Error("schema 路径超出模块目录");
     };
     confined(moduleDirAbs, custom);
@@ -65,7 +71,7 @@ export class SchemaRegistry {
         if (isICloudPath(dirname(moduleDirAbs))) assertCloudDownloaded(custom);
         const schema = JSON.parse(readFileSync(custom, "utf8"));
         const base = ref.split("/").pop() ?? ref;
-        schema.$id = `${SCHEMA_BASE}${moduleId}--${base}`;
+        schema.$id = `${SCHEMA_BASE}${moduleId}-${createHash("sha256").update(custom).digest("hex")}--${base}`;
         fn = this.ajv.compile(schema);
         this.cache.set(key, fn);
       }

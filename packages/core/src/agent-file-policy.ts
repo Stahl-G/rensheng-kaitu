@@ -11,7 +11,9 @@ export function assertAgentPath(root: string, path: string): string {
     const rel = relative(base, path);
     return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
   };
-  const managed = [localStateRoot(), ...(inside(root, home) ? [home] : [])];
+  const homeWithin =
+    inside(root, home) || (existsSync(home) && inside(realpathSync(root), realpathSync(home)));
+  const managed = [localStateRoot(), ...(homeWithin ? [home] : [])];
   if (managed.some((directory) => inside(directory, target)))
     throw new ScopeError("本机程序状态不对 AI 开放");
   const check = (base: string, value: string) => {

@@ -244,8 +244,8 @@ function out(values: Values, data: unknown, text: string): void {
   console.log(values["json-out"] ? JSON.stringify(data, null, 2) : text);
 }
 
-function workspace(values: Values): Workspace {
-  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());
+function workspace(values: Values, maintain = true): Workspace {
+  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain });
   if (!ws.exists(".kaitu/config.json"))
     throw new KaituError(`${ws.root} 还不是开图工作区，先运行 kaitu init`, "NOT_INITIALIZED");
   return ws;
@@ -482,7 +482,7 @@ async function run(argv: string[]): Promise<number> {
       return ok ? 0 : 1;
     }
     case "validate": {
-      const ws = workspace(values);
+      const ws = workspace(values, false);
       const issues = validateWorkspace(ws, args[0]);
       out(
         values,

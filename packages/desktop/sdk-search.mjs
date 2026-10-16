@@ -12,7 +12,11 @@ export async function agentSearch(root, name, args, signal, executable, execute 
     signal?.throwIfAborted();
     const info = await lstat(path);
     if (info.isSymbolicLink()) return;
-    assertAgentPath(root, path);
+    try {
+      assertAgentPath(root, path);
+    } catch {
+      return;
+    }
     if (info.isDirectory()) {
       for (const entry of await readdir(path, { withFileTypes: true })) {
         if ([".kaitu", ".git", "node_modules"].includes(entry.name)) continue;
@@ -27,7 +31,7 @@ export async function agentSearch(root, name, args, signal, executable, execute 
     }
   }
   await walk(base);
-  if (name === "glob") return { paths: files.map((path) => relative(root, path)) };
+  if (name === "glob") return { root, paths: files.map((path) => relative(root, path)) };
   const matches = [];
   for (let offset = 0; offset < files.length && matches.length < 250; offset += 128) {
     const batch = files.slice(offset, offset + 128);
@@ -46,8 +50,10 @@ export async function agentSearch(root, name, args, signal, executable, execute 
     for (const line of stdout.split("\n").filter(Boolean)) {
       const row = JSON.parse(line);
       if (row.type !== "match" || !row.data.lines.text) continue;
+      const matchedPath = assertAgentPath(root, row.data.path.text);
+      if (!batch.includes(matchedPath)) throw new Error("搜索返回了范围外路径");
       matches.push({
-        path: relative(root, row.data.path.text),
+        path: relative(root, matchedPath),
         lineNumber: row.data.line_number,
         line: row.data.lines.text.trimEnd().slice(0, 2000),
       });

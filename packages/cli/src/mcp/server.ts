@@ -152,7 +152,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       source: text.optional(),
     },
     (input) => {
-      if (tools === "remote" && input.project) assertPublicProject(ws, input.project);
+      if (tools === "remote") assertPublicInput(ws, input);
       return addTask(ws, input, { by: "agent", actor: actor() });
     },
     true,
@@ -269,10 +269,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       ref: text.optional(),
     },
     (input) => {
-      if (tools === "remote" && input.ref) {
-        assertPublicInput(ws, { id: input.ref });
-        if (input.ref.startsWith("projects/")) assertPublicProject(ws, input.ref.split("/")[1]);
-      }
+      if (tools === "remote") assertPublicInput(ws, input);
       return proposeBlock(ws, input, actor());
     },
     true,

@@ -73,7 +73,7 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
     { internal: true },
   );
   ws.writeJson(".kaitu/secrets.json", {}, { internal: true, mode: 0o600 });
-  chmodSync(join(ws.root, ".kaitu", "secrets.json"), 0o600);
+  chmodSync(ws.resolve(".kaitu/secrets.json", { internal: true }), 0o600);
   writeAgentsMd(ws);
 
   await ensureHistory(ws);

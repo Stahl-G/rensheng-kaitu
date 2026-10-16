@@ -1,8 +1,10 @@
-import { createServer } from "node:http";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { fetchCalendar } from "../src/calendar-fetch.js";
 import { addCalendarSubscription, pullCalendarSubscriptions, readCalendar } from "../src/calendar.js";
 import { deleteRecord, readRecords, updateRecord } from "../src/records.js";
 import { freshWorkspace } from "./helpers.js";
+
+vi.mock("../src/calendar-fetch.js", () => ({ fetchCalendar: vi.fn() }));
 
 it("订阅拉取按 15 分钟刷新，保留人工修改与删除，失败不清空已导入日程", async () => {
   const ws = await freshWorkspace();
@@ -10,21 +12,15 @@ it("订阅拉取按 15 分钟刷新，保留人工修改与删除，失败不清
   let fail = false;
   const now = new Date();
   const day = now.toISOString().slice(0, 10).replaceAll("-", "");
-  const server = createServer((_req, res) => {
+  vi.mocked(fetchCalendar).mockImplementation(async () => {
     calls++;
-    if (fail) {
-      res.writeHead(503);
-      res.end();
-      return;
-    }
-    res.end(
+    if (fail) throw new Error("synthetic unavailable");
+    return Buffer.from(
       `BEGIN:VCALENDAR\r\nVERSION:2.0\r\n${["a", "b", "c"].map((id) => `BEGIN:VEVENT\r\nUID:${id}\r\nDTSTART:${day}T090000Z\r\nDTEND:${day}T100000Z\r\nSUMMARY:${id}-${calls}\r\nEND:VEVENT\r\n`).join("")}END:VCALENDAR\r\n`,
     );
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   try {
-    const address = server.address() as { port: number };
-    await addCalendarSubscription(ws, `http://127.0.0.1:${address.port}/calendar.ics`, "合成日历");
+    await addCalendarSubscription(ws, "https://calendar.example/calendar.ics", "合成日历");
     const rows = readRecords(ws, "event");
     expect(rows).toHaveLength(3);
     updateRecord(ws, "event", rows[0]?.id as string, { title: "人工标题" }, { by: "user" });
@@ -42,6 +38,6 @@ it("订阅拉取按 15 分钟刷新，保留人工修改与删除，失败不清
     expect(readCalendar(ws).subscriptions[0]?.error).toBeTruthy();
     expect(readRecords(ws, "event")).toHaveLength(2);
   } finally {
-    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+    vi.mocked(fetchCalendar).mockReset();
   }
 });

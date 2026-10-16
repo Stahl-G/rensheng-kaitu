@@ -5,6 +5,7 @@ import { afterAll } from "vitest";
 
 const home = mkdtempSync(join(tmpdir(), "kaitu-test-home-"));
 process.env.HOME = home;
+process.env.KAITU_APP_HOME = join(home, "app");
 process.env.XDG_STATE_HOME = join(home, "state");
 process.env.LOCALAPPDATA = join(home, "local");
 process.env.KAITU_LOCAL_STATE_DIR = join(home, "kaitu-state");

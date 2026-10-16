@@ -79,6 +79,13 @@ export function createAskService(options: {
   let runtimeMode: AskMode | undefined;
   let starting: Promise<AskRuntime> | undefined;
   let closed = false;
+  let changing = false;
+  let relocating = false;
+  let generation = 0;
+  const clients = new Set<AskRuntime>();
+  const ready = () => {
+    if (closed || changing || relocating) throw new Error("AI 正在切换或搬迁，请稍后重试");
+  };
   const thread = (id: string) => {
     const value = threads.find((item) => item.id === id);
     if (!value) throw new Error("对话不存在");
@@ -118,21 +125,41 @@ export function createAskService(options: {
     for (const listener of listeners.get(id) ?? []) listener(event);
   };
   const stopRuntime = async () => {
-    await starting?.catch(() => {});
-    await runtime?.close();
+    generation++;
+    const pending = starting;
     runtime = undefined;
     starting = undefined;
     runtimeMode = undefined;
+    await pending?.catch(() => {});
+    for (const client of clients) {
+      await client.close();
+      clients.delete(client);
+    }
   };
   const start = async (mode: AskMode) => {
     if (closed) throw new Error("开图正在退出");
-    if (runtimeMode && runtimeMode !== mode) await stopRuntime();
+    if ((runtimeMode && runtimeMode !== mode) || (!runtime && clients.size)) {
+      changing = true;
+      try {
+        await stopRuntime();
+      } finally {
+        changing = false;
+      }
+    }
     runtimeMode = mode;
+    const epoch = generation;
     starting ??= options
       .runtime(mode)
-      .then((value) => {
+      .then(async (value) => {
+        clients.add(value);
+        if (epoch !== generation || closed) {
+          await value.close();
+          clients.delete(value);
+          throw new Error("AI 状态已变化");
+        }
         runtime = value;
         value.onNotification((method, params) => {
+          if (epoch !== generation) return;
           const id = params.sessionId;
           if (typeof id !== "string" || !threads.some((row) => row.id === id)) return;
           if (method === "session.status") {
@@ -173,6 +200,7 @@ export function createAskService(options: {
         return value;
       })
       .catch(() => {
+        if (epoch !== generation) throw new Error("AI 状态已变化");
         starting = undefined;
         throw new Error("内置 AI 未能启动，请检查 AI 连接后重试");
       });
@@ -189,6 +217,7 @@ export function createAskService(options: {
   return {
     list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
     create() {
+      ready();
       const now = new Date().toISOString();
       const row: AskThread = {
         id: `session-${randomUUID()}`,
@@ -213,6 +242,7 @@ export function createAskService(options: {
       };
     },
     async send(id, text) {
+      ready();
       const row = thread(id);
       if ((row.workspace ?? options.workspaceKey ?? options.workspace) !== options.workspace)
         throw new Error("资料已迁移，请新建对话继续；原对话记录仍可查看");
@@ -236,32 +266,53 @@ export function createAskService(options: {
       }
     },
     async setMode(id, mode, confirmed) {
+      ready();
       const row = thread(id);
       if (mode !== "scoped" && mode !== "full") throw new Error("无效模式");
       if (mode === "full" && confirmed !== true) throw new Error("开启完整 Agent 需要确认");
       if (busy.size) throw new Error("请等回复完成后切换模式");
-      if (runtimeMode !== mode) await stopRuntime();
-      row.mode = mode;
-      saveIndex();
-      return mode;
+      changing = true;
+      try {
+        row.mode = "scoped";
+        saveIndex();
+        if (runtimeMode !== mode || (clients.size && !runtime)) await stopRuntime();
+        row.mode = mode;
+        saveIndex();
+        return mode;
+      } finally {
+        changing = false;
+      }
     },
     async prepareRelocation() {
+      ready();
       if (busy.size) throw new Error("请等回复完成后更换资料位置或恢复版本");
-      await stopRuntime();
+      relocating = true;
+      try {
+        await stopRuntime();
+      } catch (error) {
+        relocating = false;
+        throw error;
+      }
     },
     relocate(workspace) {
       options.workspace = workspace;
+      relocating = false;
     },
     settings: options.settings,
     async configure(input) {
+      ready();
       if (busy.size) throw new Error("请等回复完成后修改连接");
-      await stopRuntime();
-      return options.configure(input);
+      changing = true;
+      try {
+        await stopRuntime();
+        return await options.configure(input);
+      } finally {
+        changing = false;
+      }
     },
     async close() {
       closed = true;
-      await starting?.catch(() => {});
-      await runtime?.close();
+      await stopRuntime();
       listeners.clear();
     },
   };

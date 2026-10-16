@@ -84,7 +84,8 @@ export function relocateProjectRecords(ws: Workspace, slug?: string, toPrivate =
       const moving = lines.filter((line) => ids.has(JSON.parse(line).id));
       if (!moving.length) continue;
       const existing = target.exists(file) ? target.readText(file).split("\n").filter(Boolean) : [];
-      target.writeText(file, `${[...new Set([...existing, ...moving])].join("\n")}\n`);
+      const merged = toPrivate ? [...moving, ...existing] : [...existing, ...moving];
+      target.writeText(file, `${[...new Set(merged)].join("\n")}\n`);
       const remaining = lines.filter((line) => !ids.has(JSON.parse(line).id));
       if (remaining.length) source.writeText(file, `${remaining.join("\n")}\n`);
       else rmSync(source.resolve(file));

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
+import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
@@ -14,6 +15,7 @@ import { type Workspace, stateDirectory } from "./workspace.js";
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [
   ".kaitu/secrets.json",
+  ".kaitu/bank-mail-archive/",
   ".kaitu/github-state.json",
   ".kaitu/dsh-setup.json",
   ".kaitu/automation.json",
@@ -34,6 +36,7 @@ export const NEVER_TRACK = [
 
 export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
+.kaitu/bank-mail-archive/
 .kaitu/github-state.json
 .kaitu/dsh-setup.json
 .kaitu/automation.json
@@ -68,7 +71,7 @@ function neverTrack(path: string): boolean {
 }
 
 export function historyDirectory(ws: Workspace): string {
-  return join(stateDirectory(ws.root, ws.isICloud), "history.git");
+  return ws.resolve(".kaitu/history.git", { internal: true });
 }
 
 export function hasHistory(ws: Workspace): boolean {
@@ -368,6 +371,10 @@ export async function restore(
     )
       continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
+    if (quarantineBankContent(ws, f, blob)) {
+      fs.rmSync(ws.resolve(f), { force: true });
+      continue;
+    }
     if ((privateSlugs.size || privateMetricIds.size) && /\.jsonl$/.test(f)) {
       const rows = Buffer.from(blob)
         .toString("utf8")

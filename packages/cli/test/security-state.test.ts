@@ -1,24 +1,35 @@
+import { randomUUID } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   lstatSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   Workspace,
+  enableDrive,
+  exportWorkspace,
   historyDirectory,
   initWorkspace,
+  localStateRoot,
   readAgentFile,
   snapshot,
   stateDirectory,
 } from "@kaitu/core";
 import { expect, it } from "vitest";
+const { unzipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
+// @ts-expect-error Desktop support modules run directly in Electron Node.
+import { desktopPaths } from "../../desktop/environment.mjs";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
@@ -72,7 +83,7 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
   try {
     const ws = await initWorkspace(root);
     const secret = "synthetic-secret-6287";
-    ws.writeJson(".kaitu/secrets.json", { token: secret }, { internal: true });
+    ws.writeJson(".kaitu/secrets.json", { token: secret }, { internal: true, mode: 0o600 });
     ws.writeText("note.md", "synthetic-note");
     symlinkSync(join(root, ".kaitu"), join(root, "state-alias"));
     const files = new (confinedFileSystem(HostFiles, FsError, root))();
@@ -98,6 +109,7 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
     expect(
       (await files.listDir(await files.resolve("."))).map((entry: { name: string }) => entry.name),
     ).not.toContain(".kaitu");
+    await expect(agentSearch(root, "grep", { path: "state-alias", pattern: ".*" })).rejects.toThrow();
     const names = await agentSearch(root, "glob", { pattern: "**/*" });
     expect(names.paths).toContain("note.md");
     expect(names.paths.some((path: string) => path.includes("secrets.json"))).toBe(false);
@@ -133,7 +145,88 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
     expect(stateDirectory(root)).toBe(state);
     expect(historyDirectory(reopened)).toBe(join(state, "history.git"));
     expect(existsSync(outside)).toBe(false);
+    const appHome = process.env.KAITU_APP_HOME;
+    process.env.KAITU_APP_HOME = join(root, "program");
+    ws.writeText("program/credential.txt", secret);
+    try {
+      const entries = unzipSync(
+        Buffer.from(exportWorkspace(ws, { includePrivate: true }).base64, "base64"),
+      ) as Record<string, Uint8Array>;
+      const contents = Object.values(entries)
+        .map((bytes) => Buffer.from(bytes).toString("utf8"))
+        .join("\n");
+      expect(contents).not.toContain(secret);
+      expect(contents).toContain("updated-note");
+      await expect(files.resolve("program/credential.txt")).rejects.toThrow();
+      const names = await agentSearch(root, "glob", { pattern: "**/*" });
+      expect(names.paths.some((name: string) => name.startsWith("program/"))).toBe(false);
+    } finally {
+      if (appHome === undefined) Reflect.deleteProperty(process.env, "KAITU_APP_HOME");
+      else process.env.KAITU_APP_HOME = appHome;
+    }
+    expect(() => desktopPaths({ KAITU_DIR: root, KAITU_APP_HOME: join(root, "program") })).toThrow();
+    ws.writeText(
+      ".agents/skills/normal/SKILL.md",
+      "---\nname: normal\ndescription: synthetic\n---\nSynthetic skill",
+    );
+    symlinkSync(join(root, ".kaitu"), join(root, ".agents/skills/alias"));
+    expect(await files.readText(await files.resolve(".agents/skills/normal/SKILL.md"))).toContain(
+      "Synthetic skill",
+    );
+    await expect(files.resolve(".agents/skills/alias/secrets.json")).rejects.toThrow();
+    const drive = join(temp, "drive");
+    mkdirSync(drive);
+    await enableDrive(reopened, { driveDir: drive });
+    const external = stateDirectory(reopened.root);
+    const cloudConfig = reopened.readJson<Record<string, unknown>>(".kaitu/config.json");
+    Reflect.deleteProperty(cloudConfig, "state_dir");
+    reopened.writeJson(".kaitu/config.json", cloudConfig, { internal: true });
+    expect(stateDirectory(new Workspace(reopened.root).root)).toBe(external);
+    const foreign = join(localStateRoot(), "foreign-synthetic");
+    mkdirSync(foreign);
+    writeFileSync(join(foreign, "secrets.json"), "foreign-original");
+    renameSync(external, `${external}.saved`);
+    symlinkSync(foreign, external);
+    expect(() => new Workspace(reopened.root)).toThrow();
+    expect(readFileSync(join(foreign, "secrets.json"), "utf8")).toBe("foreign-original");
+    rmSync(external);
+    renameSync(`${external}.saved`, external);
+    const other = join(temp, "other");
+    mkdirSync(join(other, ".kaitu"), { recursive: true });
+    writeFileSync(join(other, ".kaitu/config.json"), JSON.stringify({ ...cloudConfig, state_dir: external }));
+    expect(() => new Workspace(other)).toThrow();
+    const legacy = join(localStateRoot(), randomUUID());
+    mkdirSync(legacy);
+    writeFileSync(join(legacy, "secrets.json"), JSON.stringify({ token: "synthetic-legacy-secret" }), {
+      mode: 0o600,
+    });
+    const legacyRoot = join(temp, "legacy-workspace");
+    mkdirSync(join(legacyRoot, ".kaitu"), { recursive: true });
+    cpSync(join(reopened.root, "me"), join(legacyRoot, "me"), { recursive: true });
+    writeFileSync(
+      join(legacyRoot, ".kaitu/config.json"),
+      JSON.stringify({ ...cloudConfig, state_dir: legacy }),
+    );
+    const legacyWorkspace = new Workspace(legacyRoot);
+    expect(legacyWorkspace.readJson<{ token: string }>(".kaitu/secrets.json").token).toBe(
+      "synthetic-legacy-secret",
+    );
+    expect(stateDirectory(legacyRoot)).toBe(legacy);
+    const cloud = join(process.env.HOME as string, "Library/CloudStorage/GoogleDrive-synthetic/kaitu");
+    mkdirSync(join(cloud, ".kaitu"), { recursive: true });
+    cpSync(join(reopened.root, "me"), join(cloud, "me"), { recursive: true });
+    writeFileSync(join(cloud, ".kaitu/config.json"), JSON.stringify(cloudConfig));
+    writeFileSync(join(cloud, ".kaitu/secrets.json"), JSON.stringify({ token: secret }));
+    const migrated = new Workspace(cloud, { maintain: false });
+    new Workspace(cloud);
+    expect(stateDirectory(migrated.root)).not.toBe(join(cloud, ".kaitu"));
+    expect(migrated.readJson<{ token: string }>(".kaitu/secrets.json").token).toBe(secret);
+    expect(existsSync(join(cloud, ".kaitu/secrets.json"))).toBe(false);
   } finally {
+    rmSync(join(process.env.HOME as string, "Library/CloudStorage/GoogleDrive-synthetic"), {
+      recursive: true,
+      force: true,
+    });
     rmSync(temp, { recursive: true, force: true });
   }
 });

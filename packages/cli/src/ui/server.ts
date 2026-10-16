@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
@@ -140,7 +140,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const askClients = new Set<ServerResponse>();
   const uploads = new Map<
     string,
-    { source: ImportSource; file: string; name: string; preview: unknown; expires: number }
+    { source: ImportSource; file: string; name: string; preview: unknown; digest: string; expires: number }
   >();
   let queue: Promise<unknown> = Promise.resolve();
   function exclusive<T>(operation: () => Promise<T>): Promise<T> {
@@ -331,19 +331,20 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
               : await exclusive(async () => {
                   const mutates = productMutations.has(method);
                   if (mutates) await saveExternal();
-                  if (method === "moveStorage" || method === "restoreVersion")
-                    await options.ask?.prepareRelocation();
-                  if (method === "moveStorage") await options.onWorkspaceChanging?.();
+                  const relocation = method === "moveStorage" || method === "restoreVersion";
+                  if (relocation) await options.ask?.prepareRelocation();
                   const oldRoot = ws.root;
                   let value: unknown;
                   try {
+                    if (method === "moveStorage") await options.onWorkspaceChanging?.();
                     value = await productRequest(ws, method, args, options.ask);
                   } finally {
-                    if (ws.root !== oldRoot) {
-                      startWatching();
-                      options.ask?.relocate(ws.root);
+                    try {
+                      if (ws.root !== oldRoot) startWatching();
+                      if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                    } finally {
+                      if (relocation) options.ask?.relocate(ws.root);
                     }
-                    if (method === "moveStorage") await options.onWorkspaceChanged?.();
                   }
                   if (method === "configureAutomation") await options.onAutomationChanged?.();
                   if (mutates) notify();
@@ -437,7 +438,14 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           try {
             const preview = await importUpload(ws, source, file, true, name);
             const token = randomUUID();
-            uploads.set(token, { source, file, name, preview, expires: Date.now() + 30 * 60000 });
+            uploads.set(token, {
+              source,
+              file,
+              name,
+              preview,
+              digest: createHash("sha256").update(bytes).digest("hex"),
+              expires: Date.now() + 30 * 60000,
+            });
             return { token, preview };
           } catch (error) {
             discardUpload(ws, file);
@@ -487,14 +495,17 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                     to: typeof data.to === "string" && data.to ? data.to : undefined,
                   });
             } finally {
-              startWatching();
-              if (ws.root !== oldRoot) {
+              try {
+                startWatching();
+                if (ws.root !== oldRoot) {
+                  aiChild?.kill();
+                  aiChild = undefined;
+                  aiReady = undefined;
+                }
+                await options.onWorkspaceChanged?.();
+              } finally {
                 options.ask?.relocate(ws.root);
-                aiChild?.kill();
-                aiChild = undefined;
-                aiReady = undefined;
               }
-              await options.onWorkspaceChanged?.();
             }
           }
           case "/api/projects/sync":
@@ -509,14 +520,22 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             return completeNext(ws, field(data, "file"), field(data, "id"));
           case "/api/memory/delete":
             return removeMemory(ws, field(data, "file"), { by: "user" });
-          case "/api/restore":
-            return restore(ws, field(data, "version"));
+          case "/api/restore": {
+            await options.ask?.prepareRelocation();
+            try {
+              return await restore(ws, field(data, "version"));
+            } finally {
+              options.ask?.relocate(ws.root);
+            }
+          }
           case "/api/import/confirm": {
             const token = field(data, "token");
             const upload = uploads.get(token);
             if (!upload || upload.expires < Date.now())
               throw new KaituError("预览已过期，请重新选择文件", "CONFLICT");
             try {
+              if (createHash("sha256").update(ws.readBytes(upload.file)).digest("hex") !== upload.digest)
+                throw new KaituError("文件已变化，请重新预览", "CONFLICT");
               const preview = await importUpload(ws, upload.source, upload.file, true, upload.name);
               if (JSON.stringify(preview) !== JSON.stringify(upload.preview)) {
                 throw new KaituError("文件夹已变化，请重新预览后确认", "CONFLICT");

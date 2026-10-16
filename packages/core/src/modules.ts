@@ -37,8 +37,9 @@ export function listModules(ws: Workspace): LoadedModule[] {
     if (ws.conflictCopy(name)) continue;
     if (NOT_MODULES.has(name) || name.startsWith(".")) continue;
     const full = join(ws.root, name);
-    if (!lstatSync(full).isDirectory() || !ws.exists(`${name}/module.json`)) continue;
+    if (!lstatSync(full).isDirectory()) continue;
     try {
+      if (!ws.exists(`${name}/module.json`)) continue;
       const def = ws.readJson<ModuleDef>(`${name}/module.json`);
       if (!schemas().builtin("module.schema.json")(def)) continue;
       out.push({ dir: name, def });

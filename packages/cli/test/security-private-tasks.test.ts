@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import {
   exportWorkspace,
   history,
   initWorkspace,
+  parseFrontmatter,
   proposeBlock,
   readExploration,
   readRecordRevisions,
@@ -19,6 +20,7 @@ import {
   setProject,
   snapshot,
   stateDirectory,
+  stringifyFrontmatter,
   updateRecord,
   writeExploration,
 } from "@kaitu/core";
@@ -85,12 +87,34 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
       },
       "synthetic",
     );
+    const reassociated = await addTask(ws, { title: "synthetic-reassociated-private", due: "2026-10-16" });
+    await proposeBlock(
+      ws,
+      { title: "synthetic-reassociated-private", start: "12:00", end: "13:00", ref: reassociated.record.id },
+      "synthetic",
+    );
+    const plan = parseFrontmatter<Record<string, unknown>>(ws.readText("NOW.md"));
+    ws.writeText(
+      "NOW.md",
+      stringifyFrontmatter(
+        {
+          ...plan.data,
+          date: "2026-10-15",
+          attention: [{ kind: "task", title: "synthetic-private-attention", ref: task.record.id }],
+        },
+        plan.body,
+      ),
+    );
     const beforePrivate = (await snapshot(ws, "synthetic-before-private")) ?? (await history(ws))[0]?.oid;
     await addTask(ws, { title: "shared-task", due: "2026-10-16" });
     await setProject(ws, project.slug, { local_only: true });
     const revisions = readRecordRevisions(ws, "task").filter((row) => row.id === task.record.id);
     expect(revisions.map((row) => row.notes)).toEqual(["original-notes", "revised-notes"]);
     expect(readRecords(ws, "task").some((row) => row.title === marker)).toBe(true);
+    updateRecord(ws, "task", reassociated.record.id, { project: project.slug });
+    expect(readRecordRevisions(ws, "task").filter((row) => row.id === reassociated.record.id)).toHaveLength(
+      2,
+    );
     const newMarker = "synthetic-local-new-9348";
     const newTask = await addTask(ws, {
       title: newMarker,
@@ -127,8 +151,11 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
       "synthetic-question-681",
       "synthetic-evidence-681",
       "synthetic-private-plan-path",
+      "synthetic-private-attention",
+      "synthetic-reassociated-private",
     ])
       expect(sharedText()).not.toContain(value);
+    expect(ws.readText("NOW.md")).toContain("synthetic-private-attention");
     expect(readExploration(ws).directions.some((row) => row.id === direction.id)).toBe(true);
     expect(readExploration(ws, true).directions).toEqual([]);
     expect(JSON.stringify(readStatus(ws, new Date("2026-10-16T12:00:00Z"), true))).not.toContain(marker);
@@ -146,9 +173,24 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
         .map((bytes) => Buffer.from(bytes).toString("utf8"))
         .join("\n"),
     ).toContain(newMarker);
+    const privateRoot = ws.resolve(".kaitu/local-projects", { internal: true });
+    renameSync(privateRoot, `${privateRoot}.saved`);
+    symlinkSync(stateDirectory(ws.root), privateRoot);
+    try {
+      expect(() => exportWorkspace(ws, { includePrivate: true })).toThrow();
+    } finally {
+      rmSync(privateRoot);
+      renameSync(`${privateRoot}.saved`, privateRoot);
+    }
     const leaked = { ...revisions[0], id: "01ARZ3NDEKTSV4RRFFQ69G5FAV", title: "synthetic-legacy-private" };
     ws.appendLine("me/data/tasks/2026-10.jsonl", JSON.stringify(leaked));
-    const stale = { ...newTask.record, project: undefined, rev: 2, title: "synthetic-stale-without-project" };
+    const stale = {
+      ...newTask.record,
+      project: undefined,
+      source: undefined,
+      rev: 1,
+      title: "synthetic-stale-without-project",
+    };
     ws.appendLine("me/data/tasks/2026-10.jsonl", JSON.stringify(stale));
     server = createMcpServer(ws, "remote");
     const [a, b] = InMemoryTransport.createLinkedPair();
@@ -175,9 +217,16 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
         "synthetic-question-681",
         "synthetic-evidence-681",
         "synthetic-private-plan-path",
+        "synthetic-private-attention",
+        "synthetic-reassociated-private",
       ])
         expect(JSON.stringify(result)).not.toContain(value);
     }
+    const remoteTask = await client.callTool({
+      name: "task_add",
+      arguments: { title: "synthetic-remote-private", source: `./projects/${project.slug}/STATUS.md` },
+    });
+    expect(remoteTask.isError).toBe(true);
     const rejected = await client.callTool({
       name: "exploration_write",
       arguments: {
@@ -193,11 +242,13 @@ it("私有任务及完整修订留在本机，对外出口与同步目录无内�
     expect(readRecords(reopened, "task").some((row) => row.id === leaked.id)).toBe(true);
     expect(sharedText()).not.toContain(leaked.title);
     expect(sharedText()).not.toContain(stale.title);
+    expect(readRecords(reopened, "task").find((row) => row.id === newTask.record.id)?.title).toBe(newMarker);
     await restore(reopened, beforePrivate as string);
     expect(sharedText()).not.toContain(marker);
     expect(sharedText()).not.toContain(newMarker);
     expect(sharedText()).not.toContain(leaked.title);
     expect(sharedText()).not.toContain(stale.title);
+    expect(readRecords(reopened, "task").find((row) => row.id === newTask.record.id)?.title).toBe(newMarker);
     expect(sharedText()).not.toContain("synthetic-question-681");
     await setProject(reopened, project.slug, { local_only: false });
     expect(sharedText()).toContain(marker);

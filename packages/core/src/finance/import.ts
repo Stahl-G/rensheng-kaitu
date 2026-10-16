@@ -7,7 +7,7 @@ import { snapshot } from "../history.js";
 import { batchOverview } from "../overview.js";
 import { type StoredRecord, addRecords, appendPreparedRecords, readRecords } from "../records.js";
 import { isoInZone } from "../time.js";
-import { discardUpload, stageUpload } from "../ui-imports.js";
+import { discardUpload, resolveUpload, stageUpload } from "../ui-imports.js";
 import type { Workspace } from "../workspace.js";
 import { financeEffects, reconcileFinance, transactionKey } from "./accounting.js";
 import { refreshBankNotificationMatches } from "./bank-notifications.js";
@@ -28,7 +28,7 @@ export interface FinanceImportOptions {
 }
 const staged = (file: string) => /^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml|xls|xlsx)$/.test(file);
 const filePath = (ws: Workspace, file: string) =>
-  isAbsolute(file) ? file : ws.resolve(file, { internal: true });
+  staged(file) ? resolveUpload(ws, file) : isAbsolute(file) ? file : ws.resolve(file, { internal: true });
 const receiptPath = (file: string) => file.replace(/\.(csv|xml|xls|xlsx)$/, ".receipt.json");
 const queues = new Map<string, Promise<unknown>>();
 export function stageFinanceUpload(ws: Workspace, name: string, bytes: Uint8Array): string {
@@ -44,6 +44,8 @@ async function parse(ws: Workspace, file: string, options: FinanceImportOptions)
   )
     throw new KaituError("银行卡尾号须为四位数字", "INVALID_IMPORT");
   const path = filePath(ws, file);
+  if (statSync(path).size > 32 * 1024 * 1024)
+    throw new KaituError("账单超过 32 MiB，请分批导入", "IMPORT_LIMIT");
   const bytes = readFileSync(path);
   const document = await readFinanceDocument(bytes, options.sheet);
   const { text, encoding } = document;

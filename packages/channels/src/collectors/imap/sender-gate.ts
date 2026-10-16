@@ -18,6 +18,7 @@ const AUTH_FRESHNESS_MS = 48 * 60 * 60 * 1_000;
 const DNS_TIMEOUT_MS = 5_000;
 
 type ImapAuthEvidence = {
+  signed?: boolean;
   strength: IdentifierAuthentication;
   reason:
     | `dmarc-${Exclude<AuthenticateResult["dmarc"], false>["status"]["result"]}`
@@ -127,7 +128,12 @@ function mapImapAuthStrength(
     return { strength: "unverified", reason: "dkim-unsigned-body", transient: false };
   }
   if (dmarc === "pass") {
-    return { strength: "verified", reason: "dmarc-pass", transient: false };
+    return {
+      strength: "verified",
+      reason: "dmarc-pass",
+      transient: false,
+      signed: !!dmarcResult?.alignment?.dkim.result,
+    };
   }
   const trusted = headers.find(
     (header) => header.dmarc === "pass" && account.senderAuth.trustedAuthservIds.includes(header.authservId),
@@ -205,5 +211,11 @@ export async function evaluateImapSender(params: {
   if (!meetsIdentifierAuthentication(evidence.strength, params.account.senderAuth.min)) {
     return { accepted: false, sender, ...evidence };
   }
-  return { accepted: true, sender, strength: evidence.strength, reason: evidence.reason };
+  return {
+    accepted: true,
+    sender,
+    strength: evidence.strength,
+    reason: evidence.reason,
+    signed: evidence.signed,
+  };
 }

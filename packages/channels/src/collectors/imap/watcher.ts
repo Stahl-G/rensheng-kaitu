@@ -1,6 +1,6 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
 
-import { receiveBankNotification } from "@kaitu/core";
+import { archiveBankMail, isBankNotificationMail, receiveBankNotification } from "@kaitu/core";
 import { type FetchMessageObject, ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { receiveMessage } from "../inbox.js";
@@ -187,7 +187,29 @@ export class ImapCollector implements Collector {
       account: this.config,
       authenticator: this.authenticator,
     });
+    const bankMail = {
+      sender: verdict.sender ?? mail.from?.value[0]?.address ?? "",
+      subject: mail.subject ?? "",
+      text: mail.text ?? "",
+      time: date.toISOString(),
+    };
+    const bank =
+      isBankNotificationMail(bankMail) ||
+      mail.headerLines.some(
+        ({ key, line }) =>
+          key.toLowerCase() === "from" &&
+          isBankNotificationMail({ ...bankMail, sender: line.slice(line.indexOf(":") + 1).trim() }),
+      );
+    if (bank)
+      archiveBankMail(
+        this.context.ws,
+        bankMail,
+        message.source,
+        `${this.config.host}/${this.config.user}/${this.config.mailbox}/${validity}:${message.uid}`,
+        verdict.accepted && "strength" in verdict && verdict.strength === "verified" && !!verdict.signed,
+      );
     if (!verdict.accepted) {
+      if (bank) this.context.status({ error: "有银行通知未通过身份核验，请在邮箱核对" });
       if (verdict.transient && this.state.attempt(message.uid) < 3) return false;
       return true;
     }
@@ -195,6 +217,13 @@ export class ImapCollector implements Collector {
     if (this.stopped) return false;
     const scope = `${this.config.host}/${this.config.user}/${this.config.mailbox}`;
     const externalId = `${scope}/${mail.messageId ?? `${validity}:${message.uid}`}`;
+    if (bank) {
+      if ("strength" in verdict && verdict.strength === "verified" && verdict.signed)
+        receiveBankNotification(this.context.ws, bankMail);
+      else this.context.status({ error: "有银行通知未通过身份核验，请在邮箱核对" });
+      if (mail.messageId) this.state.remember(mail.messageId);
+      return true;
+    }
     receiveMessage(this.context.ws, {
       source: "imap",
       account: this.context.account.label,
@@ -209,14 +238,6 @@ export class ImapCollector implements Collector {
         : `imap://${encodeURIComponent(this.config.user)}@${this.config.host}/${encodeURIComponent(this.config.mailbox)};UIDVALIDITY=${validity}/;UID=${message.uid}`,
       authentication: verdict.reason,
     });
-    // 只认 DMARC 通过的银行动账通知，识别出的交易进本机待核对，不直接记账。
-    if ("strength" in verdict && verdict.strength === "verified" && mail.text)
-      receiveBankNotification(this.context.ws, {
-        sender: verdict.sender,
-        subject: mail.subject ?? "",
-        text: mail.text,
-        time: date.toISOString(),
-      });
     if (mail.messageId) this.state.remember(mail.messageId);
     return true;
   }
