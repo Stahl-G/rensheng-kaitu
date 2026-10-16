@@ -14,7 +14,7 @@ const EXTENSIONS: Record<ImportSource, string[]> = {
   "apple-health": [".zip", ".xml"],
   ics: [".ics"],
   "nut-ai": [".json"],
-  finance: [".csv"],
+  finance: [".csv", ".xml"],
 };
 export function stageUpload(ws: Workspace, source: ImportSource, name: string, bytes: Uint8Array): string {
   const ext = extname(name).toLowerCase();

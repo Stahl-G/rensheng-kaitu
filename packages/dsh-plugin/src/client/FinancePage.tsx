@@ -374,7 +374,7 @@ function ImportPanel({
                 选择 CSV 文件
                 <input
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.xml,text/csv,application/xml"
                   disabled={!account || busy}
                   onChange={(e) => {
                     void upload(e.target.files?.[0]);
@@ -389,8 +389,7 @@ function ImportPanel({
           {p && (
             <div className={css.preview}>
               <p>
-                {p.format === "alipay-csv" ? "支付宝账单 CSV" : "券商 / 同花顺持仓 CSV"} ·{" "}
-                {p.encoding.toUpperCase()}
+                {p.format} · {p.encoding.toUpperCase()}
               </p>
               <p className={css.muted}>
                 期间：{p.period.from ? stamp(p.period.from) : "暂无记录"} –{" "}

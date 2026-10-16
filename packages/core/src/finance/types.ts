@@ -33,6 +33,9 @@ export interface FinanceTransaction extends StoredRecord {
   source_transaction_id: string | null;
   related_ids: string[];
   reconciliation: "ok" | "pending_review" | "candidate_duplicate";
+  source_status?: string | null;
+  source_direction?: string | null;
+  account_last4?: string | null;
   direction_unknown?: boolean;
   original_source_transaction_id?: string | null;
   cost?: string | null;

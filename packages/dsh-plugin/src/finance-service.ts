@@ -95,6 +95,6 @@ export class KaituFinanceService extends TypertRemoteService {
     discardFinanceImport(this.workspace, file);
   }
   private assertUpload(file: string): void {
-    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.csv$/.test(file)) throw new Error("无效的财务上传文件");
+    if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(csv|xml)$/.test(file)) throw new Error("无效的财务上传文件");
   }
 }
