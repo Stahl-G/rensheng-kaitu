@@ -39,7 +39,12 @@ export interface OverviewPageProps
   onAgent: () => void;
   onAdvanced?: () => void;
   channelSettings?: ChannelRequest;
-  renderAsk?: (prompt: string, configureRequest: number, configureBuiltin: boolean) => ReactNode;
+  renderAsk?: (
+    prompt: string,
+    configureRequest: number,
+    configureBuiltin: boolean,
+    onConnections: () => void,
+  ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
 const modules = [
@@ -679,7 +684,7 @@ export function OverviewPage(props: OverviewPageProps) {
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div hidden={view !== "ask"}>
-            {props.renderAsk(promptDraft, configureRequest, configureBuiltin)}
+            {props.renderAsk(promptDraft, configureRequest, configureBuiltin, () => setView("connections"))}
           </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (

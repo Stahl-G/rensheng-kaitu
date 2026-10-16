@@ -1,0 +1,28 @@
+{
+  "surface": "kaitu ui on synthetic workspace; ask/settings forwarded to local SDK service",
+  "options": [
+    "DeepSeek（推荐）",
+    "OpenAI",
+    "Anthropic Claude",
+    "Google Gemini",
+    "OpenRouter",
+    "Kimi",
+    "智谱",
+    "通义千问",
+    "自定义（OpenAI 兼容）"
+  ],
+  "shots": [
+    "01-connect-default",
+    "02-key-error",
+    "03-local-connection",
+    "04-settings",
+    "05-image-enabled",
+    "06-mobile-dark-text-only",
+    "07-mobile-dialog"
+  ],
+  "modelSwitch": "local-first -> local-second, stored key reused",
+  "imageUi": "synthetic credential seed only; no DeepSeek requests sent",
+  "mobileOverflow": false,
+  "pageErrors": [],
+  "incompleteCustomToExternal": "passed, no custom parameters or key required"
+}

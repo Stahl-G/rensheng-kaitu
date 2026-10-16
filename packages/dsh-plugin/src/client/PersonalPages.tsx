@@ -108,12 +108,16 @@ export function PersonalPages(
           <>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>「问问」用的 AI</h2>
+              <p className={css.small}>
+                填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）
+              </p>
+              <p className={css.small}>更换服务或模型后，下一条消息生效。</p>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css.conn}>
                   <span className={css.logo} style={{ background: "var(--explore)" }}>
                     AI
                   </span>
-                  <b>{data.ai?.model ?? "由 DSH 管理"}</b>
+                  <b>{data.ai ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}` : "由 DSH 管理"}</b>
                   <span className={css.small}>
                     {data.ai
                       ? data.ai.configured

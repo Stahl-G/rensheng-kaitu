@@ -580,7 +580,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
         <h2 id="ai-title">问问开图，需要先连接一个 AI</h2>
         <p style="color: var(--ink2)">看资料、随手记都不需要 AI。连接之后，开图可以帮你整理记录、排日程、回答关于你自己的问题。</p>
         <button type="button" class="choice" data-choice="own" aria-pressed="true"><span class="radio" aria-hidden="true"></span><span><b>用你已经在用的 AI</b><span>Claude、ChatGPT、Grok 都可以。开图给你一段连接说明，复制给它就行。</span></span></button>
-        <button type="button" class="choice" data-choice="built" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span><b>用开图里的 AI</b><span>直接在开图里聊天。需要一个模型的 API Key，比如 DeepSeek。</span></span></button>
+        <button type="button" class="choice" data-choice="built" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span><b>用开图里的 AI</b><span>填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）</span></span></button>
         <div class="dialog-foot">
           <button type="button" class="btn btn-quiet" data-close>以后再说</button>
           <button type="button" class="btn btn-primary" id="ai-next">下一步</button>
@@ -841,7 +841,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     var opt = function (id, t, d) { return '<button type="button" role="radio" class="ob-goal" aria-checked="' + (c === id) + '" aria-pressed="' + (c === id) + '" data-obaipick="' + id + '"><b>' + t + '</b><span>' + d + '</span></button>'; };
     return '<h1 class="ob-h">选一个 AI 帮你整理</h1><p class="ob-lead">开图负责把资料存好，AI 负责整理和排计划。AI 随时能换，资料都在。</p>' +
       '<div class="ob-goals ob-ai-opts" role="radiogroup" aria-label="用哪个 AI">' +
-      opt('builtin', '用开图里的「问问」', '填一个 DeepSeek 的 API Key 就能用，按用量付费') +
+      opt('builtin', '用开图里的「问问」', '填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）') +
       opt('mine', '在原来的 AI 里继续', '复制一份筛选过的资料包给 ChatGPT、Claude，再把回答贴回开图核对；也能连 Claude、Codex 自动读写') +
       opt('none', '先不用 AI', '随手记和导入都能用，原文先存着') + '</div>' +
       obFoot(false, 'finish', c === 'none' ? '完成' : c === 'builtin' ? '去填 API Key' : '去 AI 与连接', '');
@@ -1202,7 +1202,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       '<div class="c-row"><button type="button" class="c-btn" aria-label="添加文件或照片"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg></button>' +
       '<span class="mode-wrap"><button type="button" class="c-btn' + (full ? ' is-full' : '') + '" data-mode="toggle" aria-haspopup="dialog" aria-expanded="' + !!state.modeOpen + '">' + (full ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2.5 13.5 5v3.5c0 3-2.4 4.8-5.5 5.5-3.1-.7-5.5-2.5-5.5-5.5V5z" stroke-linejoin="round"/></svg>完整 Agent' : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>只读写开图资料') + '</button>' +
       (state.modeOpen ? modePanel(full) : '') + '</span>' +
-      '<button type="button" class="c-btn">DeepSeek V4 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 3.5 3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+      '<button type="button" class="c-btn">DeepSeek · deepseek-flash <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 3.5 3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
       '<button type="submit" class="send" aria-label="发送"' + (state.busy ? ' disabled' : '') + '><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></form>' +
       '<p class="c-note">回复里的数字都来自你的开图资料，点开工具卡片能看到读了哪些。</p>';
     return '<div class="chat">' + side + '<section class="convo" aria-label="' + esc(t.title) + '"><div class="msgs" id="msgs">' + body + '</div>' + composer + '</section></div>';
@@ -1277,7 +1277,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       }
       body = '<div class="head"><h1>AI 与连接</h1><span class="sub">哪些 AI 能读写你的开图，资料存在哪里</span></div>' +
         '<section class="sec" aria-labelledby="h-built"><h2 id="h-built" class="eyebrow">「问问」用的 AI</h2><div class="card list-card"><div class="conn">' +
-        '<span class="logo" style="background:var(--explore)">D</span><b>DeepSeek V4</b><span class="small">已连接 · API Key 只存在这台电脑的开图目录里，不会同步到云端</span>' +
+        '<span class="logo" style="background:var(--explore)">D</span><b>DeepSeek · deepseek-flash</b><span class="small">已连接 · API Key 只存在这台电脑的开图目录里，不会同步到云端</span>' +
         '<span style="display:flex;gap:8px"><button type="button" class="btn btn-quiet" style="height:34px">换模型</button></span></div></div></section>' +
         '<section class="sec" aria-labelledby="h-local"><div class="sec-head"><h2 id="h-local" class="eyebrow">这台电脑上的 AI</h2><span class="small">通过 MCP 直接读写，电脑开着时可用</span></div><div class="card list-card">' + connRows(local) + '</div></section>' +
         '<section class="sec" aria-labelledby="h-cloud"><div class="sec-head"><h2 id="h-cloud" class="eyebrow">云端的 AI</h2><span class="small">通过 Google Drive 里的文件接力，电脑关着也能用</span></div><div class="card list-card">' + connRows(cloud) + '</div>' +

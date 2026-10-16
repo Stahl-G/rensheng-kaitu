@@ -208,7 +208,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     {
       id: "builtin",
       title: "用开图里的「问问」",
-      description: "填一个 DeepSeek API Key 就能用",
+      description: "填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）",
       target: "ask",
     },
     {
