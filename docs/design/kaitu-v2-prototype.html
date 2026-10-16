@@ -133,6 +133,54 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 .start h3 { font-size: 17px; font-weight: 600 }
 .start p { color: var(--ink2); font-size: 14px }
 .start .tag { align-self: flex-start }
+.ob { display: flex; flex-direction: column; gap: 18px; padding: 28px; max-width: 860px; width: 100%; margin: 0 auto }
+.ob-h { font-size: 26px; line-height: 34px; font-weight: 600; text-wrap: balance }
+.ob-lead { color: var(--ink2); font-size: 15px; max-width: 40em; margin-top: -8px }
+.ob-steps { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; padding: 0; margin: 0; font-size: 13px; color: var(--muted) }
+.ob-steps li { display: flex; align-items: center; gap: 6px }
+.ob-steps .num { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--control); font-size: 12px }
+.ob-steps .is-now { color: var(--ink); font-weight: 600 }
+.ob-steps .is-now .num { background: var(--primary); color: #FFFFFF }
+.ob-steps .is-done .num { background: var(--health-tint); color: var(--health-ink) }
+.ob-ais { display: flex; flex-wrap: wrap; gap: 6px }
+.ob-ais button { height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: transparent; color: var(--ink2); font-size: 14px }
+.ob-ais button[aria-checked="true"] { background: var(--strong); border-color: var(--strong); color: var(--on-strong) }
+.ob-step { display: flex; gap: 12px; align-items: flex-start }
+.ob-n { flex: none; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--control); font-size: 13px; font-weight: 600 }
+.ob-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px }
+.ob-prompt { position: relative; border-radius: 12px; background: var(--control) }
+.ob-prompt pre { margin: 0; padding: 14px 16px; padding-right: 84px; white-space: pre-wrap; font: 13px/1.7 inherit; color: var(--ink) }
+.ob-prompt .btn { position: absolute; top: 8px; right: 8px; height: 32px; background: var(--surface) }
+.ob textarea { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; resize: vertical }
+.ob-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 6px }
+.ob-foot-r { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-left: auto }
+.link-btn { border: 0; background: none; padding: 0; color: var(--primary); font: inherit; font-size: 14px; cursor: pointer }
+.ob-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px }
+.ob-group { display: flex; flex-direction: column; gap: 4px; min-width: 0 }
+.ob-item { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; font-size: 14px }
+.ob-item input { margin-top: 3px; accent-color: var(--primary) }
+.ob-goals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px }
+.ob-goal { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left }
+.ob-goal b { font-weight: 600; font-size: 15px }
+.ob-goal span { font-size: 13px; color: var(--ink2) }
+.ob-goal[aria-pressed="true"] { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); background: var(--control) }
+.ob-srcs { display: flex; flex-direction: column; padding: 4px 18px }
+.ob-src { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 0; border-top: 1px solid var(--line) }
+.ob-src:first-child { border-top: 0 }
+.ob-src-t { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 2px }
+.ob-how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 8px 0 }
+.ob-how div { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; background: var(--control) }
+.ob-how span { font-size: 13px; color: var(--ink2) }
+.ob-check { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px }
+.ob-chk { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line) }
+.ob-chk .stack { flex: 1; min-width: 0 }
+.ob-chk.is-done b { color: var(--muted); font-weight: 500 }
+.ob-tick { flex: none; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--line); font-size: 13px; color: var(--health-ink) }
+.ob-chk.is-done .ob-tick { background: var(--health-tint); box-shadow: none }
+@media (max-width: 760px) {
+  .ob { padding: 20px 16px }
+  .ob-groups, .ob-how { grid-template-columns: 1fr }
+}
 
 /* 开图 */
 .subtabs { display: flex; flex-wrap: wrap; gap: 6px }
@@ -165,7 +213,9 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 .comment { padding-left: 10px; border-left: 2px solid var(--news); font-size: 14px; color: var(--ink) }
 
 /* 记录 */
-.mods { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px }
+.mods { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+@media (max-width: 760px) { .mods { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 460px) { .mods { grid-template-columns: 1fr } }
 .mod { display: flex; flex-direction: column; gap: 6px; padding: 16px; color: var(--ink); font-weight: 400 }
 .mod:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--muted) }
 .raw { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 16px; padding: 14px 4px; border-top: 1px solid var(--line) }
@@ -251,7 +301,12 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 }
 /* 足迹地图：铺满宽度，工具和详情浮在地图上 */
 .map-hero { position: relative; height: clamp(400px, 64vh, 660px); padding: 0; overflow: hidden; background: var(--map-sea) }
-.map-svg { position: absolute; inset: 0; width: 100%; height: 100% }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab }
+.map-svg.is-dragging { cursor: grabbing }
+.map-zoom { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; padding: 4px; gap: 2px; box-shadow: 0 6px 20px rgba(0,0,0,0.10), 0 0 0 1px var(--line) }
+.map-zoom button { min-width: 36px; height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 13px }
+.map-zoom button[data-zoom="in"], .map-zoom button[data-zoom="out"] { font-size: 18px }
+.map-zoom button:hover { background: var(--control) }
 .map-svg .city { cursor: pointer; outline: none }
 .map-svg .city:focus-visible circle { stroke: var(--explore) }
 .map-tools { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.10), 0 0 0 1px var(--line) }
@@ -271,7 +326,8 @@ main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left
 .tl-dot { width: 10px; height: 10px; border-radius: 50% }
 @media (max-width: 760px) {
   .map-hero { height: 520px }
-  .map-tools { right: 14px }
+  .map-tools { right: 66px }
+  .map-zoom button[data-zoom="mine"], .map-zoom button[data-zoom="world"] { font-size: 12px; padding: 0 4px }
   .layer-chips { flex-wrap: wrap }
   .map-stats { display: none }
 }
@@ -587,16 +643,145 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     return '<div class="sec" style="gap:14px"><div class="head"><h1>10 月 16 日，周五</h1><span class="sub">今天还有 2 件日程 · 1 件事要你确认</span></div>' + captureForm() + '</div>' + focus + agenda() + ask + sums + fin + feed;
   }
 
+  /* 第一次打开：从常用的 AI 搬记忆 → 选先管哪几件事 → 接数据 → 选 AI；每步都能跳过 */
+  var OB_PROMPT = '请把你记住的关于我的所有信息完整列出来，尽量保持原文，不要总结或省略。包括：\n1. 你保存的记忆条目\n2. 我设置的自定义指令或个性化偏好\n3. 你从我们的对话里了解到的我的情况：工作、目标、健康、作息、兴趣、正在做的项目、重要的人\n按下面的格式输出，每条一行：\n[类别] 内容 （如果知道记下的时间，写在最后）';
+  var OB_AIS = [
+    ['chatgpt', 'ChatGPT', '再到「设置 → 个性化 → 记忆 → 管理」，把列表也复制过来，ChatGPT 有时会漏掉几条。'],
+    ['claude', 'Claude', '开了记忆的话，把「设置」里的记忆内容也一起复制过来。'],
+    ['gemini', 'Gemini', '把「保存的信息」页面里的内容也一起复制过来。'],
+    ['deepseek', 'DeepSeek', '它不保存长期记忆，回答里主要是这次对话能看到的内容，可以多聊几句再问。'],
+    ['doubao', '豆包', '开了记忆的话，把设置里的记忆列表也一起复制过来。'],
+    ['other', '其他', '任何 AI 都可以，回答格式对不上也没关系，对不上的行会原样留着。']
+  ];
+  var OB_SAMPLE = '[工作] 独立开发者，在做一个叫「开图」的个人数据 App （2026-08）\n[项目] 每周写一篇短篇连载，目前写到第 6 篇\n[目标] 今年体脂降到 15%，每周练 3 次\n[健康] 有轻度乳糖不耐\n[作息] 一般 1 点睡，9 点起，想提前到 12 点睡\n[偏好] 回答用中文，先给结论再解释\n[偏好] 不喜欢被催，建议给两三个选项就好\n[兴趣] 城市素描、播客、跑步\n[人物] 阿杰：大学室友，一起在做连载的插画\n[地点] 2024 年起住在胡志明市，之前在上海住了 6 年\n记得用户说过想学日语，但没有具体计划';
+  var OB_GOALS = [
+    ['me', '了解自己的现状', '把散在各处的情况放在一起，攒一段时间再看变化'],
+    ['projects', '推进手上的项目', '记下在做的事，AI 帮你盯里程碑和下一步'],
+    ['health', '吃好、睡好、练好', '睡眠、训练、饮食和体检放在一起看'],
+    ['finance', '管好钱', '账单、持仓和资产，一眼看到钱去了哪里'],
+    ['calendar', '把日程排明白', '接上日历，AI 每天早上帮你排今天'],
+    ['explore', '想清楚一个方向', '比如要不要换城市、换工作，先写问题再慢慢试'],
+    ['news', '每天看点有用的资讯', '只看和你在做的事有关的']
+  ];
+  var OB_SOURCES = {
+    calendar: ['日历', '粘贴 Google 日历、iCloud 或 Outlook 的订阅地址（ICS），每 15 分钟同步一次，只读。', '粘贴订阅地址'],
+    health: ['Apple 健康', 'iPhone「健康」→ 右上角头像 → 导出所有健康数据，把压缩包拖进来。', '选择导出文件'],
+    finance: ['账单与持仓', '微信、支付宝、招商、工商、建设、中行、京东、美团的账单，券商导出的持仓或成交表。', '选择账单文件'],
+    projects: ['项目', '连上 GitHub，或选一个本机文件夹，开图会读里面的进度和 TODO。', '选择文件夹'],
+    mail: ['邮件和聊天', 'Gmail、iCloud、QQ、163 邮箱，或 Slack、飞书；只读，开图从不替你发消息。', '添加账号'],
+    news: ['关注方向', '写几个你关心的方向，比如「独立开发」「东南亚生活」。', '写下方向']
+  };
+  var OB_NEEDS = { me: ['mail'], projects: ['projects'], health: ['health'], finance: ['finance', 'mail'], calendar: ['calendar'], explore: [], news: ['news'] };
+  function obParse(text) {
+    var cats = { '工作': '工作', '项目': '在做的事', '目标': '目标', '健康': '健康', '作息': '健康', '偏好': '偏好和规则', '指令': '偏好和规则', '兴趣': '兴趣', '人物': '重要的人', '地点': '地点' };
+    return text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).map(function (l, i) {
+      var m = l.match(/^\[([^\]]+)\]\s*(.+?)\s*(?:（([^）]+)）)?$/);
+      return m ? { i: i, cat: cats[m[1]] || '其他', text: m[2], when: m[3] || '' } : { i: i, cat: '其他', text: l, when: '', raw: true };
+    });
+  }
+  function obSteps() {
+    var names = ['搬来记忆', '先管哪些', '接上数据', '选一个 AI'];
+    return '<ol class="ob-steps" aria-label="开始使用的步骤">' + names.map(function (n, i) {
+      var k = i + 1, cls = state.ob === k ? ' is-now' : state.ob > k ? ' is-done' : '';
+      return '<li class="' + cls.trim() + '"' + (state.ob === k ? ' aria-current="step"' : '') + '><span class="num">' + k + '</span>' + n + '</li>';
+    }).join('') + '</ol>';
+  }
+  function obFoot(back, next, nextLabel, skipLabel) {
+    return '<div class="ob-foot">' + (back ? '<button type="button" class="btn btn-quiet" data-ob="back">上一步</button>' : '<span></span>') +
+      '<div class="ob-foot-r">' + (skipLabel ? '<button type="button" class="link-btn" data-ob="skip">' + skipLabel + '</button>' : '') +
+      '<button type="button" class="btn btn-primary" data-ob="' + next + '">' + nextLabel + '</button></div></div>';
+  }
+  function obMemory() {
+    var ai = OB_AIS.filter(function (a) { return a[0] === (state.obAi || 'chatgpt'); })[0];
+    if (state.obPreview) {
+      var items = obParse(state.obText || ''), picked = state.obPick || {};
+      var groups = {};
+      items.forEach(function (it) { (groups[it.cat] = groups[it.cat] || []).push(it); });
+      var n = items.filter(function (it) { return picked[it.i] !== false; }).length;
+      return '<h1 class="ob-h">开图从 ' + ai[1] + ' 那里认识了你 ' + items.length + ' 件事</h1>' +
+        '<p class="ob-lead">看一眼，不对的取消勾选。写入后在「个人档案」里每条都能改，也能看到来自哪里。</p>' +
+        '<div class="ob-groups">' + Object.keys(groups).map(function (g) {
+          return '<section class="ob-group"><h2 class="eyebrow">' + g + '</h2>' + groups[g].map(function (it) {
+            return '<label class="ob-item"><input type="checkbox" data-obpick="' + it.i + '"' + (picked[it.i] !== false ? ' checked' : '') + '><span>' + esc(it.text) +
+              (it.when ? '<span class="small"> · ' + esc(it.when) + '</span>' : '') + (it.raw ? '<span class="small"> · 格式没对上，原样保留</span>' : '') + '</span></label>';
+          }).join('') + '</section>';
+        }).join('') + '</div>' +
+        obFoot(true, 'save', '记下这 ' + n + ' 条', '');
+    }
+    return '<h1 class="ob-h">先让开图认识你</h1>' +
+      '<p class="ob-lead">你常用的 AI 已经记住了不少关于你的事。复制下面这段话发给它，再把回答粘贴回来，不用从头填档案。</p>' +
+      '<div class="ob-ais" role="radiogroup" aria-label="你最常用的 AI">' + OB_AIS.map(function (a) {
+        return '<button type="button" role="radio" aria-checked="' + (a === ai) + '" data-obai="' + a[0] + '">' + a[1] + '</button>';
+      }).join('') + '</div>' +
+      '<div class="ob-step"><span class="ob-n">1</span><div class="ob-body"><b>复制这段话，发给 ' + ai[1] + '</b>' +
+      '<div class="ob-prompt"><pre id="ob-prompt">' + esc(OB_PROMPT) + '</pre><button type="button" class="btn btn-quiet" data-ob="copy">' + (state.obCopied ? '已复制' : '复制') + '</button></div>' +
+      '<span class="small">' + ai[2] + '</span></div></div>' +
+      '<div class="ob-step"><span class="ob-n">2</span><div class="ob-body"><b>把它的回答粘贴到这里</b>' +
+      '<textarea id="ob-text" rows="7" placeholder="[工作] 独立开发者……">' + esc(state.obText || '') + '</textarea>' +
+      '<span class="small">没有现成的回答？<button type="button" class="link-btn" data-ob="sample">用一段示例试试</button> · 想连完整聊天记录一起搬：<a href="#">导入 ChatGPT 数据导出包</a></span></div></div>' +
+      obFoot(false, 'preview', '看看认出了什么', '我没有常用的 AI，跳过');
+  }
+  function obGoals() {
+    var g = state.obGoals || {};
+    return '<h1 class="ob-h">你最想先管好哪几件事？</h1><p class="ob-lead">选几个就行，下一步只请你接这几件需要的数据。以后随时能加。</p>' +
+      '<div class="ob-goals">' + OB_GOALS.map(function (o) {
+        return '<button type="button" class="ob-goal" aria-pressed="' + !!g[o[0]] + '" data-obgoal="' + o[0] + '"><b>' + o[1] + '</b><span>' + o[2] + '</span></button>';
+      }).join('') + '</div>' + obFoot(true, 'next', '下一步', '先随便看看');
+  }
+  function obSourceList() {
+    var g = state.obGoals || {}, seen = {}, out = [];
+    Object.keys(g).forEach(function (k) { if (g[k]) OB_NEEDS[k].forEach(function (s) { if (!seen[s]) { seen[s] = 1; out.push(s); } }); });
+    return out;
+  }
+  function obData() {
+    var list = obSourceList(), done = state.obDone || {};
+    var rows = list.length ? list.map(function (k) {
+      var s = OB_SOURCES[k], d = done[k];
+      return '<div class="ob-src"><div class="ob-src-t"><b>' + s[0] + '</b><span class="small">' + s[1] + '</span></div>' +
+        (d ? plain('已接上', 'var(--health-tint)', 'var(--health-ink)') : '<button type="button" class="btn btn-quiet" data-obsrc="' + k + '">' + s[2] + '</button>') + '</div>';
+    }).join('') : '<p class="note">你选的事不需要先接数据，直接下一步。</p>';
+    return '<h1 class="ob-h">把数据接进来</h1><p class="ob-lead">导入前都会先给你看预览，确认后才写入。没准备好的先跳过，以后在「资料」里接。</p>' +
+      '<div class="ob-srcs card">' + rows + '</div>' + obFoot(true, 'next', '下一步', list.length ? '都先跳过' : '');
+  }
+  function obAi() {
+    var c = state.obAiPick || 'builtin';
+    var opt = function (id, t, d) { return '<button type="button" role="radio" class="ob-goal" aria-checked="' + (c === id) + '" aria-pressed="' + (c === id) + '" data-obaipick="' + id + '"><b>' + t + '</b><span>' + d + '</span></button>'; };
+    return '<h1 class="ob-h">选一个 AI 帮你整理</h1><p class="ob-lead">开图负责把资料存好，AI 负责每天整理、排计划。AI 随时能换，资料都在。</p>' +
+      '<div class="ob-goals ob-ai-opts" role="radiogroup" aria-label="用哪个 AI">' +
+      opt('builtin', '用开图里的「问问」', '填一个 DeepSeek 的 API Key 就能用，按用量付费，几块钱能用很久') +
+      opt('mine', '用我已有的 AI', 'Claude、ChatGPT、Codex、Grok 都能接，在「AI 与连接」里一步步带你连') +
+      opt('none', '先不用 AI', '随手记和导入都能用，原文会先存着，等你连上再整理') + '</div>' +
+      obFoot(true, 'finish', c === 'none' ? '完成' : c === 'builtin' ? '去填 API Key' : '去连接', '');
+  }
+  function obChecklist() {
+    var g = state.obGoals || {}, items = [
+      ['记住你的情况', state.obSaved ? state.obSaved + ' 条，来自 ' + (OB_AIS.filter(function (a) { return a[0] === (state.obAi || 'chatgpt'); })[0][1]) : '从常用的 AI 搬过来', !!state.obSaved, 'mem']
+    ];
+    obSourceList().forEach(function (k) { items.push(['接上' + (/^[A-Za-z]/.test(OB_SOURCES[k][0]) ? ' ' : '') + OB_SOURCES[k][0], (state.obDone || {})[k] ? '已接上' : '还没接', !!(state.obDone || {})[k], 'src-' + k]); });
+    items.push(['连上一个 AI', state.obAiPick === 'none' ? '先不用也没关系' : '还没连上', false, 'ai']);
+    items.push(['拿到第一份今天计划', '连上 AI 后，第二天早上 7:30 自动排好', false, 'plan']);
+    var n = items.filter(function (x) { return x[2]; }).length;
+    return '<section class="card ob-check" aria-labelledby="h-chk"><div class="sec-head"><h2 id="h-chk" style="font-size:17px;font-weight:600">开始使用 · ' + n + '/' + items.length + '</h2><button type="button" class="link-btn" data-ob="restart">重新走一遍</button></div>' +
+      '<div class="bar" style="height:6px"><i style="width:' + Math.round(n / items.length * 100) + '%;background:var(--primary)"></i></div>' +
+      items.map(function (x) {
+        return '<div class="ob-chk' + (x[2] ? ' is-done' : '') + '"><span class="ob-tick" aria-hidden="true">' + (x[2] ? '✓' : '') + '</span><div class="stack"><b>' + x[0] + '</b><span class="small">' + x[1] + '</span></div>' +
+          (x[2] ? '' : x[3] === 'ai' ? '<button type="button" class="btn btn-quiet" data-open-ai>去连接</button>' : x[3] === 'plan' ? '' : '<button type="button" class="btn btn-quiet" data-ob="goto" data-obto="' + (x[3] === 'mem' ? 1 : 3) + '">去做</button>') + '</div>';
+      }).join('') + '</section>';
+  }
   function firstRun() {
-    return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎</span><h1 id="h-wel">先记下一句，开图就开始认识你</h1>' +
-      '<p>你的记录都存在你自己的文件夹里，换哪个 AI 都能接着用。现在不用设置任何东西。</p></section>' +
-      '<div class="sec" style="gap:14px">' + captureForm() + '</div>' +
-      '<section class="sec" aria-labelledby="h-start"><h2 id="h-start" class="eyebrow">也可以从这里开始</h2><div class="starts">' +
-      '<button type="button" class="start card"><h3>导入已有资料</h3><p>Apple 健康、日历、支付宝账单、和 AI 的聊天记录。开图先给你看预览，确认后才写入。</p></button>' +
-      '<button type="button" class="start card" data-open-ai><h3>连接一个 AI</h3><p>Claude、ChatGPT、Grok 都可以。连上后它能读写你的开图，帮你整理。</p>' + plain('可选', 'var(--control)', 'var(--ink2)').replace('chip"', 'chip tag"') + '</button>' +
-      '<button type="button" class="start card" data-go="explore"><h3>写下一个想试的方向</h3><p>比如「要不要搬去别的城市住三个月」。先写问题，别的以后再补。</p></button>' +
-      '</div></section>' +
-      '<p class="note">这里暂时没有图表：等有了真实记录才会出现，开图不会把「没记」当成 0。</p>';
+    if (!state.ob) {
+      return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎来到人生开图</span><h1 id="h-wel">把你的生活交给 AI 打理，你只看结果、做决定</h1>' +
+        '<div class="ob-how"><div><b>1 · 资料放进开图</b><span>记忆、日历、健康、账单、项目，都存在你自己的文件夹里</span></div>' +
+        '<div><b>2 · AI 每天整理</b><span>早上排好今天，晚上整理当天，有变动先问你</span></div>' +
+        '<div><b>3 · 你只确认</b><span>换哪个 AI 都能接着用，人生进度不会丢</span></div></div>' +
+        '<div class="ob-foot"><span class="small">大约 5 分钟，每一步都能跳过</span><div class="ob-foot-r"><button type="button" class="link-btn" data-ob="later">先随便看看</button><button type="button" class="btn btn-primary" data-ob="start">开始</button></div></div></section>';
+    }
+    if (state.ob === 'done') {
+      return '<div class="sec" style="gap:14px"><div class="head"><h1>10 月 16 日，周五</h1><span class="sub">' + (state.obSaved ? '开图已经记住了 ' + state.obSaved + ' 件关于你的事' : '先记下一句，开图就开始认识你') + '</span></div>' + captureForm() + '</div>' + obChecklist() +
+        '<p class="note">这里暂时没有图表：等有了真实记录才会出现，开图不会把「没记」当成 0。</p>';
+    }
+    var body = state.ob === 1 ? obMemory() : state.ob === 2 ? obGoals() : state.ob === 3 ? obData() : obAi();
+    return '<section class="ob card" aria-label="开始使用">' + obSteps() + body + '</section>';
   }
 
   var dirs = [
@@ -634,24 +819,29 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     { name: '东京', lng: 139.69, lat: 35.69, layer: 'been', from: 2023, to: 2023, note: '2023 年 4 月旅行 6 天', n: 1 },
     { name: '清迈', lng: 98.99, lat: 18.79, layer: 'been', from: null, note: '时间不详 · 来自一段聊天记录', n: 1 },
     { name: '胡志明市', lng: 106.70, lat: 10.78, layer: 'now', from: 2024, to: null, note: '2024 年起住在这里', n: 26 },
-    { name: '岘港', lng: 108.22, lat: 16.05, layer: 'plan', from: 2027, to: 2027, note: '计划 2027 年试住三个月', n: 1 }
+    { name: '岘港', lng: 108.22, lat: 16.05, layer: 'plan', from: 2027, to: 2027, note: '计划 2027 年试住三个月', n: 1 },
+    { name: '旧金山', lng: -122.42, lat: 37.77, layer: 'been', from: 2019, to: 2019, note: '2019 年 9 月开会一周', n: 2 },
+    { name: '巴塞罗那', lng: 2.17, lat: 41.39, layer: 'been', from: 2022, to: 2022, note: '2022 年 5 月旅行 8 天', n: 1 }
   ];
   var layerColor = { been: 'var(--explore)', now: 'var(--health)', plan: 'var(--news)' };
   var layerName = { been: '去过', now: '现在住', plan: '计划' };
-  var MASK = {"l0": 88, "b1": 44, "step": 0.5, "cols": 120, "rows": "0.95.12.7.6|0.88.1.4.14.8.5|0.87.3.1.13.8.8|0.85.19.1.4.2.9|0.84.20.1.15|0.83.23.1.13|0.66.2.15.21.3.13|0.65.3.13.23.4.12|0.63.4.4.2.6.25.4.12|0.62.5.1.7.4.25.4.12|0.59.16.5.23.4.13|0.60.14.7.22.3.14|0.62.3.1.11.5.20.4.14|0.62.2.5.9.5.18.5.14|0.67.9.7.14.8.15|0.65.12.6.7.1.5.9.15|0.64.13.6.13.10.14|0.63.14.6.6.13.2.1.15|0.62.15.1.10.5.1.3.2.2.19|0.65.17.1.3.3.2.6.23|0.65.18.1.1.1.3.4.2.1.24|0.65.11.1.6.5.1.1.30|0.66.15.1.2.4.32|0.67.18.2.33|0.68.15.4.33|0.67.53|0.67.53|0.65.1.1.53|0.68.52|0.68.52|0.67.53|0.66.16.1.37|0.65.55|0.65.55|0.63.17.1.39|0.63.16.1.40|0.63.57|0.63.57|0.61.5.2.52|0.60.5.2.53|0.59.5.3.53|0.57.7.3.53|0.5.1.48.10.2.54|0.6.2.43.14.1.54|0.3.5.40.72|8.31.5.1.75|9.28.7.1.75|10.27.83|11.25.7.3.74|11.25.5.4.75|12.23.6.4.75|13.23.29.4.51|13.24.28.3.52|13.25.27.4.51|13.3.1.1.1.20.26.4.51|12.4.3.21.25.3.52|19.22.23.3.53|20.22.22.3.53|20.22.24.1.53|20.22.23.2.2.1.50|20.22.22.1.1.1.1.1.1.3.47|21.3.2.17.22.2.4.1.48|9.1.11.3.2.17.23.1.53|21.3.5.13.24.1.3.2.1.2.45|9.1.11.3.6.12.26.1.5.1.45|21.2.7.12.26.2.1.1.1.2.45|20.3.7.10.28.1.1.1.49|21.1.11.4.25.1.7.2.48|21.1.12.3.24.1.7.1.2.1.47|21.3.10.2.24.1.9.1.4.1.44|20.4.35.1.14.3.43|21.4.45.7.43|22.2.44.3.1.5.43|23.2.33.1.9.1.3.3.1.1.43|24.3.30.2.13.3.45|24.4.28.3.13.3.45|25.4.27.5.13.1.45|14.4.7.5.25.8.57|15.5.5.6.22.8.59|16.5.4.6.21.8.60|17.5.4.5.9.1.10.8.61|18.5.4.4.19.9.61|15.1.3.5.3.4.16.13.60|20.5.3.4.14.14.20.1.39"};
-  var landSvg = null;
+  var MASK = {"l0":-180,"b1":78,"step":0.75,"cols":480,"rows":"89.4.6.1.12.4.7.2.1.10.10.4.1.61.48.4.4.4.106.2.100|80.5.2.1.23.4.6.15.11.65.2.1.46.2.66.3.43.8.97|77.3.5.5.4.2.5.2.1.2.1.3.6.3.30.2.8.55.107.9.36.2.3.19.34.1.55|83.5.1.10.2.1.4.4.2.3.2.17.28.52.103.5.27.1.8.34.31.10.2.3.42|88.4.20.1.6.2.1.11.32.49.100.6.35.33.92|74.11.21.1.1.1.4.7.45.48.99.5.38.30.1.2.40.2.50|74.10.1.3.8.2.1.1.6.3.4.5.3.4.1.12.28.37.1.5.102.4.18.2.12.8.1.25.1.17.6.7.68|73.8.1.13.1.4.4.7.2.2.5.5.2.5.1.1.2.4.26.40.3.1.100.4.18.5.3.1.2.3.2.62.1.1.14.7.1.1.45|75.4.4.18.6.2.3.3.5.6.1.13.1.1.24.2.1.1.1.39.99.5.17.5.2.3.1.70.4.1.9.14.40|30.4.1.2.45.19.10.5.5.22.1.2.24.1.1.34.2.3.62.1.1.1.1.1.33.5.13.8.2.75.1.28.2.7.26.1.1|24.22.23.2.13.21.6.6.8.10.1.12.1.1.17.2.1.33.1.5.56.3.1.4.1.4.1.1.38.2.10.7.1.12.1.102.27|22.33.5.1.1.3.1.6.1.1.1.5.5.19.5.2.1.1.2.5.6.4.5.1.1.1.1.12.17.2.2.35.56.22.20.1.15.5.5.6.1.126.4.11.1|2.16.70.1.4.3.3.11.2.3.4.1.3.3.6.10.7.20.2.1.32.57.30.19.2.5.2.1.10.2.6.1.4.1.136|5.15.66.6.1.3.7.7.2.1.9.2.7.6.5.1.8.1.1.16.28.63.34.5.3.4.32.2.140|7.1.1.13.74.1.34.12.14.11.27.64.36.4.2.3.32.3.141|7.1.5.6.2.4.99.2.2.13.9.1.7.10.21.1.4.15.1.8.1.1.1.36.28.3.6.2.2.1.35.2.144|1.1.10.4.105.1.2.1.2.15.7.4.2.14.19.1.2.17.3.1.9.35.14.3.13.7.187|6.3.9.106.1.4.7.16.18.16.22.14.32.14.5.13.3.2.3.180.1.1.1.2.1|25.97.3.6.12.10.18.15.25.8.34.15.4.16.3.187.2|11.1.1.1.9.96.7.1.8.1.8.5.1.3.19.13.65.1.1.14.4.209.1|20.97.11.2.17.4.22.10.67.14.4.190.2.19.1|19.96.18.1.2.8.30.10.64.15.6.184.1.3.2.14.7|20.19.1.75.21.9.30.8.63.1.3.13.6.179.5.2.3.12.10|18.1.1.3.1.13.1.4.2.1.1.68.22.11.2.1.30.2.56.1.8.1.1.15.2.1.3.5.3.169.9.5.1.1.3.1.13|24.11.3.2.14.60.22.11.6.2.92.18.12.162.1.6.8.4.22|24.2.1.1.1.1.1.5.20.58.21.12.1.1.3.4.79.1.11.5.3.8.7.159.24.4.1.1.21|30.4.2.1.21.1.1.56.21.20.76.2.14.2.4.7.11.155.23.5.24|29.2.3.2.23.1.2.55.21.20.73.6.16.1.2.6.2.1.4.2.2.153.23.8.23|27.2.31.2.2.58.16.19.75.5.15.2.3.5.6.156.24.10.22|24.1.1.2.4.1.29.1.2.59.13.22.75.3.14.3.1.4.9.155.25.8.24|22.2.38.2.1.1.1.63.6.25.68.1.1.1.1.5.13.3.14.153.2.1.23.9.5.1.18|66.64.4.29.66.3.3.4.13.2.8.3.1.156.26.6.26|17.1.45.1.2.64.5.24.2.2.1.1.62.5.4.4.10.173.2.3.2.1.17.5.27|68.64.3.31.61.5.3.5.1.1.4.182.1.2.17.3.19.1.9|7.2.61.62.3.31.61.3.4.8.4.185.18.2.29|70.63.1.29.2.1.70.5.3.1.1.182.1.2.18.1.30|69.1.2.1.1.87.3.1.69.1.7.185.2.3.48|71.2.1.77.3.1.8.1.1.1.75.186.3.2.48|72.3.1.73.2.3.3.1.5.6.69.189.2.2.1.1.47|76.71.1.6.8.7.65.193.2.1.50|74.72.1.7.7.1.1.2.2.2.67.190.3.1.50|75.78.1.1.82.52.3.15.2.1.1.114.4.2.11.1.37|75.80.1.1.1.2.78.43.2.3.5.14.6.113.5.1.10.1.39|75.66.1.12.1.3.80.18.2.22.3.4.1.1.1.13.6.1.1.112.57|75.75.2.3.83.18.4.18.7.1.5.11.5.115.7.2.49|74.73.5.2.84.13.3.3.4.17.14.11.5.113.8.5.46|74.72.82.16.10.4.4.15.17.9.6.110.8.7.46|74.71.83.16.7.2.2.4.6.12.18.9.6.104.12.1.3.1.49|75.71.82.16.13.4.5.12.5.5.7.10.5.1.1.101.67|74.69.85.13.11.1.6.4.3.6.2.3.2.27.7.100.14.2.51|74.67.87.12.11.2.7.2.2.1.1.4.4.32.4.90.3.8.16.2.51|75.63.1.2.87.12.11.2.8.2.4.4.5.30.5.88.3.1.4.3.17.2.51|75.63.1.1.88.12.21.1.5.5.4.29.7.85.10.4.15.3.51|77.61.1.1.88.11.18.3.8.3.5.29.7.87.8.1.1.3.12.4.52|77.61.90.2.1.7.14.2.4.2.9.2.6.30.5.91.6.4.9.1.1.4.52|77.62.93.1.8.13.23.1.1.2.2.2.3.113.8.4.9.5.53|78.61.93.1.6.16.33.112.9.4.6.1.1.5.54|79.59.94.22.29.2.3.111.10.3.4.9.55|81.55.95.22.35.112.15.1.2.4.58|83.51.95.26.32.114.7.1.4.2.2.1.62|84.49.95.31.9.3.16.114.13.2.64|84.48.95.34.6.6.13.116.12.1.65|85.2.2.42.96.36.4.10.3.3.1.118.12.1.65|85.2.3.31.2.1.1.6.96.38.1.135.79|86.2.2.23.3.4.9.3.95.56.1.20.3.95.78|87.2.2.22.17.2.94.78.4.94.78|88.2.2.18.20.2.92.60.1.20.3.93.79|87.3.3.17.20.3.89.63.3.18.4.91.79|89.2.3.16.20.3.2.1.86.63.3.19.9.84.80|90.2.2.16.21.2.88.65.3.18.1.1.7.84.80|91.1.4.14.28.1.81.66.4.17.1.1.5.1.14.70.81|91.1.5.13.110.67.3.18.5.3.14.67.4.1.3.1.74|93.1.4.12.109.68.4.27.13.66.3.2.78|99.11.19.5.84.70.4.27.13.1.1.61.5.2.78|27.1.71.11.21.5.82.71.3.28.12.4.1.24.1.29.89|29.1.70.10.11.3.11.3.79.72.3.27.14.3.1.19.7.21.3.1.92|31.1.68.10.9.5.13.3.78.72.3.26.18.19.7.19.4.1.93|32.1.66.12.8.4.13.1.5.1.2.1.72.72.4.23.20.18.10.16.5.2.92|32.1.68.11.7.4.20.4.71.72.5.22.20.16.12.16.4.2.93|102.12.1.7.14.1.4.6.1.1.1.2.67.72.4.20.22.15.14.15.4.1.15.1.78|105.17.97.73.4.18.24.13.15.16.18.3.77|107.15.96.74.5.15.26.12.16.3.1.13.17.3.77|109.4.2.7.87.1.8.74.5.13.28.10.19.1.2.14.16.3.77|116.12.90.75.4.12.29.9.23.15.15.2.78|117.12.88.78.2.9.33.8.24.14.15.2.78|119.10.89.78.2.6.35.8.24.15.15.1.2.2.74|123.6.31.1.57.79.1.3.39.7.24.2.2.11.15.1.2.1.75|124.4.16.1.73.80.13.1.28.7.25.1.3.10.15.1.1.2.1.1.73|125.3.15.1.75.78.10.1.33.5.17.1.8.1.4.9.94|126.3.11.4.1.4.71.78.4.6.33.5.25.2.5.6.19.2.1.1.73|127.2.10.5.1.8.1.2.2.1.62.87.34.4.34.2.16.1.7.2.72|128.2.4.1.4.5.1.14.63.86.34.3.2.1.23.1.8.1.26.1.72|128.6.1.2.1.20.64.85.35.2.3.1.23.2.23.1.9.2.72|131.2.3.25.62.83.40.3.23.2.29.6.71|136.26.62.82.40.3.24.1.31.4.71|137.26.63.18.2.59.42.2.25.2.19.2.8.2.73|137.32.58.13.7.58.69.3.18.3.82|137.33.58.4.5.1.9.57.63.4.3.4.15.5.82|137.35.80.52.64.3.3.4.14.5.83|137.35.79.1.1.50.66.4.2.3.13.6.83|136.36.81.49.68.4.2.2.10.9.83|135.38.80.47.71.5.1.2.9.9.13.1.69|134.39.80.46.73.5.8.13.3.1.4.1.4.1.68|133.40.80.45.74.6.7.12.7.1.5.2.68|118.1.14.38.1.3.77.45.76.5.7.12.12.2.3.1.1.1.63|132.39.2.6.73.44.78.5.8.9.3.2.1.2.10.5.2.1.58|132.41.1.7.72.42.79.5.1.2.5.8.4.3.4.2.5.1.2.3.4.2.55|134.49.70.41.79.1.1.7.5.8.4.4.14.3.2.6.12.1.39|133.55.66.39.83.5.8.1.2.3.3.5.5.2.1.3.3.14.11.1.37|132.57.66.38.84.4.18.1.2.2.16.13.47|132.58.66.36.86.3.18.1.3.1.18.12.8.1.37|132.61.63.36.107.1.19.1.4.11.3.4.4.1.33|132.61.64.35.89.4.40.12.10.1.32|134.60.63.36.89.11.18.1.3.1.9.11.13.1.30|134.60.64.35.94.6.15.1.15.8.2.3.12.1.30|135.58.65.34.100.2.1.2.1.1.1.4.3.2.18.4.4.3.3.1.12.1.25|135.58.65.35.106.1.5.2.29.3.41|136.56.66.35.107.1.4.1.23.1.8.2.1.1.38|136.55.67.36.186|137.53.68.36.120.1.14.1.23.1.26|138.51.69.36.11.1.108.7.1.1.6.2.49|138.50.69.37.11.2.107.8.7.2.49|138.50.69.37.10.3.106.8.8.2.49|139.49.68.38.10.3.100.4.2.8.8.4.47|140.48.68.38.8.5.99.16.7.5.28.1.17|142.46.68.37.7.6.100.17.6.5.46|144.44.68.36.7.7.97.1.1.20.3.6.44.1.1|40.1.104.43.68.34.9.7.97.32.29.1.12.1.2|146.41.69.33.10.7.97.32.45|146.41.70.31.11.6.97.33.42.1.2|146.41.70.29.13.6.95.37.43|146.40.72.28.13.6.92.41.21.1.20|147.38.73.29.11.6.90.45.21.1.19|146.39.74.28.11.6.89.46.23.1.17|146.36.1.1.75.28.11.6.88.49.39|146.34.79.28.11.5.88.51.38|146.31.82.28.11.5.88.52.37|146.30.84.25.14.3.90.51.37|146.29.85.24.107.53.36|146.29.85.24.107.53.36|145.30.85.24.108.52.36|145.30.86.22.109.53.35|145.29.88.21.110.52.35|145.28.90.19.111.51.36|144.28.91.18.112.51.36|144.27.93.16.114.50.36|145.25.94.15.115.17.5.28.36|145.25.94.14.116.13.12.24.37|144.25.95.12.118.11.15.3.1.18.38|144.24.96.6.123.6.21.2.1.19.38|144.19.3.1.228.3.25.1.1.16.39|143.21.260.16.31.2.7|143.21.262.14.32.1.7|142.22.262.14.33.2.5|142.21.264.10.36.3.1.1.2|142.20.269.1.2.2.37.5.2|142.15.315.4.4|142.15.280.1.36.2.4|141.12.1.3.276.1.3.1.32.1.2.2.5|142.1.1.9.280.5.31.3.8|141.1.1.11.280.3.31.4.8|141.1.1.11.280.3.30.4.9|141.12.313.5.9|142.11.311.4.12|143.8.312.5.12|140.10.312.5.13|141.10.329|141.11.328|139.12.329|139.11.182.1.147|140.8.1.1.330|139.9.313.1.18|140.8.13.1.318|142.7.10.2.319|142.2.1.4.331|142.1.1.1.2.2.331|145.1.2.3.40.1.288|147.4.329"};
+  var landSvg = null, MK = 10;
+  var MW = MASK.cols * MASK.step * MK, MH = MASK.rows.split('|').length * MASK.step * MK;
+  function MX(l) { return (l - MASK.l0) * MK; }
+  function MY(b) { return (MASK.b1 - b) * MK; }
   function land() {
     if (landSvg) return landSvg;
-    var out = [], K = 20, rows = MASK.rows.split('|');
+    var out = [], rows = MASK.rows.split('|');
     rows.forEach(function (r, bi) {
       var li = 0, on = false;
       r.split('.').forEach(function (n) {
         n = +n;
-        if (on) for (var k = 0; k < n; k++) out.push('M' + ((li + k + 0.5) * MASK.step * K).toFixed(0) + ' ' + ((bi + 0.5) * MASK.step * K).toFixed(0) + 'h0');
+        if (on) for (var k = 0; k < n; k++) out.push('M' + ((li + k + 0.5) * MASK.step * MK).toFixed(1) + ' ' + ((bi + 0.5) * MASK.step * MK).toFixed(1) + 'h0');
         li += n; on = !on;
       });
     });
-    landSvg = '<path d="' + out.join('') + '" stroke="var(--map-dot)" stroke-width="6" stroke-linecap="round" fill="none"/>';
+    landSvg = out.join('');
     return landSvg;
   }
   function placeVisible(p) {
@@ -660,29 +850,56 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     var y = state.mapYear || 2027;
     return p.from === null || p.from <= y;
   }
+  /* 视野：默认框住你去过的地方；可以拖动、滚轮或按钮缩放，也能一键看全世界 */
+  function mapBox() { var el = document.querySelector('.map-hero'); return el ? { w: el.clientWidth || 1000, h: el.clientHeight || 560 } : { w: 1000, h: 560 }; }
+  function clampView(v) {
+    var b = mapBox(), a = b.h / b.w;
+    v.w = Math.max(240, Math.min(MW, v.w));
+    var h = v.w * a;
+    v.x = Math.max(0, Math.min(MW - v.w, v.x));
+    v.y = h >= MH ? (MH - h) / 2 : Math.max(0, Math.min(MH - h, v.y));
+    return v;
+  }
+  function fitView(list) {
+    if (!list.length) return worldView();
+    var xs = list.map(function (p) { return MX(p.lng); }), ys = list.map(function (p) { return MY(p.lat); });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var b = mapBox(), a = b.h / b.w, pad = 1.35;
+    var w = Math.max(360, (x1 - x0) * pad, (y1 - y0) * pad / a);
+    return clampView({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - w * a / 2, w: w });
+  }
+  function worldView() { return clampView({ x: 0, y: 0, w: MW }); }
+  function zoomAt(f, cx, cy) {
+    var v = state.mapView || fitView(places.filter(placeVisible)), b = mapBox();
+    cx = cx == null ? 0.5 : cx; cy = cy == null ? 0.5 : cy;
+    var px = v.x + v.w * cx, py = v.y + v.w * b.h / b.w * cy, w = v.w * f;
+    state.mapView = clampView({ x: px - w * cx, y: py - w * b.h / b.w * cy, w: w });
+  }
   function map() {
-    var K = 20, X = function (l) { return (l - MASK.l0) * K; }, Y = function (b) { return (MASK.b1 - b) * K; };
-    var W = MASK.cols * MASK.step * K, H = MASK.rows.split('|').length * MASK.step * K;
+    var b = mapBox(), v = state.mapView || fitView(places.filter(placeVisible)), h = v.w * b.h / b.w, u = v.w / b.w;
+    var X = MX, Y = MY;
     var vis = places.filter(placeVisible);
-    var path = function (a, b, dash) {
-      var pa = places.filter(function (p) { return p.name === a; })[0], pb = places.filter(function (p) { return p.name === b; })[0];
+    var path = function (a, c, dash) {
+      var pa = places.filter(function (p) { return p.name === a; })[0], pb = places.filter(function (p) { return p.name === c; })[0];
       if (!placeVisible(pa) || !placeVisible(pb)) return '';
       var x1 = X(pa.lng), y1 = Y(pa.lat), x2 = X(pb.lng), y2 = Y(pb.lat), mx = (x1 + x2) / 2 + (y2 - y1) * 0.18, my = (y1 + y2) / 2 - (x2 - x1) * 0.18;
-      return '<path d="M' + x1 + ' ' + y1 + ' Q' + mx + ' ' + my + ' ' + x2 + ' ' + y2 + '" fill="none" stroke="' + (dash ? 'var(--news)' : 'var(--ink2)') + '" stroke-width="2.5" stroke-dasharray="' + (dash ? '8 7' : '0') + '" opacity="' + (dash ? 0.9 : 0.55) + '"/>';
+      return '<path d="M' + x1 + ' ' + y1 + ' Q' + mx + ' ' + my + ' ' + x2 + ' ' + y2 + '" fill="none" stroke="' + (dash ? 'var(--news)' : 'var(--ink2)') + '" stroke-width="' + 2 * u + '" stroke-dasharray="' + (dash ? 7 * u + ' ' + 6 * u : '0') + '" opacity="' + (dash ? 0.9 : 0.55) + '"/>';
     };
     var routes = path('上海', '胡志明市', false) + path('胡志明市', '岘港', true);
     var pts = vis.map(function (p) {
-      var i = places.indexOf(p), px = X(p.lng), py = Y(p.lat), r = p.layer === 'now' ? 13 : Math.min(13, 7 + Math.sqrt(p.n));
+      var i = places.indexOf(p), px = X(p.lng), py = Y(p.lat), r = (p.layer === 'now' ? 9 : Math.min(9, 5 + Math.sqrt(p.n) * 0.8)) * u;
       var sel = state.city === i;
       var mark = p.layer === 'plan'
-        ? '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="var(--surface)" stroke="var(--news)" stroke-width="3" stroke-dasharray="4 3"/>'
-        : '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="' + layerColor[p.layer] + '" stroke="var(--surface)" stroke-width="3"/>';
-      var ring = sel ? '<circle cx="' + px + '" cy="' + py + '" r="' + (r + 8) + '" fill="none" stroke="' + layerColor[p.layer] + '" stroke-width="2.5"/>' : '';
-      return '<g class="city" data-city="' + i + '" tabindex="0" role="button" aria-label="' + p.name + '，' + layerName[p.layer] + '">' + ring + mark +
-        '<text x="' + (px + r + 8) + '" y="' + (py + 6) + '" font-size="19" font-weight="600" fill="var(--ink)" paint-order="stroke" stroke="var(--map-sea)" stroke-width="6" stroke-linejoin="round">' + p.name + '</text></g>';
+        ? '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="var(--surface)" stroke="var(--news)" stroke-width="' + 2.5 * u + '" stroke-dasharray="' + 3 * u + ' ' + 2.5 * u + '"/>'
+        : '<circle cx="' + px + '" cy="' + py + '" r="' + r + '" fill="' + layerColor[p.layer] + '" stroke="var(--surface)" stroke-width="' + 2.5 * u + '"/>';
+      var ring = sel ? '<circle cx="' + px + '" cy="' + py + '" r="' + (r + 6 * u) + '" fill="none" stroke="' + layerColor[p.layer] + '" stroke-width="' + 2 * u + '"/>' : '';
+      var hit = '<circle cx="' + px + '" cy="' + py + '" r="' + 16 * u + '" fill="transparent"/>';
+      return '<g class="city" data-city="' + i + '" tabindex="0" role="button" aria-label="' + p.name + '，' + layerName[p.layer] + '">' + hit + ring + mark +
+        '<text x="' + (px + r + 6 * u) + '" y="' + (py + 5 * u) + '" font-size="' + 15 * u + '" font-weight="600" fill="var(--ink)" paint-order="stroke" stroke="var(--map-sea)" stroke-width="' + 4 * u + '" stroke-linejoin="round">' + p.name + '</text></g>';
     }).join('');
-    return '<svg class="map-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid slice" role="img" aria-label="足迹地图：' + vis.length + ' 座城市">' + land() + routes + pts + '</svg>';
+    return '<svg class="map-svg" viewBox="' + v.x.toFixed(1) + ' ' + v.y.toFixed(1) + ' ' + v.w.toFixed(1) + ' ' + h.toFixed(1) + '" role="img" aria-label="足迹地图：' + vis.length + ' 座城市"><path d="' + land() + '" stroke="var(--map-dot)" stroke-width="' + Math.min(6.2, Math.max(4, 2.6 * u)).toFixed(2) + '" stroke-linecap="round" fill="none"/>' + routes + pts + '</svg>';
   }
+  function redrawMap() { var svg = document.querySelector('.map-svg'); if (svg) svg.outerHTML = map(); }
   function placesView() {
     var L = state.layers || { been: true, now: true, plan: true }, y = state.mapYear || 2027;
     var sel = state.city != null ? places[state.city] : null;
@@ -695,14 +912,17 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       '<div class="sec-head"><b style="font-size:18px;font-weight:600">' + sel.name + '</b>' + plain(layerName[sel.layer], 'var(--control)', 'var(--ink2)') + '</div><span class="small" style="color:var(--ink2)">' + sel.note + '</span>' +
       '<span class="small">来自 ' + sel.n + ' 条记录 · <a href="#">看原文</a></span><div style="display:flex;gap:8px"><button type="button" class="btn btn-quiet" style="height:34px">修改</button><button type="button" class="btn btn-quiet" style="height:34px">隐藏</button></div>'
       : '<b style="font-weight:600">点一座城市看详情</b><span class="small">地点都从你的记录里来，认错了可以直接改，改过的不会被旧资料覆盖。</span>') + '</div>';
-    var stats = '<div class="map-stats">6 座城市 · 4 个国家 · 住过 2 座</div>';
+    var stats = '<div class="map-stats">8 座城市 · 6 个国家 · 住过 2 座</div>';
+    var zoom = '<div class="map-zoom card" role="group" aria-label="缩放地图">' +
+      '<button type="button" data-zoom="in" aria-label="放大">+</button><button type="button" data-zoom="out" aria-label="缩小">−</button>' +
+      '<button type="button" data-zoom="mine">我的足迹</button><button type="button" data-zoom="world">全世界</button></div>';
     var line = places.slice().sort(function (a, b) { return (a.from || 9999) - (b.from || 9999); }).map(function (p) {
       var i = places.indexOf(p);
       return '<button type="button" class="tl-item" data-city="' + i + '" aria-pressed="' + (state.city === i) + '"><span class="tl-year num">' + (p.from ? p.from : '时间不详') + '</span><span class="tl-dot" style="' + (p.layer === 'plan' ? 'background:var(--surface);box-shadow:0 0 0 2px var(--news)' : 'background:' + layerColor[p.layer]) + '"></span><b>' + p.name + '</b><span class="small">' + p.note + '</span></button>';
     }).join('');
-    return '<section class="map-hero card" aria-label="足迹地图">' + map() + tools + detail + stats + '</section>' +
+    return '<section class="map-hero card" aria-label="足迹地图">' + map() + tools + zoom + detail + stats + '</section>' +
       '<section class="sec" aria-labelledby="h-tl"><h2 id="h-tl" class="eyebrow">按时间</h2><div class="timeline">' + line + '</div></section>' +
-      '<p class="note">原型用海岸线点阵当底图；App 里是可缩放的真实地图。</p>';
+      '<p class="note">默认框住你去过的地方，拖动、滚轮或双指缩放可以看全世界。</p>';
   }
 
   function explore() {
@@ -1095,6 +1315,43 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   });
 
   var view = document.getElementById('view');
+  var mapDrag = null, mapPts = {};
+  view.addEventListener('wheel', function (e) {
+    var svg = e.target.closest('.map-svg'); if (!svg) return;
+    e.preventDefault();
+    var r = svg.getBoundingClientRect();
+    zoomAt(Math.exp(e.deltaY * 0.0015), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); redrawMap();
+  }, { passive: false });
+  view.addEventListener('pointerdown', function (e) {
+    var svg = e.target.closest('.map-svg'); if (!svg) return;
+    mapPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    state.mapView = state.mapView || fitView(places.filter(placeVisible));
+    mapDrag = { x: e.clientX, y: e.clientY, v: Object.assign({}, state.mapView), moved: false, dist: null };
+  });
+  view.addEventListener('pointermove', function (e) {
+    if (!mapDrag || !mapPts[e.pointerId]) return;
+    mapPts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var b = mapBox(), ids = Object.keys(mapPts);
+    if (ids.length === 2) {
+      var p = mapPts[ids[0]], q = mapPts[ids[1]], d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (mapDrag.dist) { var r = document.querySelector('.map-svg').getBoundingClientRect(); zoomAt(mapDrag.dist / d, ((p.x + q.x) / 2 - r.left) / r.width, ((p.y + q.y) / 2 - r.top) / r.height); }
+      mapDrag.dist = d; mapDrag.moved = true; return redrawMap();
+    }
+    var dx = e.clientX - mapDrag.x, dy = e.clientY - mapDrag.y;
+    if (!mapDrag.moved && Math.hypot(dx, dy) < 4) return;
+    mapDrag.moved = true;
+    var k = mapDrag.v.w / b.w;
+    state.mapView = clampView({ x: mapDrag.v.x - dx * k, y: mapDrag.v.y - dy * k, w: mapDrag.v.w });
+    redrawMap(); var s2 = document.querySelector('.map-svg'); if (s2) s2.classList.add('is-dragging');
+  });
+  function endMapPointer(e) {
+    delete mapPts[e.pointerId];
+    if (mapDrag && !mapDrag.moved) mapDrag = null;
+    var s2 = document.querySelector('.map-svg'); if (s2) s2.classList.remove('is-dragging');
+  }
+  view.addEventListener('pointerup', endMapPointer);
+  view.addEventListener('pointercancel', endMapPointer);
+  window.addEventListener('resize', function () { if (state.view === 'explore' && state.sub === 'places') redrawMap(); });
   function render() {
     view.dataset.view = state.view;
     view.innerHTML = state.view === 'calendar' ? calendarView() : state.view === 'me' ? me() : state.view === 'ask' ? ask() : state.view === 'explore' ? explore() : state.view === 'records' ? records() : overview();
@@ -1113,9 +1370,34 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
     var b = e.target.closest('button[data-view]'); if (b) { if (b.dataset.view === 'records') state.rec = ''; go(b.dataset.view); }
   });
   document.getElementById('demo-data').addEventListener('click', function () { state.first = false; state.saved = ''; go('overview'); });
-  document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; go('overview'); });
+  document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; state.ob = 0; state.obPreview = false; go('overview'); });
 
   view.addEventListener('click', function (e) {
+    var ob = e.target.closest('[data-ob],[data-obai],[data-obgoal],[data-obsrc],[data-obaipick]');
+    if (ob) {
+      var top = function () { render(); window.scrollTo(0, 0); };
+      if (ob.dataset.obai) { state.obAi = ob.dataset.obai; return render(); }
+      if (ob.dataset.obgoal) { state.obGoals = state.obGoals || {}; state.obGoals[ob.dataset.obgoal] = !state.obGoals[ob.dataset.obgoal]; return render(); }
+      if (ob.dataset.obsrc) { state.obDone = state.obDone || {}; state.obDone[ob.dataset.obsrc] = true; return render(); }
+      if (ob.dataset.obaipick) { state.obAiPick = ob.dataset.obaipick; return render(); }
+      var act = ob.dataset.ob;
+      if (act === 'copy') {
+        var done = function () { state.obCopied = true; render(); };
+        try { navigator.clipboard.writeText(OB_PROMPT).then(done, function () { var r = document.createRange(); r.selectNodeContents(document.getElementById('ob-prompt')); getSelection().removeAllRanges(); getSelection().addRange(r); }); } catch (x) { done(); }
+        return;
+      }
+      if (act === 'sample') { state.obText = OB_SAMPLE; return render(); }
+      if (act === 'start') { state.ob = 1; return top(); }
+      if (act === 'later') { state.ob = 'done'; return top(); }
+      if (act === 'restart') { state.ob = 1; state.obPreview = false; return top(); }
+      if (act === 'goto') { state.ob = +ob.dataset.obto; return top(); }
+      if (act === 'preview') { if (!(state.obText || '').trim()) { var ta = document.getElementById('ob-text'); if (ta) ta.focus(); return; } state.obPreview = true; state.obPick = {}; return top(); }
+      if (act === 'save') { state.obSaved = obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length; state.obPreview = false; state.ob = 2; return top(); }
+      if (act === 'back') { if (state.ob === 1 && state.obPreview) state.obPreview = false; else state.ob = Math.max(1, state.ob - 1); return top(); }
+      if (act === 'skip') { state.ob = state.ob === 2 ? 'done' : state.ob + 1; return top(); }
+      if (act === 'next') { state.ob += 1; return top(); }
+      if (act === 'finish') { var pick = state.obAiPick || 'builtin'; state.ob = 'done'; top(); if (pick !== 'none') openAi(); return; }
+    }
     var rc = e.target.closest('[data-rec],[data-fin],[data-src]');
     if (rc) {
       if (rc.matches('a')) e.preventDefault();
@@ -1140,6 +1422,9 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
       if (m.dataset.me) { state.me = m.dataset.me; return render(); }
       state.facts[m.dataset.fact] = m.dataset.to; return render();
     }
+    var zb = e.target.closest('[data-zoom]');
+    if (zb) { var zk = zb.dataset.zoom; if (zk === 'in') zoomAt(0.6); else if (zk === 'out') zoomAt(1 / 0.6); else if (zk === 'world') state.mapView = worldView(); else state.mapView = null; return redrawMap(); }
+    if (mapDrag && mapDrag.moved) { mapDrag = null; return; }
     var ct = e.target.closest('[data-city],[data-layer]');
     if (ct) { if (ct.dataset.layer) { state.layers = Object.assign({ been: true, now: true, plan: true }, state.layers); state.layers[ct.dataset.layer] = !state.layers[ct.dataset.layer]; } else { var ci = +ct.dataset.city; state.city = state.city === ci ? null : ci; } return render(); }
     var hb = e.target.closest('[data-hint]');
@@ -1194,7 +1479,7 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
   function closeAi() { dlg.hidden = true; if (lastFocus) lastFocus.focus(); }
   document.getElementById('demo-ai').addEventListener('click', function () { state.connected = false; go('ask'); });
   document.getElementById('ai-next').addEventListener('click', function () { s1.hidden = true; s2.hidden = false; document.getElementById('auto-morning').focus(); });
-  view.addEventListener('input', function (e) { if (e.target.id === 'map-year') { state.mapYear = +e.target.value; render(); var r = document.getElementById('map-year'); if (r) r.focus(); } });
+  view.addEventListener('input', function (e) { if (e.target.id === 'ob-text') { state.obText = e.target.value; return; } if (e.target.dataset && e.target.dataset.obpick) { state.obPick[e.target.dataset.obpick] = e.target.checked; var sv = view.querySelector('[data-ob="save"]'); if (sv) sv.textContent = '记下这 ' + obParse(state.obText).filter(function (it) { return state.obPick[it.i] !== false; }).length + ' 条'; return; } if (e.target.id === 'map-year') { state.mapYear = +e.target.value; render(); var r = document.getElementById('map-year'); if (r) r.focus(); } });
   view.addEventListener('change', function (e) {
     if (e.target.dataset && e.target.dataset.auto) { state.auto[e.target.dataset.auto] = e.target.checked; render(); var sw = document.getElementById(e.target.id); if (sw) sw.focus(); }
     if (e.target.dataset && e.target.dataset.time && e.target.value) state.times[e.target.dataset.time] = e.target.value;
