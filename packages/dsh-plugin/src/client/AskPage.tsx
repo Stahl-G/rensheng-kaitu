@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { OverviewData } from "../types.js";
 import css from "./AskPage.module.css";
 import v2 from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
@@ -164,11 +165,14 @@ export function AskPage({
       if (configureBuiltin) setChoice("builtin");
     }
   }, [configureRequest, configureBuiltin]);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [modelMenu, setModelMenu] = useState(false);
   const [modeMenu, setModeMenu] = useState<"select" | "confirm" | null>(null);
   const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
     setSelected(id);
     setModeMenu(null);
+    setModelMenu(false);
   };
   const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
 
@@ -201,6 +205,26 @@ export function AskPage({
     const label = day(thread.updated);
     groups.set(label, [...(groups.get(label) ?? []), thread]);
   }
+  useLayoutEffect(() => {
+    if (!input.current) return;
+    input.current.style.height = draft ? "auto" : "48px";
+    input.current.style.height = `${Math.min(input.current.scrollHeight, 200)}px`;
+  }, [draft]);
+  useEffect(() => {
+    let active = true;
+    void call<OverviewData>("overview")
+      .then((data) => {
+        if (!active) return;
+        const prompts = data.projects.slice(0, 2).map((project) => `「${project.title}」下一步先做什么？`);
+        if (data.allNext.length) prompts.push(`帮我梳理「${data.allNext[0]?.title}」怎么推进`);
+        if (data.notes.length) prompts.push("帮我回顾最近保存的记录");
+        setQuestions(prompts.slice(0, 3));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const refreshThreads = useCallback(() => call<Thread[]>("askList").then(setThreads), []);
   useEffect(() => {
     let active = true;
@@ -356,7 +380,11 @@ export function AskPage({
   };
   const handover = aiHandover(workspace, draft);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
-  const waiting = busy && !events.slice(lastUser + 1).some((event) => event.type === "assistant/message");
+  const waiting =
+    busy &&
+    !events
+      .slice(lastUser + 1)
+      .some((event) => event.type === "assistant/message" || event.type === "tool/call");
   return (
     <div className={css.chat}>
       <nav className={css.threads} aria-label="对话">
@@ -415,27 +443,29 @@ export function AskPage({
         >
           {!events.some((event) => event.type === "user/message") && (
             <div className={css.welcome}>
-              <h1>想问开图什么？</h1>
-              <p>它会先读你的开图资料再回答。</p>
+              <h1>从你正在推进的事聊起</h1>
+              <p>
+                {questions.length
+                  ? "选一条已有资料，或直接说说你的想法。"
+                  : "说说你想推进的一件事，开图陪你一起理清下一步。"}
+              </p>
               <div className={css.suggestions}>
-                {["这周我练得够吗？", "帮我排一下明天", "最近钱都花在哪了", "我上次去东京是什么时候"].map(
-                  (question) => (
-                    <button
-                      type="button"
-                      key={question}
-                      onClick={() => {
-                        setDraft(question);
-                        input.current?.focus();
-                      }}
-                    >
-                      {question}
-                    </button>
-                  ),
-                )}
+                {questions.map((question) => (
+                  <button
+                    type="button"
+                    key={question}
+                    onClick={() => {
+                      setDraft(question);
+                      input.current?.focus();
+                    }}
+                  >
+                    {question}
+                  </button>
+                ))}
               </div>
             </div>
           )}
-          {events.map((event) => {
+          {events.map((event, index) => {
             const data = event.data;
             const message = data.message as { content?: unknown } | undefined;
             if (event.type === "user/message")
@@ -453,19 +483,51 @@ export function AskPage({
                   <Body content={text(message?.content)} />
                 </article>
               );
-            if (event.type === "tool/call")
-              return (
-                <Tool
-                  key={event.id}
-                  event={event}
-                  finished={!busy}
-                  result={events.find(
-                    (item) =>
-                      item.type === "tool/result" &&
-                      (item.data.message as { toolCallId?: string })?.toolCallId === data.callId,
-                  )}
-                />
+            if (event.type === "tool/call") {
+              const start = events.slice(0, index).findLastIndex((item) => item.type === "user/message");
+              if (events.slice(start + 1, index).some((item) => item.type === "tool/call")) return null;
+              const next = events.findIndex((item, i) => i > index && item.type === "user/message");
+              const turn = events.slice(start + 1, next < 0 ? undefined : next);
+              const calls = turn.filter((item) => item.type === "tool/call");
+              const running = busy && next < 0;
+              const active = calls.findLast(
+                (item) =>
+                  !turn.some(
+                    (result) =>
+                      result.type === "tool/result" &&
+                      (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
+                  ),
               );
+              const name = String(active?.data.name ?? "");
+              const activity = !active
+                ? "正在整理回答"
+                : /search/.test(name)
+                  ? "正在搜索"
+                  : /read|list|status|overview|get|fetch/.test(name)
+                    ? "正在读取资料"
+                    : "正在调用工具";
+              return (
+                <details key={event.id} className={css.progress}>
+                  <summary>
+                    <span className={`${css.dot} ${running ? css.pulse : ""}`} />
+                    {running ? activity : "处理步骤"}
+                    <span className={css.stepCount}>{calls.length} 步</span>
+                  </summary>
+                  {calls.map((item) => (
+                    <Tool
+                      key={item.id}
+                      event={item}
+                      finished={!running}
+                      result={turn.find(
+                        (result) =>
+                          result.type === "tool/result" &&
+                          (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
+                      )}
+                    />
+                  ))}
+                </details>
+              );
+            }
             if (event.type === "approval/asked")
               return (
                 <details key={event.id} className={css.tool}>
@@ -481,7 +543,12 @@ export function AskPage({
               );
             return null;
           })}
-          {waiting && <output className={css.thinking}>正在看你的资料…</output>}
+          {waiting && (
+            <output className={css.progress}>
+              <span className={`${css.dot} ${css.pulse}`} />
+              正在准备回答
+            </output>
+          )}
         </div>
         {error && !step && (
           <p className={css.notice} role="alert">
@@ -509,6 +576,18 @@ export function AskPage({
         )}
         <form
           className={css.composer}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setModeMenu(null);
+              setModelMenu(false);
+            }
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setModeMenu(null);
+              setModelMenu(false);
+            }
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             void send();
@@ -523,8 +602,6 @@ export function AskPage({
             placeholder="问问开图，或者让它帮你记一件事"
             onChange={(event) => {
               setDraft(event.target.value);
-              event.target.style.height = "auto";
-              event.target.style.height = `${Math.min(event.target.scrollHeight, 200)}px`;
             }}
             onCompositionStart={() => {
               composing.current = true;
@@ -593,7 +670,7 @@ export function AskPage({
             >
               <button
                 type="button"
-                className={css.model}
+                className={css.add}
                 aria-label="上传图片"
                 aria-describedby={
                   settings?.configured && !settings.supportsImages ? "ask-image-hint" : undefined
@@ -601,19 +678,23 @@ export function AskPage({
                 disabled={busy || !settings?.configured || !settings.supportsImages}
                 onClick={() => upload.current?.click()}
               >
-                ＋ 图片
+                ＋
               </button>
             </span>
             <span className={v2["mode-wrap"]}>
               <button
                 type="button"
-                className={`${v2["c-btn"]} ${mode === "full" ? v2["is-full"] : ""}`}
+                className={`${css.model} ${mode === "full" ? v2["is-full"] : ""}`}
                 disabled={busy || modeSaving}
                 aria-haspopup="dialog"
                 aria-expanded={modeMenu !== null}
-                onClick={() => setModeMenu(modeMenu ? null : "select")}
+                onClick={() => {
+                  setModelMenu(false);
+                  setModeMenu(modeMenu ? null : "select");
+                }}
               >
-                {mode === "full" ? "完整 Agent" : "只读写开图资料"}
+                {mode === "full" ? "完整 Agent" : "开图资料"}
+                <span aria-hidden="true">⌄</span>
               </button>
               {modeMenu && (
                 <dialog
@@ -674,15 +755,43 @@ export function AskPage({
                 </dialog>
               )}
             </span>
-            <button
-              type="button"
-              className={css.model}
-              disabled={busy}
-              title="在设置 → AI 与连接中切换，下一条消息生效"
-              onClick={() => (settings?.configured && onConnections ? onConnections() : setStep(1))}
-            >
-              {settings?.configured ? `${settings.providerName} · ${settings.model}` : "连接 AI"}
-            </button>
+            <span className={css.modelWrap}>
+              <button
+                type="button"
+                className={css.model}
+                disabled={busy}
+                aria-haspopup="dialog"
+                aria-expanded={modelMenu}
+                onClick={() => {
+                  setModeMenu(null);
+                  setModelMenu(!modelMenu);
+                }}
+              >
+                <span className={css.modelName}>
+                  {settings?.configured ? `${settings.providerName} · ${settings.model}` : "连接 AI"}
+                </span>
+                <span aria-hidden="true">⌄</span>
+              </button>
+              {modelMenu && (
+                <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
+                  <b>{settings?.configured ? settings.providerName : "连接内置 AI"}</b>
+                  <p className={v2.small}>
+                    {settings?.configured ? settings.model : "连接之后就能在这里聊。"}
+                  </p>
+                  <button
+                    type="button"
+                    className={css.model}
+                    onClick={() => {
+                      setModelMenu(false);
+                      if (settings?.configured && onConnections) onConnections();
+                      else setStep(1);
+                    }}
+                  >
+                    AI 与连接
+                  </button>
+                </dialog>
+              )}
+            </span>
             <button
               type="submit"
               className={css.send}
@@ -693,6 +802,7 @@ export function AskPage({
             </button>
           </div>
         </form>
+        <p className={css.scope}>Enter 发送 · Shift + Enter 换行</p>
       </section>
       <dialog
         ref={dialog}

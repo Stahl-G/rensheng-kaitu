@@ -491,15 +491,17 @@ main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
 .act:hover { border-color: var(--muted) }
 .welcome-chat { margin: auto 0; display: flex; flex-direction: column; gap: 18px; align-items: flex-start; max-width: 680px }
 .welcome-chat h1 { font-size: 28px; line-height: 36px; font-weight: 600 }
-.suggest { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; width: 100% }
-.suggest button { text-align: left; padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-size: 14px; color: var(--ink2) }
+.suggest { display: flex; flex-wrap: wrap; gap: 10px; width: 100% }
+.suggest button { text-align: left; padding: 12px 14px; border-radius: 20px; border: 1px solid var(--line); background: transparent; font-size: 14px; color: var(--ink2) }
 .suggest button:hover { box-shadow: 0 0 0 1px var(--muted); color: var(--ink) }
 .composer { margin: 0 max(16px, 7%) 18px; display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 10px 16px; border-radius: 20px; background: var(--surface); box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1px var(--line) }
 .composer:focus-within { box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1.5px var(--explore) }
-.composer textarea { width: 100%; min-height: 48px; max-height: 200px; resize: none; border: 0; background: transparent; font: inherit; font-size: 16px; line-height: 1.5; color: var(--ink); outline: none; padding: 4px 0 }
+.composer textarea, .composer textarea:focus-visible { box-sizing: border-box; outline: none; box-shadow: none; width: 100%; min-height: 48px; max-height: 200px; resize: none; border: 0; background: transparent; font: inherit; font-size: 16px; line-height: 1.5; color: var(--ink); outline: none; padding: 4px 0 }
 .composer textarea::placeholder { color: var(--muted) }
-.c-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px }
-.c-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 8px; border: 0; background: transparent; font-size: 13px; color: var(--ink2) }
+.c-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px }
+.c-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 18px; border: 1px solid var(--line); background: transparent; font-size: 13px; color: var(--ink2); max-width: 100%; min-width: 0 }
+.c-row > .mode-wrap { min-width: 0; max-width: 40% }
+.c-row > .mode-wrap > .c-btn { overflow: hidden; white-space: nowrap; text-overflow: ellipsis }
 .c-btn:hover { background: var(--sunken) }
 .send { width: 36px; height: 36px; margin-left: auto; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 0; background: var(--strong); color: var(--on-strong) }
 .send:disabled { opacity: .35; cursor: default }
@@ -1217,7 +1219,7 @@ function openChannelDemo(index) {
   function msgHtml(m) {
     if (m.role === 'user') return '<div class="msg-user">' + esc(m.text) + '</div>';
     if (m.role === 'tool') return '<details class="tool"><summary><span class="st-dot' + (m.running ? ' run' : '') + '" aria-hidden="true"></span>' + (m.running ? '正在' + m.title.replace(/^读了/, '读') : m.title) + '</summary><pre>' + esc(m.detail) + '</pre></details>';
-    if (m.role === 'thinking') return '<p class="thinking"><span>正在看你的资料…</span></p>';
+    if (m.role === 'thinking') return '';
     return '<div class="msg-ai">' + m.html + (m.acts ? '<div class="acts">' + m.acts.map(function (a) { return '<button type="button" class="act" data-act="' + esc(a) + '">' + esc(a) + '</button>'; }).join('') + '</div>' : '') + '</div>';
   }
 
@@ -1239,15 +1241,15 @@ function openChannelDemo(index) {
     var side = '<nav class="threads" aria-label="对话"><button type="button" class="thread new-thread" data-new><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>新对话</button>' +
       Object.keys(groups).map(function (d) { return '<h2>' + d + '</h2>' + groups[d].map(function (k) { return '<button type="button" class="thread" data-thread="' + k + '" aria-current="' + (k === state.thread) + '">' + esc(threads[k].title) + '</button>'; }).join(''); }).join('') + '</nav>';
     var body = t.msgs.length ? t.msgs.map(msgHtml).join('') :
-      '<div class="welcome-chat"><h1>想问开图什么？</h1><p style="color:var(--ink2)">它会先读你的开图资料再回答，改动都会留下版本，可以撤回。</p><div class="suggest">' +
-      ['这周我练得够吗？', '帮我排一下明天', '最近钱都花在哪了', '我上次去东京是什么时候'].map(function (q) { return '<button type="button" data-suggest="' + q + '">' + q + '</button>'; }).join('') + '</div></div>';
+      '<div class="welcome-chat"><h1>从你正在推进的事聊起</h1><p style="color:var(--ink2)">说说想推进的一件事，或选一条已有资料开始聊。</p><div class="suggest">' +
+      ['开图 App 下一步先做什么？', '帮我回顾最近的记录'].map(function (q) { return '<button type="button" data-suggest="' + q + '">' + q + '</button>'; }).join('') + '</div></div>';
     var composer = '<form class="composer" id="chat-form"><label class="sr" for="chat-input">给开图发消息</label><textarea id="chat-input" rows="2" placeholder="问问开图，或者让它帮你记一件事"></textarea>' +
       '<div class="c-row"><button type="button" class="c-btn" aria-label="添加文件或照片"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg></button>' +
-      '<span class="mode-wrap"><button type="button" class="c-btn' + (full ? ' is-full' : '') + '" data-mode="toggle" aria-haspopup="dialog" aria-expanded="' + !!state.modeOpen + '">' + (full ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2.5 13.5 5v3.5c0 3-2.4 4.8-5.5 5.5-3.1-.7-5.5-2.5-5.5-5.5V5z" stroke-linejoin="round"/></svg>完整 Agent' : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>只读写开图资料') + '</button>' +
+      '<span class="mode-wrap"><button type="button" class="c-btn' + (full ? ' is-full' : '') + '" data-mode="toggle" aria-haspopup="dialog" aria-expanded="' + !!state.modeOpen + '">' + (full ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 2.5 13.5 5v3.5c0 3-2.4 4.8-5.5 5.5-3.1-.7-5.5-2.5-5.5-5.5V5z" stroke-linejoin="round"/></svg>完整 Agent' : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>开图资料 ⌄') + '</button>' +
       (state.modeOpen ? modePanel(full) : '') + '</span>' +
-      '<button type="button" class="c-btn">DeepSeek · deepseek-flash <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 3.5 3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+      '<span class="mode-wrap"><button type="button" class="c-btn" aria-haspopup="dialog" data-model-menu aria-expanded="' + !!state.modelOpen + '">DeepSeek · deepseek-flash <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 3.5 3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' + (state.modelOpen ? '<div class="mode-pop" role="dialog" aria-label="当前 AI"><b>DeepSeek · deepseek-flash</b><p class="small">下一条消息使用这个模型。</p><button type="button" class="c-btn" data-go="me">AI 与连接</button></div>' : '') + '</span>' +
       '<button type="submit" class="send" aria-label="发送"' + (state.busy ? ' disabled' : '') + '><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></form>' +
-      '<p class="c-note">回复里的数字都来自你的开图资料，点开工具卡片能看到读了哪些。</p>';
+      '<p class="c-note">Enter 发送 · Shift + Enter 换行</p>';
     return '<div class="chat">' + side + '<section class="convo" aria-label="' + esc(t.title) + '"><div class="msgs" id="msgs">' + body + '</div>' + composer + '</section></div>';
   }
 
@@ -1609,6 +1611,7 @@ function openChannelDemo(index) {
     if (hb) { state.hints = state.hints || {}; state.hints[hb.dataset.hint] = !state.hints[hb.dataset.hint]; return render(); }
     var nw = e.target.closest('[data-news]');
     if (nw) { if (nw.matches('a')) e.preventDefault(); state.newsFb = state.newsFb || {}; state.newsFb[nw.dataset.news] = nw.dataset.fb; return render(); }
+    if (e.target.closest('[data-model-menu]')) { state.modelOpen = !state.modelOpen; state.modeOpen = false; render(); return; }
     var md = e.target.closest('[data-mode]');
     if (md) {
       var a2 = md.dataset.mode; state.fullMode = state.fullMode || {};
@@ -1674,6 +1677,9 @@ function openChannelDemo(index) {
   });
   menu.addEventListener('keydown', function (e) { if (e.key === 'Escape') { setMenu(false); avatar.focus(); } });
   document.addEventListener('click', function (e) { if (!menu.hidden && !menu.contains(e.target)) setMenu(false); });
+  view.addEventListener('input', function (e) {
+    if (e.target.id === 'chat-input') { e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'; }
+  });
   view.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.city')) { e.preventDefault(); e.target.dispatchEvent(new MouseEvent('click', { bubbles: true })); return; }
     if (e.target.id !== 'chat-input' || e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
