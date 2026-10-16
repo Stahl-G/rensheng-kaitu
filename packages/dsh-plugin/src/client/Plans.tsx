@@ -31,14 +31,20 @@ export function PlansCard({
   open: (section: "projects" | "explore") => void;
 }) {
   const t = useT();
-  const [editing, setEditing] = useState<{ goal: string; mode: Mode } | null>(null);
+  // 打开表单时记下当时那一步；后台刷新换了下一步，也只改用户看到的那一步。
+  const [editing, setEditing] = useState<{
+    goal: string;
+    mode: Mode;
+    next?: { id: string; rev: number };
+  } | null>(null);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   if (!plans.goals.length) return null;
-  const start = (goal: string, mode: Mode, initial = "") => {
-    const same = editing?.goal === goal && editing.mode === mode;
-    setEditing(same ? null : { goal, mode });
+  const start = (goal: PlansData["goals"][number], mode: Mode, initial = "") => {
+    const same = editing?.goal === goal.id && editing.mode === mode;
+    const next = goal.next ? { id: goal.next.id, rev: goal.next.rev } : undefined;
+    setEditing(same ? null : { goal: goal.id, mode, ...(next ? { next } : {}) });
     setValue(initial);
     setError("");
   };
@@ -46,8 +52,8 @@ export function PlansCard({
     mode === "next"
       ? addGoalNext(goal.id, value.trim())
       : changeNext(
-          goal.next?.id ?? "",
-          goal.next?.rev ?? 1,
+          editing?.next?.id ?? "",
+          editing?.next?.rev ?? 1,
           mode,
           mode === "complete" ? value.trim() : value,
         );
@@ -87,7 +93,7 @@ export function PlansCard({
               type="button"
               className={css.link}
               disabled={busy}
-              onClick={() => start(goal.id, "complete")}
+              onClick={() => start(goal, "complete")}
             >
               {t("完成", "Done")}
             </button>
@@ -95,7 +101,7 @@ export function PlansCard({
               type="button"
               className={css.link}
               disabled={busy}
-              onClick={() => start(goal.id, "defer", goal.next?.due ?? "")}
+              onClick={() => start(goal, "defer", goal.next?.due ?? "")}
             >
               {t("改期", "Later")}
             </button>
@@ -105,7 +111,7 @@ export function PlansCard({
             type="button"
             className={`${css.btn} ${css["btn-quiet"]}`}
             disabled={busy}
-            onClick={() => start(goal.id, "next")}
+            onClick={() => start(goal, "next")}
           >
             {t("定下一步", "Set a next step")}
           </button>

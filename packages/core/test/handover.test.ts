@@ -121,6 +121,7 @@ it("资料包只带目标、结果、下一步和非敏感记忆；方向建议�
     expect(first.ids).toHaveLength(2);
     const directions = readExploration(ws).directions.filter((item) => first.ids.includes(item.id));
     expect(directions.every((item) => item.status === "suggested")).toBe(true);
+    expect(onboardingStatus(ws, options).checklist.items.find((item) => item.id === "ai")?.done).toBe(false);
     expect(directions.find((item) => item.title === "试试越野跑")?.references).toEqual([
       { kind: "source", ref: "https://example.org/trail-2026" },
     ]);
@@ -141,6 +142,8 @@ it("普通记忆里写着 Key 或本机路径时，资料包和方向提示词�
       "sk-proj-SyntheticKey0123456789abcdef",
       "Hunter2!synthetic",
       "/Users/synthetic/Customers/private.csv",
+      "Json$ecret42",
+      "Plain$ecret42",
     ];
     const preview = previewOnboardingMemory(
       ws,
@@ -148,6 +151,8 @@ it("普通记忆里写着 Key 或本机路径时，资料包和方向提示词�
         `[事实] 我的 OpenAI key 是 ${secrets[0]}`,
         `[事实] 数据库密码是 ${secrets[1]}`,
         `[事实] 客户名单在 ${secrets[2]} 里`,
+        `[事实] 配置 {"password":"${secrets[3]}"}`,
+        `[事实] My password is ${secrets[4]}`,
         "[偏好] 喜欢早上运动",
         "[目标] 半年内跑完半马",
       ].join("\n"),

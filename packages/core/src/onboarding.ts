@@ -767,7 +767,11 @@ export async function confirmOnboardingMemory(
           known.some(
             (project) =>
               project.title === full ||
-              (short !== full && project.title.startsWith(short) && notesOf(project.slug).includes(full)),
+              (short !== full &&
+                project.title.startsWith(short) &&
+                notesOf(project.slug)
+                  .split("\n")
+                  .some((line) => line.trim() === entry.text.trim())),
           )
         )
           continue;
@@ -952,8 +956,12 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const planText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
   const plan = planText ? parseFrontmatter<{ generated_at?: string | null }>(planText).data : {};
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
+  // 剪贴板贴回的方向也记为 agent 写入，但那不算连接 AI；真正接入的 Agent 会写 ai.json。
   const ai =
-    !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
+    !!connected ||
+    Object.entries(data.records).some(
+      ([type, rows]) => type !== "direction" && rows.some((row) => row.by === "agent"),
+    );
   const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
   const live = adopted
     .filter((task) => task.status !== "cancelled")

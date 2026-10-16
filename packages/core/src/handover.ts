@@ -268,7 +268,7 @@ const KEY_PATTERNS = [
 ];
 /** 「密码是 abc123」「token: …」：只换掉后面像凭据的那一段（至少 6 个可见 ASCII 字符）。 */
 const KEY_ASSIGNMENT =
-  /((?:api[\s_-]?key|access[\s_-]?key|secret|token|password|passwd|pwd|密钥|密码|口令|令牌)\s*(?:[:：=]|是|为)\s*)[!-~]{6,}/gi;
+  /((?:api[\s_-]?key|access[\s_-]?key|secret|token|password|passwd|pwd|密钥|密码|口令|令牌)["']?\s*(?:[:：=]|是|为|is\b)\s*["']?)[^\s"'，。；;,]{6,}/gi;
 const PATH_PATTERNS = [
   /file:\/\/\S+/gi,
   /(?<![\w.:/~-])(?:~|\/(?:Users|home|root|Volumes|private|var|tmp|opt|etc|mnt|media|Library|Applications|System))\/[^\s，。、；;,)）"'”’]+/g,

@@ -384,7 +384,7 @@ it("搬入时括号里的条件和记下的时间都留着；已有记忆也能�
       "[目标] 完成论文",
       "[事实] 完成论文",
       "[项目] 开图上线（先做邀请制）",
-      `[项目] ${long} for macOS`,
+      `[项目] ${long} Volume II`,
       `[项目] ${long} for Windows`,
       "[在考虑] 是否去杭州（取决于孩子入学）",
     ].join("\n");
@@ -409,10 +409,10 @@ it("搬入时括号里的条件和记下的时间都留着；已有记忆也能�
     );
     const projects = listProjects(ws);
     expect(projects.map((project) => project.title)).toContain("开图上线（先做邀请制）");
-    for (const platform of ["macOS", "Windows"])
+    for (const volume of ["Volume II", "for Windows"])
       expect(
         projects.filter((project) =>
-          ws.readText(`projects/${project.slug}/notes.md`).includes(`${long} for ${platform}`),
+          ws.readText(`projects/${project.slug}/notes.md`).includes(`${long} ${volume}\n`),
         ),
       ).toHaveLength(1);
     expect(readExploration(ws).directions.map((item) => item.title)).toContain(
@@ -427,6 +427,15 @@ it("搬入时括号里的条件和记下的时间都留着；已有记忆也能�
     const again = await bring();
     expect(again.result).toMatchObject({ goals: 0, projects: 0, directions: 0 });
     expect(listProjects(ws)).toHaveLength(3);
+    // 之后再搬来的「Volume I」是另一个项目，不能因为是「Volume II」的前缀被当成重复。
+    const later = previewOnboardingMemory(ws, `[项目] ${long} Volume I`, "chatgpt", options);
+    const added = await confirmOnboardingMemory(
+      ws,
+      later.token,
+      later.candidates.map((item) => item.id),
+      options,
+    );
+    expect(added).toMatchObject({ projects: 1 });
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
