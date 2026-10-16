@@ -50,6 +50,7 @@
 
 ## 文档关系
 
+- [prd/launch.md](prd/launch.md)：首发范围、发布门槛与验收（发布前必须完成的事）。
 - [GOAL.md](GOAL.md)：执行目标、工作树、当前进度。
 - [prd-completion.md](prd-completion.md)：原有 FR-01–27、AC-01–15 的能力账本；按本文件安排入口和顺序。
 - [PRD.md](PRD.md)：历史产品草案，其中 §6 数据规范继续有效。
