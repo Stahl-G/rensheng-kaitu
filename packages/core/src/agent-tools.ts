@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { extname, relative, sep } from "node:path";
+import { assertAgentPath } from "./agent-file-policy.js";
 import { KaituError } from "./errors.js";
 import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
@@ -17,6 +18,7 @@ import type { TodayPlan } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export function readAgentFile(ws: Workspace, file: string, publicOnly = false): string {
+  assertAgentPath(ws.root, file);
   const abs = ws.resolve(file);
   // 同时检查请求路径和真实路径，不能借工作区内链接读取程序状态。
   const paths = [

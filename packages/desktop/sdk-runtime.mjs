@@ -220,7 +220,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       try {
         await rpc.request(
           "initialize",
-          { cwd: root, provider: settings.provider, model: settings.model },
+          { cwd: workspace, provider: settings.provider, model: settings.model },
           AbortSignal.timeout(20000),
         );
       } catch {

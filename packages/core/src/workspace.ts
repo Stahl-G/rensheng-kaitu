@@ -10,18 +10,18 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { currentWorkspace, localStateRoot } from "./drive.js";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import { stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
   conflictOriginal,
   isEvictedICloudFile,
   placeholderOriginal as placeholderName,
-  readWorkspaceConfig,
   syncInventory,
 } from "./sync-files.js";
 import { isICloudPath } from "./sync-location.js";
@@ -36,12 +36,7 @@ export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function stateDirectory(root: string, icloud?: boolean): string {
-  const state = readWorkspaceConfig(root, icloud).state_dir;
-  if (state !== undefined && (typeof state !== "string" || !isAbsolute(state))) {
-    throw new KaituError("state_dir 必须是本机绝对路径", "INVALID_STATE_DIR");
-  }
-  if (state && !existsSync(state)) return join(localStateRoot(), basename(state));
-  return state ?? join(root, STATE_DIR);
+  return stateBinding(root, icloud).state;
 }
 
 export function migrateHistory(root: string, icloud?: boolean): void {
@@ -94,7 +89,7 @@ export class Workspace {
 
   set root(value: string) {
     this.location = value;
-    this.icloud = isICloudPath(value);
+    this.icloud = isICloudPath(value) || stateBinding(value).mode === "icloud";
     this.unread.clear();
   }
 

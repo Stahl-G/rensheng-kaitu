@@ -1,11 +1,16 @@
 import { realpathSync } from "node:fs";
 import { readdir } from "node:fs/promises";
-import { isAbsolute, join, relative } from "node:path";
+import { join } from "node:path";
+import { assertAgentPath } from "../core/dist/agent-file-policy.js";
 
 export function confinedFileSystem(LocalFileSystem, FsError, root) {
   const contains = (path) => {
-    const value = relative(root, path);
-    return value === "" || (!isAbsolute(value) && value !== ".." && !value.startsWith("../"));
+    try {
+      assertAgentPath(root, path);
+      return true;
+    } catch {
+      return false;
+    }
   };
   return class KaituFileSystem extends LocalFileSystem {
     get sandboxMode() {
@@ -13,7 +18,8 @@ export function confinedFileSystem(LocalFileSystem, FsError, root) {
     }
     async resolve(path, options) {
       const target = await super.resolve(path, options);
-      if (!contains(target.targetKey)) throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
+      if (!contains(target.displayPath) || !contains(target.targetKey))
+        throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
       return target;
     }
     async checked(target) {
@@ -39,7 +45,8 @@ export function confinedFileSystem(LocalFileSystem, FsError, root) {
       return entries;
     }
     processPath(target) {
-      if (!contains(target.targetKey)) throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
+      if (!contains(target.displayPath) || !contains(target.targetKey))
+        throw new FsError("只能访问开图资料", "FS_SANDBOX_DENIED");
       return super.processPath(target);
     }
     processPathFromHostPath(path) {
