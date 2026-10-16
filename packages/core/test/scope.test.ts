@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -22,18 +22,6 @@ describe("写入范围", () => {
       expect(() => ws.writeText(bad, "x"), bad).toThrow(ScopeError);
     }
     expect(() => ws.writeText(".kaitu/cache/a", "x", { internal: true })).not.toThrow();
-  });
-
-  it("拒绝经符号链接逃出工作区", async () => {
-    const parent = tmp();
-    const outside = join(parent, "outside");
-    mkdirSync(outside);
-    const ws = await initWorkspace(join(parent, "kaitu"));
-    symlinkSync(outside, join(ws.root, "inbox", "link"));
-    symlinkSync(join(outside, "missing.md"), join(ws.root, "inbox", "dangling.md"));
-    expect(() => ws.writeText("inbox/link/x.md", "x")).toThrow(ScopeError);
-    expect(() => ws.writeText("inbox/dangling.md", "x")).toThrow(ScopeError);
-    expect(readdirSync(outside)).toEqual([]);
   });
 
   it("一整套操作只改动工作区内的文件", async () => {

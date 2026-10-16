@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
 import { schemas } from "./schema.js";
@@ -30,10 +30,24 @@ export interface LoadedModule {
 
 const NOT_MODULES = new Set([".kaitu", ".git", "memory", "chats", "inbox", "node_modules"]);
 
-/** 工作区顶层含 module.json 的目录即模块。 */
+const loaded = new WeakMap<Workspace, { key: string; modules: LoadedModule[] }>();
+
+/** 工作区顶层含 module.json 的目录即模块；module.json 没变就用上次读到的结果。 */
 export function listModules(ws: Workspace): LoadedModule[] {
+  const names = readdirSync(ws.root).sort();
+  const key = names
+    .map((name) => {
+      try {
+        return `${name}:${statSync(join(ws.root, name, "module.json")).mtimeMs}`;
+      } catch {
+        return "";
+      }
+    })
+    .join("|");
+  const cached = loaded.get(ws);
+  if (cached?.key === key) return cached.modules;
   const out: LoadedModule[] = [];
-  for (const name of readdirSync(ws.root).sort()) {
+  for (const name of names) {
     if (ws.conflictCopy(name)) continue;
     if (NOT_MODULES.has(name) || name.startsWith(".")) continue;
     const full = join(ws.root, name);
@@ -47,6 +61,7 @@ export function listModules(ws: Workspace): LoadedModule[] {
       // 损坏的 module.json 由 validate 报告，这里跳过
     }
   }
+  loaded.set(ws, { key, modules: out });
   return out;
 }
 

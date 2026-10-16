@@ -19,10 +19,12 @@ import {
   completeNext,
   completeTask,
   decideProposal,
+  deferSnapshots,
   disableSync,
   discardUpload,
   enableSync,
   history,
+  holdOverview,
   ignoredWorkspaceChange,
   importUpload,
   onboardingStatus,
@@ -35,7 +37,7 @@ import {
   removeMemory,
   removePhoto,
   restore,
-  snapshot,
+  snapshotNow,
   stageUpload,
   syncProject,
   syncProjects,
@@ -44,12 +46,13 @@ import {
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
-import { productMutations, productRequest } from "./product.js";
+import { planMutations, productMutations, productRequest } from "./product.js";
 
 export interface UiOptions {
   port?: number;
   open?: boolean;
   snapshotDelayMs?: number;
+  versionDelayMs?: number;
   refreshDelayMs?: number;
   inboxStableMs?: number;
   webRoot?: string;
@@ -169,6 +172,22 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   let watchError = "";
   let polling: ReturnType<typeof setInterval> | undefined;
   let stamps = workspaceFileStamps(ws);
+  holdOverview(ws);
+  deferSnapshots(ws, (message) => {
+    messages.push(message);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(
+      () => void exclusive(saveExternal).catch(reportError),
+      options.versionDelayMs ?? 2000,
+    );
+  });
+  const syncCalendar = () => {
+    if (!options.calendarExecutor) return;
+    void exclusive(async () => {
+      await calendarPush.sync(calendarPushEntries(ws));
+      notify();
+    }).catch(() => {});
+  };
   const notify = () => {
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
@@ -178,20 +197,25 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
     notify();
   };
+  let messages: string[] = [];
   async function saveExternal() {
     clearTimeout(saveTimer);
     refreshOverview(ws);
     const files = await pendingWorkspaceFiles(ws);
+    const own = [...new Set(messages)];
+    messages = [];
     if (!files.length) {
       watchError = "";
       return;
     }
-    const version = await snapshot(
+    const version = await snapshotNow(
       ws,
-      `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
-        .slice(0, 3)
-        .map((file) => file.split("/").at(-1))
-        .join("、")}等 ${files.length} 个文件`,
+      own.length
+        ? own.join("；")
+        : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+            .slice(0, 3)
+            .map((file) => file.split("/").at(-1))
+            .join("、")}等 ${files.length} 个文件`,
     );
     if (!version && (await pendingWorkspaceFiles(ws)).length) {
       reportError();
@@ -228,7 +252,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(
       () => void exclusive(saveExternal).catch(reportError),
-      options.snapshotDelayMs ?? 30000,
+      messages.length ? (options.versionDelayMs ?? 2000) : (options.snapshotDelayMs ?? 30000),
     );
   }
   for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
@@ -336,28 +360,28 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             ? await openAi()
             : method.startsWith("ask")
               ? await productRequest(ws, method, args, options.ask, calendarPush)
-              : await exclusive(async () => {
-                  const mutates = productMutations.has(method);
-                  if (mutates) await saveExternal();
-                  const relocation = method === "moveStorage" || method === "restoreVersion";
-                  if (relocation) await options.ask?.prepareRelocation();
-                  const oldRoot = ws.root;
-                  let value: unknown;
-                  try {
-                    if (method === "moveStorage") await options.onWorkspaceChanging?.();
-                    value = await productRequest(ws, method, args, options.ask, calendarPush);
-                  } finally {
+              : method === "moveStorage" || method === "restoreVersion"
+                ? await exclusive(async () => {
+                    await saveExternal();
+                    await options.ask?.prepareRelocation();
+                    const oldRoot = ws.root;
                     try {
-                      if (ws.root !== oldRoot) startWatching();
-                      if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                      if (method === "moveStorage") await options.onWorkspaceChanging?.();
+                      return await productRequest(ws, method, args, options.ask, calendarPush);
                     } finally {
-                      if (relocation) options.ask?.relocate(ws.root);
+                      try {
+                        if (ws.root !== oldRoot) startWatching();
+                        if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                      } finally {
+                        options.ask?.relocate(ws.root);
+                        notify();
+                      }
                     }
-                  }
-                  if (method === "configureAutomation") await options.onAutomationChanged?.();
-                  if (mutates) notify();
-                  return value;
-                });
+                  })
+                : await productRequest(ws, method, args, options.ask, calendarPush);
+        if (method === "configureAutomation") await options.onAutomationChanged?.();
+        if (planMutations.has(method)) syncCalendar();
+        if (productMutations.has(method)) notify();
         if (
           method === "openAi" &&
           draftId &&
@@ -394,11 +418,10 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           res.writeHead(200, { "Content-Type": photo.contentType });
           return res.end(photo.bytes);
         }
-        if (url.pathname === "/api/onboarding")
-          return json(res, 200, await exclusive(async () => onboardingStatus(ws)));
+        if (url.pathname === "/api/onboarding") return json(res, 200, onboardingStatus(ws));
         if (["/api/drive", "/api/sync"].includes(url.pathname)) return json(res, 200, syncStatus(ws));
         if (url.pathname === "/api/state") return json(res, 200, { ...readWorkbench(ws), watchError });
-        if (url.pathname === "/api/history") return json(res, 200, await exclusive(() => history(ws)));
+        if (url.pathname === "/api/history") return json(res, 200, await history(ws));
         if (url.pathname === "/api/events") {
           res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive" });
           res.write(": connected\n\n");
@@ -425,14 +448,11 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
       }
       if (url.pathname === "/api/photos/add") {
         const bytes = await body(req, MAX_PHOTO_BYTES);
-        const result = await exclusive(async () => {
-          await saveExternal();
-          return addPhotoBytes(ws, bytes, {
-            pose: (url.searchParams.get("pose") ?? "other") as Pose,
-            ts: url.searchParams.get("ts") ?? undefined,
-            notes: url.searchParams.get("notes") ?? undefined,
-            by: "user",
-          });
+        const result = await addPhotoBytes(ws, bytes, {
+          pose: (url.searchParams.get("pose") ?? "other") as Pose,
+          ts: url.searchParams.get("ts") ?? undefined,
+          notes: url.searchParams.get("notes") ?? undefined,
+          by: "user",
         });
         notify();
         return json(res, 200, result);

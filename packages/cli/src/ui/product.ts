@@ -92,6 +92,9 @@ import { organizeOnboardingMatter } from "./onboarding-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
+/** 改了今天计划、需要在后台同步系统日历的操作。 */
+export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
+
 export const productMutations = new Set([
   "configureAutomation",
   "configureCalendarPush",
@@ -190,11 +193,11 @@ export async function productRequest(
       return calendarPush.removeAll();
     case "editCalendarBlock": {
       const result = await editCalendarBlock(ws, text(0), text(1), text(2));
-      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+      return { ...result, calendarPush: calendarPush.settings() };
     }
     case "scheduleNext": {
       const result = await scheduleNext(ws, text(0), text(1), text(2), text(3));
-      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+      return { ...result, calendarPush: calendarPush.settings() };
     }
     case "calendar":
       return readCalendar(ws);
@@ -293,7 +296,7 @@ export async function productRequest(
       return readOverviewPage(ws);
     case "decideProposal": {
       const result = await decideProposal(ws, text(0), text(1) as "confirmed" | "rejected");
-      return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+      return { ...result, calendarPush: calendarPush.settings() };
     }
     case "capture":
       return captureNote(ws, text(0));

@@ -142,6 +142,13 @@ export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
     .map(([file]) => file);
 }
 
+const deferred = new WeakMap<Workspace, (message: string) => void>();
+
+/** 界面进程里存版本交给后台：写入后立刻返回，版本稍后补存。 */
+export function deferSnapshots(ws: Workspace, schedule: (message: string) => void): void {
+  deferred.set(ws, schedule);
+}
+
 /** 把工作区当前状态记为一个版本；没有改动时返回 null。 */
 const batchDepth = new WeakMap<Workspace, number>();
 
@@ -163,6 +170,14 @@ export async function batchSnapshot<T>(
 
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   if (batchDepth.get(ws)) return null;
+  const schedule = deferred.get(ws);
+  if (!schedule) return snapshotNow(ws, message, now);
+  schedule(message);
+  return null;
+}
+
+/** 立刻存版本，不经过后台。 */
+export async function snapshotNow(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   let localVersion: string | null = null;
   if (!ws.privateRecords && ws.exists(".kaitu/local-projects"))
     localVersion = await snapshot(localRecordStore(ws), "更新了本机资料", now);

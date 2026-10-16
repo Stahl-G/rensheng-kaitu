@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { startUi } from "../../cli/src/ui/server.js";
 import {
   addMemory,
@@ -74,7 +74,7 @@ it("本地接口只确认预览中所选的记忆，整批一个版本并能撤�
   const previousState = process.env.KAITU_LOCAL_STATE_DIR;
   process.env.KAITU_LOCAL_STATE_DIR = join(root, "state");
   const ws = await initWorkspace(join(root, "ws"));
-  const ui = await startUi(ws, { port: 0, open: false });
+  const ui = await startUi(ws, { port: 0, open: false, versionDelayMs: 10 });
   const call = (method: string, args: unknown[], origin = ui.url) =>
     fetch(`${ui.url}/api/product/${method}`, {
       method: "POST",
@@ -96,14 +96,13 @@ it("本地接口只确认预览中所选的记忆，整批一个版本并能撤�
       await call("onboardingMemoryConfirm", [preview.token, ["line-1", "line-2"]])
     ).json();
     expect(result.before).toBe(before[0]?.oid);
-    expect(result.version).toBeTruthy();
     expect(
       listMemories(ws)
         .map((entry) => entry.text)
         .sort(),
     ).toEqual(["小张", "简洁"]);
     expect(new Set(listMemories(ws).map((entry) => entry.source))).toEqual(new Set(["从 Claude 搬来"]));
-    expect(await history(ws)).toHaveLength(before.length + 1);
+    await vi.waitFor(async () => expect(await history(ws)).toHaveLength(before.length + 1));
     expect((await call("onboardingMemoryConfirm", [preview.token, ["line-1"]])).status).toBe(409);
     const repeated = previewOnboardingMemory(ws, "[偏好] 简洁", "claude");
     expect(repeated.candidates).toEqual([]);

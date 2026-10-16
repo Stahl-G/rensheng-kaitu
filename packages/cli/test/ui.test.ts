@@ -87,8 +87,7 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
     body: JSON.stringify({ id: "p1", decision: "confirmed" }),
   });
   expect(response.status).toBe(200);
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  expect((await history(ws)).length).toBe(before + 2);
+  await expect.poll(async () => (await history(ws)).length, { timeout: 3000 }).toBe(before + 2);
   ws.writeJson("inbox/agents/auto.proposal.json", {
     title: "散步",
     start: "20:00",

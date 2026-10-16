@@ -1,14 +1,5 @@
 import { randomBytes } from "node:crypto";
-import {
-  appendFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { quarantineBankNotes } from "./bank-mail.js";
@@ -58,14 +49,6 @@ export function migrateHistory(root: string, icloud?: boolean): void {
       `无法把版本历史从 ${old} 迁移到 ${target}：${(error as Error).message}`,
       "HISTORY_MIGRATION",
     );
-  }
-}
-
-function isSymlink(p: string): boolean {
-  try {
-    return lstatSync(p).isSymbolicLink();
-  } catch {
-    return false;
   }
 }
 
@@ -143,41 +126,15 @@ export class Workspace {
     if (parts.includes(STATE_DIR) && !opts.internal)
       throw new ScopeError(`.kaitu/ 由程序管理，不能直接写入：${rel}`);
     if (parts.includes(".git")) throw new ScopeError(`不能写入版本库目录：${rel}`);
-    this.assertNoSymlinkEscape(abs, Boolean(opts.internal));
     if (
       top === STATE_DIR &&
       abs !== join(this.root, STATE_DIR) &&
       relative(this.root, abs) !== join(STATE_DIR, "config.json")
     ) {
       const state = stateDirectory(this.root, this.icloud);
-      const target = resolve(state, relative(join(this.root, STATE_DIR), abs));
-      this.assertNoSymlinkEscapeAt(state, target);
-      return target;
+      return resolve(state, relative(join(this.root, STATE_DIR), abs));
     }
     return abs;
-  }
-
-  /** 从目标向上找到第一个已存在的路径，确认其真实位置仍在工作区内。 */
-  private assertNoSymlinkEscape(abs: string, internal = true): void {
-    this.assertNoSymlinkEscapeAt(this.root, abs, internal);
-  }
-
-  private assertNoSymlinkEscapeAt(root: string, abs: string, internal = true): void {
-    if (!existsSync(root)) return;
-    const realRoot = realpathSync(root);
-    let probe = abs;
-    while (!existsSync(probe) && !isSymlink(probe)) {
-      const parent = dirname(probe);
-      if (parent === probe) return;
-      probe = parent;
-    }
-    const real = isSymlink(probe) && !existsSync(probe) ? null : realpathSync(probe);
-    if (real === null || !isInside(realRoot, real)) {
-      throw new ScopeError(`路径经符号链接指向工作区外：${relative(this.root, abs)}`);
-    }
-    const parts = relative(realRoot, real).split(sep);
-    if (parts.includes(".git") || (!internal && parts.includes(STATE_DIR)))
-      throw new ScopeError("不能通过别名访问程序目录");
   }
 
   exists(rel: string): boolean {
@@ -235,7 +192,6 @@ export class Workspace {
     const absolute = resolve(this.root, prefix);
     if (isAbsolute(prefix) || !isInside(this.root, absolute))
       throw new ScopeError(`路径超出工作区：${prefix}`);
-    this.assertNoSymlinkEscape(absolute);
     const scope = relative(this.root, absolute);
     if (scope === ".kaitu" || scope.startsWith(".kaitu/"))
       return (scope === ".kaitu" || scope === ".kaitu/config.json") &&

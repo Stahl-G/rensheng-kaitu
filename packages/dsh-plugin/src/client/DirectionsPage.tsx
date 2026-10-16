@@ -135,7 +135,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
       setTab("overview");
     }
     closeForm();
-    setReceipt(result.version ? "已保存" : "记录已写入，版本等待补存");
+    setReceipt("已保存");
     await refresh();
   };
   const update = async (patch: Partial<Pick<Direction, "status" | "favorite">>) => {

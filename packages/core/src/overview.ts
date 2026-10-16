@@ -139,6 +139,11 @@ export function overviewDeferred(ws: Workspace): boolean {
   return (deferred.get(ws) ?? 0) > 0;
 }
 
+/** 界面进程里写入后不再同步刷新现状，由文件监听在后台刷新。 */
+export function holdOverview(ws: Workspace): void {
+  deferred.set(ws, (deferred.get(ws) ?? 0) + 1);
+}
+
 export async function batchOverview<T>(ws: Workspace, operation: () => Promise<T>): Promise<T> {
   deferred.set(ws, (deferred.get(ws) ?? 0) + 1);
   try {

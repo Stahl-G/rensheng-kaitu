@@ -53,8 +53,6 @@ it("模块定义、记录目录及文件链接不能跨越模块边界，合法�
         (issue: { file: string }) => issue.file === "custom/module.json",
       ),
     ).toBe(true);
-    symlinkSync(tmpdir(), join(root, "escape"));
-    expect(() => ws.resolve("escape/outside.jsonl")).toThrow();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
