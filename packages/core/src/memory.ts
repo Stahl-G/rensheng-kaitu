@@ -91,10 +91,18 @@ export function listMemories(ws: Workspace): MemoryEntry[] {
   if (!ws.exists("memory")) return [];
   const order = Object.keys(TYPES);
   return readdirSync(ws.resolve("memory"))
-    .filter(
-      (file) => file.endsWith(".md") && file !== "MEMORY.md" && ws.scanText(`memory/${file}`) !== undefined,
-    )
-    .map((file) => ({ ...readMemory(ws, file).data, file }))
+    .filter((file) => file.endsWith(".md") && file !== "MEMORY.md")
+    .flatMap((file) => {
+      // 同步冲突副本不是记忆，先跳过再校验文件名，免得一份副本让全部记忆读不出来。
+      if (ws.conflictCopy(`memory/${file}`)) return [];
+      // 文件没变时直接用上次解析、校验过的结果。
+      const data = ws.scanParsed(memoryPath(file), "memory", (text) => {
+        const parsed = parseFrontmatter<Memory>(text);
+        validateMemory(parsed.data);
+        return parsed.data;
+      });
+      return data ? [{ ...data, file }] : [];
+    })
     .sort(
       (a, b) =>
         order.indexOf(a.type) - order.indexOf(b.type) ||

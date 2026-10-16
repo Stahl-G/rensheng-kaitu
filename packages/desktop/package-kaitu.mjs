@@ -565,7 +565,7 @@ async function writeIcon(resources) {
   const sharp = requireDsh("sharp");
   // 浅色圆角底块，标志占底块的 76%（896 × 0.76 ≈ 681，即 48 格放大 14.19 倍），居中。
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<rect x="64" y="64" width="896" height="896" rx="224" fill="#F4F7F7"/>
+<rect x="64" y="64" width="896" height="896" rx="224" fill="#F7F2EF"/>
 <g transform="translate(171.5 171.5) scale(14.1875)">${markBody()}</g></svg>`;
   const png = join(resources, "icon.png");
   await sharp(Buffer.from(svg)).png().toFile(png);

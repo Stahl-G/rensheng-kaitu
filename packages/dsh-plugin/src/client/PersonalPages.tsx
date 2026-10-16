@@ -1,12 +1,14 @@
-import type { CalendarPushSettings } from "@kaitu/core";
+import type { CalendarPushSettings, HandoverPack, SyncProvider } from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
+import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
+import { type Locale, useT } from "./i18n.js";
 
 export interface PersonalServices extends CalendarPushServices {
   phoneChannels?: boolean;
@@ -17,8 +19,16 @@ export interface PersonalServices extends CalendarPushServices {
   ) => Promise<AutomationSettings>;
   exportWorkspace: () => Promise<{ name: string; base64: string }>;
   restoreVersion: (oid: string) => Promise<unknown>;
-  moveStorage: (path: string, drive: boolean) => Promise<unknown>;
+  moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
+  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
 }
+const PROVIDERS: { id: SyncProvider; zh: string; en: string; key?: "icloud" | "drive" | "nutstore" }[] = [
+  { id: "local", zh: "这台电脑（不同步）", en: "This computer (no sync)" },
+  { id: "icloud", zh: "iCloud 云盘", en: "iCloud Drive", key: "icloud" },
+  { id: "nutstore", zh: "坚果云", en: "Nutstore (坚果云)", key: "nutstore" },
+  { id: "google-drive", zh: "Google Drive", en: "Google Drive", key: "drive" },
+  { id: "folder", zh: "其他同步盘的文件夹", en: "A folder another sync app syncs" },
+];
 export type PersonalView = "profile" | "connections" | "settings";
 export function PersonalPages(
   props: PersonalServices &
@@ -31,8 +41,12 @@ export function PersonalPages(
       manageAi: () => void;
       refreshWorkspace: () => Promise<void>;
       subscribe?: (refresh: () => void) => () => void;
+      onHandoverAnswer: (answer: string) => Promise<void>;
+      locale: Locale;
+      onLocale: (locale: Locale) => Promise<void>;
     },
 ) {
+  const t = useT();
   const [calendarPush, setCalendarPush] = useState<CalendarPushSettings | null>(null);
   const [data, setData] = useState<SettingsData | null>(null);
   const [searchProvider, setSearchProvider] = useState("perplexity");
@@ -44,7 +58,7 @@ export function PersonalPages(
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [path, setPath] = useState("");
-  const [drive, setDrive] = useState(false);
+  const [provider, setProvider] = useState<SyncProvider>("local");
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -59,7 +73,7 @@ export function PersonalPages(
     void refresh();
   }, [refresh]);
   useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
-  const run = async (operation: () => Promise<unknown>, message = "已保存") => {
+  const run = async (operation: () => Promise<unknown>, message = t("已保存", "Saved")) => {
     setBusy(true);
     setError("");
     setReceipt("");
@@ -103,15 +117,29 @@ export function PersonalPages(
       },
       remove ? "已移除 Key，下一次搜索生效" : "搜索设置已保存，下一次搜索生效",
     );
-  const title = props.view === "profile" ? "个人档案" : props.view === "connections" ? "AI 与连接" : "设置";
+  const title =
+    props.view === "profile"
+      ? t("个人档案", "Profile")
+      : props.view === "connections"
+        ? t("AI 与连接", "AI & connections")
+        : t("设置", "Settings");
+  const storageName = (id: SyncProvider | undefined) => {
+    const item = PROVIDERS.find((entry) => entry.id === id) ?? PROVIDERS[0];
+    return t(item?.zh ?? "", item?.en ?? "");
+  };
+  const suggestion = (id: SyncProvider) => {
+    const key = PROVIDERS.find((entry) => entry.id === id)?.key;
+    const folder = key ? data?.storage.suggested?.[key] : null;
+    return folder ? `${folder}/kaitu` : "";
+  };
   return (
     <div className={css.me}>
-      <nav className={css["me-nav"]} aria-label="个人">
+      <nav className={css["me-nav"]} aria-label={t("个人", "Personal")}>
         {(
           [
-            ["profile", "个人档案"],
-            ["connections", "AI 与连接"],
-            ["settings", "设置"],
+            ["profile", t("个人档案", "Profile")],
+            ["connections", t("AI 与连接", "AI & connections")],
+            ["settings", t("设置", "Settings")],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -127,7 +155,11 @@ export function PersonalPages(
       <div className={css["me-body"]}>
         <div className={css.head}>
           <h1>{title}</h1>
-          {props.view === "profile" && <span className={css.sub}>开图对你的了解，每条都留着出处</span>}
+          {props.view === "profile" && (
+            <span className={css.sub}>
+              {t("开图对你的了解，每条都留着出处", "What Kaitu knows about you, each with its source")}
+            </span>
+          )}
         </div>
         {error && (
           <p className={css.error} role="alert">
@@ -138,30 +170,45 @@ export function PersonalPages(
         {props.view === "profile" ? (
           <MePage {...props} />
         ) : !data ? (
-          <p className={css.small}>正在读取设置…</p>
+          <p className={css.small}>{t("正在读取设置…", "Loading settings…")}</p>
         ) : props.view === "connections" ? (
           <>
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>「问问」用的 AI</h2>
+              <HandoverPanel loadHandover={props.loadHandover} onAnswer={props.onHandoverAnswer} />
+            </section>
+            <section className={css.sec}>
+              <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
               <p className={css.small}>
-                填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）
+                {t(
+                  "填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）",
+                  "Paste an API key from an AI service (DeepSeek, OpenAI, Claude, Gemini, Kimi, Zhipu and others)",
+                )}
               </p>
-              <p className={css.small}>更换服务或模型后，下一条消息生效。</p>
+              <p className={css.small}>
+                {t(
+                  "更换服务或模型后，下一条消息生效。",
+                  "A new service or model applies from the next message.",
+                )}
+              </p>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css.conn}>
                   <span className={css.logo} style={{ background: "var(--explore)" }}>
                     AI
                   </span>
-                  <b>{data.ai ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}` : "由 DSH 管理"}</b>
+                  <b>
+                    {data.ai
+                      ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}`
+                      : t("由 DSH 管理", "Managed by DSH")}
+                  </b>
                   <span className={css.small}>
                     {data.ai
                       ? data.ai.configured
-                        ? "已连接 · 凭据只存本机"
-                        : "还没连接"
-                      : "使用 DSH 的模型设置"}
+                        ? t("已连接 · 凭据只存本机", "Connected · key stays on this computer")
+                        : t("还没连接", "Not connected")
+                      : t("使用 DSH 的模型设置", "Uses DSH model settings")}
                   </span>
                   <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} onClick={props.manageAi}>
-                    管理模型
+                    {t("管理模型", "Manage model")}
                   </button>
                 </div>
               </div>
@@ -256,17 +303,29 @@ export function PersonalPages(
             )}
             <section className={css.sec}>
               <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>这台电脑上的 AI</h2>
-                <span className={css.small}>通过 MCP 直接读写，电脑开着时可用</span>
+                <h2 className={css.eyebrow}>
+                  {t("这台电脑上的 AI（进阶）", "AI on this computer (advanced)")}
+                </h2>
+                <span className={css.small}>
+                  {t(
+                    "通过 MCP 直接读写，电脑开着时可用",
+                    "Reads and writes directly over MCP while this computer is on",
+                  )}
+                </span>
               </div>
               <div className={`${css.card} ${css.sum}`}>
-                <b>接入你正在用的 AI</b>
-                <p className={css.small}>在支持 MCP 的 AI 中接入这个开图文件夹</p>
+                <b>{t("接入支持 MCP 的客户端", "Connect an MCP client")}</b>
+                <p className={css.small}>
+                  {t(
+                    "Claude Desktop、Claude Code、Codex 等本机客户端可以直接读写这个开图文件夹",
+                    "Local clients such as Claude Desktop, Claude Code and Codex can read and write this Kaitu folder",
+                  )}
+                </p>
                 <details>
-                  <summary className={css.link}>查看接入说明</summary>
+                  <summary className={css.link}>{t("查看接入说明", "Setup instructions")}</summary>
                   <pre className={css.detailBody}>{`命令：kaitu mcp\n工作目录：${data.storage.root}`}</pre>
                   <textarea
-                    aria-label="AI 接手说明"
+                    aria-label={t("AI 接手说明", "AI handover instructions")}
                     rows={5}
                     readOnly
                     value={aiHandover(data.storage.root, "")}
@@ -278,29 +337,34 @@ export function PersonalPages(
                     onClick={() =>
                       void run(
                         () => navigator.clipboard.writeText(aiHandover(data.storage.root, "")),
-                        "接手说明已复制",
+                        t("接手说明已复制", "Instructions copied"),
                       )
                     }
                   >
-                    复制接手说明
+                    {t("复制接手说明", "Copy instructions")}
                   </button>
                 </details>
               </div>
             </section>
             <section className={css.sec}>
               <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>云端的 AI</h2>
-                <span className={css.small}>通过 Google Drive 文件接力</span>
+                <h2 className={css.eyebrow}>{t("云端的 AI（进阶）", "Cloud AI (advanced)")}</h2>
+                <span className={css.small}>
+                  {t("通过同步盘里的文件接力", "Relays through files in a synced folder")}
+                </span>
               </div>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <span>
-                    <b>Google Drive 接力</b>
+                    <b>{t("同步盘接力", "Synced folder relay")}</b>
                     <br />
                     <span className={css.small}>
                       {data.storage.mode === "drive"
-                        ? `已开启${data.storage.lastInboxProcessed ? ` · 最近处理 ${data.storage.lastInboxProcessed}` : ""}`
-                        : "还没连接"}
+                        ? t(
+                            `已开启 · ${storageName(data.storage.provider)}${data.storage.lastInboxProcessed ? ` · 最近处理 ${data.storage.lastInboxProcessed}` : ""}`,
+                            `On · ${storageName(data.storage.provider)}${data.storage.lastInboxProcessed ? ` · last processed ${data.storage.lastInboxProcessed}` : ""}`,
+                          )
+                        : t("还没开启", "Not on")}
                     </span>
                   </span>
                   <button
@@ -309,10 +373,10 @@ export function PersonalPages(
                     onClick={() => {
                       props.navigate("settings");
                       setMoving(true);
-                      setDrive(true);
+                      setProvider(data.storage.suggested?.nutstore ? "nutstore" : "google-drive");
                     }}
                   >
-                    管理存放位置
+                    {t("管理存放位置", "Manage storage")}
                   </button>
                 </div>
               </div>
@@ -328,9 +392,9 @@ export function PersonalPages(
               />
             )}
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>资料存在哪里</h2>
+              <h2 className={css.eyebrow}>{t("资料存在哪里", "Where your notes live")}</h2>
               <div className={`${css.card} ${css.sum}`}>
-                <b>{data.storage.mode === "drive" ? "Google Drive 文件夹" : "这台电脑"}</b>
+                <b>{storageName(data.storage.provider)}</b>
                 <p className={css.small}>{data.storage.root}</p>
               </div>
             </section>
@@ -338,16 +402,58 @@ export function PersonalPages(
         ) : (
           <>
             <section className={css.sec}>
+              <h2 className={css.eyebrow}>{t("语言", "Language")}</h2>
+              <div className={`${css.card} ${css["list-card"]}`}>
+                <div className={css["switch-row"]}>
+                  <label htmlFor="ui-language">
+                    <b>{t("界面语言", "Interface language")}</b>
+                    <span className={css.small}>
+                      {t(
+                        "只影响这台电脑上的开图界面和给 AI 的提示词",
+                        "Applies to Kaitu on this computer and the prompts it gives your AI",
+                      )}
+                    </span>
+                  </label>
+                  <select
+                    id="ui-language"
+                    value={props.locale}
+                    disabled={busy}
+                    onChange={(event) =>
+                      void run(() => props.onLocale(event.target.value === "en" ? "en" : "zh-CN"), "")
+                    }
+                  >
+                    <option value="zh-CN">中文</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+            <section className={css.sec}>
               <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>自动整理</h2>
-                <span className={css.small}>用「问问」的 AI 运行</span>
+                <h2 className={css.eyebrow}>{t("自动整理", "Automatic organizing")}</h2>
+                <span className={css.small}>{t("用「问问」的 AI 运行", "Runs with the AI behind Ask")}</span>
               </div>
               <div className={`${css.card} ${css["list-card"]}`}>
                 {(
                   [
-                    ["morning", "早间计划", "排好今天的安排，等你确认"],
-                    ["organizer", "每日整理", "把各个 AI 当天留下的记录合并成一份"],
-                    ["news", "资讯搜索", "按你关注的方向找新东西"],
+                    [
+                      "morning",
+                      t("早间计划", "Morning plan"),
+                      t("排好今天的安排，等你确认", "Plans your day for you to confirm"),
+                    ],
+                    [
+                      "organizer",
+                      t("每日整理", "Daily organizer"),
+                      t(
+                        "把各个 AI 当天留下的记录合并成一份",
+                        "Merges what each AI left today into one record",
+                      ),
+                    ],
+                    [
+                      "news",
+                      t("资讯搜索", "News search"),
+                      t("按你关注的方向找新东西", "Finds new things on topics you follow"),
+                    ],
                   ] as const
                 ).map(([key, label, note]) => (
                   <div className={`${css["switch-row"]} ${css["auto-row"]}`} key={key}>
@@ -357,7 +463,7 @@ export function PersonalPages(
                     </label>
                     <span className={css["auto-ctl"]}>
                       <input
-                        aria-label={`${label}的时间`}
+                        aria-label={t(`${label}的时间`, `${label} time`)}
                         type="time"
                         className={css.time}
                         key={`${key}:${data.automation.times[key]}`}
@@ -385,14 +491,21 @@ export function PersonalPages(
                   </div>
                 ))}
               </div>
-              <p className={css.note}>时间按你的时区（{data.timeZone}）算</p>
+              <p className={css.note}>
+                {t(`时间按你的时区（${data.timeZone}）算`, `Times use your time zone (${data.timeZone})`)}
+              </p>
             </section>
             <section className={css.sec}>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <label htmlFor="calendar-push">
-                    <b>确认日程时加入系统日历</b>
-                    <span className={css.small}>只加入你确认的时间段。关闭后已写入的保持不动。</span>
+                    <b>{t("确认日程时加入系统日历", "Add confirmed time blocks to the system calendar")}</b>
+                    <span className={css.small}>
+                      {t(
+                        "只加入你确认的时间段。关闭后已写入的保持不动。",
+                        "Only blocks you confirm are added. Turning this off leaves existing events as they are.",
+                      )}
+                    </span>
                   </label>
                   <span className={css.switch}>
                     <input
@@ -446,73 +559,85 @@ export function PersonalPages(
               </div>
             </section>
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>资料</h2>
+              <h2 className={css.eyebrow}>{t("资料", "Data")}</h2>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <span>
-                    <b>导出全部资料</b>
+                    <b>{t("导出全部资料", "Export everything")}</b>
                     <br />
-                    <span className={css.small}>Markdown、JSON 和附件，不含本机连接凭据</span>
+                    <span className={css.small}>
+                      {t(
+                        "Markdown、JSON 和附件，不含本机连接凭据",
+                        "Markdown, JSON and attachments, without local connection keys",
+                      )}
+                    </span>
                   </span>
                   <button
                     type="button"
                     className={`${css.btn} ${css["btn-quiet"]}`}
                     disabled={busy}
                     onClick={() =>
-                      void run(async () => {
-                        const file = await props.exportWorkspace();
-                        const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
-                        const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
-                        const anchor = document.createElement("a");
-                        anchor.href = url;
-                        anchor.download = file.name;
-                        anchor.click();
-                        setTimeout(() => URL.revokeObjectURL(url), 10000);
-                      }, "导出文件已生成")
+                      void run(
+                        async () => {
+                          const file = await props.exportWorkspace();
+                          const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
+                          const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+                          const anchor = document.createElement("a");
+                          anchor.href = url;
+                          anchor.download = file.name;
+                          anchor.click();
+                          setTimeout(() => URL.revokeObjectURL(url), 10000);
+                        },
+                        t("导出文件已生成", "Export ready"),
+                      )
                     }
                   >
-                    导出
+                    {t("导出", "Export")}
                   </button>
                 </div>
                 <div className={css["switch-row"]}>
                   <span>
-                    <b>版本历史</b>
+                    <b>{t("版本历史", "Version history")}</b>
                     <br />
-                    <span className={css.small}>每次改动都留了版本，可以恢复</span>
+                    <span className={css.small}>
+                      {t("每次改动都留了版本，可以恢复", "Every change keeps a version you can restore")}
+                    </span>
                   </span>
                   <button
                     type="button"
                     className={`${css.btn} ${css["btn-quiet"]}`}
                     onClick={() => setHistory(!history)}
                   >
-                    打开
+                    {t("打开", "Open")}
                   </button>
                 </div>
                 <div className={css["switch-row"]}>
                   <span>
-                    <b>换一个存放位置</b>
+                    <b>{t("换一个存放位置", "Change where notes live")}</b>
                     <br />
-                    <span className={css.small}>{data.storage.root}</span>
+                    <span className={css.small}>
+                      {storageName(data.storage.provider)} · {data.storage.root}
+                    </span>
                   </span>
                   <button
                     type="button"
                     className={`${css.btn} ${css["btn-quiet"]}`}
                     onClick={() => setMoving(!moving)}
                   >
-                    更换
+                    {t("更换", "Change")}
                   </button>
                 </div>
               </div>
             </section>
             {history && (
               <section className={css.sec}>
-                <h2 className={css.eyebrow}>版本历史</h2>
+                <h2 className={css.eyebrow}>{t("版本历史", "Version history")}</h2>
                 {data.versions.map((version) => (
                   <div className={`${css.card} ${css.sum}`} key={version.oid}>
                     <b>{version.message}</b>
                     <time className={css.small}>{version.time}</time>
                     <button type="button" className={css.link} onClick={() => setRestore(version.oid)}>
-                      恢复这个版本
+                      {t("恢复这个版本", "Restore this version")}
                     </button>
                   </div>
                 ))}
@@ -520,23 +645,31 @@ export function PersonalPages(
             )}
             {restore && (
               <section className={css.ask}>
-                <p>恢复前会自动保存当前版本，之后可以撤销。</p>
+                <p>
+                  {t(
+                    "恢复前会自动保存当前版本，之后可以撤销。",
+                    "The current version is saved first, so you can undo this.",
+                  )}
+                </p>
                 <button
                   type="button"
                   className={`${css.btn} ${css["btn-primary"]}`}
                   disabled={busy}
                   onClick={() =>
-                    void run(async () => {
-                      await props.restoreVersion(restore);
-                      setRestore(null);
-                      await props.refreshWorkspace();
-                    }, "已恢复版本")
+                    void run(
+                      async () => {
+                        await props.restoreVersion(restore);
+                        setRestore(null);
+                        await props.refreshWorkspace();
+                      },
+                      t("已恢复版本", "Version restored"),
+                    )
                   }
                 >
-                  确认恢复
+                  {t("确认恢复", "Restore")}
                 </button>
                 <button type="button" className={css.link} onClick={() => setRestore(null)}>
-                  取消
+                  {t("取消", "Cancel")}
                 </button>
               </section>
             )}
@@ -545,45 +678,79 @@ export function PersonalPages(
                 className={`${css.card} ${css["sub-form"]}`}
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void run(async () => {
-                    await props.moveStorage(path, drive);
-                    setMoving(false);
-                    await props.refreshWorkspace();
-                  }, "资料已迁移");
+                  void run(
+                    async () => {
+                      await props.moveStorage(path, provider !== "local", provider);
+                      setMoving(false);
+                      await props.refreshWorkspace();
+                    },
+                    t("资料已迁移", "Notes moved"),
+                  );
                 }}
               >
                 <label>
-                  新的文件夹位置
+                  {t("由谁同步", "Synced by")}
+                  <select
+                    value={provider}
+                    onChange={(event) => {
+                      const next = event.target.value as SyncProvider;
+                      setProvider(next);
+                      if (!path.trim() || PROVIDERS.some((item) => suggestion(item.id) === path))
+                        setPath(suggestion(next));
+                    }}
+                  >
+                    {PROVIDERS.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t(item.zh, item.en)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {provider === "nutstore" && (
+                  <p className={css.small}>
+                    {data.storage.suggested?.nutstore
+                      ? t(
+                          "已找到坚果云同步文件夹。资料放进去后由坚果云同步到你的其他电脑；版本历史、密钥和索引留在这台电脑。",
+                          "Found your Nutstore folder. Nutstore syncs your notes to your other computers; version history, keys and the index stay on this computer.",
+                        )
+                      : t(
+                          "没找到坚果云同步文件夹。先在坚果云客户端里设好一个同步文件夹，再在下面填它里面的新文件夹路径。",
+                          "No Nutstore folder found. Set up a synced folder in Nutstore first, then enter a new folder inside it below.",
+                        )}
+                  </p>
+                )}
+                {provider !== "local" && (
+                  <p className={css.small}>
+                    {t(
+                      "不要直接把现在的开图文件夹加进同步盘：那样会把密钥和版本库一起上传。请用这里迁移，开图会把它们留在本机。",
+                      "Don't add the current Kaitu folder to a sync app directly; that would upload keys and history too. Move it here and Kaitu keeps those on this computer.",
+                    )}
+                  </p>
+                )}
+                <label>
+                  {t("新的文件夹位置", "New folder location")}
                   <input
                     required
                     value={path}
-                    placeholder="填写新文件夹的完整路径"
+                    placeholder={t("填写新文件夹的完整路径", "Full path of the new folder")}
                     onChange={(event) => setPath(event.target.value)}
                   />
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={drive}
-                    onChange={(event) => setDrive(event.target.checked)}
-                  />
-                  这是 Google Drive 同步目录
                 </label>
                 <button
                   type="submit"
                   className={`${css.btn} ${css["btn-primary"]}`}
                   disabled={busy || !path.trim()}
                 >
-                  迁移到这里
+                  {t("迁移到这里", "Move here")}
                 </button>
               </form>
             )}
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>关于</h2>
+              <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
               <p className={css.small}>
-                人生开图 {data.version ?? "本地工作台"}
-                {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} · 时区{" "}
-                {data.timeZone}
+                {t("人生开图", "Kaitu")} {data.version ?? t("本地工作台", "local workbench")}
+                {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} ·{" "}
+                {t("时区", "Time zone")} {data.timeZone}
               </p>
             </section>
           </>

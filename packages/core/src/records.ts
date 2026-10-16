@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
+import { deepFreeze } from "./frozen.js";
 import {
   type RecordTypeRef,
   findRecordType,
@@ -232,16 +233,38 @@ export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[]
   return revisionsFor(ws, findRecordType(ws, type));
 }
 
+/** 一个数据文件里的全部行：文件没变时不再读取、解析和校验。行对象已冻结，可以共用。 */
+function fileRevisions(ws: Workspace, file: string): readonly StoredRecord[] {
+  return (
+    ws.scanParsed(file, "records", (text) => {
+      const rows: StoredRecord[] = [];
+      text.split("\n").forEach((raw, i) => {
+        if (!raw.trim()) return;
+        try {
+          const row = JSON.parse(raw) as StoredRecord;
+          if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
+          rows.push(row);
+        } catch {
+          throw new KaituError(`${file}:${i + 1} 记录格式不合法`, "CORRUPT");
+        }
+      });
+      return deepFreeze(rows);
+    }) ?? []
+  );
+}
+
 function revisionsFor(ws: Workspace, ref: RecordTypeRef): StoredRecord[] {
-  return recordLines(ws, ref).map((line) => {
-    try {
-      const row = JSON.parse(line.raw) as StoredRecord;
-      if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
-      return row;
-    } catch {
-      throw new KaituError(`${line.file}:${line.line} 记录格式不合法`, "CORRUPT");
-    }
-  });
+  const { dir, match } = recordFilePattern(ref);
+  const abs = resolveRecordPath(ws, ref, dir);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs)
+    .filter((n) => match.test(n))
+    .sort()
+    .flatMap((f) => {
+      const file = `${dir}/${f}`;
+      resolveRecordPath(ws, ref, file);
+      return fileRevisions(ws, file);
+    });
 }
 
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
@@ -265,10 +288,13 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
   const ref = findRecordType(ws, type);
   const tz = ws.timeZone();
   const day = (r: StoredRecord) => isoInZone(parseTs(r.ts), tz).slice(0, 10);
+  // 排序前把时间各解析一次，不在比较函数里反复解析。
   return [...latestById(ws, ref).values()]
     .filter((r) => !r.deleted)
     .filter((r) => (!opts.from || day(r) >= opts.from) && (!opts.to || day(r) <= opts.to))
-    .sort((a, b) => parseTs(a.ts).getTime() - parseTs(b.ts).getTime() || a.id.localeCompare(b.id));
+    .map((record) => ({ record, at: parseTs(record.ts).getTime() }))
+    .sort((a, b) => a.at - b.at || a.record.id.localeCompare(b.record.id))
+    .map((item) => item.record);
 }
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */

@@ -9,6 +9,7 @@ import {
   CalendarPush,
   type CalendarPushResult,
   type CalendarPushSettings,
+  type HandoverPack,
   type ImportSource,
   KaituError,
   type LibraryData,
@@ -29,10 +30,14 @@ import {
   type OnboardingSetupPreview,
   type OnboardingSetupResult,
   type OnboardingStatus,
+  type OnboardingTarget,
+  type Preferences,
   type ProjectGoal,
   type SettingsData,
+  type SyncProvider,
   Workspace,
   addCalendarSubscription,
+  addGoalNext,
   adoptOnboardingMatter,
   bindGithub,
   calendarPushEntries,
@@ -49,16 +54,22 @@ import {
   createProject,
   decideProposal,
   defaultRoot,
+  directionsPrompt,
   dismissNews,
   draftOnboardingMatter,
   editCalendarBlock,
   editExperience,
   exportWorkspace,
+  handoverPack,
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  matterPrompt,
   moveWorkspace,
+  normalizeLocale,
   onboardingStatus,
+  pasteDirections,
+  pasteOnboardingMatter,
   previewExperienceBatch,
   previewOnboardingImport,
   previewOnboardingMemory,
@@ -84,11 +95,13 @@ import {
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  resolvePreferences,
   restore,
   saveAvatar,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  savePreferences,
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
@@ -164,6 +177,40 @@ export class KaituOverviewService extends TypertRemoteService {
   async onboardingMatterOrganize(source: string): Promise<OnboardingMatter> {
     return this.write(async () => readOnboardingMatter(this.workspace, source));
   }
+  @Remote("onboardingMatterPrompt")
+  async onboardingMatterPrompt(source: string, locale?: string): Promise<string> {
+    return matterPrompt(readOnboardingMatter(this.workspace, source).text, normalizeLocale(locale));
+  }
+  @Remote("onboardingMatterPaste")
+  async onboardingMatterPaste(source: string, answer: string, locale?: string): Promise<OnboardingMatter> {
+    return this.write(() =>
+      pasteOnboardingMatter(this.workspace, source, answer, { locale: normalizeLocale(locale) }),
+    );
+  }
+  @Remote("goalNextAdd")
+  async goalNextAdd(goalId: string, title: string): Promise<OnboardingNext> {
+    return this.write(() => addGoalNext(this.workspace, goalId, title));
+  }
+  @Remote("handoverPack")
+  async handoverPack(locale?: string): Promise<HandoverPack> {
+    return handoverPack(this.workspace, normalizeLocale(locale));
+  }
+  @Remote("directionsPrompt")
+  async directionsPrompt(locale?: string): Promise<string> {
+    return directionsPrompt(this.workspace, normalizeLocale(locale));
+  }
+  @Remote("directionsPaste")
+  async directionsPaste(answer: string, locale?: string): Promise<{ ids: string[]; skipped: number }> {
+    return this.write(() => pasteDirections(this.workspace, answer, { locale: normalizeLocale(locale) }));
+  }
+  @Remote("preferences")
+  async preferences(hint?: string): Promise<Preferences> {
+    return this.write(async () => resolvePreferences(this.workspace, hint));
+  }
+  @Remote("savePreferences")
+  async savePreferences(input: Preferences): Promise<Preferences> {
+    return savePreferences(input);
+  }
   @Remote("onboardingMatterDraft")
   async onboardingMatterDraft(source: string, input: OnboardingMatterSuggestion): Promise<OnboardingMatter> {
     return this.write(() => draftOnboardingMatter(this.workspace, source, input));
@@ -187,18 +234,28 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("onboarding")
-  async onboarding(): Promise<OnboardingStatus> {
-    return this.write(async () => onboardingStatus(this.workspace));
+  async onboarding(locale?: string): Promise<OnboardingStatus> {
+    return this.write(async () => onboardingStatus(this.workspace, { locale: normalizeLocale(locale) }));
   }
 
   @Remote("onboardingMemoryPreview")
-  async onboardingMemoryPreview(text: string, ai: OnboardingAi): Promise<OnboardingMemoryPreview> {
-    return this.write(async () => previewOnboardingMemory(this.workspace, text, ai));
+  async onboardingMemoryPreview(
+    text: string,
+    ai: OnboardingAi,
+    locale?: string,
+  ): Promise<OnboardingMemoryPreview> {
+    return this.write(async () =>
+      previewOnboardingMemory(this.workspace, text, ai, { locale: normalizeLocale(locale) }),
+    );
   }
 
   @Remote("onboardingMemoryConfirm")
-  async onboardingMemoryConfirm(token: string, selected: string[]): Promise<OnboardingMemoryResult> {
-    return this.write(() => confirmOnboardingMemory(this.workspace, token, selected));
+  async onboardingMemoryConfirm(
+    token: string,
+    selected: string[],
+    targets?: Record<string, OnboardingTarget>,
+  ): Promise<OnboardingMemoryResult> {
+    return this.write(() => confirmOnboardingMemory(this.workspace, token, selected, { targets }));
   }
 
   @Remote("onboardingCancel")
@@ -290,8 +347,8 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("moveStorage")
-  async moveStorage(path: string, drive: boolean): Promise<SettingsData["storage"]> {
-    return this.write(() => moveWorkspace(this.workspace, path, drive));
+  async moveStorage(path: string, drive: boolean, provider?: SyncProvider): Promise<SettingsData["storage"]> {
+    return this.write(() => moveWorkspace(this.workspace, path, drive, provider));
   }
 
   @Remote("automation")

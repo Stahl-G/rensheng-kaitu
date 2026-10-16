@@ -1,4 +1,5 @@
 import type {
+  HandoverPack,
   OnboardingAi,
   OnboardingChoiceResult,
   OnboardingChoices,
@@ -14,23 +15,41 @@ import type {
   OnboardingSetupPreview,
   OnboardingSetupResult,
   OnboardingStatus,
+  OnboardingTarget,
+  Preferences,
 } from "@kaitu/core";
+import type { Locale } from "./i18n.js";
 
 export interface OnboardingServices {
   keepOnboardingMatter: (source: string) => Promise<OnboardingMatter>;
   saveOnboardingMatter: (text: string) => Promise<OnboardingMatter>;
   readOnboardingMatter: (source: string) => Promise<OnboardingMatter>;
-  organizeOnboardingMatter: (source: string) => Promise<OnboardingMatter>;
+  organizeOnboardingMatter: (source: string, locale?: Locale) => Promise<OnboardingMatter>;
+  /** 剪贴板协议：拿到发给自己 AI 的整理提示词，再把回答贴回来。 */
+  promptOnboardingMatter: (source: string, locale?: Locale) => Promise<string>;
+  pasteOnboardingMatter: (source: string, answer: string, locale?: Locale) => Promise<OnboardingMatter>;
   adoptOnboardingMatter: (
     source: string,
     draft: OnboardingMatterDraft,
     path?: OnboardingPath | null,
   ) => Promise<OnboardingNext>;
   changeOnboardingNext: (id: string, rev: number, action: string, value: string) => Promise<OnboardingNext>;
-  loadOnboarding: () => Promise<OnboardingStatus>;
+  addGoalNext: (goalId: string, title: string) => Promise<OnboardingNext>;
+  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
+  loadOnboarding: (locale?: Locale) => Promise<OnboardingStatus>;
+  loadPreferences: (hint?: string) => Promise<Preferences>;
+  savePreferences: (input: Preferences) => Promise<Preferences>;
   chooseOnboarding: (choices: OnboardingChoices) => Promise<OnboardingChoiceResult>;
-  previewOnboardingMemory: (text: string, ai: OnboardingAi) => Promise<OnboardingMemoryPreview>;
-  confirmOnboardingMemory: (token: string, selected: string[]) => Promise<OnboardingMemoryResult>;
+  previewOnboardingMemory: (
+    text: string,
+    ai: OnboardingAi,
+    locale?: Locale,
+  ) => Promise<OnboardingMemoryPreview>;
+  confirmOnboardingMemory: (
+    token: string,
+    selected: string[],
+    targets?: Record<string, OnboardingTarget>,
+  ) => Promise<OnboardingMemoryResult>;
   cancelOnboarding: (token: string) => Promise<void>;
   previewOnboardingImport: (
     source: "apple-health" | "chatgpt-conversations",

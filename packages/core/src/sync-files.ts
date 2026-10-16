@@ -6,6 +6,8 @@ import { isICloudPath } from "./sync-location.js";
 
 export function conflictOriginal(root: string, file: string): string | undefined {
   const name = basename(file);
+  // 坚果云冲突副本的命名还没真机核对（HANDOFF §6），核对前只认通用写法，不猜「-冲突」之类的后缀，
+  // 否则「沟通-冲突解决」这样的普通名字会被当成副本。
   const original = name.replace(
     / (?:\d+|\(\d+\)|\(conflict(?:ed)?(?: copy)?[^)]*\)|\[conflict(?:ed)?(?: copy)?[^\]]*\])(?=(?:\.[^/]*)?$)/i,
     "",

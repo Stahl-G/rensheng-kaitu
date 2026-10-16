@@ -92,7 +92,7 @@ const HELP = `开图 kaitu
 
 用法：
   kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
-  kaitu sync enable icloud|drive [--dir <路径>] [--name kaitu]  选择同步文件夹
+  kaitu sync enable icloud|drive|nutstore [--dir <路径>] [--name kaitu]  选择同步文件夹（nutstore 为坚果云）
   kaitu sync disable [--to <目录>] | status          搬回本机 / 查看存放位置
   kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
   kaitu drive disable [--to <目录>]                  搬回本机
@@ -334,24 +334,26 @@ async function run(argv: string[]): Promise<number> {
       const action = args[0];
       const ws = workspace(cmd === "sync" && action === "enable" ? { ...values, dir: undefined } : values);
       const mode = cmd === "drive" ? "drive" : args[1];
-      if (action === "enable" && mode !== "icloud" && mode !== "drive")
-        throw new KaituError("使用 sync enable icloud|drive", "BAD_ARGS");
+      if (action === "enable" && mode !== "icloud" && mode !== "drive" && mode !== "nutstore")
+        throw new KaituError("使用 sync enable icloud|drive|nutstore", "BAD_ARGS");
       const result =
         action === "enable"
-          ? await enableSync(ws, mode as "icloud" | "drive", {
+          ? await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
               dir: cmd === "drive" ? values["drive-dir"] : values.dir,
               name: values.name,
+              ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
             })
           : action === "disable"
             ? await disableSync(ws, { to: values.to })
             : action === "status"
               ? syncStatus(ws)
               : undefined;
-      if (!result) throw new KaituError("使用 sync enable icloud|drive / disable / status", "BAD_ARGS");
+      if (!result)
+        throw new KaituError("使用 sync enable icloud|drive|nutstore / disable / status", "BAD_ARGS");
       out(
         values,
         result,
-        `模式：${result.mode}\n工作区：${result.root}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}${result.hint ? `\n${result.hint}` : ""}`,
+        `模式：${result.mode}（${result.provider}）\n工作区：${result.root}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}${result.hint ? `\n${result.hint}` : ""}`,
       );
       return 0;
     }

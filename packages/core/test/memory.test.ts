@@ -1,10 +1,25 @@
+import { copyFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { handoverPack } from "../src/handover.js";
 import { history, restore } from "../src/history.js";
+import { readMe } from "../src/me-page.js";
 import { addMemory, importMemories, listMemories, removeMemory } from "../src/memory.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
 describe("记忆", () => {
+  it("记忆文件夹里有同步冲突副本时，其余记忆、个人档案和资料包照常读取", async () => {
+    const ws = await freshWorkspace();
+    const city = await addMemory(ws, { type: "fact", name: "city", text: "住在上海" });
+    const original = join(ws.root, "memory", city.file);
+    copyFileSync(original, original.replace(/\.md$/, " (Conflicted Copy).md"));
+    copyFileSync(original, original.replace(/\.md$/, " 2.md"));
+    expect(listMemories(ws).map((memory) => memory.text)).toEqual(["住在上海"]);
+    expect(() => readMe(ws)).not.toThrow();
+    expect(handoverPack(ws, "zh-CN").text).toContain("住在上海");
+  });
+
   it("增删后 MEMORY.md 同步", async () => {
     const ws = await freshWorkspace();
     const home = await addMemory(ws, { type: "fact", name: "Home", text: "在上海生活。喜欢散步。" });

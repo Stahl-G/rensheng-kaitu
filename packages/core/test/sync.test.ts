@@ -18,6 +18,7 @@ import {
   historyDirectory,
   initWorkspace,
   mcpToken,
+  moveWorkspace,
   pendingWorkspaceFiles,
   processInbox,
   readProject,
@@ -94,7 +95,8 @@ it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可
     mkdirSync(custom);
     await enableSync(ws, "icloud", { dir: custom, name: "life" });
     expect(syncStatus(new Workspace(ws.root)).mode).toBe("icloud");
-    await disableSync(ws);
+    // 设置里选「本机」走同一条关闭同步的路。
+    await moveWorkspace(ws, join(home, "local-life"), false, "local");
     expect(syncStatus(ws).mode).toBe("local");
     expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(taskMarker);
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);
@@ -209,6 +211,67 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
   } finally {
     io.mockRestore();
     Object.defineProperty(process, "platform", platform);
+    vi.unstubAllEnvs();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+it("坚果云往返：资料进同步文件夹、状态留本机；冲突副本不进版本，「沟通-冲突解决」这类普通名字照常保存", async () => {
+  const home = tmp();
+  vi.stubEnv("HOME", home);
+  vi.stubEnv("KAITU_DIR", "");
+  try {
+    const ws = await initWorkspace(join(home, "kaitu"));
+    const added = addRecord(ws, "workout", workout);
+    const token = mcpToken(ws);
+    await snapshot(ws, "迁移前");
+    await expect(enableSync(ws, "drive", { provider: "nutstore" })).rejects.toThrow("坚果云");
+    const nutstore = join(home, "Nutstore Files/我的坚果云");
+    mkdirSync(nutstore, { recursive: true });
+    expect(syncStatus(ws).suggested.nutstore).toBe(nutstore);
+    const result = await enableSync(ws, "drive", { provider: "nutstore" });
+    expect(result).toMatchObject({ mode: "drive", provider: "nutstore", root: join(nutstore, "kaitu") });
+    expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
+    expect(historyDirectory(ws).startsWith(nutstore)).toBe(false);
+    expect(mcpToken(ws)).toBe(token);
+    expect(syncStatus(new Workspace(ws.root)).provider).toBe("nutstore");
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
+    const handoff = (agent: string) =>
+      `---\nagent: ${agent}\nat: ${new Date().toISOString()}\n---\n## 当前下一步\n- 合成下一步\n`;
+    ws.writeText("handoffs/relay.md", handoff("retained-agent"));
+    await snapshot(ws, "交接");
+    const conflicts = ["handoffs/relay (conflicted copy 2026-10-16).md", "handoffs/relay 2.md"];
+    for (const file of conflicts) writeFileSync(join(ws.root, file), handoff("conflict-agent"));
+    const reported = (await doctor(ws)).filter((check) => !check.ok).flatMap((check) => check.files ?? []);
+    expect(reported).toEqual(expect.arrayContaining(conflicts));
+    expect(validateWorkspace(ws)).toEqual([]);
+    refreshOverview(ws);
+    expect(ws.readText("OVERVIEW.md")).not.toContain("conflict-agent");
+    ws.writeText("handoffs/relay.md", `${handoff("retained-agent")}\n正常更新\n`);
+    ws.writeText("learning/沟通/notes.md", "# 沟通\n");
+    ws.writeText("learning/沟通-冲突解决/notes.md", "# 冲突解决\n先复述对方的意思\n");
+    expect(ws.scanText("learning/沟通-冲突解决/notes.md")).toContain("先复述对方的意思");
+    const oid = await snapshot(ws, "冲突副本不进版本");
+    const tracked = await git.listFiles({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      ref: oid as string,
+    });
+    for (const file of conflicts) expect(tracked).not.toContain(file);
+    expect(tracked).toContain("learning/沟通-冲突解决/notes.md");
+    for (const file of conflicts) rmSync(join(ws.root, file));
+    // 同步中换成另一种同步方式，记下的同步方式跟着换。
+    mkdirSync(join(home, "Sync"));
+    await moveWorkspace(ws, join(home, "Sync/kaitu"), true, "folder");
+    expect(syncStatus(new Workspace(ws.root))).toMatchObject({ mode: "drive", provider: "folder" });
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
+    await disableSync(ws, { to: join(home, "back") });
+    expect(syncStatus(ws)).toMatchObject({ mode: "local", provider: "local" });
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
+    expect(mcpToken(ws)).toBe(token);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });
   }

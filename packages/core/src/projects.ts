@@ -8,6 +8,7 @@ import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { deepFreeze } from "./frozen.js";
 import { projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { findRecordType, recordFileFor } from "./modules.js";
@@ -56,6 +57,21 @@ export function readProject(ws: Workspace, slug: string) {
   checkStatus(parsed.data);
   return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
 }
+/** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
+function projectSnapshot(ws: Workspace, slug: string) {
+  const dir = projectDirectory(ws, slug);
+  const status = ws.scanParsed(`${dir}/STATUS.md`, "project", (text) => {
+    const parsed = parseFrontmatter<ProjectStatus>(text);
+    parsed.data.links ??= [];
+    checkStatus(parsed.data);
+    return deepFreeze(parsed);
+  });
+  if (!status) throw new KaituError("找不到项目", "NOT_FOUND");
+  const log = ws.exists(`${dir}/log.md`)
+    ? (ws.scanParsed(`${dir}/log.md`, "text", (text) => text) ?? "")
+    : "";
+  return { slug, dir, ...status, log };
+}
 function slugs(ws: Workspace): string[] {
   const names = new Set<string>();
   for (const base of ["projects"]) {
@@ -87,15 +103,23 @@ export function projectStatusFiles(ws: Workspace) {
 }
 export function listProjects(ws: Workspace, options: { now?: Date; slug?: string } = {}) {
   const now = options.now ?? new Date();
-  const today = localDate(now, ws.timeZone());
+  const tz = ws.timeZone();
+  const today = localDate(now, tz);
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
+  // 指标只读一次，再按项目分组。
+  const allMetrics = new Map<string, StoredRecord[]>();
+  const metricType = ws.exists("projects/module.json") ? findRecordType(ws, "project_metric") : null;
+  if (metricType)
+    for (const r of readRecords(ws, "project_metric"))
+      if (Date.parse(r.ts) <= now.getTime()) {
+        const key = String(r.project);
+        const list = allMetrics.get(key);
+        if (list) list.push(r);
+        else allMetrics.set(key, [r]);
+      }
   return (options.slug ? [options.slug] : slugs(ws)).flatMap((slug) => {
-    const project = readProject(ws, slug);
-    const metrics = ws.exists("projects/module.json")
-      ? readRecords(ws, "project_metric").filter(
-          (r) => r.project === slug && Date.parse(r.ts) <= now.getTime(),
-        )
-      : [];
+    const project = projectSnapshot(ws, slug);
+    const metrics = allMetrics.get(slug) ?? [];
     const words = metrics.filter((r) => r.kind === "words");
     const recentWords = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) >= from);
     const baseline =
@@ -165,13 +189,9 @@ export function listProjects(ws: Workspace, options: { now?: Date; slug?: string
         file: `${project.dir}/STATUS.md`,
         metricFiles: [
           ...new Set(
-            metrics.map((r) => {
-              const file = recordFileFor(
-                findRecordType(ws, "project_metric"),
-                localMonth(parseTs(r.ts), ws.timeZone()),
-              );
-              return file;
-            }),
+            metrics.map((r) =>
+              recordFileFor(metricType as NonNullable<typeof metricType>, localMonth(parseTs(r.ts), tz)),
+            ),
           ),
         ],
       },

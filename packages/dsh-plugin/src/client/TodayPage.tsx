@@ -7,6 +7,7 @@ import type {
 } from "../types.js";
 import type { FinancePageProps } from "./FinancePage.js";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
 const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
 const money = (metric: { amount: string | null; record_ids: string[] } | undefined, currency: string) =>
@@ -112,13 +113,19 @@ export function TodayFinance({
   );
 }
 export function DataSummaries({ data, open }: { data: OverviewData; open: (id: string) => void }) {
+  const t = useT();
   const sections = data.sections.filter((section) => section.id !== "finance");
   if (!sections.length) return null;
   return (
     <section className={css.sec}>
       <div className={css["sec-head"]}>
-        <h2 className={css.eyebrow}>你的数据</h2>
-        <span className={css.small}>有数据的板块会自动出现，没数据的不占位置</span>
+        <h2 className={css.eyebrow}>{t("你的数据", "Your data")}</h2>
+        <span className={css.small}>
+          {t(
+            "有数据的板块会自动出现，没数据的不占位置",
+            "Sections appear once they have data; empty ones stay out of the way",
+          )}
+        </span>
       </div>
       <div className={css.grid}>
         {sections.map((section) => (
@@ -135,13 +142,28 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
                   background: `var(--${({ health: "health", projects: "doing", feed: "news", calendar: "news", me: "me" } as Record<string, string>)[section.id] ?? "explore"})`,
                 }}
               />
-              {(
-                { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
-                  string,
-                  string
-                >
-              )[section.id] ?? section.label}
-              <span>{section.count} 条</span>
+              {t(
+                (
+                  { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
+                    string,
+                    string
+                  >
+                )[section.id] ?? section.label,
+                (
+                  {
+                    feed: "News",
+                    me: "Profile",
+                    explore: "Directions",
+                    projects: "Projects",
+                    health: "Health",
+                    calendar: "Schedule",
+                    learning: "Learning",
+                    decisions: "Decisions",
+                    reviews: "Reviews",
+                  } as Record<string, string>
+                )[section.id] ?? section.label,
+              )}
+              <span>{t(`${section.count} 条`, `${section.count}`)}</span>
             </span>
             {section.id === "health" && data.metrics.length ? (
               <>
@@ -177,12 +199,16 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
               data.projects.slice(0, 2).map((project) => (
                 <span className={css.stack} key={project.slug}>
                   <b>{project.title}</b>
-                  <span className={css.small}>{project.next[0] ?? "还没有下一步"}</span>
+                  <span className={css.small}>
+                    {project.next[0] ?? t("还没有下一步", "No next step yet")}
+                  </span>
                 </span>
               ))
             ) : (
               <span className={css.small}>
-                {section.latest ? `记录日期 ${section.latest.slice(0, 10)}` : "查看全部资料与来源"}
+                {section.latest
+                  ? t(`记录日期 ${section.latest.slice(0, 10)}`, `Recorded ${section.latest.slice(0, 10)}`)
+                  : t("查看全部资料与来源", "See all notes and sources")}
               </span>
             )}
           </button>

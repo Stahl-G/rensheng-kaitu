@@ -14,6 +14,7 @@ import css from "./DirectionsPage.module.css";
 import base from "./OverviewPage.module.css";
 import v2 from "./Prototype.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 
 export interface DirectionsPageProps {
   generateDirections?: (start: boolean) => Promise<{
@@ -22,6 +23,9 @@ export interface DirectionsPageProps {
     error?: string;
   }>;
   onConnect?: () => void;
+  /** 剪贴板协议：把研究提示词复制给自己的 AI，再把方向建议贴回来。 */
+  directionsPrompt?: (locale?: Locale) => Promise<string>;
+  pasteDirections?: (answer: string, locale?: Locale) => Promise<{ ids: string[]; skipped: number }>;
   loadExploration: () => Promise<ExplorationData>;
   writeExploration: (command: ExplorationCommand) => Promise<{ id: string; version: string | null }>;
   loadExplorationSource: (
@@ -39,6 +43,13 @@ const states = {
   paused: "已暂停",
   archived: "已归档",
   dismissed: "已忽略",
+};
+const statesEn = {
+  suggested: "AI suggestion · to adopt",
+  active: "Trying",
+  paused: "Paused",
+  archived: "Archived",
+  dismissed: "Dismissed",
 };
 const actionStates = { planned: "计划中", active: "进行中", completed: "行动已完成", cancelled: "已取消" };
 const conclusions = {
@@ -81,7 +92,123 @@ function ReferenceList({
   );
 }
 
+/** 没有内置 AI 时，用自己常用的 AI 提方向：复制提示词，贴回建议，建议进「待采纳」。 */
+function ClipboardDirections({
+  directionsPrompt,
+  pasteDirections,
+  done,
+}: {
+  directionsPrompt: NonNullable<DirectionsPageProps["directionsPrompt"]>;
+  pasteDirections: NonNullable<DirectionsPageProps["pasteDirections"]>;
+  done: (message: string) => Promise<void>;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const [prompt, setPrompt] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [copied, setCopied] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const area = useRef<HTMLTextAreaElement>(null);
+  return (
+    <div
+      className={`${v2.card} ${v2["sub-form"]}`}
+      aria-label={t("用你常用的 AI 提方向", "Ask your own AI for directions")}
+    >
+      <b>{t("用你常用的 AI 提方向，不用 API Key", "Ask the AI you already use, no API key")}</b>
+      <span className={v2.small}>
+        {t(
+          "复制一段研究提示词（含你的目标、在做的事和已有方向，不含健康、财务和敏感记忆），发给能联网搜索的 AI，再把它的回答贴回来。建议先放进「待采纳」，由你决定。",
+          "Copy a research prompt (with your goals, projects and existing directions; no health, finance or sensitive memories), send it to an AI that can search the web, then paste its answer back. Suggestions wait for you to adopt them.",
+        )}
+      </span>
+      <div className={v2["dialog-foot"]}>
+        {copied && <output className={v2.small}>{copied}</output>}
+        <button
+          type="button"
+          className={`${v2.btn} ${v2["btn-quiet"]}`}
+          disabled={busy}
+          onClick={() =>
+            void (async () => {
+              setError("");
+              try {
+                const text = prompt || (await directionsPrompt(locale));
+                setPrompt(text);
+                try {
+                  await navigator.clipboard.writeText(text);
+                  setCopied(t("已复制，去你的 AI 里粘贴发送", "Copied. Paste it into your AI and send"));
+                } catch {
+                  setCopied(t("已显示在下面，请全选复制", "Shown below; select all and copy"));
+                  requestAnimationFrame(() => area.current?.select());
+                }
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              }
+            })()
+          }
+        >
+          {t("1 · 复制研究提示词", "1 · Copy the research prompt")}
+        </button>
+      </div>
+      {prompt && (
+        <textarea
+          ref={area}
+          readOnly
+          rows={4}
+          value={prompt}
+          aria-label={t("研究提示词", "Research prompt")}
+        />
+      )}
+      <textarea
+        rows={5}
+        value={answer}
+        disabled={busy}
+        aria-label={t("AI 的回答", "The AI's answer")}
+        placeholder={t(
+          "2 · 把 AI 按【方向】格式回复的内容贴到这里",
+          "2 · Paste what the AI replied in the [Direction] format",
+        )}
+        onChange={(event) => setAnswer(event.target.value)}
+      />
+      {error && (
+        <p role="alert" className={v2.error}>
+          {error}
+        </p>
+      )}
+      <div className={v2["dialog-foot"]}>
+        <button
+          type="button"
+          className={`${v2.btn} ${v2["btn-primary"]}`}
+          disabled={busy || !answer.trim()}
+          onClick={() => {
+            setBusy(true);
+            setError("");
+            void pasteDirections(answer, locale)
+              .then(async (result) => {
+                setAnswer("");
+                await done(
+                  t(
+                    `加入了 ${result.ids.length} 个方向建议${result.skipped ? `，${result.skipped} 个已存在` : ""}，在下面采纳或选不感兴趣`,
+                    `Added ${result.ids.length} suggestions${result.skipped ? ` (${result.skipped} already there)` : ""}. Adopt or dismiss them below`,
+                  ),
+                );
+              })
+              .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy ? t("正在读取…", "Reading…") : t("3 · 读取方向建议", "3 · Read the suggestions")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DirectionsPage(props: DirectionsPageProps) {
+  const t = useT();
+  const locale = useLocale();
+  const stateLabel = (status: Direction["status"]) => (locale === "en" ? statesEn[status] : states[status]);
+  const [clipboard, setClipboard] = useState(false);
   const [data, setData] = useState<ExplorationData | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [filter, setFilter] = useState("current");
@@ -147,7 +274,17 @@ export function DirectionsPage(props: DirectionsPageProps) {
       setGeneration(await props.generateDirections(true));
     } catch (error) {
       setGeneration(undefined);
-      setError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      // 没连内置 AI 时直接给出「用你常用的 AI」这条路，而不是只让用户去连接。
+      if (props.pasteDirections && /连接 AI|AI_CONNECTION/.test(message)) {
+        setClipboard(true);
+        setError(
+          t(
+            "还没有连接开图里的 AI。可以用下面的方式，让你常用的 AI 来提方向。",
+            "Ask inside Kaitu isn't connected. Use the AI you already use below instead.",
+          ),
+        );
+      } else setError(message);
     }
   };
   const direction = data?.directions.find((d) => d.id === selected);
@@ -252,12 +389,12 @@ export function DirectionsPage(props: DirectionsPageProps) {
             </button>
           </p>
         ) : (
-          <p className={base.muted}>正在读取方向…</p>
+          <p className={base.muted}>{t("正在读取方向…", "Loading directions…")}</p>
         )}
       </section>
     );
   return (
-    <section className={css.page} aria-label="探索方向">
+    <section className={css.page} aria-label={t("探索方向", "Directions")}>
       {error && (
         <p role="alert" className={base.notice}>
           {error}
@@ -271,7 +408,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
       )}
       {(error || generation?.error) && props.onConnect && (
         <button type="button" className={base.link} onClick={props.onConnect}>
-          AI 与连接
+          {t("AI 与连接", "AI & connections")}
         </button>
       )}
       {receipt && <output className={base.muted}>{receipt}</output>}
@@ -535,19 +672,36 @@ export function DirectionsPage(props: DirectionsPageProps) {
       ) : (
         <>
           <header className={css.listHeader}>
-            <h2 className={v2.eyebrow}>你在探索的方向</h2>
+            <h2 className={v2.eyebrow}>{t("你在探索的方向", "Directions you're exploring")}</h2>
             <button
               type="button"
               className={v2.btn}
               disabled={generation?.status === "running"}
               onClick={() => void generate()}
             >
-              让 AI 提几个方向
+              {t("让 AI 提几个方向", "Ask AI for directions")}
             </button>
+            {props.pasteDirections && (
+              <button type="button" className={v2.link} onClick={() => setClipboard(!clipboard)}>
+                {t("用你常用的 AI 提", "Use your own AI")}
+              </button>
+            )}
             <button type="button" className={v2.link} onClick={() => openForm("direction")}>
-              写下一个新方向
+              {t("写下一个新方向", "Write a new direction")}
             </button>
           </header>
+          {clipboard && props.directionsPrompt && props.pasteDirections && (
+            <ClipboardDirections
+              directionsPrompt={props.directionsPrompt}
+              pasteDirections={props.pasteDirections}
+              done={async (message) => {
+                setClipboard(false);
+                setError(null);
+                setReceipt(message);
+                await refresh();
+              }}
+            />
+          )}
           <div className={`${v2.grid} ${css.cards}`}>
             {listedDirections.map((d) => {
               const attempt = data.experiments.filter((e) => e.direction_id === d.id).at(-1);
@@ -581,9 +735,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         color: d.status === "suggested" ? "var(--news-ink)" : "var(--explore-ink)",
                       }}
                     >
-                      {states[d.status]}
+                      {stateLabel(d.status)}
                     </span>
-                    {d.favorite && <span className={v2.small}>已收藏</span>}
+                    {d.favorite && <span className={v2.small}>{t("已收藏", "Saved")}</span>}
                   </div>
                   <h3>
                     <button
@@ -601,9 +755,17 @@ export function DirectionsPage(props: DirectionsPageProps) {
                   </h3>
                   {d.status === "suggested" ? (
                     <div className={css.prose}>
-                      <p>{d.motivation || "这条建议还没有写明依据"}</p>
+                      <p>
+                        {d.motivation ||
+                          t("这条建议还没有写明依据", "No reasoning written for this suggestion yet")}
+                      </p>
                       <p>{d.hypothesis}</p>
-                      {d.unknowns && <p>还不清楚：{d.unknowns}</p>}
+                      {d.unknowns && (
+                        <p>
+                          {t("还不清楚：", "Still unclear: ")}
+                          {d.unknowns}
+                        </p>
+                      )}
                       {d.references
                         ?.filter((ref) => ref.kind === "source" && /^https?:\/\//.test(ref.ref))
                         .map((ref) => (
@@ -616,18 +778,25 @@ export function DirectionsPage(props: DirectionsPageProps) {
                     </div>
                   ) : (
                     <dl>
-                      <dt>当前猜想</dt>
-                      <dd>{d.hypothesis || "还没有写下猜想"}</dd>
-                      <dt>还不清楚</dt>
-                      <dd>{d.unknowns || "尚未记录"}</dd>
+                      <dt>{t("当前猜想", "Current guess")}</dt>
+                      <dd>{d.hypothesis || t("还没有写下猜想", "No guess written yet")}</dd>
+                      <dt>{t("还不清楚", "Still unclear")}</dt>
+                      <dd>{d.unknowns || t("尚未记录", "Not noted yet")}</dd>
                     </dl>
                   )}
                   {attempt && (
                     <div className={v2.attempt}>
-                      <span className={v2.small}>{d.status === "paused" ? "上次尝试" : "这次尝试"}</span>
+                      <span className={v2.small}>
+                        {d.status === "paused"
+                          ? t("上次尝试", "Last attempt")
+                          : t("这次尝试", "Current attempt")}
+                      </span>
                       <b>{attempt.action}</b>
                       <span className={v2.small}>
-                        投入：{attempt.budget} · 期限：{attempt.deadline}
+                        {t(
+                          `投入：${attempt.budget} · 期限：${attempt.deadline}`,
+                          `Effort: ${attempt.budget} · by ${attempt.deadline}`,
+                        )}
                       </span>
                       {attempt.result && <p>{attempt.result}</p>}
                     </div>
@@ -636,9 +805,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
                     <div className={v2.evidence}>
                       {(
                         [
-                          ["supports", "支持"],
-                          ["refutes", "反对"],
-                          ["unclear", "还说不准"],
+                          ["supports", t("支持", "For")],
+                          ["refutes", t("反对", "Against")],
+                          ["unclear", t("还说不准", "Unclear")],
                         ] as const
                       ).map(([stance, label]) => (
                         <span key={stance} className={v2.chip}>
@@ -656,7 +825,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           disabled={busy}
                           onClick={() => void change("active")}
                         >
-                          采纳
+                          {t("采纳", "Adopt")}
                         </button>
                         <button
                           type="button"
@@ -664,7 +833,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           disabled={busy}
                           onClick={() => void change("dismissed")}
                         >
-                          不感兴趣
+                          {t("不感兴趣", "Not interested")}
                         </button>
                         <button
                           type="button"
@@ -672,7 +841,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           disabled={generation?.status === "running"}
                           onClick={() => void generate()}
                         >
-                          换一批
+                          {t("换一批", "New batch")}
                         </button>
                       </>
                     ) : (
@@ -685,7 +854,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                             setTab("overview");
                           }}
                         >
-                          打开方向 →
+                          {t("打开方向 →", "Open →")}
                         </button>
                         <button
                           type="button"
@@ -693,7 +862,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           disabled={busy}
                           onClick={() => void change(d.status === "active" ? "paused" : "active")}
                         >
-                          {d.status === "active" ? "暂停" : "继续探索"}
+                          {d.status === "active" ? t("暂停", "Pause") : t("继续探索", "Resume")}
                         </button>
                       </>
                     )}
@@ -703,13 +872,13 @@ export function DirectionsPage(props: DirectionsPageProps) {
             })}
           </div>
           <details>
-            <summary className={v2.link}>筛选方向</summary>{" "}
-            <nav className={base.secondaryNav} aria-label="方向筛选">
+            <summary className={v2.link}>{t("筛选方向", "Filter")}</summary>{" "}
+            <nav className={base.secondaryNav} aria-label={t("方向筛选", "Direction filter")}>
               {(
                 [
-                  ["current", "当前"],
-                  ["favorites", "收藏"],
-                  ["history", "已归档"],
+                  ["current", t("当前", "Current")],
+                  ["favorites", t("收藏", "Saved")],
+                  ["history", t("已归档", "Archived")],
                 ] as const
               ).map(([id, title]) => (
                 <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
@@ -720,22 +889,33 @@ export function DirectionsPage(props: DirectionsPageProps) {
           </details>
           {!data.directions.length && (
             <div className={base.focus}>
-              <h2>一个值得探索的问题</h2>
-              <p className={base.subtitle}>可以是创作、学习、职业，或一个尚不确定的想法。</p>
+              <h2>{t("一个值得探索的问题", "A question worth exploring")}</h2>
+              <p className={base.subtitle}>
+                {t(
+                  "可以是创作、学习、职业，或一个尚不确定的想法。",
+                  "Creative work, learning, a career move, or an idea you're unsure about.",
+                )}
+              </p>
             </div>
           )}
           {!!data.directions.length && !listedDirections.length && (
             <p className={base.muted}>
               {filter === "favorites"
-                ? "还没有收藏的方向。打开一个方向后可以收藏。"
+                ? t(
+                    "还没有收藏的方向。打开一个方向后可以收藏。",
+                    "No saved directions yet. Open one to save it.",
+                  )
                 : filter === "history"
-                  ? "还没有暂停、归档或忽略的方向。"
-                  : "当前没有正在探索的方向，可以记下新问题，或从暂停与归档中继续。"}
+                  ? t("还没有暂停、归档或忽略的方向。", "Nothing paused, archived or dismissed yet.")
+                  : t(
+                      "当前没有正在探索的方向，可以记下新问题，或从暂停与归档中继续。",
+                      "Nothing in progress. Write down a new question, or resume one from paused and archived.",
+                    )}
             </p>
           )}
           {!!props.goals?.length && (
             <details>
-              <summary>从已有目标出发</summary>
+              <summary>{t("从已有目标出发", "Start from a goal you have")}</summary>
               {props.goals.map((goal) => (
                 <div key={goal.id} className={base.row}>
                   <strong>{goal.title}</strong>
@@ -748,7 +928,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                       setForm("direction");
                     }}
                   >
-                    建立为方向
+                    {t("建立为方向", "Make it a direction")}
                   </button>
                 </div>
               ))}
