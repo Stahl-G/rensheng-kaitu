@@ -314,6 +314,11 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              saveNewsKeywords: async (keywords: string[]) => {
+                const result = await ctx.remote.kaitu.saveNewsKeywords(keywords);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               feedbackNews: async (id: string, value: NewsFeedback | null) => {
                 const r = await ctx.remote.kaitu.feedbackNews(id, value);
                 if (!r.ok) throw new Error(r.error.message);

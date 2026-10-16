@@ -131,6 +131,26 @@ function feedSettings(ws: Workspace) {
     : {};
 }
 
+export function normalizeNewsKeywords(input: unknown): string[] {
+  if (
+    !Array.isArray(input) ||
+    input.length > 100 ||
+    input.some((word) => typeof word !== "string" || word.trim().length > 200)
+  )
+    throw new KaituError("关注方向请填写最多 100 条，每条不超过 200 字", "BAD_ARGS");
+  return [...new Set(input.map((word: string) => word.trim()).filter(Boolean))];
+}
+
+export async function saveNewsKeywords(ws: Workspace, input: string[]): Promise<string[]> {
+  const keywords = normalizeNewsKeywords(input);
+  const settings = feedSettings(ws);
+  if (JSON.stringify(keywords) !== JSON.stringify(settings.keywords ?? [])) {
+    ws.writeJson("feed/feeds.json", { ...settings, keywords });
+    await snapshot(ws, "你更新了资讯关注方向");
+  }
+  return keywords;
+}
+
 export function readNews(ws: Workspace, now = new Date()): NewsData {
   const zone = ws.timeZone();
   const date = localDate(now, zone);

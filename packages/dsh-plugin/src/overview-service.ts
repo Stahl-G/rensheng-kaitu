@@ -82,6 +82,7 @@ import {
   resolveExperience,
   restore,
   saveAvatar,
+  saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
   scheduleNext,
@@ -402,6 +403,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("news")
   async news(): Promise<NewsData> {
     return readNews(this.workspace);
+  }
+
+  @Remote("saveNewsKeywords")
+  async saveNewsKeywords(keywords: string[]): Promise<string[]> {
+    return this.write(() => saveNewsKeywords(this.workspace, keywords));
   }
 
   @Remote("feedbackNews")

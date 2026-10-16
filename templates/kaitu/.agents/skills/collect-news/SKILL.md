@@ -7,8 +7,11 @@ description: 为开图采集新闻、论文、发布、视频播客与 X 热门�
 
 ## 通用规则（所有 Agent）
 
-先读 me/profile.md、me/goals.json、各模块 STATUS.md 与 feed/feeds.json，按用户目标、项目、所在地和关注点筛选。
-feed/feeds.json 的 keywords 包含用户标记有用的来源，后续优先采集；muted 是用户不相关反馈，减少这类来源。
+先读 feed/feeds.json，keywords 是用户已确认的关注方向，按它采集，muted 中的来源减少采集。
+再读 me/profile.md、me/goals.json、各模块 STATUS.md，结合目标、项目和所在地判断具体关联。
+keywords 为空时先请用户在「资讯 → 采集规则」填写或生成关注方向，不自行推断一份隐藏方案。
+生成下一版方案时，读取 news_read 的 feedback，结合对应资讯的主题、来源与关联汇总有用和不相关反馈。
+反馈只用于提议下一版，不直接修改 keywords 或 muted。方案以关键词列表交给用户在采集规则中编辑、查看差异并确认保存。
 让用户不必点开原文也能理解发生了什么、为什么相关、可做什么。记录字段以工作区 schema 为准。
 
 - news_item 保留 title、url、source、via、status。kind 缺省 article，可选 x_post、paper、release、video、podcast、rss。

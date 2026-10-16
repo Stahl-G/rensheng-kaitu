@@ -27,14 +27,6 @@ export async function setNewsFeedback(ws: Workspace, id: string, value: NewsFeed
   if (!row) throw new KaituError("找不到这条资讯", "NOT_FOUND");
   const current = state(ws);
   const term = String(row.source).trim();
-  const settingsFile = "feed/feeds.json";
-  const settings = ws.exists(settingsFile)
-    ? ws.readJson<{ keywords?: string[]; muted?: string[]; [key: string]: unknown }>(settingsFile)
-    : {};
-  const has = (words: string[] | undefined) =>
-    !!words?.some((word) => word.toLowerCase() === term.toLowerCase());
-  if (!current.baseline[term])
-    current.baseline[term] = { keyword: has(settings.keywords), muted: has(settings.muted) };
   if (value === null) delete current.votes[id];
   else
     current.votes[id] = {
@@ -42,23 +34,7 @@ export async function setNewsFeedback(ws: Workspace, id: string, value: NewsFeed
       term,
       at: Math.max(Date.now(), ...Object.values(current.votes).map((vote) => vote.at + 1)),
     };
-  const latest = Object.values(current.votes)
-    .filter((vote) => vote.term === term)
-    .sort((a, b) => b.at - a.at)[0];
-  const baseline = current.baseline[term];
-  const update = (key: "keywords" | "muted", enabled: boolean) => {
-    const words = settings[key] ?? [];
-    settings[key] = enabled
-      ? has(words)
-        ? words
-        : [...words, term]
-      : words.filter((word) => word.toLowerCase() !== term.toLowerCase());
-  };
-  update("keywords", latest ? latest.value === "useful" || baseline.keyword : baseline.keyword);
-  update("muted", latest ? latest.value === "irrelevant" : baseline.muted);
-  if (!latest) delete current.baseline[term];
-  ws.writeJson(settingsFile, settings);
   ws.writeJson(file, current, { internal: true });
-  await snapshot(ws, "你调整了资讯采集偏好");
+  await snapshot(ws, "你记录了资讯反馈");
   return readNewsFeedback(ws);
 }

@@ -78,6 +78,7 @@ import {
   resolveExperience,
   restore,
   saveAvatar,
+  saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
   scheduleNext,
@@ -88,6 +89,7 @@ import {
   unhideExperience,
   writeExploration,
 } from "@kaitu/core";
+import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
@@ -128,6 +130,7 @@ export const productMutations = new Set([
   "unhideExperience",
   "tryNews",
   "feedbackNews",
+  "saveNewsKeywords",
   "dismissNews",
   "setAvatar",
   "removeAvatar",
@@ -338,6 +341,10 @@ export async function productRequest(
       return unhideExperience(ws, text(0), revision(1));
     case "news":
       return readNews(ws);
+    case "suggestNewsKeywords":
+      return suggestNewsKeywords(ws, ask);
+    case "saveNewsKeywords":
+      return saveNewsKeywords(ws, args[0] as string[]);
     case "feedbackNews":
       return setNewsFeedback(ws, text(0), args[1] as NewsFeedback | null);
     case "tryNews": {

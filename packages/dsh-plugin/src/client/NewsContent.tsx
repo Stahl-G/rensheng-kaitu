@@ -10,7 +10,11 @@ function webUrl(value?: string): string | undefined {
     return undefined;
   }
 }
-function NewsImage({ src, className, source = "X" }: { src?: string; className?: string; source?: string }) {
+export function NewsImage({
+  src,
+  className,
+  source = "X",
+}: { src?: string; className?: string; source?: string }) {
   const [failed, setFailed] = useState<string | null>(null);
   const url = webUrl(src);
   return url && url !== failed ? (

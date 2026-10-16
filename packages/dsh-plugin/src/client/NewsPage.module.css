@@ -472,3 +472,46 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--kt-control);
+  border-radius: 12px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  overflow-wrap: anywhere;
+}
+.rules p,
+.rules h3,
+.rules h4 {
+  margin: 0;
+}
+.rules .actions {
+  flex-wrap: wrap;
+}
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.editor textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  resize: vertical;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  color: var(--kt-text);
+  background: var(--kt-canvas);
+}
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--kt-feed-tint);
+}

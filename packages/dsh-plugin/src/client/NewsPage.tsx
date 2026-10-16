@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NewsAction, NewsData, NewsFeedback, NewsItem } from "../types.js";
-import { NewsExtra, TrendDetails } from "./NewsContent.js";
+import { NewsExtra, NewsImage, TrendDetails } from "./NewsContent.js";
+import { NewsRules } from "./NewsRules.js";
 import css from "./Prototype.module.css";
 
 export interface NewsPageProps {
@@ -9,6 +10,8 @@ export interface NewsPageProps {
   tryNews: (id: string) => Promise<NewsAction>;
   dismissNews: (id: string) => Promise<NewsAction>;
   feedbackNews: (id: string, value: NewsFeedback | null) => Promise<Record<string, NewsFeedback>>;
+  saveNewsKeywords: (keywords: string[]) => Promise<string[]>;
+  suggestNewsKeywords?: () => Promise<string[]>;
   onPrompt: (text: string) => void;
 }
 const labels = { rss: "RSS", grok: "Grok", dot: "Dot", codex: "Codex", agent: "AI", user: "你" };
@@ -33,6 +36,7 @@ export function NewsPage(props: NewsPageProps) {
   const [data, setData] = useState<NewsData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [rules, setRules] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
   const refresh = useCallback(async () => {
     try {
@@ -63,9 +67,7 @@ export function NewsPage(props: NewsPageProps) {
     const related = item.relevance?.ref || item.relevance?.reason;
     return (
       <article className={`${css.news} ${css.card}`} key={item.id}>
-        <div className={css.thumb} style={{ background: "var(--news)" }}>
-          {kinds[item.kind ?? "article"]}
-        </div>
+        <NewsImage src={item.image} className={css.thumb} source={kinds[item.kind ?? "article"]} />
         <div className={css.stack} style={{ gap: 6, minWidth: 0 }}>
           <span className={css.small}>
             {item.source} · {labels[item.via]} 采集
@@ -101,7 +103,7 @@ export function NewsPage(props: NewsPageProps) {
             </button>
             {vote ? (
               <span className={css.small}>
-                记下了，以后{vote === "useful" ? "多" : "少"}找这类 ·{" "}
+                已记为{vote === "useful" ? "有用" : "不相关"}，下次生成关注方案时参考 ·{" "}
                 <button
                   type="button"
                   className={css.link}
@@ -144,15 +146,21 @@ export function NewsPage(props: NewsPageProps) {
         <button
           type="button"
           className={css.link}
-          onClick={() =>
-            props.onPrompt(
-              "请读取 feed/feeds.json 中的关注词与屏蔽来源，和我调整资讯采集规则。点评对我说你，关联写具体目标、项目或方向。",
-            )
-          }
+          aria-expanded={rules}
+          onClick={() => setRules((open) => !open)}
         >
           采集规则
         </button>
       </div>
+      {rules && data && (
+        <NewsRules
+          keywords={data.keywords ?? []}
+          save={props.saveNewsKeywords}
+          suggest={props.suggestNewsKeywords}
+          onPrompt={props.onPrompt}
+          onSaved={(keywords) => setData((current) => (current ? { ...current, keywords } : current))}
+        />
+      )}
       {error && (
         <p className={css.error} role="alert">
           {error}
