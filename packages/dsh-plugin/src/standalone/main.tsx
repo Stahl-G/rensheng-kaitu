@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { AskPage } from "../client/AskPage.js";
 import { OverviewPage, type OverviewPageProps } from "../client/OverviewPage.js";
 
 async function call<T>(method: string, ...args: unknown[]): Promise<T> {
@@ -11,23 +12,19 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   if (!response.ok) throw new Error(value.error ?? "操作失败，请重试");
   return value;
 }
-async function openAi(text?: string) {
-  const output = document.getElementById("startup-error");
-  if (output) {
-    output.hidden = false;
-    output.textContent = "正在打开内置 AI…";
-  }
-  const result = await call<{ url?: string }>("openAi", text);
-  if (result.url) window.location.assign(result.url);
-  else if (output) output.textContent = "内置 AI 已在独立窗口打开";
-}
+let workspace = "";
 const props: OverviewPageProps = {
+  renderAsk: (prompt) => <AskPage workspace={workspace} initialPrompt={prompt} />,
   subscribe: (refresh) => {
     const events = new EventSource("/api/events");
     events.onmessage = refresh;
     return () => events.close();
   },
-  load: () => call("overview"),
+  load: async () => {
+    const data = await call<Awaited<ReturnType<OverviewPageProps["load"]>>>("overview");
+    workspace = data.root;
+    return data;
+  },
   decideProposal: (id, decision) => call("decideProposal", id, decision),
   capture: (text) => call("capture", text),
   loadMe: () => call("me"),
@@ -62,15 +59,7 @@ const props: OverviewPageProps = {
   previewFinanceImport: (name, base64, options) => call("financeImportPreview", name, base64, options),
   commitFinanceImport: (file, options) => call("financeImportCommit", file, options),
   discardFinanceImport: (file) => call("financeImportDiscard", file),
-  onAgent: () => void openAi().catch(showError),
-  onPrompt: (text) => void openAi(text).catch(showError),
-  onAdvanced: () => void openAi().catch(showError),
+  onAgent: () => {},
+  onPrompt: () => {},
 };
-function showError(error: unknown) {
-  const output = document.getElementById("startup-error");
-  if (output) {
-    output.textContent = error instanceof Error ? error.message : String(error);
-    output.hidden = false;
-  }
-}
 createRoot(document.getElementById("root") as HTMLElement).render(<OverviewPage {...props} />);

@@ -1,0 +1,428 @@
+.chat {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  height: calc(100dvh - 204px);
+  min-height: 460px;
+}
+.threads {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 12px 16px 0;
+  border-right: 1px solid var(--kt-control);
+  overflow: auto;
+  min-width: 0;
+}
+.threads h2 {
+  padding: 14px 10px 4px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kt-muted);
+}
+.threads button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--kt-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.threads button:hover {
+  background: var(--kt-subtle);
+}
+.threads button[aria-current="true"] {
+  background: var(--kt-control);
+  font-weight: 600;
+}
+.threads .newThread {
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.conversation {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px max(16px, 7%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 28px), transparent 100%);
+}
+.user {
+  align-self: flex-end;
+  max-width: min(78%, 560px);
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--kt-accent) 8%, var(--kt-card));
+  font-size: 16px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.assistant {
+  max-width: 680px;
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.assistant p {
+  white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+.assistant h3 {
+  margin: 10px 0;
+  font-size: 18px;
+}
+.assistant ul {
+  margin: 0 0 10px;
+  padding-left: 1.2em;
+}
+.tool {
+  align-self: flex-start;
+  max-width: 100%;
+  border-radius: 10px;
+  background: var(--kt-subtle);
+  box-shadow: 0 0 0 1px var(--kt-control);
+  font-size: 14px;
+  color: var(--kt-secondary);
+}
+.tool summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.tool summary::-webkit-details-marker {
+  display: none;
+}
+.tool summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-right: 1.5px solid var(--kt-muted);
+  border-bottom: 1.5px solid var(--kt-muted);
+  transform: rotate(-45deg);
+  flex: none;
+}
+.tool[open] summary::after {
+  transform: rotate(45deg);
+}
+.tool pre {
+  margin: 0;
+  padding: 0 12px 10px 34px;
+  font: 13px / 1.6 ui-monospace, Menlo, monospace;
+  color: var(--kt-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--kt-health);
+}
+.pulse {
+  background: var(--kt-accent);
+  animation: pulse 1.3s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+.thinking {
+  position: relative;
+  align-self: flex-start;
+  color: var(--kt-muted);
+  font-size: 15px;
+}
+.thinking::after {
+  content: "正在看你的资料…";
+  position: absolute;
+  inset: 0;
+  color: var(--kt-text);
+  mask-image: linear-gradient(90deg, transparent, #000, transparent);
+  animation: sweep 1.7s ease-in-out infinite;
+}
+@keyframes sweep {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+.welcome {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: flex-start;
+  max-width: 680px;
+}
+.welcome h1 {
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  margin: 0;
+}
+.welcome p {
+  color: var(--kt-secondary);
+  margin: 0;
+}
+.suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+.suggestions button {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--kt-card);
+  box-shadow: 0 0 0 1px var(--kt-control);
+  font-size: 14px;
+  color: var(--kt-secondary);
+}
+.suggestions button:hover {
+  box-shadow: 0 0 0 1px var(--kt-muted);
+  color: var(--kt-text);
+}
+.composer {
+  margin: 12px max(16px, 7%) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 10px 16px;
+  border-radius: 20px;
+  background: var(--kt-card);
+  box-shadow: var(--kt-shadow), 0 0 0 1px var(--kt-control);
+}
+.composer:focus-within {
+  box-shadow: var(--kt-shadow), 0 0 0 1.5px var(--kt-accent);
+}
+.composer textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  max-height: 200px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--kt-text);
+  outline: none;
+  padding: 4px 0;
+}
+.composer textarea::placeholder {
+  color: var(--kt-muted);
+}
+.composerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.model {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kt-secondary);
+  font-size: 13px;
+}
+.model:hover {
+  background: var(--kt-subtle);
+}
+.send {
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border-radius: 50%;
+  border: 0;
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+  font-size: 24px;
+}
+.chat button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.scope {
+  margin: 8px 0 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--kt-muted);
+}
+.notice {
+  margin: 4px max(16px, 7%);
+  color: var(--kt-secondary);
+  overflow-wrap: anywhere;
+}
+.connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px max(16px, 7%);
+  color: var(--kt-muted);
+  font-size: 13px;
+}
+.connect button,
+.external button,
+.actions button,
+.mobileNew button {
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  padding: 8px 12px;
+}
+.dialog {
+  width: min(560px, calc(100vw - 48px));
+  box-sizing: border-box;
+  max-height: calc(100dvh - 48px);
+  padding: 28px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+.dialog::backdrop {
+  background: rgb(31 30 29 / 42%);
+}
+.dialog h2 {
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 600;
+  margin: 12px 0;
+}
+.dialog p {
+  color: var(--kt-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.dialog .step {
+  font-size: 12px;
+  color: var(--kt-muted);
+  margin: 0;
+}
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin: 10px 0;
+  border: 1px solid var(--kt-control);
+  border-radius: 12px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+}
+.choice span {
+  color: var(--kt-muted);
+  font-size: 13px;
+}
+.choice[aria-pressed="true"] {
+  border-color: var(--kt-accent);
+  background: color-mix(in srgb, var(--kt-accent) 8%, var(--kt-card));
+}
+.key {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.key input,
+.external textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  color: var(--kt-text);
+  background: var(--kt-subtle);
+}
+.external textarea {
+  resize: vertical;
+  font-size: 13px;
+}
+.external button {
+  margin-top: 8px;
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+.toggle input {
+  accent-color: var(--kt-accent);
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+.actions button:last-child {
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+}
+.mobileNew {
+  display: none;
+}
+@media (max-width: 700px) {
+  .chat {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 380px;
+    height: calc(100dvh - 180px);
+  }
+  .threads {
+    display: none;
+  }
+  .mobileNew {
+    display: block;
+    padding: 8px 16px 0;
+  }
+  .suggestions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .welcome {
+    gap: 12px;
+  }
+  .dialog {
+    padding: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+  .thinking::after {
+    display: none;
+  }
+}

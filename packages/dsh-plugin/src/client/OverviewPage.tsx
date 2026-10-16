@@ -9,6 +9,7 @@ import { MePage, type MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import css from "./OverviewPage.module.css";
 import { RecordSummary } from "./RecordSummary.js";
+import { aiHandover } from "./connections.js";
 
 export interface OverviewPageProps
   extends MePageProps,
@@ -24,8 +25,9 @@ export interface OverviewPageProps
   capture: (text: string) => Promise<unknown>;
   onAgent: () => void;
   onAdvanced?: () => void;
+  renderAsk?: (prompt: string) => ReactNode;
 }
-type View = "overview" | "explore" | "records" | "profile" | "connections" | "advanced";
+type View = "ask" | "overview" | "explore" | "records" | "profile" | "connections" | "advanced";
 type RecordView = "all" | "projects" | "health" | "finance" | "knowledge" | "memory";
 const navigation: { id: View; title: string; subtitle: string }[] = [
   { id: "overview", title: "总览", subtitle: "我的现状" },
@@ -66,6 +68,10 @@ function noteText(text: string) {
 
 export function OverviewPage(props: OverviewPageProps) {
   const [view, setView] = useState<View>("overview");
+  const [askVisited, setAskVisited] = useState(false);
+  useEffect(() => {
+    if (view === "ask") setAskVisited(true);
+  }, [view]);
   const [recordDetails, setRecordDetails] = useState(false);
   const [recordView, setRecordView] = useState<RecordView>("all");
   const [exploreView, setExploreView] = useState("directions");
@@ -149,7 +155,7 @@ export function OverviewPage(props: OverviewPageProps) {
   };
   const prompt = (text: string) => {
     setDraft(text);
-    setView("connections");
+    setView(props.renderAsk ? "ask" : "connections");
   };
   const childProps = { ...props, onPrompt: prompt };
   const togglePin = (id: string) => {
@@ -251,7 +257,7 @@ export function OverviewPage(props: OverviewPageProps) {
       </div>
     ));
   return (
-    <main className={css.page} aria-busy={loading}>
+    <main className={`${css.page} ${view === "ask" ? css.askPage : ""}`} aria-busy={loading}>
       <div className={css.content}>
         <header className={css.topbar}>
           <strong className={css.wordmark}>开图</strong>
@@ -286,7 +292,10 @@ export function OverviewPage(props: OverviewPageProps) {
           </div>
         </header>
         <nav className={css.primaryNav} aria-label="主要导航">
-          {navigation.map((item) => (
+          {(props.renderAsk
+            ? [...navigation, { id: "ask" as View, title: "问问", subtitle: "和开图聊聊" }]
+            : navigation
+          ).map((item) => (
             <button
               type="button"
               key={item.id}
@@ -617,6 +626,9 @@ export function OverviewPage(props: OverviewPageProps) {
             <MePage {...childProps} />
           </>
         )}
+        {(view === "ask" || askVisited) && props.renderAsk && (
+          <div hidden={view !== "ask"}>{props.renderAsk(draft)}</div>
+        )}
         {view === "connections" && (
           <>
             <header>
@@ -630,7 +642,7 @@ export function OverviewPage(props: OverviewPageProps) {
                 <textarea
                   className={css.connectionText}
                   readOnly
-                  value={`请接续我的开图工作区：${data?.root ?? ""}\n先读 AGENT-README.md 和 OVERVIEW.md，再读相关交接。${draft ? `\n这次要处理：${draft}` : ""}`}
+                  value={aiHandover(data?.root ?? "", draft)}
                   rows={5}
                 />
                 <button
@@ -638,9 +650,7 @@ export function OverviewPage(props: OverviewPageProps) {
                   className={css.button}
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText(
-                        `请接续我的开图工作区：${data?.root ?? ""}\n先读 AGENT-README.md 和 OVERVIEW.md，再读相关交接。${draft ? `\n这次要处理：${draft}` : ""}`,
-                      );
+                      await navigator.clipboard.writeText(aiHandover(data?.root ?? "", draft));
                       setReceipt("接手说明已复制");
                     } catch {
                       setReceipt("请选中并复制上面的接手说明");
@@ -656,7 +666,9 @@ export function OverviewPage(props: OverviewPageProps) {
               <button
                 type="button"
                 className={css.button}
-                onClick={() => (draft ? props.onPrompt(draft) : props.onAgent())}
+                onClick={() =>
+                  props.renderAsk ? setView("ask") : draft ? props.onPrompt(draft) : props.onAgent()
+                }
               >
                 使用内置 AI
               </button>
@@ -668,9 +680,11 @@ export function OverviewPage(props: OverviewPageProps) {
           <>
             <h1>高级设置</h1>
             <p className={css.subtitle}>连接、运行环境与开发者能力按需使用</p>
-            <button type="button" className={css.button} onClick={props.onAdvanced}>
-              插件与运行环境
-            </button>
+            {props.onAdvanced && (
+              <button type="button" className={css.button} onClick={props.onAdvanced}>
+                插件与运行环境
+              </button>
+            )}
             <button type="button" className={css.link} onClick={() => setView("connections")}>
               管理 AI 连接
             </button>

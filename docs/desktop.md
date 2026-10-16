@@ -51,19 +51,24 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 ## 装好后怎么用
 
 打开 `Kaitu.dmg`，将 `Kaitu.app` 拖入 Applications 后双击；只有应用目录时直接复制后打开。
-默认直接进入独立本地工作台，只有总览、开图、记录三个导航。查看资料、保存原文、打开地图和财务不要求模型或 API Key。
-「AI 与连接」先提供已有 AI 的接手说明，主动选择「使用内置 AI」后才启动 DSH、配置模型。
+默认直接进入独立本地工作台，有总览、开图、记录、问问四个同级导航。查看资料、保存原文、打开地图和财务不要求模型或 API Key。
+「问问」首次打开提供已有 AI 的接手说明或内置 DeepSeek API Key 连接；凭据使用 DSH 的本机存储。
 
 工作区优先使用 `~/Library/Application Support/kaitu/current-workspace.json` 指向的有效目录，
 否则使用 `~/kaitu`，空目录会自动初始化。默认资料服务只监听本机随机端口，退出应用时停止。
-应用移动后会自动更新内置插件路径。已存在的健康目标和任务保留，新用户不预填私人健康数值。第一次打开内置 AI 时询问一次自动任务：每日整理 03:00、早间计划 07:30 默认开启，资讯搜索 08:00 默认关闭，按工作区时区执行。
+应用移动后会自动更新内置插件路径。已存在的健康目标和任务保留，新用户不预填私人健康数值。第一次在问问连接内置 AI 后，以第二步对话框询问一次自动任务：每日整理 03:00、早间计划 07:30 默认开启，资讯搜索 08:00 默认关闭，按工作区时区执行。
 「开图 → 设置」可分别开关，已有用户不重新询问，已有任务不覆盖时间、内容或手动删除决定。
 自动任务由内置 AI 执行，应用运行时按需在后台启动该进程。
 
 应用状态和 Electron 数据保存在 `~/.kaitu-app/`，开图文件保留在原工作区。
 内置 AI 复用当前安装已经使用的状态目录：有旧 `ai/profiles/desktop` 时沿用 `~/.kaitu-app/ai/`，否则使用原 `~/.kaitu-app/`。
 不迁移或删除登录凭据、会话和 DSH 的 `~/.dsh`。资料窗口使用单独的 `workbench-userData`，避免争用 AI 的 Electron 存储。
-AI 子进程隐藏 Dock 图标；重复打开复用同一进程，主窗口退出会等待 AI 正常保存退出，超时清理其进程组。
+问问使用无界面的 SDK profile，通过 initialize / session/prompt 与原生事件通知工作，不打开 DSH 窗口。
+会话索引与展示事件在本机 `~/.kaitu-app/ask/`，原生日志在 AI home 的 sdk profile，均不写入工作区。
+SDK 专用权限预设为 workspace-write / never，文件与 shell 的写入仅放行工作区（shell 另放行 `/dev/null`）。
+已有会话通过 DSH 公开 agents.resume 恢复；原生注入的指令和运行时上下文不作为用户消息展示。
+定时任务保留隐藏的 Electron 进程，因为 rc.2 SDK profile 不含 schedule 需要的 sessionController。
+重复启动复用原后台进程；退出会关闭 SDK 与后台任务进程。
 API Key 自动引导只在 Kaitu.app 关闭；`kaitu dsh --install` 和 `kaitu dsh` 的 DSH 入口恢复引导。
 插件市场和运行时配置只通过高级设置进入。
 

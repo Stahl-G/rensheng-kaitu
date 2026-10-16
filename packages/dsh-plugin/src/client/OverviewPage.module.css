@@ -1140,3 +1140,10 @@ body[data-ds-dark-theme] .page {
     max-width: 110px;
   }
 }
+
+.askPage {
+  padding-bottom: 12px;
+}
+.askPage .content {
+  max-width: 1240px;
+}
