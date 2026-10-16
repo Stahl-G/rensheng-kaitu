@@ -494,17 +494,23 @@ async function writeProtocolBridge(payload, build) {
   writeFileSync(join(bridge, "index.js"), `${exports.join("\n")}\n`);
 }
 
-function welcomeBrand() {
-  const mark = readFileSync(join(root, "docs/design/kaitu-mark.svg"), "utf8")
+function markBody() {
+  return readFileSync(join(root, "docs/design/kaitu-mark.svg"), "utf8")
     .replace(/<svg[^>]*>/, "")
-    .replace("</svg>", "");
+    .replace("</svg>", "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+}
+
+function welcomeBrand() {
+  // 标志是 48 格画布，缩放到约 38px 高，与 30px 字号对齐；标志自带颜色。
+  const mark = markBody();
   return `<svg width="472" height="40" viewBox="0 0 472 40" fill="none" xmlns="http://www.w3.org/2000/svg">
 <style>
   :root { color: #0f1115; }
   @media (prefers-color-scheme: dark) { :root { color: #f9fafb; } }
   text { font: 600 30px -apple-system, "SF Pro Display", "PingFang SC", sans-serif; letter-spacing: -0.5px; }
 </style>
-<g transform="translate(176 1) scale(1.58)">${mark}</g>
+<g transform="translate(176 1) scale(0.79)">${mark}</g>
 <text x="222" y="31" fill="currentColor">Kaitu</text>
 </svg>
 `;
@@ -512,16 +518,10 @@ function welcomeBrand() {
 
 async function writeIcon(resources) {
   const sharp = requireDsh("sharp");
-  const mark = readFileSync(join(root, "docs/design/kaitu-mark.svg"), "utf8")
-    .replace(/<svg[^>]*>/, "")
-    .replace("</svg>", "")
-    .replaceAll("currentColor", "#FFFFFF")
-    .replaceAll('stroke-width="1.8"', 'stroke-width="1.6"')
-    .replace('r="2.1"', 'r="2"')
-    .replace("#3D6FE0", "#7FA2F0");
+  // 浅色圆角底块，标志占底块的 76%（896 × 0.76 ≈ 681，即 48 格放大 14.19 倍），居中。
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<rect x="64" y="64" width="896" height="896" rx="224" fill="#1F1E1D"/>
-<g transform="translate(227 227) scale(23.75)">${mark}</g></svg>`;
+<rect x="64" y="64" width="896" height="896" rx="224" fill="#F4F7F7"/>
+<g transform="translate(171.5 171.5) scale(14.1875)">${markBody()}</g></svg>`;
   const png = join(resources, "icon.png");
   await sharp(Buffer.from(svg)).png().toFile(png);
   // 直接写 ICNS 的 PNG 图块，避免依赖 iconutil 的编码流程。

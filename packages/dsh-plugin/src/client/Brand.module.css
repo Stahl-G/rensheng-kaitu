@@ -1,9 +1,36 @@
-.dot {
-  fill: #3d6fe0;
+.fold0 {
+  fill: #0f4c5c;
+  stroke: #0f4c5c;
+}
+.fold1 {
+  fill: #2e7f86;
+  stroke: #2e7f86;
+}
+.fold2 {
+  fill: #9fd3cf;
+  stroke: #9fd3cf;
+}
+.routeFolded {
+  stroke: #fff;
+}
+.routeOpen {
+  stroke: #0f4c5c;
 }
 
-body[data-ds-dark-theme] .dot {
-  fill: #7fa2f0;
+body[data-ds-dark-theme] .fold0,
+[data-theme="dark"] .fold0 {
+  fill: #2b6e7e;
+  stroke: #2b6e7e;
+}
+body[data-ds-dark-theme] .fold1,
+[data-theme="dark"] .fold1 {
+  fill: #4c9aa0;
+  stroke: #4c9aa0;
+}
+body[data-ds-dark-theme] .fold2,
+[data-theme="dark"] .fold2 {
+  fill: #b5e0dc;
+  stroke: #b5e0dc;
 }
 
 .powered {

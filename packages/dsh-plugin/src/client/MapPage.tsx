@@ -355,7 +355,7 @@ function CityMap({
           id: "experience-order",
           type: "line",
           source: "experience-order",
-          paint: { "line-color": text, "line-width": 2, "line-opacity": 0.55 },
+          paint: { "line-color": ink, "line-width": 2, "line-opacity": 1 },
         });
         m.addSource("cities", {
           type: "geojson",
@@ -447,7 +447,7 @@ function CityMap({
     const observer = new MutationObserver(() => {
       if (!instance) return;
       waitForMap();
-      instance.setStyle(styleUrl());
+      instance.setStyle(styleUrl(), { diff: false });
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     if (themeRoot !== document.body)

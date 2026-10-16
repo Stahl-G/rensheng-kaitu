@@ -10,7 +10,7 @@
 <helmet>
 <style>
 body{margin:0;background:#FCFCFB}
-a{color:#2F5FC4;text-decoration:none;font-weight:500}
+a{color:#1f6f78;text-decoration:none;font-weight:500}
 a:hover{text-decoration:underline dotted;text-underline-offset:3px}
 button{font-family:inherit}
 </style>
@@ -19,7 +19,7 @@ button{font-family:inherit}
 
 <sc-if value="{{sideOpen}}" hint-placeholder-val="{{ true }}">
   <nav aria-label="Kaitu 侧栏" style="flex: 1 1 248px; max-width: 272px; box-sizing: border-box; padding: 20px 14px; background: #F5F5F3; display: flex; flex-direction: column; gap: 4px">
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 20px 12px"><span style="display: flex; align-items: center; gap: 10px; font-size: 18px; line-height: 26px; font-weight: 600"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.8" stroke-linejoin="round"/><path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.1" fill="#3D6FE0"/></svg>Kaitu</span><button type="button" aria-label="收起侧栏" onClick="{{toggleSide}}" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 0; background: transparent; color: #4D4C48; cursor: pointer"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg></button></div>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px 20px 12px"><span style="display: flex; align-items: center; gap: 10px; font-size: 18px; line-height: 26px; font-weight: 600"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="#1F1E1D" stroke-width="1.8" stroke-linejoin="round"/><path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="#1F1E1D" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.1" fill="#2e7f86"/></svg>Kaitu</span><button type="button" aria-label="收起侧栏" onClick="{{toggleSide}}" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 0; background: transparent; color: #4D4C48; cursor: pointer"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg></button></div>
     <a href="#" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; color: #1F1E1D; font-weight: 400; font-size: 16px">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>新会话</a>
     <a href="#" style="display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; color: #1F1E1D; font-weight: 400; font-size: 16px">
@@ -131,7 +131,7 @@ button{font-family:inherit}
             <a href="#" style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; padding: 12px 14px; border-radius: 12px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06); color: #1F1E1D; font-weight: 400">
               <span style="font-size: 15px; line-height: 22px; font-weight: 600">今天的每日整理</span>
               <span style="flex: 1 1 240px; font-size: 15px; line-height: 22px; color: #4D4C48">Grok 凌晨 03:02 整理了 7 份交接，留下 3 条未决等你确认</span>
-              <span style="font-size: 13px; line-height: 18px; color: #2F5FC4; font-weight: 500">打开</span>
+              <span style="font-size: 13px; line-height: 18px; color: #1f6f78; font-weight: 500">打开</span>
             </a>
             <sc-for list="{{feed}}" as="f" hint-placeholder-count="5">
               <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 9px 10px; border-radius: 10px">
@@ -147,7 +147,7 @@ button{font-family:inherit}
         <aside style="display: flex; flex-direction: column; gap: 28px; min-width: 0">
           <section aria-labelledby="h-metrics" style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06)">
             <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 4px">
-              <h2 id="h-metrics" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; line-height: 24px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #2E8B57"></span>健康</h2>
+              <h2 id="h-metrics" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; line-height: 24px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #3e8a5a"></span>健康</h2>
               <span style="font-size: 13px; line-height: 18px; color: #6B6A66">近 7 天 · 10/10–10/16</span>
             </div>
 
@@ -175,7 +175,7 @@ button{font-family:inherit}
                 <span aria-hidden="true" style="position: absolute; left: 0; right: 0; bottom: 40px; border-top: 1px dashed #C9C8C3"></span>
                 <sc-for list="{{sleep}}" as="n" hint-placeholder-count="7">
                   <sc-if value="{{n.has}}" hint-placeholder-val="{{ true }}">
-                    <span style="height: {{n.h}}px; border-radius: 5px; background: #2E8B57; opacity: 0.9"></span>
+                    <span style="height: {{n.h}}px; border-radius: 5px; background: #3e8a5a; opacity: 0.9"></span>
                   </sc-if>
                   <sc-if value="{{n.missing}}" hint-placeholder-val="{{ false }}">
                     <span style="height: 16px; box-sizing: border-box; border-radius: 5px; border: 1px dashed #B5B4AF"></span>
@@ -192,7 +192,7 @@ button{font-family:inherit}
               </div>
               <div role="img" aria-label="约 128 克，目标 140 到 150 克" style="position: relative; height: 12px; border-radius: 6px; background: #F0EFEC">
                 <span aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: 82%; width: 6%; background: #9ED2B2; border-radius: 2px"></span>
-                <span aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: 0; width: 75%; border-radius: 6px; background: repeating-linear-gradient(135deg, #2E8B57 0 6px, #7FC29B 6px 9px)"></span>
+                <span aria-hidden="true" style="position: absolute; top: 0; bottom: 0; left: 0; width: 75%; border-radius: 6px; background: repeating-linear-gradient(135deg, #3e8a5a 0 6px, #7FC29B 6px 9px)"></span>
               </div>
               <div style="display: flex; justify-content: space-between; font-size: 13px; line-height: 18px; color: #6B6A66">
                 <span>斜纹 = 估算</span><span>目标 140–150 g</span>
@@ -212,7 +212,7 @@ button{font-family:inherit}
           </section>
 
           <section aria-labelledby="h-projects" style="display: flex; flex-direction: column; gap: 8px">
-            <h2 id="h-projects" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 10px; font-size: 16px; line-height: 24px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #6B5BD6"></span>进行中的项目</h2>
+            <h2 id="h-projects" style="display: flex; align-items: center; gap: 8px; margin: 0; padding: 0 10px; font-size: 16px; line-height: 24px; font-weight: 600"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; corner-shape: round; background: #4a6a8f"></span>进行中的项目</h2>
             <sc-for list="{{projects}}" as="p" hint-placeholder-count="2">
               <a href="#" style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: #F5F5F3; color: #1F1E1D; font-weight: 400">
                 <span style="font-size: 16px; line-height: 24px; font-weight: 600">{{p.title}}</span>
@@ -221,7 +221,7 @@ button{font-family:inherit}
                   <span style="font-size: 13px; line-height: 18px; color: #6B6A66; font-variant-numeric: tabular-nums">{{p.stats}}</span>
                   <span role="img" aria-label="近 7 天每日产出" style="display: flex; align-items: end; gap: 4px; height: 24px">
                     <sc-for list="{{p.bars}}" as="h" hint-placeholder-count="7">
-                      <span style="position: relative; width: 8px; height: 24px; border-radius: 3px; background: #E4E1F7; overflow: hidden"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{h}}px; background: #6B5BD6"></span></span>
+                      <span style="position: relative; width: 8px; height: 24px; border-radius: 3px; background: #e1e8f0; overflow: hidden"><span style="position: absolute; left: 0; right: 0; bottom: 0; height: {{h}}px; background: #4a6a8f"></span></span>
                     </sc-for>
                   </span>
                 </div>
@@ -234,14 +234,14 @@ button{font-family:inherit}
   </main>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#3D6FE0","options":["#3D6FE0","#1F1E1D","#2F7D5B"]},"primary":{"editor":"color","default":"#1F1E1D","options":["#1F1E1D","#3D6FE0"]},"$preview":{"width":1440,"height":1400}}'>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#2e7f86","options":["#2e7f86","#1F1E1D","#2F7D5B"]},"primary":{"editor":"color","default":"#1F1E1D","options":["#1F1E1D","#2e7f86"]},"$preview":{"width":1440,"height":1400}}'>
 class Component extends DCLogic {
   constructor(props) {
     super(props);
     this.state = { side: true, top: true, tab: '今天' };
   }
   renderVals() {
-    const hue = { '今天': { dot: '#1F1E1D', tint: '#F0EFEC', ink: '#4D4C48' }, '健康': { dot: '#2E8B57', tint: '#E6F3EB', ink: '#1F6B42' }, '在做的事': { dot: '#6B5BD6', tint: '#ECEAFB', ink: '#4B3DB0' }, '资讯': { dot: '#C47A12', tint: '#FAEEDC', ink: '#8A520A' }, '关于我': { dot: '#C2507A', tint: '#F8E6ED', ink: '#93345A' } };
+    const hue = { '今天': { dot: '#1F1E1D', tint: '#F0EFEC', ink: '#4D4C48' }, '健康': { dot: '#3e8a5a', tint: '#e5f1e9', ink: '#2a6a41' }, '在做的事': { dot: '#4a6a8f', tint: '#e7edf4', ink: '#344e6e' }, '资讯': { dot: '#b5711a', tint: '#f7ecdc', ink: '#84520f' }, '关于我': { dot: '#b5577a', tint: '#f6e7ed', ink: '#8a3a5a' } };
     const names = Object.keys(hue);
     const tip = { '今天': '今天的安排、下一步和要你确认的事', '健康': '训练、饮食、睡眠和身体数据', '在做的事': '你的项目和长期计划，以及进度', '资讯': '你关注的领域每天的新消息', '关于我': '目标、作息规则和 AI 记住的你' };
     return {
@@ -256,7 +256,7 @@ class Component extends DCLogic {
         const on = name === this.state.tab;
         return { name, on: on ? 'true' : 'false', bg: on ? '#FFFFFF' : 'transparent', shadow: on ? '0 1px 2px rgba(31,30,29,0.08)' : 'none', weight: on ? 600 : 400, color: hue[name].dot, tip: tip[name], pick: () => this.setState({ tab: name }) };
       }),
-      accent: this.props.accent ?? '#3D6FE0',
+      accent: this.props.accent ?? '#2e7f86',
       primary: this.props.primary ?? '#1F1E1D',
       blocks: [
         { time: '09:30–10:30', title: '周会', event: true, pending: false, bg: 'transparent' },
@@ -272,13 +272,13 @@ class Component extends DCLogic {
         { title: '整理示例说明', module: '开图', ...hue['在做的事'], by: '本机 Agent' }
       ],
       feed: [
-        { time: '今天 08:05', actor: 'Grok · 云端', ini: 'G', bg: '#3D6FE0', text: '出了今天的计划，2 条日程建议等你确认' },
+        { time: '今天 08:05', actor: 'Grok · 云端', ini: 'G', bg: '#2e7f86', text: '出了今天的计划，2 条日程建议等你确认' },
         { time: '昨天 20:46', actor: 'Dot · 云端', ini: 'D', bg: '#5B7FA6', text: '记录晚饭牛肉面一碗、晚上跑步 5 公里 30 分钟' },
-        { time: '昨天 20:42', actor: 'Grok · 云端', ini: 'G', bg: '#3D6FE0', text: '「明天称体重」改为「后天」，写进交接' },
+        { time: '昨天 20:42', actor: 'Grok · 云端', ini: 'G', bg: '#2e7f86', text: '「明天称体重」改为「后天」，写进交接' },
         { time: '昨天 18:00', actor: '你', ini: '你', bg: '#1F1E1D', text: '记录深蹲 3×12 60kg、卧推 3×12 40kg' },
         { time: '昨天 17:14', actor: '本机 Agent', ini: '本', bg: '#7A7975', text: '记录午饭，热量为估算' }
       ],
-      week: ['一','二','三','四','五','六','日'].map((day, i) => ({ day, fill: [0, 2, 4].includes(i) ? '#2E8B57' : '#ECEBE7' })),
+      week: ['一','二','三','四','五','六','日'].map((day, i) => ({ day, fill: [0, 2, 4].includes(i) ? '#3e8a5a' : '#ECEBE7' })),
       sleep: [7.2, 6.1, null, 7.5, 6.4, null, 6.9].map((v) => ({ has: v !== null, missing: v === null, h: v === null ? 0 : Math.round(v / 9 * 48) })),
       projects: [
         { title: '小说二稿', next: '写完下一节', stats: '近 7 天 +4,210 字', bars: [8, 0, 14, 20, 6, 0, 18] },
