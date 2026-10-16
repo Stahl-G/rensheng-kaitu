@@ -185,7 +185,8 @@ export function ChannelSettings({ request }: { request: ChannelRequest }) {
               </label>
               <p>
                 企业自建应用需启用机器人和长连接事件
-                im.message.receive_v1。仅能收到机器人所在群及发给机器人的私信，无法读取个人其他聊天。
+                im.message.receive_v1。仅能收到机器人所在群及发给机器人的私信，无法读取个人其他聊天。群聊只授予
+                @消息权限时仅接收 @机器人的消息。
               </p>
             </>
           )}

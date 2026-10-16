@@ -25,10 +25,11 @@
 | GeoNames cities15000（城市表精简版） | CC BY 4.0 | https://download.geonames.org/export/dump/cities15000.zip （https://www.geonames.org/） |
 | maplibre-gl 6.11.2（打进插件前端） | BSD-3-Clause | https://github.com/maplibre/maplibre-gl-js |
 
-## OpenClaw IMAP 只读采集适配
+## OpenClaw IMAP / 飞书只读采集适配
 
 来源：OpenClaw 2026.10.4 的 `extensions/imap/src/{config,sender-gate,state,watcher}.ts`。
-移除了插件框架、提示词与 Agent 会话派发。
+飞书适配参考 `extensions/feishu/src/client.ts`（WSClient 建立与生命周期回调）与 `post.ts`（富文本结构与元素处理）。
+移除了插件框架、提示词、Agent 会话派发与发送能力。
 
 ```text
 MIT License

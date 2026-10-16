@@ -40,6 +40,20 @@ manifest 只有 `channels:history`、`groups:history`、`im:history`、`mpim:his
 [Slack 官方读取规则](https://docs.slack.dev/reference/methods/conversations.history/) 和
 [线程读取规则](https://docs.slack.dev/reference/methods/conversations.replies/) 适用于用户有权访问的会话。
 
+## 飞书
+
+1. 在 [飞书开放平台](https://open.feishu.cn/app) 创建企业自建应用，启用机器人能力。
+2. 开通 `im:message.p2p_msg:readonly` 接收发给机器人的私信，群聊使用 `im:message.group_at_msg:readonly`。
+   若需要所在群的全部用户消息，需企业批准 `im:message.group_msg` 权限；不申请发送权限。
+3. 事件与回调 → 使用长连接接收事件 → 订阅 `im.message.receive_v1`，发布应用版本并设置可用范围。
+4. 在开图添加 App ID / App Secret，测试连接；把机器人加入要接收的测试群，或直接私聊机器人。
+
+**只能收到机器人所在群和发给机器人的私信，无法读取个人的其他聊天。**
+只开群 @权限时，群里必须 @机器人。参见 [官方事件说明](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive)。
+只接收平台推送，不回灌离线期间的历史消息；平台可能重推，按 message_id 去重。
+支持文本、富文本 post 与提及；图片 / 文件 / 音频仅留类型占位，不下载附件。
+原文链接打开所在会话，笔记同时保留 message_id；尚不能直接定位原消息。
+
 ## 本机设置与接口
 
 账号配置、凭据、游标、状态在 `localStateRoot/collectors/`，JSON 文件权限 600。

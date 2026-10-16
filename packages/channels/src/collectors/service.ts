@@ -1,5 +1,6 @@
 import { isAbsolute, join, relative, sep } from "node:path";
 import { type Workspace, localStateRoot } from "@kaitu/core";
+import { feishuProvider } from "./feishu.js";
 import { imapPresets } from "./imap/config.js";
 import { imapProvider } from "./imap/watcher.js";
 import { makeSlackProvider } from "./slack.js";
@@ -22,7 +23,11 @@ export class CollectorService {
   constructor(
     private ws: Workspace,
     root = join(localStateRoot(), "collectors"),
-    private providers: Record<string, CollectorProvider> = { imap: imapProvider, slack: makeSlackProvider() },
+    private providers: Record<string, CollectorProvider> = {
+      imap: imapProvider,
+      slack: makeSlackProvider(),
+      feishu: feishuProvider,
+    },
   ) {
     const rel = relative(ws.root, root);
     if (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
