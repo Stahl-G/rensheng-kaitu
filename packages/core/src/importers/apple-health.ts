@@ -1,10 +1,21 @@
-import { createReadStream, readFileSync } from "node:fs";
+import { createReadStream, readFileSync, statSync } from "node:fs";
 import { Unzip, UnzipInflate } from "fflate";
 import { SaxesParser } from "saxes";
 import { KaituError } from "../errors.js";
 import { isoInZone, localDate, localTimeToInstant, parseTs } from "../time.js";
 import type { Workspace } from "../workspace.js";
 import { type BatchOptions, type Candidate, candidate, importBatch } from "./batch.js";
+
+const MAX_SAMPLES = 100000;
+const MAX_RECORDS = 20000;
+const MAX_BYTES = 32 * 1024 * 1024;
+const MAX_EXPANDED_BYTES = 128 * 1024 * 1024;
+function importLimit(message: string): never {
+  throw new KaituError(message, "IMPORT_LIMIT");
+}
+function checkInput(file: string): void {
+  if (statSync(file).size > MAX_BYTES) importLimit("健康文件超过 32 MiB，请分批导入");
+}
 
 const QUANTITY = "HKQuantityTypeIdentifier";
 const ASLEEP = new Set(["Asleep", "AsleepCore", "AsleepDeep", "AsleepREM", "AsleepUnspecified"]);
@@ -97,11 +108,19 @@ function healthEventType(type: string) {
 
 export function healthCandidates(zone: string) {
   const candidates: Candidate[] = [];
+  let samples = 0;
+  function emit(...items: Candidate[]) {
+    if (candidates.length + items.length > MAX_RECORDS) importLimit("健康导入超过 20000 条输出记录");
+    candidates.push(...items);
+  }
   const ignored: Record<string, number> = { unsupported: 0, incomplete_bp: 0 };
   const pressure = new Map<string, { ts: string; systolic?: number; diastolic?: number }>();
   const daily = new Map<string, Map<string, Map<string, number>>>();
   const sleep = new Map<string, Segment[]>();
   function add(sample: HealthSample) {
+    if (++samples > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
+    const span = +parseTs(sample.end) - +parseTs(sample.start);
+    if (span < 0 || span > 7 * 86400000) importLimit("健康样本时间跨度须在 7 天以内");
     const type = sample.type;
     if (type === "workout") {
       const workout = sample.workout;
@@ -109,7 +128,7 @@ export function healthCandidates(zone: string) {
         throw new Error("Invalid workout duration");
       if (+parseTs(sample.end) < +parseTs(sample.start)) throw new Error("Invalid workout interval");
       const { activity, ...data } = workout;
-      candidates.push(
+      emit(
         candidate("workout", {
           ts: isoInZone(parseTs(sample.start), zone),
           modality: "cardio",
@@ -133,7 +152,7 @@ export function healthCandidates(zone: string) {
         data.kind = type.slice("symptom_".length);
         data[data.kind === "appetite_changes" ? "appetite_change" : "severity"] = sample.value;
       } else data[eventType === "mood" ? "valence" : "kind"] = sample.value;
-      candidates.push(candidate(eventType, data));
+      emit(candidate(eventType, data));
       return;
     }
     if (
@@ -175,9 +194,7 @@ export function healthCandidates(zone: string) {
       throw new Error("Invalid quantity");
     const unit = sample.unit;
     const metric = (kind: string, amount: number | string, outputUnit: string) => {
-      candidates.push(
-        candidate("metric", { ts, kind, value: amount, unit: outputUnit, source: "apple-health" }),
-      );
+      emit(candidate("metric", { ts, kind, value: amount, unit: outputUnit, source: "apple-health" }));
     };
     const convert = (units: Record<string, number>) => {
       const factor = unit === undefined ? undefined : units[unit];
@@ -237,7 +254,7 @@ export function healthCandidates(zone: string) {
         ignored.incomplete_bp = (ignored.incomplete_bp ?? 0) + 1;
         continue;
       }
-      candidates.push(
+      emit(
         candidate("metric", {
           ts: pair.ts,
           kind: "bp",
@@ -255,7 +272,7 @@ export function healthCandidates(zone: string) {
       const steps = max("StepCount");
       const active = max("ActiveEnergyBurned");
       const basal = max("BasalEnergyBurned");
-      candidates.push({
+      emit({
         ...candidate("activity", {
           ts: isoInZone(localTimeToInstant(`${date}T00:00:00`, zone), zone),
           date,
@@ -287,7 +304,7 @@ export function healthCandidates(zone: string) {
       )[0];
       for (const session of selected?.[1] ?? []) {
         const start = isoInZone(new Date(session.start), zone);
-        candidates.push(
+        emit(
           candidate("sleep", {
             ts: start,
             start,
@@ -304,6 +321,7 @@ export function healthCandidates(zone: string) {
 }
 
 export async function parseAppleHealth(inputFile: string, zone: string) {
+  checkInput(inputFile);
   const collector = healthCandidates(zone);
   const parser = new SaxesParser();
   let root = false;
@@ -386,11 +404,20 @@ export async function parseAppleHealth(inputFile: string, zone: string) {
     if (inputFile.toLowerCase().endsWith(".zip")) {
       let found = false;
       let finished = false;
+      let expanded = 0;
+      let declared = 0;
+      const count = (data: Uint8Array) => {
+        expanded += data.byteLength;
+        if (expanded > MAX_EXPANDED_BYTES) importLimit("ZIP 累计解压内容超过 128 MiB");
+      };
       const unzip = new Unzip((file) => {
+        declared += file.originalSize ?? 0;
+        if (declared > MAX_EXPANDED_BYTES) importLimit("ZIP 累计解压内容超过 128 MiB");
         if (file.name !== "apple_health_export/export.xml") {
           // 未启动的条目会被 fflate 缓存；消费并丢弃，避免 CDA、路线文件积满内存。
-          file.ondata = (err) => {
+          file.ondata = (err, data) => {
             if (err) throw err;
+            count(data);
           };
           file.start();
           return;
@@ -399,6 +426,7 @@ export async function parseAppleHealth(inputFile: string, zone: string) {
         found = true;
         file.ondata = (err, data, final) => {
           if (err) throw err;
+          count(data);
           pushXml(data, final);
           if (final) finished = true;
         };
@@ -413,7 +441,8 @@ export async function parseAppleHealth(inputFile: string, zone: string) {
       pushXml(new Uint8Array(), true);
     }
     if (!root) throw new Error("Missing HealthData");
-  } catch {
+  } catch (error) {
+    if (error instanceof KaituError) throw error;
     throw new KaituError("无法解析 Apple Health 导出文件", "INVALID_IMPORT");
   }
   return collector.finish();
@@ -479,6 +508,7 @@ function parallelSamples(raw: Record<string, unknown>) {
     columns[key] = lines;
   }
   if (type === "sleep_analysis" && !columns.ends) throw new Error("sleep_analysis 缺少 ends");
+  if ((columns.values?.length ?? 0) > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
   return (columns.values ?? []).map((value, index) => {
     const start = columns.starts?.[index] ?? "";
     if (!value || !start) throw new Error(`第 ${index + 1} 行的 values 或 starts 为空`);
@@ -502,6 +532,7 @@ function parallelSamples(raw: Record<string, unknown>) {
 }
 
 export function parseHealthShortcut(inputFile: string, zone: string) {
+  checkInput(inputFile);
   try {
     const raw = JSON.parse(readFileSync(inputFile, "utf8"));
     if (!raw || typeof raw !== "object" || Array.isArray(raw))
@@ -517,6 +548,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
         throw new Error("Invalid health shortcut envelope");
       parseTs(raw.exported_at);
     }
+    if (samples.length > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
     const collector = healthCandidates(zone);
     for (const sample of samples) {
       const type =
@@ -559,6 +591,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     }
     return collector.finish();
   } catch (error) {
+    if (error instanceof KaituError) throw error;
     throw new KaituError(`无法解析快捷指令健康文件：${(error as Error).message}`, "INVALID_IMPORT");
   }
 }

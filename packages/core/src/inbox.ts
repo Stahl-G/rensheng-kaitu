@@ -16,8 +16,8 @@ import { setTimeout } from "node:timers/promises";
 import { proposeBlock, writeDigest } from "./agent-tools.js";
 import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { parseHealthInWorker } from "./health-import.js";
 import { batchSnapshot } from "./history.js";
-import { parseAppleHealth, parseHealthShortcut } from "./importers/apple-health.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
@@ -299,14 +299,13 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
           result.pending.push(file);
           continue;
         }
-        let parsed: Awaited<ReturnType<typeof parseAppleHealth>> | undefined;
+        let parsed: Awaited<ReturnType<typeof parseHealthInWorker>> | undefined;
         const shortcut = file.endsWith(".health.json");
         const errors: string[] = [];
         try {
-          parsed = shortcut
-            ? parseHealthShortcut(ws.resolve(file), ws.timeZone())
-            : /^export\.(zip|xml)$/i.test(basename(file))
-              ? await parseAppleHealth(ws.resolve(file), ws.timeZone())
+          parsed =
+            shortcut || /^export\.(zip|xml)$/i.test(basename(file))
+              ? await parseHealthInWorker(ws.resolve(file), ws.timeZone(), shortcut)
               : undefined;
           if (!parsed)
             throw new KaituError("健康收件箱接受 export.zip、export.xml 或 *.health.json", "BAD_INBOX");
