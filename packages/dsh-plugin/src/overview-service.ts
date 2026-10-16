@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
+import type { CollectorService } from "@kaitu/channels/collectors";
 import {
   type AutomationKey,
   type AutomationSettings,
@@ -90,9 +91,18 @@ export class KaituOverviewService extends TypertRemoteService {
     config: Config = {},
     workspace?: Workspace,
     private readonly write: MutationQueue = (run) => run(),
+    private readonly collectors?: CollectorService,
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
+  }
+
+  @Remote("channelSettings")
+  async channelSettings(operation: string, input: string): Promise<string> {
+    if (!this.collectors) throw new Error("采集服务未启动");
+    const parsed: unknown = JSON.parse(input);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("采集参数必须是对象");
+    return JSON.stringify(await this.collectors.request(operation, parsed as Record<string, unknown>));
   }
 
   /** Desktop passes its installed release version to the running Host (apps/desktop/src/main.ts). */

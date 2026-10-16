@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { MeData, OverviewData, OverviewVersion } from "../types.js";
+import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import { DoingPage, type DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
@@ -25,6 +26,7 @@ export interface OverviewPageProps
   capture: (text: string) => Promise<unknown>;
   onAgent: () => void;
   onAdvanced?: () => void;
+  channelSettings?: ChannelRequest;
   renderAsk?: (prompt: string) => ReactNode;
 }
 type View = "ask" | "overview" | "explore" | "records" | "profile" | "connections" | "advanced";
@@ -695,6 +697,7 @@ export function OverviewPage(props: OverviewPageProps) {
                 使用内置 AI
               </button>
             </Section>
+            {props.channelSettings && <ChannelSettings request={props.channelSettings} />}
             {receipt && <output>{receipt}</output>}
           </>
         )}

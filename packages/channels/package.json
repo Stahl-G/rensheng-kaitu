@@ -15,6 +15,22 @@
     "@kaitu/core": "workspace:*",
     "@larksuiteoapi/node-sdk": "^1.75.0",
     "@tencent-connect/qqbot-nodejs": "^1.0.5",
-    "grammy": "^1.46.0"
+    "grammy": "^1.46.0",
+    "imapflow": "2.2.10",
+    "mailauth": "7.1.1",
+    "mailparser": "3.9.36"
+  },
+  "devDependencies": {
+    "@types/mailparser": "3.4.6"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./collectors": {
+      "types": "./dist/collectors/index.d.ts",
+      "default": "./dist/collectors/index.js"
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 import type { Context } from "@deepseek-ai/cordis";
 import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry";
+import { CollectorService } from "@kaitu/channels/collectors";
 import { Workspace, defaultRoot, initWorkspace, upgradeWorkspace } from "@kaitu/core";
 import { TYPERT as contribution } from "../lib/typert.host.js";
 import type { SkillContext, Context as ToolContext } from "./dsh.js";
@@ -33,7 +34,10 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   registerSkills(ctx as unknown as SkillContext, ws);
   const queue = applyTools(ctx as unknown as ToolContext, config, ws);
   ctx.typert.register(contribution as TypertContribution);
-  new KaituOverviewService(ctx, config, ws, queue);
+  const collectors = new CollectorService(ws);
+  collectors.start();
+  ctx.effect(() => () => collectors.stop());
+  new KaituOverviewService(ctx, config, ws, queue, collectors);
   new KaituFinanceService(ctx, config, ws, queue);
   const stop = startInboxLoop(ws, 60000, queue);
   ctx.effect(() => stop);

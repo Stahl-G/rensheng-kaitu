@@ -4,6 +4,7 @@ import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CollectorService } from "@kaitu/channels/collectors";
 import {
   type ImportSource,
   KaituError,
@@ -46,6 +47,7 @@ export interface UiOptions {
   refreshDelayMs?: number;
   inboxStableMs?: number;
   webRoot?: string;
+  collectorStateRoot?: string;
   ask?: AskService;
   onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
@@ -82,6 +84,7 @@ function field(data: Record<string, unknown>, key: string): string {
 
 export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const WEB_ROOT = options.webRoot ?? (existsSync(`${PRODUCT_ROOT}/index.html`) ? PRODUCT_ROOT : LEGACY_ROOT);
+  const collectors = new CollectorService(ws, options.collectorStateRoot);
   let aiChild: ReturnType<typeof spawn> | undefined;
   let aiReady: Promise<{ url?: string }> | undefined;
   const openAi = () => {
@@ -274,6 +277,16 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }
     try {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
+      if (url.pathname.startsWith("/api/channels/") && req.method === "POST") {
+        const input = JSON.parse((await body(req, MAX_JSON)).toString());
+        if (!input || typeof input !== "object" || Array.isArray(input))
+          throw new KaituError("参数必须是对象", "BAD_ARGS");
+        try {
+          return json(res, 200, await collectors.request(url.pathname.slice("/api/channels/".length), input));
+        } catch {
+          return json(res, 400, { error: "采集设置未完成，请检查参数或稍后重试" });
+        }
+      }
       if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
         const method = url.pathname.slice("/api/product/".length);
         const args = JSON.parse(
@@ -495,6 +508,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearInterval(heartbeat);
     clearInterval(polling);
     for (const client of [...clients, ...askClients]) client.end();
+    await collectors.stop();
     await options.ask?.close();
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
@@ -516,6 +530,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearTimeout(saveTimer);
     throw error;
   }
+  collectors.start();
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;

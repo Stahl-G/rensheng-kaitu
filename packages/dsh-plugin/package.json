@@ -14,7 +14,8 @@
     "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
     "@kaitu/core": "workspace:*",
     "react-easy-crop": "6.2.4",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@kaitu/channels": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",

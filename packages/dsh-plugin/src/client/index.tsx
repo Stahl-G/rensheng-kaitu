@@ -128,6 +128,11 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              channelSettings: async (operation: string, input: Record<string, unknown> = {}) => {
+                const result = await ctx.remote.kaitu.channelSettings(operation, JSON.stringify(input));
+                if (!result.ok) throw new Error(result.error.message);
+                return JSON.parse(result.value);
+              },
               onAdvanced: () => ctx.layout.selectPanel("plugins" as MainPanelId),
               loadNews: async () => {
                 const result = await ctx.remote.kaitu.news();
