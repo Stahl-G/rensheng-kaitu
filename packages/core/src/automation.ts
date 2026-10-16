@@ -29,7 +29,7 @@ export function readAutomation(ws: Workspace): AutomationSettings {
     tasks: {
       morning: existing ? !!legacy.morning : true,
       organizer: existing ? !!legacy.organizer : true,
-      news: true,
+      news: false,
     },
   };
 }

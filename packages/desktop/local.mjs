@@ -37,11 +37,36 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     const settings = readAutomation(ws);
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
   };
+  // 第一次主动打开 AI 时问一次；资讯搜索默认不开，可在设置里单独打开。
+  let asking;
+  const askAutomation = () => {
+    if (readAutomation(ws).asked) return Promise.resolve();
+    asking ??= dialog
+      .showMessageBox(window, {
+        type: "question",
+        title: "开启自动任务",
+        message: "要开图每天自动帮你整理吗？",
+        detail:
+          "每天 07:30 排好今天的计划，每晚 03:00 整理当天的记录。会用你连接的 AI 运行，可在开图 → 设置中随时开关。",
+        buttons: ["开启", "暂不开启"],
+        defaultId: 0,
+        cancelId: 1,
+      })
+      .then(({ response }) => {
+        configureAutomation(ws, { morning: response === 0, organizer: response === 0, news: false });
+        updateMenu();
+      })
+      .finally(() => {
+        asking = undefined;
+      });
+    return asking;
+  };
   const server = await startUi(ws, {
     port: 0,
     open: false,
     webRoot: join(resources, "web"),
     openAi: async () => {
+      await askAutomation();
       await ai.open();
       return {};
     },
@@ -127,18 +152,5 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     closing = true;
     void Promise.allSettled([server.close(), ai.close()]).finally(() => app.quit());
   });
-  if (!readAutomation(ws).asked) {
-    const { response } = await dialog.showMessageBox(window, {
-      type: "question",
-      title: "开启自动任务",
-      message: "为你开启每日整理、早间计划和资讯搜索？",
-      detail: "默认每天 03:00 整理、07:30 计划、08:00 搜索资讯。可在开图 → 设置中随时开关。任务使用内置 AI。",
-      buttons: ["开启", "暂不开启"],
-      defaultId: 0,
-      cancelId: 1,
-    });
-    configureAutomation(ws, { morning: response === 0, organizer: response === 0, news: response === 0 });
-    updateMenu();
-  }
   await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));
 }

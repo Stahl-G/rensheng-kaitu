@@ -59,7 +59,7 @@ it("首次确认后建立三个任务，开关可恢复，重启保留已修改�
     expect([...tasks.values()].filter((task) => task.title === morning.title)).toHaveLength(1);
     expect(tasks.size).toBe(2);
     expect([...tasks.values()].find((task) => task.title === morning.title)?.time).toBe("09:15:00");
-    // 已发布的旧回执没有 applied；只新增资讯任务，不补回被用户删掉的整理任务。
+    // 已发布的旧回执没有 applied；资讯搜索默认关，不新增，也不补回被用户删掉的整理任务。
     rmSync(ws.resolve(".kaitu/automation.json", { internal: true }));
     ws.writeJson(
       ".kaitu/dsh-setup.json",
@@ -75,7 +75,7 @@ it("首次确认后建立三个任务，开关可恢复，重启保留已修改�
     await setupSchedules(ctx, ws);
     expect(readAutomation(ws).asked).toBe(true);
     expect(tasks.get(morning.id)?.time).toBe("09:15:00");
-    expect([...tasks.values()].map((task) => task.title).sort()).toEqual(["开图早间计划", "开图资讯搜索"]);
+    expect([...tasks.values()].map((task) => task.title).sort()).toEqual(["开图早间计划"]);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }
