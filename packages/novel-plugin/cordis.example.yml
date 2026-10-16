@@ -1,0 +1,7 @@
+- insert:
+    - id: novel-workspace
+      name: '/absolute/path/to/kaitu/packages/novel-plugin/dist/index.js'
+      config:
+        workspace: '/absolute/path/to/kaitu-workspace'
+    - id: sf-consistency
+      name: '/absolute/path/to/kaitu/packages/sf-plugin/dist/index.js'

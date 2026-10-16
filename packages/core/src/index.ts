@@ -69,3 +69,7 @@ export * from "./news-feedback.js";
 export * from "./settings.js";
 export * from "./sync-location.js";
 export * from "./onboarding.js";
+export * from "./novel/index.js";
+export * from "./novel/time.js";
+export * from "./novel/science.js";
+export * from "./novel/reference.js";

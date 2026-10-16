@@ -452,7 +452,7 @@ function manuscriptFiles(root: string, include = ["**/*"]): string[] {
   walk(root);
   return out;
 }
-function docxText(bytes: Uint8Array): string {
+export function docxText(bytes: Uint8Array): string {
   const xml = unzipSync(bytes, { filter: (entry) => entry.name === "word/document.xml" })[
     "word/document.xml"
   ];

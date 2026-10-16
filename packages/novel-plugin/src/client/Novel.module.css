@@ -1,0 +1,131 @@
+.wrap {
+  padding: 28px;
+  max-width: 1120px;
+  margin: auto;
+  color: var(--ink);
+  font: 15px / 1.6 var(--font);
+}
+.wrap h1 {
+  font-size: 28px;
+  margin: 0;
+}
+.wrap h2 {
+  font-size: 18px;
+}
+.wrap h3 {
+  font-size: 16px;
+}
+.wrap button,
+.wrap input,
+.wrap select,
+.wrap textarea {
+  font: inherit;
+}
+.wrap input,
+.wrap select,
+.wrap textarea {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 7px;
+  padding: 7px;
+  min-width: 0;
+}
+.wrap textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 85px;
+}
+.wrap label {
+  display: grid;
+  gap: 4px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.stack {
+  display: grid;
+  gap: 14px;
+}
+.actions {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 9px;
+  vertical-align: top;
+}
+.table th {
+  font-size: 12px;
+  color: var(--muted);
+}
+.scroll {
+  overflow: auto;
+}
+.quote {
+  white-space: pre-wrap;
+  background: var(--sunken);
+  padding: 15px;
+  border-radius: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  background: var(--surface);
+}
+.warn {
+  color: var(--news-ink);
+  background: var(--news-tint);
+  padding: 10px;
+  border-radius: 8px;
+}
+.check {
+  display: flex !important;
+  align-items: center;
+  gap: 7px;
+}
+.wrap a {
+  color: var(--link);
+}
+.diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.diff pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.selected {
+  background: var(--doing-tint);
+}
+@media (max-width: 760px) {
+  .grid,
+  .diff {
+    grid-template-columns: 1fr;
+  }
+  .wrap {
+    padding: 15px;
+  }
+  .table td {
+    min-width: 100px;
+  }
+}
