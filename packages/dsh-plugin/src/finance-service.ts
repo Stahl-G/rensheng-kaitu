@@ -7,8 +7,8 @@ import {
   discardFinanceImport,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
+  loadFinanceInvestments,
   previewFinanceImport,
   stageFinanceUpload,
 } from "@kaitu/core";
@@ -56,7 +56,7 @@ export class KaituFinanceService extends TypertRemoteService {
   }
   @Remote("financeInvestments")
   async financeInvestments(options?: FinanceRemoteViewOptions): Promise<FinanceInvestmentsData> {
-    return financeInvestments(this.workspace, options);
+    return loadFinanceInvestments(this.workspace, options);
   }
   @Remote("financeAccounts")
   async financeAccounts(options?: FinanceRemoteViewOptions): Promise<FinanceAccountsData> {

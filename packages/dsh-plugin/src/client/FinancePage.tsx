@@ -863,7 +863,23 @@ export function FinancePage(props: FinancePageProps) {
                             <td data-label="成本">
                               {h.cost.amount === null ? "暂无成本" : money(h.cost.amount, h.currency)}
                             </td>
-                            <td data-label="市值">{money(h.valuation.amount, h.currency)}</td>
+                            <td data-label="市值">
+                              {money(h.valuation.amount, h.currency)}
+                              <small>
+                                {h.reference.price === null ? (
+                                  "没有行情"
+                                ) : (
+                                  <>
+                                    参考价 {money(h.reference.price, h.reference.currency)} ·{" "}
+                                    {h.reference.at ? stamp(h.reference.at) : ""} · 来源 Yahoo
+                                  </>
+                                )}
+                              </small>
+                              {h.reference.value !== null && (
+                                <small>参考市值 {money(h.reference.value, h.reference.currency)}</small>
+                              )}
+                              {h.reference.status === "stale" && <small>刷新失败，保留上次参考价</small>}
+                            </td>
                             <td data-label="浮动收益">
                               {money(h.unrealized_gain.amount, h.currency)}
                               {h.snapshot_return.amount !== null && (

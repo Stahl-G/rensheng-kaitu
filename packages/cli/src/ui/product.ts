@@ -16,11 +16,11 @@ import {
   editExperience,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
   hideExperience,
   lifeMap,
   listProjects,
+  loadFinanceInvestments,
   previewExperienceBatch,
   previewFinanceImport,
   readAutomation,
@@ -198,7 +198,7 @@ export async function productRequest(
     case "financeCashflow":
       return financeCashflow(ws, text(0), text(1), (args[2] ?? undefined) as FinanceViewOptions | undefined);
     case "financeInvestments":
-      return financeInvestments(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
+      return loadFinanceInvestments(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeAccounts":
       return financeAccounts(ws, (args[0] ?? undefined) as FinanceViewOptions | undefined);
     case "financeImportPreview": {

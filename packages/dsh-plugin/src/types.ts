@@ -4,8 +4,8 @@ import type {
   commitFinanceImport,
   financeAccounts,
   financeCashflow,
-  financeInvestments,
   financeOverview,
+  loadFinanceInvestments,
   previewFinanceImport,
   readHealthPage,
 } from "@kaitu/core";
@@ -197,7 +197,7 @@ export interface FinanceRemoteCommitOptions extends FinanceRemoteImportOptions {
 }
 export type FinanceOverviewData = ReturnType<typeof financeOverview>;
 export type FinanceCashflowData = ReturnType<typeof financeCashflow>;
-export type FinanceInvestmentsData = ReturnType<typeof financeInvestments>;
+export type FinanceInvestmentsData = Awaited<ReturnType<typeof loadFinanceInvestments>>;
 export type FinanceAccountsData = ReturnType<typeof financeAccounts>;
 export type FinanceImportPreviewData = {
   file: string;
