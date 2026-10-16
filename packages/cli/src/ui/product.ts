@@ -6,16 +6,21 @@ import {
   type FinanceImportOptions,
   type FinanceViewOptions,
   KaituError,
+  type NewsFeedback,
+  type SettingsData,
   type Workspace,
+  addCalendarSubscription,
   bankNotificationCandidates,
   captureNote,
   changeExperienceBatch,
   commitFinanceImport,
+  completeNext,
   configureAutomation,
   decideProposal,
   discardFinanceImport,
   dismissNews,
   editExperience,
+  exportWorkspace,
   financeAccounts,
   financeCashflow,
   financeOverview,
@@ -23,36 +28,47 @@ import {
   lifeMap,
   listProjects,
   loadFinanceInvestments,
+  moveWorkspace,
   previewExperienceBatch,
   previewFinanceImport,
   readAutomation,
   readAvatar,
+  readCalendar,
   readDoing,
   readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLibrary,
+  readLibraryDocument,
   readMe,
   readNews,
   readOverviewPage,
   readPhoto,
+  readSettings,
   receiveBankNotification,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  restore,
   saveAvatar,
   setExperienceSource,
+  setNewsFeedback,
   stageFinanceUpload,
   tryNews,
   unhideExperience,
   writeExploration,
 } from "@kaitu/core";
 
-import type { AskService } from "./ask.js";
+import type { AskMode, AskService } from "./ask.js";
 
 export const productMutations = new Set([
   "configureAutomation",
+  "restoreVersion",
+  "moveStorage",
+  "addCalendarSubscription",
+  "completeNext",
   "setExperienceSource",
   "changeExperienceBatch",
   "recoverExperienceImports",
@@ -64,6 +80,7 @@ export const productMutations = new Set([
   "hideExperience",
   "unhideExperience",
   "tryNews",
+  "feedbackNews",
   "dismissNews",
   "setAvatar",
   "removeAvatar",
@@ -88,6 +105,8 @@ export async function productRequest(
   if (method.startsWith("ask")) {
     if (!ask) throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
     switch (method) {
+      case "askSetMode":
+        return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings":
         return ask.settings();
       case "askConfigure":
@@ -103,10 +122,37 @@ export async function productRequest(
     }
   }
   switch (method) {
+    case "library":
+      return readLibrary(ws);
+    case "libraryDocument":
+      return readLibraryDocument(ws, text(0));
+    case "calendar":
+      return readCalendar(ws);
+    case "addCalendarSubscription":
+      return addCalendarSubscription(ws, text(0), text(1));
+    case "completeNext":
+      return completeNext(ws, text(0), text(1));
+    case "settings": {
+      const data: SettingsData = await readSettings(ws);
+      data.ai = ask ? await ask.settings() : null;
+      return data;
+    }
+    case "exportWorkspace":
+      return exportWorkspace(ws);
+    case "restoreVersion":
+      return restore(ws, text(0));
+    case "moveStorage": {
+      if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
+      return moveWorkspace(ws, text(0), args[1]);
+    }
     case "automation":
       return readAutomation(ws);
     case "configureAutomation":
-      return configureAutomation(ws, args[0] as Partial<Record<AutomationKey, boolean>>);
+      return configureAutomation(
+        ws,
+        args[0] as Partial<Record<AutomationKey, boolean>>,
+        (args[1] ?? undefined) as Partial<Record<AutomationKey, string>> | undefined,
+      );
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":
@@ -173,6 +219,8 @@ export async function productRequest(
       return unhideExperience(ws, text(0), revision(1));
     case "news":
       return readNews(ws);
+    case "feedbackNews":
+      return setNewsFeedback(ws, text(0), args[1] as NewsFeedback | null);
     case "tryNews": {
       const result = await tryNews(ws, text(0));
       return { id: result.record.id, status: "tried", version: result.version };

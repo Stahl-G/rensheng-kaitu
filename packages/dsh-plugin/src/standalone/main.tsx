@@ -24,7 +24,9 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt) => <AskPage workspace={workspace} initialPrompt={prompt} />,
+  renderAsk: (prompt, configureRequest) => (
+    <AskPage workspace={workspace} initialPrompt={prompt} configureRequest={configureRequest} />
+  ),
   subscribe: (refresh) => {
     const events = new EventSource("/api/events");
     events.onmessage = refresh;
@@ -35,6 +37,16 @@ const props: OverviewPageProps = {
     workspace = data.root;
     return data;
   },
+  loadSettings: () => call("settings"),
+  configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
+  exportWorkspace: () => call("exportWorkspace"),
+  restoreVersion: (oid) => call("restoreVersion", oid),
+  moveStorage: (path, drive) => call("moveStorage", path, drive),
+  loadCalendar: () => call("calendar"),
+  addCalendar: (url, name) => call("addCalendarSubscription", url, name),
+  loadLibrary: () => call("library"),
+  loadLibraryDocument: (file) => call("libraryDocument", file),
+  completeNext: (file, id) => call("completeNext", file, id),
   decideProposal: (id, decision) => call("decideProposal", id, decision),
   capture: (text) => call("capture", text),
   loadMe: () => call("me"),
@@ -60,6 +72,7 @@ const props: OverviewPageProps = {
   hideExperience: (id, revision) => call("hideExperience", id, revision),
   unhideExperience: (id, revision) => call("unhideExperience", id, revision),
   loadNews: () => call("news"),
+  feedbackNews: (id, value) => call("feedbackNews", id, value),
   tryNews: (id) => call("tryNews", id),
   dismissNews: (id) => call("dismissNews", id),
   loadFinanceOverview: (options) => call("financeOverview", options),

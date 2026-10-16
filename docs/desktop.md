@@ -51,7 +51,7 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 ## 装好后怎么用
 
 打开 `Kaitu.dmg`，将 `Kaitu.app` 拖入 Applications 后双击；只有应用目录时直接复制后打开。
-默认直接进入独立本地工作台，有总览、开图、记录、问问四个同级导航。查看资料、保存原文、打开地图和财务不要求模型或 API Key。
+默认直接进入独立本地工作台，有今天、开图、资料、问问四个同级导航。查看资料、保存原文、打开地图和财务不要求模型或 API Key。
 「问问」首次打开提供已有 AI 的接手说明或内置 DeepSeek API Key 连接；凭据使用 DSH 的本机存储。
 
 工作区优先使用 `~/Library/Application Support/kaitu/current-workspace.json` 指向的有效目录，
@@ -65,9 +65,10 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 不迁移或删除登录凭据、会话和 DSH 的 `~/.dsh`。资料窗口使用单独的 `workbench-userData`，避免争用 AI 的 Electron 存储。
 问问使用无界面的 SDK profile，通过 initialize / session/prompt 与原生事件通知工作，不打开 DSH 窗口。
 会话索引与展示事件在本机 `~/.kaitu-app/ask/`，原生日志在 AI home 的 sdk profile，均不写入工作区。
-问问的文件读写与搜索仅放行当前工作区，解析符号链接后再检查；禁用命令、作业、网页抓取/搜索、子代理、工作流及插件管理。
+默认「只读写开图资料」模式的文件读写与搜索仅放行当前工作区，解析符号链接后再检查；禁用命令、作业、网页抓取/搜索、子代理、工作流及插件管理。
 不挂载 shell / Seatbelt 执行器；保留 workspace-write 文件能力与 approval/never，禁用硬依赖 shell 的权限预设服务。
-导入和照片原件须先放入工作区，问问不执行项目外部链接访问/同步或工作区迁移。
+默认模式中，导入和照片原件须先放入工作区，问问不执行项目外部链接访问/同步或工作区迁移。
+切换「完整 Agent」须二次确认，只对当前对话生效。此模式以 DSH 标准完整权限重启 SDK 并续接同一会话，可使用命令、文件和联网。新对话回到默认模式。
 已有会话通过 DSH 公开 agents.resume 恢复；原生注入的指令和运行时上下文不作为用户消息展示。
 定时任务保留隐藏的 Electron 进程，因为 rc.2 SDK profile 不含 schedule 需要的 sessionController。
 重复启动复用原后台进程；退出会关闭 SDK 与后台任务进程。

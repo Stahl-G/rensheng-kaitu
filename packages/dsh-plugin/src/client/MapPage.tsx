@@ -635,7 +635,7 @@ export function MapPage({
         <div>
           <h1>
             <span className={css.dot} aria-hidden="true" />
-            地图
+            足迹
           </h1>
           <p className={css.secondary}>走过的、现在的和计划去的城市 · 由 Agent 从你的记忆整理</p>
         </div>

@@ -276,3 +276,10 @@ Adapted from double-entry-generator (Apache-2.0), Copyright deb-sig contributors
 ## Yahoo 参考行情
 
 yahoo-finance2 4.0.3（MIT）：https://github.com/gadicc/yahoo-finance2 。仅用于参考价和汇率查询。
+
+## FullCalendar standard 6.1.19
+
+- Packages: @fullcalendar/core, react, daygrid, timegrid, list (exact versions in pnpm-lock.yaml).
+- Source: https://github.com/fullcalendar/fullcalendar and https://github.com/fullcalendar/fullcalendar-react
+- License: MIT, Copyright (c) Adam Shaw. License texts are included in the installed npm packages.
+- Only standard calendar views are used. No premium scheduler dependency.

@@ -5,9 +5,11 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import contribution from "../../lib/typert.remote-client.js";
 import type {
+  AutomationKey,
   FinanceRemoteCommitOptions,
   FinanceRemoteImportOptions,
   FinanceRemoteViewOptions,
+  NewsFeedback,
 } from "../types.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { SessionPage } from "./SessionPage.js";
@@ -119,6 +121,59 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadSettings: async () => {
+                const r = await ctx.remote.kaitu.settings();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              configureAutomation: async (
+                tasks: Partial<Record<AutomationKey, boolean>>,
+                times?: Partial<Record<AutomationKey, string>>,
+              ) => {
+                const r = await ctx.remote.kaitu.configureAutomation(tasks, times);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              exportWorkspace: async () => {
+                const r = await ctx.remote.kaitu.exportWorkspace();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              restoreVersion: async (oid: string) => {
+                const r = await ctx.remote.kaitu.restoreVersion(oid);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              moveStorage: async (path: string, drive: boolean) => {
+                const r = await ctx.remote.kaitu.moveStorage(path, drive);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadCalendar: async () => {
+                const r = await ctx.remote.kaitu.calendar();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              addCalendar: async (url: string, name: string) => {
+                const r = await ctx.remote.kaitu.addCalendarSubscription(url, name);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLibrary: async () => {
+                const r = await ctx.remote.kaitu.library();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLibraryDocument: async (file: string) => {
+                const r = await ctx.remote.kaitu.libraryDocument(file);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              completeNext: async (file: string, id: string) => {
+                const r = await ctx.remote.kaitu.completeNext(file, id);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               decideProposal: async (id: string, decision: "confirmed" | "rejected") => {
                 const result = await ctx.remote.kaitu.decideProposal(id, decision);
                 if (!result.ok) throw new Error(result.error.message);
@@ -138,6 +193,11 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
+              },
+              feedbackNews: async (id: string, value: NewsFeedback | null) => {
+                const r = await ctx.remote.kaitu.feedbackNews(id, value);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
               },
               tryNews: async (id: string) => {
                 const result = await ctx.remote.kaitu.tryNews(id);

@@ -24,6 +24,7 @@ import {
   importUpload,
   pendingWorkspaceFiles,
   processInbox,
+  pullCalendarSubscriptions,
   readPhoto,
   readWorkbench,
   refreshOverview,
@@ -49,6 +50,8 @@ export interface UiOptions {
   webRoot?: string;
   collectorStateRoot?: string;
   ask?: AskService;
+  onWorkspaceChanging?: () => Promise<void>;
+  onWorkspaceChanged?: () => Promise<void>;
   onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
 }
@@ -144,6 +147,13 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     queue = result.catch(() => {});
     return result;
   }
+  const pullCalendars = () =>
+    exclusive(async () => {
+      await pullCalendarSubscriptions(ws);
+      notify();
+    });
+  const calendarTimer = setInterval(() => void pullCalendars().catch(() => {}), 60000);
+  calendarTimer.unref();
   let inboxTimer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -155,6 +165,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
+  void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
     notify();
@@ -314,7 +325,20 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
               : await exclusive(async () => {
                   const mutates = productMutations.has(method);
                   if (mutates) await saveExternal();
-                  const value = await productRequest(ws, method, args, options.ask);
+                  if (method === "moveStorage" || method === "restoreVersion")
+                    await options.ask?.prepareRelocation();
+                  if (method === "moveStorage") await options.onWorkspaceChanging?.();
+                  const oldRoot = ws.root;
+                  let value: unknown;
+                  try {
+                    value = await productRequest(ws, method, args, options.ask);
+                  } finally {
+                    if (ws.root !== oldRoot) {
+                      startWatching();
+                      options.ask?.relocate(ws.root);
+                    }
+                    if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                  }
                   if (method === "configureAutomation") await options.onAutomationChanged?.();
                   if (mutates) notify();
                   return value;
@@ -510,6 +534,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     clearInterval(polling);
     for (const client of [...clients, ...askClients]) client.end();
     await collectors.stop();
+    clearInterval(calendarTimer);
     await options.ask?.close();
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
@@ -524,6 +549,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    clearInterval(calendarTimer);
     clearInterval(heartbeat);
     clearInterval(polling);
     clearTimeout(inboxTimer);

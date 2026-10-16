@@ -5,35 +5,49 @@ import type { CollectorService } from "@kaitu/channels/collectors";
 import {
   type AutomationKey,
   type AutomationSettings,
+  type CalendarData,
   KaituError,
+  type LibraryData,
+  type NewsFeedback,
+  type SettingsData,
   Workspace,
+  addCalendarSubscription,
   captureNote,
   changeExperienceBatch,
+  completeNext,
   configureAutomation,
   decideProposal,
   defaultRoot,
   dismissNews,
   editExperience,
+  exportWorkspace,
   hideExperience,
   lifeMap,
   listProjects,
+  moveWorkspace,
   previewExperienceBatch,
   readAutomation,
   readAvatar,
+  readCalendar,
   readDoing,
   readExperienceImports,
   readExperienceSource,
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLibrary,
+  readLibraryDocument,
   readNews,
   readOverviewPage,
   readPhoto,
+  readSettings,
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  restore,
   saveAvatar,
   setExperienceSource,
+  setNewsFeedback,
   tryNews,
   unhideExperience,
   writeExploration,
@@ -111,14 +125,62 @@ export class KaituOverviewService extends TypertRemoteService {
     return process.env.DSH_CLIENT_VERSION?.trim() || null;
   }
 
+  @Remote("library")
+  async library(): Promise<LibraryData> {
+    return readLibrary(this.workspace);
+  }
+
+  @Remote("libraryDocument")
+  async libraryDocument(file: string): Promise<string> {
+    return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("calendar")
+  async calendar(): Promise<CalendarData> {
+    return readCalendar(this.workspace);
+  }
+
+  @Remote("addCalendarSubscription")
+  async addCalendarSubscription(url: string, name: string): Promise<CalendarData> {
+    return this.write(() => addCalendarSubscription(this.workspace, url, name));
+  }
+
+  @Remote("completeNext")
+  async completeNext(file: string, id: string): Promise<{ version: string | null }> {
+    return this.write(() => completeNext(this.workspace, file, id));
+  }
+
+  @Remote("settings")
+  async settings(): Promise<SettingsData> {
+    return readSettings(this.workspace);
+  }
+
+  @Remote("exportWorkspace")
+  async exportWorkspace(): Promise<{ name: string; base64: string }> {
+    return exportWorkspace(this.workspace);
+  }
+
+  @Remote("restoreVersion")
+  async restoreVersion(oid: string): Promise<{ oid: string | null; changed: number }> {
+    return this.write(() => restore(this.workspace, oid));
+  }
+
+  @Remote("moveStorage")
+  async moveStorage(path: string, drive: boolean): Promise<SettingsData["storage"]> {
+    return this.write(() => moveWorkspace(this.workspace, path, drive));
+  }
+
   @Remote("automation")
   async automation(): Promise<AutomationSettings> {
     return readAutomation(this.workspace);
   }
 
   @Remote("configureAutomation")
-  async configureAutomation(tasks: Partial<Record<AutomationKey, boolean>>): Promise<AutomationSettings> {
-    return this.write(async () => configureAutomation(this.workspace, tasks));
+  async configureAutomation(
+    tasks: Partial<Record<AutomationKey, boolean>>,
+    times?: Partial<Record<AutomationKey, string>>,
+  ): Promise<AutomationSettings> {
+    return this.write(async () => configureAutomation(this.workspace, tasks, times));
   }
 
   @Remote("workspacePath")
@@ -162,6 +224,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("news")
   async news(): Promise<NewsData> {
     return readNews(this.workspace);
+  }
+
+  @Remote("feedbackNews")
+  async feedbackNews(id: string, value: NewsFeedback | null): Promise<Record<string, NewsFeedback>> {
+    return this.write(() => setNewsFeedback(this.workspace, id, value));
   }
 
   @Remote("tryNews")

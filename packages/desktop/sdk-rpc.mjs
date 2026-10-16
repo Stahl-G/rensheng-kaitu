@@ -2,10 +2,18 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const load = (name) => import(pathToFileURL(join(process.env.KAITU_DSH_MODULES, name, "lib/index.js")).href);
-const [{ JsonRpcLineTransport }, { HarnessSdkJsonRpcServer }, { createUserMessage }] = await Promise.all([
+const [
+  { JsonRpcLineTransport },
+  { HarnessSdkJsonRpcServer },
+  { createUserMessage },
+  { setSandboxMode },
+  { setApprovalPolicy },
+] = await Promise.all([
   load("@deepseek-ai/dsh-sdk-protocol"),
   load("@deepseek-ai/dsh-sdk-jsonrpc-server"),
   load("@deepseek-ai/dsh-llm"),
+  load("@deepseek-ai/dsh-sandbox-policy"),
+  load("@deepseek-ai/dsh-user-approval"),
 ]);
 export const name = "kaitu-sdk-rpc";
 export const inject = ["sdkAppStartup", "loader", "agents", "sessionPersistence", "kaitu", "fs"];
@@ -42,6 +50,11 @@ export function apply(ctx) {
           await handle.dispose();
           throw new Error("会话不属于此工作区");
         }
+        setSandboxMode(
+          handle.agent.session,
+          process.env.KAITU_AGENT_MODE === "full" ? "danger-full-access" : "workspace-write",
+        );
+        setApprovalPolicy(handle.agent.session, "never");
         resumed.set(id, handle);
       }
       const handle = resumed.get(id);

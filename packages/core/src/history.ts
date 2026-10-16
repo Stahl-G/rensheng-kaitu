@@ -14,6 +14,9 @@ export const NEVER_TRACK = [
   ".kaitu/github-state.json",
   ".kaitu/dsh-setup.json",
   ".kaitu/automation.json",
+  ".kaitu/calendar-subscriptions.json",
+  ".kaitu/news-feedback.json",
+  ".kaitu/ask-workspace.json",
   ".kaitu/index.sqlite",
   ".kaitu/cache/",
   ".kaitu/local-projects/",
@@ -31,6 +34,9 @@ export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/github-state.json
 .kaitu/dsh-setup.json
 .kaitu/automation.json
+.kaitu/calendar-subscriptions.json
+.kaitu/news-feedback.json
+.kaitu/ask-workspace.json
 .kaitu/index.sqlite
 .kaitu/index.sqlite-*
 .kaitu/cache/

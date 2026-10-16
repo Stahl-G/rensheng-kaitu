@@ -3,6 +3,68 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
+  if (mode === "full")
+    return [
+      { id: "sdk-jsonrpc-server", disabled: true },
+      { id: "sandbox-policy", config: { mode: "danger-full-access", workspaceRoot: workspace } },
+      { id: "approval", config: { policy: "never" } },
+      {
+        insert: [
+          { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
+          { id: "kaitu", name: plugin, config: { workspace } },
+        ],
+      },
+    ];
+  return [
+    { id: "sdk-jsonrpc-server", disabled: true },
+    { id: "sandbox", disabled: true },
+    { id: "fs-sandbox", disabled: true },
+    ...[
+      "tool-bash",
+      "tool-pwsh",
+      "tool-jobs",
+      "tool-web",
+      "web-fetch-http",
+      "web-search-deepseek",
+      "tool-subagent",
+      "tool-subagent-fork",
+      "tool-subagent-control",
+      "tool-subagent-list-agents",
+      "tool-workflow",
+      "tool-plugin-manager",
+      "bash-sandbox",
+      "pwsh-sandbox",
+      "shell-env",
+      "ptc-runtime",
+      "workflow-ptc",
+    ].map((id) => ({ id, disabled: true })),
+    {
+      id: "skill-filesystem",
+      config: {
+        includeDefaultRoots: false,
+        customSkillDirs: [join(workspace, ".agents/skills")],
+        watch: false,
+      },
+    },
+    {
+      id: "agent-instructions",
+      config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: [".kaitu"] },
+    },
+    { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
+    { id: "approval", config: { policy: "never" } },
+    { id: "permission", disabled: true },
+    { id: "tool-skill", disabled: false },
+    {
+      insert: [
+        { id: "kaitu-sdk-host", name: hostPlugin },
+        { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
+        { id: "kaitu", name: plugin, config: { workspace } },
+      ],
+    },
+  ];
+}
+
 export function createSdkRuntime({ executable, archive, home, workspace, plugin, hostPlugin, helper }) {
   const modules = join(archive, "dsh/node_modules");
   const settingsFile = join(home, "kaitu-ai.json");
@@ -62,63 +124,16 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return { ...settings, configured: settings.choice === "builtin" };
     },
-    async runtime() {
+    async runtime(mode = "scoped") {
+      if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       const settings = loadSettings();
       if (settings.choice === "external" || !(await credential("status")).configured)
         throw new Error("请先连接内置 AI");
-      const profile = join(home, "kaitu-sdk.patch.json");
+      const profile = join(home, `kaitu-sdk-${mode}.patch.json`);
       mkdirSync(home, { recursive: true, mode: 0o700 });
-      writeFileSync(
-        profile,
-        JSON.stringify([
-          { id: "sdk-jsonrpc-server", disabled: true },
-          { id: "sandbox", disabled: true },
-          { id: "fs-sandbox", disabled: true },
-          ...[
-            "tool-bash",
-            "tool-pwsh",
-            "tool-jobs",
-            "tool-web",
-            "web-fetch-http",
-            "web-search-deepseek",
-            "tool-subagent",
-            "tool-subagent-fork",
-            "tool-subagent-control",
-            "tool-subagent-list-agents",
-            "tool-workflow",
-            "tool-plugin-manager",
-            "bash-sandbox",
-            "pwsh-sandbox",
-            "shell-env",
-            "ptc-runtime",
-            "workflow-ptc",
-          ].map((id) => ({ id, disabled: true })),
-          {
-            id: "skill-filesystem",
-            config: {
-              includeDefaultRoots: false,
-              customSkillDirs: [join(workspace, ".agents/skills")],
-              watch: false,
-            },
-          },
-          {
-            id: "agent-instructions",
-            config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: [".kaitu"] },
-          },
-          { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
-          { id: "approval", config: { policy: "never" } },
-          { id: "permission", disabled: true },
-          { id: "tool-skill", disabled: false },
-          {
-            insert: [
-              { id: "kaitu-sdk-host", name: hostPlugin },
-              { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-              { id: "kaitu", name: plugin, config: { workspace } },
-            ],
-          },
-        ]),
-        { mode: 0o600 },
-      );
+      writeFileSync(profile, JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode })), {
+        mode: 0o600,
+      });
       const { JsonRpcLineTransport } = await import(
         pathToFileURL(join(modules, "@deepseek-ai/dsh-sdk-protocol/lib/index.js")).href
       );
@@ -134,7 +149,11 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
         ],
         {
           cwd: workspace,
-          env,
+          env: {
+            ...env,
+            DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
+            KAITU_AGENT_MODE: mode,
+          },
           detached: true,
           stdio: ["pipe", "pipe", "ignore"],
         },
