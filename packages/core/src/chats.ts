@@ -71,7 +71,7 @@ export function listChatFiles(ws: Workspace): string[] {
       if (entry.isDirectory()) visit(file);
       else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
         chatPath(ws, file);
-        files.push(file);
+        if (ws.scanText(file) !== undefined) files.push(file);
       }
     }
   }
@@ -197,6 +197,7 @@ export async function importChatgptConversations(
   inputFile: string,
   opts: { dryRun?: boolean } = {},
 ): Promise<ImportResult> {
+  if (!opts.dryRun) ws.assertDownloaded("chats");
   const documents = loadExport(inputFile).map((value) => parseConversation(value, ws.timeZone()));
   const existing = new Map(
     listChatFiles(ws).map((file) => {

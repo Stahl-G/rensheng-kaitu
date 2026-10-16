@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { doctor } from "./doctor.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
@@ -128,7 +128,7 @@ export function syncStatus(ws: Workspace) {
     mode,
     path: ws.root,
     drivePath: mode === "drive" ? ws.root : null,
-    hint: mode === "icloud" ? "在 Finder 里对工作区文件夹选『始终保留下载』" : null,
+    hint: mode === "icloud" ? `在 Finder 里对 ${basename(ws.root)} 文件夹选『始终保留下载』` : null,
     root: ws.root,
     stateDir: state,
     lastInboxProcessed: ws.exists(file) ? ws.readJson<{ lastProcessed: string }>(file).lastProcessed : null,
@@ -195,6 +195,12 @@ export async function enableSync(
 
 export async function disableSync(ws: Workspace, options: { to?: string } = {}) {
   if (syncStatus(ws).mode === "local") throw new KaituError("当前是本地模式", "CONFLICT");
+  const unavailable = ws.unavailableFiles();
+  if (unavailable.length)
+    throw new KaituError(
+      `还没从 iCloud 下载：${unavailable.join("、")}，下载完成后再搬回本机`,
+      "CLOUD_UNAVAILABLE",
+    );
   const old = ws.root;
   const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu"));
   separate(old, target);

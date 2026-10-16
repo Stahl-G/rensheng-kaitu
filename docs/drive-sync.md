@@ -33,6 +33,7 @@ kaitu sync disable --to /本机目录/kaitu
 - `disable` 缺省搬回 `~/kaitu`；允许回到只留有本次迁移说明的目录。
 - `kaitu drive enable [--drive-dir <路径>] [--name kaitu]`、`drive disable`、`drive status` 保留。
   旧命令的全局 `--dir` 仍指原工作区。
+- 开启或搬回后，显式设置过 `KAITU_DIR` 的用户需更新或取消该变量，才能使用新位置；本机指针不覆盖显式路径。
 - status 返回 `mode`、`path` / `root`、`stateDir`、上次收件箱处理时间与 iCloud 提示。
 - 旧位置留下 `WORKSPACE-MOVED.md`，本机状态根目录的 `current-workspace.json` 记录当前位置。
   迁移后运行 doctor 与 validate。
@@ -46,11 +47,11 @@ config schema 与 PRD §6 保持不变。
 Kaitu.app 的 `local.mjs` 与 `kaitu ui` 共用 `packages/cli/src/ui/server.ts`：
 
 - `GET /api/sync`：返回存放位置与状态目录。
-- `POST /api/sync/enable`：`{"mode":"icloud"或"drive","dir":"可选父目录","name":"可选目录名"}`。
+- `POST /api/sync/enable`：`{"mode":"icloud","dir":"/可选父目录","name":"kaitu"}`，mode 也可为 `drive`；dir / name 可省略。
 - `POST /api/sync/disable`：`{"to":"可选本机目标目录"}`。
 - 保留 `GET /api/drive` 与 `POST /api/drive/enable`、`/api/drive/disable`；旧 enable 的 `driveDir` 参数继续支持。
 
-接口复用原有本机访问校验与串行写入队列，迁移后重建文件监听。
+写请求需 `X-Kaitu: 1` 和与服务同源的 `Origin`。接口复用原有本机访问校验与串行写入队列，迁移后重建文件监听。
 
 ## 目录：哪些上云，哪些留在本机
 
@@ -120,6 +121,21 @@ Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 
 `kaitu status`、OVERVIEW 与工作台「今天 · 需要你处理」显示待整理数量。
 晚间复盘由本机 Agent 把可结构化内容写入记录、记忆或简报，保留原 agent 来源；拿不准的留着并列入日报。
 
+## iCloud 未下载文件与冲突副本
+
+- 识别旧式 `.文件名.icloud` 占位文件。对普通 iCloud 文件，在独立 `/bin/cat` 进程读取内容，最多等待两秒。
+  超时、离线或读取失败统一作为“还没从 iCloud 下载”报告；不会把失败读成空字符串。
+  使用实际读取而非“大小为零”或某一版本的扩展属性，是因为空文件可以合法存在，File Provider 的占位表示也会变化。
+  小文件按 size / mtime / ctime 缓存，文件变化后重新读取；失败会在五秒后重试。
+- `doctor` 列出所有不可读文件，JSON 输出的对应检查含 `files` 列表。扫描跳过这些文件，汇总携带未下载提示。
+  配置、NOW 或时区规则未下载时，不自动维护派生文件。覆盖或追加未下载的原文件会报错。
+  依赖完整追加历史的修改、删除、记忆索引更新与对话导入也先检查相应目录，避免根据不完整数据写回。
+- 存版本前检查整个共享文件夹；有任何未下载文件时延后整个版本，下载后再由监听或 `kaitu snapshot` 补存。
+  版本扫描和暂存也使用同一个有限时读取，防止读取失败生成删除版本。恢复和搬回本机须先下载完整。
+- 识别 `NOW 2.md`、`xxx 2.jsonl`、`xxx (1).jsonl` 及带 `(Conflicted Copy)` / `[Conflict]` 显式标记的同步副本，包括冲突目录中的文件。
+  仅当去掉数字后缀或显式冲突标记后原文件仍存在（或有占位文件）才判作副本，避免误判合法数字文件名。
+  doctor 只列出供人工处理；校验、总览、记录/记忆/对话/收件箱扫描与版本暂存均跳过副本，不合并、不删除。
+
 ## 与 MCP 的关系
 
 收件箱是默认路径（零暴露）。需要实时调用时再用 `kaitu mcp --http` + 隧道（见 `docs/remote-agents.md`）。两条路写入同一套 core 函数、同一套校验。MCP 的 `inbox_notes` 只读列出笔记，`inbox_note_done` 仅在 `--tools all` 中提供。
@@ -128,7 +144,7 @@ Apple 官方 `export.zip` / `export.xml` 与快捷指令 `*.health.json` 放进 
 
 - Grok Bot / Dots 的 Google Drive 连接器能否读取、创建 `.md` / `.json` / `.jsonl` 纯文本文件（有的连接器只处理 Google 文档格式）。需要用户用真实账号试一次；不行的话，`OVERVIEW.md` 另存一份 Google 文档格式由 Drive 自动转换不在本地可控，届时再定。
 - Google Drive 电脑版（File Provider）下文件监听是否可靠；不可靠时用已有的轮询回退。
-- 「仅在线」占位文件被读取时的延迟。
+- 真实 iCloud / Drive 的「仅在线」占位行为与文件监听时序。iCloud 读取已有有限等待与延后版本保护，仍需实际云盘验证。
 
 ## 本机端到端测试（开发机已具备：Google Drive 电脑版已登录、ChatGPT 与 Grok Bot 桌面应用已安装）
 

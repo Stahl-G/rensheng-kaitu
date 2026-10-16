@@ -1,10 +1,11 @@
 import fs from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { batchOverview, refreshOverview } from "./overview.js";
 import { driveProjects, projectStatusFiles, readProject } from "./projects.js";
+import { syncMode } from "./sync-location.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -87,8 +88,34 @@ async function headOid(ws: Workspace): Promise<string | null> {
   }
 }
 
+function historyFs(ws: Workspace) {
+  if (syncMode(ws.root) !== "icloud") return fs;
+  const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
+    if (typeof path === "string") {
+      const rel = relative(ws.root, path);
+      if (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) {
+        const bytes = ws.readBytes(rel);
+        const encoding = typeof options === "string" ? options : options?.encoding;
+        return encoding ? bytes.toString(encoding) : bytes;
+      }
+    }
+    return fs.promises.readFile(path, options);
+  }) as typeof fs.promises.readFile;
+  return { ...fs, promises: { ...fs.promises, readFile } };
+}
+
+function deferredCloudSnapshot(ws: Workspace): boolean {
+  return ws.unavailableFiles().length > 0;
+}
+
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
-  const matrix = await git.statusMatrix({ fs, dir: ws.root, gitdir: historyDirectory(ws) });
+  if (deferredCloudSnapshot(ws)) return [];
+  const matrix = await git.statusMatrix({
+    fs: historyFs(ws),
+    dir: ws.root,
+    gitdir: historyDirectory(ws),
+    filter: (file) => !ws.conflictCopy(file),
+  });
   return matrix
     .filter(
       ([file, head, workdir, stage]) =>
@@ -121,11 +148,13 @@ export async function batchSnapshot<T>(
 
 export async function snapshot(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
   if (batchDepth.get(ws)) return null;
+  if (deferredCloudSnapshot(ws)) return null;
   refreshOverview(ws, now);
   try {
     return await saveSnapshot(ws, message, now);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
+    if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
     if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
     return null;
@@ -133,9 +162,16 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
 }
 
 async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
+  if (deferredCloudSnapshot(ws)) return null;
   await ensureHistory(ws);
   const dir = ws.root;
-  const matrix = await git.statusMatrix({ fs, dir, gitdir: historyDirectory(ws) });
+  const io = historyFs(ws);
+  const matrix = await git.statusMatrix({
+    fs: io,
+    dir,
+    gitdir: historyDirectory(ws),
+    filter: (file) => !ws.conflictCopy(file),
+  });
   let changed = 0;
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
@@ -147,7 +183,7 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
     if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-    else await git.add({ fs, dir, gitdir: historyDirectory(ws), filepath });
+    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
     changed++;
   }
   if (changed === 0) return null;
@@ -214,6 +250,9 @@ export async function restore(
   opts: { path?: string; now?: Date } = {},
 ): Promise<{ oid: string | null; changed: number }> {
   if (!hasHistory(ws)) throw new KaituError("工作区还没有版本历史", "NO_HISTORY");
+  const unavailable = ws.unavailableFiles();
+  if (unavailable.length)
+    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
   const target = await resolveVersion(ws, version);
   const prefix = (opts.path ?? "").replace(/^\.\/?/, "").replace(/\/+$/, "");
   await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
@@ -275,13 +314,18 @@ export async function restore(
     privateSlugs.has(file.split("/")[0] === "projects" ? (file.split("/")[1] ?? "") : "");
   let changed = 0;
   for (const f of currentFiles) {
-    if (!targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
+    if (!ws.conflictCopy(f) && !targetFiles.has(f) && !neverTrack(f) && !privateFile(f)) {
       fs.rmSync(ws.resolve(f, { internal: true }), { force: true });
       changed++;
     }
   }
   for (const f of targetFiles) {
-    if (neverTrack(f) || privateFile(f) || ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f))
+    if (
+      ws.conflictCopy(f) ||
+      neverTrack(f) ||
+      privateFile(f) ||
+      ["OVERVIEW.md", "AGENT-README.md", "ORGANIZER.md"].includes(f)
+    )
       continue;
     let { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     if (privateSlugs.size && /^projects\/data\/(?:metrics|github)\/[^/]+\.jsonl$/.test(f)) {

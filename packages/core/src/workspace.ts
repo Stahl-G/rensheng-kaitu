@@ -16,6 +16,16 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
+import {
+  cacheWrittenFile,
+  cloudPlaceholder,
+  conflictOriginal,
+  placeholderOriginal as placeholderName,
+  readCloudFile,
+  readWorkspaceConfig,
+  syncInventory,
+} from "./sync-files.js";
+import { syncMode } from "./sync-location.js";
 import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
 
@@ -27,8 +37,7 @@ export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function stateDirectory(root: string): string {
-  const config = join(root, STATE_DIR, "config.json");
-  const state = existsSync(config) ? JSON.parse(readFileSync(config, "utf8")).state_dir : undefined;
+  const state = readWorkspaceConfig(root).state_dir;
   if (state !== undefined && (typeof state !== "string" || !isAbsolute(state))) {
     throw new KaituError("state_dir 必须是本机绝对路径", "INVALID_STATE_DIR");
   }
@@ -77,16 +86,21 @@ export class Workspace {
   constructor(root: string, options: { maintain?: boolean } = {}) {
     this.root = resolve(root);
     if (options.maintain === false) return;
-    const state = stateDirectory(this.root);
-    if (state !== join(this.root, STATE_DIR) && !existsSync(state)) {
-      mkdirSync(state, { recursive: true });
-      writeFileSync(join(state, "secrets.json"), "{}\n", { mode: 0o600 });
-    }
-    migrateHistory(this.root);
-    if (this.exists(".kaitu/config.json")) {
-      ensureTaskModule(this);
-      maintainHistoryIgnore(this);
-      refreshOverview(this);
+    try {
+      const state = stateDirectory(this.root);
+      if (state !== join(this.root, STATE_DIR) && !existsSync(state)) {
+        mkdirSync(state, { recursive: true });
+        writeFileSync(join(state, "secrets.json"), "{}\n", { mode: 0o600 });
+      }
+      migrateHistory(this.root);
+      if (this.unavailableFiles().length) return;
+      if (this.exists(".kaitu/config.json")) {
+        ensureTaskModule(this);
+        maintainHistoryIgnore(this);
+        refreshOverview(this);
+      }
+    } catch (error) {
+      if (!(error instanceof KaituError) || error.code !== "CLOUD_UNAVAILABLE") throw error;
     }
   }
 
@@ -133,11 +147,74 @@ export class Workspace {
   }
 
   exists(rel: string): boolean {
-    return existsSync(this.resolve(rel, { internal: true }));
+    return existsSync(this.resolve(rel, { internal: true })) || cloudPlaceholder(this.root, rel);
+  }
+
+  readBytes(rel: string): Buffer {
+    const abs = this.resolve(rel, { internal: true });
+    if (
+      (rel === ".kaitu/config.json" && process.platform === "darwin") ||
+      (!rel.startsWith(".kaitu/") && syncMode(this.root) === "icloud")
+    )
+      return readCloudFile(abs);
+    return readFileSync(abs);
   }
 
   readText(rel: string): string {
-    return readFileSync(this.resolve(rel, { internal: true }), "utf8");
+    return this.readBytes(rel).toString("utf8");
+  }
+
+  conflictCopy(rel: string): boolean {
+    let path = rel;
+    while (path !== ".") {
+      if (conflictOriginal(this.root, path)) return true;
+      const parent = dirname(path);
+      if (parent === path) break;
+      path = parent;
+    }
+    return false;
+  }
+
+  scanText(rel: string): string | undefined {
+    if (this.conflictCopy(rel) || placeholderName(rel)) return;
+    try {
+      return this.readText(rel);
+    } catch (error) {
+      if (!(error instanceof KaituError) || error.code !== "CLOUD_UNAVAILABLE") throw error;
+      return;
+    }
+  }
+
+  unavailableFiles(): string[] {
+    try {
+      if (syncMode(this.root) !== "icloud") return [];
+    } catch (error) {
+      if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return [".kaitu/config.json"];
+      throw error;
+    }
+    const { files, unavailable } = syncInventory(this.root);
+    for (const file of files) {
+      try {
+        this.readBytes(file);
+      } catch (error) {
+        if (!(error instanceof KaituError) || error.code !== "CLOUD_UNAVAILABLE") throw error;
+        unavailable.push(file);
+      }
+    }
+    return [...new Set(unavailable)].sort();
+  }
+
+  assertDownloaded(prefix = ""): void {
+    const unavailable = this.unavailableFiles().filter(
+      (file) => !prefix || file === prefix || file.startsWith(`${prefix}/`),
+    );
+    if (unavailable.length)
+      throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+  }
+
+  private protectWrite(rel: string): void {
+    if (rel.startsWith(".kaitu/") || syncMode(this.root) !== "icloud") return;
+    if (this.exists(rel)) this.readBytes(rel);
   }
 
   readJson<T = unknown>(rel: string): T {
@@ -151,10 +228,12 @@ export class Workspace {
     opts: { internal?: boolean; mode?: number } = {},
   ): void {
     const abs = this.resolve(rel, opts);
+    this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    cacheWrittenFile(abs, content);
     this.refreshAfterWrite(rel);
   }
 
@@ -164,6 +243,7 @@ export class Workspace {
 
   appendLine(rel: string, line: string): void {
     const abs = this.resolve(rel);
+    this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
     this.refreshAfterWrite(rel);

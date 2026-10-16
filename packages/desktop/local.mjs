@@ -56,8 +56,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
+    onWorkspaceMoving: () => ai.close(),
     onWorkspaceChanged: async () => {
-      await ai.close();
       ai = makeAi();
     },
     onAutomationChanged: async () => {

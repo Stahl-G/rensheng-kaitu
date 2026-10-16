@@ -38,6 +38,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     ws.exists("explore/module.json")
   )
     return { templateVersion: version, changes: [], version: null };
+  if (!options.dryRun) ws.assertDownloaded();
   const files = templateFiles(templateDir());
   const writes = new Map<string, string | Buffer>();
   const deletes: string[] = [];
@@ -89,7 +90,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
         if (!file.startsWith(`${skillRoot}${name}/`)) continue;
         const target = file.replace(".agents/", `${base}/`);
         desired.add(target);
-        if (!ws.exists(target) || !readFileSync(ws.resolve(target)).equals(bytes)) writes.set(target, bytes);
+        if (!ws.exists(target) || !ws.readBytes(target).equals(bytes)) writes.set(target, bytes);
       }
       if (ws.exists(directory)) {
         for (const path of templateFiles(ws.resolve(directory)).keys()) {

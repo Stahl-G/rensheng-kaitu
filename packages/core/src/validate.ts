@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ValidateFunction } from "ajv";
 import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
@@ -6,6 +6,7 @@ import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { projectStatusFiles } from "./projects.js";
 import { recordLines } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
+import { placeholderOriginal } from "./sync-files.js";
 import { localMonth, parseTs } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -15,13 +16,17 @@ export interface Issue {
   message: string;
 }
 
-function walk(root: string, dir: string, out: string[]): void {
-  for (const name of readdirSync(join(root, dir))) {
+function walk(ws: Workspace, dir: string, out: string[]): void {
+  const root = ws.root;
+  for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+    const name = entry.name;
+    if (entry.isSymbolicLink()) continue;
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
+    if (ws.conflictCopy(rel) || placeholderOriginal(rel)) continue;
     if ([".kaitu/cache", ".kaitu/history.git", ".kaitu/local-projects", "handoffs/archive"].includes(rel))
       continue;
-    if (statSync(join(root, rel)).isDirectory()) walk(root, rel, out);
+    if (entry.isDirectory()) walk(ws, rel, out);
     else out.push(rel);
   }
 }
@@ -37,20 +42,22 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
   const reg = schemas();
   const issues: Issue[] = [];
   const files: string[] = [];
-  walk(ws.root, "", files);
+  walk(ws, "", files);
   const prefix = path ? relative(ws.root, join(ws.root, path)).replace(/\\/g, "/") : "";
   const inScope = (f: string) => !prefix || f === prefix || f.startsWith(`${prefix}/`);
 
   const json = (f: string): unknown => {
     try {
-      return ws.readJson(f);
+      const text = ws.scanText(f);
+      return text === undefined ? undefined : JSON.parse(text);
     } catch (e) {
       issues.push({ file: f, message: `不是合法 JSON：${(e as Error).message}` });
       return undefined;
     }
   };
   const fm = (f: string): Record<string, unknown> | undefined => {
-    const text = ws.readText(f);
+    const text = ws.scanText(f);
+    if (text === undefined) return;
     if (!hasFrontmatter(text)) {
       issues.push({ file: f, message: "缺少 frontmatter" });
       return undefined;
@@ -169,7 +176,9 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
       const d = fm(f);
       if (d) check(reg.builtin("memory.schema.json"), d, f, issues);
     } else if (f.startsWith("chats/") && name.endsWith(".jsonl")) {
-      const lines = ws.readText(f).split("\n");
+      const text = ws.scanText(f);
+      if (text === undefined) continue;
+      const lines = text.split("\n");
       if (lines.at(-1) === "") lines.pop();
       if (lines.length === 0) issues.push({ file: f, message: "缺少对话头" });
       for (const [i, raw] of lines.entries()) {

@@ -114,7 +114,9 @@ function slugs(ws: Workspace): string[] {
       if (
         entry.isDirectory() &&
         !entry.name.startsWith(".") &&
-        ws.exists(`${base}/${entry.name}/STATUS.md`)
+        !ws.conflictCopy(`${base}/${entry.name}`) &&
+        ws.exists(`${base}/${entry.name}/STATUS.md`) &&
+        ws.scanText(`${base}/${entry.name}/STATUS.md`) !== undefined
       ) {
         names.add(entry.name);
       }

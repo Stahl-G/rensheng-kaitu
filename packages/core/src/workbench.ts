@@ -69,6 +69,7 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
   return readdirSync(ws.resolve(dir), { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(suffix))
     .map((entry) => `${dir}/${entry.name}`)
+    .filter((file) => ws.scanText(file) !== undefined)
     .sort()
     .reverse();
 }
@@ -79,6 +80,7 @@ export function statusFiles(ws: Workspace, publicOnly = false): { file: string; 
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
+      if (ws.conflictCopy(file)) continue;
       if (entry.isDirectory()) walk(file, module);
       else if (entry.name === "STATUS.md") out.push({ file, module });
     }
@@ -149,7 +151,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     modules,
     records,
     tasks: read("待办", () => tasksForToday(records.task ?? [], ws.timeZone(), now), []),
-    profile: ws.exists("me/profile.md") ? ws.readText("me/profile.md") : "",
+    profile: ws.exists("me/profile.md") ? (ws.scanText("me/profile.md") ?? "") : "",
     rules: read("作息规则", () => document<Rules>(ws, "me/rules.md", { timezone: ws.timeZone() }), {
       data: { timezone: ws.timeZone() } as Rules,
       body: "",
@@ -161,12 +163,12 @@ export function readWorkbench(ws: Workspace, now = new Date(), publicOnly = fals
     }),
     digests: read("动态简报", () => docs("feed/digests"), []),
     reports: read("现状报告", () => docs("me/reports"), []),
-    daily: ws.exists(`reviews/daily/${today}.md`) ? ws.readText(`reviews/daily/${today}.md`) : "",
+    daily: ws.exists(`reviews/daily/${today}.md`) ? (ws.scanText(`reviews/daily/${today}.md`) ?? "") : "",
     labs: files(ws, "health/data/labs", ".json").flatMap((file) =>
       read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
     ),
     memories: read("记忆", () => listMemories(ws), []),
-    warnings,
+    warnings: [...warnings, ...ws.unavailableFiles().map((file) => `还没从 iCloud 下载：${file}`)],
   };
 }
 export type WorkbenchData = ReturnType<typeof readWorkbench>;

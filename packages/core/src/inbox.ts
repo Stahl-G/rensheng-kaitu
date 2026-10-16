@@ -25,6 +25,7 @@ import { type ExperienceInput, addExperiences } from "./places.js";
 import { assertPublicProject } from "./projects.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords } from "./records.js";
+import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -178,7 +179,7 @@ function stamp(ws: Workspace, file: string) {
 }
 function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: string, attach = false) {
   const size = statSync(ws.resolve(file)).size;
-  const bytes = attach ? Buffer.alloc(0) : readFileSync(ws.resolve(file));
+  const bytes = attach ? Buffer.alloc(0) : ws.readBytes(file);
   const directory = `inbox/notes/${localDate(new Date(), ws.timeZone())}`;
   if (file.endsWith(".note.md") && !errors.length && isUtf8(bytes) && !bytes.includes(0)) {
     return moveInboxFile(ws, file, directory);
@@ -249,12 +250,19 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       if (!readdirSync(ws.resolve("inbox/rejected")).length)
         rmSync(ws.resolve("inbox/rejected"), { recursive: true });
     }
+    const unavailable = ws.unavailableFiles();
     const observed = new Map<string, string>();
     for (const dir of ["inbox/agents", "inbox/health"]) {
       if (!ws.exists(dir)) continue;
       for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
         if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name === ".DS_Store") continue;
         const file = `${dir}/${entry.name}`;
+        if (ws.conflictCopy(file) || placeholderOriginal(file)) continue;
+        if (unavailable.some((path) => file === path || file.startsWith(`${path}/`))) {
+          result.pending.push(file);
+          continue;
+        }
+        if (file.startsWith("inbox/agents/") && ws.scanText(file) === undefined) continue;
         observed.set(file, stamp(ws, file));
       }
     }
@@ -267,6 +275,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         continue;
       }
       if (file.startsWith("inbox/health/")) {
+        if (ws.unavailableFiles().includes(file)) {
+          result.pending.push(file);
+          continue;
+        }
         let parsed: Awaited<ReturnType<typeof parseAppleHealth>> | undefined;
         const shortcut = file.endsWith(".health.json");
         const errors: string[] = [];

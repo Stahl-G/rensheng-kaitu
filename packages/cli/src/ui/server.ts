@@ -47,6 +47,7 @@ export interface UiOptions {
   inboxStableMs?: number;
   webRoot?: string;
   ask?: AskService;
+  onWorkspaceMoving?: () => Promise<void>;
   onWorkspaceChanged?: () => Promise<void>;
   onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
@@ -421,6 +422,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             await options.ask?.prepareRelocation?.();
             const oldRoot = ws.root;
             try {
+              await options.onWorkspaceMoving?.();
               return url.pathname.endsWith("enable")
                 ? await enableSync(
                     ws,
@@ -446,8 +448,8 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                 aiChild?.kill();
                 aiChild = undefined;
                 aiReady = undefined;
-                await options.onWorkspaceChanged?.();
               }
+              await options.onWorkspaceChanged?.();
             }
           }
           case "/api/projects/sync":
