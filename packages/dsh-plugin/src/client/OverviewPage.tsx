@@ -12,6 +12,7 @@ import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
+import { OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingChecklist, OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import css from "./Prototype.module.css";
@@ -192,12 +193,13 @@ export function OverviewPage(props: OverviewPageProps) {
     if (source) openSource(source);
   };
   const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
-    if (item.id === "memory") startGuide(1);
-    else if (item.id === "ai") {
-      if (item.action.target === "ask" && props.renderAsk) manageAi(true);
-      else setView("connections");
-    } else if (item.id === "plan") prompt("请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。");
-    else startGuide(3, item.id);
+    if (item.disabled) return;
+    if (item.id === "matter") startGuide(1);
+    else if (item.id === "memory") startGuide(5);
+    else if (item.id === "starts") startGuide(2);
+    else if (item.id === "sources") startGuide(3);
+    else if (item.id === "ai") startGuide(4);
+    else if (item.id === "plan") prompt("请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。");
   };
   const child = {
     ...props,
@@ -383,11 +385,12 @@ export function OverviewPage(props: OverviewPageProps) {
               type="button"
               className={css.link}
               onClick={() => {
+                setGuide(null);
                 setView("overview");
                 void refresh();
               }}
             >
-              ← 返回引导 · {onboarding?.content.steps[(guide ?? 1) - 1] ?? "开始使用"}
+              ← 回到今天
             </button>
           </div>
         )}
@@ -404,6 +407,7 @@ export function OverviewPage(props: OverviewPageProps) {
               onStatus={setOnboarding}
               refresh={refresh}
               openSource={openSource}
+              onPrompt={prompt}
               onComplete={(destination) => {
                 setGuide(null);
                 if (destination === "ask") manageAi(true);
@@ -414,7 +418,17 @@ export function OverviewPage(props: OverviewPageProps) {
           </div>
         )}
         {view === "overview" && !guideVisible && guide !== undefined && onboarding && (
-          <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
+          <>
+            {onboarding.next && (
+              <OnboardingNextCard
+                {...props}
+                key={`${onboarding.next.id}-${onboarding.next.rev}`}
+                next={onboarding.next}
+                refresh={refresh}
+              />
+            )}
+            <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
+          </>
         )}
         {view === "overview" &&
           !guideVisible &&
@@ -445,74 +459,80 @@ export function OverviewPage(props: OverviewPageProps) {
                 </div>
                 {capture}
               </div>
-              <section className={css.sec}>
-                <h2 className={css.eyebrow}>现在最该做的</h2>
-                <div className={`${css.focus} ${css.card}`}>
-                  <div className={css["focus-body"]}>
-                    <h2 className={css["focus-title"]}>{focus?.title ?? "今天，留一点空间给下一步"}</h2>
-                    <p className={css.small}>
-                      {focus
-                        ? `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`
-                        : "看看最近的变化，或记下一件值得跟进的事。"}
-                    </p>
-                  </div>
-                  {focus && (
-                    <>
-                      {!focus.proposed && (
+              {(!onboarding?.next || focus) && (
+                <section className={css.sec}>
+                  <h2 className={css.eyebrow}>现在最该做的</h2>
+                  <div className={`${css.focus} ${css.card}`}>
+                    <div className={css["focus-body"]}>
+                      <h2 className={css["focus-title"]}>{focus?.title ?? "今天，留一点空间给下一步"}</h2>
+                      <p className={css.small}>
+                        {focus
+                          ? `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`
+                          : "看看最近的变化，或记下一件值得跟进的事。"}
+                      </p>
+                    </div>
+                    {focus && (
+                      <>
+                        {!focus.proposed && (
+                          <button
+                            type="button"
+                            className={`${css.btn} ${css["btn-strong"]} ${css["btn-big"]}`}
+                            disabled={busy}
+                            onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
+                          >
+                            完成
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className={`${css.btn} ${css["btn-strong"]} ${css["btn-big"]}`}
-                          disabled={busy}
-                          onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
+                          className={`${css.btn} ${css["btn-quiet"]}`}
+                          onClick={() => openSection(focus.section)}
                         >
-                          完成
+                          查看相关资料
                         </button>
-                      )}
+                      </>
+                    )}
+                  </div>
+                  {data.next.slice(1, 3).map((item) => (
+                    <div className={`${css.row} ${css.card}`} key={item.id}>
                       <button
                         type="button"
-                        className={`${css.btn} ${css["btn-quiet"]}`}
-                        onClick={() => openSection(focus.section)}
+                        className={css.check}
+                        aria-label={`完成：${item.title}`}
+                        disabled={busy || item.proposed}
+                        onClick={() => void run(() => props.completeNext(item.file, item.id))}
                       >
-                        查看相关资料
+                        ✓
                       </button>
-                    </>
+                      <span className={css["row-title"]}>{item.title}</span>
+                      <span className={css.chip}>
+                        {item.module}
+                        {item.proposed ? " · 待确认" : ""}
+                      </span>
+                      <button type="button" className={css.link} onClick={() => openSection(item.section)}>
+                        查看
+                      </button>
+                    </div>
+                  ))}
+                  {data.allNext.length > 3 && (
+                    <details>
+                      <summary className={css.link}>全部 {data.allNext.length} 条下一步</summary>
+                      {data.allNext.map((item) => (
+                        <div className={css.row} key={item.id}>
+                          <span className={css["row-title"]}>{item.title}</span>
+                          <button
+                            type="button"
+                            className={css.link}
+                            onClick={() => openSection(item.section)}
+                          >
+                            查看
+                          </button>
+                        </div>
+                      ))}
+                    </details>
                   )}
-                </div>
-                {data.next.slice(1, 3).map((item) => (
-                  <div className={`${css.row} ${css.card}`} key={item.id}>
-                    <button
-                      type="button"
-                      className={css.check}
-                      aria-label={`完成：${item.title}`}
-                      disabled={busy || item.proposed}
-                      onClick={() => void run(() => props.completeNext(item.file, item.id))}
-                    >
-                      ✓
-                    </button>
-                    <span className={css["row-title"]}>{item.title}</span>
-                    <span className={css.chip}>
-                      {item.module}
-                      {item.proposed ? " · 待确认" : ""}
-                    </span>
-                    <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                      查看
-                    </button>
-                  </div>
-                ))}
-                {data.allNext.length > 3 && (
-                  <details>
-                    <summary className={css.link}>全部 {data.allNext.length} 条下一步</summary>
-                    {data.allNext.map((item) => (
-                      <div className={css.row} key={item.id}>
-                        <span className={css["row-title"]}>{item.title}</span>
-                        <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                          查看
-                        </button>
-                      </div>
-                    ))}
-                  </details>
-                )}
-              </section>
+                </section>
+              )}
               <Agenda data={calendar} open={() => openRecord("calendar")} />
               {data.blocks
                 .filter((b) => b.status === "pending" && b.kind === "proposal")
@@ -694,6 +714,22 @@ export function OverviewPage(props: OverviewPageProps) {
             }}
           >
             <ChannelSettings request={props.channelSettings} />
+          </div>
+        )}
+        {guideVisible && view !== "overview" && (
+          <div className={css["sec-head"]}>
+            <span />
+            <button
+              type="button"
+              className={`${css.btn} ${css["btn-primary"]}`}
+              onClick={() => {
+                setGuide(null);
+                setView("overview");
+                void refresh();
+              }}
+            >
+              完成
+            </button>
           </div>
         )}
       </main>

@@ -380,3 +380,88 @@
     padding: 48px 14px 14px;
   }
 }
+.entryTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+.entryTabs button {
+  border: 0;
+  border-radius: calc(var(--radius) * 0.57);
+  background: var(--control);
+  color: var(--ink2);
+  padding: 8px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.entryTabs button[aria-selected="true"] {
+  background: var(--strong);
+  color: var(--on-strong);
+}
+.matter,
+.nextCard,
+.draftFields,
+.resultForm {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.matter textarea,
+.draftFields input,
+.resultForm input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: calc(var(--radius) * 0.57);
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.draftFields label,
+.resultForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badges span {
+  border-radius: calc(var(--radius) * 0.57);
+  background: var(--control);
+  color: var(--ink2);
+  font-size: 12px;
+  padding: 3px 8px;
+}
+.original {
+  margin: 0;
+  padding: 14px;
+  border-radius: calc(var(--radius) * 0.57);
+  background: var(--control);
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  font: inherit;
+  font-size: 14px;
+}
+.nextCard h2 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .entryTabs button {
+    width: 100%;
+  }
+  .matter .footerActions {
+    flex-wrap: wrap;
+  }
+}

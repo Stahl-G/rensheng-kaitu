@@ -1,27 +1,31 @@
 ---
 name: onboarding
-description: 首次使用开图或用户要求重新开始时，按四步搬记忆、选事情、接数据并选择 AI。
+description: 首次使用开图时，先保存一件事的原文，核对并采纳一个下一步，其他设置按需进行。
 ---
 
 # 开始使用开图
 
 先运行 `kaitu onboarding status`。DSH 使用 `kaitu_onboarding` 的 status，MCP 可读 `onboarding_status`。
-运行结果的 content 是界面与助手共用的引导内容，使用其中的 steps、ais、prompt、starts、sources、aiChoices。
-先看现有 choices、sources 和 checklist，不重复询问已有资料。showGuide 为 false 时，仅在用户主动要求后重走。
+content 是界面与助手共用的 AI 列表、记忆提示词、起步选项、数据源与 AI 选择。查看 choices、draft、next 和 checklist，避免重复导入。
+showGuide 为 false 时，只在用户主动要求后重走。欢迎说明约三分钟：带来一件事，核对一个下一步，记下结果后继续推进。
 
-1. 搬来记忆：让用户选常用 AI，展示该项 hint 与原样 prompt。收到粘贴文本后按 import-chatgpt-memory 技能预览、勾选和确认。
-   也可导入 ChatGPT 对话导出包，或跳过。
-2. 先管哪些：展示 content.starts，允许多选和跳过。
-   用 `kaitu onboarding choose --json '<选择对象>'` 保存 seen:true、starts 和 memoryAi，固定 ID 的下一步由程序写入。
-3. 接上数据：只使用 status.sources 返回的所需来源。文件导入走已有导入器的 dry-run → 确认。
-   本机项目或关注方向用 `kaitu onboarding setup-preview --json '<设置对象>'`，展示返回的 input 后，确认执行 setup-confirm <token>。
-   设置对象分别为 source:projects + project，或 source:news + keywords。项目至少提供一个用户指定的本机文件夹链接。
-   财务复用现有财务预览。未准备好的来源存入 skipped，跳过不会计为完成。
-4. 选一个 AI：展示 content.aiChoices。builtin 进入「问问」填 DeepSeek API Key，mine 进入「AI 与连接」，none 直接使用记录与导入。
-   保存 aiChoice，不把选择视为实际连接。用户若要首份计划，再运行 morning-plan。
+默认请用户带来一段和 AI 聊过的计划，或写下正在推进的事。界面先保存到原文记录，再整理「当前目标 / 已知现状 / 一个下一步」。
+已保存的原文可以用 `kaitu onboarding matter-read <source>` 读取；DSH 用 matter-read（source）。
+AI 整理只生成待核对草稿：用 `kaitu onboarding matter-draft <source> --json '<草稿>'`，草稿字段为 goal、current、next，均为单行文本。
+DSH 用 matter-draft（source、draft）。核对目标和已知现状，不确定的信息写明未知，只提出一个可执行的下一步。
+用户在界面采纳才生成待办，来源指向原文。不要把对话里的其他建议自动写成待办；用户选择只保存原文时，到此结束。
+未连接 AI 的用户可以在界面自己填写这三项，不要求先连接模型。
 
-选择对象是部分更新，starts 和 skipped 传入时替换本机所选列表。重新选择不会删除已写入的下一步。
-DSH 的 choose、preview、confirm、setup-preview、setup-confirm、cancel 使用同名 action。
+并列入口是「从常用的 AI 搬来记忆」。按 import-chatgpt-memory 技能预览、勾选、确认，也可导入 ChatGPT 对话导出包。
 
-最后再查询 status，以 checklist 交代已经有的资料、仍需接的数据和下一步。实际完成由数据计算，无须手动打勾。
-不要求把每项都做完才能使用，也不把同一份资料重新导入。
+今天页的开始使用清单有六项，全部按实际数据计算：带来一件事并采纳、认识你（可选）、选事情、接数据、选 AI、第一份今天计划。
+选事情、接数据、选 AI 都是可选面板，不要求做完才能使用：
+
+- 展示 content.starts，用 `kaitu onboarding choose --json '<选择对象>'` 保存 seen:true 和 starts。固定 ID 的模块下一步由程序去重。
+- 只接 status.sources 返回的数据。文件导入、财务、项目与关注方向均先预览再确认；项目/关注方向用 setup-preview、setup-confirm。
+  日历用 ICS 订阅，邮件聊天打开「AI 与连接」。跳过不算完成，没有选事情时先选事情。
+- builtin 进入问问设置，mine 进入「AI 与连接」继续使用原来的 AI，none 先不用。DSH 不提供内置问问。
+  选择方式不等于已经连接成功。需要首份今天计划时运行 morning-plan，建议仍待确认。
+
+最后重读 status，说明实际保存、采纳和未完成项。今天页可查看下一步的原文，完成时记一句结果，或改到以后。
+选择对象为部分更新，starts 和 skipped 传入时替换本机列表；reset 只清本机选择，不删除资料，不手改完成状态或 config。

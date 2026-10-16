@@ -1,6 +1,7 @@
 import type { OnboardingAi, OnboardingChoices, OnboardingStart, OnboardingStatus } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import css from "./Onboarding.module.css";
+import { OnboardingMatter } from "./OnboardingMatter.js";
 import { OnboardingFileImport, OnboardingSetup } from "./OnboardingSources.js";
 import v2 from "./Prototype.module.css";
 import type { OnboardingServices } from "./onboarding-services.js";
@@ -17,6 +18,7 @@ interface Props extends OnboardingServices {
   refresh: () => Promise<void>;
   onComplete: (destination: Destination) => void;
   openSource: (source: string) => void;
+  onPrompt: (text: string) => void;
 }
 const primary = `${v2.btn} ${v2["btn-primary"]}`;
 const quiet = `${v2.btn} ${v2["btn-quiet"]}`;
@@ -25,6 +27,8 @@ const focusHeading = (element: HTMLHeadingElement | null) => element?.focus();
 export function OnboardingPage(props: Props) {
   const { status, step } = props;
   const { content, choices } = status;
+  const [entry, setEntry] = useState<"matter" | "memory">("matter");
+  const memoryMode = step === 5 || (step === 1 && entry === "memory");
   const firstAi = content.ais.find((ai) => ai.id === choices?.memoryAi) ?? content.ais[0];
   const [ai, setAi] = useState(firstAi?.id ?? "chatgpt");
   const [text, setText] = useState("");
@@ -116,7 +120,7 @@ export function OnboardingPage(props: Props) {
     if (step === 0) {
       await save({ seen: true });
       move(1);
-    } else if (step === 1) {
+    } else if (memoryMode) {
       if (!preview) {
         const result = await props.previewOnboardingMemory(text, ai as OnboardingAi);
         token.current = result.token;
@@ -136,15 +140,15 @@ export function OnboardingPage(props: Props) {
           confirming.current = false;
         }
         await save({ memoryAi: ai as OnboardingAi, skipped: skip(["memory"], false) });
-        move(2);
+        finish("today");
         await props.refresh();
       }
     } else if (step === 2) {
       await save({ starts });
-      move(3);
+      finish("today");
     } else if (step === 3) {
       setPanel(null);
-      move(4);
+      finish("today");
     } else {
       const choice = !props.builtin && aiChoice === "builtin" ? "mine" : aiChoice;
       await save({ seen: true, aiChoice: choice, skipped: skip(["ai"], choice === "none") });
@@ -152,38 +156,28 @@ export function OnboardingPage(props: Props) {
     }
   };
   const skipStep = async () => {
-    if (step === 0) {
-      await save({ seen: true });
-      finish("today");
-    } else if (step === 1) {
-      await clearPreview();
-      await save({ memoryAi: ai as OnboardingAi, skipped: skip(["memory"], true) });
-      move(2);
-    } else if (step === 2) {
-      setStarts([]);
-      await save({ starts: [] });
-      move(3);
-    } else if (step === 3) {
-      await save({
-        skipped: skip(
-          status.sources
-            .filter((source) => !status.checklist.items.find((item) => item.id === source.id)?.done)
-            .map((source) => source.id),
-          true,
-        ),
-      });
-      setPanel(null);
-      move(4);
-    } else {
-      await save({ seen: true, aiChoice: "none", skipped: skip(["ai"], true) });
-      finish("today");
-    }
+    await clearPreview();
+    await save({
+      seen: true,
+      ...(memoryMode ? { memoryAi: ai as OnboardingAi, skipped: skip(["memory"], true) } : {}),
+      ...(step === 3
+        ? {
+            skipped: skip(
+              status.sources.filter((source) => !source.done).map((source) => source.id),
+              true,
+            ),
+          }
+        : {}),
+      ...(step === 4 ? { aiChoice: "none", skipped: skip(["ai"], true) } : {}),
+    });
+    finish("today");
   };
   const back = async () => {
     setError("");
     if (panel) setPanel(null);
     else if (preview) await clearPreview();
-    else move(Math.max(0, step - 1));
+    else if (step >= 2) finish("today");
+    else move(0);
   };
   const open = (source: string) => {
     if (source === "health") setPanel("apple-health");
@@ -192,7 +186,7 @@ export function OnboardingPage(props: Props) {
   };
   const footer = (label: string, skipLabel: string, disabled = false) => (
     <div className={css.footer}>
-      {step > 0 ? (
+      {step === 1 ? (
         <button type="button" className={quiet} disabled={busy} onClick={() => void run(back)}>
           上一步
         </button>
@@ -214,20 +208,20 @@ export function OnboardingPage(props: Props) {
       <section className={`${v2.welcome} ${css.welcome}`} aria-label="欢迎来到人生开图" aria-busy={busy}>
         <span className={v2.eyebrow}>欢迎来到人生开图</span>
         <h1 key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
-          把你的生活交给 AI 打理，你只看结果、做决定
+          把你和 AI 聊过的计划，变成能持续推进、随时查回的个人进度
         </h1>
         <div className={css.how}>
           <div>
-            <b>1 · 资料放进开图</b>
-            <span>记忆、日历、健康、账单、项目，都存在你自己的文件夹里</span>
+            <b>1 · 带来一件事</b>
+            <span>粘贴最近和 AI 聊的一段计划，或直接写下想推进的事</span>
           </div>
           <div>
-            <b>2 · AI 每天整理</b>
-            <span>早上排好今天，晚上整理当天，有变动先问你</span>
+            <b>2 · 核对，选一个下一步</b>
+            <span>开图先整理出草稿，只有你确认的才算数</span>
           </div>
           <div>
-            <b>3 · 你只确认</b>
-            <span>换哪个 AI 都能接着用，人生进度不会丢</span>
+            <b>3 · 记下结果，换个 AI 也能接着</b>
+            <span>资料在你自己的文件夹里，每一步有据可查</span>
           </div>
         </div>
         {error && (
@@ -235,31 +229,67 @@ export function OnboardingPage(props: Props) {
             {error}
           </p>
         )}
-        <p className={v2.small}>大约 5 分钟，每一步都能跳过</p>
+        <p className={v2.small}>大约 3 分钟，也可以先随便看看</p>
         {footer("开始", "先随便看看")}
       </section>
     );
   return (
     <section className={`${css.flow} ${v2.card}`} aria-label="开始使用" aria-busy={busy}>
-      <ol className={css.steps} aria-label="开始使用的步骤">
-        {content.steps.map((title, index) => (
-          <li
-            key={title}
-            data-current={step === index + 1}
-            data-done={step > index + 1}
-            aria-current={step === index + 1 ? "step" : undefined}
+      {step >= 2 && (
+        <button type="button" className={v2.link} disabled={busy} onClick={() => finish("today")}>
+          ← 回到今天
+        </button>
+      )}
+      {step === 1 && (
+        <div className={css.entryTabs} role="tablist" aria-label="从哪里开始">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={entry === "matter"}
+            disabled={busy}
+            onClick={() => setEntry("matter")}
           >
-            <span>{step > index + 1 ? "✓" : index + 1}</span>
-            {title}
-          </li>
-        ))}
-      </ol>
+            带来一件正在推进的事
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={entry === "memory"}
+            disabled={busy}
+            onClick={() => setEntry("memory")}
+          >
+            从常用的 AI 搬来记忆
+          </button>
+        </div>
+      )}
+      {step === 1 && entry === "matter" && (
+        <>
+          <OnboardingMatter
+            {...props}
+            onBusy={setBusy}
+            initial={status.draft}
+            onDone={async () => {
+              await save({ seen: true });
+              await props.refresh();
+              finish("today");
+            }}
+          />
+          <div className={css.footer}>
+            <button type="button" className={quiet} disabled={busy} onClick={() => move(0)}>
+              上一步
+            </button>
+            <button type="button" className={v2.link} disabled={busy} onClick={() => void run(skipStep)}>
+              先随便看看
+            </button>
+          </div>
+        </>
+      )}
       {error && (
         <p role="alert" className={v2.error}>
           {error}
         </p>
       )}
-      {step === 1 && (
+      {memoryMode && (
         <>
           <h1 className={css.title} key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
             {preview
@@ -374,7 +404,7 @@ export function OnboardingPage(props: Props) {
           )}
           {!panel &&
             footer(
-              preview ? (selected.length ? `记下这 ${selected.length} 条` : "继续下一步") : "看看认出了什么",
+              preview ? (selected.length ? `记下这 ${selected.length} 条` : "完成") : "看看认出了什么",
               "我没有常用的 AI，跳过",
               !preview && !text.trim(),
             )}
@@ -385,7 +415,7 @@ export function OnboardingPage(props: Props) {
           <h1 className={css.title} key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
             你最想先管好哪几件事？
           </h1>
-          <p className={css.lead}>选几个就行，下一步只请你接这几件需要的数据。以后随时能加。</p>
+          <p className={css.lead}>选几个就行。清单里只请你接这几件需要的数据，以后随时能加。</p>
           <fieldset className={css.options} disabled={busy}>
             <legend className={v2.sr}>先管哪些事情，可多选</legend>
             {content.starts.map((item) => (
@@ -410,7 +440,7 @@ export function OnboardingPage(props: Props) {
               </label>
             ))}
           </fieldset>
-          {footer("下一步", "先随便看看")}
+          {footer("完成", "暂时不选")}
         </>
       )}
       {step === 3 && (
@@ -420,9 +450,9 @@ export function OnboardingPage(props: Props) {
           </h1>
           <p className={css.lead}>只接你选的事需要的数据。没准备好的先跳过，以后在「资料」里接。</p>
           <div className={css.sources}>
-            {!status.sources.length && <p className={v2.small}>你选的事不需要先接数据，直接下一步。</p>}
+            {!status.sources.length && <p className={v2.small}>你选的事不需要先接数据，点完成回到今天。</p>}
             {status.sources.map((source) => {
-              const item = status.checklist.items.find((row) => row.id === source.id);
+              const item = source;
               return (
                 <div className={css.source} key={source.id}>
                   <div className={css.sourceText}>
@@ -478,7 +508,7 @@ export function OnboardingPage(props: Props) {
               onClose={() => setPanel(null)}
             />
           )}
-          {!panel && footer("下一步", "都先跳过")}
+          {!panel && footer("完成", "都先跳过")}
         </>
       )}
       {step === 4 && (
@@ -548,11 +578,17 @@ export function OnboardingChecklist({
           <div className={v2.stack}>
             <b>{item.title}</b>
             <span className={v2.small}>
-              {item.done ? "已完成" : item.skipped ? "先跳过，随时能继续" : "还没完成"}
+              {item.done
+                ? "已完成"
+                : item.disabled
+                  ? "先选你想管的事"
+                  : item.skipped
+                    ? "先跳过，随时能继续"
+                    : "还没完成"}
             </span>
           </div>
           {!item.done && (
-            <button type="button" className={quiet} onClick={() => go(item)}>
+            <button type="button" className={quiet} disabled={item.disabled} onClick={() => go(item)}>
               {item.action.label}
             </button>
           )}

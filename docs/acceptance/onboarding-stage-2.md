@@ -1,5 +1,7 @@
 # 新手引导阶段 2 交审
 
+本页保留 113e88a 基线的交审历史。当前首发流程与最新验证见 [onboarding-launch.md](onboarding-launch.md)。
+
 基线：`main 113e88a`。阶段 1 已合并，本轮接共享界面与当前数据入口。
 
 ## 实现

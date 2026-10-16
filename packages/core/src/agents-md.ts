@@ -123,11 +123,11 @@ ${renderRecordReference(ws)}
 
 ### 首次使用
 
-- 四步：${ONBOARDING.steps.join(" → ")}。
+- 首次先带来一件事：保存原文，核对当前目标、已知现状和一个下一步，由用户采纳；也可并列选择搬来记忆。
 - 起步选项：${ONBOARDING.starts.map((item) => item.title).join("、")}。
 - 先运行 \`kaitu onboarding status\`，或 MCP \`onboarding_status\`；DSH 使用 \`kaitu_onboarding\` 的 status。
-- AI 列表、记忆位置提示、提示词与所需数据源取返回值 content，按 onboarding 技能带用户完成四步，每步均可跳过。
-- 记忆先 preview 展示候选，确认后传 token 与 selected；数据源先预览再确认，来源、版本与撤销点以工具回执为准。
+- AI 列表、记忆位置提示、提示词与所需数据源取返回值 content，按 onboarding 技能先得到一个下一步，其余设置从今天清单按需完成。
+- 原文用 onboarding matter-read 读取，matter-draft 仅保存待核对草稿，不自动建待办。记忆先 preview 展示候选，确认后传 token 与 selected；数据源先预览再确认，来源、版本与撤销点以工具回执为准。
 - 选择用 onboarding choose 保存，完成情况实时计算；reset 只重置本机选择，不删除资料。不要手改配置或打勾完成状态。
 
 ## 8. 日常节奏
