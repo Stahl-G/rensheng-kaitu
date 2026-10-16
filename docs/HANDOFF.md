@@ -2,10 +2,11 @@
 
 ## 当前产品裁决（2026-10-16）
 
-以 [PRODUCT.md](PRODUCT.md) 为唯一当前产品定义：总览、开图、记录三个默认入口，先精简默认体验。
-本文件以下四页/七板块描述为历史实施记录，不作为恢复旧导航的依据。
+以 [PRODUCT.md](PRODUCT.md) 为唯一当前产品定义，首发范围与发布门槛见 [prd/launch.md](prd/launch.md)。
+独立 Kaitu.app 四个同级入口：今天、开图、资料、问问；DSH 插件三个入口（今天、开图、资料）加 DSH 原生会话。界面依据 [V2 原型](design/kaitu-v2-prototype.html)。
+本文件以下三入口、四页/七板块等描述均为历史实施记录，不作为导航依据。
 实现状态及验收见 [prd-completion.md](prd-completion.md)。
-独立本地桌面入口和 DSH 插件共用三个导航的 React 页面；默认不启动 AI Runtime。
+独立本地桌面入口和 DSH 插件共用同一套 React 页面；默认不启动 AI Runtime，用户进入问问或开启自动任务时才启动。
 新工作区没有私人健康目标和默认自动化，已有配置保留。运行与隔离验收见 [desktop.md](desktop.md)。
 轻量方向与尝试见 [第 4 轮验收](acceptance/prd-completion-2026-10-16/run-04.md)：
 方向决策由用户保存，AI 通过专用 exploration 工具提议与补资料，通用记录工具不能绕过采纳步骤。
