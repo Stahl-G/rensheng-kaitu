@@ -10,14 +10,19 @@ import {
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoices,
+  type OnboardingMatterDraft,
+  type OnboardingMatterSuggestion,
+  type OnboardingPath,
   type OnboardingSetupInput,
   type SettingsData,
   type Workspace,
   addCalendarSubscription,
+  adoptOnboardingMatter,
   bankNotificationCandidates,
   cancelOnboardingPreview,
   captureNote,
   changeExperienceBatch,
+  changeOnboardingNext,
   commitFinanceImport,
   completeNext,
   configureAutomation,
@@ -27,12 +32,14 @@ import {
   decideProposal,
   discardFinanceImport,
   dismissNews,
+  draftOnboardingMatter,
   editExperience,
   exportWorkspace,
   financeAccounts,
   financeCashflow,
   financeOverview,
   hideExperience,
+  keepOnboardingMatter,
   lifeMap,
   listProjects,
   loadFinanceInvestments,
@@ -56,6 +63,7 @@ import {
   readLibraryDocument,
   readMe,
   readNews,
+  readOnboardingMatter,
   readOverviewPage,
   readPhoto,
   readSettings,
@@ -67,6 +75,7 @@ import {
   restore,
   saveAvatar,
   saveOnboardingChoices,
+  saveOnboardingMatter,
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
@@ -74,6 +83,7 @@ import {
   unhideExperience,
   writeExploration,
 } from "@kaitu/core";
+import { organizeOnboardingMatter } from "./onboarding-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -84,6 +94,12 @@ export const productMutations = new Set([
   "addCalendarSubscription",
   "completeNext",
   "onboardingChoose",
+  "onboardingMatterSave",
+  "onboardingMatterKeep",
+  "onboardingMatterDraft",
+  "onboardingMatterOrganize",
+  "onboardingMatterAdopt",
+  "onboardingNextChange",
   "onboardingSetupConfirm",
   "onboardingMemoryConfirm",
   "onboardingImportConfirm",
@@ -169,6 +185,25 @@ export async function productRequest(
       if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
       return moveWorkspace(ws, text(0), args[1]);
     }
+    case "onboardingMatterKeep":
+      return keepOnboardingMatter(ws, text(0));
+    case "onboardingMatterSave":
+      return saveOnboardingMatter(ws, text(0));
+    case "onboardingMatterRead":
+      return readOnboardingMatter(ws, text(0));
+    case "onboardingMatterOrganize":
+      return organizeOnboardingMatter(ws, text(0), ask);
+    case "onboardingMatterDraft":
+      return draftOnboardingMatter(ws, text(0), args[1] as OnboardingMatterSuggestion);
+    case "onboardingMatterAdopt":
+      return adoptOnboardingMatter(
+        ws,
+        text(0),
+        args[1] as OnboardingMatterDraft,
+        (args[2] ?? null) as OnboardingPath | null,
+      );
+    case "onboardingNextChange":
+      return changeOnboardingNext(ws, text(0), revision(1), text(2), text(3));
     case "onboarding":
       return onboardingStatus(ws);
     case "onboardingMemoryPreview":

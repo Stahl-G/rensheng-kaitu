@@ -237,12 +237,14 @@
   box-shadow: var(--kt-shadow);
   font-size: 13px;
   line-height: 20px;
-  pointer-events: none;
+}
+.mapNotice button {
+  margin-left: 8px;
 }
 .precision {
   position: absolute;
   top: 12px;
-  right: 12px;
+  left: 12px;
   border-radius: 6px;
   padding: 4px 8px;
   background: var(--kt-card);
@@ -250,6 +252,34 @@
   font-size: 12px;
   line-height: 18px;
   pointer-events: none;
+}
+.page .mapControls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--kt-card);
+  box-shadow: var(--kt-shadow);
+}
+.mapControls button {
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kt-text);
+  font-size: 13px;
+}
+.mapControls button[aria-label] {
+  font-size: 18px;
+}
+.mapControls button:hover {
+  background: var(--kt-control);
 }
 .listPane {
   min-width: 0;

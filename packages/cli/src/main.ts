@@ -10,6 +10,7 @@ import {
   type MemoryPatch,
   type OnboardingAi,
   type OnboardingChoices,
+  type OnboardingMatterSuggestion,
   type OnboardingSetupInput,
   type Pose,
   type ProjectLink,
@@ -30,6 +31,7 @@ import {
   deleteRecord,
   disableSync,
   doctor,
+  draftOnboardingMatter,
   enableSync,
   findRecordType,
   history,
@@ -51,6 +53,7 @@ import {
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
+  readOnboardingMatter,
   readProject,
   readRecords,
   readStatus,
@@ -110,6 +113,8 @@ const HELP = `开图 kaitu
   kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
   kaitu mcp token [--rotate]                      查看或轮换 HTTP token
   kaitu onboarding status | reset                  查看引导 / 重置本机选择
+  kaitu onboarding matter-read <source>            读取已保存原文
+  kaitu onboarding matter-draft <source> --json '<草稿>'  保存待核对草稿
   kaitu onboarding choose --json '<选择对象>'        保存引导选择
   kaitu onboarding preview --file <文本> --source <ai>  预览粘贴记忆
   kaitu onboarding confirm <token> --json '{"selected":["line-1"]}'  确认所选候选
@@ -504,6 +509,16 @@ async function run(argv: string[]): Promise<number> {
       const ws = workspace(values);
       let result: unknown;
       switch (args[0]) {
+        case "matter-read":
+          result = readOnboardingMatter(ws, need(args[1], "source"));
+          break;
+        case "matter-draft":
+          result = await draftOnboardingMatter(
+            ws,
+            need(args[1], "source"),
+            parseJson(values.json) as unknown as OnboardingMatterSuggestion,
+          );
+          break;
         case "status":
           result = onboardingStatus(ws);
           break;
@@ -539,7 +554,7 @@ async function run(argv: string[]): Promise<number> {
           break;
         default:
           throw new KaituError(
-            "用法：kaitu onboarding status|reset|choose|preview|confirm|setup-preview|setup-confirm|cancel",
+            "用法：kaitu onboarding status|reset|choose|matter-read|matter-draft|preview|confirm|setup-preview|setup-confirm|cancel",
             "BAD_ARGS",
           );
       }

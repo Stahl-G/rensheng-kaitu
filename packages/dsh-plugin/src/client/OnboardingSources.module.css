@@ -1,0 +1,42 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.preview {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--control);
+  overflow-wrap: anywhere;
+}
+.preview p {
+  margin: 0;
+}
+.list {
+  max-height: 240px;
+  overflow: auto;
+  padding-inline-start: 20px;
+  margin-block: 10px 0;
+}
+.select,
+.textarea {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  min-width: 0;
+}
+.textarea {
+  resize: vertical;
+}
+label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.checkbox input {
+  height: 18px;
+  width: 18px;
+}

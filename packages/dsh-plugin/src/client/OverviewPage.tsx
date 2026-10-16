@@ -1,3 +1,4 @@
+import type { OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
@@ -12,13 +13,17 @@ import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
+import { OnboardingNextCard } from "./OnboardingMatter.js";
+import { OnboardingChecklist, OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import css from "./Prototype.module.css";
 import { DataSummaries, TodayFinance } from "./TodayPage.js";
+import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
   extends MePageProps,
     PersonalServices,
+    OnboardingServices,
     Omit<NewsPageProps, "onPrompt">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals">,
@@ -34,7 +39,7 @@ export interface OverviewPageProps
   onAgent: () => void;
   onAdvanced?: () => void;
   channelSettings?: ChannelRequest;
-  renderAsk?: (prompt: string, configureRequest: number) => ReactNode;
+  renderAsk?: (prompt: string, configureRequest: number, configureBuiltin: boolean) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
 const modules = [
@@ -46,6 +51,14 @@ const modules = [
   ["inbox", "收件箱"],
 ];
 export function OverviewPage(props: OverviewPageProps) {
+  const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
+  const [guide, setGuide] = useState<number | null>();
+  const [guideKey, setGuideKey] = useState(0);
+  const [guideSource, setGuideSource] = useState<string>();
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [financeImporting, setFinanceImporting] = useState(false);
+  const [channelFocus, setChannelFocus] = useState(false);
+  const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("directions");
@@ -61,28 +74,32 @@ export function OverviewPage(props: OverviewPageProps) {
   const [menu, setMenu] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
   const [configureRequest, setConfigureRequest] = useState(0);
+  const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
   const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
   const refresh = useCallback(async () => {
     const seq = ++sequence.current;
     try {
-      const [overview, agenda, files, me] = await Promise.all([
+      const [overview, agenda, files, me, introduction] = await Promise.all([
         props.load(),
         props.loadCalendar(),
         props.loadLibrary(),
         props.loadMe(),
+        props.loadOnboarding(),
       ]);
       if (seq !== sequence.current) return;
       setData(overview);
       setCalendar(agenda);
       setLibrary(files);
       setPersonal(me);
+      setOnboarding(introduction);
+      setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
       setError("");
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [props.load, props.loadCalendar, props.loadLibrary, props.loadMe]);
+  }, [props.load, props.loadCalendar, props.loadLibrary, props.loadMe, props.loadOnboarding]);
   useEffect(() => {
     void refresh();
     return () => {
@@ -134,6 +151,8 @@ export function OverviewPage(props: OverviewPageProps) {
     }
   };
   const openRecord = (id: string) => {
+    setCalendarAdding(false);
+    setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
     setView("records");
   };
@@ -148,6 +167,40 @@ export function OverviewPage(props: OverviewPageProps) {
       setExplore(id === "feed" ? "news" : "directions");
       setView("explore");
     } else openRecord(["learning", "decisions"].includes(id) ? "notes" : id);
+  };
+  const manageAi = (builtin = false) => {
+    if (props.renderAsk) {
+      setConfigureBuiltin(builtin);
+      setConfigureRequest((n) => n + 1);
+      setView("ask");
+    } else setView("connections");
+  };
+  const openSource = (source: string) => {
+    if (source === "calendar" || source === "finance") {
+      openRecord(source);
+      setCalendarAdding(source === "calendar");
+      setFinanceImporting(source === "finance");
+    } else if (source === "mail") {
+      setChannelFocus(true);
+      setView("connections");
+    }
+  };
+  const startGuide = (step = 0, source?: string) => {
+    setGuideKey((current) => current + 1);
+    setGuideSource(source);
+    setGuide(step);
+    setView("overview");
+    setMenu(false);
+    if (source) openSource(source);
+  };
+  const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
+    if (item.disabled) return;
+    if (item.id === "matter") startGuide(1);
+    else if (item.id === "memory") startGuide(5);
+    else if (item.id === "starts") startGuide(2);
+    else if (item.id === "sources") startGuide(3);
+    else if (item.id === "ai") startGuide(4);
+    else if (item.id === "plan") prompt("请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。");
   };
   const child = {
     ...props,
@@ -232,6 +285,7 @@ export function OverviewPage(props: OverviewPageProps) {
               aria-current={view === id ? "page" : undefined}
               onClick={() => {
                 setView(id as View);
+                if (id === "overview") void refresh();
                 setRecord("");
                 setMenu(false);
               }}
@@ -289,6 +343,9 @@ export function OverviewPage(props: OverviewPageProps) {
                     {title}
                   </button>
                 ))}
+                <button type="button" role="menuitem" onClick={() => startGuide()}>
+                  开始使用
+                </button>
               </div>
             )}
           </div>
@@ -308,45 +365,70 @@ export function OverviewPage(props: OverviewPageProps) {
             ))}
           </details>
         ) : null}
+        {guide === undefined && !error && <output className={css.small}>正在读取开图…</output>}
+        {guideVisible && view !== "overview" && (
+          <div className={css["sec-head"]}>
+            <button
+              type="button"
+              className={css.link}
+              onClick={() => {
+                setGuide(null);
+                setView("overview");
+                void refresh();
+              }}
+            >
+              ← 回到今天
+            </button>
+          </div>
+        )}
+        {onboarding && guideVisible && (
+          <div hidden={!guideVisible || view !== "overview"}>
+            <OnboardingPage
+              {...props}
+              key={guideKey}
+              status={onboarding}
+              step={guide ?? 0}
+              builtin={!!props.renderAsk}
+              initialSource={guideSource}
+              setStep={setGuide}
+              onStatus={setOnboarding}
+              refresh={refresh}
+              openSource={openSource}
+              onPrompt={prompt}
+              onComplete={(destination) => {
+                setGuide(null);
+                if (destination === "ask") manageAi(true);
+                else setView(destination === "connections" ? "connections" : "overview");
+                void refresh();
+              }}
+            />
+          </div>
+        )}
+        {view === "overview" && !guideVisible && guide !== undefined && onboarding && (
+          <>
+            {onboarding.next && (
+              <OnboardingNextCard
+                {...props}
+                key={`${onboarding.next.id}-${onboarding.next.rev}`}
+                next={onboarding.next}
+                refresh={refresh}
+              />
+            )}
+            <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
+          </>
+        )}
         {view === "overview" &&
+          !guideVisible &&
+          guide !== undefined &&
           data &&
           (data.empty ? (
             <>
-              <section className={css.welcome}>
-                <span className={css.eyebrow}>欢迎</span>
-                <h1>先记下一句，开图就开始认识你</h1>
-                <p>你的记录都存在你自己的文件夹里，换哪个 AI 都能接着用。现在不用设置任何东西。</p>
-              </section>
+              <div className={css.head}>
+                <h1>今天</h1>
+                <span className={css.sub}>先记下一句，开图就开始认识你</span>
+              </div>
               {capture}
-              <section className={css.sec}>
-                <h2 className={css.eyebrow}>也可以从这里开始</h2>
-                <div className={css.starts}>
-                  <button type="button" className={`${css.start} ${css.card}`} onClick={() => openRecord("")}>
-                    <h3>导入已有资料</h3>
-                    <p>健康、日历、账单和已有记录，先从资料入口选一类。</p>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${css.start} ${css.card}`}
-                    onClick={() => setView("connections")}
-                  >
-                    <h3>连接一个 AI</h3>
-                    <p>连上后，它能读写你的开图，帮你整理。</p>
-                    <span className={css.chip}>可选</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`${css.start} ${css.card}`}
-                    onClick={() => {
-                      setView("explore");
-                      setExplore("directions");
-                    }}
-                  >
-                    <h3>写下一个想试的方向</h3>
-                    <p>比如「要不要搬去别的城市住三个月」。先写问题，别的以后再补。</p>
-                  </button>
-                </div>
-              </section>
+              <p className={css.small}>有了真实记录后，你的数据和最近变化会出现在这里。</p>
             </>
           ) : (
             <>
@@ -364,74 +446,80 @@ export function OverviewPage(props: OverviewPageProps) {
                 </div>
                 {capture}
               </div>
-              <section className={css.sec}>
-                <h2 className={css.eyebrow}>现在最该做的</h2>
-                <div className={`${css.focus} ${css.card}`}>
-                  <div className={css["focus-body"]}>
-                    <h2 className={css["focus-title"]}>{focus?.title ?? "今天，留一点空间给下一步"}</h2>
-                    <p className={css.small}>
-                      {focus
-                        ? `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`
-                        : "看看最近的变化，或记下一件值得跟进的事。"}
-                    </p>
-                  </div>
-                  {focus && (
-                    <>
-                      {!focus.proposed && (
+              {(!onboarding?.next || focus) && (
+                <section className={css.sec}>
+                  <h2 className={css.eyebrow}>现在最该做的</h2>
+                  <div className={`${css.focus} ${css.card}`}>
+                    <div className={css["focus-body"]}>
+                      <h2 className={css["focus-title"]}>{focus?.title ?? "今天，留一点空间给下一步"}</h2>
+                      <p className={css.small}>
+                        {focus
+                          ? `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`
+                          : "看看最近的变化，或记下一件值得跟进的事。"}
+                      </p>
+                    </div>
+                    {focus && (
+                      <>
+                        {!focus.proposed && (
+                          <button
+                            type="button"
+                            className={`${css.btn} ${css["btn-strong"]} ${css["btn-big"]}`}
+                            disabled={busy}
+                            onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
+                          >
+                            完成
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className={`${css.btn} ${css["btn-strong"]} ${css["btn-big"]}`}
-                          disabled={busy}
-                          onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
+                          className={`${css.btn} ${css["btn-quiet"]}`}
+                          onClick={() => openSection(focus.section)}
                         >
-                          完成
+                          查看相关资料
                         </button>
-                      )}
+                      </>
+                    )}
+                  </div>
+                  {data.next.slice(1, 3).map((item) => (
+                    <div className={`${css.row} ${css.card}`} key={item.id}>
                       <button
                         type="button"
-                        className={`${css.btn} ${css["btn-quiet"]}`}
-                        onClick={() => openSection(focus.section)}
+                        className={css.check}
+                        aria-label={`完成：${item.title}`}
+                        disabled={busy || item.proposed}
+                        onClick={() => void run(() => props.completeNext(item.file, item.id))}
                       >
-                        查看相关资料
+                        ✓
                       </button>
-                    </>
+                      <span className={css["row-title"]}>{item.title}</span>
+                      <span className={css.chip}>
+                        {item.module}
+                        {item.proposed ? " · 待确认" : ""}
+                      </span>
+                      <button type="button" className={css.link} onClick={() => openSection(item.section)}>
+                        查看
+                      </button>
+                    </div>
+                  ))}
+                  {data.allNext.length > 3 && (
+                    <details>
+                      <summary className={css.link}>全部 {data.allNext.length} 条下一步</summary>
+                      {data.allNext.map((item) => (
+                        <div className={css.row} key={item.id}>
+                          <span className={css["row-title"]}>{item.title}</span>
+                          <button
+                            type="button"
+                            className={css.link}
+                            onClick={() => openSection(item.section)}
+                          >
+                            查看
+                          </button>
+                        </div>
+                      ))}
+                    </details>
                   )}
-                </div>
-                {data.next.slice(1, 3).map((item) => (
-                  <div className={`${css.row} ${css.card}`} key={item.id}>
-                    <button
-                      type="button"
-                      className={css.check}
-                      aria-label={`完成：${item.title}`}
-                      disabled={busy || item.proposed}
-                      onClick={() => void run(() => props.completeNext(item.file, item.id))}
-                    >
-                      ✓
-                    </button>
-                    <span className={css["row-title"]}>{item.title}</span>
-                    <span className={css.chip}>
-                      {item.module}
-                      {item.proposed ? " · 待确认" : ""}
-                    </span>
-                    <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                      查看
-                    </button>
-                  </div>
-                ))}
-                {data.allNext.length > 3 && (
-                  <details>
-                    <summary className={css.link}>全部 {data.allNext.length} 条下一步</summary>
-                    {data.allNext.map((item) => (
-                      <div className={css.row} key={item.id}>
-                        <span className={css["row-title"]}>{item.title}</span>
-                        <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                          查看
-                        </button>
-                      </div>
-                    ))}
-                  </details>
-                )}
-              </section>
+                </section>
+              )}
               <Agenda data={calendar} open={() => openRecord("calendar")} />
               {data.blocks
                 .filter((b) => b.status === "pending" && b.kind === "proposal")
@@ -532,7 +620,7 @@ export function OverviewPage(props: OverviewPageProps) {
             {!record ? (
               <LibraryPage data={library} open={openRecord} />
             ) : record === "calendar" ? (
-              <CalendarPage {...props} />
+              <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
               <ProjectsLibrary {...child} timeZone={data?.timeZone} />
             ) : record === "health" ? (
@@ -541,7 +629,12 @@ export function OverviewPage(props: OverviewPageProps) {
                 sources={library?.sections.find((s) => s.id === "health")?.sources ?? []}
               />
             ) : record === "finance" ? (
-              <FinancePage {...child} today={data?.today} timeZone={data?.timeZone} />
+              <FinancePage
+                {...child}
+                initialImport={financeImporting}
+                today={data?.today}
+                timeZone={data?.timeZone}
+              />
             ) : record === "inbox" ? (
               <InboxPage data={library} />
             ) : (
@@ -585,7 +678,9 @@ export function OverviewPage(props: OverviewPageProps) {
           </>
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div hidden={view !== "ask"}>{props.renderAsk(promptDraft, configureRequest)}</div>
+          <div hidden={view !== "ask"}>
+            {props.renderAsk(promptDraft, configureRequest, configureBuiltin)}
+          </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (
           <PersonalPages
@@ -593,16 +688,36 @@ export function OverviewPage(props: OverviewPageProps) {
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             refreshWorkspace={refresh}
-            manageAi={() => {
-              if (props.renderAsk) {
-                setConfigureRequest((n) => n + 1);
-                setView("ask");
-              } else props.onAgent();
-            }}
+            manageAi={props.renderAsk ? manageAi : props.onAgent}
           />
         )}
         {view === "connections" && props.channelSettings && (
-          <ChannelSettings request={props.channelSettings} />
+          <div
+            ref={(element) => {
+              if (element && channelFocus) {
+                element.scrollIntoView({ block: "start" });
+                setChannelFocus(false);
+              }
+            }}
+          >
+            <ChannelSettings request={props.channelSettings} />
+          </div>
+        )}
+        {guideVisible && view !== "overview" && (
+          <div className={css["sec-head"]}>
+            <span />
+            <button
+              type="button"
+              className={`${css.btn} ${css["btn-primary"]}`}
+              onClick={() => {
+                setGuide(null);
+                setView("overview");
+                void refresh();
+              }}
+            >
+              完成
+            </button>
+          </div>
         )}
       </main>
     </div>

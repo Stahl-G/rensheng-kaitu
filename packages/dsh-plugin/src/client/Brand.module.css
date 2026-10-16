@@ -11,7 +11,7 @@
   stroke: #9fd3cf;
 }
 .routeFolded {
-  stroke: var(--brand-route, #fff);
+  stroke: #fff;
 }
 .routeOpen {
   stroke: #0f4c5c;
@@ -19,8 +19,8 @@
 
 body[data-ds-dark-theme] .fold0,
 [data-theme="dark"] .fold0 {
-  fill: #4c8e99;
-  stroke: #4c8e99;
+  fill: #2b6e7e;
+  stroke: #2b6e7e;
 }
 body[data-ds-dark-theme] .fold1,
 [data-theme="dark"] .fold1 {
@@ -40,9 +40,4 @@ body[data-ds-dark-theme] .fold2,
   opacity: 0.6;
   font-size: 11px;
   overflow-wrap: anywhere;
-}
-
-body[data-ds-dark-theme],
-[data-theme="dark"] {
-  --brand-route: #102e35;
 }

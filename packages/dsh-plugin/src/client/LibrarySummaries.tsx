@@ -183,7 +183,11 @@ export function ProjectsLibrary(props: DoingPageProps & { timeZone?: string }) {
                     className={css.check}
                     style={
                       item.status === "done"
-                        ? { borderColor: "var(--health)", background: "var(--health)", color: "white" }
+                        ? {
+                            borderColor: "var(--health)",
+                            background: "var(--health)",
+                            color: "var(--on-health)",
+                          }
                         : {}
                     }
                     aria-hidden="true"

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开图品牌色板</title>
+<style>
+body{margin:0;padding:24px;font:14px/1.5 system-ui,sans-serif;background:#fcfcfb;color:#1f1e1d}
+h1{font-size:24px}button{padding:8px 16px;background:#2e7f86;color:white;border:0;border-radius:8px}
+.cards{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.card{flex:1 1 180px;padding:20px;border-radius:14px}
+.card i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:8px}
+.table{overflow:auto}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px;border-bottom:1px solid #deded8;white-space:nowrap}
+input[type="color"]{width:24px;height:24px;vertical-align:middle;margin-right:6px;padding:0;border:0}
+.swatch{display:inline-block;width:18px;height:18px;vertical-align:middle;margin-right:6px;border:1px solid #777}
+.bad{color:#a02020;font-weight:700}.ok{color:#245f35}small{display:block}
+</style>
+<h1>开图品牌色板</h1>
+<p>品牌深青贯穿链接、开图与地图；其余板块采用低饱和自然色。今天保留墨色。</p>
+<button id="theme">示例卡片：切换深色</button><div id="cards" class="cards"></div>
+<p>对比度按 WCAG 相对亮度实时计算。文字按前景 / 背景角色配对，装饰色以示例正文展示，低于 4.5:1 标红。
+板块主色作为图形时另列其与页面底色的对比度，低于 3:1 标红。修改新色值后，对比度与示例卡片即时更新。</p>
+<div class="table"><table><thead><tr><th>变量</th><th>旧浅色</th><th>新浅色</th><th>旧深色</th><th>新深色</th>
+<th>浅色文字对比</th><th>深色文字对比</th></tr></thead><tbody id="rows"></tbody></table></div>
+<script>
+const data={
+  "old": [
+    {
+      "bg": "#fcfcfb",
+      "surface": "#ffffff",
+      "sunken": "#f5f5f3",
+      "control": "#f0efec",
+      "line": "#ecebe7",
+      "ink": "#1f1e1d",
+      "ink2": "#4d4c48",
+      "muted": "#6b6a66",
+      "link": "#2f5fc4",
+      "primary": "#2f5fc4",
+      "on-primary": "#ffffff",
+      "strong": "#1f1e1d",
+      "on-strong": "#ffffff",
+      "ask": "#f2f5fd",
+      "ask-line": "#dce4f8",
+      "health": "#2e8b57",
+      "health-tint": "#e8f3ec",
+      "health-ink": "#1f6b43",
+      "doing": "#6b5bd6",
+      "doing-tint": "#efedfb",
+      "doing-ink": "#4b3fb0",
+      "explore": "#3d6fe0",
+      "explore-tint": "#ecf1fc",
+      "explore-ink": "#2a4fa8",
+      "news": "#c47a12",
+      "news-tint": "#fbefe0",
+      "news-ink": "#8a520a",
+      "finance": "#1f8a8a",
+      "finance-tint": "#e3f2f2",
+      "finance-ink": "#176868",
+      "me": "#c2507a",
+      "empty": "#f0efec",
+      "map-land": "#eef1ec",
+      "map-grid": "#dde2da",
+      "map-sea": "#f4f6f7",
+      "map-dot": "#d3dad4",
+      "kt-canvas": "#fcfcfb",
+      "kt-subtle": "#f5f5f3",
+      "kt-control": "#f0efec",
+      "kt-card": "#fff",
+      "kt-text": "#1f1e1d",
+      "kt-secondary": "#4d4c48",
+      "kt-muted": "#6b6a66",
+      "kt-faint": "#a3a29d",
+      "kt-primary": "#1f1e1d",
+      "kt-on-primary": "#fff",
+      "kt-link": "#2f5fc4",
+      "kt-accent": "#3d6fe0",
+      "kt-today": "#1f1e1d",
+      "kt-today-tint": "#f0efec",
+      "kt-today-ink": "#4d4c48",
+      "kt-health": "#2e8b57",
+      "kt-health-tint": "#e6f3eb",
+      "kt-health-ink": "#1f6b42",
+      "kt-projects": "#6b5bd6",
+      "kt-projects-tint": "#eceafb",
+      "kt-projects-ink": "#4b3db0",
+      "kt-map": "#2674cb",
+      "kt-map-tint": "#e6f0fc",
+      "kt-map-ink": "#205ca0",
+      "kt-feed": "#c47a12",
+      "kt-feed-tint": "#faeedc",
+      "kt-feed-ink": "#8a520a",
+      "kt-finance": "#087f9b",
+      "kt-finance-tint": "#e1f2f7",
+      "kt-finance-ink": "#076078",
+      "kt-me": "#c2507a",
+      "kt-me-tint": "#f8e6ed",
+      "kt-me-ink": "#93345a",
+      "kt-project-slot": "#e4e1f7",
+      "kt-target": "#9ed2b2",
+      "kt-estimate": "#7fc29b",
+      "scrim": "rgba(31, 30, 29, 0.42)"
+    },
+    {
+      "bg": "#171716",
+      "surface": "#201f1e",
+      "sunken": "#1b1b1a",
+      "control": "#2a2927",
+      "line": "#2f2e2c",
+      "ink": "#ecebe8",
+      "ink2": "#c9c7c2",
+      "muted": "#a09e98",
+      "link": "#8fb0f5",
+      "primary": "#4c7be6",
+      "on-primary": "#ffffff",
+      "strong": "#ecebe8",
+      "on-strong": "#171716",
+      "ask": "#1e2638",
+      "ask-line": "#2c3a5c",
+      "health-tint": "#1c3226",
+      "health-ink": "#8fd3ac",
+      "doing-tint": "#2a2547",
+      "doing-ink": "#b9aff5",
+      "explore-tint": "#1e2a45",
+      "explore-ink": "#a9c1f7",
+      "news-tint": "#3a2a12",
+      "news-ink": "#ebc27f",
+      "finance-tint": "#173333",
+      "finance-ink": "#8ed1d1",
+      "empty": "#2a2927",
+      "map-land": "#1f2620",
+      "map-grid": "#2d352e",
+      "map-sea": "#1a1c1d",
+      "map-dot": "#343d36",
+      "kt-canvas": "#1c1c1b",
+      "kt-subtle": "#252524",
+      "kt-control": "#323230",
+      "kt-card": "#292928",
+      "kt-text": "#f2f1ee",
+      "kt-secondary": "#cfcec9",
+      "kt-muted": "#aaa9a3",
+      "kt-faint": "#8c8b85",
+      "kt-primary": "#eeede9",
+      "kt-on-primary": "#1f1e1d",
+      "kt-link": "#94b6ff",
+      "kt-accent": "#7b9ff5",
+      "kt-today": "#eeede9",
+      "kt-today-tint": "#323230",
+      "kt-today-ink": "#cfcec9",
+      "kt-health": "#69c28b",
+      "kt-health-tint": "#203b2b",
+      "kt-health-ink": "#9edbb4",
+      "kt-projects": "#a69aef",
+      "kt-projects-tint": "#332c50",
+      "kt-projects-ink": "#c4bbff",
+      "kt-map": "#79b6ff",
+      "kt-map-tint": "#20364e",
+      "kt-map-ink": "#add2ff",
+      "kt-feed": "#e5ad57",
+      "kt-feed-tint": "#45341e",
+      "kt-feed-ink": "#f2cb8d",
+      "kt-finance": "#67cce0",
+      "kt-finance-tint": "#203b43",
+      "kt-finance-ink": "#a1e3ef",
+      "kt-me": "#e08eae",
+      "kt-me-tint": "#472b37",
+      "kt-me-ink": "#f3b7cd",
+      "kt-project-slot": "#3b3459",
+      "kt-target": "#3e7953",
+      "kt-estimate": "#3b8758",
+      "scrim": "rgba(0, 0, 0, 0.6)"
+    }
+  ],
+  "new": [
+    {
+      "bg": "#fcfcfb",
+      "surface": "#ffffff",
+      "sunken": "#f5f5f3",
+      "control": "#f0efec",
+      "line": "#ecebe7",
+      "ink": "#1f1e1d",
+      "ink2": "#4d4c48",
+      "muted": "#6b6a66",
+      "link": "#1f6f78",
+      "primary": "#2e7f86",
+      "on-primary": "#ffffff",
+      "strong": "#1f1e1d",
+      "on-strong": "#ffffff",
+      "ask": "#edf4f3",
+      "ask-line": "#cedfdd",
+      "health": "#3e8a5a",
+      "health-tint": "#e5f1e9",
+      "health-ink": "#2a6a41",
+      "doing": "#4a6a8f",
+      "doing-tint": "#e7edf4",
+      "doing-ink": "#344e6e",
+      "explore": "#0f4c5c",
+      "explore-tint": "#e3f0ef",
+      "explore-ink": "#0f4c5c",
+      "news": "#b5711a",
+      "news-tint": "#f7ecdc",
+      "news-ink": "#84520f",
+      "finance": "#5f6f2a",
+      "finance-tint": "#eef1e2",
+      "finance-ink": "#4a5720",
+      "me": "#b5577a",
+      "empty": "#f0efec",
+      "map-land": "#eef1ec",
+      "map-grid": "#dde2da",
+      "map-sea": "#f4f6f7",
+      "map-dot": "#d3dad4",
+      "me-tint": "#f6e7ed",
+      "me-ink": "#8a3a5a",
+      "on-health": "#020d05",
+      "on-news": "#191005",
+      "on-me": "#ffffff",
+      "on-explore": "#ffffff",
+      "kt-canvas": "#fcfcfb",
+      "kt-subtle": "#f5f5f3",
+      "kt-control": "#f0efec",
+      "kt-card": "#fff",
+      "kt-text": "#1f1e1d",
+      "kt-secondary": "#4d4c48",
+      "kt-muted": "#6b6a66",
+      "kt-faint": "#a3a29d",
+      "kt-primary": "#2e7f86",
+      "kt-on-primary": "#fff",
+      "kt-link": "#1f6f78",
+      "kt-accent": "#2e7f86",
+      "kt-today": "#1f1e1d",
+      "kt-today-tint": "#f0efec",
+      "kt-today-ink": "#4d4c48",
+      "kt-health": "#3e8a5a",
+      "kt-health-tint": "#e5f1e9",
+      "kt-health-ink": "#2a6a41",
+      "kt-projects": "#4a6a8f",
+      "kt-projects-tint": "#e7edf4",
+      "kt-projects-ink": "#344e6e",
+      "kt-map": "#0f4c5c",
+      "kt-map-tint": "#e3f0ef",
+      "kt-map-ink": "#0f4c5c",
+      "kt-feed": "#b5711a",
+      "kt-feed-tint": "#f7ecdc",
+      "kt-feed-ink": "#84520f",
+      "kt-finance": "#5f6f2a",
+      "kt-finance-tint": "#eef1e2",
+      "kt-finance-ink": "#4a5720",
+      "kt-me": "#b5577a",
+      "kt-me-tint": "#f6e7ed",
+      "kt-me-ink": "#8a3a5a",
+      "kt-project-slot": "#e1e8f0",
+      "kt-target": "#598a67",
+      "kt-estimate": "#4c805c",
+      "scrim": "rgba(31, 30, 29, 0.42)",
+      "brand-fold0": "#0f4c5c",
+      "brand-fold1": "#2e7f86",
+      "brand-fold2": "#9fd3cf",
+      "brand-route": "#ffffff"
+    },
+    {
+      "bg": "#171716",
+      "surface": "#201f1e",
+      "sunken": "#1b1b1a",
+      "control": "#2a2927",
+      "line": "#2f2e2c",
+      "ink": "#ecebe8",
+      "ink2": "#c9c7c2",
+      "muted": "#a09e98",
+      "link": "#8fcac6",
+      "primary": "#4c9aa0",
+      "on-primary": "#0b252a",
+      "strong": "#ecebe8",
+      "on-strong": "#171716",
+      "ask": "#202e2f",
+      "ask-line": "#3a5353",
+      "health-tint": "#203a2b",
+      "health-ink": "#a2d9b6",
+      "doing-tint": "#263243",
+      "doing-ink": "#bfd0e4",
+      "explore-tint": "#1e3a3c",
+      "explore-ink": "#a8dad6",
+      "news-tint": "#43331e",
+      "news-ink": "#f0ca8f",
+      "finance-tint": "#2f3420",
+      "finance-ink": "#cbd69a",
+      "empty": "#2a2927",
+      "map-land": "#1f2620",
+      "map-grid": "#2d352e",
+      "map-sea": "#1a1c1d",
+      "map-dot": "#343d36",
+      "health": "#6dba8a",
+      "doing": "#93adcb",
+      "explore": "#6fb3b4",
+      "news": "#ddaa5e",
+      "finance": "#a9b86a",
+      "me": "#dc92ae",
+      "me-tint": "#452b36",
+      "me-ink": "#f1bbcf",
+      "on-health": "#020d05",
+      "on-news": "#191005",
+      "on-me": "#361525",
+      "on-explore": "#102e35",
+      "kt-canvas": "#1c1c1b",
+      "kt-subtle": "#252524",
+      "kt-control": "#323230",
+      "kt-card": "#292928",
+      "kt-text": "#f2f1ee",
+      "kt-secondary": "#cfcec9",
+      "kt-muted": "#aaa9a3",
+      "kt-faint": "#8c8b85",
+      "kt-primary": "#4c9aa0",
+      "kt-on-primary": "#0b252a",
+      "kt-link": "#8fcac6",
+      "kt-accent": "#4c9aa0",
+      "kt-today": "#eeede9",
+      "kt-today-tint": "#323230",
+      "kt-today-ink": "#cfcec9",
+      "kt-health": "#6dba8a",
+      "kt-health-tint": "#203a2b",
+      "kt-health-ink": "#a2d9b6",
+      "kt-projects": "#93adcb",
+      "kt-projects-tint": "#263243",
+      "kt-projects-ink": "#bfd0e4",
+      "kt-map": "#6fb3b4",
+      "kt-map-tint": "#1e3a3c",
+      "kt-map-ink": "#a8dad6",
+      "kt-feed": "#ddaa5e",
+      "kt-feed-tint": "#43331e",
+      "kt-feed-ink": "#f0ca8f",
+      "kt-finance": "#a9b86a",
+      "kt-finance-tint": "#2f3420",
+      "kt-finance-ink": "#cbd69a",
+      "kt-me": "#dc92ae",
+      "kt-me-tint": "#452b36",
+      "kt-me-ink": "#f1bbcf",
+      "kt-project-slot": "#2e3a4b",
+      "kt-target": "#669979",
+      "kt-estimate": "#76ad88",
+      "scrim": "rgba(0, 0, 0, 0.6)",
+      "brand-fold0": "#2b6e7e",
+      "brand-fold1": "#4c9aa0",
+      "brand-fold2": "#b5e0dc",
+      "brand-route": "#ffffff"
+    }
+  ]
+};
+let dark = false
+const groups = ['explore', 'doing', 'finance', 'health', 'news', 'me']
+const names = ['开图 / 地图', '项目', '财务', '健康', '资讯', '我的']
+function luminance(hex) {
+  let value = hex.slice(1)
+  if (value.length === 3) value = value.split('').map(x => x + x).join('')
+  const linear = [0, 2, 4].map(i => parseInt(value.slice(i, i + 2), 16) / 255)
+    .map(x => x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)
+  return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722
+}
+function contrast(a, b) {
+  const x = luminance(a)
+  const y = luminance(b)
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+}
+function pair(key, values) {
+  const legacy = key.startsWith('kt-')
+  const prefix = legacy ? 'kt-' : ''
+  const name = legacy ? key.slice(3) : key
+  const text = values[legacy ? 'kt-text' : 'ink']
+  const surface = values[legacy ? 'kt-card' : 'surface']
+  const accents = [...groups, 'projects', 'map', 'feed', 'today']
+  if (accents.includes(name)) {
+    return [values[prefix + name + '-ink'] || text, values[prefix + name + '-tint'] || surface,
+      '板块文字 / 浅底', contrast(values[key], surface)]
+  }
+  if (name.endsWith('-ink')) {
+    return [values[key], values[key.replace(/-ink$/, '-tint')] || surface, '文字 / 板块底']
+  }
+  if (name.endsWith('-tint')) {
+    return [values[key.replace(/-tint$/, '-ink')] || text, values[key], '文字 / 板块底']
+  }
+  if (name.startsWith('on-')) return [values[key], values[prefix + name.slice(3)], '按钮文字 / 底']
+  if (name === 'strong') return [values['on-strong'], values[key], '按钮文字 / 底']
+  if (name === 'primary') return [values[prefix + 'on-primary'], values[key], '按钮文字 / 底']
+  if (['ink', 'ink2', 'muted', 'link', 'text', 'secondary'].includes(name)) {
+    return [values[key], surface, '文字 / 卡片']
+  }
+  if (['accent', 'target', 'estimate'].includes(name)) {
+    return [values[prefix + 'link'], surface, '链接 / 卡片', contrast(values[key], surface)]
+  }
+  if (name === 'faint') return [null, null, '装饰边框，文字使用 --kt-muted']
+  if (key.startsWith('brand-')) {
+    const fold = key === 'brand-route' ? values['brand-fold0'] : values[key]
+    const route = key === 'brand-fold2' ? '#0f4c5c' : values['brand-route']
+    return [null, null, '标志路线 / 折面', contrast(fold, route)]
+  }
+  if (name === 'scrim') return [null, null, '遮罩，无文字']
+  return [text, values[key], '示例正文 / 此色块']
+}
+function score(key, values) {
+  const [fg, bg, label, graphic] = pair(key, values)
+  const ratio = fg && bg ? contrast(fg, bg) : null
+  const result = ratio === null ? '—' :
+    `<span class="${ratio < 4.5 ? 'bad' : 'ok'}">${ratio.toFixed(2)}:1</span>`
+  return result + `<small>${label}${fg ? ': ' + fg + ' / ' + bg : ''}</small>` +
+    (graphic ? `<small class="${graphic < 3 ? 'bad' : 'ok'}">图形 ${graphic.toFixed(2)}:1</small>` : '')
+}
+function cell(value, key, theme) {
+  if (!value) return '<td>新增</td>'
+  const editable = theme !== undefined && value.startsWith('#')
+  const swatch = editable ?
+    `<input type="color" aria-label="${key} ${theme ? '深色' : '浅色'}" data-key="${key}" data-theme="${theme}"` +
+    ` value="${value.length === 4 ? '#' + value.slice(1).split('').map(x => x + x).join('') : value}">` :
+    `<i class="swatch" style="background:${value}"></i>`
+  return `<td>${swatch}${value.toUpperCase()}</td>`
+}
+function render() {
+  const keys = [...new Set([...Object.keys(data.old[0]), ...Object.keys(data.new[0])])]
+  document.querySelector('#rows').innerHTML = keys.map(key => `<tr><td>--${key}</td>` +
+    cell(data.old[0][key], key) + cell(data.new[0][key], key, 0) +
+    cell(data.old[1][key] || data.old[0][key], key) + cell(data.new[1][key] || data.new[0][key], key, 1) +
+    `<td>${score(key, data.new[0])}</td>` +
+    `<td>${score(key, {...data.new[0], ...data.new[1]})}</td></tr>`).join('')
+  const values = dark ? {...data.new[0], ...data.new[1]} : data.new[0]
+  document.querySelector('#cards').innerHTML = groups.map((group, i) =>
+    `<article class="card" style="background:${values[group + '-tint']};color:${values[group + '-ink']}">` +
+    `<h2><i style="background:${values[group]}"></i>${names[i]}</h2><p>看见现状，探索下一步。</p>` +
+    `<a style="color:${values.link}" href="#rows">查看配色</a></article>`).join('')
+  document.querySelector('#theme').textContent = `示例卡片：切换${dark ? '浅' : '深'}色`
+}
+document.querySelector('#theme').onclick = () => {
+  dark = !dark
+  render()
+}
+document.querySelector('#rows').addEventListener('change', event => {
+  const input = event.target
+  if (input instanceof HTMLInputElement && input.dataset.key) {
+    data.new[Number(input.dataset.theme)][input.dataset.key] = input.value
+    render()
+  }
+})
+render()
+</script></html>

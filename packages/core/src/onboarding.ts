@@ -10,25 +10,54 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
 import { templateDir } from "./assets.js";
+import type { CalendarSubscription } from "./calendar.js";
 import { type ImportResult, listChatFiles, readChat } from "./chats.js";
 import { localStateRoot } from "./drive.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { history, snapshot } from "./history.js";
+import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "./github.js";
+import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
+import { captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
-import { type ProjectInput, createProject, driveProjects, listProjects } from "./projects.js";
+import { type ProjectInput, createProject, driveProjects, listProjects, projectVersion } from "./projects.js";
+import { updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
+import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { type ModuleStatus, readWorkbench } from "./workbench.js";
-import type { Workspace } from "./workspace.js";
+import { type Workspace, stateDirectory } from "./workspace.js";
 
 export const ONBOARDING = {
-  steps: ["搬来记忆", "先管哪些", "接上数据", "选一个 AI"],
+  welcome: {
+    title: "让 AI 持续了解你，把想改变的事变成能推进、能查回的个人进度",
+    first: "说出想改变的一件事",
+    firstDescription: "直接写，或粘贴一段和 AI 聊过的对话",
+  },
+  matter: {
+    entry: "说出想改变的一件事",
+    question: "最近有什么想改变，却一直没推进？",
+    examples: [
+      { title: "吃饭和训练总坚持不了", text: "我想吃得健康点、每周练三次，但每次坚持不到两周就断了。" },
+      {
+        title: "不想再做现在的工作又不知道能做什么",
+        text: "现在的工作做了四年，越来越没意思，但不知道自己还能做什么。",
+      },
+      {
+        title: "六周内做完作品集",
+        text: `我：我想六周内做完作品集，转岗去做产品设计。
+ChatGPT：可以先挑 2–3 个最能体现你解决问题能力的项目，每个写清背景、你的决策和结果。
+ChatGPT：建议每周固定两个晚上推进，第一周先选项目、列出缺的材料。
+我：我手上有 4 个项目，其中「门店排班」那个还缺上线后的数据。
+ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
+      },
+    ],
+  },
+  steps: ["带来一件事", "先管哪些", "接上数据", "选一个 AI"],
   ais: [
     {
       id: "chatgpt",
@@ -129,9 +158,9 @@ export const ONBOARDING = {
     {
       id: "calendar",
       title: "日历",
-      description: "导入 Google 日历、iCloud 或 Outlook 导出的 ICS 文件。",
-      action: "选择日历文件",
-      target: "import:ics",
+      description: "订阅 Google 日历、iCloud 或 Outlook 的 ICS 地址，自动更新日程。",
+      action: "添加日历订阅",
+      target: "calendar",
       available: true,
     },
     {
@@ -153,7 +182,7 @@ export const ONBOARDING = {
     {
       id: "projects",
       title: "项目",
-      description: "先选一个本机文件夹，确认后建立项目。已有项目可在项目设置中连接 GitHub。",
+      description: "接上本机文件夹或 GitHub 仓库，确认后建立项目。",
       action: "选择项目",
       target: "setup:projects",
       available: true,
@@ -161,9 +190,9 @@ export const ONBOARDING = {
     {
       id: "mail",
       title: "邮件和聊天",
-      description: "可以先导入 ChatGPT 数据导出包。邮箱与聊天账号连接尚未提供。",
-      action: "导入聊天记录",
-      target: "import:chatgpt-conversations",
+      description: "在「AI 与连接」里接上邮箱或聊天账号，接收摘录与原文链接。",
+      action: "设置邮件和聊天",
+      target: "connections",
       available: true,
     },
     {
@@ -184,15 +213,18 @@ export const ONBOARDING = {
     },
     {
       id: "mine",
-      title: "用我已有的 AI",
-      description: "在「AI 与连接」里连接已有的 AI",
+      title: "在原来的 AI 里继续",
+      description: "进入「AI 与连接」，设置你已有的 AI",
       target: "connections",
     },
     { id: "none", title: "先不用 AI", description: "随手记和导入都能用，等你连上再整理", target: "today" },
   ],
   checklist: {
-    memory: "记住你的情况",
-    ai: "连上一个 AI",
+    matter: "带来一件事并采纳第一个下一步",
+    memory: "让开图认识你（可选）",
+    starts: "选你想先管的事",
+    sources: "接上数据",
+    ai: "选一个 AI 帮你整理",
     plan: "拿到第一份今天计划",
     sourcePrefix: "接上",
     action: "去做",
@@ -225,6 +257,8 @@ export interface OnboardingSourceInfo {
   available: boolean;
 }
 export interface OnboardingContent {
+  welcome: { title: string; first: string; firstDescription: string };
+  matter: { entry: string; question: string; examples: readonly { title: string; text: string }[] };
   steps: readonly string[];
   ais: readonly { id: string; name: string; hint: string }[];
   prompt: string;
@@ -239,20 +273,32 @@ export interface OnboardingContent {
   }[];
   sources: readonly OnboardingSourceInfo[];
   aiChoices: readonly { id: string; title: string; description: string; target: string }[];
-  checklist: { memory: string; ai: string; plan: string; sourcePrefix: string; action: string };
+  checklist: {
+    matter: string;
+    memory: string;
+    starts: string;
+    sources: string;
+    ai: string;
+    plan: string;
+    sourcePrefix: string;
+    action: string;
+  };
 }
 export interface OnboardingStatus {
   content: OnboardingContent;
   choices: LocalOnboardingChoices | null;
   showGuide: boolean;
   hasUserData: boolean;
-  sources: readonly OnboardingSourceInfo[];
+  sources: readonly (OnboardingSourceInfo & { done: boolean; skipped: boolean })[];
+  next: OnboardingNext | null;
+  draft: OnboardingMatter | null;
   checklist: {
     items: {
       id: string;
       title: string;
       done: boolean;
       skipped: boolean;
+      disabled: boolean;
       action: { kind: string; target: string; label: string };
     }[];
     completed: number;
@@ -378,7 +424,7 @@ interface FilePreview {
   expires: number;
 }
 export type OnboardingSetupInput =
-  | { source: "projects"; project: ProjectInput }
+  | { source: "projects"; project: ProjectInput; github?: string }
   | { source: "news"; keywords: string[] };
 export interface OnboardingSetupPreview {
   token: string;
@@ -388,6 +434,7 @@ export interface OnboardingSetupResult {
   version: string | null;
   before: string | null;
   slug?: string;
+  github?: { repo: string; ok: boolean; problem: GithubProblem; error?: string };
 }
 interface SetupPreview {
   kind: "setup";
@@ -400,6 +447,7 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
   z
     .object({
       source: z.literal("projects"),
+      github: z.string().trim().min(1).optional(),
       project: z
         .object({
           title: z.string().trim().min(1).max(200),
@@ -415,11 +463,12 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
                 })
                 .strict(),
             )
-            .min(1),
+            .default([]),
         })
         .strict(),
     })
-    .strict(),
+    .strict()
+    .refine((input) => input.project.links.length > 0 || !!input.github),
   z
     .object({
       source: z.literal("news"),
@@ -433,10 +482,11 @@ export function previewOnboardingSetup(
   options: OnboardingOptions = {},
 ): OnboardingSetupPreview {
   const parsed = onboardingSetupSchema.safeParse(value);
-  if (!parsed.success) throw new KaituError("请提供项目文件夹或关注方向", "BAD_ARGS");
+  if (!parsed.success) throw new KaituError("请提供项目文件夹、GitHub 仓库或关注方向", "BAD_ARGS");
   const input = parsed.data;
   if (input.source === "projects") {
     if (!ws.exists("projects/module.json")) throw new KaituError("请先升级工作区以启用项目", "BAD_ARGS");
+    if (input.github) input.github = parseGithubRepo(input.github);
     for (const link of input.project.links) {
       if (!isAbsolute(link.path) || !existsSync(link.path) || !statSync(link.path).isDirectory())
         throw new KaituError("项目链接必须是本机已有文件夹的绝对路径", "BAD_ARGS");
@@ -465,21 +515,46 @@ export async function confirmOnboardingSetup(
   let result: OnboardingSetupResult;
   if (preview.input.source === "projects") {
     const input = preview.input.project;
-    if (!input.links?.every((link) => existsSync(link.path) && statSync(link.path).isDirectory()))
+    const github = preview.input.github;
+    input.links ??= [];
+    if (!input.links.every((link) => existsSync(link.path) && statSync(link.path).isDirectory()))
       throw new KaituError("项目文件夹已变化，请重新预览", "CONFLICT");
     const existing = listProjects(ws).find(
       (project) =>
         project.title === input.title &&
         project.kind === input.kind &&
         project.local_only === (input.local_only ?? false) &&
+        (!github || !project.github || project.github.repo.toLowerCase() === github.toLowerCase()) &&
         JSON.stringify(project.links) === JSON.stringify(input.links),
     );
     result = existing
-      ? { slug: existing.slug, version: null, before }
+      ? { slug: existing.slug, version: null, before: input.local_only && driveProjects(ws) ? null : before }
       : {
           ...(await createProject(ws, input)),
           before: input.local_only && driveProjects(ws) ? null : before,
         };
+    if (github && result.slug) {
+      try {
+        const bound = await bindGithub(ws, result.slug, github);
+        result.github = {
+          repo: bound.repo,
+          ok: bound.ok,
+          problem: bound.problem,
+          ...(bound.ok ? {} : { error: projectGithub(ws, result.slug)?.error ?? "GitHub 同步失败" }),
+        };
+        result.version = bound.version ?? result.version;
+      } catch (error) {
+        result.github = {
+          repo: github,
+          ok: false,
+          problem:
+            error instanceof KaituError && "problem" in error ? (error.problem as GithubProblem) : "network",
+          error: error instanceof Error ? error.message : "GitHub 连接失败",
+        };
+      }
+      result.version =
+        (await projectVersion(ws, result.slug, "新手引导：保存项目与 GitHub 连接")) ?? result.version;
+    }
   } else {
     const current = ws.exists("feed/feeds.json") ? ws.readText("feed/feeds.json") : null;
     if (current !== preview.previousFeeds) throw new KaituError("关注方向已变化，请重新预览", "CONFLICT");
@@ -490,7 +565,7 @@ export async function confirmOnboardingSetup(
     if (changed) ws.writeJson("feed/feeds.json", { ...feeds, keywords });
     result = { before, version: changed ? await snapshot(ws, "新手引导：保存关注方向") : null };
   }
-  cancelOnboardingPreview(ws, token, options);
+  if (!result.github || result.github.ok) cancelOnboardingPreview(ws, token, options);
   return result;
 }
 function previewFile(token: string) {
@@ -628,13 +703,24 @@ function hasUserFiles(ws: Workspace): boolean {
       if (entry.isDirectory()) return walk(file);
       const template = join(templateDir(), file);
       if (!existsSync(template)) return statSync(ws.resolve(file)).size > 0;
-      const text = ws.readText(file);
+      const text = ws.scanText(file);
+      if (text === undefined) return true;
       const normalize = (value: string) =>
         file === "me/rules.md" ? value.replace(/^timezone:.*$/m, "") : value;
       return normalize(text) !== normalize(readFileSync(template, "utf8"));
     });
   }
   return walk("");
+}
+function hasCollectedMessages(ws: Workspace, dir = "inbox"): boolean {
+  if (!ws.exists(dir)) return false;
+  return readdirSync(ws.resolve(dir), { withFileTypes: true }).some((entry) => {
+    if (entry.isSymbolicLink()) return false;
+    const file = `${dir}/${entry.name}`;
+    return entry.isDirectory()
+      ? hasCollectedMessages(ws, file)
+      : entry.isFile() && /^channel-[a-f0-9]{64}\.note\.md$/.test(entry.name);
+  });
 }
 export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {}): OnboardingStatus {
   const choices = localRead<LocalOnboardingChoices | null>(ws, "choices.json", null, options);
@@ -644,12 +730,17 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       .filter((m) => m.def.id === module)
       .flatMap((m) => Object.keys(m.def.records ?? {}))
       .reduce((n, type) => n + (data.records[type]?.length ?? 0), 0);
+  const calendarFile = join(stateDirectory(ws.root), "calendar-subscriptions.json");
+  const calendars: CalendarSubscription[] = existsSync(calendarFile)
+    ? JSON.parse(readFileSync(calendarFile, "utf8"))
+    : [];
+  const collected = hasCollectedMessages(ws);
   const sourceData: Record<OnboardingSource, boolean> = {
-    calendar: !!data.records.event?.length,
+    calendar: !!data.records.event?.length || calendars.some((subscription) => !!subscription.syncedAt),
     health: count("health") + data.labs.length > 0,
     finance: count("finance") > 0,
     projects: data.projects.some((p) => p.links.length > 0 || !!p.github?.latest),
-    mail: listChatFiles(ws).some((file) => readChat(ws, file).messages.length > 0),
+    mail: collected || listChatFiles(ws).some((file) => readChat(ws, file).messages.length > 0),
     news: data.feeds.feeds.length + data.feeds.keywords.length > 0 || count("feed") > 0,
   };
   const required = new Set(
@@ -657,45 +748,72 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       ...(ONBOARDING.starts.find((item) => item.id === id)?.sources ?? []),
     ]),
   );
-  const sources = ONBOARDING.sources.filter((source) => required.has(source.id));
-  const plan = ws.exists("NOW.md")
-    ? parseFrontmatter<{ generated_at?: string | null }>(ws.readText("NOW.md")).data
-    : {};
+  const sources = ONBOARDING.sources
+    .filter((source) => required.has(source.id))
+    .map((source) => ({
+      ...source,
+      done: sourceData[source.id],
+      skipped: choices?.skipped?.includes(source.id) ?? false,
+    }));
+  const planText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
+  const plan = planText ? parseFrontmatter<{ generated_at?: string | null }>(planText).data : {};
   const connected = localRead<{ connectedAt?: string }>(ws, "ai.json", {}, options).connectedAt;
   const ai =
     !!connected || Object.values(data.records).some((rows) => rows.some((row) => row.by === "agent"));
+  const adopted = listTasks(ws, { status: "all" }).filter(isOnboardingTask);
+  const latest = adopted
+    .filter((task) => task.status !== "cancelled")
+    .sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id))[0];
   const items = [
+    {
+      id: "matter",
+      title: ONBOARDING.checklist.matter,
+      done: adopted.length > 0,
+      action: { kind: "matter", target: "matter" },
+    },
     {
       id: "memory",
       title: ONBOARDING.checklist.memory,
       done: data.memories.length > 0,
       action: { kind: "memory", target: "memory" },
     },
-    ...sources.map((source) => ({
-      id: source.id,
-      title: `${ONBOARDING.checklist.sourcePrefix}${source.title}`,
-      done: sourceData[source.id],
-      action: { kind: "source", target: source.target },
-    })),
+    {
+      id: "starts",
+      title: ONBOARDING.checklist.starts,
+      done: !!choices?.starts?.length,
+      action: { kind: "starts", target: "starts" },
+    },
+    {
+      id: "sources",
+      title: ONBOARDING.checklist.sources,
+      done: !!choices?.starts?.length && sources.every((source) => source.done),
+      action: { kind: "source", target: "sources" },
+    },
     {
       id: "ai",
       title: ONBOARDING.checklist.ai,
       done: ai || !!plan.generated_at,
-      action: { kind: "ai", target: choices?.aiChoice === "builtin" ? "ask" : "connections" },
+      action: { kind: "ai", target: "ai" },
     },
     {
       id: "plan",
       title: ONBOARDING.checklist.plan,
-      done: !!plan.generated_at || data.now.data.blocks.length > 0,
+      done:
+        !!plan.generated_at ||
+        data.now.data.blocks.some((block) => block.status === "confirmed" || block.status === "done"),
       action: { kind: "plan", target: "plan" },
     },
   ].map((item) => ({
     ...item,
+    disabled: item.id === "sources" && !choices?.starts?.length,
     action: { ...item.action, label: ONBOARDING.checklist.action },
     skipped: choices?.skipped?.includes(item.id as OnboardingSource | "memory" | "ai" | "plan") ?? false,
   }));
   const completed = items.filter((item) => item.done).length;
   const hasUserData =
+    calendars.length > 0 ||
+    collected ||
+    ws.unavailableFiles().length > 0 ||
     data.projects.length > 0 ||
     Object.values(data.records).some((rows) => rows.length > 0) ||
     hasUserFiles(ws);
@@ -705,6 +823,8 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     showGuide: !choices && !hasUserData,
     hasUserData,
     sources,
+    next: latest ? onboardingNext(ws, latest) : null,
+    draft: pendingOnboardingMatter(ws),
     checklist: {
       items,
       completed,
@@ -769,4 +889,281 @@ export async function saveOnboardingChoices(
 export function resetOnboarding(ws: Workspace, options: OnboardingOptions = {}) {
   rmSync(join(localDirectory(ws, options), "choices.json"), { force: true });
   return onboardingStatus(ws, options);
+}
+
+export interface OnboardingMatterDraft {
+  goal: string;
+  current: string;
+  next: string;
+}
+export interface OnboardingPath {
+  name: string;
+  fit: string;
+  unknown: string;
+  experiment: string;
+}
+export interface OnboardingMatterSuggestion extends OnboardingMatterDraft {
+  paths?: OnboardingPath[];
+}
+export interface OnboardingMatter {
+  source: string;
+  text: string;
+  kind: "conversation" | "note";
+  draft: OnboardingMatterSuggestion | null;
+}
+export interface OnboardingNext extends OnboardingMatterDraft {
+  kind: "conversation" | "note";
+  id: string;
+  source: string;
+  status: string;
+  due: string | null;
+  result: string;
+  rev: number;
+}
+export const onboardingMatterSchema = z
+  .object({
+    goal: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .regex(/^[^\r\n]+$/),
+    current: z
+      .string()
+      .trim()
+      .max(4000)
+      .regex(/^[^\r\n]*$/),
+    next: z
+      .string()
+      .trim()
+      .min(1)
+      .max(2000)
+      .regex(/^[^\r\n]+$/),
+  })
+  .strict();
+const pathText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2000)
+  .regex(/^[^\r\n]+$/);
+export const onboardingPathSchema = z
+  .object({ name: pathText, fit: pathText, unknown: pathText, experiment: pathText })
+  .strict();
+export const onboardingMatterSuggestionSchema = onboardingMatterSchema
+  .extend({
+    next: z
+      .string()
+      .trim()
+      .max(2000)
+      .regex(/^[^\r\n]*$/),
+    paths: z.array(onboardingPathSchema).min(2).max(3).optional(),
+  })
+  .refine((input) => (input.paths ? !input.next : !!input.next), "路径先由用户选择，不预填下一步");
+function inputKind(text: string): "conversation" | "note" {
+  return /(?:^|\n)\s*(?:[-*>]\s*)?(?:ChatGPT|Claude|Gemini|DeepSeek|豆包|Kimi|通义|助手|assistant|AI|你)\s*[:：]/i.test(
+    text,
+  )
+    ? "conversation"
+    : "note";
+}
+function pathNotes(paths: OnboardingPath[]) {
+  return paths
+    .map(
+      (path, index) =>
+        `\n#### 可能路径 ${index + 1}\n名称：${path.name}\n为什么适合：${path.fit}\n还有哪些不清楚：${path.unknown}\n小实验：${path.experiment}\n`,
+    )
+    .join("");
+}
+function readPaths(section: string): OnboardingPath[] {
+  return section
+    .split(/\n#### 可能路径 \d+\n/)
+    .slice(1)
+    .map((part) => ({
+      name: noteLine(part, "名称"),
+      fit: noteLine(part, "为什么适合"),
+      unknown: noteLine(part, "还有哪些不清楚"),
+      experiment: noteLine(part, "小实验"),
+    }));
+}
+const matterId = (source: string) =>
+  `onboarding-matter-${createHash("sha256").update(source).digest("hex").slice(0, 20)}`;
+function matterNotes(draft: OnboardingMatterDraft) {
+  return `当前目标：${draft.goal}\n已知现状：${draft.current}\n`;
+}
+function noteLine(notes: string, label: string) {
+  return (
+    notes
+      .split("\n")
+      .find((line) => line.startsWith(`${label}：`))
+      ?.slice(label.length + 1) ?? ""
+  );
+}
+function isOnboardingTask(task: Task): boolean {
+  return (
+    typeof task.source === "string" &&
+    /^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) &&
+    !!noteLine(task.notes ?? "", "当前目标")
+  );
+}
+function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
+  let kind: OnboardingMatter["kind"] = "note";
+  try {
+    kind = readOnboardingMatter(ws, task.source ?? "").kind;
+  } catch {}
+  return {
+    kind,
+    id: task.id,
+    source: task.source ?? "",
+    next: task.title,
+    goal: noteLine(task.notes ?? "", "当前目标"),
+    current: noteLine(task.notes ?? "", "已知现状"),
+    result: noteLine(task.notes ?? "", "完成结果"),
+    status: task.status,
+    due: task.due ?? null,
+    rev: task.rev ?? 1,
+  };
+}
+export function readOnboardingMatter(ws: Workspace, source: string): OnboardingMatter {
+  if (typeof source !== "string" || !/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(source))
+    throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
+  const file = findInboxNote(ws, basename(source));
+  const text = file ? ws.scanText(file) : undefined;
+  if (!text || noteMetadata(text).kind !== "capture") throw new KaituError("原文记录不存在", "NOT_FOUND");
+  if (source !== `inbox/notes/${noteMetadata(text).date}/${basename(source)}`)
+    throw new KaituError("原文来源与保存记录不一致", "BAD_ARGS");
+  const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+  const item = doc.data.next?.find((item) => item.id === matterId(source) && item.status === "proposed");
+  const section = doc.body.split(`### ${matterId(source)}\n`)[1]?.split("\n### ")[0] ?? "";
+  const paths = readPaths(section);
+  const draft = item
+    ? {
+        goal: noteLine(section, "当前目标"),
+        current: noteLine(section, "已知现状"),
+        next: paths.length ? "" : item.title,
+        ...(paths.length ? { paths } : {}),
+      }
+    : null;
+  const original = parseFrontmatter(text).body;
+  return { source, text: original, kind: inputKind(original), draft };
+}
+function pendingOnboardingMatter(ws: Workspace): OnboardingMatter | null {
+  const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+  const item = [...(doc.data.next ?? [])]
+    .reverse()
+    .find((item) => item.id.startsWith("onboarding-matter-") && item.status === "proposed");
+  if (!item?.ref) return null;
+  try {
+    return readOnboardingMatter(ws, item.ref);
+  } catch {
+    return null;
+  }
+}
+export async function saveOnboardingMatter(ws: Workspace, text: string): Promise<OnboardingMatter> {
+  const result = await captureNote(ws, text);
+  return readOnboardingMatter(ws, result.path);
+}
+export async function draftOnboardingMatter(
+  ws: Workspace,
+  source: string,
+  input: OnboardingMatterSuggestion,
+): Promise<OnboardingMatter> {
+  readOnboardingMatter(ws, source);
+  const parsed = onboardingMatterSuggestionSchema.safeParse(input);
+  if (!parsed.success)
+    throw new KaituError("请填写当前目标、已知现状和一个下一步，均使用单行文本", "BAD_ARGS");
+  const draft = parsed.data;
+  const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+  const id = matterId(source);
+  if (listTasks(ws, { status: "all" }).some((task) => task.source === source))
+    throw new KaituError("这段原文已有采纳的下一步", "CONFLICT");
+  doc.data.next = [
+    ...(doc.data.next ?? []).filter((item) => item.id !== id),
+    { id, title: draft.paths ? "从可能路径中选择一个小实验" : draft.next, status: "proposed", ref: source },
+  ];
+  doc.data.updated = isoInZone(new Date(), ws.timeZone());
+  const section = `### ${id}\n${matterNotes(draft)}${pathNotes(draft.paths ?? [])}`;
+  const old = doc.body.indexOf(`### ${id}\n`);
+  const end = old < 0 ? -1 : doc.body.indexOf("\n### ", old + 4);
+  doc.body =
+    old < 0
+      ? `${doc.body.trimEnd()}\n\n${section}`
+      : `${doc.body.slice(0, old)}${section}${end < 0 ? "" : doc.body.slice(end)}`;
+  ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  await snapshot(ws, "AI 整理了一条待核对的下一步");
+  return readOnboardingMatter(ws, source);
+}
+export async function keepOnboardingMatter(ws: Workspace, source: string): Promise<OnboardingMatter> {
+  const matter = readOnboardingMatter(ws, source);
+  if (!matter.draft) return matter;
+  const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+  doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
+  ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  await snapshot(ws, "你只保留了原文，未采纳下一步");
+  return readOnboardingMatter(ws, source);
+}
+export async function adoptOnboardingMatter(
+  ws: Workspace,
+  source: string,
+  input: OnboardingMatterDraft,
+  path: OnboardingPath | null = null,
+): Promise<OnboardingNext> {
+  const matter = readOnboardingMatter(ws, source);
+  const parsed = onboardingMatterSchema.safeParse(input);
+  if (!parsed.success)
+    throw new KaituError("请填写当前目标、已知现状和一个下一步，均使用单行文本", "BAD_ARGS");
+  const draft = parsed.data;
+  const existing = listTasks(ws, { status: "all" }).find((task) => task.source === source);
+  if (existing) return onboardingNext(ws, existing);
+  const paths = matter.draft?.paths;
+  const selected = onboardingPathSchema.safeParse(path);
+  const chosen = paths?.find(
+    (item) =>
+      selected.success &&
+      item.name === selected.data.name &&
+      item.fit === selected.data.fit &&
+      item.unknown === selected.data.unknown &&
+      item.experiment === selected.data.experiment,
+  );
+  if (paths?.length && !chosen)
+    throw new KaituError(
+      path ? "路径已经变化，请重新核对" : "请先选一条可能路径，再核对小实验",
+      path ? "CONFLICT" : "USER_DECISION",
+    );
+  const notes =
+    matterNotes(draft) +
+    (chosen
+      ? `所选路径：${chosen.name}\n为什么适合：${chosen.fit}\n还有哪些不清楚：${chosen.unknown}\n原建议小实验：${chosen.experiment}\n`
+      : "");
+  let task: Task | undefined;
+  await batchSnapshot(ws, "你从原文采纳了一个下一步", async () => {
+    task = (await addTask(ws, { title: draft.next, source, notes })).record as Task;
+    const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+    doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
+    ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  });
+  if (!task) throw new KaituError("下一步未保存", "WRITE_FAILED");
+  return onboardingNext(ws, task);
+}
+export async function changeOnboardingNext(
+  ws: Workspace,
+  id: string,
+  rev: number,
+  action: string,
+  value: string,
+): Promise<OnboardingNext> {
+  const task = listTasks(ws, { status: "all" }).find((item) => item.id === id && isOnboardingTask(item));
+  if (!task) throw new KaituError("下一步不存在", "NOT_FOUND");
+  if (task.status !== "open" || (task.rev ?? 1) !== rev)
+    throw new KaituError("下一步已变化，请刷新后重试", "CONFLICT");
+  if (typeof value !== "string" || !value.trim()) throw new KaituError("请写一句结果或选择日期", "BAD_ARGS");
+  let patch: Record<string, unknown>;
+  if (action === "complete") {
+    if (value.length > 2000 || /[\r\n]/.test(value)) throw new KaituError("请用一句话记录结果", "BAD_ARGS");
+    patch = { status: "done", notes: `${task.notes ?? ""}完成结果：${value.trim()}\n` };
+  } else if (action === "defer" && /^\d{4}-\d{2}-\d{2}$/.test(value)) patch = { due: value };
+  else throw new KaituError("操作或日期不合法", "BAD_ARGS");
+  const result = updateRecord(ws, "task", id, patch, { by: "user" });
+  await snapshot(ws, action === "complete" ? "你完成下一步并记下结果" : "你调整了下一步的日期");
+  return onboardingNext(ws, result.record as Task);
 }

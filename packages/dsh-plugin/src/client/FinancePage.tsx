@@ -559,7 +559,7 @@ function ImportPanel({
   );
 }
 
-export function FinancePage(props: FinancePageProps) {
+export function FinancePage(props: FinancePageProps & { initialImport?: boolean }) {
   const {
     loadFinanceOverview,
     loadFinanceCashflow,
@@ -571,7 +571,7 @@ export function FinancePage(props: FinancePageProps) {
   const [tab, setTab] = useState(0);
   const [period, setPeriod] = useState("month");
   const [currency, setCurrency] = useState("CNY");
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState(props.initialImport ?? false);
   const [data, setData] = useState<{
     overview: FinanceOverviewData;
     cashflow: FinanceCashflowData;
