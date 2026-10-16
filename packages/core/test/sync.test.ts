@@ -95,7 +95,8 @@ it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可
     mkdirSync(custom);
     await enableSync(ws, "icloud", { dir: custom, name: "life" });
     expect(syncStatus(new Workspace(ws.root)).mode).toBe("icloud");
-    await disableSync(ws);
+    // 设置里选「本机」走同一条关闭同步的路。
+    await moveWorkspace(ws, join(home, "local-life"), false, "local");
     expect(syncStatus(ws).mode).toBe("local");
     expect(readRecords(ws, "task").find((row) => row.id === task.record.id)?.title).toBe(taskMarker);
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);

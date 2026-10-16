@@ -313,7 +313,7 @@ export async function moveWorkspace(ws: Workspace, target: string, drive: boolea
       name: destination.split(/[\\/]/).at(-1),
       ...(provider === undefined || provider === "icloud" || provider === "local" ? {} : { provider }),
     });
-  if (!drive && mode === "drive") return disableDrive(ws, { to: destination });
+  if (!drive && mode !== "local") return disableDrive(ws, { to: destination });
   const old = ws.root;
   separate(old, destination);
   await snapshot(ws, "迁移资料前保存");
