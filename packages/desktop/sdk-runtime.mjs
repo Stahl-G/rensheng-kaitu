@@ -11,7 +11,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
     ELECTRON_RUN_AS_NODE: "1",
     DSH_HOME: home,
     KAITU_DSH_MODULES: modules,
-    KAITU_DIR: workspace,
+
     DSH_PRIMARY_RUNTIME: "",
     DSH_PERMISSION_MODE: "workspace-write",
   };
@@ -63,6 +63,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       return { ...settings, configured: settings.choice === "builtin" };
     },
     async runtime() {
+      const root = typeof workspace === "function" ? workspace() : workspace;
       const settings = loadSettings();
       if (settings.choice === "external" || !(await credential("status")).configured)
         throw new Error("请先连接内置 AI");
@@ -97,15 +98,15 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
             id: "skill-filesystem",
             config: {
               includeDefaultRoots: false,
-              customSkillDirs: [join(workspace, ".agents/skills")],
+              customSkillDirs: [join(root, ".agents/skills")],
               watch: false,
             },
           },
           {
             id: "agent-instructions",
-            config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: [".kaitu"] },
+            config: { maxBytes: 65536, dshHome: join(root, ".dsh"), projectRootMarkers: [".kaitu"] },
           },
-          { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
+          { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: root } },
           { id: "approval", config: { policy: "never" } },
           { id: "permission", disabled: true },
           { id: "tool-skill", disabled: false },
@@ -113,7 +114,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
             insert: [
               { id: "kaitu-sdk-host", name: hostPlugin },
               { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-              { id: "kaitu", name: plugin, config: { workspace } },
+              { id: "kaitu", name: plugin, config: { workspace: root } },
             ],
           },
         ]),
@@ -133,8 +134,8 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
           profile,
         ],
         {
-          cwd: workspace,
-          env,
+          cwd: root,
+          env: { ...env, KAITU_DIR: root },
           detached: true,
           stdio: ["pipe", "pipe", "ignore"],
         },
@@ -200,7 +201,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       try {
         await rpc.request(
           "initialize",
-          { cwd: workspace, provider: settings.provider, model: settings.model },
+          { cwd: root, provider: settings.provider, model: settings.model },
           AbortSignal.timeout(20000),
         );
       } catch {

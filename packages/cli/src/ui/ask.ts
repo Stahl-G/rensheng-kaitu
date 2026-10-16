@@ -38,6 +38,7 @@ export interface AskService {
     model: string;
   }>;
   configure(input: Record<string, unknown>): Promise<unknown>;
+  prepareRelocation?(): Promise<void>;
   close(): Promise<void>;
 }
 const visible = new Set<AskEventType>([
@@ -211,6 +212,13 @@ export function createAskService(options: {
       runtime = undefined;
       starting = undefined;
       return options.configure(input);
+    },
+    async prepareRelocation() {
+      if (busy.size) throw new Error("请等回复完成后更换存放位置");
+      await starting?.catch(() => {});
+      await runtime?.close();
+      runtime = undefined;
+      starting = undefined;
     },
     async close() {
       closed = true;

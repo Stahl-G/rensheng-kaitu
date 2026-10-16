@@ -1,3 +1,4 @@
+import childProcess from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   constants,
@@ -18,6 +19,7 @@ import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { refreshOverview } from "./overview.js";
 import { rebaseProjectLinks, relocateProjects } from "./projects.js";
+import { type SyncMode, iCloudDirectory, syncMode } from "./sync-location.js";
 import { validateWorkspace } from "./validate.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -118,28 +120,41 @@ async function verify(ws: Workspace) {
   }
 }
 
-export function driveStatus(ws: Workspace) {
+export function syncStatus(ws: Workspace) {
   const state = stateDirectory(ws.root);
-  const drive = state !== join(ws.root, ".kaitu");
+  const mode = syncMode(ws.root);
   const file = ".kaitu/inbox-state.json";
   return {
-    mode: drive ? "drive" : "local",
-    drivePath: drive ? ws.root : null,
+    mode,
+    path: ws.root,
+    drivePath: mode === "drive" ? ws.root : null,
+    hint: mode === "icloud" ? "在 Finder 里对工作区文件夹选『始终保留下载』" : null,
     root: ws.root,
     stateDir: state,
     lastInboxProcessed: ws.exists(file) ? ws.readJson<{ lastProcessed: string }>(file).lastProcessed : null,
   };
 }
 
-export async function enableDrive(ws: Workspace, options: { driveDir?: string; name?: string } = {}) {
-  if (driveStatus(ws).mode === "drive") throw new KaituError("已开启 Drive 模式", "CONFLICT");
+export async function enableSync(
+  ws: Workspace,
+  mode: Exclude<SyncMode, "local">,
+  options: { dir?: string; name?: string } = {},
+) {
+  if (mode !== "icloud" && mode !== "drive") throw new KaituError("请选择 icloud 或 drive", "BAD_ARGS");
+  if (syncStatus(ws).mode !== "local")
+    throw new KaituError("已在同步模式，请先运行 kaitu sync disable 搬回本机", "CONFLICT");
+  if (mode === "icloud" && process.platform !== "darwin")
+    throw new KaituError("iCloud 同步仅支持 macOS", "UNSUPPORTED_PLATFORM");
   const name = options.name ?? "kaitu";
   if (!name || name === "." || name === ".." || /[/\\]/.test(name))
     throw new KaituError("name 必须是单个目录名", "BAD_ARGS");
-  const drive = resolve(options.driveDir ?? findDriveDirectory());
-  accessSync(drive, constants.W_OK);
+  const cloud = mode === "icloud" ? iCloudDirectory() : undefined;
+  if (cloud && !existsSync(cloud))
+    throw new KaituError("在系统设置 → Apple 账户 → iCloud 里打开 iCloud 云盘", "ICLOUD_DIRECTORY");
+  const folder = resolve(options.dir ?? cloud ?? findDriveDirectory());
+  accessSync(folder, constants.W_OK);
   const old = ws.root;
-  const target = join(drive, name);
+  const target = join(folder, name);
   if (existsSync(target)) throw new KaituError(`目标已存在，未覆盖：${target}`, "TARGET_EXISTS");
   separate(old, target);
   const state = join(localStateRoot(), randomUUID());
@@ -152,7 +167,8 @@ export async function enableDrive(ws: Workspace, options: { driveDir?: string; n
   try {
     mkdirSync(join(old, ".kaitu"));
     ws.writeJson(".kaitu/config.json", { ...config, state_dir: state }, { internal: true });
-    // 配置必须在同步工作区内，其他状态从未进入 Drive。
+    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode })}\n`);
+    // 配置留在同步文件夹，其他状态留在本机。
     rmSync(join(state, "config.json"));
     move(old, target);
   } catch (error) {
@@ -167,13 +183,18 @@ export async function enableDrive(ws: Workspace, options: { driveDir?: string; n
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
-  await snapshot(ws, "开启 Google Drive 同步");
+  if (mode === "icloud") {
+    try {
+      childProcess.execFileSync("brctl", ["download", target], { timeout: 2000, stdio: "ignore" });
+    } catch {}
+  }
+  await snapshot(ws, `开启 ${mode === "icloud" ? "iCloud" : "Google Drive"} 同步`);
   await verify(ws);
-  return driveStatus(ws);
+  return syncStatus(ws);
 }
 
-export async function disableDrive(ws: Workspace, options: { to?: string } = {}) {
-  if (driveStatus(ws).mode !== "drive") throw new KaituError("当前是本地模式", "CONFLICT");
+export async function disableSync(ws: Workspace, options: { to?: string } = {}) {
+  if (syncStatus(ws).mode === "local") throw new KaituError("当前是本地模式", "CONFLICT");
   const old = ws.root;
   const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu"));
   separate(old, target);
@@ -193,7 +214,7 @@ export async function disableDrive(ws: Workspace, options: { to?: string } = {})
     rmSync(target, { recursive: true });
   }
   const extras = readdirSync(join(old, ".kaitu")).filter((file) => file !== "config.json");
-  if (extras.length) throw new KaituError("Drive 的 .kaitu/ 有额外文件，请先核对再迁移", "CONFLICT");
+  if (extras.length) throw new KaituError("同步文件夹的 .kaitu/ 有额外文件，请先核对再迁移", "CONFLICT");
   move(old, target);
   ws.root = target;
   try {
@@ -208,11 +229,19 @@ export async function disableDrive(ws: Workspace, options: { to?: string } = {})
   }
   const { state_dir: _state, ...local } = config;
   ws.writeJson(".kaitu/config.json", local, { internal: true });
+  rmSync(join(target, ".kaitu/sync-location.json"), { force: true });
   relocateProjects(ws, false);
   rebaseProjectLinks(ws, old, target);
   remember(target);
   relocationNote(old, target);
-  await snapshot(ws, "关闭 Google Drive 同步，搬回本机");
+  await snapshot(ws, "关闭同步，搬回本机");
   await verify(ws);
-  return driveStatus(ws);
+  return syncStatus(ws);
+}
+
+export const driveStatus = syncStatus;
+export const disableDrive = disableSync;
+
+export function enableDrive(ws: Workspace, options: { driveDir?: string; name?: string } = {}) {
+  return enableSync(ws, "drive", { dir: options.driveDir, name: options.name });
 }

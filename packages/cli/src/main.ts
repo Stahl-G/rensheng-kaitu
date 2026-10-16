@@ -21,10 +21,9 @@ import {
   createProject,
   defaultRoot,
   deleteRecord,
-  disableDrive,
+  disableSync,
   doctor,
-  driveStatus,
-  enableDrive,
+  enableSync,
   findRecordType,
   history,
   importAppleHealth,
@@ -60,6 +59,7 @@ import {
   snapshot,
   syncProject,
   syncProjects,
+  syncStatus,
   updateMemory,
   updateRecord,
   upgradeWorkspace,
@@ -78,6 +78,8 @@ const HELP = `开图 kaitu
 
 用法：
   kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
+  kaitu sync enable icloud|drive [--dir <路径>] [--name kaitu]  选择同步文件夹
+  kaitu sync disable [--to <目录>] | status          搬回本机 / 查看存放位置
   kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
   kaitu drive disable [--to <目录>]                  搬回本机
   kaitu drive status                                查看同步状态
@@ -313,22 +315,29 @@ async function run(argv: string[]): Promise<number> {
       out(values, result, JSON.stringify(result, null, 2));
       return 0;
     }
+    case "sync":
     case "drive": {
-      const ws = workspace(values);
       const action = args[0];
+      const ws = workspace(cmd === "sync" && action === "enable" ? { ...values, dir: undefined } : values);
+      const mode = cmd === "drive" ? "drive" : args[1];
+      if (action === "enable" && mode !== "icloud" && mode !== "drive")
+        throw new KaituError("使用 sync enable icloud|drive", "BAD_ARGS");
       const result =
         action === "enable"
-          ? await enableDrive(ws, { driveDir: values["drive-dir"], name: values.name })
+          ? await enableSync(ws, mode as "icloud" | "drive", {
+              dir: cmd === "drive" ? values["drive-dir"] : values.dir,
+              name: values.name,
+            })
           : action === "disable"
-            ? await disableDrive(ws, { to: values.to })
+            ? await disableSync(ws, { to: values.to })
             : action === "status"
-              ? driveStatus(ws)
+              ? syncStatus(ws)
               : undefined;
-      if (!result) throw new KaituError("使用 drive enable / disable / status", "BAD_ARGS");
+      if (!result) throw new KaituError("使用 sync enable icloud|drive / disable / status", "BAD_ARGS");
       out(
         values,
         result,
-        `模式：${result.mode}\n工作区：${result.root}\nDrive：${result.drivePath ?? "未开启"}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}`,
+        `模式：${result.mode}\n工作区：${result.root}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}${result.hint ? `\n${result.hint}` : ""}`,
       );
       return 0;
     }

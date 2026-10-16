@@ -1,35 +1,66 @@
-# Google Drive 模式（给 Grok Bot / ChatGPT Dots 用户）
+# 存放位置：本机、iCloud 或 Google Drive
 
-状态：已实现（2026-10-15，决策 D20）。临时目录迁移、收件箱与工作台自动保存已验证；真实 Drive / 云端连接器仍待实测。
+本轮只提供后端、CLI 与本地接口。设置页面由 ui-v2 后续接入。
 
-## 为什么
+## 怎么选择
 
-Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，但都有 Google Drive 连接器。把工作区放进 Google Drive 同步文件夹，它们就能直接读到现状，也能把结果放回来，不需要把本机接口暴露到公网。能用这两个产品的用户本来就能用 Google Drive。
+| 存放位置 | 用途 | 云端 AI 接力 |
+|---|---|---|
+| 本机（默认） | 只在当前 Mac 使用，不依赖云盘 | 无 |
+| iCloud | 多台 Mac 同步资料，为以后的 iPhone 开图准备文件位置 | 无，云端 AI 读不到 iCloud |
+| Google Drive | 同步资料，并让 Grok Bot / ChatGPT Dots 通过 Drive 连接器接力 | 唯一支持的云端接力途径 |
 
-## 用户怎么开
+三选一。已启用一种同步模式时，开启另一种会报错，先搬回本机再选择。
+两种同步模式都把版本、密钥、索引、cache、上传暂存与本机项目留在本机状态目录。
 
-1. 安装 Google Drive 电脑版（官方客户端），登录。
-2. `kaitu drive enable`（工作台「设置 → 同步到 Google Drive」同等功能）：找到 Drive 的「我的云端硬盘」本地路径（macOS 一般在 `~/Library/CloudStorage/GoogleDrive-<账号>/` 下，子目录名随系统语言变化：英文 `My Drive`、中文「我的云端硬盘」等，不要写死，取该目录下唯一的可写子目录或让用户选；有多个账号时让用户选），把工作区移到其中的 `kaitu/`，并把不该上云的东西移出来（见下）。
-3. 在 Grok Bot / Dots 里连上 Google Drive，告诉它「读 `kaitu/AGENT-README.md`」。
-4. `kaitu drive disable`：搬回本机，状态目录合并回去。
+## 命令
 
-默认关闭。开启前界面明确提示：个人数据会存到 Google Drive，版本历史与密钥留在本机。
+```sh
+kaitu sync status
+kaitu sync enable icloud
+kaitu sync enable drive
+kaitu sync enable icloud --dir /自选同步目录 --name kaitu
+kaitu sync disable --to /本机目录/kaitu
+```
 
-- `kaitu drive enable [--drive-dir <我的云端硬盘目录>] [--name kaitu]`；目标已存在时报错，不覆盖。
-- `kaitu drive disable [--to <本机目录>]`，默认搬到 `~/kaitu`；允许回到此前只留下迁移说明的目录。
-- `kaitu drive status` 显示模式、路径、状态目录与上次处理收件箱的时间。
-- 旧位置留下 `WORKSPACE-MOVED.md`；本机状态根目录的 `current-workspace.json` 供 `defaultRoot()` 找到当前位置，
-  显式 `--dir` 与 `KAITU_DIR` 优先。迁移后运行 doctor 与 validate。
+- `sync enable --dir` 指同步目标的父目录；原工作区从 `KAITU_DIR` 或 current-workspace 指针读取，缺省 `~/kaitu`。
+- iCloud 仅支持 macOS，默认目标为 `~/Library/Mobile Documents/com~apple~CloudDocs/kaitu/`。
+  iCloud 根目录不存在时，先在系统设置 → Apple 账户 → iCloud 里打开 iCloud 云盘。
+  开启时尽力调用 `brctl download`，最多等待两秒，失败不阻止迁移。
+  返回提示：在 Finder 里对 kaitu 文件夹选『始终保留下载』。
+- Drive 自动查找唯一 Google Drive 账号下的可写目录；多账号或目录不明确时用 `--dir` 指定。
+- `--name` 缺省 `kaitu`，目标已存在时不覆盖。
+- `disable` 缺省搬回 `~/kaitu`；允许回到只留有本次迁移说明的目录。
+- `kaitu drive enable [--drive-dir <路径>] [--name kaitu]`、`drive disable`、`drive status` 保留。
+  旧命令的全局 `--dir` 仍指原工作区。
+- status 返回 `mode`、`path` / `root`、`stateDir`、上次收件箱处理时间与 iCloud 提示。
+- 旧位置留下 `WORKSPACE-MOVED.md`，本机状态根目录的 `current-workspace.json` 记录当前位置。
+  迁移后运行 doctor 与 validate。
+
+模式不写入 config.json：没有 `state_dir` 是本机；有 `state_dir` 时，按工作区真实路径识别标准 iCloud / Google Drive 目录。
+自定义同步目录的类型写在本机状态目录 `sync-location.json`。旧版自定义 Drive 目录没有此文件时仍按 Drive 识别。
+config schema 与 PRD §6 保持不变。
+
+## 本地接口
+
+Kaitu.app 的 `local.mjs` 与 `kaitu ui` 共用 `packages/cli/src/ui/server.ts`：
+
+- `GET /api/sync`：返回存放位置与状态目录。
+- `POST /api/sync/enable`：`{"mode":"icloud"或"drive","dir":"可选父目录","name":"可选目录名"}`。
+- `POST /api/sync/disable`：`{"to":"可选本机目标目录"}`。
+- 保留 `GET /api/drive` 与 `POST /api/drive/enable`、`/api/drive/disable`；旧 enable 的 `driveDir` 参数继续支持。
+
+接口复用原有本机访问校验与串行写入队列，迁移后重建文件监听。
 
 ## 目录：哪些上云，哪些留在本机
 
 | 内容 | 位置 |
 |---|---|
-| 数据文件（模块、记录、记忆、对话、NOW.md、AGENTS.md……） | Drive 内的 `kaitu/` |
+| 数据文件（模块、记录、记忆、对话、NOW.md、AGENTS.md……） | 所选同步文件夹内的 `kaitu/` |
 | 仅本机项目与进度 | **本机**状态目录 `local-projects/<slug>/`；metric 在 `local-projects/projects/data/metrics/`，不会进入 OVERVIEW 或 MCP remote |
-| `.kaitu/config.json`（不含密钥） | Drive 内，额外记录 `"state_dir"` |
+| `.kaitu/config.json`（不含密钥） | 同步文件夹内，保留现有 `"state_dir"` |
 | 版本库（git 目录） | **本机**状态目录 `history.git`（isomorphic-git 的 `gitdir` 与 `dir` 分开）。同步盘与 git 目录放一起会产生冲突副本、损坏版本库 |
-| `secrets.json`、`index.sqlite`、`cache/`、上传暂存 | **本机**状态目录。Google Drive 电脑版不支持排除规则，所以不能靠忽略文件 |
+| `secrets.json`、`index.sqlite`、`cache/`、上传暂存 | **本机**状态目录。这些程序状态不依赖云盘忽略规则 |
 
 本地版本库为 `.kaitu/history.git/`，打开旧工作区时自动迁移 `.git`，失败明确报错并保留历史。
 版本写入遇权限或磁盘空间问题时，数据保持已保存，提示稍后运行 `kaitu ui` 或 `kaitu snapshot` 补存版本。
@@ -38,7 +69,7 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 
 ## 云端 Agent 怎么读
 
-- 根目录生成 `AGENT-README.md`（云端接力入口）与 `ORGANIZER.md`（夜间整理规则）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
+- 只有 Drive 模式在根目录生成 `AGENT-README.md`（云端接力入口）与 `ORGANIZER.md`（夜间整理规则）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
 - 根目录生成 `OVERVIEW.md`：`kaitu status` 的 Markdown 版（今天的安排与待确认、各模块进度与下一步、最近 7 天关键数据）。每次 core 写入、晚间复盘保存版本及工作台检测到外部改动后刷新；内容不变不重写，派生文件事件不触发自动版本。云端 Agent 读这一个文件就能「一眼看到情况」。
 
 ## 云端 Agent 怎么写
@@ -63,7 +94,7 @@ Grok Bot 与 ChatGPT Dots 跑在云端电脑上，碰不到本机 `~/kaitu`，�
 记录逐行、记忆逐条校验：合法部分立即写入，其余部分保留待整理；只接受新增操作。来源可写在简报 frontmatter、每行记录、每条记忆或建议的 `agent` 字段。
 未处理文件不进版本，成功原件与待整理笔记均保存版本；处理时间与进程锁留在本机状态目录。
 无法识别的文件也转为笔记；二进制只记录文件名、大小，原件放当日 notes 的 `files/`。同名文件保留独立副本，不覆盖。
-本地模式同样生成 `AGENT-README.md`、`ORGANIZER.md`、`OVERVIEW.md` 与 `inbox/agents/`、`handoffs/daily/`、`handoffs/archive/`。入口与现状开头标明用户时区与当天 UTC 偏移。
+本机与 iCloud 模式同样生成 `OVERVIEW.md`，不生成云端接力入口。收件箱和交接目录继续保留。入口与现状开头标明用户时区与当天 UTC 偏移。
 
 记录格式从各模块 schema 自动生成，含自定义模块；`AGENT-README.md` 与本机 `AGENTS.md` 内嵌字段与示例。
 本机可用 `kaitu record types` 列出全部类型、`kaitu record schema <类型>` 查单个类型。

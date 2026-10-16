@@ -28,18 +28,20 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   await app.whenReady();
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
-  const ai = createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
-    ...process.env,
-    KAITU_EMBEDDED_AI: "1",
-    KAITU_APP_HOME: aiHome,
-    KAITU_DIR: ws.root,
-    KAITU_APP_PORT: "0",
-  });
+  const makeAi = () =>
+    createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
+      ...process.env,
+      KAITU_EMBEDDED_AI: "1",
+      KAITU_APP_HOME: aiHome,
+      KAITU_DIR: ws.root,
+      KAITU_APP_PORT: "0",
+    });
+  let ai = makeAi();
   const sdk = createSdkRuntime({
     executable: join(dirname(app.getPath("exe")), "DSH"),
     archive: join(dirname(resources), "app.asar"),
     home: aiHome,
-    workspace: ws.root,
+    workspace: () => ws.root,
     plugin: join(resources, "dist/sdk-plugin.mjs"),
     hostPlugin: join(resources, "dist/sdk-host.mjs"),
     helper: join(resources, "dist/sdk-credentials.mjs"),
@@ -54,6 +56,10 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
+    onWorkspaceChanged: async () => {
+      await ai.close();
+      ai = makeAi();
+    },
     onAutomationChanged: async () => {
       updateMenu();
       await startAutomation();

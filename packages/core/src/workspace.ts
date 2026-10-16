@@ -10,8 +10,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { currentWorkspace } from "./drive.js";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { currentWorkspace, localStateRoot } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { maintainHistoryIgnore } from "./history.js";
@@ -32,6 +32,7 @@ export function stateDirectory(root: string): string {
   if (state !== undefined && (typeof state !== "string" || !isAbsolute(state))) {
     throw new KaituError("state_dir 必须是本机绝对路径", "INVALID_STATE_DIR");
   }
+  if (state && !existsSync(state)) return join(localStateRoot(), basename(state));
   return state ?? join(root, STATE_DIR);
 }
 
@@ -76,6 +77,11 @@ export class Workspace {
   constructor(root: string, options: { maintain?: boolean } = {}) {
     this.root = resolve(root);
     if (options.maintain === false) return;
+    const state = stateDirectory(this.root);
+    if (state !== join(this.root, STATE_DIR) && !existsSync(state)) {
+      mkdirSync(state, { recursive: true });
+      writeFileSync(join(state, "secrets.json"), "{}\n", { mode: 0o600 });
+    }
     migrateHistory(this.root);
     if (this.exists(".kaitu/config.json")) {
       ensureTaskModule(this);
@@ -168,7 +174,7 @@ export class Workspace {
       overviewDeferred(this) ||
       rel.startsWith(".kaitu/") ||
       ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
-      !this.exists("AGENT-README.md")
+      !this.exists("OVERVIEW.md")
     )
       return;
     refreshOverview(this);

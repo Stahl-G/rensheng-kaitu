@@ -4,6 +4,7 @@ import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
+import { syncMode } from "./sync-location.js";
 import { timeZoneNotice } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -238,8 +239,10 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     ...data.warnings.map((warning) => `- ${warning}`),
     "",
   );
-  put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
-  put(ws, "ORGANIZER.md", renderOrganizer());
+  if (syncMode(ws.root) === "drive") {
+    put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
+    put(ws, "ORGANIZER.md", renderOrganizer());
+  }
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
   const withoutTime = (value: string) => value.replace(/^生成时间：.*$/m, "");
