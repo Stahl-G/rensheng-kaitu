@@ -31,12 +31,16 @@ function partsIn(date: Date, timeZone: string): Parts {
   return out as unknown as Parts;
 }
 
+const validZones = new Set<string>();
+
 export function assertTimeZone(timeZone: string): void {
+  if (validZones.has(timeZone)) return;
   try {
     new Intl.DateTimeFormat("en", { timeZone });
   } catch {
     throw new Error(`无效的时区：${timeZone}`);
   }
+  validZones.add(timeZone);
 }
 
 /** 该时区相对 UTC 的偏移（分钟），东八区为 +480。 */

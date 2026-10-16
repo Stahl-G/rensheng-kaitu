@@ -40,8 +40,21 @@ export function readStatus(ws: Workspace, now = new Date(), remote = false) {
 export function summarizeStatus(data: WorkbenchData) {
   const from = new Date(Date.parse(`${data.today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
+  // 当地日期与 UTC 日期最多差 14 小时（UTC−12 到 UTC+14）：窗口外的记录不用逐条换算当地日期。
+  const earliest = Date.parse(`${from}T00:00:00Z`) - 14 * 3600000;
+  const latest = Date.parse(`${data.today}T00:00:00Z`) + 86400000 + 12 * 3600000;
   const recent = (type: string, field = "ts") =>
-    (data.records[type] ?? []).filter((row) => day(row[field]) >= from && day(row[field]) <= data.today);
+    (data.records[type] ?? []).filter((row) => {
+      const at = Date.parse(String(row[field]));
+      if (!(at >= earliest && at < latest)) return false;
+      const date = day(row[field]);
+      return date >= from && date <= data.today;
+    });
+  const notAfterToday = (ts: unknown) => {
+    const at = Date.parse(String(ts));
+    if (at < Date.parse(`${data.today}T00:00:00Z`) - 14 * 3600000) return true;
+    return at < latest && day(ts) <= data.today;
+  };
   const averageDaily = (type: string, field: string, dateField = "ts", divisor = 1) => {
     const totals = dailyRecordTotals(recent(type, dateField), data.timeZone, field, dateField, divisor);
     return totals.size ? [...totals.values()].reduce((a, b) => a + b, 0) / totals.size : null;
@@ -65,8 +78,7 @@ export function summarizeStatus(data: WorkbenchData) {
       averageSleepHours: averageDaily("sleep", "duration_min", "end", 60),
       averageProteinG: averageDaily("meal", "protein_g"),
       latestWeight:
-        (data.records.metric ?? []).filter((r) => r.kind === "weight" && day(r.ts) <= data.today).at(-1) ??
-        null,
+        (data.records.metric ?? []).filter((r) => r.kind === "weight" && notAfterToday(r.ts)).at(-1) ?? null,
     },
     warnings: data.warnings,
   };

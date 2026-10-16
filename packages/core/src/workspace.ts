@@ -1,5 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { quarantineBankNotes } from "./bank-mail.js";
@@ -62,6 +70,9 @@ export class Workspace {
   private location = "";
   private icloud = false;
   private unread = new Set<string>();
+  /** 按文件状态缓存的解析结果，见 scanParsed。 */
+  private parsed = new Map<string, { stamp: string; value: unknown }>();
+  private zone: { stamp: string; timeZone: string } | null = null;
 
   get isICloud(): boolean {
     return this.icloud;
@@ -75,6 +86,8 @@ export class Workspace {
     this.location = value;
     this.icloud = isICloudPath(value) || stateBinding(value).mode === "icloud";
     this.unread.clear();
+    this.parsed.clear();
+    this.zone = null;
   }
 
   constructor(root: string, options: { maintain?: boolean } = {}) {
@@ -166,6 +179,41 @@ export class Workspace {
     }
   }
 
+  /**
+   * 文件状态指纹：改名替换、追加或原地改写后都会变；不是普通文件或读不到时为 null。
+   * 刚改过（2 秒内）的文件也返回 null：时间戳精度低的文件系统上，紧接着的同长度原地改写可能不改变状态。
+   */
+  private stableStamp(rel: string): string | null {
+    try {
+      const stat = statSync(this.resolve(rel, { internal: true }));
+      if (!stat.isFile() || Date.now() - stat.mtimeMs < 2000) return null;
+      return `${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 读文件并解析；文件没变时直接用上次的结果，不再读和解析。跳过的文件与 scanText 相同。
+   * 结果会被之后的请求共用，调用方不能修改（解析函数可以冻结它）。解析出错不缓存，下次照样报错。
+   */
+  scanParsed<T>(rel: string, kind: string, parse: (text: string) => T): T | undefined {
+    if (this.conflictCopy(rel) || placeholderName(rel)) return;
+    const key = `${kind}\0${rel}`;
+    const stamp = this.stableStamp(rel);
+    const hit = this.parsed.get(key);
+    if (stamp && hit?.stamp === stamp) return hit.value as T;
+    const text = this.scanText(rel);
+    if (text === undefined) {
+      this.parsed.delete(key);
+      return;
+    }
+    const value = parse(text);
+    if (stamp) this.parsed.set(key, { stamp, value });
+    else this.parsed.delete(key);
+    return value;
+  }
+
   isUnavailable(rel: string): boolean {
     if (!this.icloud || (rel.startsWith(".kaitu/") && rel !== ".kaitu/config.json")) return false;
     const pending = isEvictedICloudFile(this.resolve(rel, { internal: true }));
@@ -246,15 +294,19 @@ export class Workspace {
     refreshOverview(this);
   }
 
-  /** 用户时区：me/rules.md 的 timezone，缺省用系统时区。 */
+  /** 用户时区：me/rules.md 的 timezone，缺省用系统时区。rules.md 没变时不重新读取。 */
   timeZone(): string {
     if (this.exists("me/rules.md")) {
+      const stamp = this.stableStamp("me/rules.md");
+      if (stamp && this.zone?.stamp === stamp) return this.zone.timeZone;
       const tz = parseFrontmatter<{ timezone?: unknown }>(this.readText("me/rules.md")).data.timezone;
       if (typeof tz === "string" && tz) {
         assertTimeZone(tz);
+        this.zone = stamp ? { stamp, timeZone: tz } : null;
         return tz;
       }
     }
+    this.zone = null;
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   }
 }

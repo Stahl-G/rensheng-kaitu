@@ -1,7 +1,15 @@
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { addRecord, deleteRecord, readRecords, updateRecord } from "../src/index.js";
+import {
+  addMemory,
+  addRecord,
+  deleteRecord,
+  listMemories,
+  readRecords,
+  readStatus,
+  updateRecord,
+} from "../src/index.js";
 import { freshWorkspace, workout } from "./helpers.js";
 
 const lines = (root: string, rel: string) => readFileSync(join(root, rel), "utf8").trim().split("\n");
@@ -44,6 +52,28 @@ describe("记录追加语义", () => {
     expect(record.rev).toBeUndefined();
   });
 
+  it("别的程序改了数据文件或记忆，下一次读取就是新内容；读到的记录不能被误改", async () => {
+    const ws = await freshWorkspace();
+    const { record, file } = addRecord(ws, "workout", { ...workout, ts: "2026-10-15T20:00:00+08:00" });
+    const memory = await addMemory(ws, { type: "fact", name: "city", text: "住在上海" });
+    const old = new Date(Date.now() - 60000);
+    for (const path of [file, `memory/${memory.file}`]) utimesSync(join(ws.root, path), old, old);
+    expect(readRecords(ws, "workout")).toHaveLength(1);
+    expect(listMemories(ws)[0]?.text).toBe("住在上海");
+
+    appendFileSync(
+      join(ws.root, file),
+      `${JSON.stringify({ ...record, id: "01M52KXTRNAGENTWR1TE000000", ts: "2026-10-15T21:00:00+08:00", sets: 5 })}\n`,
+    );
+    const path = join(ws.root, "memory", memory.file);
+    writeFileSync(path, readFileSync(path, "utf8").replace("上海", "杭州"));
+    expect(readRecords(ws, "workout").map((row) => row.sets)).toEqual([3, 5]);
+    expect(listMemories(ws)[0]?.text).toBe("住在杭州");
+    expect(() => {
+      (readRecords(ws, "workout")[0] as { sets: number }).sets = 9;
+    }).toThrow(TypeError);
+  });
+
   it("非法记录不会写入", async () => {
     const ws = await freshWorkspace();
     expect(() => addRecord(ws, "workout", { exercise: "深蹲" })).toThrow(/不合法/);
@@ -53,6 +83,29 @@ describe("记录追加语义", () => {
 });
 
 describe("时区与日期切分", () => {
+  it("近 7 天按当地日期统计：UTC+14 与 UTC−12 的边界记录不多算也不漏算", async () => {
+    const cases = [
+      // 当地今天 10-15，近 7 天从 10-09 起
+      [
+        "Pacific/Kiritimati",
+        "2026-10-14T22:00:00Z",
+        "2026-10-09T00:30:00+14:00",
+        "2026-10-08T23:30:00+14:00",
+      ],
+      ["Etc/GMT+12", "2026-10-16T00:00:00Z", "2026-10-15T23:30:00-12:00", "2026-10-16T00:30:00-12:00"],
+    ] as const;
+    for (const [timeZone, now, inside, outside] of cases) {
+      const ws = await freshWorkspace(timeZone);
+      addRecord(ws, "workout", { ...workout, session_id: "inside", ts: inside });
+      addRecord(ws, "workout", { ...workout, session_id: "outside", ts: outside });
+      expect(readStatus(ws, new Date(now)).recent7).toMatchObject({
+        from: "2026-10-09",
+        to: "2026-10-15",
+        workouts: 1,
+      });
+    }
+  });
+
   it("按用户时区切分月份：UTC 10-31 17:30 在上海已是 11-01", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
     expect(addRecord(ws, "workout", { ...workout, ts: "2026-10-31T17:30:00Z" }).file).toBe(

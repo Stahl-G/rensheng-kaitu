@@ -225,16 +225,36 @@ export interface Version {
   time: string;
 }
 
+/** 版本列表只在 HEAD 变化时改变：按 HEAD、条数、路径和时区缓存，不必每次重读提交对象。 */
+const logs = new WeakMap<Workspace, Map<string, readonly Version[]>>();
+
 /** 版本列表，新的在前；给了 path 只列改动过它的版本。 */
 export async function history(
   ws: Workspace,
   opts: { path?: string; limit?: number } = {},
 ): Promise<Version[]> {
-  if (!hasHistory(ws) || !(await headOid(ws))) return [];
+  const head = hasHistory(ws) ? await headOid(ws) : null;
+  if (!head) return [];
   const filepath = opts.path?.replace(/\/+$/, "") || undefined;
+  const key = `${head}\0${opts.limit ?? ""}\0${filepath ?? ""}\0${ws.timeZone()}`;
+  const cached = logs.get(ws)?.get(key);
+  if (cached) return [...cached];
+  const versions = await readLog(ws, filepath, opts.limit);
+  const map = logs.get(ws) ?? new Map<string, readonly Version[]>();
+  if (map.size > 20) map.clear();
+  map.set(key, Object.freeze(versions.map((version) => Object.freeze(version))));
+  logs.set(ws, map);
+  return versions;
+}
+
+async function readLog(
+  ws: Workspace,
+  filepath: string | undefined,
+  limit: number | undefined,
+): Promise<Version[]> {
   let entries: Awaited<ReturnType<typeof git.log>>;
   try {
-    entries = await git.log({ fs, dir: ws.root, gitdir: historyDirectory(ws), depth: opts.limit, filepath });
+    entries = await git.log({ fs, dir: ws.root, gitdir: historyDirectory(ws), depth: limit, filepath });
   } catch (e) {
     if ((e as { code?: string }).code === "NotFoundError") return [];
     throw e;

@@ -49,15 +49,22 @@ export function inboxNotes(ws: Workspace) {
     .flatMap((entry) => {
       const dir = `inbox/notes/${entry.name}`;
       return readdirSync(ws.resolve(dir), { withFileTypes: true })
-        .filter(
-          (file) =>
-            file.isFile() && file.name.endsWith(".md") && ws.scanText(`${dir}/${file.name}`) !== undefined,
-        )
-        .map((file) => {
+        .filter((file) => file.isFile() && file.name.endsWith(".md"))
+        .flatMap((file) => {
           const path = `${dir}/${file.name}`;
-          const content = ws.readText(path);
-          const data = noteMetadata(content);
-          return { path, agent: noteAgent(data.agent), date: data.date ?? entry.name, content };
+          // 原文没变时不重新读取和解析。
+          const note = ws.scanParsed(path, "note", (content) => ({ content, data: noteMetadata(content) }));
+          return note
+            ? [
+                {
+                  path,
+                  agent: noteAgent(note.data.agent),
+                  date: note.data.date ?? entry.name,
+                  kind: note.data.kind,
+                  content: note.content,
+                },
+              ]
+            : [];
         });
     })
     .sort((a, b) => b.path.localeCompare(a.path));

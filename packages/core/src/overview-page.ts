@@ -4,7 +4,7 @@ import { driveStatus } from "./drive.js";
 import { committedExperiences, pendingExperienceImports } from "./experience-imports.js";
 import { type TimedExperience, experienceLayer } from "./experience-time.js";
 import { history } from "./history.js";
-import { inboxNotes, noteMetadata } from "./inbox-notes.js";
+import { inboxNotes } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { latestDaily } from "./overview.js";
 import { readPlans } from "./plans.js";
@@ -64,15 +64,20 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const status = summarizeStatus(data);
   const cutoff = now.toISOString();
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
+  // 先按时间粗筛（任何时区的当地零点都不早于 UTC 零点前 14 小时），只给近几天的记录换算当地日期。
+  const earliest = Date.parse(`${status.recent7.from}T00:00:00Z`) - 14 * 3600000;
   const rows = (type: string, field = "ts") =>
-    (data.records[type] ?? []).filter(
-      (row) => day(row[field]) >= status.recent7.from && Date.parse(String(row[field])) <= now.getTime(),
-    );
-  const sources = (type: string, records: StoredRecord[]) =>
-    records.map((row) => ({
-      file: recordFileFor(findRecordType(ws, type), localMonth(parseTs(row.ts), data.timeZone)),
+    (data.records[type] ?? []).filter((row) => {
+      const at = Date.parse(String(row[field]));
+      return at >= earliest && at <= now.getTime() && day(row[field]) >= status.recent7.from;
+    });
+  const sources = (type: string, records: StoredRecord[]) => {
+    const ref = records.length ? findRecordType(ws, type) : null;
+    return records.map((row) => ({
+      file: recordFileFor(ref as NonNullable<typeof ref>, localMonth(parseTs(row.ts), data.timeZone)),
       text: JSON.stringify(row, null, 2),
     }));
+  };
   const metric = (
     key: string,
     label: string,
@@ -159,13 +164,14 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const notes = inboxNotes(ws).map((note) => ({
     file: note.path,
     text: note.content,
-    status: noteMetadata(note.content).kind === "capture" ? ("received" as const) : ("needs_review" as const),
+    status: note.kind === "capture" ? ("received" as const) : ("needs_review" as const),
   }));
   const directionSuggestions = (data.records.direction ?? []).filter(
     (row) => row.status === "suggested",
   ).length;
   const mapPendingImports = pendingExperienceImports(ws).length;
-  const mapNeedsReview = committedExperiences(ws).filter(
+  const experiences = committedExperiences(ws);
+  const mapNeedsReview = experiences.filter(
     (row) => row.review || !experienceLayer(row as unknown as TimedExperience, data.today),
   ).length;
   const pendingFiles = ["inbox/agents", "inbox/health"].reduce(
@@ -178,7 +184,8 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         : 0),
     0,
   );
-  const versions = (await history(ws))
+  // 只看最近的版本：最近变化最多显示 30 条，不必每次读完整个版本历史。
+  const versions = (await history(ws, { limit: 100 }))
     .flatMap((v) => {
       const text = friendlyVersion(v.message);
       return text
@@ -196,7 +203,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const sections = data.modules.flatMap(({ dir, def }) => {
     const records = Object.keys(def.records ?? {}).flatMap<{ ts: string }>((type) => {
       if (["experience_batch", "experience_source", "finance_fx_rate"].includes(type)) return [];
-      return type === "experience" ? committedExperiences(ws) : (data.records[type] ?? []);
+      return type === "experience" ? experiences : (data.records[type] ?? []);
     });
     const topics = data.statuses.filter(
       (item) => item.file.startsWith(`${dir}/`) && item.file !== `${dir}/STATUS.md`,
@@ -212,12 +219,20 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
               ? data.memories.length + data.goals.length
               : records.length + topics.length;
     if (!count) return [];
-    const timestamps = [
+    // 只要最新的一个时间，扫一遍即可，不排序。
+    let latest: string | null = null;
+    let latestAt = Number.NEGATIVE_INFINITY;
+    for (const value of [
       ...records.map((record) => record.ts),
       ...topics.map((topic) => topic.data.updated),
-    ].filter((value): value is string => !!value && Number.isFinite(Date.parse(value)));
-    timestamps.sort((a, b) => Date.parse(b) - Date.parse(a));
-    return [{ id: def.id, label: def.name, count, latest: timestamps[0] ?? null }];
+    ]) {
+      const at = value ? Date.parse(value) : Number.NaN;
+      if (Number.isFinite(at) && at > latestAt) {
+        latest = value as string;
+        latestAt = at;
+      }
+    }
+    return [{ id: def.id, label: def.name, count, latest }];
   });
   return {
     root: data.root,
