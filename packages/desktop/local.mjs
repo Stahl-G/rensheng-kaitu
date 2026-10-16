@@ -11,6 +11,7 @@ import {
   upgradeWorkspace,
 } from "../core/dist/index.js";
 import { createAiProcess } from "./ai-process.mjs";
+import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { desktopPaths } from "./environment.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 
@@ -68,6 +69,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
+    calendarExecutor: process.platform === "darwin" ? createCalendarExecutor() : undefined,
     onWorkspaceChanging: () => ai.close(),
     onWorkspaceChanged: async () => {
       ai = makeBackgroundAi();

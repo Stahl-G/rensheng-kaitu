@@ -206,6 +206,7 @@ async function packageApplication() {
     set("CFBundleVersion", version);
     set("CFBundleExecutable", "Kaitu");
     set("CFBundleIconFile", "Kaitu.icns");
+    set("NSAppleEventsUsageDescription", "开图将你确认的时间段加入日历，并同步改期和取消。");
     set("NSMicrophoneUsageDescription", "Kaitu 使用麦克风将语音转为消息草稿。");
     // 取消 dsh:// 协议声明，避免抢占原 DSH 应用的链接。
     execFileSync("/usr/bin/plutil", ["-remove", "CFBundleURLTypes", outputPlist]);
@@ -309,6 +310,14 @@ async function signApplication(temporary) {
     requireDsh.resolve("@electron/osx-sign", { paths: [requireDsh.resolve("app-builder-lib")] }),
   );
   const settings = join(resolve(values["dsh-root"]), "apps/desktop/scripts");
+  const calendarEntitlements = join(temporary, "calendar-entitlements.plist");
+  writeFileSync(
+    calendarEntitlements,
+    readFileSync(join(settings, "macos-entitlements.plist"), "utf8").replace(
+      "</dict>",
+      "<key>com.apple.security.automation.apple-events</key><true/></dict>",
+    ),
+  );
   const empty = join(temporary, "empty-entitlements.plist");
   writeFileSync(empty, '<?xml version="1.0"?><plist version="1.0"><dict/></plist>\n');
   await signAsync({
@@ -330,7 +339,9 @@ async function signApplication(temporary) {
           ? jit
             ? join(settings, "jit-entitlements.plist")
             : empty
-          : join(settings, "macos-entitlements.plist"),
+          : file === output
+            ? calendarEntitlements
+            : join(settings, "macos-entitlements.plist"),
       };
     },
   });

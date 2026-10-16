@@ -11,7 +11,7 @@ import { listProjects, projectStatusFiles, projectVersion } from "./projects.js"
 import { type PrivacyIndex, privacyIndex } from "./record-privacy.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
-import { tasksForToday } from "./tasks.js";
+import { listTasks, tasksForToday } from "./tasks.js";
 import { templateOutdated } from "./template-version.js";
 import { isoInZone, localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -211,11 +211,55 @@ async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, e
 export function decideProposal(ws: Workspace, id: string, decision: "confirmed" | "rejected") {
   if (!["confirmed", "rejected"].includes(decision)) throw new KaituError("无效的确认操作", "BAD_ARGS");
   return editFrontmatter<TodayPlan>(ws, "NOW.md", "now.schema.json", (data) => {
-    const block = data.blocks.find((item) => item.id === id && item.kind === "proposal");
-    if (!block || block.status !== "pending")
+    const block = data.blocks.find((item) => item.id === id && ["proposal", "task"].includes(item.kind));
+    if (!block || !["pending", "confirmed", "rejected"].includes(block.status))
       throw new KaituError("这条建议已处理或不存在，请刷新", "CONFLICT");
     block.status = decision;
     return `你${decision === "confirmed" ? "确认" : "拒绝"}了日程建议：${block.title}`;
+  });
+}
+
+export function editCalendarBlock(ws: Workspace, id: string, start: string, end: string) {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
+    throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");
+  return editFrontmatter<TodayPlan>(ws, "NOW.md", "now.schema.json", (data) => {
+    const block = data.blocks.find(
+      (row) => row.id === id && ["proposal", "task"].includes(row.kind) && row.status === "confirmed",
+    );
+    if (!block) throw new KaituError("找不到已确认的时间段", "NOT_FOUND");
+    Object.assign(block, { start, end });
+    return `你调整了日程：${block.title}`;
+  });
+}
+
+export function scheduleNext(ws: Workspace, file: string, id: string, start: string, end: string) {
+  if (file !== "task" && !statusFiles(ws).some((item) => item.file === file))
+    throw new KaituError("找不到模块状态", "NOT_FOUND");
+  const item =
+    file === "task"
+      ? listTasks(ws, { includePrivate: true }).find((row) => row.id === id)
+      : parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next?.find(
+          (row) => row.id === id && row.status === "todo",
+        );
+  if (!item) throw new KaituError("找不到待办的下一步", "NOT_FOUND");
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
+    throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");
+  return editFrontmatter<TodayPlan>(ws, "NOW.md", "now.schema.json", (data) => {
+    if (!data.date || !data.blocks.length) data.date = localDate(new Date(), ws.timeZone());
+    const blockId = `next-${id}`;
+    const existing = data.blocks.find((block) => block.id === blockId);
+    const block: PlanBlock = {
+      id: blockId,
+      title: item.title,
+      kind: "task",
+      status: "confirmed",
+      start,
+      end,
+      ref: id,
+    };
+    if (existing) Object.assign(existing, block);
+    else data.blocks.push(block);
+    return `你确认了下一步的时间段：${item.title}`;
   });
 }
 

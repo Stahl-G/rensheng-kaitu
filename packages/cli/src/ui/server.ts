@@ -6,12 +6,16 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CollectorService } from "@kaitu/channels/collectors";
 import {
+  type CalendarExecutor,
+  CalendarPush,
   type ImportSource,
   KaituError,
   MAX_PHOTO_BYTES,
   type Pose,
   type Workspace,
   addPhotoBytes,
+  calendarPushEntries,
+  calendarPushStore,
   completeNext,
   completeTask,
   decideProposal,
@@ -51,6 +55,7 @@ export interface UiOptions {
   webRoot?: string;
   collectorStateRoot?: string;
   ask?: AskService;
+  calendarExecutor?: CalendarExecutor;
   onWorkspaceChanging?: () => Promise<void>;
   onWorkspaceChanged?: () => Promise<void>;
   onAutomationChanged?: () => Promise<void>;
@@ -88,6 +93,7 @@ function field(data: Record<string, unknown>, key: string): string {
 
 export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const WEB_ROOT = options.webRoot ?? (existsSync(`${PRODUCT_ROOT}/index.html`) ? PRODUCT_ROOT : LEGACY_ROOT);
+  const calendarPush = new CalendarPush(calendarPushStore(ws), options.calendarExecutor);
   const collectors = new CollectorService(ws, options.collectorStateRoot);
   let aiChild: ReturnType<typeof spawn> | undefined;
   let aiReady: Promise<{ url?: string }> | undefined;
@@ -151,6 +157,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
   const pullCalendars = () =>
     exclusive(async () => {
       await pullCalendarSubscriptions(ws);
+      if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
       notify();
     });
   const calendarTimer = setInterval(() => void pullCalendars().catch(() => {}), 60000);
@@ -214,6 +221,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     refreshTimer = setTimeout(() => {
       void exclusive(async () => {
         refreshOverview(ws);
+        if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
         notify();
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);
@@ -327,7 +335,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           method === "openAi"
             ? await openAi()
             : method.startsWith("ask")
-              ? await productRequest(ws, method, args, options.ask)
+              ? await productRequest(ws, method, args, options.ask, calendarPush)
               : await exclusive(async () => {
                   const mutates = productMutations.has(method);
                   if (mutates) await saveExternal();
@@ -337,7 +345,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
                   let value: unknown;
                   try {
                     if (method === "moveStorage") await options.onWorkspaceChanging?.();
-                    value = await productRequest(ws, method, args, options.ask);
+                    value = await productRequest(ws, method, args, options.ask, calendarPush);
                   } finally {
                     try {
                       if (ws.root !== oldRoot) startWatching();
@@ -512,8 +520,14 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
             return typeof data.slug === "string" ? syncProject(ws, data.slug) : syncProjects(ws);
           case "/api/photos/delete":
             return removePhoto(ws, field(data, "id"), { by: "user" });
-          case "/api/proposal":
-            return decideProposal(ws, field(data, "id"), field(data, "decision") as "confirmed" | "rejected");
+          case "/api/proposal": {
+            const result = await decideProposal(
+              ws,
+              field(data, "id"),
+              field(data, "decision") as "confirmed" | "rejected",
+            );
+            return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+          }
           case "/api/tasks/done":
             return completeTask(ws, field(data, "id"), { by: "user" });
           case "/api/next":

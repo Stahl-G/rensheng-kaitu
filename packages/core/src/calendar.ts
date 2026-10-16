@@ -29,6 +29,7 @@ export interface CalendarEntry {
 }
 export interface CalendarData {
   today: string;
+  planDate: string | null;
   timeZone: string;
   events: CalendarEntry[];
   subscriptions: Omit<CalendarSubscription, "url">[];
@@ -101,9 +102,11 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
       (/^[0-9a-f-]{36}$/i.test(String(row.calendar)) ? "导入日历 · 名称未记录" : String(row.calendar)),
     pending: false,
   }));
+  let planDate: string | null = null;
   if (ws.exists("NOW.md")) {
     const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
     const date = data.date;
+    planDate = data.blocks?.length ? date : null;
     for (const block of data.blocks ?? []) {
       if (!date || !block.start || ["rejected", "skipped"].includes(block.status)) continue;
       const start = block.start;
@@ -130,6 +133,7 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
   }
   return {
     today: localDate(now, ws.timeZone()),
+    planDate,
     timeZone: ws.timeZone(),
     events,
     subscriptions: rows.map(({ url: _url, ...row }) => row),

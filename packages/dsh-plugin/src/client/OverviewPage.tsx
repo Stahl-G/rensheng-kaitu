@@ -1,4 +1,4 @@
-import type { OnboardingStatus } from "@kaitu/core";
+import type { CalendarPushSettings, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
@@ -17,7 +17,7 @@ import { OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingChecklist, OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import css from "./Prototype.module.css";
-import { DataSummaries, TodayFinance } from "./TodayPage.js";
+import { CalendarPushResult, CalendarSlotForm, DataSummaries, TodayFinance } from "./TodayPage.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
@@ -68,6 +68,8 @@ export function OverviewPage(props: OverviewPageProps) {
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("directions");
   const [data, setData] = useState<OverviewData | null>(null);
+  const [push, setPush] = useState<CalendarPushSettings | null>(null);
+  const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
@@ -86,15 +88,17 @@ export function OverviewPage(props: OverviewPageProps) {
   const refresh = useCallback(async () => {
     const seq = ++sequence.current;
     try {
-      const [overview, agenda, files, me, introduction] = await Promise.all([
+      const [overview, agenda, files, me, introduction, calendarPush] = await Promise.all([
         props.load(),
         props.loadCalendar(),
         props.loadLibrary(),
         props.loadMe(),
         props.loadOnboarding(),
+        props.loadCalendarPush(),
       ]);
       if (seq !== sequence.current) return;
       setData(overview);
+      setPush(calendarPush);
       setCalendar(agenda);
       setLibrary(files);
       setPersonal(me);
@@ -104,7 +108,14 @@ export function OverviewPage(props: OverviewPageProps) {
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [props.load, props.loadCalendar, props.loadLibrary, props.loadMe, props.loadOnboarding]);
+  }, [
+    props.load,
+    props.loadCalendar,
+    props.loadLibrary,
+    props.loadMe,
+    props.loadOnboarding,
+    props.loadCalendarPush,
+  ]);
   useEffect(() => {
     void refresh();
     return () => {
@@ -416,11 +427,22 @@ export function OverviewPage(props: OverviewPageProps) {
                 {...props}
                 key={`${onboarding.next.id}-${onboarding.next.rev}`}
                 next={onboarding.next}
+                onSchedule={() => setSlot({ file: "task", id: onboarding.next?.id ?? "" })}
                 refresh={refresh}
               />
             )}
             <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
           </>
+        )}
+        {view === "overview" && slot && (
+          <CalendarSlotForm
+            date={calendar?.planDate ?? calendar?.today ?? "今天"}
+            close={() => setSlot(null)}
+            save={async (start, end) => {
+              await props.scheduleNext(slot.file, slot.id, start, end);
+              await refresh();
+            }}
+          />
         )}
         {view === "overview" &&
           !guideVisible &&
@@ -475,6 +497,15 @@ export function OverviewPage(props: OverviewPageProps) {
                             完成
                           </button>
                         )}
+                        {!focus.proposed && (
+                          <button
+                            type="button"
+                            className={css.link}
+                            onClick={() => setSlot({ file: focus.file, id: focus.id })}
+                          >
+                            安排时间段
+                          </button>
+                        )}
                         <button
                           type="button"
                           className={`${css.btn} ${css["btn-quiet"]}`}
@@ -501,6 +532,15 @@ export function OverviewPage(props: OverviewPageProps) {
                         {item.module}
                         {item.proposed ? " · 待确认" : ""}
                       </span>
+                      {!item.proposed && (
+                        <button
+                          type="button"
+                          className={css.link}
+                          onClick={() => setSlot({ file: item.file, id: item.id })}
+                        >
+                          安排时间段
+                        </button>
+                      )}
                       <button type="button" className={css.link} onClick={() => openSection(item.section)}>
                         查看
                       </button>
@@ -526,6 +566,23 @@ export function OverviewPage(props: OverviewPageProps) {
                 </section>
               )}
               <Agenda data={calendar} open={() => openRecord("calendar")} />
+              {push &&
+                data.blocks
+                  .filter((block) => block.status === "confirmed" && block.start && block.end)
+                  .map((block) => (
+                    <div className={css.row} key={block.id}>
+                      <span>{block.title}</span>
+                      <CalendarPushResult
+                        id={block.id}
+                        state={push}
+                        retry={async (id) => {
+                          setPush(
+                            await (push?.enabled ? props.retryCalendarPush(id) : props.removeCalendarPush()),
+                          );
+                        }}
+                      />
+                    </div>
+                  ))}
               {data.blocks
                 .filter((b) => b.status === "pending" && b.kind === "proposal")
                 .map((b) => (
@@ -541,7 +598,7 @@ export function OverviewPage(props: OverviewPageProps) {
                       disabled={busy}
                       onClick={() => void run(() => props.decideProposal(b.id, "confirmed"))}
                     >
-                      放进日程
+                      确认
                     </button>
                     <button
                       type="button"
