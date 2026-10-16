@@ -21,9 +21,16 @@ export default defineConfig({
     },
   ],
   resolve: {
-    alias: {
-      "@kaitu/core": fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url)),
-    },
+    alias: [
+      {
+        find: "@kaitu/core/experience-time",
+        replacement: fileURLToPath(new URL("./packages/core/src/experience-time.ts", import.meta.url)),
+      },
+      {
+        find: /^@kaitu\/core$/,
+        replacement: fileURLToPath(new URL("./packages/core/src/index.ts", import.meta.url)),
+      },
+    ],
   },
   test: {
     maxWorkers: 2,
