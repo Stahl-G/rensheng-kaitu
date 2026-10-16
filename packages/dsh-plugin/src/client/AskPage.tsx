@@ -35,6 +35,8 @@ interface Settings {
   provider: string;
   providerName: string;
   baseURL?: string;
+  api?: string;
+  protocols: { id: string; name: string }[];
   supportsImages: boolean;
   providers: Provider[];
 }
@@ -175,6 +177,7 @@ export function AskPage({
   const [provider, setProvider] = useState("deepseek-official");
   const [model, setModel] = useState("deepseek-flash");
   const [baseURL, setBaseURL] = useState("");
+  const [api, setApi] = useState("openai-completions");
   const [image, setImage] = useState<ImageInput | null>(null);
   const upload = useRef<HTMLInputElement>(null);
   const selectedProvider = settings?.providers.find((item) => item.id === provider);
@@ -212,6 +215,7 @@ export function AskPage({
         setProvider(ai.provider);
         setModel(ai.model);
         setBaseURL(ai.baseURL ?? "");
+        setApi(ai.api ?? "openai-completions");
         if (!configurationRequested.current) setChoice(ai.choice ?? "external");
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
@@ -321,7 +325,7 @@ export function AskPage({
           ? {
               provider,
               model,
-              ...(custom ? { baseURL } : {}),
+              ...(custom ? { baseURL, api } : {}),
               ...(key ? { apiKey: key } : {}),
             }
           : {}),
@@ -752,6 +756,18 @@ export function AskPage({
                 </label>
                 {custom && (
                   <label className={css.key}>
+                    协议
+                    <select value={api} onChange={(event) => setApi(event.target.value)}>
+                      {settings?.protocols.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {custom && (
+                  <label className={css.key}>
                     Base URL
                     <input
                       type="url"
@@ -800,9 +816,7 @@ export function AskPage({
                     去 {selectedProvider.name} 官方申请 API Key ↗
                   </a>
                 ) : (
-                  <p>
-                    请从你的 OpenAI 兼容服务获取 Base URL、模型 ID 和 API Key。自定义模型当前按仅文字连接。
-                  </p>
+                  <p>请按服务文档选择协议，填写 Base URL、模型 ID 和 API Key。自定义模型当前按仅文字连接。</p>
                 )}
                 <p>下一步会发送一次最小请求验证连接。切换后下一条消息生效。</p>
               </fieldset>
