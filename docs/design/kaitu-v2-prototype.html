@@ -1,0 +1,667 @@
+<title>开图新版界面</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 布局：顶栏三入口居中，内容单列 1040px；摘要卡片自动成网格，窄屏全部单列 */
+:root {
+  --bg: #FCFCFB; --surface: #FFFFFF; --sunken: #F5F5F3; --control: #F0EFEC; --line: #ECEBE7;
+  --ink: #1F1E1D; --ink2: #4D4C48; --muted: #6B6A66; --link: #2F5FC4;
+  --primary: #2F5FC4; --on-primary: #FFFFFF; --strong: #1F1E1D; --on-strong: #FFFFFF;
+  --ask: #F2F5FD; --ask-line: #DCE4F8; --scrim: rgba(31,30,29,0.42);
+  --health: #2E8B57; --health-tint: #E8F3EC; --health-ink: #1F6B43;
+  --doing: #6B5BD6; --doing-tint: #EFEDFB; --doing-ink: #4B3FB0;
+  --explore: #3D6FE0; --explore-tint: #ECF1FC; --explore-ink: #2A4FA8;
+  --news: #C47A12; --news-tint: #FBEFE0; --news-ink: #8A520A;
+  --finance: #1F8A8A; --finance-tint: #E3F2F2; --finance-ink: #176868;
+  --me: #C2507A; --empty: #F0EFEC; --map-land: #EEF1EC; --map-grid: #DDE2DA;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
+  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #8FB0F5;
+  --primary: #4C7BE6; --on-primary: #FFFFFF; --strong: #ECEBE8; --on-strong: #171716;
+  --ask: #1E2638; --ask-line: #2C3A5C; --scrim: rgba(0,0,0,0.6);
+  --health-tint: #1C3226; --health-ink: #8FD3AC; --doing-tint: #2A2547; --doing-ink: #B9AFF5;
+  --explore-tint: #1E2A45; --explore-ink: #A9C1F7; --news-tint: #3A2A12; --news-ink: #EBC27F;
+  --finance-tint: #173333; --finance-ink: #8ED1D1; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171716; --surface: #201F1E; --sunken: #1B1B1A; --control: #2A2927; --line: #2F2E2C;
+  --ink: #ECEBE8; --ink2: #C9C7C2; --muted: #A09E98; --link: #8FB0F5;
+  --primary: #4C7BE6; --on-primary: #FFFFFF; --strong: #ECEBE8; --on-strong: #171716;
+  --ask: #1E2638; --ask-line: #2C3A5C; --scrim: rgba(0,0,0,0.6);
+  --health-tint: #1C3226; --health-ink: #8FD3AC; --doing-tint: #2A2547; --doing-ink: #B9AFF5;
+  --explore-tint: #1E2A45; --explore-ink: #A9C1F7; --news-tint: #3A2A12; --news-ink: #EBC27F;
+  --finance-tint: #173333; --finance-ink: #8ED1D1; --empty: #2A2927; --map-land: #1F2620; --map-grid: #2D352E;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+a { color: var(--link); text-decoration: none; font-weight: 500 }
+a:hover { text-decoration: underline dotted; text-underline-offset: 3px }
+button, input { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--explore); outline-offset: 2px }
+h1, h2, h3, p { margin: 0 }
+h1, h2, h3 { text-wrap: balance }
+.num { font-variant-numeric: tabular-nums }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+/* 原型演示条：和产品界面区分开 */
+.demo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--sunken); border-bottom: 1px dashed var(--line); font-size: 13px; color: var(--muted) }
+.demo b { font-weight: 600; color: var(--ink2) }
+.demo button { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px dashed var(--muted); background: transparent; font-size: 13px; color: var(--ink2) }
+.demo button[aria-pressed="true"] { border-style: solid; border-color: var(--ink); color: var(--ink); background: var(--surface) }
+
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--bg); border-bottom: 1px solid var(--line) }
+.brand { flex: 1 1 120px; display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600 }
+.tabs { flex: 0 1 auto; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--control) }
+.tabs button { height: 40px; padding: 0 22px; border: 0; border-radius: 9px; background: transparent; color: var(--ink2); font-size: 15px; font-weight: 500 }
+.tabs button[aria-current="page"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,29,0.12) }
+.tools { flex: 1 1 120px; display: flex; align-items: center; justify-content: flex-end; gap: 10px }
+.sync { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted) }
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; display: inline-block }
+.btn { height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border-radius: 10px; border: 0; font-size: 15px; font-weight: 500; white-space: nowrap }
+.btn-primary { background: var(--primary); color: var(--on-primary) }
+.btn-strong { background: var(--strong); color: var(--on-strong) }
+.btn-quiet { background: var(--control); color: var(--ink); font-weight: 400 }
+.btn-big { height: 44px; padding: 0 20px }
+.avatar { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--me); color: #FFFFFF; font-weight: 600 }
+
+main { max-width: 1040px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 32px }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px }
+.head h1 { font-size: 28px; line-height: 36px; font-weight: 600 }
+.sub { font-size: 14px; color: var(--muted) }
+.eyebrow { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em }
+.sec { display: flex; flex-direction: column; gap: 12px; min-width: 0 }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px }
+.card { background: var(--surface); border-radius: var(--radius); box-shadow: 0 0 0 1px var(--line) }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 6px; font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap }
+
+.capture { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border-radius: 14px; background: var(--surface); box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1px var(--line) }
+.capture input { flex: 1 1 260px; min-width: 0; height: 44px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; font-size: 16px }
+.capture input::placeholder { color: var(--muted) }
+.saved { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; color: var(--ink2) }
+
+.focus { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; padding: 24px; border-radius: 18px; box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1px var(--line) }
+.focus-body { flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 8px }
+.focus-title { font-size: 22px; line-height: 30px; font-weight: 600 }
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-height: 52px; padding: 6px 16px }
+.row-title { flex: 1 1 240px; min-width: 0; font-size: 16px }
+.check { width: 24px; height: 24px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; border: 1.5px solid var(--muted); background: transparent; color: transparent }
+.check[aria-pressed="true"] { border-color: var(--health); background: var(--health); color: #FFFFFF }
+.row.is-done .row-title { text-decoration: line-through; color: var(--muted) }
+.when { width: 64px; text-align: right; font-size: 13px; color: var(--muted) }
+
+.ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 18px; border-radius: 14px; background: var(--ask); box-shadow: 0 0 0 1px var(--ask-line) }
+.ask p { flex: 1 1 300px; min-width: 0 }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px }
+.sum { display: flex; flex-direction: column; gap: 14px; padding: 18px; color: var(--ink); font-weight: 400 }
+.sum:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--muted) }
+.sum-h { display: flex; align-items: center; gap: 8px; font-weight: 600 }
+.sum-h span:last-child { margin-left: auto; font-weight: 400; font-size: 13px; color: var(--muted) }
+.big { font-size: 26px; line-height: 32px; font-weight: 600 }
+.small { font-size: 13px; color: var(--muted) }
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.stack { display: flex; flex-direction: column; gap: 2px }
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px }
+.week span { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--muted) }
+.week i { display: block; width: 100%; height: 18px; border-radius: 5px; background: var(--empty) }
+.bar { height: 8px; border-radius: 4px; background: var(--control); overflow: hidden; display: flex }
+.bar i { display: block; height: 100% }
+.fin { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; overflow: hidden }
+.fin-cell { display: flex; flex-direction: column; gap: 2px; padding: 18px; border-right: 1px solid var(--line); min-width: 0 }
+.fin-cell:nth-child(4) { border-right: 0 }
+.fin-wide { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border-top: 1px solid var(--line) }
+.fin-pending { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px }
+@media (max-width: 760px) {
+  .fin { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .fin-cell { border-right: 0; border-bottom: 1px solid var(--line) }
+  .fin-cell:nth-child(odd) { border-right: 1px solid var(--line) }
+}
+.feed-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 4px; border-top: 1px solid var(--line) }
+.feed-row p { flex: 1 1 300px; min-width: 0 }
+.ini { width: 28px; height: 28px; flex: none; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #FFFFFF; font-size: 12px; font-weight: 600 }
+
+/* 第一次打开 */
+.welcome { display: flex; flex-direction: column; gap: 10px; padding: 32px 28px; border-radius: 20px; background: var(--surface); box-shadow: 0 0 0 1px var(--line) }
+.welcome h1 { font-size: 30px; line-height: 40px; font-weight: 600 }
+.welcome p { max-width: 36em; color: var(--ink2); font-size: 16px }
+.starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px }
+.start { display: flex; flex-direction: column; gap: 10px; padding: 20px; text-align: left; border: 0 }
+.start h3 { font-size: 17px; font-weight: 600 }
+.start p { color: var(--ink2); font-size: 14px }
+.start .tag { align-self: flex-start }
+
+/* 开图 */
+.subtabs { display: flex; flex-wrap: wrap; gap: 6px }
+.subtabs button { height: 36px; padding: 0 16px; border-radius: 18px; border: 1px solid var(--line); background: transparent; color: var(--ink2); font-size: 14px }
+.subtabs button[aria-pressed="true"] { background: var(--strong); border-color: var(--strong); color: var(--on-strong) }
+.dir { display: flex; flex-direction: column; gap: 14px; padding: 20px }
+.dir h3 { font-size: 19px; line-height: 27px; font-weight: 600 }
+.dir dl { margin: 0; display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 6px 12px; font-size: 14px }
+.dir dt { color: var(--muted) }
+.dir dd { margin: 0; color: var(--ink) }
+.attempt { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--sunken); font-size: 14px }
+.evidence { display: flex; flex-wrap: wrap; gap: 6px }
+.dir-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px }
+.dir.is-paused { background: var(--sunken); box-shadow: 0 0 0 1px var(--line) }
+.split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px }
+.map-box { padding: 12px; overflow: hidden }
+.map-box svg { display: block; width: 100%; height: auto }
+.places { display: flex; flex-direction: column }
+.place { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 12px 4px; border-top: 1px solid var(--line) }
+.place b { font-weight: 600; flex: 1 1 120px }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--ink2) }
+.legend span { display: inline-flex; align-items: center; gap: 6px }
+.news { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding: 16px }
+.news .thumb { aspect-ratio: 4 / 3; max-width: 100%; border-radius: 10px; display: flex; align-items: flex-end; padding: 8px; font-size: 12px; font-weight: 600; color: #FFFFFF }
+.news h3 { font-size: 17px; line-height: 25px; font-weight: 600 }
+.news p { font-size: 14px; color: var(--ink2) }
+.comment { padding-left: 10px; border-left: 2px solid var(--news); font-size: 14px; color: var(--ink) }
+
+/* 记录 */
+.mods { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px }
+.mod { display: flex; flex-direction: column; gap: 6px; padding: 16px; color: var(--ink); font-weight: 400 }
+.mod:hover { text-decoration: none; box-shadow: 0 0 0 1px var(--muted) }
+.raw { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 16px; padding: 14px 4px; border-top: 1px solid var(--line) }
+.raw time { font-size: 13px; color: var(--muted) }
+.raw blockquote { margin: 0; font-size: 15px }
+.raw .st { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--ink2) }
+
+/* 问问开图对话框 */
+.scrim { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); background: var(--scrim) }
+.dialog { width: 100%; max-width: 560px; max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 18px; padding: 28px; border-radius: 20px; background: var(--surface); box-shadow: 0 20px 60px rgba(0,0,0,0.25) }
+.dialog h2 { font-size: 22px; line-height: 30px; font-weight: 600 }
+.steps { font-size: 13px; color: var(--muted) }
+.choice { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: 14px; border: 1.5px solid var(--line); background: transparent; text-align: left; width: 100% }
+.choice[aria-pressed="true"] { border-color: var(--primary); background: var(--ask) }
+.choice .radio { width: 20px; height: 20px; flex: none; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--muted) }
+.choice[aria-pressed="true"] .radio { border: 6px solid var(--primary) }
+.choice b { display: block; font-size: 16px; font-weight: 600 }
+.choice span { font-size: 14px; color: var(--ink2) }
+.toggle { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line) }
+.toggle input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--primary); flex: none }
+.toggle label b { display: block; font-weight: 600 }
+.toggle label span { font-size: 14px; color: var(--ink2) }
+.dialog-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px }
+.note { font-size: 13px; color: var(--muted) }
+
+@media (max-width: 760px) {
+  .split { grid-template-columns: minmax(0, 1fr) }
+  .news { grid-template-columns: 84px minmax(0, 1fr) }
+  .tools .sync { display: none }
+  .brand { flex-basis: auto }
+  .tabs { order: 3; flex: 1 1 100%; justify-content: stretch }
+  .tabs button { flex: 1 1 0; padding: 0 8px }
+  .head h1 { font-size: 24px; line-height: 32px }
+}
+
+/* 问问：会话列表 + 对话流，交互参考 open-claude-ui，配色用开图自己的 */
+main[data-view="ask"] { max-width: 1240px; padding-block: 0; gap: 0 }
+.chat { display: grid; grid-template-columns: 236px minmax(0, 1fr); height: calc(100dvh - 118px); min-height: 560px }
+.threads { display: flex; flex-direction: column; gap: 2px; padding: 16px 12px 16px 0; border-right: 1px solid var(--line); overflow: auto; min-width: 0 }
+.threads h2 { padding: 14px 10px 4px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.06em }
+.thread { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.thread:hover { background: var(--sunken) }
+.thread[aria-current="true"] { background: var(--control); font-weight: 600 }
+.new-thread { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 500 }
+.convo { display: flex; flex-direction: column; min-width: 0; min-height: 0 }
+.msgs { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 14px; padding: 28px max(16px, 7%) 28px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 28px), transparent 100%) }
+.msg-user { align-self: flex-end; max-width: min(78%, 560px); padding: 10px 16px; border-radius: 18px; background: var(--ask); font-size: 16px; line-height: 1.6; overflow-wrap: anywhere }
+.msg-ai { max-width: 680px; font-size: 16px; line-height: 1.7; display: flex; flex-direction: column; gap: 10px }
+.msg-ai ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px }
+.tool { align-self: flex-start; max-width: 100%; border-radius: 10px; background: var(--sunken); box-shadow: 0 0 0 1px var(--line); font-size: 14px; color: var(--ink2) }
+.tool summary { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none }
+.tool summary::-webkit-details-marker { display: none }
+.tool summary::after { content: ""; width: 7px; height: 7px; margin-left: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg); transition: transform .12s }
+.tool[open] summary::after { transform: rotate(45deg) }
+.tool pre { margin: 0; padding: 0 12px 10px 34px; font: 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere }
+.st-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--health) }
+.st-dot.run { background: var(--explore) }
+.thinking { align-self: flex-start; font-size: 15px; color: var(--muted) }
+.acts { display: flex; flex-wrap: wrap; gap: 8px }
+.act { height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; color: var(--ink) }
+.act:hover { border-color: var(--muted) }
+.welcome-chat { margin: auto 0; display: flex; flex-direction: column; gap: 18px; align-items: flex-start; max-width: 680px }
+.welcome-chat h1 { font-size: 28px; line-height: 36px; font-weight: 600 }
+.suggest { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; width: 100% }
+.suggest button { text-align: left; padding: 12px 14px; border-radius: 12px; border: 0; background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-size: 14px; color: var(--ink2) }
+.suggest button:hover { box-shadow: 0 0 0 1px var(--muted); color: var(--ink) }
+.composer { margin: 0 max(16px, 7%) 18px; display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 10px 16px; border-radius: 20px; background: var(--surface); box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1px var(--line) }
+.composer:focus-within { box-shadow: 0 1px 3px rgba(31,30,29,0.08), 0 0 0 1.5px var(--explore) }
+.composer textarea { width: 100%; min-height: 48px; max-height: 200px; resize: none; border: 0; background: transparent; font: inherit; font-size: 16px; line-height: 1.5; color: var(--ink); outline: none; padding: 4px 0 }
+.composer textarea::placeholder { color: var(--muted) }
+.c-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px }
+.c-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 8px; border: 0; background: transparent; font-size: 13px; color: var(--ink2) }
+.c-btn:hover { background: var(--sunken) }
+.send { width: 36px; height: 36px; margin-left: auto; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 0; background: var(--strong); color: var(--on-strong) }
+.send:disabled { opacity: .35; cursor: default }
+.c-note { padding: 0 max(16px, 7%) 10px; text-align: center; font-size: 12px; color: var(--muted) }
+@media (prefers-reduced-motion: no-preference) {
+  .st-dot.run { animation: pulse 1.2s ease-in-out infinite }
+  @keyframes pulse { 50% { opacity: .35 } }
+  .thinking span { background: linear-gradient(105deg, var(--muted) 40%, var(--ink) 50%, var(--muted) 60%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shine 1.8s linear infinite }
+  @keyframes shine { from { background-position: 100% 0 } to { background-position: -150% 0 } }
+}
+@media (max-width: 760px) {
+  .chat { grid-template-columns: minmax(0, 1fr); height: calc(100dvh - 150px) }
+  .threads { display: none }
+  .msgs, .composer, .c-note { padding-left: 0; padding-right: 0; margin-left: 0; margin-right: 0 }
+  .composer { padding-left: 14px; padding-right: 10px }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .scrim { animation: fade .16s ease-out }
+  @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+}
+</style>
+
+<div class="demo" role="region" aria-label="原型演示开关">
+  <b>原型演示</b>
+  <span>总览看：</span>
+  <button type="button" id="demo-data" aria-pressed="true">有数据</button>
+  <button type="button" id="demo-first" aria-pressed="false">第一次打开</button>
+  <button type="button" id="demo-ai">第一次打开「问问」</button>
+</div>
+
+<header class="top">
+  <span class="brand"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="2.1" fill="#3D6FE0"/></svg>开图</span>
+  <nav class="tabs" aria-label="主导航">
+    <button type="button" data-view="overview" aria-current="page">总览</button>
+    <button type="button" data-view="explore">开图</button>
+    <button type="button" data-view="records">记录</button>
+    <button type="button" data-view="ask">问问</button>
+  </nav>
+  <div class="tools">
+    <span class="sync"><span class="dot" style="background: var(--health)"></span>已同步 08:12</span>
+    <button type="button" class="avatar" aria-label="个人档案、AI 与连接、设置">郭</button>
+  </div>
+</header>
+
+<main id="view" aria-live="polite"></main>
+
+<div class="scrim" id="ai-dialog" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ai-title">
+    <div id="ai-step1">
+      <div style="display: flex; flex-direction: column; gap: 18px">
+        <p class="steps">第 1 步，共 2 步</p>
+        <h2 id="ai-title">问问开图，需要先连接一个 AI</h2>
+        <p style="color: var(--ink2)">看资料、随手记都不需要 AI。连接之后，开图可以帮你整理记录、排日程、回答关于你自己的问题。</p>
+        <button type="button" class="choice" data-choice="own" aria-pressed="true"><span class="radio" aria-hidden="true"></span><span><b>用你已经在用的 AI</b><span>Claude、ChatGPT、Grok 都可以。开图给你一段连接说明，复制给它就行。</span></span></button>
+        <button type="button" class="choice" data-choice="built" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span><b>用开图里的 AI</b><span>直接在开图里聊天。需要一个模型的 API Key，比如 DeepSeek。</span></span></button>
+        <div class="dialog-foot">
+          <button type="button" class="btn btn-quiet" data-close>以后再说</button>
+          <button type="button" class="btn btn-primary" id="ai-next">下一步</button>
+        </div>
+      </div>
+    </div>
+    <div id="ai-step2" hidden>
+      <div style="display: flex; flex-direction: column; gap: 14px">
+        <p class="steps">第 2 步，共 2 步</p>
+        <h2>要开图每天自动帮你整理吗？</h2>
+        <p style="color: var(--ink2)">会用你刚连接的 AI 来跑，不开也能手动问。</p>
+        <div>
+          <div class="toggle"><input type="checkbox" id="auto-morning" checked><label for="auto-morning"><b>每天早上 7:30 排好今天</b><span>看日程、待办和你的规则，给出今天的安排，等你确认。</span></label></div>
+          <div class="toggle"><input type="checkbox" id="auto-night" checked><label for="auto-night"><b>每晚 3:00 整理一遍</b><span>把当天各个 AI 留下的记录合并成一份，更新每件事的下一步。</span></label></div>
+        </div>
+        <p class="note">以后可以在 右上角 › 设置 › 自动整理 里随时关掉。</p>
+        <div class="dialog-foot">
+          <button type="button" class="btn btn-quiet" data-close data-finish>都不要</button>
+          <button type="button" class="btn btn-primary" data-close data-finish>开始用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var state = { view: 'overview', first: false, done: {}, focusDone: false, asked: false, saved: '', sub: 'directions', dirs: {}, connected: false, thread: 'week', busy: false };
+  try { var s = localStorage.getItem('kaitu-proto-view'); if (s) state.view = s; } catch (e) {}
+
+  var C = {
+    health: ['var(--health)', 'var(--health-tint)', 'var(--health-ink)'],
+    doing: ['var(--doing)', 'var(--doing-tint)', 'var(--doing-ink)'],
+    explore: ['var(--explore)', 'var(--explore-tint)', 'var(--explore-ink)'],
+    news: ['var(--news)', 'var(--news-tint)', 'var(--news-ink)'],
+    finance: ['var(--finance)', 'var(--finance-tint)', 'var(--finance-ink)']
+  };
+  function chip(kind, text) {
+    var c = C[kind];
+    return '<span class="chip" style="background:' + c[1] + ';color:' + c[2] + '"><span class="dot" style="width:6px;height:6px;background:' + c[0] + '"></span>' + text + '</span>';
+  }
+  function plain(text, bg, ink) {
+    return '<span class="chip" style="background:' + bg + ';color:' + ink + '">' + text + '</span>';
+  }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var check = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m2.5 6.2 2.3 2.3 4.7-4.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  var next = [
+    { id: 'a', title: '把周三的力量训练补记进健康', kind: 'health', module: '健康', when: '今天' },
+    { id: 'b', title: '回复出版社关于短篇连载的邮件', kind: 'explore', module: '开图', when: '周六' }
+  ];
+  var trained = [1, 0, 1, 0, 1, 0, 0];
+
+  function captureForm() {
+    return '<form class="capture" id="capture"><label class="sr" for="capture-text">随手记一句</label>' +
+      '<input id="capture-text" autocomplete="off" placeholder="随手记一句，比如「今晚跑了 5 公里，有点累」">' +
+      '<button type="submit" class="btn btn-strong btn-big">记下</button></form>' +
+      (state.saved ? '<p class="saved">' + plain('已收到', 'var(--health-tint)', 'var(--health-ink)') + '「' + esc(state.saved) + '」原文已保存' + (state.first ? '。连上 AI 后会自动整理到对应的地方。' : '，开图会整理到对应的地方。') + '<a href="#" data-go="records">在记录里查看</a></p>' : '');
+  }
+
+  function overview() {
+    if (state.first) return firstRun();
+    var focus = '<section class="sec" aria-labelledby="h-focus"><h2 id="h-focus" class="eyebrow">现在最该做的</h2>' +
+      '<div class="focus card"><div class="focus-body"><div style="display:flex;flex-wrap:wrap;gap:8px">' + chip('doing', '开图 App') + plain('后天截止', 'var(--news-tint)', 'var(--news-ink)') + '</div>' +
+      '<p class="focus-title">给 Kaitu.app 做开发者签名和公证</p>' +
+      '<p style="color:var(--ink2)">周日要发第一个公开版本，签名后别人才能直接打开。里程碑 4 / 6 已完成。</p></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px"><button type="button" class="btn btn-big ' + (state.focusDone ? '" style="background:var(--health-tint);color:var(--health-ink)"' : 'btn-strong"') + ' id="focus-done">' + (state.focusDone ? '已完成' : '完成') + '</button>' +
+      '<button type="button" class="btn btn-big btn-quiet">改到明天</button></div></div>' +
+      next.map(function (n) {
+        var d = !!state.done[n.id];
+        return '<div class="row card' + (d ? ' is-done' : '') + '"><button type="button" class="check" data-done="' + n.id + '" aria-pressed="' + d + '" aria-label="' + (d ? '标为未完成：' : '标为完成：') + n.title + '">' + check + '</button>' +
+          '<span class="row-title">' + n.title + '</span>' + chip(n.kind, n.module) + '<span class="when">' + n.when + '</span></div>';
+      }).join('') +
+      '<a href="#" style="align-self:flex-start;padding:0 16px;font-size:14px">全部 9 条下一步</a></section>';
+
+    var ask = state.asked ? '' : '<section class="ask" aria-labelledby="h-ask"><h2 id="h-ask" style="font-size:15px;font-weight:600">要你确认</h2>' +
+      '<p>Grok 建议明早 7:30 跑步 40 分钟，空出了 7:30–8:15</p><div style="display:flex;gap:8px">' +
+      '<button type="button" class="btn btn-primary" data-ask>放进日程</button><button type="button" class="btn" style="background:var(--surface)" data-ask>不用</button></div></section>';
+
+    var sums = '<section class="sec" aria-labelledby="h-sum"><div class="sec-head"><h2 id="h-sum" class="eyebrow">你的数据</h2><span class="small">有数据的板块会自动出现，没数据的不占位置</span></div><div class="grid">' +
+      '<a href="#" class="sum card" data-go="records"><span class="sum-h"><span class="dot" style="width:8px;height:8px;background:var(--health)"></span>健康<span>本周</span></span>' +
+      '<div class="pair"><span class="stack"><span class="big num">3 次</span><span class="small">训练</span></span><span class="stack"><span class="big num">6.8 h</span><span class="small">日均睡眠 · 2 晚没记</span></span></div>' +
+      '<div class="week" role="img" aria-label="周一、周三、周五训练">' + ['一', '二', '三', '四', '五', '六', '日'].map(function (d, i) { return '<span><i style="' + (trained[i] ? 'background:var(--health)' : '') + '"></i>' + d + '</span>'; }).join('') + '</div></a>' +
+      '<a href="#" class="sum card" data-go="records"><span class="sum-h"><span class="dot" style="width:8px;height:8px;background:var(--doing)"></span>在做的事<span>2 个项目</span></span>' +
+      [['开图 App', '4 / 6', 67, '下一步：签名与公证'], ['短篇连载', '2 / 5', 40, '第二篇草稿写到一半']].map(function (p) {
+        return '<span class="stack" style="gap:6px"><span style="display:flex;justify-content:space-between;gap:8px"><span>' + p[0] + '</span><span class="num small">' + p[1] + '</span></span><span class="bar"><i style="width:' + p[2] + '%;background:var(--doing)"></i></span><span class="small">' + p[3] + '</span></span>';
+      }).join('') + '</a>' +
+      '</div></section>';
+
+    var fin = '<section class="sec" aria-labelledby="h-fin"><div class="sec-head"><h2 id="h-fin" class="sum-h" style="font-size:17px"><span class="dot" style="width:8px;height:8px;background:var(--finance)"></span>财务</h2>' +
+      '<span class="small">10 月 · 账单导入到昨天 · <a href="#" data-go="records">打开财务</a></span></div>' +
+      '<div class="fin card">' +
+      [['本月支出', '¥6,420', '比上月同期少 ¥830'], ['本月收入', '¥18,500', '工资 1 笔 · 转账和退款不算收入'], ['总资产', '¥326,400', '3 个账户，美元按昨天汇率折算'], ['今年投资收益', '+¥4,120', '1 只持仓缺成本价，没算进去']].map(function (m) {
+        return '<div class="fin-cell"><span class="small">' + m[0] + '</span><span class="big num">' + m[1] + '</span><span class="small">' + m[2] + '</span></div>';
+      }).join('') +
+      '<div class="fin-wide"><span class="small">本月支出去向</span><span class="bar" style="height:10px"><i style="width:46%;background:var(--finance)"></i><i style="width:22%;background:var(--finance);opacity:.65"></i><i style="width:12%;background:var(--finance);opacity:.35"></i></span>' +
+      '<span class="small" style="display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--ink2)"><span>房租 46%</span><span>吃饭 22%</span><span>交通 12%</span><span>其他 20%</span></span></div>' +
+      '<div class="fin-wide fin-pending">' + plain('3 笔待核对', 'var(--news-tint)', 'var(--news-ink)') + '<span style="flex:1 1 260px;min-width:0">10 月 12 日支付宝转出 ¥2,000：是还款，还是一笔消费？</span><a href="#" data-go="records">去核对</a></div>' +
+      '</div></section>';
+
+    var feed = '<section class="sec" style="gap:4px" aria-labelledby="h-feed"><div class="sec-head" style="padding-bottom:6px"><h2 id="h-feed" class="eyebrow">最近的变化</h2><a href="#" style="font-size:14px">近期回顾</a></div>' +
+      [['G', '#3F3E3B', 'Grok 凌晨整理了 7 份交接，更新了开图 App 的下一步', '03:02'],
+       ['我', 'var(--me)', '你记了一句「今晚跑了 5 公里」，已记进健康 · 训练', '昨天 21:40'],
+       ['D', 'var(--doing)', 'Dot 导入了 10 月的支付宝账单，3 笔待核对', '昨天 18:15']].map(function (f) {
+        return '<div class="feed-row"><span class="ini" aria-hidden="true" style="background:' + f[1] + '">' + f[0] + '</span><p>' + f[2] + '</p><span class="small num">' + f[3] + '</span></div>';
+      }).join('') + '</section>';
+
+    return '<div class="sec" style="gap:14px"><div class="head"><h1>10 月 16 日，周五</h1><span class="sub">今天还有 2 件日程 · 1 件事要你确认</span></div>' + captureForm() + '</div>' + focus + ask + sums + fin + feed;
+  }
+
+  function firstRun() {
+    return '<section class="welcome" aria-labelledby="h-wel"><span class="eyebrow">欢迎</span><h1 id="h-wel">先记下一句，开图就开始认识你</h1>' +
+      '<p>你的记录都存在你自己的文件夹里，换哪个 AI 都能接着用。现在不用设置任何东西。</p></section>' +
+      '<div class="sec" style="gap:14px">' + captureForm() + '</div>' +
+      '<section class="sec" aria-labelledby="h-start"><h2 id="h-start" class="eyebrow">也可以从这里开始</h2><div class="starts">' +
+      '<button type="button" class="start card"><h3>导入已有资料</h3><p>Apple 健康、日历、支付宝账单、和 AI 的聊天记录。开图先给你看预览，确认后才写入。</p></button>' +
+      '<button type="button" class="start card" data-open-ai><h3>连接一个 AI</h3><p>Claude、ChatGPT、Grok 都可以。连上后它能读写你的开图，帮你整理。</p>' + plain('可选', 'var(--control)', 'var(--ink2)').replace('chip"', 'chip tag"') + '</button>' +
+      '<button type="button" class="start card" data-go="explore"><h3>写下一个想试的方向</h3><p>比如「要不要搬去别的城市住三个月」。先写问题，别的以后再补。</p></button>' +
+      '</div></section>' +
+      '<p class="note">这里暂时没有图表：等有了真实记录才会出现，开图不会把「没记」当成 0。</p>';
+  }
+
+  var dirs = [
+    { id: 'serial', status: 'active', title: '短篇连载有没有人追着读', hypo: '先发两篇独立短篇，读者会主动要第二篇', unknown: '读者是出于礼貌还是真想看', attempt: { action: '发两篇给三位志愿读者，看谁回来读第二篇', budget: '两个周末，不花钱', deadline: '10 月 30 日' }, ev: [['支持', 1, 'health'], ['反对', 0, 'news'], ['还说不准', 1, 'explore']] },
+    { id: 'sketch', status: 'suggested', title: '周末学城市素描', why: '你最近三次随手记都提到想画画，周末上午常常空着。', by: 'Grok 建议' },
+    { id: 'danang', status: 'paused', title: '搬去岘港住三个月', hypo: '换个安静城市，写作时间会变多', result: '试住一周：网络常断，写作时间没变多。这次结果反对假设。' }
+  ];
+
+  function dirCard(d) {
+    var st = state.dirs[d.id] || d.status;
+    if (st === 'dismissed') return '';
+    if (st === 'suggested') {
+      return '<article class="dir card"><div style="display:flex;flex-wrap:wrap;gap:8px">' + plain(d.by, 'var(--explore-tint)', 'var(--explore-ink)') + '</div>' +
+        '<h3>' + d.title + '</h3><p style="color:var(--ink2);font-size:14px">' + d.why + '</p>' +
+        '<p class="note">AI 只能提建议，要不要试由你决定。</p>' +
+        '<div class="dir-foot"><span></span><div style="display:flex;gap:8px"><button type="button" class="btn btn-quiet" data-dir="' + d.id + '" data-to="dismissed">先不用</button><button type="button" class="btn btn-primary" data-dir="' + d.id + '" data-to="active">想试试</button></div></div></article>';
+    }
+    if (st === 'paused') {
+      return '<article class="dir is-paused"><div style="display:flex;flex-wrap:wrap;gap:8px">' + plain('已暂停', 'var(--control)', 'var(--ink2)') + '</div>' +
+        '<h3>' + d.title + '</h3><dl><dt>当时的假设</dt><dd>' + d.hypo + '</dd><dt>试的结果</dt><dd>' + d.result + '</dd></dl>' +
+        '<div class="dir-foot"><span class="note">暂停不会删掉任何资料和结果。</span><button type="button" class="btn btn-quiet" data-dir="' + d.id + '" data-to="active">重新开始</button></div></article>';
+    }
+    var a = d.attempt || { action: '还没安排尝试', budget: '—', deadline: '—' };
+    return '<article class="dir card"><div style="display:flex;flex-wrap:wrap;gap:8px">' + chip('explore', '在试') + '</div>' +
+      '<h3>' + d.title + '</h3>' +
+      (d.hypo ? '<dl><dt>我猜</dt><dd>' + d.hypo + '</dd>' + (d.unknown ? '<dt>还不知道</dt><dd>' + d.unknown + '</dd>' : '') + '</dl>' : '<p class="note">只记了问题，假设和依据以后再补。</p>') +
+      '<div class="attempt"><span class="eyebrow">这次怎么试</span><span>' + a.action + '</span><span class="small">投入：' + a.budget + ' · 截止：' + a.deadline + '</span></div>' +
+      (d.ev ? '<div class="evidence">' + d.ev.map(function (e) { return plain(e[0] + ' ' + e[1], C[e[2]][1], C[e[2]][2]); }).join('') + '</div>' : '') +
+      '<div class="dir-foot"><a href="#">加一条依据</a><button type="button" class="btn btn-quiet" data-dir="' + d.id + '" data-to="paused">暂停</button></div></article>';
+  }
+
+  var places = [
+    { name: '上海', lng: 121.47, lat: 31.23, layer: 'been', note: '2015–2021 住过' },
+    { name: '北京', lng: 116.40, lat: 39.90, layer: 'been', note: '出差 3 次' },
+    { name: '东京', lng: 139.69, lat: 35.69, layer: 'been', note: '2023 年 4 月旅行' },
+    { name: '胡志明市', lng: 106.70, lat: 10.78, layer: 'now', note: '2024 年起住在这里' },
+    { name: '岘港', lng: 108.22, lat: 16.05, layer: 'plan', note: '计划 2027 年试住' },
+    { name: '清迈', lng: 98.99, lat: 18.79, layer: 'been', note: '时间不详 · 来自聊天记录' }
+  ];
+  var layerColor = { been: 'var(--explore)', now: 'var(--health)', plan: 'var(--news)' };
+  var layerName = { been: '去过', now: '现在住', plan: '计划' };
+
+  function map() {
+    // 等距圆柱投影：经度 95–145、纬度 5–45，宽 500 高 400
+    var W = 500, H = 400, L0 = 95, L1 = 145, B0 = 5, B1 = 45;
+    function x(l) { return ((l - L0) / (L1 - L0)) * W; }
+    function y(b) { return H - ((b - B0) / (B1 - B0)) * H; }
+    var g = '';
+    for (var l = 100; l < L1; l += 10) g += '<line x1="' + x(l) + '" y1="0" x2="' + x(l) + '" y2="' + H + '" stroke="var(--map-grid)" stroke-width="1"/><text x="' + (x(l) + 4) + '" y="' + (H - 6) + '" font-size="11" fill="var(--muted)">' + l + '°E</text>';
+    for (var b = 10; b < B1; b += 10) g += '<line x1="0" y1="' + y(b) + '" x2="' + W + '" y2="' + y(b) + '" stroke="var(--map-grid)" stroke-width="1"/><text x="4" y="' + (y(b) - 4) + '" font-size="11" fill="var(--muted)">' + b + '°N</text>';
+    var pts = places.map(function (p) {
+      var px = x(p.lng), py = y(p.lat), right = px < W - 90;
+      var mark = p.layer === 'plan'
+        ? '<circle cx="' + px + '" cy="' + py + '" r="7" fill="var(--surface)" stroke="' + layerColor.plan + '" stroke-width="2.5" stroke-dasharray="3 2"/>'
+        : '<circle cx="' + px + '" cy="' + py + '" r="' + (p.layer === 'now' ? 9 : 7) + '" fill="' + layerColor[p.layer] + '" stroke="var(--surface)" stroke-width="2"/>';
+      return mark + '<text x="' + (right ? px + 13 : px - 13) + '" y="' + (py + 4) + '" font-size="13" font-weight="600" text-anchor="' + (right ? 'start' : 'end') + '" fill="var(--ink)">' + p.name + '</text>';
+    }).join('');
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="足迹地图：6 个城市"><rect width="' + W + '" height="' + H + '" rx="10" fill="var(--map-land)"/>' + g + pts + '</svg>';
+  }
+
+  function explore() {
+    var subs = [['directions', '方向'], ['places', '足迹'], ['discover', '发现']];
+    var head = '<div class="sec" style="gap:16px"><div class="head"><h1>开图</h1><span class="sub">想试的方向、走过的地方、值得看的新东西</span></div>' +
+      '<div class="subtabs" role="group" aria-label="开图里的内容">' + subs.map(function (s) { return '<button type="button" data-sub="' + s[0] + '" aria-pressed="' + (state.sub === s[0]) + '">' + s[1] + '</button>'; }).join('') + '</div></div>';
+    var body = '';
+    if (state.sub === 'directions') {
+      body = '<section class="sec" aria-label="方向"><div class="sec-head"><h2 class="eyebrow">你在探索的方向</h2><a href="#">写下一个新方向</a></div>' +
+        '<div class="grid">' + dirs.map(dirCard).join('') + '</div>' +
+        '<p class="note">做完一次尝试不等于猜对了：结果是支持还是反对，由你来判断，反对的依据也会一直留着。</p></section>';
+    } else if (state.sub === 'places') {
+      body = '<section class="sec" aria-label="足迹"><div class="split"><div class="map-box card">' + map() + '</div>' +
+        '<div class="sec" style="gap:8px"><div class="legend"><span><span class="dot" style="background:var(--explore)"></span>去过</span><span><span class="dot" style="background:var(--health)"></span>现在住</span><span><span class="dot" style="background:var(--surface);box-shadow:0 0 0 2px var(--news)"></span>计划</span></div>' +
+        '<div class="places">' + places.map(function (p) { return '<div class="place"><b>' + p.name + '</b>' + plain(layerName[p.layer], 'var(--control)', 'var(--ink2)') + '<span class="small" style="flex:1 1 100%">' + p.note + '</span></div>'; }).join('') + '</div>' +
+        '<p class="note">地点都从你的记录里来，点开能看到原文。认错了可以直接改，改过的不会被旧资料覆盖。</p></div></div></section>';
+    } else {
+      var items = [
+        { kind: 'X 帖子', src: 'X 上的一位独立开发者 · 3 小时前', color: '#3F3E3B', title: '一个人维护的个人知识库，正在变成 AI 的长期记忆', sum: '他展示了把笔记、日程和代码放在一个文件夹里，让多个 AI 轮流读写。讨论里很多人在问怎么防止互相覆盖。', comment: '和开图的思路几乎一样，可以看看评论区里大家担心的问题。', by: 'Grok 采集' },
+        { kind: '文章', src: '一个效率博客 · 昨天', color: 'var(--news)', title: '用 Apple 健康导出做一年的睡眠复盘', sum: '作者用快捷指令每天导出睡眠数据，再按周看入睡时间的变化，结论是周末晚睡最影响下周状态。', comment: '你的睡眠记录有 2 晚缺失，这个导出方法可能能补上。', by: 'Dot 采集' },
+        { kind: '论文', src: 'arXiv · 10 月 14 日', color: 'var(--doing)', title: '长期个人助理的记忆该怎么分层', sum: '把记忆分成事实、偏好和推测三层，推测必须标来源和时效，过期要重新确认。', comment: '和开图「关于我」的事实、偏好、推测分法一致。', by: 'Grok 采集' }
+      ];
+      body = '<section class="sec" aria-label="发现"><div class="sec-head"><h2 class="eyebrow">AI 帮你找来的</h2><a href="#">采集规则</a></div>' +
+        items.map(function (n) {
+          return '<article class="news card"><div class="thumb" style="background:' + n.color + '">' + n.kind + '</div><div class="stack" style="gap:6px;min-width:0">' +
+            '<span class="small">' + n.src + ' · ' + n.by + '</span><h3>' + n.title + '</h3><p>' + n.sum + '</p><p class="comment">' + n.comment + '</p></div></article>';
+        }).join('') + '</section>';
+    }
+    return head + body;
+  }
+
+  function records() {
+    var mods = [
+      ['在做的事', 'var(--doing)', '2 个项目', '今天 03:02 更新'],
+      ['健康', 'var(--health)', '1,284 条', '昨天 21:40 更新'],
+      ['财务', 'var(--finance)', '312 笔', '3 笔待核对'],
+      ['知识与决策', 'var(--explore)', '14 篇', '上周更新'],
+      ['关于我', 'var(--me)', '86 条', '2 条推测待确认'],
+      ['原文记录', 'var(--muted)', '57 条', '今天 08:05']
+    ];
+    var raws = [
+      ['今天 08:05', '早上状态不错，想把签名的事今天搞完', ['已整理', 'health'], '更新了 开图 App 的下一步'],
+      ['昨天 21:40', '今晚跑了 5 公里，有点累', ['已整理', 'health'], '记进 健康 · 训练：跑步 5 km'],
+      ['昨天 12:20', '下个月想去西贡那边看看房子', ['要你核对', 'news'], '「西贡」是指胡志明市吗？确认后加进足迹的计划'],
+      ['10 月 14 日', '读了一半《长期个人助理的记忆该怎么分层》', ['只存了原文', 'none'], '当时还没连 AI，连上后会补整理']
+    ];
+    return '<div class="head"><h1>记录</h1><span class="sub">开图里的全部资料，都存在你自己的文件夹</span></div>' +
+      '<section class="sec" aria-label="各类资料"><div class="mods">' + mods.map(function (m) {
+        return '<a href="#" class="mod card"><span class="sum-h"><span class="dot" style="width:8px;height:8px;background:' + m[1] + '"></span>' + m[0] + '</span><span class="big num">' + m[2] + '</span><span class="small">' + m[3] + '</span></a>';
+      }).join('') + '</div></section>' +
+      '<section class="sec" style="gap:0" aria-labelledby="h-raw"><div class="sec-head" style="padding-bottom:10px"><h2 id="h-raw" class="eyebrow">原文记录</h2><a href="#">导入资料</a></div>' +
+      (state.saved ? '<div class="raw"><time>刚刚</time><blockquote>' + esc(state.saved) + '</blockquote><span class="st">' + plain('已收到', 'var(--control)', 'var(--ink2)') + '正在整理</span></div>' : '') +
+      raws.map(function (r) {
+        var tag = r[2][1] === 'none' ? plain(r[2][0], 'var(--control)', 'var(--ink2)') : plain(r[2][0], C[r[2][1]][1], C[r[2][1]][2]);
+        return '<div class="raw"><time>' + r[0] + '</time><blockquote>' + r[1] + '</blockquote><span class="st">' + tag + r[3] + (r[2][1] === 'news' ? ' <a href="#">核对</a>' : '') + '</span></div>';
+      }).join('') + '</section>';
+  }
+
+
+  var threads = {
+    week: { title: '这周我练得够吗？', day: '今天', msgs: [
+      { role: 'user', text: '这周我练得够吗？' },
+      { role: 'tool', title: '读了 健康 · 本周训练', detail: '10/10–10/16 · 3 条训练记录 · 5 晚睡眠' },
+      { role: 'tool', title: '读了 你的训练规则', detail: 'me/rules.md · 隔天练，每次 40 分钟，晚上优先' },
+      { role: 'ai', html: '<p>这周练了 3 次，周一、周三、周五，正好符合你「隔天练」的规则。</p><p>要留意的是睡眠：7 晚里有 2 晚没记录，记了的 5 晚平均 6.8 小时，比你定的 7.5 小时少一些。</p><ul><li>周三那次只有心率数据，没有动作记录，可以补一下</li><li>周六上午是空的，可以再安排一次 40 分钟力量训练</li></ul>', acts: ['把周六训练放进日程', '补记周三的训练'] }
+    ] },
+    bills: { title: '整理 10 月账单', day: '今天', msgs: [
+      { role: 'user', text: '帮我看看 10 月的账单有什么问题' },
+      { role: 'tool', title: '读了 财务 · 10 月流水', detail: '312 笔 · 支付宝 284 笔 · 银行卡 28 笔' },
+      { role: 'ai', html: '<p>有 3 笔需要你确认，最大的是 10 月 12 日转出的 ¥2,000：备注是「还」，我判断更像还款，所以先没算进消费。</p><p>其他都归好类了，本月支出 ¥6,420。</p>', acts: ['去核对这 3 笔'] }
+    ] },
+    serial: { title: '短篇连载要不要继续', day: '昨天', msgs: [
+      { role: 'user', text: '短篇连载还要不要继续写？' },
+      { role: 'tool', title: '读了 开图 · 方向「短篇连载有没有人追着读」', detail: '1 条支持 · 0 条反对 · 1 条还说不准 · 尝试截止 10/30' },
+      { role: 'ai', html: '<p>现在下结论还早：三位读者里有一位主动问了第二篇，另一位没回音。你给这次尝试定的截止是 10 月 30 日，建议等到那天再看。</p>' }
+    ] },
+    fresh: { title: '新对话', day: '今天', msgs: [] }
+  };
+
+  function msgHtml(m) {
+    if (m.role === 'user') return '<div class="msg-user">' + esc(m.text) + '</div>';
+    if (m.role === 'tool') return '<details class="tool"><summary><span class="st-dot' + (m.running ? ' run' : '') + '" aria-hidden="true"></span>' + (m.running ? '正在' + m.title.replace(/^读了/, '读') : m.title) + '</summary><pre>' + esc(m.detail) + '</pre></details>';
+    if (m.role === 'thinking') return '<p class="thinking"><span>正在看你的资料…</span></p>';
+    return '<div class="msg-ai">' + m.html + (m.acts ? '<div class="acts">' + m.acts.map(function (a) { return '<button type="button" class="act" data-act="' + esc(a) + '">' + esc(a) + '</button>'; }).join('') + '</div>' : '') + '</div>';
+  }
+
+  function ask() {
+    var t = threads[state.thread];
+    var order = ['fresh', 'week', 'bills', 'serial'].filter(function (k) { return k !== 'fresh' || threads.fresh.msgs.length || state.thread === 'fresh'; });
+    var groups = {};
+    order.forEach(function (k) { (groups[threads[k].day] = groups[threads[k].day] || []).push(k); });
+    var side = '<nav class="threads" aria-label="对话"><button type="button" class="thread new-thread" data-new><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg>新对话</button>' +
+      Object.keys(groups).map(function (d) { return '<h2>' + d + '</h2>' + groups[d].map(function (k) { return '<button type="button" class="thread" data-thread="' + k + '" aria-current="' + (k === state.thread) + '">' + esc(threads[k].title) + '</button>'; }).join(''); }).join('') + '</nav>';
+    var body = t.msgs.length ? t.msgs.map(msgHtml).join('') :
+      '<div class="welcome-chat"><h1>想问开图什么？</h1><p style="color:var(--ink2)">它会先读你的开图资料再回答，改动都会留下版本，可以撤回。</p><div class="suggest">' +
+      ['这周我练得够吗？', '帮我排一下明天', '最近钱都花在哪了', '我上次去东京是什么时候'].map(function (q) { return '<button type="button" data-suggest="' + q + '">' + q + '</button>'; }).join('') + '</div></div>';
+    var composer = '<form class="composer" id="chat-form"><label class="sr" for="chat-input">给开图发消息</label><textarea id="chat-input" rows="2" placeholder="问问开图，或者让它帮你记一件事"></textarea>' +
+      '<div class="c-row"><button type="button" class="c-btn" aria-label="添加文件或照片"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-linecap="round"/></svg></button>' +
+      '<button type="button" class="c-btn" title="这个模式下只能读写开图资料，碰不到别的文件"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>只读写开图资料</button>' +
+      '<button type="button" class="c-btn">DeepSeek V4 <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m2 3.5 3 3 3-3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>' +
+      '<button type="submit" class="send" aria-label="发送"' + (state.busy ? ' disabled' : '') + '><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div></form>' +
+      '<p class="c-note">回复里的数字都来自你的开图资料，点开工具卡片能看到读了哪些。</p>';
+    return '<div class="chat">' + side + '<section class="convo" aria-label="' + esc(t.title) + '"><div class="msgs" id="msgs">' + body + '</div>' + composer + '</section></div>';
+  }
+
+  function send(text) {
+    text = text.trim();
+    if (!text || state.busy) return;
+    var t = threads[state.thread];
+    if (!t.msgs.length) t.title = text.length > 16 ? text.slice(0, 16) + '…' : text;
+    t.msgs.push({ role: 'user', text: text });
+    var tool = { role: 'tool', title: '读了 你的开图资料', detail: '原型示例：真实版本会列出读了哪些文件', running: true };
+    t.msgs.push(tool, { role: 'thinking' });
+    state.busy = true; render();
+    setTimeout(function () {
+      tool.running = false;
+      t.msgs.pop();
+      t.msgs.push({ role: 'ai', html: '<p>这是原型里的示例回复。真实版本会用你连接的 AI 读完资料再回答，需要改动时会先写成建议，等你在总览确认。</p>' });
+      state.busy = false; render();
+    }, 1400);
+  }
+
+  var view = document.getElementById('view');
+  function render() {
+    view.dataset.view = state.view;
+    view.innerHTML = state.view === 'ask' ? ask() : state.view === 'explore' ? explore() : state.view === 'records' ? records() : overview();
+    var box = document.getElementById('msgs'); if (box) box.scrollTop = box.scrollHeight;
+    document.querySelectorAll('.tabs button').forEach(function (b) {
+      if (b.dataset.view === state.view) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    document.getElementById('demo-data').setAttribute('aria-pressed', String(!state.first));
+    document.getElementById('demo-first').setAttribute('aria-pressed', String(state.first));
+    try { localStorage.setItem('kaitu-proto-view', state.view); } catch (e) {}
+  }
+  function go(v) { state.view = v; render(); window.scrollTo(0, 0); if (v === 'ask' && !state.connected) openAi(); }
+
+  document.querySelector('.tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-view]'); if (b) go(b.dataset.view);
+  });
+  document.getElementById('demo-data').addEventListener('click', function () { state.first = false; state.saved = ''; go('overview'); });
+  document.getElementById('demo-first').addEventListener('click', function () { state.first = true; state.saved = ''; go('overview'); });
+
+  view.addEventListener('click', function (e) {
+    var c = e.target.closest('[data-thread],[data-new],[data-suggest],[data-act]');
+    if (c) {
+      if (c.dataset.thread) { state.thread = c.dataset.thread; return render(); }
+      if (c.hasAttribute('data-new')) { threads.fresh = { title: '新对话', day: '今天', msgs: [] }; state.thread = 'fresh'; render(); var i = document.getElementById('chat-input'); if (i) i.focus(); return; }
+      if (c.dataset.suggest) return send(c.dataset.suggest);
+      if (c.dataset.act) return send(c.dataset.act);
+    }
+    var t = e.target.closest('[data-go],[data-done],#focus-done,[data-ask],[data-dir],[data-sub],[data-open-ai]');
+    if (!t) return;
+    if (t.matches('a')) e.preventDefault();
+    if (t.dataset.go) return go(t.dataset.go);
+    if (t.dataset.done) { state.done[t.dataset.done] = !state.done[t.dataset.done]; return render(); }
+    if (t.id === 'focus-done') { state.focusDone = !state.focusDone; return render(); }
+    if (t.hasAttribute('data-ask')) { state.asked = true; return render(); }
+    if (t.dataset.dir) { state.dirs[t.dataset.dir] = t.dataset.to; return render(); }
+    if (t.dataset.sub) { state.sub = t.dataset.sub; return render(); }
+    if (t.hasAttribute('data-open-ai')) return openAi();
+  });
+  view.addEventListener('submit', function (e) {
+    if (e.target.id === 'chat-form') { e.preventDefault(); return send(document.getElementById('chat-input').value); }
+    if (e.target.id !== 'capture') return;
+    e.preventDefault();
+    var v = document.getElementById('capture-text').value.trim();
+    if (v) { state.saved = v; render(); }
+  });
+
+  var dlg = document.getElementById('ai-dialog');
+  var s1 = document.getElementById('ai-step1'), s2 = document.getElementById('ai-step2');
+  var lastFocus = null;
+  function openAi() {
+    lastFocus = document.activeElement;
+    s1.hidden = false; s2.hidden = true; dlg.hidden = false;
+    dlg.querySelector('.choice').focus();
+  }
+  function closeAi() { dlg.hidden = true; if (lastFocus) lastFocus.focus(); }
+  document.getElementById('demo-ai').addEventListener('click', function () { state.connected = false; go('ask'); });
+  document.getElementById('ai-next').addEventListener('click', function () { s1.hidden = true; s2.hidden = false; document.getElementById('auto-morning').focus(); });
+  view.addEventListener('keydown', function (e) {
+    if (e.target.id !== 'chat-input' || e.key !== 'Enter' || e.shiftKey || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault(); send(e.target.value);
+  });
+  dlg.addEventListener('click', function (e) {
+    if (e.target.closest('[data-finish]')) { state.connected = true; if (state.view === 'ask') render(); }
+    if (e.target === dlg || e.target.closest('[data-close]')) return closeAi();
+    var c = e.target.closest('.choice');
+    if (c) dlg.querySelectorAll('.choice').forEach(function (x) { x.setAttribute('aria-pressed', String(x === c)); });
+  });
+  dlg.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAi(); });
+
+  render();
+})();
+</script>
