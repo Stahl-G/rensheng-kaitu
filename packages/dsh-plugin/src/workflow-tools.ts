@@ -243,7 +243,6 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         .object({
           operation: z.literal("write"),
           files: z.array(z.object({ path: text, content: z.string() }).strict()).min(1),
-          confirmed: z.boolean().default(false),
         })
         .strict(),
       z.object({ operation: z.literal("snapshot"), message: text }).strict(),
@@ -257,7 +256,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         case "list":
           return listFiles(ws, input.path);
         case "write":
-          return writeFiles(ws, input.files, input.confirmed);
+          return writeFiles(ws, input.files, false);
         case "snapshot":
           return { version: await snapshot(ws, `DeepSeek：${input.message}`) };
         case "agents-md":

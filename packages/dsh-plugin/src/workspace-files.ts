@@ -1,10 +1,19 @@
 import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, extname } from "node:path";
-import { type Workspace, readAgentFile, snapshot, validateWorkspace, writeAgentsMd } from "@kaitu/core";
+import {
+  type Workspace,
+  agentRelativePath,
+  assertAgentWrite,
+  readAgentFile,
+  snapshot,
+  validateWorkspace,
+  writeAgentsMd,
+} from "@kaitu/core";
 
 function visiblePath(ws: Workspace, file: string): string {
-  const path = ws.resolve(file);
-  if (file.split(/[\\/]/).some((part) => part.startsWith("."))) throw new Error("不允许访问隐藏目录");
+  const normalized = agentRelativePath(ws.root, file);
+  const path = ws.resolve(normalized);
+  if (normalized.split(/[\\/]/).some((part) => part.startsWith("."))) throw new Error("不允许访问隐藏目录");
   return path;
 }
 
@@ -18,22 +27,17 @@ export function listFiles(ws: Workspace, directory: string) {
 /** 文件编辑只开放文档和模块定义，结构化记录与记忆走 core 的专用写入接口。 */
 export async function writeFiles(
   ws: Workspace,
-  files: { path: string; content: string }[],
+  inputFiles: { path: string; content: string }[],
   confirmed: boolean,
 ) {
+  const files = inputFiles.map((file) => ({
+    ...file,
+    path: assertAgentWrite(ws.root, file.path, confirmed),
+  }));
   const previous = new Map<string, string | undefined>();
   for (const { path, content } of files) {
     visiblePath(ws, path);
     if (![".md", ".json"].includes(extname(path))) throw new Error("只允许写 Markdown / JSON");
-    if (
-      ["AGENTS.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
-      path.startsWith("memory/") ||
-      path.startsWith("chats/") ||
-      (path.includes("/data/") && !/^health\/data\/labs\/[^/]+\.json$/.test(path))
-    )
-      throw new Error("此路径由开图管理，请用专用工具");
-    if (["me/rules.md", "me/goals.json"].includes(path) && !confirmed)
-      throw new Error("规则或目标变更须用户确认");
     if (extname(path) === ".json") JSON.parse(content);
     if (previous.has(path)) throw new Error("一次写入不能包含重复路径");
     previous.set(path, ws.exists(path) ? readAgentFile(ws, path) : undefined);

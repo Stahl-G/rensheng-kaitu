@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { assertAgentPath } from "../core/dist/agent-file-policy.js";
+import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
 
 export function confinedFileSystem(LocalFileSystem, FsError, root) {
   const contains = (path) => {
@@ -76,10 +76,14 @@ export function confinedFileSystem(LocalFileSystem, FsError, root) {
       return super.watch(await this.checked(target), ...args);
     }
     async writeText(target, ...args) {
-      return super.writeText(await this.checked(target), ...args);
+      const checked = await this.checked(target);
+      assertAgentWrite(root, checked.targetKey);
+      return super.writeText(checked, ...args);
     }
     async editText(target, ...args) {
-      return super.editText(await this.checked(target), ...args);
+      const checked = await this.checked(target);
+      assertAgentWrite(root, checked.targetKey);
+      return super.editText(checked, ...args);
     }
   };
 }
