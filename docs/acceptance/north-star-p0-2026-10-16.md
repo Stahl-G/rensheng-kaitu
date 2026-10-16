@@ -128,7 +128,7 @@
 - `handover.test.ts`：贴回回答的标签行、英文路径与 JSON 都能读成草稿，缺项报原因，采纳后校验通过；资料包只带该带的内容，方向贴回为待采纳且不重复。
 - `records.test.ts`：别的程序追加记录行、原地改写记忆后，下一次读取就是新内容，读到的记录不能被误改；近 7 天统计在 UTC+14 与 UTC−12 下按当地日期算，边界记录不多算也不漏算。
 
-四项检查（已合入 main `527373f`）：build、typecheck、lint 通过；test 191 通过、2 跳过、1 失败。
+四项检查（已合入 main `527373f`）：build、typecheck、lint 通过；test 192 通过、2 跳过、1 失败。
 `packages/cli/test/status.test.ts`「版本库只读时 record add 仍保存数据」在本容器失败：容器以 root 运行，chmod 只读挡不住写入；main 上同样失败，与本分支无关。
 
 ## 没有验证的

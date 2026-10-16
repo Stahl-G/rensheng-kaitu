@@ -463,3 +463,28 @@ it("两个目标各有下一步：今天页卡片给还没做完的那一步，�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("没有方向模块的旧工作区也能搬入目标，「在考虑」记为记忆", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-legacy-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    rmSync(join(ws.root, "explore/module.json"));
+    const preview = previewOnboardingMemory(
+      ws,
+      "[目标] 年底跑完半马\n[在考虑] 明年要不要搬去杭州",
+      "chatgpt",
+      options,
+    );
+    const result = await confirmOnboardingMemory(
+      ws,
+      preview.token,
+      preview.candidates.map((item) => item.id),
+      options,
+    );
+    expect(result).toMatchObject({ goals: 1, directions: 0 });
+    expect(listMemories(ws).map((entry) => entry.text)).toContain("明年要不要搬去杭州");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -18,6 +18,7 @@ import {
   historyDirectory,
   initWorkspace,
   mcpToken,
+  moveWorkspace,
   pendingWorkspaceFiles,
   processInbox,
   readProject,
@@ -259,6 +260,11 @@ it("坚果云往返：资料进同步文件夹、状态留本机；冲突副本�
     for (const file of conflicts) expect(tracked).not.toContain(file);
     expect(tracked).toContain("learning/沟通-冲突解决/notes.md");
     for (const file of conflicts) rmSync(join(ws.root, file));
+    // 同步中换成另一种同步方式，记下的同步方式跟着换。
+    mkdirSync(join(home, "Sync"));
+    await moveWorkspace(ws, join(home, "Sync/kaitu"), true, "folder");
+    expect(syncStatus(new Workspace(ws.root))).toMatchObject({ mode: "drive", provider: "folder" });
+    expect(readRecords(ws, "workout")[0]).toEqual(added.record);
     await disableSync(ws, { to: join(home, "back") });
     expect(syncStatus(ws)).toMatchObject({ mode: "local", provider: "local" });
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);

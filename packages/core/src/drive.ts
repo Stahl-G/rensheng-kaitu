@@ -318,13 +318,22 @@ export async function moveWorkspace(ws: Workspace, target: string, drive: boolea
   separate(old, destination);
   await snapshot(ws, "迁移资料前保存");
   const state = stateDirectory(old);
+  // 已在同步时换了同步方式（例如 iCloud → 坚果云），绑定和记下的同步方式都要跟着换。
+  const next: SyncMode =
+    mode !== "local" && provider !== undefined && provider !== "local"
+      ? provider === "icloud"
+        ? "icloud"
+        : "drive"
+      : mode;
   move(old, destination);
   setStateBinding(
     destination,
     mode === "local" ? join(destination, ".kaitu") : state,
-    mode,
+    next,
     stateBinding(old).id,
   );
+  if (next === "drive" && provider !== undefined && provider !== "local" && provider !== "icloud")
+    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode: next, provider })}\n`);
   ws.root = destination;
   rebaseProjectLinks(ws, old, destination);
   remember(destination);

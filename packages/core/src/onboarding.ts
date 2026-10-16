@@ -714,11 +714,9 @@ export async function confirmOnboardingMemory(
     }));
   const date = localDate(new Date(), ws.timeZone());
   const routed = chosen.filter((entry) => route(entry) !== "memory");
+  const hasDirections = listRecordTypes(ws).some((ref) => ref.type === "direction");
   // 先确认能写到方向，再动手写，免得一半写进去一半报错。
-  if (
-    routed.some((entry) => route(entry) === "direction") &&
-    !listRecordTypes(ws).some((ref) => ref.type === "direction")
-  )
+  if (routed.some((entry) => route(entry) === "direction") && !hasDirections)
     throw new KaituError(
       pick(
         locale,
@@ -784,7 +782,9 @@ export async function confirmOnboardingMemory(
         );
         projects++;
       }
-      const directionTitles = new Set(readRecords(ws, "direction").map((row) => String(row.title).trim()));
+      const directionTitles = new Set(
+        hasDirections ? readRecords(ws, "direction").map((row) => String(row.title).trim()) : [],
+      );
       for (const entry of chosen.filter((item) => route(item) === "direction")) {
         if (directionTitles.has(entry.content)) continue;
         directionTitles.add(entry.content);
@@ -1044,7 +1044,7 @@ export function resolvePreferences(
   const saved = readPreferences();
   if (saved.locale) return saved;
   const locale: Locale =
-    onboardingStatus(ws, options).hasUserData || typeof hint !== "string" || /^zh\b/i.test(hint)
+    ws.unavailableFiles().length > 0 || hasUserFiles(ws) || typeof hint !== "string" || /^zh\b/i.test(hint)
       ? "zh-CN"
       : "en";
   return savePreferences({ locale });

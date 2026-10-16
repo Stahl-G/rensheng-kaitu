@@ -1,6 +1,7 @@
 import { KaituError } from "./errors.js";
 import type { Direction, ExplorationCommand, ExplorationExperiment } from "./exploration.js";
 import { writeExploration } from "./exploration.js";
+import { batchSnapshot } from "./history.js";
 import { type Locale, normalizeLocale, pick } from "./locale.js";
 import { listMemories } from "./memory.js";
 import {
@@ -10,7 +11,6 @@ import {
   type OnboardingPath,
   draftOnboardingMatter,
   readOnboardingMatter,
-  recordOnboardingAiConnection,
 } from "./onboarding.js";
 import { completedAt, goalOrigin, noteLine, readPlans, taskGoal } from "./plans.js";
 import { listProjects } from "./projects.js";
@@ -232,7 +232,6 @@ export async function pasteOnboardingMatter(
     source,
     parseMatterAnswer(answer, normalizeLocale(options.locale)),
   );
-  recordOnboardingAiConnection(ws, "clipboard", options);
   return matter;
 }
 
@@ -572,36 +571,42 @@ export async function pasteDirections(
   );
   const ids: string[] = [];
   let skipped = 0;
-  for (const item of valid) {
-    if (existing.has(item.title)) {
-      skipped++;
-      continue;
-    }
-    existing.add(item.title);
-    const urls = [...new Set(item.urls)].slice(0, 8).filter((url) => {
-      try {
-        const parsed = new URL(url);
-        return (
-          (parsed.protocol === "http:" || parsed.protocol === "https:") &&
-          !parsed.username &&
-          !parsed.password
-        );
-      } catch {
-        return false;
+  // 一次贴回只存一个版本。
+  await batchSnapshot(
+    ws,
+    pick(locale, "你从自己的 AI 贴回了方向建议", "You pasted direction ideas from your own AI"),
+    async () => {
+      for (const item of valid) {
+        if (existing.has(item.title)) {
+          skipped++;
+          continue;
+        }
+        existing.add(item.title);
+        const urls = [...new Set(item.urls)].slice(0, 8).filter((url) => {
+          try {
+            const parsed = new URL(url);
+            return (
+              (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+              !parsed.username &&
+              !parsed.password
+            );
+          } catch {
+            return false;
+          }
+        });
+        const command: ExplorationCommand = {
+          operation: "create_direction",
+          data: {
+            title: item.title,
+            motivation: item.motivation,
+            hypothesis: item.hypothesis,
+            ...(item.unknowns ? { unknowns: item.unknowns } : {}),
+            ...(urls.length ? { references: urls.map((ref) => ({ kind: "source" as const, ref })) } : {}),
+          },
+        };
+        ids.push((await writeExploration(ws, command, "agent")).id);
       }
-    });
-    const command: ExplorationCommand = {
-      operation: "create_direction",
-      data: {
-        title: item.title,
-        motivation: item.motivation,
-        hypothesis: item.hypothesis,
-        ...(item.unknowns ? { unknowns: item.unknowns } : {}),
-        ...(urls.length ? { references: urls.map((ref) => ({ kind: "source" as const, ref })) } : {}),
-      },
-    };
-    ids.push((await writeExploration(ws, command, "agent")).id);
-  }
-  if (ids.length) recordOnboardingAiConnection(ws, "clipboard", options);
+    },
+  );
   return { ids, skipped };
 }
