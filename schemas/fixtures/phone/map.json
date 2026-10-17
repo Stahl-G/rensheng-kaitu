@@ -4,12 +4,43 @@
   "generated_at": "2026-10-18T07:30:12+08:00",
   "as_of": "2026-10-18",
   "rows": [
-    { "id": "photo-book", "kind": "goal", "title": "年底出一本摄影集", "done": true, "ahead": "planned", "next": "把初选从 80 张挑到 30 张", "suggested": false },
-    { "id": "kaitu-app", "kind": "project", "title": "开图 App", "done": true, "ahead": "planned", "next": "发 TestFlight 0.6.0", "suggested": false },
-    { "id": "01JAZ0W6QK8R2F4M7N9P1S3T5W", "kind": "direction", "title": "要不要搬去杭州", "done": false, "ahead": "unexplored", "next": null, "suggested": true }
+    {
+      "id": "photo-book",
+      "kind": "goal",
+      "title": "年底出一本摄影集",
+      "done": true,
+      "ahead": "planned",
+      "next": "把初选从 80 张挑到 30 张",
+      "suggested": false
+    },
+    {
+      "id": "kaitu-app",
+      "kind": "project",
+      "title": "开图 App",
+      "done": true,
+      "ahead": "planned",
+      "next": "发 TestFlight 0.6.0",
+      "suggested": false
+    },
+    {
+      "id": "01JAZ0W6QK8R2F4M7N9P1S3T5W",
+      "kind": "direction",
+      "title": "要不要搬去杭州",
+      "done": false,
+      "ahead": "unexplored",
+      "next": null,
+      "suggested": true
+    }
   ],
   "places": [
-    { "name": "南京", "lat": 32.0603, "lng": 118.7969, "layer": "been", "start": "2014-09", "end": "2018-06" },
+    {
+      "name": "南京",
+      "lat": 32.0603,
+      "lng": 118.7969,
+      "layer": "been",
+      "start": "2014-09",
+      "end": "2018-06"
+    },
     { "name": "上海", "lat": 31.2304, "lng": 121.4737, "layer": "now", "start": "2018-07" },
     { "name": "杭州", "lat": 30.2741, "lng": 120.1551, "layer": "planned" }
   ],

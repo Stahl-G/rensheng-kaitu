@@ -30,7 +30,10 @@
         "properties": {
           "args": {
             "required": ["file", "id"],
-            "properties": { "file": { "type": "string", "minLength": 1 }, "id": { "type": "string", "minLength": 1 } }
+            "properties": {
+              "file": { "type": "string", "minLength": 1 },
+              "id": { "type": "string", "minLength": 1 }
+            }
           }
         }
       }
@@ -63,7 +66,9 @@
     {
       "if": { "properties": { "op": { "const": "keep_draft" } } },
       "then": {
-        "properties": { "args": { "required": ["source"], "properties": { "source": { "type": "string", "minLength": 1 } } } }
+        "properties": {
+          "args": { "required": ["source"], "properties": { "source": { "type": "string", "minLength": 1 } } }
+        }
       }
     },
     {
@@ -94,7 +99,10 @@
         "properties": {
           "args": {
             "required": ["question_id", "value"],
-            "properties": { "question_id": { "type": "string", "minLength": 1 }, "value": { "type": "string" } }
+            "properties": {
+              "question_id": { "type": "string", "minLength": 1 },
+              "value": { "type": "string" }
+            }
           }
         }
       }

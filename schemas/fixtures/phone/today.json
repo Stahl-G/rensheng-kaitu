@@ -33,10 +33,25 @@
     }
   ],
   "proposals": [
-    { "id": "b-0412", "title": "整理摄影集", "start": "20:00", "end": "21:00", "kind": "proposal", "module": "projects", "status": "pending" }
+    {
+      "id": "b-0412",
+      "title": "整理摄影集",
+      "start": "20:00",
+      "end": "21:00",
+      "kind": "proposal",
+      "module": "projects",
+      "status": "pending"
+    }
   ],
   "blocks": [
-    { "id": "b-0410", "title": "周会", "start": "10:00", "end": "11:00", "kind": "event", "status": "confirmed" }
+    {
+      "id": "b-0410",
+      "title": "周会",
+      "start": "10:00",
+      "end": "11:00",
+      "kind": "event",
+      "status": "confirmed"
+    }
   ],
   "goals": [
     {

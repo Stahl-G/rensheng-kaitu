@@ -4,7 +4,19 @@
   "title": "手机快照：今天（phone/today.json）",
   "description": "电脑生成，手机只读。next 的第一项就是今天最重要的一件事，与电脑今天页一致。字段只增不改，手机忽略不认识的字段。",
   "type": "object",
-  "required": ["format", "version", "generated_at", "today", "timezone", "next", "proposals", "blocks", "goals", "question", "sync"],
+  "required": [
+    "format",
+    "version",
+    "generated_at",
+    "today",
+    "timezone",
+    "next",
+    "proposals",
+    "blocks",
+    "goals",
+    "question",
+    "sync"
+  ],
   "properties": {
     "format": { "const": "kaitu.phone.today" },
     "version": { "const": 1 },
@@ -18,16 +30,28 @@
       "items": { "$ref": "#/$defs/block" }
     },
     "blocks": { "type": "array", "description": "今天其余的日程块", "items": { "$ref": "#/$defs/block" } },
-    "goals": { "type": "array", "description": "进行中的目标（你带来的规划）", "items": { "$ref": "#/$defs/goal" } },
+    "goals": {
+      "type": "array",
+      "description": "进行中的目标（你带来的规划）",
+      "items": { "$ref": "#/$defs/goal" }
+    },
     "question": { "type": "null", "description": "关键问题，version 1 恒为 null，预留" },
     "sync": {
       "type": "object",
       "required": ["received", "needs_review", "organizer", "updated_at"],
       "properties": {
-        "received": { "type": "integer", "minimum": 0, "description": "已收到、还没整理的原文和收件箱文件数" },
+        "received": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "已收到、还没整理的原文和收件箱文件数"
+        },
         "needs_review": { "type": "integer", "minimum": 0 },
         "organizer": { "type": "boolean", "description": "是否开着每日整理" },
-        "updated_at": { "type": ["string", "null"], "format": "date-time", "description": "资料最近一次真正更新的时间" }
+        "updated_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "资料最近一次真正更新的时间"
+        }
       }
     }
   },

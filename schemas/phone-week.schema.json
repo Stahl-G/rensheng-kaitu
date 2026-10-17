@@ -67,7 +67,9 @@
     "notes": {
       "type": "object",
       "required": ["captured"],
-      "properties": { "captured": { "type": "integer", "minimum": 0, "description": "这 7 天保存的原文条数" } }
+      "properties": {
+        "captured": { "type": "integer", "minimum": 0, "description": "这 7 天保存的原文条数" }
+      }
     },
     "changes": {
       "type": "array",
