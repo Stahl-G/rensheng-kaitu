@@ -272,7 +272,7 @@
 <h2 id="updates">Updates<a class="anchor" href="#updates" aria-label="#">#</a></h2>
 <ul>
   <li><strong>Feature package</strong>: interface, notes service, tools and skills. Settings → About → Kaitu feature updates: Check for updates → Download update → Restart app. Packages must pass signature and engine-version checks, or Kaitu keeps the current version. Restore previous features if something goes wrong; this doesn't restore your notes (use version history for that).</li>
-  <li><strong>The app itself</strong>: when the DSH engine (pinned at 0.2.1-rc.1), Electron or the launcher changes, download a new Kaitu.app.</li>
+  <li><strong>The app itself</strong>: when the DSH engine (pinned at 0.2.1-rc.2), Electron or the launcher changes, download a new Kaitu.app.</li>
 </ul>
 <p>If Settings shows No update source configured, in-app updates aren't available; get the new version from <a href="/en/download/">Download</a>. A new app version upgrades the built-in templates and skills in your notes folder on launch and keeps your settings. Command-line only? Run <code>kaitu upgrade</code> on older folders first (<code>--dry-run</code> to preview).</p>
 
@@ -302,7 +302,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>The global option <code>--dir &lt;folder&gt;</code> (or the <code>KAITU_DIR</code> environment variable) picks the notes folder. Without either, it uses the app's current folder, or <code>~/kaitu</code>. Run <code>kaitu --help</code> for the full list.</p>
 <p><strong>MCP over HTTP</strong>: <code>kaitu mcp --http</code> listens only on <code>127.0.0.1:4871</code>; requests need the Bearer token from <code>kaitu mcp token</code>, and only reading and adding are allowed by default. Kaitu has no built-in public access.</p>
 <h3 id="dsh">Add Kaitu to DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
-<p>If you already use the DSH 0.2.1-rc.1 desktop app, after <code>pnpm build</code> in the source folder:</p>
+<p>If you already use the DSH 0.2.1-rc.2 desktop app, after <code>pnpm build</code> in the source folder:</p>
 <ol>
   <li>Open DSH once and set up a model in Settings → Models.</li>
   <li>Run <code>kaitu dsh --install</code>. If Kaitu.app uses the same notes folder, add <code>--no-automation</code> so background tasks only run in Kaitu.app.</li>
@@ -335,7 +335,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h3 id="faq-export">How do I take all my notes with me?<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>Settings → Export everything gives you a zip, or just copy your notes folder.</p>
 <h3 id="faq-dsh">How does it relate to DeepSeek Harness?<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
-<p>Kaitu.app is built on DeepSeek Harness (DSH) 0.2.1-rc.1, and Ask runs on its engine. If you already use DSH, you can install Kaitu as a plugin instead (see <a href="#dsh">Add Kaitu to DeepSeek Harness</a>).</p>
+<p>Kaitu.app is built on DeepSeek Harness (DSH) 0.2.1-rc.2, and Ask runs on its engine. If you already use DSH, you can install Kaitu as a plugin instead (see <a href="#dsh">Add Kaitu to DeepSeek Harness</a>).</p>
 <h3 id="faq-engine">Ask says its engine didn't load?<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
 <p>Reinstall the full CLI and web package and restart the workbench. Until then, you can still copy a context pack from AI &amp; connections to the AI you use.</p>
 <h3 id="faq-update-source">Settings says No update source configured?<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>

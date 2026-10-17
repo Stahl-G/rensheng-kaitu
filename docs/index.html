@@ -271,7 +271,7 @@
 <h2 id="updates">更新<a class="anchor" href="#updates" aria-label="#">#</a></h2>
 <ul>
   <li><strong>功能包</strong>：界面、资料服务、工具和技能。「设置 → 关于 → 开图功能更新」：检查更新 → 下载更新 → 重启应用。更新包要通过签名和内核版本检查，不通过就继续用当前版本。有问题可以「恢复上一版功能」；这不会恢复你的资料，资料回退用版本历史。</li>
-  <li><strong>App 本身</strong>：DSH 内核（当前固定 0.2.1-rc.1）、Electron 或启动器有变化时，需要下载新的 Kaitu.app。</li>
+  <li><strong>App 本身</strong>：DSH 内核（当前固定 0.2.1-rc.2）、Electron 或启动器有变化时，需要下载新的 Kaitu.app。</li>
 </ul>
 <p>设置里显示「未配置更新源」时，不能在应用内检查更新，到<a href="/download/">下载</a>页下载新版。新版 App 打开时会自动升级资料文件夹里的内置模板和技能，保留你的配置。只用命令行时，旧资料文件夹先运行 <code>kaitu upgrade</code>（<code>--dry-run</code> 预览）。</p>
 
@@ -301,7 +301,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>通用选项 <code>--dir &lt;目录&gt;</code>，也可以设环境变量 <code>KAITU_DIR</code>。都不设时，用 App 当前的资料文件夹，没有就用 <code>~/kaitu</code>。完整列表见 <code>kaitu --help</code>。</p>
 <p><strong>MCP over HTTP</strong>：<code>kaitu mcp --http</code> 只监听 <code>127.0.0.1:4871</code>，请求要带 <code>kaitu mcp token</code> 给出的 Bearer token，默认只开放读取和新增。开图不内置公网访问。</p>
 <h3 id="dsh">装进 DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
-<p>已经在用 DSH 0.2.1-rc.1 桌面应用时，在源码目录 <code>pnpm build</code> 之后：</p>
+<p>已经在用 DSH 0.2.1-rc.2 桌面应用时，在源码目录 <code>pnpm build</code> 之后：</p>
 <ol>
   <li>打开一次 DSH，在「设置 → 模型」配好模型。</li>
   <li>运行 <code>kaitu dsh --install</code>。同一个资料文件夹也在 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。</li>
@@ -334,7 +334,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h3 id="faq-export">怎么把资料全部带走？<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>「设置 → 导出全部资料」得到一个 zip；或者直接复制资料文件夹。</p>
 <h3 id="faq-dsh">和 DeepSeek Harness 是什么关系？<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
-<p>Kaitu.app 基于 DeepSeek Harness（DSH）0.2.1-rc.1 打包，问问用的是它的引擎。已经在用 DSH，也可以只把开图装成插件（见<a href="#dsh">装进 DeepSeek Harness</a>）。</p>
+<p>Kaitu.app 基于 DeepSeek Harness（DSH）0.2.1-rc.2 打包，问问用的是它的引擎。已经在用 DSH，也可以只把开图装成插件（见<a href="#dsh">装进 DeepSeek Harness</a>）。</p>
 <h3 id="faq-engine">问问页显示「问问引擎没有载入」？<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
 <p>重新安装完整的命令行与网页版安装包，再重启工作台。在那之前，仍可以在「AI 与连接」复制资料包，带到你常用的 AI。</p>
 <h3 id="faq-update-source">设置里显示「未配置更新源」？<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>
