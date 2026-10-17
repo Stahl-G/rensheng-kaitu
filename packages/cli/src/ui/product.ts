@@ -107,6 +107,7 @@ import {
   syncProject,
   tryNews,
   unhideExperience,
+  workspaceBackupRequest,
   writeExploration,
 } from "@kaitu/core";
 import { directionGeneration } from "./directions-ai.js";
@@ -120,6 +121,7 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "workspaceBackup",
   "askModels",
   "projectCreate",
   "projectBindGithub",
@@ -262,6 +264,8 @@ export async function productRequest(
       return addCalendarSubscription(ws, text(0), text(1));
     case "completeNext":
       return completeNext(ws, text(0), text(1));
+    case "workspaceBackup":
+      return workspaceBackupRequest(ws, text(0), args[1]);
     case "settings": {
       const data: SettingsData = await readSettings(ws);
       data.ai = ask ? await ask.settings() : null;

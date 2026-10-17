@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
 import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
+import { HISTORY_MARKER } from "./history-ownership.js";
 import { batchOverview, refreshOverview } from "./overview.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
@@ -13,6 +14,8 @@ export const NEVER_TRACK = [
   ".kaitu/secrets.json",
   ".kaitu/bank-mail-archive/",
   ".kaitu/github-state.json",
+  ".kaitu/workspace-backup.json",
+  ".kaitu/backup-conflicts/",
   ".kaitu/dsh-setup.json",
   ".kaitu/automation.json",
   ".kaitu/calendar-subscriptions.json",
@@ -33,6 +36,8 @@ export const GITIGNORE = `# 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
 .kaitu/bank-mail-archive/
 .kaitu/github-state.json
+.kaitu/workspace-backup.json
+.kaitu/backup-conflicts/
 .kaitu/dsh-setup.json
 .kaitu/automation.json
 .kaitu/calendar-subscriptions.json
@@ -75,6 +80,7 @@ export function hasHistory(ws: Workspace): boolean {
 export async function ensureHistory(ws: Workspace): Promise<void> {
   if (!hasHistory(ws))
     await git.init({ fs, dir: ws.root, gitdir: historyDirectory(ws), defaultBranch: "main" });
+  fs.writeFileSync(join(historyDirectory(ws), HISTORY_MARKER), "kaitu\n");
   maintainHistoryIgnore(ws);
 }
 

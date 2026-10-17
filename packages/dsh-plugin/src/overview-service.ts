@@ -114,6 +114,7 @@ import {
   syncProject,
   tryNews,
   unhideExperience,
+  workspaceBackupRequest,
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
@@ -361,6 +362,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("completeNext")
   async completeNext(file: string, id: string): Promise<{ version: string | null }> {
     return this.write(() => completeNext(this.workspace, file, id));
+  }
+
+  @Remote("workspaceBackup")
+  async workspaceBackup(operation: string, input: string): Promise<string> {
+    return JSON.stringify(await workspaceBackupRequest(this.workspace, operation, JSON.parse(input)));
   }
 
   @Remote("settings")

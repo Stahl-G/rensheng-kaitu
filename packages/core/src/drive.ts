@@ -43,7 +43,7 @@ export function currentWorkspace(env: NodeJS.ProcessEnv = process.env): string |
   return typeof root === "string" && existsSync(join(root, ".kaitu/config.json")) ? root : undefined;
 }
 
-function remember(root: string) {
+export function rememberWorkspace(root: string) {
   const path = join(localStateRoot(), "current-workspace.json");
   mkdirSync(dirname(path), { recursive: true });
   const temp = `${path}.tmp`;
@@ -224,7 +224,7 @@ export async function enableSync(
   setStateBinding(target, state, mode, stateBinding(old).id);
   ws.root = target;
   rebaseProjectLinks(ws, old, target);
-  remember(target);
+  rememberWorkspace(target);
   relocationNote(old, target);
   setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   if (mode === "icloud") requestICloudDownload(target);
@@ -279,7 +279,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   ws.writeJson(".kaitu/config.json", local, { internal: true });
   rmSync(join(target, ".kaitu/sync-location.json"), { force: true });
   rebaseProjectLinks(ws, old, target);
-  remember(target);
+  rememberWorkspace(target);
   relocationNote(old, target);
   setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   await snapshot(ws, "关闭同步，搬回本机");
@@ -336,7 +336,7 @@ export async function moveWorkspace(ws: Workspace, target: string, drive: boolea
     writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode: next, provider })}\n`);
   ws.root = destination;
   rebaseProjectLinks(ws, old, destination);
-  remember(destination);
+  rememberWorkspace(destination);
   relocationNote(old, destination);
   setStateBinding(old, join(old, ".kaitu"), "local", randomUUID());
   await snapshot(ws, "你更换了资料存放位置");

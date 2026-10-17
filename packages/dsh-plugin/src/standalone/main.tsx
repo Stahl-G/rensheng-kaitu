@@ -75,6 +75,7 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  workspaceBackup: (operation, input) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
   plugins: (action, input) => call("plugins", action, input),
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),

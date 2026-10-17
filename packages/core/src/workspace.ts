@@ -14,6 +14,7 @@ import { quarantineBankNotes } from "./bank-mail.js";
 import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import { ownsLegacyHistory } from "./history-ownership.js";
 import { maintainHistoryIgnore } from "./history.js";
 import { overviewDeferred, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
@@ -43,6 +44,7 @@ export function migrateHistory(root: string, icloud?: boolean): void {
   const old = join(root, ".git");
   const target = join(stateDirectory(root, icloud), "history.git");
   if (!existsSync(join(root, STATE_DIR, "config.json")) || !existsSync(old)) return;
+  if (!ownsLegacyHistory(old)) return;
   if (existsSync(target)) {
     throw new KaituError(`发现两个版本库，请先核对 ${old} 与 ${target}，未改动历史`, "HISTORY_MIGRATION");
   }
