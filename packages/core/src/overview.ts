@@ -80,7 +80,11 @@ export function renderOrganizer(): string {
 
 1. handoffs/daily/<今天>.md 已存在：今晚已经有人整理过，直接结束。
 2. 读最新的每日整理（没有就读 OVERVIEW.md），再读它之后的全部交接记录和 inbox/agents/ 文件。
-3. 让各模块 STATUS.md 的 next 与最新交接一致，同时更新 updated。改之前先重读；只改这两个字段，不动其他字段和正文。
+3. 把交接合并进各模块 STATUS.md 的 next，不整份照抄交接：
+   - 改之前先重读，以 STATUS.md 现在的 next 为起点。
+   - 只应用交接明确写出的变化（完成、新增、改期、取消）；交接没提到的条目原样保留。
+   - STATUS.md 的 updated 晚于最新一份交接的 at：用户在交接之后改过，这个文件的 next 不动，把交接和现状的差异写进「未决事项」。
+   - 只改 next 和 updated 两个字段，不动其他字段和正文；next 有改动才更新 updated。
 4. 写 handoffs/daily/<今天>.md，frontmatter 为 organizer（你的 Agent 名）、date（YYYY-MM-DD）。
    正文包含「昨天做了什么」（附来源文件）、「当前下一步」（完整清单）、「未决事项」、「收件箱里还没导入的记录」。
 5. 把已整理的交接记录移到 handoffs/archive/<今天>/。不删除文件，不动收件箱，留给本机导入。
