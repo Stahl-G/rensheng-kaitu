@@ -160,7 +160,7 @@
   }
 })();
 
-/* Windows 访客直达 EXE；Linux 继续使用 DSH 插件。 */
+/* 下载页按系统滚动到对应安装说明；首页始终提供 Windows 与 Mac 两个入口。 */
 (() => {
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const agent = navigator.userAgent || "";
@@ -170,13 +170,6 @@
       ? "Linux"
       : "";
   if (!os) return;
-  const en = location.pathname.startsWith("/en/");
-  for (const el of document.querySelectorAll("[data-dl]")) {
-    el.href = `${en ? "/en" : ""}/download/#${os === "Windows" ? "windows" : "plugin"}`;
-    el.textContent = os === "Windows" ? (en ? "Download for Windows" : "下载 Windows 版") : (en ? "Install on Linux" : "Linux 版安装指引");
-  }
-  for (const el of document.querySelectorAll("[data-dl-meta]"))
-    el.textContent = os === "Windows" ? (en ? "Windows 10 / 11 · x64" : "Windows 10 / 11 · x64") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");
   if (/\/download\/?$/.test(location.pathname) && !location.hash) {
     const target = document.getElementById(os === "Windows" ? "windows" : "plugin");
     if (target) requestAnimationFrame(() => target.scrollIntoView());
