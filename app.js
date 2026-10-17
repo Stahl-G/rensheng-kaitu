@@ -152,3 +152,26 @@
     }
   }
 })();
+
+/* Windows / Linux 访客：Kaitu.app 只有 Mac 版，下载按钮改成 DSH 插件的安装指引，下载页直接跳到那一节。 */
+(() => {
+  const platform = navigator.userAgentData?.platform || navigator.platform || "";
+  const agent = navigator.userAgent || "";
+  const os = /win/i.test(platform) || /Windows/.test(agent)
+    ? "Windows"
+    : (/linux|x11|cros/i.test(platform) || /Linux|X11|CrOS/.test(agent)) && !/Android/.test(agent)
+      ? "Linux"
+      : "";
+  if (!os) return;
+  const en = location.pathname.startsWith("/en/");
+  for (const el of document.querySelectorAll("[data-dl]")) {
+    el.href = `${en ? "/en" : ""}/download/#windows`;
+    el.textContent = en ? `Install on ${os}` : `${os} 版安装指引`;
+  }
+  for (const el of document.querySelectorAll("[data-dl-meta]"))
+    el.textContent = en ? `${os} · DeepSeek Harness plugin` : `${os} · DeepSeek Harness 插件`;
+  if (/\/download\/?$/.test(location.pathname) && !location.hash) {
+    const target = document.getElementById("windows");
+    if (target) requestAnimationFrame(() => target.scrollIntoView());
+  }
+})();
