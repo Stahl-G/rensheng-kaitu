@@ -864,7 +864,7 @@ function Overview({
           </>
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div hidden={view !== "ask"}>
+          <div className={css.askPanel} hidden={view !== "ask"}>
             {props.renderAsk(promptDraft, configureRequest, configureBuiltin, () => setView("connections"))}
           </div>
         )}

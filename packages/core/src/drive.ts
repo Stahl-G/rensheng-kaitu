@@ -51,7 +51,19 @@ function remember(root: string) {
   renameSync(temp, path);
 }
 
+export function findWindowsDriveDirectory(
+  roots = Array.from({ length: 26 }, (_, index) => `${String.fromCharCode(65 + index)}:\\`),
+): string {
+  const candidates = roots
+    .flatMap((root) => ["My Drive", "我的云端硬盘", "我的雲端硬碟"].map((name) => join(root, name)))
+    .filter((path) => existsSync(path));
+  if (candidates.length !== 1)
+    throw new KaituError("未找到唯一 Google Drive 账号，请选择「我的云端硬盘」文件夹", "DRIVE_DIRECTORY");
+  return candidates[0] as string;
+}
+
 export function findDriveDirectory(home = process.env.HOME || homedir()): string {
+  if (process.platform === "win32") return findWindowsDriveDirectory();
   const cloud = join(home, "Library/CloudStorage");
   const accounts = existsSync(cloud)
     ? readdirSync(cloud, { withFileTypes: true }).filter(

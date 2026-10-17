@@ -1,8 +1,9 @@
 .chat {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
-  height: calc(100dvh - 112px);
-  min-height: 560px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 .threads {
   display: flex;
@@ -12,6 +13,7 @@
   border-right: 1px solid var(--kt-control);
   overflow: auto;
   min-width: 0;
+  min-height: 0;
 }
 .threads h2 {
   padding: 14px 10px 4px;
@@ -353,6 +355,7 @@ output.progress,
   width: min(560px, calc(100vw - 48px));
   box-sizing: border-box;
   max-height: calc(100dvh - 48px);
+  overflow: auto;
   padding: 28px;
   border: 0;
   border-radius: 20px;
@@ -435,6 +438,7 @@ output.progress,
 }
 .actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
@@ -449,8 +453,6 @@ output.progress,
 @media (max-width: 700px) {
   .chat {
     grid-template-columns: minmax(0, 1fr);
-    min-height: 380px;
-    height: calc(100dvh - 180px);
   }
   .threads {
     display: none;
@@ -469,13 +471,6 @@ output.progress,
 @media (prefers-reduced-motion: reduce) {
   .pulse {
     animation: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .chat {
-    height: calc(100dvh - 168px);
-    min-height: 460px;
   }
 }
 

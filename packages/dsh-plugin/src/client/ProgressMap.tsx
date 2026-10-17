@@ -111,7 +111,7 @@ export function ProgressMap(props: ProgressMapProps) {
           )}
           <ul className={css.legend} aria-hidden="true">
             <li>
-              <i className={css.solid} />
+              <i />
               {t("已经走过", "Done")}
             </li>
             <li>
@@ -259,7 +259,7 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
         !cities.some((f) => f.properties.place.geonameid === hometown.geonameid)
       ) {
         const element = document.createElement("span");
-        element.className = `${css.city} ${css.been}`;
+        element.className = css.city ?? "";
         element.textContent = hometown.name;
         markers.push(
           new Marker({ element, anchor: "left" }).setLngLat([hometown.lng, hometown.lat]).addTo(m),
@@ -267,7 +267,16 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
       }
       for (const feature of cities) {
         const element = document.createElement("span");
-        element.className = `${css.city} ${css[feature.properties.layer]}`;
+        element.className = [
+          css.city,
+          feature.properties.layer === "now"
+            ? css.now
+            : feature.properties.layer === "planned"
+              ? css.planned
+              : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
         element.textContent = feature.properties.place.name;
         markers.push(
           new Marker({ element, anchor: "left" }).setLngLat(feature.geometry.coordinates).addTo(m),

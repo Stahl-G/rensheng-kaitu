@@ -75,26 +75,27 @@ export function StorageChoice({
         });
       }}
     >
-      <fieldset className={css.stack}>
+      <fieldset className={css.storageProviders}>
         <legend className={css.small}>{t("资料放在", "Keep your notes in")}</legend>
         {PROVIDERS.map((item) => {
           const found = item.key ? Boolean(storage.suggested?.[item.key]) : true;
           return (
-            <label key={item.id}>
+            <label key={item.id} className={css.storageOption}>
               <input
                 type="radio"
                 name="storage-provider"
                 checked={provider === item.id}
                 disabled={busy}
                 onChange={() => choose(item.id)}
-              />{" "}
-              {t(item.zh, item.en)}
-              {item.key && (
-                <span className={css.small}>
-                  {" · "}
-                  {found ? t("已在这台电脑上找到", "found on this computer") : t("没找到", "not found")}
-                </span>
-              )}
+              />
+              <span className={css.storageLabel}>
+                <span>{t(item.zh, item.en)}</span>
+                {item.key && (
+                  <span className={css.small}>
+                    {found ? t("已在这台电脑上找到", "found on this computer") : t("没找到", "not found")}
+                  </span>
+                )}
+              </span>
             </label>
           );
         })}
@@ -118,7 +119,20 @@ export function StorageChoice({
             const folder = await pickStorageFolder();
             if (folder) {
               const separator = folder.includes("\\") ? "\\" : "/";
-              setPath(`${folder.replace(/[\\/]+$/, "")}${separator}kaitu`);
+              const selected = folder.replace(/[\\/]+$/, "");
+              setPath(
+                selected.split(/[\\/]/).at(-1)?.toLowerCase() === "kaitu"
+                  ? selected
+                  : `${selected}${separator}kaitu`,
+              );
+              const normalized = selected.replaceAll("\\", "/").toLowerCase();
+              const detected = PROVIDERS.find((item) => {
+                const base = item.key
+                  ? storage.suggested?.[item.key]?.replaceAll("\\", "/").toLowerCase()
+                  : undefined;
+                return base && (normalized === base || normalized.startsWith(`${base}/`));
+              });
+              if (detected) setProvider(detected.id);
             }
           })
         }

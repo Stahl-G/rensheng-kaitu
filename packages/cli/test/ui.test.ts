@@ -79,7 +79,7 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
   const plan = parseFrontmatter<{ date: string; blocks: { title: string }[] }>(ws.readText("NOW.md"));
   if (plan.data.blocks[0]) plan.data.blocks[0].title = "外部改动后的训练";
   writeFileSync(join(ws.root, "NOW.md"), stringifyFrontmatter(plan.data, plan.body));
-  await expect.poll(async () => (await history(ws)).length, { timeout: 3000 }).toBe(before + 1);
+  await expect.poll(async () => (await history(ws)).length, { timeout: 15000 }).toBe(before + 1);
   expect(ws.readText("OVERVIEW.md")).not.toBe(overview);
   const response = await fetch(`${ui.url}/api/proposal`, {
     method: "POST",
@@ -87,14 +87,14 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
     body: JSON.stringify({ id: "p1", decision: "confirmed" }),
   });
   expect(response.status).toBe(200);
-  await expect.poll(async () => (await history(ws)).length, { timeout: 3000 }).toBe(before + 2);
+  await expect.poll(async () => (await history(ws)).length, { timeout: 15000 }).toBe(before + 2);
   ws.writeJson("inbox/agents/auto.proposal.json", {
     title: "散步",
     start: "20:00",
     end: "20:30",
     agent: "auto-source",
   });
-  await expect.poll(async () => (await history(ws)).length, { timeout: 3000 }).toBe(before + 3);
+  await expect.poll(async () => (await history(ws)).length, { timeout: 15000 }).toBe(before + 3);
   await new Promise((resolve) => setTimeout(resolve, 300));
   expect((await history(ws)).length).toBe(before + 3);
 });

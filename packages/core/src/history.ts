@@ -117,6 +117,7 @@ function snapshotFile(ws: Workspace, file: string): boolean {
 }
 
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
+  await ensureHistory(ws);
   const matrix = await git.statusMatrix({
     fs: historyFs(ws),
     dir: ws.root,

@@ -47,7 +47,11 @@ export function syncProvider(root: string, mode: SyncMode, state?: string): Sync
 /** 只按路径判断同步盘：坚果云目录、Google Drive 目录，其他算普通同步文件夹。 */
 export function folderProvider(path: string): "nutstore" | "google-drive" | "folder" {
   if (isNutstorePath(path)) return "nutstore";
-  return path.split(/[\\/]/).some((part) => /^GoogleDrive(?:-|$)/.test(part)) ? "google-drive" : "folder";
+  return path
+    .split(/[\\/]/)
+    .some((part) => /^(?:GoogleDrive(?:-|$)|My Drive$|我的云端硬盘$|我的雲端硬碟$)/i.test(part))
+    ? "google-drive"
+    : "folder";
 }
 
 function real(path: string): string {

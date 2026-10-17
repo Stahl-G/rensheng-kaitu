@@ -43,7 +43,7 @@ export function selectPayload(state, resources) {
   const bundledModules = join(resources, "kaitu/node_modules");
   if (readlinkSync(modules) !== bundledModules) {
     unlinkSync(modules);
-    symlinkSync(bundledModules, modules);
+    symlinkSync(bundledModules, modules, process.platform === "win32" ? "junction" : "dir");
   }
   return payload;
 }

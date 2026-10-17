@@ -352,6 +352,7 @@ export function createAskService(options: {
       relocating = true;
       try {
         await stopRuntime();
+        await options.dispose?.();
       } catch (error) {
         relocating = false;
         throw error;

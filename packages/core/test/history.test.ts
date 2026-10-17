@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { pendingWorkspaceFiles } from "../src/history.js";
 import {
   Workspace,
   addRecord,
@@ -11,7 +12,27 @@ import {
   restore,
   snapshot,
 } from "../src/index.js";
-import { freshWorkspace, workout } from "./helpers.js";
+import { freshWorkspace, tmp, workout } from "./helpers.js";
+
+it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
+  const original = await freshWorkspace();
+  original.writeText("me/profile.md", "# 合成跨设备档案\n");
+  const root = join(tmp(), "GoogleDrive-test", "我的云端硬盘", "kaitu");
+  cpSync(original.root, root, {
+    recursive: true,
+    filter: (path) => {
+      const file = relative(original.root, path).replaceAll("\\", "/");
+      return !file.startsWith(".kaitu/") || file === ".kaitu/config.json";
+    },
+  });
+  const opened = new Workspace(root);
+  expect(await history(opened)).toEqual([]);
+  expect(await pendingWorkspaceFiles(opened)).toContain("me/profile.md");
+  await snapshot(opened, "这台电脑的首个版本");
+  expect(await history(opened)).toHaveLength(1);
+  expect(opened.readText("me/profile.md")).toBe("# 合成跨设备档案\n");
+  expect((await history(original))[0]?.message).toBe("初始化开图工作区");
+});
 
 describe("版本历史", () => {
   it("每次写入可回看，按路径过滤", async () => {

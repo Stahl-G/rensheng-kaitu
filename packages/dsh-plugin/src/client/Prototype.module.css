@@ -42,7 +42,7 @@
   --on-news: #191005;
   --on-me: #ffffff;
   --on-explore: #ffffff;
-  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI",
+  --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC",
     sans-serif;
   --radius: 14px;
 }
@@ -173,10 +173,7 @@
   outline: 2px solid var(--explore);
   outline-offset: 2px;
 }
-.app h1,
-.app h2,
-.app h3,
-.app p {
+:where(.app) :where(h1, h2, h3, p) {
   margin: 0;
 }
 .app h1,
@@ -233,8 +230,9 @@
   position: sticky;
   top: env(safe-area-inset-top, 0px);
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  flex: none;
   align-items: center;
   gap: 12px 20px;
   padding-block: 12px;
@@ -244,7 +242,7 @@
   border-bottom: 1px solid var(--line);
 }
 .brand {
-  flex: 1 1 120px;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -276,7 +274,7 @@
   box-shadow: 0 1px 2px rgba(31, 30, 29, 0.12);
 }
 .tools {
-  flex: 1 1 120px;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -348,6 +346,7 @@
 }
 
 .content {
+  flex: none;
   max-width: 1040px;
   margin: 0 auto;
   padding-block: 28px 72px;
@@ -575,7 +574,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(270px, 100%), 1fr));
   gap: 16px;
 }
 .sum {
@@ -603,11 +602,14 @@
   font-size: 13px;
   color: var(--muted);
 }
-.app input[type="checkbox"],
-.app input[type="radio"] {
+:where(.app input:is([type="checkbox"], [type="radio"])) {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: none;
   accent-color: var(--primary);
 }
-.app select {
+:where(.app) select {
   min-height: 34px;
   padding: 0 28px 0 10px;
   border: 1px solid var(--line);
@@ -1105,12 +1107,16 @@
   .tools .sync {
     display: none;
   }
-  .brand {
-    flex-basis: auto;
+  .top {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .tools {
+    grid-column: 2;
+    grid-row: 1;
   }
   .tabs {
-    order: 3;
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
+    grid-row: 2;
     justify-content: stretch;
   }
   .tabs button {
@@ -1297,7 +1303,7 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 10px;
 }
-.sub-form label {
+:where(.sub-form label) {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1305,8 +1311,11 @@
   color: var(--ink2);
   min-width: 0;
 }
-.sub-form input,
-.sub-form select {
+.sub-form
+  :where(
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"]),
+    select
+  ) {
   height: 40px;
   padding: 0 12px;
   border-radius: 9px;
@@ -1315,6 +1324,41 @@
   color: var(--ink);
   font-size: 15px;
   min-width: 0;
+}
+:where(.sub-form label:has(> input:is([type="checkbox"], [type="radio"]))) {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.storageProviders {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 12px;
+}
+.storageProviders legend {
+  padding: 0;
+  margin-bottom: 12px;
+}
+.storageProviders .storageOption {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  line-height: 20px;
+}
+.storageProviders input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 1px 0 0;
+}
+.storageLabel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
 }
 .agenda {
   display: flex;
@@ -1854,6 +1898,15 @@
   align-items: center;
   gap: 12px;
 }
+@media (max-width: 460px) {
+  .auto-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .auto-ctl {
+    justify-content: space-between;
+  }
+}
 .time {
   height: 36px;
   padding: 0 10px;
@@ -2360,6 +2413,8 @@
   --kt-estimate: var(--health);
   --kt-shadow: 0 0 0 1px var(--line);
   height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   container-type: inline-size;
   scrollbar-gutter: stable;
@@ -2371,8 +2426,8 @@
   opacity: 0.55;
   cursor: default;
 }
-.app textarea,
-.app select {
+:where(.app) textarea,
+:where(.app) select {
   font: inherit;
   color: inherit;
   background: var(--surface);
@@ -2511,9 +2566,19 @@
 }
 
 .askContent {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   max-width: 1240px;
   padding-block: 0;
   gap: 0;
+}
+.askPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 .switch[aria-checked="true"] i::after {

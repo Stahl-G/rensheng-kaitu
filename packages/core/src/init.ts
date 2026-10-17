@@ -56,7 +56,7 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
   if (tz !== "Asia/Shanghai") {
     const text = ws.readText("me/rules.md");
     const end = text.indexOf("\n---", 4);
-    const doc = parseDocument(text.slice(4, end));
+    const doc = parseDocument(text.slice(4, end).trim());
     doc.set("timezone", tz);
     ws.writeText("me/rules.md", `---\n${doc.toString().trimEnd()}${text.slice(end)}`);
   }

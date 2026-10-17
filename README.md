@@ -8,6 +8,12 @@
 
 > 灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。
 
+## 下载
+
+[Windows 10 / 11 x64 安装包](https://kaitu.si/download/#windows) · [macOS（Apple 芯片）](https://kaitu.si/download/) · [GitHub Releases](https://github.com/Stahl-G/rensheng-kaitu/releases)
+
+Windows EXE 已内置运行环境，安装后在「问问 → 连接 AI」添加 API Key 即可使用。两个桌面版本共用同一份开图界面和后端；Windows 构建与使用说明见 [docs/windows.md](docs/windows.md)。
+
 ## 状态
 
 阶段 1（本地工作区、工作台、健康同步、手机通道、DeepSeek Harness 插件）基本完成；云端接力已实测通过，DeepSeek Harness 验证（阶段 2）暂停；当前目标与里程碑见 [docs/GOAL.md](docs/GOAL.md)。

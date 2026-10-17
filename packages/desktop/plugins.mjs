@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { KaituError } from "../core/dist/index.js";
 
@@ -19,7 +19,8 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   const modules = join(archive, "dsh/node_modules");
   const bin = join(home, "bin");
   const pnpm = join(bin, "pnpm");
-  if (!existsSync(pnpm)) {
+  const windows = process.platform === "win32";
+  if (!windows && !existsSync(pnpm)) {
     mkdirSync(bin, { recursive: true });
     writeFileSync(
       pnpm,
@@ -31,11 +32,17 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   const manifest = (profile) => JSON.parse(readFileSync(join(profileDir(profile), "package.json"), "utf8"));
   const run = (profile, args) =>
     new Promise((resolve, reject) => {
-      const child = spawn(pnpm, args, {
-        cwd: profileDir(profile),
-        env: { ...process.env, PATH: `${bin}:/usr/bin:/bin:/usr/sbin:/sbin`, CI: "true" },
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      const node = join(runtime, windows ? "node/bin/node.exe" : "node/bin/node");
+      const child = spawn(
+        windows ? node : pnpm,
+        windows ? [join(runtime, "pnpm/bin/pnpm.cjs"), ...args] : args,
+        {
+          cwd: profileDir(profile),
+          env: { ...process.env, PATH: [bin, process.env.PATH].join(delimiter), CI: "true" },
+          windowsHide: true,
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
       let output = "";
       child.stdout.on("data", (chunk) => {
         output += chunk;

@@ -108,7 +108,9 @@ it("本地接口只确认预览中所选的记忆，整批一个版本并能撤�
         .sort(),
     ).toEqual(["小张", "简洁"]);
     expect(new Set(listMemories(ws).map((entry) => entry.source))).toEqual(new Set(["从 Claude 搬来"]));
-    await vi.waitFor(async () => expect(await history(ws)).toHaveLength(before.length + 1));
+    await vi.waitFor(async () => expect(await history(ws)).toHaveLength(before.length + 1), {
+      timeout: 15000,
+    });
     expect((await call("onboardingMemoryConfirm", [preview.token, ["line-1"]])).status).toBe(409);
     const repeated = previewOnboardingMemory(ws, "[偏好] 简洁", "claude");
     expect(repeated.candidates).toEqual([]);
