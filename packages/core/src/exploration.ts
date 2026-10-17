@@ -33,7 +33,8 @@ export interface Direction extends ExplorationRecord, DirectionInput {
   updated_at?: string;
 }
 export interface ExperimentInput {
-  direction_id: string;
+  direction_id?: string;
+  investment?: string;
   question: string;
   action: string;
   budget: string;
@@ -78,6 +79,10 @@ export type ExplorationCommand =
           Pick<ExplorationExperiment, "status" | "result" | "conclusion" | "source">
       >;
     }
+  | {
+      operation: "create_checkin";
+      data: { experiment_id: string; date: string; done: boolean; note?: string; investment?: string };
+    }
   | { operation: "add_note"; data: DirectionNoteInput }
   | {
       operation: "update_note";
@@ -85,7 +90,7 @@ export type ExplorationCommand =
       expected_revision: number;
       data: Partial<Omit<DirectionNoteInput, "direction_id" | "experiment_id">>;
     };
-const types = ["direction", "exploration_experiment", "direction_note"];
+const types = ["direction", "exploration_experiment", "direction_note", "exploration_checkin"];
 export function isExplorationType(type: string): boolean {
   return types.includes(type);
 }
@@ -156,8 +161,10 @@ export async function writeExploration(
       break;
     }
     case "create_experiment": {
-      const direction = current<Direction>(ws, "direction", command.data.direction_id);
-      if (direction.status !== "active")
+      const direction = command.data.direction_id
+        ? current<Direction>(ws, "direction", command.data.direction_id)
+        : undefined;
+      if (direction && direction.status !== "active")
         throw new KaituError("先采纳或恢复方向，再安排新尝试", "DIRECTION_INACTIVE");
       result = addRecord(
         ws,
@@ -184,6 +191,12 @@ export async function writeExploration(
         throw new KaituError("先记录实际观察结果，再判断尝试或假设", "RESULT_REQUIRED");
       result = updateRecord(ws, "exploration_experiment", old.id, { ...data, updated_at: now }, { by });
       message = next.status === "completed" ? "记录了尝试结果" : "更新了方向尝试";
+      break;
+    }
+    case "create_checkin": {
+      current<ExplorationExperiment>(ws, "exploration_experiment", command.data.experiment_id);
+      result = addRecord(ws, "exploration_checkin", data, { by });
+      message = "记录了尝试打卡";
       break;
     }
     case "add_note": {
@@ -228,6 +241,9 @@ export function readExploration(ws: Workspace) {
       Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
   );
   const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment");
+  const checkins = rows<
+    ExplorationRecord & { experiment_id: string; date: string; done: boolean; note?: string }
+  >(ws, "exploration_checkin");
   const notes = rows<DirectionNote>(ws, "direction_note");
   const timeline: {
     id: string;
@@ -245,6 +261,7 @@ export function readExploration(ws: Workspace) {
     const previous = new Map<string, StoredRecord>();
     for (const record of readRecordRevisions(ws, type).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1))) {
       if (record.deleted) continue;
+      if (type !== "direction" && !record.direction_id) continue;
       const old = previous.get(record.id);
       const id = type === "direction" ? record.id : String(record.direction_id);
       let text: string;
@@ -293,6 +310,7 @@ export function readExploration(ws: Workspace) {
     },
     directions,
     experiments,
+    checkins,
     notes,
     timeline: timeline.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)),
   };

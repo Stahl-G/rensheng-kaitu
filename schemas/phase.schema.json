@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phase.schema.json",
+  "title": "phase",
+  "type": "object",
+  "required": ["title", "start", "status"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+        },
+        {
+          "format": "date"
+        }
+      ],
+      "examples": ["2026-10"]
+    },
+    "end": {
+      "type": "string",
+      "anyOf": [
+        {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+        },
+        {
+          "format": "date"
+        }
+      ],
+      "examples": ["2026-10"]
+    },
+    "status": {
+      "enum": ["suggested", "confirmed", "dismissed"]
+    },
+    "trigger": {
+      "type": "string"
+    },
+    "reflection": {
+      "type": "string"
+    },
+    "investments": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(project|learning|ongoing):[^/\\\\:]+$"
+      }
+    },
+    "source": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "unevaluatedProperties": false
+}

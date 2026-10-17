@@ -193,6 +193,9 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
     } else if (f === "me/rules.md") {
       const d = fm(f);
       if (d) check(reg.builtin("rules.schema.json"), d, f, issues);
+    } else if (f === "me/ongoing.json") {
+      const d = json(f);
+      if (d !== undefined) check(reg.builtin("ongoing.schema.json"), d, f, issues);
     } else if (f === "me/goals.json") {
       const d = json(f);
       if (d !== undefined) check(reg.builtin("goals.schema.json"), d, f, issues);

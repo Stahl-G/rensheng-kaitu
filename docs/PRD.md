@@ -185,7 +185,7 @@
 ├─ projects/                # 个人项目与工作（D21）
 │  ├─ module.json
 │  └─ <slug>/
-│     ├─ STATUS.md           # frontmatter 另含 kind: work | personal
+│     ├─ STATUS.md           # frontmatter 另含 kind: work | learning | personal
 │     ├─ notes.md            # 背景、要点、相关人
 │     └─ log.md              # 按日期记的进展
 ├─ decisions/
@@ -281,7 +281,7 @@ blocked: []
 本周完成 2/3 次训练；蛋白质日均 128 g，低于 150 g 目标……
 ```
 
-项目 `projects/<slug>/STATUS.md` 在通用字段之外包含 `title`（显示名）、`kind: work|personal`、
+项目 `projects/<slug>/STATUS.md` 在通用字段之外包含 `title`（显示名）、`kind: work|learning|personal`、
 `stage: idea|active|paused|done`和 `links` 数组。
 每条链接包含本机绝对路径或 `~/` 开头的 `path`、`role: manuscript|repo|folder`，可用 `include` 指定相对路径 glob。
 正文与代码留在链接文件夹内，只读；项目目录只存 STATUS、背景笔记 `notes.md` 与按 `## YYYY-MM-DD` 分节的 `log.md`。
@@ -386,6 +386,39 @@ account_last4（本方银行卡尾四位，四位数字或 null）；原交易�
 完整 JSON Schema 放在仓库 `schemas/` 目录，由程序校验，不在提示词中重复。
 
 ---
+
+### 6.7 投入、阶段与尝试打卡（数据规范 v2）
+
+旧工作区无需迁移，已有字段、ID 与追加修订格式保留。详细规范见
+[数据规范 v2 §1–§3](proposals/2026-10-18-data-spec-v2.md)。
+
+- 投入领域为 `work / learning / personal`，形式为项目或长期投入。项目 `kind` 新增 `learning`。
+  项目仍放 `projects/<slug>/STATUS.md`，学习主题放 `learning/<主题>/STATUS.md`。
+- 其他长期投入放 `me/ongoing.json`，数组项为 `id`（slug）、`title`、`domain`、
+  `status`（active / paused / ended），可选 `note`、`since`（日期）。缺文件等于空清单。
+  与 `me/goals.json` 一样由用户维护，Agent 先提议，确认后修改。
+- 所有记录及原文 frontmatter 可选 `investment`，引用为 `project:<slug>`、`learning:<主题目录名>`、
+  `ongoing:<id>`。待办旧 `project` 继续视为 `project:<slug>`，新写入优先 `investment`。
+  悬空引用不拒绝保存，由 doctor 提示。`listInvestments` / CLI `kaitu investments --json` 与 MCP / DSH 只读工具列出投入。
+- `phase` 放 `me/data/phases/{YYYY-MM}.jsonl`：`title`、`start`、可选 `end`（年月或日期）、
+  `status`（suggested / confirmed / dismissed），可选 `trigger`、`reflection`、`investments`、`source`。
+  修改带预期修订号。Agent 只能建立 suggested 并修改自己建议的文字，确认、忽略、回顾由用户写入。
+  本次提供读写函数与只读工具，不增加阶段界面和发现提示。
+- `exploration_experiment.direction_id` 可选，尝试可标 `investment`，也可两者都不挂。
+  无方向的尝试暂不进入进度图。`exploration_checkin` 放 `explore/data/checkins/{YYYY-MM}.jsonl`，
+  字段为 `experiment_id`、`date`、`done`、可选 `note`，通过 `writeExploration.create_checkin` 写入。
+- 浏览器子路径 `@kaitu/core/completion-rate` 提供 `completionRate(checkins)`，返回 `done`、`total`、
+  `lower`、`upper`（0–1），后两项为 Beta(1+做到, 1+没做到) 的 10% / 90% 分位，仅描述按计划做到的比例。
+
+### 6.8 手机快照与收件箱（2026-10-18）
+
+`phone/` 是电脑生成、Agent 只读的目录，不作为模块、不进本机版本历史。
+`today.json`、`week.json`、`map.json`、`receipts.json` 的契约见 `schemas/phone-*.schema.json`，样例见 `schemas/fixtures/phone/`。
+只有手机可读的同步存放位置或启用 GitHub 备份时，后台防抖生成读快照；内容不变不写。
+手机新建 `inbox/agents/ios-<8位设备号>-<ULID>.note.md / .records.jsonl / .actions.jsonl`。
+原文保留 capture 与作者，手机记录 origin 映射署名 by，权限按 Agent 校验；操作按 client_id 去重并先核对当前状态，结果写十四天回执。
+支持完成下一步、完成或取消待办；日程建议、阶段确认、方向启用只在电脑上由用户确认。其他操作预留。GitHub 手机路径独立于备份内容开关。
+详细读写、隐私边界与失败语义见 [手机契约](guides/phone-contract.md)。本次不支持照片。
 
 ## 7. 系统功能
 

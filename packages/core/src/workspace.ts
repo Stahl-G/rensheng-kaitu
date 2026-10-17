@@ -290,6 +290,7 @@ export class Workspace {
       overviewDeferred(this) ||
       /^projects\/[a-z0-9-]+\/view\.json$/.test(rel) ||
       rel.startsWith(".kaitu/") ||
+      rel.startsWith("phone/") ||
       ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
       !this.exists("OVERVIEW.md")
     )

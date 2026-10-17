@@ -28,7 +28,7 @@ export interface LoadedModule {
   def: ModuleDef;
 }
 
-const NOT_MODULES = new Set([".kaitu", ".git", "memory", "chats", "inbox", "node_modules"]);
+const NOT_MODULES = new Set([".kaitu", ".git", "memory", "chats", "inbox", "node_modules", "phone"]);
 
 const loaded = new WeakMap<Workspace, { key: string; modules: LoadedModule[] }>();
 

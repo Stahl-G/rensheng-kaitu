@@ -94,12 +94,14 @@ function selected(path: string, c: Pick<BackupConnection, "text" | "records">): 
   if (parts.some((p) => !p || p === ".." || p.startsWith(".") || p === "node_modules") || path.includes("\\"))
     return false;
   if (
-    parts[0] === "inbox" ||
     /(?:secrets?|credentials?|tokens?|auth|api[-_]?keys?|passwords?|\.pem|\.key)(?:[.\-_]|$)/i.test(
       parts.at(-1) as string,
     )
   )
     return false;
+  if (parts[0] === "phone") return /^phone\/(today|week|map|receipts)\.json$/.test(path);
+  if (parts[0] === "inbox")
+    return /^inbox\/(agents\/[^/]+\.(?:md|jsonl?|txt)|health\/[^/]+\.health\.json)$/.test(path);
   return (c.text && /\.(md|txt)$/i.test(path)) || (c.records && /\.(jsonl?|ya?ml|csv|ics|toml)$/i.test(path));
 }
 async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFiles> {
@@ -122,7 +124,7 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
         e.isSymbolicLink() ||
         e.name.startsWith(".") ||
         e.name === "node_modules" ||
-        (!prefix && e.name === "inbox")
+        (prefix === "inbox" && !["agents", "health"].includes(e.name))
       )
         continue;
       if (path === internal) continue;
@@ -380,7 +382,14 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       const other = await remote.read(c.repo, c.branch);
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
       const incoming = Object.fromEntries(Object.entries(other.files).filter(([path]) => selected(path, c)));
-      const merged = mergeBackup(s.base, local, incoming);
+      // phone 由本机生成；远端删除不会清掉本机快照，也不会写回远端修改。
+      const mergeIncoming = { ...incoming };
+      for (const path of new Set([...Object.keys(incoming), ...Object.keys(local)])) {
+        if (!path.startsWith("phone/")) continue;
+        if (local[path] === undefined) delete mergeIncoming[path];
+        else mergeIncoming[path] = local[path];
+      }
+      const merged = mergeBackup(s.base, local, mergeIncoming);
       if (merged.conflicts.length) {
         store(ws, { ...s, conflicts: merged.conflicts, error: undefined });
         return;

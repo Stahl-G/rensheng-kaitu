@@ -9,6 +9,7 @@ import {
   inboxNoteDone,
   inboxNotes,
   lifeMap,
+  listInvestments,
   listMemories,
   listProjects,
   listTasks,
@@ -23,6 +24,7 @@ import {
   readExperienceImports,
   readExploration,
   readNews,
+  readPhases,
   readRecords,
   readStatus,
   recordOnboardingAiConnection,
@@ -151,6 +153,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
       due: text.optional(),
       remind_at: text.optional(),
       project: text.optional(),
+      investment: text.optional(),
       notes: text.optional(),
       source: text.optional(),
     },
@@ -194,6 +197,8 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     ({ items }) => addExperiences(ws, items, "agent"),
     true,
   );
+  register("investment_list", "列出项目、学习主题与长期投入。", {}, () => listInvestments(ws));
+  register("phase_list", "读取阶段建议与用户回顾。", {}, () => readPhases(ws));
   register("exploration_read", "读取方向、依据、尝试与认识变化，只读。", {}, () => readExploration(ws));
   register(
     "exploration_write",
@@ -317,8 +322,9 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     register(
       "record_update",
       "修改一条记录，无需确认，可撤销。",
-      { type, id: text, data },
-      ({ type, id, data }) => writeAgentRecord(ws, "update", type, actor(), data, id),
+      { type, id: text, data, expected_revision: z.number().int().min(1).optional() },
+      ({ type, id, data, expected_revision }) =>
+        writeAgentRecord(ws, "update", type, actor(), data, id, expected_revision),
       true,
     );
     register(

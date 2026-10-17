@@ -1,0 +1,3 @@
+{"client_id":"01JAZ1B2C3D4E5F6G7H8J9K0MP","at":"2026-10-18T07:20:00+08:00","device":"3fa9c1d2","op":"decide_proposal","args":{"id":"b-0412","decision":"confirmed"}}
+{"client_id":"01JAZ1B2C3D4E5F6G7H8J9K0MQ","at":"2026-10-18T07:21:00+08:00","device":"3fa9c1d2","op":"complete_next","args":{"file":"health/STATUS.md","id":"h-0007"}}
+{"client_id":"01JAZ1B2C3D4E5F6G7H8J9K0MR","at":"2026-10-18T07:22:00+08:00","device":"3fa9c1d2","op":"complete_task","args":{"id":"01JAZ0W6QK8R2F4M7N9P1S3T5V"}}

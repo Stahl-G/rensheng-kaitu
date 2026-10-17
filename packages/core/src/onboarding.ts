@@ -520,7 +520,7 @@ export const onboardingSetupSchema = z.discriminatedUnion("source", [
       project: z
         .object({
           title: z.string().trim().min(1).max(200),
-          kind: z.enum(["work", "personal"]),
+          kind: z.enum(["work", "learning", "personal"]),
           links: z
             .array(
               z

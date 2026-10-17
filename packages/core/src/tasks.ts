@@ -14,6 +14,7 @@ export interface Task extends StoredRecord {
   due?: string;
   remind_at?: string;
   project?: string;
+  investment?: string;
   notes?: string;
   source?: string;
 }
@@ -22,6 +23,7 @@ export interface TaskInput {
   due?: string;
   remind_at?: string;
   project?: string;
+  investment?: string;
   notes?: string;
   source?: string;
 }

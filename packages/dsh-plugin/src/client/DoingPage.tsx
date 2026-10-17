@@ -237,7 +237,7 @@ export function DoingPage({
                     <div className={css.tags}>
                       <span className={css.kind}>
                         <span className={css.kindDot} aria-hidden="true" />
-                        {project.kind === "work" ? "工作" : "个人"}
+                        {project.kind === "work" ? "工作" : project.kind === "learning" ? "学习" : "个人"}
                       </span>
                       <span className={css.stage}>{stages[project.stage]}</span>
                     </div>

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/ongoing.schema.json",
+  "title": "ongoing",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["id", "title", "domain", "status"],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1
+      },
+      "domain": {
+        "enum": ["work", "learning", "personal"]
+      },
+      "status": {
+        "enum": ["active", "paused", "ended"]
+      },
+      "note": {
+        "type": "string"
+      },
+      "since": {
+        "type": "string",
+        "format": "date"
+      }
+    }
+  }
+}

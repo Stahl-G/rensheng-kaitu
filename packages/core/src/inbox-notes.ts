@@ -9,7 +9,7 @@ import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
 
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
-export async function captureNote(ws: Workspace, text: string) {
+export async function captureNote(ws: Workspace, text: string, investment?: string) {
   if (typeof text !== "string" || !text.trim() || text.length > 100000)
     throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
   const now = new Date();
@@ -18,7 +18,13 @@ export async function captureNote(ws: Workspace, text: string) {
   ws.writeText(
     path,
     stringifyFrontmatter(
-      { agent: "你", date, created: isoInZone(now, ws.timeZone()), kind: "capture" },
+      {
+        agent: "你",
+        date,
+        created: isoInZone(now, ws.timeZone()),
+        kind: "capture",
+        ...(investment ? { investment } : {}),
+      },
       text.trim(),
     ),
   );
@@ -42,12 +48,12 @@ export function noteMetadata(text: string): Record<string, unknown> {
   }
 }
 
-export function inboxNotes(ws: Workspace) {
-  if (!ws.exists("inbox/notes")) return [];
-  return readdirSync(ws.resolve("inbox/notes"), { withFileTypes: true })
+export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
+  if (!ws.exists(directory)) return [];
+  return readdirSync(ws.resolve(directory), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name))
     .flatMap((entry) => {
-      const dir = `inbox/notes/${entry.name}`;
+      const dir = `${directory}/${entry.name}`;
       return readdirSync(ws.resolve(dir), { withFileTypes: true })
         .filter((file) => file.isFile() && file.name.endsWith(".md"))
         .flatMap((file) => {
@@ -61,6 +67,7 @@ export function inboxNotes(ws: Workspace) {
                   agent: noteAgent(note.data.agent),
                   date: note.data.date ?? entry.name,
                   kind: note.data.kind,
+                  investment: note.data.investment,
                   content: note.content,
                 },
               ]

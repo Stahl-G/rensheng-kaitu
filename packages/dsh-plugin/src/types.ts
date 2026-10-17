@@ -134,6 +134,7 @@ export interface OverviewData {
   next: OverviewNext[];
   allNext: OverviewNext[];
   plans: PlansData;
+  phoneConflicts?: { ref: string; message?: string; at: string }[];
   sync: {
     received: number;
     /** 开了每日整理才说「等待整理」，否则原文只是已保存。 */
@@ -159,7 +160,7 @@ export interface DoingProject {
   slug: string;
   title: string;
   stage: "idea" | "active" | "paused" | "done";
-  kind: "work" | "personal";
+  kind: "work" | "learning" | "personal";
   links: { path: string; role: "manuscript" | "repo" | "folder" }[];
   recentLog: { date: string; text: string } | null;
   recent7: {

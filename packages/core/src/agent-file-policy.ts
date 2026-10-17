@@ -63,12 +63,14 @@ export function assertAgentWrite(root: string, file: string, confirmed = false, 
   if (
     (path === "NOW.md" && !managedPlan) ||
     ["AGENTS.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
+    path === "phone" ||
+    path.startsWith("phone/") ||
     path.startsWith("memory/") ||
     path.startsWith("chats/") ||
     (path.includes("/data/") && !/^health\/data\/labs\/[^/]+\.json$/.test(path))
   )
     throw new ScopeError("此路径由开图管理，请用专用工具");
-  if (["me/rules.md", "me/goals.json"].includes(path) && !confirmed)
+  if (["me/rules.md", "me/goals.json", "me/ongoing.json"].includes(path) && !confirmed)
     throw new ScopeError("规则或目标变更须用户确认");
   return path;
 }

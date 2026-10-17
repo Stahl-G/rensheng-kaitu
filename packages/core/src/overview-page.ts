@@ -7,6 +7,7 @@ import { history } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { latestDaily } from "./overview.js";
+import { phoneReceipts } from "./phone-receipts.js";
 import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, summarizeStatus, workoutSessions } from "./status.js";
@@ -166,11 +167,21 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
             ? "me"
             : "today",
   }));
-  const notes = inboxNotes(ws).map((note) => ({
-    file: note.path,
-    text: note.content,
-    status: note.kind === "capture" ? ("received" as const) : ("needs_review" as const),
-  }));
+  const capturedNotes = [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")];
+  const capturedWeek = capturedNotes.filter(
+    (note) =>
+      note.kind === "capture" &&
+      typeof note.date === "string" &&
+      note.date >= status.recent7.from &&
+      note.date <= data.today,
+  ).length;
+  const notes = capturedNotes
+    .filter((note) => !note.path.startsWith("inbox/notes/done/"))
+    .map((note) => ({
+      file: note.path,
+      text: note.content,
+      status: note.kind === "capture" ? ("received" as const) : ("needs_review" as const),
+    }));
   const directionSuggestions = (data.records.direction ?? []).filter(
     (row) => row.status === "suggested",
   ).length;
@@ -239,6 +250,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     }
     return [{ id: def.id, label: def.name, count, latest }];
   });
+  const phoneConflicts = phoneReceipts(ws).filter((item) => item.status === "conflict");
   return {
     root: data.root,
     timeZone: data.timeZone,
@@ -260,11 +272,14 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     allNext,
     versions,
     plans: readPlans(data),
+    phoneConflicts,
+    capturedWeek,
     sync: {
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
       // 只有开了每日整理才说「等待整理」；没开时原文就是已保存，不暗示后台在处理。
       organizer: organizerOn(ws),
       needsReview:
+        phoneConflicts.length +
         mapNeedsReview +
         mapPendingImports +
         directionSuggestions +
@@ -281,6 +296,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       .map((p) => ({
         slug: p.slug,
         title: p.title,
+        kind: p.kind,
         file: p.file,
         metricFiles: p.metricFiles,
         next: p.next.filter((n) => n.status === "todo" || n.status === "proposed").map((n) => n.title),

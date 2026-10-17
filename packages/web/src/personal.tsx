@@ -121,7 +121,8 @@ export function Me({ data, act, busy }: { data: WorkbenchData; act: Act; busy: b
         {data.projects.map((project) => (
           <div class="goal" key={project.slug}>
             <h3>
-              {project.title} · {project.kind === "work" ? "工作" : "个人"} ·{" "}
+              {project.title} ·{" "}
+              {project.kind === "work" ? "工作" : project.kind === "learning" ? "学习" : "个人"} ·{" "}
               {{ idea: "构想", active: "进行中", paused: "暂停", done: "完成" }[project.stage]}
             </h3>
             <p>

@@ -25,6 +25,8 @@ import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories, memoryInput, memoryType } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
+import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
+import { writePhoneReceipts } from "./phone-receipts.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
 import { addRecords, deleteRecord } from "./records.js";
@@ -150,7 +152,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const groups = new Map<string, Record<string, unknown>[]>();
     const fileAgent = rows.find((row) => row && typeof row.agent === "string" && row.agent.trim())?.agent;
     for (const [index, row] of rows.entries()) {
-      const { type: rawType, agent, id: _id, by: _by, rev: _rev, ...data } = row ?? {};
+      const { type: rawType, agent, id: _id, by: _by, rev: _rev, origin, ...data } = row ?? {};
       const type = rawType;
       try {
         if (!row) throw new KaituError("必须是合法 JSON 对象", "BAD_INBOX");
@@ -184,9 +186,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
         if (type === "experience")
           await addExperiences(ws, [record as unknown as ExperienceInput], "agent", { dryRun: true });
         else addRecords(ws, type, [record], { dryRun: true });
-        const group = groups.get(type) ?? [];
+        const key = `${type}|${phoneInboxName.test(basename(file)) && origin === "user" ? "user" : "agent"}`;
+        const group = groups.get(key) ?? [];
         group.push(record);
-        groups.set(type, group);
+        groups.set(key, group);
       } catch (error) {
         errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`);
       }
@@ -203,8 +206,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
         : previous.agent !== agents
           ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
           : null;
-    // 替换不成立时整份不生效，原文转待整理笔记。
-    if (refused) return { errors: [refused], agent: agents, message: "", apply: async () => {} };
+    // 替换不成立时整份不生效，原文转待整理笔记；手机记录有一条不合格也整份不生效，手机按回执重发。
+    const phone = phoneInboxName.test(basename(file));
+    if (refused || (phone && errors.length))
+      return { errors: refused ? [refused] : errors, agent: agents, message: "", apply: async () => {} };
     const added = [...groups.values()].flat().length;
     return {
       errors,
@@ -222,9 +227,12 @@ async function prepare(ws: Workspace, file: string, text: string) {
           }
         }
         const records: Receipt["records"] = [];
-        for (const [type, rows] of groups) {
-          if (type === "experience") await addExperiences(ws, rows as unknown as ExperienceInput[], "agent");
-          else for (const result of addRecords(ws, type, rows)) records.push({ type, id: result.record.id });
+        for (const [key, rows] of groups) {
+          const [type, by] = key.split("|") as [string, "user" | "agent"];
+          if (type === "experience") await addExperiences(ws, rows as unknown as ExperienceInput[], by);
+          else
+            for (const result of addRecords(ws, type, rows, { by }))
+              records.push({ type, id: result.record.id });
         }
         const next = { ...receipts, [basename(file)]: { agent: agents, records } };
         if (replaces) delete next[basename(replaces)];
@@ -294,7 +302,7 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
     isUtf8(bytes) &&
     !bytes.includes(0)
   ) {
-    if (/^channel-[a-f0-9]{64}\.note\.md$/.test(basename(file))) {
+    if (/^channel-[a-f0-9]{64}\.note\.md$/.test(basename(file)) || phoneInboxName.test(basename(file))) {
       const existing = findInboxNote(ws, basename(file));
       if (existing) {
         rmSync(ws.resolve(file));
@@ -497,6 +505,14 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         continue;
       }
       const text = ws.readText(file);
+      if (phoneInboxName.test(basename(file)) && file.endsWith(".actions.jsonl")) {
+        await batchSnapshot(ws, "你在 iPhone 上处理了待办", async () => {
+          await applyPhoneActions(ws, file, text);
+          moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+          result.processed.push(file);
+        });
+        continue;
+      }
       let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
       let errors: string[] = [];
       if (!file.endsWith(".md") || file.endsWith(".digest.md")) {
@@ -538,6 +554,16 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
           }
         },
       );
+      if (phoneInboxName.test(basename(file)))
+        writePhoneReceipts(ws, [
+          {
+            ref: basename(file),
+            kind: "file",
+            status: errors.length ? "rejected" : "applied",
+            ...(errors.length ? { message: errors.join("\n") } : {}),
+            at: new Date().toISOString(),
+          },
+        ]);
     }
     ws.writeJson(".kaitu/inbox-state.json", { lastProcessed: new Date().toISOString() }, { internal: true });
     return result;

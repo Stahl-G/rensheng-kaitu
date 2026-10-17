@@ -86,6 +86,7 @@ export async function writeAgentRecord(
   actor: string,
   data: Record<string, unknown> = {},
   id = "",
+  expectedRevision?: number,
 ) {
   if (isExperienceControlType(type))
     throw new KaituError("足迹来源与导入控制由用户在界面处理", "USER_DECISION");
@@ -113,7 +114,7 @@ export async function writeAgentRecord(
     operation === "add"
       ? addRecord(ws, type, { ...data, ...fill })
       : operation === "update"
-        ? updateRecord(ws, type, id, data)
+        ? updateRecord(ws, type, id, data, { expected_revision: expectedRevision })
         : deleteRecord(ws, type, id);
   const message = operation === "add" ? "记录了" : operation === "update" ? "修改了" : "删除了";
   const version = await snapshot(
