@@ -9,13 +9,17 @@ import { useEffect, useRef, useState } from "react";
 import css from "./Onboarding.module.css";
 import { OnboardingMatter } from "./OnboardingMatter.js";
 import { OnboardingFileImport, OnboardingSetup } from "./OnboardingSources.js";
+import type { PersonalServices } from "./PersonalPages.js";
 import v2 from "./Prototype.module.css";
+import { StorageChoice, type StorageInfo } from "./StorageChoice.js";
 import { useLocale, useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 type Destination = "today" | "ask" | "connections";
 type Panel = "apple-health" | "chatgpt-conversations" | "projects" | "news";
-interface Props extends OnboardingServices {
+interface Props
+  extends OnboardingServices,
+    Pick<PersonalServices, "loadSettings" | "moveStorage" | "pickStorageFolder"> {
   status: OnboardingStatus;
   step: number;
   builtin: boolean;
@@ -30,6 +34,8 @@ interface Props extends OnboardingServices {
 const primary = `${v2.btn} ${v2["btn-primary"]}`;
 const quiet = `${v2.btn} ${v2["btn-quiet"]}`;
 const focusHeading = (element: HTMLHeadingElement | null) => element?.focus();
+/** 欢迎页之后先选资料放哪；引导里其他步骤的编号不变。 */
+export const STORAGE_STEP = 6;
 
 export function OnboardingPage(props: Props) {
   const t = useT();
@@ -58,6 +64,14 @@ export function OnboardingPage(props: Props) {
         : null,
   );
   const [busy, setBusy] = useState(false);
+  const [storage, setStorage] = useState<StorageInfo | null>(null);
+  useEffect(() => {
+    if (step !== STORAGE_STEP) return;
+    void props
+      .loadSettings()
+      .then((settings) => setStorage(settings.storage))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  }, [step, props.loadSettings]);
   const [error, setError] = useState("");
   const [copyState, setCopyState] = useState("");
   const prompt = useRef<HTMLPreElement>(null);
@@ -129,7 +143,7 @@ export function OnboardingPage(props: Props) {
   const next = async () => {
     if (step === 0) {
       await save({ seen: true });
-      move(1);
+      move(STORAGE_STEP);
     } else if (memoryMode) {
       if (!preview) {
         const result = await props.previewOnboardingMemory(text, ai as OnboardingAi, locale);
@@ -220,6 +234,41 @@ export function OnboardingPage(props: Props) {
       </div>
     </div>
   );
+  if (step === STORAGE_STEP)
+    return (
+      <section className={`${v2.welcome} ${css.welcome}`} aria-label={t("资料放哪", "Where your notes live")}>
+        <h1 ref={focusHeading} tabIndex={-1}>
+          {t("资料放哪", "Where your notes live")}
+        </h1>
+        {error && (
+          <p role="alert" className={v2.error}>
+            {error}
+          </p>
+        )}
+        {storage ? (
+          <StorageChoice
+            storage={storage}
+            moveStorage={props.moveStorage}
+            pickStorageFolder={props.pickStorageFolder}
+            submitLabel={t("下一步", "Next")}
+            onDone={async (moved) => {
+              const firstRun = status.checklist.completed === 0;
+              await save({ storage: true });
+              if (moved) await props.refresh();
+              if (firstRun) move(1);
+              else finish("today");
+            }}
+          />
+        ) : (
+          !error && <p className={v2.small}>{t("正在读取…", "Loading…")}</p>
+        )}
+        <div className={css.footer}>
+          <button type="button" className={quiet} onClick={() => move(0)}>
+            {t("上一步", "Back")}
+          </button>
+        </div>
+      </section>
+    );
   if (step === 0)
     return (
       <section
@@ -625,15 +674,13 @@ export function OnboardingChecklist({
             <span className={v2.small}>
               {item.done
                 ? t("已完成", "Done")
-                : item.disabled
-                  ? t("先选你想管的事", "Pick what to focus on first")
-                  : item.skipped
-                    ? t("先跳过，随时能继续", "Skipped for now; continue anytime")
-                    : t("还没完成", "Not yet")}
+                : item.skipped
+                  ? t("先跳过，随时能继续", "Skipped for now; continue anytime")
+                  : t("还没完成", "Not yet")}
             </span>
           </div>
           {!item.done && (
-            <button type="button" className={quiet} disabled={item.disabled} onClick={() => go(item)}>
+            <button type="button" className={quiet} onClick={() => go(item)}>
               {item.action.label}
             </button>
           )}

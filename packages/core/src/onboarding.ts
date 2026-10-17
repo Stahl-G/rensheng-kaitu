@@ -32,6 +32,7 @@ import { type GoalOrigin, noteLine, upsertGoal } from "./plans.js";
 import { type ProjectInput, createProject, listProjects } from "./projects.js";
 import { readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
+import { syncMode } from "./sync-location.js";
 import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone, localDate } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
@@ -106,7 +107,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
       },
     ],
   },
-  steps: ["带来一件事", "先管哪些", "接上数据", "选一个 AI"],
+  steps: ["带来一件事", "先管哪些", "接入健康、日历等", "选一个 AI"],
   ais: [
     {
       id: "chatgpt",
@@ -253,7 +254,8 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     matter: "带来一件事并采纳第一个下一步",
     memory: "让开图认识你（可选）",
     starts: "选你想先管的事",
-    sources: "接上数据",
+    storage: "选资料放哪",
+    sources: "接入健康、日历等",
     ai: "选一个 AI 帮你整理",
     plan: "拿到第一份今天计划",
     sourcePrefix: "接上",
@@ -266,6 +268,8 @@ export type OnboardingSource = (typeof ONBOARDING.sources)[number]["id"];
 export type OnboardingAi = (typeof ONBOARDING.ais)[number]["id"];
 export interface OnboardingChoices {
   seen?: boolean;
+  /** 引导第一步选过资料放哪。 */
+  storage?: boolean;
   starts?: OnboardingStart[];
   skipped?: (OnboardingSource | "memory" | "ai" | "plan")[];
   memoryAi?: OnboardingAi;
@@ -273,6 +277,7 @@ export interface OnboardingChoices {
 }
 export interface LocalOnboardingChoices {
   seenAt?: string;
+  storage?: boolean;
   starts?: OnboardingStart[];
   skipped?: (OnboardingSource | "memory" | "ai" | "plan")[];
   memoryAi?: OnboardingAi;
@@ -304,6 +309,7 @@ export interface OnboardingContent {
   sources: readonly OnboardingSourceInfo[];
   aiChoices: readonly { id: string; title: string; description: string; target: string }[];
   checklist: {
+    storage: string;
     matter: string;
     memory: string;
     starts: string;
@@ -332,7 +338,6 @@ export interface OnboardingStatus {
       title: string;
       done: boolean;
       skipped: boolean;
-      disabled: boolean;
       action: { kind: string; target: string; label: string };
     }[];
     completed: number;
@@ -963,6 +968,12 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const latest = live.find((task) => task.status === "open") ?? live[0];
   const items = [
     {
+      id: "storage",
+      title: content.checklist.storage,
+      done: !!choices?.storage || syncMode(ws.root) !== "local",
+      action: { kind: "storage", target: "storage" },
+    },
+    {
       id: "matter",
       title: content.checklist.matter,
       done: adopted.length > 0,
@@ -984,7 +995,10 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
       id: "sources",
       title: content.checklist.sources,
       done: !!choices?.starts?.length && sources.every((source) => source.done),
-      action: { kind: "source", target: "sources" },
+      // 还没选要管的事时先去选，选完接着接数据，不让这一项变成点不动的灰按钮。
+      action: choices?.starts?.length
+        ? { kind: "source", target: "sources" }
+        : { kind: "starts", target: "starts" },
     },
     {
       id: "ai",
@@ -1002,7 +1016,6 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     },
   ].map((item) => ({
     ...item,
-    disabled: item.id === "sources" && !choices?.starts?.length,
     action: { ...item.action, label: content.checklist.action },
     skipped: choices?.skipped?.includes(item.id as OnboardingSource | "memory" | "ai" | "plan") ?? false,
   }));
@@ -1058,10 +1071,15 @@ export async function saveOnboardingChoices(
     !input ||
     typeof input !== "object" ||
     Array.isArray(input) ||
-    Object.keys(input).some((key) => !["seen", "starts", "skipped", "memoryAi", "aiChoice"].includes(key))
+    Object.keys(input).some(
+      (key) => !["seen", "storage", "starts", "skipped", "memoryAi", "aiChoice"].includes(key),
+    )
   )
     throw new KaituError("引导选择不合法", "BAD_ARGS");
-  if (input.seen !== undefined && typeof input.seen !== "boolean")
+  if (
+    (input.seen !== undefined && typeof input.seen !== "boolean") ||
+    (input.storage !== undefined && typeof input.storage !== "boolean")
+  )
     throw new KaituError("引导选择不合法", "BAD_ARGS");
   for (const [ids, allowed] of [
     [input.starts, ONBOARDING.starts.map((item) => item.id)],

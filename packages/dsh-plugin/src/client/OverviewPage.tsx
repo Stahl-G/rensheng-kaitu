@@ -14,7 +14,7 @@ import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingNextCard } from "./OnboardingMatter.js";
-import { OnboardingChecklist, OnboardingPage } from "./OnboardingPage.js";
+import { OnboardingChecklist, OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import css from "./Prototype.module.css";
@@ -267,11 +267,11 @@ function Overview({
     if (source) openSource(source);
   };
   const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
-    if (item.disabled) return;
-    if (item.id === "matter") startGuide(1);
+    if (item.id === "storage") startGuide(STORAGE_STEP);
+    else if (item.id === "matter") startGuide(1);
     else if (item.id === "memory") startGuide(5);
     else if (item.id === "starts") startGuide(2);
-    else if (item.id === "sources") startGuide(3);
+    else if (item.id === "sources") startGuide(item.action.target === "starts" ? 2 : 3);
     else if (item.id === "ai") startGuide(4);
     else if (item.id === "plan")
       prompt(

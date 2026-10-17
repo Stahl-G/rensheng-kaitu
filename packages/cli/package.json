@@ -1,6 +1,6 @@
 {
   "name": "rensheng-kaitu",
-  "version": "0.1.0-rc.2",
+  "version": "0.1.0-rc.3",
   "private": true,
   "license": "MIT",
   "description": "开图：把个人生活放进一个本地文件夹，任何 Agent 都能接手",

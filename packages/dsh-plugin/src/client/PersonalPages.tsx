@@ -8,6 +8,7 @@ import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import css from "./Prototype.module.css";
+import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
 import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
 
@@ -25,13 +26,6 @@ export interface PersonalServices extends CalendarPushServices {
   pickStorageFolder: () => Promise<string | null>;
   loadHandover: (locale?: Locale) => Promise<HandoverPack>;
 }
-const PROVIDERS: { id: SyncProvider; zh: string; en: string; key?: "icloud" | "drive" | "nutstore" }[] = [
-  { id: "local", zh: "这台电脑（不同步）", en: "This computer (no sync)" },
-  { id: "icloud", zh: "iCloud 云盘", en: "iCloud Drive", key: "icloud" },
-  { id: "nutstore", zh: "坚果云", en: "Nutstore (坚果云)", key: "nutstore" },
-  { id: "google-drive", zh: "Google Drive", en: "Google Drive", key: "drive" },
-  { id: "folder", zh: "其他同步盘的文件夹", en: "A folder another sync app syncs" },
-];
 export type PersonalView = "profile" | "connections" | "settings";
 export function PersonalPages(
   props: PersonalServices &
@@ -61,9 +55,6 @@ export function PersonalPages(
   const [history, setHistory] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
-  const [pickingFolder, setPickingFolder] = useState(false);
-  const [path, setPath] = useState("");
-  const [provider, setProvider] = useState<SyncProvider>("local");
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -131,11 +122,6 @@ export function PersonalPages(
   const storageName = (id: SyncProvider | undefined) => {
     const item = PROVIDERS.find((entry) => entry.id === id) ?? PROVIDERS[0];
     return t(item?.zh ?? "", item?.en ?? "");
-  };
-  const suggestion = (id: SyncProvider) => {
-    const key = PROVIDERS.find((entry) => entry.id === id)?.key;
-    const folder = key ? data?.storage.suggested?.[key] : null;
-    return folder ? `${folder}/kaitu` : "";
   };
   return (
     <div className={css.me}>
@@ -338,7 +324,6 @@ export function PersonalPages(
                     onClick={() => {
                       props.navigate("settings");
                       setMoving(true);
-                      setProvider(data.storage.suggested?.nutstore ? "nutstore" : "google-drive");
                     }}
                   >
                     {t("管理存放位置", "Manage storage")}
@@ -603,84 +588,19 @@ export function PersonalPages(
               </section>
             )}
             {moving && (
-              <form
-                className={`${css.card} ${css["sub-form"]}`}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run(
-                    async () => {
-                      await props.moveStorage(path, provider !== "local", provider);
-                      setMoving(false);
-                      await props.refreshWorkspace();
-                    },
-                    t("资料已迁移", "Notes moved"),
-                  );
+              <StorageChoice
+                storage={data.storage}
+                moveStorage={props.moveStorage}
+                pickStorageFolder={props.pickStorageFolder}
+                submitLabel={t("迁移到这里", "Move here")}
+                onDone={async (moved) => {
+                  setMoving(false);
+                  if (moved) {
+                    await props.refreshWorkspace();
+                    setReceipt(t("资料已迁移", "Notes moved"));
+                  }
                 }}
-              >
-                <label>
-                  {t("由谁同步", "Synced by")}
-                  <select
-                    value={provider}
-                    onChange={(event) => {
-                      const next = event.target.value as SyncProvider;
-                      setProvider(next);
-                      if (!path.trim() || PROVIDERS.some((item) => suggestion(item.id) === path))
-                        setPath(suggestion(next));
-                    }}
-                  >
-                    {PROVIDERS.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {t(item.zh, item.en)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {provider === "nutstore" && (
-                  <p className={css.small}>
-                    {data.storage.suggested?.nutstore
-                      ? t("已找到坚果云同步文件夹", "Nutstore folder found")
-                      : t("没找到坚果云同步文件夹", "No Nutstore folder found")}
-                  </p>
-                )}
-                <label>
-                  {t("新的文件夹位置", "New folder location")}
-                  <input
-                    required
-                    value={path}
-                    placeholder={t("填写新文件夹的完整路径", "Full path of the new folder")}
-                    onChange={(event) => setPath(event.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className={`${css.btn} ${css["btn-quiet"]}`}
-                  disabled={busy || pickingFolder}
-                  onClick={async () => {
-                    setPickingFolder(true);
-                    setError("");
-                    try {
-                      const folder = await props.pickStorageFolder();
-                      if (folder) {
-                        const separator = folder.includes("\\") ? "\\" : "/";
-                        setPath(`${folder.replace(/[\\/]+$/, "")}${separator}kaitu`);
-                      }
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : String(err));
-                    } finally {
-                      setPickingFolder(false);
-                    }
-                  }}
-                >
-                  {pickingFolder ? t("正在选择…", "Choosing…") : t("选择存放文件夹…", "Choose folder…")}
-                </button>
-                <button
-                  type="submit"
-                  className={`${css.btn} ${css["btn-primary"]}`}
-                  disabled={busy || pickingFolder || !path.trim()}
-                >
-                  {t("迁移到这里", "Move here")}
-                </button>
-              </form>
+              />
             )}
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("关于", "About")}</h2>

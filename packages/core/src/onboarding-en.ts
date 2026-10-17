@@ -29,7 +29,7 @@ ChatGPT: Then start with the other two and add the scheduling project once you h
       },
     ],
   },
-  steps: ["Bring one thing", "Pick focus areas", "Connect data", "Choose an AI"],
+  steps: ["Bring one thing", "Pick focus areas", "Connect health, calendar and more", "Choose an AI"],
   ais: [
     {
       id: "chatgpt",
@@ -186,10 +186,11 @@ Output one item per line in this format, choosing the category from Work, Goal, 
     },
   ],
   checklist: {
+    storage: "Choose where your notes live",
     matter: "Bring one thing and adopt a first next step",
     memory: "Let Kaitu get to know you (optional)",
     starts: "Pick what to focus on first",
-    sources: "Connect data",
+    sources: "Connect health, calendar and more",
     ai: "Choose an AI to help you organize",
     plan: "Get your first plan for today",
     sourcePrefix: "Connect ",
