@@ -29,6 +29,14 @@ describe("记忆", () => {
     });
   });
 
+  it("写了却认不出的记忆类型原样保留：校验报出来，不归到别的类型、不进资料包", async () => {
+    const ws = await freshWorkspace();
+    ws.writeText("memory/context_mom.md", "---\ntype: persno\n---\n妈妈住在杭州。\n");
+    expect(listMemories(ws).find((memory) => memory.text.includes("妈妈"))?.type).toBe("persno");
+    expect(validateWorkspace(ws).some((issue) => issue.file === "memory/context_mom.md")).toBe(true);
+    expect(handoverPack(ws, "zh-CN").text).not.toContain("妈妈住在杭州");
+  });
+
   it("frontmatter 写坏时按敏感处理，不进资料包", async () => {
     const ws = await freshWorkspace();
     ws.writeText("memory/fact_secret.md", "---\nsensitive: true\nname: [没写完\n---\n只给自己看的事。\n");

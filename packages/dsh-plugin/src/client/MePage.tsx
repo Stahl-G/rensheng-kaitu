@@ -110,7 +110,9 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
           type="button"
           className={`${css.btn} ${css["btn-quiet"]}`}
           onClick={() =>
-            onPrompt(`请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type]}，保留出处。`)
+            onPrompt(
+              `请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type] ?? "记忆"}，保留出处。`,
+            )
           }
         >
           {t("修改", "Edit")}

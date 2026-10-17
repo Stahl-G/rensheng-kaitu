@@ -41,3 +41,14 @@ it("订阅拉取按 15 分钟刷新，保留人工修改与删除，失败不清
     vi.mocked(fetchCalendar).mockReset();
   }
 });
+
+it("日历页和今天页读同一份补齐后的计划：取消的不显示，斜杠日期和「7点」照常显示", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  ws.writeText(
+    "NOW.md",
+    '---\ndate: "2026/10/17"\nblocks:\n  - { title: 晨跑, start: 7点, end: 8点 }\n  - { title: 取消的会, start: "10:00", end: "11:00", status: 取消 }\n---\n',
+  );
+  const calendar = readCalendar(ws, new Date("2026-10-17T03:00:00Z"));
+  expect(calendar.planDate).toBe("2026-10-17");
+  expect(calendar.events.map((event) => [event.title, event.start])).toEqual([["晨跑", "2026-10-17T07:00"]]);
+});

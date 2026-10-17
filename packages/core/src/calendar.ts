@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fetchCalendar } from "./calendar-fetch.js";
+import { normalizeNow } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { importIcs } from "./importers/ics.js";
@@ -104,7 +105,11 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
   }));
   let planDate: string | null = null;
   if (ws.exists("NOW.md")) {
-    const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+    // 和今天页读同一份补齐后的计划（取消 → skipped、2026/10/17 → 2026-10-17、9点 → 09:00）。
+    const data = normalizeNow(
+      parseFrontmatter(ws.readText("NOW.md")).data,
+      ws.timeZone(),
+    ) as unknown as TodayPlan;
     const date = data.date;
     planDate = data.blocks?.length ? date : null;
     for (const block of data.blocks ?? []) {

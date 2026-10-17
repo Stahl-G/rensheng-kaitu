@@ -139,11 +139,14 @@ function looseMemory(file: string, raw: string, fallbackDate: string): Memory | 
     heading ||
     base.replace(/^(preference|fact|context|person|decision)_/, "") ||
     text.slice(0, 30);
-  const date = (value: unknown) =>
-    typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : fallbackDate;
+  // 没写的才从文件名、修改时间补；写了却认不出的类型和日期原样保留，让校验报出来，写回时也不丢。
+  const absent = (value: unknown) => value === undefined || value === null || value === "";
+  const date = (value: unknown) => (absent(value) ? fallbackDate : value);
   return {
     ...data,
-    type: memoryType(data.type) ?? memoryType(base.split("_")[0]) ?? "context",
+    type: absent(data.type)
+      ? (memoryType(base.split("_")[0]) ?? "context")
+      : (memoryType(data.type) ?? data.type),
     name,
     text,
     created: date(data.created),

@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { normalizeHandoff } from "./doc-input.js";
+import { normalizeHandoff, normalizeNow } from "./doc-input.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
@@ -184,10 +184,10 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
   if (data.now.date !== data.today) {
     // 过期计划仍是接力证据，明确标出日期，避免把它混入今天或在更新时丢掉变化。
     try {
-      const plan = parseFrontmatter<{
+      const plan = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data, ws.timeZone()) as {
         date: string;
         blocks: { start?: string; end?: string; title: string; status: string }[];
-      }>(ws.readText("NOW.md")).data;
+      };
       lines.push("", `## 最近计划（${plan.date}）`, "");
       for (const block of plan.blocks)
         lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);

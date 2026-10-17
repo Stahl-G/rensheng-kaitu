@@ -245,9 +245,9 @@ export function normalizeRecordInput(
   const out = normalizeObject(root, data, timeZone, options.patch);
   if (typeof out.ts === "string") out.ts = dateTime(out.ts.trim(), timeZone);
   if (options.patch) return out;
-  // 餐次没写或认不出时按吃饭时间推断，和导入营养 App 时的规则一致。
+  // 餐次没写时按吃饭时间推断，和导入营养 App 时的规则一致；写了却认不出的留给校验，不改成别的餐次。
   const meal = root.properties?.meal?.enum;
-  if (meal?.includes("加餐") && !meal.includes(out.meal)) {
+  if (meal?.includes("加餐") && (out.meal === undefined || out.meal === null || out.meal === "")) {
     const at = typeof out.ts === "string" && HAS_OFFSET.test(out.ts) ? new Date(out.ts) : now;
     if (!Number.isNaN(at.getTime())) {
       const hour = Number(isoInZone(at, timeZone).slice(11, 13));
