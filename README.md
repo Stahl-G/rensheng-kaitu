@@ -32,7 +32,7 @@ python3 -m http.server 4894 --bind 127.0.0.1
 
 ## 发新版时
 
-每个页面打开时读取 GitHub Releases 里最新带 `.dmg` 的版本，自动更新版本号、下载链接、大小和 SHA-256；同一版本的 `Kaitu-Setup-*-x64.exe` 用于 Windows，`rensheng-kaitu-*.tgz` 用于命令行。正式版会去掉「预览版」字样。发布时把两种桌面安装包上传到同一个 Release。
+每个页面打开时读取 GitHub Releases 里最新带 `.dmg` 的版本，自动更新版本号、下载链接、大小和 SHA-256；同一版本的 `Kaitu-Setup-*-x64.exe` 用于 Windows，`rensheng-kaitu-*.tgz` 用于命令行。同一 Release 有多个 Windows 安装器修订时，按 asset ID 选择最新上传的文件。正式版会去掉「预览版」字样。发布时把两种桌面安装包上传到同一个 Release。
 读不到（断网、被限流）时显示页面里写死的版本。想让写死的也跟上，搜 `0.1.0-rc.4` 全部替换，并改中英文下载页里的大小和 SHA-256。
 常见问题「这是正式版吗？」和文档开头的版本说明也跟着自动变。
 
