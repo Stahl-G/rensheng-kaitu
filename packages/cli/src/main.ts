@@ -100,7 +100,7 @@ const HELP = `开图 kaitu
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
-  kaitu dsh [--install]                           把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令）
+  kaitu dsh [--install] [--no-automation]         把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令；开图 App 已在用同一工作区时加 --no-automation）
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
   kaitu channels pair <通道>                       生成本人配对码
   kaitu channels start [--only <通道>]             前台启动手机通道
@@ -165,6 +165,7 @@ const HELP = `开图 kaitu
 const options = {
   channels: { type: "boolean" },
   install: { type: "boolean" },
+  "no-automation": { type: "boolean" },
   only: { type: "string" },
   title: { type: "string" },
   due: { type: "string" },
@@ -267,7 +268,7 @@ async function run(argv: string[]): Promise<number> {
       if (!values.install && !ws.exists(".kaitu/config.json")) {
         ws = await initWorkspace(ws.root, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
       }
-      console.log(values.install ? installDsh(ws) : dshCommand(ws));
+      console.log(values.install ? installDsh(ws, !values["no-automation"]) : dshCommand(ws));
       return 0;
     }
     case "channels": {

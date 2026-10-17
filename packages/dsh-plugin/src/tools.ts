@@ -25,6 +25,8 @@ export const inject = ["tools", "systemPrompt"];
 export interface Config {
   workspace?: string;
   enableAutomation?: boolean;
+  /** false：后台工作交给开图 App（同一工作区不跑两遍），插件只提供页面和工具。 */
+  automation?: boolean;
 }
 
 const instructions = [

@@ -36,10 +36,12 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   const queue = applyTools(ctx as unknown as ToolContext, config, ws);
   ctx.typert.register(contribution as TypertContribution);
   const collectors = new CollectorService(ws);
-  collectors.start();
-  ctx.effect(() => () => collectors.stop());
   new KaituOverviewService(ctx, config, ws, queue, collectors);
   new KaituFinanceService(ctx, config, ws, queue);
+  // automation: false 时后台工作（采集、日历推送、收件箱、定时任务）交给开图 App，插件只提供页面和工具。
+  if (config.automation === false) return;
+  collectors.start();
+  ctx.effect(() => () => collectors.stop());
   ctx.effect(() => startCalendarLoop(ws, queue));
   const stop = startInboxLoop(ws, 60000, queue);
   ctx.effect(() => stop);

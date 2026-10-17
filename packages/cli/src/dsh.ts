@@ -10,7 +10,13 @@ const END = "# kaitu:end";
 
 const defaultPlugin = () => fileURLToPath(new URL("../../dsh-plugin/dist/index.js", import.meta.url));
 
-function entry(workspace: string, plugin: string, flow: boolean, standalone = false): string {
+function entry(
+  workspace: string,
+  plugin: string,
+  flow: boolean,
+  standalone = false,
+  automation = true,
+): string {
   if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
   const disabled = [
@@ -33,7 +39,7 @@ function entry(workspace: string, plugin: string, flow: boolean, standalone = fa
       { id: "tool-skill", disabled: false },
       { id: "ui-settings-models", config: { credentialOnboarding: !standalone } },
       {
-        insert: [{ id: "kaitu", name: plugin, config: { workspace } }],
+        insert: [{ id: "kaitu", name: plugin, config: { workspace, ...(automation ? {} : { automation }) } }],
       },
     ]
       .map((row) => JSON.stringify(row))
@@ -51,6 +57,7 @@ function entry(workspace: string, plugin: string, flow: boolean, standalone = fa
     `      name: ${JSON.stringify(plugin)}`,
     "      config:",
     `        workspace: ${JSON.stringify(workspace)}`,
+    ...(automation ? [] : ["        automation: false"]),
     "",
   ].join("\n");
 }
@@ -58,7 +65,7 @@ function entry(workspace: string, plugin: string, flow: boolean, standalone = fa
 // CLI 与独立桌面应用共用受管段；定时任务由固定版本的 DSH 宿主提供。
 export function renderDshPatch(
   text: string,
-  options: { home: string; workspace: string; plugin?: string; standalone?: boolean },
+  options: { home: string; workspace: string; plugin?: string; standalone?: boolean; automation?: boolean },
 ): string {
   const start = text.indexOf(START);
   const end = text.indexOf(END);
@@ -69,7 +76,7 @@ export function renderDshPatch(
   const emptyFlow = /^\[[ \t]*\](?=[ \t]*(?:#.*)?$)/m.exec(text);
   // 受管段前面也可能有别的条目（如 Kaitu.app 的 webserver 行，以逗号结尾），仍属 flow 序列。
   const flow = start >= 0 ? /[[,]$/.test(text.slice(0, start).trimEnd()) : emptyFlow !== null;
-  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, options.standalone).trimEnd()}\n${END}`;
+  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, options.standalone, options.automation).trimEnd()}\n${END}`;
   let next: string;
   if (start >= 0) {
     next = text.slice(0, start) + block + text.slice(end + END.length);
@@ -83,12 +90,12 @@ export function renderDshPatch(
 }
 
 // 写进 DeepSeek Harness 桌面应用的 profile；重复运行只替换开图这一段。
-export function installDsh(ws: Workspace): string {
+export function installDsh(ws: Workspace, automation = true): string {
   const home = process.env.DSH_HOME ?? join(homedir(), ".dsh");
   const patch = join(home, "profiles", "desktop", "cordis.patch.yml");
   if (!existsSync(patch))
     throw new KaituError(`没找到 ${patch}，请先安装并打开一次 DeepSeek Harness 桌面应用`, "NO_DSH");
-  writeFileSync(patch, renderDshPatch(readFileSync(patch, "utf8"), { home, workspace: ws.root }));
+  writeFileSync(patch, renderDshPatch(readFileSync(patch, "utf8"), { home, workspace: ws.root, automation }));
   return `已把开图插件写入 ${patch}。重启 DeepSeek Harness 桌面应用后，侧栏点「开图」查看总览，新建会话可记录（桌面应用需为 ${DSH_VERSION}）。`;
 }
 
