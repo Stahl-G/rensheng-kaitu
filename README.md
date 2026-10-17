@@ -15,6 +15,7 @@ https://kaitu.si/ ，由 GitHub Pages 直接发布本分支（`gh-pages`）根�
 | `tokens.css` | 颜色、字体等，和开图应用一致，含深色 |
 | `style.css`、`app.js` | 全站样式与脚本（动效、语言切换、下载信息） |
 | `404.html`、`sitemap.xml`、`robots.txt`、`favicon.svg` | 其他 |
+| `plugins/index.json` | DSH 插件市场索引（开图插件列表） |
 | `CNAME` | 域名 `kaitu.si`，不要删 |
 
 ## 本地预览
