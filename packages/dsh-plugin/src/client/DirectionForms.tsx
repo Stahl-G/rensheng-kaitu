@@ -1,4 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
+import { FilePicker } from "./DshFiles.js";
 import type {
   Direction,
   DirectionNote,
@@ -64,31 +65,52 @@ function Field({
   type = "text",
 }: { name: string; label: string; value?: string; optional?: boolean; multiline?: boolean; type?: string }) {
   const id = useId();
+  const [text, setText] = useState(value ?? "");
+  const [picking, setPicking] = useState(false);
   return (
-    <label htmlFor={id}>
-      {label}
-      {multiline ? (
-        <textarea
-          id={id}
-          name={name}
-          aria-label={label}
-          defaultValue={value}
-          required={!optional}
-          rows={3}
-          maxLength={100000}
-        />
-      ) : (
-        <input
-          id={id}
-          name={name}
-          aria-label={label}
-          defaultValue={value}
-          required={!optional}
-          type={type}
-          maxLength={100000}
+    <div>
+      <label htmlFor={id}>
+        {label}
+        {multiline ? (
+          <textarea
+            id={id}
+            name={name}
+            aria-label={label}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            required={!optional}
+            rows={3}
+            maxLength={100000}
+          />
+        ) : (
+          <input
+            id={id}
+            name={name}
+            aria-label={label}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            required={!optional}
+            type={type}
+            maxLength={100000}
+          />
+        )}
+      </label>
+      {["source", "sources"].includes(name) && (
+        <button type="button" className={base.link} onClick={() => setPicking(true)}>
+          选择开图资料…
+        </button>
+      )}
+      {picking && (
+        <FilePicker
+          filesOnly
+          close={() => setPicking(false)}
+          select={(path) => {
+            setText(multiline && text.trim() ? `${text.trim()}\n${path}` : path);
+            setPicking(false);
+          }}
         />
       )}
-    </label>
+    </div>
   );
 }
 function References({ data, selected = [] }: { data: ExplorationData; selected?: ExplorationReference[] }) {

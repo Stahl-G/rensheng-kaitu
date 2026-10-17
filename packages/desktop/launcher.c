@@ -15,7 +15,7 @@ int main(int argc, char **argv) {
   if (!slash) return 1;
   *slash = '\0';
   if (snprintf(runtime, sizeof(runtime), "%s/DSH", resolved) >= (int)sizeof(runtime) ||
-      snprintf(initializer, sizeof(initializer), "%s/../Resources/kaitu/dist/initialize.mjs", resolved) >= (int)sizeof(initializer)) return 1;
+      snprintf(initializer, sizeof(initializer), "%s/../Resources/kaitu-loader.mjs", resolved) >= (int)sizeof(initializer)) return 1;
   char state[PATH_MAX];
   const char *home = getenv("HOME");
   const char *custom_state = getenv("KAITU_APP_HOME");

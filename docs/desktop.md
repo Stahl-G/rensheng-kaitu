@@ -21,6 +21,44 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --d
 脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本，关于面板显示 `开图版本+dsh.0.2.0-rc.2`。
 插件与初始化器随应用打包，运行时不依赖本仓库。自动更新源、强制更新查询与 `dsh://` 注册会移除。
 
+## 开图功能包独立更新
+
+DSH 固定为 `0.2.0-rc.2`，宿主接口版本为 `1`。功能更新不修改 `.app`，不更换 Electron、DSH、原生启动器或协议桥接。
+界面、资料服务、开图工具与技能一起更新，保证前后端同版。下载后在设置里重启生效，也可恢复上一版功能。
+恢复功能版本不恢复用户资料；需要回退资料时使用资料的版本历史。
+
+首次安装须使用带 `kaitu-loader.mjs` 的新宿主。旧 App 没有该加载器，不能只靠功能包取得更新能力。
+更新包放在本机 App 状态目录的 `updates/dsh-0.2.0-rc.2-host-1/`，不放工作区或同步盘。
+启动器仍从签名 App 读取。功能包的 `node_modules` 只链接宿主中的固定 DSH 桥接，包内不能分发内核依赖。
+
+发布配置是只含公钥的 JSON：`{"feedUrl":"https://你的发布地址/latest.json","publicKey":"PEM 格式 Ed25519 公钥"}`。
+打包宿主时使用 `--update-config <配置文件>`，配置在签名前写入 App。省略时设置会明确提示尚未配置更新源。
+私钥由发布者保管，通过 `--key <私钥文件>` 交给本机发布工具，不打包、不上传、不写入工作区。
+
+日常发布不必构建完整 App：
+
+```sh
+pnpm build
+node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
+  --payload-only dist/features-0.1.1 --payload-version 0.1.1
+node packages/desktop/package-update.mjs \
+  --payload dist/features-0.1.1 --output dist/release-0.1.1 \
+  --key /安全位置/更新签名私钥.pem \
+  --url https://你的发布地址/0.1.1/kaitu-features.zip --notes '本版更新说明'
+```
+
+产物为 `kaitu-features.zip` 和带 Ed25519 签名的 `latest.json`。先上传版本目录中的 ZIP，再更新频道清单。
+这些命令只生成本地产物，不执行上传。版本目录不可覆盖。正式版和 RC 使用不同的 feed URL。
+下载入口检查签名、包哈希、允许的目录与确切的 DSH/宿主接口版本，再切换版本指针；不在每次读资料时重查。
+HTTP 只允许回环地址以便本机验收，对外发布使用 HTTPS，不跟随重定向。
+需要原生能力、原生依赖或新的 DSH 适配时升级宿主；不要伪造相同的适配版本号来强行安装。
+
+目前仅本机签名测试源完成验收，正式发布域名与正式更新公钥尚未配置，未公开发布更新。
+
+界面语言默认跟随系统首选语言：`zh`（含地区变体）使用中文，英语及其他语言使用英语。
+桌面从 Electron 的系统语言接口读取，Web 使用浏览器语言。设置中可手动选择或恢复跟随系统。
+早期版本曾自动保存语言且未标记来源，不能区分它和用户手动选择；保留旧值，用户可在设置中恢复跟随系统。
+
 ## 作者自己签名与公证
 
 准备 Apple Developer Program 账号，以及已导入本机钥匙串、带私钥的

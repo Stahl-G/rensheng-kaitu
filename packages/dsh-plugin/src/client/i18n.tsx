@@ -13,12 +13,12 @@ export function useT() {
   return useCallback((zh: string, en: string) => (locale === "en" ? en : zh), [locale]);
 }
 
-/** 浏览器 / 系统语言，只作为第一次打开时的参考；已有资料的工作区由服务端保持中文。 */
+/** Web 使用浏览器首选语言；桌面服务端会替换为系统首选语言。 */
 export function browserLocale(): string {
   try {
-    return navigator.languages?.[0] ?? navigator.language ?? "zh-CN";
+    return navigator.languages?.[0] ?? navigator.language ?? "en";
   } catch {
-    return "zh-CN";
+    return "en";
   }
 }
 

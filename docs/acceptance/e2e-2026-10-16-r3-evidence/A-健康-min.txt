@@ -1,0 +1,40 @@
+Window: "开图", App: Kaitu.
+0 standard window 开图, Secondary Actions: Raise
+	1 container 开图
+		2 container
+			3 HTML content 开图, URL: 127.0.0.1:52250/
+				4 container
+					5 text 人生开图
+					6 container 主要导航
+						7 button 今天
+						8 button 开图
+						9 button 资料
+						10 button 问问
+					11 pop up button 个人档案、AI 与连接、设置
+					12 button ← 资料
+					13 heading 健康, Value: 1
+						14 text 健康
+					15 text 完整的记录和来源
+					16 container
+						17 heading 训练 · 最近 4 周, Value: 2
+							18 text 训练 · 最近 4 周
+						19 text 这段时间还没有训练记录
+					20 container
+						21 heading 睡眠 · 最近 14 晚, Value: 2
+							22 text 睡眠 · 最近 14 晚
+						23 text 还没有睡眠记录
+					24 container
+						25 heading 来源, Value: 2
+							26 text 来源
+						27 text 还没有健康资料来源
+					28 button 全部健康记录、照片与趋势 →
+	29 close button
+	30 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	31 minimize button
+32 menu bar
+	33 Kaitu
+	34 编辑
+	35 视图
+	36 窗口
+
+The focused UI element is 3 HTML content 开图, URL: 127.0.0.1:52250/

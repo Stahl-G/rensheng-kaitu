@@ -1,3 +1,4 @@
+import { conciseDirection } from "./direction-copy.js";
 import { KaituError } from "./errors.js";
 import type { Direction, ExplorationCommand, ExplorationExperiment } from "./exploration.js";
 import { writeExploration } from "./exploration.js";
@@ -477,27 +478,27 @@ export function directionsPrompt(ws: Workspace, localeInput?: Locale, now = new 
   return pick(
     locale,
     `请根据下面我在「人生开图」里的资料，为我研究 3–5 个值得探索的方向。
-- 请联网搜索外部依据，搜索词只用不含我身份的主题词，不要把我的资料原文拼进搜索。
+- 只在需要核实外部事实时搜索，不强求论文。搜索词只用不含身份的主题词。正文不出现路径、行号、哈希、ID 或裸链接。
 - 不要重复我已有或不感兴趣的方向；不要编造资料或链接，资料不足就直接说明，不凑数。
 每个方向按下面的格式回复，方向之间空一行，不要别的内容：
-【方向】一句话
-【为什么适合】引用我资料里的具体事实，再附外部依据和来源日期
-【假设】一个可检验的假设，加一个一周内能完成的低成本小实验（投入多少、看什么结果）
-【还不清楚】还没弄清的问题
-【来源】https://…（每个链接一行）
+【方向】短标题，20 字以内
+【为什么适合】结合我的情况说一句话，60 字以内，不复制资料原文、不堆论文名
+【假设】一周内能做的第一步、投入和看什么结果，60 字以内
+【还不清楚】最多一句，40 字以内
+【来源】可选，最多 3 个真实来源链接，每个一行
 
 <我的资料>
 ${material || "（还没有资料，请先问我几个问题）"}
 </我的资料>`,
     `Using my notes from Kaitu below, research 3–5 directions worth exploring for me.
-- Search the web for outside evidence. Use topic words only, without anything that identifies me, and don't paste my notes into searches.
+- Search only when an outside fact needs checking; papers are not required. Use anonymous topic words only. No file paths, line numbers, hashes, IDs or bare URLs in the prose.
 - Don't repeat directions I already have or declined. Don't invent facts or links; if there isn't enough to go on, say so instead of padding.
 Reply in this format for each direction, with a blank line between directions and nothing else:
-[Direction] one sentence
-[Why it fits] cite specific facts from my notes, then the outside evidence with its date
-[Hypothesis] a testable hypothesis plus one low-cost experiment I can finish within a week (how much effort, what result to watch)
-[Still unclear] open questions
-[Sources] https://… (one link per line)
+[Direction] a short title, up to 60 characters
+[Why it fits] one plain sentence, up to 180 characters; no copied notes or lists of papers
+[Hypothesis] one first step for this week, effort and result to watch, up to 180 characters
+[Still unclear] at most one sentence, up to 100 characters
+[Sources] optional, up to 3 genuine links, one per line
 
 <my notes>
 ${material || "(no notes yet, ask me a few questions first)"}
@@ -556,7 +557,10 @@ export async function pasteDirections(
         current.urls.push(...(value.match(/https?:\/\/[^\s)）】\]，,。"'<>]+/g) ?? []));
     }
   }
-  const valid = drafts.filter((item) => item.title).slice(0, 5);
+  const valid = drafts
+    .map((item) => conciseDirection(item))
+    .filter((item) => item.title)
+    .slice(0, 5);
   if (!valid.length)
     throw new KaituError(
       pick(
@@ -582,7 +586,7 @@ export async function pasteDirections(
           continue;
         }
         existing.add(item.title);
-        const urls = [...new Set(item.urls)].slice(0, 8).filter((url) => {
+        const urls = [...new Set(item.urls)].slice(0, 3).filter((url) => {
           try {
             const parsed = new URL(url);
             return (
@@ -597,10 +601,12 @@ export async function pasteDirections(
         const command: ExplorationCommand = {
           operation: "create_direction",
           data: {
-            title: item.title,
-            motivation: item.motivation,
-            hypothesis: item.hypothesis,
-            ...(item.unknowns ? { unknowns: item.unknowns } : {}),
+            ...conciseDirection({
+              title: item.title,
+              motivation: item.motivation,
+              hypothesis: item.hypothesis,
+              ...(item.unknowns ? { unknowns: item.unknowns } : {}),
+            }),
             ...(urls.length ? { references: urls.map((ref) => ({ kind: "source" as const, ref })) } : {}),
           },
         };

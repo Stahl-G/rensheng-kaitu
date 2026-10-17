@@ -9,9 +9,12 @@ import {
   CalendarPush,
   type CalendarPushResult,
   type CalendarPushSettings,
+  type City,
   type HandoverPack,
+  type Hometown,
   type ImportSource,
   KaituError,
+  dshFiles,
   type LibraryData,
   type NewsFeedback,
   type OnboardingAi,
@@ -95,9 +98,11 @@ import {
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  resolvePlace,
   resolvePreferences,
   restore,
   saveAvatar,
+  saveHometown,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -141,6 +146,7 @@ declare module "@deepseek-ai/cordis" {
 /** 工作区页面数据、资讯与地点核对、本机头像。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
+  private readonly files: ReturnType<typeof dshFiles>;
 
   constructor(
     ctx: Context,
@@ -151,6 +157,27 @@ export class KaituOverviewService extends TypertRemoteService {
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
+    this.files = dshFiles(this.workspace);
+    ctx.effect(() => () => this.files.dispose());
+    const performWrite = this.write;
+    this.write = async (operation) => {
+      try {
+        return await performWrite(operation);
+      } finally {
+        this.files.invalidate();
+      }
+    };
+  }
+
+  @Remote("findWorkspaceFiles")
+  async findWorkspaceFiles(query: string): Promise<{ path: string; kind: "file" | "directory" }[]> {
+    if (!query) this.files.invalidate();
+    return this.files.find(query);
+  }
+
+  @Remote("openWorkspacePath")
+  async openWorkspacePath(path: string, action: "open" | "reveal"): Promise<{ opened: boolean }> {
+    return this.files.open(path, action);
   }
 
   @Remote("channelSettings")
@@ -496,6 +523,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("experienceSource")
   async experienceSource(id: string): Promise<ExperienceSource> {
     return readExperienceSource(this.workspace, id);
+  }
+
+  @Remote("hometownCities")
+  async hometownCities(name: string): Promise<City[]> {
+    return resolvePlace(name);
+  }
+
+  @Remote("saveHometown")
+  async saveHometown(name: string, geonameid: number): Promise<Hometown> {
+    return this.write(() => saveHometown(this.workspace, name, geonameid));
   }
 
   @Remote("lifeMap")

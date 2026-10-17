@@ -491,7 +491,7 @@ const SLEEP_VALUES: Record<string, string> = {
 };
 
 function parallelSamples(raw: Record<string, unknown>) {
-  const type = typeof raw.type === "string" ? raw.type : "";
+  const type = shortcutType(raw.type);
   const definition = SHORTCUT_TYPES[type];
   if (!definition) throw new Error(`未知健康类型：${type}`);
   // 没有样本时快捷指令发来空字符串（如不戴表睡觉），直接归档，不生成笔记。
@@ -511,10 +511,7 @@ function parallelSamples(raw: Record<string, unknown>) {
   if ((columns.values?.length ?? 0) > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
   return (columns.values ?? []).map((value, index) => {
     const start = columns.starts?.[index] ?? "";
-    if (!value || !start) throw new Error(`第 ${index + 1} 行的 values 或 starts 为空`);
     const end = columns.ends?.[index] ?? start;
-    parseTs(end);
-    if (+parseTs(end) < +parseTs(start)) throw new Error(`第 ${index + 1} 行的 ends 早于 starts`);
     const daily = ["step_count", "active_energy", "basal_energy"].includes(type);
     return {
       type,
@@ -688,6 +685,7 @@ export async function importHealthShortcut(ws: Workspace, inputFile: string, opt
   return importBatch(ws, "apple-health", candidates, {
     ...opts,
     ignored,
+    skipInvalid: true,
     message: (count) => `从 Apple 健康同步了 ${count} 条记录（快捷指令）`,
   });
 }

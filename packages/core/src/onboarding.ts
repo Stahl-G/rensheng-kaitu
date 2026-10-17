@@ -29,7 +29,6 @@ import {
   normalizeLocale,
   pick,
   readPreferences,
-  savePreferences,
 } from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
@@ -1041,21 +1040,19 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
 }
 
 /**
- * 读界面偏好；还没选过语言时只决定一次并存下：已有资料的工作区保持中文，
- * 新用户按系统语言（hint）选中文或英文，避免老用户因系统语言改变界面。
+ * 手动选择优先，否则跟随系统首选语言：中文用中文，其他语言用英文。
  */
 export function resolvePreferences(
-  ws: Workspace,
+  _ws: Workspace,
   hint?: unknown,
-  options: OnboardingOptions = {},
+  _options: OnboardingOptions = {},
 ): Preferences {
   const saved = readPreferences();
-  if (saved.locale) return saved;
-  const locale: Locale =
-    ws.unavailableFiles().length > 0 || hasUserFiles(ws) || typeof hint !== "string" || /^zh\b/i.test(hint)
-      ? "zh-CN"
-      : "en";
-  return savePreferences({ locale });
+  if (saved.locale) return { ...saved, followSystem: false };
+  return {
+    locale: typeof hint === "string" && /^zh(?:[-_]|$)/i.test(hint.trim()) ? "zh-CN" : "en",
+    followSystem: true,
+  };
 }
 
 export async function saveOnboardingChoices(

@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { selection } from "./sdk-providers.mjs";
 import { createPublicFetch, createSearchRouter } from "./sdk-web-providers.mjs";
 export const name = "kaitu-sdk-web";
 export const inject = ["web", "credentials"];
@@ -15,7 +14,7 @@ export function apply(ctx) {
       current: () => {
         const file = join(process.env.DSH_HOME, "kaitu-ai.json");
         const stored = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
-        return { choice: stored.choice, ...selection(stored) };
+        return stored;
       },
     }),
   );

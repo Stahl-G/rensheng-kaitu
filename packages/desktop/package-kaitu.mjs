@@ -38,6 +38,9 @@ const { values, positionals } = parseArgs({
     dmg: { type: "boolean", default: false },
     output: { type: "string" },
     "dsh-root": { type: "string", default: join(homedir(), "Developer/deepseek-harness-rc2") },
+    "update-config": { type: "string" },
+    "payload-only": { type: "string" },
+    "payload-version": { type: "string" },
   },
 });
 if (positionals.length !== 1) {
@@ -52,7 +55,7 @@ if (!source.endsWith(".app") || basename(output) !== "Kaitu.app")
 if (output === source || relative(source, output).startsWith("..") === false) {
   throw new Error("输出不能覆盖输入应用或位于输入包内");
 }
-if (existsSync(output)) throw new Error(`输出已存在，请另选目录：${output}`);
+if (!values["payload-only"] && existsSync(output)) throw new Error(`输出已存在，请另选目录：${output}`);
 if (!existsSync(source)) throw new Error(`输入不存在：${source}`);
 const identity = process.env.KAITU_SIGN_IDENTITY?.trim();
 const notaryProfile = process.env.KAITU_NOTARY_PROFILE?.trim();
@@ -63,6 +66,7 @@ const dmg = join(dirname(output), "Kaitu.dmg");
 if (values.dmg && existsSync(dmg)) throw new Error(`输出已存在，请另选目录：${dmg}`);
 const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
 const version = kaituVersion;
+const payloadVersion = values["payload-version"] || version;
 const plan = [
   `COPY ${source} → ${output}；校验 DSH 0.2.0-rc.2 / arm64 / 主入口`,
   `Info.plist: 人生开图 / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
@@ -94,7 +98,9 @@ const plan = [
       ]
     : []),
 ];
-console.log(plan.join("\n"));
+console.log(values["payload-only"]
+  ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.0-rc.2，不生成 App`
+  : plan.join("\n"));
 if (values["dry-run"]) {
   console.log("DRY-RUN：仅列步骤，未读取应用内容、复制、写入、签名或提交公证。");
   process.exit(0);
@@ -168,6 +174,13 @@ changes.set("kaitu-bootstrap.mjs", readFileSync(join(directory, "bootstrap.mjs")
 changes.set("kaitu-environment.mjs", readFileSync(join(directory, "environment.mjs")));
 
 console.log(`app.asar: ${[...changes.keys()].join(", ")}；替换 ${replacements} 处品牌文案`);
+if (values["payload-only"]) {
+  const target = resolve(values["payload-only"]);
+  if (existsSync(target)) throw new Error(`输出已存在：${target}`);
+  await writePayload(target);
+  console.log(`功能包已构建：${target}；未修改或重打包 DSH 内核`);
+  process.exit(0);
+}
 if (process.platform !== "darwin" || process.arch !== "arm64") throw new Error("请在 macOS arm64 上后处理");
 const architectures = execFileSync(
   "/usr/bin/lipo",
@@ -187,6 +200,9 @@ async function packageApplication() {
     const resources = join(output, "Contents/Resources");
     const payload = join(resources, "kaitu");
     await writePayload(payload);
+    cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
+    if (values["update-config"])
+      cpSync(resolve(values["update-config"]), join(resources, "kaitu-update.json"));
     await writeIcon(resources);
     await rewriteArchive(join(temporary, "app.asar"));
     cpSync(join(temporary, "app.asar"), join(resources, "app.asar"));
@@ -402,6 +418,7 @@ function createDmg(temporary) {
 async function writePayload(payload) {
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
+  writeFileSync(join(payload, "payload.json"), JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }));
   await build({
     entryPoints: [join(directory, "plugin.mjs")],
     outfile: join(payload, "dist/index.js"),
@@ -505,38 +522,47 @@ async function writePayload(payload) {
   for (const folder of ["schemas", "templates"])
     cpSync(join(root, folder), join(payload, folder), { recursive: true });
   cpSync(join(root, "packages/core/data"), join(payload, "data"), { recursive: true });
-  await writeProtocolBridge(payload, build);
+  for (const [name, subpaths] of [
+    ["@deepseek-ai/dsh-typert-protocol", ["."]],
+    ["@deepseek-ai/dsh-native-command", ["."]],
+    ["@deepseek-ai/dsh-file-reference-local", ["./search"]],
+  ])
+    await writeProtocolBridge(payload, build, name, subpaths);
 }
 
-async function writeProtocolBridge(payload, build) {
-  const name = "@deepseek-ai/dsh-typert-protocol";
+async function writeProtocolBridge(payload, build, name, subpaths) {
   const packagePath = `dsh/node_modules/${name}`;
-  const protocol = JSON.parse(asar.extractFile(archive, `${packagePath}/package.json`).toString());
-  const entry = protocol.exports?.["."];
-  const target = typeof entry === "string" ? entry : (entry?.import ?? entry?.default ?? protocol.main);
-  if (protocol.type !== "module" || typeof target !== "string") {
-    throw new Error("未知的 DSH typert-protocol 模块类型或入口");
-  }
-  const entryPath = join(packagePath, target);
-  const { metafile } = await build({
-    stdin: { contents: asar.extractFile(archive, entryPath).toString(), sourcefile: entryPath },
-    format: "esm",
-    write: false,
-    metafile: true,
-  });
+  const manifest = JSON.parse(asar.extractFile(archive, `${packagePath}/package.json`).toString());
   const bridge = join(payload, "node_modules", name);
-  const specifier = JSON.stringify(relative(bridge, join(dirname(payload), "app.asar", entryPath)));
-  // 只转发到 DSH 的规范入口，Remote 与注册表复用同一模块实例。
-  const exports = [`export * from ${specifier};`];
-  if (Object.values(metafile.outputs).some((output) => output.exports.includes("default"))) {
-    exports.push(`export { default } from ${specifier};`);
-  }
   mkdirSync(bridge, { recursive: true });
+  const exportsMap = {};
+  for (const [index, subpath] of subpaths.entries()) {
+    const declaration = manifest.exports?.[subpath];
+    const target =
+      typeof declaration === "string"
+        ? declaration
+        : (declaration?.import ?? declaration?.default ?? manifest.main);
+    if (manifest.type !== "module" || typeof target !== "string")
+      throw new Error(`DSH 模块入口不可用：${name}${subpath}`);
+    const entryPath = join(packagePath, target);
+    const { metafile } = await build({
+      stdin: { contents: asar.extractFile(archive, entryPath).toString(), sourcefile: entryPath },
+      format: "esm",
+      write: false,
+      metafile: true,
+    });
+    const filename = `bridge-${index}.js`;
+    const specifier = JSON.stringify(relative(bridge, join(dirname(payload), "app.asar", entryPath)));
+    const lines = [`export * from ${specifier};`];
+    if (Object.values(metafile.outputs).some((output) => output.exports.includes("default")))
+      lines.push(`export { default } from ${specifier};`);
+    writeFileSync(join(bridge, filename), `${lines.join("\n")}\n`);
+    exportsMap[subpath] = `./${filename}`;
+  }
   writeFileSync(
     join(bridge, "package.json"),
-    `${JSON.stringify({ name, version: protocol.version, type: protocol.type, main: "index.js", exports: "./index.js" }, null, 2)}\n`,
+    `${JSON.stringify({ name, version: manifest.version, type: "module", exports: exportsMap }, null, 2)}\n`,
   );
-  writeFileSync(join(bridge, "index.js"), `${exports.join("\n")}\n`);
 }
 
 function markBody() {
@@ -565,7 +591,7 @@ async function writeIcon(resources) {
   const sharp = requireDsh("sharp");
   // 浅色圆角底块，标志占底块的 76%（896 × 0.76 ≈ 681，即 48 格放大 14.19 倍），居中。
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-<rect x="64" y="64" width="896" height="896" rx="224" fill="#F7F2EF"/>
+<rect x="64" y="64" width="896" height="896" rx="224" fill="#FCFCFB"/>
 <g transform="translate(171.5 171.5) scale(14.1875)">${markBody()}</g></svg>`;
   const png = join(resources, "icon.png");
   await sharp(Buffer.from(svg)).png().toFile(png);

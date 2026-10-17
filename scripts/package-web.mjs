@@ -1,0 +1,73 @@
+import { chmodSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const output = resolve(process.argv[2] ?? join(root, "dist/web-release"));
+const { build } = createRequire(join(root, "packages/dsh-plugin/package.json"))("esbuild");
+const cli = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
+mkdirSync(join(output, "dist/cli"), { recursive: true });
+const banner = [
+  'import { createRequire as kaituRequire } from "node:module";',
+  'import { dirname as kaituDirname } from "node:path";',
+  'import { fileURLToPath as kaituFileURLToPath } from "node:url";',
+  "const require = kaituRequire(import.meta.url);",
+  "const __filename = kaituFileURLToPath(import.meta.url);",
+  "const __dirname = kaituDirname(__filename);",
+].join("\n");
+for (const [entry, target] of [
+  ["packages/cli/src/main.ts", "dist/cli/main.js"],
+  ["packages/core/src/health-import-worker.ts", "dist/cli/health-import-worker.js"],
+]) {
+  await build({
+    entryPoints: [join(root, entry)],
+    outfile: join(output, target),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    external: ["@deepseek-ai/*", "better-sqlite3"],
+    banner: { js: banner },
+  });
+}
+cpSync(join(output, "dist/cli/health-import-worker.js"), join(output, "dist/health-import-worker.js"));
+for (const [source, target] of [
+  ["packages/cli/dist/engine", "dist/engine"],
+  ["packages/core/data", "dist/data"],
+  ["packages/dsh-plugin/dist/standalone", "web"],
+  ["schemas", "schemas"],
+  ["templates", "templates"],
+  ["LICENSE", "LICENSE"],
+  ["THIRD_PARTY_NOTICES.md", "THIRD_PARTY_NOTICES.md"],
+])
+  cpSync(join(root, source), join(output, target), { recursive: true });
+cpSync(join(output, "dist/cli/health-import-worker.js"), join(output, "dist/engine/health-import-worker.js"));
+const dependencies = Object.fromEntries(
+  Object.entries(cli.dependencies).filter(
+    ([name]) => name.startsWith("@deepseek-ai/") || name === "@vscode/ripgrep",
+  ),
+);
+for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
+  dependencies[`@deepseek-ai/${name}`] = "0.2.0-rc.2";
+writeFileSync(
+  join(output, "package.json"),
+  `${JSON.stringify(
+    {
+      name: cli.name,
+      version: cli.version,
+      description: cli.description,
+      license: cli.license,
+      type: "module",
+      bin: { kaitu: "dist/cli/main.js" },
+      engines: { node: "^22.19.0 || >=24" },
+      files: ["dist", "web", "schemas", "templates", "THIRD_PARTY_NOTICES.md"],
+      dependencies,
+    },
+    null,
+    2,
+  )}\n`,
+);
+cpSync(join(root, "docs/web.md"), join(output, "README.md"));
+chmodSync(join(output, "dist/cli/main.js"), 0o755);
+console.log(`CLI/Web 安装包目录：${output}`);

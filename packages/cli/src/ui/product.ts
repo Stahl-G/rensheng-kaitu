@@ -90,9 +90,11 @@ import {
   recoverExperienceImports,
   removeAvatar,
   resolveExperience,
+  resolvePlace,
   resolvePreferences,
   restore,
   saveAvatar,
+  saveHometown,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -118,6 +120,7 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "askModels",
   "projectCreate",
   "projectBindGithub",
   "projectGoalSave",
@@ -152,6 +155,7 @@ export const productMutations = new Set([
   "capture",
   "decideProposal",
   "resolveExperience",
+  "saveHometown",
   "editExperience",
   "hideExperience",
   "unhideExperience",
@@ -184,7 +188,7 @@ export async function productRequest(
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
     if (!ask) {
-      // 浏览器工作台没有内置 AI：读取类接口如实说不可用，界面据此提示，不当成错误。
+      // 未找到本机 AI 引擎时，保留资料浏览和外部 AI 入口。
       if (method === "askSettings")
         return {
           available: false,
@@ -197,9 +201,15 @@ export async function productRequest(
           providers: [],
         };
       if (method === "askList") return [];
-      throw new KaituError("请在 Kaitu.app 中使用问问", "BAD_ARGS");
+      throw new KaituError("问问引擎未载入，请重新安装开图 CLI/Web 包并重启工作台", "BAD_ARGS");
     }
     switch (method) {
+      case "askSupport": {
+        if (!ask.support) throw new KaituError("请更新开图引擎", "AI_CONNECTION");
+        return ask.support(text(0), (args[1] ?? {}) as Record<string, unknown>);
+      }
+      case "askModels":
+        return ask.models((args[0] ?? {}) as Record<string, unknown>);
       case "askSearchConfigure":
         return ask.configure({ search: args[0] });
       case "askSetMode":
@@ -221,7 +231,7 @@ export async function productRequest(
       case "askEvents":
         return ask.events(text(0));
       case "askSend":
-        return ask.send(text(0), text(1), args[2] as import("./ask.js").AskImage[] | undefined);
+        return ask.send(text(0), text(1), args[2] as import("./ask.js").AskAttachment[] | undefined);
     }
   }
   switch (method) {
@@ -388,6 +398,10 @@ export async function productRequest(
       return syncProject(ws, text(0));
     case "experienceSource":
       return readExperienceSource(ws, text(0));
+    case "hometownCities":
+      return resolvePlace(text(0));
+    case "saveHometown":
+      return saveHometown(ws, text(0), revision(1));
     case "lifeMap":
       return lifeMap(ws);
     case "resolveExperience":

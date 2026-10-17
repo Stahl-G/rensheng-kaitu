@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAskService } from "../cli/dist/ui/ask.js";
 import { startUi } from "../cli/dist/ui/server.js";
-import kaituPackage from "../cli/package.json" with { type: "json" };
 import {
   Workspace,
   configureAutomation,
@@ -15,6 +14,46 @@ import { createAiProcess } from "./ai-process.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { desktopPaths } from "./environment.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
+import { createPayloadUpdater } from "./payload-update.mjs";
+
+export function createLocalAsk({ state, resources, executable, getWorkspace, conversationState = state }) {
+  const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
+  const makeSdk = () =>
+    createSdkRuntime({
+      executable: join(dirname(executable), "DSH"),
+      archive: join(process.env.KAITU_HOST_RESOURCES || dirname(resources), "app.asar"),
+      home: aiHome,
+      workspace: getWorkspace(),
+      plugin: join(resources, "dist/sdk-plugin.mjs"),
+      hostPlugin: join(resources, "dist/sdk-host.mjs"),
+      helper: join(resources, "dist/sdk-credentials.mjs"),
+    });
+  const ws = new Workspace(getWorkspace());
+  let sdkRoot = ws.root;
+  let sdk = makeSdk();
+  const currentSdk = () => {
+    if (sdkRoot !== getWorkspace()) {
+      void sdk.closeSupport();
+      sdkRoot = getWorkspace();
+      sdk = makeSdk();
+    }
+    return sdk;
+  };
+  const keyFile = ".kaitu/ask-workspace.json";
+  const workspaceKey = ws.exists(keyFile) ? ws.readJson(keyFile).key : ws.root;
+  if (!ws.exists(keyFile)) ws.writeJson(keyFile, { key: workspaceKey }, { internal: true });
+  return createAskService({
+    state: conversationState,
+    workspace: ws.root,
+    workspaceKey,
+    runtime: (mode) => currentSdk().runtime(mode),
+    settings: () => currentSdk().settings(),
+    models: (input) => currentSdk().models(input),
+    configure: (input) => currentSdk().configure(input),
+    support: (method, input) => currentSdk().support(method, input),
+    dispose: () => sdk.closeSupport(),
+  });
+}
 
 export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) {
   if (!app.requestSingleInstanceLock()) {
@@ -23,6 +62,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   }
   const { state, workspace } = desktopPaths();
   const resources = dirname(dirname(fileURLToPath(import.meta.url)));
+  const hostResources = process.env.KAITU_HOST_RESOURCES || dirname(resources);
   let ws = new Workspace(workspace);
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -34,39 +74,33 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
       ...process.env,
       KAITU_EMBEDDED_AI: "1",
+      KAITU_PARENT_PAYLOAD: resources,
       KAITU_APP_HOME: aiHome,
       KAITU_DIR: ws.root,
       KAITU_APP_PORT: "0",
     });
   let ai = makeBackgroundAi();
   process.env.DSH_CLIENT_VERSION = JSON.parse(
-    readFileSync(join(dirname(resources), "app.asar/package.json"), "utf8"),
+    readFileSync(join(hostResources, "app.asar/package.json"), "utf8"),
   ).version;
+  const updater = createPayloadUpdater({
+    state, resources: hostResources, payload: resources,
+    restart: () => setTimeout(() => {
+      app.relaunch({ execPath: join(dirname(app.getPath("exe")), "Kaitu") });
+      app.quit();
+    }, 200),
+  });
+  const featureVersion = (await updater.request()).version;
   app.setAboutPanelOptions({
     applicationName: "人生开图",
-    applicationVersion: kaituPackage.version,
+    applicationVersion: featureVersion,
     version: `Powered by DeepSeek Harness ${process.env.DSH_CLIENT_VERSION}`,
   });
-  const makeSdk = () =>
-    createSdkRuntime({
-      executable: join(dirname(app.getPath("exe")), "DSH"),
-      archive: join(dirname(resources), "app.asar"),
-      home: aiHome,
-      workspace: ws.root,
-      plugin: join(resources, "dist/sdk-plugin.mjs"),
-      hostPlugin: join(resources, "dist/sdk-host.mjs"),
-      helper: join(resources, "dist/sdk-credentials.mjs"),
-    });
-  const askKeyFile = ".kaitu/ask-workspace.json";
-  const workspaceKey = ws.exists(askKeyFile) ? ws.readJson(askKeyFile).key : ws.root;
-  if (!ws.exists(askKeyFile)) ws.writeJson(askKeyFile, { key: workspaceKey }, { internal: true });
-  const ask = createAskService({
+  const ask = createLocalAsk({
     state,
-    workspace: ws.root,
-    workspaceKey,
-    runtime: (mode) => makeSdk().runtime(mode),
-    settings: () => makeSdk().settings(),
-    configure: (input) => makeSdk().configure(input),
+    resources,
+    executable: app.getPath("exe"),
+    getWorkspace: () => ws.root,
   });
   const startAutomation = async () => {
     const settings = readAutomation(ws);
@@ -77,6 +111,15 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
+    systemLocale: app.getPreferredSystemLanguages()[0] || "en",
+    desktopUpdate: (action) => updater.request(action),
+    pickDirectory: async () => {
+      const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+        title: "选择开图资料的存放文件夹",
+        properties: ["openDirectory", "createDirectory"],
+      });
+      return canceled ? null : (filePaths[0] ?? null);
+    },
     calendarExecutor: process.platform === "darwin" ? createCalendarExecutor() : undefined,
     onWorkspaceChanging: () => ai.close(),
     onWorkspaceChanged: async () => {

@@ -24,6 +24,34 @@ import {
   validateWorkspace,
 } from "../src/index.js";
 
+it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参考链接仍可追溯", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-direction-copy-"));
+  try {
+    const ws = await initWorkspace(join(root, "workspace"), { timeZone: "Asia/Shanghai" });
+    const answer = JSON.stringify([
+      {
+        title: "试一次周末摄影",
+        motivation: `你喜欢散步。projects/abcdef123456/notes.md 和 /Users/example/Documents/private.md 记录过这个兴趣。${"从身边的小事开始。".repeat(80)}`,
+        hypothesis:
+          "这周末用手机拍三张照片，每周保留 2/3 次散步时间，看看是否愿意继续。https://example.org/papers/0123456789abcdef",
+        references: [{ kind: "source", ref: "https://example.org/photography" }],
+      },
+    ]);
+    const result = await pasteDirections(ws, answer);
+    const saved = readExploration(ws).directions.find((item) => item.id === result.ids[0]);
+    expect(saved?.title).toBe("试一次周末摄影");
+    expect(saved?.motivation.length).toBeLessThan(250);
+    expect(saved?.motivation).toContain("你喜欢散步");
+    expect(saved?.motivation).not.toContain("abcdef123456");
+    expect(saved?.motivation).not.toContain("/Users/");
+    expect(saved?.hypothesis).toBe("这周末用手机拍三张照片，每周保留 2/3 次散步时间，看看是否愿意继续。");
+    expect(saved?.references).toEqual([{ kind: "source", ref: "https://example.org/photography" }]);
+    expect(await pasteDirections(ws, answer)).toEqual({ ids: [], skipped: 1 });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核对草稿，缺项说明原因", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-clipboard-"));
   const options = { stateRoot: join(root, "state") };

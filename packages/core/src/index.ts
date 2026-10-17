@@ -70,6 +70,7 @@ export * from "./settings.js";
 export * from "./sync-location.js";
 export * from "./onboarding.js";
 export * from "./locale.js";
+export { localStateRoot } from "./local-state.js";
 export * from "./plans.js";
 export * from "./handover.js";
 
@@ -84,3 +85,8 @@ export * from "./system-calendar.js";
 export * from "./project-page.js";
 
 export * from "./project-view.js";
+
+export type { Hometown } from "./hometown.js";
+export { conciseDirection, directionText } from "./direction-copy.js";
+export { saveHometown } from "./hometown.js";
+export { dshFiles } from "./dsh-files.js";

@@ -14,11 +14,13 @@ export function nativeSearchInfo(settings = {}, configured = false) {
   const entry = providers.find((item) => item.id === settings.provider);
   const api = settings.api ?? entry?.api;
   const reason =
-    entry?.id === "openrouter"
-      ? "OpenRouter 搜索可能回落到其他搜索商，当前未接入。"
-      : entry?.id === "kaitu-qwen" && settings.model === "qwen-vl-plus"
-        ? "当前通义多模态模型的搜索需要流式接口，请换用 qwen-plus 或添加搜索服务。"
-        : undefined;
+    settings.auth === "dsh"
+      ? "此账号登录通道未提供独立搜索接口，可添加搜索服务。"
+      : entry?.id === "openrouter"
+        ? "OpenRouter 搜索可能回落到其他搜索商，当前未接入。"
+        : entry?.id === "kaitu-qwen" && settings.model === "qwen-vl-plus"
+          ? "当前通义多模态模型的搜索需要流式接口，请换用 qwen-plus 或添加搜索服务。"
+          : undefined;
   const supported = !!entry && !reason;
   return {
     provider: entry?.id ?? null,

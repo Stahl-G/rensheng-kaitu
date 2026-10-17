@@ -2,6 +2,7 @@ import type { ProjectGoal } from "@kaitu/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DoingData, DoingProject, ProjectDetailData } from "../types.js";
 import css from "./DoingPage.module.css";
+import { OpenPath } from "./DshFiles.js";
 
 export interface DoingPageProps {
   loadProjects: () => Promise<DoingProject[]>;
@@ -50,7 +51,7 @@ export function Output({ project }: { project: DoingProject }) {
           project.links.map((link) => (
             <span key={`${link.role}:${link.path}`}>
               <span className={css.role}>{roles[link.role]}：</span>
-              {link.path}
+              <OpenPath path={link.path} />
             </span>
           ))
         ) : (

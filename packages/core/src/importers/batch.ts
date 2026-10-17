@@ -39,6 +39,7 @@ export interface BatchImportResult extends Counts {
 }
 export interface BatchOptions {
   dryRun?: boolean;
+  skipInvalid?: boolean;
   message?: (changed: number) => string;
   ignored?: Record<string, number>;
   scope?: (record: StoredRecord) => boolean;
@@ -101,6 +102,23 @@ export async function importBatch(
   }
   if (opts.deleteMissing && !groups.has("event")) groups.set("event", new Map());
   const plans = [...groups].map(([type, group]) => {
+    // 快捷指令逐条预览，读不出的记录不影响同文件里其余记录。
+    try {
+      if (opts.skipInvalid) {
+        for (const [key, item] of group) {
+          try {
+            addRecords(ws, type, [item.data], { by, dryRun: true });
+          } catch {
+            group.delete(key);
+            result.ignored.invalid = (result.ignored.invalid ?? 0) + 1;
+          }
+        }
+      } else {
+        addRecords(ws, type, [...group.values()].map((item) => item.data), { by, dryRun: true });
+      }
+    } catch {
+      throw new KaituError(`导入（${source}）包含不合法的 ${type} 记录`, "INVALID_IMPORT");
+    }
     const revisions = readRecordRevisions(ws, type);
     const latest = new Map<string, StoredRecord>();
     for (const record of revisions) {
@@ -153,19 +171,10 @@ export async function importBatch(
     result.types[type] = counts;
     for (const action of ["added", "updated", "deleted", "skipped"] as const)
       result[action] += counts[action];
-    // 预览也使用记录写入层的同一份校验，整批合法后才开始追加。
-    try {
-      addRecords(
-        ws,
-        type,
-        [...group.values()].map((item) => item.data),
-        { by, dryRun: true },
-      );
-    } catch {
-      throw new KaituError(`导入（${source}）包含不合法的 ${type} 记录`, "INVALID_IMPORT");
-    }
     return { type, added, updated, deleted };
   });
+  if (opts.skipInvalid && candidates.length && ![...groups.values()].some((group) => group.size))
+    throw new KaituError("没有能导入的健康记录", "INVALID_IMPORT");
   const changed = result.added + result.updated + result.deleted;
   if (opts.dryRun || !changed) return result;
   for (const plan of plans) {

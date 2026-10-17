@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./direction-copy": {
+      "types": "./dist/direction-copy.d.ts",
+      "default": "./dist/direction-copy.js"
+    },
     "./experience-time": {
       "types": "./dist/experience-time.d.ts",
       "default": "./dist/experience-time.js"
@@ -21,6 +25,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-file-reference-local": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-native-command": "0.2.0-rc.2",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "fflate": "^0.8.3",
@@ -33,5 +39,8 @@
     "yaml": "^2.6.0",
     "zod": "^4.6.7"
   },
-  "files": ["dist", "data"]
+  "files": [
+    "dist",
+    "data"
+  ]
 }

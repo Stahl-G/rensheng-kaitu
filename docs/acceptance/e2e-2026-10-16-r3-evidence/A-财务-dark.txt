@@ -1,0 +1,125 @@
+Window: "开图", App: Kaitu.
+0 standard window 开图, Secondary Actions: Raise
+	1 container 开图
+		2 container
+			3 HTML content 开图, URL: 127.0.0.1:56520/
+				4 container
+					5 text 人生开图
+					6 container 主要导航
+						7 button 今天
+						8 button 开图
+						9 button 资料
+						10 button 问问
+					11 button 已更新 10/16 13:48
+					12 pop up button 个人档案、AI 与连接、设置
+					13 button ← 资料
+					14 heading 财务, Value: 1
+						15 text 财务
+					16 text 完整的记录和来源
+					17 container
+						18 heading 财务, Value: 1
+							19 text 财务
+						20 text 只记录和分析，不连交易账户 · 明细只在本机
+						21 button 刷新
+						22 button 导入账单
+						23 container 财务视图
+							24 toggle button 总览, Value: 1
+							25 toggle button 收支, Value: 0
+							26 toggle button 投资, Value: 0
+							27 toggle button 账户, Value: 0
+						28 text 折算为
+						29 pop up button 折算为, Value: CNY
+							30 (selected) CNY
+						31 container 现金
+							32 heading 现金, Value: 2
+								33 text 现金
+							34 disclosure triangle Description: CNY，展开记录, Help: CNY 暂无记录 统计截止 2026/10/16 13:56 缺少余额基准 查看组成记录
+								35 text CNY
+								36 text 暂无记录
+								37 text 统计截止 2026/10/16 13:56
+								38 text 缺少余额基准
+								39 text 查看组成记录
+							40 disclosure triangle 折算合计（部分）：暂无记录 · 查看记录
+								41 text 折算合计
+								42 text （部分）
+								43 text ：
+								44 text 暂无记录
+								45 text  · 查看记录
+							46 disclosure triangle 未计入合计 · 1 项
+								47 text 未计入合计 · 
+								48 text 1
+								49 text  项
+						50 container 投资资产
+							51 heading 投资资产, Value: 2
+								52 text 投资资产
+							53 disclosure triangle Description: CNY，展开记录, Help: CNY 0 CNY 统计截止 2026/10/16 13:56 查看组成记录
+								54 text CNY
+								55 text 0 CNY
+								56 text 统计截止 2026/10/16 13:56
+								57 text 查看组成记录
+							58 disclosure triangle 折算合计：暂无记录 · 查看记录
+								59 text 折算合计
+								60 text ：
+								61 text 暂无记录
+								62 text  · 查看记录
+						63 container 负债
+							64 heading 负债, Value: 2
+								65 text 负债
+							66 disclosure triangle Description: CNY，展开记录, Help: CNY 0 CNY 统计截止 2026/10/16 13:56 查看组成记录
+								67 text CNY
+								68 text 0 CNY
+								69 text 统计截止 2026/10/16 13:56
+								70 text 查看组成记录
+							71 disclosure triangle 折算合计：暂无记录 · 查看记录
+								72 text 折算合计
+								73 text ：
+								74 text 暂无记录
+								75 text  · 查看记录
+						76 container 总资产
+							77 heading 总资产, Value: 2
+								78 text 总资产
+							79 disclosure triangle Description: CNY，展开记录, Help: CNY 暂无记录 统计截止 2026/10/16 13:56 缺少余额基准 查看组成记录
+								80 text CNY
+								81 text 暂无记录
+								82 text 统计截止 2026/10/16 13:56
+								83 text 缺少余额基准
+								84 text 查看组成记录
+							85 disclosure triangle 折算合计（部分）：暂无记录 · 查看记录
+								86 text 折算合计
+								87 text （部分）
+								88 text ：
+								89 text 暂无记录
+								90 text  · 查看记录
+							91 disclosure triangle 未计入合计 · 1 项
+								92 text 未计入合计 · 
+								93 text 1
+								94 text  项
+						95 container 净资产
+							96 heading 净资产, Value: 2
+								97 text 净资产
+							98 disclosure triangle Description: CNY，展开记录, Help: CNY 暂无记录 统计截止 2026/10/16 13:56 缺少余额基准 查看组成记录
+								99 text CNY
+								100 text 暂无记录
+								101 text 统计截止 2026/10/16 13:56
+								102 text 缺少余额基准
+								103 text 查看组成记录
+							104 disclosure triangle 折算合计（部分）：暂无记录 · 查看记录
+								105 text 折算合计
+								106 text （部分）
+								107 text ：
+								108 text 暂无记录
+								109 text  · 查看记录
+							110 disclosure triangle 未计入合计 · 1 项
+								111 text 未计入合计 · 
+								112 text 1
+								113 text  项
+	114 close button
+	115 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	116 minimize button
+117 menu bar
+	118 Kaitu
+	119 编辑
+	120 视图
+	121 窗口
+
+The focused UI element is 3 HTML content 开图, URL: 127.0.0.1:56520/

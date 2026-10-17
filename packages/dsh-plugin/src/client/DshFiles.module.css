@@ -1,0 +1,110 @@
+.picker {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--kt-control);
+  border-radius: 12px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  font-size: 14px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 8px;
+  color: var(--kt-secondary);
+  font-size: 12px;
+}
+.header button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kt-secondary);
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+.search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 38px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  background: var(--kt-card);
+  color: var(--kt-text);
+  font: inherit;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: min(240px, 32dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kt-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.kind {
+  flex: 0 0 38px;
+  color: var(--kt-muted);
+  font-size: 11px;
+}
+.path {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.row:hover,
+.header button:hover {
+  background: var(--kt-subtle);
+}
+.row:active,
+.header button:active {
+  background: var(--kt-control);
+}
+.row:focus-visible,
+.header button:focus-visible,
+.picker .search input:focus-visible {
+  outline: 1px solid var(--kt-accent);
+  outline-offset: -2px;
+}
+.notice {
+  margin: 8px;
+  color: var(--kt-secondary);
+  font-size: 13px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.picker .search input:focus,
+.picker .search input:focus-visible {
+  border-color: var(--kt-accent);
+  outline: none;
+  box-shadow: none;
+}

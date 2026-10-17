@@ -1,7 +1,11 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import css from "./AskPage.module.css";
 import v2 from "./Prototype.module.css";
+import filesCss from "./DshFiles.module.css";
+import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
+import { FilePicker } from "./DshFiles.js";
+import { DshAuthorization } from "./DshAuthorization.js";
 import { aiHandover } from "./connections.js";
 
 type AskMode = "scoped" | "full";
@@ -11,6 +15,7 @@ interface Thread {
   title: string;
   created: string;
   updated: string;
+  workspace?: string;
 }
 interface ChatEvent {
   id: number;
@@ -22,21 +27,25 @@ interface Provider {
   name: string;
   recommended?: boolean;
   keyUrl?: string;
-  models: { id: string; image: boolean }[];
+  api?: string;
+  authKey?: string;
+  authMethods?: { id: string; label: string }[];
 }
-interface ImageInput {
+interface AttachmentInput {
+  kind: "image" | "file";
   data: string;
-  mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+  mimeType: string;
   name: string;
 }
 interface Settings {
-  /** 浏览器工作台没有内置 AI 时为 false。 */
+  /** 本机没有可用的问问引擎时为 false。 */
   available?: boolean;
   configured: boolean;
   choice?: "builtin" | "external";
   model: string;
   provider: string;
   providerName: string;
+  auth?: "dsh" | "key";
   baseURL?: string;
   api?: string;
   protocols: { id: string; name: string }[];
@@ -181,13 +190,31 @@ export function AskPage({
   const [choice, setChoice] = useState<"builtin" | "external">("external");
   const [key, setKey] = useState("");
   const [provider, setProvider] = useState("deepseek-official");
-  const [model, setModel] = useState("deepseek-flash");
+  const [model, setModel] = useState("");
+  const [availableModels, setAvailableModels] = useState<{ id: string; name?: string; image?: boolean }[]>(
+    [],
+  );
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelNotice, setModelNotice] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [api, setApi] = useState("openai-completions");
-  const [image, setImage] = useState<ImageInput | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
+  const [readingFiles, setReadingFiles] = useState(false);
+  const [references, setReferences] = useState(false);
+  const [referenceKind, setReferenceKind] = useState<"files" | "sessions">("files");
+  const [sessionReferences, setSessionReferences] = useState<
+    { id: string; title: string; mention: string }[]
+  >([]);
+  const [atQuery, setAtQuery] = useState<string | undefined>();
+  const [auth, setAuth] = useState<"dsh" | "key">("key");
+  const cursor = useRef(0);
   const upload = useRef<HTMLInputElement>(null);
   const selectedProvider = settings?.providers.find((item) => item.id === provider);
   const custom = provider === "kaitu-custom";
+  const nativeLoginOnly =
+    Boolean(selectedProvider?.authMethods?.length) &&
+    (selectedProvider!.authMethods!.every((method) => method.id === "oauth") ||
+      !settings?.protocols.some((protocol) => protocol.id === selectedProvider?.api));
   const [automation, setAutomation] = useState({ morning: true, organizer: true, news: false });
   const [asked, setAsked] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -202,6 +229,15 @@ export function AskPage({
   const activeSession = useRef<string | null>(null);
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
+  const referenceThreads = threads.filter(
+    (thread) => thread.id !== selected && thread.title !== "新对话" &&
+      (!thread.workspace || thread.workspace === workspace),
+  );
+  const closeReferences = () => {
+    setReferences(false);
+    setAtQuery(undefined);
+    input.current?.focus();
+  };
   const groups = new Map<string, Thread[]>();
   for (const thread of threads) {
     const label = day(thread.updated);
@@ -238,6 +274,7 @@ export function AskPage({
       .then(([ai, auto, list]) => {
         if (!active) return;
         setSettings(ai);
+        setAuth(ai.auth ?? "key");
         setProvider(ai.provider);
         setModel(ai.model);
         setBaseURL(ai.baseURL ?? "");
@@ -297,8 +334,10 @@ export function AskPage({
     if (nearBottom.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   });
   const send = async () => {
-    const value = draft.trim() || (image ? "请看看这张图片" : "");
-    if (!value || busy || !settings?.configured) return;
+    const value =
+      draft.trim() ||
+      (attachments.length ? "请看看这些附件" : sessionReferences.length ? "参考这些对话帮我继续" : "");
+    if (!value || busy || readingFiles || !settings?.configured) return;
     setError("");
     setSending(true);
     try {
@@ -310,16 +349,78 @@ export function AskPage({
         selectThread(id);
         await refreshThreads();
       }
-      await call("askSend", id, value, image ? [{ data: image.data, mimeType: image.mimeType }] : []);
+      await call(
+        "askSend",
+        id,
+        [value, ...sessionReferences.map((reference) => reference.mention)].join("\n"),
+        attachments,
+      );
       if (activeSession.current === id) {
         setDraft("");
-        setImage(null);
+        setAttachments([]);
+        setSessionReferences([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
     }
+  };
+  const addFiles = async (files: File[]) => {
+    if (!files.length || busy || readingFiles) return;
+    setError("");
+    if (attachments.length + files.length > 10 || files.some((file) => file.size > 25 * 1024 * 1024)) {
+      setError("每次最多添加 10 个附件，单个附件不超过 25MB");
+      return;
+    }
+    if (
+      files.some((file) => file.type.startsWith("image/")) &&
+      settings?.configured &&
+      !settings.supportsImages
+    ) {
+      setError("当前连接未启用图片，请切换模型后重试");
+      return;
+    }
+    setReadingFiles(true);
+    try {
+      const added = await Promise.all(
+        files.map(
+          (file) =>
+            new Promise<AttachmentInput>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () =>
+                resolve({
+                  kind: file.type.startsWith("image/") ? "image" : "file",
+                  data: String(reader.result).split(",")[1] ?? "",
+                  mimeType: file.type,
+                  name: file.name,
+                });
+              reader.onerror = () => reject(new Error("附件读取失败，请重新选择"));
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+      setAttachments((current) => [...current, ...added]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReadingFiles(false);
+    }
+  };
+  const insertReference = (path: string, kind: "file" | "directory" = "file") => {
+    const position = cursor.current;
+    const token = atQuery === undefined ? undefined : activeAtToken(draft, position);
+    let mention = formatFileMention({ path, kind }, false);
+    if (!mention) return;
+    if (kind === "directory" && mention.startsWith('@"')) mention += '"';
+    setDraft(
+      token
+        ? `${draft.slice(0, position - token.prefix.length)}${mention} ${draft.slice(position)}`
+        : `${draft}${draft && !/\s$/.test(draft) ? " " : ""}${mention} `,
+    );
+    setReferences(false);
+    setAtQuery(undefined);
+    input.current?.focus();
   };
   const changeMode = async (value: AskMode) => {
     if (busy || modeSaving) return;
@@ -341,6 +442,31 @@ export function AskPage({
       setModeSaving(false);
     }
   };
+  const loadModels = async () => {
+    setLoadingModels(true);
+    setModelNotice("");
+    try {
+      const models = await call<typeof availableModels>("askModels", {
+        provider,
+        auth,
+        ...(custom ? { baseURL, api } : {}),
+        ...(key ? { apiKey: key } : {}),
+      });
+      setAvailableModels(models);
+      setModelNotice(
+        models.length
+          ? auth === "dsh"
+            ? `此登录通道使用 DSH 提供的 ${models.length} 个型号，也可手填模型 ID。`
+            : `已从服务获取 ${models.length} 个模型，可选择或手填 ID。`
+          : "服务未返回模型，可以手填模型 ID。",
+      );
+    } catch (err) {
+      setAvailableModels([]);
+      setModelNotice(`${err instanceof Error ? err.message : String(err)} 也可以手填模型 ID。`);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
   const next = async () => {
     setSaving(true);
     setError("");
@@ -351,6 +477,10 @@ export function AskPage({
           ? {
               provider,
               model,
+              auth,
+              ...(availableModels.find((item) => item.id === model)?.image === undefined
+                ? {}
+                : { supportsImages: availableModels.find((item) => item.id === model)?.image }),
               ...(custom ? { baseURL, api } : {}),
               ...(key ? { apiKey: key } : {}),
             }
@@ -358,7 +488,9 @@ export function AskPage({
       });
       setKey("");
       setSettings(ai);
-      if (!ai.supportsImages) setImage(null);
+      setAuth(ai.auth ?? "key");
+      if (!ai.supportsImages) setAttachments([]);
+      setSessionReferences([]);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
     } catch (err) {
@@ -391,8 +523,8 @@ export function AskPage({
     return (
       <div className={css.unavailable}>
         <div className={css.welcome}>
-          <h1>问问在开图桌面应用里用</h1>
-          <p>浏览器里的工作台没有内置 AI。想接着聊，可以在「AI 与连接」复制资料包，带到你常用的 AI。</p>
+          <h1>问问引擎没有载入</h1>
+          <p>请重新安装完整的开图 CLI/Web 包并重启工作台。也可以复制资料包，带到你常用的 AI。</p>
           {onConnections && (
             <button type="button" onClick={onConnections}>
               打开 AI 与连接
@@ -410,7 +542,8 @@ export function AskPage({
           onClick={() => {
             selectThread(null);
             setDraft("");
-            setImage(null);
+            setAttachments([]);
+            setSessionReferences([]);
             setError("");
           }}
         >
@@ -442,7 +575,8 @@ export function AskPage({
             onClick={() => {
               selectThread(null);
               setDraft("");
-              setImage(null);
+              setAttachments([]);
+              setSessionReferences([]);
             }}
           >
             ＋ 新对话
@@ -488,6 +622,10 @@ export function AskPage({
               return (
                 <div key={event.id} className={css.user}>
                   {text(data.content)}
+                  {Array.isArray(data.content) &&
+                    data.content
+                      .filter((block) => block.type === "file")
+                      .map((block, i) => <span key={i}> · {block.attachment?.name ?? "已附文件"}</span>)}
                   {Array.isArray(data.content) && data.content.some((block) => block.type === "image") && (
                     <span> · 已附图片</span>
                   )}
@@ -586,16 +724,24 @@ export function AskPage({
         {settings?.configured && !settings.supportsImages && (
           <p id="ask-image-hint" className={css.scope}>
             {settings.provider === "kaitu-custom"
-              ? "自定义模型尚未确认图片能力，当前仅支持文字。"
-              : "当前模型仅支持文字，可在 AI 与连接中切换图片模型。"}
+              ? "当前连接未启用图片。"
+              : "当前连接未启用图片，可在 AI 与连接中切换模型。"}
           </p>
         )}
         <form
           className={css.composer}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            void addFiles(Array.from(event.dataTransfer.files));
+          }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setModeMenu(null);
               setModelMenu(false);
+              closeReferences();
             }
           }}
           onBlur={(event) => {
@@ -618,6 +764,15 @@ export function AskPage({
             placeholder="问问开图，或者让它帮你记一件事"
             onChange={(event) => {
               setDraft(event.target.value);
+              cursor.current = event.target.selectionStart;
+              setAtQuery(activeAtToken(event.target.value, event.target.selectionStart)?.query);
+            }}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files);
+              if (files.length) {
+                event.preventDefault();
+                void addFiles(files);
+              }
             }}
             onCompositionStart={() => {
               composing.current = true;
@@ -638,65 +793,117 @@ export function AskPage({
               }
             }}
           />
-          {image && (
-            <div className={css.attachment}>
-              <img src={`data:${image.mimeType};base64,${image.data}`} alt={image.name} />
-              <span>{image.name}</span>
-              <button type="button" onClick={() => setImage(null)} aria-label="移除图片">
+          {attachments.map((file, index) => (
+            <div className={css.attachment} key={`${index}:${file.name}`}>
+              {file.kind === "image" && (
+                <img src={`data:${file.mimeType};base64,${file.data}`} alt={file.name} />
+              )}
+              <span>{file.name}</span>
+              <button
+                type="button"
+                onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))}
+                aria-label={`移除 ${file.name}`}
+              >
                 ×
               </button>
+            </div>
+          ))}
+          {sessionReferences.map((reference) => (
+            <div key={reference.id} className={css.attachment}>
+              <span>引用对话 · {reference.title}</span>
+              <button
+                type="button"
+                aria-label={`移除引用 ${reference.title}`}
+                onClick={() =>
+                  setSessionReferences((current) => current.filter((item) => item.id !== reference.id))
+                }
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {readingFiles && <p role="status">正在读取附件…</p>}
+          {(references || atQuery !== undefined) && (
+            <div className={css.referencePanel}>
+              {references && (
+                <div className={css.referenceTabs}>
+                  <button type="button" aria-pressed={referenceKind === "files"}
+                    onClick={() => { setReferenceKind("files"); setAtQuery(undefined); }}>
+                    文件和文件夹
+                  </button>
+                  <button type="button" aria-pressed={referenceKind === "sessions"}
+                    onClick={() => { setReferenceKind("sessions"); setAtQuery(undefined); }}>
+                    其他对话
+                  </button>
+                </div>
+              )}
+              {references && referenceKind === "sessions" && atQuery === undefined ? (
+                <section className={filesCss.picker} aria-label="引用对话">
+                  <header className={filesCss.header}>
+                    <span>其他对话</span>
+                    <button type="button" onClick={closeReferences} aria-label="关闭对话选择">×</button>
+                  </header>
+                  {!referenceThreads.length && <p className={filesCss.notice}>还没有其他可引用的对话</p>}
+                  <div className={filesCss.list}>
+                    {referenceThreads.map((thread) => (
+                      <button type="button" className={filesCss.row} key={thread.id}
+                        onClick={async () => {
+                          try {
+                            const mention = await call<string>("askSupport", "sessionMention", {
+                              sessionId: thread.id,
+                              label: thread.title,
+                            });
+                            setSessionReferences((current) => current.some((item) => item.id === thread.id)
+                              ? current : [...current, { id: thread.id, title: thread.title, mention }]);
+                            closeReferences();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : String(err));
+                          }
+                        }}>
+                        <span className={filesCss.path} title={thread.title}>{thread.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : (
+                <FilePicker query={atQuery} select={insertReference} close={closeReferences} />
+              )}
             </div>
           )}
           <div className={css.composerRow}>
             <input
               ref={upload}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
               hidden
               onChange={(event) => {
-                const file = event.target.files?.[0];
+                void addFiles(Array.from(event.target.files ?? []));
                 event.target.value = "";
-                if (!file) return;
-                if (
-                  file.size > 2 * 1024 * 1024 ||
-                  !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)
-                ) {
-                  setError("请选择一张不超过 2MB 的 JPG、PNG、WebP 或 GIF 图片");
-                  return;
-                }
-                const reader = new FileReader();
-                reader.onload = () =>
-                  setImage({
-                    data: String(reader.result).split(",")[1] ?? "",
-                    mimeType: file.type as ImageInput["mimeType"],
-                    name: file.name,
-                  });
-                reader.onerror = () => setError("图片读取失败，请重新选择");
-                reader.readAsDataURL(file);
               }}
             />
-            <span
-              title={
-                !settings?.configured
-                  ? "请先连接 AI"
-                  : !settings.supportsImages
-                    ? "当前模型不支持图片，请在 AI 与连接中切换模型"
-                    : "上传一张图片（最多 2MB）"
-              }
+            <button
+              type="button"
+              className={css.add}
+              aria-label="添加附件"
+              disabled={busy || readingFiles}
+              onClick={() => upload.current?.click()}
             >
-              <button
-                type="button"
-                className={css.add}
-                aria-label="上传图片"
-                aria-describedby={
-                  settings?.configured && !settings.supportsImages ? "ask-image-hint" : undefined
-                }
-                disabled={busy || !settings?.configured || !settings.supportsImages}
-                onClick={() => upload.current?.click()}
-              >
-                ＋
-              </button>
-            </span>
+              ＋
+            </button>
+            <button
+              type="button"
+              className={css.model}
+              disabled={busy}
+              onClick={() => {
+                cursor.current = input.current?.selectionStart ?? draft.length;
+                setAtQuery(undefined);
+                setReferences(!references);
+                setModeMenu(null);
+                setModelMenu(false);
+              }}
+            >
+              引用资料
+            </button>
             <span className={v2["mode-wrap"]}>
               <button
                 type="button"
@@ -812,7 +1019,12 @@ export function AskPage({
               type="submit"
               className={css.send}
               aria-label="发送"
-              disabled={busy || (!draft.trim() && !image) || !settings?.configured}
+              disabled={
+                busy ||
+                readingFiles ||
+                (!draft.trim() && !attachments.length && !sessionReferences.length) ||
+                !settings?.configured
+              }
             >
               ↑
             </button>
@@ -855,19 +1067,21 @@ export function AskPage({
               onClick={() => setChoice("builtin")}
             >
               <b>用开图里的 AI</b>
-              <span>填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）</span>
+              <span>用 API Key 连接，或使用服务商提供的账号登录。</span>
             </button>
             {choice === "builtin" ? (
-              <fieldset className={css.fields} disabled={saving}>
+              <fieldset className={css.fields} disabled={saving || loadingModels}>
                 <label className={css.key}>
                   AI 服务
                   <select
                     value={provider}
                     onChange={(event) => {
                       const id = event.target.value;
-                      const next = settings?.providers.find((item) => item.id === id);
                       setProvider(id);
-                      setModel(next?.models[0]?.id ?? "");
+                      setAuth(settings?.provider === id ? (settings.auth ?? "key") : "key");
+                      setModel(settings?.provider === id ? settings.model : "");
+                      setAvailableModels([]);
+                      setModelNotice("");
                       setKey("");
                       setError("");
                     }}
@@ -903,48 +1117,67 @@ export function AskPage({
                     />
                   </label>
                 )}
-                <label className={css.key} htmlFor="ask-model">
-                  {custom ? "模型 ID" : "模型"}
-                  {custom ? (
-                    <input
-                      id="ask-model"
-                      value={model}
-                      placeholder="服务提供的模型 ID"
-                      onChange={(event) => setModel(event.target.value)}
-                    />
-                  ) : (
-                    <select id="ask-model" value={model} onChange={(event) => setModel(event.target.value)}>
-                      {selectedProvider?.models.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.id}
-                          {item.image ? " · 支持图片" : " · 仅文字"}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </label>
-                <label className={css.key}>
-                  API Key
-                  <input
-                    type="password"
-                    autoComplete="off"
-                    value={key}
-                    placeholder={
-                      settings?.configured && settings.provider === provider
-                        ? "已连接，留空保留"
-                        : "粘贴这个 AI 服务的 API Key"
-                    }
-                    onChange={(event) => setKey(event.target.value)}
+                {selectedProvider?.authKey && (
+                  <DshAuthorization
+                    provider={selectedProvider}
+                    onAuthorized={() => {
+                      setAuth("dsh");
+                      setKey("");
+                      setModelNotice("账号已授权，请获取型号或手填模型 ID。");
+                    }}
                   />
+                )}
+                {!nativeLoginOnly && (
+                  <label className={css.key}>
+                    API Key
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      value={key}
+                      placeholder={
+                        settings?.configured && settings.provider === provider
+                          ? "已连接，留空保留"
+                          : "粘贴这个 AI 服务的 API Key"
+                      }
+                      onChange={(event) => {
+                        setKey(event.target.value);
+                        setAuth("key");
+                      }}
+                      onBlur={() => {
+                        if (key.trim()) void loadModels();
+                      }}
+                    />
+                  </label>
+                )}
+                <label className={css.key} htmlFor="ask-model">
+                  模型
+                  <input
+                    id="ask-model"
+                    list="ask-model-options"
+                    value={model}
+                    placeholder="从接口获取后选择，或填写模型 ID"
+                    onChange={(event) => setModel(event.target.value)}
+                  />
+                  <datalist id="ask-model-options">
+                    {availableModels.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </datalist>
                 </label>
+                <button type="button" onClick={() => void loadModels()} disabled={loadingModels}>
+                  {loadingModels ? "正在获取模型…" : "从服务获取模型列表"}
+                </button>
+                {modelNotice && <p role="status">{modelNotice}</p>}
                 {selectedProvider?.keyUrl ? (
                   <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
                     去 {selectedProvider.name} 官方申请 API Key ↗
                   </a>
-                ) : (
-                  <p>请按服务文档选择协议，填写 Base URL、模型 ID 和 API Key。自定义模型当前按仅文字连接。</p>
-                )}
-                <p>下一步会发送一次最小请求验证连接。切换后下一条消息生效。</p>
+                ) : custom ? (
+                  <p>请按服务文档选择协议，填写 Base URL、模型 ID 和 API Key。</p>
+                ) : null}
+                <p>API Key 会发送最小请求验证；账号登录由服务商授权。切换后下一条消息生效。</p>
               </fieldset>
             ) : (
               <div className={css.external}>
@@ -978,7 +1211,11 @@ export function AskPage({
               <button type="button" disabled={saving} onClick={() => setStep(0)}>
                 以后再说
               </button>
-              <button type="button" disabled={saving} onClick={() => void next()}>
+              <button
+                type="button"
+                disabled={saving || loadingModels || (choice === "builtin" && !model.trim())}
+                onClick={() => void next()}
+              >
                 {saving ? "连接中…" : choice === "external" ? "使用已有 AI" : "下一步"}
               </button>
             </div>

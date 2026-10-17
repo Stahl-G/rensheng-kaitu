@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -5,7 +6,13 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { KaituError } from "../core/dist/index.js";
 import { assertDesktopIsolation } from "./environment.mjs";
-import { connectionInfo, credentialRef, providerPatch, selection } from "./sdk-providers.mjs";
+import {
+  connectionInfo,
+  credentialRef,
+  providerPatch,
+  selection,
+  extendProviders,
+} from "./sdk-providers.mjs";
 import {
   nativeSearchInfo,
   searchProviders,
@@ -14,7 +21,15 @@ import {
 } from "./sdk-search-settings.mjs";
 
 export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
-  const web = webRuntimePatch(hostPlugin);
+  const web = [
+    ...webRuntimePatch(hostPlugin),
+    {
+      insert: [
+        { id: "kaitu-session-reference", name: "@deepseek-ai/dsh-session-reference" },
+        { id: "kaitu-file-reference", name: "@deepseek-ai/dsh-file-reference-local" },
+      ],
+    },
+  ];
   if (mode === "full")
     return [
       ...web,
@@ -75,9 +90,18 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
   ];
 }
 
-export function createSdkRuntime({ executable, archive, home, workspace, plugin, hostPlugin, helper }) {
+export function createSdkRuntime({
+  executable,
+  archive,
+  home,
+  workspace,
+  plugin,
+  hostPlugin,
+  helper,
+  modules = join(archive, "dsh/node_modules"),
+  entry = join(modules, "@deepseek-ai/dsh-desktop-host/lib/cli.js"),
+}) {
   assertDesktopIsolation(workspace, home);
-  const modules = join(archive, "dsh/node_modules");
   const settingsFile = join(home, "kaitu-ai.json");
   const env = {
     ...process.env,
@@ -93,8 +117,17 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
   const readSettings = () =>
     existsSync(settingsFile)
       ? JSON.parse(readFileSync(settingsFile, "utf8"))
-      : { choice: undefined, provider: "deepseek-official", model: "deepseek-flash" };
-  const loadSettings = () => {
+      : { choice: undefined, provider: "deepseek-official", model: "" };
+  let directory;
+  const loadDirectory = async () => {
+    directory ??= credential("catalog").then((entries) => {
+      extendProviders(entries);
+      return entries;
+    });
+    return directory;
+  };
+  const loadSettings = async () => {
+    await loadDirectory();
     const stored = readSettings();
     return { choice: stored.choice, ...selection(stored) };
   };
@@ -123,7 +156,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
   const preferredSearch = () =>
     existsSync(searchFile) ? JSON.parse(readFileSync(searchFile, "utf8")).provider : undefined;
   const describeSearch = async () => {
-    const settings = loadSettings();
+    const settings = await loadSettings();
     const info = await credential("search-status", { ref: credentialRef(settings.provider) });
     return searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured));
   };
@@ -141,26 +174,69 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
     writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
     return describeSearch();
   };
-  return {
+  let capabilityRuntime;
+  const api = {
+    async support(method, input = {}) {
+      capabilityRuntime ??= api.runtime("scoped", true).catch((error) => {
+        capabilityRuntime = undefined;
+        throw error;
+      });
+      return (await capabilityRuntime).request(`kaitu/${method}`, input);
+    },
+    async closeSupport() {
+      const running = capabilityRuntime;
+      capabilityRuntime = undefined;
+      if (running) await (await running).close();
+    },
+    async models(input) {
+      const previous = await loadSettings();
+      const settings = selection(input, previous);
+      if (settings.auth === "dsh") {
+        const models = await api.support("models", { provider: settings.provider });
+        return models.map((item) => ({
+          id: item.id,
+          name: item.name,
+          image: item.inputModalities?.includes("image"),
+        }));
+      }
+      const result = await credential("models", {
+        settings,
+        ref: credentialRef(settings.provider),
+        apiKey: input.apiKey,
+        useStoredKey: settings.provider !== "kaitu-custom" || settings.baseURL === previous.baseURL,
+      });
+      if (result.code) throw new KaituError(result.message, result.code);
+      return result.models;
+    },
     async settings() {
-      const settings = loadSettings();
-      const info = await credential("status", { ref: credentialRef(settings.provider), search: true });
+      const settings = await loadSettings();
+      const info = await credential("status", {
+        ref: credentialRef(settings.provider),
+        search: true,
+        settings,
+      });
       return {
-        ...connectionInfo({ ...settings, configured: settings.choice === "builtin" && info.configured }),
+        ...connectionInfo({
+          ...settings,
+          supportsImages: settings.supportsImages ?? info.supportsImages,
+          configured: settings.choice === "builtin" && info.configured,
+        }),
         search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
       };
     },
     async configure(input) {
+      await loadDirectory();
       if (input.search !== undefined) return configureSearch(input.search);
       if (input.choice !== "builtin" && input.choice !== "external")
         throw new KaituError("请选择 AI 连接方式", "AI_CONFIG");
       let settings;
       try {
-        settings = { choice: input.choice, ...selection(input, loadSettings()) };
+        settings = { choice: input.choice, ...selection(input, await loadSettings()) };
       } catch (error) {
         throw new KaituError(error.message, "AI_CONFIG");
       }
       if (input.choice === "builtin") {
+        if (!settings.model) throw new KaituError("请选择或填写模型 ID", "AI_MODEL");
         if (
           input.apiKey !== undefined &&
           (typeof input.apiKey !== "string" || !input.apiKey.trim() || input.apiKey.length > 4096)
@@ -168,64 +244,57 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
           throw new KaituError("请输入有效 API Key", "AI_KEY");
         if (
           settings.provider === "kaitu-custom" &&
-          settings.baseURL !== loadSettings().baseURL &&
+          settings.baseURL !== (await loadSettings()).baseURL &&
           !input.apiKey
         )
           throw new KaituError("更换 Base URL 后请填入该服务的 API Key", "AI_KEY");
         const ref = credentialRef(settings.provider);
-        const result = await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
-        if (!result.configured) throw new KaituError(result.message, result.code);
+        const result =
+          settings.auth === "dsh"
+            ? await credential("status", { settings, ref })
+            : await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
+        if (!result.configured)
+          throw new KaituError(result.message ?? "请先完成此服务的登录", result.code ?? "AI_AUTH");
         if (input.apiKey) await credential("save", { ref, apiKey: input.apiKey.trim() });
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return connectionInfo({ ...settings, configured: settings.choice === "builtin" });
     },
-    async runtime(mode = "scoped") {
+    async runtime(mode = "scoped", capabilities = false) {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
-      const settings = loadSettings();
-      if (
-        settings.choice !== "builtin" ||
-        !(await credential("status", { ref: credentialRef(settings.provider) })).configured
-      )
+      const settings = await loadSettings();
+      const info = await credential("status", { ref: credentialRef(settings.provider), settings });
+      settings.supportsImages ??= info.supportsImages;
+      if (!capabilities && (settings.choice !== "builtin" || !info.configured))
         throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
-      const profile = join(home, `kaitu-sdk-${mode}.patch.json`);
+      const profile = join(home, `kaitu-sdk-${capabilities ? "capabilities" : mode}.patch.json`);
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(
         profile,
         JSON.stringify([
           ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }),
-          ...providerPatch(settings),
+          ...(capabilities ? [] : providerPatch(settings)),
         ]),
         {
           mode: 0o600,
         },
       );
       const { JsonRpcLineTransport } = await import(
-        pathToFileURL(join(modules, "@deepseek-ai/dsh-sdk-protocol/lib/index.js")).href
+        pathToFileURL(createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-sdk-protocol"))
+          .href
       );
-      const child = spawn(
-        executable,
-        [
-          "--expose-internals",
-          join(modules, "@deepseek-ai/dsh-desktop-host/lib/cli.js"),
-          "--profile",
-          "sdk",
-          "--patch",
-          profile,
-        ],
-        {
-          cwd: workspace,
-          env: {
-            ...env,
-            DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
-            KAITU_AGENT_MODE: mode,
-            KAITU_DIR: workspace,
-          },
-          detached: true,
-          stdio: ["pipe", "pipe", "ignore"],
+      const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
+        cwd: workspace,
+        env: {
+          ...env,
+          DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
+          KAITU_AGENT_MODE: mode,
+          KAITU_DIR: workspace,
         },
-      );
+        detached: true,
+        stdio: ["pipe", "pipe", "ignore"],
+      });
       const listeners = new Set();
       const active = new Set();
       const rpc = new JsonRpcLineTransport(child.stdout, child.stdin);
@@ -287,7 +356,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       try {
         await rpc.request(
           "initialize",
-          { cwd: workspace, provider: settings.provider, model: settings.model },
+          { cwd: workspace, provider: settings.provider, model: settings.model, capabilities },
           AbortSignal.timeout(20000),
         );
       } catch {
@@ -308,6 +377,7 @@ export function createSdkRuntime({ executable, archive, home, workspace, plugin,
       };
     },
   };
+  return api;
 }
 
 export const sdkSupportFiles = dirname(fileURLToPath(import.meta.url));

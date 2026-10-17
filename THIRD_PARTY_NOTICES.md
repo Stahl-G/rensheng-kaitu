@@ -14,6 +14,7 @@
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
+| DeepSeek Harness Node 引擎与 SDK 0.2.0-rc.2（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |
 | @slack/web-api | MIT | https://github.com/slackapi/node-slack-sdk |
 | imapflow | MIT | https://github.com/postalsys/imapflow |
 | mailauth | MIT | https://github.com/postalsys/mailauth |
