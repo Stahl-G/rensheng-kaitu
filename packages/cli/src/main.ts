@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { createChannelRuntime } from "@kaitu/channels";
 import {
@@ -85,8 +87,10 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { channelsCommand, installShutdown } from "./channels.js";
 import { dshCommand, installDsh } from "./dsh.js";
+import { createAgentConnection } from "./local-agents/connection.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
+import { createAskService } from "./ui/ask.js";
 import { startUi } from "./ui/server.js";
 
 const HELP = `开图 kaitu
@@ -404,7 +408,26 @@ async function run(argv: string[]): Promise<number> {
     case "ui": {
       const ws = workspace(values);
       const channels = values.channels ? createChannelRuntime(ws) : undefined;
+      const state = process.env.KAITU_APP_HOME ?? join(homedir(), ".kaitu-app");
+      const connection = () =>
+        createAgentConnection({
+          state,
+          workspace: ws.root,
+          mcp: {
+            command: process.execPath,
+            args: [fileURLToPath(new URL("./local-agents/mcp-stdio.js", import.meta.url)), ws.root],
+          },
+        });
+      const ask = createAskService({
+        state,
+        workspace: ws.root,
+        runtime: (mode) => connection().runtime(mode),
+        settings: () => connection().settings(),
+        configure: (input) => connection().configure(input),
+        detectAgents: () => connection().detect(),
+      });
       const ui = await startUi(ws, {
+        ask,
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],
       });

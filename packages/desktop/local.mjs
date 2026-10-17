@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createAgentConnection } from "../cli/dist/local-agents/connection.js";
 import { createAskService } from "../cli/dist/ui/ask.js";
 import { startUi } from "../cli/dist/ui/server.js";
 import {
@@ -52,13 +53,25 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   const askKeyFile = ".kaitu/ask-workspace.json";
   const workspaceKey = ws.exists(askKeyFile) ? ws.readJson(askKeyFile).key : ws.root;
   if (!ws.exists(askKeyFile)) ws.writeJson(askKeyFile, { key: workspaceKey }, { internal: true });
+  const connection = () =>
+    createAgentConnection({
+      state,
+      workspace: ws.root,
+      sdk: makeSdk,
+      mcp: {
+        command: join(dirname(app.getPath("exe")), "DSH"),
+        args: [join(resources, "dist/mcp-stdio.mjs"), ws.root],
+        env: { ELECTRON_RUN_AS_NODE: "1" },
+      },
+    });
   const ask = createAskService({
     state,
     workspace: ws.root,
     workspaceKey,
-    runtime: (mode) => makeSdk().runtime(mode),
-    settings: () => makeSdk().settings(),
-    configure: (input) => makeSdk().configure(input),
+    runtime: (mode) => connection().runtime(mode),
+    settings: () => connection().settings(),
+    configure: (input) => connection().configure(input),
+    detectAgents: () => connection().detect(),
   });
   const startAutomation = async () => {
     const settings = readAutomation(ws);

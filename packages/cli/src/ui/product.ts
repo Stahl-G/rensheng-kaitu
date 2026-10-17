@@ -152,6 +152,10 @@ export async function productRequest(
     switch (method) {
       case "askSearchConfigure":
         return ask.configure({ search: args[0] });
+      case "askDetectAgents":
+        return ask.detectAgents?.() ?? [];
+      case "askCancel":
+        return ask.cancel(text(0));
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {

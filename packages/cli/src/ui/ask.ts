@@ -39,12 +39,14 @@ export interface AskService {
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
   send(id: string, text: string, images?: AskImage[]): Promise<unknown>;
+  cancel(id: string): Promise<unknown>;
+  detectAgents?(): Promise<unknown>;
   settings(): Promise<{
     configured: boolean;
     search?: NetworkSearchSettings;
     supportsImages?: boolean;
     providerName?: string;
-    choice?: "builtin" | "external";
+    choice?: "builtin" | "external" | "local";
     provider: string;
     model: string;
   }>;
@@ -69,6 +71,7 @@ export function createAskService(options: {
   runtime: (mode: AskMode) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
+  detectAgents?: () => Promise<unknown>;
 }): AskService {
   const directory = join(
     options.state,
@@ -118,8 +121,22 @@ export function createAskService(options: {
   const append = (id: string, type: AskEventType, data: Record<string, unknown>) => {
     const row = thread(id);
     const previous = events(id);
-    const event = { id: (previous.at(-1)?.id ?? 0) + 1, type, data };
-    appendFileSync(join(directory, `${id}.jsonl`), `${JSON.stringify(event)}\n`, { mode: 0o600 });
+    const existing =
+      data.localStream === true &&
+      previous.find(
+        (row) =>
+          row.type === type &&
+          (row.data.message as { id?: string })?.id === (data.message as { id?: string })?.id,
+      );
+    const event = { id: existing ? existing.id : (previous.at(-1)?.id ?? 0) + 1, type, data };
+    if (existing) {
+      writeFileSync(
+        join(directory, `${id}.jsonl.tmp`),
+        `${previous.map((row) => JSON.stringify(row.id === existing.id ? event : row)).join("\n")}\n`,
+        { mode: 0o600 },
+      );
+      renameSync(join(directory, `${id}.jsonl.tmp`), join(directory, `${id}.jsonl`));
+    } else appendFileSync(join(directory, `${id}.jsonl`), `${JSON.stringify(event)}\n`, { mode: 0o600 });
     row.updated = new Date().toISOString();
     if (type === "user/message" && row.title === "新对话") {
       const content = data.content as { type: string; text?: string }[] | undefined;
@@ -332,6 +349,14 @@ export function createAskService(options: {
     relocate(workspace) {
       options.workspace = workspace;
       relocating = false;
+    },
+    detectAgents: options.detectAgents,
+    async cancel(id) {
+      thread(id);
+      if (!busy.has(id)) return {};
+      const client = runtime ?? (await starting);
+      if (!client) throw new KaituError("AI 尚未就绪", "AI_CONNECTION");
+      return client.request("session/cancel", { sessionId: id });
     },
     settings: options.settings,
     async configure(input) {

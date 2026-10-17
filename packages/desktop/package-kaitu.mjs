@@ -484,6 +484,15 @@ async function writePayload(payload) {
       join(root, "node_modules/@deepseek-ai", name, "LICENSE"),
       join(payload, "licenses", `${name}.txt`),
     );
+  await build({
+    entryPoints: [join(directory, "../cli/dist/local-agents/mcp-stdio.js")],
+    outfile: join(payload, "dist/mcp-stdio.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+  });
   for (const file of ["sdk-credentials.mjs", "sdk-providers.mjs", "sdk-search-settings.mjs", "sdk-rpc.mjs"])
     cpSync(join(directory, file), join(payload, "dist", file));
   cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
