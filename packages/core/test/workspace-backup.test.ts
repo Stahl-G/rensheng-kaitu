@@ -261,3 +261,30 @@ it("GitHub API 接通空仓库初始化、缓存回读和非强推提交，可�
     vi.unstubAllGlobals();
   }
 });
+
+it("iCloud 占位不作为本地删除上传，下载后可继续，真实删除仍可同步", async () => {
+  const original = await freshWorkspace();
+  const directory = original.resolve(".kaitu", { internal: true });
+  setStateBinding(original.root, directory, "icloud");
+  const ws = new Workspace(original.root);
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/icloud" }, m.remote);
+  await syncWorkspaceBackup(ws, m.remote);
+  const before = m.files()["me/profile.md"];
+  const count = m.pushes();
+  const path = join(ws.root, "me/profile.md");
+  const placeholder = join(ws.root, "me/.profile.md.icloud");
+  fs.renameSync(path, placeholder);
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(m.files()["me/profile.md"]).toBe(before);
+  expect(m.pushes()).toBe(count);
+  expect(workspaceBackupStatus(ws).error).toContain("iCloud");
+  expect(fs.existsSync(placeholder)).toBe(true);
+  fs.renameSync(placeholder, path);
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(workspaceBackupStatus(ws).error).toBeNull();
+  fs.rmSync(path);
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(m.files()["me/profile.md"]).toBeUndefined();
+  expect(workspaceBackupStatus(ws).error).toBeNull();
+});

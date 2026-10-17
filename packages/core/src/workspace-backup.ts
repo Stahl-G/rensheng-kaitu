@@ -5,9 +5,11 @@ import { isAbsolute } from "node:path";
 import { join, relative, sep } from "node:path";
 import { z } from "zod";
 import { rememberWorkspace } from "./drive.js";
+import { KaituError } from "./errors.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
+import { placeholderOriginal } from "./sync-files.js";
 const pick = (zh: string, en: string) => translate(normalizeLocale(readPreferences().locale), zh, en);
 import { Workspace, stateDirectory } from "./workspace.js";
 
@@ -103,9 +105,20 @@ function selected(path: string, c: Pick<BackupConnection, "text" | "records">): 
 }
 async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFiles> {
   const files: BackupFiles = {};
+  const basePaths = Object.keys(state(ws).base);
   const internal = relative(ws.root, stateDirectory(ws.root, ws.isICloud)).split(sep).join("/");
   const walk = async (prefix: string) => {
     for (const e of await fs.readdir(join(ws.root, prefix), { withFileTypes: true })) {
+      const path = prefix ? `${prefix}/${e.name}` : e.name;
+      const pending = placeholderOriginal(path);
+      if (pending && (selected(pending, c) || basePaths.some((path) => path.startsWith(`${pending}/`))))
+        throw new KaituError(
+          pick(
+            `请先从 iCloud 下载：${pending}，本轮备份已暂停`,
+            `Download from iCloud first: ${pending}. This backup is paused.`,
+          ),
+          "CLOUD_UNAVAILABLE",
+        );
       if (
         e.isSymbolicLink() ||
         e.name.startsWith(".") ||
@@ -113,15 +126,16 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
         (!prefix && e.name === "inbox")
       )
         continue;
-      const path = prefix ? `${prefix}/${e.name}` : e.name;
       if (path === internal) continue;
       if (e.isDirectory()) await walk(path);
       else if (e.isFile() && selected(path, c)) {
+        ws.assertDownloaded(path);
         files[path] = await fs.readFile(ws.resolve(path), "utf8");
       }
     }
   };
   await walk("");
+  for (const path of basePaths) if (selected(path, c) && !(path in files)) ws.assertDownloaded(path);
   files[manifest] = JSON.stringify({
     format: "kaitu-workspace",
     version: 1,
@@ -396,13 +410,16 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         lastSync: new Date().toISOString(),
         error: undefined,
       });
-    } catch {
+    } catch (error) {
       store(ws, {
         ...s,
-        error: pick(
-          "同步未完成：请检查网络、GitHub 授权或远端新修改。本地资料已保留，可重试。",
-          "Sync incomplete: check network, GitHub access or newer remote changes. Local data is kept; retry when ready.",
-        ),
+        error:
+          error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE"
+            ? error.message
+            : pick(
+                "同步未完成：请检查网络、GitHub 授权或远端新修改。本地资料已保留，可重试。",
+                "Sync incomplete: check network, GitHub access or newer remote changes. Local data is kept; retry when ready.",
+              ),
       });
     }
   };
