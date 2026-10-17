@@ -15,12 +15,52 @@
           "zh": "写作",
           "en": "Writing"
         }
+      },
+      "life": {
+        "title": {
+          "zh": "生活",
+          "en": "Life"
+        }
       }
     },
     "labels": {},
     "sortKeys": {}
   },
   "plugins": [
+    {
+      "name": "kaitu-dsh",
+      "title": {
+        "zh": "人生开图",
+        "en": "Kaitu"
+      },
+      "description": {
+        "zh": "在 DeepSeek Harness 里用开图：今天、开图、资料和开图的 AI 工具",
+        "en": "Kaitu inside DeepSeek Harness: Today, Explore, Library and Kaitu's AI tools"
+      },
+      "author": "Stahl-G",
+      "homepage": "https://kaitu.si",
+      "repository": {
+        "url": "https://github.com/Stahl-G/rensheng-kaitu"
+      },
+      "metadata": {
+        "category": "life",
+        "keywords": ["开图", "kaitu", "人生"],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0-rc.4",
+          "publishTimestamp": 1792251835,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        }
+      ]
+    },
     {
       "name": "kaitu-novel-workspace",
       "title": {
