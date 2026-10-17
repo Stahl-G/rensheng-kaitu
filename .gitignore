@@ -9,7 +9,3 @@ docs/reference/interview-transcript.*
 # dsh generated reflection and declarations
 packages/dsh-plugin/lib/
 
-# Novel plugin build and isolated acceptance data
-packages/novel-plugin/lib/
-packages/sf-plugin/lib/
-.novel-run/

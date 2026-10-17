@@ -7,10 +7,7 @@
       "docs/reference/**",
       "packages/dsh-plugin/lib/**",
       "packages/core/data/cities.json",
-      ".claude/settings.local.json",
-      "packages/novel-plugin/lib/**",
-      "packages/sf-plugin/lib/**",
-      ".novel-run/**"
+      ".claude/settings.local.json"
     ]
   },
   "formatter": {
