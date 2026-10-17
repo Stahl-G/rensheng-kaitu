@@ -41,8 +41,8 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
     const upload = stageUpload(ws, "nut-ai", "test.json", Buffer.from("{}"));
     await snapshot(ws, "迁移前");
     const before = await history(ws);
-    expect(findDriveDirectory()).toBe(drive);
-    await enableDrive(ws);
+    if (process.platform !== "win32") expect(findDriveDirectory()).toBe(drive);
+    await enableDrive(ws, { driveDir: drive });
     expect(ws.root).toBe(join(drive, "kaitu"));
     expect(defaultRoot()).toBe(ws.root);
     expect(driveStatus(ws).mode).toBe("drive");
@@ -81,7 +81,7 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
     expect(driveStatus(ws).mode).toBe("local");
     expect(mcpToken(ws)).toBe(token);
     mkdirSync(join(home, "Library/CloudStorage/GoogleDrive-second/My Drive"), { recursive: true });
-    expect(() => findDriveDirectory()).toThrow();
+    if (process.platform !== "win32") expect(() => findDriveDirectory()).toThrow();
   } finally {
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });

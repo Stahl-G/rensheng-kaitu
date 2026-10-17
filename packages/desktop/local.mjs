@@ -21,7 +21,7 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
   const makeSdk = () =>
     createSdkRuntime({
-      executable: join(dirname(executable), "DSH"),
+      executable: process.platform === "win32" ? executable : join(dirname(executable), "DSH"),
       archive: join(process.env.KAITU_HOST_RESOURCES || dirname(resources), "app.asar"),
       home: aiHome,
       workspace: getWorkspace(),
@@ -64,6 +64,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   const { state, workspace } = desktopPaths();
   const resources = dirname(dirname(fileURLToPath(import.meta.url)));
   const hostResources = process.env.KAITU_HOST_RESOURCES || dirname(resources);
+  const launcher =
+    process.platform === "win32" ? app.getPath("exe") : join(dirname(app.getPath("exe")), "Kaitu");
   let ws = new Workspace(workspace);
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -72,7 +74,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
   const makeBackgroundAi = () =>
-    createAiProcess(join(dirname(app.getPath("exe")), "Kaitu"), {
+    createAiProcess(launcher, {
       ...process.env,
       KAITU_EMBEDDED_AI: "1",
       KAITU_PARENT_PAYLOAD: resources,
@@ -90,7 +92,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     payload: resources,
     restart: () =>
       setTimeout(() => {
-        app.relaunch({ execPath: join(dirname(app.getPath("exe")), "Kaitu") });
+        app.relaunch({ execPath: launcher });
         app.quit();
       }, 200),
   });

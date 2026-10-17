@@ -20,17 +20,11 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
+import { writePayload as buildPayload } from "./package-payload.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
-const nodeBanner = [
-  'import { createRequire as kaituRequire } from "node:module";',
-  'import { dirname as kaituDirname } from "node:path";',
-  'import { fileURLToPath as kaituFileURLToPath } from "node:url";',
-  "const require = kaituRequire(import.meta.url);",
-  "const __filename = kaituFileURLToPath(import.meta.url);",
-  "const __dirname = kaituDirname(__filename);",
-].join("\n");
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -106,7 +100,7 @@ console.log(
 const requireDsh = createRequire(join(resolve(values["dsh-root"]), "apps/desktop/package.json"));
 const asarPath = requireDsh.resolve("@electron/asar", { paths: [requireDsh.resolve("app-builder-lib")] });
 const asar = requireDsh(asarPath);
-const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json"));
+const writePayload = (payload) => buildPayload({ payload, archive, asar, payloadVersion, dshVersion });
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const dshVersion = manifest.version;
@@ -130,6 +124,7 @@ if (values["dry-run"]) {
 }
 
 const changes = new Map();
+const rewriteArchive = (destination) => rebuildArchive({ destination, archive, asar, asarPath, changes });
 let replacements = 0;
 for (const path of asar.listPackage(archive)) {
   const name = path.replace(/^\//, "");
@@ -422,161 +417,6 @@ function createDmg(temporary) {
   console.log(`完成：${dmg}`);
 }
 
-async function writePayload(payload) {
-  const { build } = requirePlugin("esbuild");
-  mkdirSync(join(payload, "dist"), { recursive: true });
-  writeFileSync(
-    join(payload, "payload.json"),
-    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }),
-  );
-  await build({
-    entryPoints: [join(directory, "plugin.mjs")],
-    outfile: join(payload, "dist/index.js"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: {
-      js: nodeBanner,
-    },
-    external: ["@deepseek-ai/*", "better-sqlite3"],
-  });
-  await build({
-    entryPoints: [join(root, "packages/dsh-plugin/dist/index.js")],
-    outfile: join(payload, "dist/sdk-plugin.mjs"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: {
-      js: nodeBanner,
-    },
-    external: ["@deepseek-ai/*", "better-sqlite3"],
-  });
-  await build({
-    entryPoints: [join(directory, "initialize.mjs")],
-    outfile: join(payload, "dist/initialize.mjs"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: {
-      js: nodeBanner,
-    },
-    external: ["better-sqlite3"],
-  });
-  await build({
-    entryPoints: [join(directory, "local.mjs")],
-    outfile: join(payload, "dist/local.mjs"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: {
-      js: nodeBanner,
-    },
-    external: ["better-sqlite3"],
-  });
-  await build({
-    entryPoints: [join(directory, "sdk-host.mjs")],
-    outfile: join(payload, "dist/sdk-host.mjs"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-  });
-  await build({
-    entryPoints: [join(root, "packages/core/dist/health-import-worker.js")],
-    outfile: join(payload, "dist/health-import-worker.js"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: { js: nodeBanner },
-    external: ["better-sqlite3"],
-  });
-  await build({
-    entryPoints: [join(directory, "sdk-web.mjs")],
-    outfile: join(payload, "dist/sdk-web.mjs"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: { js: nodeBanner },
-    external: ["better-sqlite3"],
-  });
-  mkdirSync(join(payload, "licenses"), { recursive: true });
-  for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
-    cpSync(
-      join(root, "node_modules/@deepseek-ai", name, "LICENSE"),
-      join(payload, "licenses", `${name}.txt`),
-    );
-  for (const file of ["sdk-credentials.mjs", "sdk-providers.mjs", "sdk-search-settings.mjs", "sdk-rpc.mjs"])
-    cpSync(join(directory, file), join(payload, "dist", file));
-  cpSync(join(root, "packages/dsh-plugin/dist/standalone"), join(payload, "web"), { recursive: true });
-  const clientPath = join(root, "packages/dsh-plugin/dist/client.js");
-  const client = readFileSync(clientPath, "utf8");
-  // 主面板已注册；不要依赖 bundle 尾部，地图组件会在其后附带许可证。
-  const navigation = /(\n +)(ctx2\.slots\.inject\(\s*"sidebar\.panellist",)/g;
-  if ([...client.matchAll(navigation)].length !== 1)
-    throw new Error("开图客户端构建结构已变化，请核对默认页面插入点");
-  writeFileSync(
-    join(payload, "dist/client.js"),
-    client.replace(
-      navigation,
-      (_match, indent, call) => `${indent}ctx2.layout.selectPanel(panel);${indent}${call}`,
-    ),
-  );
-  const pluginManifest = JSON.parse(readFileSync(join(root, "packages/dsh-plugin/package.json"), "utf8"));
-  writeFileSync(join(payload, "package.json"), `${JSON.stringify(pluginManifest, null, 2)}\n`);
-  for (const folder of ["schemas", "templates"])
-    cpSync(join(root, folder), join(payload, folder), { recursive: true });
-  cpSync(join(root, "packages/core/data"), join(payload, "data"), { recursive: true });
-  // 插件里用到的每个 DSH 入口都转接到宿主自带的同一份模块；从构建结果里找，内核新增子路径时不会漏。
-  const bridges = new Map();
-  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs"])
-    for (const [, name, subpath] of readFileSync(join(payload, file), "utf8").matchAll(
-      /from ?"(@deepseek-ai\/[\w-]+)(\/[\w-]+)?"/g,
-    ))
-      bridges.set(name, new Set([...(bridges.get(name) ?? []), subpath ? `.${subpath}` : "."]));
-  for (const [name, subpaths] of bridges) await writeProtocolBridge(payload, build, name, [...subpaths]);
-}
-
-async function writeProtocolBridge(payload, build, name, subpaths) {
-  const packagePath = `dsh/node_modules/${name}`;
-  const manifest = JSON.parse(asar.extractFile(archive, `${packagePath}/package.json`).toString());
-  const bridge = join(payload, "node_modules", name);
-  mkdirSync(bridge, { recursive: true });
-  const exportsMap = {};
-  for (const [index, subpath] of subpaths.entries()) {
-    const declaration = manifest.exports?.[subpath];
-    const target =
-      typeof declaration === "string"
-        ? declaration
-        : (declaration?.import ?? declaration?.default ?? manifest.main);
-    if (manifest.type !== "module" || typeof target !== "string")
-      throw new Error(`DSH 模块入口不可用：${name}${subpath}`);
-    const entryPath = join(packagePath, target);
-    const { metafile } = await build({
-      stdin: { contents: asar.extractFile(archive, entryPath).toString(), sourcefile: entryPath },
-      format: "esm",
-      write: false,
-      metafile: true,
-    });
-    const filename = `bridge-${index}.js`;
-    const specifier = JSON.stringify(relative(bridge, join(dirname(payload), "app.asar", entryPath)));
-    const lines = [`export * from ${specifier};`];
-    if (Object.values(metafile.outputs).some((output) => output.exports.includes("default")))
-      lines.push(`export { default } from ${specifier};`);
-    writeFileSync(join(bridge, filename), `${lines.join("\n")}\n`);
-    exportsMap[subpath] = `./${filename}`;
-  }
-  writeFileSync(
-    join(bridge, "package.json"),
-    `${JSON.stringify({ name, version: manifest.version, type: "module", exports: exportsMap }, null, 2)}\n`,
-  );
-}
-
 function markBody() {
   return readFileSync(join(root, "docs/design/kaitu-mark.svg"), "utf8")
     .replace(/<svg[^>]*>/, "")
@@ -632,59 +472,6 @@ async function writeIcon(resources) {
   header.write("icns");
   header.writeUInt32BE(body.length + 8, 4);
   writeFileSync(join(resources, "Kaitu.icns"), Buffer.concat([header, body]));
-}
-
-async function rewriteArchive(destination) {
-  const extracted = join(dirname(destination), "extracted");
-  asar.extractAll(archive, extracted);
-  const unpack = [];
-  const unpackDotFiles = [];
-  const unpackDir = [];
-  const escapeGlob = (path) => path.replace(/[\\*?[\]{}()!+@]/g, "\\$&");
-  const visit = (entry, path = "", parentUnpacked = false) => {
-    const unpacked = parentUnpacked || entry.unpacked === true;
-    if (entry.files) {
-      if (entry.unpacked) unpackDir.push(escapeGlob(path));
-      const start = unpack.length;
-      const children = Object.entries(entry.files).map(([name, child]) =>
-        visit(child, path ? `${path}/${name}` : name, unpacked),
-      );
-      const allUnpacked = children.length > 0 && children.every(Boolean);
-      // 将整棵 unpacked 子树合并为一个 glob，避免为每个文件展开巨大匹配式。
-      if (path && allUnpacked) {
-        unpack.splice(start, unpack.length - start, `${escapeGlob(join(extracted, path))}/**`);
-      }
-      return allUnpacked;
-    }
-    if (unpacked) {
-      unpack.push(escapeGlob(join(extracted, path)));
-      // asar 的 unpack glob 默认不匹配点文件，须为这些原件保留精确路径。
-      if (path.split("/").some((part) => part.startsWith("."))) {
-        unpackDotFiles.push(escapeGlob(join(extracted, path)));
-      }
-      // extractAll 仅恢复 header 的 executable 标记；unpacked 原件的权限来自磁盘。
-      if (!entry.link) chmodSync(join(extracted, path), statSync(join(`${archive}.unpacked`, path)).mode);
-    }
-    return unpacked;
-  };
-  visit(asar.getRawHeader(archive).header);
-  for (const [path, body] of changes) {
-    mkdirSync(dirname(join(extracted, path)), { recursive: true });
-    writeFileSync(join(extracted, path), body);
-  }
-  const pattern = (paths) => (paths.length > 1 ? `{${paths.join(",")}}` : paths[0]);
-  // asar 3.4.1 的 Promise 在输出流 finish 前返回；子进程退出后才复制归档，确保尾部落盘。
-  execFileSync(
-    process.execPath,
-    [
-      join(directory, "repack-asar.mjs"),
-      asarPath,
-      extracted,
-      destination,
-      JSON.stringify({ unpack: pattern([...unpack, ...unpackDotFiles]), unpackDir: pattern(unpackDir) }),
-    ],
-    { stdio: "inherit" },
-  );
 }
 
 function verifyArchive(destination) {

@@ -1,4 +1,6 @@
-# Kaitu.app（macOS arm64）
+# Kaitu 桌面应用
+
+Windows 10 / 11 x64 的 EXE 使用同一份开图功能包，安装、构建与隔离调试见 [windows.md](windows.md)。下文为 macOS arm64 的打包方式。
 
 ## 打包
 

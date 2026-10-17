@@ -54,6 +54,7 @@ if (embedded) {
 async function startWorkbench() {
   try {
     const payload = selectPayload(state, process.resourcesPath);
+    await import(pathToFileURL(join(payload, "dist/initialize.mjs")).href);
     const { startDesktop } = await import(pathToFileURL(join(payload, "dist/local.mjs")).href);
     await startDesktop({ app, BrowserWindow, Menu, shell, dialog });
   } catch (error) {

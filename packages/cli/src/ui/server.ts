@@ -669,6 +669,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       json(res, 200, result);
     } catch (error) {
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
+      if (req.url === "/api/product/moveStorage" && (error as NodeJS.ErrnoException).code === "EBUSY")
+        return json(res, 400, { error: "资料文件夹正在被其他程序占用，请关闭占用它的窗口后重试" });
       const known =
         error instanceof KaituError || (error instanceof Error && error.name === "KaituError")
           ? (error as KaituError)

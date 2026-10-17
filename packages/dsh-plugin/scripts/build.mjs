@@ -13,11 +13,11 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WorkspaceTypertGenerator } from "@deepseek-ai/dsh-typert-generator";
 import { build } from "esbuild";
-import { transform } from "lightningcss";
+import { clientStyles } from "./client-styles.mjs";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const pkg = resolve(root, "packages/dsh-plugin");
@@ -117,7 +117,6 @@ await build({
   format: "esm",
   packages: "external",
 });
-const css = [];
 const worker = await build({
   entryPoints: [resolve(pkg, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs")],
   bundle: true,
@@ -125,6 +124,7 @@ const worker = await build({
   minify: true,
   write: false,
 });
+const styles = clientStyles(worker.outputFiles[0].text);
 await build({
   entryPoints: [resolve(pkg, "src/client/index.tsx")],
   outfile: resolve(pkg, "dist/client.js"),
@@ -136,38 +136,7 @@ await build({
   // 隐私说明等正文写成 Markdown 文件，按文本打包。
   loader: { ".md": "text" },
   external: ["react", "react/*", "@deepseek-ai/cordis", "@deepseek-ai/dsh-client-ui-primitives"],
-  plugins: [
-    {
-      name: "kaitu-css-modules",
-      setup(builder) {
-        builder.onLoad({ filter: /maplibre-gl-worker\.mjs$/ }, () => ({
-          contents: `export default ${JSON.stringify(worker.outputFiles[0].text)}`,
-          loader: "js",
-        }));
-        builder.onLoad({ filter: /maplibre-gl\.css$/ }, ({ path }) => {
-          css.push(readFileSync(path, "utf8"));
-          return { contents: "", loader: "js" };
-        });
-        builder.onLoad({ filter: /\.module\.css$/ }, async ({ path }) => {
-          const { readFileSync } = await import("node:fs");
-          const result = transform({
-            filename: path,
-            code: readFileSync(path),
-            cssModules: { pattern: "kt_[local]_[hash]" },
-          });
-          css.push(result.code.toString());
-          const names = Object.fromEntries(
-            Object.entries(result.exports).map(([key, value]) => [key, value.name]),
-          );
-          return {
-            contents: `export default ${JSON.stringify(names)}`,
-            loader: "js",
-            resolveDir: dirname(path),
-          };
-        });
-      },
-    },
-  ],
+  plugins: [styles.plugin],
   banner: {
     js: 'window.__ModuleLoader__.load({id:"@kaitu/dsh-plugin",factory:(require)=>{var module={exports:{}};var exports=module.exports;',
   },
@@ -179,7 +148,7 @@ await build({
     'const style=document.createElement("style");',
     'style.dataset.plugin="@kaitu/dsh-plugin";',
     'style.dataset.pluginCss="overview";',
-    `style.textContent=${JSON.stringify(css.join("\n"))};`,
+    `style.textContent=${JSON.stringify(styles.css())};`,
     "document.head.appendChild(style);",
   ].join("");
   writeFileSync(

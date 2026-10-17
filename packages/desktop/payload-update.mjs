@@ -108,7 +108,11 @@ export async function installPayload({ state, resources, release, bytes }) {
       await writeFile(join(staging, file), content);
     }
     // DSH protocol bridges stay in the signed host. No engine dependencies arrive in updates.
-    await symlink(join(resources, "kaitu/node_modules"), join(staging, "node_modules"));
+    await symlink(
+      join(resources, "kaitu/node_modules"),
+      join(staging, "node_modules"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     await rename(staging, target);
     const previous = selection(state).current;
     activate(state, release.version, previous);

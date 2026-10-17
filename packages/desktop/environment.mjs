@@ -7,7 +7,12 @@ export function desktopPaths(env = process.env) {
   if (!isAbsolute(state)) throw new Error("KAITU_APP_HOME 必须是绝对路径");
   let workspace = env.KAITU_DIR || (env.KAITU_APP_HOME ? join(state, "workspace") : join(homedir(), "kaitu"));
   if (!env.KAITU_DIR && !env.KAITU_APP_HOME) {
-    const pointer = join(homedir(), "Library/Application Support/kaitu/current-workspace.json");
+    const localState =
+      env.KAITU_LOCAL_STATE_DIR ||
+      (process.platform === "win32"
+        ? join(env.LOCALAPPDATA || join(homedir(), "AppData/Local"), "kaitu")
+        : join(homedir(), "Library/Application Support/kaitu"));
+    const pointer = join(localState, "current-workspace.json");
     if (existsSync(pointer)) {
       const root = JSON.parse(readFileSync(pointer, "utf8")).root;
       if (typeof root === "string" && isAbsolute(root) && existsSync(join(root, ".kaitu/config.json")))

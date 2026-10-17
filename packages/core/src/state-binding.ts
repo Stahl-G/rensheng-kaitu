@@ -82,7 +82,9 @@ function cloudMode(root: string): Binding["mode"] {
   )
     return "icloud";
   const parts = canonical(root).split(sep);
-  return parts.some((part) => /^GoogleDrive(?:-|$)/.test(part)) ? "drive" : "local";
+  return parts.some((part) => /^(?:GoogleDrive(?:-|$)|My Drive$|我的云端硬盘$|我的雲端硬碟$)/i.test(part))
+    ? "drive"
+    : "local";
 }
 export function stateBinding(root: string, icloud?: boolean): Binding {
   const file = bindingFile(root);
