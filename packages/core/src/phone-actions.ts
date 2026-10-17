@@ -19,19 +19,22 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   let seen: Record<string, Pick<PhoneReceipt, "status" | "message">> = ws.exists(ledgerFile)
     ? ws.readJson(ledgerFile)
     : {};
-  // 旧账本只记了 client_id：结果从回执里找回，回执已过期的不再执行，转给用户核对。
+  // 旧账本只记了 client_id，结果从回执里找回。旧版把失败的重投也记成 duplicate，
+  // 所以回执已过期或只剩 duplicate 的都不再执行，转给用户核对；新账本只存首次结果，不会有 duplicate。
+  const unknown = {
+    status: "conflict",
+    message: "这条操作在旧版本处理过，结果已无法确认，请在电脑上核对",
+  } as const;
   if (Array.isArray(seen)) {
     const shown = new Map(phoneReceipts(ws).map((item) => [item.ref, item]));
     seen = Object.fromEntries(
       (seen as string[]).map((id) => {
-        const { status, message } = shown.get(id) ?? {
-          status: "conflict",
-          message: "这条操作在旧版本处理过，结果已无法确认，请在电脑上核对",
-        };
+        const { status, message } = shown.get(id) ?? unknown;
         return [id, { status, ...(message ? { message } : {}) }];
       }),
     );
   }
+  for (const [id, first] of Object.entries(seen)) if (first.status === "duplicate") seen[id] = unknown;
   const receipts: PhoneReceipt[] = [];
   let openTasks: Set<string> | undefined;
   const validate = schemas().builtin("phone-action.schema.json");
