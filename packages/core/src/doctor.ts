@@ -128,13 +128,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     const investments = new Set(listInvestments(ws).map((item) => item.ref));
     const dangling: string[] = [];
     for (const ref of listRecordTypes(ws)) {
-      let records: ReturnType<typeof readRecords>;
-      try {
-        records = readRecords(ws, ref.type);
-      } catch {
-        continue;
-      }
-      for (const record of records) {
+      for (const record of readRecords(ws, ref.type)) {
         const refs = [
           investmentOf(record),
           ...(ref.type === "phase" && Array.isArray(record.investments) ? record.investments : []),
