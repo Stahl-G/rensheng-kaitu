@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-action.schema.json",
+  "title": "手机操作（inbox/agents/ios-*.actions.jsonl 的一行）",
+  "description": "手机交给电脑执行的一次操作。电脑先核对前提（这一项还在、仍是待办或待确认），不满足记为 conflict；同一 client_id 只执行一次。",
+  "type": "object",
+  "required": ["client_id", "at", "device", "op", "args"],
+  "properties": {
+    "client_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID，手机生成" },
+    "at": { "type": "string", "format": "date-time" },
+    "device": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
+    "op": {
+      "enum": [
+        "complete_next",
+        "decide_proposal",
+        "complete_task",
+        "cancel_task",
+        "keep_draft",
+        "adopt_draft",
+        "answer_question",
+        "trial_checkin"
+      ]
+    },
+    "args": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "op": { "const": "complete_next" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["file", "id"],
+            "properties": { "file": { "type": "string", "minLength": 1 }, "id": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "decide_proposal" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["id", "decision"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "decision": { "enum": ["confirmed", "rejected"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "enum": ["complete_task", "cancel_task"] } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["id"],
+            "properties": { "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "keep_draft" } } },
+      "then": {
+        "properties": { "args": { "required": ["source"], "properties": { "source": { "type": "string", "minLength": 1 } } } }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "adopt_draft" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["source", "draft"],
+            "properties": {
+              "source": { "type": "string", "minLength": 1 },
+              "draft": {
+                "type": "object",
+                "required": ["goal", "current", "next"],
+                "properties": {
+                  "goal": { "type": "string", "minLength": 1 },
+                  "current": { "type": "string", "minLength": 1 },
+                  "next": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "answer_question" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["question_id", "value"],
+            "properties": { "question_id": { "type": "string", "minLength": 1 }, "value": { "type": "string" } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "trial_checkin" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "required": ["experiment_id", "done"],
+            "properties": {
+              "experiment_id": { "type": "string", "minLength": 1 },
+              "done": { "type": "boolean" },
+              "date": { "type": "string", "format": "date" },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

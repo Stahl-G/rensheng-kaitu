@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-week.schema.json",
+  "title": "手机快照：一周近况（phone/week.json）",
+  "description": "电脑生成，手机只读。最近 7 天的投入和健康摘要；没有记录的项为 null，不显示为零。",
+  "type": "object",
+  "required": ["format", "version", "generated_at", "from", "to", "projects", "health", "notes", "changes"],
+  "properties": {
+    "format": { "const": "kaitu.phone.week" },
+    "version": { "const": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "from": { "type": "string", "format": "date" },
+    "to": { "type": "string", "format": "date" },
+    "projects": {
+      "type": "array",
+      "description": "进行中的项目",
+      "items": {
+        "type": "object",
+        "required": ["slug", "title", "kind", "file", "next", "words", "commits", "daily"],
+        "properties": {
+          "slug": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "title": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["work", "learning", "personal"] },
+          "file": { "type": "string", "minLength": 1 },
+          "next": { "type": "array", "items": { "type": "string" } },
+          "words": { "type": ["integer", "null"], "description": "7 天字数变化" },
+          "commits": { "type": ["integer", "null"] },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["date", "words", "commits"],
+              "properties": {
+                "date": { "type": "string", "format": "date" },
+                "words": { "type": ["integer", "null"] },
+                "commits": { "type": ["integer", "null"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "required": ["workouts", "workout_days", "sleep_avg_hours", "protein_avg_g", "weight"],
+      "properties": {
+        "workouts": { "type": ["integer", "null"], "description": "训练次数（同一次训练的多条记录算一次）" },
+        "workout_days": { "type": "integer", "minimum": 0 },
+        "sleep_avg_hours": { "type": ["number", "null"] },
+        "protein_avg_g": { "type": ["number", "null"] },
+        "weight": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["value", "unit", "ts"],
+              "properties": {
+                "value": { "type": "number" },
+                "unit": { "type": "string" },
+                "ts": { "type": "string", "format": "date-time" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "notes": {
+      "type": "object",
+      "required": ["captured"],
+      "properties": { "captured": { "type": "integer", "minimum": 0, "description": "这 7 天保存的原文条数" } }
+    },
+    "changes": {
+      "type": "array",
+      "maxItems": 3,
+      "description": "最近三项变化",
+      "items": {
+        "type": "object",
+        "required": ["time", "message"],
+        "properties": {
+          "time": { "type": "string", "format": "date-time" },
+          "message": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

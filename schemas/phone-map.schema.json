@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-map.schema.json",
+  "title": "手机快照：人生进度图（phone/map.json）",
+  "description": "电脑生成，手机只读。路线已经按电脑的规则算好，手机直接画：walked 画实线，planned 画虚线。坐标顺序为 [经度, 纬度]。",
+  "type": "object",
+  "required": ["format", "version", "generated_at", "as_of", "rows", "places", "hometown", "routes"],
+  "properties": {
+    "format": { "const": "kaitu.phone.map" },
+    "version": { "const": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "as_of": { "type": "string", "format": "date" },
+    "rows": {
+      "type": "array",
+      "description": "接下来往哪走：实线已有记录，虚线有下一步或在试，点线 AI 建议或还没定下一步",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "title", "done", "ahead", "next", "suggested"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "enum": ["goal", "project", "direction"] },
+          "title": { "type": "string", "minLength": 1 },
+          "done": { "type": "boolean" },
+          "ahead": { "enum": ["planned", "unexplored"] },
+          "next": { "type": ["string", "null"] },
+          "suggested": { "type": "boolean" }
+        }
+      }
+    },
+    "places": {
+      "type": "array",
+      "description": "城市级地点",
+      "items": {
+        "type": "object",
+        "required": ["name", "lat", "lng", "layer"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+          "lng": { "type": "number", "minimum": -180, "maximum": 180 },
+          "layer": { "enum": ["been", "now", "planned"] },
+          "start": { "type": "string" },
+          "end": { "type": "string" }
+        }
+      }
+    },
+    "hometown": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["name", "lat", "lng"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+            "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+          }
+        }
+      ]
+    },
+    "routes": {
+      "type": "object",
+      "required": ["walked", "planned"],
+      "properties": {
+        "walked": { "type": "array", "items": { "$ref": "#/$defs/line" } },
+        "planned": { "type": "array", "items": { "$ref": "#/$defs/line" } }
+      }
+    }
+  },
+  "$defs": {
+    "line": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "array",
+        "prefixItems": [
+          { "type": "number", "minimum": -180, "maximum": 180 },
+          { "type": "number", "minimum": -90, "maximum": 90 }
+        ],
+        "minItems": 2,
+        "maxItems": 2
+      }
+    }
+  }
+}
