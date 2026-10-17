@@ -96,9 +96,9 @@
     mark();
   }
 
-  /* download: newest non-draft release with a .dmg, cached 10 minutes; any failure keeps the static page */
-  const rel = document.querySelector("[data-release]");
-  if (rel && "fetch" in window) {
+  /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
+  const rel = document;
+  if (document.querySelector("[data-rel]") && "fetch" in window) {
     const KEY = "kaitu-release-v1";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
@@ -123,7 +123,7 @@
         set("tgz-sha", (el) => { el.textContent = tgz.digest ? tgz.digest.replace(/^sha256:/, "") : "—"; });
         set("tgz-url", (el) => { el.textContent = tgz.url; });
       }
-      rel.dataset.live = "true";
+      document.documentElement.dataset.release = version;
     };
     let cached = null;
     try {
