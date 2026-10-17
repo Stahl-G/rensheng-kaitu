@@ -277,8 +277,10 @@ it("快捷指令样本写法不一时照常导入，不支持的类型和坏样�
     JSON.stringify([
       { type: "body_mass", start: "2026-10-16T07:00:00+08:00", value: 70.2, unit: "kg" },
       { type: "state_of_mind", start: "2026-10-16T08:00:00+08:00", value: "happy", unit: "" },
+      // 写了却读不出的距离不悄悄丢掉，这条样本算读不出
+      { type: "workout", start: "2026-10-16T18:00:00+08:00", value: 30, workout: { distance_km: "five" } },
     ]),
   );
-  expect((await importHealthShortcut(ws, mixed)).ignored).toMatchObject({ invalid: 1 });
+  expect((await importHealthShortcut(ws, mixed)).ignored).toMatchObject({ invalid: 2 });
   expect(readRecords(ws, "metric").some((row) => row.value === 70.2)).toBe(true);
 });

@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import type { ValidateFunction } from "ajv";
 import { normalizeHandoff, normalizeNow, normalizeStatus } from "./doc-input.js";
 import { hasFrontmatter, parseFrontmatter } from "./frontmatter.js";
+import { normalizedMemory } from "./memory.js";
 import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { projectStatusFiles } from "./projects.js";
 import { recordLines } from "./records.js";
@@ -196,8 +197,18 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
       const d = json(f);
       if (d !== undefined) check(reg.builtin("goals.schema.json"), d, f, issues);
     } else if (f.startsWith("memory/") && name.endsWith(".md") && name !== "MEMORY.md") {
-      const d = fm(f);
-      if (d) check(reg.builtin("memory.schema.json"), d, f, issues);
+      // frontmatter 可以不写；写了就得是合法 YAML，内容按读取时补齐后的样子校验。
+      const text = ws.scanText(f);
+      if (text !== undefined && hasFrontmatter(text)) {
+        try {
+          parseFrontmatter(text);
+        } catch (e) {
+          issues.push({ file: f, message: `frontmatter 不是合法 YAML：${(e as Error).message}` });
+          continue;
+        }
+      }
+      const memory = text === undefined ? undefined : normalizedMemory(ws, f.slice("memory/".length));
+      if (memory) check(reg.builtin("memory.schema.json"), memory, f, issues);
     } else if (f.startsWith("chats/") && name.endsWith(".jsonl")) {
       const text = ws.scanText(f);
       if (text === undefined) continue;

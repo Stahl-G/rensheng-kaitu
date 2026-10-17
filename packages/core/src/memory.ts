@@ -169,6 +169,14 @@ function availableFile(ws: Workspace, type: MemoryType, name: string, current?: 
   return file;
 }
 
+/** 校验和读取用同一份补齐后的记忆：没有 frontmatter 的普通 Markdown 也算合法记忆。 */
+export function normalizedMemory(ws: Workspace, file: string): Memory | undefined {
+  const path = memoryPath(file);
+  const text = ws.scanText(path);
+  if (text === undefined) return undefined;
+  return looseMemory(file, text, localDate(statSync(ws.resolve(path)).mtime, ws.timeZone()));
+}
+
 function readMemory(ws: Workspace, file: string): { data: Memory; body: string } {
   const path = memoryPath(file);
   if (!ws.exists(path)) throw new KaituError(`找不到记忆：${file}`, "NOT_FOUND");

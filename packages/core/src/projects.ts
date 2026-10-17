@@ -87,7 +87,9 @@ function projectStatus(data: ProjectStatus, slug: string, timeZone: string): Pro
     data as unknown as Record<string, unknown>,
     timeZone,
   ) as unknown as ProjectStatus;
-  if (typeof out.title !== "string" || !out.title.trim()) out.title = slug;
+  const title = out.title as unknown;
+  if (title === undefined || title === null || (typeof title === "string" && !title.trim())) out.title = slug;
+  else if (typeof title === "number") out.title = String(title);
   const kind = out.kind as unknown;
   if (kind === undefined || kind === null || kind === "") out.kind = "personal";
   else out.kind = KINDS[String(kind).trim().toLowerCase()] ?? out.kind;

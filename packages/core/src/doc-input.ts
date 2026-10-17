@@ -218,8 +218,9 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
         title,
         kind,
         status,
-        ...(start ? { start } : {}),
-        ...(end ? { end } : {}),
+        // 读得出的时间换成 09:00；写了却读不出的（25:00）原样留给校验，写回时不删。
+        ...(start ? { start } : missing(block.start) ? {} : { start: block.start }),
+        ...(end ? { end } : missing(block.end) ? {} : { end: block.end }),
       },
     ];
   });

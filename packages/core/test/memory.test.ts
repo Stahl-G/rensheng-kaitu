@@ -18,6 +18,8 @@ describe("记忆", () => {
       ["context", "notes", "住在杭州，在做产品经理。"],
     ]);
     expect(() => readMe(ws)).not.toThrow();
+    // 校验和读取用同一份补齐后的记忆，不把没有 frontmatter 的普通 Markdown 报成损坏。
+    expect(validateWorkspace(ws)).toEqual([]);
   });
 
   it("只改正文时保留原来的类型（MCP 和问问的补丁里没写的字段是 undefined）", async () => {
@@ -42,6 +44,7 @@ describe("记忆", () => {
     ws.writeText("memory/fact_secret.md", "---\nsensitive: true\nname: [没写完\n---\n只给自己看的事。\n");
     // 敏感标记写成字符串 "true" 也从严
     ws.writeText("memory/context_diary.md", '---\nsensitive: "true"\n---\n日记里的私事。\n');
+    expect(validateWorkspace(ws).some((issue) => issue.file === "memory/fact_secret.md")).toBe(true);
     for (const needle of ["只给自己看", "日记里的私事"]) {
       expect(listMemories(ws).find((memory) => memory.text.includes(needle))?.sensitive).toBe(true);
       expect(handoverPack(ws, "zh-CN").text).not.toContain(needle);

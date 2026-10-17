@@ -628,8 +628,11 @@ function shortcutSample(input: unknown, device: string, zone: string): HealthSam
       duration_min: duration,
     };
     for (const key of ["distance_km", "kcal", "avg_hr"] as const) {
+      if (data[key] === undefined || data[key] === null || data[key] === "") continue;
+      // 写了却读不出的数量（"five"）让这条样本算作读不出并计数，不悄悄丢掉。
       const amount = Number(data[key]);
-      if (data[key] !== undefined && Number.isFinite(amount)) workout[key] = amount;
+      if (!Number.isFinite(amount)) throw new Error(`训练的 ${key} 读不出`);
+      workout[key] = amount;
     }
   }
   return {

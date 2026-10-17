@@ -122,6 +122,13 @@ describe("工作台写入", () => {
         expect.arrayContaining(["health/STATUS.md", "NOW.md"]),
       );
     }
+    // 写了却读不出的时间（25:00）原样保留给校验，不悄悄删掉
+    ws.writeText("health/STATUS.md", "---\nnext:\n  - 跑步\n---\n");
+    ws.writeText(
+      "NOW.md",
+      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 写周报, kind: task, start: "25:00" }\n---\n',
+    );
+    expect(validateWorkspace(ws).map((issue) => issue.file)).toEqual(["NOW.md"]);
   });
 
   it("--sample 创建的工作区符合已有数据规范", async () => {
