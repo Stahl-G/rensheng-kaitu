@@ -95,25 +95,33 @@ describe("工作台写入", () => {
     });
   });
 
-  it("下一步和日程的状态认常见写法，写了却认不出的报格式错误，不悄悄当成待办或已确认", async () => {
+  it("下一步和日程的状态、优先级、类型认常见写法，写了却认不出的报格式错误，不悄悄改成别的", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
-    ws.writeText("health/STATUS.md", "---\nnext:\n  - { title: 跑步, status: closed }\n---\n");
+    ws.writeText(
+      "health/STATUS.md",
+      "---\nnext:\n  - { title: 跑步, status: closed, priority: urgent }\n---\n",
+    );
     ws.writeText(
       "NOW.md",
-      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 会议, start: "10:00", end: "11:00", status: cancelled }\n---\n',
+      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 会议, kind: appointment, start: "10:00", end: "11:00", status: cancelled }\n---\n',
     );
     expect(
-      readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next?.[0]?.status,
-    ).toBe("done");
+      readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next?.[0],
+    ).toMatchObject({
+      status: "done",
+      priority: "high",
+    });
     expect(validateWorkspace(ws)).toEqual([]);
-    ws.writeText("health/STATUS.md", "---\nnext:\n  - { title: 跑步, status: donee }\n---\n");
-    ws.writeText(
-      "NOW.md",
-      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 会议, start: "10:00", end: "11:00", status: maybe }\n---\n',
-    );
-    expect(validateWorkspace(ws).map((issue) => issue.file)).toEqual(
-      expect.arrayContaining(["health/STATUS.md", "NOW.md"]),
-    );
+    for (const [status, block] of [
+      ["{ title: 跑步, status: donee }", '{ title: 会议, start: "10:00", end: "11:00", status: maybe }'],
+      ["{ title: 跑步, priority: 很急 }", '{ title: 会议, kind: meetup, start: "10:00", end: "11:00" }'],
+    ]) {
+      ws.writeText("health/STATUS.md", `---\nnext:\n  - ${status}\n---\n`);
+      ws.writeText("NOW.md", `---\ndate: "2026-10-17"\nblocks:\n  - ${block}\n---\n`);
+      expect(validateWorkspace(ws).map((issue) => issue.file)).toEqual(
+        expect.arrayContaining(["health/STATUS.md", "NOW.md"]),
+      );
+    }
   });
 
   it("--sample 创建的工作区符合已有数据规范", async () => {

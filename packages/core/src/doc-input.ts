@@ -72,6 +72,9 @@ const BLOCK_KIND: Record<string, string> = {
   meeting: "event",
   calendar: "event",
   日程: "event",
+  appointment: "event",
+  会议: "event",
+  约会: "event",
   proposal: "proposal",
   suggestion: "proposal",
   建议: "proposal",
@@ -81,11 +84,17 @@ const BLOCK_KIND: Record<string, string> = {
 };
 const PRIORITY: Record<string, string> = {
   high: "high",
+  urgent: "high",
   高: "high",
+  紧急: "high",
+  高优先级: "high",
   normal: "normal",
+  medium: "normal",
   中: "normal",
+  普通: "normal",
   low: "low",
   低: "low",
+  低优先级: "low",
 };
 
 const OFFSET = /(Z|[+-]\d{2}:\d{2})$/i;
@@ -133,18 +142,14 @@ function uniqueIds<T extends { id: string }>(list: T[]): T[] {
 
 export function normalizeStatus(data: Doc, timeZone: string): Doc {
   const out: Doc = { ...data };
-  out.updated = instant(out.updated, timeZone) ?? null;
+  // 没写的补默认；读得出的换成规范写法；写了却读不出的原样留给校验报错，写回时不丢。
+  out.updated = missing(out.updated) ? null : (instant(out.updated, timeZone) ?? out.updated);
   const progress = out.progress as Doc | null | undefined;
-  if (progress !== undefined && progress !== null) {
+  if (progress && typeof progress === "object") {
     const current = Number(progress.current);
     const target = Number(progress.target);
-    out.progress =
-      typeof progress === "object" &&
-      text(progress.label) &&
-      Number.isFinite(current) &&
-      Number.isFinite(target)
-        ? { ...progress, label: text(progress.label), current, target }
-        : null;
+    if (text(progress.label) && Number.isFinite(current) && Number.isFinite(target))
+      out.progress = { ...progress, label: text(progress.label), current, target };
   }
   if (out.next !== undefined) {
     const next = items(out.next).flatMap((raw) => {
@@ -158,7 +163,7 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
       const when = text(item.when) || (item.due !== undefined && (!due || !dateOnly) ? text(item.due) : "");
       // 没写状态算待办；认得出的写法换成规范值，写了却认不出的留给校验报错，不悄悄当成待办。
       const status = missing(item.status) ? "todo" : (pick(NEXT_STATUS, item.status) ?? item.status);
-      const priority = pick(PRIORITY, item.priority);
+      const priority = missing(item.priority) ? undefined : (pick(PRIORITY, item.priority) ?? item.priority);
       const { name: _name, text: _text, ...rest } = item;
       return [
         {
@@ -182,11 +187,11 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
 
 export function normalizeNow(data: Doc, timeZone: string): Doc {
   const out: Doc = { ...data };
-  out.date = day(out.date) ?? null;
-  if (out.generated_at !== undefined) {
-    const at = instant(out.generated_at, timeZone);
-    out.generated_at = at;
-  }
+  out.date = missing(out.date) ? null : (day(out.date) ?? out.date);
+  if (out.generated_at !== undefined)
+    out.generated_at = missing(out.generated_at)
+      ? undefined
+      : (instant(out.generated_at, timeZone) ?? out.generated_at);
   const blocks = items(out.blocks).flatMap((raw) => {
     const block: Doc =
       typeof raw === "string" ? { title: raw } : raw && typeof raw === "object" ? { ...(raw as Doc) } : {};
@@ -194,8 +199,12 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
     if (!title) return [];
     const start = clockTime(block.start);
     const end = clockTime(block.end);
-    let kind = pick(BLOCK_KIND, block.kind) ?? (start && end ? "event" : "task");
-    if (kind !== "task" && !(start && end)) kind = "task";
+    // 没写类型时按有没有起止时间推断；写了却认不出的原样留给校验，不改成别的意思。
+    const kind = missing(block.kind)
+      ? start && end
+        ? "event"
+        : "task"
+      : (pick(BLOCK_KIND, block.kind) ?? block.kind);
     const status = missing(block.status)
       ? kind === "proposal"
         ? "pending"
@@ -222,7 +231,7 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
       const title = text(item.title);
       return title ? [{ ...item, kind: text(item.kind) || "note", title }] : [];
     });
-  // 读不出的 generated_at 去掉，不写成 null。
+  // 空的 generated_at 去掉，不写成 null；读不出的已原样保留给校验。
   return Object.fromEntries(
     Object.entries(out).filter(([key, value]) => key !== "generated_at" || value !== undefined),
   );
