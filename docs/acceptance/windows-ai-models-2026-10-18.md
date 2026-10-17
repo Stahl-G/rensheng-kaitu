@@ -26,3 +26,14 @@
 本轮仅修改本地分支 `fix/windows-ai-connection`，重新生成本地 Windows 安装器修订 3；没有推送分支、创建 PR 或上传新安装包。此前 PR #8 已在用户要求暂停发布之前合并；官网入口恢复系统识别的改动也已在暂停前推送。
 
 本地产物：`dist/windows-ai-fixed/Kaitu-Setup-0.1.0-rc.4-windows.3-x64.exe`，297426301 字节，SHA-256 为 `b7904a2bf7e3a771152db1d51db489ffe7ceb38f3c24e46fb082c2b4c04b711b`。新包内前端 JS 与已更新的安装目录及构建源哈希相同。没有再次运行安装器覆盖用户环境，也没有将本机已保存的凭据打包进去。
+
+## 真实消息与切换模型补验（2026-10-18）
+
+用户进一步要求实际发送消息及切换模型。使用已安装 Windows App 的本机 HTTP 接口和其已保存凭据，新建测试会话，发送两条只要求返回随机标识的消息，没有使用独立直连脚本替代 App 对话链路。
+
+1. `deepseek-flash` 返回 `KAITU_FIRST_56e4d3b2`，会话正常结束。
+2. 同一会话切换至 `deepseek-v4-pro`，返回 `KAITU_SWITCHED_8d983b3d`，会话正常结束。
+3. 两条 `assistant/message` 的 `message.source.model` 分别为上述型号，确认实际引擎路由已改变；没有工具调用。
+4. 测试结束恢复原模型 `deepseek-flash`，保留测试会话供查看。没有推送、上传或发布新版本。
+
+本机测试记录为忽略目录中的 `.kaitu/live-chat-proof.json`；测试提示未包含个人资料，并明确要求不读取文件、不调用工具、不修改资料。
