@@ -1,10 +1,11 @@
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
 
-export function confinedFileSystem(LocalFileSystem, FsError, root) {
+export function confinedFileSystem(LocalFileSystem, FsError, root, attachments = new Set(), attachmentRoot) {
   const contains = (path) => {
+    if (attachments.has(path)) return true;
     try {
       assertAgentPath(root, path);
       return true;
@@ -52,6 +53,9 @@ export function confinedFileSystem(LocalFileSystem, FsError, root) {
     processPathFromHostPath(path) {
       try {
         const real = realpathSync(path);
+        // DSH 在准备已上传附件时调用此映射；目录本身和其他程序状态不开放。
+        if (attachmentRoot && real.startsWith(`${realpathSync(attachmentRoot)}/`) && statSync(real).isFile())
+          attachments.add(real);
         return contains(real) ? real : undefined;
       } catch {
         return undefined;

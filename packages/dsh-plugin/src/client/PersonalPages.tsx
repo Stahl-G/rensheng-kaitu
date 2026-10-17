@@ -4,6 +4,7 @@ import type { AutomationKey, AutomationSettings, SettingsData } from "../types.j
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { HandoverPanel } from "./Handover.js";
+import { FeatureUpdates, type FeatureUpdateRequest } from "./FeatureUpdates.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import { PrivacyPage } from "./Privacy.js";
@@ -12,6 +13,7 @@ import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
 
 export interface PersonalServices extends CalendarPushServices {
+  desktopUpdate?: FeatureUpdateRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
   configureAutomation: (
@@ -21,6 +23,7 @@ export interface PersonalServices extends CalendarPushServices {
   exportWorkspace: () => Promise<{ name: string; base64: string }>;
   restoreVersion: (oid: string) => Promise<unknown>;
   moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
+  pickStorageFolder: () => Promise<string | null>;
   loadHandover: (locale?: Locale) => Promise<HandoverPack>;
 }
 const PROVIDERS: { id: SyncProvider; zh: string; en: string; key?: "icloud" | "drive" | "nutstore" }[] = [
@@ -44,7 +47,8 @@ export function PersonalPages(
       subscribe?: (refresh: () => void) => () => void;
       onHandoverAnswer: (answer: string) => Promise<void>;
       locale: Locale;
-      onLocale: (locale: Locale) => Promise<void>;
+      followSystem: boolean;
+      onLocale: (locale: Locale | null) => Promise<void>;
     },
 ) {
   const t = useT();
@@ -58,6 +62,7 @@ export function PersonalPages(
   const [history, setHistory] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [pickingFolder, setPickingFolder] = useState(false);
   const [path, setPath] = useState("");
   const [provider, setProvider] = useState<SyncProvider>("local");
   const [privacy, setPrivacy] = useState(false);
@@ -476,12 +481,13 @@ export function PersonalPages(
                   </label>
                   <select
                     id="ui-language"
-                    value={props.locale}
+                    value={props.followSystem ? "system" : props.locale}
                     disabled={busy}
                     onChange={(event) =>
-                      void run(() => props.onLocale(event.target.value === "en" ? "en" : "zh-CN"), "")
+                      void run(() => props.onLocale(event.target.value === "system" ? null : event.target.value === "en" ? "en" : "zh-CN"), "")
                     }
                   >
+                    <option value="system">{t("跟随系统", "System default")}</option>
                     <option value="zh-CN">中文</option>
                     <option value="en">English</option>
                   </select>
@@ -811,39 +817,45 @@ export function PersonalPages(
                   />
                 </label>
                 <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy || pickingFolder}
+                  onClick={async () => {
+                    setPickingFolder(true);
+                    setError("");
+                    try {
+                      const folder = await props.pickStorageFolder();
+                      if (folder) {
+                        const separator = folder.includes("\\") ? "\\" : "/";
+                        setPath(`${folder.replace(/[\\/]+$/, "")}${separator}kaitu`);
+                      }
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      setPickingFolder(false);
+                    }
+                  }}
+                >
+                  {pickingFolder ? t("正在选择…", "Choosing…") : t("选择存放文件夹…", "Choose folder…")}
+                </button>
+                <p className={css.small}>
+                  {t(
+                    "选择后，资料将放在该位置下新的 kaitu 文件夹中。也可以手动修改上面的路径。",
+                    "Your notes will go into a new kaitu folder inside the selected location. You can also edit the path above.",
+                  )}
+                </p>
+                <button
                   type="submit"
                   className={`${css.btn} ${css["btn-primary"]}`}
-                  disabled={busy || !path.trim()}
+                  disabled={busy || pickingFolder || !path.trim()}
                 >
                   {t("迁移到这里", "Move here")}
                 </button>
               </form>
             )}
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>{t("关于与隐私", "About and privacy")}</h2>
-              <div className={`${css.card} ${css["list-card"]}`}>
-                <div className={css["switch-row"]}>
-                  <span>
-                    <b>{t("资料去向", "Where your data goes")}</b>
-                    <br />
-                    <span className={css.small}>
-                      {t(
-                        "什么存在这台电脑、什么同步到云盘、什么会发给 AI",
-                        "What stays on this computer, what syncs to your cloud, what goes to AI",
-                      )}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className={`${css.btn} ${css["btn-quiet"]}`}
-                    onClick={() => setPrivacy(true)}
-                  >
-                    {t("查看", "View")}
-                  </button>
-                </div>
-              </div>
               <p className={css.small}>
-                {t("人生开图", "Kaitu")} {data.version ?? t("本地工作台", "local workbench")}
+                {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}
                 {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} ·{" "}
                 {t("时区", "Time zone")} {data.timeZone}
               </p>

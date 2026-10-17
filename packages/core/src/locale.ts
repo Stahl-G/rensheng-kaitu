@@ -7,6 +7,8 @@ export const locales = ["zh-CN", "en"] as const;
 export type Locale = (typeof locales)[number];
 export interface Preferences {
   locale: Locale | null;
+  /** Resolved UI state only; an automatic choice is never persisted as a manual choice. */
+  followSystem?: boolean;
 }
 
 /** 未知或缺省的语言按中文处理，已有用户的界面不变。 */

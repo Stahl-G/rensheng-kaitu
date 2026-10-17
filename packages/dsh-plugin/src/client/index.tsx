@@ -115,6 +115,19 @@ export async function apply(ctx: Context) {
             name: "main",
             key: panel,
             inject: () => ({
+              fileServices: {
+                pickDirectory: () => ctx.get("uiWorkspace").pickDirectory(),
+                findFiles: async (query: string) => {
+                  const result = await ctx.remote.kaitu.findWorkspaceFiles(query);
+                  if (!result.ok) throw new Error(result.error.message);
+                  return result.value;
+                },
+                openPath: async (path: string, action: "open" | "reveal") => {
+                  const result = await ctx.remote.kaitu.openWorkspacePath(path, action);
+                  if (!result.ok) throw new Error(result.error.message);
+                  return result.value;
+                },
+              },
               subscribe: (refresh: () => void) => {
                 const update = () => {
                   if (document.visibilityState === "visible") refresh();
@@ -133,22 +146,22 @@ export async function apply(ctx: Context) {
               },
               keepOnboardingMatter: async (source: string) => {
                 const r = await ctx.remote.kaitu.onboardingMatterKeep(source);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               saveOnboardingMatter: async (text: string) => {
                 const r = await ctx.remote.kaitu.onboardingMatterSave(text);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               readOnboardingMatter: async (source: string) => {
                 const r = await ctx.remote.kaitu.onboardingMatterRead(source);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               organizeOnboardingMatter: async (source: string) => {
                 const r = await ctx.remote.kaitu.onboardingMatterOrganize(source);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               promptOnboardingMatter: async (source: string, locale?: string) => {
@@ -197,12 +210,12 @@ export async function apply(ctx: Context) {
                 path: OnboardingPath | null = null,
               ) => {
                 const r = await ctx.remote.kaitu.onboardingMatterAdopt(source, draft, path);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               changeOnboardingNext: async (id: string, rev: number, action: string, value: string) => {
                 const r = await ctx.remote.kaitu.onboardingNextChange(id, rev, action, value);
-                if (!r.ok) throw new Error(r.error);
+                if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
               loadOnboarding: async (locale?: string) => {
@@ -316,6 +329,7 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              pickStorageFolder: () => ctx.get("uiWorkspace").pickDirectory(),
               loadCalendar: async () => {
                 const r = await ctx.remote.kaitu.calendar();
                 if (!r.ok) throw new Error(r.error.message);
@@ -448,6 +462,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              hometownCities: async (name: string) => {
+                const result = await ctx.remote.kaitu.hometownCities(name);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              saveHometown: async (name: string, id: number) => {
+                const result = await ctx.remote.kaitu.saveHometown(name, id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadLifeMap: async () => {
                 const result = await ctx.remote.kaitu.lifeMap();
                 if (!result.ok) throw new Error(result.error.message);
@@ -552,8 +576,12 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.removeAvatar();
                 if (!result.ok) throw new Error(result.error.message);
               },
-              onPrompt: (text: string) => open(text),
-              onAgent: () => open(),
+              onPrompt: async (text: string) => {
+                await open(text);
+              },
+              onAgent: async () => {
+                await open();
+              },
             }),
           },
           SessionPage,

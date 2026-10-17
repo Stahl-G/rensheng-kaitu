@@ -11,14 +11,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Experience, ExperienceChanges, LifeMapData } from "../types.js";
 import { ExperienceEditor } from "./ExperienceEditor.js";
 import { type ExperienceImportControlProps, ExperienceImportControls } from "./ExperienceImportControls.js";
+import { HometownEditor } from "./HometownEditor.js";
 import css from "./MapPage.module.css";
 import { SourceEvidence } from "./SourceEvidence.js";
+import { useT } from "./i18n.js";
 import { atlasStyle, cityKey, journeyRoutes } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
   subscribe?: (refresh: () => void) => () => void;
   loadExperienceSource: (id: string) => Promise<import("../types.js").ExperienceSource>;
   loadLifeMap: () => Promise<LifeMapData>;
+  hometownCities: (name: string) => Promise<import("../types.js").City[]>;
+  saveHometown: (name: string, id: number) => Promise<unknown>;
   resolveExperience: (id: string, geonameid: number) => Promise<unknown>;
   editExperience: (id: string, changes: ExperienceChanges, revision: number) => Promise<void>;
   hideExperience: (id: string, revision: number) => Promise<number>;
@@ -623,6 +627,8 @@ export function MapPage({
   subscribe,
   loadExperienceSource,
   loadLifeMap,
+  hometownCities,
+  saveHometown,
   resolveExperience,
   editExperience,
   hideExperience,
@@ -630,6 +636,8 @@ export function MapPage({
   onPrompt,
   ...importControls
 }: MapPageProps) {
+  const t = useT();
+  const [editingHome, setEditingHome] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; revision: number } | null>(null);
   const [data, setData] = useState<LifeMapData | null>(null);
@@ -844,10 +852,17 @@ export function MapPage({
         {city.home && (
           <section className={css.homeStory}>
             <span className={css.homeBadge}>⌂ 从这里出发</span>
-            <p>{data.hometown?.evidence}</p>
-            <p className={css.source}>依据：{data.hometown?.source}</p>
-            <button type="button" className={css.link} onClick={() => ask(homePrompt)}>
-              核对或修正家乡
+            <p>{home?.name}</p>
+            <p className={css.source}>{t("来自个人档案", "From your profile")}</p>
+            <button
+              type="button"
+              className={css.link}
+              onClick={() => {
+                dismiss();
+                setEditingHome(true);
+              }}
+            >
+              {t("修改家乡", "Change hometown")}
             </button>
           </section>
         )}
@@ -894,14 +909,23 @@ export function MapPage({
           onChanged={refresh}
           pending={data?.importsPending ?? 0}
         />
-        <button
-          type="button"
-          className={css.control}
-          onClick={() => (homeId ? setSelected(homeId) : ask(homePrompt))}
-        >
-          {home ? `⌂ 家乡：${home.name}` : data?.hometown?.status === "review" ? "核对家乡" : "识别我的家乡"}
+        <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
+          {home ? `⌂ ${t("家乡", "Hometown")}：${home.name}` : t("设置家乡", "Set hometown")}
         </button>
       </div>
+      {data && (!home || editingHome) && (
+        <HometownEditor
+          initial={home?.name ?? ""}
+          search={hometownCities}
+          save={async (name, id) => {
+            await saveHometown(name, id);
+            await refresh();
+            setEditingHome(false);
+            setNotice(t("家乡已保存", "Hometown saved"));
+          }}
+          cancel={home ? () => setEditingHome(false) : undefined}
+        />
+      )}
       {error && (
         <p className={css.notice} role="alert">
           {error}{" "}
@@ -1164,15 +1188,6 @@ export function MapPage({
                     </div>
                   ))}
                 </details>
-              )}
-              {!home && (
-                <section className={css.homeStory}>
-                  <h2>{data.hometown?.status === "review" ? "家乡待核对" : "从家乡开始"}</h2>
-                  <p>{data.hometown?.evidence ?? "让开图从已有资料识别家乡，为人生地图找到起点。"}</p>
-                  <button type="button" className={css.link} onClick={() => ask(homePrompt)}>
-                    识别与核对家乡
-                  </button>
-                </section>
               )}
               <div className={css.listHeading}>
                 <h2>我的城市</h2>

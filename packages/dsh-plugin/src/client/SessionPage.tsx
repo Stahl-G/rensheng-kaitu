@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { FileServicesContext, type FileServices } from "./DshFiles.js";
 import { OverviewPage, type OverviewPageProps } from "./OverviewPage.js";
 
 type Props = Omit<OverviewPageProps, "onAgent" | "onPrompt"> & {
   onAgent: () => Promise<void>;
   onPrompt: (text: string) => Promise<void>;
+  fileServices: FileServices;
 };
 
 export function SessionPage(props: Props) {
@@ -17,9 +19,9 @@ export function SessionPage(props: Props) {
     }
   };
   return (
-    <>
+    <FileServicesContext.Provider value={props.fileServices}>
       {error && <p role="alert">{error}</p>}
       <OverviewPage {...props} onPrompt={(text) => void open(text)} onAgent={() => void open()} />
-    </>
+    </FileServicesContext.Provider>
   );
 }

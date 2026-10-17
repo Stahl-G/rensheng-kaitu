@@ -15,11 +15,13 @@ import {
   type Pose,
   type Workspace,
   addPhotoBytes,
+  assetsRoot,
   calendarPushEntries,
   calendarPushStore,
   completeNext,
   completeTask,
   decideProposal,
+  dshFiles,
   deferSnapshots,
   disableSync,
   discardUpload,
@@ -47,6 +49,7 @@ import {
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
+import { browserAsk } from "./browser-ask.js";
 import { phoneAnswer } from "./phone-answer.js";
 import { planMutations, productMutations, productRequest } from "./product.js";
 
@@ -65,6 +68,9 @@ export interface UiOptions {
   onWorkspaceChanged?: () => Promise<void>;
   onAutomationChanged?: () => Promise<void>;
   openAi?: () => Promise<{ url?: string }>;
+  pickDirectory?: () => Promise<string | null>;
+  desktopUpdate?: (action: string) => Promise<unknown>;
+  systemLocale?: string;
 }
 const PRODUCT_ROOT = fileURLToPath(new URL("../../../dsh-plugin/dist/standalone/", import.meta.url));
 const LEGACY_ROOT = fileURLToPath(new URL("../../../web/dist/", import.meta.url));
@@ -97,7 +103,16 @@ function field(data: Record<string, unknown>, key: string): string {
 }
 
 export async function startUi(ws: Workspace, options: UiOptions = {}) {
-  const WEB_ROOT = options.webRoot ?? (existsSync(`${PRODUCT_ROOT}/index.html`) ? PRODUCT_ROOT : LEGACY_ROOT);
+  const files = dshFiles(ws);
+  options = { ...options, ask: options.ask ?? (await browserAsk(ws)) };
+  const packagedWeb = resolve(assetsRoot(), "web");
+  const WEB_ROOT =
+    options.webRoot ??
+    (existsSync(`${packagedWeb}/index.html`)
+      ? packagedWeb
+      : existsSync(`${PRODUCT_ROOT}/index.html`)
+        ? PRODUCT_ROOT
+        : LEGACY_ROOT);
   const calendarPush = new CalendarPush(calendarPushStore(ws), options.calendarExecutor);
   const collectors = new CollectorService(ws, options.collectorStateRoot);
   const phones = new PhoneService(ws, phoneAnswer(options.ask));
@@ -241,6 +256,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     }, options.refreshDelayMs ?? 300);
   }
   function changedFile(file: string) {
+    files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
@@ -346,13 +362,30 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
           (
             await body(
               req,
-              ["financeImportPreview", "onboardingImportPreview"].includes(method)
+              ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
                 ? 49 * 1024 * 1024
                 : 3 * 1024 * 1024,
             )
           ).toString(),
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
+        if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
+        if (method === "desktopUpdate")
+          return json(res, 200, options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null);
+        if (method === "findWorkspaceFiles") return json(res, 200, await files.find(String(args[0] ?? "")));
+        if (method === "openWorkspacePath") {
+          if (typeof args[0] !== "string" || !["open", "reveal"].includes(String(args[1] ?? "open")))
+            throw new KaituError("请选择要打开的资料", "BAD_ARGS");
+          return json(res, 200, await files.open(args[0], (args[1] ?? "open") as "open" | "reveal"));
+        }
+        if (method === "pickStorageFolder") {
+          const folder = options.pickDirectory
+            ? await options.pickDirectory()
+            : await (await import("@deepseek-ai/dsh-host-directory-picker-native")).pickNativeDirectory(
+                AbortSignal.timeout(10 * 60 * 1000),
+              );
+          return json(res, 200, folder);
+        }
         let draftId: string | undefined;
         if (method === "openAi" && typeof args[0] === "string" && args[0].trim()) {
           if (args[0].length > 100000) throw new KaituError("请求内容过长", "BAD_ARGS");
@@ -604,17 +637,21 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
       notify();
       json(res, 200, result);
     } catch (error) {
-      const code = error instanceof KaituError ? error.code : "BAD_REQUEST";
+      // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
+      const known =
+        error instanceof KaituError || (error instanceof Error && error.name === "KaituError")
+          ? (error as KaituError)
+          : null;
+      const code = known?.code ?? "BAD_REQUEST";
       const status =
         code === "CONFLICT" ? 409 : code === "TOO_LARGE" ? 413 : code === "NOT_FOUND" ? 404 : 400;
       json(res, status, {
         ...(req.url?.startsWith("/api/product/ask") ? { code } : {}),
-        error:
-          error instanceof KaituError
-            ? error.message
-            : req.url?.startsWith("/api/product/ask")
-              ? "AI 连接未完成，请检查连接设置后重试"
-              : "请求未完成，请检查文件格式后重试",
+        error: known
+          ? known.message
+          : req.url?.startsWith("/api/product/ask")
+            ? "AI 连接未完成，请检查连接设置后重试"
+            : "请求未完成，请检查文件格式后重试",
       });
     }
   });
@@ -641,6 +678,7 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
     await collectors.stop();
     clearInterval(calendarTimer);
     await options.ask?.close();
+    files.dispose();
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>

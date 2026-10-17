@@ -5,7 +5,8 @@ import { pathToFileURL } from "node:url";
 import { confinedFileSystem } from "./sdk-filesystem.mjs";
 import { agentSearch } from "./sdk-search.mjs";
 
-const load = (name) => import(pathToFileURL(join(process.env.KAITU_DSH_MODULES, name, "lib/index.js")).href);
+const resolveModule = createRequire(join(process.env.KAITU_DSH_MODULES, "package.json")).resolve;
+const load = (name) => import(pathToFileURL(resolveModule(name)).href);
 const [{ LocalFileSystem }, { FsError }] = await Promise.all([
   load("@deepseek-ai/dsh-fs-local"),
   load("@deepseek-ai/dsh-fs"),
@@ -14,7 +15,12 @@ const root = realpathSync(process.env.KAITU_DIR);
 export const name = "kaitu-sdk-host";
 export const inject = ["loader", "tools"];
 export async function apply(ctx) {
-  await ctx.plugin(confinedFileSystem(LocalFileSystem, FsError, root), { cwd: root });
+  const attachments = new Set();
+  ctx.provide("kaituAttachmentPaths", attachments);
+  await ctx.plugin(
+    confinedFileSystem(LocalFileSystem, FsError, root, attachments, ctx.get("attachments")?.root),
+    { cwd: root },
+  );
   ctx.inject(["fs"], (services) => {
     services.on("tools/execute", async (exec, next) => {
       if (exec.name === "glob" || exec.name === "grep") {

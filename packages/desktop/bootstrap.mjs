@@ -2,9 +2,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { BrowserWindow, Menu, app, dialog, shell } from "electron";
 import { desktopPaths } from "./kaitu-environment.mjs";
+import { selectPayload, rollback } from "../kaitu-loader.mjs";
+import { pathToFileURL } from "node:url";
 
 // 在原主进程导入和单实例锁之前设置，包括 Electron 的 relaunch 路径。
 const { state } = desktopPaths();
+process.env.KAITU_HOST_RESOURCES = process.resourcesPath;
 const embedded = process.env.KAITU_EMBEDDED_AI === "1";
 process.env.DSH_HOME = state;
 app.setName("人生开图");
@@ -44,9 +47,33 @@ if (embedded) {
   process.once("disconnect", () => app.emit("kaitu:quit"));
   await import("./lib/main.js");
 } else {
-  const { startDesktop } = await import("../kaitu/dist/local.mjs");
-  void startDesktop({ app, BrowserWindow, Menu, shell, dialog }).catch((error) => {
-    console.error(error);
+  // Electron emits ready only after its ESM entry finishes evaluating.
+  void startWorkbench();
+}
+
+async function startWorkbench() {
+  try {
+    const payload = selectPayload(state, process.resourcesPath);
+    const { startDesktop } = await import(pathToFileURL(join(payload, "dist/local.mjs")).href);
+    await startDesktop({ app, BrowserWindow, Menu, shell, dialog });
+  } catch (error) {
+    await app.whenReady();
+    const answer = await dialog.showMessageBox({
+      type: "error",
+      message: "开图启动未完成",
+      detail: String(error),
+      buttons: ["退出", "恢复上一版并重启"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+    if (answer.response === 1) {
+      try {
+        rollback(state);
+        app.relaunch();
+      } catch (failure) {
+        dialog.showErrorBox("恢复失败", String(failure));
+      }
+    }
     app.exit(1);
-  });
+  }
 }

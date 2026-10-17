@@ -189,3 +189,86 @@
   line-height: 27px;
   font-weight: 600;
 }
+
+/* Direction suggestions use compact full-width rows in the existing Kaitu palette. */
+.directionList {
+  display: grid;
+  gap: 0;
+}
+.ideaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--kt-control);
+  min-width: 0;
+}
+.ideaRow[data-paused="true"] {
+  opacity: 0.7;
+}
+.ideaBody {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.ideaHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ideaTitle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.ideaTitle:hover {
+  color: var(--kt-link);
+}
+.ideaTitle:focus-visible {
+  outline: 2px solid var(--kt-link);
+  outline-offset: 4px;
+}
+.ideaTitle:active {
+  opacity: 0.75;
+}
+.page .ideaSummary,
+.page .ideaNext {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.ideaSummary {
+  color: var(--kt-secondary);
+}
+.ideaNext {
+  color: var(--kt-text);
+}
+.ideaNext span {
+  color: var(--kt-secondary);
+  margin-right: 10px;
+}
+.ideaActions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+@media (max-width: 700px) {
+  .ideaRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .ideaActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

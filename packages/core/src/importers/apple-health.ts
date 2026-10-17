@@ -491,7 +491,7 @@ const SLEEP_VALUES: Record<string, string> = {
 };
 
 function parallelSamples(raw: Record<string, unknown>) {
-  const type = typeof raw.type === "string" ? raw.type : "";
+  const type = shortcutType(raw.type);
   const definition = SHORTCUT_TYPES[type];
   if (!definition) throw new Error(`未知健康类型：${type}`);
   // 没有样本时快捷指令发来空字符串（如不戴表睡觉），直接归档，不生成笔记。

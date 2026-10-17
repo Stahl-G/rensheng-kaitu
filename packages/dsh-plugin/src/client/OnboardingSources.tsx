@@ -1,6 +1,7 @@
 import type { OnboardingImportPreview, OnboardingSetupInput, OnboardingSetupPreview } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import styles from "./OnboardingSources.module.css";
+import { FolderButton } from "./DshFiles.js";
 import css from "./Prototype.module.css";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -310,13 +311,14 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
           </div>
           {mode === "folder" ? (
             <label>
-              文件夹的完整路径
+              项目文件夹
               <input
                 value={path}
                 placeholder="/Users/你的名字/项目"
                 disabled={locked}
                 onChange={(event) => setPath(event.target.value)}
               />
+              <FolderButton disabled={locked} onSelect={setPath} />
             </label>
           ) : (
             <label>

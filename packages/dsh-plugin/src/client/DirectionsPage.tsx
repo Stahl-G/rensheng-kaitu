@@ -1,3 +1,4 @@
+import { directionText } from "@kaitu/core/direction-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Direction,
@@ -23,7 +24,7 @@ export interface DirectionsPageProps {
     error?: string;
   }>;
   onConnect?: () => void;
-  /** 剪贴板协议：把研究提示词复制给自己的 AI，再把方向建议贴回来。 */
+  /** 剪贴板协议：把提示词复制给自己的 AI，再把方向建议贴回来。 */
   directionsPrompt?: (locale?: Locale) => Promise<string>;
   pasteDirections?: (answer: string, locale?: Locale) => Promise<{ ids: string[]; skipped: number }>;
   loadExploration: () => Promise<ExplorationData>;
@@ -80,10 +81,12 @@ function ReferenceList({
           <p>
             {item.kind === "project" ? "项目：" : item.kind === "decision" ? "决策：" : "原文："}
             {item.kind === "project"
-              ? (data?.references.projects.find((p) => p.id === item.ref)?.title ?? item.ref)
+              ? (data?.references.projects.find((p) => p.id === item.ref)?.title ?? "关联项目")
               : item.kind === "decision"
-                ? (data?.references.decisions.find((d) => d.path === item.ref)?.title ?? item.ref)
-                : item.ref}
+                ? (data?.references.decisions.find((d) => d.path === item.ref)?.title ?? "决策记录")
+                : /^https?:\/\//i.test(item.ref)
+                  ? "外部参考资料"
+                  : "个人资料"}
           </p>
           <SourceEvidence id={id} label="查看关联资料" load={() => load(owner, id, index)} />
         </div>
@@ -118,8 +121,8 @@ function ClipboardDirections({
       <b>{t("用你常用的 AI 提方向，不用 API Key", "Ask the AI you already use, no API key")}</b>
       <span className={v2.small}>
         {t(
-          "复制一段研究提示词（含你的目标、在做的事和已有方向，不含健康、财务和敏感记忆），发给能联网搜索的 AI，再把它的回答贴回来。建议先放进「待采纳」，由你决定。",
-          "Copy a research prompt (with your goals, projects and existing directions; no health, finance or sensitive memories), send it to an AI that can search the web, then paste its answer back. Suggestions wait for you to adopt them.",
+          "复制提示词给你常用的 AI，再贴回建议。只带目标、项目和已有方向，由你选择是否采纳。",
+          "Copy the prompt to your own AI, then paste its ideas back. It includes goals, projects and directions. You choose what to adopt.",
         )}
       </span>
       <div className={v2["dialog-foot"]}>
@@ -147,17 +150,11 @@ function ClipboardDirections({
             })()
           }
         >
-          {t("1 · 复制研究提示词", "1 · Copy the research prompt")}
+          {t("1 · 复制提示词", "1 · Copy the research prompt")}
         </button>
       </div>
       {prompt && (
-        <textarea
-          ref={area}
-          readOnly
-          rows={4}
-          value={prompt}
-          aria-label={t("研究提示词", "Research prompt")}
-        />
+        <textarea ref={area} readOnly rows={4} value={prompt} aria-label={t("提示词", "Research prompt")} />
       )}
       <textarea
         rows={5}
@@ -455,7 +452,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
             <span className={base.muted}>{states[direction.status]}</span>
           </header>
           <div className={css.heading}>
-            <h2>{direction.title}</h2>
+            <h2>{directionText(direction.title, 120)}</h2>
             <button
               type="button"
               className={base.link}
@@ -483,23 +480,17 @@ export function DirectionsPage(props: DirectionsPageProps) {
             <>
               <div className={css.statement}>
                 <h3>为什么在意</h3>
-                <p>{direction.motivation || "先保留这个问题，再慢慢补充为什么在意。"}</p>
+                <p>{directionText(direction.motivation, 600) || "先保留这个问题，再慢慢补充为什么在意。"}</p>
                 <h3>目前的假设</h3>
-                <p>{direction.hypothesis || "还没形成假设，可以先收集一点资料。"}</p>
+                <p>{directionText(direction.hypothesis, 400) || "还没形成假设，可以先收集一点资料。"}</p>
                 {direction.unknowns && (
                   <>
                     <h3>仍然未知</h3>
-                    <p>{direction.unknowns}</p>
+                    <p>{directionText(direction.unknowns, 240)}</p>
                   </>
                 )}
               </div>
-              <ReferenceList
-                data={data}
-                load={props.loadExplorationSource}
-                owner="direction"
-                id={direction.id}
-                items={direction.references}
-              />
+
               {notes.some((n) => n.stance === "refutes") && (
                 <section>
                   <h3>需要认真看待的反面证据</h3>
@@ -592,6 +583,13 @@ export function DirectionsPage(props: DirectionsPageProps) {
           )}
           {tab === "sources" && (
             <>
+              <ReferenceList
+                data={data}
+                load={props.loadExplorationSource}
+                owner="direction"
+                id={direction.id}
+                items={direction.references}
+              />
               <div className={css.actions}>
                 <button type="button" className={base.button} onClick={() => openForm("note")}>
                   补充依据或认识
@@ -702,10 +700,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
               }}
             />
           )}
-          <div className={`${v2.grid} ${css.cards}`}>
+          <div className={css.directionList}>
             {listedDirections.map((d) => {
               const attempt = data.experiments.filter((e) => e.direction_id === d.id).at(-1);
-              const evidence = data.notes.filter((n) => n.direction_id === d.id);
               const change = async (status: Direction["status"]) => {
                 setBusy(true);
                 setError(null);
@@ -722,101 +719,35 @@ export function DirectionsPage(props: DirectionsPageProps) {
                   setBusy(false);
                 }
               };
+              const open = () => {
+                setSelected(d.id);
+                setTab("overview");
+                setReceipt(null);
+              };
               return (
-                <article
-                  key={d.id}
-                  className={`${v2.dir} ${v2.card} ${d.status === "paused" ? v2["is-paused"] : ""}`}
-                >
-                  <div className={v2["sec-head"]}>
-                    <span
-                      className={v2.chip}
-                      style={{
-                        background: d.status === "suggested" ? "var(--news-tint)" : "var(--explore-tint)",
-                        color: d.status === "suggested" ? "var(--news-ink)" : "var(--explore-ink)",
-                      }}
-                    >
-                      {stateLabel(d.status)}
-                    </span>
-                    {d.favorite && <span className={v2.small}>{t("已收藏", "Saved")}</span>}
-                  </div>
-                  <h3>
-                    <button
-                      type="button"
-                      className={v2.link}
-                      style={{ color: "inherit", font: "inherit" }}
-                      onClick={() => {
-                        setSelected(d.id);
-                        setTab("overview");
-                        setReceipt(null);
-                      }}
-                    >
-                      {d.title}
-                    </button>
-                  </h3>
-                  {d.status === "suggested" ? (
-                    <div className={css.prose}>
-                      <p>
-                        {d.motivation ||
-                          t("这条建议还没有写明依据", "No reasoning written for this suggestion yet")}
+                <article key={d.id} className={css.ideaRow} data-paused={d.status === "paused"}>
+                  <div className={css.ideaBody}>
+                    <div className={css.ideaHeading}>
+                      <span className={v2.chip}>{stateLabel(d.status)}</span>
+                      {d.favorite && <span className={v2.small}>{t("已收藏", "Saved")}</span>}
+                    </div>
+                    <h3>
+                      <button type="button" className={css.ideaTitle} onClick={open}>
+                        {directionText(d.title, 60)}
+                      </button>
+                    </h3>
+                    <p className={css.ideaSummary}>
+                      {directionText(d.motivation, 110).split(/(?<=[。！？!?])\s*/)[0] ||
+                        t("先记下这个想法，试过再判断。", "Keep the idea and learn by trying.")}
+                    </p>
+                    {(attempt?.action || d.hypothesis) && (
+                      <p className={css.ideaNext}>
+                        <span>{t("第一步", "First step")}</span>
+                        {directionText(attempt?.action || d.hypothesis, 100)}
                       </p>
-                      <p>{d.hypothesis}</p>
-                      {d.unknowns && (
-                        <p>
-                          {t("还不清楚：", "Still unclear: ")}
-                          {d.unknowns}
-                        </p>
-                      )}
-                      {d.references
-                        ?.filter((ref) => ref.kind === "source" && /^https?:\/\//.test(ref.ref))
-                        .map((ref) => (
-                          <p key={ref.ref}>
-                            <a href={ref.ref} target="_blank" rel="noreferrer">
-                              {ref.ref}
-                            </a>
-                          </p>
-                        ))}
-                    </div>
-                  ) : (
-                    <dl>
-                      <dt>{t("当前猜想", "Current guess")}</dt>
-                      <dd>{d.hypothesis || t("还没有写下猜想", "No guess written yet")}</dd>
-                      <dt>{t("还不清楚", "Still unclear")}</dt>
-                      <dd>{d.unknowns || t("尚未记录", "Not noted yet")}</dd>
-                    </dl>
-                  )}
-                  {attempt && (
-                    <div className={v2.attempt}>
-                      <span className={v2.small}>
-                        {d.status === "paused"
-                          ? t("上次尝试", "Last attempt")
-                          : t("这次尝试", "Current attempt")}
-                      </span>
-                      <b>{attempt.action}</b>
-                      <span className={v2.small}>
-                        {t(
-                          `投入：${attempt.budget} · 期限：${attempt.deadline}`,
-                          `Effort: ${attempt.budget} · by ${attempt.deadline}`,
-                        )}
-                      </span>
-                      {attempt.result && <p>{attempt.result}</p>}
-                    </div>
-                  )}
-                  {d.status !== "suggested" && (
-                    <div className={v2.evidence}>
-                      {(
-                        [
-                          ["supports", t("支持", "For")],
-                          ["refutes", t("反对", "Against")],
-                          ["unclear", t("还说不准", "Unclear")],
-                        ] as const
-                      ).map(([stance, label]) => (
-                        <span key={stance} className={v2.chip}>
-                          {label} {evidence.filter((n) => n.stance === stance).length}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className={v2["dir-foot"]}>
+                    )}
+                  </div>
+                  <div className={css.ideaActions}>
                     {d.status === "suggested" ? (
                       <>
                         <button
@@ -835,37 +766,20 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         >
                           {t("不感兴趣", "Not interested")}
                         </button>
-                        <button
-                          type="button"
-                          className={v2.link}
-                          disabled={generation?.status === "running"}
-                          onClick={() => void generate()}
-                        >
-                          {t("换一批", "New batch")}
-                        </button>
                       </>
                     ) : (
-                      <>
-                        <button
-                          type="button"
-                          className={v2.link}
-                          onClick={() => {
-                            setSelected(d.id);
-                            setTab("overview");
-                          }}
-                        >
-                          {t("打开方向 →", "Open →")}
-                        </button>
-                        <button
-                          type="button"
-                          className={v2.link}
-                          disabled={busy}
-                          onClick={() => void change(d.status === "active" ? "paused" : "active")}
-                        >
-                          {d.status === "active" ? t("暂停", "Pause") : t("继续探索", "Resume")}
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        className={v2.link}
+                        disabled={busy}
+                        onClick={() => void change(d.status === "active" ? "paused" : "active")}
+                      >
+                        {d.status === "active" ? t("暂停", "Pause") : t("继续探索", "Resume")}
+                      </button>
                     )}
+                    <button type="button" className={v2.link} onClick={open}>
+                      {t("查看详情", "Details")}
+                    </button>
                   </div>
                 </article>
               );

@@ -33,13 +33,15 @@ export interface AskImage {
   data: string;
   mimeType: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
 }
+export type AskAttachment = AskImage | { kind: "file"; data: string; mimeType: string; name: string };
 export interface AskService {
+  support?(method: string, input: Record<string, unknown>): Promise<unknown>;
   background(): AskService;
   list(): AskThread[];
   create(): AskThread;
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
-  send(id: string, text: string, images?: AskImage[]): Promise<unknown>;
+  send(id: string, text: string, images?: AskAttachment[]): Promise<unknown>;
   settings(): Promise<{
     configured: boolean;
     search?: NetworkSearchSettings;
@@ -50,6 +52,7 @@ export interface AskService {
     model: string;
   }>;
   configure(input: Record<string, unknown>): Promise<unknown>;
+  models(input: Record<string, unknown>): Promise<{ id: string; name?: string; image?: boolean }[]>;
   setMode(id: string, mode: AskMode, confirmed: boolean): Promise<AskMode>;
   prepareRelocation(): Promise<void>;
   relocate(workspace: string): void;
@@ -71,6 +74,9 @@ export function createAskService(options: {
   runtime: (mode: AskMode) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
+  models: AskService["models"];
+  support?: AskService["support"];
+  dispose?: () => Promise<void>;
 }): AskService {
   const directory = join(
     options.state,
@@ -281,24 +287,20 @@ export function createAskService(options: {
       const mode = row.mode ?? "scoped";
       if (busy.size && runtimeMode !== mode)
         throw new KaituError("请等当前回复完成后切换模式", "AI_CONNECTION");
-      if (typeof text !== "string" || !text.trim() || text.length > 100000)
+      if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000)
         throw new KaituError("请输入有效消息（最多十万字）", "AI_CONNECTION");
       if (busy.has(id)) throw new KaituError("请等这次回复完成", "AI_CONNECTION");
       if (
         !Array.isArray(images) ||
-        images.length > 1 ||
-        images.some(
-          (image) =>
-            !image ||
-            !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(image.mimeType) ||
-            typeof image.data !== "string" ||
-            image.data.length > 2800000 ||
-            !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data),
-        )
+        images.length > 10 ||
+        images.some((file) => !file || typeof file.data !== "string" || file.data.length > 40 * 1024 * 1024)
       )
-        throw new KaituError("请选择一张不超过 2MB 的 JPG、PNG、WebP 或 GIF 图片", "AI_IMAGE");
-      if (images.length && !(await options.settings()).supportsImages)
-        throw new KaituError("当前模型不支持图片，请在 AI 与连接中切换到支持图片的模型", "AI_IMAGE");
+        throw new KaituError("每次最多添加 10 个附件，单个附件不超过 25MB", "AI_ATTACHMENT");
+      if (
+        images.some((file) => !("kind" in file && file.kind === "file")) &&
+        !(await options.settings()).supportsImages
+      )
+        throw new KaituError("当前连接未启用图片，请切换模型后重试", "AI_IMAGE");
       ready();
       busy.add(id);
       append(id, "session.status", { status: "running" });
@@ -308,7 +310,10 @@ export function createAskService(options: {
           sessionId: id,
           contentBlocks: [
             { type: "text", text: text.trim() },
-            ...images.map((image) => ({ type: "image", ...image })),
+            ...images.map((file) => ({
+              ...file,
+              type: "kind" in file && file.kind === "file" ? "file" : "image",
+            })),
           ],
         });
       } catch (error) {
@@ -357,6 +362,8 @@ export function createAskService(options: {
       relocating = false;
     },
     settings: options.settings,
+    support: options.support,
+    models: options.models,
     async configure(input) {
       ready();
       if (busy.size || backgrounds.size) throw new KaituError("请等回复完成后修改连接", "AI_CONNECTION");
@@ -373,6 +380,7 @@ export function createAskService(options: {
       if (backgrounds.size) await Promise.all([...backgrounds].map((service) => service.close()));
       await stopRuntime();
       listeners.clear();
+      await options.dispose?.();
     },
   };
 }

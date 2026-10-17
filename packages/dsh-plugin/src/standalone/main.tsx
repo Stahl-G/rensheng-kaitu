@@ -75,10 +75,12 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  desktopUpdate: (action) => call("desktopUpdate", action),
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
   exportWorkspace: () => call("exportWorkspace"),
   restoreVersion: (oid) => call("restoreVersion", oid),
   moveStorage: (path, drive, provider) => call("moveStorage", path, drive, provider),
+  pickStorageFolder: () => call("pickStorageFolder"),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
   loadLibrary: () => call("library"),
@@ -105,6 +107,8 @@ const props: OverviewPageProps = {
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
+  hometownCities: (name) => call("hometownCities", name),
+  saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),
   previewExperienceBatch: (id, operation) => call("experienceBatchPreview", id, operation),
   setExperienceSource: (locator, excluded, revision) =>

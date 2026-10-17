@@ -3,7 +3,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import listPlugin from "@fullcalendar/list";
 import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
-import type { CalendarPushSettings } from "@kaitu/core";
+import type { CalendarPushSettings, PlanBlock } from "@kaitu/core";
 import { useEffect, useState } from "react";
 import type { CalendarData, CalendarEntry } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices, CalendarSlotForm } from "./CalendarPush.js";
@@ -31,7 +31,19 @@ export function calendarTime(value: string, zone: string) {
         hour12: false,
       }).format(new Date(value));
 }
-export function Agenda({ data, open }: { data: CalendarData | null; open: () => void }) {
+export function Agenda({
+  data,
+  open,
+  proposals,
+  decide,
+  busy,
+}: {
+  data: CalendarData | null;
+  open: () => void;
+  proposals: PlanBlock[];
+  decide: (id: string, decision: "confirmed" | "rejected") => void;
+  busy: boolean;
+}) {
   const t = useT();
   const today =
     data?.events.filter(
@@ -42,6 +54,17 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
             !(event.end.length === 10 && event.end === data.today)
           : calendarDay(event.start, data.timeZone) === data.today),
     ) ?? [];
+  today.push(
+    ...proposals
+      .filter((b) => !b.start)
+      .map((b) => ({
+        id: b.id,
+        title: b.title,
+        start: "",
+        pending: true,
+        source: "开图",
+      })),
+  );
   return (
     <section className={css.sec}>
       <div className={css["sec-head"]}>
@@ -60,12 +83,30 @@ export function Agenda({ data, open }: { data: CalendarData | null; open: () => 
             .sort((a, b) => a.start.localeCompare(b.start))
             .map((event) => (
               <div className={css["agenda-row"]} key={event.id}>
-                <time>{calendarTime(event.start, data.timeZone)}</time>
+                <time>{event.start ? calendarTime(event.start, data.timeZone) : t("待定", "TBD")}</time>
                 <span>{event.title}</span>
-                <span className={css.small}>
-                  {event.source}
-                  {event.pending ? t(" · 建议，待确认", " · suggestion, to confirm") : ""}
-                </span>
+                {event.pending ? (
+                  <div className={css.confirmationActions}>
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css.confirmationAccept}`}
+                      disabled={busy}
+                      onClick={() => decide(event.id, "confirmed")}
+                    >
+                      {t("确认", "Confirm")}
+                    </button>
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css.confirmationDismiss}`}
+                      disabled={busy}
+                      onClick={() => decide(event.id, "rejected")}
+                    >
+                      {t("不用", "No thanks")}
+                    </button>
+                  </div>
+                ) : (
+                  <span className={css.small}>{event.source}</span>
+                )}
               </div>
             ))
         )}

@@ -1,5 +1,6 @@
 import type { ProjectGoal } from "@kaitu/core";
 import { useEffect, useState } from "react";
+import { OpenPath } from "./DshFiles.js";
 import type { DoingProject, ProjectDetailData } from "../types.js";
 import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
@@ -502,7 +503,7 @@ export function ProjectsPage(
                     <span className={css.role}>
                       {{ repo: "仓库", manuscript: "手稿", folder: "文件夹" }[link.role]}
                     </span>{" "}
-                    {link.path}
+                    <OpenPath path={link.path} />
                   </p>
                 ))}
                 {project.sources.map((file) => (

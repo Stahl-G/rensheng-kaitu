@@ -4,9 +4,9 @@
     <clipPath id="kaitu-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
     <clipPath id="kaitu-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
   </defs>
-  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#7C2A1E" stroke="#7C2A1E" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#B23A2A" stroke="#B23A2A" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#F0C2B5" stroke="#F0C2B5" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#1B3254" stroke="#1B3254" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2B4C7E" stroke="#2B4C7E" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#B8CBE4" stroke="#B8CBE4" stroke-width="1.5" stroke-linejoin="round"/>
   <g clip-path="url(#kaitu-folded)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#7C2A1E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1B3254" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
 </svg>

@@ -1,0 +1,9 @@
+{
+  "name": "@kaitu/desktop",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "semver": "^7.8.5"
+  }
+}

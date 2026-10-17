@@ -60,12 +60,17 @@ const modules = [
 /** 先读本机语言偏好（第一次打开时由服务端决定一次），再用它渲染整个应用。 */
 export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
+  const [followSystem, setFollowSystem] = useState(true);
   useEffect(() => {
     let active = true;
-    // 已有资料的工作区保持中文，新用户按系统语言。
+    // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
     void props
       .loadPreferences(browserLocale())
-      .then((value) => active && setLocale(value.locale === "en" ? "en" : "zh-CN"))
+      .then((value) => {
+        if (!active) return;
+        setLocale(value.locale === "en" ? "en" : "zh-CN");
+        setFollowSystem(value.followSystem ?? false);
+      })
       .catch(() => active && setLocale("zh-CN"));
     return () => {
       active = false;
@@ -73,7 +78,7 @@ export function OverviewPage(props: OverviewPageProps) {
   }, [props.loadPreferences]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
-      <Overview {...props} locale={locale} setLocale={setLocale} />
+      <Overview {...props} locale={locale} setLocale={setLocale} followSystem={followSystem} setFollowSystem={setFollowSystem} />
     </LocaleContext.Provider>
   );
 }
@@ -81,8 +86,11 @@ export function OverviewPage(props: OverviewPageProps) {
 function Overview({
   locale,
   setLocale,
+  followSystem,
+  setFollowSystem,
   ...props
-}: OverviewPageProps & { locale: Locale | null; setLocale: (locale: Locale) => void }) {
+}: OverviewPageProps & { locale: Locale | null; setLocale: (locale: Locale) => void;
+  followSystem: boolean; setFollowSystem: (value: boolean) => void }) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();
@@ -97,6 +105,7 @@ function Overview({
   // 开图默认先看健康，然后是足迹、资讯、方向（2026-10-17 用户决定）。
   const [explore, setExplore] = useState("health");
   const [data, setData] = useState<OverviewData | null>(null);
+  const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
@@ -208,6 +217,13 @@ function Overview({
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
+  const askNext = (item: { title: string; module: string }) =>
+    prompt(
+      t(
+        `帮我完成「${item.title}」（来自${item.module}）。先看开图里相关的已有资料，缺少的信息一次问我一个问题。根据我的回答补全并写回对应资料，最后简短告诉我更新了什么。`,
+        `Help me with “${item.title}” from ${item.module}. Read the related Kaitu notes first. Ask one question at a time for missing information, update the relevant notes from my answers, then briefly tell me what changed.`,
+      ),
+    );
   const openSection = (id: string) => {
     if (id === "me") setView("profile");
     else if (["explore", "health", "feed", "directions"].includes(id)) {
@@ -262,9 +278,11 @@ function Overview({
     await refresh();
     startGuide(1);
   };
-  const changeLocale = async (next: Locale) => {
+  const changeLocale = async (next: Locale | null) => {
     await props.savePreferences({ locale: next });
-    setLocale(next);
+    const resolved = await props.loadPreferences(browserLocale());
+    setLocale(resolved.locale === "en" ? "en" : "zh-CN");
+    setFollowSystem(resolved.followSystem ?? false);
   };
   const child = {
     ...props,
@@ -605,10 +623,10 @@ function Overview({
                         )}
                         <button
                           type="button"
-                          className={`${css.btn} ${css["btn-quiet"]}`}
-                          onClick={() => openSection(focus.section)}
+                          className={`${css.btn} ${css["btn-strong"]}`}
+                          onClick={() => askNext(focus)}
                         >
-                          {t("查看相关资料", "Related notes")}
+                          {t("让问问帮我", "Ask for help")}
                         </button>
                       </>
                     )}
@@ -638,8 +656,8 @@ function Overview({
                           {t("安排时间段", "Schedule a time")}
                         </button>
                       )}
-                      <button type="button" className={css.link} onClick={() => openSection(item.section)}>
-                        {t("查看", "View")}
+                      <button type="button" className={css.link} onClick={() => askNext(item)}>
+                        {t("让问问帮我", "Ask for help")}
                       </button>
                     </div>
                   ))}
@@ -651,12 +669,8 @@ function Overview({
                       {data.allNext.map((item) => (
                         <div className={css.row} key={item.id}>
                           <span className={css["row-title"]}>{item.title}</span>
-                          <button
-                            type="button"
-                            className={css.link}
-                            onClick={() => openSection(item.section)}
-                          >
-                            {t("查看", "View")}
+                          <button type="button" className={css.link} onClick={() => askNext(item)}>
+                            {t("让问问帮我", "Ask for help")}
                           </button>
                         </div>
                       ))}
@@ -665,7 +679,13 @@ function Overview({
                 </section>
               )}
               {plansCard}
-              <Agenda data={calendar} open={() => openRecord("calendar")} />
+              <Agenda
+                data={calendar}
+                open={() => openRecord("calendar")}
+                proposals={pendingProposals}
+                busy={busy}
+                decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
+              />
               {push &&
                 data.blocks
                   .filter((block) => block.status === "confirmed" && block.start && block.end)
@@ -683,36 +703,9 @@ function Overview({
                       />
                     </div>
                   ))}
-              {data.blocks
-                .filter((b) => b.status === "pending" && b.kind === "proposal")
-                .map((b) => (
-                  <section className={css.ask} key={b.id}>
-                    <h2 className={css.eyebrow}>{t("要你确认", "Needs your confirmation")}</h2>
-                    <p>
-                      {b.title} · {b.start}
-                      {b.end ? `–${b.end}` : ""}
-                    </p>
-                    <button
-                      type="button"
-                      className={`${css.btn} ${css["btn-primary"]}`}
-                      disabled={busy}
-                      onClick={() => void run(() => props.decideProposal(b.id, "confirmed"))}
-                    >
-                      {t("确认", "Confirm")}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${css.btn} ${css["btn-quiet"]}`}
-                      disabled={busy}
-                      onClick={() => void run(() => props.decideProposal(b.id, "rejected"))}
-                    >
-                      {t("不用", "No thanks")}
-                    </button>
-                  </section>
-                ))}
               {data.sync.needsReview > 0 && (
-                <section className={css.ask}>
-                  <b>{t("要你确认", "Needs your confirmation")}</b>
+                <div className={css.reviewLinks}>
+                  <span className={css.small}>{t("要你核对：", "To review:")}</span>
                   {data.sync.directionSuggestions > 0 && (
                     <button type="button" className={css.link} onClick={() => openSection("directions")}>
                       {t(
@@ -738,7 +731,7 @@ function Overview({
                       {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
                     </button>
                   )}
-                </section>
+                </div>
               )}
               <DataSummaries data={data} open={openSection} />
               {data.sections.some((section) => section.id === "finance") && (
@@ -888,6 +881,7 @@ function Overview({
             manageAi={props.renderAsk ? manageAi : props.onAgent}
             onHandoverAnswer={handoverAnswer}
             locale={locale ?? "zh-CN"}
+            followSystem={followSystem}
             onLocale={changeLocale}
           />
         )}
