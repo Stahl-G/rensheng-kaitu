@@ -22,6 +22,7 @@ import type {
   NewsFeedback,
 } from "../types.js";
 import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
+import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
 
@@ -89,6 +90,18 @@ export async function apply(ctx: Context) {
         void check();
         return () => clearInterval(timer);
       });
+      // 问问在开图页里就地对话；服务对象只建一次，页面重绘不会重开会话。
+      const askServices: PluginAskServices = {
+        sessions: ctx.get("sessions") as PluginAskServices["sessions"],
+        workspaces: ctx.get("workspaces") as PluginAskServices["workspaces"],
+        conversation: ctx.get("conversation") as PluginAskServices["conversation"],
+        workspacePath: async () => {
+          const result = await ctx.remote.kaitu.workspacePath();
+          if (!result.ok) throw new Error(result.error.message);
+          return result.value;
+        },
+      };
+      ctx.slots.inject("kaitu.ask.chat", () => ctx.slots.register({ name: "kaitu.ask.chat" }, AskChat));
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
         if (!result.ok) throw new Error(result.error.message);
@@ -118,7 +131,9 @@ export async function apply(ctx: Context) {
           {
             name: "main",
             key: panel,
+            children: { "kaitu.ask.chat": { kind: "single", scope: "session" } },
             inject: () => ({
+              askServices,
               fileServices: {
                 pickDirectory: () => ctx.get("uiWorkspace").pickDirectory(),
                 findFiles: async (query: string) => {
