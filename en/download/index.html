@@ -21,10 +21,10 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -39,7 +39,7 @@
 <div class="wrap narrow" data-release>
   <header class="page-head">
     <h1>Download Kaitu</h1>
-    <p class="lead">Kaitu.app for macOS, for Macs with Apple silicon.</p>
+    <p class="lead">On a Mac with Apple silicon, download Kaitu.app. On Windows and Linux, add Kaitu to DeepSeek Harness; see <a href="#windows">below</a>.</p>
   </header>
 
   <section class="dl-card" aria-labelledby="dl-title">
@@ -74,17 +74,30 @@
 
     <h2 id="needs">What you need</h2>
     <ul>
-      <li>A Mac with Apple silicon (arm64). There's no Intel Mac or Windows version yet.</li>
+      <li>Kaitu.app needs a Mac with Apple silicon (arm64). On an Intel Mac, Windows or Linux, use the <a href="#windows">DeepSeek Harness plugin</a>.</li>
       <li>No API key is needed to browse your notes, jot things down, or view maps and finances. To use the built-in Ask, add an AI service: DeepSeek is the default suggestion, and OpenAI, Claude, Gemini, Kimi, Zhipu and others also work.</li>
     </ul>
+
+    <h2 id="windows">Windows and Linux: add Kaitu to DeepSeek Harness</h2>
+    <p>On Windows and Linux, Kaitu runs as a DeepSeek Harness (DSH) plugin. Support is in preview. Once installed, DSH gets a Kaitu entry in its sidebar with three tabs, Today, Explore and Library, and chats use DSH’s own sessions.</p>
+    <ol>
+      <li>Install the DeepSeek Harness desktop app, version 0.2.1-rc.2 or later (see <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness on GitHub</a>). Open it once and set up a model in Settings → Models.</li>
+      <li>Open Plugins in the sidebar and install <code>kaitu-dsh</code>.</li>
+      <li>Reopen DSH and click Kaitu in the sidebar. The first time, choose where your notes live.</li>
+    </ol>
+    <p>You can also install it from a plugin market: in Plugins, click More next to Experimental plugins and turn on Custom plugin market; under Discover, click Add index source, enter <code>https://kaitu.si/plugins/index.json</code>, then install Kaitu.</p>
+    <p>If you prefer the command line (Node.js 22.19+ or 24+):</p>
+<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
+kaitu dsh --install</code></pre><button type="button" class="copy">Copy</button></div>
+    <p>Then reopen DSH. If Kaitu.app on a Mac uses the same notes folder, add <code>--no-automation</code> so background tasks only run in Kaitu.app. Writing to the system calendar only works in Kaitu.app on a Mac; elsewhere Kaitu creates calendar files for you to import.</p>
 
     <h2 id="other">Other ways</h2>
     <h3 id="cli">CLI and web version</h3>
     <p>The same version also ships as a CLI and web package: <a data-rel="tgz" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/rensheng-kaitu-0.1.0-rc.3.tgz"><code data-rel="tgz-name">rensheng-kaitu-0.1.0-rc.3.tgz</code></a> (SHA-256 <code data-rel="tgz-sha">628977878b48b1451bf364074ef1ddbdda40c0f6bbd2e2bcc5cdc58a7f1cf412</code>). It needs Node.js 22.19+ (22.x) or 24+, and doesn't need Kaitu.app or a separate DSH install.</p>
-<div class="codeblock"><pre><code>npm install -g <span data-rel="tgz-url">https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/rensheng-kaitu-0.1.0-rc.3.tgz</span> --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
+<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
 kaitu init ~/kaitu-web
 kaitu --dir ~/kaitu-web ui</code></pre><button type="button" class="copy">Copy</button></div>
-    <p>The workbench only listens on this computer (127.0.0.1). Open the address it prints, then add an AI service in Ask → Connect AI. It isn't published to npm yet.</p>
+    <p>The workbench only listens on this computer (127.0.0.1). Open the address it prints, then add an AI service in Ask → Connect AI.</p>
 
     <h3 id="source">Run from source</h3>
     <p>You need Node.js 22.19+ (22.x) or 24+, and pnpm.</p>
@@ -95,10 +108,6 @@ pnpm build
 node packages/cli/dist/main.js init ~/kaitu-demo --sample
 node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="button" class="copy">Copy</button></div>
     <p><code>--sample</code> creates synthetic demo notes.</p>
-
-    <h3 id="dsh">Add it to DeepSeek Harness</h3>
-    <p>If you already use the DeepSeek Harness 0.2.1-rc.2 desktop app: after <code>pnpm build</code> in the source folder, run the command below and reopen DeepSeek Harness. Kaitu appears in the sidebar with three tabs: Today, Explore and Library. DSH keeps its own brand and panels, and chats use DSH's own sessions. If Kaitu.app uses the same notes folder, add <code>--no-automation</code>.</p>
-<div class="codeblock"><pre><code>node packages/cli/dist/main.js dsh --install</code></pre><button type="button" class="copy">Copy</button></div>
 
     <p style="margin-top:28px">Every build is published on <a href="https://github.com/Stahl-G/rensheng-kaitu/releases">GitHub Releases</a>. For how to use it, see the <a href="/en/docs/">docs</a>; for where your notes are stored and sent, see <a href="/en/privacy/">Where your data goes</a>.</p>
   </div>

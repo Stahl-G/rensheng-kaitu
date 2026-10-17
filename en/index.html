@@ -21,14 +21,13 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/mock/mock.css">
-<script src="/mock/persona.js" defer></script>
-<script src="/mock/mock.js" defer></script>
-<script src="/mock/lifemap.js" defer></script>
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
+<link rel="stylesheet" href="/mock/mock.css?v=374b26a3">
+<script src="/mock/persona.js?v=ddadd7d1" defer></script>
+<script src="/mock/mock.js?v=c411fc6e" defer></script>
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -179,8 +178,6 @@
       <p class="eyebrow">Inspiration</p>
       <h2 id="insp-title">Where the idea came from</h2>
     </div>
-    <div class="insp-grid">
-      <div>
     <div class="prose" data-reveal>
       <p>“Sun-ology”, “thin muscle”, the “yellow-hair theory”… In the widely debated four-hour interview between Allen Shao and Justin Sun, three cryptic-sounding ideas were stitched together into a life philosophy about the mind, the body and action.</p>
       <p>Interestingly, the most concrete part of the interview is exactly how many of us have already started using AI in everyday life.</p>
@@ -191,9 +188,6 @@
       <p>You can look back on the road behind you. Where to go next is yours to decide, like opening up the map in a game.</p>
     </div>
     <p class="disclaimer" data-reveal>Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
-      </div>
-      <div class="lifemap" data-lifemap data-lang="en"></div>
-    </div>
   </div>
 </section>
 
@@ -220,7 +214,7 @@
       <details><summary>Do I have to use a particular AI?</summary><div><p>No. Add a key for DeepSeek, OpenAI, Claude, Gemini, Kimi, Zhipu or another service to use Ask; every service you add is kept, so you can switch. Or skip keys entirely: copy a context pack to the AI you already use and paste its answer back.</p></div></details>
       <details><summary>Is it free? Is it open source?</summary><div><p>Free. The code is open source under the MIT License, on <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>.</p></div></details>
       <details><summary>Is this a stable release?</summary><div><p data-rel="pre">Not yet. The current version is <span data-rel="version">0.1.0-rc.3</span>, a release candidate marked as a pre-release on GitHub.</p><p data-rel="stable" hidden>Yes. The current version is <span data-rel="version">0.1.0-rc.3</span>.</p></div></details>
-      <details><summary>Is there a Windows or Intel Mac version?</summary><div><p>Not yet. Kaitu.app is macOS on Apple silicon only. On other computers you can try the CLI and web version; see the <a href="/en/download/#other">download page</a>.</p></div></details>
+      <details><summary>Is there a Windows version?</summary><div><p>Yes, as a DeepSeek Harness plugin, in preview: install the DeepSeek Harness desktop app, then install <code>kaitu-dsh</code> from its Plugins page. The same works on Linux and Intel Macs. See the <a href="/en/download/#windows">download page</a>.</p></div></details>
       <details><summary>Is the app available in English?</summary><div><p>Yes. The interface follows your system language by default, and you can switch between 中文 and English in Settings (avatar menu, top right). Some pages are still partly in Chinese.</p></div></details>
       <details><summary>Where are my notes stored?</summary><div><p>The first time you open Kaitu, you choose where your notes live: this computer (<code>~/kaitu</code> by default), iCloud, Google Drive, Nutstore, or a folder another sync app syncs. Nothing syncs unless you pick a cloud drive, and version history and keys always stay on this computer. For what is sent to an AI, see <a href="/en/privacy/">Where your data goes</a>.</p></div></details>
     </div>

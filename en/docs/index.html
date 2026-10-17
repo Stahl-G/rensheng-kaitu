@@ -21,10 +21,10 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -302,13 +302,13 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>The global option <code>--dir &lt;folder&gt;</code> (or the <code>KAITU_DIR</code> environment variable) picks the notes folder. Without either, it uses the app's current folder, or <code>~/kaitu</code>. Run <code>kaitu --help</code> for the full list.</p>
 <p><strong>MCP over HTTP</strong>: <code>kaitu mcp --http</code> listens only on <code>127.0.0.1:4871</code>; requests need the Bearer token from <code>kaitu mcp token</code>, and only reading and adding are allowed by default. Kaitu has no built-in public access.</p>
 <h3 id="dsh">Add Kaitu to DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
-<p>If you already use the DSH 0.2.1-rc.2 desktop app, after <code>pnpm build</code> in the source folder:</p>
+<p>This is how Kaitu runs on Windows, Linux and Intel Macs (in preview). With the DSH 0.2.1-rc.2 or later desktop app, install <code>kaitu-dsh</code> from Plugins, or add the index source <code>https://kaitu.si/plugins/index.json</code> in a plugin market and install Kaitu; see the <a href="/en/download/#windows">download page</a>. From the command line:</p>
 <ol>
   <li>Open DSH once and set up a model in Settings → Models.</li>
   <li>Run <code>kaitu dsh --install</code>. If Kaitu.app uses the same notes folder, add <code>--no-automation</code> so background tasks only run in Kaitu.app.</li>
   <li>Quit and reopen DSH, then click Kaitu in the sidebar: Today, Explore and Library. DSH keeps its own brand and panels, and chats use DSH's own sessions.</li>
 </ol>
-<p>Without <code>--install</code> it prints the command to start the web version. The CLI and web package doesn't include the DSH plugin, so this step needs a source build.</p>
+<p>The <code>kaitu</code> command comes from <code>npm install -g rensheng-kaitu@next</code> (see the download page). Without <code>--install</code> it prints the command to start the web version.</p>
 
 <h2 id="privacy">Where your data goes<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
 <ul>
@@ -330,8 +330,8 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>No. Scheduled tasks, phone channels, calendar sync and mail collection run while the app is open. With your computer off, a cloud AI can take over through Google Drive.</p>
 <h3 id="faq-undo">Can I undo a mistake?<a class="anchor" href="#faq-undo" aria-label="#">#</a></h3>
 <p>Yes. Settings → Version history, pick a version and restore. The current version is saved first, so the restore itself can be undone.</p>
-<h3 id="faq-platform">Is there a Windows or Intel Mac version?<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
-<p>Kaitu.app is Apple silicon only. On other computers, try the CLI and web version (see the <a href="/en/download/#other">download page</a>).</p>
+<h3 id="faq-platform">Is there a Windows version?<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
+<p>Yes, as a DeepSeek Harness plugin, in preview; the same works on Linux and Intel Macs. Install the DeepSeek Harness desktop app, then install <code>kaitu-dsh</code> from Plugins. See the <a href="/en/download/#windows">download page</a>.</p>
 <h3 id="faq-export">How do I take all my notes with me?<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>Settings → Export everything gives you a zip, or just copy your notes folder.</p>
 <h3 id="faq-dsh">How does it relate to DeepSeek Harness?<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>

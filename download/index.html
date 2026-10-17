@@ -22,10 +22,10 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -40,7 +40,7 @@
 <div class="wrap narrow" data-release>
   <header class="page-head">
     <h1>下载开图</h1>
-    <p class="lead">Kaitu.app，macOS 版，适用于 Apple 芯片的 Mac。</p>
+    <p class="lead">Mac（Apple 芯片）下载 Kaitu.app；Windows 和 Linux 把开图装进 DeepSeek Harness，见<a href="#windows">下方说明</a>。</p>
   </header>
 
   <section class="dl-card" aria-labelledby="dl-title">
@@ -75,17 +75,30 @@
 
     <h2 id="needs">需要什么</h2>
     <ul>
-      <li>一台 Apple 芯片（arm64）的 Mac。目前没有 Intel Mac 和 Windows 版。</li>
+      <li>Kaitu.app 需要一台 Apple 芯片（arm64）的 Mac；Intel Mac、Windows 和 Linux 用 <a href="#windows">DeepSeek Harness 插件</a>。</li>
       <li>看资料、记原文、看地图和财务都不需要 API Key。想用内置问问，再添加一个 AI 服务：DeepSeek 默认推荐，也可以用 OpenAI、Claude、Gemini、Kimi、智谱等。</li>
     </ul>
+
+    <h2 id="windows">Windows 和 Linux：装进 DeepSeek Harness</h2>
+    <p>Windows 和 Linux 上，开图以 DeepSeek Harness（DSH）插件的形式使用，目前是试用支持。装好后 DSH 侧栏多出「开图」，有今天、开图、资料三个入口；对话用 DSH 自己的会话。</p>
+    <ol>
+      <li>装好 DeepSeek Harness 桌面版，版本 0.2.1-rc.2 或更新（见 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness 的 GitHub</a>）。打开一次，在「设置 → 模型」配好模型。</li>
+      <li>打开侧栏「插件」，安装 <code>kaitu-dsh</code>。</li>
+      <li>装好后重开 DSH，侧栏点「开图」。第一次打开先选资料放哪。</li>
+    </ol>
+    <p>也可以从插件市场装：在「插件」点「实验性插件」旁的「更多」，打开「自定义插件市场」；在「发现」里点「添加索引源」，填 <code>https://kaitu.si/plugins/index.json</code>，再安装「人生开图」。</p>
+    <p>习惯命令行的话（需要 Node.js 22.19+ 或 24+）：</p>
+<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
+kaitu dsh --install</code></pre><button type="button" class="copy">复制</button></div>
+    <p>运行后重开 DSH。同一个资料文件夹也在 Mac 上的 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。写入系统日历只在 Mac 的 Kaitu.app 里可用，其他环境会生成日历文件让你导入。</p>
 
     <h2 id="other">其他方式</h2>
     <h3 id="cli">命令行与网页版</h3>
     <p>同一个版本也有命令行与网页版安装包：<a data-rel="tgz" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/rensheng-kaitu-0.1.0-rc.3.tgz"><code data-rel="tgz-name">rensheng-kaitu-0.1.0-rc.3.tgz</code></a>（SHA-256 <code data-rel="tgz-sha">628977878b48b1451bf364074ef1ddbdda40c0f6bbd2e2bcc5cdc58a7f1cf412</code>）。需要 Node.js 22.19+（22 系列）或 24+。不需要 Kaitu.app，也不需要另装 DSH。</p>
-<div class="codeblock"><pre><code>npm install -g <span data-rel="tgz-url">https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/rensheng-kaitu-0.1.0-rc.3.tgz</span> --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
+<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
 kaitu init ~/kaitu-web
 kaitu --dir ~/kaitu-web ui</code></pre><button type="button" class="copy">复制</button></div>
-    <p>工作台只在本机（127.0.0.1）打开；打开命令输出的地址，在「问问 → 连接 AI」里添加 AI 服务。还没有发布到 npm。</p>
+    <p>工作台只在本机（127.0.0.1）打开；打开命令输出的地址，在「问问 → 连接 AI」里添加 AI 服务。</p>
 
     <h3 id="source">从源码运行</h3>
     <p>需要 Node.js 22.19+（22 系列）或 24+，以及 pnpm。</p>
@@ -96,10 +109,6 @@ pnpm build
 node packages/cli/dist/main.js init ~/kaitu-demo --sample
 node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="button" class="copy">复制</button></div>
     <p><code>--sample</code> 会生成合成的演示资料。</p>
-
-    <h3 id="dsh">装进 DeepSeek Harness</h3>
-    <p>已经在用 DeepSeek Harness 0.2.1-rc.2 桌面应用：在源码目录 <code>pnpm build</code> 之后运行下面的命令，重开 DeepSeek Harness，侧栏就有开图（今天、开图、资料三个入口）。DSH 保持自己的品牌和面板，对话用 DSH 自己的会话。同一个资料文件夹也在 Kaitu.app 里用时，加 <code>--no-automation</code>。</p>
-<div class="codeblock"><pre><code>node packages/cli/dist/main.js dsh --install</code></pre><button type="button" class="copy">复制</button></div>
 
     <p style="margin-top:28px">安装包都发布在 <a href="https://github.com/Stahl-G/rensheng-kaitu/releases">GitHub Releases</a>。安装以后怎么用，见<a href="/docs/">文档</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a>。</p>
   </div>

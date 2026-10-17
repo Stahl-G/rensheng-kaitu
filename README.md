@@ -28,7 +28,7 @@ python3 -m http.server 4894 --bind 127.0.0.1
 
 ## 发布
 
-改完提交并推送到 `gh-pages`，GitHub Pages 自动部署，一两分钟后生效。
+改完先在根目录运行 `python3 tools/stamp.py`（给 CSS / JS 链接加版本号，避免浏览器拿旧缓存），再提交并推送到 `gh-pages`，GitHub Pages 自动部署，一两分钟后生效。
 
 ## 发新版时
 

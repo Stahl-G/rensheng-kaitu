@@ -21,15 +21,14 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/mock/mock.css">
-<script src="/mock/persona.js" defer></script>
-<script src="/mock/mock.js" defer></script>
-<script src="/mock/lifemap.js" defer></script>
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
+<link rel="stylesheet" href="/mock/mock.css?v=374b26a3">
+<script src="/mock/persona.js?v=ddadd7d1" defer></script>
+<script src="/mock/mock.js?v=c411fc6e" defer></script>
 <script>document.documentElement.classList.add("js")</script>
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -180,8 +179,6 @@
       <p class="eyebrow">灵感</p>
       <h2 id="insp-title">灵感来源</h2>
     </div>
-    <div class="insp-grid">
-      <div>
     <div class="prose" data-reveal>
       <p>孙学、薄肌、黄毛理论……在邵艾伦与孙宇晨那场广受争议的四小时访谈中，这三个听起来玄乎其玄的概念，被拼成了一套关于认知、身体和行动的人生方法论。</p>
       <p>有意思的是，访谈里最具体的部分，恰恰是我们已经开始在日常生活中使用 AI 的方式。</p>
@@ -192,9 +189,6 @@
       <p>走过的路可以回看，接下来要去哪里，则像游戏里开地图一样，由自己决定。</p>
     </div>
     <p class="disclaimer" data-reveal>灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
-      </div>
-      <div class="lifemap" data-lifemap data-lang="zh"></div>
-    </div>
   </div>
 </section>
 
@@ -221,7 +215,7 @@
       <details><summary>必须用某一个 AI 吗？</summary><div><p>不用。可以填 DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等任一服务的 Key 用内置问问，添加过的服务都会保留，随时切换；也可以不填 Key，把资料包复制给你常用的 AI，再把回答贴回来。</p></div></details>
       <details><summary>免费吗？开源吗？</summary><div><p>免费。代码以 MIT 许可证开源，在 <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>。</p></div></details>
       <details><summary>这是正式版吗？</summary><div><p data-rel="pre">还不是。当前是 <span data-rel="version">0.1.0-rc.3</span>，发布候选版，在 GitHub 上标为预览版。</p><p data-rel="stable" hidden>是。当前是 <span data-rel="version">0.1.0-rc.3</span> 正式版。</p></div></details>
-      <details><summary>有 Windows 或 Intel Mac 版吗？</summary><div><p>暂时没有。Kaitu.app 目前只有 macOS（Apple 芯片）版。其他电脑可以试试命令行与网页版，见<a href="/download/#other">下载页</a>。</p></div></details>
+      <details><summary>有 Windows 版吗？</summary><div><p>有，以 DeepSeek Harness 插件的形式试用：装好 DeepSeek Harness 桌面版，在「插件」里安装 <code>kaitu-dsh</code>。Linux 和 Intel Mac 也一样。步骤见<a href="/download/#windows">下载页</a>。</p></div></details>
       <details><summary>有英文界面吗？</summary><div><p>有。界面语言默认跟随系统，也可以在「右上角头像 → 设置」里改成中文或 English。</p></div></details>
       <details><summary>我的资料存在哪里？</summary><div><p>第一次打开时先选资料放哪：这台电脑（默认 <code>~/kaitu</code>），或 iCloud、Google Drive、坚果云、其他同步盘的文件夹。选了云盘才会同步；版本历史和 Key 始终留在这台电脑。哪些内容会发给 AI，见<a href="/privacy/">资料去向</a>。</p></div></details>
     </div>

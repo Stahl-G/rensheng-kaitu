@@ -22,10 +22,10 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<link rel="stylesheet" href="/tokens.css">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=7c721b69">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=30bc878f" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -301,13 +301,13 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>通用选项 <code>--dir &lt;目录&gt;</code>，也可以设环境变量 <code>KAITU_DIR</code>。都不设时，用 App 当前的资料文件夹，没有就用 <code>~/kaitu</code>。完整列表见 <code>kaitu --help</code>。</p>
 <p><strong>MCP over HTTP</strong>：<code>kaitu mcp --http</code> 只监听 <code>127.0.0.1:4871</code>，请求要带 <code>kaitu mcp token</code> 给出的 Bearer token，默认只开放读取和新增。开图不内置公网访问。</p>
 <h3 id="dsh">装进 DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
-<p>已经在用 DSH 0.2.1-rc.2 桌面应用时，在源码目录 <code>pnpm build</code> 之后：</p>
+<p>Windows、Linux 和 Intel Mac 用这种方式（试用支持）。装好 DSH 0.2.1-rc.2 或更新的桌面版后，在「插件」里安装 <code>kaitu-dsh</code>，或在插件市场添加索引源 <code>https://kaitu.si/plugins/index.json</code> 后安装「人生开图」，详见<a href="/download/#windows">下载页</a>。用命令行装时：</p>
 <ol>
   <li>打开一次 DSH，在「设置 → 模型」配好模型。</li>
   <li>运行 <code>kaitu dsh --install</code>。同一个资料文件夹也在 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。</li>
   <li>退出再打开 DSH，侧栏点「开图」：今天、开图、资料三个入口。DSH 保持自己的品牌和面板，对话用 DSH 自己的会话。</li>
 </ol>
-<p>不加 <code>--install</code> 会打印网页版的启动命令。命令行与网页版安装包里不带 DSH 插件，这一步要从源码构建。</p>
+<p><code>kaitu</code> 命令来自 <code>npm install -g rensheng-kaitu@next</code>（见下载页）。不加 <code>--install</code> 会打印网页版的启动命令。</p>
 
 <h2 id="privacy">资料去向<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
 <ul>
@@ -329,8 +329,8 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <p>不会。自动任务、手机通道、日历同步和邮件采集都在 App 运行时工作。电脑关着时，可以用 Google Drive 让云端 AI 接力。</p>
 <h3 id="faq-undo">改错了能恢复吗？<a class="anchor" href="#faq-undo" aria-label="#">#</a></h3>
 <p>能。「设置 → 版本历史」选一个版本恢复；恢复前会先存一个版本，恢复本身也能撤回。</p>
-<h3 id="faq-platform">有 Windows 或 Intel Mac 版吗？<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
-<p>Kaitu.app 只有 Apple 芯片版。其他电脑可以试试命令行与网页版（见<a href="/download/#other">下载页</a>）。</p>
+<h3 id="faq-platform">有 Windows 版吗？<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
+<p>有，以 DeepSeek Harness 插件的形式试用，Linux 和 Intel Mac 也一样：装好 DeepSeek Harness 桌面版，在「插件」里安装 <code>kaitu-dsh</code>。步骤见<a href="/download/#windows">下载页</a>。</p>
 <h3 id="faq-export">怎么把资料全部带走？<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>「设置 → 导出全部资料」得到一个 zip；或者直接复制资料文件夹。</p>
 <h3 id="faq-dsh">和 DeepSeek Harness 是什么关系？<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
