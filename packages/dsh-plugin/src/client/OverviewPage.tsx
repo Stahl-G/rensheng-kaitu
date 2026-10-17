@@ -17,6 +17,7 @@ import { OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingChecklist, OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
+import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { CalendarPushResult, CalendarSlotForm, DataSummaries, TodayFinance } from "./TodayPage.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
@@ -835,6 +836,19 @@ function Overview({
                 ))}
               </div>
             </div>
+            <ProgressMap
+              plans={data?.plans}
+              projects={data?.projects ?? []}
+              loadLifeMap={props.loadLifeMap}
+              loadExploration={props.loadExploration}
+              subscribe={props.subscribe}
+              open={(section) => {
+                if (section === "footprints") setExplore("footprints");
+                else if (section === "directions") setExplore("directions");
+                else if (section === "plans") setView("overview");
+                else openSection("projects");
+              }}
+            />
             <div className={css.child}>
               {explore === "health" ? (
                 <HealthPage {...child} />
