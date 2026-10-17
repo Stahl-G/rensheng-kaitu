@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Download · Kaitu</title>
-<meta name="description" content="Download Kaitu.app for macOS on Apple silicon, or install the CLI and web version, or run it from source.">
+<meta name="description" content="Download Kaitu for Windows or macOS, install it and add an API key. CLI and DSH plugin options are also available.">
 <link rel="canonical" href="https://kaitu.si/en/download/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/download/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/download/">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Kaitu">
 <meta property="og:title" content="Download · Kaitu">
-<meta property="og:description" content="Download Kaitu.app for macOS on Apple silicon, or install the CLI and web version, or run it from source.">
+<meta property="og:description" content="Download Kaitu for Windows or macOS, install it and add an API key. CLI and DSH plugin options are also available.">
 <meta property="og:url" content="https://kaitu.si/en/download/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -21,10 +21,10 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=467faf27">
+<link rel="stylesheet" href="/tokens.css?v=da5dfb17">
+<link rel="stylesheet" href="/style.css?v=a384ed8d">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=99bb48f0" defer></script>
+<script src="/app.js?v=b4a896a9" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -39,30 +39,42 @@
 <div class="wrap narrow" data-release>
   <header class="page-head">
     <h1>Download Kaitu</h1>
-    <p class="lead">On a Mac with Apple silicon, download Kaitu.app. On Windows and Linux, add Kaitu to DeepSeek Harness; see <a href="#windows">below</a>.</p>
+    <p class="lead">Install Kaitu, then add an API key in Ask to get started. Available for <a href="#windows">Windows 10 / 11</a> and Macs with Apple silicon.</p>
   </header>
 
   <section class="dl-card" aria-labelledby="dl-title">
     <div class="dl-top">
-      <h2 id="dl-title">Kaitu.app <span data-rel="version">0.1.0-rc.3</span></h2>
+      <h2 id="dl-title">Kaitu.app <span data-rel="version">0.1.0-rc.4</span></h2>
       <span class="chip chip-pre" data-rel="pre">Pre-release</span>
     </div>
     <dl class="dl-facts">
       <dt>Released</dt><dd><time data-rel="date" datetime="2026-10-17">October 17, 2026</time></dd>
       <dt>File</dt><dd><span data-rel="dmg-name">Kaitu.dmg</span> · <span data-rel="size">392 MB</span></dd>
       <dt>System</dt><dd>macOS, Apple silicon (arm64) only</dd>
-      <dt>SHA-256</dt><dd><code data-rel="sha">0240be2af47f21838e79d34dee746f4a668eba2da2f59b78fe99ede7155c4318</code></dd>
+      <dt>SHA-256</dt><dd><code data-rel="sha">2de8bf1ac880d05cb826d331591c87ef405b9ef17f5b69beaf86b7557a44a358</code></dd>
     </dl>
     <div class="dl-actions">
-      <a class="btn btn-big btn-primary" data-rel="dmg" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/Kaitu.dmg">Download Kaitu.dmg</a>
-      <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3">Release notes ↗</a>
+      <a class="btn btn-big btn-primary" data-rel="dmg" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.4/Kaitu.dmg">Download Kaitu.dmg</a>
+      <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4">Release notes ↗</a>
       <a href="https://github.com/Stahl-G/rensheng-kaitu/releases">All releases ↗</a>
     </div>
     <p class="small" style="margin-top:14px">Downloads come from GitHub Releases. This is a release candidate, not a stable release yet.</p>
   </section>
 
+  <section class="dl-card" id="windows" aria-labelledby="windows-title" style="margin-top:24px">
+    <div class="dl-top"><h2 id="windows-title">Windows <span data-rel="version">0.1.0-rc.4</span></h2><span class="chip chip-pre" data-rel="pre">Preview</span></div>
+    <dl class="dl-facts">
+      <dt>File</dt><dd><span data-rel="exe-name">Kaitu-Setup-0.1.0-rc.4-x64.exe</span> · <span data-rel="exe-size">284 MB</span></dd>
+      <dt>System</dt><dd>Windows 10 / 11, 64-bit (x64)</dd>
+      <dt>SHA-256</dt><dd><code data-rel="exe-sha">4f13f3727be536b999cbd2b3d2689a6635e03f65cd5d9ce741b5e3c060fc3792</code></dd>
+    </dl>
+    <div class="dl-actions"><a class="btn btn-big btn-primary" data-rel="exe" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.4/Kaitu-Setup-0.1.0-rc.4-x64.exe">Download Windows installer</a><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4">Release notes ↗</a></div>
+    <p class="small" style="margin-top:14px">Run the EXE to install, then open Kaitu. Node and DSH are included; no developer tools are needed. This Windows preview is not digitally signed, so Windows may show a publisher verification notice.</p>
+    <p class="small">Choose a notes folder on first launch. In Ask → Connect AI → Use Kaitu's AI, enter an API key, fetch the model list and choose a model. DeepSeek is recommended; other providers are available.</p>
+  </section>
+
   <div class="doc" style="margin-top:40px">
-    <h2 id="install">Install</h2>
+    <h2 id="install">Install on Mac</h2>
     <ol>
       <li>Open the downloaded <code>Kaitu.dmg</code>.</li>
       <li>Drag Kaitu.app (shown as 人生开图) into Applications.</li>
@@ -74,12 +86,12 @@
 
     <h2 id="needs">What you need</h2>
     <ul>
-      <li>Kaitu.app needs a Mac with Apple silicon (arm64). On an Intel Mac, Windows or Linux, use the <a href="#windows">DeepSeek Harness plugin</a>.</li>
+      <li>Use the EXE above on Windows. Kaitu.app needs a Mac with Apple silicon (arm64). On Intel Macs and Linux, use the <a href="#plugin">DeepSeek Harness plugin</a>.</li>
       <li>No API key is needed to browse your notes, jot things down, or view maps and finances. To use the built-in Ask, add an AI service: DeepSeek is the default suggestion, and OpenAI, Claude, Gemini, Kimi, Zhipu and others also work.</li>
     </ul>
 
-    <h2 id="windows">Windows and Linux: add Kaitu to DeepSeek Harness</h2>
-    <p>On Windows and Linux, Kaitu runs as a DeepSeek Harness (DSH) plugin. Support is in preview. Once installed, DSH gets a Kaitu entry in its sidebar with three tabs, Today, Explore and Library, and chats use DSH’s own sessions.</p>
+    <h2 id="plugin">Alternative: add Kaitu to DeepSeek Harness</h2>
+    <p>As an alternative on Windows, Linux and Intel Macs, Kaitu runs as a DeepSeek Harness (DSH) plugin. Support is in preview. Once installed, DSH gets a Kaitu entry in its sidebar with three tabs, Today, Explore and Library, and chats use DSH’s own sessions.</p>
     <ol>
       <li>Install the DeepSeek Harness desktop app, version 0.2.1-rc.2 or later (see <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness on GitHub</a>). Open it once and set up a model in Settings → Models.</li>
       <li>Open Plugins in the sidebar and install <code>kaitu-dsh</code>.</li>
@@ -93,7 +105,7 @@ kaitu dsh --install</code></pre><button type="button" class="copy">Copy</button>
 
     <h2 id="other">Other ways</h2>
     <h3 id="cli">CLI and web version</h3>
-    <p>The same version also ships as a CLI and web package: <a data-rel="tgz" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.3/rensheng-kaitu-0.1.0-rc.3.tgz"><code data-rel="tgz-name">rensheng-kaitu-0.1.0-rc.3.tgz</code></a> (SHA-256 <code data-rel="tgz-sha">628977878b48b1451bf364074ef1ddbdda40c0f6bbd2e2bcc5cdc58a7f1cf412</code>). It needs Node.js 22.19+ (22.x) or 24+, and doesn't need Kaitu.app or a separate DSH install.</p>
+    <p>The same version also ships as a CLI and web package: <a data-rel="tgz" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.4/rensheng-kaitu-0.1.0-rc.4.tgz"><code data-rel="tgz-name">rensheng-kaitu-0.1.0-rc.4.tgz</code></a> (SHA-256 <code data-rel="tgz-sha">a3fb91a302dab8dd9adc8ffe03e7a6c890449019e6bbad0d82278ea85bb1cbc3</code>). It needs Node.js 22.19+ (22.x) or 24+, and doesn't need Kaitu.app or a separate DSH install.</p>
 <div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
 kaitu init ~/kaitu-web
 kaitu --dir ~/kaitu-web ui</code></pre><button type="button" class="copy">Copy</button></div>
@@ -118,7 +130,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
     <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
-    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a></p>
+    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
     <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
   </div>
 </footer>

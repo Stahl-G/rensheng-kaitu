@@ -21,14 +21,14 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=467faf27">
-<link rel="stylesheet" href="/mock/mock.css?v=9954b9ff">
-<script src="/mock/persona.js?v=ddadd7d1" defer></script>
-<script src="/mock/mock.js?v=c411fc6e" defer></script>
-<script src="/mock/lifemap.js?v=8313b27b" defer></script>
+<link rel="stylesheet" href="/tokens.css?v=da5dfb17">
+<link rel="stylesheet" href="/style.css?v=a384ed8d">
+<link rel="stylesheet" href="/mock/mock.css?v=e002b650">
+<script src="/mock/persona.js?v=bf4bbe25" defer></script>
+<script src="/mock/mock.js?v=de896050" defer></script>
+<script src="/mock/lifemap.js?v=b4557c74" defer></script>
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=99bb48f0" defer></script>
+<script src="/app.js?v=b4a896a9" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -50,7 +50,7 @@
         <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
         <a class="btn btn-big btn-quiet" href="/en/docs/">Read the docs</a>
       </div>
-      <p class="meta"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
+      <p class="meta"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
     </div>
     <svg class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="Kaitu mark: a three-fold map unfolding">
       <defs>
@@ -202,7 +202,7 @@
     <div class="band-box" data-reveal>
       <div>
         <h2 id="band-title">Download Kaitu.app</h2>
-        <p><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a><span data-rel="pre"> preview</span> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
+        <p><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a><span data-rel="pre"> preview</span> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
       </div>
       <div class="cta" style="margin-top:0">
         <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
@@ -219,8 +219,8 @@
       <details><summary>Does this website read my notes?</summary><div><p>No. This is the project website. The app on this page shows sample data and isn't connected to your notes folder. There are no analytics or third-party scripts; only the download page asks GitHub for the latest version.</p></div></details>
       <details><summary>Do I have to use a particular AI?</summary><div><p>No. Add a key for DeepSeek, OpenAI, Claude, Gemini, Kimi, Zhipu or another service to use Ask; every service you add is kept, so you can switch. Or skip keys entirely: copy a context pack to the AI you already use and paste its answer back.</p></div></details>
       <details><summary>Is it free? Is it open source?</summary><div><p>Free. The code is open source under the MIT License, on <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>.</p></div></details>
-      <details><summary>Is this a stable release?</summary><div><p data-rel="pre">Not yet. The current version is <span data-rel="version">0.1.0-rc.3</span>, a release candidate marked as a pre-release on GitHub.</p><p data-rel="stable" hidden>Yes. The current version is <span data-rel="version">0.1.0-rc.3</span>.</p></div></details>
-      <details><summary>Is there a Windows version?</summary><div><p>Yes, as a DeepSeek Harness plugin, in preview: install the DeepSeek Harness desktop app, then install <code>kaitu-dsh</code> from its Plugins page. The same works on Linux and Intel Macs. See the <a href="/en/download/#windows">download page</a>.</p></div></details>
+      <details><summary>Is this a stable release?</summary><div><p data-rel="pre">Not yet. The current version is <span data-rel="version">0.1.0-rc.4</span>, a release candidate marked as a pre-release on GitHub.</p><p data-rel="stable" hidden>Yes. The current version is <span data-rel="version">0.1.0-rc.4</span>.</p></div></details>
+      <details><summary>Is there a Windows version?</summary><div><p>Yes. Download the Windows EXE, install it, and add an API key in Ask. Linux and Intel Macs can use the DSH plugin. See the <a href="/en/download/#windows">download page</a>.</p></div></details>
       <details><summary>Is the app available in English?</summary><div><p>Yes. The interface follows your system language by default, and you can switch between 中文 and English in Settings (avatar menu, top right). Some pages are still partly in Chinese.</p></div></details>
       <details><summary>Where are my notes stored?</summary><div><p>The first time you open Kaitu, you choose where your notes live: this computer (<code>~/kaitu</code> by default), iCloud, Google Drive, Nutstore, or a folder another sync app syncs. Nothing syncs unless you pick a cloud drive, and version history and keys always stay on this computer. For what is sent to an AI, see <a href="/en/privacy/">Where your data goes</a>.</p></div></details>
     </div>
@@ -232,7 +232,7 @@
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
     <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
-    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a></p>
+    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
     <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
   </div>
 </footer>
