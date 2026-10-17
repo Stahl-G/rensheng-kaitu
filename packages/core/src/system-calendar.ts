@@ -52,12 +52,11 @@ export interface CalendarExecutor {
   remove(uid: string, entry: CalendarPushEntry): Promise<void>;
 }
 function nowPlan(ws: Workspace): TodayPlan {
-  return normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data, ws.timeZone()) as unknown as TodayPlan;
+  return normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as unknown as TodayPlan;
 }
 export function calendarPushStore(ws: Workspace): CalendarPushStore {
   const file = () => join(localStateRoot(), "system-calendar", `${stateBinding(ws.root).id}.json`);
   return {
-    // 和同步条目用同一份补齐后的日期（2026/10/17 → 2026-10-17），前缀才对得上。
     date: () => (ws.exists("NOW.md") ? nowPlan(ws).date : null),
     read: () =>
       existsSync(file()) ? JSON.parse(readFileSync(file(), "utf8")) : { enabled: true, entries: {} },
@@ -80,10 +79,7 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   const related = new Map(tasks.map((task) => [task.id, task.title]));
   const taskIds = new Set(tasks.filter((task) => task.status !== "cancelled").map((task) => task.id));
   for (const { file } of statusFiles(ws)) {
-    const status = normalizeStatus(
-      parseFrontmatter(ws.readText(file)).data,
-      ws.timeZone(),
-    ) as unknown as ModuleStatus;
+    const status = normalizeStatus(parseFrontmatter(ws.readText(file)).data) as unknown as ModuleStatus;
     for (const item of status.next ?? []) {
       related.set(item.id, item.title);
       if (item.status !== "skipped") taskIds.add(item.id);

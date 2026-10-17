@@ -213,7 +213,7 @@ export async function tryNews(ws: Workspace, id: string) {
     ? parseFrontmatter(ws.readText(file))
     : { data: { updated: null } as Record<string, unknown>, body: "" };
   const body = parsed.body;
-  const data = normalizeStatus(parsed.data, ws.timeZone());
+  const data = normalizeStatus(parsed.data);
   const validate = schemas().builtin("status.schema.json");
   if (!validate(data)) throw new KaituError("模块现状格式不合法", "BAD_STATUS");
   const next = (data.next ?? []) as { id: string; ref?: string }[];

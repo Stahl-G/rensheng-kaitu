@@ -184,7 +184,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
   if (data.now.date !== data.today) {
     // 过期计划仍是接力证据，明确标出日期，避免把它混入今天或在更新时丢掉变化。
     try {
-      const plan = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data, ws.timeZone()) as {
+      const plan = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as {
         date: string;
         blocks: { start?: string; end?: string; title: string; status: string }[];
       };

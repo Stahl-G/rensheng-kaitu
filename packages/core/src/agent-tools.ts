@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { extname, relative, sep } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
-import { clockTime, normalizeNow } from "./doc-input.js";
+import { normalizeNow } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
@@ -151,14 +151,11 @@ export async function proposeBlock(ws: Workspace, input: ProposedBlock, actor: s
   const raw = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
   const current = {
     ...raw,
-    data: normalizeNow(raw.data as unknown as Record<string, unknown>, ws.timeZone()) as unknown as TodayPlan,
+    data: normalizeNow(raw.data as unknown as Record<string, unknown>) as unknown as TodayPlan,
   };
   const parsed = current.data.date === date ? current : { data: { date, blocks: [] } as TodayPlan, body: "" };
-  // 9:00、9点这类写法换成 09:00。
-  const start = clockTime(input.start) ?? input.start;
-  const end = clockTime(input.end) ?? input.end;
-  if (end <= start) throw new KaituError("结束时间必须晚于开始时间", "BAD_ARGS");
-  const block = { ...input, start, end, id: ulid(), kind: "proposal" as const, status: "pending" as const };
+  if (input.end <= input.start) throw new KaituError("结束时间必须晚于开始时间", "BAD_ARGS");
+  const block = { ...input, id: ulid(), kind: "proposal" as const, status: "pending" as const };
   parsed.data.blocks.push(block);
   const data = { ...parsed.data, generated_at: isoInZone(now, ws.timeZone()) };
   if (!schemas().builtin("now.schema.json")(data)) throw new KaituError("日程建议不合法", "BAD_ARGS");

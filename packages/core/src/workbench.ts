@@ -106,7 +106,7 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
       : file.endsWith("STATUS.md")
         ? "status.schema.json"
         : "rules.schema.json";
-  const data = normalizeDocument(schema, parsed.data, ws.timeZone()) as T;
+  const data = normalizeDocument(schema, parsed.data) as T;
   if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
   return { ...parsed, data };
 }
@@ -179,7 +179,7 @@ export type WorkbenchData = ReturnType<typeof readWorkbench>;
 
 async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, edit: (data: T) => string) {
   const raw = parseFrontmatter<T>(ws.readText(file));
-  const parsed = { ...raw, data: normalizeDocument(schema, raw.data, ws.timeZone()) as T };
+  const parsed = { ...raw, data: normalizeDocument(schema, raw.data) as T };
   const message = edit(parsed.data);
   const validate = schemas().builtin(schema);
   if (!validate(parsed.data)) {
@@ -229,7 +229,6 @@ export function scheduleNext(ws: Workspace, file: string, id: string, start: str
           normalizeDocument(
             "status.schema.json",
             parseFrontmatter(ws.readText(file)).data,
-            ws.timeZone(),
           ) as unknown as ModuleStatus
         ).next?.find((row) => row.id === id && row.status === "todo");
   if (!item) throw new KaituError("找不到待办的下一步", "NOT_FOUND");

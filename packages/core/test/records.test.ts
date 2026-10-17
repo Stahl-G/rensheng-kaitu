@@ -156,18 +156,14 @@ describe("时区与日期切分", () => {
 
   it("餐次没写时按时间推断，写了却认不出的不改成别的餐次", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
-    const meal = { items: ["粥"], kcal: 200, protein_g: 5, source: "agent", ts: "2026-10-17T08:00:00+08:00" };
+    const meal = {
+      items: [{ name: "粥" }],
+      kcal: 200,
+      protein_g: 5,
+      source: "agent",
+      ts: "2026-10-17T08:00:00+08:00",
+    };
     expect(addRecord(ws, "meal", meal).record.meal).toBe("早");
     expect(() => addRecord(ws, "meal", { ...meal, meal: "dinnre" })).toThrow(/只能是/);
-  });
-
-  it("数字带单位时按字段单位换算，认不出的单位不当成数字", async () => {
-    const ws = await freshWorkspace("Asia/Shanghai");
-    expect(addRecord(ws, "workout", { ...workout, weight_kg: "150 lb" }).record.weight_kg).toBe(68.04);
-    expect(
-      addRecord(ws, "workout", { modality: "cardio", exercise: "跑步", duration_min: "1.5 小时" }).record
-        .duration_min,
-    ).toBe(90);
-    expect(() => addRecord(ws, "workout", { ...workout, weight_kg: "150 stone" })).toThrow();
   });
 });

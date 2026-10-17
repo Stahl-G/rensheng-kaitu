@@ -75,9 +75,9 @@ function inputPath(ws: Workspace, path: string): string {
   return isAbsolute(path) ? path : ws.resolve(path);
 }
 const fields = z.record(z.string(), z.unknown());
-// 类型也认复数和中文，名字不写时取正文开头；多余字段忽略，不因为写法退回。
+// 名字不写时取正文开头。
 const memory = z.object({
-  type: z.string().describe("preference、fact、context、person、decision，也认复数和中文"),
+  type: z.string().describe("preference、fact、context、person、decision"),
   name: z.string().optional(),
   text,
   source: z.string().optional(),

@@ -1086,10 +1086,7 @@ export async function saveOnboardingChoices(
       : { data: { updated: null } as ModuleStatus, body: "" };
     const doc = {
       ...raw,
-      data: normalizeStatus(
-        raw.data as unknown as Record<string, unknown>,
-        ws.timeZone(),
-      ) as unknown as ModuleStatus,
+      data: normalizeStatus(raw.data as unknown as Record<string, unknown>) as unknown as ModuleStatus,
     };
     if (doc.data.next?.some((item) => item.id === `onboarding-${id}`)) return [];
     doc.data.next = [...(doc.data.next ?? []), { id: `onboarding-${id}`, title: start.next, status: "todo" }];

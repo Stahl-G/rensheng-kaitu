@@ -191,7 +191,7 @@ export function updateRecord(
   ws.assertDownloaded(recordFilePattern(ref).dir);
   const current = latestById(ws, ref).get(id);
   if (!current || current.deleted) throw new KaituError(`找不到「${type}」记录 ${id}`, "NOT_FOUND");
-  // 修改也认 AI 的常见写法（dinner、"35 g"），只换写法，不补字段、不丢空值。
+  // 修改只补时区，不补字段、不丢空值。
   const normalized = normalizeRecordInput(validatorFor(ws, ref).schema, patch, ws.timeZone(), new Date(), {
     patch: true,
   });

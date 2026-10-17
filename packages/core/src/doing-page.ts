@@ -35,7 +35,6 @@ function topics(ws: Workspace, dir: string) {
       const body = parsed.body;
       const data = normalizeStatus(
         parsed.data as unknown as Record<string, unknown>,
-        ws.timeZone(),
       ) as unknown as typeof parsed.data;
       if (!schemas().builtin("status.schema.json")(data))
         throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");

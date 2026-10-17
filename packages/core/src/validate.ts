@@ -186,10 +186,10 @@ export function validateWorkspace(ws: Workspace, path?: string): Issue[] {
       check(reg.builtin("handoff.schema.json"), normalizeHandoff(d, f, zone), f, issues);
     } else if (name === "STATUS.md") {
       const d = fm(f);
-      if (d) check(reg.builtin("status.schema.json"), normalizeStatus(d, zone), f, issues);
+      if (d) check(reg.builtin("status.schema.json"), normalizeStatus(d), f, issues);
     } else if (f === "NOW.md") {
       const d = fm(f);
-      if (d) check(reg.builtin("now.schema.json"), normalizeNow(d, zone), f, issues);
+      if (d) check(reg.builtin("now.schema.json"), normalizeNow(d), f, issues);
     } else if (f === "me/rules.md") {
       const d = fm(f);
       if (d) check(reg.builtin("rules.schema.json"), d, f, issues);

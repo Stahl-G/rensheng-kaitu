@@ -103,13 +103,13 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
       },
       { type: "activity", date: "2026-07-01", steps: 100 },
       { type: "task", title: "给妈妈买生日礼物", status: "open", due: "2026-07-08" },
-      // AI 常见写法：英文餐次、带单位的数字、一道菜名、不带时区的时间。
+      // 不带时区的时间按工作区时区补上偏移。
       {
         type: "meal",
-        meal: "dinner",
-        items: "釜山猪肉汤饭",
-        kcal: "约 1050 kcal",
-        protein_g: "35 g",
+        meal: "晚",
+        items: [{ name: "釜山猪肉汤饭" }],
+        kcal: 1050,
+        protein_g: 35,
         ts: "2026-07-01 19:30",
       },
     ];
@@ -298,13 +298,13 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
   try {
     const today = localDate(new Date(), ws.timeZone());
     const files = {
-      // 没用约定后缀、带了 id、类型写成复数
+      // 没用约定后缀、带了 id
       "grok-meals.json": JSON.stringify([
         {
-          type: "meals",
+          type: "meal",
           id: "abc",
-          meal: "lunch",
-          items: ["牛肉面"],
+          meal: "午",
+          items: [{ name: "牛肉面" }],
           kcal: 650,
           protein_g: 30,
           agent: "grok-bot",
@@ -314,12 +314,12 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
       // 普通 .json 里写明 type: proposal 的日程建议
       "grok-stretch.json": JSON.stringify({ type: "proposal", title: "拉伸", start: "21:00", end: "21:15" }),
       "grok.memory.json": JSON.stringify([
-        { type: "preferences", text: "喜欢晚上训练", confidence: 0.9, agent: "grok-bot" },
+        { type: "preference", text: "喜欢晚上训练", confidence: 0.9, agent: "grok-bot" },
       ]),
       "grok.proposal.json": JSON.stringify({
         title: "散步",
-        start: "9:00",
-        end: "9:30",
+        start: "09:00",
+        end: "09:30",
         reason: "天气好",
         agent: "grok-bot",
       }),

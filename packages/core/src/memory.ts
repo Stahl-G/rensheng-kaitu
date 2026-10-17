@@ -67,37 +67,18 @@ function memoryPath(file: string): string {
   return `memory/${file}`;
 }
 
-const TYPE_NAMES: Record<string, MemoryType> = {
-  preference: "preference",
-  preferences: "preference",
-  偏好: "preference",
-  fact: "fact",
-  facts: "fact",
-  事实: "fact",
-  context: "context",
-  背景: "context",
-  person: "person",
-  people: "person",
-  persons: "person",
-  人物: "person",
-  decision: "decision",
-  decisions: "decision",
-  决定: "decision",
-};
+const MEMORY_TYPES: MemoryType[] = ["preference", "fact", "context", "person", "decision"];
 
-/** 记忆类型的常见写法（复数、中文）→ 规范类型；认不出返回 undefined。 */
 export function memoryType(value: unknown): MemoryType | undefined {
-  return typeof value === "string" ? TYPE_NAMES[value.trim().toLowerCase()] : undefined;
+  return MEMORY_TYPES.find((type) => type === value);
 }
 
-/** AI 交来的记忆：类型换成规范写法，正文可以叫 content，名字没写就取正文开头。 */
+/** AI 交来的记忆：名字没写就取正文开头。 */
 export function memoryInput(raw: Record<string, unknown>): MemoryInput {
-  const type = memoryType(raw.type) ?? memoryType(raw.category);
+  const type = memoryType(raw.type);
   if (!type)
     throw new KaituError("记忆类型只能是 preference、fact、context、person、decision", "INVALID_MEMORY");
-  const text = [raw.text, raw.content, raw.value].find((v) => typeof v === "string" && v.trim()) as
-    | string
-    | undefined;
+  const text = typeof raw.text === "string" && raw.text.trim() ? raw.text : undefined;
   if (!text) throw new KaituError("记忆没有正文 text", "INVALID_MEMORY");
   const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : text.trim().slice(0, 30);
   return {

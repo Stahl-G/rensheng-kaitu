@@ -16,7 +16,6 @@ import {
 import { basename, dirname, join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { proposeBlock, writeDigest } from "./agent-tools.js";
-import { clockTime } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { parseHealthInWorker } from "./health-import.js";
@@ -42,38 +41,6 @@ const sourceAgent = noteAgent;
 /** 只留认得的字段，多余的忽略，不因为多写了一个字段整条退回。 */
 function only(data: Record<string, unknown>, fields: string[]) {
   return Object.fromEntries(Object.entries(data).filter(([key]) => fields.includes(key)));
-}
-
-const TYPE_ALIASES: Record<string, string> = {
-  news: "news_item",
-  article: "news_item",
-  articles: "news_item",
-  新闻: "news_item",
-  资讯: "news_item",
-  饮食: "meal",
-  吃饭: "meal",
-  food: "meal",
-  训练: "workout",
-  运动: "workout",
-  exercise: "workout",
-  睡眠: "sleep",
-  todo: "task",
-  todos: "task",
-  待办: "task",
-  心情: "mood",
-};
-/** 记录类型的常见写法：大小写、连字符、复数、中文 → 工作区里的类型名。 */
-function recordType(ws: Workspace, value: unknown): unknown {
-  if (typeof value !== "string") return value;
-  const known = new Set(listRecordTypes(ws).map((ref) => ref.type));
-  if (known.has(value)) return value;
-  const key = value
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, "_");
-  for (const candidate of [key, TYPE_ALIASES[key], key.replace(/ies$/, "y"), key.replace(/e?s$/, "")])
-    if (candidate && known.has(candidate)) return candidate;
-  return value;
 }
 
 type InboxContent =
@@ -122,7 +89,7 @@ function inboxContent(file: string, text: string): InboxContent {
     (row): row is Record<string, unknown> => !!row && typeof row === "object" && !Array.isArray(row),
   );
   if (!rows.length || rows.length !== list.length) return { kind: "note" };
-  if (rows.every((row) => memoryType(row.type) && (row.text ?? row.content))) return { kind: "memory", rows };
+  if (rows.every((row) => memoryType(row.type) && row.text)) return { kind: "memory", rows };
   // 有标题和起止时间、没写类型或写明是日程建议的，按日程建议收，不当成记录类型去查。
   if (
     object?.title &&
@@ -174,7 +141,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const fileAgent = rows.find((row) => row && typeof row.agent === "string" && row.agent.trim())?.agent;
     for (const [index, row] of rows.entries()) {
       const { type: rawType, agent, id: _id, by: _by, rev: _rev, ...data } = row ?? {};
-      const type = recordType(ws, rawType);
+      const type = rawType;
       try {
         if (!row) throw new KaituError("必须是合法 JSON 对象", "BAD_INBOX");
         if (typeof type !== "string") throw new KaituError("缺少 type（记录类型）", "BAD_INBOX");
@@ -251,15 +218,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
   }
   if (content.kind === "proposal") {
     const raw = content.row;
-    const row = only(
-      {
-        ...raw,
-        title: raw.title ?? raw.name,
-        start: clockTime(raw.start) ?? raw.start,
-        end: clockTime(raw.end) ?? raw.end,
-      },
-      ["title", "start", "end", "module", "agent"],
-    );
+    const row = only(raw, ["title", "start", "end", "module", "agent"]);
     if (
       !["title", "start", "end"].every((key) => typeof row[key] === "string") ||
       (row.module !== undefined && typeof row.module !== "string")

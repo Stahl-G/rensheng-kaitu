@@ -57,11 +57,11 @@ describe("工作台写入", () => {
     expect(validateWorkspace(ws)).toEqual([]);
   });
 
-  it("Agent 手写的 STATUS.md 缺 id、状态写成完成、updated 只写日期也能读，今天页能完成那一步；无 frontmatter 的交接也算", async () => {
+  it("Agent 手写的 STATUS.md 缺 id 也能读，今天页能完成那一步；无 frontmatter 的交接也算", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
     ws.writeText(
       "health/STATUS.md",
-      "---\nupdated: 2026-10-17\nnext:\n  - 晚上 40 分钟力量训练\n  - { title: 买蛋白粉, status: 完成 }\n---\n",
+      "---\nnext:\n  - 晚上 40 分钟力量训练\n  - { title: 买蛋白粉, status: done }\n---\n",
     );
     const health = readStatus(ws).modules.find((module) => module.file === "health/STATUS.md");
     const next = health?.next ?? [];
@@ -82,41 +82,10 @@ describe("工作台写入", () => {
     expect(validateWorkspace(ws).map((issue) => issue.file)).toContain("handoffs/20261340T2500-grok-bot.md");
   });
 
-  it("完成别的下一步、整份写回时，带时间的截止不丢时间", async () => {
+  it("下一步和日程写了认不出的状态、优先级、类型、时间，校验报给 Agent，写回时不丢", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
-    ws.writeText(
-      "health/STATUS.md",
-      '---\nnext:\n  - 散步\n  - { title: 复查, due: "2026-10-18T14:00:00+08:00" }\n---\n',
-    );
-    const next = readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next ?? [];
-    // 没写 id 的下一步也能排时间（id 和今天页看到的一样）。
-    await scheduleNext(ws, "health/STATUS.md", next[1]?.id as string, "09:00", "10:00");
-    await completeNext(ws, "health/STATUS.md", next[0]?.id as string);
-    const saved = parseFrontmatter<{ next: { title: string }[] }>(ws.readText("health/STATUS.md")).data.next;
-    expect(saved.find((item) => item.title === "复查")).toMatchObject({
-      due: "2026-10-18",
-      when: "2026-10-18T14:00:00+08:00",
-    });
-  });
-
-  it("下一步和日程的状态、优先级、类型认常见写法，写了却认不出的报格式错误，不悄悄改成别的", async () => {
-    const ws = await freshWorkspace("Asia/Shanghai");
-    ws.writeText(
-      "health/STATUS.md",
-      "---\nnext:\n  - { title: 跑步, status: closed, priority: urgent }\n---\n",
-    );
-    ws.writeText(
-      "NOW.md",
-      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 会议, kind: appointment, start: "10:00", end: "11:00", status: cancelled }\n---\n',
-    );
-    expect(
-      readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next?.[0],
-    ).toMatchObject({
-      status: "done",
-      priority: "high",
-    });
-    expect(validateWorkspace(ws)).toEqual([]);
     for (const [status, block] of [
+      ["{ title: 跑步, status: 完成 }", '{ title: 会议, start: "10:00", end: "11:00", status: 取消 }'],
       ["{ title: 跑步, status: donee }", '{ title: 会议, start: "10:00", end: "11:00", status: maybe }'],
       ["{ title: 跑步, priority: 很急 }", '{ title: 会议, kind: meetup, start: "10:00", end: "11:00" }'],
     ]) {
@@ -133,19 +102,19 @@ describe("工作台写入", () => {
     );
     expect(validateWorkspace(ws).map((issue) => issue.file)).toContain("health/STATUS.md");
     const run = (
-      normalizeStatus(parseFrontmatter(ws.readText("health/STATUS.md")).data, "Asia/Shanghai").next as {
+      normalizeStatus(parseFrontmatter(ws.readText("health/STATUS.md")).data).next as {
         id: string;
       }[]
     )[0]?.id as string;
     await expect(completeNext(ws, "health/STATUS.md", run)).rejects.toThrow(/格式不合法/);
     expect(parseFrontmatter<{ next: unknown[] }>(ws.readText("health/STATUS.md")).data.next).toHaveLength(2);
-    // 写了却读不出的时间（25:00）原样保留给校验，不悄悄删掉
+    // 读不出的时间（25:00、9点）原样保留给校验
     ws.writeText("health/STATUS.md", "---\nnext:\n  - 跑步\n---\n");
     ws.writeText(
       "NOW.md",
-      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 写周报, kind: task, start: "25:00" }\n---\n',
+      '---\ndate: "2026-10-17"\nblocks:\n  - { title: 写周报, kind: task, start: "25:00" }\n  - { title: 晨跑, start: 9点, end: 10点 }\n---\n',
     );
-    expect(validateWorkspace(ws).map((issue) => issue.file)).toEqual(["NOW.md"]);
+    expect(new Set(validateWorkspace(ws).map((issue) => issue.file))).toEqual(new Set(["NOW.md"]));
   });
 
   it("--sample 创建的工作区符合已有数据规范", async () => {

@@ -83,10 +83,7 @@ const STAGES: Record<string, ProjectStatus["stage"]> = {
  * 类型和阶段认常见写法，写了却认不出的保留原样报格式错误，不悄悄改成别的。
  */
 function projectStatus(data: ProjectStatus, slug: string, timeZone: string): ProjectStatus {
-  const out = normalizeStatus(
-    data as unknown as Record<string, unknown>,
-    timeZone,
-  ) as unknown as ProjectStatus;
+  const out = normalizeStatus(data as unknown as Record<string, unknown>) as unknown as ProjectStatus;
   const title = out.title as unknown;
   if (title === undefined || title === null || (typeof title === "string" && !title.trim())) out.title = slug;
   else if (typeof title === "number") out.title = String(title);

@@ -105,11 +105,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
   const type = text.describe("module.json 中已定义的记录类型，如 workout、meal");
   const data = z.record(z.string(), z.unknown()).describe("记录字段，按工作区 schema 校验");
   const memory = {
-    type: z
-      .string()
-      .describe(
-        "preference、fact、context、person、decision，也认复数和中文（偏好、事实、背景、人物、决定）",
-      ),
+    type: z.string().describe("preference、fact、context、person、decision"),
     name: z.string().optional().describe("不写时取正文开头"),
     text,
     source: z.string().optional(),
