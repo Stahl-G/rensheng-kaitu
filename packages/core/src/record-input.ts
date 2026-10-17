@@ -72,10 +72,14 @@ function enumValue(allowed: unknown[], value: string, key: string | undefined): 
   const match =
     options.find((item) => item.toLowerCase() === lower) ??
     (synonym && options.includes(synonym) ? synonym : undefined) ??
-    // grok-bot → grok、codex-cli → codex
-    options.find(
-      (item) => /^[a-z]/.test(item) && lower.startsWith(item) && /^[-_ .]?$/.test(lower[item.length] ?? ""),
-    );
+    // 只有交来的 Agent（via）认前缀：grok-bot → grok、codex-cli → codex。其他取值写错交给校验，
+    // 不把 private-shared 悄悄改成 private。
+    (key === "via"
+      ? options.find(
+          (item) =>
+            /^[a-z]/.test(item) && lower.startsWith(item) && /^[-_ .]?$/.test(lower[item.length] ?? ""),
+        )
+      : undefined);
   if (match) return match;
   return key === "via" && options.includes("agent") ? "agent" : value;
 }

@@ -669,13 +669,15 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
       }
     }
     const result = collector.finish();
-    if (skipped.length) {
-      if (!result.candidates.length)
-        throw new Error(
-          `没有能导入的样本：${skipped.slice(0, 3).join("；")}${skipped.length > 3 ? ` 等 ${skipped.length} 条` : ""}`,
-        );
-      result.ignored.invalid = skipped.length;
+    // 有样本却一条都没导入（读不出、类型都不支持）时转待整理，不能当成功归档。
+    if (samples.length && !result.candidates.length) {
+      const reasons = skipped.slice(0, 3);
+      if (skipped.length > 3) reasons.push(`另有 ${skipped.length - 3} 条读不出`);
+      if (result.ignored.unsupported) reasons.push(`${result.ignored.unsupported} 条类型暂不支持`);
+      if (result.ignored.incomplete_bp) reasons.push(`${result.ignored.incomplete_bp} 条血压缺另一半`);
+      throw new Error(`没有能导入的样本：${reasons.join("；")}`);
     }
+    if (skipped.length) result.ignored.invalid = skipped.length;
     return result;
   } catch (error) {
     if (error instanceof KaituError) throw error;

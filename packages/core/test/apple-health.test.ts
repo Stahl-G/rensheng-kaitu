@@ -261,4 +261,13 @@ it("快捷指令样本写法不一时照常导入，不支持的类型和坏样�
   expect(result.ignored).toMatchObject({ unsupported: 1, invalid: 1 });
   expect(readRecords(ws, "activity")).toMatchObject([{ date: "2026-10-15", steps: 8532 }]);
   expect(readRecords(ws, "sleep")).toMatchObject([{ duration_min: 420 }]);
+  // 一条都导入不了（类型都不支持）时报错转待整理，不能当成功归档。
+  const unsupported = join(tmp(), "unsupported.health.json");
+  writeFileSync(
+    unsupported,
+    JSON.stringify([
+      { type: "heart_rate", start: "2026-10-15T08:00:00+08:00", value: 72, unit: "count/min" },
+    ]),
+  );
+  await expect(importHealthShortcut(ws, unsupported)).rejects.toThrow(/没有能导入的样本：1 条类型暂不支持/);
 });

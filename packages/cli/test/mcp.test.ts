@@ -47,6 +47,13 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
     const versions = await history(ws);
     expect(versions).toHaveLength(before + 1);
     expect(versions[0]?.message).toContain("MCP:grok-bot");
+    // 只交标题和链接的新闻：发布方按网址补，交来的 Agent 记在 via。
+    const news = await client.callTool({
+      name: "record_add",
+      arguments: { type: "news_item", data: { title: "合成新闻", url: "https://www.example.com/a" } },
+    });
+    expect(news.isError).not.toBe(true);
+    expect(readRecords(ws, "news_item")[0]).toMatchObject({ source: "example.com", via: "grok" });
     const deleted = await client.callTool({
       name: "record_delete",
       arguments: { type: "workout", id: readRecords(ws, "workout")[0]?.id },

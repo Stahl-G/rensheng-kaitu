@@ -67,15 +67,23 @@ export async function writeAgentRecord(
     return addExperiences(ws, [data as unknown as ExperienceInput], "agent");
   const ref = findRecordType(ws, type);
   if (type === "photo" && operation === "delete") return removePhoto(ws, id, { by: "agent", actor });
-  // 来源没写就记成交来的这个 Agent，和收件箱的做法一致。
-  const source = /MCP:(.+)）$/.exec(actor)?.[1] ?? actor;
-  const needsSource =
-    operation === "add" &&
-    data.source === undefined &&
-    recordReference(ws, type).required.some((field) => field.name === "source");
+  // 来源没写就记成交来的这个 Agent，和收件箱的做法一致。新闻的 source 是发布方（按网址补），
+  // 交来的 Agent 记在 via。
+  const agent = /MCP:(.+)）$/.exec(actor)?.[1] ?? actor;
+  const fill =
+    operation !== "add"
+      ? {}
+      : type === "news_item" || type === "trend"
+        ? data.via === undefined
+          ? { via: agent }
+          : {}
+        : data.source === undefined &&
+            recordReference(ws, type).required.some((field) => field.name === "source")
+          ? { source: agent }
+          : {};
   const result =
     operation === "add"
-      ? addRecord(ws, type, needsSource ? { ...data, source } : data)
+      ? addRecord(ws, type, { ...data, ...fill })
       : operation === "update"
         ? updateRecord(ws, type, id, data)
         : deleteRecord(ws, type, id);

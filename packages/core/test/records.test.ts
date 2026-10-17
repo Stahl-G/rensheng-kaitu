@@ -148,4 +148,9 @@ describe("时区与日期切分", () => {
     );
     expect(() => addRecord(ws, "workout", { ...workout, ts: "昨晚八点" })).toThrow(/时区偏移/);
   });
+
+  it("只有交来的 Agent 认前缀写法，其他取值写错仍拒绝", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    expect(() => addRecord(ws, "task", { title: "整理照片", status: "open-ended" })).toThrow(/只能是/);
+  });
 });
