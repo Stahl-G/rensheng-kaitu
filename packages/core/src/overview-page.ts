@@ -129,7 +129,12 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     (m) =>
       m[1]?.toLowerCase() !== "x" && !/^(?:无|暂无|没有|无未决事项)[。.!！\s]*$/.test(m[2]?.trim() ?? ""),
   );
+  // 暂停或已完成的项目不再给今天出下一步；想法和进行中的照常。
+  const shelved = new Set(
+    status.projects.filter((p) => p.stage === "paused" || p.stage === "done").map((p) => p.file),
+  );
   const next = status.modules
+    .filter((module) => !shelved.has(module.file))
     .flatMap((module) =>
       (module.next ?? [])
         .filter((item) => item.status === "todo" || item.status === "proposed")
