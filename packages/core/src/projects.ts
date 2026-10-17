@@ -45,7 +45,34 @@ export function projectDirectory(ws: Workspace, slug: string): string {
   slugCheck(slug);
   return `projects/${slug}`;
 }
-/** 项目 STATUS.md 缺标题、类型或阶段时用目录名、个人、进行中补上，不让整个项目消失。 */
+const STAGES: Record<string, ProjectStatus["stage"]> = {
+  idea: "idea",
+  想法: "idea",
+  构思: "idea",
+  planned: "idea",
+  planning: "idea",
+  active: "active",
+  进行中: "active",
+  doing: "active",
+  ongoing: "active",
+  "in progress": "active",
+  "in-progress": "active",
+  paused: "paused",
+  暂停: "paused",
+  搁置: "paused",
+  "on hold": "paused",
+  "on-hold": "paused",
+  done: "done",
+  完成: "done",
+  已完成: "done",
+  completed: "done",
+  complete: "done",
+  finished: "done",
+};
+/**
+ * 项目 STATUS.md 缺标题、类型或阶段时用目录名、个人、进行中补上，不让整个项目消失；
+ * 阶段认常见写法，写了却认不出的保留原样报格式错误，不悄悄当成进行中。
+ */
 function projectStatus(data: ProjectStatus, slug: string, timeZone: string): ProjectStatus {
   const out = normalizeStatus(
     data as unknown as Record<string, unknown>,
@@ -53,7 +80,9 @@ function projectStatus(data: ProjectStatus, slug: string, timeZone: string): Pro
   ) as unknown as ProjectStatus;
   if (typeof out.title !== "string" || !out.title.trim()) out.title = slug;
   if (out.kind !== "work" && out.kind !== "personal") out.kind = "personal";
-  if (!["idea", "active", "paused", "done"].includes(out.stage)) out.stage = "active";
+  const stage = out.stage as unknown;
+  if (stage === undefined || stage === null || stage === "") out.stage = "active";
+  else out.stage = STAGES[String(stage).trim().toLowerCase()] ?? out.stage;
   return out;
 }
 function checkStatus(data: ProjectStatus) {

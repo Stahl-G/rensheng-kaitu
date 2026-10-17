@@ -7,6 +7,7 @@ import {
   parseFrontmatter,
   readStatus,
   refreshOverview,
+  scheduleNext,
   snapshot,
   stringifyFrontmatter,
   validateWorkspace,
@@ -84,6 +85,8 @@ describe("工作台写入", () => {
       '---\nnext:\n  - 散步\n  - { title: 复查, due: "2026-10-18T14:00:00+08:00" }\n---\n',
     );
     const next = readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next ?? [];
+    // 没写 id 的下一步也能排时间（id 和今天页看到的一样）。
+    await scheduleNext(ws, "health/STATUS.md", next[1]?.id as string, "09:00", "10:00");
     await completeNext(ws, "health/STATUS.md", next[0]?.id as string);
     const saved = parseFrontmatter<{ next: { title: string }[] }>(ws.readText("health/STATUS.md")).data.next;
     expect(saved.find((item) => item.title === "复查")).toMatchObject({

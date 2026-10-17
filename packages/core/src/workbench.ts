@@ -224,9 +224,14 @@ export function scheduleNext(ws: Workspace, file: string, id: string, start: str
   const item =
     file === "task"
       ? listTasks(ws).find((row) => row.id === id)
-      : parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next?.find(
-          (row) => row.id === id && row.status === "todo",
-        );
+      : // 和今天页看到的一样先补齐 id，Agent 手写没有 id 的下一步也能排时间。
+        (
+          normalizeDocument(
+            "status.schema.json",
+            parseFrontmatter(ws.readText(file)).data,
+            ws.timeZone(),
+          ) as unknown as ModuleStatus
+        ).next?.find((row) => row.id === id && row.status === "todo");
   if (!item) throw new KaituError("找不到待办的下一步", "NOT_FOUND");
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
     throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");

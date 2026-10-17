@@ -29,6 +29,13 @@ describe("记忆", () => {
     });
   });
 
+  it("frontmatter 写坏时按敏感处理，不进资料包", async () => {
+    const ws = await freshWorkspace();
+    ws.writeText("memory/fact_secret.md", "---\nsensitive: true\nname: [没写完\n---\n只给自己看的事。\n");
+    expect(listMemories(ws).find((memory) => memory.text.includes("只给自己看"))?.sensitive).toBe(true);
+    expect(handoverPack(ws, "zh-CN").text).not.toContain("只给自己看");
+  });
+
   it("记忆文件夹里有同步冲突副本时，其余记忆、个人档案和资料包照常读取", async () => {
     const ws = await freshWorkspace();
     const city = await addMemory(ws, { type: "fact", name: "city", text: "住在上海" });

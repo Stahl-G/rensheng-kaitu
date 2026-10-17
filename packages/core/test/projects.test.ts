@@ -164,3 +164,13 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     fs.rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+it("项目阶段认常见写法、没写补进行中，写了却认不出的报格式错误", async () => {
+  const ws = await freshWorkspace();
+  ws.writeText("projects/novel/STATUS.md", "---\ntitle: 小说\nstage: completed\n---\n");
+  ws.writeText("projects/garden/STATUS.md", "---\ntitle: 花园\n---\n");
+  ws.writeText("projects/typo/STATUS.md", "---\ntitle: 错字\nstage: donee\n---\n");
+  expect(readProject(ws, "novel").data.stage).toBe("done");
+  expect(readProject(ws, "garden").data.stage).toBe("active");
+  expect(() => readProject(ws, "typo")).toThrow(/项目状态格式不合法/);
+});

@@ -153,4 +153,14 @@ describe("时区与日期切分", () => {
     const ws = await freshWorkspace("Asia/Shanghai");
     expect(() => addRecord(ws, "task", { title: "整理照片", status: "open-ended" })).toThrow(/只能是/);
   });
+
+  it("数字带单位时按字段单位换算，认不出的单位不当成数字", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    expect(addRecord(ws, "workout", { ...workout, weight_kg: "150 lb" }).record.weight_kg).toBe(68.04);
+    expect(
+      addRecord(ws, "workout", { modality: "cardio", exercise: "跑步", duration_min: "1.5 小时" }).record
+        .duration_min,
+    ).toBe(90);
+    expect(() => addRecord(ws, "workout", { ...workout, weight_kg: "150 stone" })).toThrow();
+  });
 });

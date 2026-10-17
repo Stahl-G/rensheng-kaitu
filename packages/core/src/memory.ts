@@ -113,11 +113,16 @@ export function memoryInput(raw: Record<string, unknown>): MemoryInput {
 function looseMemory(file: string, raw: string, fallbackDate: string): Memory | undefined {
   let data: Record<string, unknown> = {};
   let body = raw;
+  // frontmatter 写坏时读不出是否敏感，按敏感处理（不进资料包），正文照常显示。
+  let broken = false;
   try {
     const parsed = parseFrontmatter(raw);
     data = parsed.data;
     body = parsed.body;
-  } catch {}
+  } catch {
+    broken = true;
+    body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  }
   const heading = /^#\s+(.+)$/m.exec(body)?.[1]?.trim();
   const content = (heading ? body.replace(/^#\s+.+$/m, "") : body).trim();
   const text = (typeof data.text === "string" && data.text.trim()) || content || heading;
@@ -137,7 +142,7 @@ function looseMemory(file: string, raw: string, fallbackDate: string): Memory | 
     text,
     created: date(data.created),
     updated: date(data.updated ?? data.created),
-    sensitive: data.sensitive === true,
+    sensitive: broken || data.sensitive === true,
     ...(typeof data.source === "string" ? { source: data.source } : {}),
   } as Memory;
 }
