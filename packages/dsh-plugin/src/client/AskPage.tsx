@@ -449,6 +449,13 @@ export function AskPage({
       setModeSaving(false);
     }
   };
+  // 服务、接口或 Key 变了，之前获取的模型和还没回来的请求都作废。
+  const dropModels = () => {
+    modelRequest.current++;
+    setLoadingModels(false);
+    setAvailableModels([]);
+    setModelNotice("");
+  };
   const loadModels = async () => {
     const request = ++modelRequest.current;
     setLoadingModels(true);
@@ -1122,14 +1129,11 @@ export function AskPage({
                     value={provider}
                     onChange={(event) => {
                       const id = event.target.value;
-                      modelRequest.current++;
-                      setLoadingModels(false);
+                      dropModels();
                       setManualModel(false);
                       setProvider(id);
                       setAuth(settings?.provider === id ? (settings.auth ?? "key") : "key");
                       setModel(settings?.provider === id ? settings.model : "");
-                      setAvailableModels([]);
-                      setModelNotice("");
                       setKey("");
                       setError("");
                     }}
@@ -1148,10 +1152,7 @@ export function AskPage({
                     <select
                       value={api}
                       onChange={(event) => {
-                        modelRequest.current++;
-                        setLoadingModels(false);
-                        setAvailableModels([]);
-                        setModelNotice("");
+                        dropModels();
                         setApi(event.target.value);
                       }}
                     >
@@ -1171,10 +1172,7 @@ export function AskPage({
                       value={baseURL}
                       placeholder="https://api.example.com/v1"
                       onChange={(event) => {
-                        modelRequest.current++;
-                        setLoadingModels(false);
-                        setAvailableModels([]);
-                        setModelNotice("");
+                        dropModels();
                         setBaseURL(event.target.value);
                       }}
                     />
@@ -1203,12 +1201,12 @@ export function AskPage({
                           : "粘贴这个 AI 服务的 API Key"
                       }
                       onChange={(event) => {
-                        modelRequest.current++;
-                        setLoadingModels(false);
-                        setAvailableModels([]);
-                        setModelNotice("");
+                        dropModels();
                         setKey(event.target.value);
                         setAuth("key");
+                      }}
+                      onBlur={() => {
+                        if (key.trim()) void loadModels();
                       }}
                     />
                   </label>
