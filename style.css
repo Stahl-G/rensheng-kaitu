@@ -310,3 +310,4 @@ main { display: block; }
   .js [data-reveal] { opacity: 1; transform: none; }
   .site-top { position: static; }
 }
+.doc table.plugins td:nth-child(-n+2) { white-space: nowrap; }

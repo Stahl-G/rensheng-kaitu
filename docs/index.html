@@ -23,7 +23,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
 <link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=7c721b69">
+<link rel="stylesheet" href="/style.css?v=467faf27">
 <script>document.documentElement.classList.add("js")</script>
 <script src="/app.js?v=30bc878f" defer></script>
 </head>
@@ -55,6 +55,7 @@
           <li><a href="#storage">存放位置与同步</a></li>
           <li><a href="#phone">手机通道</a></li>
           <li><a href="#automation">自动任务与日历</a></li>
+          <li><a href="#plugins">插件</a></li>
           <li><a href="#updates">更新</a></li>
           <li><a href="#cli">从源码运行 / 命令行</a></li>
           <li><a href="#privacy">资料去向</a></li>
@@ -267,6 +268,25 @@
   <li>关掉开关后，已经写入的事件保持不动；要清掉，点「移除开图已写入的日历事件」。</li>
   <li>浏览器里的 <code>kaitu ui</code> 和 DSH 插件只生成日历文件。</li>
 </ul>
+
+<h2 id="plugins">插件<a class="anchor" href="#plugins" aria-label="#">#</a></h2>
+<p>开图有自己的插件目录：<code>https://kaitu.si/plugins/index.json</code>，格式是 DeepSeek Harness 的插件市场索引。现在有两个插件：</p>
+<div class="tablewrap"><table class="plugins">
+  <thead><tr><th>插件</th><th>包名</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td>人生开图</td><td><code>kaitu-dsh</code></td><td>在 DeepSeek Harness 里用开图：今天、开图、资料和开图的 AI 工具。Windows、Linux 和 Intel Mac 用这个（试用支持）。</td></tr>
+    <tr><td>小说工作台</td><td><code>kaitu-novel-workspace</code></td><td>章节与资料、世界书、续写候选和科幻设定校对。</td></tr>
+  </tbody>
+</table></div>
+<h3 id="plugins-app">在 Kaitu.app 里装<a class="anchor" href="#plugins-app" aria-label="#">#</a></h3>
+<p>点右上角头像，进「设置 → 插件」，在列表里点「安装」或「移除」。装好的插件页面在 DSH 窗口里，点「打开插件页面」查看。Kaitu.app 本身就是开图，所以列表里不显示「人生开图」。</p>
+<h3 id="plugins-dsh">在 DeepSeek Harness 里装<a class="anchor" href="#plugins-dsh" aria-label="#">#</a></h3>
+<ol>
+  <li>打开侧栏「插件」，点「实验性插件」旁的「更多」，打开「自定义插件市场」。</li>
+  <li>在「已安装」旁边的「发现」里点「添加索引源」，填 <code>https://kaitu.si/plugins/index.json</code>。</li>
+  <li>在列表里安装「人生开图」或「小说工作台」，确认框里会显示来源，核对后确认。</li>
+</ol>
+<p>只装开图的话，也可以直接在「插件」里安装 <code>kaitu-dsh</code>，步骤见<a href="/download/#windows">下载页</a>。</p>
 
 <h2 id="updates">更新<a class="anchor" href="#updates" aria-label="#">#</a></h2>
 <ul>
