@@ -28,7 +28,7 @@ export interface ProjectLink {
 }
 export interface ProjectStatus extends ModuleStatus {
   title: string;
-  kind: "work" | "personal";
+  kind: "work" | "learning" | "personal";
   stage: "idea" | "active" | "paused" | "done";
   links: ProjectLink[];
   github?: { repo: string };
@@ -49,6 +49,8 @@ const KINDS: Record<string, ProjectStatus["kind"]> = {
   work: "work",
   job: "work",
   工作: "work",
+  learning: "learning",
+  学习: "learning",
   personal: "personal",
   life: "personal",
   个人: "personal",
@@ -82,7 +84,7 @@ const STAGES: Record<string, ProjectStatus["stage"]> = {
  * 项目 STATUS.md 缺标题、类型或阶段时用目录名、个人、进行中补上，不让整个项目消失；
  * 类型和阶段认常见写法，写了却认不出的保留原样报格式错误，不悄悄改成别的。
  */
-function projectStatus(data: ProjectStatus, slug: string, timeZone: string): ProjectStatus {
+export function projectStatus(data: ProjectStatus, slug: string): ProjectStatus {
   const out = normalizeStatus(data as unknown as Record<string, unknown>) as unknown as ProjectStatus;
   const title = out.title as unknown;
   if (title === undefined || title === null || (typeof title === "string" && !title.trim())) out.title = slug;
@@ -104,7 +106,7 @@ export function readProject(ws: Workspace, slug: string) {
   const dir = projectDirectory(ws, slug);
   if (!ws.exists(`${dir}/STATUS.md`)) throw new KaituError("找不到项目", "NOT_FOUND");
   const raw = parseFrontmatter<ProjectStatus>(ws.readText(`${dir}/STATUS.md`));
-  const parsed = { ...raw, data: projectStatus(raw.data, slug, ws.timeZone()) };
+  const parsed = { ...raw, data: projectStatus(raw.data, slug) };
   parsed.data.links ??= [];
   checkStatus(parsed.data);
   return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
@@ -114,7 +116,7 @@ function projectSnapshot(ws: Workspace, slug: string) {
   const dir = projectDirectory(ws, slug);
   const status = ws.scanParsed(`${dir}/STATUS.md`, "project", (text) => {
     const raw = parseFrontmatter<ProjectStatus>(text);
-    const parsed = { ...raw, data: projectStatus(raw.data, slug, ws.timeZone()) };
+    const parsed = { ...raw, data: projectStatus(raw.data, slug) };
     parsed.data.links ??= [];
     checkStatus(parsed.data);
     return deepFreeze(parsed);

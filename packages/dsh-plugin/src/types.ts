@@ -159,7 +159,7 @@ export interface DoingProject {
   slug: string;
   title: string;
   stage: "idea" | "active" | "paused" | "done";
-  kind: "work" | "personal";
+  kind: "work" | "learning" | "personal";
   links: { path: string; role: "manuscript" | "repo" | "folder" }[];
   recentLog: { date: string; text: string } | null;
   recent7: {

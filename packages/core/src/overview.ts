@@ -241,7 +241,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
   lines.push("## 项目", "");
   for (const project of data.projects) {
     lines.push(
-      `### ${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}）`,
+      `### ${project.title}（${project.kind === "work" ? "工作" : project.kind === "learning" ? "学习" : "个人"} / ${project.stage}）`,
       "",
       `近 7 天：字数变化 ${project.recent7.words ?? "待补"}；${project.recent7.commits} 次提交`,
       `最近进展：${project.lastLogDate ?? "待补"}`,

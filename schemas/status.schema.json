@@ -68,7 +68,7 @@
       "minLength": 1
     },
     "kind": {
-      "enum": ["work", "personal"]
+      "enum": ["work", "learning", "personal"]
     },
     "stage": {
       "enum": ["idea", "active", "paused", "done"]

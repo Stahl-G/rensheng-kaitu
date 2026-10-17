@@ -34,9 +34,14 @@
       "path": "data/notes/{YYYY-MM}.jsonl",
       "schema": "schemas/direction-note.schema.json",
       "label": "方向资料与认识变化"
+    },
+    "exploration_checkin": {
+      "path": "data/checkins/{YYYY-MM}.jsonl",
+      "schema": "schemas/exploration-checkin.schema.json",
+      "label": "尝试打卡"
     }
   },
   "agent": {
-    "instructions": "地点经历通过 experience_add 或 kaitu_add_experience 提交，只给城市名和国家代码，坐标由城市表解析。计划用 planned，歧义交给用户核对。 方向与实验通过 exploration_read / exploration_write（DSH 加 kaitu_ 前缀）读写，保留预期版本。AI 新方向只作 suggested，采纳、暂停和归档由用户决定。记录行动完成与假设结论两件事，负面证据和历史不删除。 来源排除与批次撤销由用户在足迹的来源与导入中操作，Agent 可用 experience_imports 查询状态。经历提交结果的 excluded 表示来源被排除，不改名来源或定位符重试绕过。"
+    "instructions": "地点经历通过 experience_add 或 kaitu_add_experience 提交，只给城市名和国家代码，坐标由城市表解析。计划用 planned，歧义交给用户核对。 方向与实验通过 exploration_read / exploration_write（DSH 加 kaitu_ 前缀）读写，保留预期版本。AI 新方向只作 suggested，采纳、暂停和归档由用户决定。记录行动完成与假设结论两件事，负面证据和历史不删除。 来源排除与批次撤销由用户在足迹的来源与导入中操作，Agent 可用 experience_imports 查询状态。经历提交结果的 excluded 表示来源被排除，不改名来源或定位符重试绕过。 尝试可选 direction_id 或 investment，也可都不挂。打卡用 create_checkin，记录是否按计划做到。"
   }
 }

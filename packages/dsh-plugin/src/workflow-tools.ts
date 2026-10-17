@@ -27,6 +27,7 @@ import {
   inboxNotes,
   lifeMap,
   linkProject,
+  listInvestments,
   listMemories,
   listProjects,
   listTasks,
@@ -44,6 +45,7 @@ import {
   readExperienceImports,
   readExploration,
   readOnboardingMatter,
+  readPhases,
   readProject,
   readRecords,
   recordOnboardingAiConnection,
@@ -89,6 +91,7 @@ const task = z
     due: text.optional(),
     remind_at: text.optional(),
     project: text.optional(),
+    investment: text.optional(),
     notes: text.optional(),
     source: text.optional(),
   })
@@ -193,6 +196,10 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
       }
     },
   );
+  register("kaitu_investment_list", "列出项目、学习主题与长期投入。", z.object({}).strict(), () =>
+    listInvestments(ws),
+  );
+  register("kaitu_phase_list", "读取阶段建议与用户回顾。", z.object({}).strict(), () => readPhases(ws));
   register("kaitu_exploration_read", "读取方向、依据、尝试与认识变化。", z.object({}).strict(), () =>
     readExploration(ws),
   );
@@ -215,7 +222,15 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
       z
         .object({ operation: z.literal("list"), type: text, from: date.optional(), to: date.optional() })
         .strict(),
-      z.object({ operation: z.literal("update"), type: text, id: text, fields }).strict(),
+      z
+        .object({
+          operation: z.literal("update"),
+          type: text,
+          id: text,
+          fields,
+          expected_revision: z.number().int().min(1).optional(),
+        })
+        .strict(),
       z.object({ operation: z.literal("delete"), type: text, id: text }).strict(),
     ]),
     (input) =>
@@ -228,6 +243,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
             "DeepSeek",
             input.operation === "update" ? input.fields : {},
             input.id,
+            input.operation === "update" ? input.expected_revision : undefined,
           ),
   );
   register(
@@ -439,7 +455,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         .object({
           operation: z.literal("new"),
           title: text,
-          kind: z.enum(["work", "personal"]),
+          kind: z.enum(["work", "learning", "personal"]),
         })
         .strict(),
       z.object({ operation: z.literal("show"), slug: text }).strict(),

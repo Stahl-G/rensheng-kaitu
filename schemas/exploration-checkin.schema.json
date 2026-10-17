@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/exploration-checkin.schema.json",
+  "title": "exploration-checkin",
+  "type": "object",
+  "required": ["experiment_id", "date", "done"],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "done": {
+      "type": "boolean"
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "record-base.schema.json"
+    }
+  ],
+  "unevaluatedProperties": false
+}

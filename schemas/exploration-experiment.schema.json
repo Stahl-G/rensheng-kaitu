@@ -7,16 +7,7 @@
       "$ref": "record-base.schema.json"
     }
   ],
-  "required": [
-    "direction_id",
-    "question",
-    "action",
-    "budget",
-    "deadline",
-    "criteria",
-    "status",
-    "conclusion"
-  ],
+  "required": ["question", "action", "budget", "deadline", "criteria", "status", "conclusion"],
   "properties": {
     "direction_id": {
       "type": "string",

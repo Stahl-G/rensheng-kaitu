@@ -80,11 +80,13 @@ ${instructions}
   - 修改：\`kaitu record update <类型> <id> --json '{...}'\`
   - 删除：\`kaitu record rm <类型> <id>\`
   - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
+- 记录与原文 frontmatter 可用 investment 标所属投入：project:<slug>、learning:<主题目录名>、ongoing:<id>；先用 kaitu investments 查询。待办旧 project 字段视为 project:<slug>。
+- 尝试可挂 direction_id 或 investment，也可独立保存；create_checkin 记录是否按计划做到。
 - 财务流水可选保留 source_status、source_direction、account_last4；退款关联原交易号。银行通知只进入本机待核对候选，不直接记入流水。
 - 健康症状写 \`symptom\`（普通症状填 severity，食欲变化只填 appetite_change）；心理状态写 \`mood\`（七级 valence）；设备心率通知写 \`heart_notification\`，不写日历 event。
 - 地点经历用 MCP \`experience_add\` 或 dsh \`kaitu_add_experience\`，只给城市名和国家代码；计划用 planned，坐标由城市表提供。
 - 方向与实验通过 MCP \`exploration_read\` / \`exploration_write\`（dsh 加 kaitu_ 前缀），修改带预期版本；AI 提议先标 suggested，用户采纳后才是 active。行动完成不自动支持假设。
-- 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--project slug]\`，新建为 open。
+- 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--investment 引用]\`，新建为 open。
 - \`kaitu task list [--all]\` 查询，\`kaitu task done <id>\` 完成，\`kaitu task cancel <id>\` 取消；状态变化追加修订并保存版本。
 - 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
 - 项目改回公开会搬回关联记录的全部修订与删除标记；只在用户明确选择后操作。迁移可在重新打开时继续，既有云端副本须由用户清理。
@@ -119,7 +121,7 @@ ${renderRecordReference(ws)}
 | 写入外部日历 | 是 |
 | 批量导入 | 是（一屏列出，默认全选） |
 | 删除模块、删除超过 10 条记录 | 是 |
-| 修改 \`me/rules.md\`、\`me/goals.json\` | 是：先提出修改建议，用户确认后再改 |
+| 修改 \`me/rules.md\`、\`me/goals.json\`、\`me/ongoing.json\` | 是：先提出修改建议，用户确认后再改 |
 
 ## 6. 撤销与历史
 
