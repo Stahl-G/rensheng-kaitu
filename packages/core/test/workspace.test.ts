@@ -75,7 +75,7 @@ describe("init / doctor / validate", () => {
     expect(renderAgentsMd(ws)).toContain("`books/`");
   });
 
-  it("密钥文件权限不对时 doctor 报错", async () => {
+  it.skipIf(process.platform === "win32")("密钥文件权限不对时 doctor 报错", async () => {
     const ws = await freshWorkspace();
     chmodSync(join(ws.root, ".kaitu/secrets.json"), 0o644);
     expect((await doctor(ws)).find((c) => c.name.startsWith("密钥文件"))?.ok).toBe(false);

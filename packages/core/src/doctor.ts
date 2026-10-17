@@ -7,6 +7,8 @@ import { templateOutdated } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
 import type { Workspace } from "./workspace.js";
 
+const isWindows = process.platform === "win32";
+
 export interface Check {
   name: string;
   ok: boolean;
@@ -94,7 +96,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
 
   const secrets = ws.resolve(".kaitu/secrets.json", { internal: true });
   if (!existsSync(secrets)) add("密钥文件", false, "缺少 .kaitu/secrets.json");
-  else {
+  else if (!isWindows) {
     const mode = statSync(secrets).mode & 0o777;
     add(
       "密钥文件权限为 600",

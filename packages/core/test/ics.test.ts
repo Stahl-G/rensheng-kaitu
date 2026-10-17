@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import ICAL from "ical.js";
 import { expect, it } from "vitest";
 import { history, restore } from "../src/history.js";
@@ -9,7 +10,7 @@ import { addRecord, readRecords, recordLines } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
-const fixture = new URL("../../../examples/calendar.ics", import.meta.url).pathname;
+const fixture = fileURLToPath(new URL("../../../examples/calendar.ics", import.meta.url));
 const window = { from: "2026-10-01", to: "2026-10-31" };
 
 it("ICS：循环、排除与改期、全天、VTIMEZONE / IANA、跨月，幂等与恢复", async () => {

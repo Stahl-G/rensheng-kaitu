@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(process.argv[2] ?? join(root, "dist/web-release"));
 const { build } = createRequire(join(root, "packages/dsh-plugin/package.json"))("esbuild");
 const cli = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
+const plugin = JSON.parse(readFileSync(join(root, "packages/dsh-plugin/package.json"), "utf8"));
 mkdirSync(join(output, "dist/cli"), { recursive: true });
 const banner = [
   'import { createRequire as kaituRequire } from "node:module";',
@@ -31,6 +32,26 @@ for (const [entry, target] of [
     banner: { js: banner },
   });
 }
+const pluginDist = join(output, "dsh-plugin/dist");
+mkdirSync(pluginDist, { recursive: true });
+await build({
+  entryPoints: [join(root, "packages/dsh-plugin/src/index.ts")],
+  outfile: join(pluginDist, "index.js"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  external: ["@deepseek-ai/*", "better-sqlite3"],
+  banner: { js: banner },
+});
+cpSync(join(root, "packages/dsh-plugin/dist/client.js"), join(pluginDist, "client.js"));
+const pluginImports = new Set(
+  [
+    ...readFileSync(join(pluginDist, "index.js"), "utf8").matchAll(
+      /(?:from\s*|import\s*\(\s*)["'](@deepseek-ai\/[\w-]+)/g,
+    ),
+  ].map(([, name]) => name),
+);
 cpSync(join(output, "dist/cli/health-import-worker.js"), join(output, "dist/health-import-worker.js"));
 for (const [source, target] of [
   ["packages/cli/dist/engine", "dist/engine"],
@@ -48,8 +69,24 @@ const dependencies = Object.fromEntries(
     ([name]) => name.startsWith("@deepseek-ai/") || name === "@vscode/ripgrep",
   ),
 );
+for (const name of pluginImports) {
+  const version = plugin.dependencies[name] ?? cli.dependencies[name];
+  if (!version) throw new Error(`插件 bundle 引用了未声明的依赖：${name}`);
+  dependencies[name] = version;
+}
 for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
   dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.2";
+const pluginPackage = {
+  name: plugin.name,
+  version: cli.version,
+  type: plugin.type,
+  main: plugin.main,
+  exports: Object.fromEntries(
+    [".", "./client"].map((name) => [name, { default: plugin.exports[name].default }]),
+  ),
+  dsh: plugin.dsh,
+};
+writeFileSync(join(output, "dsh-plugin/package.json"), `${JSON.stringify(pluginPackage, null, 2)}\n`);
 writeFileSync(
   join(output, "package.json"),
   `${JSON.stringify(
@@ -61,7 +98,7 @@ writeFileSync(
       type: "module",
       bin: { kaitu: "dist/cli/main.js" },
       engines: { node: "^22.19.0 || >=24" },
-      files: ["dist", "web", "schemas", "templates", "THIRD_PARTY_NOTICES.md"],
+      files: ["dist", "dsh-plugin", "web", "schemas", "templates", "THIRD_PARTY_NOTICES.md"],
       dependencies,
     },
     null,

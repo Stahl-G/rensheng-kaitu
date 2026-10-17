@@ -77,7 +77,8 @@ it("一次性配对隔离主人，消息使用已连接的 AI并按会话排队�
     expect(await isTracked(ws, "me/processed.txt")).toBe(true);
     expect(await isTracked(ws, ".kaitu/channels/telegram/pairing.json")).toBe(false);
     expect(await isTracked(ws, ".kaitu/secrets.json")).toBe(false);
-    expect(statSync(ws.resolve(".kaitu/secrets.json", { internal: true })).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32")
+      expect(statSync(ws.resolve(".kaitu/secrets.json", { internal: true })).mode & 0o777).toBe(0o600);
     expect(errors).toEqual([]);
   } finally {
     await runtime.stop();

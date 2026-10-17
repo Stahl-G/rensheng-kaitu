@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export function desktopPaths(env = process.env) {
   const state = env.KAITU_APP_HOME || join(homedir(), ".kaitu-app");
@@ -31,7 +31,7 @@ export function assertDesktopIsolation(workspace, state) {
   const stateWithin = relative(real(workspace), real(state));
   if (
     stateWithin === "" ||
-    (!isAbsolute(stateWithin) && stateWithin !== ".." && !stateWithin.startsWith("../"))
+    (!isAbsolute(stateWithin) && stateWithin !== ".." && !stateWithin.startsWith(`..${sep}`))
   )
     throw new Error("程序存放位置须在资料目录之外");
 }
