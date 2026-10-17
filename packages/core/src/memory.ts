@@ -141,7 +141,8 @@ function looseMemory(file: string, raw: string, fallbackDate: string): Memory | 
     text.slice(0, 30);
   // 没写的才从文件名、修改时间补；写了却认不出的类型和日期原样保留，让校验报出来，写回时也不丢。
   const absent = (value: unknown) => value === undefined || value === null || value === "";
-  const date = (value: unknown) => (absent(value) ? fallbackDate : value);
+  // 写成数字的日期（20261017）按文字保留：校验能报出来，排序也不会因为它出错。
+  const date = (value: unknown) => (absent(value) ? fallbackDate : String(value));
   return {
     ...data,
     type: absent(data.type)
@@ -208,7 +209,7 @@ export function listMemories(ws: Workspace): MemoryEntry[] {
     .sort(
       (a, b) =>
         order.indexOf(a.type) - order.indexOf(b.type) ||
-        b.updated.localeCompare(a.updated) ||
+        String(b.updated).localeCompare(String(a.updated)) ||
         a.file.localeCompare(b.file),
     );
 }

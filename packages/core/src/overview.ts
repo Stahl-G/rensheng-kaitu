@@ -190,7 +190,8 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
       };
       lines.push("", `## 最近计划（${plan.date}）`, "");
       for (const block of plan.blocks)
-        lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);
+        if (block && typeof block.title === "string")
+          lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);
     } catch {
       // 格式问题已由 readStatus 的 warnings 报告。
     }

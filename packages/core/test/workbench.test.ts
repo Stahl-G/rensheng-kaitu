@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { normalizeStatus } from "../src/doc-input.js";
 import {
   completeNext,
   decideProposal,
@@ -122,6 +123,19 @@ describe("工作台写入", () => {
         expect.arrayContaining(["health/STATUS.md", "NOW.md"]),
       );
     }
+    // 没标题的下一步、写成空值的进度原样保留给校验，完成别的下一步写回时也不丢
+    ws.writeText(
+      "health/STATUS.md",
+      "---\nprogress: { label: 训练, current: null, target: 12 }\nnext:\n  - 跑步\n  - { status: todo, due: 2026-10-20 }\n---\n",
+    );
+    expect(validateWorkspace(ws).map((issue) => issue.file)).toContain("health/STATUS.md");
+    const run = (
+      normalizeStatus(parseFrontmatter(ws.readText("health/STATUS.md")).data, "Asia/Shanghai").next as {
+        id: string;
+      }[]
+    )[0]?.id as string;
+    await expect(completeNext(ws, "health/STATUS.md", run)).rejects.toThrow(/格式不合法/);
+    expect(parseFrontmatter<{ next: unknown[] }>(ws.readText("health/STATUS.md")).data.next).toHaveLength(2);
     // 写了却读不出的时间（25:00）原样保留给校验，不悄悄删掉
     ws.writeText("health/STATUS.md", "---\nnext:\n  - 跑步\n---\n");
     ws.writeText(

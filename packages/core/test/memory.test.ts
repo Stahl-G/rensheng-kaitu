@@ -37,6 +37,10 @@ describe("记忆", () => {
     expect(listMemories(ws).find((memory) => memory.text.includes("妈妈"))?.type).toBe("persno");
     expect(validateWorkspace(ws).some((issue) => issue.file === "memory/context_mom.md")).toBe(true);
     expect(handoverPack(ws, "zh-CN").text).not.toContain("妈妈住在杭州");
+    // 日期写成数字：按文字保留并报出来，整份记忆列表照常可读
+    ws.writeText("memory/fact_city.md", "---\nupdated: 20261017\n---\n住在上海。\n");
+    expect(listMemories(ws).find((memory) => memory.text === "住在上海。")?.updated).toBe("20261017");
+    expect(validateWorkspace(ws).some((issue) => issue.file === "memory/fact_city.md")).toBe(true);
   });
 
   it("frontmatter 写坏时按敏感处理，不进资料包", async () => {

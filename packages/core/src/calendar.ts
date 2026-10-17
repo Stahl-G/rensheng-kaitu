@@ -113,6 +113,7 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     const date = data.date;
     planDate = data.blocks?.length ? date : null;
     for (const block of data.blocks ?? []) {
+      if (!block || typeof block.id !== "string" || typeof block.title !== "string") continue;
       if (!date || !block.start || ["rejected", "skipped"].includes(block.status)) continue;
       const start = block.start;
       if (block.ref && events.some((event) => event.id === block.ref)) continue;

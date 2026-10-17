@@ -106,7 +106,22 @@ const instant = (value: unknown, timeZone: string) => {
 const text = (value: unknown) =>
   typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
 const pick = (table: Record<string, string>, value: unknown) => table[text(value).toLowerCase()];
-const missing = (value: unknown) => value === undefined || value === null || text(value) === "";
+const missing = (value: unknown) =>
+  value === undefined || value === null || (typeof value === "string" && !value.trim());
+/** 一行写成字符串或数字就当标题；对象照原样展开；其余读不出（返回 undefined）。 */
+const entry = (raw: unknown): Doc | undefined =>
+  typeof raw === "string" || typeof raw === "number"
+    ? { title: String(raw) }
+    : raw && typeof raw === "object" && !Array.isArray(raw)
+      ? { ...(raw as Doc) }
+      : undefined;
+/** 只认真正的数字或数字文字；null、""、"three" 都不当成 0。 */
+const count = (value: unknown) =>
+  typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim() && Number.isFinite(Number(value))
+      ? Number(value)
+      : Number.NaN;
 const shortHash = (value: string) => createHash("sha1").update(value).digest("hex").slice(0, 8);
 
 /** 9:00、9点、21:30 → 09:00、21:30；读不出返回 undefined。 */
@@ -134,6 +149,7 @@ function items(value: unknown): unknown[] {
 function uniqueIds<T extends { id: string }>(list: T[]): T[] {
   const seen = new Map<string, number>();
   return list.map((item) => {
+    if (!item || typeof item !== "object" || typeof item.id !== "string") return item;
     const count = seen.get(item.id) ?? 0;
     seen.set(item.id, count + 1);
     return count ? { ...item, id: `${item.id}-${count + 1}` } : item;
@@ -146,17 +162,18 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
   out.updated = missing(out.updated) ? null : (instant(out.updated, timeZone) ?? out.updated);
   const progress = out.progress as Doc | null | undefined;
   if (progress && typeof progress === "object") {
-    const current = Number(progress.current);
-    const target = Number(progress.target);
+    const current = count(progress.current);
+    const target = count(progress.target);
     if (text(progress.label) && Number.isFinite(current) && Number.isFinite(target))
       out.progress = { ...progress, label: text(progress.label), current, target };
   }
   if (out.next !== undefined) {
     const next = items(out.next).flatMap((raw) => {
-      const item: Doc =
-        typeof raw === "string" ? { title: raw } : raw && typeof raw === "object" ? { ...(raw as Doc) } : {};
-      const title = text(item.title) || text(item.name) || text(item.text);
-      if (!title) return [];
+      if (missing(raw)) return [];
+      const item = entry(raw);
+      const title = item ? text(item.title) || text(item.name) || text(item.text) : "";
+      // 没标题、读不出的条目原样保留给校验报错，写回时不丢。
+      if (!item || !title) return [raw as Doc];
       const due = day(item.due);
       // 带时间或文字的截止（2026-10-17T14:00、下周五）原样留在 when，due 只留日期，时间不丢。
       const dateOnly = /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(text(item.due));
@@ -178,8 +195,10 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
         },
       ];
     });
-    out.next = uniqueIds(next).map((item) =>
-      Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined)),
+    out.next = uniqueIds(next as { id: string }[]).map((item) =>
+      item && typeof item === "object" && !Array.isArray(item)
+        ? Object.fromEntries(Object.entries(item).filter(([, v]) => v !== undefined))
+        : item,
     );
   }
   return out;
@@ -193,10 +212,10 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
       ? undefined
       : (instant(out.generated_at, timeZone) ?? out.generated_at);
   const blocks = items(out.blocks).flatMap((raw) => {
-    const block: Doc =
-      typeof raw === "string" ? { title: raw } : raw && typeof raw === "object" ? { ...(raw as Doc) } : {};
-    const title = text(block.title) || text(block.name);
-    if (!title) return [];
+    if (missing(raw)) return [];
+    const block = entry(raw);
+    const title = block ? text(block.title) || text(block.name) : "";
+    if (!block || !title) return [raw as Doc];
     const start = clockTime(block.start);
     const end = clockTime(block.end);
     // 没写类型时按有没有起止时间推断；写了却认不出的原样留给校验，不改成别的意思。
@@ -224,13 +243,13 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
       },
     ];
   });
-  out.blocks = uniqueIds(blocks);
+  out.blocks = uniqueIds(blocks as { id: string }[]);
   if (out.attention !== undefined)
     out.attention = items(out.attention).flatMap((raw) => {
-      const item: Doc =
-        typeof raw === "string" ? { title: raw } : raw && typeof raw === "object" ? (raw as Doc) : {};
-      const title = text(item.title);
-      return title ? [{ ...item, kind: text(item.kind) || "note", title }] : [];
+      if (missing(raw)) return [];
+      const item = entry(raw);
+      const title = item ? text(item.title) : "";
+      return item && title ? [{ ...item, kind: missing(item.kind) ? "note" : item.kind, title }] : [raw];
     });
   // 空的 generated_at 去掉，不写成 null；读不出的已原样保留给校验。
   return Object.fromEntries(

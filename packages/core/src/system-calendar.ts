@@ -93,6 +93,8 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
     for (const goal of ws.readJson<Goal[]>("me/goals.json")) related.set(goal.id, goal.title);
   }
   return data.blocks.flatMap((block) => {
+    // 读不出的时间段（没标题、没 id）留给校验报出来，这里不同步。
+    if (!block || typeof block.id !== "string" || typeof block.title !== "string") return [];
     const id = `${data.date}/${block.id}`;
     const linkedTitle = block.ref ? related.get(block.ref) : undefined;
     if (block.kind === "task" && block.id.startsWith("next-") && block.ref && !taskIds.has(block.ref))
