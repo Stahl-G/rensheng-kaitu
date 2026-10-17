@@ -722,7 +722,7 @@ export function AskPage({
                     <>
                       <b>给这个对话开启完整 Agent？</b>
                       <p className={v2.small}>
-                        它可以运行命令、读写这台电脑上的任何文件、上网。资讯、邮件或网页里的内容可能诱导它做你不想做的事，只在你信任这次任务时开启。
+                        {`它可以运行命令、读写这台电脑上的任何文件、上网，读到的内容会发给 ${settings?.providerName || "当前 AI 服务"}。资讯、邮件或网页里的内容可能诱导它做你不想做的事，只在你信任这次任务时开启。`}
                       </p>
                       <p className={v2.small}>只对这个对话生效，新对话仍是只读写开图资料。</p>
                       <div className={v2["dialog-foot"]}>
@@ -818,7 +818,19 @@ export function AskPage({
             </button>
           </div>
         </form>
-        <p className={css.scope}>Enter 发送 · Shift + Enter 换行</p>
+        <p className={css.scope}>
+          {settings?.configured
+            ? `发给 ${settings.providerName} · ${mode === "full" ? "完整 Agent：能读写这台电脑上的任何文件" : "只读写开图资料，读不到 Key 和凭据"}`
+            : "Enter 发送 · Shift + Enter 换行"}
+          {settings?.configured && onConnections && (
+            <>
+              {" · "}
+              <button type="button" className={css.scopeLink} onClick={onConnections}>
+                资料去向
+              </button>
+            </>
+          )}
+        </p>
       </section>
       <dialog
         ref={dialog}

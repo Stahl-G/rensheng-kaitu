@@ -6,6 +6,7 @@ import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
+import { PrivacyPage } from "./Privacy.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
@@ -59,6 +60,8 @@ export function PersonalPages(
   const [moving, setMoving] = useState(false);
   const [path, setPath] = useState("");
   const [provider, setProvider] = useState<SyncProvider>("local");
+  const [privacy, setPrivacy] = useState(false);
+  const reading = props.view === "settings" && privacy;
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -146,21 +149,26 @@ export function PersonalPages(
             type="button"
             key={id}
             aria-current={props.view === id ? "page" : undefined}
-            onClick={() => props.navigate(id)}
+            onClick={() => {
+              setPrivacy(false);
+              props.navigate(id);
+            }}
           >
             {label}
           </button>
         ))}
       </nav>
       <div className={css["me-body"]}>
-        <div className={css.head}>
-          <h1>{title}</h1>
-          {props.view === "profile" && (
-            <span className={css.sub}>
-              {t("开图对你的了解，每条都留着出处", "What Kaitu knows about you, each with its source")}
-            </span>
-          )}
-        </div>
+        {!reading && (
+          <div className={css.head}>
+            <h1>{title}</h1>
+            {props.view === "profile" && (
+              <span className={css.sub}>
+                {t("开图对你的了解，每条都留着出处", "What Kaitu knows about you, each with its source")}
+              </span>
+            )}
+          </div>
+        )}
         {error && (
           <p className={css.error} role="alert">
             {error}
@@ -173,6 +181,57 @@ export function PersonalPages(
           <p className={css.small}>{t("正在读取设置…", "Loading settings…")}</p>
         ) : props.view === "connections" ? (
           <>
+            <section className={css.sec}>
+              <div className={css["sec-head"]}>
+                <h2 className={css.eyebrow}>{t("资料去向", "Where your data goes")}</h2>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => {
+                    setPrivacy(true);
+                    props.navigate("settings");
+                  }}
+                >
+                  {t("逐项说明", "Full details")}
+                </button>
+              </div>
+              <dl className={`${css.card} ${css.where}`}>
+                <dt>{t("存在", "Stored")}</dt>
+                <dd>
+                  {data.storage.mode === "local"
+                    ? t("这台电脑，不同步", "This computer, not synced")
+                    : t(
+                        `同步到你的云盘 · ${storageName(data.storage.provider)}`,
+                        `Synced to your cloud · ${storageName(data.storage.provider)}`,
+                      )}
+                  <span className={css.small}>{data.storage.root}</span>
+                </dd>
+                <dt>{t("发给 AI", "Sent to AI")}</dt>
+                <dd>
+                  {!data.ai
+                    ? t("问问用 DSH 的模型设置", "Ask uses DSH model settings")
+                    : data.ai.configured
+                      ? t(
+                          `问问的对话发给 ${data.ai.providerName ?? "AI"} · ${data.ai.model}`,
+                          `Ask conversations go to ${data.ai.providerName ?? "AI"} · ${data.ai.model}`,
+                        )
+                      : t("问问还没连接 AI", "Ask isn't connected to an AI yet")}
+                  <span className={css.small}>
+                    {t(
+                      "默认只读写开图资料；你接入的外部 AI 各按下面写的范围读取",
+                      "By default it only reads and writes your Kaitu notes; AIs you connect below read what each one says",
+                    )}
+                  </span>
+                </dd>
+                <dt>{t("留在本机", "Stays here")}</dt>
+                <dd>
+                  {t(
+                    "Key、凭据、版本历史和索引：不进云盘，问问默认读不到",
+                    "Keys, credentials, version history and the index: never synced, and Ask can't read them by default",
+                  )}
+                </dd>
+              </dl>
+            </section>
             <section className={css.sec}>
               <HandoverPanel loadHandover={props.loadHandover} onAnswer={props.onHandoverAnswer} />
             </section>
@@ -323,6 +382,12 @@ export function PersonalPages(
                 </p>
                 <details>
                   <summary className={css.link}>{t("查看接入说明", "Setup instructions")}</summary>
+                  <p className={`${css.small} ${css.notice}`}>
+                    {t(
+                      "接入后，这个 AI 能读写开图资料，读到的内容会发给它背后的 AI 服务；经公网连接的读不到财务明细，所有外部 AI 都读不到 Key、凭据和版本历史。",
+                      "Once connected, this AI can read and write your Kaitu notes, and what it reads goes to the AI service behind it. Connections over the internet can't read finance details, and no outside AI can read keys, credentials or version history.",
+                    )}
+                  </p>
                   <pre className={css.detailBody}>{`命令：kaitu mcp\n工作目录：${data.storage.root}`}</pre>
                   <textarea
                     aria-label={t("AI 接手说明", "AI handover instructions")}
@@ -391,14 +456,9 @@ export function PersonalPages(
                 onFocused={props.onChannelFocused}
               />
             )}
-            <section className={css.sec}>
-              <h2 className={css.eyebrow}>{t("资料存在哪里", "Where your notes live")}</h2>
-              <div className={`${css.card} ${css.sum}`}>
-                <b>{storageName(data.storage.provider)}</b>
-                <p className={css.small}>{data.storage.root}</p>
-              </div>
-            </section>
           </>
+        ) : reading ? (
+          <PrivacyPage back={() => setPrivacy(false)} />
         ) : (
           <>
             <section className={css.sec}>
@@ -720,12 +780,26 @@ export function PersonalPages(
                   </p>
                 )}
                 {provider !== "local" && (
-                  <p className={css.small}>
-                    {t(
-                      "不要直接把现在的开图文件夹加进同步盘：那样会把密钥和版本库一起上传。请用这里迁移，开图会把它们留在本机。",
-                      "Don't add the current Kaitu folder to a sync app directly; that would upload keys and history too. Move it here and Kaitu keeps those on this computer.",
-                    )}
-                  </p>
+                  <div className={`${css.small} ${css.notice}`}>
+                    <b>
+                      {t(
+                        `资料会同步到${provider === "folder" ? "那个同步盘" : ` ${storageName(provider)} `}`,
+                        `Your notes will sync through ${provider === "folder" ? "that sync app" : storageName(provider)}`,
+                      )}
+                    </b>
+                    <span>
+                      {t(
+                        "资料文件夹里的全部资料文件，包括财务明细，都由它存放和同步；你授权读取这个云盘的 AI 也能读到。版本历史、Key、凭据和索引留在这台电脑。",
+                        "Every file in your notes folder, finance details included, is stored and synced by it, and any AI you let read that cloud folder can read them. Version history, keys, credentials and the index stay on this computer.",
+                      )}
+                    </span>
+                    <span>
+                      {t(
+                        "不要直接把现在的开图文件夹拖进同步盘，那样会连密钥和版本库一起上传；请用这里迁移。",
+                        "Don't drag the current Kaitu folder into a sync app; that would upload keys and history too. Move it here instead.",
+                      )}
+                    </span>
+                  </div>
                 )}
                 <label>
                   {t("新的文件夹位置", "New folder location")}
@@ -746,7 +820,28 @@ export function PersonalPages(
               </form>
             )}
             <section className={css.sec}>
-              <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
+              <h2 className={css.eyebrow}>{t("关于与隐私", "About and privacy")}</h2>
+              <div className={`${css.card} ${css["list-card"]}`}>
+                <div className={css["switch-row"]}>
+                  <span>
+                    <b>{t("资料去向", "Where your data goes")}</b>
+                    <br />
+                    <span className={css.small}>
+                      {t(
+                        "什么存在这台电脑、什么同步到云盘、什么会发给 AI",
+                        "What stays on this computer, what syncs to your cloud, what goes to AI",
+                      )}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className={`${css.btn} ${css["btn-quiet"]}`}
+                    onClick={() => setPrivacy(true)}
+                  >
+                    {t("查看", "View")}
+                  </button>
+                </div>
+              </div>
               <p className={css.small}>
                 {t("人生开图", "Kaitu")} {data.version ?? t("本地工作台", "local workbench")}
                 {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} ·{" "}

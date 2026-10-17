@@ -682,7 +682,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   return (
     <div className={css.page} aria-busy={loading}>
       <header className={css.header}>
-        <p className={css.muted}>只记录和分析，不连交易账户 · 明细只在本机</p>
+        <p className={css.muted}>只记录和分析，不连交易账户 · 明细存在资料文件夹，开了云盘同步会一起同步</p>
         <div className={css.actions}>
           <button type="button" className={css.button} disabled={loading} onClick={() => void refresh()}>
             {loading ? "刷新中…" : "刷新"}

@@ -98,7 +98,12 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
     <div className={css.fact} key={memory.file}>
       <p>{memory.text}</p>
       <span className={css.src}>
-        {[sourceLabel(memory.source), memory.sensitive ? "仅本机" : ""].filter(Boolean).join(" · ")}
+        {[
+          sourceLabel(memory.source),
+          memory.sensitive ? t("敏感 · 不进资料包", "Sensitive · left out of packs") : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </span>
       <span className={css["fact-acts"]}>
         <button

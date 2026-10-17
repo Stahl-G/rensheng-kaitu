@@ -23,6 +23,8 @@ await build({
   target: "es2022",
   jsx: "automatic",
   minify: true,
+  // 隐私说明等正文写成 Markdown 文件，按文本打包。
+  loader: { ".md": "text" },
   plugins: [
     {
       name: "kaitu-product-styles",

@@ -6,3 +6,7 @@ declare module "maplibre-gl/dist/maplibre-gl-worker.mjs" {
   const source: string;
   export default source;
 }
+declare module "*.md" {
+  const text: string;
+  export default text;
+}

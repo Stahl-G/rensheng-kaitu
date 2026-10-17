@@ -94,6 +94,8 @@ await build({
   target: "es2022",
   format: "cjs",
   jsx: "automatic",
+  // 隐私说明等正文写成 Markdown 文件，按文本打包。
+  loader: { ".md": "text" },
   external: ["react", "react/*", "@deepseek-ai/cordis", "@deepseek-ai/dsh-client-ui-primitives"],
   plugins: [
     {
