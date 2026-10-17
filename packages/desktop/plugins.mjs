@@ -79,17 +79,20 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       const response = await fetch(KAITU_PLUGIN_INDEX, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
       const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
-      const catalog = index.plugins.map((plugin) => {
-        const latest = plugin.versions[0];
-        return {
-          name: plugin.name,
-          title: text(plugin.title) || plugin.name,
-          description: text(plugin.description),
-          version: latest?.version ?? "",
-          spec: latest ? marketInstallTarget(plugin.name, latest).spec : "",
-          installed: names.includes(plugin.name),
-        };
-      });
+      // 目录里的 kaitu-dsh 是给 DSH 装开图用的，开图 App 自己就是开图，不列出来。
+      const catalog = index.plugins
+        .filter((plugin) => plugin.name !== "kaitu-dsh")
+        .map((plugin) => {
+          const latest = plugin.versions[0];
+          return {
+            name: plugin.name,
+            title: text(plugin.title) || plugin.name,
+            description: text(plugin.description),
+            version: latest?.version ?? "",
+            spec: latest ? marketInstallTarget(plugin.name, latest).spec : "",
+            installed: names.includes(plugin.name),
+          };
+        });
       const extra = names
         .filter((name) => !catalog.some((plugin) => plugin.name === name))
         .map((name) => ({ name, title: name, description: "", version: "", spec: "", installed: true }));

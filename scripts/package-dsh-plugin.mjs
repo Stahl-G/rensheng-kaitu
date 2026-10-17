@@ -1,5 +1,5 @@
-// 把开图插件单独打成一个 DSH 插件包（npm 名 kaitu-dsh）：在 DSH 里 `dsh plugin add kaitu-dsh`
-// 或插件页安装即可，Mac、Windows、Linux 通用，不需要先装开图 CLI。
+// 把开图插件单独打成一个 DSH 插件包（npm 名 kaitu-dsh）：在 DSH 插件市场或插件页安装即可，
+// Mac、Windows、Linux 通用，不需要先装开图 CLI。
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
@@ -65,7 +65,7 @@ writeFileSync(
 );
 writeFileSync(
   join(output, "README.md"),
-  `# 人生开图 · DSH 插件\n\n在 DeepSeek Harness 里装上开图：今天、开图、资料三个页面，以及开图的 AI 工具。\n\n\`\`\`sh\ndsh plugin --profile desktop add ${name}\n\`\`\`\n\n资料默认放在用户目录下的 \`kaitu\` 文件夹。说明见 https://kaitu.si/docs/ 。\n`,
+  `# 人生开图 · DSH 插件\n\n在 DeepSeek Harness 里装上开图：今天、开图、资料三个页面，以及开图的 AI 工具。\n\n桌面版：在 DSH 的插件市场添加插件目录 https://kaitu.si/plugins/index.json ，找到「人生开图」安装；也可以在插件页直接安装 \`${name}\`。\n\n网页版或命令行：\n\n\`\`\`sh\ndsh plugin --profile web add ${name}\n\`\`\`\n\n资料默认放在用户目录下的 \`kaitu\` 文件夹。说明见 https://kaitu.si/docs/ 。\n`,
 );
 writeFileSync(
   join(output, "package.json"),
