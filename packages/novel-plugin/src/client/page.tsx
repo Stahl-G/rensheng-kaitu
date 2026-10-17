@@ -2,6 +2,7 @@ import type { Anchor, Finding, NovelData, NovelView, WorldRule } from "@kaitu/co
 import { useCallback, useEffect, useState } from "react";
 import base from "../../../dsh-plugin/src/client/Prototype.module.css";
 import css from "./Novel.module.css";
+import { continuationPrompt, externalContinuationPrompt } from "./continuation-prompt.js";
 export type Request = <T = unknown>(operation: string, input?: object) => Promise<T>;
 type Agent = (text: string) => Promise<void>;
 type Project = {
@@ -36,6 +37,7 @@ export function NovelPage({ request, onAgent }: { request: Request; onAgent?: Ag
   const [receipt, setReceipt] = useState("");
   const [completed, setCompleted] = useState("");
   const [next, setNext] = useState("");
+  const [writingIntent, setWritingIntent] = useState("");
   const refresh = useCallback(async () => {
     const info = await request<Catalog>("projects");
     setCatalog(info);
@@ -64,6 +66,7 @@ export function NovelPage({ request, onAgent }: { request: Request; onAgent?: Ag
     setProject(p.slug);
     setView(null);
     setSource(null);
+    setWritingIntent("");
     setTab("overview");
     if (p.linked) {
       const v = await request<NovelView>("view", { project: p.slug });
@@ -487,17 +490,41 @@ export function NovelPage({ request, onAgent }: { request: Request; onAgent?: Ag
                     />
                     允许保存续写候选与合稿
                   </label>
+                  <label className={css.stack}>
+                    这次想怎么续写（选填）
+                    <textarea
+                      value={writingIntent}
+                      onChange={(e) => setWritingIntent(e.target.value)}
+                      placeholder="例如：接着当前章节写 1000 字，保持第一人称，让两人的矛盾在对话中显露，先不揭晓真相。"
+                      rows={3}
+                    />
+                  </label>
+                  <p className={css.muted}>
+                    本地 Agent 读取正文、世界书和文风样本，整理成包含实际材料的完整提示词。 复制给 Gemini
+                    等外部聊天模型即可续写。
+                  </p>
                   {onAgent && (
                     <button
                       className={base.btn}
                       type="button"
                       onClick={() =>
                         void ask(
-                          `请为作品 ${project} 续写一份独立候选稿。先读当前正文样本、世界书和交接，沿用作者的叙述视角、对白、句式与节奏，保持设定连贯。保存候选，不自动合入原稿。`,
+                          externalContinuationPrompt(data, title ?? project, source?.scene, writingIntent),
                         )
                       }
                     >
-                      让 Agent 续写候选
+                      整理外部续写提示词
+                    </button>
+                  )}
+                  {onAgent && (
+                    <button
+                      className={base.btn}
+                      type="button"
+                      onClick={() =>
+                        void ask(continuationPrompt(data, title ?? project, source?.scene, writingIntent))
+                      }
+                    >
+                      在 DSH 中续写
                     </button>
                   )}
                 </section>
