@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>文档 · 人生开图</title>
+<meta name="description" content="开图 0.1.0-rc.3 的安装、四个入口、资料文件夹、接上 AI、存放与同步和常见问题。">
+<link rel="canonical" href="https://kaitu.si/docs/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/docs/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/docs/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/docs/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="人生开图">
+<meta property="og:title" content="文档 · 人生开图">
+<meta property="og:description" content="开图 0.1.0-rc.3 的安装、四个入口、资料文件夹、接上 AI、存放与同步和常见问题。">
+<meta property="og:url" content="https://kaitu.si/docs/">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>人生开图</span></a>
+    <a class="lang" href="/en/docs/" hreflang="en" lang="en" data-lang-switch="en">English</a>
+    <nav class="site-nav" aria-label="网站导航"><a href="/#tour">产品</a><a href="/docs/" aria-current="page">文档</a><a href="/download/">下载</a><a href="/#inspiration">灵感</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="wrap">
+  <header class="page-head">
+    <h1>文档</h1>
+    <p class="lead">本页对应开图 0.1.0-rc.3。还没装好的话，先去<a href="/download/">下载</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a>。</p>
+  </header>
+  <div class="docs-layout">
+    <details class="toc" data-toc open>
+      <summary>目录</summary>
+      <nav aria-label="文档目录">
+        <ol>
+          <li><a href="#start">快速开始</a></li>
+          <li><a href="#entries">四个入口</a></li>
+          <li><a href="#folder">资料文件夹</a></li>
+          <li><a href="#ai">接上你的 AI</a></li>
+          <li><a href="#import">导入与记录</a></li>
+          <li><a href="#storage">存放位置与同步</a></li>
+          <li><a href="#phone">手机通道</a></li>
+          <li><a href="#automation">自动任务与日历</a></li>
+          <li><a href="#updates">更新</a></li>
+          <li><a href="#cli">从源码运行 / 命令行</a></li>
+          <li><a href="#privacy">资料去向</a></li>
+          <li><a href="#faq">常见问题</a></li>
+          <li><a href="#credits">开源致谢</a></li>
+        </ol>
+      </nav>
+    </details>
+    <article class="doc">
+
+<h2 id="start">快速开始<a class="anchor" href="#start" aria-label="#">#</a></h2>
+<p><strong>需要</strong>：Apple 芯片（arm64）的 Mac。Kaitu.app 目前只有这一个版本。</p>
+<ol>
+  <li>下载 <code>Kaitu.dmg</code>（见<a href="/download/">下载</a>）。</li>
+  <li>打开 DMG，把 Kaitu.app 拖进「应用程序」。</li>
+  <li>在「应用程序」里双击打开。macOS 不让打开时，见<a href="/download/#blocked">下载页的说明</a>。</li>
+</ol>
+<h3 id="first-run">第一次打开<a class="anchor" href="#first-run" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>先选资料放哪</strong>：这台电脑（不同步）、iCloud 云盘、Google Drive、坚果云，或其他同步盘的文件夹。旁边会标出这台电脑上找没找到对应的同步文件夹。选本机时默认是 <code>~/kaitu</code>，空文件夹会自动建好。以后随时能换，见<a href="#storage">存放位置与同步</a>。</li>
+  <li><strong>带来一件事</strong>：写下想改变的事，或粘贴一段和 AI 聊过的对话。点「保存并整理」时，开图先原样保存原文，再整理出「当前目标」「已知现状」「一个下一步」草稿，每项都能改。只有你点「采纳这个下一步」的那一条会变成待办，目标同时记进目标列表；其他建议留在原文里。一条都不想采纳，就点「只保存原文」。</li>
+  <li>AI 给出几条「可能的路径」时，先选一条，才能把它的小实验改成你的下一步。</li>
+  <li>没连开图里的 AI 也能整理：在「用你常用的 AI 整理」里点「1 · 复制整理提示词」，发给豆包、Kimi、DeepSeek、ChatGPT 等任何 AI，把回答原样贴回，点「3 · 读取回答」。也可以自己填那三项。</li>
+  <li>也可以「从常用的 AI 搬来记忆」（见<a href="#import">导入与记录</a>），或者「先随便看看」。</li>
+</ul>
+<p>今天页有一份「开始使用」清单，按你的实际进度勾选：选资料放哪、带来一件事并采纳第一个下一步、让开图认识你（可选）、选你想先管的事、接入健康、日历等、选一个 AI 帮你整理、拿到第一份今天计划。点「接入健康、日历等」时，如果还没选想先管的事，会先让你选，再按选择列出要接的数据。</p>
+<p>看资料、记原文、看地图和财务都不需要 API Key。「选一个 AI 帮你整理」不会锁定资料：开图负责保存资料，AI 负责整理和排计划，以后换 AI，资料都还在。</p>
+<p>界面语言默认跟随系统，可以在「右上角头像 → 设置 → 界面语言」改成中文或 English。它只在这台电脑生效，也决定开图复制给 AI 的提示词和资料包用哪种语言；你写的内容和 AI 的回答不会被翻译。</p>
+<p class="note">App 自己的状态和问问的会话在 <code>~/.kaitu-app/</code>，不在资料文件夹里。</p>
+
+<h2 id="entries">四个入口<a class="anchor" href="#entries" aria-label="#">#</a></h2>
+<div class="tablewrap"><table>
+  <thead><tr><th>入口</th><th>里面有什么</th></tr></thead>
+  <tbody>
+    <tr><td>今天</td><td>现在最该做的一件事；你带来的规划（目标、来源和下一步）；最多三条下一步；要你核对的事；今天的日程；最近的变化和近期回顾；「随手记一句」</td></tr>
+    <tr><td>开图</td><td>健康、足迹、资讯、方向，默认打开健康</td></tr>
+    <tr><td>资料</td><td>日程、在做的事、健康、财务、笔记与决策、收件箱；导入、对账和详细图表也在这里</td></tr>
+    <tr><td>问问</td><td>内置 AI 对话：会话列表、引用资料和附件、每一步读了什么做了什么</td></tr>
+  </tbody>
+</table></div>
+<p>个人档案、AI 与连接、设置在右上角头像里。DSH 插件只有今天、开图、资料三个入口，没有问问页。</p>
+<h3 id="today">今天<a class="anchor" href="#today" aria-label="#">#</a></h3>
+<ul>
+  <li>勾选下一步就是完成；做完可以记一句实际结果，做不了就改到以后。</li>
+  <li>「随手记一句」写一句就存成原文，不需要 AI；开了每日整理，会在整理时处理。</li>
+  <li>待确认的日程有「确认」和「不用」。确认的、带起止时间的日程会写进系统日历，见<a href="#automation">自动任务与日历</a>。</li>
+</ul>
+<h3 id="explore">开图<a class="anchor" href="#explore" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>健康</strong>：目标、本周训练与饮食、近 5 周的训练格子、健康的下一步。</li>
+  <li><strong>足迹</strong>：从家乡出发，把读书、工作、旅行过的城市连在地图上。地图图块来自 OpenFreeMap，需要联网。</li>
+  <li><strong>资讯</strong>：按你的关注方向整理的新闻。每条点「有用」或「不相关」会记下来；在「关注方向」点「让 AI 结合反馈提议」时，AI 会参考这些反馈，每日整理提方向建议时也会参考。提议的关注方向要你点「确认保存」才生效。</li>
+  <li><strong>方向</strong>：一条一行，写着为什么在意和第一步。打开一个方向，能看到目前的假设、仍然未知的事、支持和反面的依据，以及每次尝试的结果。暂停的方向仍留在列表里；归档的和点过「不感兴趣」的在「已归档」里，都可以「继续探索」，资料、尝试和变化记录都还在。</li>
+</ul>
+<h3 id="library">资料<a class="anchor" href="#library" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>财务 · 收支</strong>：转账、借入本金、偿还本金和证券卖出本金不算收入，也不算消费，单独列在「不计入收支」。转账和借款本金按带方向的金额显示，转出为负数。</li>
+  <li>退款只冲减消费，不算收入，而且要和原来那笔消费对上；对不上的先进待核对，不计入。</li>
+  <li><strong>财务 · 投资</strong>：分红、手续费、税费各自单列。卖出收益有没有扣过手续费，取决于导入的成交记录。</li>
+</ul>
+<h3 id="profile">个人档案<a class="anchor" href="#profile" aria-label="#">#</a></h3>
+<ul>
+  <li>在右上角头像 →「个人档案」：名字和简介、事实、偏好和规则、我的目标，每条都标着出处。标为敏感的记忆不进资料包。</li>
+  <li><strong>经历</strong>：足迹里记下的读书和工作经历按时间从近到远列出。点「导出简历」得到一份 Markdown 简历，工作在前，读书在后。</li>
+</ul>
+
+<h2 id="folder">资料文件夹<a class="anchor" href="#folder" aria-label="#">#</a></h2>
+<p>全部是 Markdown、JSON 和 JSONL，任何编辑器都能打开。</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>位置</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>NOW.md</code></td><td>今天的计划和待确认的日程建议</td></tr>
+    <tr><td><code>OVERVIEW.md</code></td><td>现状一页：今天、各模块进度与下一步、最近 7 天数据。自动生成</td></tr>
+    <tr><td><code>AGENTS.md</code>、<code>CLAUDE.md</code></td><td>给 AI 的入口说明，自动生成；<code>AGENTS.md</code> 文末分隔线以下可以自己补充</td></tr>
+    <tr><td><code>me/</code></td><td>档案 <code>profile.md</code>、目标 <code>goals.json</code>、作息与训练营养规则 <code>rules.md</code>、待办 <code>data/tasks/</code></td></tr>
+    <tr><td><code>health/</code></td><td>训练、饮食、睡眠、活动、身体指标等记录在 <code>data/</code>，照片和体检原件在 <code>files/</code></td></tr>
+    <tr><td><code>projects/</code></td><td>每件在做的事一个文件夹：<code>STATUS.md</code>、<code>notes.md</code>、<code>log.md</code></td></tr>
+    <tr><td><code>explore/</code></td><td>足迹经历、方向、尝试和依据</td></tr>
+    <tr><td><code>feed/</code></td><td>资讯：每日简报 <code>digests/</code>，关注方向 <code>feeds.json</code></td></tr>
+    <tr><td><code>finance/</code></td><td>账户、流水、持仓快照、汇率</td></tr>
+    <tr><td><code>calendar/</code></td><td>日程</td></tr>
+    <tr><td><code>memory/</code></td><td>记忆：<code>MEMORY.md</code> 是索引，每条一个文件</td></tr>
+    <tr><td><code>reviews/</code></td><td>日报、周报、月报</td></tr>
+    <tr><td><code>decisions/</code>、<code>learning/</code></td><td>决策档案、学习主题</td></tr>
+    <tr><td><code>chats/</code></td><td>导入的历史对话</td></tr>
+    <tr><td><code>inbox/</code></td><td>收件箱：随手记的原文、其他 AI 送来的文件、健康导出</td></tr>
+    <tr><td><code>handoffs/</code></td><td>AI 之间的交接记录和每日整理</td></tr>
+    <tr><td><code>.agents/skills/</code>、<code>.claude/skills/</code></td><td>19 个内置技能，Codex、Claude Code 等可以直接用</td></tr>
+    <tr><td><code>.kaitu/</code></td><td>程序配置；资料只存在本机时，版本历史、密钥和索引也在这里</td></tr>
+  </tbody>
+</table></div>
+<p>记录按月存成 <code>data/&lt;类型&gt;/YYYY-MM.jsonl</code>，只追加：修改是追加同一 id 的新版本，删除是追加一条删除标记。</p>
+<h3 id="history">版本历史<a class="anchor" href="#history" aria-label="#">#</a></h3>
+<ul>
+  <li>每次写入都会存一个版本。直接用编辑器改文件也行，App 开着时，改完安静 30 秒自动存版本。</li>
+  <li>「设置 → 版本历史」可以恢复任一版本。恢复前会先自动保存当前版本，恢复后还能再恢复回来。</li>
+  <li>「设置 → 导出全部资料」得到一个 zip，包含资料文件夹里的 Markdown、JSON 和附件，不含本机连接凭据和版本历史。</li>
+</ul>
+
+<h2 id="ai">接上你的 AI<a class="anchor" href="#ai" aria-label="#">#</a></h2>
+<p>「连接 AI」有两种：<strong>用你已经在用的 AI</strong>，不需要 API Key，靠复制资料包往返，但问问页本身不能聊；<strong>用开图里的 AI</strong>，用 API Key 或服务商的账号登录，在问问里直接聊。</p>
+<h3 id="ask">用开图里的 AI（问问）<a class="anchor" href="#ask" aria-label="#">#</a></h3>
+<ol>
+  <li>打开「问问」→「连接 AI」→「用开图里的 AI」。</li>
+  <li>选 AI 服务：DeepSeek 默认推荐，也可以选 OpenAI、Claude、Gemini、Kimi、智谱等。粘贴 API Key，或用服务商提供的账号登录。</li>
+  <li>从服务获取模型列表选模型，或直接填模型 ID。</li>
+  <li>下一步选要不要每天自动整理（见<a href="#automation">自动任务与日历</a>）。</li>
+</ol>
+<ul>
+  <li>用 API Key 连接时，开图会发一次很短的测试请求，检查 Key、额度、网络和模型；不通过会说明原因，也不会保存这个 Key。账号登录由服务商授权。自定义服务改了 Base URL，要重新填 Key。</li>
+  <li><strong>添加过的服务都会保留。</strong>输入框下方的模型按钮会列出已保存的服务和模型，点一下就切换；要再加一个，点「添加服务商」。换服务或模型后，从下一条消息开始生效。</li>
+  <li>Key 只存在这台电脑的凭据存储里。</li>
+  <li>可以引用文件、文件夹和其他对话；一次最多 10 个附件，每个不超过 25MB。能不能发图片取决于所选模型；提示「当前模型不支持图片」时，到「AI 与连接」点「管理模型」换一个。</li>
+  <li>网络搜索默认用当前 AI 服务自带的搜索，不用另申请 Key。当前服务没有自带搜索时（例如用账号登录连接），在「AI 与连接 → 网络搜索」添加 Perplexity、Exa 或 Tavily 的 Key。</li>
+</ul>
+<div class="tablewrap"><table>
+  <thead><tr><th>模式</th><th>能做什么</th></tr></thead>
+  <tbody>
+    <tr><td>只读写开图资料（默认，按钮显示「开图资料」）</td><td>只能读写资料文件夹，可以搜索和打开网页，不能运行命令，读不到 Key、凭据和版本历史。每个新对话都从这个模式开始</td></tr>
+    <tr><td>完整 Agent</td><td>能运行命令、读写这台电脑上的任何文件、上网，读到的内容会发给当前的 AI 服务。资讯、邮件或网页里的内容可能诱导它做你不想做的事，只在你信任这次任务时开启。开启要再确认一次，只对当前对话生效</td></tr>
+  </tbody>
+</table></div>
+<h3 id="handover">用你已经在用的 AI（不要 Key）<a class="anchor" href="#handover" aria-label="#">#</a></h3>
+<ol>
+  <li>在「AI 与连接 → 把近况带给你常用的 AI」勾选要带的内容，点「复制资料包」，贴进 ChatGPT、豆包、Kimi、DeepSeek 等任何 AI 的对话。</li>
+  <li>聊完对它说「整理给开图」，把回答贴到「把 AI 的回答贴回来」，点「读取回答并核对」，像整理一件事一样核对、采纳。</li>
+</ol>
+<ul>
+  <li>资料包里有进行中的目标、最近 30 天的结果、下一步、项目、在探索的方向和非敏感记忆。不带哪些内容、会自动去掉什么，见<a href="/privacy/">资料去向</a>。</li>
+  <li>在文本框里删改过资料包后再换勾选，开图会先问你：「重新生成」按勾选重做，你的删改会丢掉；「保留我的修改」则不变。</li>
+  <li>这是手动接续，不算「已连接」：问问页仍要另外连接开图里的 AI 才能聊。</li>
+  <li>提方向也一样：没连开图里的 AI 时，在「开图 → 方向」点「用你常用的 AI 提」，复制提示词发给任何 AI，把它的回复贴回，点「3 · 读取方向建议」。提示词带上你的目标、在做的事、在探索的方向、非敏感记忆，以及已经提过或不感兴趣的方向标题。贴回的建议标为「AI 建议 · 待采纳」，采纳还是「不感兴趣」由你定。</li>
+</ul>
+<h3 id="mcp">本机的 Claude、Codex（MCP）<a class="anchor" href="#mcp" aria-label="#">#</a></h3>
+<p>需要能运行 <code>kaitu</code> 命令（见<a href="#cli">命令行</a>）。命令默认用 App 当前的资料文件夹。</p>
+<ul>
+  <li>Claude Code：在资料文件夹里打开，文件夹自带 <code>.mcp.json</code>。</li>
+  <li>Codex：<code>codex mcp add kaitu -- kaitu mcp</code></li>
+  <li>Claude Desktop 等：添加一个 MCP 服务，命令填 <code>kaitu mcp</code>。</li>
+</ul>
+<p>「AI 与连接 → 这台电脑上的 AI（进阶）」可以复制接手说明。</p>
+<h3 id="relay">云端的 AI（同步盘接力）<a class="anchor" href="#relay" aria-label="#">#</a></h3>
+<ol>
+  <li>把存放位置换成 Google Drive（见<a href="#storage">存放位置与同步</a>）。资料文件夹根目录会多出 <code>AGENT-README.md</code>（接手入口）和 <code>ORGANIZER.md</code>（夜间整理规则）。</li>
+  <li>在 Grok 等能连 Google Drive 的 AI 里说：「打开 Google Drive 的 kaitu 文件夹，先读 AGENT-README.md」。</li>
+</ol>
+<ul>
+  <li>云端 AI 只新建文件（<code>inbox/agents/</code> 里的记录、<code>handoffs/</code> 里的交接），不改已有文件；电脑开机后，开图把记录导入。授权 Drive 时尽量只给开图文件夹。</li>
+  <li><strong>交错了怎么改</strong>：AI 可以放一份新的记录文件，第一行写 <code>{"replaces": "之前的文件名"}</code>，后面写改好的全部记录；只写这一行就是撤回。只能替换它自己交的文件，替换不成立时整份不生效，原文转成待整理的笔记。</li>
+</ul>
+
+<h2 id="import">导入与记录<a class="anchor" href="#import" aria-label="#">#</a></h2>
+<p>「开始使用 → 接入健康、日历等」按你选的事情列出要接的数据：日历、Apple 健康、账单与持仓、项目、邮件和聊天、关注方向。都可以跳过，以后再接。</p>
+<ul>
+  <li><strong>随手记一句</strong>：今天页，写一句就存成原文（<code>inbox/notes/&lt;日期&gt;/</code>），不需要 AI。开了每日整理，会在整理时处理。</li>
+  <li><strong>搬来 AI 记忆</strong>：「开始使用 → 从常用的 AI 搬来记忆」。复制记忆导出提示词发给你最常用的 AI，把回答贴回来。预览里不对的取消勾选，每条可以改去处：设为目标、建为在做的事、放进在探索的方向，或只记作记忆。每条都记着来源；确认后，目标出现在今天页的「你带来的规划」。</li>
+  <li><strong>ChatGPT 对话</strong>：在同一页点「导入 ChatGPT 数据导出包」，选 ChatGPT 导出的 ZIP 或 <code>conversations.json</code>，预览后确认。对话存进 <code>chats/</code>，可以搜索。</li>
+  <li><strong>Apple 健康</strong>：iPhone「健康」→ 右上角头像 → 导出所有健康数据，把导出的 ZIP（或解压出的 XML）在「接数据 → Apple 健康」导入；也可以直接放进 <code>inbox/health/</code>。每晚自动同步需要先把存放位置换成 Google Drive，安装步骤在仓库的 <code>docs/guides/apple-health.html</code>；自己做快捷指令见<a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/health-shortcut-format.md">文件格式</a>。</li>
+  <li><strong>日历订阅</strong>：「资料 → 日程 → 添加日历」，填 Google 日历、iCloud 或 Outlook 的 ICS 地址（也可以是 webcal），每 15 分钟刷新。</li>
+  <li><strong>账单</strong>：「资料 → 财务 → 导入账单」，CSV、XML、XLS、XLSX，单个不超过 36MB。按表头识别支付宝、微信、招商银行、工商银行、建设银行、中国银行、京东、美团、华西证券、海通证券、同花顺、IBKR（Flex XML）和持仓表。先预览再确认，同一份文件重复导入不会重复记账。PDF、图片和加密压缩包不能导入。</li>
+  <li><strong>邮件与聊天</strong>：「AI 与连接 → 邮件与聊天」，只读接收 Gmail、IMAP 邮箱（iCloud、QQ、163 等）、Slack 和飞书。只存来源、发件人、时间、标题、最多 280 字摘录和原文链接。</li>
+  <li><strong>项目</strong>：「接数据 → 项目」，连本机文件夹或 GitHub 仓库。</li>
+  <li><strong>命令行</strong>：<code>kaitu import chatgpt-conversations | apple-health | ics | nut-ai &lt;文件&gt;</code>，加 <code>--dry-run</code> 只预览。单个 <code>.ics</code> 文件和 Nut AI 备份用这里导入。</li>
+</ul>
+
+<h2 id="storage">存放位置与同步<a class="anchor" href="#storage" aria-label="#">#</a></h2>
+<p>第一次打开时就会问资料放哪。以后在「右上角头像 → 设置 → 换一个存放位置 → 更换」，选由谁同步：</p>
+<ul>
+  <li>这台电脑（不同步，默认）</li>
+  <li>iCloud 云盘</li>
+  <li>Google Drive</li>
+  <li>坚果云</li>
+  <li>其他同步盘的文件夹</li>
+</ul>
+<p>点「选择文件夹…」会填成所选位置下一个新的 <code>kaitu</code> 文件夹，也可以手改路径。目标必须是还不存在的文件夹，开图不会覆盖已有文件夹。点确认才会真正搬资料；旧位置会留下 <code>WORKSPACE-MOVED.md</code>。</p>
+<p class="note">不要直接把现在的开图文件夹拖进同步盘，那样会把密钥和版本库一起上传。用「换一个存放位置」迁移时，它们会留在这台电脑。</p>
+<ul>
+  <li>云盘里只放资料文件。版本历史、Key 和凭据、搜索索引、头像、界面设置留在这台电脑。认得出的冲突副本（如「(conflicted copy)」「文件 2」）不进版本，<code>kaitu doctor</code> 会列出来。</li>
+  <li><strong>iCloud</strong>：先在「系统设置 → Apple 账户 → iCloud」打开 iCloud 云盘；搬过去后，在访达里对 kaitu 文件夹选「始终保留下载」。云端 AI 读不到 iCloud。</li>
+  <li><strong>坚果云</strong>：默认用找到的坚果云同步文件夹。提示没找到时，先在坚果云客户端里设好一个同步文件夹，再把路径填成它里面的一个新文件夹。</li>
+  <li><strong>Google Drive</strong>：云端 AI 接力用它（见<a href="#relay">云端的 AI</a>）。</li>
+</ul>
+<p>命令行：<code>kaitu sync enable icloud|drive|nutstore [--dir &lt;父目录&gt;]</code>、<code>kaitu sync disable [--to &lt;目录&gt;]</code>、<code>kaitu sync status</code>。同步后哪些文件进云盘、哪些 AI 能读到，见<a href="/privacy/">资料去向</a>。</p>
+
+<h2 id="phone">手机通道<a class="anchor" href="#phone" aria-label="#">#</a></h2>
+<p>在微信、Telegram、飞书或 QQ 里给开图发消息，由问问当前连接的 AI 回答，用「只读写开图资料」模式：能读写开图资料、搜索和读网页，不能运行命令。电脑要开着、Kaitu.app 要在运行、问问要先连好 AI。只处理文字。</p>
+<ol>
+  <li>「右上角头像 → AI 与连接 → 在手机上和开图聊」。</li>
+  <li>按页面上的步骤连接一个通道（微信扫码登录；Telegram、QQ、飞书填机器人凭据）。</li>
+  <li>页面显示配对码，10 分钟内有效。用手机私聊机器人，发这个码。发来配对码的那个账号会成为唯一能收到回复的账号。</li>
+</ol>
+<p>真机测过的是 Telegram 和微信；飞书和 QQ 还没在真机上测过。消息会经过所选平台，见<a href="/privacy/">资料去向</a>。命令行：<code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>、<code>kaitu channels pair &lt;通道&gt;</code>、<code>kaitu channels status</code>。</p>
+
+<h2 id="automation">自动任务与日历<a class="anchor" href="#automation" aria-label="#">#</a></h2>
+<p>第一次在问问连上开图里的 AI 后，会问一次要不要每天自动整理。它们用你刚连接的 AI 运行；选「都不要」也能随时手动问。</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>任务</th><th>时间</th><th>默认</th></tr></thead>
+  <tbody>
+    <tr><td>早间计划：排好今天的安排，等你确认</td><td>07:30</td><td>开</td></tr>
+    <tr><td>每日整理：把各个 AI 留下的交接记录合并成一份每日整理，更新各板块的下一步；最近七天没有方向建议时，只用主题词联网搜索，提 3–5 个方向建议等你采纳</td><td>03:00</td><td>开</td></tr>
+    <tr><td>资讯搜索：按你确认过的关注方向找新资料</td><td>08:00</td><td>关</td></tr>
+  </tbody>
+</table></div>
+<p>以后在「设置 → 自动整理」分别开关、改时间（Kaitu.app 菜单「人生开图」→「设置」也能开关）。时间按「设置 → 关于」里显示的时区算。任务只在 Kaitu.app 开着时运行。</p>
+<h3 id="calendar">确认日程时加入系统日历<a class="anchor" href="#calendar" aria-label="#">#</a></h3>
+<ul>
+  <li>macOS 的 Kaitu.app 默认打开。确认一条有起止时间的日程，或给下一步排好时间段，会写进系统的「开图」日历，提前 10 分钟提醒。待确认的建议和没有时间的待办不会写进去。</li>
+  <li>加入成功的不会在今天页再列一遍；失败或只生成了日历文件时，今天页会列出这一条，可以「下载日历文件」或「重试日历操作」。</li>
+  <li>第一次写入会请求自动化权限。拒绝后可以到「系统设置 → 隐私与安全性 → 自动化」允许开图控制日历，再点「重试日历操作」。</li>
+  <li>关掉开关后，已经写入的事件保持不动；要清掉，点「移除开图已写入的日历事件」。</li>
+  <li>浏览器里的 <code>kaitu ui</code> 和 DSH 插件只生成日历文件。</li>
+</ul>
+
+<h2 id="updates">更新<a class="anchor" href="#updates" aria-label="#">#</a></h2>
+<ul>
+  <li><strong>功能包</strong>：界面、资料服务、工具和技能。「设置 → 关于 → 开图功能更新」：检查更新 → 下载更新 → 重启应用。更新包要通过签名和内核版本检查，不通过就继续用当前版本。有问题可以「恢复上一版功能」；这不会恢复你的资料，资料回退用版本历史。</li>
+  <li><strong>App 本身</strong>：DSH 内核（当前固定 0.2.1-rc.1）、Electron 或启动器有变化时，需要下载新的 Kaitu.app。</li>
+</ul>
+<p>设置里显示「未配置更新源」时，不能在应用内检查更新，到<a href="/download/">下载</a>页下载新版。新版 App 打开时会自动升级资料文件夹里的内置模板和技能，保留你的配置。只用命令行时，旧资料文件夹先运行 <code>kaitu upgrade</code>（<code>--dry-run</code> 预览）。</p>
+
+<h2 id="cli">从源码运行 / 命令行<a class="anchor" href="#cli" aria-label="#">#</a></h2>
+<p>命令行与网页版也有现成的安装包，见<a href="/download/#cli">下载页</a>。从源码运行需要 Node.js 22.19+（22 系列）或 24+，以及 pnpm。</p>
+<div class="codeblock"><pre><code>git clone https://github.com/Stahl-G/rensheng-kaitu.git
+cd rensheng-kaitu
+pnpm install
+pnpm build
+node packages/cli/dist/main.js init ~/kaitu-demo --sample
+node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="button" class="copy">复制</button></div>
+<p><code>--sample</code> 会生成合成的演示数据。工作台只监听 127.0.0.1，入口和 Kaitu.app 一样，问问在页面里连接 AI。下面的 <code>kaitu</code> 在源码里指 <code>node packages/cli/dist/main.js</code>。</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>命令</th><th>作用</th></tr></thead>
+  <tbody>
+    <tr><td><code>kaitu init [目录] [--sample]</code></td><td>新建资料文件夹（默认 <code>~/kaitu</code>）</td></tr>
+    <tr><td><code>kaitu ui [--port 4870] [--no-open]</code></td><td>打开本机工作台</td></tr>
+    <tr><td><code>kaitu doctor</code></td><td>检查资料文件夹</td></tr>
+    <tr><td><code>kaitu validate [路径]</code></td><td>按 schema 校验</td></tr>
+    <tr><td><code>kaitu status</code></td><td>今天、模块进度与最近 7 天数据</td></tr>
+    <tr><td><code>kaitu mcp [--http] [--port 4871] [--tools remote|all]</code></td><td>启动 MCP 服务</td></tr>
+    <tr><td><code>kaitu upgrade [--dry-run]</code></td><td>升级内置模板与技能</td></tr>
+    <tr><td><code>kaitu history</code> · <code>restore &lt;版本&gt;</code> · <code>snapshot -m &lt;说明&gt;</code></td><td>版本历史</td></tr>
+    <tr><td><code>kaitu dsh [--install] [--no-automation]</code></td><td>装进 DeepSeek Harness</td></tr>
+  </tbody>
+</table></div>
+<p>通用选项 <code>--dir &lt;目录&gt;</code>，也可以设环境变量 <code>KAITU_DIR</code>。都不设时，用 App 当前的资料文件夹，没有就用 <code>~/kaitu</code>。完整列表见 <code>kaitu --help</code>。</p>
+<p><strong>MCP over HTTP</strong>：<code>kaitu mcp --http</code> 只监听 <code>127.0.0.1:4871</code>，请求要带 <code>kaitu mcp token</code> 给出的 Bearer token，默认只开放读取和新增。开图不内置公网访问。</p>
+<h3 id="dsh">装进 DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
+<p>已经在用 DSH 0.2.1-rc.1 桌面应用时，在源码目录 <code>pnpm build</code> 之后：</p>
+<ol>
+  <li>打开一次 DSH，在「设置 → 模型」配好模型。</li>
+  <li>运行 <code>kaitu dsh --install</code>。同一个资料文件夹也在 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。</li>
+  <li>退出再打开 DSH，侧栏点「开图」：今天、开图、资料三个入口。DSH 保持自己的品牌和面板，对话用 DSH 自己的会话。</li>
+</ol>
+<p>不加 <code>--install</code> 会打印网页版的启动命令。命令行与网页版安装包里不带 DSH 插件，这一步要从源码构建。</p>
+
+<h2 id="privacy">资料去向<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
+<ul>
+  <li><strong>存在这台电脑</strong>：资料文件夹，以及版本历史、Key、凭据和索引。</li>
+  <li><strong>同步到你的云盘</strong>：只在你选了云盘之后，只同步资料文件。</li>
+  <li><strong>这次发给 AI</strong>：问问把你的消息和它读到的资料发给你选的 AI 服务；完整 Agent 读到的内容都可能发出；自动任务用同一个 AI；通过 MCP 或云盘接力的外部 AI，读到的内容会发给它们背后的服务；资料包和剪贴板只发你复制的那一段。</li>
+  <li><strong>其他联网</strong>：地图图块（OpenFreeMap）、行情参考价（Yahoo，只发代码）、GitHub、日历订阅、邮箱和聊天采集。</li>
+</ul>
+<p>逐项说明见<a href="/privacy/">资料去向</a>。</p>
+
+<h2 id="faq">常见问题<a class="anchor" href="#faq" aria-label="#">#</a></h2>
+<h3 id="faq-key">一定要填 API Key 吗？<a class="anchor" href="#faq-key" aria-label="#">#</a></h3>
+<p>不用。看资料、记原文、看地图和财务都不需要。想让 AI 帮忙，可以复制资料包或提示词给你常用的 AI，再把回答贴回来。</p>
+<h3 id="faq-where">资料在哪？能直接改吗？<a class="anchor" href="#faq-where" aria-label="#">#</a></h3>
+<p>在你第一次打开时选的位置，「设置 → 换一个存放位置」能看到当前位置。文件可以用任何编辑器改，App 开着时会自动存版本。</p>
+<h3 id="faq-switch">换了 AI，进度还在吗？<a class="anchor" href="#faq-switch" aria-label="#">#</a></h3>
+<p>在。进度存在你的资料文件夹里，不在某个 AI 里。新的 AI 读 <code>AGENTS.md</code> 和 <code>OVERVIEW.md</code> 就能接着做。</p>
+<h3 id="faq-closed">关掉 App，还会自动整理、回手机消息吗？<a class="anchor" href="#faq-closed" aria-label="#">#</a></h3>
+<p>不会。自动任务、手机通道、日历同步和邮件采集都在 App 运行时工作。电脑关着时，可以用 Google Drive 让云端 AI 接力。</p>
+<h3 id="faq-undo">改错了能恢复吗？<a class="anchor" href="#faq-undo" aria-label="#">#</a></h3>
+<p>能。「设置 → 版本历史」选一个版本恢复；恢复前会先存一个版本，恢复本身也能撤回。</p>
+<h3 id="faq-platform">有 Windows 或 Intel Mac 版吗？<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
+<p>Kaitu.app 只有 Apple 芯片版。其他电脑可以试试命令行与网页版（见<a href="/download/#other">下载页</a>）。</p>
+<h3 id="faq-export">怎么把资料全部带走？<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
+<p>「设置 → 导出全部资料」得到一个 zip；或者直接复制资料文件夹。</p>
+<h3 id="faq-dsh">和 DeepSeek Harness 是什么关系？<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
+<p>Kaitu.app 基于 DeepSeek Harness（DSH）0.2.1-rc.1 打包，问问用的是它的引擎。已经在用 DSH，也可以只把开图装成插件（见<a href="#dsh">装进 DeepSeek Harness</a>）。</p>
+<h3 id="faq-engine">问问页显示「问问引擎没有载入」？<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
+<p>重新安装完整的命令行与网页版安装包，再重启工作台。在那之前，仍可以在「AI 与连接」复制资料包，带到你常用的 AI。</p>
+<h3 id="faq-update-source">设置里显示「未配置更新源」？<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>
+<p>这个版本不能在应用内检查更新，到<a href="/download/">下载</a>页下载新版。</p>
+
+<h2 id="credits">开源致谢<a class="anchor" href="#credits" aria-label="#">#</a></h2>
+<p>人生开图基于 DeepSeek Harness、Electron、React、MapLibre、FullCalendar 等开源项目构建。完整的<a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md">项目、用途与许可证清单</a>和<a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/THIRD_PARTY_NOTICES.md">第三方许可说明</a>在仓库里。开图本身以 MIT 许可证开源。</p>
+
+    </article>
+  </div>
+</div>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>人生开图</b><span>生活，逐渐清晰。</span></p>
+    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
+    <p class="foot-note">MIT 许可证 · 0.1.0-rc.3</p>
+    <p class="foot-note">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
+  </div>
+</footer>
+</body>
+</html>

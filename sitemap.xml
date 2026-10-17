@@ -1,2 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://kaitu.si/</loc></url></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url><loc>https://kaitu.si/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/"/></url>
+  <url><loc>https://kaitu.si/en/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/"/></url>
+  <url><loc>https://kaitu.si/docs/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/docs/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/docs/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/docs/"/></url>
+  <url><loc>https://kaitu.si/en/docs/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/docs/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/docs/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/docs/"/></url>
+  <url><loc>https://kaitu.si/download/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/download/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/download/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/download/"/></url>
+  <url><loc>https://kaitu.si/en/download/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/download/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/download/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/download/"/></url>
+  <url><loc>https://kaitu.si/privacy/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/privacy/"/></url>
+  <url><loc>https://kaitu.si/en/privacy/</loc><xhtml:link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/"/><xhtml:link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/"/><xhtml:link rel="alternate" hreflang="x-default" href="https://kaitu.si/privacy/"/></url>
+</urlset>

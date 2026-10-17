@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>资料去向 · 人生开图</title>
+<meta name="description" content="哪些资料存在这台电脑，哪些同步到你的云盘，哪些会发给 AI。">
+<link rel="canonical" href="https://kaitu.si/privacy/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/privacy/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="人生开图">
+<meta property="og:title" content="资料去向 · 人生开图">
+<meta property="og:description" content="哪些资料存在这台电脑，哪些同步到你的云盘，哪些会发给 AI。">
+<meta property="og:url" content="https://kaitu.si/privacy/">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>人生开图</span></a>
+    <a class="lang" href="/en/privacy/" hreflang="en" lang="en" data-lang-switch="en">English</a>
+    <nav class="site-nav" aria-label="网站导航"><a href="/#tour">产品</a><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/#inspiration">灵感</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="wrap narrow">
+  <header class="page-head"><h1>资料去向</h1><p class="lead">本页内容来自开图仓库的 <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/site/privacy.zh-CN.md">docs/site/privacy.zh-CN.md</a>，对应 0.1.0-rc.3。</p></header>
+  <div class="doc">
+<p>开图把资料分三种去向说清楚：存在这台电脑、同步到你的云盘、这次发给 AI。下面逐项写明什么时候、发到哪里、发什么。</p>
+<h2>存在这台电脑</h2>
+<ul><li>资料文件放在你选的资料文件夹里：目标、记录、笔记、记忆、项目和原文，都是 Markdown、JSON 和 JSONL，用任何编辑器都能打开。</li><li>程序状态只在这台电脑：版本历史、AI 服务的 Key 和各种凭据、搜索索引、头像、界面设置。开了云盘同步，它们也不进云盘。</li></ul>
+<h2>同步到你的云盘</h2>
+<ul><li>只有在「设置 → 换一个存放位置」选了 iCloud、Google Drive、坚果云或同步文件夹，资料才会同步。</li><li>同步的是资料文件夹里的全部资料文件，包括财务明细，由你选的云盘服务存放和同步，开图不经手。</li><li>版本历史、Key、凭据和索引仍留在这台电脑。</li></ul>
+<h2>这次发给 AI</h2>
+<ul><li>问问：你发的消息，和它为回答读到的开图资料，会发给你在「AI 与连接」里选的 AI 服务。默认只能读写资料文件夹，读不到 Key、凭据和版本历史。</li><li>完整 Agent：只在你为某个对话开启后生效，能运行命令、读写这台电脑上的任何文件，读到的内容都可能发给 AI 服务。</li><li>早间计划、每日整理、资讯搜索：开启后按时用问问的 AI 运行，会读取相关资料，发给同一个 AI 服务。</li><li>网络搜索：搜索词默认发给问问当前的 AI 服务；改用 Perplexity、Exa 或 Tavily 时发给所选服务。</li><li>外部 AI：通过 MCP 连接的 Claude、Codex、ChatGPT、Grok 等能读写开图资料；经公网连接的读不到财务明细；所有外部 AI 都读不到 Key、凭据和版本历史。读到的内容会发给它们背后的 AI 服务。</li><li>云盘接力：在云盘里读写开图资料的云端 AI（如通过 Google Drive 接手的 Grok）能读到云盘里的全部资料文件，包括财务明细。</li><li>手机通道：你在微信、Telegram、飞书或 QQ 发的消息和收到的回答都会经过这些平台，由问问的 AI 回答。</li><li>资料包和剪贴板：只有你复制、粘贴的那段文字会离开开图。资料包不带健康记录、财务明细和标为敏感的记忆，认得出的 Key 和本机路径会去掉。</li></ul>
+<h2>其他联网</h2>
+<ul><li>地图图块来自 OpenFreeMap。</li><li>行情参考价来自 Yahoo，发出的是代码，不含持仓数量。</li><li>GitHub 进度用你填的 token 读取所绑定的仓库。</li><li>日历订阅从你填的地址读取；确认的日程可以写进这台电脑的系统日历。</li><li>邮箱、Slack、飞书采集只读你授权的账号，摘录进入资料文件夹。</li></ul>
+<h2>你随时可以</h2>
+<ul><li>在「设置 → 导出全部资料」拿走全部资料文件。</li><li>在「设置 → 换一个存放位置」搬回这台电脑，停止云盘同步。</li><li>在「AI 与连接」更换或断开 AI 服务。</li></ul>
+  </div>
+</div>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>人生开图</b><span>生活，逐渐清晰。</span></p>
+    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
+    <p class="foot-note">MIT 许可证 · 0.1.0-rc.3</p>
+    <p class="foot-note">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,55 +1,232 @@
 <!doctype html>
-<html lang="zh-CN"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kaitu 开图 · AI可以换，人生不能</title>
-<meta name="description" content="开图，把你分散的个人记录变成持续有用的行动。你保留资料、决定方向，也可以随时更换助手。">
-<meta name="theme-color" content="#FCFCFB"><meta property="og:title" content="Kaitu 开图 · AI可以换，人生不能">
-<meta property="og:description" content="个人记录、计划、进度与下一步，放在你自己的文件夹里。">
-<meta property="og:type" content="website"><meta property="og:url" content="https://kaitu.si/">
-<link rel="canonical" href="https://kaitu.si/"><link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
-</head><body>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>人生开图 · AI可以换，人生不能</title>
+<meta name="description" content="开图把散在各个 AI 里的目标、在做的事和下一步排成一张进度图。资料放在你自己的文件夹里，换一个 AI 也能接着做。开源，macOS。">
+<link rel="canonical" href="https://kaitu.si/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="人生开图">
+<meta property="og:title" content="人生开图 · AI可以换，人生不能">
+<meta property="og:description" content="一张看得见、接得上、每周往前走的人生进度图。资料在你自己的文件夹里。">
+<meta property="og:url" content="https://kaitu.si/">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/mock/mock.css">
+<script src="/mock/persona.js" defer></script>
+<script src="/mock/mock.js" defer></script>
+<script>document.documentElement.classList.add("js")</script>
+<script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en/"+location.hash)}}}catch(e){}</script>
+<script src="/app.js" defer></script>
+</head>
+<body>
 <a class="skip" href="#main">跳到正文</a>
-<header class="header wrap"><a class="brand" href="#" aria-label="Kaitu 开图首页"><svg width="32" height="32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-  <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <circle cx="12" cy="12" r="2.1" fill="#3D6FE0"/>
-</svg>
-<span>Kaitu</span><small>开图</small></a>
-<nav aria-label="主导航"><a href="#product">产品界面</a><a href="#data">资料与接续</a><a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub ↗</a></nav></header>
-<main id="main">
-<section class="intro wrap"><p class="muted">个人记录 · 长期进度 · 多 Agent 接续</p>
-<h1>AI可以换，人生不能</h1>
-<p class="lead">开图，把你分散的个人记录变成持续有用的行动。<br>AI 了解你正在做什么，帮你看清选项、安排下一步。</p>
-<div class="actions"><a class="button primary" href="#product">看看开图</a><a class="button" href="https://github.com/Stahl-G/rensheng-kaitu#readme">查看项目 ↗</a></div>
-<p class="muted intro-note">你保留资料，决定方向，也可以随时更换助手。</p></section>
-<section id="product" class="product wrap" aria-label="开图产品界面设计预览">
-<div class="preview-heading"><h2>打开，就知道现在到了哪。</h2><span>设计预览 · 全部为示例资料</span></div>
-<div class="sections" role="group" aria-label="选择界面设计预览">
-<button type="button" data-preview="overview" aria-pressed="true"><i class="today"></i>今天</button>
-<button type="button" data-preview="health" aria-pressed="false"><i class="health"></i>健康</button>
-<button type="button" data-preview="doing" aria-pressed="false"><i class="doing"></i>在做的事</button>
-<button type="button" data-preview="news" aria-pressed="false"><i class="news"></i>资讯</button>
-<button type="button" data-preview="me" aria-pressed="false"><i class="me"></i>关于我</button>
-</div>
-<p id="preview-caption" class="preview-caption" aria-live="polite">今天的安排、下一步和要你确认的事。</p>
-<div class="preview-window"><iframe id="product-preview" title="今天：原有设计稿示意，非个人工作区" src="previews/overview.html" loading="lazy" sandbox=""></iframe></div>
-<div class="preview-foot"><span>原有界面设计稿，页面内操作仅作展示。窄屏可横向滑动查看。</span><a id="preview-full" href="previews/overview.html" target="_blank" rel="noopener">打开完整预览 ↗</a></div>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>人生开图</span></a>
+    <a class="lang" href="/en/" hreflang="en" lang="en" data-lang-switch="en">English</a>
+    <nav class="site-nav" aria-label="网站导航"><a href="/#tour">产品</a><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/#inspiration">灵感</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">人生进度图</p>
+      <h1 id="hero-title">AI可以换，人生不能</h1>
+      <p class="lead">把散在各个 AI 里的目标和计划，排成一张看得见的进度图。<br>每周往前走一步；换一个 AI，也接得上。</p>
+      <div class="cta">
+        <a class="btn btn-big btn-primary" href="/download/">下载 macOS 版</a>
+        <a class="btn btn-big btn-quiet" href="/docs/">看文档</a>
+      </div>
+      <p class="meta">0.1.0-rc.3 · macOS Apple 芯片 · 开源 MIT</p>
+    </div>
+    <svg class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="开图标志：一张正在展开的三折地图">
+      <defs>
+        <clipPath id="hm-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
+        <clipPath id="hm-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
+      </defs>
+      <g class="hm-fold hm-f0"><path class="hm-face" d="M4 10L17.33 6L17.33 38L4 42Z"/></g>
+      <g class="hm-fold hm-f1"><path class="hm-face" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="hm-shade" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></g>
+      <g class="hm-fold hm-f2"><path class="hm-face" d="M30.67 10L44 6L44 38L30.67 42Z"/><path class="hm-shade" d="M30.67 10L44 6L44 38L30.67 42Z"/></g>
+      <g clip-path="url(#hm-folded)"><path class="hm-route hm-route-folded" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
+      <g clip-path="url(#hm-open)"><path class="hm-route hm-route-open" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
+      <circle class="hm-ring" cx="39.5" cy="16" r="2.2"/>
+    </svg>
+  </div>
 </section>
-<section class="workflow wrap"><h2>把记录留下来，把事情做下去。</h2><div class="steps">
-<article><span class="step-dot me"></span><h3>先让开图认识你</h3><p>整理档案、记忆、目标和规则，把已经告诉过 AI 的事收在一起。</p></article>
-<article><span class="step-dot doing"></span><h3>看清正在推进的事</h3><p>项目、健康与生活记录连着具体的下一步。打开工作台就能查看进度。</p></article>
-<article><span class="step-dot news"></span><h3>下一次，还能继续</h3><p>复盘留下实际结果与未决事项。另一个 Agent 读到相同现状，接着做。</p></article>
-</div></section>
-<section id="data" class="data-area"><div class="wrap data-grid"><div><h2>资料放在自己的文件夹里。</h2><p>Markdown 与 JSON 保存个人记录，版本历史支持回看和恢复。你可以查看、备份和迁移，也可以选择 Google Drive 同步，让云端 Agent 接续。</p><p>日常记录、待确认的建议与实际完成的事，各有自己的状态。</p><a class="link" href="https://github.com/Stahl-G/rensheng-kaitu/blob/claude/dsh-overview-page/docs/cloud-relay.md">了解多 Agent 接续 →</a></div>
-<div class="folder"><div class="folder-title">kaitu /<span>你的工作区</span></div><dl><div><dt>NOW.md</dt><dd>今天的计划</dd></div><div><dt>me /</dt><dd>档案、目标与规则</dd></div><div><dt>health /</dt><dd>身体与生活记录</dd></div><div><dt>projects /</dt><dd>正在做的事</dd></div><div><dt>memory /</dt><dd>值得记住的事</dd></div><div><dt>reviews /</dt><dd>复盘与下一步</dd></div></dl><p>人能读，Agent 也能接着做。</p></div></div></section>
-<section class="start wrap"><div><h2>从你自己的生活开始。</h2><p>开图正在持续开发与自用验证。<br>当前安装、支持范围与使用方式以项目文档为准。</p><a class="button primary" href="https://github.com/Stahl-G/rensheng-kaitu#readme">查看安装与使用 ↗</a></div>
-<div class="faq"><details><summary>这个网站会读取我的个人数据吗？</summary><p>这里是项目官网，展示的是隔离的示例设计。它不会读取你的开图工作区或个人记录。</p></details><details><summary>必须使用某一个 AI 吗？</summary><p>工作区数据与 Agent 运行时分离，通过工作区说明、技能、CLI 或 MCP 接入。各入口的实际能力以文档和实测为准。</p></details><details><summary>这是正式发布版吗？</summary><p>项目仍在开发。已有数据层、本地工作台与 Agent 接入能力，部分新界面正在不同工作树中实现和验证。</p></details></div></section>
+
+<section class="sec strip" aria-labelledby="swap-title">
+  <div class="wrap">
+    <div data-reveal>
+      <p class="eyebrow">AI 可以换</p>
+      <h2 class="h2" id="swap-title">换一个 AI，从同一份进度接着做。</h2>
+      <p class="prose" style="margin-top:12px">资料放在你自己的文件夹里。今天用 ChatGPT，明天换 Claude、Codex、Grok 或 DeepSeek，都从同一份进度接着做。</p>
+    </div>
+    <figure class="swap" data-swap data-reveal aria-label="示意：换了 AI，进度一直往下记">
+      <div class="swap-head">
+        <span>现在用的 AI</span>
+        <span class="swap-chip"><span class="swap-name">ChatGPT</span><span class="swap-name">Claude</span><span class="swap-name">Codex</span><span class="swap-name">Grok</span><span class="swap-name">DeepSeek</span></span>
+        <span class="chip tag">示意</span>
+      </div>
+      <ol class="swap-card card">
+        <li class="swap-row"><i></i><span>看清选项</span><time>第 1 周</time></li>
+        <li class="swap-row"><i></i><span>安排下一步</span><time>第 2 周</time></li>
+        <li class="swap-row"><i></i><span>记下实际结果</span><time>第 3 周</time></li>
+        <li class="swap-row"><i></i><span>根据结果调整</span><time>第 4 周</time></li>
+        <li class="swap-row"><i></i><span>安排下一步</span><time>第 5 周</time></li>
+      </ol>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="tour" aria-labelledby="tour-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow">产品</p>
+      <h2 id="tour-title">打开，就知道现在到了哪。</h2>
+      <p class="prose" data-persona>小林，29 岁，在上海做产品经理。之前和 ChatGPT、Claude 聊过重新开始训练、一个业余项目，还有要不要搬去杭州。</p>
+      <p class="tour-meta"><span class="chip chip-pre">虚构示例人物，资料均为合成</span><span class="chip">示例资料 · 页面内操作不会保存</span></p>
+    </div>
+    <ol class="walk" data-walk aria-label="跟着小林走一遍"></ol>
+    <p class="walk-cap" data-walk-cap aria-live="polite">点上面的一步，看开图在那一天做了什么；也可以直接点下面的界面。</p>
+    <div class="mock" data-mock data-lang="zh">
+      <div class="m-chrome"><span class="m-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-badge">示例资料</span></div>
+      <div class="m-fallback">
+        <div><h3>今天</h3><p>最重要的一件事、你带来的规划、最多三条下一步，和要你确认的事。</p></div>
+        <div><h3>开图</h3><p>健康、足迹、资讯、方向，打开先看健康。</p></div>
+        <div><h3>资料</h3><p>日程、在做的事、健康、财务、笔记与决策、收件箱，都在这里查。</p></div>
+        <div><h3>问问</h3><p>内置 AI 对话。添加一个 AI 服务，它能读你的资料来回答。</p></div>
+        <p class="fb-note">打开 JavaScript 后，这里是一个可以点击的开图示例。</p>
+      </div>
+    </div>
+    <div class="entry-caps" data-reveal-group>
+      <div data-reveal><h3>健康</h3><p>目标、本周训练与饮食、健康的下一步。</p></div>
+      <div data-reveal><h3>足迹</h3><p>从家乡出发，把去过的城市和经历连在地图上。</p></div>
+      <div data-reveal><h3>资讯</h3><p>按你关注的方向收集资讯，可以标「有用」或「不相关」。</p></div>
+      <div data-reveal><h3>方向</h3><p>一条一行：为什么在意，第一步做什么；再记下尝试和正反依据。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow">怎么用</p>
+      <h2 id="how-title">把记录留下来，把事情做下去。</h2>
+    </div>
+    <ol class="steps" data-reveal-group>
+      <li class="card" data-reveal><span class="n">1</span><h3>搬进来就看得见</h3><p>先选资料放哪：这台电脑，或 iCloud、Google Drive、坚果云。再从 ChatGPT、Claude、Gemini、豆包等常用的 AI 搬来记忆，或贴一段聊过的对话。逐条确认后，目标出现在今天页，标明来自哪里，不用填 Key。</p></li>
+      <li class="card" data-reveal><span class="n">2</span><h3>每周往前走一步</h3><p>每个目标定一个下一步。做完记一句实际结果；做不了就改到以后，或写下为什么暂停。</p></li>
+      <li class="card" data-reveal><span class="n">3</span><h3>换个 AI 也接得上</h3><p>把近况打包复制给常用的 AI，回答贴回开图，核对后再更新。问问里可以添加多个 AI 服务，随时切换。Claude、Codex 等本机客户端可以通过 MCP 直接读写；Grok 等能连 Google Drive 的 AI 可以接力。</p></li>
+    </ol>
+    <div class="weekly">
+      <div data-reveal>
+        <h3>每周往前走</h3>
+        <p>每个目标都落到一个下一步和一条真实结果。健康页的「近 5 周」把这几周的训练排成格子：哪天练了、练了多少，一眼看清。</p>
+        <p class="small" style="margin-top:12px">示意：小林的示例资料，不是真实用户数据。</p>
+      </div>
+      <figure class="card weeks-card" data-reveal>
+        <div class="wk-head"><b>近 5 周</b><span class="small">颜色越深，那天练得越多</span></div>
+        <div class="weeks wk-anim" data-reveal aria-label="近 5 周训练格子（示意）" role="img"><span class="wd">一</span><span class="wd">二</span><span class="wd">三</span><span class="wd">四</span><span class="wd">五</span><span class="wd">六</span><span class="wd">日</span><i style="--w:0;--d:0" data-l="0"></i><i style="--w:0;--d:1" data-l="0"></i><i style="--w:0;--d:2" data-l="0"></i><i style="--w:0;--d:3" data-l="0"></i><i style="--w:0;--d:4" data-l="0"></i><i style="--w:0;--d:5" data-l="1"></i><i style="--w:0;--d:6" data-l="0"></i><i style="--w:1;--d:0" data-l="0"></i><i style="--w:1;--d:1" data-l="0"></i><i style="--w:1;--d:2" data-l="0"></i><i style="--w:1;--d:3" data-l="0"></i><i style="--w:1;--d:4" data-l="1"></i><i style="--w:1;--d:5" data-l="0"></i><i style="--w:1;--d:6" data-l="0"></i><i style="--w:2;--d:0" data-l="0"></i><i style="--w:2;--d:1" data-l="0"></i><i style="--w:2;--d:2" data-l="1"></i><i style="--w:2;--d:3" data-l="0"></i><i style="--w:2;--d:4" data-l="0"></i><i style="--w:2;--d:5" data-l="0"></i><i style="--w:2;--d:6" data-l="0"></i><i style="--w:3;--d:0" data-l="3"></i><i style="--w:3;--d:1" data-l="0"></i><i style="--w:3;--d:2" data-l="0"></i><i style="--w:3;--d:3" data-l="3"></i><i style="--w:3;--d:4" data-l="0"></i><i style="--w:3;--d:5" data-l="2"></i><i style="--w:3;--d:6" data-l="0"></i><i style="--w:4;--d:0" data-l="0"></i><i style="--w:4;--d:1" data-l="3"></i><i style="--w:4;--d:2" data-l="0"></i><i style="--w:4;--d:3" data-l="2"></i><i style="--w:4;--d:4" data-l="0"></i><i style="--w:4;--d:5" data-l="0"></i><i style="--w:4;--d:6" data-future></i></div>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="folder" aria-labelledby="folder-title">
+  <div class="wrap folder">
+    <div data-reveal>
+      <p class="eyebrow">资料</p>
+      <h2 class="h2" id="folder-title">资料放在自己的文件夹里。</h2>
+      <div class="prose" style="margin-top:12px">
+        <p>全是 Markdown 和 JSON，任何编辑器都能打开。每次写入都存一个版本，改错了能恢复。</p>
+        <p>资料可以只放在这台电脑，也可以同步到 iCloud、Google Drive、坚果云或其他同步盘；版本历史和 Key 始终留在这台电脑。</p>
+      </div>
+      <p class="links-row"><a href="/privacy/">资料去向 →</a><a href="/docs/#folder">文件夹说明 →</a></p>
+    </div>
+    <figure class="card tree" data-reveal aria-label="资料文件夹示意">
+      <div class="tree-head"><code>kaitu/</code><span class="small">你的资料文件夹</span></div>
+      <ul>
+        <li><code>AGENTS.md</code><span>给 AI 的入口说明</span></li>
+        <li><code>NOW.md</code><span>今天的计划</span></li>
+        <li><code>me/</code><span>档案、目标与规则</span></li>
+        <li><code>health/</code><span>训练、饮食、睡眠</span></li>
+        <li><code>projects/</code><span>在做的事</span></li>
+        <li><code>explore/</code><span>足迹与方向</span></li>
+        <li><code>memory/</code><span>记忆</span></li>
+        <li><code>inbox/</code><span>原文与收件箱</span></li>
+      </ul>
+      <figcaption class="tree-foot small">人能读，AI 也能接着做。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="inspiration" aria-labelledby="insp-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <p class="eyebrow">灵感</p>
+      <h2 id="insp-title">灵感来源</h2>
+    </div>
+    <div class="prose" data-reveal>
+      <p>开图的想法来自邵艾伦和孙宇晨的一次访谈。孙宇晨在访谈里讲了他怎样把吃饭、训练、睡眠和学习交给 AI：饭前饭后拍照让 AI 估算热量，用 Oura 戒指读睡眠和消耗，把训练视频交给 AI 记录组数和重量，AI 每天出一份日报。所有资料都存成本机的 Markdown 文档，写好 README，换任何一个 Agent 都能直接接手。</p>
+      <p>很多人也早就把自己的事告诉过 ChatGPT，但这些信息锁在各家服务里，看不到进度；自己搭一套又要懂 Markdown、API 和 MCP。</p>
+      <p>开图留下了其中两点：资料在你自己的文件夹里；任何 AI 读了都能接着做。</p>
+      <p>那套做法是灵感，不是要照着做的规定。新建的资料里不预填训练、作息、蛋白质这类目标，由你自己定。开图现在要做的是：让每个会用 AI 的人，都有一张看得见、接得上、每周往前走的人生进度图。</p>
+    </div>
+    <p class="disclaimer" data-reveal>灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
+  </div>
+</section>
+
+<section class="sec band" aria-labelledby="band-title">
+  <div class="wrap">
+    <div class="band-box" data-reveal>
+      <div>
+        <h2 id="band-title">下载 Kaitu.app</h2>
+        <p>0.1.0-rc.3 预览版 · macOS Apple 芯片 · 开源 MIT</p>
+      </div>
+      <div class="cta" style="margin-top:0">
+        <a class="btn btn-big btn-primary" href="/download/">下载 macOS 版</a>
+        <a class="btn btn-big btn-quiet" href="/download/#other">命令行与网页版</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="faq" aria-labelledby="faq-title">
+  <div class="wrap">
+    <div class="sec-head"><h2 id="faq-title">常见问题</h2></div>
+    <div class="faq">
+      <details><summary>这个网站会读取我的资料吗？</summary><div><p>不会。这是项目官网，页面里的界面都是示例资料，不连接你的资料文件夹。网站不放统计和第三方脚本；只有下载页会向 GitHub 查询最新版本。</p></div></details>
+      <details><summary>必须用某一个 AI 吗？</summary><div><p>不用。可以填 DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等任一服务的 Key 用内置问问，添加过的服务都会保留，随时切换；也可以不填 Key，把资料包复制给你常用的 AI，再把回答贴回来。</p></div></details>
+      <details><summary>免费吗？开源吗？</summary><div><p>免费。代码以 MIT 许可证开源，在 <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>。</p></div></details>
+      <details><summary>这是正式版吗？</summary><div><p>还不是。当前是 0.1.0-rc.3，发布候选版，在 GitHub 上标为预览版。</p></div></details>
+      <details><summary>有 Windows 或 Intel Mac 版吗？</summary><div><p>暂时没有。Kaitu.app 目前只有 macOS（Apple 芯片）版。其他电脑可以试试命令行与网页版，见<a href="/download/#other">下载页</a>。</p></div></details>
+      <details><summary>有英文界面吗？</summary><div><p>有。界面语言默认跟随系统，也可以在「右上角头像 → 设置」里改成中文或 English。</p></div></details>
+      <details><summary>我的资料存在哪里？</summary><div><p>第一次打开时先选资料放哪：这台电脑（默认 <code>~/kaitu</code>），或 iCloud、Google Drive、坚果云、其他同步盘的文件夹。选了云盘才会同步；版本历史和 Key 始终留在这台电脑。哪些内容会发给 AI，见<a href="/privacy/">资料去向</a>。</p></div></details>
+    </div>
+  </div>
+</section>
+
 </main>
-<footer class="wrap"><div><a class="brand" href="#"><svg width="32" height="32" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M12 3.2 19.6 7.6v8.8L12 20.8 4.4 16.4V7.6z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-  <path d="M4.9 7.9 10.3 11M19.1 7.9 13.7 11M12 13.9v6.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-  <circle cx="12" cy="12" r="2.1" fill="#3D6FE0"/>
-</svg>
-<span>Kaitu</span></a><p>生活，逐渐清晰。</p></div><div class="footer-links"><a href="https://github.com/Stahl-G/rensheng-kaitu">项目源码 ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues">反馈与建议 ↗</a></div><p class="disclaimer">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p></footer>
-</body></html>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>人生开图</b><span>生活，逐渐清晰。</span></p>
+    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
+    <p class="foot-note">MIT 许可证 · 0.1.0-rc.3</p>
+    <p class="foot-note">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
+  </div>
+</footer>
+</body>
+</html>

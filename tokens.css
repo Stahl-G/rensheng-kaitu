@@ -1,34 +1,89 @@
-/* Copied from Kaitu OverviewPage.module.css light-theme tokens. */
+/* Kaitu tokens — copied from the app (packages/dsh-plugin/src/client/Prototype.module.css, Brand.module.css). Light + dark. */
 :root {
-  --kt-canvas: #fcfcfb;
-  --kt-subtle: #f5f5f3;
-  --kt-control: #f0efec;
-  --kt-card: #fff;
-  --kt-text: #1f1e1d;
-  --kt-secondary: #4d4c48;
-  --kt-muted: #6b6a66;
-  --kt-faint: #a3a29d;
-  --kt-primary: #1f1e1d;
-  --kt-on-primary: #fff;
-  --kt-link: #2f5fc4;
-  --kt-accent: #3d6fe0;
-  --kt-today: #1f1e1d;
-  --kt-today-tint: #f0efec;
-  --kt-today-ink: #4d4c48;
-  --kt-health: #2e8b57;
-  --kt-health-tint: #e6f3eb;
-  --kt-health-ink: #1f6b42;
-  --kt-projects: #6b5bd6;
-  --kt-projects-tint: #eceafb;
-  --kt-projects-ink: #4b3db0;
-  --kt-feed: #c47a12;
-  --kt-feed-tint: #faeedc;
-  --kt-feed-ink: #8a520a;
-  --kt-me: #c2507a;
-  --kt-me-tint: #f8e6ed;
-  --kt-me-ink: #93345a;
-  --kt-project-slot: #e4e1f7;
-  --kt-target: #9ed2b2;
-  --kt-estimate: #7fc29b;
-  --kt-shadow: 0 1px 3px rgb(31 30 29 / 6%);
+  color-scheme: light;
+  /* 底与文字 */
+  --bg: #fcfcfb;          /* 暖纸白 */
+  --surface: #ffffff;     /* 卡片 */
+  --sunken: #f5f5f3;      /* 下沉区域、统计格、悬停底 */
+  --control: #f0efec;     /* 分段控件底、次按钮、空格子 */
+  --line: #e6e4dd;        /* 发丝线、卡片外圈 */
+  --ink: #1f1e1d;         /* 墨：正文、主按钮 */
+  --ink2: #4d4c48;        /* 次要正文 */
+  --muted: #6b6a66;       /* 说明、时间、区块标签 */
+  --link: #2b4c7e;        /* 岩山靛：链接 */
+  --primary: #1f1e1d;     /* 主按钮 = 墨色 */
+  --on-primary: #ffffff;
+  --strong: #1f1e1d;      /* 选中的子标签、发送键 */
+  --on-strong: #ffffff;
+  --ask: #f7f6f3;         /* 问问气泡、选中选项底 */
+  --ask-line: #e6e4dd;
+  --scrim: rgba(31, 30, 29, 0.42);
+  --empty: #f0efec;
+  /* 板块色：主色 / 淡底 tint / 深字 ink */
+  --health: #3e8a5a;  --health-tint: #e5f1e9;  --health-ink: #2a6a41;  --on-health: #020d05;
+  --doing: #4a6a8f;   --doing-tint: #e7edf4;   --doing-ink: #344e6e;
+  --explore: #1b3254; --explore-tint: #eef2f7; --explore-ink: #1b3254; --on-explore: #ffffff;
+  --news: #b5711a;    --news-tint: #f7ecdc;    --news-ink: #84520f;    --on-news: #191005;
+  --finance: #5f6f2a; --finance-tint: #eef1e2; --finance-ink: #4a5720;
+  --me: #b5577a;      --me-tint: #f6e7ed;      --me-ink: #8a3a5a;      --on-me: #ffffff;
+  /* 淡靛蓝小按钮（今天页「确认」），Prototype.module.css .confirmationAccept */
+  --confirm-bg: #edf2fa; --confirm-bg-hover: #e1eaf8; --confirm-ink: #234782;
+  --confirm-line: #d5e0f2; --confirm-line-hover: #a9bfdc;
+  /* 健康热力格 1、2 级的 color-mix 预算值（health 30% / 60% 混 surface） */
+  --heat-1: #c5dcce; --heat-2: #8bb99c;
+  /* 标志：Brand.module.css */
+  --mark-fold0: #1b3254;  /* 左折，最深，还折着 */
+  --mark-fold1: #2b4c7e;  /* 中折 */
+  --mark-fold2: #b8cbe4;  /* 右折，最亮，已展开 */
+  --mark-route-folded: #ffffff;
+  --mark-route-open: #1b3254;
+  /* 阴影：应用里只有这几档 */
+  --shadow-ring: 0 0 0 1px var(--line);                                   /* 普通卡片 */
+  --shadow-raised: 0 1px 3px rgba(31, 30, 29, 0.08), 0 0 0 1px var(--line); /* 重点卡、输入条、问问输入框 */
+  --shadow-tab: 0 1px 2px rgba(31, 30, 29, 0.12);                         /* 选中的分段 */
+  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--line);  /* 地图上的浮层 */
+  --shadow-menu: 0 12px 40px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--line); /* 头像菜单 */
+  --shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.25);                       /* 对话框 */
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --radius: 14px;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #171716; --surface: #201f1e; --sunken: #1b1b1a; --control: #2a2927; --line: #2f2e2c;
+    --ink: #ecebe8; --ink2: #c9c7c2; --muted: #a09e98; --link: #b8cbe4;
+    --primary: #ecebe8; --on-primary: #171716; --strong: #ecebe8; --on-strong: #171716;
+    --ask: #252422; --ask-line: #393735; --scrim: rgba(0, 0, 0, 0.6); --empty: #2a2927;
+    --health: #6dba8a;  --health-tint: #203a2b;  --health-ink: #a2d9b6;
+    --doing: #93adcb;   --doing-tint: #263243;   --doing-ink: #bfd0e4;
+    --explore: #8faed6; --explore-tint: #242e3e; --explore-ink: #b8cbe4; --on-explore: #16243a;
+    --news: #ddaa5e;    --news-tint: #43331e;    --news-ink: #f0ca8f;
+    --finance: #a9b86a; --finance-tint: #2f3420; --finance-ink: #cbd69a;
+    --me: #dc92ae;      --me-tint: #452b36;      --me-ink: #f1bbcf;      --on-me: #361525;
+    --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
+    --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
+    --heat-1: #374e3e; --heat-2: #4e7c5f;
+    --mark-fold0: #365b90; --mark-fold1: #7194c4; --mark-fold2: #b8cbe4;
+    /* 路线两色在深色下不变：白 / #1b3254 */
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #171716; --surface: #201f1e; --sunken: #1b1b1a; --control: #2a2927; --line: #2f2e2c;
+  --ink: #ecebe8; --ink2: #c9c7c2; --muted: #a09e98; --link: #b8cbe4;
+  --primary: #ecebe8; --on-primary: #171716; --strong: #ecebe8; --on-strong: #171716;
+  --ask: #252422; --ask-line: #393735; --scrim: rgba(0, 0, 0, 0.6); --empty: #2a2927;
+  --health: #6dba8a;  --health-tint: #203a2b;  --health-ink: #a2d9b6;
+  --doing: #93adcb;   --doing-tint: #263243;   --doing-ink: #bfd0e4;
+  --explore: #8faed6; --explore-tint: #242e3e; --explore-ink: #b8cbe4; --on-explore: #16243a;
+  --news: #ddaa5e;    --news-tint: #43331e;    --news-ink: #f0ca8f;
+  --finance: #a9b86a; --finance-tint: #2f3420; --finance-ink: #cbd69a;
+  --me: #dc92ae;      --me-tint: #452b36;      --me-ink: #f1bbcf;      --on-me: #361525;
+  --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
+  --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
+  --heat-1: #374e3e; --heat-2: #4e7c5f;
+  --mark-fold0: #365b90; --mark-fold1: #7194c4; --mark-fold2: #b8cbe4;
 }

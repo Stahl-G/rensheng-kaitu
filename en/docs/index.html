@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Docs · Kaitu</title>
+<meta name="description" content="Install Kaitu 0.1.0-rc.3, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
+<link rel="canonical" href="https://kaitu.si/en/docs/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/docs/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/docs/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/docs/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kaitu">
+<meta property="og:title" content="Docs · Kaitu">
+<meta property="og:description" content="Install Kaitu 0.1.0-rc.3, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
+<meta property="og:url" content="https://kaitu.si/en/docs/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/en/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>Kaitu</span></a>
+    <a class="lang" href="/docs/" hreflang="zh-CN" lang="zh-CN" data-lang-switch="zh">中文</a>
+    <nav class="site-nav" aria-label="Site"><a href="/en/#tour">Product</a><a href="/en/docs/" aria-current="page">Docs</a><a href="/en/download/">Download</a><a href="/en/#inspiration">Inspiration</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="wrap">
+  <header class="page-head">
+    <h1>Docs</h1>
+    <p class="lead">For Kaitu 0.1.0-rc.3. Not installed yet? Start at <a href="/en/download/">Download</a>. For what is stored where and sent to whom, see <a href="/en/privacy/">Where your data goes</a>.</p>
+  </header>
+  <div class="docs-layout">
+    <details class="toc" data-toc open>
+      <summary>Contents</summary>
+      <nav aria-label="Docs contents">
+        <ol>
+          <li><a href="#start">Quick start</a></li>
+          <li><a href="#entries">The four tabs</a></li>
+          <li><a href="#folder">Your notes folder</a></li>
+          <li><a href="#ai">Connect your AI</a></li>
+          <li><a href="#import">Import and capture</a></li>
+          <li><a href="#storage">Storage and sync</a></li>
+          <li><a href="#phone">Phone channels</a></li>
+          <li><a href="#automation">Scheduled tasks and calendar</a></li>
+          <li><a href="#updates">Updates</a></li>
+          <li><a href="#cli">Source and command line</a></li>
+          <li><a href="#privacy">Where your data goes</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#credits">Open-source credits</a></li>
+        </ol>
+      </nav>
+    </details>
+    <article class="doc">
+
+<p class="note">The app's interface is available in English, but some pages (Health, News and Ask) are still partly in Chinese. Where a label below isn't translated in the app yet, we describe it in English.</p>
+
+<h2 id="start">Quick start<a class="anchor" href="#start" aria-label="#">#</a></h2>
+<p><strong>You need</strong> a Mac with Apple silicon (arm64). That's the only Kaitu.app build for now.</p>
+<ol>
+  <li>Download <code>Kaitu.dmg</code> (see <a href="/en/download/">Download</a>).</li>
+  <li>Open the DMG and drag Kaitu.app into Applications.</li>
+  <li>Double-click it in Applications. If macOS won't open it, see <a href="/en/download/#blocked">the note on the download page</a>.</li>
+</ol>
+<h3 id="first-run">The first time you open it<a class="anchor" href="#first-run" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>Choose where your notes live</strong>: this computer (no sync), iCloud Drive, Google Drive, Nutstore (坚果云), or a folder another sync app syncs. Each option shows whether its sync folder was found on this computer. On this computer the default is <code>~/kaitu</code>, created automatically. You can change it later; see <a href="#storage">Storage and sync</a>.</li>
+  <li><strong>Bring one thing</strong>: write what you want to change, or paste a conversation you had with an AI. When you click Save and organize, Kaitu saves your text as written, then drafts a Current goal, What's known now and One next step, all editable. Only the step you adopt with Adopt this next step becomes a task, and its goal is added to your goals; other suggestions stay in the original text. If you don't want any of them, click Just save the text.</li>
+  <li>When the AI offers several Possible paths, pick one first; then you can turn its small experiment into your next step.</li>
+  <li>You can organize without connecting Kaitu's AI: under Organize with your own AI, click 1 · Copy the prompt, send it to any AI (Doubao, Kimi, DeepSeek, ChatGPT…), paste the answer back as is, and click 3 · Read the answer. Or fill in the three fields yourself.</li>
+  <li>You can also Bring memories from your AI (see <a href="#import">Import and capture</a>), or Look around first.</li>
+</ul>
+<p>Today shows a Get started checklist that ticks off as you go: Choose where your notes live, Bring one thing and adopt a first next step, Let Kaitu get to know you (optional), Pick what to focus on first, Connect health, calendar and more, Choose an AI to help you organize, and Get your first plan for today. If you open Connect health, calendar and more before picking what to focus on, Kaitu asks you to pick first, then lists the data those choices need.</p>
+<p>No API key is needed to browse notes, jot things down, or view maps and finances. Choosing an AI doesn't lock in your notes: Kaitu keeps the notes, the AI organizes and plans. Switch AIs later and everything is still there.</p>
+<p>The interface language follows your system by default; change it in Settings → Interface language (avatar menu, top right). The setting applies to this computer only, and also decides the language of prompts and context packs Kaitu copies for an AI. What you write and what the AI answers are never translated.</p>
+<p class="note">The app's own state and Ask conversations live in <code>~/.kaitu-app/</code>, not in your notes folder.</p>
+
+<h2 id="entries">The four tabs<a class="anchor" href="#entries" aria-label="#">#</a></h2>
+<div class="tablewrap"><table>
+  <thead><tr><th>Tab</th><th>What's in it</th></tr></thead>
+  <tbody>
+    <tr><td>Today</td><td>The one thing to do now; Your plans (goals, where they came from, next steps); up to three next steps; things to review; Today's schedule; recent changes and reviews; Quick note</td></tr>
+    <tr><td>Explore</td><td>Health, Footprints, News and Directions; opens on Health</td></tr>
+    <tr><td>Library</td><td>Schedule, Projects, Health, Finance, Notes and decisions, Inbox; imports, reconciliation and detailed charts live here too</td></tr>
+    <tr><td>Ask</td><td>A built-in AI chat: conversation list, quoting notes and attachments, and what it read and did at each step</td></tr>
+  </tbody>
+</table></div>
+<p>Profile, AI &amp; connections and Settings are in the avatar menu at the top right. The DSH plugin has only Today, Explore and Library; there's no Ask tab.</p>
+<h3 id="today">Today<a class="anchor" href="#today" aria-label="#">#</a></h3>
+<ul>
+  <li>Tick a next step to mark it done; you can add one line about how it went, or move it to later.</li>
+  <li>Quick note saves one line as written, no AI needed. With the daily organizer on, it's processed during organizing.</li>
+  <li>Suggested time blocks have Confirm and No thanks. Confirmed blocks with a start and end time go to the system calendar; see <a href="#automation">Scheduled tasks and calendar</a>.</li>
+</ul>
+<h3 id="explore">Explore<a class="anchor" href="#explore" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>Health</strong>: goals, this week's training and meals, the last-5-weeks training grid, and health next steps.</li>
+  <li><strong>Footprints</strong>: start from your hometown and connect the cities where you studied, worked and travelled on a map. Map tiles come from OpenFreeMap and need a connection.</li>
+  <li><strong>News</strong>: news on the topics you follow. Marking an item Useful or Not relevant is remembered; when you ask AI to propose topics from your feedback, it takes these into account, and so does the daily organizer when it suggests directions. Proposed topics only apply after you confirm and save them.</li>
+  <li><strong>Directions</strong>: one line each, with why it matters and the first step. Open one to see the current hypothesis, what's still unknown, evidence for and against, and the result of each attempt. Paused directions stay in the list; archived ones and ones you marked Not interested are under Archived, and Resume brings any of them back with their notes, attempts and history.</li>
+</ul>
+<h3 id="library">Library<a class="anchor" href="#library" aria-label="#">#</a></h3>
+<ul>
+  <li><strong>Finance · income and spending</strong>: transfers, borrowed principal, repaid principal and the principal of securities you sold count as neither income nor spending; they're listed separately. Transfers and loan principal show signed amounts, with money out as negative.</li>
+  <li>Refunds only reduce spending, never count as income, and must match the original purchase; unmatched refunds wait for review and aren't counted.</li>
+  <li><strong>Finance · investments</strong>: dividends, fees and taxes are listed separately. Whether sale gains already exclude fees depends on the trade records you imported.</li>
+</ul>
+<h3 id="profile">Profile<a class="anchor" href="#profile" aria-label="#">#</a></h3>
+<ul>
+  <li>Avatar menu → Profile: name and bio, facts, preferences and rules, and your goals, each with its source. Memories marked sensitive are left out of context packs.</li>
+  <li><strong>Experience</strong>: the study and work history recorded in Footprints, newest first. Export résumé downloads it as a Markdown résumé, work first, then education.</li>
+</ul>
+
+<h2 id="folder">Your notes folder<a class="anchor" href="#folder" aria-label="#">#</a></h2>
+<p>Everything is Markdown, JSON and JSONL that any editor can open.</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>Path</th><th>Contents</th></tr></thead>
+  <tbody>
+    <tr><td><code>NOW.md</code></td><td>Today's plan and suggested time blocks to confirm</td></tr>
+    <tr><td><code>OVERVIEW.md</code></td><td>One page on where things stand: today, progress and next steps per area, last 7 days. Generated</td></tr>
+    <tr><td><code>AGENTS.md</code>, <code>CLAUDE.md</code></td><td>Where an AI starts reading. Generated; you can add your own notes below the divider at the end of <code>AGENTS.md</code></td></tr>
+    <tr><td><code>me/</code></td><td>Profile <code>profile.md</code>, goals <code>goals.json</code>, routines and training/nutrition rules <code>rules.md</code>, tasks <code>data/tasks/</code></td></tr>
+    <tr><td><code>health/</code></td><td>Training, meals, sleep, activity, body metrics and more in <code>data/</code>; photos and checkup files in <code>files/</code></td></tr>
+    <tr><td><code>projects/</code></td><td>One folder per project: <code>STATUS.md</code>, <code>notes.md</code>, <code>log.md</code></td></tr>
+    <tr><td><code>explore/</code></td><td>Footprints, directions, attempts and evidence</td></tr>
+    <tr><td><code>feed/</code></td><td>News: daily digests in <code>digests/</code>, topics in <code>feeds.json</code></td></tr>
+    <tr><td><code>finance/</code></td><td>Accounts, transactions, holdings snapshots, exchange rates</td></tr>
+    <tr><td><code>calendar/</code></td><td>Schedule</td></tr>
+    <tr><td><code>memory/</code></td><td>Memories: <code>MEMORY.md</code> is the index, one file per memory</td></tr>
+    <tr><td><code>reviews/</code></td><td>Daily, weekly and monthly reviews</td></tr>
+    <tr><td><code>decisions/</code>, <code>learning/</code></td><td>Decision records, study topics</td></tr>
+    <tr><td><code>chats/</code></td><td>Imported conversations</td></tr>
+    <tr><td><code>inbox/</code></td><td>Inbox: quick notes as written, files other AIs drop off, health exports</td></tr>
+    <tr><td><code>handoffs/</code></td><td>Handovers between AIs and the daily organizer's summaries</td></tr>
+    <tr><td><code>.agents/skills/</code>, <code>.claude/skills/</code></td><td>19 built-in skills that Codex, Claude Code and others can use directly</td></tr>
+    <tr><td><code>.kaitu/</code></td><td>Program settings; when notes stay on this computer, version history, keys and the index are here too</td></tr>
+  </tbody>
+</table></div>
+<p>Records are stored per month as <code>data/&lt;type&gt;/YYYY-MM.jsonl</code>, append-only: an edit appends a new version with the same id, a delete appends a deletion marker.</p>
+<h3 id="history">Version history<a class="anchor" href="#history" aria-label="#">#</a></h3>
+<ul>
+  <li>Every write saves a version. Editing files directly is fine too: with the app open, a version is saved after 30 quiet seconds.</li>
+  <li>Settings → Version history restores any version. Kaitu saves the current version first, so a restore can be undone.</li>
+  <li>Settings → Export everything gives you a zip with the Markdown, JSON and attachments in your notes folder, without local credentials or version history.</li>
+</ul>
+
+<h2 id="ai">Connect your AI<a class="anchor" href="#ai" aria-label="#">#</a></h2>
+<p>There are two ways. <strong>Use the AI you already use</strong>: no API key, you carry a context pack back and forth, but you can't chat in Ask itself. <strong>Use Kaitu's AI</strong>: connect with an API key or a provider account and chat right in Ask.</p>
+<h3 id="ask">Use Kaitu's AI (Ask)<a class="anchor" href="#ask" aria-label="#">#</a></h3>
+<ol>
+  <li>Open Ask → Connect AI → Use Kaitu's AI.</li>
+  <li>Choose a service: DeepSeek is suggested by default; OpenAI, Claude, Gemini, Kimi, Zhipu and others also work. Paste an API key, or sign in with the provider's account.</li>
+  <li>Fetch the model list from the service and pick one, or type a model ID.</li>
+  <li>Next, choose whether to organize automatically every day (see <a href="#automation">Scheduled tasks</a>).</li>
+</ol>
+<ul>
+  <li>With an API key, Kaitu sends one tiny test request to check the key, quota, network and model. If it fails, you see why, and the key isn't saved. Account sign-in is authorized by the provider. If you change a custom service's Base URL, enter the key again.</li>
+  <li><strong>Every service you add is kept.</strong> The model button under the message box lists your saved services and models; click one to switch, or choose Add a provider. A new service or model applies from your next message.</li>
+  <li>Keys are stored only in this computer's credential store.</li>
+  <li>You can quote files, folders and other conversations; up to 10 attachments at a time, 25 MB each. Whether images work depends on the model; if it says the current model doesn't support images, go to AI &amp; connections → Manage model and pick another.</li>
+  <li>Web search uses the current AI service's built-in search by default, no extra key. If the service has none (for example when signed in with an account), add a Perplexity, Exa or Tavily key under AI &amp; connections → Web search.</li>
+</ul>
+<div class="tablewrap"><table>
+  <thead><tr><th>Mode</th><th>What it can do</th></tr></thead>
+  <tbody>
+    <tr><td>Kaitu notes only (default)</td><td>Reads and writes only your notes folder, can search and open web pages, can't run commands, can't read keys, credentials or version history. Every new conversation starts here</td></tr>
+    <tr><td>Full agent</td><td>Runs commands, reads and writes any file on this computer, uses the internet; what it reads goes to the current AI service. Content in news, mail or web pages could steer it into things you don't want, so only turn it on for tasks you trust. It asks you to confirm and applies to the current conversation only</td></tr>
+  </tbody>
+</table></div>
+<h3 id="handover">Use the AI you already use (no key)<a class="anchor" href="#handover" aria-label="#">#</a></h3>
+<ol>
+  <li>In AI &amp; connections → Bring where you are to the AI you already use, tick what to include and click Copy the pack. Paste it into ChatGPT, Doubao, Kimi, DeepSeek or any other AI.</li>
+  <li>When you're done, tell it to "organize this for Kaitu", paste the answer into Paste the AI's answer back, and click Read and review. Review and adopt like any other item.</li>
+</ol>
+<ul>
+  <li>The pack includes active goals, results from the last 30 days, next steps, projects, directions you're exploring and non-sensitive memories. For what's left out and removed automatically, see <a href="/en/privacy/">Where your data goes</a>.</li>
+  <li>If you edit the pack text and then change the ticks, Kaitu asks first: Rebuild redoes the pack and drops your edits; Keep my edits leaves it alone.</li>
+  <li>This is a manual hand-off, not a connection: to chat in Ask you still need to connect Kaitu's AI.</li>
+  <li>Directions work the same way: without Kaitu's AI, open Explore → Directions → Use your own AI, copy the prompt to any AI, paste its reply back and click 3 · Read the suggestions. The prompt includes your goals, projects, directions, non-sensitive memories, and titles you've already seen or dismissed. Pasted ideas are marked AI suggestion · to adopt; you decide whether to adopt them or mark them Not interested.</li>
+</ul>
+<h3 id="mcp">Claude and Codex on this computer (MCP)<a class="anchor" href="#mcp" aria-label="#">#</a></h3>
+<p>You need the <code>kaitu</code> command (see <a href="#cli">command line</a>). It uses the app's current notes folder by default.</p>
+<ul>
+  <li>Claude Code: open it in your notes folder, which includes a <code>.mcp.json</code>.</li>
+  <li>Codex: <code>codex mcp add kaitu -- kaitu mcp</code></li>
+  <li>Claude Desktop and others: add an MCP server with the command <code>kaitu mcp</code>.</li>
+</ul>
+<p>AI &amp; connections → AI on this computer (advanced) can copy handover instructions for you.</p>
+<h3 id="relay">Cloud AIs (synced folder relay)<a class="anchor" href="#relay" aria-label="#">#</a></h3>
+<ol>
+  <li>Move your notes to Google Drive (see <a href="#storage">Storage and sync</a>). Two files appear at the top of the folder: <code>AGENT-README.md</code> (where to start) and <code>ORGANIZER.md</code> (nightly organizing rules).</li>
+  <li>In an AI that can open Google Drive, such as Grok, say: "Open the kaitu folder in Google Drive and read AGENT-README.md first."</li>
+</ol>
+<ul>
+  <li>Cloud AIs only create new files (records in <code>inbox/agents/</code>, handovers in <code>handoffs/</code>) and never edit existing ones; when your computer is on, Kaitu imports the records. When authorizing Drive, grant access to the Kaitu folder only if you can.</li>
+  <li><strong>Fixing a mistake</strong>: the AI can drop a new records file whose first line is <code>{"replaces": "earlier-file-name"}</code>, followed by the full corrected records; that line alone withdraws the earlier file. An AI can only replace files it sent itself. If the replacement doesn't check out, none of it applies and the text is kept as a note to sort out.</li>
+</ul>
+
+<h2 id="import">Import and capture<a class="anchor" href="#import" aria-label="#">#</a></h2>
+<p>Get started → Connect health, calendar and more lists the data your chosen focus areas need: calendar, Apple Health, bills and holdings, projects, mail and chat, and news topics. Skip any of them and connect later.</p>
+<ul>
+  <li><strong>Quick note</strong>: on Today, one line is saved as written (<code>inbox/notes/&lt;date&gt;/</code>), no AI needed. With the daily organizer on, it's processed during organizing.</li>
+  <li><strong>Bring memories from your AI</strong>: copy the memory export prompt to the AI you use most and paste its answer back. Untick anything wrong, and choose where each item goes: Make it a goal, Make it a project, Add as a direction, or Keep as a memory. Every item keeps its source; confirmed goals appear under Your plans on Today.</li>
+  <li><strong>ChatGPT conversations</strong>: on the same page, click Import a ChatGPT data export and choose the ZIP or <code>conversations.json</code>; preview, then confirm. Conversations go to <code>chats/</code> and are searchable.</li>
+  <li><strong>Apple Health</strong>: on iPhone, Health → your picture → Export All Health Data, then import the ZIP (or the XML inside) under Connect data → Apple Health, or drop it into <code>inbox/health/</code>. Nightly sync requires moving your notes to Google Drive; the setup guide is <code>docs/guides/apple-health.html</code> in the repository, and the <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/health-shortcut-format.md">file format</a> is documented for your own shortcuts (Chinese).</li>
+  <li><strong>Calendar subscriptions</strong>: Library → Schedule → add a calendar with an ICS (or webcal) address from Google Calendar, iCloud or Outlook. Refreshed every 15 minutes.</li>
+  <li><strong>Bills</strong>: Library → Finance → import CSV, XML, XLS or XLSX, up to 36 MB each. Recognized by header: Alipay, WeChat Pay, China Merchants Bank, ICBC, CCB, Bank of China, JD, Meituan, Huaxi Securities, Haitong Securities, Tonghuashun, IBKR (Flex XML) and holdings sheets. Preview before confirming; importing the same file twice doesn't double-count. PDFs, images and encrypted archives can't be imported.</li>
+  <li><strong>Mail and chat</strong>: AI &amp; connections → mail and chat; read-only for Gmail, IMAP mailboxes (iCloud, QQ, 163…), Slack and Feishu. Only source, sender, time, subject, an excerpt of up to 280 characters and a link are stored.</li>
+  <li><strong>Projects</strong>: Connect data → Projects, from a local folder or a GitHub repository.</li>
+  <li><strong>Command line</strong>: <code>kaitu import chatgpt-conversations | apple-health | ics | nut-ai &lt;file&gt;</code>; add <code>--dry-run</code> to preview. Single <code>.ics</code> files and Nut AI backups are imported here.</li>
+</ul>
+
+<h2 id="storage">Storage and sync<a class="anchor" href="#storage" aria-label="#">#</a></h2>
+<p>Kaitu asks where your notes live the first time you open it. To change it later: avatar menu → Settings → Change where notes live → Change, and pick who syncs:</p>
+<ul>
+  <li>This computer (no sync, default)</li>
+  <li>iCloud Drive</li>
+  <li>Google Drive</li>
+  <li>Nutstore (坚果云)</li>
+  <li>A folder another sync app syncs</li>
+</ul>
+<p>Choose folder… fills in a new <code>kaitu</code> folder inside the location you pick, or type the path. The target must not exist yet; Kaitu never overwrites a folder. Nothing moves until you confirm; the old location keeps a <code>WORKSPACE-MOVED.md</code>.</p>
+<p class="note">Don't drag your current Kaitu folder into a synced drive yourself; that uploads your keys and version store too. Moving it with Change where notes live keeps them on this computer.</p>
+<ul>
+  <li>Only note files go to the cloud. Version history, keys and credentials, the search index, your avatar and interface settings stay on this computer. Recognizable conflict copies (like "(conflicted copy)" or "file 2") aren't versioned; <code>kaitu doctor</code> lists them.</li>
+  <li><strong>iCloud</strong>: turn on iCloud Drive in System Settings → Apple Account → iCloud first; after moving, set the kaitu folder to Keep Downloaded in Finder. Cloud AIs can't read iCloud.</li>
+  <li><strong>Nutstore</strong>: uses the Nutstore sync folder it finds. If none is found, set up a sync folder in the Nutstore client, then enter a new folder inside it.</li>
+  <li><strong>Google Drive</strong>: used for cloud AI relay (see <a href="#relay">Cloud AIs</a>).</li>
+</ul>
+<p>Command line: <code>kaitu sync enable icloud|drive|nutstore [--dir &lt;parent&gt;]</code>, <code>kaitu sync disable [--to &lt;folder&gt;]</code>, <code>kaitu sync status</code>. For which files reach the cloud and which AIs can read them, see <a href="/en/privacy/">Where your data goes</a>.</p>
+
+<h2 id="phone">Phone channels<a class="anchor" href="#phone" aria-label="#">#</a></h2>
+<p>Message Kaitu on WeChat, Telegram, Feishu or QQ and Ask's current AI answers, in Kaitu notes only mode: it can read and write your notes, search and read web pages, but not run commands. Your computer must be on, Kaitu.app running, and Ask connected to an AI. Text only.</p>
+<ol>
+  <li>Avatar menu → AI &amp; connections → chat with Kaitu on your phone.</li>
+  <li>Connect a channel by following the steps on the page (scan to sign in for WeChat; bot credentials for Telegram, QQ and Feishu).</li>
+  <li>The page shows a pairing code, valid for 10 minutes. Send it to the bot in a private chat. The account that sends it becomes the only one that gets replies.</li>
+</ol>
+<p>Telegram and WeChat have been tested on real devices; Feishu and QQ haven't yet. Messages pass through the platform you choose; see <a href="/en/privacy/">Where your data goes</a>. Command line: <code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>, <code>kaitu channels pair &lt;channel&gt;</code>, <code>kaitu channels status</code>.</p>
+
+<h2 id="automation">Scheduled tasks and calendar<a class="anchor" href="#automation" aria-label="#">#</a></h2>
+<p>The first time you connect Kaitu's AI in Ask, it asks once whether to organize automatically. Tasks run on the AI you just connected; choose none and you can still ask any time.</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>Task</th><th>Time</th><th>Default</th></tr></thead>
+  <tbody>
+    <tr><td>Morning plan: plans your day for you to confirm</td><td>07:30</td><td>On</td></tr>
+    <tr><td>Daily organizer: merges the handovers other AIs left into one daily summary and updates each area's next steps; if no directions were suggested in the last seven days, it searches the web using topic words only and suggests 3–5 directions for you to adopt</td><td>03:00</td><td>On</td></tr>
+    <tr><td>News search: finds new things on the topics you confirmed</td><td>08:00</td><td>Off</td></tr>
+  </tbody>
+</table></div>
+<p>Turn each on or off and change times in Settings → Automatic organizing (the 人生开图 app menu → Settings can also turn them on or off). Times use the time zone shown in Settings → About. Tasks only run while Kaitu.app is open.</p>
+<h3 id="calendar">Add confirmed time blocks to the system calendar<a class="anchor" href="#calendar" aria-label="#">#</a></h3>
+<ul>
+  <li>On by default in Kaitu.app for macOS. Confirming a block with a start and end time, or scheduling a next step, writes it to a "开图" calendar in the system Calendar with a 10-minute reminder. Suggestions awaiting confirmation and tasks without times aren't written.</li>
+  <li>Blocks added successfully aren't listed again on Today. If writing fails or only a calendar file was produced, Today lists it with options to download the calendar file or retry.</li>
+  <li>The first write asks for Automation permission. If you deny it, allow Kaitu to control Calendar in System Settings → Privacy &amp; Security → Automation, then retry.</li>
+  <li>Turning the switch off leaves events already written in place; to clear them, use remove the calendar events Kaitu added.</li>
+  <li><code>kaitu ui</code> in a browser and the DSH plugin only produce calendar files.</li>
+</ul>
+
+<h2 id="updates">Updates<a class="anchor" href="#updates" aria-label="#">#</a></h2>
+<ul>
+  <li><strong>Feature package</strong>: interface, notes service, tools and skills. Settings → About → Kaitu feature updates: Check for updates → Download update → Restart app. Packages must pass signature and engine-version checks, or Kaitu keeps the current version. Restore previous features if something goes wrong; this doesn't restore your notes (use version history for that).</li>
+  <li><strong>The app itself</strong>: when the DSH engine (pinned at 0.2.1-rc.1), Electron or the launcher changes, download a new Kaitu.app.</li>
+</ul>
+<p>If Settings shows No update source configured, in-app updates aren't available; get the new version from <a href="/en/download/">Download</a>. A new app version upgrades the built-in templates and skills in your notes folder on launch and keeps your settings. Command-line only? Run <code>kaitu upgrade</code> on older folders first (<code>--dry-run</code> to preview).</p>
+
+<h2 id="cli">Source and command line<a class="anchor" href="#cli" aria-label="#">#</a></h2>
+<p>There's a ready-made CLI and web package on the <a href="/en/download/#cli">download page</a>. To run from source you need Node.js 22.19+ (22.x) or 24+, and pnpm.</p>
+<div class="codeblock"><pre><code>git clone https://github.com/Stahl-G/rensheng-kaitu.git
+cd rensheng-kaitu
+pnpm install
+pnpm build
+node packages/cli/dist/main.js init ~/kaitu-demo --sample
+node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="button" class="copy">Copy</button></div>
+<p><code>--sample</code> creates synthetic demo data. The workbench only listens on 127.0.0.1, has the same tabs as Kaitu.app, and Ask connects to an AI in the page. In a source checkout, <code>kaitu</code> below means <code>node packages/cli/dist/main.js</code>.</p>
+<div class="tablewrap"><table>
+  <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>kaitu init [folder] [--sample]</code></td><td>Create a notes folder (default <code>~/kaitu</code>)</td></tr>
+    <tr><td><code>kaitu ui [--port 4870] [--no-open]</code></td><td>Open the local workbench</td></tr>
+    <tr><td><code>kaitu doctor</code></td><td>Check the notes folder</td></tr>
+    <tr><td><code>kaitu validate [path]</code></td><td>Validate against the schemas</td></tr>
+    <tr><td><code>kaitu status</code></td><td>Today, progress per area and the last 7 days</td></tr>
+    <tr><td><code>kaitu mcp [--http] [--port 4871] [--tools remote|all]</code></td><td>Start the MCP server</td></tr>
+    <tr><td><code>kaitu upgrade [--dry-run]</code></td><td>Upgrade built-in templates and skills</td></tr>
+    <tr><td><code>kaitu history</code> · <code>restore &lt;version&gt;</code> · <code>snapshot -m &lt;message&gt;</code></td><td>Version history</td></tr>
+    <tr><td><code>kaitu dsh [--install] [--no-automation]</code></td><td>Add Kaitu to DeepSeek Harness</td></tr>
+  </tbody>
+</table></div>
+<p>The global option <code>--dir &lt;folder&gt;</code> (or the <code>KAITU_DIR</code> environment variable) picks the notes folder. Without either, it uses the app's current folder, or <code>~/kaitu</code>. Run <code>kaitu --help</code> for the full list.</p>
+<p><strong>MCP over HTTP</strong>: <code>kaitu mcp --http</code> listens only on <code>127.0.0.1:4871</code>; requests need the Bearer token from <code>kaitu mcp token</code>, and only reading and adding are allowed by default. Kaitu has no built-in public access.</p>
+<h3 id="dsh">Add Kaitu to DeepSeek Harness<a class="anchor" href="#dsh" aria-label="#">#</a></h3>
+<p>If you already use the DSH 0.2.1-rc.1 desktop app, after <code>pnpm build</code> in the source folder:</p>
+<ol>
+  <li>Open DSH once and set up a model in Settings → Models.</li>
+  <li>Run <code>kaitu dsh --install</code>. If Kaitu.app uses the same notes folder, add <code>--no-automation</code> so background tasks only run in Kaitu.app.</li>
+  <li>Quit and reopen DSH, then click Kaitu in the sidebar: Today, Explore and Library. DSH keeps its own brand and panels, and chats use DSH's own sessions.</li>
+</ol>
+<p>Without <code>--install</code> it prints the command to start the web version. The CLI and web package doesn't include the DSH plugin, so this step needs a source build.</p>
+
+<h2 id="privacy">Where your data goes<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
+<ul>
+  <li><strong>Kept on this computer</strong>: your notes folder, plus version history, keys, credentials and the index.</li>
+  <li><strong>Synced to your cloud drive</strong>: only after you pick one, and only note files.</li>
+  <li><strong>Sent to an AI this time</strong>: Ask sends your messages and the notes it reads to the AI service you chose; a full agent may send anything it reads; scheduled tasks use the same AI; external AIs over MCP or cloud relay send what they read to the services behind them; context packs and the clipboard send only what you copy.</li>
+  <li><strong>Other connections</strong>: map tiles (OpenFreeMap), reference prices (Yahoo, ticker symbols only), GitHub, calendar subscriptions, and mail and chat collection.</li>
+</ul>
+<p>Details are on <a href="/en/privacy/">Where your data goes</a>.</p>
+
+<h2 id="faq">FAQ<a class="anchor" href="#faq" aria-label="#">#</a></h2>
+<h3 id="faq-key">Do I need an API key?<a class="anchor" href="#faq-key" aria-label="#">#</a></h3>
+<p>No. Browsing notes, jotting things down, maps and finances work without one. For AI help, copy a context pack or prompt to the AI you already use and paste the answer back.</p>
+<h3 id="faq-where">Where are my notes? Can I edit them directly?<a class="anchor" href="#faq-where" aria-label="#">#</a></h3>
+<p>Wherever you chose the first time; Settings → Change where notes live shows the current location. Edit files in any editor; with the app open, versions are saved automatically.</p>
+<h3 id="faq-switch">If I switch AIs, is my progress still there?<a class="anchor" href="#faq-switch" aria-label="#">#</a></h3>
+<p>Yes. Progress lives in your notes folder, not inside any AI. A new AI reads <code>AGENTS.md</code> and <code>OVERVIEW.md</code> and carries on.</p>
+<h3 id="faq-closed">Do scheduled tasks and phone replies keep working when the app is closed?<a class="anchor" href="#faq-closed" aria-label="#">#</a></h3>
+<p>No. Scheduled tasks, phone channels, calendar sync and mail collection run while the app is open. With your computer off, a cloud AI can take over through Google Drive.</p>
+<h3 id="faq-undo">Can I undo a mistake?<a class="anchor" href="#faq-undo" aria-label="#">#</a></h3>
+<p>Yes. Settings → Version history, pick a version and restore. The current version is saved first, so the restore itself can be undone.</p>
+<h3 id="faq-platform">Is there a Windows or Intel Mac version?<a class="anchor" href="#faq-platform" aria-label="#">#</a></h3>
+<p>Kaitu.app is Apple silicon only. On other computers, try the CLI and web version (see the <a href="/en/download/#other">download page</a>).</p>
+<h3 id="faq-export">How do I take all my notes with me?<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
+<p>Settings → Export everything gives you a zip, or just copy your notes folder.</p>
+<h3 id="faq-dsh">How does it relate to DeepSeek Harness?<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
+<p>Kaitu.app is built on DeepSeek Harness (DSH) 0.2.1-rc.1, and Ask runs on its engine. If you already use DSH, you can install Kaitu as a plugin instead (see <a href="#dsh">Add Kaitu to DeepSeek Harness</a>).</p>
+<h3 id="faq-engine">Ask says its engine didn't load?<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
+<p>Reinstall the full CLI and web package and restart the workbench. Until then, you can still copy a context pack from AI &amp; connections to the AI you use.</p>
+<h3 id="faq-update-source">Settings says No update source configured?<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>
+<p>This build can't check for updates in the app; download the new version from <a href="/en/download/">Download</a>.</p>
+
+<h2 id="credits">Open-source credits<a class="anchor" href="#credits" aria-label="#">#</a></h2>
+<p>Kaitu is built on open-source projects including DeepSeek Harness, Electron, React, MapLibre and FullCalendar. The full <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md">list of projects, uses and licenses</a> and the <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/THIRD_PARTY_NOTICES.md">third-party notices</a> are in the repository. Kaitu itself is MIT-licensed.</p>
+
+    </article>
+  </div>
+</div>
+
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
+    <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
+    <p class="foot-note">MIT License · 0.1.0-rc.3</p>
+    <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where your data goes · Kaitu</title>
+<meta name="description" content="What stays on this computer, what syncs to your cloud drive, and what is sent to an AI.">
+<link rel="canonical" href="https://kaitu.si/en/privacy/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/privacy/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kaitu">
+<meta property="og:title" content="Where your data goes · Kaitu">
+<meta property="og:description" content="What stays on this computer, what syncs to your cloud drive, and what is sent to an AI.">
+<meta property="og:url" content="https://kaitu.si/en/privacy/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/en/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>Kaitu</span></a>
+    <a class="lang" href="/privacy/" hreflang="zh-CN" lang="zh-CN" data-lang-switch="zh">中文</a>
+    <nav class="site-nav" aria-label="Site"><a href="/en/#tour">Product</a><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/#inspiration">Inspiration</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="wrap narrow">
+  <header class="page-head"><h1>Where your data goes</h1><p class="lead">This page comes from <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/site/privacy.en.md">docs/site/privacy.en.md</a> in the Kaitu repository, for 0.1.0-rc.3.</p></header>
+  <div class="doc">
+<p>Kaitu describes three places your notes can go: kept on this computer, synced to your cloud drive, or sent to an AI this time. Below is when, where and what.</p>
+<h2>Kept on this computer</h2>
+<ul><li>Your notes live in the folder you chose: goals, records, notes, memories, projects and originals, all as Markdown, JSON and JSONL that any editor can open.</li><li>Program state stays on this computer only: version history, AI service keys and other credentials, the search index, your avatar and interface settings. They stay here even when sync is on.</li></ul>
+<h2>Synced to your cloud drive</h2>
+<ul><li>Only after you pick iCloud, Google Drive, Nutstore or a synced folder in Settings → Change where notes live.</li><li>Every note file in the folder syncs, finance details included. Your cloud service stores and syncs them; Kaitu is not in between.</li><li>Version history, keys, credentials and the index still stay on this computer.</li></ul>
+<h2>Sent to an AI this time</h2>
+<ul><li>Ask: your messages, and the Kaitu notes it reads to answer, go to the AI service you chose in AI &amp; connections. By default it can only read and write your notes folder, not keys, credentials or version history.</li><li>Full agent: only for a conversation where you turn it on. It can run commands and read or write any file on this computer, and what it reads may go to the AI service.</li><li>Morning plan, daily organizer and news search: when on, they run on schedule with Ask's AI, read the notes they need and send them to the same AI service.</li><li>Web search: queries go to Ask's current AI service by default, or to Perplexity, Exa or Tavily if you switch.</li><li>Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; ones connected over the internet can't read finance details, and none can read keys, credentials or version history. What they read goes to the AI service behind them.</li><li>Cloud relay: a cloud AI that works through your drive (such as Grok over Google Drive) can read every note file on the drive, finance details included.</li><li>Phone channels: messages you send on WeChat, Telegram, Feishu or QQ, and the replies, pass through those platforms; Ask's AI answers them.</li><li>Context pack and clipboard: only the text you copy and paste leaves Kaitu. Packs leave out health records, finance details and memories marked sensitive, and recognizable keys and local paths are removed.</li></ul>
+<h2>Other connections</h2>
+<ul><li>Map tiles come from OpenFreeMap.</li><li>Reference prices come from Yahoo; only ticker symbols are sent, not your holdings.</li><li>GitHub progress uses the token you add to read the repositories you linked.</li><li>Calendar subscriptions are read from the addresses you add; confirmed blocks can be written to this computer's calendar.</li><li>Mail, Slack and Feishu collection reads only the accounts you authorize, and excerpts go into your notes folder.</li></ul>
+<h2>Any time you can</h2>
+<ul><li>Take every note file with Settings → Export everything.</li><li>Move back to this computer and stop syncing in Settings → Change where notes live.</li><li>Change or disconnect the AI service in AI &amp; connections.</li></ul>
+  </div>
+</div>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
+    <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
+    <p class="foot-note">MIT License · 0.1.0-rc.3</p>
+    <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
+  </div>
+</footer>
+</body>
+</html>
