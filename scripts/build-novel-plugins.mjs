@@ -12,7 +12,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const folder = process.argv[2];
 const pkg = resolve(root, "packages", folder);
 const packageName = JSON.parse(readFileSync(resolve(pkg, "package.json"), "utf8")).name;
-// rc.2 recognizes protocol symbols only inside its workspace inventory. Give the
+// 0.2.1-rc.1 recognizes protocol and registry symbols inside its workspace inventory. Give the
 // published declarations a temporary workspace identity, without importing DSH source.
 const analysis = mkdtempSync("/tmp/kaitu-typert-");
 if (folder === "novel-plugin")
@@ -37,14 +37,28 @@ if (folder === "novel-plugin")
       JSON.stringify({ name: "@deepseek-ai/dsh-typert-protocol", exports: { ".": "./src/index.d.ts" } }),
     );
     symlinkSync(resolve(pkg, "node_modules"), resolve(protocol, "node_modules"));
+    const registry = resolve(analysis, "packages/registry");
+    cpSync(
+      resolve(pkg, "node_modules/@deepseek-ai/dsh-typert-registry/lib/types"),
+      resolve(registry, "src"),
+      {
+        recursive: true,
+      },
+    );
+    writeFileSync(
+      resolve(registry, "package.json"),
+      JSON.stringify({ name: "@deepseek-ai/dsh-typert-registry", exports: { ".": "./src/index.d.ts" } }),
+    );
+    symlinkSync(resolve(pkg, "node_modules"), resolve(registry, "node_modules"));
     const options = JSON.parse(readFileSync(resolve(root, "tsconfig.base.json"), "utf8"));
     options.compilerOptions.types = ["node"];
     options.compilerOptions.paths = {
       "@deepseek-ai/dsh-typert-protocol": [resolve(protocol, "src/index.d.ts")],
+      "@deepseek-ai/dsh-typert-registry": [resolve(registry, "src/index.d.ts")],
     };
     writeFileSync(resolve(analysis, "tsconfig.base.json"), JSON.stringify(options));
     symlinkSync(resolve(root, "node_modules"), resolve(analysis, "node_modules"));
-    for (const dir of [analyzedPkg, protocol]) {
+    for (const dir of [analyzedPkg, protocol, registry]) {
       writeFileSync(
         resolve(dir, "tsconfig.json"),
         JSON.stringify({
@@ -59,7 +73,11 @@ if (folder === "novel-plugin")
       JSON.stringify({
         extends: "./tsconfig.base.json",
         files: [],
-        references: [{ path: `packages/${folder}` }, { path: "packages/protocol" }],
+        references: [
+          { path: `packages/${folder}` },
+          { path: "packages/protocol" },
+          { path: "packages/registry" },
+        ],
       }),
     );
     const generator = new WorkspaceTypertGenerator(analysis);

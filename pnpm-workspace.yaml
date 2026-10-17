@@ -8,3 +8,6 @@ allowBuilds:
   koffi: true
   node-pty: true
   protobufjs: false
+# DSH 0.2.1-rc.1 is newer than pnpm's default release-age window.
+minimumReleaseAgeExclude:
+  - "@deepseek-ai/*"

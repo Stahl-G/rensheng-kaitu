@@ -40,6 +40,10 @@ export function startInboxLoop(
   let watcher: FSWatcher | undefined;
   try {
     watcher = watch(ws.resolve("inbox"), { recursive: true }, () => schedule(2000));
+    watcher.once("error", () => {
+      watcher?.close();
+      watcher = undefined;
+    });
   } catch {
     // 目录不可监听时只靠定时器。
   }

@@ -7,14 +7,12 @@ const load = (name) => import(pathToFileURL(resolveModule(name)).href);
 const [
   { JsonRpcLineTransport },
   { HarnessSdkJsonRpcServer },
-  { createUserMessage },
   { setSandboxMode },
   { setApprovalPolicy },
   { admitEncodedImages, admitEncodedFile },
 ] = await Promise.all([
   load("@deepseek-ai/dsh-sdk-protocol"),
   load("@deepseek-ai/dsh-sdk-jsonrpc-server"),
-  load("@deepseek-ai/dsh-llm"),
   load("@deepseek-ai/dsh-sandbox-policy"),
   load("@deepseek-ai/dsh-user-approval"),
   load("@deepseek-ai/dsh-attachment"),
@@ -24,6 +22,7 @@ export const inject = [
   "sdkAppStartup",
   "loader",
   "agents",
+  "workingDirectory",
   "sessionPersistence",
   "kaitu",
   "fs",
@@ -34,17 +33,27 @@ export const inject = [
 export function apply(ctx) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const sdk = new HarnessSdkJsonRpcServer(ctx, transport);
-  const fresh = new Set();
-  const resumed = new Map();
+  const opened = new Set();
   const attempts = new Map();
-  let route;
+  let initialized = false;
   let shutdown;
   const close = () => {
     shutdown ??= (async () => {
-      await Promise.all([...resumed.values()].map((handle) => handle.dispose()));
       await sdk.shutdown();
     })();
     return shutdown;
+  };
+  const resume = async (sessionId, stored) => {
+    if (stored && stored.header.cwd !== process.env.KAITU_DIR) throw new Error("会话不属于此工作区");
+    const result = await sdk.handleRequest("session/resume", { sessionId });
+    const session = ctx.agents.get(sessionId).session;
+    setSandboxMode(
+      session,
+      process.env.KAITU_AGENT_MODE === "full" ? "danger-full-access" : "workspace-write",
+    );
+    setApprovalPolicy(session, "never");
+    opened.add(sessionId);
+    return result;
   };
   transport.onRequest(async (method, params) => {
     if (method === "initialize") {
@@ -52,7 +61,7 @@ export function apply(ctx) {
       if (params.cwd !== process.env.KAITU_DIR) throw new Error("工作区不匹配");
       if (params.capabilities) return { serverInfo: { name: "kaitu-dsh-capabilities", version: "1" } };
       const result = await sdk.initialize(params);
-      route = { provider: params.provider, model: params.model };
+      initialized = true;
       return result;
     }
     if (method === "kaitu/directory") {
@@ -134,24 +143,15 @@ export function apply(ctx) {
       return { cancelled: true };
     }
     if (method === "session/prompt") {
-      if (!route || shutdown) throw new Error("AI 尚未就绪");
+      if (!initialized || shutdown) throw new Error("AI 尚未就绪");
       const id = params.sessionId;
       if (typeof id !== "string" || !/^session-[\w-]+$/.test(id)) throw new Error("无效会话");
-      // rc.2's SDK creates fresh agents; existing native logs resume through its public agent API.
-      if (!fresh.has(id) && !resumed.has(id) && (await ctx.sessionPersistence.stat(id))) {
-        const handle = await ctx.agents.resume({ resumeSessionId: id, agentOptions: route });
-        if (handle.agent.session.header.cwd !== process.env.KAITU_DIR) {
-          await handle.dispose();
-          throw new Error("会话不属于此工作区");
-        }
-        setSandboxMode(
-          handle.agent.session,
-          process.env.KAITU_AGENT_MODE === "full" ? "danger-full-access" : "workspace-write",
-        );
-        setApprovalPolicy(handle.agent.session, "never");
-        resumed.set(id, handle);
+      // Admit a persisted identity once; the SDK owns restoration and Agent disposal.
+      if (!opened.has(id)) {
+        const stored = await ctx.sessionPersistence.stat(id);
+        if (stored) await resume(id, stored);
+        opened.add(id);
       }
-      const handle = resumed.get(id);
       const blocks = params.contentBlocks;
       if (
         !Array.isArray(blocks) ||
@@ -185,15 +185,18 @@ export function apply(ctx) {
           content.push({ type: "file", attachment });
         }
       }
-      if (!handle) {
-        const receipt = await sdk.prompt({ ...params, contentBlocks: content });
-        fresh.add(id);
-        return receipt;
-      }
-      const message = createUserMessage({ content, source: { kind: "user" } });
-      handle.agent.followup(message);
-      return { messageId: message.id };
+      return sdk.prompt({ ...params, contentBlocks: content });
     }
+    if (method === "session/resume") {
+      return resume(params.sessionId, await ctx.sessionPersistence.stat(params.sessionId));
+    }
+    if (method === "session/working-directory/get") {
+      const result = await sdk.handleRequest(method, params);
+      opened.add(params.sessionId);
+      return result;
+    }
+    if (method === "session/wait") return sdk.handleRequest(method, params);
+
     if (method === "shutdown") {
       await close();
       setImmediate(() => {

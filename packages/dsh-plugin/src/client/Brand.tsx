@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import css from "./Brand.module.css";
 
-// rc.2 ui-conversation/src/client/contract/slots.ts. Only the owner contract is needed here.
+// 0.2.1-rc.1 dsh-client-ui-conversation/lib/types/client/contract/slots.d.ts: owner contract.
 declare module "@deepseek-ai/dsh-client-ui-slots" {
   interface SlotMap {
     "conversation.hero.brand.mark": {

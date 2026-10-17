@@ -105,7 +105,7 @@ test.skipIf(!available)(
       // @ts-expect-error Native ESM runtime configuration.
       const { providerPatch } = await import("../sdk-providers.mjs");
       expect(JSON.stringify(providerPatch(result.body))).not.toContain(secret);
-      const logs = await new Promise<string>((done, reject) => {
+      const logs = await new Promise<{ output: string; diagnostics: string }>((done, reject) => {
         const child = spawn(executable, [resolve("packages/desktop/sdk-credentials.mjs"), "status"], {
           env: {
             ...process.env,
@@ -115,18 +115,19 @@ test.skipIf(!available)(
           },
         });
         let output = "";
+        let diagnostics = "";
         child.stdout.on("data", (chunk) => {
           output += chunk;
         });
         child.stderr.on("data", (chunk) => {
-          output += chunk;
+          diagnostics += chunk;
         });
         child.on("error", reject);
-        child.on("exit", () => done(output));
+        child.on("exit", () => done({ output, diagnostics }));
         child.stdin.end(JSON.stringify({ ref: "KAITU_KAITU_CUSTOM_API_KEY" }));
       });
-      expect(logs).not.toContain(secret);
-      expect(JSON.parse(logs).configured).toBe(true);
+      expect(logs.output + logs.diagnostics).not.toContain(secret);
+      expect(JSON.parse(logs.output).configured).toBe(true);
       const kept = await run.post({
         choice: "builtin",
         provider: "kaitu-custom",

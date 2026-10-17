@@ -74,7 +74,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
     },
     {
       id: "agent-instructions",
-      config: { maxBytes: 65536, dshHome: join(workspace, ".dsh"), projectRootMarkers: ["AGENTS.md"] },
+      config: { maxBytes: 65536, projectRootMarkers: ["AGENTS.md"] },
     },
     { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
     { id: "approval", config: { policy: "never" } },
@@ -367,7 +367,11 @@ export function createSdkRuntime({
         request(method, params) {
           if (dead) throw new Error("内置 AI 已退出");
           if (method === "session/prompt") active.add(params.sessionId);
-          return rpc.request(method, params, AbortSignal.timeout(20000));
+          return rpc.request(
+            method,
+            params,
+            method === "session/wait" ? undefined : AbortSignal.timeout(20000),
+          );
         },
         onNotification(listener) {
           listeners.add(listener);

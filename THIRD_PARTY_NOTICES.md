@@ -14,7 +14,7 @@
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
-| DeepSeek Harness Node 引擎与 SDK 0.2.0-rc.2（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |
+| DeepSeek Harness Node 引擎与 SDK 0.2.1-rc.1（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |
 | @slack/web-api | MIT | https://github.com/slackapi/node-slack-sdk |
 | imapflow | MIT | https://github.com/postalsys/imapflow |
 | mailauth | MIT | https://github.com/postalsys/mailauth |
@@ -285,9 +285,9 @@ yahoo-finance2 4.0.3（MIT）：https://github.com/gadicc/yahoo-finance2 。仅�
 - License: MIT, Copyright (c) Adam Shaw. License texts are included in the installed npm packages.
 - Only standard calendar views are used. No premium scheduler dependency.
 
-## DSH 网络搜索提供方 0.2.0-rc.2
+## DSH 网络搜索提供方 0.2.1-rc.1
 
 - @deepseek-ai/dsh-web-search-exa、@deepseek-ai/dsh-web-search-perplexity，MIT。
-- 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.0-rc.2/packages/web
+- 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.1/packages/web
 - 复用发布包的提供方实现，Key 在开图适配层通过本机凭据服务读取，不写入提供方配置。
 - 完整许可证随 npm 依赖及桌面载荷的 `licenses/` 目录保留。

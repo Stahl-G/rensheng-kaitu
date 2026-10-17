@@ -4,35 +4,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KaituError, type Workspace } from "@kaitu/core";
 
-const DSH_VERSION = "0.2.0-rc.2";
+const DSH_VERSION = "0.2.1-rc.1";
 const START = "# kaitu:start（由 kaitu dsh --install 维护）";
 const END = "# kaitu:end";
 
-function schedulePackages(profile: string, outside = "") {
-  const manifest = join(profile, "package.json");
-  const bundles: string[] = existsSync(manifest)
-    ? (JSON.parse(readFileSync(manifest, "utf8")).dsh?.profile?.bundles ?? [])
-    : [];
-  const bundled = bundles.includes("@deepseek-ai/dsh-experimental-schedule-bundle");
-  return [
-    ...(!bundled && !outside.includes("@deepseek-ai/dsh-schedule")
-      ? [{ id: "kaitu-schedule", name: "@deepseek-ai/dsh-schedule" }]
-      : []),
-    ...(!bundled && !outside.includes("@deepseek-ai/dsh-client-ui-schedule")
-      ? [{ id: "kaitu-ui-schedule", name: "@deepseek-ai/dsh-client-ui-schedule" }]
-      : []),
-  ];
-}
-
 const defaultPlugin = () => fileURLToPath(new URL("../../dsh-plugin/dist/index.js", import.meta.url));
 
-function entry(
-  workspace: string,
-  plugin: string,
-  flow: boolean,
-  schedules: { id: string; name: string }[],
-  standalone = false,
-): string {
+function entry(workspace: string, plugin: string, flow: boolean, standalone = false): string {
   if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
   const disabled = [
@@ -55,7 +33,7 @@ function entry(
       { id: "tool-skill", disabled: false },
       { id: "ui-settings-models", config: { credentialOnboarding: !standalone } },
       {
-        insert: [...schedules, { id: "kaitu", name: plugin, config: { workspace } }],
+        insert: [{ id: "kaitu", name: plugin, config: { workspace } }],
       },
     ]
       .map((row) => JSON.stringify(row))
@@ -69,7 +47,6 @@ function entry(
     "  config:",
     `    credentialOnboarding: ${!standalone}`,
     "- insert:",
-    ...schedules.flatMap(({ id, name }) => [`    - id: ${id}`, `      name: ${JSON.stringify(name)}`]),
     "    - id: kaitu",
     `      name: ${JSON.stringify(plugin)}`,
     "      config:",
@@ -78,7 +55,7 @@ function entry(
   ].join("\n");
 }
 
-// CLI 与独立桌面应用共用受管段，包括定时任务包的去重逻辑。
+// CLI 与独立桌面应用共用受管段；定时任务由固定版本的 DSH 宿主提供。
 export function renderDshPatch(
   text: string,
   options: { home: string; workspace: string; plugin?: string; standalone?: boolean },
@@ -92,9 +69,7 @@ export function renderDshPatch(
   const emptyFlow = /^\[[ \t]*\](?=[ \t]*(?:#.*)?$)/m.exec(text);
   // 受管段前面也可能有别的条目（如 Kaitu.app 的 webserver 行，以逗号结尾），仍属 flow 序列。
   const flow = start >= 0 ? /[[,]$/.test(text.slice(0, start).trimEnd()) : emptyFlow !== null;
-  const outside = start >= 0 ? text.slice(0, start) + text.slice(end + END.length) : text;
-  const schedules = schedulePackages(join(options.home, "profiles", "desktop"), outside);
-  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, schedules, options.standalone).trimEnd()}\n${END}`;
+  const block = `${START}\n${entry(options.workspace, options.plugin ?? defaultPlugin(), flow, options.standalone).trimEnd()}\n${END}`;
   let next: string;
   if (start >= 0) {
     next = text.slice(0, start) + block + text.slice(end + END.length);
@@ -119,10 +94,7 @@ export function installDsh(ws: Workspace): string {
 
 export function dshCommand(ws: Workspace): string {
   const file = ".kaitu/cache/dsh/cordis.yml";
-  const profile = join(process.env.DSH_HOME ?? join(homedir(), ".dsh"), "profiles", "web");
-  const profilePatch = join(profile, "cordis.patch.yml");
-  const outside = existsSync(profilePatch) ? readFileSync(profilePatch, "utf8") : "";
-  ws.writeText(file, entry(ws.root, defaultPlugin(), false, schedulePackages(profile, outside)), {
+  ws.writeText(file, entry(ws.root, defaultPlugin(), false), {
     internal: true,
   });
   const patch = ws.resolve(file, { internal: true }).replace(/'/g, "'\\''");
