@@ -1,8 +1,8 @@
 import { isUtf8 } from "node:buffer";
 import {
+  type Dirent,
   closeSync,
   copyFileSync,
-  type Dirent,
   existsSync,
   mkdirSync,
   openSync,

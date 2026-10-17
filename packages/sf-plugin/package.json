@@ -1,0 +1,49 @@
+{
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-typert-registry": "0.2.0-rc.2",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "0.28.2",
+    "lightningcss": "1.33.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "name": "kaitu-sf-consistency",
+  "description": "开图科幻校对：世界规则、版本与受限确定性检查",
+  "scripts": {
+    "build": "node ../../scripts/build-novel-plugins.mjs sf-plugin",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "0.2.0-rc.2",
+    "@kaitu/core": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.4"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "lib/types", "lib/typert.host.js", "lib/typert.remote-client.js", "README.md", "LICENSE"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Stahl-G/rensheng-kaitu.git",
+    "directory": "packages/sf-plugin"
+  }
+}
