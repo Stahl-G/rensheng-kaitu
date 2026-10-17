@@ -98,9 +98,11 @@ const plan = [
       ]
     : []),
 ];
-console.log(values["payload-only"]
-  ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.0-rc.2，不生成 App`
-  : plan.join("\n"));
+console.log(
+  values["payload-only"]
+    ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.0-rc.2，不生成 App`
+    : plan.join("\n"),
+);
 if (values["dry-run"]) {
   console.log("DRY-RUN：仅列步骤，未读取应用内容、复制、写入、签名或提交公证。");
   process.exit(0);
@@ -418,7 +420,10 @@ function createDmg(temporary) {
 async function writePayload(payload) {
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
-  writeFileSync(join(payload, "payload.json"), JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }));
+  writeFileSync(
+    join(payload, "payload.json"),
+    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }),
+  );
   await build({
     entryPoints: [join(directory, "plugin.mjs")],
     outfile: join(payload, "dist/index.js"),

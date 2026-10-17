@@ -41,6 +41,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
       if (key && activeKey.current === key) void support("authCancel", { key }).catch(() => {});
     };
   }, [key]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: poll restarts only when the login starts or the provider changes.
   useEffect(() => {
     if (!running || !key) return;
     let active = true;
@@ -94,6 +95,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
           </button>
         ))}
       {state.notices?.map((notice, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: notices are append-only and have no id.
         <p key={index}>
           {notice.message}{" "}
           {notice.url && /^https?:\/\//.test(notice.url) && (
@@ -106,6 +108,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
       ))}
       {state.prompt && (
         <div>
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: the control is the select or input below. */}
           <label>
             {state.prompt.message}
             {state.prompt.kind === "select" ? (
@@ -148,7 +151,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
           取消登录
         </button>
       )}
-      {state.status === "authorized" && <p role="status">账号已授权</p>}
+      {state.status === "authorized" && <output>账号已授权</output>}
       {(error || state.error) && <p role="alert">{error || state.error}</p>}
     </section>
   );

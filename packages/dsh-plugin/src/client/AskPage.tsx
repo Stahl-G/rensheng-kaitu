@@ -1,11 +1,11 @@
-import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
+import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import css from "./AskPage.module.css";
-import v2 from "./Prototype.module.css";
-import filesCss from "./DshFiles.module.css";
-import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
-import { FilePicker } from "./DshFiles.js";
 import { DshAuthorization } from "./DshAuthorization.js";
+import { FilePicker } from "./DshFiles.js";
+import filesCss from "./DshFiles.module.css";
+import v2 from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 
 type AskMode = "scoped" | "full";
@@ -211,9 +211,10 @@ export function AskPage({
   const upload = useRef<HTMLInputElement>(null);
   const selectedProvider = settings?.providers.find((item) => item.id === provider);
   const custom = provider === "kaitu-custom";
+  const authMethods = selectedProvider?.authMethods ?? [];
   const nativeLoginOnly =
-    Boolean(selectedProvider?.authMethods?.length) &&
-    (selectedProvider!.authMethods!.every((method) => method.id === "oauth") ||
+    authMethods.length > 0 &&
+    (authMethods.every((method) => method.id === "oauth") ||
       !settings?.protocols.some((protocol) => protocol.id === selectedProvider?.api));
   const [automation, setAutomation] = useState({ morning: true, organizer: true, news: false });
   const [asked, setAsked] = useState(false);
@@ -230,7 +231,9 @@ export function AskPage({
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
   const referenceThreads = threads.filter(
-    (thread) => thread.id !== selected && thread.title !== "新对话" &&
+    (thread) =>
+      thread.id !== selected &&
+      thread.title !== "新对话" &&
       (!thread.workspace || thread.workspace === workspace),
   );
   const closeReferences = () => {
@@ -625,7 +628,10 @@ export function AskPage({
                   {Array.isArray(data.content) &&
                     data.content
                       .filter((block) => block.type === "file")
-                      .map((block, i) => <span key={i}> · {block.attachment?.name ?? "已附文件"}</span>)}
+                      .map((block, i) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: attachments of one sent message never reorder.
+                        <span key={i}> · {block.attachment?.name ?? "已附文件"}</span>
+                      ))}
                   {Array.isArray(data.content) && data.content.some((block) => block.type === "image") && (
                     <span> · 已附图片</span>
                   )}
@@ -822,17 +828,29 @@ export function AskPage({
               </button>
             </div>
           ))}
-          {readingFiles && <p role="status">正在读取附件…</p>}
+          {readingFiles && <output>正在读取附件…</output>}
           {(references || atQuery !== undefined) && (
             <div className={css.referencePanel}>
               {references && (
                 <div className={css.referenceTabs}>
-                  <button type="button" aria-pressed={referenceKind === "files"}
-                    onClick={() => { setReferenceKind("files"); setAtQuery(undefined); }}>
+                  <button
+                    type="button"
+                    aria-pressed={referenceKind === "files"}
+                    onClick={() => {
+                      setReferenceKind("files");
+                      setAtQuery(undefined);
+                    }}
+                  >
                     文件和文件夹
                   </button>
-                  <button type="button" aria-pressed={referenceKind === "sessions"}
-                    onClick={() => { setReferenceKind("sessions"); setAtQuery(undefined); }}>
+                  <button
+                    type="button"
+                    aria-pressed={referenceKind === "sessions"}
+                    onClick={() => {
+                      setReferenceKind("sessions");
+                      setAtQuery(undefined);
+                    }}
+                  >
                     其他对话
                   </button>
                 </div>
@@ -841,26 +859,37 @@ export function AskPage({
                 <section className={filesCss.picker} aria-label="引用对话">
                   <header className={filesCss.header}>
                     <span>其他对话</span>
-                    <button type="button" onClick={closeReferences} aria-label="关闭对话选择">×</button>
+                    <button type="button" onClick={closeReferences} aria-label="关闭对话选择">
+                      ×
+                    </button>
                   </header>
                   {!referenceThreads.length && <p className={filesCss.notice}>还没有其他可引用的对话</p>}
                   <div className={filesCss.list}>
                     {referenceThreads.map((thread) => (
-                      <button type="button" className={filesCss.row} key={thread.id}
+                      <button
+                        type="button"
+                        className={filesCss.row}
+                        key={thread.id}
                         onClick={async () => {
                           try {
                             const mention = await call<string>("askSupport", "sessionMention", {
                               sessionId: thread.id,
                               label: thread.title,
                             });
-                            setSessionReferences((current) => current.some((item) => item.id === thread.id)
-                              ? current : [...current, { id: thread.id, title: thread.title, mention }]);
+                            setSessionReferences((current) =>
+                              current.some((item) => item.id === thread.id)
+                                ? current
+                                : [...current, { id: thread.id, title: thread.title, mention }],
+                            );
                             closeReferences();
                           } catch (err) {
                             setError(err instanceof Error ? err.message : String(err));
                           }
-                        }}>
-                        <span className={filesCss.path} title={thread.title}>{thread.title}</span>
+                        }}
+                      >
+                        <span className={filesCss.path} title={thread.title}>
+                          {thread.title}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -1181,7 +1210,7 @@ export function AskPage({
                 <button type="button" onClick={() => void loadModels()} disabled={loadingModels}>
                   {loadingModels ? "正在获取模型…" : "从服务获取模型列表"}
                 </button>
-                {modelNotice && <p role="status">{modelNotice}</p>}
+                {modelNotice && <output>{modelNotice}</output>}
                 {selectedProvider?.keyUrl ? (
                   <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
                     去 {selectedProvider.name} 官方申请 API Key ↗

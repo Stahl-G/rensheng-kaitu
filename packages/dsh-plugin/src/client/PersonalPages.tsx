@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
+import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
-import { FeatureUpdates, type FeatureUpdateRequest } from "./FeatureUpdates.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import { PrivacyPage } from "./Privacy.js";
@@ -484,7 +484,17 @@ export function PersonalPages(
                     value={props.followSystem ? "system" : props.locale}
                     disabled={busy}
                     onChange={(event) =>
-                      void run(() => props.onLocale(event.target.value === "system" ? null : event.target.value === "en" ? "en" : "zh-CN"), "")
+                      void run(
+                        () =>
+                          props.onLocale(
+                            event.target.value === "system"
+                              ? null
+                              : event.target.value === "en"
+                                ? "en"
+                                : "zh-CN",
+                          ),
+                        "",
+                      )
                     }
                   >
                     <option value="system">{t("跟随系统", "System default")}</option>

@@ -1,9 +1,9 @@
+import { resolve } from "node:path";
 import {
   DEFAULT_FILE_SEARCH_EXCLUDED_DIRECTORIES,
   WorkspaceFileSearch,
 } from "@deepseek-ai/dsh-file-reference-local/search";
 import { openNativeAssociatedPath, revealNativePath } from "@deepseek-ai/dsh-native-command";
-import { resolve } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { listProjects } from "./projects.js";
 import type { Workspace } from "./workspace.js";
@@ -35,7 +35,7 @@ export function dshFiles(ws: Workspace): DshFiles {
           excludedDirectories: [...DEFAULT_FILE_SEARCH_EXCLUDED_DIRECTORIES, ".kaitu"],
         });
       }
-      const rows = await search!.list(query, AbortSignal.timeout(10000));
+      const rows = await (search as WorkspaceFileSearch).list(query, AbortSignal.timeout(10000));
       return rows.filter((row) => {
         try {
           assertAgentPath(root, row.path);

@@ -13,8 +13,8 @@ import {
 import { createAiProcess } from "./ai-process.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { desktopPaths } from "./environment.mjs";
-import { createSdkRuntime } from "./sdk-runtime.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
+import { createSdkRuntime } from "./sdk-runtime.mjs";
 
 export function createLocalAsk({ state, resources, executable, getWorkspace, conversationState = state }) {
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
@@ -84,11 +84,14 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     readFileSync(join(hostResources, "app.asar/package.json"), "utf8"),
   ).version;
   const updater = createPayloadUpdater({
-    state, resources: hostResources, payload: resources,
-    restart: () => setTimeout(() => {
-      app.relaunch({ execPath: join(dirname(app.getPath("exe")), "Kaitu") });
-      app.quit();
-    }, 200),
+    state,
+    resources: hostResources,
+    payload: resources,
+    restart: () =>
+      setTimeout(() => {
+        app.relaunch({ execPath: join(dirname(app.getPath("exe")), "Kaitu") });
+        app.quit();
+      }, 200),
   });
   const featureVersion = (await updater.request()).version;
   app.setAboutPanelOptions({

@@ -1,7 +1,7 @@
 import type { OnboardingImportPreview, OnboardingSetupInput, OnboardingSetupPreview } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
-import styles from "./OnboardingSources.module.css";
 import { FolderButton } from "./DshFiles.js";
+import styles from "./OnboardingSources.module.css";
 import css from "./Prototype.module.css";
 import type { OnboardingServices } from "./onboarding-services.js";
 

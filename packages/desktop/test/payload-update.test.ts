@@ -1,20 +1,20 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { createServer } from "node:http";
 import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  rmSync,
   existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
   realpathSync,
+  rmSync,
+  writeFileSync,
 } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { zipSync } from "fflate";
 import { expect, it } from "vitest";
+import { rollback, selectPayload, selection, updateRoot } from "../payload-loader.mjs";
 import { createPayloadUpdater, installPayload, verifyRelease } from "../payload-update.mjs";
-import { selectPayload, rollback, selection, updateRoot } from "../payload-loader.mjs";
 
 it("真实下载已签名功能包，切换后读取新功能，回退保留内核和原版本", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-feature-update-"));
@@ -38,9 +38,9 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   );
   const bytes = Buffer.from(zipSync(entries));
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-  let envelope;
+  const served: { envelope?: { manifest: string; signature: string } } = {};
   const server = createServer((req, res) =>
-    res.end(req.url === "/latest.json" ? JSON.stringify(envelope) : bytes),
+    res.end(req.url === "/latest.json" ? JSON.stringify(served.envelope) : bytes),
   );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
@@ -54,7 +54,8 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     const manifest = JSON.stringify(value);
     return { manifest, signature: sign(null, Buffer.from(manifest), privateKey).toString("base64") };
   };
-  envelope = signed(release);
+  const envelope = signed(release);
+  served.envelope = envelope;
   writeFileSync(
     join(resources, "kaitu-update.json"),
     JSON.stringify({

@@ -27,9 +27,9 @@ for (const [name, entry] of Object.entries({
         'import { createRequire as kaituRequire } from "node:module";',
         'import { dirname as kaituDirname } from "node:path";',
         'import { fileURLToPath as kaituFileURLToPath } from "node:url";',
-        'const require = kaituRequire(import.meta.url);',
-        'const __filename = kaituFileURLToPath(import.meta.url);',
-        'const __dirname = kaituDirname(__filename);',
+        "const require = kaituRequire(import.meta.url);",
+        "const __filename = kaituFileURLToPath(import.meta.url);",
+        "const __dirname = kaituDirname(__filename);",
       ].join("\n"),
     },
   });

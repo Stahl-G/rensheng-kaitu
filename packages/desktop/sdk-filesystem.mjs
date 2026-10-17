@@ -3,7 +3,13 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
 
-export function confinedFileSystem(LocalFileSystem, FsError, root, attachments = new Set(), attachmentRoot) {
+export function confinedFileSystem(
+  LocalFileSystem,
+  FsError,
+  root,
+  attachments = new Set(),
+  attachmentRoot = undefined,
+) {
   const contains = (path) => {
     if (attachments.has(path)) return true;
     try {

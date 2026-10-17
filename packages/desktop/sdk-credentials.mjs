@@ -1,7 +1,7 @@
 import { createRequire, findPackageJSON } from "node:module";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { fetchModels, validateConnection, providers, extendProviders } from "./sdk-providers.mjs";
+import { extendProviders, fetchModels, providers, validateConnection } from "./sdk-providers.mjs";
 import { searchProviders } from "./sdk-search-settings.mjs";
 
 const resolveModule = createRequire(join(process.env.KAITU_DSH_MODULES, "package.json")).resolve;

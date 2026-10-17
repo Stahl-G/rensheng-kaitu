@@ -39,8 +39,5 @@
     "yaml": "^2.6.0",
     "zod": "^4.6.7"
   },
-  "files": [
-    "dist",
-    "data"
-  ]
+  "files": ["dist", "data"]
 }

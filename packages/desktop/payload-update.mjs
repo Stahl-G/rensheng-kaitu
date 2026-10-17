@@ -1,10 +1,10 @@
 import { createHash, verify } from "node:crypto";
-import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
+import { mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { unzipSync } from "fflate";
 import semver from "semver";
-import { activate, DSH_VERSION, HOST_API, rollback, selection, updateRoot } from "./payload-loader.mjs";
+import { DSH_VERSION, HOST_API, activate, rollback, selection, updateRoot } from "./payload-loader.mjs";
 
 const MAX_PACKAGE = 64 * 1024 * 1024;
 const requiredFiles = [

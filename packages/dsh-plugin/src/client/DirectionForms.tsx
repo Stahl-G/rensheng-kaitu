@@ -1,5 +1,4 @@
 import { type ReactNode, useId, useState } from "react";
-import { FilePicker } from "./DshFiles.js";
 import type {
   Direction,
   DirectionNote,
@@ -9,6 +8,7 @@ import type {
   ExplorationReference,
 } from "../types.js";
 import css from "./DirectionsPage.module.css";
+import { FilePicker } from "./DshFiles.js";
 import base from "./OverviewPage.module.css";
 
 function FormShell({

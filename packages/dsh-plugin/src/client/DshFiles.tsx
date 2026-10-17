@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import css from "./Prototype.module.css";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import filesCss from "./DshFiles.module.css";
+import css from "./Prototype.module.css";
 
 export interface FileCandidate {
   path: string;
@@ -77,6 +77,8 @@ export function FilePicker({
   const [items, setItems] = useState<FileCandidate[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const search = useRef<HTMLInputElement>(null);
+  useEffect(() => search.current?.focus(), []);
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -105,21 +107,27 @@ export function FilePicker({
     <section className={filesCss.picker} aria-label="选择开图资料">
       <header className={filesCss.header}>
         <span>开图资料</span>
-        <button type="button" onClick={close} aria-label="关闭资料选择">×</button>
+        <button type="button" onClick={close} aria-label="关闭资料选择">
+          ×
+        </button>
       </header>
       {givenQuery === undefined && (
         <label className={filesCss.search}>
           <span className={filesCss.srOnly}>查找资料</span>
           <input
-            autoFocus
+            ref={search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="文件名或文件夹"
           />
         </label>
       )}
-      {loading && <p className={filesCss.notice} role="status">正在查找…</p>}
-      {error && <p className={filesCss.notice} role="alert">{error}</p>}
+      {loading && <output className={filesCss.notice}>正在查找…</output>}
+      {error && (
+        <p className={filesCss.notice} role="alert">
+          {error}
+        </p>
+      )}
       {!loading && !error && !items.length && <p className={filesCss.notice}>没有找到资料</p>}
       <div className={filesCss.list}>
         {items.map((item) => (
@@ -134,7 +142,9 @@ export function FilePicker({
             }
           >
             <span className={filesCss.kind}>{item.kind === "directory" ? "文件夹" : "文件"}</span>
-            <span className={filesCss.path} title={item.path}>{item.path}</span>
+            <span className={filesCss.path} title={item.path}>
+              {item.path}
+            </span>
           </button>
         ))}
       </div>

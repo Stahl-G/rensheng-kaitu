@@ -1,9 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { BrowserWindow, Menu, app, dialog, shell } from "electron";
-import { desktopPaths } from "./kaitu-environment.mjs";
-import { selectPayload, rollback } from "../kaitu-loader.mjs";
 import { pathToFileURL } from "node:url";
+import { BrowserWindow, Menu, app, dialog, shell } from "electron";
+import { rollback, selectPayload } from "../kaitu-loader.mjs";
+import { desktopPaths } from "./kaitu-environment.mjs";
 
 // 在原主进程导入和单实例锁之前设置，包括 Electron 的 relaunch 路径。
 const { state } = desktopPaths();

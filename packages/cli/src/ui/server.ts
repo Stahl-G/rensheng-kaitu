@@ -21,10 +21,10 @@ import {
   completeNext,
   completeTask,
   decideProposal,
-  dshFiles,
   deferSnapshots,
   disableSync,
   discardUpload,
+  dshFiles,
   enableSync,
   history,
   holdOverview,
@@ -102,9 +102,9 @@ function field(data: Record<string, unknown>, key: string): string {
   return data[key];
 }
 
-export async function startUi(ws: Workspace, options: UiOptions = {}) {
+export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const files = dshFiles(ws);
-  options = { ...options, ask: options.ask ?? (await browserAsk(ws)) };
+  const options = { ...input, ask: input.ask ?? (await browserAsk(ws)) };
   const packagedWeb = resolve(assetsRoot(), "web");
   const WEB_ROOT =
     options.webRoot ??
@@ -371,7 +371,11 @@ export async function startUi(ws: Workspace, options: UiOptions = {}) {
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
         if (method === "desktopUpdate")
-          return json(res, 200, options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null);
+          return json(
+            res,
+            200,
+            options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null,
+          );
         if (method === "findWorkspaceFiles") return json(res, 200, await files.find(String(args[0] ?? "")));
         if (method === "openWorkspacePath") {
           if (typeof args[0] !== "string" || !["open", "reveal"].includes(String(args[1] ?? "open")))

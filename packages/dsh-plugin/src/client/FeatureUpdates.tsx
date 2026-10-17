@@ -69,9 +69,9 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
         </p>
       )}
       {state.phase === "current" && <p>{t("已是最新功能版本", "Features are up to date")}</p>}
-      {state.phase === "checking" && <p role="status">{t("正在检查更新…", "Checking for updates…")}</p>}
+      {state.phase === "checking" && <output>{t("正在检查更新…", "Checking for updates…")}</output>}
       {state.phase === "downloading" && (
-        <p role="status">{t("正在下载并验证更新…", "Downloading and verifying…")}</p>
+        <output>{t("正在下载并验证更新…", "Downloading and verifying…")}</output>
       )}
       {state.phase === "available" && (
         <p>
@@ -83,7 +83,7 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
         {state.phase === "ready" ? (
           <>
-            <p role="status">{t("已准备好，重启后生效。", "Ready. Restart to apply.")}</p>
+            <output>{t("已准备好，重启后生效。", "Ready. Restart to apply.")}</output>
             <button type="button" className={css.btn} disabled={busy} onClick={() => void run("restart")}>
               {t("重启应用", "Restart app")}
             </button>

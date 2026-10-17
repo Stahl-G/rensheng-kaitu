@@ -1,8 +1,8 @@
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createAskService } from "../dist/ui/ask.js";
 import { createSdkRuntime } from "../../desktop/sdk-runtime.mjs";
+import { createAskService } from "../dist/ui/ask.js";
 
 export function createWebAsk(ws, state) {
   const directory = dirname(fileURLToPath(import.meta.url));

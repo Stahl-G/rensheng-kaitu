@@ -78,7 +78,13 @@ export function OverviewPage(props: OverviewPageProps) {
   }, [props.loadPreferences]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
-      <Overview {...props} locale={locale} setLocale={setLocale} followSystem={followSystem} setFollowSystem={setFollowSystem} />
+      <Overview
+        {...props}
+        locale={locale}
+        setLocale={setLocale}
+        followSystem={followSystem}
+        setFollowSystem={setFollowSystem}
+      />
     </LocaleContext.Provider>
   );
 }
@@ -89,8 +95,12 @@ function Overview({
   followSystem,
   setFollowSystem,
   ...props
-}: OverviewPageProps & { locale: Locale | null; setLocale: (locale: Locale) => void;
-  followSystem: boolean; setFollowSystem: (value: boolean) => void }) {
+}: OverviewPageProps & {
+  locale: Locale | null;
+  setLocale: (locale: Locale) => void;
+  followSystem: boolean;
+  setFollowSystem: (value: boolean) => void;
+}) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();

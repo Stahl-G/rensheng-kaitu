@@ -1,6 +1,6 @@
-import { createRequire } from "node:module";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -9,9 +9,9 @@ import { assertDesktopIsolation } from "./environment.mjs";
 import {
   connectionInfo,
   credentialRef,
+  extendProviders,
   providerPatch,
   selection,
-  extendProviders,
 } from "./sdk-providers.mjs";
 import {
   nativeSearchInfo,

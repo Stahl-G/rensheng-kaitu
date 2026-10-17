@@ -24,13 +24,7 @@ import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "
 import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
 import { archiveInboxNote, captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
-import {
-  type Locale,
-  type Preferences,
-  normalizeLocale,
-  pick,
-  readPreferences,
-} from "./locale.js";
+import { type Locale, type Preferences, normalizeLocale, pick, readPreferences } from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import { ONBOARDING_EN } from "./onboarding-en.js";
