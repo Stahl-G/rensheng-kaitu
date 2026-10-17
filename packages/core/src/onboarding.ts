@@ -1283,7 +1283,13 @@ function pendingOnboardingMatter(ws: Workspace): OnboardingMatter | null {
   const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
   const item = [...(doc.data.next ?? [])]
     .reverse()
-    .find((item) => item.id.startsWith("onboarding-matter-") && item.status === "proposed");
+    // Agent 手写的下一步可能没有 id，跳过它们，不让整个今天页的引导读不出。
+    .find(
+      (item) =>
+        typeof item?.id === "string" &&
+        item.id.startsWith("onboarding-matter-") &&
+        item.status === "proposed",
+    );
   if (!item?.ref) return null;
   try {
     return readOnboardingMatter(ws, item.ref);

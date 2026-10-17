@@ -77,6 +77,9 @@ describe("工作台写入", () => {
     refreshOverview(ws);
     expect(ws.readText("OVERVIEW.md")).toContain("grok-bot");
     expect(validateWorkspace(ws)).toEqual([]);
+    // 文件名里的时间不合法：校验报出来，不让 kaitu doctor 中断
+    ws.writeText("handoffs/20261340T2500-grok-bot.md", "## 做了什么\n- 采集资讯\n");
+    expect(validateWorkspace(ws).map((issue) => issue.file)).toContain("handoffs/20261340T2500-grok-bot.md");
   });
 
   it("完成别的下一步、整份写回时，带时间的截止不丢时间", async () => {

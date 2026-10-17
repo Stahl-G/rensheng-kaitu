@@ -264,13 +264,22 @@ export function normalizeHandoff(data: Doc, file: string, timeZone: string): Doc
   const stamp = /^(\d{4})(\d{2})(\d{2})T?(\d{2})(\d{2})(?:\d{2})?[-_]?(.*)$/.exec(name);
   const agent = text(out.agent) || text(out.author) || text(out.by) || stamp?.[6] || "";
   if (agent) out.agent = agent;
-  const at = instant(out.at, timeZone) ?? instant(out.time, timeZone) ?? instant(out.date, timeZone);
+  // 写了 at 就只用它：读得出换成带偏移的时间，读不出原样留给校验；没写才看 time、date 和文件名。
+  if (!missing(out.at)) {
+    out.at = instant(out.at, timeZone) ?? out.at;
+    return out;
+  }
+  const at = instant(out.time, timeZone) ?? instant(out.date, timeZone);
   if (at) out.at = at;
   else if (stamp)
-    out.at = isoInZone(
-      localTimeToInstant(`${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:00`, timeZone),
-      timeZone,
-    );
+    try {
+      out.at = isoInZone(
+        localTimeToInstant(`${stamp[1]}-${stamp[2]}-${stamp[3]}T${stamp[4]}:${stamp[5]}:00`, timeZone),
+        timeZone,
+      );
+    } catch {
+      // 文件名里的时间不合法（20261340T2500）时不补，留给校验报出缺少的 at。
+    }
   return out;
 }
 

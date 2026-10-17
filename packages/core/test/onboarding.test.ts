@@ -497,3 +497,16 @@ it("没有方向模块的旧工作区也能搬入目标，「在考虑」记为�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("Agent 在 me/STATUS.md 手写没有 id 的下一步时，引导状态照常读取", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    ws.writeText("me/STATUS.md", "---\nnext:\n  - 和家人吃饭\n---\n");
+    expect(() => onboardingStatus(ws, options)).not.toThrow();
+    expect(onboardingStatus(ws, options).draft).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

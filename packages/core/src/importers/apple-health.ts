@@ -509,12 +509,16 @@ function parallelSamples(raw: Record<string, unknown>) {
   }
   if (type === "sleep_analysis" && !columns.ends) throw new Error("sleep_analysis 缺少 ends");
   if ((columns.values?.length ?? 0) > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
+  // 每行的问题只让这一行算读不出（交给样本循环跳过并计数），不拖垮整份文件。
   return (columns.values ?? []).map((value, index) => {
     const start = columns.starts?.[index] ?? "";
-    if (!value || !start) throw new Error(`第 ${index + 1} 行的 values 或 starts 为空`);
+    if (!value || !start) return { invalid: "的 values 或 starts 为空" };
     const end = columns.ends?.[index] ?? start;
-    parseTs(end);
-    if (+parseTs(end) < +parseTs(start)) throw new Error(`第 ${index + 1} 行的 ends 早于 starts`);
+    try {
+      if (+parseTs(end) < +parseTs(start)) return { invalid: "的 ends 早于 starts" };
+    } catch {
+      return { invalid: "的时间读不出" };
+    }
     const daily = ["step_count", "active_energy", "basal_energy"].includes(type);
     return {
       type,
@@ -664,6 +668,11 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     // 单条样本有问题只跳过这一条，其余照常导入；全部读不出时才整份转待整理。
     const skipped: string[] = [];
     for (const [index, input] of samples.entries()) {
+      const invalid = (input as { invalid?: unknown } | null)?.invalid;
+      if (parallel && typeof invalid === "string") {
+        skipped.push(`第 ${index + 1} 行${invalid}`);
+        continue;
+      }
       try {
         collector.add(shortcutSample(input, device, zone));
       } catch (error) {

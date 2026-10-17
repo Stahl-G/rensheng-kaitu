@@ -284,3 +284,19 @@ it("快捷指令样本写法不一时照常导入，不支持的类型和坏样�
   expect((await importHealthShortcut(ws, mixed)).ignored).toMatchObject({ invalid: 2 });
   expect(readRecords(ws, "metric").some((row) => row.value === 70.2)).toBe(true);
 });
+
+it("并列列表里一行读不出只跳过那一行，其余照常导入", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "steps.health.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      type: "step_count",
+      values: "8000\n\n9000",
+      starts: "2026-10-14T08:00:00+08:00\n2026-10-15T08:00:00+08:00\n2026-10-16T08:00:00+08:00",
+    }),
+  );
+  const result = await importHealthShortcut(ws, file);
+  expect(result.ignored).toMatchObject({ invalid: 1 });
+  expect(readRecords(ws, "activity").map((row) => row.steps)).toEqual([8000, 9000]);
+});
