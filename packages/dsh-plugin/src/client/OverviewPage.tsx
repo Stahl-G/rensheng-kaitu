@@ -7,7 +7,7 @@ import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
-import type { HealthPageProps } from "./HealthPage.js";
+import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
@@ -94,7 +94,8 @@ function Overview({
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
-  const [explore, setExplore] = useState("directions");
+  // 开图默认先看健康，然后是足迹、资讯、方向（2026-10-17 用户决定）。
+  const [explore, setExplore] = useState("health");
   const [data, setData] = useState<OverviewData | null>(null);
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
@@ -209,8 +210,8 @@ function Overview({
   };
   const openSection = (id: string) => {
     if (id === "me") setView("profile");
-    else if (id === "explore" || id === "feed") {
-      setExplore(id === "feed" ? "news" : "directions");
+    else if (["explore", "health", "feed", "directions"].includes(id)) {
+      setExplore(id === "feed" ? "news" : id === "directions" ? "directions" : "health");
       setView("explore");
     } else openRecord(["learning", "decisions"].includes(id) ? "notes" : id);
   };
@@ -340,7 +341,7 @@ function Overview({
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
       refresh={refresh}
-      open={(section) => (section === "projects" ? openRecord("projects") : openSection("explore"))}
+      open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
   const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
@@ -367,6 +368,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
+                if (id === "explore") setExplore("health");
                 setRecord("");
                 setMenu(false);
               }}
@@ -712,7 +714,7 @@ function Overview({
                 <section className={css.ask}>
                   <b>{t("要你确认", "Needs your confirmation")}</b>
                   {data.sync.directionSuggestions > 0 && (
-                    <button type="button" className={css.link} onClick={() => openSection("explore")}>
+                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
                       {t(
                         `${data.sync.directionSuggestions} 个方向建议`,
                         `${data.sync.directionSuggestions} direction suggestions`,
@@ -833,16 +835,17 @@ function Overview({
                 <h1>{t("开图", "Explore")}</h1>
                 <span className={css.sub}>
                   {t(
-                    "想试的方向、走过的地方、值得看的新东西",
-                    "Directions to try, places you've been, new things worth a look",
+                    "身体和饮食、走过的地方、值得看的新东西、想试的方向",
+                    "Your health, places you've been, new things worth a look, directions to try",
                   )}
                 </span>
               </div>
               <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
                 {[
-                  ["directions", t("方向", "Directions")],
+                  ["health", t("健康", "Health")],
                   ["footprints", t("足迹", "Footprints")],
                   ["news", t("资讯", "News")],
+                  ["directions", t("方向", "Directions")],
                 ].map(([id, title]) => (
                   <button
                     type="button"
@@ -856,12 +859,14 @@ function Overview({
               </div>
             </div>
             <div className={css.child}>
-              {explore === "directions" ? (
-                <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+              {explore === "health" ? (
+                <HealthPage {...child} />
               ) : explore === "footprints" ? (
                 <MapPage {...child} />
-              ) : (
+              ) : explore === "news" ? (
                 <NewsPage {...child} />
+              ) : (
+                <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
               )}
             </div>
           </>

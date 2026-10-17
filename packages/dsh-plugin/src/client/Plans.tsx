@@ -28,7 +28,7 @@ export function PlansCard({
   addGoalNext: (goalId: string, title: string) => Promise<unknown>;
   changeNext: (id: string, rev: number, action: string, value: string) => Promise<unknown>;
   refresh: () => Promise<void>;
-  open: (section: "projects" | "explore") => void;
+  open: (section: "projects" | "directions") => void;
 }) {
   const t = useT();
   // 打开表单时记下当时那一步；后台刷新换了下一步，也只改用户看到的那一步。
@@ -205,7 +205,7 @@ export function PlansCard({
           )}
           {plans.projects > 0 && plans.directions > 0 && " · "}
           {plans.directions > 0 && (
-            <button type="button" className={css.link} onClick={() => open("explore")}>
+            <button type="button" className={css.link} onClick={() => open("directions")}>
               {t(
                 `${plans.directions} 个在探索的方向`,
                 `${plans.directions} direction${plans.directions > 1 ? "s" : ""} to explore`,
