@@ -22,9 +22,9 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=467faf27">
-<script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=99bb48f0" defer></script>
+<link rel="stylesheet" href="/style.css?v=d40d0445">
+<script>document.documentElement.classList.add("js");try{var p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||"",u=navigator.userAgent;if(/Win|Linux|CrOS/i.test(p+" "+u)&&!/Android|iPhone|iPad/i.test(u))document.documentElement.dataset.os="dsh"}catch(e){}</script>
+<script src="/app.js?v=a0061798" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -42,9 +42,26 @@
     <p class="lead">On a Mac with Apple silicon, download Kaitu.app. On Windows and Linux, add Kaitu to DeepSeek Harness; see <a href="#windows">below</a>.</p>
   </header>
 
+  <section class="dl-card os-dsh" aria-labelledby="win-title">
+    <div class="dl-top">
+      <h2 id="win-title">Windows and Linux</h2>
+      <span class="chip chip-pre">Preview</span>
+    </div>
+    <p style="margin-top:12px">Looks like you’re on Windows or Linux. Here Kaitu runs inside DeepSeek Harness (DSH); you don’t need Kaitu.dmg.</p>
+    <ol class="win-steps">
+      <li>Install the DeepSeek Harness desktop app (0.2.1-rc.2 or later) and set up a model in Settings → Models.</li>
+      <li>Open Plugins in the sidebar and install <code>kaitu-dsh</code>.</li>
+      <li>Restart DSH, click Kaitu in the sidebar and choose where your notes live.</li>
+    </ol>
+    <div class="dl-actions">
+      <a class="btn btn-big btn-primary" href="https://github.com/deepseek-ai/deepseek-harness" rel="noopener">Get DeepSeek Harness ↗</a>
+      <a href="#windows">Full steps and other ways</a>
+    </div>
+  </section>
+
   <section class="dl-card" aria-labelledby="dl-title">
     <div class="dl-top">
-      <h2 id="dl-title">Kaitu.app <span data-rel="version">0.1.0-rc.3</span></h2>
+      <h2 id="dl-title"><span class="os-dsh">macOS: </span>Kaitu.app <span data-rel="version">0.1.0-rc.3</span></h2>
       <span class="chip chip-pre" data-rel="pre">Pre-release</span>
     </div>
     <dl class="dl-facts">

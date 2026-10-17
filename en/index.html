@@ -22,13 +22,13 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=467faf27">
+<link rel="stylesheet" href="/style.css?v=d40d0445">
 <link rel="stylesheet" href="/mock/mock.css?v=9954b9ff">
 <script src="/mock/persona.js?v=ddadd7d1" defer></script>
 <script src="/mock/mock.js?v=c411fc6e" defer></script>
 <script src="/mock/lifemap.js?v=8313b27b" defer></script>
-<script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=99bb48f0" defer></script>
+<script>document.documentElement.classList.add("js");try{var p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||"",u=navigator.userAgent;if(/Win|Linux|CrOS/i.test(p+" "+u)&&!/Android|iPhone|iPad/i.test(u))document.documentElement.dataset.os="dsh"}catch(e){}</script>
+<script src="/app.js?v=a0061798" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -47,10 +47,12 @@
       <h1 id="hero-title">Swap the AI. Keep your life.</h1>
       <p class="lead">Turn the goals and plans scattered across your AI chats into one progress map you can see.<br>Move one step forward each week, and pick up where you left off with any AI.</p>
       <div class="cta">
-        <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
+        <a class="btn btn-big btn-primary os-mac" href="/en/download/">Download for macOS</a>
+        <a class="btn btn-big btn-primary os-dsh" href="/en/download/#windows">Set up on Windows</a>
         <a class="btn btn-big btn-quiet" href="/en/docs/">Read the docs</a>
       </div>
-      <p class="meta"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
+      <p class="meta os-mac"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a> · macOS on Apple silicon · Open source (MIT)</p>
+      <p class="meta os-dsh">Windows · Linux: as a DeepSeek Harness plugin · Open source (MIT) · <a href="/en/download/">Also on macOS</a></p>
     </div>
     <svg class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="Kaitu mark: a three-fold map unfolding">
       <defs>
@@ -201,12 +203,14 @@
   <div class="wrap">
     <div class="band-box" data-reveal>
       <div>
-        <h2 id="band-title">Download Kaitu.app</h2>
-        <p><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a><span data-rel="pre"> preview</span> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
+        <h2 id="band-title"><span class="os-mac">Download Kaitu.app</span><span class="os-dsh">Use Kaitu on Windows</span></h2>
+        <p><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.3"><span data-rel="version">0.1.0-rc.3</span></a><span data-rel="pre"> preview</span> · <span class="os-mac">macOS on Apple silicon</span><span class="os-dsh">Windows and Linux via the DeepSeek Harness plugin</span> · Open source (MIT)</p>
       </div>
       <div class="cta" style="margin-top:0">
-        <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
-        <a class="btn btn-big btn-quiet" href="/en/download/#other">CLI and web version</a>
+        <a class="btn btn-big btn-primary os-mac" href="/en/download/">Download for macOS</a>
+        <a class="btn btn-big btn-primary os-dsh" href="/en/download/#windows">Set up on Windows</a>
+        <a class="btn btn-big btn-quiet os-mac" href="/en/download/#other">CLI and web version</a>
+        <a class="btn btn-big btn-quiet os-dsh" href="/en/download/">macOS version</a>
       </div>
     </div>
   </div>

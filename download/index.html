@@ -23,9 +23,9 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
 <link rel="stylesheet" href="/tokens.css?v=906e6266">
-<link rel="stylesheet" href="/style.css?v=467faf27">
-<script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=99bb48f0" defer></script>
+<link rel="stylesheet" href="/style.css?v=d40d0445">
+<script>document.documentElement.classList.add("js");try{var p=(navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||"",u=navigator.userAgent;if(/Win|Linux|CrOS/i.test(p+" "+u)&&!/Android|iPhone|iPad/i.test(u))document.documentElement.dataset.os="dsh"}catch(e){}</script>
+<script src="/app.js?v=a0061798" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -43,9 +43,26 @@
     <p class="lead">Mac（Apple 芯片）下载 Kaitu.app；Windows 和 Linux 把开图装进 DeepSeek Harness，见<a href="#windows">下方说明</a>。</p>
   </header>
 
+  <section class="dl-card os-dsh" aria-labelledby="win-title">
+    <div class="dl-top">
+      <h2 id="win-title">Windows 和 Linux</h2>
+      <span class="chip chip-pre">试用支持</span>
+    </div>
+    <p style="margin-top:12px">看起来你在用 Windows 或 Linux。在这里，开图装进 DeepSeek Harness（DSH）使用，不用下载 Kaitu.dmg。</p>
+    <ol class="win-steps">
+      <li>装好 DeepSeek Harness 桌面版（0.2.1-rc.2 或更新），在「设置 → 模型」配好模型。</li>
+      <li>打开侧栏「插件」，安装 <code>kaitu-dsh</code>。</li>
+      <li>重开 DSH，侧栏点「开图」，先选资料放哪。</li>
+    </ol>
+    <div class="dl-actions">
+      <a class="btn btn-big btn-primary" href="https://github.com/deepseek-ai/deepseek-harness" rel="noopener">获取 DeepSeek Harness ↗</a>
+      <a href="#windows">完整步骤和其他装法</a>
+    </div>
+  </section>
+
   <section class="dl-card" aria-labelledby="dl-title">
     <div class="dl-top">
-      <h2 id="dl-title">Kaitu.app <span data-rel="version">0.1.0-rc.3</span></h2>
+      <h2 id="dl-title"><span class="os-dsh">macOS：</span>Kaitu.app <span data-rel="version">0.1.0-rc.3</span></h2>
       <span class="chip chip-pre" data-rel="pre">预览版</span>
     </div>
     <dl class="dl-facts">

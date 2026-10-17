@@ -291,6 +291,9 @@ main { display: block; }
 .dl-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 20px; margin-top: 18px; font-size: 14px; }
 .dl-facts dt { color: var(--muted); }
 .dl-facts dd code { overflow-wrap: anywhere; word-break: break-all; }
+/* platform: the head script sets data-os="dsh" on Windows/Linux; without JS everyone sees the Mac version */
+html:not([data-os="dsh"]) .os-dsh, html[data-os="dsh"] .os-mac { display: none !important; }
+.win-steps { margin: 12px 0 0; padding-inline-start: 1.4em; display: grid; gap: 4px; }
 .dl-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 22px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .grid2 > .card { padding: 20px; }
