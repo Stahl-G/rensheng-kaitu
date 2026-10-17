@@ -26,6 +26,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "dependencies": {
+    "@deepseek-ai/dsh-native-command": "0.2.1-rc.1",
     "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.1",
     "@kaitu/core": "workspace:*",
     "zod": "4.4.3"

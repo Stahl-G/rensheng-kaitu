@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { strToU8, zipSync } from "fflate";
 import { expect, it } from "vitest";
 import { history, restore } from "../src/history.js";
@@ -8,7 +9,7 @@ import { readRecords } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
-const fixture = new URL("../../../examples/apple-health/export.xml", import.meta.url);
+const fixture = fileURLToPath(new URL("../../../examples/apple-health/export.xml", import.meta.url));
 
 it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等且整次可恢复", async () => {
   const ws = await freshWorkspace();
@@ -62,7 +63,7 @@ it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等�
   expect(validateWorkspace(ws)).toEqual([]);
   const versions = await history(ws);
   expect(versions).toHaveLength(2);
-  expect((await importAppleHealth(ws, fixture.pathname)).version).toBeNull();
+  expect((await importAppleHealth(ws, fixture)).version).toBeNull();
   expect(await history(ws)).toEqual(versions);
   await restore(ws, initial);
   for (const type of ["metric", "activity", "sleep", "workout"]) expect(readRecords(ws, type)).toEqual([]);

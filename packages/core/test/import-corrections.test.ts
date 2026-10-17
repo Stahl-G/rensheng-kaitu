@@ -1,4 +1,5 @@
 import { rmSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { importIcs } from "../src/importers/ics.js";
 import { deleteRecord, readRecords, updateRecord } from "../src/records.js";
@@ -7,7 +8,7 @@ import { freshWorkspace } from "./helpers.js";
 it("重新同步日历保留人工改期和删除，不生成重复事件，也不新建版本", async () => {
   const ws = await freshWorkspace();
   try {
-    const fixture = new URL("../../../examples/calendar.ics", import.meta.url).pathname;
+    const fixture = fileURLToPath(new URL("../../../examples/calendar.ics", import.meta.url));
     const window = { from: "2026-10-01", to: "2026-10-31" };
     await importIcs(ws, fixture, window);
     const [rescheduled, removed] = readRecords(ws, "event");

@@ -293,6 +293,9 @@ importers:
 
   packages/novel-plugin:
     dependencies:
+      '@deepseek-ai/dsh-native-command':
+        specifier: 0.2.1-rc.1
+        version: 0.2.1-rc.1(@deepseek-ai/cordis@4.0.5)
       '@deepseek-ai/dsh-typert-protocol':
         specifier: 0.2.1-rc.1
         version: 0.2.1-rc.1(@deepseek-ai/cordis@4.0.5)

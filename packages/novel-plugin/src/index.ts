@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { type Context, Service } from "@deepseek-ai/cordis";
+import { openNativeAssociatedPath } from "@deepseek-ai/dsh-native-command";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry";
 import {
@@ -102,13 +102,7 @@ export class NovelService extends TypertRemoteService {
         break;
       case "open": {
         const source = this.scene(project, String(args.scene));
-        await new Promise<void>((resolve, reject) => {
-          const child = spawn("open", [source.path], { stdio: "ignore" });
-          child.once("error", reject);
-          child.once("exit", (code) =>
-            code === 0 ? resolve() : reject(new Error("无法打开编辑器，请按路径打开正文")),
-          );
-        });
+        await openNativeAssociatedPath(source.path, AbortSignal.timeout(10000));
         result = { path: source.path, heading: source.scene.title };
         break;
       }

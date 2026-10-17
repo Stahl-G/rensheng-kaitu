@@ -190,7 +190,8 @@ it("解析、核验、分页和条件缓存，同日只修订一条，按真实�
   const tracked = await git.listFiles({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
   expect(tracked).not.toContain(".kaitu/github-state.json");
   expect(tracked).not.toContain(".kaitu/secrets.json");
-  expect(fs.statSync(ws.resolve(".kaitu/secrets.json", { internal: true })).mode & 0o777).toBe(0o600);
+  if (process.platform !== "win32")
+    expect(fs.statSync(ws.resolve(".kaitu/secrets.json", { internal: true })).mode & 0o777).toBe(0o600);
   setGithubToken(ws, null);
   expect(ws.readJson(".kaitu/secrets.json")).toEqual({ mcp_token: mcp });
 });

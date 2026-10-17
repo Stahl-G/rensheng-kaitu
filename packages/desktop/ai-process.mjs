@@ -15,7 +15,7 @@ export function createAiProcess(executable, env) {
       if (!child) {
         child = spawn(executable, [], {
           env: { ...env, KAITU_AI_BACKGROUND: background ? "1" : "0" },
-          detached: true,
+          detached: process.platform !== "win32",
           stdio: ["ignore", "ignore", "ignore", "ipc"],
         });
         const launched = child;
@@ -52,7 +52,8 @@ export function createAiProcess(executable, env) {
         clearTimeout(timeout);
         if (owned.exitCode === null && owned.signalCode === null) {
           try {
-            process.kill(-owned.pid, "SIGKILL");
+            if (process.platform === "win32") owned.kill("SIGKILL");
+            else process.kill(-owned.pid, "SIGKILL");
           } catch (error) {
             if (error.code !== "ESRCH") throw error;
           }

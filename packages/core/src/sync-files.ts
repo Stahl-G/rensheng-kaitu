@@ -1,8 +1,10 @@
 import childProcess from "node:child_process";
 import { existsSync, lstatSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { KaituError } from "./errors.js";
 import { isICloudPath } from "./sync-location.js";
+
+const isWindows = process.platform === "win32";
 
 export function conflictOriginal(root: string, file: string): string | undefined {
   const name = basename(file);
@@ -57,7 +59,7 @@ export function requestICloudDownload(inputPath: string): void {
 export function isEvictedICloudFile(path: string): boolean {
   const stat = fileStat(path);
   const evicted =
-    !!(stat?.isFile() && stat.size > 0 && stat.blocks === 0) ||
+    !!(stat?.isFile() && stat.size > 0 && !isWindows && stat.blocks === 0) ||
     cloudPlaceholder(dirname(path), basename(path));
   if (evicted) requestICloudDownload(path);
   return evicted;
@@ -104,7 +106,12 @@ export function syncInventory(root: string, prefix = "", icloud = false) {
     }
   }
   walk(prefix);
-  return { files, conflicts, unavailable: [...new Set(unavailable)] };
+  const portable = (path: string) => path.split(sep).join("/");
+  return {
+    files: files.map(portable),
+    conflicts: conflicts.map(portable),
+    unavailable: [...new Set(unavailable.map(portable))],
+  };
 }
 
 export function readWorkspaceConfig(root: string, icloud = isICloudPath(root)): Record<string, unknown> {

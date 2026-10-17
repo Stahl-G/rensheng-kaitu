@@ -331,7 +331,7 @@ export function createSdkRuntime({
           KAITU_AGENT_MODE: mode,
           KAITU_DIR: workspace,
         },
-        detached: true,
+        detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "ignore"],
       });
       const listeners = new Set();
@@ -381,11 +381,13 @@ export function createSdkRuntime({
             });
           await wait(4000);
           if (!dead) {
-            process.kill(-child.pid, "SIGTERM");
+            if (process.platform === "win32") child.kill("SIGTERM");
+            else process.kill(-child.pid, "SIGTERM");
             await wait(2000);
           }
           if (!dead) {
-            process.kill(-child.pid, "SIGKILL");
+            if (process.platform === "win32") child.kill("SIGKILL");
+            else process.kill(-child.pid, "SIGKILL");
             await wait(2000);
           }
           rpc.close();

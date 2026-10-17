@@ -106,7 +106,8 @@ it("IMAP 只读拉取新邮件，归档后重投不重写，凭据和游标留�
     await restarted.stop();
     const local = readdirSync(root).filter((file) => file.endsWith(".json"));
     expect(local.some((file) => readFileSync(join(root, file), "utf8").includes(password))).toBe(true);
-    for (const file of local) expect(statSync(join(root, file)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32")
+      for (const file of local) expect(statSync(join(root, file)).mode & 0o777).toBe(0o600);
     expect(contents(ws.root)).not.toContain(password);
     expect(id).toBeDefined();
   } finally {

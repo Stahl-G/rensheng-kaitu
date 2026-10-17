@@ -1,6 +1,19 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WorkspaceTypertGenerator } from "@deepseek-ai/dsh-typert-generator";
 import { build } from "esbuild";
@@ -8,9 +21,21 @@ import { transform } from "lightningcss";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const pkg = resolve(root, "packages/dsh-plugin");
+const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
+// Link each dependency to its real directory: Windows resolves pnpm's relative workspace links
+// against the link path, so a single junction to node_modules would point them outside the repo.
+function linkNodeModules(from, to) {
+  mkdirSync(to, { recursive: true });
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    const source = resolve(from, entry.name);
+    if (entry.name.startsWith("@")) linkNodeModules(source, resolve(to, entry.name));
+    else if (statSync(source).isDirectory())
+      symlinkSync(realpathSync(source), resolve(to, entry.name), "junction");
+  }
+}
 // 0.2.1-rc.1 recognizes protocol and registry symbols inside its workspace inventory. Give the
 // published declarations a temporary workspace identity, without importing DSH source.
-const analysis = mkdtempSync("/tmp/kaitu-typert-");
+const analysis = mkdtempSync(join(tmpdir(), "kaitu-typert-"));
 try {
   const analyzedPkg = resolve(analysis, "packages/dsh-plugin");
   const protocol = resolve(analysis, "packages/protocol");
@@ -19,7 +44,7 @@ try {
   cpSync(resolve(pkg, "package.json"), resolve(analyzedPkg, "package.json"));
   mkdirSync(resolve(analyzedPkg, "lib"));
   writeFileSync(resolve(analyzedPkg, "lib/typert.host.d.ts"), "export declare const TYPERT: unknown;\n");
-  symlinkSync(resolve(pkg, "node_modules"), resolve(analyzedPkg, "node_modules"));
+  linkNodeModules(resolve(pkg, "node_modules"), resolve(analyzedPkg, "node_modules"));
   cpSync(resolve(pkg, "node_modules/@deepseek-ai/dsh-typert-protocol/lib/types"), resolve(protocol, "src"), {
     recursive: true,
   });
@@ -27,7 +52,7 @@ try {
     resolve(protocol, "package.json"),
     JSON.stringify({ name: "@deepseek-ai/dsh-typert-protocol", exports: { ".": "./src/index.d.ts" } }),
   );
-  symlinkSync(resolve(pkg, "node_modules"), resolve(protocol, "node_modules"));
+  linkNodeModules(resolve(pkg, "node_modules"), resolve(protocol, "node_modules"));
   const registry = resolve(analysis, "packages/registry");
   cpSync(resolve(pkg, "node_modules/@deepseek-ai/dsh-typert-registry/lib/types"), resolve(registry, "src"), {
     recursive: true,
@@ -36,7 +61,7 @@ try {
     resolve(registry, "package.json"),
     JSON.stringify({ name: "@deepseek-ai/dsh-typert-registry", exports: { ".": "./src/index.d.ts" } }),
   );
-  symlinkSync(resolve(pkg, "node_modules"), resolve(registry, "node_modules"));
+  linkNodeModules(resolve(pkg, "node_modules"), resolve(registry, "node_modules"));
   const options = JSON.parse(readFileSync(resolve(root, "tsconfig.base.json"), "utf8"));
   options.compilerOptions.types = ["node"];
   options.compilerOptions.paths = {
@@ -44,7 +69,7 @@ try {
     "@deepseek-ai/dsh-typert-registry": [resolve(registry, "src/index.d.ts")],
   };
   writeFileSync(resolve(analysis, "tsconfig.base.json"), JSON.stringify(options));
-  symlinkSync(resolve(root, "node_modules"), resolve(analysis, "node_modules"));
+  symlinkSync(resolve(root, "node_modules"), resolve(analysis, "node_modules"), "junction");
   for (const dir of [analyzedPkg, protocol, registry]) {
     writeFileSync(
       resolve(dir, "tsconfig.json"),
@@ -81,8 +106,8 @@ try {
 } finally {
   rmSync(analysis, { recursive: true, force: true });
 }
-execFileSync("tsc", ["-p", "tsconfig.json"], { cwd: pkg, stdio: "inherit" });
-execFileSync("tsc", ["-p", "tsconfig.client.json"], { cwd: pkg, stdio: "inherit" });
+execFileSync(process.execPath, [tsc, "-p", "tsconfig.json"], { cwd: pkg, stdio: "inherit" });
+execFileSync(process.execPath, [tsc, "-p", "tsconfig.client.json"], { cwd: pkg, stdio: "inherit" });
 await build({
   entryPoints: [resolve(pkg, "src/index.ts")],
   outfile: resolve(pkg, "dist/index.js"),

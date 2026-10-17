@@ -147,7 +147,7 @@ it("Gmail PKCE 登录后增量收取、重复不重写，令牌仅保存在本�
       readFileSync(file, "utf8").includes("synthetic-refresh"),
     );
     expect(tokens).toHaveLength(1);
-    expect(statSync(tokens[0] ?? "").mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") expect(statSync(tokens[0] ?? "").mode & 0o777).toBe(0o600);
     expect(f.calls.some((call) => call.startsWith("GET /history?"))).toBe(true);
   } finally {
     await f.close();
