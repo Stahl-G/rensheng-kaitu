@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { KaituError, type Workspace } from "@kaitu/core";
 
-const DSH_VERSION = "0.2.1-rc.1";
+const DSH_VERSION = "0.2.1-rc.2";
 const START = "# kaitu:start（由 kaitu dsh --install 维护）";
 const END = "# kaitu:end";
 

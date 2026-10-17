@@ -111,17 +111,18 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
   };
   const plugins = createPluginService({
-    executable: join(dirname(app.getPath("exe")), "DSH"),
     archive: join(hostResources, "app.asar"),
     runtime: join(hostResources, "runtime/primary-runtime/dependencies"),
     home: aiHome,
-    // 装好或删掉插件后，后台 AI 和问问的引擎都重新加载。
-    onChanged: async () => {
+    // desktop profile 只能在 DSH 进程不用它时改：先停后台 AI 和问问的引擎，装好再重新加载。
+    beforeChange: async () => {
       await ai.close();
-      ai = makeBackgroundAi();
-      await startAutomation();
       await ask.prepareRelocation();
+    },
+    onChanged: async () => {
+      ai = makeBackgroundAi();
       ask.relocate(ws.root);
+      await startAutomation();
     },
   });
   const server = await startUi(ws, {

@@ -68,7 +68,7 @@ const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.js
 const version = kaituVersion;
 const payloadVersion = values["payload-version"] || version;
 const plan = [
-  `COPY ${source} → ${output}；校验 DSH 0.2.1-rc.1 / arm64 / 主入口`,
+  `COPY ${source} → ${output}；校验 DSH 0.2.1-rc.2 / arm64 / 主入口`,
   `Info.plist: 人生开图 / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
   "Frameworks: 按实际 helper 应用重命名 人生开图 Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
@@ -100,7 +100,7 @@ const plan = [
 ];
 console.log(
   values["payload-only"]
-    ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.1-rc.1，不生成 App`
+    ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.1-rc.2，不生成 App`
     : plan.join("\n"),
 );
 const requireDsh = createRequire(join(resolve(values["dsh-root"]), "apps/desktop/package.json"));
@@ -110,7 +110,7 @@ const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const dshVersion = manifest.version;
-if (dshVersion !== "0.2.1-rc.1") throw new Error(`仅支持 DSH 0.2.1-rc.1，输入为 ${dshVersion}`);
+if (dshVersion !== "0.2.1-rc.2") throw new Error(`仅支持 DSH 0.2.1-rc.2，输入为 ${dshVersion}`);
 if (manifest.main !== "lib/main.js") throw new Error(`未知桌面入口：${manifest.main}`);
 const main = asar.extractFile(archive, manifest.main).toString();
 if (!main.includes("DeepSeek Harness")) throw new Error("找不到原生菜单品牌文案，拒绝静默跳过");
@@ -141,7 +141,7 @@ for (const path of asar.listPackage(archive)) {
     replacements += count;
   }
 }
-// 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 0.2.1-rc.1。
+// 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 0.2.1-rc.2。
 // 开图版本只用于 Info.plist 和关于面板。
 const about = "applicationVersion: app.getVersion()";
 const brandedMain = changes.get("lib/main.js").toString();

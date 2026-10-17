@@ -39,7 +39,7 @@ function savedInput(task: ScheduleTask): ScheduleInput {
   }
 }
 
-// 0.2.1-rc.1 dsh-schedule and dsh-api-session-controller: lib/types/index.d.ts.
+// 0.2.1-rc.2 dsh-schedule and dsh-api-session-controller: lib/types/index.d.ts.
 export interface ScheduleContext {
   schedule: {
     list(input: { sessionId: string }): Promise<ScheduleTask[]>;

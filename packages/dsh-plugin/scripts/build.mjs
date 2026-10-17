@@ -8,7 +8,7 @@ import { transform } from "lightningcss";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const pkg = resolve(root, "packages/dsh-plugin");
-// 0.2.1-rc.1 recognizes protocol and registry symbols inside its workspace inventory. Give the
+// 0.2.1-rc.2 recognizes protocol and registry symbols inside its workspace inventory. Give the
 // published declarations a temporary workspace identity, without importing DSH source.
 const analysis = mkdtempSync("/tmp/kaitu-typert-");
 try {

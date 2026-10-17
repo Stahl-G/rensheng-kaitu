@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { KaituError } from "../core/dist/index.js";
 
 /** 开图的插件目录（DSH 插件市场索引格式 1）。 */
 export const KAITU_PLUGIN_INDEX = "https://kaitu.si/plugins/index.json";
@@ -10,10 +11,11 @@ export const KAITU_PLUGIN_INDEX = "https://kaitu.si/plugins/index.json";
 const PROFILES = ["desktop", "sdk"];
 
 /**
- * 插件 = DSH bundle。安装、删除交给 DSH 自带的 `dsh plugin`（在 profile 目录里跑 pnpm 并登记 bundle），
- * pnpm 和 node 用 App 自带的运行时，不依赖用户电脑上装没装。
+ * 插件 = DSH bundle。和 DSH 插件管理器做的一样：在 profile 目录里用 pnpm 装包，再把包名登记进
+ * package.json 的 dsh.profile.bundles。pnpm 和 node 用 App 自带的运行时。
+ * 改 profile 前先停掉后台 AI（beforeChange），改完再重新加载（onChanged）。
  */
-export function createPluginService({ executable, archive, runtime, home, onChanged }) {
+export function createPluginService({ archive, runtime, home, beforeChange, onChanged }) {
   const modules = join(archive, "dsh/node_modules");
   const bin = join(home, "bin");
   const pnpm = join(bin, "pnpm");
@@ -25,22 +27,19 @@ export function createPluginService({ executable, archive, runtime, home, onChan
     );
     chmodSync(pnpm, 0o755);
   }
-  const dsh = (profile, args) =>
+  const profileDir = (profile) => join(home, "profiles", profile);
+  const manifest = (profile) => JSON.parse(readFileSync(join(profileDir(profile), "package.json"), "utf8"));
+  const run = (profile, args) =>
     new Promise((resolve, reject) => {
-      const child = spawn(
-        executable,
-        [join(modules, "@deepseek-ai/dsh/lib/bin.js"), "plugin", "--profile", profile, ...args],
-        {
-          env: {
-            ...process.env,
-            ELECTRON_RUN_AS_NODE: "1",
-            DSH_HOME: home,
-            PATH: `${bin}:/usr/bin:/bin:/usr/sbin:/sbin`,
-          },
-          stdio: ["ignore", "ignore", "pipe"],
-        },
-      );
+      const child = spawn(pnpm, args, {
+        cwd: profileDir(profile),
+        env: { ...process.env, PATH: `${bin}:/usr/bin:/bin:/usr/sbin:/sbin`, CI: "true" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       let output = "";
+      child.stdout.on("data", (chunk) => {
+        output += chunk;
+      });
       child.stderr.on("data", (chunk) => {
         output += chunk;
       });
@@ -48,21 +47,27 @@ export function createPluginService({ executable, archive, runtime, home, onChan
       child.once("exit", (code) => {
         if (code === 0) resolve();
         else {
-          const reason = output
-            .split("\n")
-            .find((line) => line.startsWith("dsh: ") && !line.includes("initialized"));
-          reject(new Error(reason?.replace(/^dsh: /, "") ?? "插件安装没有完成"));
+          const reason = output.split("\n").find((line) => /ERR_|error/i.test(line));
+          reject(new KaituError(`插件安装没有完成：${reason?.trim() ?? `pnpm 退出码 ${code}`}`, "PLUGIN"));
         }
       });
     });
-  const installed = () => {
-    const file = join(home, "profiles", "desktop", "package.json");
-    if (!existsSync(file)) return [];
-    const manifest = JSON.parse(readFileSync(file, "utf8"));
-    return Object.keys(manifest.dependencies ?? {}).filter((name) => !name.startsWith("@deepseek-ai/"));
+  const setBundle = (profile, name, present) => {
+    const file = join(profileDir(profile), "package.json");
+    const data = manifest(profile);
+    const bundles = (data.dsh?.profile?.bundles ?? []).filter((item) => item !== name);
+    if (present) bundles.push(name);
+    data.dsh = { ...data.dsh, profile: { ...data.dsh?.profile, bundles } };
+    writeFileSync(file, `${JSON.stringify(data, null, 2)}\n`);
   };
-  const text = (value) =>
-    typeof value === "string" ? value : (value?.["zh-CN"] ?? value?.zh ?? value?.en ?? "");
+  const profiles = () => PROFILES.filter((profile) => existsSync(join(profileDir(profile), "package.json")));
+  const installed = () =>
+    existsSync(join(profileDir("desktop"), "package.json"))
+      ? Object.keys(manifest("desktop").dependencies ?? {}).filter(
+          (name) => !name.startsWith("@deepseek-ai/"),
+        )
+      : [];
+  const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
     async list() {
       const { parseMarketIndex, marketInstallTarget } = await import(
@@ -72,7 +77,7 @@ export function createPluginService({ executable, archive, runtime, home, onChan
       );
       const names = installed();
       const response = await fetch(KAITU_PLUGIN_INDEX, { signal: AbortSignal.timeout(15000) });
-      if (!response.ok) throw new Error(`插件目录读取失败（HTTP ${response.status}）`);
+      if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
       const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
       const catalog = index.plugins.map((plugin) => {
         const latest = plugin.versions[0];
@@ -91,14 +96,31 @@ export function createPluginService({ executable, archive, runtime, home, onChan
       return [...catalog, ...extra];
     },
     async install(spec) {
-      if (typeof spec !== "string" || !spec.trim()) throw new Error("请选择要安装的插件");
-      for (const profile of PROFILES) await dsh(profile, ["add", spec]);
-      await onChanged();
+      if (typeof spec !== "string" || !spec.trim()) throw new KaituError("请选择要安装的插件", "PLUGIN");
+      await beforeChange();
+      try {
+        for (const profile of profiles()) {
+          const before = Object.keys(manifest(profile).dependencies ?? {});
+          await run(profile, ["add", spec]);
+          for (const name of Object.keys(manifest(profile).dependencies ?? {}))
+            if (!before.includes(name)) setBundle(profile, name, true);
+        }
+      } finally {
+        await onChanged();
+      }
     },
     async remove(name) {
-      if (!installed().includes(name)) throw new Error("这个插件没有安装");
-      for (const profile of PROFILES) await dsh(profile, ["remove", name]);
-      await onChanged();
+      if (!installed().includes(name)) throw new KaituError("这个插件没有安装", "PLUGIN");
+      await beforeChange();
+      try {
+        for (const profile of profiles()) {
+          if (!(name in (manifest(profile).dependencies ?? {}))) continue;
+          setBundle(profile, name, false);
+          await run(profile, ["remove", name]);
+        }
+      } finally {
+        await onChanged();
+      }
     },
   };
 }

@@ -22,7 +22,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   const resources = join(root, "Resources");
   const payload = join(resources, "kaitu");
   mkdirSync(join(payload, "node_modules"), { recursive: true });
-  const base = { version: "0.1.0", dshVersion: "0.2.1-rc.1", hostApi: 1 };
+  const base = { version: "0.1.0", dshVersion: "0.2.1-rc.2", hostApi: 1 };
   writeFileSync(join(payload, "payload.json"), JSON.stringify(base));
   writeFileSync(join(resources, "app.asar"), "fixed engine");
   const metadata = { ...base, version: "0.1.1-rc.1" };

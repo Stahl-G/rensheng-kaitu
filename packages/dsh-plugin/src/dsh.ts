@@ -1,4 +1,4 @@
-// 最小兼容面，按 dsh 0.2.1-rc.1（tag dsh-v0.2.1-rc.1）核对；以后可替换为官方类型。
+// 最小兼容面，按 dsh 0.2.1-rc.2（tag dsh-v0.2.1-rc.2）核对；以后可替换为官方类型。
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
 // packages/llm/llm/src/types.ts: ToolSchema

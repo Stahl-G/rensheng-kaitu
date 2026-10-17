@@ -18,7 +18,12 @@
       "author": "Stahl-G",
       "homepage": "https://github.com/Stahl-G/dsh-novel-workspace",
       "repository": { "url": "https://github.com/Stahl-G/dsh-novel-workspace" },
-      "metadata": { "category": "writing", "keywords": ["小说", "写作", "novel"], "labels": [], "sortKeys": {} },
+      "metadata": {
+        "category": "writing",
+        "keywords": ["小说", "写作", "novel"],
+        "labels": [],
+        "sortKeys": {}
+      },
       "versions": [
         {
           "version": "0.3.0",

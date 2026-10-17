@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const HOST_API = 1;
-export const DSH_VERSION = "0.2.1-rc.1";
+export const DSH_VERSION = "0.2.1-rc.2";
 
 export function updateRoot(state) {
   return join(state, "updates", `dsh-${DSH_VERSION}-host-${HOST_API}`);

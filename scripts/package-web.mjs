@@ -49,7 +49,7 @@ const dependencies = Object.fromEntries(
   ),
 );
 for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
-  dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.1";
+  dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.2";
 writeFileSync(
   join(output, "package.json"),
   `${JSON.stringify(

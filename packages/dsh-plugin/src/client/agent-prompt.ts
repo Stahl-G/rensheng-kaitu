@@ -1,6 +1,6 @@
 import type { Context } from "@deepseek-ai/cordis";
 
-// 0.2.1-rc.1: dsh-api-workspace-controller/client, dsh-api-session-controller/client,
+// 0.2.1-rc.2: dsh-api-workspace-controller/client, dsh-api-session-controller/client,
 // dsh-client-ui-workspace/client/navigation. Use the owners for workspace feeds and mainView retention.
 export interface KaituSessionServices {
   workspaces: { create(input: { path: string }): Promise<{ workspaceId: string }> };
