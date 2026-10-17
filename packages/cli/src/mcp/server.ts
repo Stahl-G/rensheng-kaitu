@@ -212,9 +212,12 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     {},
     () => readExperienceImports(ws),
   );
-  register("memory_list", "列出已保存记忆，无需确认。", {}, () => listMemories(ws));
+  // 公网连接（remote）读不到标为敏感的记忆。
+  const visible = (memories: ReturnType<typeof listMemories>) =>
+    tools === "remote" ? memories.filter((memory) => !memory.sensitive) : memories;
+  register("memory_list", "列出已保存记忆，无需确认。", {}, () => visible(listMemories(ws)));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
-    searchMemories(ws, query),
+    visible(searchMemories(ws, query)),
   );
   register(
     "search_chats",

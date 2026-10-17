@@ -130,7 +130,12 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
       <span className={css.src}>
         {[
           sourceLabel(memory.source),
-          memory.sensitive ? t("敏感 · 不进资料包", "Sensitive · left out of packs") : "",
+          memory.sensitive
+            ? t(
+                "敏感 · 不进资料包，公网连接的 AI 读不到",
+                "Sensitive · left out of packs, hidden from AI over the internet",
+              )
+            : "",
         ]
           .filter(Boolean)
           .join(" · ")}

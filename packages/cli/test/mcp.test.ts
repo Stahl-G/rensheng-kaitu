@@ -1,14 +1,16 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { history, initWorkspace, mcpToken, readRecords } from "@kaitu/core";
+import { addMemory, history, initWorkspace, mcpToken, readRecords } from "@kaitu/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { expect, it } from "vitest";
 import { startMcpHttp } from "../src/mcp/http.js";
+import { type ToolSet, createMcpServer } from "../src/mcp/server.js";
 
 it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源，不能调用删除", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-"));
@@ -103,6 +105,55 @@ it("HTTP 拒绝缺失或错误 token 和错误 Host，有效 token 能连接，�
   } finally {
     await client.close();
     await http.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("公网 remote 读不到标为敏感的记忆：列表、搜索、索引和单个文件都不给，本机 all 照常", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-sensitive-"));
+  try {
+    const ws = await initWorkspace(root);
+    const open = await addMemory(ws, { type: "fact", name: "Open note", text: "合成公开记忆" });
+    const secret = await addMemory(ws, {
+      type: "fact",
+      name: "Secret note",
+      text: "合成敏感记忆",
+      sensitive: true,
+    });
+    symlinkSync(ws.resolve(`memory/${secret.file}`), join(root, "alias.md"));
+    const call = async (tools: ToolSet, name: string, args: Record<string, unknown>) => {
+      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "remote-client", version: "1" });
+      await createMcpServer(ws, tools).connect(serverSide);
+      await client.connect(clientSide);
+      try {
+        const response = await client.callTool({ name, arguments: args });
+        return {
+          error: response.isError === true,
+          text: (response.content as { text: string }[])[0]?.text ?? "",
+        };
+      } finally {
+        await client.close();
+      }
+    };
+    for (const [name, args] of [
+      ["memory_list", {}],
+      ["memory_search", { query: "合成" }],
+      ["read_file", { path: "memory/MEMORY.md" }],
+    ] as const) {
+      const remote = await call("remote", name, args);
+      expect(remote.text).toContain("合成公开记忆");
+      expect(remote.text).not.toContain("合成敏感记忆");
+      expect((await call("all", name, args)).text).toContain("合成敏感记忆");
+    }
+    for (const path of [`memory/${secret.file}`, "alias.md"]) {
+      expect((await call("remote", "read_file", { path })).error).toBe(true);
+      expect((await call("all", "read_file", { path })).text).toContain("合成敏感记忆");
+    }
+    expect((await call("remote", "read_file", { path: `memory/${open.file}` })).text).toContain(
+      "合成公开记忆",
+    );
+  } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });

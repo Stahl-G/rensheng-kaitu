@@ -14,7 +14,7 @@ kaitu mcp token --dir /你的工作区
 请求必须带 `Authorization: Bearer <token>`。token 存在状态目录的 `secrets.json`（本地模式为 `.kaitu/secrets.json`，Drive 模式留在本机；权限 600），不进版本历史。
 用 `kaitu mcp token --rotate` 轮换；正在运行的服务会在后续请求中拒绝旧 token。
 
-HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档；`record_types` 只读列出记录类型、字段与示例；新增记录、记忆、简报和待确认日程建议。
+HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档（不含财务明细和标为敏感的记忆）；`record_types` 只读列出记录类型、字段与示例；新增记录、记忆、简报和待确认日程建议。
 `--tools all` 才开放修改、删除和保存版本；stdio 默认 all，也可显式加 `--tools remote`。
 工具不提供恢复版本、删除模块、修改规则或目标、任意文件写入。
 

@@ -7,6 +7,7 @@ import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
+import { listMemories, normalizedMemory } from "./memory.js";
 import { findRecordType, listModules, recordFilePattern, resolveRecordPath } from "./modules.js";
 import { refreshOverview } from "./overview.js";
 import { removePhoto } from "./photos.js";
@@ -48,7 +49,34 @@ export function readAgentFile(ws: Workspace, file: string, remote = false): stri
     }
   }
   if (remote && paths.includes("OVERVIEW.md")) refreshOverview(ws);
-  return ws.readText(file);
+  if (!remote || !paths.some((path) => path.split("/")[0]?.toLowerCase() === "memory"))
+    return ws.readText(file);
+  // 公网连接读不到标为敏感的记忆：单条文件拒绝，索引去掉提到它们的行。
+  const sensitive = listMemories(ws)
+    .filter((memory) => memory.sensitive)
+    .map((memory) => memory.file);
+  let index = false;
+  for (const path of paths) {
+    const [dir, ...rest] = path.split("/");
+    if (dir?.toLowerCase() !== "memory") continue;
+    const name = rest.join("/");
+    if (name.toLowerCase() === "memory.md") {
+      index = true;
+      continue;
+    }
+    let open = false;
+    try {
+      open = rest.length === 1 && normalizedMemory(ws, name)?.sensitive === false;
+    } catch {}
+    if (!open) throw new KaituError("标为敏感的记忆只允许在本机读取", "OUT_OF_SCOPE");
+  }
+  const text = ws.readText(file);
+  return index
+    ? text
+        .split("\n")
+        .filter((line) => !sensitive.some((name) => line.includes(name)))
+        .join("\n")
+    : text;
 }
 
 export async function writeAgentRecord(
