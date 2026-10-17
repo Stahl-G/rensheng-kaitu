@@ -320,6 +320,11 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              workspaceBackup: async (operation: string, input: Record<string, unknown> = {}) => {
+                const r = await ctx.remote.kaitu.workspaceBackup(operation, JSON.stringify(input));
+                if (!r.ok) throw new Error(r.error.message);
+                return JSON.parse(r.value);
+              },
               loadSettings: async () => {
                 const r = await ctx.remote.kaitu.settings();
                 if (!r.ok) throw new Error(r.error.message);

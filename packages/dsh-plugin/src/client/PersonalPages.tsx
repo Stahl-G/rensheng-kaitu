@@ -10,6 +10,7 @@ import { PhoneChannels } from "./PhoneChannels.js";
 import { type PluginRequest, Plugins } from "./Plugins.js";
 import css from "./Prototype.module.css";
 import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
+import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.js";
 import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
 
@@ -19,6 +20,7 @@ export interface PersonalServices extends CalendarPushServices {
   plugins?: PluginRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
     tasks: Partial<Record<AutomationKey, boolean>>,
     times?: Partial<Record<AutomationKey, string>>,
@@ -334,6 +336,14 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
+            {props.workspaceBackup && (
+              <WorkspaceBackup
+                request={props.workspaceBackup}
+                subscribe={props.subscribe}
+                pickFolder={props.pickStorageFolder}
+                onActivated={props.refreshWorkspace}
+              />
+            )}
             {props.phoneChannels && props.channelSettings && (
               <PhoneChannels request={props.channelSettings} />
             )}

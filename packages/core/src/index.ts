@@ -90,3 +90,5 @@ export type { Hometown } from "./hometown.js";
 export { conciseDirection, directionText } from "./direction-copy.js";
 export { saveHometown } from "./hometown.js";
 export { dshFiles } from "./dsh-files.js";
+
+export * from "./workspace-backup.js";

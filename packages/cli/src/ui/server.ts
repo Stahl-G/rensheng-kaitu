@@ -43,6 +43,7 @@ import {
   restore,
   snapshotNow,
   stageUpload,
+  startWorkspaceBackup,
   syncProject,
   syncProjects,
   syncStatus,
@@ -213,6 +214,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
+  const stopBackup = startWorkspaceBackup(ws, notify);
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -417,6 +419,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               );
           return json(res, 200, folder);
         }
+        const relocate = method === "moveStorage" || (method === "workspaceBackup" && args[0] === "activate");
         let draftId: string | undefined;
         if (method === "openAi" && typeof args[0] === "string" && args[0].trim()) {
           if (args[0].length > 100000) throw new KaituError("请求内容过长", "BAD_ARGS");
@@ -432,19 +435,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             ? await openAi()
             : method.startsWith("ask") || method === "projectGoalSuggest"
               ? await productRequest(ws, method, args, options.ask, calendarPush)
-              : method === "moveStorage" || method === "restoreVersion"
+              : relocate || method === "restoreVersion"
                 ? await exclusive(async () => {
                     await saveExternal();
                     await options.ask?.prepareRelocation();
                     await phones.stop();
                     const oldRoot = ws.root;
                     try {
-                      if (method === "moveStorage") await options.onWorkspaceChanging?.();
+                      if (relocate) await options.onWorkspaceChanging?.();
                       return await productRequest(ws, method, args, options.ask, calendarPush);
                     } finally {
                       try {
                         if (ws.root !== oldRoot) startWatching();
-                        if (method === "moveStorage") await options.onWorkspaceChanged?.();
+                        if (relocate) await options.onWorkspaceChanged?.();
                       } finally {
                         options.ask?.relocate(ws.root);
                         phones.start();
@@ -710,6 +713,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
+    stopBackup();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
@@ -726,6 +730,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    stopBackup();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
