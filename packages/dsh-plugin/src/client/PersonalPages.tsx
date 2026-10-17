@@ -7,6 +7,7 @@ import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
+import { type PluginRequest, Plugins } from "./Plugins.js";
 import css from "./Prototype.module.css";
 import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
 import { aiHandover } from "./connections.js";
@@ -14,6 +15,8 @@ import { type Locale, useT } from "./i18n.js";
 
 export interface PersonalServices extends CalendarPushServices {
   desktopUpdate?: FeatureUpdateRequest;
+  /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
+  plugins?: PluginRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
   configureAutomation: (
@@ -602,6 +605,7 @@ export function PersonalPages(
                 }}
               />
             )}
+            {props.plugins && <Plugins request={props.plugins} />}
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
               {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}

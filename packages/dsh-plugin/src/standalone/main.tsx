@@ -76,6 +76,7 @@ const props: OverviewPageProps = {
   },
   loadSettings: () => call("settings"),
   desktopUpdate: (action) => call("desktopUpdate", action),
+  plugins: (action, input) => call("plugins", action, input),
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
   exportWorkspace: () => call("exportWorkspace"),
   restoreVersion: (oid) => call("restoreVersion", oid),

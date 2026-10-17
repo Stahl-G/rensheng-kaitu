@@ -14,6 +14,7 @@ import { createAiProcess } from "./ai-process.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
+import { createPluginService } from "./plugins.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 
 export function createLocalAsk({ state, resources, executable, getWorkspace, conversationState = state }) {
@@ -109,6 +110,20 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     const settings = readAutomation(ws);
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
   };
+  const plugins = createPluginService({
+    executable: join(dirname(app.getPath("exe")), "DSH"),
+    archive: join(hostResources, "app.asar"),
+    runtime: join(hostResources, "runtime/primary-runtime/dependencies"),
+    home: aiHome,
+    // 装好或删掉插件后，后台 AI 和问问的引擎都重新加载。
+    onChanged: async () => {
+      await ai.close();
+      ai = makeBackgroundAi();
+      await startAutomation();
+      await ask.prepareRelocation();
+      ask.relocate(ws.root);
+    },
+  });
   const server = await startUi(ws, {
     port: 0,
     open: false,
@@ -116,6 +131,14 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     ask,
     systemLocale: app.getPreferredSystemLanguages()[0] || "en",
     desktopUpdate: (action) => updater.request(action),
+    plugins: async (action, input) =>
+      action === "install"
+        ? plugins.install(input)
+        : action === "remove"
+          ? plugins.remove(input)
+          : action === "open"
+            ? ai.open()
+            : plugins.list(),
     pickDirectory: async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog(window, {
         title: "选择开图资料的存放文件夹",

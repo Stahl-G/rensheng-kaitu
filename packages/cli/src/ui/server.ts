@@ -71,6 +71,8 @@ export interface UiOptions {
   openAi?: () => Promise<{ url?: string }>;
   pickDirectory?: () => Promise<string | null>;
   desktopUpdate?: (action: string) => Promise<unknown>;
+  /** 开图 App 的插件：list、install、remove、open（打开 DSH 窗口里的插件页面）。 */
+  plugins?: (action: string, input?: string) => Promise<unknown>;
   systemLocale?: string;
 }
 const PRODUCT_ROOT = fileURLToPath(new URL("../../../dsh-plugin/dist/standalone/", import.meta.url));
@@ -390,6 +392,17 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             200,
             options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null,
           );
+        if (method === "plugins") {
+          if (!options.plugins) throw new KaituError("插件只在开图 App 里可用", "BAD_ARGS");
+          return json(
+            res,
+            200,
+            (await options.plugins(
+              String(args[0] ?? "list"),
+              typeof args[1] === "string" ? args[1] : undefined,
+            )) ?? null,
+          );
+        }
         if (method === "findWorkspaceFiles") return json(res, 200, await files.find(String(args[0] ?? "")));
         if (method === "openWorkspacePath") {
           if (typeof args[0] !== "string" || !["open", "reveal"].includes(String(args[1] ?? "open")))
