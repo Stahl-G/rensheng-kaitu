@@ -105,8 +105,14 @@ export function memoryInput(raw: Record<string, unknown>): MemoryInput {
     name,
     text: text.trim(),
     ...(typeof raw.source === "string" && raw.source.trim() ? { source: raw.source.trim() } : {}),
-    ...(raw.sensitive === true ? { sensitive: true } : {}),
+    ...(sensitiveFlag(raw.sensitive) ? { sensitive: true } : {}),
   };
+}
+
+/** 写了敏感标记就从严：只有没写或明确写否（false、no、否、0）才算不敏感，"true"、"是" 都算敏感。 */
+function sensitiveFlag(value: unknown): boolean {
+  if (value === undefined || value === null || value === false || value === "") return false;
+  return !/^(false|no|否|0)$/i.test(String(value).trim());
 }
 
 /** 读一份记忆文件：frontmatter 缺的字段从文件名、标题和正文补，读不出正文才不算记忆。 */
@@ -142,7 +148,7 @@ function looseMemory(file: string, raw: string, fallbackDate: string): Memory | 
     text,
     created: date(data.created),
     updated: date(data.updated ?? data.created),
-    sensitive: broken || data.sensitive === true,
+    sensitive: broken || sensitiveFlag(data.sensitive),
     ...(typeof data.source === "string" ? { source: data.source } : {}),
   } as Memory;
 }

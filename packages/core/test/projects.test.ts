@@ -173,4 +173,9 @@ it("项目阶段认常见写法、没写补进行中，写了却认不出的报�
   expect(readProject(ws, "novel").data.stage).toBe("done");
   expect(readProject(ws, "garden").data.stage).toBe("active");
   expect(() => readProject(ws, "typo")).toThrow(/项目状态格式不合法/);
+  // 类型同理：认得出的换成规范值，写错的报格式错误，不悄悄改成个人
+  ws.writeText("projects/job/STATUS.md", "---\ntitle: 上班\nkind: 工作\n---\n");
+  ws.writeText("projects/biz/STATUS.md", "---\ntitle: 生意\nkind: business\n---\n");
+  expect(readProject(ws, "job").data.kind).toBe("work");
+  expect(() => readProject(ws, "biz")).toThrow(/项目状态格式不合法/);
 });

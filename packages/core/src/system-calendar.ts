@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import ICAL from "ical.js";
+import { normalizeNow, normalizeStatus } from "./doc-input.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { localStateRoot } from "./local-state.js";
 import { stateBinding } from "./state-binding.js";
@@ -67,14 +68,22 @@ export function calendarPushStore(ws: Workspace): CalendarPushStore {
 }
 export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   if (!ws.exists("NOW.md")) return [];
-  const { data } = parseFrontmatter<TodayPlan>(ws.readText("NOW.md"));
+  // 和今天页读同一份补齐后的数据：Agent 手写、没写 id 的时间段也有稳定 id。
+  const data = normalizeNow(
+    parseFrontmatter(ws.readText("NOW.md")).data,
+    ws.timeZone(),
+  ) as unknown as TodayPlan;
   if (!data.date) return [];
   const previous = calendarPushStore(ws).read().entries;
   const tasks = listTasks(ws, { status: "all" });
   const related = new Map(tasks.map((task) => [task.id, task.title]));
   const taskIds = new Set(tasks.filter((task) => task.status !== "cancelled").map((task) => task.id));
   for (const { file } of statusFiles(ws)) {
-    for (const item of parseFrontmatter<ModuleStatus>(ws.readText(file)).data.next ?? []) {
+    const status = normalizeStatus(
+      parseFrontmatter(ws.readText(file)).data,
+      ws.timeZone(),
+    ) as unknown as ModuleStatus;
+    for (const item of status.next ?? []) {
       related.set(item.id, item.title);
       if (item.status !== "skipped") taskIds.add(item.id);
     }

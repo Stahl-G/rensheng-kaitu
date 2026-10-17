@@ -45,6 +45,15 @@ export function projectDirectory(ws: Workspace, slug: string): string {
   slugCheck(slug);
   return `projects/${slug}`;
 }
+const KINDS: Record<string, ProjectStatus["kind"]> = {
+  work: "work",
+  job: "work",
+  工作: "work",
+  personal: "personal",
+  life: "personal",
+  个人: "personal",
+  生活: "personal",
+};
 const STAGES: Record<string, ProjectStatus["stage"]> = {
   idea: "idea",
   想法: "idea",
@@ -71,7 +80,7 @@ const STAGES: Record<string, ProjectStatus["stage"]> = {
 };
 /**
  * 项目 STATUS.md 缺标题、类型或阶段时用目录名、个人、进行中补上，不让整个项目消失；
- * 阶段认常见写法，写了却认不出的保留原样报格式错误，不悄悄当成进行中。
+ * 类型和阶段认常见写法，写了却认不出的保留原样报格式错误，不悄悄改成别的。
  */
 function projectStatus(data: ProjectStatus, slug: string, timeZone: string): ProjectStatus {
   const out = normalizeStatus(
@@ -79,7 +88,9 @@ function projectStatus(data: ProjectStatus, slug: string, timeZone: string): Pro
     timeZone,
   ) as unknown as ProjectStatus;
   if (typeof out.title !== "string" || !out.title.trim()) out.title = slug;
-  if (out.kind !== "work" && out.kind !== "personal") out.kind = "personal";
+  const kind = out.kind as unknown;
+  if (kind === undefined || kind === null || kind === "") out.kind = "personal";
+  else out.kind = KINDS[String(kind).trim().toLowerCase()] ?? out.kind;
   const stage = out.stage as unknown;
   if (stage === undefined || stage === null || stage === "") out.stage = "active";
   else out.stage = STAGES[String(stage).trim().toLowerCase()] ?? out.stage;
