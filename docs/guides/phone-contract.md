@@ -32,7 +32,7 @@
 执行前核对下一步仍为 todo、日程建议仍为 pending、待办仍为 open。
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
 操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重。
-同一个 client_id 再投递返回 duplicate，不重复执行。
+同一个 client_id 再投递不重复执行：第一次成功的返回 duplicate，第一次 conflict 或 rejected 的照原结果再返回。
 conflict 计入电脑今天页需要核对的数量。回执供手机撤回乐观显示并呈现原因。
 成功文件移到 processed，原文进入 notes；不合格记录附原因进入待整理笔记。
 

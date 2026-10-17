@@ -206,8 +206,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
         : previous.agent !== agents
           ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
           : null;
-    // 替换不成立时整份不生效，原文转待整理笔记。
-    if (refused) return { errors: [refused], agent: agents, message: "", apply: async () => {} };
+    // 替换不成立时整份不生效，原文转待整理笔记；手机记录有一条不合格也整份不生效，手机按回执重发。
+    const phone = phoneInboxName.test(basename(file));
+    if (refused || (phone && errors.length))
+      return { errors: refused ? [refused] : errors, agent: agents, message: "", apply: async () => {} };
     const added = [...groups.values()].flat().length;
     return {
       errors,

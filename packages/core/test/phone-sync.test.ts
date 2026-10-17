@@ -260,3 +260,33 @@ it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手�
     ),
   ).toBe(true);
 });
+
+it("手机记录有一条不合格整份不写，重投不重复；冲突操作重投仍回冲突", async () => {
+  const ws = await freshWorkspace();
+  const file = phoneFile("records.jsonl");
+  const text = [
+    { type: "workout", origin: "user", exercise: "合成", sets: 3, reps: 12, weight_kg: 60, session_id: "s" },
+    { type: "workout", origin: "user", sets: 3 },
+  ]
+    .map((row) => JSON.stringify(row))
+    .join("\n");
+  for (let i = 0; i < 2; i++) {
+    ws.writeText(file, text);
+    await processInbox(ws, { stableMs: 0 });
+    expect(phoneReceipts(ws).find((r) => r.ref === basename(file))?.status).toBe("rejected");
+    expect(readRecords(ws, "workout")).toHaveLength(0);
+  }
+  const action = JSON.stringify({
+    client_id: ulid(),
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "complete_task",
+    args: { id: ulid() },
+  });
+  for (let i = 0; i < 2; i++) {
+    const reopened = new Workspace(ws.root);
+    reopened.writeText(phoneFile("actions.jsonl"), action);
+    await processInbox(reopened, { stableMs: 0 });
+    expect(phoneReceipts(reopened).find((r) => r.kind === "action")?.status).toBe("conflict");
+  }
+});

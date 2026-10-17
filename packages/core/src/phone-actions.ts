@@ -16,7 +16,10 @@ interface Action {
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
   const ledgerFile = ".kaitu/phone-actions.json";
-  const seen = new Set(ws.exists(ledgerFile) ? ws.readJson<string[]>(ledgerFile) : []);
+  // 账本记每个 client_id 第一次的结果；重投时成功的回 duplicate，冲突或拒绝的照原样再回一次。
+  const seen: Record<string, Pick<PhoneReceipt, "status" | "message">> = ws.exists(ledgerFile)
+    ? ws.readJson(ledgerFile)
+    : {};
   const receipts: PhoneReceipt[] = [];
   let openTasks: Set<string> | undefined;
   const validate = schemas().builtin("phone-action.schema.json");
@@ -42,7 +45,8 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       status: "applied",
       at: new Date().toISOString(),
     };
-    if (seen.has(action.client_id)) receipt.status = "duplicate";
+    const first = seen[action.client_id];
+    if (first) Object.assign(receipt, first.status === "applied" ? { status: "duplicate" } : first);
     else {
       const { id, file: target, decision } = action.args;
       try {
@@ -75,10 +79,13 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         receipt.status = "conflict";
         receipt.message = (error as Error).message;
       }
-      seen.add(action.client_id);
+      seen[action.client_id] = {
+        status: receipt.status,
+        ...(receipt.message ? { message: receipt.message } : {}),
+      };
     }
     receipts.push(receipt);
   }
-  ws.writeJson(ledgerFile, [...seen], { internal: true });
+  ws.writeJson(ledgerFile, seen, { internal: true });
   writePhoneReceipts(ws, receipts);
 }
