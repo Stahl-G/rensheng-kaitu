@@ -62,7 +62,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 | 后缀 | 内容 | 电脑端处理 |
 |---|---|---|
 | `.note.md` | 原文。frontmatter 写 `agent: 你（iPhone）`、`kind: capture`、`origin: user`、`date`、`created`；正文是原文 | 收作原文，等同于在电脑上「保存原文」；每日整理负责起草。需确认导入时保留 `kind: capture`。 |
-| `.records.jsonl` | 记录，沿用现有格式。每行写 `agent: "iPhone"` 和 `origin: "user"` 或 `"assistant"` | `origin: user` 记为用户自己的记录（`by: user`），`assistant`（手机问问写的）记为 Agent |
+| `.records.jsonl` | 记录，沿用现有格式。每行写 `agent: "iPhone"` 和 `origin: "user"` 或 `"assistant"` | `origin: user` 署名为用户（`by: user`），`assistant`（手机问问写的）记为 Agent；权限按 Agent 校验 |
 | `.actions.jsonl` | 操作，新格式，每行一条（见下） | 按顺序执行并去重，写回执 |
 | `.jpg` / `.heic` | 照片：长边不超过 2048、单张不超过 1 MB，和引用它的记录一起交 | 移到 `health/files/meals/<日期>/`，在记录里写相对路径。v0.6 只在 iCloud 方式下可用 |
 
@@ -88,7 +88,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 - 电脑处理后写入 `phone/receipts.json`，每条是 `{client_id 或文件名, status, message, at}`，`status` 取 applied / duplicate / conflict / rejected。文件被移出 `inbox/agents/` 也表示已经处理。
 - 还没收到回执的操作，手机先在界面上显示成生效（划掉、标为已确认），并标「等电脑处理」。收到 conflict 或 rejected 时撤回，并说明原因。
 
-**可信边界：** 能写资料位置的都能写收件箱（都是用户授权过的 Agent），`origin` 按此信任，与现有收件箱规则一致。
+**可信边界：** 能写资料位置的 Agent 都能写收件箱，也能造出同名的手机文件，收件箱格式里没有签名或配对校验。手机文件只有 Agent 的权限，`origin` 只决定署名。只能由用户本人做的决定（确认阶段、启用方向、确认或拒绝日程建议）手机不生效，在电脑上确认。手机可信确认通道未交付，见[手机契约](../guides/phone-contract.md)。
 
 ## 5. 存储层（iOS）
 
@@ -119,7 +119,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
   - D2b：支持二进制文件，用于照片。
 - **D3 收件箱：**
   - 手机原文保留 `kind: capture` 和作者。
-  - `origin` 映射成 `by`。
+  - `origin` 映射成署名 `by`，权限按 Agent 校验。
   - 执行 `.actions.jsonl` 并去重，写 `phone/receipts.json`。
 - **D4 数据规范：** 投入（工作 / 学习 / 个人 × 长期投入 / 项目）、阶段、尝试可以挂在任何投入下。改 PRD §6、schemas、AGENTS.md 模板和 core。之后快照加上投入。
 - **D5（v0.6.1）快照补充：** 待核对草稿的内容（供手机采纳）、关键问题、到期的尝试。

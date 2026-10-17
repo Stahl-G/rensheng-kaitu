@@ -23,13 +23,23 @@
 文件名为 `ios-<8 位小写十六进制设备号>-<大写 ULID>.<后缀>`，每次提交创建新文件。
 
 - `.note.md`：保留 frontmatter 和正文，包括 `agent: 你（iPhone）`、`kind: capture`、`origin: user`、date、created。
-- `.records.jsonl`：沿用记录入箱格式。手机文件的 `origin: user` 写为 `by: user`，assistant 写为 agent。
+- `.records.jsonl`：沿用记录入箱格式。手机文件的 `origin: user` 署名为 `by: user`，assistant 写为 agent。
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
-  支持 complete_next、decide_proposal、complete_task、cancel_task。预留操作返回 rejected。
+  执行 complete_next、complete_task、cancel_task。decide_proposal 返回 rejected，日程建议在电脑上确认。预留操作返回 rejected。
 - 健康仍使用 `inbox/health/*.health.json`。照片不在本次实现范围内。
 
-执行前核对下一步仍为 todo、日程建议仍为 pending、待办仍为 open。
+执行前核对下一步仍为 todo、待办仍为 open。
+
+### 可信边界
+
+收件箱文件没有签名，也不带用户手势证明；能写资料位置的 Agent 都能造出同名的手机文件。
+所以手机文件只拿到 Agent 的权限，origin 只决定署名，不是授权，核对当前状态也不等于认证来源。
+
+- 照常收：原文、普通记录，以及 Agent 本来就能做的操作（完成下一步、完成或取消待办）。
+- 不生效：只能由用户本人做的决定。确认阶段、写阶段回顾、启用方向按 Agent 权限校验，整份拒绝；
+  确认或拒绝日程建议返回 rejected。这些在电脑上确认。
+- 未交付：手机可信确认通道。需要设备配对和签名之类的来源证明，本期不做，也不新增凭据或授权。
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
 操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重。
 同一个 client_id 再投递不重复执行：第一次成功的返回 duplicate，第一次 conflict 或 rejected 的照原结果再返回。

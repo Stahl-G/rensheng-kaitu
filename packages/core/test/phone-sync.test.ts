@@ -212,7 +212,7 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
     phoneReceipts(ws)
       .filter((r) => r.kind === "action")
       .map((r) => r.status),
-  ).toEqual(["applied", "applied", "applied", "applied", "rejected", "conflict"]);
+  ).toEqual(["applied", "rejected", "applied", "applied", "rejected", "conflict"]);
   expect(readRecords(ws, "task").find((r) => r.id === task.id)?.status).toBe("done");
   expect(readRecords(ws, "task").find((r) => r.id === cancelled.id)?.status).toBe("cancelled");
   expect(
@@ -220,7 +220,7 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
   ).toBe("done");
   expect(
     parseFrontmatter<{ blocks: { status: string }[] }>(ws.readText("NOW.md")).data.blocks[0]?.status,
-  ).toBe("confirmed");
+  ).toBe("pending");
   const before = readRecords(ws, "task");
   const receiptFile = ws.readJson<{ items: { ref: string }[] }>("phone/receipts.json");
   receiptFile.items = receiptFile.items.filter((r) => r.ref !== actions[2]?.client_id);

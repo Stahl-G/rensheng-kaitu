@@ -1,9 +1,8 @@
 import { basename } from "node:path";
-import { parseFrontmatter } from "./frontmatter.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { cancelTask, completeTask, listTasks } from "./tasks.js";
-import { type TodayPlan, completeNext, decideProposal } from "./workbench.js";
+import { completeNext } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export const phoneInboxName =
@@ -11,7 +10,7 @@ export const phoneInboxName =
 interface Action {
   client_id: string;
   op: string;
-  args: { id: string; file: string; decision: "confirmed" | "rejected" };
+  args: { id: string; file: string };
 }
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
@@ -61,21 +60,17 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
     const first = seen[action.client_id];
     if (first) Object.assign(receipt, first.status === "applied" ? { status: "duplicate" } : first);
     else {
-      const { id, file: target, decision } = action.args;
+      const { id, file: target } = action.args;
       try {
         switch (action.op) {
           case "complete_next":
             await completeNext(ws, target, id);
             break;
-          case "decide_proposal": {
-            const plan = parseFrontmatter<TodayPlan>(ws.readText("NOW.md")).data;
-            const pending = plan.blocks.some(
-              (b) => b.id === id && b.kind === "proposal" && b.status === "pending",
-            );
-            if (!pending) throw new Error("日程建议已处理或不存在");
-            await decideProposal(ws, id, decision);
+          case "decide_proposal":
+            // 收件箱文件谁都能写，证明不了是你本人；日程只由你在电脑上确认。
+            receipt.status = "rejected";
+            receipt.message = "日程建议请在电脑上确认";
             break;
-          }
           case "complete_task":
           case "cancel_task":
             openTasks ??= new Set(listTasks(ws).map((task) => task.id));
