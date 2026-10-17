@@ -219,13 +219,17 @@ describe("confirmed system calendar", () => {
   });
 });
 
-it("Agent 手写、没写 id 的时间段也能同步到系统日历，用和今天页一样的 id", async () => {
+it("Agent 手写、没写 id、日期写成斜杠的时间段也能同步到系统日历，用和今天页一样的 id", async () => {
   const ws = await freshWorkspace("Asia/Shanghai");
   ws.writeText(
     "NOW.md",
-    '---\ndate: "2026-10-17"\nblocks:\n  - { title: 写周报, kind: task, status: confirmed, start: "15:00", end: "16:00" }\n---\n',
+    '---\ndate: "2026/10/17"\nblocks:\n  - { title: 写周报, kind: task, status: confirmed, start: "15:00", end: "16:00" }\n---\n',
   );
   const entries = calendarPushEntries(ws);
   expect(entries).toHaveLength(1);
   expect(entries[0]?.id).toMatch(/^2026-10-17\/b-[0-9a-f]{8}$/);
+  const calendar = fakeCalendar();
+  const result = await new CalendarPush(calendarPushStore(ws), calendar.executor).sync(entries);
+  // 同步后按当天的时间段 id 记下回执：日期前缀和条目对得上才会真的写进日历。
+  expect(result.entries[(entries[0]?.id as string).slice("2026-10-17/".length)]?.status).toBe("added");
 });

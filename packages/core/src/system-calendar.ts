@@ -51,10 +51,14 @@ export interface CalendarExecutor {
   upsert(entry: CalendarPushEntry, uid?: string, changed?: boolean): Promise<string | null>;
   remove(uid: string, entry: CalendarPushEntry): Promise<void>;
 }
+function nowPlan(ws: Workspace): TodayPlan {
+  return normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data, ws.timeZone()) as unknown as TodayPlan;
+}
 export function calendarPushStore(ws: Workspace): CalendarPushStore {
   const file = () => join(localStateRoot(), "system-calendar", `${stateBinding(ws.root).id}.json`);
   return {
-    date: () => (ws.exists("NOW.md") ? parseFrontmatter<TodayPlan>(ws.readText("NOW.md")).data.date : null),
+    // 和同步条目用同一份补齐后的日期（2026/10/17 → 2026-10-17），前缀才对得上。
+    date: () => (ws.exists("NOW.md") ? nowPlan(ws).date : null),
     read: () =>
       existsSync(file()) ? JSON.parse(readFileSync(file(), "utf8")) : { enabled: true, entries: {} },
     write: (state) => {
@@ -69,10 +73,7 @@ export function calendarPushStore(ws: Workspace): CalendarPushStore {
 export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   if (!ws.exists("NOW.md")) return [];
   // 和今天页读同一份补齐后的数据：Agent 手写、没写 id 的时间段也有稳定 id。
-  const data = normalizeNow(
-    parseFrontmatter(ws.readText("NOW.md")).data,
-    ws.timeZone(),
-  ) as unknown as TodayPlan;
+  const data = nowPlan(ws);
   if (!data.date) return [];
   const previous = calendarPushStore(ws).read().entries;
   const tasks = listTasks(ws, { status: "all" });
