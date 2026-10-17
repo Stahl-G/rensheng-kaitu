@@ -27,7 +27,7 @@ import { type MemoryInput, importMemories, memoryInput, memoryType } from "./mem
 import { listRecordTypes } from "./modules.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
-import { addRecords } from "./records.js";
+import { addRecords, deleteRecord } from "./records.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -102,6 +102,12 @@ function inboxContent(file: string, text: string): InboxContent {
   return { kind: "note" };
 }
 
+/** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
+const RECEIPTS = ".kaitu/inbox-records.json";
+type Receipt = { agent: string; records: { type: string; id: string }[] };
+const readReceipts = (ws: Workspace): Record<string, Receipt> =>
+  ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
+
 async function prepare(ws: Workspace, file: string, text: string) {
   if (file.endsWith(".digest.md")) {
     if (text.startsWith("---") && !hasFrontmatter(text))
@@ -134,9 +140,13 @@ async function prepare(ws: Workspace, file: string, text: string) {
   }
   const content = inboxContent(file, text);
   if (content.kind === "records") {
-    const rows = content.rows;
+    // 第一行可以是 {"replaces": "之前的文件名"}：先撤掉那份文件记下的记录，再记这份；只有这一行就是撤回。
+    const header = content.rows[0];
+    const replaces =
+      header && typeof header.replaces === "string" && header.type === undefined ? header.replaces : null;
+    const rows = replaces ? content.rows.slice(1) : content.rows;
     const errors: string[] = [];
-    if (!rows.length) errors.push(`记录文件为空\n\n${recordRejectionHelp(ws, undefined)}`);
+    if (!rows.length && !replaces) errors.push(`记录文件为空\n\n${recordRejectionHelp(ws, undefined)}`);
     const groups = new Map<string, Record<string, unknown>[]>();
     const fileAgent = rows.find((row) => row && typeof row.agent === "string" && row.agent.trim())?.agent;
     for (const [index, row] of rows.entries()) {
@@ -145,8 +155,12 @@ async function prepare(ws: Workspace, file: string, text: string) {
       try {
         if (!row) throw new KaituError("必须是合法 JSON 对象", "BAD_INBOX");
         if (typeof type !== "string") throw new KaituError("缺少 type（记录类型）", "BAD_INBOX");
-        // 收件箱只新增：带了 id、by、rev 就当新记录收下，删除标记不接受。
-        if ("deleted" in data) throw new KaituError("收件箱只新增记录，不能删除", "BAD_INBOX");
+        // 带了 id、by、rev 就当新记录收下；要改或删就整份替换之前的文件。
+        if ("deleted" in data)
+          throw new KaituError(
+            '要删除或修改，请放一份新文件，第一行写 {"replaces": "之前的文件名"}，后面写改好的记录；只写这一行就是撤回',
+            "BAD_INBOX",
+          );
         if (typeof data.ts === "number" && Number.isFinite(data.ts))
           data.ts = isoInZone(new Date(data.ts > 1e12 ? data.ts : data.ts * 1000), ws.timeZone());
         const reference = recordReference(ws, type);
@@ -177,16 +191,44 @@ async function prepare(ws: Workspace, file: string, text: string) {
         errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${recordRejectionHelp(ws, type)}`);
       }
     }
-    const agents = [...new Set(rows.map((row) => sourceAgent(row?.agent ?? fileAgent)))].join("、");
+    const agents =
+      [...new Set(rows.map((row) => sourceAgent(row?.agent ?? fileAgent)))].join("、") ||
+      sourceAgent(header?.agent);
+    const receipts = readReceipts(ws);
+    const previous = replaces ? receipts[basename(replaces)] : undefined;
+    const refused = !replaces
+      ? null
+      : !previous
+        ? `找不到要替换的 ${replaces}：只能替换开图已经记下的收件箱记录文件，写文件名即可`
+        : previous.agent !== agents
+          ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
+          : null;
+    // 替换不成立时整份不生效，原文转待整理笔记。
+    if (refused) return { errors: [refused], agent: agents, message: "", apply: async () => {} };
+    const added = [...groups.values()].flat().length;
     return {
       errors,
       agent: agents,
-      message: `Agent（Drive 收件箱：${agents}）新增了 ${[...groups.values()].flat().length} 条记录`,
+      message: replaces
+        ? `Agent（Drive 收件箱：${agents}）${added ? `修改了 ${replaces}，现在 ${added} 条记录` : `撤回了 ${replaces}`}`
+        : `Agent（Drive 收件箱：${agents}）新增了 ${added} 条记录`,
       apply: async () => {
+        for (const item of previous?.records ?? []) {
+          try {
+            deleteRecord(ws, item.type, item.id, { by: "agent" });
+          } catch (error) {
+            // 已经被删掉的跳过，其余照常替换。
+            if ((error as KaituError).code !== "NOT_FOUND") throw error;
+          }
+        }
+        const records: Receipt["records"] = [];
         for (const [type, rows] of groups) {
           if (type === "experience") await addExperiences(ws, rows as unknown as ExperienceInput[], "agent");
-          else addRecords(ws, type, rows);
+          else for (const result of addRecords(ws, type, rows)) records.push({ type, id: result.record.id });
         }
+        const next = { ...receipts, [basename(file)]: { agent: agents, records } };
+        if (replaces) delete next[basename(replaces)];
+        ws.writeJson(RECEIPTS, next, { internal: true });
       },
     };
   }

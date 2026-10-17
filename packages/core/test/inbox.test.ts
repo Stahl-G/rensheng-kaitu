@@ -358,3 +358,31 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+it("Agent 放一份 replaces 之前文件的新文件就能修改或撤回，只能替换自己交的", async () => {
+  const ws = await freshWorkspace("Asia/Saigon");
+  const meal = (kcal: number) => ({
+    type: "meal",
+    agent: "grok-bot",
+    meal: "晚",
+    items: [{ name: "韩式炸鸡" }],
+    kcal,
+    protein_g: 45,
+    ts: "2026-10-17T20:00:00+07:00",
+  });
+  const drop = async (name: string, rows: object[]) => {
+    ws.writeText(`inbox/agents/${name}`, `${rows.map((row) => JSON.stringify(row)).join("\n")}\n`);
+    return processInbox(ws, { stableMs: 0 });
+  };
+  await drop("grok-1.records.jsonl", [meal(1400)]);
+  await drop("grok-2.records.jsonl", [{ replaces: "grok-1.records.jsonl" }, meal(1250)]);
+  expect(readRecords(ws, "meal").map((row) => row.kcal)).toEqual([1250]);
+  const other = await drop("codex-1.records.jsonl", [
+    { replaces: "grok-2.records.jsonl", agent: "codex" },
+    { ...meal(900), agent: "codex" },
+  ]);
+  expect(other.notes).toHaveLength(1);
+  expect(readRecords(ws, "meal").map((row) => row.kcal)).toEqual([1250]);
+  await drop("grok-3.records.jsonl", [{ replaces: "grok-2.records.jsonl", agent: "grok-bot" }]);
+  expect(readRecords(ws, "meal")).toEqual([]);
+});

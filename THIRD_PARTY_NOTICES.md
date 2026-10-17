@@ -1,5 +1,8 @@
 # 第三方依赖
 
+按功能查看所有直接依赖、运行环境、构建工具与数据来源：
+[开源项目与致谢](docs/open-source.md)。本文件保留原始许可文本及代码移植说明。
+
 | 名称 | 许可证 | 仓库 |
 |---|---|---|
 | fflate | MIT | https://github.com/101arrowz/fflate |
@@ -28,7 +31,7 @@
 
 ## OpenClaw IMAP / 飞书只读采集适配
 
-来源：OpenClaw 2026.10.4 的 `extensions/imap/src/{config,sender-gate,state,watcher}.ts`。
+来源：[OpenClaw](https://github.com/openclaw/openclaw) 2026.10.4 的 `extensions/imap/src/{config,sender-gate,state,watcher}.ts`。
 飞书适配参考 `extensions/feishu/src/client.ts`（WSClient 建立与生命周期回调）与 `post.ts`（富文本结构与元素处理）。
 移除了插件框架、提示词、Agent 会话派发与发送能力。
 
@@ -271,7 +274,7 @@ Adapted from double-entry-generator (Apache-2.0), Copyright deb-sig contributors
 
 ## 本机表格读取
 
-- read-excel-file 9.3.12（MIT）：https://github.com/catamphetamine/read-excel-file ，读取 XLSX。
+- read-excel-file 9.3.12（MIT）：https://gitlab.com/catamphetamine/read-excel-file （[GitHub 仓库](https://github.com/catamphetamine/read-excel-file)），读取 XLSX。
 - xls-reader 0.7.0（MIT）：https://github.com/zanlucathiago/xls-reader ，读取 BIFF8 XLS。
 
 ## Yahoo 参考行情

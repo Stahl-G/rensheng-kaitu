@@ -35,6 +35,11 @@ node packages/cli/dist/main.js init /tmp/kaitu-demo
 - 产品需求：[`docs/PRD.md`](docs/PRD.md)
 - 开发交接：[`docs/HANDOFF.md`](docs/HANDOFF.md)
 
+## 开源致谢
+
+人生开图基于 DeepSeek Harness、Electron、React、MapLibre、FullCalendar 等开源项目构建。
+完整的 [项目、用途与许可证清单](docs/open-source.md)，以及 [第三方许可和代码移植说明](THIRD_PARTY_NOTICES.md)，在仓库中持续保留。
+
 ## 许可证
 
 [MIT](LICENSE)。npm 包名规划为 `rensheng-kaitu`（命令行仍为 `kaitu`）。
