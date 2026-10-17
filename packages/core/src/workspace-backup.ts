@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { promises as fs, rmSync } from "node:fs";
-import { isAbsolute } from "node:path";
-import { join, relative, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { z } from "zod";
 import { rememberWorkspace } from "./drive.js";
 import { KaituError } from "./errors.js";
@@ -129,13 +128,11 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
       if (path === internal) continue;
       if (e.isDirectory()) await walk(path);
       else if (e.isFile() && selected(path, c)) {
-        ws.assertDownloaded(path);
         files[path] = await fs.readFile(ws.resolve(path), "utf8");
       }
     }
   };
   await walk("");
-  for (const path of basePaths) if (selected(path, c) && !(path in files)) ws.assertDownloaded(path);
   files[manifest] = JSON.stringify({
     format: "kaitu-workspace",
     version: 1,
@@ -388,11 +385,10 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         store(ws, { ...s, conflicts: merged.conflicts, error: undefined });
         return;
       }
-      // 网络期间作者可能继续写：这次结果留待下轮，不覆盖刚保存的内容。
-      if (!sameFiles(await localFiles(ws, c), local)) return;
       const changes = [...new Set([...Object.keys(local), ...Object.keys(merged.files)])].filter(
         (path) => path !== manifest && local[path] !== merged.files[path],
       );
+      // 网络期间作者可能继续写：这次结果留待下轮，不覆盖刚保存的内容。
       if (changes.some((path) => (ws.exists(path) ? ws.readText(path) : undefined) !== local[path])) return;
       for (const path of changes) {
         if (merged.files[path] === undefined) rmSync(ws.resolve(path));
@@ -558,25 +554,27 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
     case "disconnect":
       return disconnectWorkspaceBackup(ws);
     case "resolve": {
-      if (!args.path || !args.choice) throw new Error("请选择冲突文件和保留版本 / Choose a file and version");
+      if (!args.path || !args.choice)
+        throw new Error(pick("请选择冲突文件和保留版本", "Choose a file and version"));
       return resolveWorkspaceBackup(ws, args.path, args.choice);
     }
     case "activate": {
       if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
       if (!args.root || !isAbsolute(args.root))
-        throw new Error("请选择恢复后的工作区 / Select a restored workspace");
+        throw new Error(pick("请选择恢复后的工作区", "Select a restored workspace"));
       const opened = new Workspace(args.root);
-      if (!opened.exists(".kaitu/config.json")) throw new Error("不是开图工作区 / Not a Kaitu workspace");
+      if (!opened.exists(".kaitu/config.json"))
+        throw new Error(pick("不是开图工作区", "Not a Kaitu workspace"));
       ws.root = opened.root;
       rememberWorkspace(opened.root);
       return workspaceBackupStatus(ws);
     }
     case "restore": {
-      if (!args.root) throw new Error("请选择一个新的恢复目录 / Choose a new restore folder");
+      if (!args.root) throw new Error(pick("请选择一个新的恢复目录", "Choose a new restore folder"));
       if (args.token) setGithubToken(ws, args.token);
       return restoreWorkspaceBackup(args.root, ws, args);
     }
     default:
-      throw new Error("未知的备份操作 / Unknown backup action");
+      throw new Error(pick("未知的备份操作", "Unknown backup action"));
   }
 }

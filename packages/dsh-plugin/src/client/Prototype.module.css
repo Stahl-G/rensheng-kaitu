@@ -2797,3 +2797,9 @@
     margin-bottom: 8px;
   }
 }
+
+.pre {
+  white-space: pre-wrap;
+  max-height: 250px;
+  overflow: auto;
+}

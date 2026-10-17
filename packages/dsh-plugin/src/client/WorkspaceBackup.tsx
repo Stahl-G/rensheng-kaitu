@@ -52,16 +52,8 @@ export function WorkspaceBackup({
   const c = status?.connection;
   return (
     <section className={css.sec}>
-      <h2 className={css.eyebrow}>
-        {t("GitHub 工作区备份（开发者可选）", "GitHub workspace backup (optional)")}
-      </h2>
-      <div className={css.card} style={{ padding: 20 }}>
-        <p>
-          {t(
-            "只同步所选文字和结构化资料。密钥、凭据、本机状态、内部历史及媒体文件留在本机。",
-            "Sync selected text and structured data. Credentials, local state, internal history and media stay on this device.",
-          )}
-        </p>
+      <h2 className={css.eyebrow}>{t("GitHub 备份", "GitHub backup")}</h2>
+      <div className={`${css.card} ${css["sub-form"]}`}>
         {c && (
           <p>
             {c.repo} · {c.private ? t("私有仓库", "Private repository") : t("公开仓库", "Public repository")}{" "}
@@ -74,14 +66,13 @@ export function WorkspaceBackup({
             {status.lastSync && ` · ${new Date(status.lastSync).toLocaleString()}`}
           </p>
         )}
-        {status?.error && <p role="alert">{status.error}</p>}
-        {c && !c.private && !c.enabled && (
-          <p role="alert">
-            {t(
-              "这是公开仓库，备份内容会对外可见。默认未开启上传，请换成私库，或主动选择允许公开同步。",
-              "This is a public repository: backup contents would be public. Upload is disabled. Choose a private repository or explicitly allow public sync.",
-            )}
+        {status?.error && (
+          <p className={css.error} role="alert">
+            {status.error}
           </p>
+        )}
+        {c && !c.private && !c.enabled && (
+          <p role="alert">{t("公开仓库，未开启上传", "Public repository; upload is off")}</p>
         )}
         <details open={!c}>
           <summary>
@@ -92,12 +83,6 @@ export function WorkspaceBackup({
           <label>
             {t("仓库（owner/repo）", "Repository (owner/repo)")}
             <input
-              style={{
-                padding: "8px 10px",
-                border: "1px solid var(--line)",
-                borderRadius: 8,
-                background: "var(--surface)",
-              }}
               aria-label={t("备份仓库", "Backup repository")}
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
@@ -105,14 +90,8 @@ export function WorkspaceBackup({
             />
           </label>
           <label>
-            {t("GitHub token（留空复用已有凭据）", "GitHub token (leave blank to reuse saved credentials)")}
+            GitHub token
             <input
-              style={{
-                padding: "8px 10px",
-                border: "1px solid var(--line)",
-                borderRadius: 8,
-                background: "var(--surface)",
-              }}
               type="password"
               autoComplete="new-password"
               value={token}
@@ -120,12 +99,8 @@ export function WorkspaceBackup({
             />
           </label>
           <p className={css.small}>
-            {t(
-              "授权时只选目标仓库，Contents 设为 Read and write；token 仅保存在本机。",
-              "Authorize only the selected repository with Contents: Read and write. The token is saved locally.",
-            )}{" "}
             <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
-              {t("在 GitHub 创建授权", "Authorize on GitHub")}
+              {t("在 GitHub 创建 token", "Create a token on GitHub")}
             </a>
           </p>
           <label>
@@ -200,23 +175,13 @@ export function WorkspaceBackup({
                 ? t("同一条记录在两端修改或删除", "The same record was edited or deleted on both devices")
                 : t("两端都有修改", "Changed on both devices")}
             </summary>
-            <p>
-              {t(
-                "两份内容已保留，本次上传暂停。请选择这个文件要保留的版本。",
-                "Both versions are kept; upload is paused. Choose the version to keep for this file.",
-              )}
-            </p>
             <details>
               <summary>{t("本机版本", "Local version")}</summary>
-              <pre style={{ whiteSpace: "pre-wrap", maxHeight: 250, overflow: "auto" }}>
-                {conflict.local ?? t("已删除", "Deleted")}
-              </pre>
+              <pre className={css.pre}>{conflict.local ?? t("已删除", "Deleted")}</pre>
             </details>
             <details>
               <summary>{t("远端版本", "Remote version")}</summary>
-              <pre style={{ whiteSpace: "pre-wrap", maxHeight: 250, overflow: "auto" }}>
-                {conflict.remote ?? t("已删除", "Deleted")}
-              </pre>
+              <pre className={css.pre}>{conflict.remote ?? t("已删除", "Deleted")}</pre>
             </details>
             <button
               className={`${css.btn} ${css["btn-quiet"]}`}
@@ -250,7 +215,11 @@ export function WorkspaceBackup({
             </button>
           </output>
         )}
-        {message && <p role="alert">{message}</p>}
+        {message && (
+          <p className={css.error} role="alert">
+            {message}
+          </p>
+        )}
       </div>
     </section>
   );

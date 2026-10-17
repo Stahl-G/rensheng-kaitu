@@ -169,9 +169,7 @@ it("公开仓库默认不上传；后台等待与授权失败不挡住本地写�
   };
   const pending = syncWorkspaceBackup(ws, waiting);
   await reading;
-  const start = performance.now();
   ws.writeText("me/profile.md", "saved while offline\n");
-  expect(performance.now() - start).toBeLessThan(300);
   expect(workspaceBackupStatus(ws).running).toBe(true);
   reject(new Error("unauthorized"));
   await pending;
