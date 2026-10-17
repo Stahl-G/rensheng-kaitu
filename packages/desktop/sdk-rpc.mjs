@@ -29,7 +29,54 @@ export const inject = [
   "llm",
   "authorization",
   "attachments",
+  "configEditor",
 ];
+
+// 问问的服务商按 DSH 自己的格式存在 sdk profile 的 cordis.patch.yml：DeepSeek 在 llm-deepseek，其余在 llm-pi-ai。
+const LLM_ENTRIES = ["llm-deepseek", "llm-pi-ai"];
+const modelIds = (models) => (Array.isArray(models) ? models.map((model) => model?.id).filter(Boolean) : []);
+const mergeModels = (old = [], next = []) => [
+  ...old.filter((model) => !next.some((item) => item.id === model?.id)),
+  ...next,
+];
+function savedProviders(ctx) {
+  const rows = [];
+  for (const { entry, override } of ctx.configEditor.configuration()) {
+    if (entry.options.id === "llm-deepseek" && modelIds(override.models).length)
+      rows.push({ provider: "deepseek-official", models: modelIds(override.models) });
+    if (entry.options.id === "llm-pi-ai")
+      for (const [provider, config] of Object.entries(override.providers ?? {}))
+        if (modelIds(config?.models).length)
+          rows.push({ provider, api: config.api, baseURL: config.baseURL, models: modelIds(config.models) });
+  }
+  return rows;
+}
+async function saveProvider(ctx, patch) {
+  for (const row of patch) {
+    const entry = ctx.configEditor.entries().find((item) => item.options.id === row.id);
+    if (!entry || !LLM_ENTRIES.includes(row.id)) continue;
+    if (row.id === "llm-deepseek")
+      await ctx.configEditor.edit(entry, (current) => ({
+        ...current,
+        ...row.config,
+        models: mergeModels(current.models, row.config.models),
+      }));
+    else
+      for (const [provider, config] of Object.entries(row.config.providers ?? {}))
+        await ctx.configEditor.edit(entry, (current) => ({
+          ...current,
+          providers: {
+            ...current.providers,
+            [provider]: {
+              ...current.providers?.[provider],
+              ...config,
+              models: mergeModels(current.providers?.[provider]?.models, config.models),
+            },
+          },
+        }));
+  }
+  return savedProviders(ctx);
+}
 export function apply(ctx) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const sdk = new HarnessSdkJsonRpcServer(ctx, transport);
@@ -67,6 +114,8 @@ export function apply(ctx) {
     if (method === "kaitu/directory") {
       return { providers: ctx.llm.listConfigurableProviders(), authorization: ctx.authorization.list() };
     }
+    if (method === "kaitu/providers") return savedProviders(ctx);
+    if (method === "kaitu/saveProvider") return saveProvider(ctx, params.patch);
     if (method === "kaitu/models") {
       return ctx.llm.discoverModels("llm-pi-ai", { provider: params.provider }, AbortSignal.timeout(20000));
     }

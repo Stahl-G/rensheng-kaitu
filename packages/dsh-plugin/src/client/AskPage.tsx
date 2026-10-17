@@ -51,6 +51,8 @@ interface Settings {
   protocols: { id: string; name: string }[];
   supportsImages: boolean;
   providers: Provider[];
+  /** 已添加的服务商和模型，存在 DSH 的 profile 里。 */
+  saved?: { provider: string; name: string; models: string[] }[];
 }
 interface Automation {
   asked: boolean;
@@ -490,6 +492,18 @@ export function AskPage({
       setSessionReferences([]);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const switchModel = async (provider: string, id: string) => {
+    setModelMenu(false);
+    setSaving(true);
+    setError("");
+    try {
+      setSettings(await call<Settings>("askConfigure", { choice: "builtin", provider, model: id }));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1003,18 +1017,31 @@ export function AskPage({
               </button>
               {modelMenu && (
                 <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
-                  <b>{settings?.configured ? settings.providerName : "连接内置 AI"}</b>
-                  <p className={v2.small}>{settings?.configured ? settings.model : ""}</p>
+                  {settings?.saved?.flatMap((row) =>
+                    row.models.map((id) => (
+                      <button
+                        type="button"
+                        key={`${row.provider}/${id}`}
+                        className={css.model}
+                        aria-pressed={
+                          settings.configured && settings.provider === row.provider && settings.model === id
+                        }
+                        disabled={busy || saving}
+                        onClick={() => void switchModel(row.provider, id)}
+                      >
+                        {row.name} · {id}
+                      </button>
+                    )),
+                  )}
                   <button
                     type="button"
                     className={css.model}
                     onClick={() => {
                       setModelMenu(false);
-                      if (settings?.configured && onConnections) onConnections();
-                      else setStep(1);
+                      setStep(1);
                     }}
                   >
-                    AI 与连接
+                    添加服务商
                   </button>
                 </dialog>
               )}

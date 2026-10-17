@@ -11,6 +11,7 @@ import {
   credentialRef,
   extendProviders,
   providerPatch,
+  providers,
   selection,
 } from "./sdk-providers.mjs";
 import {
@@ -129,6 +130,8 @@ export function createSdkRuntime({
   const loadSettings = async () => {
     await loadDirectory();
     const stored = readSettings();
+    if (stored.provider && !providers.some((item) => item.id === stored.provider))
+      await savedProviders().catch(() => []);
     return { choice: stored.choice, ...selection(stored) };
   };
   const credential = (operation, input) =>
@@ -174,6 +177,25 @@ export function createSdkRuntime({
     writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
     return describeSearch();
   };
+  // 已添加的服务商存在 DSH 的 profile 里（可以有多个）；自定义服务各自一个 id，按地址区分。
+  const savedProviders = async () => {
+    const rows = await api.support("providers");
+    extendProviders(
+      rows
+        .filter((row) => row.baseURL && !providers.some((item) => item.id === row.provider))
+        .map((row) => ({
+          id: row.provider,
+          name: new URL(row.baseURL).hostname,
+          api: row.api,
+          baseURL: row.baseURL,
+        })),
+    );
+    return rows.map((row) => ({
+      ...row,
+      name: providers.find((item) => item.id === row.provider)?.name ?? row.provider,
+    }));
+  };
+  const saveProvider = (settings) => api.support("saveProvider", { patch: providerPatch(settings) });
   let capabilityRuntime;
   const api = {
     async support(method, input = {}) {
@@ -221,6 +243,7 @@ export function createSdkRuntime({
           supportsImages: settings.supportsImages ?? info.supportsImages,
           configured: settings.choice === "builtin" && info.configured,
         }),
+        saved: await savedProviders().catch(() => []),
         search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
       };
     },
@@ -237,6 +260,12 @@ export function createSdkRuntime({
       }
       if (input.choice === "builtin") {
         if (!settings.model) throw new KaituError("请选择或填写模型 ID", "AI_MODEL");
+        if (settings.provider === "kaitu-custom") {
+          const host = new URL(settings.baseURL).hostname;
+          const id = `custom-${host.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}`;
+          extendProviders([{ id, name: host, api: settings.api, baseURL: settings.baseURL }]);
+          settings = { ...settings, provider: id };
+        }
         if (
           input.apiKey !== undefined &&
           (typeof input.apiKey !== "string" || !input.apiKey.trim() || input.apiKey.length > 4096)
@@ -249,37 +278,47 @@ export function createSdkRuntime({
         )
           throw new KaituError("更换 Base URL 后请填入该服务的 API Key", "AI_KEY");
         const ref = credentialRef(settings.provider);
+        // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
+        const known =
+          !input.apiKey &&
+          (await savedProviders().catch(() => [])).some(
+            (row) => row.provider === settings.provider && row.models.includes(settings.model),
+          );
         const result =
-          settings.auth === "dsh"
+          settings.auth === "dsh" || (known && !input.apiKey)
             ? await credential("status", { settings, ref })
             : await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
         if (!result.configured)
           throw new KaituError(result.message ?? "请先完成此服务的登录", result.code ?? "AI_AUTH");
         if (input.apiKey) await credential("save", { ref, apiKey: input.apiKey.trim() });
+        await saveProvider(settings);
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
-      return connectionInfo({ ...settings, configured: settings.choice === "builtin" });
+      return api.settings();
     },
     async runtime(mode = "scoped", capabilities = false) {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
-      const settings = await loadSettings();
-      const info = await credential("status", { ref: credentialRef(settings.provider), settings });
-      settings.supportsImages ??= info.supportsImages;
-      if (!capabilities && (settings.choice !== "builtin" || !info.configured))
-        throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
+      // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
+      const settings = capabilities ? {} : await loadSettings();
+      if (!capabilities) {
+        const info = await credential("status", { ref: credentialRef(settings.provider), settings });
+        settings.supportsImages ??= info.supportsImages;
+        if (settings.choice !== "builtin" || !info.configured)
+          throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
+        // 旧版只存在 kaitu-ai.json 里的服务商，第一次用时搬进 DSH 的 profile。
+        if (
+          !(await savedProviders()).some(
+            (row) => row.provider === settings.provider && row.models.includes(settings.model),
+          )
+        )
+          await saveProvider(settings);
+      }
       const profile = join(home, `kaitu-sdk-${capabilities ? "capabilities" : mode}.patch.json`);
       mkdirSync(home, { recursive: true, mode: 0o700 });
-      writeFileSync(
-        profile,
-        JSON.stringify([
-          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }),
-          ...(capabilities ? [] : providerPatch(settings)),
-        ]),
-        {
-          mode: 0o600,
-        },
-      );
+      writeFileSync(profile, JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode })), {
+        mode: 0o600,
+      });
       const { JsonRpcLineTransport } = await import(
         pathToFileURL(createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-sdk-protocol"))
           .href

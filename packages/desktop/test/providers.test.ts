@@ -43,6 +43,8 @@ async function setup() {
     home,
     workspace: ws.root,
     helper: resolve("packages/desktop/sdk-credentials.mjs"),
+    plugin: resolve("packages/cli/dist/engine/sdk-plugin.mjs"),
+    hostPlugin: resolve("packages/cli/dist/engine/sdk-host.mjs"),
   });
   const ask = createAskService({
     state: temp,
@@ -124,7 +126,7 @@ test.skipIf(!available)(
         });
         child.on("error", reject);
         child.on("exit", () => done({ output, diagnostics }));
-        child.stdin.end(JSON.stringify({ ref: "KAITU_KAITU_CUSTOM_API_KEY" }));
+        child.stdin.end(JSON.stringify({ ref: "KAITU_CUSTOM_127_0_0_1_API_KEY" }));
       });
       expect(logs.output + logs.diagnostics).not.toContain(secret);
       expect(JSON.parse(logs.output).configured).toBe(true);
@@ -136,6 +138,10 @@ test.skipIf(!available)(
       });
       expect(kept.status).toBe(200);
       expect(kept.body.model).toBe("other-model");
+      // 添加过的模型都留着，可以切回去。
+      expect((await run.sdk.settings()).saved).toEqual([
+        expect.objectContaining({ provider: "custom-127-0-0-1", models: ["local-model", "other-model"] }),
+      ]);
     } finally {
       await run.close();
     }
