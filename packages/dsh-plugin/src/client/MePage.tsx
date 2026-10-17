@@ -74,6 +74,36 @@ function sourceLabel(source: string | null) {
   return source;
 }
 
+type Translate = (zh: string, en: string) => string;
+type CareerItem = MeData["career"][number];
+
+function period(item: CareerItem, t: Translate): string {
+  if (!item.start) return t("时间未知", "Dates unknown");
+  return `${item.start} – ${item.end ?? t("至今", "present")}`;
+}
+
+/** 简历由经历生成：工作在前，读书在后，各自从近到远。 */
+function downloadResume(data: MeData, t: Translate) {
+  const lines = [`# ${data.name ?? t("简历", "Résumé")}`, ""];
+  if (data.bio) lines.push(data.bio, "");
+  for (const [kind, heading] of [
+    ["worked", t("工作经历", "Work")],
+    ["studied", t("教育经历", "Education")],
+  ] as const) {
+    const items = data.career.filter((item) => item.kind === kind);
+    if (!items.length) continue;
+    lines.push(`## ${heading}`, "");
+    for (const item of items) lines.push(`- ${period(item, t)} · ${item.title} · ${item.place}`);
+    lines.push("");
+  }
+  const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/markdown" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${data.name ?? "resume"}.md`;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProps) {
   const t = useT();
   const [data, setData] = useState<MeData | null>(null);
@@ -202,6 +232,30 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
               >
                 移除
               </button>
+            )}
+          </section>
+          <section className={css.sec}>
+            <div className={css["sec-head"]}>
+              <h2 className={css.eyebrow}>{t("经历", "Experience")}</h2>
+              {data.career.length > 0 && (
+                <button type="button" className={css.link} onClick={() => downloadResume(data, t)}>
+                  {t("导出简历", "Export résumé")}
+                </button>
+              )}
+            </div>
+            {data.career.length ? (
+              <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>
+                {data.career.map((item) => (
+                  <div className={css.fact} key={item.id}>
+                    <p>{item.title}</p>
+                    <span className={css.src}>
+                      {period(item, t)} · {item.place}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className={css.small}>{t("还没有读书或工作经历", "No study or work history yet")}</p>
             )}
           </section>
           <section className={css.sec}>

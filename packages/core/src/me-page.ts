@@ -1,4 +1,5 @@
 import { readAvatar } from "./avatar.js";
+import { committedExperiences } from "./experience-imports.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { listMemories } from "./memory.js";
 import type { Workspace } from "./workspace.js";
@@ -34,6 +35,16 @@ export interface MeData {
     source: string | null;
     sensitive: boolean;
   }[];
+  /** 读书和工作经历，按开始时间从近到远；简历就是这份列表。 */
+  career: {
+    id: string;
+    kind: "studied" | "worked";
+    title: string;
+    place: string;
+    start: string | null;
+    end: string | null;
+    source: string;
+  }[];
 }
 
 export function readMe(ws: Workspace): MeData {
@@ -56,5 +67,21 @@ export function readMe(ws: Workspace): MeData {
       sensitive: sensitive ?? false,
     })),
     avatar: readAvatar(ws),
+    career: committedExperiences(ws)
+      .filter(
+        (item) =>
+          (item.event_type === "studied" || item.event_type === "worked") &&
+          !["planned", "suggested"].includes(item.fact_status),
+      )
+      .map((item) => ({
+        id: item.id,
+        kind: item.event_type as "studied" | "worked",
+        title: item.title ?? item.place.name,
+        place: item.place.name,
+        start: item.start ?? null,
+        end: item.end ?? null,
+        source: item.source,
+      }))
+      .sort((a, b) => (b.start ?? "").localeCompare(a.start ?? "")),
   };
 }
