@@ -197,6 +197,8 @@ export function AskPage({
     [],
   );
   const [loadingModels, setLoadingModels] = useState(false);
+  const [manualModel, setManualModel] = useState(false);
+  const modelRequest = useRef(0);
   const [modelNotice, setModelNotice] = useState("");
   const [baseURL, setBaseURL] = useState("");
   const [api, setApi] = useState("openai-completions");
@@ -447,7 +449,15 @@ export function AskPage({
       setModeSaving(false);
     }
   };
+  // 服务、接口或 Key 变了，之前获取的模型和还没回来的请求都作废。
+  const dropModels = () => {
+    modelRequest.current++;
+    setLoadingModels(false);
+    setAvailableModels([]);
+    setModelNotice("");
+  };
   const loadModels = async () => {
+    const request = ++modelRequest.current;
     setLoadingModels(true);
     setModelNotice("");
     try {
@@ -455,15 +465,23 @@ export function AskPage({
         provider,
         auth,
         ...(custom ? { baseURL, api } : {}),
-        ...(key ? { apiKey: key } : {}),
+        ...(key.trim() ? { apiKey: key.trim() } : {}),
       });
+      if (request !== modelRequest.current) return;
       setAvailableModels(models);
+      if (models.length) {
+        setModel((current) =>
+          models.some((item) => item.id === current) ? current : (models[0]?.id ?? current),
+        );
+        setManualModel(false);
+      }
       setModelNotice(models.length ? `${models.length} 个模型` : "服务没有返回模型");
     } catch (err) {
+      if (request !== modelRequest.current) return;
       setAvailableModels([]);
       setModelNotice(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoadingModels(false);
+      if (request === modelRequest.current) setLoadingModels(false);
     }
   };
   const next = async () => {
@@ -1104,18 +1122,18 @@ export function AskPage({
               <span>用 API Key 连接，或使用服务商提供的账号登录。</span>
             </button>
             {choice === "builtin" ? (
-              <fieldset className={css.fields} disabled={saving || loadingModels}>
+              <fieldset className={css.fields} disabled={saving}>
                 <label className={css.key}>
                   AI 服务
                   <select
                     value={provider}
                     onChange={(event) => {
                       const id = event.target.value;
+                      dropModels();
+                      setManualModel(false);
                       setProvider(id);
                       setAuth(settings?.provider === id ? (settings.auth ?? "key") : "key");
                       setModel(settings?.provider === id ? settings.model : "");
-                      setAvailableModels([]);
-                      setModelNotice("");
                       setKey("");
                       setError("");
                     }}
@@ -1131,7 +1149,13 @@ export function AskPage({
                 {custom && (
                   <label className={css.key}>
                     协议
-                    <select value={api} onChange={(event) => setApi(event.target.value)}>
+                    <select
+                      value={api}
+                      onChange={(event) => {
+                        dropModels();
+                        setApi(event.target.value);
+                      }}
+                    >
                       {settings?.protocols.map((item) => (
                         <option key={item.id} value={item.id}>
                           {item.name}
@@ -1147,7 +1171,10 @@ export function AskPage({
                       type="url"
                       value={baseURL}
                       placeholder="https://api.example.com/v1"
-                      onChange={(event) => setBaseURL(event.target.value)}
+                      onChange={(event) => {
+                        dropModels();
+                        setBaseURL(event.target.value);
+                      }}
                     />
                   </label>
                 )}
@@ -1174,6 +1201,7 @@ export function AskPage({
                           : "粘贴这个 AI 服务的 API Key"
                       }
                       onChange={(event) => {
+                        dropModels();
                         setKey(event.target.value);
                         setAuth("key");
                       }}
@@ -1183,23 +1211,36 @@ export function AskPage({
                     />
                   </label>
                 )}
-                <label className={css.key} htmlFor="ask-model">
-                  模型
-                  <input
-                    id="ask-model"
-                    list="ask-model-options"
-                    value={model}
-                    placeholder="从接口获取后选择，或填写模型 ID"
-                    onChange={(event) => setModel(event.target.value)}
-                  />
-                  <datalist id="ask-model-options">
-                    {availableModels.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </datalist>
-                </label>
+                {availableModels.length > 0 && (
+                  <label className={css.key}>
+                    模型
+                    <select
+                      value={manualModel ? "" : model}
+                      onChange={(event) => {
+                        setManualModel(!event.target.value);
+                        setModel(event.target.value);
+                      }}
+                    >
+                      {availableModels.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name && item.name !== item.id ? `${item.name} · ${item.id}` : item.id}
+                        </option>
+                      ))}
+                      <option value="">手动填写模型 ID</option>
+                    </select>
+                  </label>
+                )}
+                {(!availableModels.length || manualModel) && (
+                  <label className={css.key} htmlFor="ask-model">
+                    {availableModels.length ? "模型 ID" : "模型"}
+                    <input
+                      id="ask-model"
+                      value={model}
+                      placeholder="从服务获取后选择，或填写模型 ID"
+                      onChange={(event) => setModel(event.target.value)}
+                    />
+                  </label>
+                )}
                 <button type="button" onClick={() => void loadModels()} disabled={loadingModels}>
                   {loadingModels ? "正在获取模型…" : "从服务获取模型列表"}
                 </button>
