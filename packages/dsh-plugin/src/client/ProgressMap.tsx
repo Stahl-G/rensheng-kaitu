@@ -16,6 +16,8 @@ export interface ProgressMapProps {
   loadExploration: () => Promise<ExplorationData>;
   subscribe?: (refresh: () => void) => () => void;
   open: (section: "footprints" | "directions" | "projects" | "plans") => void;
+  /** 足迹页下面已经有一张地图，进度图就只留「接下来往哪走」。 */
+  hidePlaces?: boolean;
 }
 
 const COLLAPSED = "kaitu.progress-map.collapsed";
@@ -83,7 +85,7 @@ export function ProgressMap(props: ProgressMapProps) {
       </div>
       {!collapsed && (
         <>
-          {cities.length > 0 && places && (
+          {cities.length > 0 && places && !props.hidePlaces && (
             <>
               <h3 className={css.sub}>{t("去过的地方", "Where I've been")}</h3>
               <PlacesMap data={places} onOpen={() => props.open("footprints")} />

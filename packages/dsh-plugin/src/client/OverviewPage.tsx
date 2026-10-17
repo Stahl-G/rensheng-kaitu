@@ -837,6 +837,7 @@ function Overview({
               </div>
             </div>
             <ProgressMap
+              hidePlaces={explore === "footprints"}
               plans={data?.plans}
               projects={data?.projects ?? []}
               loadLifeMap={props.loadLifeMap}
