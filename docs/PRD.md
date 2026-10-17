@@ -387,6 +387,16 @@ account_last4（本方银行卡尾四位，四位数字或 null）；原交易�
 
 ---
 
+### 6.7 手机快照与收件箱（2026-10-18）
+
+`phone/` 是电脑生成、Agent 只读的目录，不作为模块、不进本机版本历史。
+`today.json`、`week.json`、`map.json`、`receipts.json` 的契约见 `schemas/phone-*.schema.json`，样例见 `schemas/fixtures/phone/`。
+只有手机可读的同步存放位置或启用 GitHub 备份时，后台防抖生成读快照；内容不变不写。
+手机新建 `inbox/agents/ios-<8位设备号>-<ULID>.note.md / .records.jsonl / .actions.jsonl`。
+原文保留 capture 与作者，手机记录 origin 映射 by；操作按 client_id 去重并先核对当前状态，结果写十四天回执。
+支持完成下一步、确认或拒绝日程建议、完成或取消待办，其他操作预留。GitHub 手机路径独立于备份内容开关。
+详细读写、隐私边界与失败语义见 [手机契约](guides/phone-contract.md)。本次不支持照片。
+
 ## 7. 系统功能
 
 ### 7.1 记忆（仿 ChatGPT）
