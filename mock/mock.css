@@ -216,3 +216,63 @@ button.m-act { color: var(--ink); }
   .m-panel, .m-panel.is-on, .m-tabs button { transform: none; transition: none; }
 }
 
+
+/* 灵感来源旁的人生进度图概念设计（mock/lifemap.js）：上半去过的地方，下半接下来往哪走 */
+.insp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 40px 56px; align-items: start; }
+@media (max-width: 960px) { .insp-grid { grid-template-columns: 1fr; } .insp-grid .lifemap { max-width: 520px; } }
+.lifemap:empty { display: none; }
+.lifemap { position: sticky; top: 88px; padding: 16px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-raised); --land: #eef1ec; --sea: #e8eef2; --bound: #dde2da; }
+:root[data-theme="dark"] .lifemap { --land: #1f2620; --sea: #1a1c1d; --bound: #2d352e; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .lifemap { --land: #1f2620; --sea: #1a1c1d; --bound: #2d352e; } }
+@media (max-width: 960px) { .lifemap { position: static; } }
+.lm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; }
+.lm-badge { background: var(--explore-tint); color: var(--explore-ink); }
+.lm-sub { margin: 16px 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.lm-map { position: relative; border-radius: 12px; overflow: hidden; }
+.lm-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lm-sea { fill: var(--sea); }
+.lm-land { fill: var(--land); }
+.lm-bounds { fill: none; stroke: var(--bound); stroke-width: 1; stroke-dasharray: 3 3; }
+.lm-lake { fill: var(--sea); stroke: var(--bound); stroke-width: 0.6; }
+.lm-river { fill: none; stroke: var(--bound); stroke-width: 1.4; stroke-linecap: round; }
+.lm-walked { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-linecap: round; }
+.lm-planned { fill: none; stroke: var(--explore); stroke-width: 2.5; stroke-dasharray: 6 6; stroke-linecap: round; transition: stroke-width 160ms; }
+.lm-planned.is-linked { stroke-width: 4; }
+.lm-city { position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 6px; padding: 4px; border: 0; background: none; color: var(--ink); cursor: pointer; border-radius: 8px; font-size: 13px; font-weight: 500; }
+.lm-city i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--surface); flex: none; }
+.lm-city span { position: absolute; left: calc(100% - 4px); white-space: nowrap; padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--surface) 85%, transparent); }
+.lm-left span { left: auto; right: calc(100% - 4px); }
+.lm-city em { margin-left: 6px; font-style: normal; font-size: 12px; color: var(--muted); }
+.lm-now i { width: 14px; height: 14px; box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--ink); }
+.lm-plan i { background: var(--surface); border: 2px dashed var(--explore); box-shadow: none; width: 14px; height: 14px; }
+.lm-city[aria-pressed="true"] span, .lm-city.is-linked span, .lm-row.is-linked { box-shadow: 0 0 0 2px var(--explore); }
+.lm-rows { position: relative; display: grid; gap: 2px; }
+.lm-row { display: grid; grid-template-columns: minmax(0, 1fr) 38%; align-items: center; gap: 12px; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; font-size: 14px; }
+.lm-row:hover, .lm-row[aria-pressed="true"] { background: var(--sunken); }
+.lm-row-text { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.lm-type { flex: none; font-size: 12px; color: var(--c); font-weight: 600; }
+.lm-row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lm-track { position: relative; height: 10px; }
+.lm-done { position: absolute; left: 0; top: 4px; height: 3px; border-radius: 2px; background: var(--c); }
+.lm-ahead { position: absolute; right: 0; top: 4px; height: 0; border-top: 3px dashed var(--c); opacity: 0.8; }
+.lm-fog .lm-ahead { border-top-style: dotted; opacity: 0.6; }
+.lm-fog .lm-row-title { color: var(--muted); }
+.lm-nowline { position: absolute; top: 0; bottom: 0; right: 10px; width: 38%; pointer-events: none; }
+.lm-nowline::before { content: ""; position: absolute; left: var(--now); top: 2px; bottom: 2px; border-left: 1.5px solid var(--line); }
+.lm-nowline span { position: absolute; left: var(--now); top: -18px; transform: translateX(-50%); font-size: 11px; color: var(--muted); }
+.lm-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.lm-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.lm-legend i { display: inline-block; width: 20px; border-top: 3px solid var(--ink); }
+.lm-legend .lm-k2 { border-top-style: dashed; border-color: var(--explore); }
+.lm-legend .lm-k3 { border-top-style: dotted; border-color: var(--muted); }
+.lm-card { margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--sunken); min-height: 120px; font-size: 14px; line-height: 1.6; color: var(--ink2); }
+.lm-card h3 { margin: 4px 0; font-size: 16px; line-height: 24px; color: var(--ink); }
+.lm-card p { margin: 0; }
+.lm-card dl { margin: 10px 0 0; display: grid; gap: 4px; }
+.lm-card dl div { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 8px; }
+.lm-card dt { color: var(--muted); }
+.lm-card dd { margin: 0; color: var(--ink); }
+.lm-card-top { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+.lm-hint { color: var(--muted); }
+.lm-foot { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.lm-city:focus-visible, .lm-row:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
