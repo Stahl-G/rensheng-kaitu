@@ -5,7 +5,7 @@ import { templateDir } from "./assets.js";
 import { doctor } from "./doctor.js";
 import { GITIGNORE, snapshot } from "./history.js";
 import { type ModuleDef, listModules } from "./modules.js";
-import { batchOverview } from "./overview.js";
+import { batchOverview, renderOrganizer } from "./overview.js";
 import { syncMode } from "./sync-location.js";
 import { templateOutdated, templateVersion } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
@@ -33,7 +33,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   const version = templateVersion();
   if (
     !templateOutdated(ws) &&
-    (syncMode(ws.root) !== "drive" || ws.exists("ORGANIZER.md")) &&
+    ws.exists("ORGANIZER.md") &&
     ws.exists("handoffs/daily") &&
     ws.exists("explore/module.json")
   )
@@ -110,7 +110,8 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     ...writes.keys(),
     ...deletes.map((file) => `删除 ${file}`),
     "AGENTS.md",
-    ...(syncMode(ws.root) === "drive" ? ["AGENT-README.md", "ORGANIZER.md"] : []),
+    ...(syncMode(ws.root) === "drive" ? ["AGENT-README.md"] : []),
+    "ORGANIZER.md",
     "OVERVIEW.md",
     ".kaitu/config.json",
   ];
@@ -124,6 +125,8 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     for (const [file, content] of writes) ws.writeText(file, content);
     for (const file of deletes) rmSync(ws.resolve(file));
     writeAgentsMd(ws);
+    // 现状刷新在缺 NOW.md 等文件时会跳过；规则文件直接补上，免得每次启动都重跑升级。
+    if (!ws.exists("ORGANIZER.md")) ws.writeText("ORGANIZER.md", renderOrganizer());
     const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
     ws.writeJson(
       ".kaitu/config.json",

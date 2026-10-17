@@ -75,7 +75,7 @@ it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可
     expect(existsSync(historyDirectory(ws))).toBe(true);
     expect(mcpToken(ws)).toBe(token);
     expect(ws.exists("AGENT-README.md")).toBe(false);
-    expect(ws.exists("ORGANIZER.md")).toBe(false);
+    expect(ws.exists("ORGANIZER.md")).toBe(true);
     expect(ws.exists("OVERVIEW.md")).toBe(true);
     expect((await history(ws)).slice(1)).toEqual(before);
     expect((await doctor(ws)).every((check) => check.ok)).toBe(true);

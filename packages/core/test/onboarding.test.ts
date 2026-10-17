@@ -211,6 +211,32 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
   }
 });
 
+it("每日整理起草并归档的原文不再算等待整理，草稿仍能核对采纳；核对后只留原文也不再等待", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-organizer-notes-"));
+  try {
+    const ws = await initWorkspace(join(root, "ws"));
+    const sleep = await saveOnboardingMatter(ws, "想把入睡时间调到 11 点前");
+    const swim = await saveOnboardingMatter(ws, "想学会游泳");
+    expect((await readOverviewPage(ws)).sync.received).toBe(2);
+    const draft = { goal: "11 点前入睡", current: "常拖到 1 点", next: "今晚 10:30 放下手机" };
+    await draftOnboardingMatter(ws, sleep.source, draft);
+    await inboxNoteDone(ws, sleep.source);
+    await draftOnboardingMatter(ws, swim.source, {
+      goal: "学会游泳",
+      current: "不会换气",
+      next: "报一节体验课",
+    });
+    await keepOnboardingMatter(ws, swim.source);
+    expect((await readOverviewPage(ws)).sync.received).toBe(0);
+    expect(readOnboardingMatter(ws, sleep.source).draft).toEqual(draft);
+    await adoptOnboardingMatter(ws, sleep.source, draft);
+    expect(listTasks(ws).map((task) => task.source)).toEqual([sleep.source]);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来源的下一步并可记结果", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-matter-"));
   try {

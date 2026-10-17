@@ -182,7 +182,7 @@ ${skills()
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
 - Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
 - 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
-- 只有 Drive 模式维护云端接力入口；本机与 iCloud 同样维护 OVERVIEW.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
+- 只有 Drive 模式维护云端接力入口 \`AGENT-README.md\`；本机与 iCloud 同样维护 OVERVIEW.md 和每日整理规则 ORGANIZER.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
 
 ## 12. MCP
 
@@ -190,7 +190,7 @@ ${skills()
 - Codex：在工作区运行 \`codex mcp add kaitu -- kaitu mcp\`；非默认目录先设置 \`KAITU_DIR\`。
 - 云端：\`kaitu mcp --http\` 只监听 127.0.0.1:4871，默认精简 remote 工具，须 Bearer token。
 - \`kaitu mcp token\` 查看 token，\`kaitu mcp token --rotate\` 轮换；不把 token 放进版本文件或日志。
-- MCP 可读状态、记录、记忆和对话，可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
+- MCP 可读状态、记录、记忆和对话（remote 集合不含财务明细和标为敏感的记忆），可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
 - 资讯采集先读 \`feed/COLLECT.md\`（采集规则）和 \`feed/feeds.json\`（关注方向）。
 - 新闻用 \`news_item\` 投递并写明 \`relevance.reason\`，X 热门用 \`trend\`；复用新增记录工具或收件箱。\`news_read\` 读取资讯，\`news_try\` 生成 proposed 下一步，\`news_dismiss\` 标记单条新闻不相关。
 - 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。

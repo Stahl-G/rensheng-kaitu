@@ -19,7 +19,7 @@ Kaitu describes three places your notes can go: kept on this computer, synced to
 - Full agent: only for a conversation where you turn it on. It can run commands and read or write any file on this computer, and what it reads may go to the AI service.
 - Morning plan, daily organizer and news search: when on, they run on schedule with Ask's AI, read the notes they need and send them to the same AI service.
 - Web search: queries go to Ask's current AI service by default, or to Perplexity, Exa or Tavily if you switch.
-- Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; ones connected over the internet can't read finance details, and none can read keys, credentials or version history. What they read goes to the AI service behind them.
+- Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; ones connected over the internet can't read finance details or memories marked sensitive, and none can read keys, credentials or version history. What they read goes to the AI service behind them.
 - Cloud relay: a cloud AI that works through your drive (such as Grok over Google Drive) can read every note file on the drive, finance details included.
 - Phone channels: messages you send on WeChat, Telegram, Feishu or QQ, and the replies, pass through those platforms; Ask's AI answers them.
 - Context pack and clipboard: only the text you copy and paste leaves Kaitu. Packs leave out health records, finance details and memories marked sensitive, and recognizable keys and local paths are removed.
