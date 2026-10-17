@@ -121,8 +121,15 @@ function inboxContent(file: string, text: string): InboxContent {
   );
   if (!rows.length || rows.length !== list.length) return { kind: "note" };
   if (rows.every((row) => memoryType(row.type) && (row.text ?? row.content))) return { kind: "memory", rows };
+  // 有标题和起止时间、没写类型或写明是日程建议的，按日程建议收，不当成记录类型去查。
+  if (
+    object?.title &&
+    object.start &&
+    object.end &&
+    (object.type === undefined || /^(proposal|suggestion|日程建议|建议)$/i.test(String(object.type)))
+  )
+    return { kind: "proposal", row: object };
   if (rows.every((row) => typeof row.type === "string")) return { kind: "records", rows };
-  if (object?.title && object.start && object.end) return { kind: "proposal", row: object };
   return { kind: "note" };
 }
 
@@ -433,6 +440,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
               try {
                 const imported = await importBatch(ws, "apple-health", parsed.candidates, {
                   ignored: parsed.ignored,
+                  skipInvalid: shortcut,
                 });
                 count = imported.added + imported.updated;
               } catch (error) {

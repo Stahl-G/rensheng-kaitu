@@ -43,6 +43,8 @@ export interface BatchOptions {
   ignored?: Record<string, number>;
   scope?: (record: StoredRecord) => boolean;
   deleteMissing?: (record: StoredRecord) => boolean;
+  /** 不合法的单条只跳过并计入 ignored.invalid，其余照常导入（快捷指令这类逐条交来的数据）。 */
+  skipInvalid?: boolean;
 }
 
 export function naturalKey(type: ImportType, data: Record<string, unknown>): string {
@@ -100,6 +102,36 @@ export async function importBatch(
     groups.set(item.type, group);
   }
   if (opts.deleteMissing && !groups.has("event")) groups.set("event", new Map());
+  const check = (type: ImportType, items: Candidate[]) =>
+    addRecords(
+      ws,
+      type,
+      items.map((item) => item.data),
+      { by, dryRun: true },
+    );
+  // 逐条交来的数据先挑出不合法的单条跳过，其余照常导入。
+  let invalid = 0;
+  const total = [...groups.values()].reduce((count, group) => count + group.size, 0);
+  if (opts.skipInvalid)
+    for (const [type, group] of groups) {
+      try {
+        check(type, [...group.values()]);
+      } catch {
+        for (const [key, item] of group) {
+          try {
+            check(type, [item]);
+          } catch {
+            group.delete(key);
+            invalid++;
+          }
+        }
+      }
+    }
+  if (invalid) {
+    if (invalid === total)
+      throw new KaituError(`没有能导入的样本：${invalid} 条不符合记录格式`, "INVALID_IMPORT");
+    result.ignored = { ...result.ignored, invalid: (result.ignored.invalid ?? 0) + invalid };
+  }
   const plans = [...groups].map(([type, group]) => {
     const revisions = readRecordRevisions(ws, type);
     const latest = new Map<string, StoredRecord>();
@@ -153,14 +185,9 @@ export async function importBatch(
     result.types[type] = counts;
     for (const action of ["added", "updated", "deleted", "skipped"] as const)
       result[action] += counts[action];
-    // 预览也使用记录写入层的同一份校验，整批合法后才开始追加。
+    // 预览也使用记录写入层的同一份校验（含与旧记录合并后的结果），整批合法后才开始追加。
     try {
-      addRecords(
-        ws,
-        type,
-        [...group.values()].map((item) => item.data),
-        { by, dryRun: true },
-      );
+      check(type, [...group.values()]);
     } catch {
       throw new KaituError(`导入（${source}）包含不合法的 ${type} 记录`, "INVALID_IMPORT");
     }

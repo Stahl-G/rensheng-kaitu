@@ -688,6 +688,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
 export async function importHealthShortcut(ws: Workspace, inputFile: string, opts: BatchOptions = {}) {
   const { candidates, ignored } = parseHealthShortcut(inputFile, ws.timeZone());
   return importBatch(ws, "apple-health", candidates, {
+    skipInvalid: true,
     ...opts,
     ignored,
     message: (count) => `从 Apple 健康同步了 ${count} 条记录（快捷指令）`,

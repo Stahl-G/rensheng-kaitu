@@ -270,4 +270,15 @@ it("快捷指令样本写法不一时照常导入，不支持的类型和坏样�
     ]),
   );
   await expect(importHealthShortcut(ws, unsupported)).rejects.toThrow(/没有能导入的样本：1 条类型暂不支持/);
+  // 读得出但不合记录格式的单条（心情写成 happy）只跳过这一条。
+  const mixed = join(tmp(), "mixed.health.json");
+  writeFileSync(
+    mixed,
+    JSON.stringify([
+      { type: "body_mass", start: "2026-10-16T07:00:00+08:00", value: 70.2, unit: "kg" },
+      { type: "state_of_mind", start: "2026-10-16T08:00:00+08:00", value: "happy", unit: "" },
+    ]),
+  );
+  expect((await importHealthShortcut(ws, mixed)).ignored).toMatchObject({ invalid: 1 });
+  expect(readRecords(ws, "metric").some((row) => row.value === 70.2)).toBe(true);
 });

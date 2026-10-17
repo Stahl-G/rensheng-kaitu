@@ -20,6 +20,8 @@ const NEXT_STATUS: Record<string, string> = {
   doing: "todo",
   active: "todo",
   "in progress": "todo",
+  blocked: "todo",
+  waiting: "todo",
   待办: "todo",
   未完成: "todo",
   进行中: "todo",
@@ -31,6 +33,7 @@ const NEXT_STATUS: Record<string, string> = {
   complete: "done",
   completed: "done",
   finished: "done",
+  closed: "done",
   完成: "done",
   已完成: "done",
   skipped: "skipped",
@@ -56,6 +59,10 @@ const BLOCK_STATUS: Record<string, string> = {
   skipped: "skipped",
   skip: "skipped",
   跳过: "skipped",
+  cancelled: "skipped",
+  canceled: "skipped",
+  取消: "skipped",
+  已取消: "skipped",
   rejected: "rejected",
   declined: "rejected",
   拒绝: "rejected",
@@ -90,6 +97,7 @@ const instant = (value: unknown, timeZone: string) => {
 const text = (value: unknown) =>
   typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
 const pick = (table: Record<string, string>, value: unknown) => table[text(value).toLowerCase()];
+const missing = (value: unknown) => value === undefined || value === null || text(value) === "";
 const shortHash = (value: string) => createHash("sha1").update(value).digest("hex").slice(0, 8);
 
 /** 9:00、9点、21:30 → 09:00、21:30；读不出返回 undefined。 */
@@ -148,7 +156,8 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
       // 带时间或文字的截止（2026-10-17T14:00、下周五）原样留在 when，due 只留日期，时间不丢。
       const dateOnly = /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(text(item.due));
       const when = text(item.when) || (item.due !== undefined && (!due || !dateOnly) ? text(item.due) : "");
-      const status = pick(NEXT_STATUS, item.status) ?? "todo";
+      // 没写状态算待办；认得出的写法换成规范值，写了却认不出的留给校验报错，不悄悄当成待办。
+      const status = missing(item.status) ? "todo" : (pick(NEXT_STATUS, item.status) ?? item.status);
       const priority = pick(PRIORITY, item.priority);
       const { name: _name, text: _text, ...rest } = item;
       return [
@@ -187,7 +196,11 @@ export function normalizeNow(data: Doc, timeZone: string): Doc {
     const end = clockTime(block.end);
     let kind = pick(BLOCK_KIND, block.kind) ?? (start && end ? "event" : "task");
     if (kind !== "task" && !(start && end)) kind = "task";
-    const status = pick(BLOCK_STATUS, block.status) ?? (kind === "proposal" ? "pending" : "confirmed");
+    const status = missing(block.status)
+      ? kind === "proposal"
+        ? "pending"
+        : "confirmed"
+      : (pick(BLOCK_STATUS, block.status) ?? block.status);
     const { name: _name, start: _start, end: _end, ...rest } = block;
     return [
       {

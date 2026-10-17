@@ -311,6 +311,8 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
         },
       ]),
       "grok-idea.md": "# 想法\n\n周末去爬山。\n",
+      // 普通 .json 里写明 type: proposal 的日程建议
+      "grok-stretch.json": JSON.stringify({ type: "proposal", title: "拉伸", start: "21:00", end: "21:15" }),
       "grok.memory.json": JSON.stringify([
         { type: "preferences", text: "喜欢晚上训练", confidence: 0.9, agent: "grok-bot" },
       ]),
@@ -336,7 +338,12 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
     ]);
     expect(
       parseFrontmatter<{ blocks: { title: string; start: string }[] }>(ws.readText("NOW.md")).data.blocks,
-    ).toEqual(expect.arrayContaining([expect.objectContaining({ title: "散步", start: "09:00" })]));
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: "散步", start: "09:00" }),
+        expect.objectContaining({ title: "拉伸", start: "21:00", status: "pending" }),
+      ]),
+    );
     expect(ws.readText(`feed/digests/${today}.md`)).toContain("今天的简报。");
     // 写了日期却读不出：转待整理，不归到今天。
     ws.writeText(
