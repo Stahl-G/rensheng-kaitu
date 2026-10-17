@@ -185,7 +185,7 @@ export function listProjects(ws: Workspace, options: { now?: Date; slug?: string
         kind: project.data.kind,
         stage: project.data.stage,
         links: project.data.links,
-        progress: project.data.progress,
+        progress: project.data.progress ?? null,
         next: project.data.next ?? [],
         github: projectGithub(ws, slug, now),
         completion: project.data.progress

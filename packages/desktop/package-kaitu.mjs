@@ -532,12 +532,14 @@ async function writePayload(payload) {
   for (const folder of ["schemas", "templates"])
     cpSync(join(root, folder), join(payload, folder), { recursive: true });
   cpSync(join(root, "packages/core/data"), join(payload, "data"), { recursive: true });
-  for (const [name, subpaths] of [
-    ["@deepseek-ai/dsh-typert-protocol", ["."]],
-    ["@deepseek-ai/dsh-native-command", ["."]],
-    ["@deepseek-ai/dsh-file-reference-local", ["./search"]],
-  ])
-    await writeProtocolBridge(payload, build, name, subpaths);
+  // 插件里用到的每个 DSH 入口都转接到宿主自带的同一份模块；从构建结果里找，内核新增子路径时不会漏。
+  const bridges = new Map();
+  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs"])
+    for (const [, name, subpath] of readFileSync(join(payload, file), "utf8").matchAll(
+      /from ?"(@deepseek-ai\/[\w-]+)(\/[\w-]+)?"/g,
+    ))
+      bridges.set(name, new Set([...(bridges.get(name) ?? []), subpath ? `.${subpath}` : "."]));
+  for (const [name, subpaths] of bridges) await writeProtocolBridge(payload, build, name, [...subpaths]);
 }
 
 async function writeProtocolBridge(payload, build, name, subpaths) {
