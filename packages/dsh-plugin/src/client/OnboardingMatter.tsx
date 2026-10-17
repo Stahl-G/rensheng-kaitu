@@ -56,13 +56,7 @@ function ClipboardOrganize({
   };
   return (
     <div className={css.clipboard} aria-label={t("用你常用的 AI 整理", "Organize with your own AI")}>
-      <b>{t("用你常用的 AI 整理，不用 API Key", "Organize with the AI you already use, no API key")}</b>
-      <span className={v2.small}>
-        {t(
-          "复制一段整理提示词，发给豆包、Kimi、DeepSeek、ChatGPT 等任何 AI，再把它的回答原样贴回来。",
-          "Copy an organizing prompt, send it to ChatGPT, Claude, Gemini or any other AI, then paste its answer back as is.",
-        )}
-      </span>
+      <b>{t("用你常用的 AI 整理", "Organize with the AI you already use")}</b>
       <div className={css.footerActions}>
         <button type="button" className={quiet} disabled={busy} onClick={() => void copy()}>
           {t("1 · 复制整理提示词", "1 · Copy the prompt")}
@@ -250,22 +244,6 @@ export function OnboardingMatter(
             ? t(`开图从${subject}里看到的`, `What Kaitu found in ${subject}`)
             : t("写下你的目标和一个下一步", "Write down your goal and one next step")}
       </h1>
-      <p className={css.lead}>
-        {!matter
-          ? t(
-              "直接写就行，也可以粘贴一段和 AI 聊过的对话。开图先原样保存，再帮你理出一个下一步，采不采纳由你定。",
-              "Just write it, or paste a conversation you had with an AI. Kaitu saves it as is first, then helps you find one next step. You decide whether to adopt it.",
-            )
-          : hasDraft
-            ? t(
-                "每一项都能改。只有你采纳的这一个下一步会成为待办，其他建议会留在原文里。",
-                "You can edit every field. Only the next step you adopt becomes a task; other suggestions stay in the original.",
-              )
-            : t(
-                "原文已保存。可以让你常用的 AI 先整理一遍，也可以自己填这三项。",
-                "Your text is saved. Let the AI you already use organize it first, or fill in these three fields yourself.",
-              )}
-      </p>
       {error && (
         <p role="alert" className={v2.error}>
           {error}
@@ -341,35 +319,12 @@ export function OnboardingMatter(
             </output>
           )}
           {manual && (
-            <>
-              <p className={v2.small}>
-                {props.builtin
-                  ? noAi
-                    ? t(
-                        "还没有连接开图里的 AI。可以先用你常用的 AI 整理，或自己填写这三项。",
-                        "Ask inside Kaitu isn't connected yet. Use the AI you already use, or fill in these three fields yourself.",
-                      )
-                    : t(
-                        "没有 AI 草稿时，这三项由你自己填写；也可以重新请 AI 整理。",
-                        "Without an AI draft you fill these in yourself, or ask the AI again.",
-                      )
-                  : externalRequested
-                    ? t(
-                        "到当前 AI 发送预填提示，再回到开图核对草稿。你也可以自己填写这三项。",
-                        "Send the prefilled prompt in your current AI, then come back to review the draft. You can also fill these in yourself.",
-                      )
-                    : t(
-                        "你可以自己填写这三项，也可以请当前 AI 整理成待核对草稿。",
-                        "Fill in these three fields yourself, or ask your current AI to draft them.",
-                      )}
-              </p>
-              <ClipboardOrganize
-                source={matter.source}
-                promptOnboardingMatter={props.promptOnboardingMatter}
-                pasteOnboardingMatter={props.pasteOnboardingMatter}
-                onDraft={apply}
-              />
-            </>
+            <ClipboardOrganize
+              source={matter.source}
+              promptOnboardingMatter={props.promptOnboardingMatter}
+              pasteOnboardingMatter={props.pasteOnboardingMatter}
+              onDraft={apply}
+            />
           )}
           <div className={css.draftFields}>
             {field("goal", t("当前目标", "Current goal"))}
@@ -405,12 +360,6 @@ export function OnboardingMatter(
                     </label>
                   ))}
                 </div>
-                <p className={v2.small}>
-                  {t(
-                    "AI 给的是可能性，选不选、选哪条由你定",
-                    "These are possibilities from the AI. You decide whether and which to pick",
-                  )}
-                </p>
               </fieldset>
             )}
             {field("next", t("一个下一步", "One next step"))}

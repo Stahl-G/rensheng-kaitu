@@ -86,7 +86,6 @@ export const ONBOARDING = {
   welcome: {
     title: "让 AI 持续了解你，把想改变的事变成能推进、能查回的个人进度",
     first: "说出想改变的一件事",
-    firstDescription: "直接写，或粘贴一段和 AI 聊过的对话",
   },
   matter: {
     entry: "说出想改变的一件事",
@@ -288,7 +287,7 @@ export interface OnboardingSourceInfo {
   available: boolean;
 }
 export interface OnboardingContent {
-  welcome: { title: string; first: string; firstDescription: string };
+  welcome: { title: string; first: string };
   matter: { entry: string; question: string; examples: readonly { title: string; text: string }[] };
   steps: readonly string[];
   ais: readonly { id: string; name: string; hint: string }[];

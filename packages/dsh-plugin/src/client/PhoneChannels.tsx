@@ -68,9 +68,6 @@ export function PhoneChannels({ request }: { request: ChannelRequest }) {
   return (
     <section className={css.sec}>
       <h2 className={css.eyebrow}>在手机上和开图聊</h2>
-      <p className={css.small}>
-        电脑开着时可用，只回复与你配对的账号。消息和回答会经过所选平台，由问问当前连接的模型回答；它只读写开图资料，能搜索和读网页。
-      </p>
       {error && (
         <p role="alert" className={css.small}>
           {error}

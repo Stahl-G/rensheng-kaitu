@@ -859,8 +859,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                       <p className={css.empty}>暂无消费记录</p>
                     )}
                   </Section>
-                  <Section title="不计入收支" note="转账和本金不算收入或消费；退款只冲减消费">
-                    <p className={css.muted}>转账、借款本金按净流入显示，转出为负数。</p>
+                  <Section title="不计入收支">
                     {data.cashflow.excluded.length ? (
                       data.cashflow.excluded.map((g) => (
                         <NumberDetail
@@ -988,13 +987,6 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                         />
                       ))}
                     </div>
-                    <p className={css.muted}>
-                      {g.fees_included === true
-                        ? "卖出收益已计费用，分红、独立手续费与税费另列。"
-                        : g.fees_included === false
-                          ? "卖出收益未全部计入费用，手续费与税费另列。"
-                          : "暂无完整费用记录，手续费与税费另列。"}
-                    </p>
                   </Section>
                 ))}
               </>

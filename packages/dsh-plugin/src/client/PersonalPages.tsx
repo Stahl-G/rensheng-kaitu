@@ -7,7 +7,6 @@ import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
 import { PhoneChannels } from "./PhoneChannels.js";
-import { PrivacyPage } from "./Privacy.js";
 import css from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
@@ -65,8 +64,6 @@ export function PersonalPages(
   const [pickingFolder, setPickingFolder] = useState(false);
   const [path, setPath] = useState("");
   const [provider, setProvider] = useState<SyncProvider>("local");
-  const [privacy, setPrivacy] = useState(false);
-  const reading = props.view === "settings" && privacy;
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -154,26 +151,16 @@ export function PersonalPages(
             type="button"
             key={id}
             aria-current={props.view === id ? "page" : undefined}
-            onClick={() => {
-              setPrivacy(false);
-              props.navigate(id);
-            }}
+            onClick={() => props.navigate(id)}
           >
             {label}
           </button>
         ))}
       </nav>
       <div className={css["me-body"]}>
-        {!reading && (
-          <div className={css.head}>
-            <h1>{title}</h1>
-            {props.view === "profile" && (
-              <span className={css.sub}>
-                {t("开图对你的了解，每条都留着出处", "What Kaitu knows about you, each with its source")}
-              </span>
-            )}
-          </div>
-        )}
+        <div className={css.head}>
+          <h1>{title}</h1>
+        </div>
         {error && (
           <p className={css.error} role="alert">
             {error}
@@ -187,73 +174,10 @@ export function PersonalPages(
         ) : props.view === "connections" ? (
           <>
             <section className={css.sec}>
-              <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>{t("资料去向", "Where your data goes")}</h2>
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() => {
-                    setPrivacy(true);
-                    props.navigate("settings");
-                  }}
-                >
-                  {t("逐项说明", "Full details")}
-                </button>
-              </div>
-              <dl className={`${css.card} ${css.where}`}>
-                <dt>{t("存在", "Stored")}</dt>
-                <dd>
-                  {data.storage.mode === "local"
-                    ? t("这台电脑，不同步", "This computer, not synced")
-                    : t(
-                        `同步到你的云盘 · ${storageName(data.storage.provider)}`,
-                        `Synced to your cloud · ${storageName(data.storage.provider)}`,
-                      )}
-                  <span className={css.small}>{data.storage.root}</span>
-                </dd>
-                <dt>{t("发给 AI", "Sent to AI")}</dt>
-                <dd>
-                  {!data.ai
-                    ? t("问问用 DSH 的模型设置", "Ask uses DSH model settings")
-                    : data.ai.configured
-                      ? t(
-                          `问问的对话发给 ${data.ai.providerName ?? "AI"} · ${data.ai.model}`,
-                          `Ask conversations go to ${data.ai.providerName ?? "AI"} · ${data.ai.model}`,
-                        )
-                      : t("问问还没连接 AI", "Ask isn't connected to an AI yet")}
-                  <span className={css.small}>
-                    {t(
-                      "默认只读写开图资料；你接入的外部 AI 各按下面写的范围读取",
-                      "By default it only reads and writes your Kaitu notes; AIs you connect below read what each one says",
-                    )}
-                  </span>
-                </dd>
-                <dt>{t("留在本机", "Stays here")}</dt>
-                <dd>
-                  {t(
-                    "Key、凭据、版本历史和索引：不进云盘，问问默认读不到",
-                    "Keys, credentials, version history and the index: never synced, and Ask can't read them by default",
-                  )}
-                </dd>
-              </dl>
-            </section>
-            <section className={css.sec}>
               <HandoverPanel loadHandover={props.loadHandover} onAnswer={props.onHandoverAnswer} />
             </section>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
-              <p className={css.small}>
-                {t(
-                  "填一个 AI 服务的 API Key（DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等都可以）",
-                  "Paste an API key from an AI service (DeepSeek, OpenAI, Claude, Gemini, Kimi, Zhipu and others)",
-                )}
-              </p>
-              <p className={css.small}>
-                {t(
-                  "更换服务或模型后，下一条消息生效。",
-                  "A new service or model applies from the next message.",
-                )}
-              </p>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css.conn}>
                   <span className={css.logo} style={{ background: "var(--explore)" }}>
@@ -267,7 +191,7 @@ export function PersonalPages(
                   <span className={css.small}>
                     {data.ai
                       ? data.ai.configured
-                        ? t("已连接 · 凭据只存本机", "Connected · key stays on this computer")
+                        ? t("已连接", "Connected")
                         : t("还没连接", "Not connected")
                       : t("使用 DSH 的模型设置", "Uses DSH model settings")}
                   </span>
@@ -288,20 +212,12 @@ export function PersonalPages(
                         ? `当前使用 ${search.name}`
                         : "先连接 AI，就能使用它自带的搜索"}
                   </b>
-                  <p className={css.small}>
-                    默认把搜索词发给当前对话的服务商，无需另申请搜索 Key，不新增接收方。
-                  </p>
                   {search.native && !search.native.supported && (
-                    <p className={css.small}>
-                      {search.native.reason ?? "当前服务尚未接入自带搜索，可在下面添加专门的搜索服务。"}
-                    </p>
+                    <p className={css.small}>{search.native.reason ?? "当前服务没有自带搜索"}</p>
                   )}
                   <details>
                     <summary className={css.link}>改用专门的搜索服务</summary>
                     <div className={css["sub-form"]}>
-                      <p className={css.small}>
-                        没有可用的自带搜索时，使用已添加的 Perplexity、Exa 或 Tavily；搜索词会发给所选服务。
-                      </p>
                       <label className={css.small} htmlFor="search-provider">
                         搜索服务
                       </label>
@@ -370,29 +286,11 @@ export function PersonalPages(
                 <h2 className={css.eyebrow}>
                   {t("这台电脑上的 AI（进阶）", "AI on this computer (advanced)")}
                 </h2>
-                <span className={css.small}>
-                  {t(
-                    "通过 MCP 直接读写，电脑开着时可用",
-                    "Reads and writes directly over MCP while this computer is on",
-                  )}
-                </span>
               </div>
               <div className={`${css.card} ${css.sum}`}>
                 <b>{t("接入支持 MCP 的客户端", "Connect an MCP client")}</b>
-                <p className={css.small}>
-                  {t(
-                    "Claude Desktop、Claude Code、Codex 等本机客户端可以直接读写这个开图文件夹",
-                    "Local clients such as Claude Desktop, Claude Code and Codex can read and write this Kaitu folder",
-                  )}
-                </p>
                 <details>
                   <summary className={css.link}>{t("查看接入说明", "Setup instructions")}</summary>
-                  <p className={`${css.small} ${css.notice}`}>
-                    {t(
-                      "接入后，这个 AI 能读写开图资料，读到的内容会发给它背后的 AI 服务；经公网连接的读不到财务明细，所有外部 AI 都读不到 Key、凭据和版本历史。",
-                      "Once connected, this AI can read and write your Kaitu notes, and what it reads goes to the AI service behind it. Connections over the internet can't read finance details, and no outside AI can read keys, credentials or version history.",
-                    )}
-                  </p>
                   <pre className={css.detailBody}>{`命令：kaitu mcp\n工作目录：${data.storage.root}`}</pre>
                   <textarea
                     aria-label={t("AI 接手说明", "AI handover instructions")}
@@ -419,9 +317,6 @@ export function PersonalPages(
             <section className={css.sec}>
               <div className={css["sec-head"]}>
                 <h2 className={css.eyebrow}>{t("云端的 AI（进阶）", "Cloud AI (advanced)")}</h2>
-                <span className={css.small}>
-                  {t("通过同步盘里的文件接力", "Relays through files in a synced folder")}
-                </span>
               </div>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
@@ -462,8 +357,6 @@ export function PersonalPages(
               />
             )}
           </>
-        ) : reading ? (
-          <PrivacyPage back={() => setPrivacy(false)} />
         ) : (
           <>
             <section className={css.sec}>
@@ -472,12 +365,6 @@ export function PersonalPages(
                 <div className={css["switch-row"]}>
                   <label htmlFor="ui-language">
                     <b>{t("界面语言", "Interface language")}</b>
-                    <span className={css.small}>
-                      {t(
-                        "只影响这台电脑上的开图界面和给 AI 的提示词",
-                        "Applies to Kaitu on this computer and the prompts it gives your AI",
-                      )}
-                    </span>
                   </label>
                   <select
                     id="ui-language"
@@ -507,7 +394,6 @@ export function PersonalPages(
             <section className={css.sec}>
               <div className={css["sec-head"]}>
                 <h2 className={css.eyebrow}>{t("自动整理", "Automatic organizing")}</h2>
-                <span className={css.small}>{t("用「问问」的 AI 运行", "Runs with the AI behind Ask")}</span>
               </div>
               <div className={`${css.card} ${css["list-card"]}`}>
                 {(
@@ -517,25 +403,17 @@ export function PersonalPages(
                       t("早间计划", "Morning plan"),
                       t("排好今天的安排，等你确认", "Plans your day for you to confirm"),
                     ],
-                    [
-                      "organizer",
-                      t("每日整理", "Daily organizer"),
-                      t(
-                        "把各个 AI 当天留下的记录合并成一份",
-                        "Merges what each AI left today into one record",
-                      ),
-                    ],
+                    ["organizer", t("每日整理", "Daily organizer")],
                     [
                       "news",
                       t("资讯搜索", "News search"),
                       t("按你关注的方向找新东西", "Finds new things on topics you follow"),
                     ],
                   ] as const
-                ).map(([key, label, note]) => (
+                ).map(([key, label]) => (
                   <div className={`${css["switch-row"]} ${css["auto-row"]}`} key={key}>
                     <label htmlFor={`auto-${key}`}>
                       <b>{label}</b>
-                      <span className={css.small}>{note}</span>
                     </label>
                     <span className={css["auto-ctl"]}>
                       <input
@@ -567,21 +445,12 @@ export function PersonalPages(
                   </div>
                 ))}
               </div>
-              <p className={css.note}>
-                {t(`时间按你的时区（${data.timeZone}）算`, `Times use your time zone (${data.timeZone})`)}
-              </p>
             </section>
             <section className={css.sec}>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <label htmlFor="calendar-push">
                     <b>{t("确认日程时加入系统日历", "Add confirmed time blocks to the system calendar")}</b>
-                    <span className={css.small}>
-                      {t(
-                        "只加入你确认的时间段。关闭后已写入的保持不动。",
-                        "Only blocks you confirm are added. Turning this off leaves existing events as they are.",
-                      )}
-                    </span>
                   </label>
                   <span className={css.switch}>
                     <input
@@ -640,13 +509,6 @@ export function PersonalPages(
                 <div className={css["switch-row"]}>
                   <span>
                     <b>{t("导出全部资料", "Export everything")}</b>
-                    <br />
-                    <span className={css.small}>
-                      {t(
-                        "Markdown、JSON 和附件，不含本机连接凭据",
-                        "Markdown, JSON and attachments, without local connection keys",
-                      )}
-                    </span>
                   </span>
                   <button
                     type="button"
@@ -674,10 +536,6 @@ export function PersonalPages(
                 <div className={css["switch-row"]}>
                   <span>
                     <b>{t("版本历史", "Version history")}</b>
-                    <br />
-                    <span className={css.small}>
-                      {t("每次改动都留了版本，可以恢复", "Every change keeps a version you can restore")}
-                    </span>
                   </span>
                   <button
                     type="button"
@@ -721,12 +579,7 @@ export function PersonalPages(
             )}
             {restore && (
               <section className={css.ask}>
-                <p>
-                  {t(
-                    "恢复前会自动保存当前版本，之后可以撤销。",
-                    "The current version is saved first, so you can undo this.",
-                  )}
-                </p>
+                <p>{t("恢复到这个版本？", "Restore this version?")}</p>
                 <button
                   type="button"
                   className={`${css.btn} ${css["btn-primary"]}`}
@@ -785,37 +638,9 @@ export function PersonalPages(
                 {provider === "nutstore" && (
                   <p className={css.small}>
                     {data.storage.suggested?.nutstore
-                      ? t(
-                          "已找到坚果云同步文件夹。资料放进去后由坚果云同步到你的其他电脑；版本历史、密钥和索引留在这台电脑。",
-                          "Found your Nutstore folder. Nutstore syncs your notes to your other computers; version history, keys and the index stay on this computer.",
-                        )
-                      : t(
-                          "没找到坚果云同步文件夹。先在坚果云客户端里设好一个同步文件夹，再在下面填它里面的新文件夹路径。",
-                          "No Nutstore folder found. Set up a synced folder in Nutstore first, then enter a new folder inside it below.",
-                        )}
+                      ? t("已找到坚果云同步文件夹", "Nutstore folder found")
+                      : t("没找到坚果云同步文件夹", "No Nutstore folder found")}
                   </p>
-                )}
-                {provider !== "local" && (
-                  <div className={`${css.small} ${css.notice}`}>
-                    <b>
-                      {t(
-                        `资料会同步到${provider === "folder" ? "那个同步盘" : ` ${storageName(provider)} `}`,
-                        `Your notes will sync through ${provider === "folder" ? "that sync app" : storageName(provider)}`,
-                      )}
-                    </b>
-                    <span>
-                      {t(
-                        "资料文件夹里的全部资料文件，包括财务明细，都由它存放和同步；你授权读取这个云盘的 AI 也能读到。版本历史、Key、凭据和索引留在这台电脑。",
-                        "Every file in your notes folder, finance details included, is stored and synced by it, and any AI you let read that cloud folder can read them. Version history, keys, credentials and the index stay on this computer.",
-                      )}
-                    </span>
-                    <span>
-                      {t(
-                        "不要直接把现在的开图文件夹拖进同步盘，那样会连密钥和版本库一起上传；请用这里迁移。",
-                        "Don't drag the current Kaitu folder into a sync app; that would upload keys and history too. Move it here instead.",
-                      )}
-                    </span>
-                  </div>
                 )}
                 <label>
                   {t("新的文件夹位置", "New folder location")}
@@ -848,12 +673,6 @@ export function PersonalPages(
                 >
                   {pickingFolder ? t("正在选择…", "Choosing…") : t("选择存放文件夹…", "Choose folder…")}
                 </button>
-                <p className={css.small}>
-                  {t(
-                    "选择后，资料将放在该位置下新的 kaitu 文件夹中。也可以手动修改上面的路径。",
-                    "Your notes will go into a new kaitu folder inside the selected location. You can also edit the path above.",
-                  )}
-                </p>
                 <button
                   type="submit"
                   className={`${css.btn} ${css["btn-primary"]}`}
@@ -864,6 +683,8 @@ export function PersonalPages(
               </form>
             )}
             <section className={css.sec}>
+              <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
+              {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}
               <p className={css.small}>
                 {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}
                 {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} ·{" "}

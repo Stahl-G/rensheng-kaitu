@@ -118,13 +118,7 @@ function ClipboardDirections({
       className={`${v2.card} ${v2["sub-form"]}`}
       aria-label={t("用你常用的 AI 提方向", "Ask your own AI for directions")}
     >
-      <b>{t("用你常用的 AI 提方向，不用 API Key", "Ask the AI you already use, no API key")}</b>
-      <span className={v2.small}>
-        {t(
-          "复制提示词给你常用的 AI，再贴回建议。只带目标、项目和已有方向，由你选择是否采纳。",
-          "Copy the prompt to your own AI, then paste its ideas back. It includes goals, projects and directions. You choose what to adopt.",
-        )}
-      </span>
+      <b>{t("用你常用的 AI 提方向", "Ask the AI you already use")}</b>
       <div className={v2["dialog-foot"]}>
         {copied && <output className={v2.small}>{copied}</output>}
         <button
@@ -275,12 +269,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
       // 没连内置 AI 时直接给出「用你常用的 AI」这条路，而不是只让用户去连接。
       if (props.pasteDirections && /连接 AI|AI_CONNECTION/.test(message)) {
         setClipboard(true);
-        setError(
-          t(
-            "还没有连接开图里的 AI。可以用下面的方式，让你常用的 AI 来提方向。",
-            "Ask inside Kaitu isn't connected. Use the AI you already use below instead.",
-          ),
-        );
+        setError(t("还没有连接 AI", "No AI connected"));
       } else setError(message);
     }
   };
@@ -480,9 +469,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
             <>
               <div className={css.statement}>
                 <h3>为什么在意</h3>
-                <p>{directionText(direction.motivation, 600) || "先保留这个问题，再慢慢补充为什么在意。"}</p>
+                <p>{directionText(direction.motivation, 600) || "—"}</p>
                 <h3>目前的假设</h3>
-                <p>{directionText(direction.hypothesis, 400) || "还没形成假设，可以先收集一点资料。"}</p>
+                <p>{directionText(direction.hypothesis, 400) || "—"}</p>
                 {direction.unknowns && (
                   <>
                     <h3>仍然未知</h3>
@@ -595,11 +584,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                   补充依据或认识
                 </button>
               </div>
-              {notes.length ? (
-                noteItems(notes)
-              ) : (
-                <p className={base.muted}>还没有资料。先记下支持或反对这个假设的观察。</p>
-              )}
+              {notes.length ? noteItems(notes) : <p className={base.muted}>还没有资料</p>}
             </>
           )}
           {tab === "experiments" && (
@@ -609,9 +594,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                   安排一个小尝试
                 </button>
               )}
-              {!experiments.length && (
-                <p className={base.muted}>还没有尝试。先选一件投入可控、能观察结果的事。</p>
-              )}
+              {!experiments.length && <p className={base.muted}>还没有尝试</p>}
               {experiments.map((e) => (
                 <article key={`${e.id}:${e.rev ?? 1}`} className={css.item}>
                   <div className={css.itemHeader}>
@@ -806,27 +789,15 @@ export function DirectionsPage(props: DirectionsPageProps) {
           {!data.directions.length && (
             <div className={base.focus}>
               <h2>{t("一个值得探索的问题", "A question worth exploring")}</h2>
-              <p className={base.subtitle}>
-                {t(
-                  "可以是创作、学习、职业，或一个尚不确定的想法。",
-                  "Creative work, learning, a career move, or an idea you're unsure about.",
-                )}
-              </p>
             </div>
           )}
           {!!data.directions.length && !listedDirections.length && (
             <p className={base.muted}>
               {filter === "favorites"
-                ? t(
-                    "还没有收藏的方向。打开一个方向后可以收藏。",
-                    "No saved directions yet. Open one to save it.",
-                  )
+                ? t("还没有收藏的方向", "No saved directions")
                 : filter === "history"
-                  ? t("还没有暂停、归档或忽略的方向。", "Nothing paused, archived or dismissed yet.")
-                  : t(
-                      "当前没有正在探索的方向，可以记下新问题，或从暂停与归档中继续。",
-                      "Nothing in progress. Write down a new question, or resume one from paused and archived.",
-                    )}
+                  ? t("没有暂停或归档的方向", "Nothing paused or archived")
+                  : t("没有正在探索的方向", "Nothing in progress")}
             </p>
           )}
           {!!props.goals?.length && (

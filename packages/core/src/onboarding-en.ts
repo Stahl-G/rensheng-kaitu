@@ -6,7 +6,6 @@ export const ONBOARDING_EN = {
     title:
       "Let AI keep up with you, and turn what you want to change into progress you can push and look back on",
     first: "Name one thing you want to change",
-    firstDescription: "Write it down, or paste a conversation you had with an AI",
   },
   matter: {
     entry: "Name one thing you want to change",

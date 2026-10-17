@@ -73,16 +73,9 @@ export function HandoverPanel({
   };
   return (
     <section className={`${css.card} ${css["sub-form"]} ${css.handover}`} aria-labelledby="handover-title">
-      <span className={css.eyebrow}>{t("在原来的 AI 里继续", "Keep going in your own AI")}</span>
       <h2 id="handover-title">
         {t("把近况带给你常用的 AI", "Bring where you are to the AI you already use")}
       </h2>
-      <p className={css.small}>
-        {t(
-          "复制下面的资料包，粘贴到 ChatGPT、豆包、Kimi、DeepSeek 等任何 AI 的对话里。聊完对它说「整理给开图」，再把回答贴回来。不需要 API Key。",
-          'Copy the context pack below into a chat with ChatGPT, Claude, Gemini or any other AI. When you are done, say "update Kaitu" and paste its answer back here. No API key needed.',
-        )}
-      </p>
       {error && (
         <p role="alert" className={css.error}>
           {error}
@@ -115,10 +108,7 @@ export function HandoverPanel({
           {pending && (
             <div role="alertdialog" aria-labelledby="handover-rebuild" className={css["sub-form"]}>
               <p id="handover-rebuild" className={css.small}>
-                {t(
-                  "你改过下面的文字。换勾选会按勾选重新生成资料包，你的删改会丢掉。",
-                  "You edited the text below. Changing what to bring rebuilds the pack from your choices and drops your edits.",
-                )}
+                {t("重新生成会丢掉你的删改", "Rebuilding drops your edits")}
               </p>
               <div className={css["dialog-foot"]}>
                 <button type="button" className={css.link} onClick={() => setPending(null)}>
@@ -134,12 +124,9 @@ export function HandoverPanel({
               </div>
             </div>
           )}
-          <p className={css.small}>{pack.excluded}</p>
-          <label htmlFor="handover-text" className={css.small}>
-            {t("可以在这里删改后再复制", "You can edit it here before copying")}
-          </label>
           <textarea
             id="handover-text"
+            aria-label={t("资料包", "Context pack")}
             ref={setArea}
             rows={10}
             value={text}
@@ -155,11 +142,7 @@ export function HandoverPanel({
               className={`${css.btn} ${css["btn-primary"]}`}
               onClick={() =>
                 void copyText(text, area).then((ok) =>
-                  setCopied(
-                    ok
-                      ? t("已复制，去你的 AI 里粘贴", "Copied. Paste it into your AI")
-                      : t("已选中，请按复制", "Selected. Copy it now"),
-                  ),
+                  setCopied(ok ? t("已复制", "Copied") : t("已选中，请按复制", "Selected. Copy it now")),
                 )
               }
             >

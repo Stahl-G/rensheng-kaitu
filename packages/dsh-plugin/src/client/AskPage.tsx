@@ -381,7 +381,7 @@ export function AskPage({
       settings?.configured &&
       !settings.supportsImages
     ) {
-      setError("当前连接未启用图片，请切换模型后重试");
+      setError("当前模型不支持图片");
       return;
     }
     setReadingFiles(true);
@@ -456,16 +456,10 @@ export function AskPage({
         ...(key ? { apiKey: key } : {}),
       });
       setAvailableModels(models);
-      setModelNotice(
-        models.length
-          ? auth === "dsh"
-            ? `此登录通道使用 DSH 提供的 ${models.length} 个型号，也可手填模型 ID。`
-            : `已从服务获取 ${models.length} 个模型，可选择或手填 ID。`
-          : "服务未返回模型，可以手填模型 ID。",
-      );
+      setModelNotice(models.length ? `${models.length} 个模型` : "服务没有返回模型");
     } catch (err) {
       setAvailableModels([]);
-      setModelNotice(`${err instanceof Error ? err.message : String(err)} 也可以手填模型 ID。`);
+      setModelNotice(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingModels(false);
     }
@@ -527,7 +521,6 @@ export function AskPage({
       <div className={css.unavailable}>
         <div className={css.welcome}>
           <h1>问问引擎没有载入</h1>
-          <p>请重新安装完整的开图 CLI/Web 包并重启工作台。也可以复制资料包，带到你常用的 AI。</p>
           {onConnections && (
             <button type="button" onClick={onConnections}>
               打开 AI 与连接
@@ -597,11 +590,6 @@ export function AskPage({
           {!events.some((event) => event.type === "user/message") && (
             <div className={css.welcome}>
               <h1>从你正在推进的事聊起</h1>
-              <p>
-                {questions.length
-                  ? "选一条已有资料，或直接说说你的想法。"
-                  : "说说你想推进的一件事，开图陪你一起理清下一步。"}
-              </p>
               <div className={css.suggestions}>
                 {questions.map((question) => (
                   <button
@@ -726,13 +714,6 @@ export function AskPage({
               连接 AI
             </button>
           </div>
-        )}
-        {settings?.configured && !settings.supportsImages && (
-          <p id="ask-image-hint" className={css.scope}>
-            {settings.provider === "kaitu-custom"
-              ? "当前连接未启用图片。"
-              : "当前连接未启用图片，可在 AI 与连接中切换模型。"}
-          </p>
         )}
         <form
           className={css.composer}
@@ -957,10 +938,6 @@ export function AskPage({
                   {modeMenu === "confirm" ? (
                     <>
                       <b>给这个对话开启完整 Agent？</b>
-                      <p className={v2.small}>
-                        {`它可以运行命令、读写这台电脑上的任何文件、上网，读到的内容会发给 ${settings?.providerName || "当前 AI 服务"}。资讯、邮件或网页里的内容可能诱导它做你不想做的事，只在你信任这次任务时开启。`}
-                      </p>
-                      <p className={v2.small}>只对这个对话生效，新对话仍是只读写开图资料。</p>
                       <div className={v2["dialog-foot"]}>
                         <button
                           type="button"
@@ -1027,9 +1004,7 @@ export function AskPage({
               {modelMenu && (
                 <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
                   <b>{settings?.configured ? settings.providerName : "连接内置 AI"}</b>
-                  <p className={v2.small}>
-                    {settings?.configured ? settings.model : "连接之后就能在这里聊。"}
-                  </p>
+                  <p className={v2.small}>{settings?.configured ? settings.model : ""}</p>
                   <button
                     type="button"
                     className={css.model}
@@ -1061,16 +1036,8 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `发给 ${settings.providerName} · ${mode === "full" ? "完整 Agent：能读写这台电脑上的任何文件" : "只读写开图资料，读不到 Key 和凭据"}`
+            ? `${settings.providerName} · ${mode === "full" ? "完整 Agent" : "开图资料"}`
             : "Enter 发送 · Shift + Enter 换行"}
-          {settings?.configured && onConnections && (
-            <>
-              {" · "}
-              <button type="button" className={css.scopeLink} onClick={onConnections}>
-                资料去向
-              </button>
-            </>
-          )}
         </p>
       </section>
       <dialog
@@ -1088,8 +1055,7 @@ export function AskPage({
         <p className={css.step}>第 {step} 步，共 2 步</p>
         {step === 1 ? (
           <>
-            <h2 id="ask-connect-title">问问开图，需要先连接一个 AI</h2>
-            <p>连接之后，开图可以帮你整理记录、排日程、回答关于你自己的问题。</p>
+            <h2 id="ask-connect-title">连接 AI</h2>
             <button
               type="button"
               className={css.choice}
@@ -1164,7 +1130,7 @@ export function AskPage({
                     onAuthorized={() => {
                       setAuth("dsh");
                       setKey("");
-                      setModelNotice("账号已授权，请获取型号或手填模型 ID。");
+                      setModelNotice("账号已授权");
                     }}
                   />
                 )}
@@ -1215,17 +1181,10 @@ export function AskPage({
                   <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
                     去 {selectedProvider.name} 官方申请 API Key ↗
                   </a>
-                ) : custom ? (
-                  <p>请按服务文档选择协议，填写 Base URL、模型 ID 和 API Key。</p>
                 ) : null}
-                <p>API Key 会发送最小请求验证；账号登录由服务商授权。切换后下一条消息生效。</p>
               </fieldset>
             ) : (
               <div className={css.external}>
-                <p>
-                  在「AI 与连接」复制一份资料包，贴到你常用的 AI
-                  里继续聊；聊完对它说「整理给开图」，再把回答贴回开图核对。这是手动接续，不算「已连接」。
-                </p>
                 {onConnections && (
                   <button type="button" onClick={onConnections}>
                     去复制资料包
@@ -1263,8 +1222,7 @@ export function AskPage({
           </>
         ) : (
           <>
-            <h2 id="ask-connect-title">要开图每天自动帮你整理吗？</h2>
-            <p>会用你刚连接的 AI 来跑，不开也能手动问。</p>
+            <h2 id="ask-connect-title">每天自动整理</h2>
             {(
               [
                 ["morning", "每天早上 7:30 排好今天"],
@@ -1281,7 +1239,6 @@ export function AskPage({
                 {label}
               </label>
             ))}
-            <p>以后可在开图菜单 → 设置中随时调整。</p>
             {error && <p role="alert">{error}</p>}
             <div className={css.actions}>
               <button type="button" disabled={saving} onClick={() => void finish(true)}>

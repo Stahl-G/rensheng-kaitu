@@ -103,7 +103,7 @@ export function NewsPage(props: NewsPageProps) {
             </button>
             {vote ? (
               <span className={css.small}>
-                已记为{vote === "useful" ? "有用" : "不相关"}，下次生成关注方案时参考 ·{" "}
+                已记为{vote === "useful" ? "有用" : "不相关"} ·{" "}
                 <button
                   type="button"
                   className={css.link}

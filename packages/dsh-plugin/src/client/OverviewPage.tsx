@@ -560,17 +560,8 @@ function Overview({
             <>
               <div className={css.head}>
                 <h1>{t("今天", "Today")}</h1>
-                <span className={css.sub}>
-                  {t("先记下一句，开图就开始认识你", "Write one line and Kaitu starts getting to know you")}
-                </span>
               </div>
               {capture}
-              <p className={css.small}>
-                {t(
-                  "有了真实记录后，你的数据和最近变化会出现在这里。",
-                  "Once you have real notes, your data and recent changes show up here.",
-                )}
-              </p>
               {plansCard}
             </>
           ) : (
@@ -585,7 +576,6 @@ function Overview({
                       weekday: "long",
                     }).format(new Date(`${data.today}T12:00:00Z`))}
                   </h1>
-                  <span className={css.sub}>{t("今天的事，一件一件来", "One thing at a time today")}</span>
                 </div>
                 {capture}
               </div>
@@ -604,10 +594,7 @@ function Overview({
                               `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`,
                               `From ${focus.module}${focus.proposed ? " · suggestion, needs confirming" : ""}`,
                             )
-                          : t(
-                              "看看最近的变化，或记下一件值得跟进的事。",
-                              "Look at recent changes, or note something worth following up.",
-                            )}
+                          : null}
                       </p>
                     </div>
                     {focus && (
@@ -698,7 +685,8 @@ function Overview({
               />
               {push &&
                 data.blocks
-                  .filter((block) => block.status === "confirmed" && block.start && block.end)
+                  // 加入日历成功不再列一遍；只有失败或需要手动导入的才显示。
+                  .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
                   .map((block) => (
                     <div className={css.row} key={block.id}>
                       <span>{block.title}</span>
@@ -789,14 +777,6 @@ function Overview({
                     return item ? t(item[1] as string, item[2] as string) : t("资料", "Library");
                   })()}
                 </h1>
-                <span className={css.sub}>
-                  {record
-                    ? t("完整的记录和来源", "Full records and sources")
-                    : t(
-                        "开图里的全部资料，都存在你自己的文件夹",
-                        "Everything in Kaitu, kept in your own folder",
-                      )}
-                </span>
               </div>
             </div>
             {!record ? (
@@ -836,12 +816,6 @@ function Overview({
             <div className={css.sec}>
               <div className={css.head}>
                 <h1>{t("开图", "Explore")}</h1>
-                <span className={css.sub}>
-                  {t(
-                    "身体和饮食、走过的地方、值得看的新东西、想试的方向",
-                    "Your health, places you've been, new things worth a look, directions to try",
-                  )}
-                </span>
               </div>
               <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
                 {[

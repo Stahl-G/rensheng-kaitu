@@ -57,17 +57,7 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
         {t("功能版本", "Feature version")} {state.version} · {t("固定内核", "Pinned engine")} DSH{" "}
         {state.dshVersion}
       </p>
-      <p className={css.small}>
-        {t(
-          "更新界面、工具和技能，保留当前内核。",
-          "Update the interface, tools and skills while keeping the current engine.",
-        )}
-      </p>
-      {!state.configured && (
-        <p className={css.small}>
-          {t("此测试版本尚未配置更新发布源。", "This test build has no update source configured.")}
-        </p>
-      )}
+      {!state.configured && <p className={css.small}>{t("未配置更新源", "No update source configured")}</p>}
       {state.phase === "current" && <p>{t("已是最新功能版本", "Features are up to date")}</p>}
       {state.phase === "checking" && <output>{t("正在检查更新…", "Checking for updates…")}</output>}
       {state.phase === "downloading" && (

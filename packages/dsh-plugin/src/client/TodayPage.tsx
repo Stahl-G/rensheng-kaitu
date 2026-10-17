@@ -120,12 +120,6 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
     <section className={css.sec}>
       <div className={css["sec-head"]}>
         <h2 className={css.eyebrow}>{t("你的数据", "Your data")}</h2>
-        <span className={css.small}>
-          {t(
-            "有数据的板块会自动出现，没数据的不占位置",
-            "Sections appear once they have data; empty ones stay out of the way",
-          )}
-        </span>
       </div>
       <div className={css.grid}>
         {sections.map((section) => (

@@ -173,7 +173,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
             </button>
             <span className={css.stack} style={{ flex: "1 1 200px" }}>
               <b>{data.name ?? "还没有填写名字"}</b>
-              <span className={css.small}>{data.bio ?? "头像只存在这台电脑上"}</span>
+              <span className={css.small}>{data.bio}</span>
             </span>
             <button
               type="button"
@@ -229,12 +229,7 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
                 })}
               </div>
             ) : (
-              <p className={css.small}>
-                {t(
-                  "还没有目标。从今天页带来一件想改变的事，或从常用的 AI 搬来记忆。",
-                  "No goals yet. Bring one thing you want to change from Today, or bring memories from your AI.",
-                )}
-              </p>
+              <p className={css.small}>{t("还没有目标", "No goals yet")}</p>
             )}
           </section>
           <section className={css.sec}>

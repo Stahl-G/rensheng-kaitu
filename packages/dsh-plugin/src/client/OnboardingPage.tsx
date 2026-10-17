@@ -234,25 +234,12 @@ export function OnboardingPage(props: Props) {
         <div className={css.how}>
           <div>
             <b>1 · {content.welcome.first}</b>
-            <span>{content.welcome.firstDescription}</span>
           </div>
           <div>
             <b>{t("2 · 核对，选一个下一步", "2 · Review and pick one next step")}</b>
-            <span>
-              {t(
-                "开图先整理出草稿，只有你确认的才算数",
-                "Kaitu drafts it first; only what you confirm counts",
-              )}
-            </span>
           </div>
           <div>
             <b>{t("3 · 记下结果，换个 AI 也能接着", "3 · Log the result; any AI can pick it up")}</b>
-            <span>
-              {t(
-                "资料在你自己的文件夹里，每一步有据可查",
-                "Your notes live in your own folder, and every step keeps its source",
-              )}
-            </span>
           </div>
         </div>
         {error && (
@@ -260,9 +247,6 @@ export function OnboardingPage(props: Props) {
             {error}
           </p>
         )}
-        <p className={v2.small}>
-          {t("大约 3 分钟，也可以先随便看看", "About 3 minutes. You can also just look around first")}
-        </p>
         {footer(t("开始", "Start"), t("先随便看看", "Look around first"))}
       </section>
     );
@@ -333,17 +317,6 @@ export function OnboardingPage(props: Props) {
                 )
               : t("先让开图认识你", "Let Kaitu get to know you")}
           </h1>
-          <p className={css.lead}>
-            {preview
-              ? t(
-                  "看一眼，不对的取消勾选。目标、在做的事和在考虑的事会放进「你带来的规划」，其余记作记忆，都能看到来自哪里。",
-                  "Take a look and untick anything wrong. Goals, projects and things you're still deciding go into Your plans; the rest becomes memories. Each keeps its source.",
-                )
-              : t(
-                  "你常用的 AI 已经记住了不少关于你的事。复制下面这段话发给它，再把回答粘贴回来，不用从头填档案。",
-                  "The AI you use already remembers a lot about you. Copy the text below, send it to that AI, and paste its answer back. No need to fill in a profile from scratch.",
-                )}
-          </p>
           {panel === "chatgpt-conversations" ? (
             <OnboardingFileImport
               {...props}
@@ -356,11 +329,7 @@ export function OnboardingPage(props: Props) {
             />
           ) : preview ? (
             <div className={css.groups}>
-              {!preview.candidates.length && (
-                <p className={v2.small}>
-                  {t("这些内容已经记住了，可以继续下一步。", "These are already saved. You can move on.")}
-                </p>
-              )}
+              {!preview.candidates.length && <p className={v2.small}>{t("都已经记住了", "Already saved")}</p>}
               {[...groups].map(([category, candidates]) => (
                 <section className={css.group} key={category}>
                   <h2 className={v2.eyebrow}>{category}</h2>
@@ -489,12 +458,6 @@ export function OnboardingPage(props: Props) {
           <h1 className={css.title} key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
             {t("你最想先管好哪几件事？", "What do you want to focus on first?")}
           </h1>
-          <p className={css.lead}>
-            {t(
-              "选几个就行。清单里只请你接这几件需要的数据，以后随时能加。",
-              "Pick a few. The checklist only asks for the data these need, and you can add more anytime.",
-            )}
-          </p>
           <fieldset className={css.options} disabled={busy}>
             <legend className={v2.sr}>{t("先管哪些事情，可多选", "What to focus on; pick several")}</legend>
             {content.starts.map((item) => (
@@ -527,21 +490,8 @@ export function OnboardingPage(props: Props) {
           <h1 className={css.title} key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
             {t("把数据接进来", "Connect your data")}
           </h1>
-          <p className={css.lead}>
-            {t(
-              "只接你选的事需要的数据。没准备好的先跳过，以后在「资料」里接。",
-              "Only the data your choices need. Skip what isn't ready and connect it later in Library.",
-            )}
-          </p>
           <div className={css.sources}>
-            {!status.sources.length && (
-              <p className={v2.small}>
-                {t(
-                  "你选的事不需要先接数据，点完成回到今天。",
-                  "Your choices don't need any data yet. Tap Done to go back to Today.",
-                )}
-              </p>
-            )}
+            {!status.sources.length && <p className={v2.small}>{t("不需要接数据", "No data needed")}</p>}
             {status.sources.map((source) => {
               const item = source;
               return (
@@ -607,12 +557,6 @@ export function OnboardingPage(props: Props) {
           <h1 className={css.title} key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
             {t("选一个 AI 帮你整理", "Choose an AI to help you organize")}
           </h1>
-          <p className={css.lead}>
-            {t(
-              "开图负责把资料存好，AI 负责每天整理、排计划。AI 随时能换，资料都在。",
-              "Kaitu keeps your notes; the AI organizes and plans. You can switch AIs anytime and keep everything.",
-            )}
-          </p>
           <fieldset className={css.options} disabled={busy}>
             <legend className={v2.sr}>{t("用哪个 AI", "Which AI")}</legend>
             {content.aiChoices
