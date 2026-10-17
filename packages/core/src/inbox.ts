@@ -136,13 +136,20 @@ async function prepare(ws: Workspace, file: string, text: string) {
       /^\d{4}-\d{2}-\d{2}$/.test(value) &&
       Number.isFinite(Date.parse(value)) &&
       new Date(value).toISOString().slice(0, 10) === value;
-    // 没写日期时取文件名里的日期，再没有就是今天。
+    // 没写日期时取文件名里的日期，再没有就是今天；写了却读不出时转待整理，不归到别的日子。
+    const given =
+      data.date === undefined || data.date === null || data.date === ""
+        ? undefined
+        : String(data.date)
+            .trim()
+            .replace(
+              /^(\d{4})[/.](\d{1,2})[/.](\d{1,2})$/,
+              (_, y, m, d) => `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`,
+            );
+    if (given !== undefined && !valid(given))
+      throw new KaituError(`简报的 date 读不出：${String(data.date)}，请写成 YYYY-MM-DD`, "BAD_INBOX");
     const named = /(\d{4}-\d{2}-\d{2})/.exec(basename(file))?.[1];
-    const date = valid(data.date)
-      ? (data.date as string)
-      : valid(named)
-        ? (named as string)
-        : localDate(new Date(), ws.timeZone());
+    const date = given ?? (valid(named) ? (named as string) : localDate(new Date(), ws.timeZone()));
     const actor = `Agent（Drive 收件箱：${sourceAgent(data.agent)}）`;
     return {
       message: `${actor}写入了 ${date} 的动态简报`,

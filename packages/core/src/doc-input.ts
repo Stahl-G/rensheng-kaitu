@@ -145,7 +145,9 @@ export function normalizeStatus(data: Doc, timeZone: string): Doc {
       const title = text(item.title) || text(item.name) || text(item.text);
       if (!title) return [];
       const due = day(item.due);
-      const when = text(item.when) || (item.due !== undefined && !due ? text(item.due) : "");
+      // 带时间或文字的截止（2026-10-17T14:00、下周五）原样留在 when，due 只留日期，时间不丢。
+      const dateOnly = /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(text(item.due));
+      const when = text(item.when) || (item.due !== undefined && (!due || !dateOnly) ? text(item.due) : "");
       const status = pick(NEXT_STATUS, item.status) ?? "todo";
       const priority = pick(PRIORITY, item.priority);
       const { name: _name, text: _text, ...rest } = item;

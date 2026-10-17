@@ -338,6 +338,15 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
       parseFrontmatter<{ blocks: { title: string; start: string }[] }>(ws.readText("NOW.md")).data.blocks,
     ).toEqual(expect.arrayContaining([expect.objectContaining({ title: "散步", start: "09:00" })]));
     expect(ws.readText(`feed/digests/${today}.md`)).toContain("今天的简报。");
+    // 写了日期却读不出：转待整理，不归到今天。
+    ws.writeText(
+      "inbox/agents/typo.digest.md",
+      "---\ndate: 2026-13-40\nagent: grok-bot\n---\n日期写错的简报。\n",
+    );
+    const typo = await processInbox(ws, { stableMs: 0 });
+    expect(typo.notes).toHaveLength(1);
+    expect(ws.readText(typo.notes[0] as string)).toContain("简报的 date 读不出");
+    expect(ws.readText(`feed/digests/${today}.md`)).not.toContain("日期写错的简报");
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

@@ -234,7 +234,9 @@ export async function updateMemory(
   const current = readMemory(ws, file);
   ws.assertDownloaded("memory");
   const now = opts.now ?? new Date();
-  const data: Memory = { ...current.data, ...patch, updated: isoInZone(now, ws.timeZone()).slice(0, 10) };
+  // 只改交来的字段：没写的（undefined）保留原值，不把类型等必填项清空。
+  const changes = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const data: Memory = { ...current.data, ...changes, updated: isoInZone(now, ws.timeZone()).slice(0, 10) };
   validateMemory(data);
   const renamed = data.name !== current.data.name || data.type !== current.data.type;
   const nextFile = renamed ? availableFile(ws, data.type, data.name, file) : file;

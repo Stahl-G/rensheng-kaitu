@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { handoverPack } from "../src/handover.js";
 import { history, restore } from "../src/history.js";
 import { readMe } from "../src/me-page.js";
-import { addMemory, importMemories, listMemories, removeMemory } from "../src/memory.js";
+import { addMemory, importMemories, listMemories, removeMemory, updateMemory } from "../src/memory.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
@@ -18,6 +18,15 @@ describe("记忆", () => {
       ["context", "notes", "住在杭州，在做产品经理。"],
     ]);
     expect(() => readMe(ws)).not.toThrow();
+  });
+
+  it("只改正文时保留原来的类型（MCP 和问问的补丁里没写的字段是 undefined）", async () => {
+    const ws = await freshWorkspace();
+    const gym = await addMemory(ws, { type: "preference", name: "Exercise", text: "晚上训练" });
+    expect(await updateMemory(ws, gym.file, { text: "早上训练", type: undefined })).toMatchObject({
+      type: "preference",
+      text: "早上训练",
+    });
   });
 
   it("记忆文件夹里有同步冲突副本时，其余记忆、个人档案和资料包照常读取", async () => {

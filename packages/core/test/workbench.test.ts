@@ -77,6 +77,21 @@ describe("工作台写入", () => {
     expect(validateWorkspace(ws)).toEqual([]);
   });
 
+  it("完成别的下一步、整份写回时，带时间的截止不丢时间", async () => {
+    const ws = await freshWorkspace("Asia/Shanghai");
+    ws.writeText(
+      "health/STATUS.md",
+      '---\nnext:\n  - 散步\n  - { title: 复查, due: "2026-10-18T14:00:00+08:00" }\n---\n',
+    );
+    const next = readStatus(ws).modules.find((module) => module.file === "health/STATUS.md")?.next ?? [];
+    await completeNext(ws, "health/STATUS.md", next[0]?.id as string);
+    const saved = parseFrontmatter<{ next: { title: string }[] }>(ws.readText("health/STATUS.md")).data.next;
+    expect(saved.find((item) => item.title === "复查")).toMatchObject({
+      due: "2026-10-18",
+      when: "2026-10-18T14:00:00+08:00",
+    });
+  });
+
   it("--sample 创建的工作区符合已有数据规范", async () => {
     const ws = await initWorkspace(tmp(), { sample: true });
     expect(validateWorkspace(ws)).toEqual([]);
