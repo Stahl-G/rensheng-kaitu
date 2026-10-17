@@ -27,7 +27,7 @@
 <script src="/mock/persona.js" defer></script>
 <script src="/mock/mock.js" defer></script>
 <script>document.documentElement.classList.add("js")</script>
-<script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en/"+location.hash)}}}catch(e){}</script>
+<script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
 <script src="/app.js" defer></script>
 </head>
 <body>
@@ -211,7 +211,7 @@
       <details><summary>这个网站会读取我的资料吗？</summary><div><p>不会。这是项目官网，页面里的界面都是示例资料，不连接你的资料文件夹。网站不放统计和第三方脚本；只有下载页会向 GitHub 查询最新版本。</p></div></details>
       <details><summary>必须用某一个 AI 吗？</summary><div><p>不用。可以填 DeepSeek、OpenAI、Claude、Gemini、Kimi、智谱等任一服务的 Key 用内置问问，添加过的服务都会保留，随时切换；也可以不填 Key，把资料包复制给你常用的 AI，再把回答贴回来。</p></div></details>
       <details><summary>免费吗？开源吗？</summary><div><p>免费。代码以 MIT 许可证开源，在 <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>。</p></div></details>
-      <details><summary>这是正式版吗？</summary><div><p>还不是。当前是 <span data-rel="version">0.1.0-rc.3</span>，发布候选版，在 GitHub 上标为预览版。</p></div></details>
+      <details><summary>这是正式版吗？</summary><div><p data-rel="pre">还不是。当前是 <span data-rel="version">0.1.0-rc.3</span>，发布候选版，在 GitHub 上标为预览版。</p><p data-rel="stable" hidden>是。当前是 <span data-rel="version">0.1.0-rc.3</span> 正式版。</p></div></details>
       <details><summary>有 Windows 或 Intel Mac 版吗？</summary><div><p>暂时没有。Kaitu.app 目前只有 macOS（Apple 芯片）版。其他电脑可以试试命令行与网页版，见<a href="/download/#other">下载页</a>。</p></div></details>
       <details><summary>有英文界面吗？</summary><div><p>有。界面语言默认跟随系统，也可以在「右上角头像 → 设置」里改成中文或 English。</p></div></details>
       <details><summary>我的资料存在哪里？</summary><div><p>第一次打开时先选资料放哪：这台电脑（默认 <code>~/kaitu</code>），或 iCloud、Google Drive、坚果云、其他同步盘的文件夹。选了云盘才会同步；版本历史和 Key 始终留在这台电脑。哪些内容会发给 AI，见<a href="/privacy/">资料去向</a>。</p></div></details>

@@ -21,6 +21,7 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
 <link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/style.css">
 <script>document.documentElement.classList.add("js")</script>
@@ -39,7 +40,7 @@
 <div class="wrap">
   <header class="page-head">
     <h1>文档</h1>
-    <p class="lead">本页对应开图 0.1.0-rc.3。还没装好的话，先去<a href="/download/">下载</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a>。</p>
+    <p class="lead">本页对应开图 <span data-rel="version">0.1.0-rc.3</span>。还没装好的话，先去<a href="/download/">下载</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a>。</p>
   </header>
   <div class="docs-layout">
     <details class="toc" data-toc open>

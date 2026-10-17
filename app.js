@@ -117,6 +117,7 @@
       set("sha", (el) => { el.textContent = dmg.digest ? dmg.digest.replace(/^sha256:/, "") : "—"; });
       set("page", (el) => { el.href = r.page; });
       set("pre", (el) => { el.hidden = !r.prerelease; });
+      set("stable", (el) => { el.hidden = r.prerelease; });
       if (tgz) {
         set("tgz", (el) => { el.href = tgz.url; });
         set("tgz-name", (el) => { el.textContent = tgz.name; });
