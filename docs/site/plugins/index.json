@@ -1,23 +1,41 @@
 {
   "format": 1,
-  "title": { "zh": "人生开图插件", "en": "Kaitu plugins" },
-  "description": { "zh": "可以装进人生开图的插件", "en": "Plugins for Kaitu" },
+  "title": {
+    "zh": "人生开图插件",
+    "en": "Kaitu plugins"
+  },
+  "description": {
+    "zh": "可以装进人生开图的插件",
+    "en": "Plugins for Kaitu"
+  },
   "metadata": {
-    "categories": { "writing": { "title": { "zh": "写作", "en": "Writing" } } },
+    "categories": {
+      "writing": {
+        "title": {
+          "zh": "写作",
+          "en": "Writing"
+        }
+      }
+    },
     "labels": {},
     "sortKeys": {}
   },
   "plugins": [
     {
       "name": "kaitu-novel-workspace",
-      "title": { "zh": "小说工作台", "en": "Novel workspace" },
+      "title": {
+        "zh": "小说工作台",
+        "en": "Novel workspace"
+      },
       "description": {
         "zh": "章节与资料、世界书、续写候选和科幻设定校对",
         "en": "Chapters and notes, world books, continuation drafts and sci-fi consistency checks"
       },
       "author": "Stahl-G",
       "homepage": "https://github.com/Stahl-G/dsh-novel-workspace",
-      "repository": { "url": "https://github.com/Stahl-G/dsh-novel-workspace" },
+      "repository": {
+        "url": "https://github.com/Stahl-G/dsh-novel-workspace"
+      },
       "metadata": {
         "category": "writing",
         "keywords": ["小说", "写作", "novel"],
@@ -26,6 +44,18 @@
       },
       "versions": [
         {
+          "version": "0.3.1",
+          "publishTimestamp": 1792245619,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
+            "commit": "5eb30e2fbc7170f5df42833d96a484b4f903c05f"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        },
+        {
           "version": "0.3.0",
           "publishTimestamp": 1792323476,
           "source": {
@@ -33,7 +63,9 @@
             "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
             "commit": "54528297d33b47cc009ee23991dad48fc707ce4b"
           },
-          "engines": { "dsh": "0.2.0-rc.2" }
+          "engines": {
+            "dsh": "0.2.0-rc.2"
+          }
         }
       ]
     }
