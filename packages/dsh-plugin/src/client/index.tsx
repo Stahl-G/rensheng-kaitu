@@ -29,15 +29,6 @@ export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
 
 export async function apply(ctx: Context) {
-  ctx.slots.inject("sidebar.brand.mark", () =>
-    ctx.slots.inject("sidebar.brand.name", function* () {
-      yield ctx.slots.register({ name: "sidebar.brand.mark" }, KaituMark);
-      yield ctx.slots.register({ name: "sidebar.brand.name" }, KaituName);
-    }),
-  );
-  ctx.slots.inject("conversation.hero.brand.mark", () =>
-    ctx.slots.register({ name: "conversation.hero.brand.mark" }, KaituMark),
-  );
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
@@ -103,12 +94,25 @@ export async function apply(ctx: Context) {
         if (!result.ok) throw new Error(result.error.message);
         return result.value;
       };
-      ctx.slots.inject("sidebar.footer.action", () =>
-        ctx.slots.register(
-          { name: "sidebar.footer.action", id: "kaitu-powered-by", inject: () => ({ load: loadVersion }) },
-          PoweredByDsh,
-        ),
-      );
+      // 只有开图 App 换品牌；装进 DSH 当插件时保留 DSH 自己的标志和名字。
+      void ctx.remote.kaitu.brand().then((result) => {
+        if (!result.ok || !result.value) return;
+        ctx.slots.inject("sidebar.brand.mark", () =>
+          ctx.slots.inject("sidebar.brand.name", function* () {
+            yield ctx.slots.register({ name: "sidebar.brand.mark" }, KaituMark);
+            yield ctx.slots.register({ name: "sidebar.brand.name" }, KaituName);
+          }),
+        );
+        ctx.slots.inject("conversation.hero.brand.mark", () =>
+          ctx.slots.register({ name: "conversation.hero.brand.mark" }, KaituMark),
+        );
+        ctx.slots.inject("sidebar.footer.action", () =>
+          ctx.slots.register(
+            { name: "sidebar.footer.action", id: "kaitu-powered-by", inject: () => ({ load: loadVersion }) },
+            PoweredByDsh,
+          ),
+        );
+      });
       ctx.slots.inject("main", () =>
         ctx.slots.register(
           {

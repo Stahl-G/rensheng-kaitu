@@ -27,6 +27,8 @@ export interface Config {
   enableAutomation?: boolean;
   /** false：后台工作交给开图 App（同一工作区不跑两遍），插件只提供页面和工具。 */
   automation?: boolean;
+  /** true：开图 App 自己的 profile，侧栏和首页换成开图标志。装进 DSH 当插件时不换。 */
+  brand?: boolean;
 }
 
 const instructions = [

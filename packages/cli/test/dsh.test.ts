@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { initWorkspace } from "@kaitu/core";
 import { expect, it } from "vitest";
 
-it("dsh 安装替换品牌与入口配置，重复安装保留用户段且不重复追加", async () => {
+it("dsh 插件安装只加开图、保留 DSH 品牌，重复安装保留用户段且不重复追加", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-dsh-install-"));
   try {
     const workspace = join(root, "workspace");
@@ -33,15 +33,13 @@ it("dsh 安装替换品牌与入口配置，重复安装保留用户段且不重
     expect({
       prefix: installed.slice(0, installed.indexOf("# kaitu:start")),
       suffix: installed.slice(installed.indexOf("# kaitu:end") + "# kaitu:end".length),
-      brandDisabled: installed.includes("- id: ui-brand-official\n  disabled: true"),
-      analyticsDisabled: installed.includes("- id: product-analytics\n  disabled: true"),
+      brandKept: !installed.includes("ui-brand-official") && !installed.includes("brand: true"),
       overviewRegistered: installed.includes("- id: kaitu\n"),
       repeated: readFileSync(file, "utf8"),
     }).toEqual({
       prefix: before,
       suffix: after,
-      brandDisabled: true,
-      analyticsDisabled: true,
+      brandKept: true,
       overviewRegistered: true,
       repeated: installed,
     });

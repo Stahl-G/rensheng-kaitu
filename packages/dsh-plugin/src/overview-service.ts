@@ -150,7 +150,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   constructor(
     ctx: Context,
-    config: Config = {},
+    private readonly config: Config = {},
     workspace?: Workspace,
     private readonly write: MutationQueue = (run) => run(),
     private readonly collectors?: CollectorService,
@@ -325,6 +325,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("onboardingImportConfirm")
   async onboardingImportConfirm(token: string): Promise<OnboardingImportResult> {
     return this.write(() => confirmOnboardingImport(this.workspace, token));
+  }
+
+  @Remote("brand")
+  async brand(): Promise<boolean> {
+    return this.config.brand === true;
   }
 
   /** Desktop passes its installed release version to the running Host (apps/desktop/src/main.ts). */

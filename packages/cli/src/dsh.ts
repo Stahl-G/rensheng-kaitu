@@ -19,28 +19,30 @@ function entry(
 ): string {
   if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
-  const disabled = [
-    "ui-brand-official",
-    "ui-settings-account",
-    "desktop-product-telemetry",
-    "product-analytics",
-    "session-telemetry-otel",
-    "ui-settings-session-log",
-    "ui-open-in-app",
-    "ui-subagent",
-    "ui-agent-preset",
-    "ui-sidebar-terminal",
-    "ui-sidebar-browser",
-    "ui-sidebar-files",
-  ];
+  // 开图 App 自己的 profile 关掉 DSH 的账号、遥测和开发者侧栏，并换上开图品牌；装进 DSH 当插件时只加开图。
+  const disabled = standalone
+    ? [
+        "ui-brand-official",
+        "ui-settings-account",
+        "desktop-product-telemetry",
+        "product-analytics",
+        "session-telemetry-otel",
+        "ui-settings-session-log",
+        "ui-open-in-app",
+        "ui-subagent",
+        "ui-agent-preset",
+        "ui-sidebar-terminal",
+        "ui-sidebar-browser",
+        "ui-sidebar-files",
+      ]
+    : [];
+  const config = { workspace, ...(automation ? {} : { automation }), ...(standalone ? { brand: true } : {}) };
   if (flow) {
     return [
       ...disabled.map((id) => ({ id, disabled: true })),
       { id: "tool-skill", disabled: false },
-      { id: "ui-settings-models", config: { credentialOnboarding: !standalone } },
-      {
-        insert: [{ id: "kaitu", name: plugin, config: { workspace, ...(automation ? {} : { automation }) } }],
-      },
+      ...(standalone ? [{ id: "ui-settings-models", config: { credentialOnboarding: false } }] : []),
+      { insert: [{ id: "kaitu", name: plugin, config }] },
     ]
       .map((row) => JSON.stringify(row))
       .join(",\n");
@@ -49,15 +51,12 @@ function entry(
     ...disabled.flatMap((id) => [`- id: ${id}`, "  disabled: true"]),
     "- id: tool-skill",
     "  disabled: false",
-    "- id: ui-settings-models",
-    "  config:",
-    `    credentialOnboarding: ${!standalone}`,
+    ...(standalone ? ["- id: ui-settings-models", "  config:", "    credentialOnboarding: false"] : []),
     "- insert:",
     "    - id: kaitu",
     `      name: ${JSON.stringify(plugin)}`,
     "      config:",
-    `        workspace: ${JSON.stringify(workspace)}`,
-    ...(automation ? [] : ["        automation: false"]),
+    ...Object.entries(config).map(([key, value]) => `        ${key}: ${JSON.stringify(value)}`),
     "",
   ].join("\n");
 }
