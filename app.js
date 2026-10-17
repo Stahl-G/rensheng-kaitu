@@ -99,7 +99,7 @@
   /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
   const rel = document;
   if (document.querySelector("[data-rel]") && "fetch" in window) {
-    const KEY = "kaitu-release-v3";
+    const KEY = "kaitu-release-v4";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
