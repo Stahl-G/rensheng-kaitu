@@ -6,6 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
+import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
   CalendarPush,
@@ -215,6 +216,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
+  const stopPhone = startPhoneSnapshots(ws, () => reportError());
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -714,6 +716,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopBackup();
+    stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
@@ -731,6 +734,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   } catch (error) {
     watcher?.close();
     stopBackup();
+    stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);

@@ -63,6 +63,8 @@ export function assertAgentWrite(root: string, file: string, confirmed = false, 
   if (
     (path === "NOW.md" && !managedPlan) ||
     ["AGENTS.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
+    path === "phone" ||
+    path.startsWith("phone/") ||
     path.startsWith("memory/") ||
     path.startsWith("chats/") ||
     (path.includes("/data/") && !/^health\/data\/labs\/[^/]+\.json$/.test(path))

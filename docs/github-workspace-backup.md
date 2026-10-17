@@ -20,3 +20,10 @@
 仓库权限若后来发生变化，按连接时选择继续同步；用户可断开后重新连接核对。远端分支不可读取时暂停，不把整个工作区当作已在远端删除。
 
 GitHub 接口依据：[Git trees](https://docs.github.com/en/rest/git/trees)、[Git refs](https://docs.github.com/en/rest/git/refs)、[Contents](https://docs.github.com/en/rest/repos/contents)、[个人访问令牌](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)。
+
+## 手机伙伴路径
+
+启用连接后，`phone/{today,week,map,receipts}.json` 始终只上传，远端快照修改不会覆盖电脑生成内容。
+`inbox/agents/` 的文本文件、`inbox/health/*.health.json` 始终双向同步，不受文字 / 结构化资料开关影响。
+手机只创建新文件，电脑拉下后按现有收件箱处理；处理完成后下一轮删除远端原件，并上传手机回执。
+照片与二进制文件尚不支持。格式、回执与去重规则见 [手机契约](guides/phone-contract.md)。
