@@ -1342,6 +1342,9 @@ export async function keepOnboardingMatter(ws: Workspace, source: string): Promi
   const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
   doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
   ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  // 核对过、只留原文：归档后不再算待整理，每日整理也不会再为它起草。
+  const file = findInboxNote(ws, basename(source));
+  if (file && !file.startsWith("inbox/notes/done/")) archiveInboxNote(ws, file);
   await snapshot(ws, "你只保留了原文，未采纳下一步");
   return readOnboardingMatter(ws, source);
 }

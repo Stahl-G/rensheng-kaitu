@@ -69,7 +69,7 @@ Kaitu.app 的 `local.mjs` 与 `kaitu ui` 共用 `packages/cli/src/ui/server.ts`�
 
 ## 云端 Agent 怎么读
 
-- 只有 Drive 模式在根目录生成 `AGENT-README.md`（云端接力入口）与 `ORGANIZER.md`（夜间整理规则）。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
+- 只有 Drive 模式在根目录生成 `AGENT-README.md`（云端接力入口）；`ORGANIZER.md`（每日整理规则）在任何存放位置都生成，供开图自带的每日整理使用。Drive 连接器不一定能逐个打开深层目录，所以入口要短、路径写全。
 - 根目录生成 `OVERVIEW.md`：`kaitu status` 的 Markdown 版（今天的安排与待确认、各模块进度与下一步、最近 7 天关键数据）。每次 core 写入、晚间复盘保存版本及工作台检测到外部改动后刷新；内容不变不重写，派生文件事件不触发自动版本。云端 Agent 读这一个文件就能「一眼看到情况」。
 
 ## 云端 Agent 怎么写

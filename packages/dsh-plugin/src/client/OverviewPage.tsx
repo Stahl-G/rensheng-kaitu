@@ -228,6 +228,9 @@ function Overview({
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
+  // 原文整理出的待核对草稿（每日整理或 AI 起草），在首次使用的核对页采纳。
+  const isDraft = (item: { id: string; proposed: boolean }) =>
+    item.proposed && item.id.startsWith("onboarding-matter-");
   const askNext = (item: { title: string; module: string }) =>
     prompt(
       t(
@@ -619,6 +622,15 @@ function Overview({
                             {t("安排时间段", "Schedule a time")}
                           </button>
                         )}
+                        {isDraft(focus) && (
+                          <button
+                            type="button"
+                            className={`${css.btn} ${css["btn-strong"]}`}
+                            onClick={() => startGuide(1)}
+                          >
+                            {t("去核对", "Review")}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className={`${css.btn} ${css["btn-strong"]}`}
@@ -652,6 +664,11 @@ function Overview({
                           onClick={() => setSlot({ file: item.file, id: item.id })}
                         >
                           {t("安排时间段", "Schedule a time")}
+                        </button>
+                      )}
+                      {isDraft(item) && (
+                        <button type="button" className={css.link} onClick={() => startGuide(1)}>
+                          {t("去核对", "Review")}
                         </button>
                       )}
                       <button type="button" className={css.link} onClick={() => askNext(item)}>
