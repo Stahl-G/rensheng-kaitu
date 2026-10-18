@@ -23,6 +23,10 @@
 | `StatusAgent.dc.html` | 390×844 | v0.7 同步状态：今天、这一周、开图各自由谁何时更新；「等 Dot 处理」与「等电脑处理」 | I10、I11、I14 |
 | `Mac.dc.html` | 1180×820 | v0.7 Mac：我的 › AI 与连接 › 云端整理员（整理员、交给 Agent 的说明、手机由谁更新、电脑不在时） | agent-runner §8 M1–M4 |
 
+## 验收记录
+
+- [2026-10-18：0.7.0 (6) 今天页、开图页](review-2026-10-18.md)
+
 ## 颜色与字号
 
 与桌面一致（`packages/dsh-plugin/src/client/Prototype.module.css`）：
