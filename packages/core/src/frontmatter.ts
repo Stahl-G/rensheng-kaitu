@@ -18,6 +18,11 @@ export function parseFrontmatter<T = Record<string, unknown>>(text: string): Fro
   return { data: data as T, body: m[2] ?? "" };
 }
 
+/** 只取正文，不解析 YAML：写坏的 frontmatter 也不会抛错。 */
+export function frontmatterBody(text: string): string {
+  return FM.exec(text)?.[2] ?? text;
+}
+
 export function stringifyFrontmatter(data: unknown, body = ""): string {
   return `---\n${stringify(data).trimEnd()}\n---\n${body}`;
 }

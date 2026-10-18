@@ -88,6 +88,8 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     "inbox/notes/2026-10-18/synthetic.md",
     "---\nkind: capture\n---\n\n合成原文第一行\nPRIVATE_NOTE_SECOND_LINE\n",
   );
+  // 写坏的 frontmatter 只影响这一条，不让整份快照停更。
+  ws.writeText("inbox/notes/2026-10-17/broken.md", "---\nkind: [capture\n---\n\n写坏的 frontmatter\n");
   const data = await readOverviewPage(ws, now);
   const map = lifeMap(ws, now);
   const from = { name: "合成甲", lat: 10, lng: 170, precision: "city" as const };
@@ -124,6 +126,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(items.find((i) => i.kind === "health")?.path).toBe("health/data/workouts/2026-10.jsonl");
   expect(items.find((i) => i.kind === "project")?.path).toBe("projects/synthetic/STATUS.md");
   expect(items.some((i) => i.title === "合成偏好")).toBe(true);
+  expect(items.some((i) => i.title === "写坏的 frontmatter")).toBe(true);
   expect(JSON.stringify(snapshots)).not.toContain(ws.root);
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
   expect(await writePhoneSnapshots(ws, now)).toBe(0);

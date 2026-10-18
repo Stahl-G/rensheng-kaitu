@@ -77,8 +77,8 @@
 | 工具 | 参数 | 用户点「放进待确认」后写入 | 电脑同名工具 |
 |---|---|---|---|
 | `record_add` | `type`、`data` | `inbox/agents/ios-<设备号>-<ULID>.records.jsonl`，一行，带 `origin: "assistant"` | `record_add` |
-| `task_add` | `title`、`due?`、`notes?` | 同上，`type: "task"` | `task_add` |
-| `propose_block` | `title`、`start`、`end` | 同名收件箱 `.proposal.json`（收件箱已接受的格式：title / start / end） | `propose_block` |
+| `task_add` | `title`、`due?`、`notes?` | 同上，一行 `type: "task"`、`title`、`status: "open"`（task 的必填字段），可带 `due`、`notes` | `task_add` |
+| `propose_block` | `title`、`start`、`end` | **暂不提供。** 手机能交的文件只有 `.note.md`、`.records.jsonl`、`.actions.jsonl`（`packages/core/src/phone-actions.ts` 的 `phoneInboxName`），`.proposal.json` 不会按手机文件处理，也没有回执。要做就得扩展手机文件类型，属于数据规范改动，先问用户 | `propose_block` |
 | `note` | `text` | `.note.md`，与「记一下」相同格式，`origin: assistant` | （收件箱原文） |
 
 - 工具执行后返回给模型的是「已生成卡片，等用户决定」，不是「已保存」。
