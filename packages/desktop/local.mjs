@@ -100,6 +100,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     window.show();
     window.focus();
   });
+  app.on("window-all-closed", () => app.quit());
   const painted = new Promise((resolve) => window.once("ready-to-show", resolve));
   await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING)}`);
   await painted;
@@ -205,6 +206,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     },
   });
   step("server");
+  // 打开资料时用户关了窗口：应用已经在退出，不再接着装窗口。
+  if (window.isDestroyed()) return;
   window.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) =>
     callback(permission === "clipboard-sanitized-write"),
   );
@@ -258,7 +261,6 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   updateMenu();
   await window.loadURL(server.url);
   step("loaded");
-  app.on("window-all-closed", () => app.quit());
   let closing = false;
   app.on("before-quit", (event) => {
     if (closing) return;

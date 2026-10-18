@@ -2,15 +2,12 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderDshPatch } from "../cli/dist/dsh.js";
-import { initWorkspace } from "../core/dist/index.js";
 import { desktopPaths } from "./environment.mjs";
 
 // 构建后位于 Resources/kaitu/dist/initialize.mjs，只在应用启动时写入本机状态。
+// 不碰资料文件夹：它可能在云盘里，打开和新建都放到窗口出来以后（local.mjs）。
 const resources = dirname(dirname(fileURLToPath(import.meta.url)));
 const { state, workspace, port } = desktopPaths();
-if (!existsSync(join(workspace, ".kaitu/config.json"))) {
-  await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-}
 const profile = join(state, "profiles/desktop");
 mkdirSync(profile, { recursive: true, mode: 0o700 });
 const patch = join(profile, "cordis.patch.yml");
