@@ -16,16 +16,13 @@ export interface ProgressMapProps {
   loadExploration: () => Promise<ExplorationData>;
   subscribe?: (refresh: () => void) => () => void;
   open: (section: "footprints" | "directions" | "projects" | "plans") => void;
-  /** 足迹页下面已经有一张地图，进度图就只留「接下来往哪走」。 */
-  hidePlaces?: boolean;
 }
 
-const COLLAPSED = "kaitu.progress-map.collapsed";
 let workerReady = false;
 const MAX_ROWS = 6;
 
 /**
- * 开图顶上的人生进度图：上半是去过的地方（与足迹同一张底图和路线规则），下半是接下来往哪走。
+ * 开图「全景」里的人生进度图：上半是去过的地方（与足迹同一张底图和路线规则），下半是接下来往哪走。
  * 两半共用线型：实线已经走过，虚线计划或在试，点线还没探索。地点和方向分开画，只在点开时跳到各自的页面。
  */
 export function ProgressMap(props: ProgressMapProps) {
@@ -33,13 +30,6 @@ export function ProgressMap(props: ProgressMapProps) {
   const { loadLifeMap, loadExploration, subscribe } = props;
   const [places, setPlaces] = useState<LifeMapData | null>(null);
   const [exploration, setExploration] = useState<ExplorationData | null>(null);
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(COLLAPSED) === "1";
-    } catch {
-      return false;
-    }
-  });
   useEffect(() => {
     let alive = true;
     const load = () => {
@@ -66,65 +56,50 @@ export function ProgressMap(props: ProgressMapProps) {
     [places],
   );
   // 没有地点也没有任何方向、目标和项目时不铺空图。
-  if (!cities.length && !rows.length) return null;
-  const toggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    try {
-      localStorage.setItem(COLLAPSED, next ? "1" : "0");
-    } catch {}
-  };
+  if (!cities.length && !rows.length)
+    return <p className={css.empty}>{t("还没有去过的地方或方向", "No places or directions yet")}</p>;
   const shown = rows.slice(0, MAX_ROWS);
   return (
     <section className={css.card} aria-labelledby="progress-map-title">
-      <div className={css.head}>
-        <h2 id="progress-map-title">{t("人生进度图", "Life progress map")}</h2>
-        <button type="button" className={css.toggle} aria-expanded={!collapsed} onClick={toggle}>
-          {collapsed ? t("展开", "Show") : t("收起", "Hide")}
-        </button>
-      </div>
-      {!collapsed && (
+      <h2 id="progress-map-title">{t("人生进度图", "Life progress map")}</h2>
+      {cities.length > 0 && places && (
         <>
-          {cities.length > 0 && places && !props.hidePlaces && (
-            <>
-              <h3 className={css.sub}>{t("去过的地方", "Where I've been")}</h3>
-              <PlacesMap data={places} onOpen={() => props.open("footprints")} />
-            </>
-          )}
-          {shown.length > 0 && (
-            <>
-              <h3 className={css.sub}>{t("接下来往哪走", "Where to go next")}</h3>
-              <div className={css.rows}>
-                {shown.map((row) => (
-                  <Row key={`${row.kind}:${row.id}`} row={row} open={props.open} />
-                ))}
-                <span className={css.nowLine} aria-hidden="true">
-                  <span>{t("现在", "Now")}</span>
-                </span>
-              </div>
-              {rows.length > shown.length && (
-                <p className={css.more}>
-                  {t(`还有 ${rows.length - shown.length} 项`, `${rows.length - shown.length} more`)}
-                </p>
-              )}
-            </>
-          )}
-          <ul className={css.legend} aria-hidden="true">
-            <li>
-              <i />
-              {t("已经走过", "Done")}
-            </li>
-            <li>
-              <i className={css.dashed} />
-              {t("计划或在试", "Planned or trying")}
-            </li>
-            <li>
-              <i className={css.dotted} />
-              {t("还没探索", "Unexplored")}
-            </li>
-          </ul>
+          <h3 className={css.sub}>{t("去过的地方", "Where I've been")}</h3>
+          <PlacesMap data={places} onOpen={() => props.open("footprints")} />
         </>
       )}
+      {shown.length > 0 && (
+        <>
+          <h3 className={css.sub}>{t("接下来往哪走", "Where to go next")}</h3>
+          <div className={css.rows}>
+            {shown.map((row) => (
+              <Row key={`${row.kind}:${row.id}`} row={row} open={props.open} />
+            ))}
+            <span className={css.nowLine} aria-hidden="true">
+              <span>{t("现在", "Now")}</span>
+            </span>
+          </div>
+          {rows.length > shown.length && (
+            <p className={css.more}>
+              {t(`还有 ${rows.length - shown.length} 项`, `${rows.length - shown.length} more`)}
+            </p>
+          )}
+        </>
+      )}
+      <ul className={css.legend} aria-hidden="true">
+        <li>
+          <i />
+          {t("已经走过", "Done")}
+        </li>
+        <li>
+          <i className={css.dashed} />
+          {t("计划或在试", "Planned or trying")}
+        </li>
+        <li>
+          <i className={css.dotted} />
+          {t("还没探索", "Unexplored")}
+        </li>
+      </ul>
     </section>
   );
 }
@@ -161,6 +136,12 @@ function Row({ row, open }: { row: ProgressRow; open: ProgressMapProps["open"] }
       </span>
     </button>
   );
+}
+
+function label(text: string) {
+  const name = document.createElement("span");
+  name.textContent = text;
+  return name;
 }
 
 function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) {
@@ -225,6 +206,7 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
       map = new LibreMap({
         container,
         interactive: false,
+        renderWorldCopies: false,
         attributionControl: {
           compact: true,
           customAttribution:
@@ -234,6 +216,8 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
       const m = map;
       m.on("style.load", () => {
         clearTimeout(timer);
+        // 地图不能拖动，署名不会自己收起；收成角上的按钮，不挡住城市。
+        container.querySelector(".maplibregl-compact-show")?.classList.remove("maplibregl-compact-show");
         const ink = getComputedStyle(container).getPropertyValue("--pm-ink").trim();
         const plan = getComputedStyle(container).getPropertyValue("--pm-plan").trim();
         m.addSource("walked", { type: "geojson", data: walked });
@@ -260,7 +244,7 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
       ) {
         const element = document.createElement("span");
         element.className = css.city ?? "";
-        element.textContent = hometown.name;
+        element.append(label(hometown.name));
         markers.push(
           new Marker({ element, anchor: "left" }).setLngLat([hometown.lng, hometown.lat]).addTo(m),
         );
@@ -277,7 +261,7 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
         ]
           .filter(Boolean)
           .join(" ");
-        element.textContent = feature.properties.place.name;
+        element.append(label(feature.properties.place.name));
         markers.push(
           new Marker({ element, anchor: "left" }).setLngLat(feature.geometry.coordinates).addTo(m),
         );
@@ -286,7 +270,32 @@ function PlacesMap({ data, onOpen }: { data: LifeMapData; onOpen: () => void }) 
       for (const feature of cities) bounds.extend(feature.geometry.coordinates);
       if (hometown?.lng !== undefined && hometown.lat !== undefined)
         bounds.extend([hometown.lng, hometown.lat]);
-      m.fitBounds(bounds, { padding: { top: 36, bottom: 36, left: 36, right: 96 }, maxZoom: 6, duration: 0 });
+      m.fitBounds(bounds, {
+        padding: { top: 40, bottom: 48, left: 40, right: 110 },
+        maxZoom: 6,
+        duration: 0,
+      });
+      // 名字互相压住时只留圆点：现在住的和计划去的先占位置，其余按先后。
+      const placed: DOMRect[] = [];
+      const rank = (marker: Marker) =>
+        marker.getElement().classList.contains(css.now ?? "")
+          ? 0
+          : marker.getElement().classList.contains(css.planned ?? "")
+            ? 1
+            : 2;
+      for (const marker of [...markers].sort((a, b) => rank(a) - rank(b))) {
+        const name = marker.getElement().firstElementChild as HTMLElement;
+        const box = name.getBoundingClientRect();
+        const hit = placed.some(
+          (other) =>
+            box.left < other.right &&
+            other.left < box.right &&
+            box.top < other.bottom &&
+            other.top < box.bottom,
+        );
+        name.hidden = hit;
+        if (!hit) placed.push(box);
+      }
       const applyStyle = () =>
         m.setStyle(`https://tiles.openfreemap.org/styles/${dark() ? "dark" : "positron"}`, {
           diff: false,
