@@ -17,6 +17,8 @@ export interface CalendarPushEntry {
   start: string;
   end: string;
   notes: string;
+  /** 在 iPhone 上确认、由手机写进日历：电脑只更新找得到的那条，从不新建。 */
+  phone?: true;
 }
 export interface CalendarPushReceipt {
   status: "added" | "file" | "deleted" | "removed" | "error";
@@ -91,8 +93,6 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   return data.blocks.flatMap((block) => {
     // 读不出的时间段（没标题、没 id）留给校验报出来，这里不同步。
     if (!block || typeof block.id !== "string" || typeof block.title !== "string") return [];
-    // 在 iPhone 上确认的日程已由手机写进 Apple 日历，这里再写会重复。
-    if (block.calendar === "phone") return [];
     const id = `${data.date}/${block.id}`;
     const linkedTitle = block.ref ? related.get(block.ref) : undefined;
     if (block.kind === "task" && block.id.startsWith("next-") && block.ref && !taskIds.has(block.ref))
@@ -118,6 +118,7 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
         start,
         end,
         notes: `${linkedTitle ? `关联目标：${linkedTitle}｜` : ""}做完后回开图记一句结果\n开图记录：${id}${block.ref ? `（${block.ref}）` : ""}`,
+        ...(block.calendar === "phone" ? { phone: true as const } : {}),
       },
     ];
   });
@@ -165,6 +166,11 @@ export class CalendarPush {
       ]),
     };
   }
+  /** 这台电脑已在日历里找到该时间段的事件，包括 iPhone 写入、经 iCloud 同步来的那条。 */
+  located(id: string) {
+    const date = this.store.date();
+    return Boolean(date && this.store.read().entries[`${date}/${id}`]?.uid);
+  }
   configure(enabled: boolean) {
     const state = this.store.read();
     state.enabled = enabled;
@@ -208,6 +214,8 @@ export class CalendarPush {
     }
     if (removeAll) return this.settings();
     for (const entry of current) {
+      // 手机写的日程没有日历可改时（非 macOS），也不另生成日历文件。
+      if (entry.phone && !this.executor) continue;
       let old = state.entries[entry.id];
       if (old?.receipt.status === "deleted" || old?.suppressed) continue;
       if (old?.receipt.status === "removed") {
@@ -229,6 +237,11 @@ export class CalendarPush {
       try {
         if (!this.executor) throw new Error("当前为浏览器、DSH 插件或非 macOS 环境，请导入日历文件");
         const uid = await this.executor.upsert(entry, row.uid, changed);
+        if (uid === null && entry.phone && !row.uid) {
+          // iPhone 写的那条还没同步到这台电脑：先不记，下次再找，不替手机新建。
+          delete state.entries[entry.id];
+          continue;
+        }
         if (uid === null) row.receipt = { status: "deleted" };
         else {
           row.uid = uid;

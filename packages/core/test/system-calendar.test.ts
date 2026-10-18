@@ -10,6 +10,7 @@ import {
   calendarPushStore,
   cancelTask,
   decideProposal,
+  editCalendarBlock,
   parseFrontmatter,
   scheduleNext,
   stringifyFrontmatter,
@@ -34,6 +35,49 @@ function fakeCalendar() {
 }
 
 describe("confirmed system calendar", () => {
+  it("updates the iPhone-written event once it syncs here, never creates it, and only then allows moving it", async () => {
+    const ws = await freshWorkspace();
+    const block = {
+      id: "slot",
+      title: "手机确认的日程",
+      kind: "proposal",
+      status: "confirmed",
+      calendar: "phone",
+    };
+    ws.writeText(
+      "NOW.md",
+      stringifyFrontmatter({ date: "2026-10-16", blocks: [{ ...block, start: "10:00", end: "11:00" }] }, ""),
+    );
+    const events = new Map<string, CalendarPushEntry>();
+    const executor: CalendarExecutor = {
+      async upsert(entry, uid) {
+        const key =
+          uid ??
+          [...events].find(([, event]) => event.notes.split("\n").includes(`开图记录：${entry.id}`))?.[0];
+        if (!key) return null;
+        events.set(key, structuredClone(entry));
+        return key;
+      },
+      async remove(uid) {
+        events.delete(uid);
+      },
+    };
+    const push = new CalendarPush(calendarPushStore(ws), executor);
+    await push.sync(calendarPushEntries(ws));
+    expect(events.size).toBe(0);
+    await expect(editCalendarBlock(ws, "slot", "14:00", "15:00", push.located("slot"))).rejects.toThrow(
+      "iPhone",
+    );
+    // iPhone 写的那条经 iCloud 同步到这台电脑之后才能跟着改。
+    const notes = "做完后回开图记一句结果\n开图记录：2026-10-16/slot";
+    events.set("iphone-event", { id: "2026-10-16/slot", title: block.title, start: "", end: "", notes });
+    await push.sync(calendarPushEntries(ws));
+    await editCalendarBlock(ws, "slot", "14:00", "15:00", push.located("slot"));
+    await push.sync(calendarPushEntries(ws));
+    expect([...events.keys()]).toEqual(["iphone-event"]);
+    expect(events.get("iphone-event")?.start).toBe("2026-10-16T06:00:00.000Z");
+  });
+
   it("writes only confirmed slots, preserves identity on reschedule, cancels and respects manual deletion and the switch", async () => {
     const ws = await freshWorkspace();
     ws.writeText(

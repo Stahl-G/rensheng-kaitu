@@ -223,7 +223,8 @@ export function decidePhoneProposal(ws: Workspace, id: string, decision: "confir
   });
 }
 
-export function editCalendarBlock(ws: Workspace, id: string, start: string, end: string) {
+/** located：这台电脑已在日历里找到这条日程的事件，iPhone 写入的那条也能跟着改。 */
+export function editCalendarBlock(ws: Workspace, id: string, start: string, end: string, located = false) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
     throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");
   return editFrontmatter<TodayPlan>(ws, "NOW.md", "now.schema.json", (data) => {
@@ -231,9 +232,12 @@ export function editCalendarBlock(ws: Workspace, id: string, start: string, end:
       (row) => row.id === id && ["proposal", "task"].includes(row.kind) && row.status === "confirmed",
     );
     if (!block) throw new KaituError("找不到已确认的时间段", "NOT_FOUND");
-    // 手机写进 Apple 日历的那条电脑改不到，这里改了会和日历对不上。
-    if (block.calendar === "phone")
-      throw new KaituError("这条日程由 iPhone 写进了日历，请在 iPhone 上改时间", "CONFLICT");
+    // 手机写进日历的那条，只有这台电脑在日历里找到了它才能跟着改，否则会和日历对不上。
+    if (block.calendar === "phone" && !located)
+      throw new KaituError(
+        "这条日程由 iPhone 写进了日历，这台电脑的日历里还没有它，请在 iPhone 上改时间",
+        "CONFLICT",
+      );
     Object.assign(block, { start, end });
     return `你调整了日程：${block.title}`;
   });

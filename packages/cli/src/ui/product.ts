@@ -251,7 +251,7 @@ export async function productRequest(
     case "removeCalendarPush":
       return calendarPush.removeAll();
     case "editCalendarBlock": {
-      const result = await editCalendarBlock(ws, text(0), text(1), text(2));
+      const result = await editCalendarBlock(ws, text(0), text(1), text(2), calendarPush.located(text(0)));
       return { ...result, calendarPush: calendarPush.settings() };
     }
     case "scheduleNext": {

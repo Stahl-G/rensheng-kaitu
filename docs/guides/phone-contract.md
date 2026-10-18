@@ -27,8 +27,7 @@
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
   执行 complete_next、complete_task、cancel_task、decide_proposal。预留操作返回 rejected。
-  decide_proposal 只改今天的状态：确认的日程标 `calendar: phone`，由手机自己写进 Apple 日历，电脑不再写系统日历；
-  这条日程的时间也只能在 iPhone 上改。
+  decide_proposal 只改今天的状态：确认的日程标 `calendar: phone`，由手机自己写进 Apple 日历，电脑从不替它新建日历事件。
 - 健康仍使用 `inbox/health/*.health.json`。照片不在本次实现范围内。
 
 执行前核对下一步仍为 todo、待办仍为 open、日程建议仍待确认。
@@ -37,7 +36,9 @@
 
 1. 用户在手机上点「确认」，App 用 EventKit 把日程写进「开图」日历（需日历权限），提前 10 分钟提醒，
    备注写 `开图记录：<日期>/<时间段 id>`，与电脑写入的格式一致。iCloud 会把它同步到电脑。
-2. 写完再交 `decide_proposal`（confirmed）。电脑把这条标为已确认、`calendar: phone`，推系统日历时跳过它。
+2. 写完再交 `decide_proposal`（confirmed）。电脑把这条标为已确认、`calendar: phone`。
+4. Mac 推系统日历时按备注在所有名为「开图」的日历里找这条：找到了（iCloud 已同步过来）就跟着更新，
+   这时也能在电脑上改时间，改动经 iCloud 回到手机；没找到就等下次，不新建。Windows 读不了 Apple 日历，只能在 iPhone 上改。
 3. 没有日历权限时照样交操作，界面说明「没有日历权限，只记在开图里」。点「不要」交 rejected。
 
 ### 可信边界

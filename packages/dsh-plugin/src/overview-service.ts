@@ -458,7 +458,7 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("editCalendarBlock")
   async editCalendarBlock(id: string, start: string, end: string): Promise<CalendarPushResult> {
     return this.write(async () => {
-      const result = await editCalendarBlock(this.workspace, id, start, end);
+      const result = await editCalendarBlock(this.workspace, id, start, end, this.calendarWriter.located(id));
       return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
     });
   }

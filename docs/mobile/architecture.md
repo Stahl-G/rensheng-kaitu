@@ -75,7 +75,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 | op | args | 电脑执行 | 版本 |
 |---|---|---|---|
 | `complete_next` | `file`、`id` | `completeNext` | v0.6 |
-| `decide_proposal` | `id`、`decision`（confirmed / rejected） | `decidePhoneProposal`：只改状态；确认的标 `calendar: phone`，日历由手机写入，电脑不再推系统日历 | v0.6 |
+| `decide_proposal` | `id`、`decision`（confirmed / rejected） | `decidePhoneProposal`：只改状态；确认的标 `calendar: phone`，日历由手机写入；Mac 在日历里找到那条后才跟着更新、允许改时间，从不新建 | v0.6 |
 | `complete_task` / `cancel_task` | `id` | `completeTask` / `cancelTask` | v0.6 |
 | `keep_draft` / `adopt_draft` | `source`（加核对后的草稿） | `keepOnboardingMatter` / `adoptOnboardingMatter` | v0.6.1 |
 | `answer_question` | `question_id`、`value` | 待定 | 预留 |
