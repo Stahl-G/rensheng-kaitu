@@ -6,9 +6,9 @@ import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
+import { type AskMode, modeChangeForSend } from "./ask-mode.js";
 import { useT } from "./i18n.js";
 
-type AskMode = "scoped" | "full";
 interface Thread {
   mode?: AskMode;
   id: string;
@@ -212,6 +212,7 @@ export function AskPage({
   const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
     setSelected(id);
+    setPendingMode(null);
     setModeMenu(false);
     setModelMenu(false);
   };
@@ -531,8 +532,6 @@ export function AskPage({
     const pendingReferences = sessionReferences;
     const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
     // 本机 Agent 只有完整模式：发送时直接开，不再弹确认。
-    let modeForThread = pendingMode;
-    if (settings.fullOnly && mode !== "full") modeForThread = "full";
     setDraft("");
     setAttachments([]);
     setSessionReferences([]);
@@ -540,13 +539,21 @@ export function AskPage({
     setSending(true);
     try {
       let id = selected;
+      let actualMode = threads.find((thread) => thread.id === id)?.mode;
       if (!id) {
         const thread = await call<Thread>("askCreate");
         id = thread.id;
+        actualMode = thread.mode;
         activeSession.current = id;
         selectThread(id);
       }
-      if (modeForThread && modeForThread !== mode) {
+      const modeForThread = modeChangeForSend(
+        actualMode ?? "scoped",
+        pendingMode,
+        !!selected,
+        !!settings.fullOnly,
+      );
+      if (modeForThread) {
         await call("askSetMode", id, modeForThread, modeForThread === "full");
       }
       await call("askSend", id, payload, pendingAttachments);
