@@ -32,6 +32,7 @@ import {
   holdOverview,
   ignoredWorkspaceChange,
   importUpload,
+  invalidateHistoryFile,
   onboardingStatus,
   pendingWorkspaceFiles,
   processInbox,
@@ -267,6 +268,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   function changedFile(file: string) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
+    invalidateHistoryFile(ws, file);
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);

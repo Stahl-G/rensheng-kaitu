@@ -108,8 +108,24 @@ async function headOid(ws: Workspace): Promise<string | null> {
   }
 }
 
-function historyFs(ws: Workspace) {
-  if (!ws.isICloud) return fs;
+const invalidated = new WeakMap<Workspace, Map<string, symbol>>();
+
+/** 文件事件比 Git 索引的整秒 stat 更精确；只让这些路径重新读取内容。 */
+export function invalidateHistoryFile(ws: Workspace, file: string): void {
+  const files = invalidated.get(ws) ?? new Map<string, symbol>();
+  files.set(file, Symbol());
+  invalidated.set(ws, files);
+}
+
+function clearInvalidated(ws: Workspace, checked: ReadonlyMap<string, symbol>): void {
+  const files = invalidated.get(ws);
+  for (const [file, token] of checked) {
+    if (files?.get(file) === token) files.delete(file);
+  }
+}
+
+function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map()) {
+  if (!ws.isICloud && !changed.size) return fs;
   const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
     if (typeof path === "string") {
       const rel = relative(ws.root, path);
@@ -121,7 +137,25 @@ function historyFs(ws: Workspace) {
     }
     return fs.promises.readFile(path, options);
   }) as typeof fs.promises.readFile;
-  return { ...fs, promises: { ...fs.promises, readFile } };
+  const lstat = (async (...args: Parameters<typeof fs.promises.lstat>) => {
+    const stat = await fs.promises.lstat(...args);
+    const file = relative(ws.root, String(args[0])).split(sep).join("/");
+    let affected = changed.has(file);
+    for (
+      let slash = file.lastIndexOf("/");
+      !affected && slash >= 0;
+      slash = file.lastIndexOf("/", slash - 1)
+    ) {
+      affected = changed.has(file.slice(0, slash));
+    }
+    if (stat.isFile() && affected) {
+      // statusMatrix 没有按路径禁用 stat 缓存的接口。仅在只读盘点里令时间戳失配，
+      // refresh:false 防止占位时间写入索引；git.add 仍使用真实文件状态。
+      stat.mtimeMs = Number.NaN;
+    }
+    return stat;
+  }) as typeof fs.promises.lstat;
+  return { ...fs, promises: { ...fs.promises, ...(ws.isICloud ? { readFile } : {}), lstat } };
 }
 
 function snapshotFile(ws: Workspace, file: string): boolean {
@@ -130,13 +164,15 @@ function snapshotFile(ws: Workspace, file: string): boolean {
 
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
   await ensureHistory(ws);
+  const changedFiles = new Map(invalidated.get(ws));
   const matrix = await git.statusMatrix({
-    fs: historyFs(ws),
+    fs: historyFs(ws, changedFiles),
+    refresh: !changedFiles.size,
     dir: ws.root,
     gitdir: historyDirectory(ws),
     filter: (file) => snapshotFile(ws, file),
   });
-  return matrix
+  const files = matrix
     .filter(
       ([file, head, workdir, stage]) =>
         file !== "OVERVIEW.md" &&
@@ -145,6 +181,8 @@ export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
         !(head === 1 && workdir === 1 && stage === 1),
     )
     .map(([file]) => file);
+  if (!files.length) clearInvalidated(ws, changedFiles);
+  return files;
 }
 
 const deferred = new WeakMap<Workspace, (message: string) => void>();
@@ -199,8 +237,10 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
+  const changedFiles = new Map(invalidated.get(ws));
   const matrix = await git.statusMatrix({
-    fs: io,
+    fs: historyFs(ws, changedFiles),
+    refresh: !changedFiles.size,
     dir,
     gitdir: historyDirectory(ws),
     filter: (file) => snapshotFile(ws, file),
@@ -219,15 +259,20 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
     changed++;
   }
-  if (changed === 0) return null;
+  if (changed === 0) {
+    clearInvalidated(ws, changedFiles);
+    return null;
+  }
   const timestamp = Math.floor(now.getTime() / 1000);
-  return git.commit({
+  const oid = await git.commit({
     fs,
     dir,
     gitdir: historyDirectory(ws),
     message,
     author: { ...AUTHOR, timestamp, timezoneOffset: now.getTimezoneOffset() },
   });
+  clearInvalidated(ws, changedFiles);
+  return oid;
 }
 
 export interface Version {

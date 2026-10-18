@@ -1,0 +1,512 @@
+{
+  "baseHead": "dd399018bd6bff0587ffb29fdb64938b690fedc1",
+  "scope": "startup history invalidation only",
+  "rawEvidenceDirectory": "/tmp/kaitu-startup-evidence",
+  "baselineOriginal": {
+    "testedHead": "dd399018bd6bff0587ffb29fdb64938b690fedc1",
+    "scenario": "immediately edit same length and restore exact integer mtime after startup history commit appears",
+    "trials": [
+      {
+        "trial": 0,
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      },
+      {
+        "trial": 1,
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      },
+      {
+        "trial": 2,
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      }
+    ],
+    "base": "/tmp/kaitu-perf3-behavior-wO78DJ"
+  },
+  "baselineStats": {
+    "testedHead": "dd399018bd6bff0587ffb29fdb64938b690fedc1",
+    "scenario": "immediately edit same length and restore exact integer mtime after startup history commit appears",
+    "trials": [
+      {
+        "trial": 0,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349526000,
+            "ctimeMs": 1792349546222.0386,
+            "ino": 424769755
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349526000,
+            "ctimeMs": 1792349546532.1597,
+            "ino": 424769755
+          }
+        },
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      },
+      {
+        "trial": 1,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349529000,
+            "ctimeMs": 1792349549036.2417,
+            "ino": 424770275
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349529000,
+            "ctimeMs": 1792349549216.2905,
+            "ino": 424770275
+          }
+        },
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      },
+      {
+        "trial": 2,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349531000,
+            "ctimeMs": 1792349551646.2708,
+            "ino": 424770633
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349531000,
+            "ctimeMs": 1792349551826.2092,
+            "ino": 424770633
+          }
+        },
+        "newVersion": false,
+        "committedText": "before\n",
+        "actualText": "after!\n",
+        "pending": []
+      }
+    ],
+    "base": "/tmp/kaitu-perf3-behavior-uSV8Dj"
+  },
+  "baselineTraceSummary": [
+    {
+      "trial": 0,
+      "sameCtimeSecond": true,
+      "newVersion": false,
+      "pollSawAfter": 45,
+      "gitLstatSawAfter": 3,
+      "committedText": "before\n",
+      "actualText": "after!\n",
+      "pending": []
+    },
+    {
+      "trial": 1,
+      "sameCtimeSecond": false,
+      "newVersion": true,
+      "pollSawAfter": 6,
+      "gitLstatSawAfter": 5,
+      "committedText": "after!\n",
+      "actualText": "after!\n",
+      "pending": []
+    },
+    {
+      "trial": 2,
+      "sameCtimeSecond": true,
+      "newVersion": false,
+      "pollSawAfter": 45,
+      "gitLstatSawAfter": 3,
+      "committedText": "before\n",
+      "actualText": "after!\n",
+      "pending": []
+    }
+  ],
+  "deterministicBaseline": {
+    "status": "expected failure before fix",
+    "log": "/tmp/kaitu-startup-evidence/deterministic-baseline.log",
+    "expectedBlob": "after!\n",
+    "actualBlob": "before\n"
+  },
+  "fixedBoundedRace": {
+    "testedHead": "dd399018 + startup fix working tree",
+    "scenario": "immediately edit same length and restore exact integer mtime after startup history commit appears",
+    "trials": [
+      {
+        "trial": 0,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349995000,
+            "ctimeMs": 1792350015203.0676,
+            "ino": 424887327
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349995000,
+            "ctimeMs": 1792350015581.4944,
+            "ino": 424887327
+          }
+        },
+        "newVersion": true,
+        "committedText": "after!\n",
+        "actualText": "after!\n",
+        "pending": [],
+        "afterCloseText": "after!\n",
+        "latestOid": "2ba7fe6f6400b8f38392ee2f635f1d62f3022299"
+      },
+      {
+        "trial": 1,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349997000,
+            "ctimeMs": 1792350017511.8552,
+            "ino": 424888146
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349997000,
+            "ctimeMs": 1792350017836.7834,
+            "ino": 424888146
+          }
+        },
+        "newVersion": true,
+        "committedText": "after!\n",
+        "actualText": "after!\n",
+        "pending": [],
+        "afterCloseText": "after!\n",
+        "latestOid": "2cfd6f0a56ca795ad43517247b622b5eac17bdfe"
+      },
+      {
+        "trial": 2,
+        "stats": {
+          "before": {
+            "size": 7,
+            "mtimeMs": 1792349998000,
+            "ctimeMs": 1792350018803.4763,
+            "ino": 424888921
+          },
+          "after": {
+            "size": 7,
+            "mtimeMs": 1792349998000,
+            "ctimeMs": 1792350019176.2295,
+            "ino": 424888921
+          }
+        },
+        "newVersion": true,
+        "committedText": "after!\n",
+        "actualText": "after!\n",
+        "pending": [],
+        "afterCloseText": "after!\n",
+        "latestOid": "4a3e76985e3e34ef1082e2bff7d573c7edf267c6"
+      }
+    ],
+    "base": "/tmp/kaitu-perf3-behavior-gwKiQy"
+  },
+  "gitCliProof": [
+    {
+      "trial": 0,
+      "gitCliHead": "2ba7fe6f6400b8f38392ee2f635f1d62f3022299",
+      "gitCliBlob": "after!\n",
+      "fileText": "after!\n",
+      "aligned": true
+    },
+    {
+      "trial": 1,
+      "gitCliHead": "2cfd6f0a56ca795ad43517247b622b5eac17bdfe",
+      "gitCliBlob": "after!\n",
+      "fileText": "after!\n",
+      "aligned": true
+    },
+    {
+      "trial": 2,
+      "gitCliHead": "4a3e76985e3e34ef1082e2bff7d573c7edf267c6",
+      "gitCliBlob": "after!\n",
+      "fileText": "after!\n",
+      "aligned": true
+    }
+  ],
+  "fixedBehavior": {
+    "base": "/tmp/kaitu-startup-behavior-BJEEIo",
+    "trials": [
+      {
+        "mode": "native-requested",
+        "trial": 0,
+        "fellBackToPolling": true,
+        "startup": "b44b52e6d76600c44ceda27b99b89012e6c5cf7e",
+        "restored": "de462c919ef68cfb1f5c49d4a50c115afeba48d7",
+        "restoredBlob": "after!\n",
+        "ordinary": "ee75885628cb66b5807f8628451dd707ac9af714",
+        "deleted": "e4dc93f3af56d19186012650b8263efa5912e835",
+        "historyRequestMs": 17.9448339999999,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "native-requested",
+        "trial": 1,
+        "fellBackToPolling": true,
+        "startup": "c276c05a8f0f074162ef89ea9843ff9b15acbeca",
+        "restored": "d836e7a263d143907546f5cd1371ec5280e683be",
+        "restoredBlob": "after!\n",
+        "ordinary": "4cfd3e59ed8318b94787e7f97ba4a50a7cf58121",
+        "deleted": "bcf8e7f797d5fe4896e3db1f90e0a8fad0ef96b3",
+        "historyRequestMs": 2.7219999999997526,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "native-requested",
+        "trial": 2,
+        "fellBackToPolling": true,
+        "startup": "6eb6c7ccb4b6b2a2e3f3f9c6842b0774e0aa5ba2",
+        "restored": "86aa9a50449f8aa492bc05b2914d8cbf9cff35d0",
+        "restoredBlob": "after!\n",
+        "ordinary": "4f894a7ffb9d36086d1cf21490fccc09aaabcae8",
+        "deleted": "503ecb575ee2f982df1bc5d49c09cd9553dcaf41",
+        "historyRequestMs": 3.040999999999258,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "forced-polling",
+        "trial": 0,
+        "fellBackToPolling": true,
+        "startup": "0086e912d5aa9a266cdd9f40ed99ad73a29ec680",
+        "restored": "c7069d217de77d46ad31ce6fe3fff84bf31e7f77",
+        "restoredBlob": "after!\n",
+        "ordinary": "966c421eeb221138fd247cd7e88f53106f16d53b",
+        "deleted": "f9f8fcc6940e75eb185f386a8c2e2c78ad42e1ce",
+        "historyRequestMs": 7.931875000000218,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "forced-polling",
+        "trial": 1,
+        "fellBackToPolling": true,
+        "startup": "e35f87bfc65f1d09fb09d8f8553024ae7623aff1",
+        "restored": "81b6a92ce4bc7d82ec815740444323065ea98b7e",
+        "restoredBlob": "after!\n",
+        "ordinary": "d72b98cd3003c7753412d874145c9e5c2b9c3dad",
+        "deleted": "de613f65d261f71d63733c613c75782270aad304",
+        "historyRequestMs": 3.2302080000008573,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "forced-polling",
+        "trial": 2,
+        "fellBackToPolling": true,
+        "startup": "42fb1dd8e094fde35a69ee177ea317fb2b063c9c",
+        "restored": "e8755d5ecadbdfb2c0c13972e8277324fc0e6dc7",
+        "restoredBlob": "after!\n",
+        "ordinary": "8ca3c656fd2fad7bccfa654606730406d5a11bb2",
+        "deleted": "5d82678417ab7394e789a6f4094bb7e790f78047",
+        "historyRequestMs": 8.416167000001224,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      }
+    ]
+  },
+  "syntheticNativeEvents": {
+    "base": "/tmp/kaitu-startup-behavior-WkB9KR",
+    "trials": [
+      {
+        "mode": "synthetic-native-event-delivery",
+        "trial": 0,
+        "fellBackToPolling": false,
+        "startup": "ccccdae75c15994d088466ac987b5b2da43f8988",
+        "restored": "63a386ecf8670a7f17864bed6de8f3865666fc9f",
+        "restoredBlob": "after!\n",
+        "ordinary": "e696704f87383195e743a08544e0aa8e7c0ba13e",
+        "deleted": "94c76df3f684f43bc2bcba5ce57e1c899f25f9b8",
+        "historyRequestMs": 21.97787500000004,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "synthetic-native-event-delivery",
+        "trial": 1,
+        "fellBackToPolling": false,
+        "startup": "7744addaf93c5ba4fbb49e37c628654f038f0f3a",
+        "restored": "395e25876f5f37a361c7714924592f38c5cb8c69",
+        "restoredBlob": "after!\n",
+        "ordinary": "73a7418917d7ba19274b4c0f01f62261530c740e",
+        "deleted": "621f8063277f31fc783aefe9459f3f090d43393d",
+        "historyRequestMs": 2.7352090000003955,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      },
+      {
+        "mode": "synthetic-native-event-delivery",
+        "trial": 2,
+        "fellBackToPolling": false,
+        "startup": "a9a62e53e24470c1094fe581f0ba43c6b8a1e781",
+        "restored": "a7266e3b28aee201b49d10aa0684fe3a4e1b1a15",
+        "restoredBlob": "after!\n",
+        "ordinary": "905ffeafeae335d5931cb448c12e4e750f181454",
+        "deleted": "de371249a52b96b17f1e09c67d3a480745e5ecbd",
+        "historyRequestMs": 3.6164589999998498,
+        "closeKeptHistory": true,
+        "deletionAndSensitiveExclusion": true
+      }
+    ]
+  },
+  "startupTimings": {
+    "fixtureFilesAdded": 10000,
+    "distribution": [
+      {
+        "mode": "native-requested",
+        "sample": 0,
+        "listenRequestMs": 3.5097920000000613,
+        "startReturnedMs": 7.578624999999988,
+        "firstResponseMs": 158.19070799999997,
+        "statBeforeListen": 0,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      },
+      {
+        "mode": "native-requested",
+        "sample": 1,
+        "listenRequestMs": 0.9471659999999247,
+        "startReturnedMs": 2.4117080000000897,
+        "firstResponseMs": 85.4033330000002,
+        "statBeforeListen": 0,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      },
+      {
+        "mode": "native-requested",
+        "sample": 2,
+        "listenRequestMs": 0.4416659999997137,
+        "startReturnedMs": 1.5879579999996167,
+        "firstResponseMs": 85.969333,
+        "statBeforeListen": 0,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      },
+      {
+        "mode": "forced-polling",
+        "sample": 0,
+        "listenRequestMs": 81.28533299999981,
+        "startReturnedMs": 82.62883299999976,
+        "firstResponseMs": 85.24312499999996,
+        "statBeforeListen": 10069,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      },
+      {
+        "mode": "forced-polling",
+        "sample": 1,
+        "listenRequestMs": 77.36658400000033,
+        "startReturnedMs": 78.7006250000004,
+        "firstResponseMs": 81.56862499999988,
+        "statBeforeListen": 10069,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      },
+      {
+        "mode": "forced-polling",
+        "sample": 2,
+        "listenRequestMs": 80.6542500000005,
+        "startReturnedMs": 81.99833300000046,
+        "firstResponseMs": 86.77800000000025,
+        "statBeforeListen": 10069,
+        "statBeforeFirstResponse": 10069,
+        "fellBackToPolling": true,
+        "fellBackToPollingAfterClose": true
+      }
+    ],
+    "base": "/tmp/kaitu-perf3-98tYBt"
+  },
+  "targetedContentReads": {
+    "fixtureFiles": 10069,
+    "changedFile": "synthetic/0.md",
+    "contentReads": [
+      {
+        "path": "/tmp/kaitu-perf3-98tYBt/large/synthetic/0.md",
+        "count": 3
+      }
+    ],
+    "otherSyntheticFilesRead": 0,
+    "committedBlob": "SYNTHETIC X\n",
+    "oid": "a0775fd2051ae396200648064e7d4544d73aa97c"
+  },
+  "additionalHighFrequencyProbe": {
+    "refreshDelayMs": 30,
+    "effectivePollingIntervalMs": 50,
+    "workspaceFiles": 10069,
+    "newHeadWithin6000ms": false,
+    "afterCloseOid": "345e590e995b33b96c09b3ca783cab2b55c58284",
+    "afterCloseBlob": "SYNTHETIC X\n",
+    "afterCloseActual": "SYNTHETIC X\n",
+    "afterClosePending": [],
+    "status": "failed bound; retained limitation, not counted as pass"
+  },
+  "orderedChecks": [
+    {
+      "step": "core-build",
+      "exit": 0,
+      "seconds": 3.516
+    },
+    {
+      "step": "typecheck",
+      "exit": 0,
+      "seconds": 12.949
+    },
+    {
+      "step": "biome",
+      "exit": 0,
+      "seconds": 0.468
+    },
+    {
+      "step": "related-vitest",
+      "exit": 0,
+      "seconds": 14.448
+    },
+    {
+      "step": "deterministic-repeat-2",
+      "exit": 0,
+      "seconds": 5.014
+    },
+    {
+      "step": "deterministic-repeat-3",
+      "exit": 0,
+      "seconds": 4.74
+    },
+    {
+      "step": "cli-build",
+      "exit": 0,
+      "seconds": 1.97
+    }
+  ],
+  "finalSuite": {
+    "command": "pnpm exec vitest run",
+    "exit": 0,
+    "wallSeconds": 139.936,
+    "syntheticHome": "/tmp/kaitu-startup-full-home-msa09zaw",
+    "boundary": "same prior /Applications/ existsSync=false preload; existing optional-host skips; no product test edits",
+    "summary": [
+      "Test Files  90 passed | 1 skipped (91)",
+      "Tests  267 passed | 2 skipped (269)",
+      "Duration  139.00s (transform 3.68s, setup 751ms, import 33.05s, tests 228.19s, environment 6ms)"
+    ]
+  }
+}
