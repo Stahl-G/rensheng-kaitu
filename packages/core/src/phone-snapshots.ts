@@ -1,5 +1,6 @@
 import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
+import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
@@ -21,6 +22,15 @@ export async function writePhoneSnapshots(
 ) {
   if (!options.force && !phoneReadable(ws)) return 0;
   const data = await readOverviewPage(ws, now);
+  const computer = options.generator?.kind !== "agent";
+  if (computer)
+    rememberOrganizer(
+      ws,
+      ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined,
+      undefined,
+      data.daily ?? undefined,
+      now,
+    );
   const at = now.toISOString();
   const snapshots = {
     today: buildPhoneToday(data, at),
@@ -38,6 +48,7 @@ export async function writePhoneSnapshots(
         continue;
     }
     ws.writeJson(file, value);
+    if (name === "today" && computer) rememberComputerSnapshot(ws, now);
     writes++;
   }
   return writes + writePhoneReceipts(ws, [], now);

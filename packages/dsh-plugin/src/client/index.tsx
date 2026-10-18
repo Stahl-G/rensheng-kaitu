@@ -330,6 +330,11 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              organizerSeen: async () => {
+                const r = await ctx.remote.kaitu.organizerSeen();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               configureAutomation: async (
                 tasks: Partial<Record<AutomationKey, boolean>>,
                 times?: Partial<Record<AutomationKey, string>>,

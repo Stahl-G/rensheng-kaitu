@@ -1,8 +1,9 @@
-import type { CalendarPushSettings, HandoverPack, SyncProvider } from "@kaitu/core";
+import type { CalendarPushSettings, HandoverPack, OrganizerStatus, SyncProvider } from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
+import { CloudOrganizer } from "./CloudOrganizer.js";
 import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
@@ -20,6 +21,7 @@ export interface PersonalServices extends CalendarPushServices {
   plugins?: PluginRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
     tasks: Partial<Record<AutomationKey, boolean>>,
@@ -74,6 +76,10 @@ export function PersonalPages(
     void refresh();
   }, [refresh]);
   useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(() => {
+    if (props.view === "connections" && data?.organizer.unread)
+      document.getElementById("cloud-organizer")?.scrollIntoView({ block: "center" });
+  }, [props.view, data?.organizer.unread]);
   const run = async (operation: () => Promise<unknown>, message = t("已保存", "Saved")) => {
     setBusy(true);
     setError("");
@@ -307,8 +313,28 @@ export function PersonalPages(
             </section>
             <section className={css.sec}>
               <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>{t("云端的 AI（进阶）", "Cloud AI (advanced)")}</h2>
+                <h2 className={css.eyebrow}>{t("云端整理员", "Cloud organizer")}</h2>
               </div>
+              <CloudOrganizer
+                data={data}
+                copy={(text) =>
+                  run(() => navigator.clipboard.writeText(text), t("说明已复制", "Instructions copied"))
+                }
+                seen={() =>
+                  run(async () => {
+                    const organizer = await props.organizerSeen?.();
+                    if (organizer) setData((current) => (current ? { ...current, organizer } : current));
+                  })
+                }
+                setup={() => {
+                  if (props.workspaceBackup)
+                    document.getElementById("workspace-backup")?.scrollIntoView({ block: "center" });
+                  else {
+                    props.navigate("settings");
+                    setMoving(true);
+                  }
+                }}
+              />
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <span>

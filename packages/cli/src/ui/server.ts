@@ -45,6 +45,7 @@ import {
   snapshotNow,
   stageUpload,
   startWorkspaceBackup,
+  subscribeOrganizer,
   syncProject,
   syncProjects,
   syncStatus,
@@ -216,6 +217,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
+  const stopOrganizer = subscribeOrganizer(ws, notify);
   const stopPhone = startPhoneSnapshots(ws, () => reportError());
   void pullCalendars().catch(() => {});
   const reportError = () => {
@@ -716,6 +718,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
@@ -734,6 +737,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   } catch (error) {
     watcher?.close();
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();

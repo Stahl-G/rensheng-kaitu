@@ -55,6 +55,7 @@ import {
   keepOnboardingMatter,
   lifeMap,
   loadFinanceInvestments,
+  markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
   normalizeLocale,
@@ -121,6 +122,7 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "organizerSeen",
   "workspaceBackup",
   "askModels",
   "projectCreate",
@@ -187,6 +189,7 @@ export async function productRequest(
     return args[i] as number;
   };
   const locale = (i: number): Locale => normalizeLocale(args[i]);
+  if (method === "organizerSeen") return markOrganizerSeen(ws);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
     if (!ask) {

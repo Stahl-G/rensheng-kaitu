@@ -8,7 +8,8 @@ import { KaituError } from "./errors.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
-import { refreshOverview } from "./overview.js";
+import { rememberOrganizer } from "./organizer.js";
+import { latestDaily, refreshOverview } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { placeholderOriginal } from "./sync-files.js";
@@ -398,12 +399,13 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       const other = await remote.read(c.repo, c.branch);
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
       const incoming = Object.fromEntries(Object.entries(other.files).filter(([path]) => selected(path, c)));
+      const known = new Set(phoneReceipts(ws).map((r) => `${r.kind}:${r.ref}`));
+      const added = incoming["phone/receipts.json"]
+        ? remoteReceipts(incoming["phone/receipts.json"]).filter((r) => !known.has(`${r.kind}:${r.ref}`))
+        : [];
+      rememberOrganizer(ws, incoming["phone/today.json"], added, latestDaily(ws));
       // 云端整理员写的回执，本机没有的先并进来；其余 phone 文件仍以本机为准。
-      if (local["phone/receipts.json"] !== undefined && incoming["phone/receipts.json"] !== undefined) {
-        const known = new Set(phoneReceipts(ws).map((r) => `${r.kind}:${r.ref}`));
-        const added = remoteReceipts(incoming["phone/receipts.json"]).filter(
-          (r) => !known.has(`${r.kind}:${r.ref}`),
-        );
+      if (incoming["phone/receipts.json"] !== undefined) {
         if (added.length && writePhoneReceipts(ws, added))
           local["phone/receipts.json"] = ws.readText("phone/receipts.json");
       }
@@ -428,6 +430,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         if (merged.files[path] === undefined) rmSync(ws.resolve(path));
         else ws.writeText(path, merged.files[path] as string);
       }
+      rememberOrganizer(ws, undefined, [], latestDaily(ws));
       if (!sameFiles(merged.files, incoming)) {
         const outgoing = { ...other.files, ...merged.files };
         for (const path of Object.keys(incoming)) if (!(path in merged.files)) delete outgoing[path];

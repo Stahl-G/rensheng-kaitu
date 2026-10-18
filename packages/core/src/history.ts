@@ -11,6 +11,7 @@ import { type Workspace, stateDirectory } from "./workspace.js";
 
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [
+  ".kaitu/organizer.json",
   "phone/",
   ".kaitu/phone-actions.json",
   ".kaitu/secrets.json",
@@ -34,7 +35,8 @@ export const NEVER_TRACK = [
   "inbox/rejected/",
 ];
 
-export const GITIGNORE = `phone/
+export const GITIGNORE = `.kaitu/organizer.json
+phone/
 .kaitu/phone-actions.json
 # 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json

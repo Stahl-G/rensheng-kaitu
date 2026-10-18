@@ -33,6 +33,7 @@ import {
   type OnboardingSetupResult,
   type OnboardingStatus,
   type OnboardingTarget,
+  type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
   type SettingsData,
@@ -67,6 +68,7 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
   normalizeLocale,
@@ -372,6 +374,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("settings")
   async settings(): Promise<SettingsData> {
     return readSettings(this.workspace);
+  }
+
+  @Remote("organizerSeen")
+  async organizerSeen(): Promise<OrganizerStatus> {
+    return markOrganizerSeen(this.workspace);
   }
 
   @Remote("exportWorkspace")
