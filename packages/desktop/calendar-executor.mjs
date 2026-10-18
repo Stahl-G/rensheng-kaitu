@@ -6,27 +6,31 @@ const script = String.raw`
 function run(argv) {
   const input = JSON.parse(argv[0]);
   const app = Application('Calendar');
+  // iCloud 同步来的「开图」日历可能和本机建的同名，按备注在每一个里找。
   const calendars = app.calendars.whose({name: '开图'})();
-  let calendar = calendars[0];
-  if (!calendar) {
-    if (input.uid || input.action === 'remove') return JSON.stringify({uid: null});
-    calendar = app.Calendar({name: '开图'});
-    app.calendars.push(calendar);
-  }
   const marker = '开图记录：' + input.entry.id;
-  let events = input.uid ? calendar.events.whose({uid: input.uid})() :
-    calendar.events.whose({description: {_contains: marker}})();
-  let event = input.uid ? events[0] : events.find(function(item) {
-    return item.description().split('\n').some(function(line) {
-      return line === marker || line.indexOf(marker + '（') === 0;
-    });
-  });
+  let calendar = calendars[0];
+  let event;
+  for (const candidate of calendars) {
+    event = input.uid ? candidate.events.whose({uid: input.uid})()[0] :
+      candidate.events.whose({description: {_contains: marker}})().find(function(item) {
+        return item.description().split('\n').some(function(line) {
+          return line === marker || line.indexOf(marker + '（') === 0;
+        });
+      });
+    if (event) break;
+  }
   if (input.action === 'remove') {
     if (event) app.delete(event);
     return JSON.stringify({uid: null});
   }
-  if (!event && input.uid) return JSON.stringify({uid: null});
+  // 手机写的那条只更新、不新建：没同步过来就当还没有。
+  if (!event && (input.uid || input.entry.phone)) return JSON.stringify({uid: null});
   if (!event) {
+    if (!calendar) {
+      calendar = app.Calendar({name: '开图'});
+      app.calendars.push(calendar);
+    }
     event = app.Event({summary: input.entry.title, startDate: new Date(input.entry.start),
       endDate: new Date(input.entry.end), description: input.entry.notes});
     calendar.events.push(event);

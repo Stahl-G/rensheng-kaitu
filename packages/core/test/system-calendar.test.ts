@@ -10,6 +10,7 @@ import {
   calendarPushStore,
   cancelTask,
   decideProposal,
+  editCalendarBlock,
   parseFrontmatter,
   scheduleNext,
   stringifyFrontmatter,
@@ -34,6 +35,64 @@ function fakeCalendar() {
 }
 
 describe("confirmed system calendar", () => {
+  it("updates the iPhone-written event once it syncs here, never creates it, and only then allows moving it", async () => {
+    const ws = await freshWorkspace();
+    const block = {
+      id: "slot",
+      title: "手机确认的日程",
+      kind: "proposal",
+      status: "confirmed",
+      calendar: "phone",
+    };
+    ws.writeText(
+      "NOW.md",
+      stringifyFrontmatter({ date: "2026-10-16", blocks: [{ ...block, start: "10:00", end: "11:00" }] }, ""),
+    );
+    const events = new Map<string, CalendarPushEntry>();
+    let failing = false;
+    const executor: CalendarExecutor = {
+      async upsert(entry, uid, changed) {
+        if (failing) throw new Error("日历超时");
+        const key =
+          uid ??
+          [...events].find(([, event]) => event.notes.split("\n").includes(`开图记录：${entry.id}`))?.[0];
+        if (!key) return null;
+        if (changed !== false) events.set(key, structuredClone(entry));
+        return key;
+      },
+      async remove(uid) {
+        events.delete(uid);
+      },
+    };
+    const push = new CalendarPush(calendarPushStore(ws), executor);
+    await push.sync(calendarPushEntries(ws));
+    expect(events.size).toBe(0);
+    await expect(editCalendarBlock(ws, "slot", "14:00", "15:00", push.located("slot"))).rejects.toThrow(
+      "iPhone",
+    );
+    // iPhone 写的那条经 iCloud 同步到这台电脑之后才能跟着改。同步过来前已在手机上挪到 11:00（UTC 03:00），
+    // 第一次找到时不能改回 10:00；找的时候出错要下次再找，不记成要导入的日历文件。
+    const notes = "做完后回开图记一句结果\n开图记录：2026-10-16/slot";
+    const moved = {
+      id: "2026-10-16/slot",
+      title: block.title,
+      start: "2026-10-16T03:00:00.000Z",
+      end: "",
+      notes,
+    };
+    events.set("iphone-event", moved);
+    failing = true;
+    await push.sync(calendarPushEntries(ws));
+    expect(calendarPushStore(ws).read().entries).toEqual({});
+    failing = false;
+    await push.sync(calendarPushEntries(ws));
+    expect(events.get("iphone-event")).toEqual(moved);
+    await editCalendarBlock(ws, "slot", "14:00", "15:00", push.located("slot"));
+    await push.sync(calendarPushEntries(ws));
+    expect([...events.keys()]).toEqual(["iphone-event"]);
+    expect(events.get("iphone-event")?.start).toBe("2026-10-16T06:00:00.000Z");
+  });
+
   it("writes only confirmed slots, preserves identity on reschedule, cancels and respects manual deletion and the switch", async () => {
     const ws = await freshWorkspace();
     ws.writeText(

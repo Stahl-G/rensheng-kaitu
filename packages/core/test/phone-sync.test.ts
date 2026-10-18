@@ -225,7 +225,7 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
     parseFrontmatter<{ blocks: { status: string; calendar?: string }[] }>(ws.readText("NOW.md")).data
       .blocks[0],
   ).toMatchObject({ status: "confirmed", calendar: "phone" });
-  expect(calendarPushEntries(ws)).toEqual([]);
+  expect(calendarPushEntries(ws)).toEqual([expect.objectContaining({ phone: true })]);
   await expect(editCalendarBlock(ws, "proposal-1", "12:00", "13:00")).rejects.toThrow("iPhone");
   const before = readRecords(ws, "task");
   const receiptFile = ws.readJson<{ items: { ref: string }[] }>("phone/receipts.json");
