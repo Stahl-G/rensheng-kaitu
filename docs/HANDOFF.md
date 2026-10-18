@@ -2,8 +2,8 @@
 
 ## 手机 v0.7：电脑不在也能用（2026-10-18）
 
-用户同意方向：用户自己的云端 Agent（Dot、Grok Bot 等）当「手机更新员」，电脑不在时处理手机文件、重算今天；电脑开着时电脑优先。
-规范见 [mobile/agent-runner.md](mobile/agent-runner.md)，给 Agent 的规则见 [mobile/PHONE-RUNNER.md](mobile/PHONE-RUNNER.md)。
+用户同意方向：用户自己的云端 Agent（Dot、Grok Bot 等）当整理员，白天在电脑不在时处理手机文件、重算今天，夜里照旧每日整理；电脑开着时电脑优先。用户只设这一个角色。
+规范见 [mobile/agent-runner.md](mobile/agent-runner.md)，给 Agent 的规则见 [mobile/ORGANIZER.md](mobile/ORGANIZER.md)（工作区 ORGANIZER.md 的 v0.7 版，R5 把 `renderOrganizer` 改成它）。
 顺序：用户先用合成仓库让 Dot、Grok Bot 试一轮（规范 §10）→ 再改电脑（R1–R6）和手机（I10–I14）。
 快照的 `generator` 字段是格式改动，用户点头前不改 schema。
 

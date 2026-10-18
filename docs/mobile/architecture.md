@@ -29,7 +29,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 电脑 processInbox ──应用──▶ data/、STATUS.md、NOW.md ──▶ 重新生成快照 + phone/receipts.json
 ```
 
-1. v0.6 只有电脑写资料（`data/`、`STATUS.md`、`NOW.md`、`me/`），与云端接力协议一致；手机只交新文件。v0.7 起电脑不在时，用户指定的云端 Agent 按 [PHONE-RUNNER.md](PHONE-RUNNER.md) 改其中有限的几处（[agent-runner.md](agent-runner.md)）。
+1. v0.6 只有电脑写资料（`data/`、`STATUS.md`、`NOW.md`、`me/`），与云端接力协议一致；手机只交新文件。v0.7 起电脑不在时，用户指定的整理员（云端 Agent）按 [ORGANIZER.md](ORGANIZER.md) 的白天一节改其中有限的几处（[agent-runner.md](agent-runner.md)）。
 2. 手机界面只依赖两样东西：快照的格式、写入的格式。谁生成快照、谁处理收件箱以后可以换（§8），界面不用改。
 3. 存储层可以换：iCloud 文件夹、GitHub，以后加 WebDAV（坚果云），读写的都是同一组路径。
 
@@ -150,7 +150,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 
 - 界面只读快照、只写收件箱格式。以后换成手机自己（或云端）生成快照、处理收件箱，界面不用改。
 - **两条路线：**
-  1. **云端整理（v0.7 先做）：** 用户自己的云端 Agent 当手机更新员，按 PHONE-RUNNER.md 处理手机文件、重算今天；能运行命令的 Agent 或仓库定时任务运行 `kaitu phone run`，用同一份代码。电脑开着时电脑优先。规范见 [agent-runner.md](agent-runner.md)。
+  1. **云端整理（v0.7 先做）：** 用户自己的云端 Agent 当整理员，白天按 ORGANIZER.md 处理手机文件、重算今天；能运行命令的 Agent 或仓库定时任务运行 `kaitu phone run`，用同一份代码。电脑开着时电脑优先。规范见 [agent-runner.md](agent-runner.md)。
   2. **手机端引擎（以后再评估）：** 把快照计算移植到 Swift，或者让 core 的纯计算部分在 JavaScriptCore 里跑；收件箱直接在手机上应用。GitHub 备份的记录级合并已经支持多端写同一批记录文件。
 - **现在的约束：**
   - D1 的投影函数保持纯函数，输入是已读出的数据。
