@@ -307,6 +307,14 @@ output.progress,
   color: var(--kt-on-primary);
   font-size: 24px;
 }
+.stopIcon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: auto;
+  border-radius: 2px;
+  background: currentColor;
+}
 .chat button:disabled {
   opacity: 0.4;
   cursor: default;

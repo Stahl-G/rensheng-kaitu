@@ -934,16 +934,6 @@ export function AskPage({
               )}
             </div>
           )}
-          {busy && settings?.choice === "local" && (
-            <button
-              type="button"
-              onClick={() => {
-                if (selected) void call("askCancel", selected).catch((err) => setError(err.message));
-              }}
-            >
-              {t("停止", "Stop")}
-            </button>
-          )}
           <div className={css.composerRow}>
             <input
               ref={upload}
@@ -1108,19 +1098,31 @@ export function AskPage({
                 </dialog>
               )}
             </span>
-            <button
-              type="submit"
-              className={css.send}
-              aria-label="发送"
-              disabled={
-                busy ||
-                readingFiles ||
-                (!draft.trim() && !attachments.length && !sessionReferences.length) ||
-                !settings?.configured
-              }
-            >
-              ↑
-            </button>
+            {busy ? (
+              <button
+                type="button"
+                className={css.send}
+                aria-label={t("停止", "Stop")}
+                onClick={() => {
+                  if (selected) void call("askCancel", selected).catch((err) => setError(err.message));
+                }}
+              >
+                <span className={css.stopIcon} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className={css.send}
+                aria-label="发送"
+                disabled={
+                  readingFiles ||
+                  (!draft.trim() && !attachments.length && !sessionReferences.length) ||
+                  !settings?.configured
+                }
+              >
+                ↑
+              </button>
+            )}
           </div>
         </form>
         <p className={css.scope}>
