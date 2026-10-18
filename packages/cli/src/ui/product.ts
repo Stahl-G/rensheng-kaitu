@@ -214,6 +214,8 @@ export async function productRequest(
         return ask.models((args[0] ?? {}) as Record<string, unknown>);
       case "askSearchConfigure":
         return ask.configure({ search: args[0] });
+      case "askCancel":
+        return ask.cancel(text(0));
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {

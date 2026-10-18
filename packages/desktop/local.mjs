@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createAgentConnection } from "../cli/dist/local-agents/connection.js";
 import { createAskService } from "../cli/dist/ui/ask.js";
 import { startUi } from "../cli/dist/ui/server.js";
 import {
@@ -43,15 +44,27 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
   const keyFile = ".kaitu/ask-workspace.json";
   const workspaceKey = ws.exists(keyFile) ? ws.readJson(keyFile).key : ws.root;
   if (!ws.exists(keyFile)) ws.writeJson(keyFile, { key: workspaceKey }, { internal: true });
+  const connection = createAgentConnection({
+    state,
+    workspace: getWorkspace,
+    sdk: currentSdk,
+    mcp: {
+      command: executable,
+      get args() {
+        return [join(resources, "dist/mcp-stdio.mjs"), getWorkspace()];
+      },
+      env: { ELECTRON_RUN_AS_NODE: "1" },
+    },
+  });
   return createAskService({
     state: conversationState,
     workspace: ws.root,
     workspaceKey,
-    runtime: (mode) => currentSdk().runtime(mode),
-    settings: () => currentSdk().settings(),
+    runtime: (mode) => connection.runtime(mode),
+    settings: () => connection.settings(),
     models: (input) => currentSdk().models(input),
-    configure: (input) => currentSdk().configure(input),
-    support: (method, input) => currentSdk().support(method, input),
+    configure: (input) => connection.configure(input),
+    support: (method, input) => connection.support(method, input),
     dispose: () => sdk.closeSupport(),
   });
 }

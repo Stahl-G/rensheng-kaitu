@@ -1,0 +1,10 @@
+{
+  "prompts": 3,
+  "streamed": true,
+  "reply": true,
+  "resumed": true,
+  "saved": true,
+  "cancelled": true,
+  "cliVersion": "2.154.0",
+  "platform": "macOS"
+}

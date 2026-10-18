@@ -1,5 +1,9 @@
 # 交接说明：人生开图（开图 Kaitu）
 
+## CodeBuddy ACP 本地开发（2026-10-18）
+
+独立分支 `codex/codebuddy-acp` 接续 `origin/wip/local-agents` 的 snapshot，本轮只开放 CodeBuddy，保留现有 DeepSeek 入口。仅完整 Agent 模式，用户已有 CLI 登录；未实现反向 `kaitu acp` 服务端。Mac 已通过三次合成模型任务及会话保存、恢复、取消；打包 MCP helper 的合成待办写回通过。Windows 与原生 App 打包仍待验收，无发布。详见 [验收与交接](acceptance/codebuddy-acp-2026-10-18/README.md)。
+
 ## 当前产品裁决（2026-10-16）
 
 以 [PRODUCT.md](PRODUCT.md) 为唯一当前产品定义，首发范围与发布门槛见 [prd/launch.md](prd/launch.md)。

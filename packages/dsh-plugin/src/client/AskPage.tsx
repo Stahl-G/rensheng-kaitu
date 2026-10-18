@@ -7,6 +7,7 @@ import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
 import { aiHandover } from "./connections.js";
+import { useT } from "./i18n.js";
 
 type AskMode = "scoped" | "full";
 interface Thread {
@@ -41,7 +42,10 @@ interface Settings {
   /** 本机没有可用的问问引擎时为 false。 */
   available?: boolean;
   configured: boolean;
-  choice?: "builtin" | "external";
+  choice?: "builtin" | "external" | "local";
+  fullOnly?: boolean;
+  supportsAttachments?: boolean;
+  localAgent?: { path?: string; status: string };
   model: string;
   provider: string;
   providerName: string;
@@ -161,6 +165,9 @@ export function AskPage({
   configureBuiltin?: boolean;
   onConnections?: () => void;
 }) {
+  const t = useT();
+  const [cliPath, setCliPath] = useState("");
+  const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [events, setEvents] = useState<ChatEvent[]>([]);
@@ -189,7 +196,7 @@ export function AskPage({
   };
   const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
 
-  const [choice, setChoice] = useState<"builtin" | "external">("external");
+  const [choice, setChoice] = useState<"builtin" | "external" | "local">("external");
   const [key, setKey] = useState("");
   const [provider, setProvider] = useState("deepseek-official");
   const [model, setModel] = useState("");
@@ -284,6 +291,7 @@ export function AskPage({
         setAuth(ai.auth ?? "key");
         setProvider(ai.provider);
         setModel(ai.model);
+        setCliPath(ai.localAgent?.path ?? "");
         setBaseURL(ai.baseURL ?? "");
         setApi(ai.api ?? "openai-completions");
         if (!configurationRequested.current) setChoice(ai.choice ?? "external");
@@ -293,7 +301,7 @@ export function AskPage({
         setLoaded(true);
         if (!configurationRequested.current) {
           if (!ai.choice && !ai.configured) setStep(1);
-          else if (ai.configured && !auto.asked) setStep(2);
+          else if (ai.configured && !auto.asked && ai.choice !== "local") setStep(2);
         }
       })
       .catch((err) => {
@@ -318,11 +326,21 @@ export function AskPage({
   useEffect(() => {
     activeSession.current = selected;
     setEvents([]);
+    setLiveText("");
     nearBottom.current = true;
     if (!selected) return;
     const stream = new EventSource(`/api/ask/events?session=${encodeURIComponent(selected)}`);
     stream.onmessage = (message) => {
       const event = JSON.parse(message.data) as ChatEvent;
+      if (event.type === "assistant/delta") {
+        setLiveText(String(event.data.text ?? ""));
+        return;
+      }
+      if (
+        event.type === "assistant/message" ||
+        (event.type === "session.status" && event.data.status === "idle")
+      )
+        setLiveText("");
       setEvents((previous) =>
         previous.some((item) => item.id === event.id) ? previous : [...previous, event],
       );
@@ -490,6 +508,9 @@ export function AskPage({
     try {
       const ai = await call<Settings>("askConfigure", {
         choice,
+        ...(choice === "local"
+          ? { agent: "codebuddy", ...(cliPath.trim() ? { path: cliPath.trim() } : {}) }
+          : {}),
         ...(choice === "builtin"
           ? {
               provider,
@@ -505,11 +526,13 @@ export function AskPage({
       });
       setKey("");
       setSettings(ai);
+      selectThread(null);
       setAuth(ai.auth ?? "key");
       if (!ai.supportsImages) setAttachments([]);
       setSessionReferences([]);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
+      if (choice === "local") setModeMenu("confirm");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -723,7 +746,12 @@ export function AskPage({
               );
             return null;
           })}
-          {waiting && (
+          {liveText && (
+            <article className={css.assistant} aria-live="polite">
+              <Body content={liveText} />
+            </article>
+          )}
+          {waiting && !liveText && (
             <output className={css.progress}>
               <span className={`${css.dot} ${css.pulse}`} />
               正在准备回答
@@ -912,6 +940,16 @@ export function AskPage({
               )}
             </div>
           )}
+          {busy && settings?.choice === "local" && (
+            <button
+              type="button"
+              onClick={() => {
+                if (selected) void call("askCancel", selected).catch((err) => setError(err.message));
+              }}
+            >
+              {t("停止", "Stop")}
+            </button>
+          )}
           <div className={css.composerRow}>
             <input
               ref={upload}
@@ -927,7 +965,7 @@ export function AskPage({
               type="button"
               className={css.add}
               aria-label="添加附件"
-              disabled={busy || readingFiles}
+              disabled={busy || readingFiles || settings?.supportsAttachments === false}
               onClick={() => upload.current?.click()}
             >
               ＋
@@ -935,10 +973,11 @@ export function AskPage({
             <button
               type="button"
               className={css.model}
-              disabled={busy}
+              disabled={busy || settings?.choice === "local"}
               onClick={() => {
                 cursor.current = input.current?.selectionStart ?? draft.length;
                 setAtQuery(undefined);
+                if (settings?.choice === "local") return;
                 setReferences(!references);
                 setModeMenu(null);
                 setModelMenu(false);
@@ -958,7 +997,11 @@ export function AskPage({
                   setModeMenu(modeMenu ? null : "select");
                 }}
               >
-                {mode === "full" ? "完整 Agent" : "开图资料"}
+                {mode === "full"
+                  ? "完整 Agent"
+                  : settings?.fullOnly
+                    ? t("启用完整 Agent", "Enable full Agent")
+                    : "开图资料"}
                 <span aria-hidden="true">⌄</span>
               </button>
               {modeMenu && (
@@ -969,7 +1012,18 @@ export function AskPage({
                 >
                   {modeMenu === "confirm" ? (
                     <>
-                      <b>给这个对话开启完整 Agent？</b>
+                      <b>{t("给这个对话开启完整 Agent？", "Enable full Agent for this conversation?")}</b>
+                      <p>
+                        {settings?.choice === "local"
+                          ? t(
+                              "CodeBuddy 可按宿主权限读写本机文件、运行命令和联网，使用自己的账户额度。对话及读取内容可能发给模型服务；开图减少默认资料并提醒保护私料，但不能保证隔离。",
+                              "CodeBuddy can access files, run commands and use the network under its host permissions, using your account allowance. Conversation and read content may reach the model service. Kaitu minimizes default context and adds privacy instructions; isolation is not guaranteed.",
+                            )
+                          : t(
+                              "Agent 能运行命令、读写电脑上的文件和联网。",
+                              "The Agent can run commands, access files and use the network.",
+                            )}
+                      </p>
                       <div className={v2["dialog-foot"]}>
                         <button
                           type="button"
@@ -995,6 +1049,7 @@ export function AskPage({
                         type="button"
                         className={v2["mode-opt"]}
                         aria-pressed={mode === "scoped"}
+                        disabled={settings?.fullOnly}
                         onClick={() => void changeMode("scoped")}
                       >
                         <b>只读写开图资料</b>
@@ -1008,7 +1063,12 @@ export function AskPage({
                       >
                         <b>完整 Agent</b>
                         <span>
-                          开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。
+                          {settings?.choice === "local"
+                            ? t(
+                                "使用本机 CodeBuddy 的完整能力与原生权限。",
+                                "Uses local CodeBuddy capabilities and native permissions.",
+                              )
+                            : "开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。"}
                         </span>
                       </button>
                     </>
@@ -1025,6 +1085,7 @@ export function AskPage({
                 aria-expanded={modelMenu}
                 onClick={() => {
                   setModeMenu(null);
+                  if (settings?.choice === "local") return;
                   setModelMenu(!modelMenu);
                 }}
               >
@@ -1081,7 +1142,7 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `${settings.providerName} · ${mode === "full" ? "完整 Agent" : "开图资料"}`
+            ? `${settings.providerName} · ${mode === "full" ? "完整 Agent" : settings?.fullOnly ? t("启用完整 Agent", "Enable full Agent") : "开图资料"}`
             : "Enter 发送 · Shift + Enter 换行"}
         </p>
       </section>
@@ -1116,11 +1177,70 @@ export function AskPage({
               className={css.choice}
               aria-pressed={choice === "builtin"}
               disabled={saving}
-              onClick={() => setChoice("builtin")}
+              onClick={() => {
+                setChoice("builtin");
+                if (settings?.choice === "local")
+                  void call<Settings>("askSupport", "builtinSettings", {})
+                    .then((ai) => {
+                      setSettings((current) =>
+                        current
+                          ? { ...current, providers: ai.providers, protocols: ai.protocols, saved: ai.saved }
+                          : ai,
+                      );
+                      setProvider(ai.provider);
+                      setModel(ai.model);
+                    })
+                    .catch((err) => setError(err.message));
+              }}
             >
               <b>用开图里的 AI</b>
               <span>用 API Key 连接，或使用服务商提供的账号登录。</span>
             </button>
+            <button
+              type="button"
+              className={css.choice}
+              aria-pressed={choice === "local"}
+              disabled={saving}
+              onClick={() => setChoice("local")}
+            >
+              <b>{t("用本机 CodeBuddy", "Use local CodeBuddy")}</b>
+              <span>
+                {t(
+                  "不填 Key，沿用官方 CLI 的登录、模型和账户额度。仅支持完整 Agent。",
+                  "No API key. Uses your CLI login, model and account allowance. Full Agent mode only.",
+                )}
+              </span>
+            </button>
+            {choice === "local" && (
+              <div className={css.fields}>
+                <p>
+                  {t(
+                    "连接后，在对话权限中确认开启完整 Agent。它可按宿主权限读写文件、运行命令和联网。对话和工具读取内容可能发送给 CodeBuddy 所连接的模型服务。",
+                    "After connecting, confirm full Agent mode in the conversation. It can access files, run commands and use the network under its host permissions. Conversation and tool content may go to CodeBuddy's model service.",
+                  )}
+                </p>
+                <p>
+                  {t(
+                    "开图不默认带上全部个人档案，并提醒 Agent 不向其他网站或消息擅自发送私料；提示词不能保证隔离。",
+                    "Kaitu does not preload your full personal profile and instructs the Agent not to share private data with other sites or messages. Instructions do not guarantee isolation.",
+                  )}
+                </p>
+                <label>
+                  {t("CLI 路径（可选，留空自动检测）", "CLI path (optional; auto-detect when empty)")}
+                  <input
+                    value={cliPath}
+                    onChange={(event) => setCliPath(event.target.value)}
+                    placeholder="/path/to/codebuddy"
+                  />
+                </label>
+                <small>
+                  {t(
+                    "只检测安装；实际登录状态在首次对话时验证。开图不复制或重置登录。",
+                    "Installation detection only; login is checked on the first conversation. Kaitu does not copy or reset login.",
+                  )}
+                </small>
+              </div>
+            )}
             {choice === "builtin" ? (
               <fieldset className={css.fields} disabled={saving}>
                 <label className={css.key}>
@@ -1251,7 +1371,7 @@ export function AskPage({
                   </a>
                 ) : null}
               </fieldset>
-            ) : (
+            ) : choice === "external" ? (
               <div className={css.external}>
                 {onConnections && (
                   <button type="button" onClick={onConnections}>
@@ -1273,7 +1393,7 @@ export function AskPage({
                   </button>
                 </details>
               </div>
-            )}
+            ) : null}
             {error && <p role="alert">{error}</p>}
             <div className={css.actions}>
               <button type="button" disabled={saving} onClick={() => setStep(0)}>
