@@ -21,7 +21,7 @@
 | A1 | 开发者账号类型 | 个人账号在商店显示真名，公司账号显示公司名；国区上架和备案对主体有要求（见第 5 节） | 用户 | 已有账号（TestFlight 在用），类型待定 |
 | A2 | App 名字 | 「人生开图」「开图」查 App Store 重名和商标；英文名 Kaitu 同样查 | 用户 | 待查 |
 | A3 | 隐私政策页 | 已发布：https://kaitu.si/privacy/iphone/ （英文 https://kaitu.si/en/privacy/iphone/ ），源文件在 `gh-pages` 分支，首发不带问问，联系方式已填（Stahl G）。网址填进 App Store Connect。隐私标签按「不收集数据」，与本页同一口径 | 设计起草，用户填 App Store Connect | 已发布 |
-| A4 | 支持页 | kaitu.si 上的帮助和联系方式（商店必填） | 设计起草，用户发布 | 待做 |
+| A4 | 支持页 | 已发布：https://kaitu.si/support/ （英文 https://kaitu.si/en/support/ ），邮箱和 iPhone 常见问题；网址填进 App Store Connect 的 Support URL | 设计 | 已发布 |
 | A5 | 价格 | 首发免费；付费版以后再定 | 用户 | 免费 |
 | A6 | 欧盟 DSA 商家身份 | App Store Connect 横幅提醒的就是它；个人开发者可以申报为个人商家，不申报会在欧盟区下架 | 用户 | 待申报 |
 
