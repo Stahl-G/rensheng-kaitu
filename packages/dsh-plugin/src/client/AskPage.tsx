@@ -335,6 +335,24 @@ export function AskPage({
       })
       .catch((err) => setError(err.message));
   };
+  useEffect(() => {
+    if (!threadMenu) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(`.${css.threadMenu}`) || target.closest(`.${css.threadMore}`)) return;
+      setThreadMenu(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setThreadMenu(null);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [threadMenu]);
   const threadRow = (thread: Thread) => (
     <div key={thread.id} className={css.threadRow}>
       {renaming?.id === thread.id ? (
@@ -374,9 +392,14 @@ export function AskPage({
       {threadMenu?.id === thread.id && (
         <div className={css.threadMenu} role="menu">
           {threadMenu.confirm ? (
-            <button type="button" role="menuitem" onClick={() => removeThread(thread.id)}>
-              {t("确认删除", "Confirm delete")}
-            </button>
+            <>
+              <button type="button" role="menuitem" onClick={() => removeThread(thread.id)}>
+                {t("确认删除", "Confirm delete")}
+              </button>
+              <button type="button" role="menuitem" onClick={() => setThreadMenu(null)}>
+                {t("取消", "Cancel")}
+              </button>
+            </>
           ) : (
             <>
               <button
