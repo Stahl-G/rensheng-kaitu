@@ -602,6 +602,19 @@
   font-size: 13px;
   color: var(--muted);
 }
+.sumPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sumPreview > span {
+  font-size: 15px;
+  line-height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 :where(.app input:is([type="checkbox"], [type="radio"])) {
   width: 16px;
   height: 16px;
