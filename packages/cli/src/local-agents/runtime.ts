@@ -1,10 +1,9 @@
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "@kaitu/core";
-import type { AskMode, AskRuntime } from "../ui/ask.js";
+import type { AskRuntime } from "../ui/ask.js";
 import { connectAcp } from "./acp.js";
-import { agentEnvironment, findCodeBuddy, launchCodeBuddy, terminateAgent } from "./codebuddy.js";
+import { agentEnvironment, launchCodeBuddy, terminateAgent } from "./codebuddy.js";
 import { localAgentPrivacy } from "./privacy.js";
 
 export interface McpCommand {
@@ -13,40 +12,27 @@ export interface McpCommand {
   env?: Record<string, string>;
 }
 export async function createCodeBuddyRuntime(options: {
-  mode: AskMode;
   workspace: string;
   state: string;
   path?: string;
   mcp: McpCommand;
   env?: NodeJS.ProcessEnv;
 }): Promise<AskRuntime> {
-  if (options.mode !== "full")
-    throw new KaituError(
-      "CodeBuddy 仅支持完整 Agent；请在对话中确认开启 / Enable full Agent mode for CodeBuddy",
-      "AI_CONNECTION",
-    );
   const env = agentEnvironment(options.env);
-  const bin = findCodeBuddy(options.path, env);
+  const bin = options.path;
   if (!bin)
-    throw new KaituError(
-      "未找到 CodeBuddy CLI，请安装并在官方 CLI 登录，或选择已有路径 / CodeBuddy CLI not found",
-      "AI_CONNECTION",
-    );
-  const root = join(
-    options.state,
-    "local-agents",
-    createHash("sha256")
-      .update(JSON.stringify([options.workspace, "codebuddy", bin]))
-      .digest("hex")
-      .slice(0, 24),
-  );
+    throw new KaituError("未找到 CodeBuddy CLI，请安装并登录，或填写已有 CLI 的路径", "AI_CONNECTION");
+  // 开图对话 id → CodeBuddy 会话 id，用来续接原会话。
+  const root = join(options.state, "local-agents");
   mkdirSync(root, { recursive: true, mode: 0o700 });
-  const file = join(root, "sessions.json");
+  const file = join(root, "codebuddy-sessions.json");
   const sessions: Record<string, string> = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
   type Session = {
     child: ReturnType<typeof launchCodeBuddy>;
     rpc: ReturnType<typeof connectAcp>;
     upstream: string;
+    /** 新会话的第一条消息前带上隐私提醒；续接的会话里已经有了。 */
+    fresh: boolean;
     cancelled: boolean;
     busy: boolean;
     output: string;
@@ -72,6 +58,7 @@ export async function createCodeBuddyRuntime(options: {
       child,
       rpc: undefined as unknown as ReturnType<typeof connectAcp>,
       upstream: "",
+      fresh: false,
       cancelled: false,
       busy: false,
       output: "",
@@ -153,6 +140,7 @@ export async function createCodeBuddyRuntime(options: {
         ...(resume ? { sessionId: resume } : {}),
       });
       state.upstream = result.sessionId ?? resume ?? "";
+      state.fresh = method === "session/new";
       if (!state.upstream) throw new Error("no session ID");
       sessions[id] = state.upstream;
       writeFileSync(`${file}.tmp`, JSON.stringify(sessions), { mode: 0o600 });
@@ -164,7 +152,7 @@ export async function createCodeBuddyRuntime(options: {
       running.delete(id);
       if (state.cancelled || closed) throw cancelledError;
       throw new KaituError(
-        "CodeBuddy 未能连接或恢复，请检查官方 CLI 登录和网络；原记录保留，可新建对话重试 / Check CodeBuddy login and connection",
+        "CodeBuddy 未能连接或续接，请检查 CLI 登录和网络；原记录保留，可新建对话重试",
         "AI_CONNECTION",
       );
     }
@@ -190,33 +178,26 @@ export async function createCodeBuddyRuntime(options: {
         return {};
       }
       if (method !== "session/prompt" || !id || closed)
-        throw new KaituError("不支持此 Agent 请求 / Unsupported Agent request", "AI_CONNECTION");
+        throw new KaituError("不支持此 Agent 请求", "AI_CONNECTION");
       const content = params.contentBlocks as { type: string; text?: string }[];
-      if (!Array.isArray(content) || content.some((item) => item.type !== "text"))
-        throw new KaituError(
-          "CodeBuddy 首版只接收文字，请移除附件 / CodeBuddy currently accepts text only",
-          "AI_ATTACHMENT",
-        );
       let state = running.get(id);
-      if (state?.busy) throw new KaituError("CodeBuddy 正忙 / CodeBuddy is busy", "AI_CONNECTION");
+      if (state?.busy) throw new KaituError("CodeBuddy 正忙", "AI_CONNECTION");
       try {
         state ??= await open(id);
         state.busy = true;
         state.output = "";
         state.messageId = `codebuddy-${++seq}`;
         event(id, "user/message", { content, source: { kind: "user" } });
-        const result = await state.rpc.request(
+        const text = content.map((item) => item.text ?? "").join("\n");
+        await state.rpc.request(
           "session/prompt",
           {
             sessionId: state.upstream,
-            prompt: [
-              { type: "text", text: localAgentPrivacy + content.map((item) => item.text ?? "").join("\n") },
-            ],
+            prompt: [{ type: "text", text: (state.fresh ? localAgentPrivacy : "") + text }],
           },
           30 * 60 * 1000,
         );
-        if (!state.cancelled && result.stopReason !== "cancelled" && !state.output.trim())
-          throw new Error("empty response");
+        state.fresh = false;
         return {};
       } catch (error) {
         if (!state?.cancelled && !closed && error !== cancelledError) {
@@ -227,10 +208,7 @@ export async function createCodeBuddyRuntime(options: {
           }
           throw error instanceof KaituError
             ? error
-            : new KaituError(
-                "CodeBuddy 回复未完成，请检查登录、网络或账户额度后重试 / CodeBuddy reply failed; check login, network and account",
-                "AI_CONNECTION",
-              );
+            : new KaituError("CodeBuddy 回复未完成，请检查登录、网络或账户额度后重试", "AI_CONNECTION");
         }
         return {};
       } finally {

@@ -1,7 +1,0 @@
-{
-  "method": "SIGTERM; native GUI quit unavailable because CUA transport closed",
-  "appExited": true,
-  "ownedMockExited": true,
-  "portClosed": true,
-  "elapsedMs": 5366
-}

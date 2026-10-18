@@ -6,10 +6,9 @@ import { KaituError } from "@kaitu/core";
 
 export function agentEnvironment(source = process.env): NodeJS.ProcessEnv {
   const env = { ...source };
-  // The installed CLI owns its login. Never forward Kaitu credentials or Electron's Node switch.
+  // 只去掉开图自己的变量和 Electron 的 Node 开关；CodeBuddy 自己的登录变量（如 CODEBUDDY_API_KEY）要留着。
   for (const key of Object.keys(env))
-    if (/(?:API_KEY|AUTH_TOKEN)$/i.test(key) || /^(?:KAITU_|DSH_|ELECTRON_|NODE_OPTIONS$)/.test(key))
-      delete env[key];
+    if (/^(?:KAITU_|DSH_|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
   const home = env.HOME ?? env.USERPROFILE ?? homedir();
   let nvmBins: string[] = [];
   try {
@@ -46,7 +45,7 @@ export function findCodeBuddy(custom?: string, env = agentEnvironment()): string
       );
   for (const candidate of candidates) {
     if (custom && !isAbsolute(candidate))
-      throw new KaituError("请选择 CodeBuddy CLI 的绝对路径 / Choose an absolute CLI path", "AI_CONFIG");
+      throw new KaituError("请填写 CodeBuddy CLI 的绝对路径", "AI_CONFIG");
     try {
       accessSync(candidate, constants.X_OK);
       if (statSync(candidate).isFile()) return resolve(candidate);
@@ -65,18 +64,14 @@ export function cliCommand(
   const sibling = bin.slice(0, -extname(bin).length);
   const text = existsSync(sibling) ? readFileSync(sibling, "utf8") : "";
   const match = /"\$basedir\/([^"\r\n]+)"\s+"\$@"/.exec(text);
-  if (!match?.[1])
-    throw new KaituError(
-      "无法识别 CodeBuddy 启动文件，请选择原生程序 / Unsupported CLI shim",
-      "AI_CONNECTION",
-    );
+  if (!match?.[1]) throw new KaituError("无法识别 CodeBuddy 启动文件，请填写原生程序的路径", "AI_CONNECTION");
   const entry = resolve(dirname(bin), match[1]);
   const node = [
     join(dirname(bin), "node.exe"),
     ...(env.PATH ?? "").split(delimiter).map((dir) => join(dir, "node.exe")),
   ].find(existsSync);
   if (!node || !existsSync(entry))
-    throw new KaituError("CodeBuddy CLI 缺少 Node 或入口文件 / CLI runtime missing", "AI_CONNECTION");
+    throw new KaituError("CodeBuddy CLI 缺少 Node 或入口文件", "AI_CONNECTION");
   return [node, entry];
 }
 export function launchCodeBuddy(

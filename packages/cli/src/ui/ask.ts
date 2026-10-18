@@ -299,23 +299,16 @@ export function createAskService(options: {
       const epoch = generation;
       const connection = await options.settings();
       ready();
-      if (epoch !== generation)
-        throw new KaituError("AI 连接已改变，请重新发送 / AI connection changed", "AI_CONNECTION");
+      if (epoch !== generation) throw new KaituError("AI 连接已改变，请重新发送", "AI_CONNECTION");
       const backend = connection.backend ?? "dsh";
       const previousBackend = row.backend ?? (events(id).length ? "dsh" : undefined);
       if (previousBackend && previousBackend !== backend)
-        throw new KaituError(
-          "AI 连接已改变，请新建对话；原对话记录仍可查看 / AI connection changed; start a new conversation",
-          "AI_CONNECTION",
-        );
+        throw new KaituError("AI 连接已改变，请新建对话；原对话记录仍可查看", "AI_CONNECTION");
       const mode = row.mode ?? "scoped";
       if (connection.fullOnly && mode !== "full")
-        throw new KaituError(
-          "CodeBuddy 需要完整 Agent，请在对话权限中确认开启 / Enable full Agent mode for CodeBuddy",
-          "AI_CONNECTION",
-        );
+        throw new KaituError("CodeBuddy 需要完整 Agent，请在对话权限中开启", "AI_CONNECTION");
       if (images.length && connection.supportsAttachments === false)
-        throw new KaituError("CodeBuddy 首版只接收文字 / CodeBuddy accepts text only", "AI_ATTACHMENT");
+        throw new KaituError("CodeBuddy 只接收文字", "AI_ATTACHMENT");
       if (busy.size && runtimeMode !== mode)
         throw new KaituError("请等当前回复完成后切换模式", "AI_CONNECTION");
       if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000)

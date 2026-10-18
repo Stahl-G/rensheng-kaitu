@@ -1013,17 +1013,6 @@ export function AskPage({
                   {modeMenu === "confirm" ? (
                     <>
                       <b>{t("给这个对话开启完整 Agent？", "Enable full Agent for this conversation?")}</b>
-                      <p>
-                        {settings?.choice === "local"
-                          ? t(
-                              "CodeBuddy 可按宿主权限读写本机文件、运行命令和联网，使用自己的账户额度。对话及读取内容可能发给模型服务；开图减少默认资料并提醒保护私料，但不能保证隔离。",
-                              "CodeBuddy can access files, run commands and use the network under its host permissions, using your account allowance. Conversation and read content may reach the model service. Kaitu minimizes default context and adds privacy instructions; isolation is not guaranteed.",
-                            )
-                          : t(
-                              "Agent 能运行命令、读写电脑上的文件和联网。",
-                              "The Agent can run commands, access files and use the network.",
-                            )}
-                      </p>
                       <div className={v2["dialog-foot"]}>
                         <button
                           type="button"
@@ -1206,25 +1195,13 @@ export function AskPage({
               <b>{t("用本机 CodeBuddy", "Use local CodeBuddy")}</b>
               <span>
                 {t(
-                  "不填 Key，沿用官方 CLI 的登录、模型和账户额度。仅支持完整 Agent。",
-                  "No API key. Uses your CLI login, model and account allowance. Full Agent mode only.",
+                  "不填 Key，用 CodeBuddy 自己的登录和额度。",
+                  "No API key; uses your CodeBuddy login and allowance.",
                 )}
               </span>
             </button>
             {choice === "local" && (
               <div className={css.fields}>
-                <p>
-                  {t(
-                    "连接后，在对话权限中确认开启完整 Agent。它可按宿主权限读写文件、运行命令和联网。对话和工具读取内容可能发送给 CodeBuddy 所连接的模型服务。",
-                    "After connecting, confirm full Agent mode in the conversation. It can access files, run commands and use the network under its host permissions. Conversation and tool content may go to CodeBuddy's model service.",
-                  )}
-                </p>
-                <p>
-                  {t(
-                    "开图不默认带上全部个人档案，并提醒 Agent 不向其他网站或消息擅自发送私料；提示词不能保证隔离。",
-                    "Kaitu does not preload your full personal profile and instructs the Agent not to share private data with other sites or messages. Instructions do not guarantee isolation.",
-                  )}
-                </p>
                 <label>
                   {t("CLI 路径（可选，留空自动检测）", "CLI path (optional; auto-detect when empty)")}
                   <input
@@ -1233,12 +1210,6 @@ export function AskPage({
                     placeholder="/path/to/codebuddy"
                   />
                 </label>
-                <small>
-                  {t(
-                    "只检测安装；实际登录状态在首次对话时验证。开图不复制或重置登录。",
-                    "Installation detection only; login is checked on the first conversation. Kaitu does not copy or reset login.",
-                  )}
-                </small>
               </div>
             )}
             {choice === "builtin" ? (

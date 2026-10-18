@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { cliCommand } from "../src/local-agents/codebuddy.js";
+import { agentEnvironment, cliCommand } from "../src/local-agents/codebuddy.js";
 import { createAgentConnection } from "../src/local-agents/connection.js";
 import { createCodeBuddyRuntime } from "../src/local-agents/runtime.js";
 import { createAskService } from "../src/ui/ask.js";
@@ -35,6 +35,7 @@ createInterface({input:process.stdin}).on('line',line=>{
    if(text.endsWith('hang'))return;
    if(text.endsWith('permit')){permitted=m.id;send({id:9001,method:'session/request_permission',params:{options:[{kind:'allow',optionId:'allow_once',name:'Allow once'}]}});return;}
    if(text.endsWith('fail')){send({id:m.id,error:{message:'private upstream detail'}});return;}
+   if(text.endsWith('tool')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t1',title:'task_add'}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    for(const text of ['synthetic ','reply'])send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}});
    send({id:m.id,result:{stopReason:'end_turn'}});
  }
@@ -47,7 +48,6 @@ createInterface({input:process.stdin}).on('line',line=>{
     workspace,
     path,
     mcp: { command: process.execPath, args: [] },
-    mode: "full" as const,
   };
 }
 function setup(f: ReturnType<typeof fixture>) {
@@ -99,7 +99,14 @@ test("real stdio adapter streams, persists once, resumes after restart and keeps
     const trace = readFileSync(join(f.workspace, "trace.jsonl"), "utf8");
     expect(trace).toContain('"method":"session/load"');
     expect(trace).toContain('"sessionId":"upstream-synthetic"');
-    expect(trace).toContain("Do not scan the home directory");
+    // 隐私提醒只在新会话的第一条消息前带一次。
+    const prompts = trace
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((frame) => frame.method === "session/prompt")
+      .map((frame) => frame.params.prompt[0].text as string);
+    expect(prompts.map((text) => text.includes("开图的完整 Agent 模式"))).toEqual([true, false]);
     expect(service.events(row.id).filter((event) => event.type === "assistant/message")).toHaveLength(2);
     switchBackend();
     await expect(service.send(row.id, "wrong backend")).rejects.toThrow(/新建对话/);
@@ -126,6 +133,8 @@ test("cancel terminates the owned prompt and failures are actionable without ups
     await expect(ask.send(row.id, "fail")).rejects.toThrow(/CodeBuddy/);
     expect(JSON.stringify(ask.events(row.id))).not.toContain("private upstream detail");
     await ask.send(row.id, "recover");
+    // 只调了工具、没回文字也算完成。
+    await ask.send(row.id, "tool");
     await ask.send(row.id, "permit");
     expect(
       JSON.stringify(
@@ -139,19 +148,15 @@ test("cancel terminates the owned prompt and failures are actionable without ups
     await ask.close();
   }
 });
-test("selecting CodeBuddy neither authenticates nor changes the existing SDK provider", async () => {
+test("selecting CodeBuddy keeps the existing SDK provider to switch back to", async () => {
   const f = fixture();
-  let configured = 0;
   const connection = createAgentConnection({
     state: f.state,
     workspace: () => f.workspace,
     mcp: f.mcp,
     sdk: () => ({
       settings: async () => ({ configured: true, provider: "deepseek-official", model: "test" }),
-      configure: async () => {
-        configured++;
-        return {};
-      },
+      configure: async () => ({}),
       models: async () => [],
       support: async () => ({}),
       runtime: async () => {
@@ -161,14 +166,17 @@ test("selecting CodeBuddy neither authenticates nor changes the existing SDK pro
   });
   await connection.configure({ choice: "local", agent: "codebuddy", path: f.path });
   expect((await connection.settings()).provider).toBe("codebuddy");
-  expect(configured).toBe(0);
-  await expect(connection.runtime("scoped")).rejects.toThrow(/完整 Agent/);
   await connection.configure({ choice: "builtin", provider: "deepseek-official" });
   expect((await connection.settings()).provider).toBe("deepseek-official");
-  expect(configured).toBe(1);
   await expect(
     connection.configure({ choice: "local", agent: "codebuddy", path: join(f.state, "missing") }),
   ).rejects.toThrow(/未找到/);
+});
+test("CodeBuddy keeps its own login variables; Kaitu and Electron ones are removed", () => {
+  const env = agentEnvironment({ CODEBUDDY_API_KEY: "synthetic", KAITU_DIR: "x", ELECTRON_RUN_AS_NODE: "1" });
+  expect(env.CODEBUDDY_API_KEY).toBe("synthetic");
+  expect(env.KAITU_DIR).toBeUndefined();
+  expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined();
 });
 test("Windows npm launch resolves Node entry without shell interpolation", () => {
   const f = fixture();
