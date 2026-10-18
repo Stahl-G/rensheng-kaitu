@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
@@ -21,15 +21,20 @@ function fixture() {
     path,
     `#!/usr/bin/env node
 import {createInterface} from 'node:readline';
-import {appendFileSync} from 'node:fs';
+import {appendFileSync,existsSync,unlinkSync} from 'node:fs';
+import {basename} from 'node:path';
 const send = x => process.stdout.write(JSON.stringify(x)+'\\n');
+const tag = basename(process.argv[1] || 'synthetic');
 let permitted;
 createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line), p=m.params||{};
  appendFileSync('trace.jsonl',JSON.stringify(m)+'\\n');
- if(m.id===9001 && m.result){if(m.result.outcome?.optionId!=='allow_once')process.exit(3);send({method:'session/update',params:{sessionId:'upstream-synthetic',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'approved once'}}}});send({id:permitted,result:{stopReason:'end_turn'}});return;}
+ if(m.id===9001 && m.result){if(m.result.outcome?.optionId!=='allow_once')process.exit(3);send({method:'session/update',params:{sessionId:'upstream-'+tag,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'approved once'}}}});send({id:permitted,result:{stopReason:'end_turn'}});return;}
  if(m.method==='initialize')send({id:m.id,result:{agentCapabilities:{loadSession:true}}});
- else if(m.method==='session/new'||m.method==='session/load')send({id:m.id,result:{sessionId:p.sessionId||'upstream-synthetic',configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]}]}});
+ else if(m.method==='session/new'||m.method==='session/load'){
+   if(m.method==='session/new'&&existsSync('fail-new-once')){unlinkSync('fail-new-once');send({id:m.id,error:{message:'boom'}});return;}
+   send({id:m.id,result:{sessionId:p.sessionId||('upstream-'+tag),configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]}]}});
+ }
  else if(m.method==='session/set_config_option')send({id:m.id,result:{configOptions:[{id:'model',category:'model',currentValue:p.value}]}});
  else if(m.method==='session/prompt') {
    const text=p.prompt[0].text;
@@ -99,7 +104,7 @@ test("real stdio adapter streams, persists once, resumes after restart and keeps
     await service.send(row.id, "again");
     const trace = readFileSync(join(f.workspace, "trace.jsonl"), "utf8");
     expect(trace).toContain('"method":"session/load"');
-    expect(trace).toContain('"sessionId":"upstream-synthetic"');
+    expect(trace).toContain('"sessionId":"upstream-codebuddy"');
     // 隐私提醒只在新会话的第一条消息前带一次。
     const prompts = trace
       .trim()
@@ -231,4 +236,106 @@ test("Windows npm launch resolves Node entry without shell interpolation", () =>
     'exec node "$basedir/node_modules/@tencent-ai/codebuddy-code/bin/codebuddy" "$@"',
   );
   expect(cliCommand(cmd, {}, "win32")).toEqual([join(f.workspace, "node.exe"), entry]);
+});
+test("switching AI keeps transcript after a failed first connect", async () => {
+  const f = fixture();
+  const { ask, switchBackend } = setup(f);
+  try {
+    const row = ask.create();
+    await ask.setMode(row.id, "full", true);
+    await ask.send(row.id, "before");
+    expect(ask.list().find((item) => item.id === row.id)?.backend).toBe("codebuddy:test");
+    switchBackend();
+    writeFileSync(join(f.workspace, "fail-new-once"), "");
+    await expect(ask.send(row.id, "switched")).rejects.toThrow(/未能连接|未发送/);
+    expect(ask.list().find((item) => item.id === row.id)?.backend).toBe("codebuddy:test");
+    await ask.send(row.id, "switched");
+    expect(ask.list().find((item) => item.id === row.id)?.backend).toBe("dsh");
+    const last = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((frame) => frame.method === "session/prompt")
+      .at(-1);
+    expect(last.params.prompt[0].text).toContain("用户：before");
+    expect(last.params.prompt[0].text).toContain("换了 AI");
+  } finally {
+    await ask.close();
+  }
+});
+test("legacy agent sessions file is used when path-scoped file is missing", async () => {
+  const f = fixture();
+  mkdirSync(join(f.state, "local-agents"), { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(f.state, "local-agents", "codebuddy-sessions.json"),
+    JSON.stringify({ t1: "upstream-legacy" }),
+    { mode: 0o600 },
+  );
+  const runtime = await createAgentRuntime({
+    ...f,
+    agent: localAgent("codebuddy"),
+    path: f.path,
+  });
+  try {
+    await runtime.request("session/prompt", {
+      sessionId: "t1",
+      contentBlocks: [{ type: "text", text: "resume" }],
+    });
+  } finally {
+    await runtime.close();
+  }
+  const loaded = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+    .find((frame) => frame.method === "session/load");
+  expect(loaded?.params.sessionId).toBe("upstream-legacy");
+});
+test("same agent at two CLI paths keeps separate upstream sessions", async () => {
+  const f = fixture();
+  const other = join(f.workspace, "codebuddy-other");
+  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
+  chmodSync(other, 0o755);
+  const agent = localAgent("codebuddy");
+  const a = await createAgentRuntime({ ...f, agent, path: f.path });
+  try {
+    await a.request("session/prompt", {
+      sessionId: "t1",
+      contentBlocks: [{ type: "text", text: "on-a" }],
+    });
+  } finally {
+    await a.close();
+  }
+  const b = await createAgentRuntime({ ...f, agent, path: other });
+  try {
+    await b.request("session/prompt", {
+      sessionId: "t1",
+      fresh: true,
+      contentBlocks: [{ type: "text", text: "on-b" }],
+    });
+  } finally {
+    await b.close();
+  }
+  const files = readdirSync(join(f.state, "local-agents")).filter((name) => name.endsWith("-sessions.json"));
+  expect(files.length).toBe(2);
+  const maps = files.map((name) => JSON.parse(readFileSync(join(f.state, "local-agents", name), "utf8")));
+  expect(new Set(maps.map((map) => map.t1))).toEqual(
+    new Set(["upstream-codebuddy", "upstream-codebuddy-other"]),
+  );
+  rmSync(join(f.workspace, "trace.jsonl"), { force: true });
+  const again = await createAgentRuntime({ ...f, agent, path: f.path });
+  try {
+    await again.request("session/prompt", {
+      sessionId: "t1",
+      contentBlocks: [{ type: "text", text: "back-a" }],
+    });
+  } finally {
+    await again.close();
+  }
+  const loaded = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+    .find((frame) => frame.method === "session/load");
+  expect(loaded?.params.sessionId).toBe("upstream-codebuddy");
 });
