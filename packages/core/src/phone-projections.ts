@@ -200,7 +200,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
     const month = day(latest.ts).slice(0, 7);
     items.push({
       kind: "health",
-      title: ref.def.label ?? ref.type,
+      title: clip(ref.def.label?.trim() || ref.type, 80),
       subtitle: `${rows.length} 条`,
       date: day(latest.ts),
       path: `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`,

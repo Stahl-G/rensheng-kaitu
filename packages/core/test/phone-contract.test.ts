@@ -32,10 +32,20 @@ it("手机操作样例逐行符合 schema，缺参数的操作不通过", () => 
   ).toBe(false);
 });
 
-it("generator 可选：没有时照常通过，Agent 写名字和规则版本，未知的 kind 不通过", () => {
-  const validate = schemas().builtin("phone-today.schema.json");
-  const { generator: _generator, ...plain } = JSON.parse(fixture("today.json"));
-  expect(validate(plain)).toBe(true);
-  expect(validate({ ...plain, generator: { kind: "agent", name: "Dot", spec: 1 } })).toBe(true);
-  expect(validate({ ...plain, generator: { kind: "robot" } })).toBe(false);
-});
+it.each(["today", "week", "map", "library"])(
+  "%s 的 generator 兼容旧快照且 Agent 必须有署名和规则版本",
+  (name) => {
+    const validate = schemas().builtin(`phone-${name}.schema.json`);
+    const { generator: _generator, ...plain } = JSON.parse(fixture(`${name}.json`));
+    expect(validate(plain)).toBe(true);
+    expect(validate({ ...plain, generator: { kind: "computer" } })).toBe(true);
+    expect(validate({ ...plain, generator: { kind: "agent", name: "Dot", spec: 1 } })).toBe(true);
+    for (const generator of [
+      { kind: "agent" },
+      { kind: "agent", name: "Dot" },
+      { kind: "agent", spec: 1 },
+      { kind: "robot" },
+    ])
+      expect(validate({ ...plain, generator })).toBe(false);
+  },
+);

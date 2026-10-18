@@ -11,7 +11,7 @@
 - `library.json`：资料目录，手机资料页的列表和搜索用。每项是分类（项目、健康、原文、我的）、标题、一行说明、日期和相对路径，不含正文；手机点开哪一项才读那个文件。原文只取第一行作标题（最多 40 字），只列最近 30 天；健康按记录类型各一项，路径是最近一个月的记录文件；记忆只列 frontmatter 明确 `sensitive: false` 的；财务不进目录。
 - `receipts.json`：最近十四天的处理结果，`ref` 是操作的 client_id 或收件箱文件名。
 
-每份快照含 format、version、generated_at。today、week、map、library 另有可选的 `generator`：电脑写 `{kind: "computer"}`，云端整理员写 `{kind: "agent", name, spec}`（name 不超过 32 字，spec 是 ORGANIZER.md 规则版本）；没有这个字段当作电脑生成。字段只增不改，手机忽略未知字段，遇到不支持的主版本提示升级。
+每份快照含 format、version、generated_at。today、week、map、library 另有可选的 `generator`：电脑写 `{kind: "computer"}`，云端整理员必须写 `{kind: "agent", name, spec}`（name 不超过 32 字，spec 是 ORGANIZER.md 规则版本）；没有这个字段当作电脑生成。字段只增不改，手机忽略未知字段，遇到不支持的主版本提示升级。
 资料变化在后台防抖两秒刷新，监听不可用时每分钟补看；内容不变不写，generated_at 也不变。
 只有工作区位于 iCloud / 已配置同步文件夹，或启用 GitHub 备份时才生成四个读快照。
 回执由收件箱处理器写入。`phone/` 不作为模块、不进入本机版本历史，Agent 只能读。

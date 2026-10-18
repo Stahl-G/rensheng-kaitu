@@ -184,7 +184,7 @@ ${skills()
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
 - Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
 - 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
-- \`phone/\` 是电脑生成的手机快照（today、week、map、资料目录 library、回执 receipts），只读，不进本机版本历史；整理员按 ORGANIZER.md 更新 today.json 时写 generator；手机通过 \`inbox/agents/ios-*\` 提交新文件与操作。
+- \`phone/\` 是电脑生成的手机快照（today、week、map、资料目录 library、回执 receipts），只读，不进本机版本历史；整理员按 ORGANIZER.md 更新 today.json 时写 generator（kind=agent 必须有 name 和 spec；电脑只写 kind=computer；旧快照可省略）；手机通过 \`inbox/agents/ios-*\` 提交新文件与操作。
 - GitHub 备份和同步盘均维护云端接力入口 \`AGENT-README.md\`；本机与 iCloud 同样维护 OVERVIEW.md 和每日整理规则 ORGANIZER.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
 
 ## 12. MCP

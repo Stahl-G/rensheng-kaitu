@@ -70,6 +70,25 @@ it.each(["project", "goal"] as const)(
   },
 );
 
+it.each(["", "   ", "合成".repeat(50)])("健康目录兼容空白和超长 label：%j", async (label) => {
+  const ws = await freshWorkspace();
+  try {
+    const module = ws.readJson<{ records: { workout: { label: string } } }>("health/module.json");
+    module.records.workout.label = label;
+    ws.writeText("health/module.json", JSON.stringify(module));
+    addRecord(ws, "workout", { ...workout, ts: "2026-10-19T08:00:00Z" });
+    await writePhoneSnapshots(ws, new Date("2026-10-19T08:00:00Z"), { force: true });
+    const library = ws.readJson<{ items: { title: string; path: string }[] }>("phone/library.json");
+    const validate = schemas().builtin("phone-library.schema.json");
+    expect(validate(library), JSON.stringify(validate.errors)).toBe(true);
+    const item = library.items.find((entry) => entry.path === "health/data/workouts/2026-10.jsonl");
+    expect(item?.title).toBe(label.trim() ? `${label.slice(0, 79)}…` : "workout");
+    expect(readRecords(ws, "workout")).toHaveLength(1);
+  } finally {
+    rmSync(join(ws.root, ".."), { recursive: true, force: true });
+  }
+});
+
 function remoteMock() {
   let files: BackupFiles = {};
   const remote: BackupRemote = {
