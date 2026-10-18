@@ -236,8 +236,10 @@ export class CalendarPush {
       state.entries[entry.id] = row;
       try {
         if (!this.executor) throw new Error("当前为浏览器、DSH 插件或非 macOS 环境，请导入日历文件");
-        const uid = await this.executor.upsert(entry, row.uid, changed);
-        if (uid === null && entry.phone && !row.uid) {
+        // 第一次找到手机那条只记下编号、不改它：手机上可能已经挪过时间。
+        const discovering = entry.phone && !row.uid;
+        const uid = await this.executor.upsert(entry, row.uid, discovering ? false : changed);
+        if (uid === null && discovering) {
           // iPhone 写的那条还没同步到这台电脑：先不记，下次再找，不替手机新建。
           delete state.entries[entry.id];
           continue;
@@ -248,6 +250,11 @@ export class CalendarPush {
           row.receipt = { status: "added" };
         }
       } catch (error) {
+        // 找手机那条出错（超时、没权限）就下次再找，不生成会和手机重复的日历文件。
+        if (entry.phone && !row.uid) {
+          delete state.entries[entry.id];
+          continue;
+        }
         row.receipt = {
           status: "file",
           ics: calendarPushIcs(entry, row.sequence),
