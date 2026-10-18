@@ -223,7 +223,7 @@ export function decidePhoneProposal(ws: Workspace, id: string, decision: "confir
   });
 }
 
-/** located：这台电脑已在日历里找到这条日程的事件，iPhone 写入的那条也能跟着改。 */
+/** located：这台电脑能改到日历里的这条事件（已找到、同步开着、有日历执行器），iPhone 写入的那条也能跟着改。 */
 export function editCalendarBlock(ws: Workspace, id: string, start: string, end: string, located = false) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
     throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");
@@ -235,7 +235,7 @@ export function editCalendarBlock(ws: Workspace, id: string, start: string, end:
     // 手机写进日历的那条，只有这台电脑在日历里找到了它才能跟着改，否则会和日历对不上。
     if (block.calendar === "phone" && !located)
       throw new KaituError(
-        "这条日程由 iPhone 写进了日历，这台电脑的日历里还没有它，请在 iPhone 上改时间",
+        "这条日程由 iPhone 写进了日历，这里改不到日历里的那条，请在 iPhone 上改时间",
         "CONFLICT",
       );
     Object.assign(block, { start, end });

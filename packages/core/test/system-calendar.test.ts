@@ -87,6 +87,11 @@ describe("confirmed system calendar", () => {
     failing = false;
     await push.sync(calendarPushEntries(ws));
     expect(events.get("iphone-event")).toEqual(moved);
+    // 找到了也要这里能写回日历：没有执行器（DSH 插件）或同步关着时仍然不让改。
+    expect(new CalendarPush(calendarPushStore(ws)).located("slot")).toBe(false);
+    push.configure(false);
+    expect(push.located("slot")).toBe(false);
+    push.configure(true);
     await editCalendarBlock(ws, "slot", "14:00", "15:00", push.located("slot"));
     await push.sync(calendarPushEntries(ws));
     expect([...events.keys()]).toEqual(["iphone-event"]);
