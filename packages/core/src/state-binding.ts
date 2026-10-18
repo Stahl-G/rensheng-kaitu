@@ -86,7 +86,7 @@ function cloudMode(root: string): Binding["mode"] {
     ? "drive"
     : "local";
 }
-export function stateBinding(root: string, icloud?: boolean): Binding {
+export function stateBinding(root: string, icloud?: boolean, persist = true): Binding {
   const file = bindingFile(root);
   if (existsSync(file)) {
     const binding = JSON.parse(readFileSync(file, "utf8")) as Binding;
@@ -134,7 +134,9 @@ export function stateBinding(root: string, icloud?: boolean): Binding {
     const previous = existsSync(marker) ? JSON.parse(readFileSync(marker, "utf8")).mode : mode;
     mode = previous === "icloud" ? "icloud" : "drive";
   } else if (mode !== "local") state = join(localStateRoot(), randomUUID());
-  return setStateBinding(root, state, mode, undefined, canonical(state) !== canonical(join(root, ".kaitu")));
+  const migrating = canonical(state) !== canonical(join(root, ".kaitu"));
+  if (!persist) return { id: "", root: canonical(root), state, realState: canonical(state), mode, migrating };
+  return setStateBinding(root, state, mode, undefined, migrating);
 }
 
 function moveStateEntry(source: string, target: string): void {

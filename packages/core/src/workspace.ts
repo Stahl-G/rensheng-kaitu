@@ -36,8 +36,8 @@ export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
   return resolve(env.KAITU_DIR || currentWorkspace(env) || join(env.HOME || homedir(), "kaitu"));
 }
 
-export function stateDirectory(root: string, icloud?: boolean): string {
-  return stateBinding(root, icloud).state;
+export function stateDirectory(root: string, icloud?: boolean, persist = true): string {
+  return stateBinding(root, icloud, persist).state;
 }
 
 export function migrateHistory(root: string, icloud?: boolean): void {

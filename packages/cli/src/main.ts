@@ -87,6 +87,7 @@ import { channelsCommand, installShutdown } from "./channels.js";
 import { dshCommand, installDsh } from "./dsh.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
+import { phoneGenerator, phonePreviewText, previewPhone, runPhone } from "./phone.js";
 import { startUi } from "./ui/server.js";
 
 const HELP = `开图 kaitu
@@ -100,6 +101,7 @@ const HELP = `开图 kaitu
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
+  kaitu phone run [--as <名字>] [--dry-run]           处理手机收件箱并生成快照，或只预览差异
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
   kaitu dsh [--install] [--no-automation]         把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令；开图 App 已在用同一工作区时加 --no-automation）
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
@@ -165,6 +167,7 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  as: { type: "string" },
   channels: { type: "boolean" },
   install: { type: "boolean" },
   "no-automation": { type: "boolean" },
@@ -269,6 +272,19 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "phone": {
+      if (args.length !== 1 || args[0] !== "run") throw new KaituError("使用 phone run", "BAD_ARGS");
+      const root = values.dir ? resolve(values.dir) : defaultRoot();
+      const generator = phoneGenerator(values.as);
+      if (values["dry-run"]) {
+        const result = await previewPhone(root, generator);
+        out(values, result, phonePreviewText(result) || "没有变化");
+      } else {
+        const result = await runPhone(root, generator);
+        out(values, result, JSON.stringify(result, null, 2));
+      }
+      return 0;
+    }
     case "dsh": {
       let ws = new Workspace(values.dir ?? defaultRoot());
       if (!values.install && !ws.exists(".kaitu/config.json")) {

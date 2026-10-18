@@ -12,8 +12,14 @@ import type { Workspace } from "./workspace.js";
 export function phoneReadable(ws: Workspace) {
   return syncMode(ws.root) !== "local" || workspaceBackupStatus(ws).connection?.enabled === true;
 }
-export async function writePhoneSnapshots(ws: Workspace, now = new Date()) {
-  if (!phoneReadable(ws)) return 0;
+export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
+
+export async function writePhoneSnapshots(
+  ws: Workspace,
+  now = new Date(),
+  options: { force?: boolean; generator?: PhoneGenerator } = {},
+) {
+  if (!options.force && !phoneReadable(ws)) return 0;
   const data = await readOverviewPage(ws, now);
   const at = now.toISOString();
   const snapshots = {
@@ -23,7 +29,8 @@ export async function writePhoneSnapshots(ws: Workspace, now = new Date()) {
     library: buildPhoneLibrary(ws, data, at),
   };
   let writes = 0;
-  for (const [name, value] of Object.entries(snapshots)) {
+  for (const [name, snapshot] of Object.entries(snapshots)) {
+    const value = { ...snapshot, generator: options.generator ?? { kind: "computer" } };
     const file = `phone/${name}.json`;
     if (ws.exists(file)) {
       const previous = ws.readJson<typeof value>(file);
