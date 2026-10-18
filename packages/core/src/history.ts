@@ -240,12 +240,48 @@ export interface Version {
 
 /** 版本列表只在 HEAD 变化时改变：按 HEAD、条数、路径和时区缓存，不必每次重读提交对象。 */
 const logs = new WeakMap<Workspace, Map<string, readonly Version[]>>();
+const previews = new WeakMap<Workspace, Version[]>();
+
+/** 预览只读取已有提交的元数据；不复制历史对象或在原位置创建版本库。 */
+export async function phoneHistoryMetadata(root: string, state: string) {
+  const gitdir = join(state, "history.git");
+  if (!fs.existsSync(gitdir)) return [];
+  return (await git.log({ fs, dir: root, gitdir, depth: 100 })).map(({ oid, commit }) => ({
+    oid,
+    message: commit.message.trim(),
+    timestamp: commit.author.timestamp,
+  }));
+}
+
+export function previewSnapshots(ws: Workspace, metadata: Awaited<ReturnType<typeof phoneHistoryMetadata>>) {
+  const entries = metadata.map(({ oid, message, timestamp }) => ({
+    oid,
+    short: oid.slice(0, 7),
+    message,
+    time: isoInZone(new Date(timestamp * 1000), ws.timeZone()),
+  }));
+  previews.set(ws, entries);
+  deferSnapshots(ws, (message) => {
+    // 与正式保存相同地维护派生文件，版本元数据留在预览内存中。
+    refreshOverview(ws);
+    maintainHistoryIgnore(ws);
+    entries.unshift({
+      oid: "preview",
+      short: "preview",
+      message,
+      time: isoInZone(new Date(Math.floor(Date.now() / 1000) * 1000), ws.timeZone()),
+    });
+  });
+  return entries;
+}
 
 /** 版本列表，新的在前；给了 path 只列改动过它的版本。 */
 export async function history(
   ws: Workspace,
   opts: { path?: string; limit?: number } = {},
 ): Promise<Version[]> {
+  const preview = previews.get(ws);
+  if (preview) return preview.slice(0, opts.limit ?? preview.length);
   const head = hasHistory(ws) ? await headOid(ws) : null;
   if (!head) return [];
   const filepath = opts.path?.replace(/\/+$/, "") || undefined;

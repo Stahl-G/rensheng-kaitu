@@ -1,10 +1,22 @@
 import { execFile } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { schemas } from "@kaitu/core";
 import { expect, it } from "vitest";
+
+const { zipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
 
 it("phone run 预览隔离工作区和状态，正式运行得到相同操作结果，重复运行不写入", async () => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-command-"));
@@ -69,11 +81,153 @@ it("phone run 预览隔离工作区和状态，正式运行得到相同操作结
       expect(validate(value), JSON.stringify(validate.errors)).toBe(true);
       if (name !== "receipts") expect(value.generator).toEqual({ kind: "agent", name: "Dot", spec: 1 });
     }
+    const previewWeek = JSON.parse(
+      preview.changes.find((c: { path: string }) => c.path === "phone/week.json").after,
+    );
+    const actualWeek = JSON.parse(readFileSync(join(root, "phone/week.json"), "utf8"));
+    expect(previewWeek.changes.map((c: { message: string }) => c.message)).toEqual(
+      actualWeek.changes.map((c: { message: string }) => c.message),
+    );
     expect(existsSync(join(root, "inbox/agents", note))).toBe(false);
     const after = files();
     expect((await run("phone", "run", "--as", "Dot")).snapshots).toBe(0);
     expect(files()).toEqual(after);
     expect((await run("phone", "run", "--as", "Dot", "--dry-run")).changes).toEqual([]);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+it("预览保留 files/cache/chats 项目、自定义模块、ZIP/XML/外部健康输入和二进制附件", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-compat-"));
+  const root = join(temp, "workspace");
+  const env = {
+    ...process.env,
+    HOME: join(temp, "home"),
+    KAITU_LOCAL_STATE_DIR: join(temp, "state"),
+    KAITU_APP_HOME: join(temp, "app"),
+  };
+  const run = async (...args: string[]) =>
+    JSON.parse(
+      (
+        await promisify(execFile)(
+          process.execPath,
+          ["packages/cli/dist/main.js", ...args, "--dir", root, "--json-out"],
+          { env },
+        )
+      ).stdout,
+    );
+  const put = (path: string, content: string | Uint8Array) => {
+    const file = join(root, path);
+    mkdirSync(join(file, ".."), { recursive: true });
+    writeFileSync(file, content);
+  };
+  const inventory = () =>
+    Object.fromEntries(
+      readdirSync(temp, { recursive: true, withFileTypes: true }).map((e) => {
+        const path = join(e.parentPath, e.name);
+        return [
+          path,
+          { mtime: statSync(path).mtimeMs, bytes: e.isFile() ? readFileSync(path).toString("base64") : null },
+        ];
+      }),
+    );
+  const normalized = (value: unknown): unknown =>
+    JSON.parse(
+      JSON.stringify(value).replace(
+        /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})/g,
+        "<time>",
+      ),
+    );
+  try {
+    await run("init");
+    const targets = ["projects/files", "projects/cache", "projects/chats", "cache"];
+    put(
+      "cache/module.json",
+      JSON.stringify({ id: "cache", name: "合成自定义模块", visibility: "nav", version: 1 }),
+    );
+    for (const [i, path] of targets.entries())
+      put(
+        `${path}/STATUS.md`,
+        `---\ntitle: 合成 ${path}\nkind: work\nstage: active\nlinks: []\nupdated: null\nnext:\n  - id: next-${i}\n    title: 合成行动 ${i}\n    status: todo\n---\n`,
+      );
+    put(
+      "inbox/agents/ios-3fa9c1d2-01K7M8BG000000000000000004.actions.jsonl",
+      targets
+        .map((file, i) =>
+          JSON.stringify({
+            client_id: String(i + 10).padStart(26, "0"),
+            at: new Date().toISOString(),
+            device: "3fa9c1d2",
+            op: "complete_next",
+            args: { file: `${file}/STATUS.md`, id: `next-${i}` },
+          }),
+        )
+        .join("\n"),
+    );
+    const xml = (day: string, value: number) =>
+      `<HealthData><Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Synthetic" unit="kg" value="${value}" startDate="${day} 08:00:00 +0800" endDate="${day} 08:00:00 +0800"/></HealthData>`;
+    put("inbox/health/export.xml", xml("2026-10-17", 70));
+    put(
+      "inbox/health/export.zip",
+      zipSync({ "apple_health_export/export.xml": Buffer.from(xml("2026-10-18", 71)) }),
+    );
+    const external = join(temp, "external");
+    mkdirSync(external);
+    writeFileSync(
+      join(external, "daily.health.json"),
+      JSON.stringify({
+        format: "kaitu.health.v1",
+        samples: [
+          {
+            type: "body_mass",
+            start: "2026-10-19T08:00:00+08:00",
+            end: "2026-10-19T08:00:00+08:00",
+            value: 72,
+            unit: "kg",
+            source: "Synthetic",
+          },
+        ],
+      }),
+    );
+    const config = JSON.parse(readFileSync(join(root, ".kaitu/config.json"), "utf8"));
+    put(".kaitu/config.json", JSON.stringify({ ...config, health_inbox_external: [external] }));
+    const attachment = Buffer.from([0, 255, 128, 1]);
+    put("inbox/agents/synthetic.bin", attachment);
+    const before = inventory();
+    const preview = await run("phone", "run", "--as", "Dot", "--dry-run");
+    expect(inventory()).toEqual(before);
+    expect(
+      preview.receipts.map((r: { status: string }) => r.status),
+      JSON.stringify(preview.receipts),
+    ).toEqual(["applied", "applied", "applied", "applied"]);
+    const result = await run("phone", "run", "--as", "Dot");
+    expect(result.inbox).toEqual(preview.inbox);
+    for (const path of targets)
+      expect(readFileSync(join(root, path, "STATUS.md"), "utf8")).toContain("status: done");
+    for (const name of ["today", "week", "map", "library", "receipts"]) {
+      const path = `phone/${name}.json`;
+      const planned = preview.changes.find((c: { path: string }) => c.path === path);
+      expect(normalized(JSON.parse(planned.after))).toEqual(
+        normalized(JSON.parse(readFileSync(join(root, path), "utf8"))),
+      );
+    }
+    const savedAttachment = preview.changes.find(
+      (c: { path: string }) => c.path.startsWith("inbox/notes/") && c.path.endsWith("/files/synthetic.bin"),
+    );
+    expect(savedAttachment.afterBytes).toBe(attachment.length);
+    expect(readFileSync(join(root, savedAttachment.path))).toEqual(attachment);
+    const dataFiles = readdirSync(join(root, "health/data/metrics"));
+    const metrics = dataFiles.flatMap((file) =>
+      readFileSync(join(root, "health/data/metrics", file), "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line)),
+    );
+    expect(metrics.map((r) => r.value).sort()).toEqual([70, 71, 72]);
+    const after = inventory();
+    expect((await run("phone", "run", "--as", "Dot")).snapshots).toBe(0);
+    expect(inventory()).toEqual(after);
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
