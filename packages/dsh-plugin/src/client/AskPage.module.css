@@ -341,7 +341,6 @@ output.progress,
   font-size: 13px;
 }
 .connect button,
-.external button,
 .actions button,
 .fields > button,
 .mobileNew button {
@@ -410,8 +409,7 @@ output.progress,
   margin: 16px 0;
 }
 .key select,
-.key input,
-.external textarea {
+.key input {
   box-sizing: border-box;
   width: 100%;
   padding: 10px 12px;
@@ -419,13 +417,6 @@ output.progress,
   border-radius: 8px;
   color: var(--kt-text);
   background: var(--kt-subtle);
-}
-.external textarea {
-  resize: vertical;
-  font-size: 13px;
-}
-.external button {
-  margin-top: 8px;
 }
 .toggle {
   display: flex;

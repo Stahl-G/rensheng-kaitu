@@ -6,7 +6,6 @@ import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
-import { aiHandover } from "./connections.js";
 import { useT } from "./i18n.js";
 
 type AskMode = "scoped" | "full";
@@ -196,7 +195,7 @@ export function AskPage({
   };
   const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
 
-  const [choice, setChoice] = useState<"builtin" | "external" | "local">("external");
+  const [choice, setChoice] = useState<"builtin" | "local">("local");
   const [key, setKey] = useState("");
   const [provider, setProvider] = useState("deepseek-official");
   const [model, setModel] = useState("");
@@ -294,7 +293,7 @@ export function AskPage({
         setCliPath(ai.localAgent?.path ?? "");
         setBaseURL(ai.baseURL ?? "");
         setApi(ai.api ?? "openai-completions");
-        if (!configurationRequested.current) setChoice(ai.choice ?? "external");
+        if (!configurationRequested.current) setChoice(ai.choice === "builtin" ? "builtin" : "local");
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
         setThreads(list);
@@ -564,7 +563,6 @@ export function AskPage({
       setSaving(false);
     }
   };
-  const handover = aiHandover(workspace, draft);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   const waiting =
     busy &&
@@ -765,11 +763,7 @@ export function AskPage({
         )}
         {loaded && !settings?.configured && (
           <div className={css.connect}>
-            <span>
-              {settings?.choice === "external"
-                ? "你选择了已有 AI；需要内置 AI 才能在这里聊。"
-                : "连接内置 AI，就能在这里聊。"}
-            </span>
+            <span>连接 AI，就能在这里聊。</span>
             <button type="button" onClick={() => setStep(1)}>
               连接 AI
             </button>
@@ -1154,12 +1148,17 @@ export function AskPage({
             <button
               type="button"
               className={css.choice}
-              aria-pressed={choice === "external"}
+              aria-pressed={choice === "local"}
               disabled={saving}
-              onClick={() => setChoice("external")}
+              onClick={() => setChoice("local")}
             >
-              <b>用你已经在用的 AI</b>
-              <span>复制资料包给豆包、Kimi、ChatGPT 等任意 AI，再把回答贴回来，不用 API Key</span>
+              <b>{t("用本机 CodeBuddy", "Use local CodeBuddy")}</b>
+              <span>
+                {t(
+                  "不填 Key，用 CodeBuddy 自己的登录和额度。",
+                  "No API key; uses your CodeBuddy login and allowance.",
+                )}
+              </span>
             </button>
             <button
               type="button"
@@ -1184,21 +1183,6 @@ export function AskPage({
             >
               <b>用开图里的 AI</b>
               <span>用 API Key 连接，或使用服务商提供的账号登录。</span>
-            </button>
-            <button
-              type="button"
-              className={css.choice}
-              aria-pressed={choice === "local"}
-              disabled={saving}
-              onClick={() => setChoice("local")}
-            >
-              <b>{t("用本机 CodeBuddy", "Use local CodeBuddy")}</b>
-              <span>
-                {t(
-                  "不填 Key，用 CodeBuddy 自己的登录和额度。",
-                  "No API key; uses your CodeBuddy login and allowance.",
-                )}
-              </span>
             </button>
             {choice === "local" && (
               <div className={css.fields}>
@@ -1342,28 +1326,6 @@ export function AskPage({
                   </a>
                 ) : null}
               </fieldset>
-            ) : choice === "external" ? (
-              <div className={css.external}>
-                {onConnections && (
-                  <button type="button" onClick={onConnections}>
-                    去复制资料包
-                  </button>
-                )}
-                <details>
-                  <summary>进阶：本机支持 MCP 的客户端（Claude Desktop、Claude Code、Codex）</summary>
-                  <textarea aria-label="AI 接手说明" readOnly rows={4} value={handover} />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void navigator.clipboard
-                        .writeText(handover)
-                        .catch(() => setError("请选中并复制接手说明"))
-                    }
-                  >
-                    复制连接说明
-                  </button>
-                </details>
-              </div>
             ) : null}
             {error && <p role="alert">{error}</p>}
             <div className={css.actions}>
@@ -1375,7 +1337,7 @@ export function AskPage({
                 disabled={saving || loadingModels || (choice === "builtin" && !model.trim())}
                 onClick={() => void next()}
               >
-                {saving ? "连接中…" : choice === "external" ? "使用已有 AI" : "下一步"}
+                {saving ? "连接中…" : "下一步"}
               </button>
             </div>
           </>
