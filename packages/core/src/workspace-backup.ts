@@ -113,7 +113,7 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
   const walk = async (prefix: string) => {
     for (const e of await fs.readdir(join(ws.root, prefix), { withFileTypes: true })) {
       const path = prefix ? `${prefix}/${e.name}` : e.name;
-      const pending = placeholderOriginal(path);
+      const pending = placeholderOriginal(path)?.split(sep).join("/");
       if (pending && (selected(pending, c) || basePaths.some((path) => path.startsWith(`${pending}/`))))
         throw new KaituError(
           pick(
