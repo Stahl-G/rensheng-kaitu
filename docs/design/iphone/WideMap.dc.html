@@ -18,7 +18,7 @@ a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
 <div style="position: relative; width: 1180px; height: 820px; overflow: hidden; background: #F4F6F7; color: #1F1E1D; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
 
   <svg width="1180" height="820" viewBox="0 0 1180 820" role="img" aria-label="人生进度图：从家乡合肥，到南京读书，现在在上海，计划去杭州" style="position: absolute; inset: 0;">
-    <g transform="translate(-30 -1) scale(0.868)">
+    <g transform="translate(-96 -1) scale(0.868)">
       <rect x="-300" y="-300" width="2200" height="1600" fill="#EEF1EC"></rect>
       <path d="M-300 0H2000M-300 118H2000M-300 236H2000M-300 354H2000M-300 472H2000M-300 590H2000M-300 708H2000M-300 826H2000M-300 944H2000M0 -300V1300M118 -300V1300M236 -300V1300M354 -300V1300M472 -300V1300M590 -300V1300M708 -300V1300M826 -300V1300M944 -300V1300M1062 -300V1300M1180 -300V1300M1298 -300V1300" stroke="#DDE2DA" stroke-width="1.2" stroke-opacity="0.7"></path>
       <path d="M876 -120 C870 60 880 130 935 200 C990 260 1060 300 1045 345 C1030 395 990 430 930 470 C880 505 840 560 805 597 C860 640 940 670 1001 679 C1030 700 1045 760 1060 1100 L1700 1100 L1700 -120 Z" fill="#F4F6F7" stroke="#DDE2DA" stroke-width="2"></path>
@@ -63,6 +63,8 @@ a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
       <div style="display: flex; gap: 2px; padding: 3px; border-radius: 999px; background: #F0EFEC;">
         <a href="Main.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; color: #4D4C48; font-size: 15px;">今天</a>
         <a href="WideMap.dc.html" aria-current="page" style="display: flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; background: #FFFFFF; color: #1B3254; font-size: 15px; font-weight: 600; box-shadow: 0 1px 2px rgba(31,30,29,0.12);">开图</a>
+        <a href="Library.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; color: #4D4C48; font-size: 15px;">资料</a>
+        <a href="Ask.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 16px; border-radius: 999px; color: #4D4C48; font-size: 15px;">问问</a>
       </div>
     </nav>
     <div style="display: flex; align-items: center; gap: 10px;">
@@ -77,63 +79,35 @@ a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
     </div>
   </div>
 
-  <div style="position: absolute; left: 44px; top: 488px; display: flex; flex-direction: column; gap: 10px; max-width: 460px;">
-    <span style="font-size: 15px; font-weight: 600; letter-spacing: 0.08em; color: #4D4C48;">截至 2026 年 10 月 18 日</span>
-    <h1 style="margin: 0; font-size: 54px; line-height: 62px; font-weight: 800; letter-spacing: -0.01em; color: #1F1E1D;">从合肥出发，<br>走过三座城市</h1>
-    <p style="margin: 0; font-size: 20px; line-height: 28px; color: #4D4C48;">下一站：杭州，还在计划</p>
-  </div>
 
-  <aside aria-label="接下来往哪走" style="position: absolute; right: 24px; top: 96px; width: 290px; display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 24px; background: rgba(252,252,251,0.92); box-shadow: 0 12px 40px rgba(31,30,29,0.12), 0 0 0 1px #E6E4DD;">
-    <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">接下来往哪走</h2>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <span style="font-size: 16px; line-height: 21px; font-weight: 600;">年底出一本摄影集</span>
-      <svg width="140" height="8" aria-hidden="true"><path d="M2 4H66" stroke="#1B3254" stroke-width="3" stroke-linecap="round"></path><circle cx="70" cy="4" r="3.5" fill="#1B3254"></circle><path d="M78 4H138" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
-      <span style="font-size: 14px; line-height: 19px; color: #4D4C48;">把初选从 80 张挑到 30 张</span>
-    </div>
-    <div style="height: 1px; background: #E6E4DD;"></div>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <span style="font-size: 16px; line-height: 21px; font-weight: 600;">开图 App</span>
-      <svg width="140" height="8" aria-hidden="true"><path d="M2 4H96" stroke="#1B3254" stroke-width="3" stroke-linecap="round"></path><circle cx="100" cy="4" r="3.5" fill="#1B3254"></circle><path d="M108 4H138" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
-      <span style="font-size: 14px; line-height: 19px; color: #4D4C48;">发 TestFlight 0.6.0</span>
-    </div>
-    <div style="height: 1px; background: #E6E4DD;"></div>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <span style="font-size: 16px; line-height: 21px; font-weight: 600;">要不要搬去杭州</span>
-      <svg width="140" height="8" aria-hidden="true"><circle cx="4" cy="4" r="3.5" fill="#FFFFFF" stroke="#2B4C7E" stroke-width="1.6"></circle><path d="M12 4H138" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.5 7" stroke-opacity="0.7"></path></svg>
-      <span style="font-size: 14px; line-height: 19px; color: #6B6A66;">AI 提的 · 还没探索</span>
-    </div>
-    <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
-      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #2B4C7E;">今天最重要的一件事</span>
-      <span style="font-size: 16px; line-height: 22px; font-weight: 600;">把摄影集初选从 80 张挑到 30 张</span>
-    </div>
-    <a href="Wide.dc.html" style="display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; border-radius: 22px; background: #F0EFEC; color: #1F1E1D; font-size: 15px; font-weight: 600;">
-      全部信息
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
-    </a>
-  </aside>
-
-  <nav aria-label="人生章节" style="position: absolute; left: 24px; right: 24px; bottom: 24px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; padding: 16px 20px 14px; border-radius: 24px; background: rgba(252,252,251,0.92); box-shadow: 0 12px 40px rgba(31,30,29,0.12), 0 0 0 1px #E6E4DD;">
-    <button type="button" aria-label="合肥，家乡" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: transparent; text-align: left;">
-      <span style="display: flex; align-items: center; width: 100%;"><span style="width: 14px; height: 14px; border-radius: 7px; background: #FFFFFF; box-shadow: inset 0 0 0 3px #1B3254; flex: none;"></span><span style="flex: 1; height: 3px; background: #1B3254;"></span></span>
-      <span style="font-size: 18px; font-weight: 700;">合肥</span>
-      <span style="font-size: 13px; color: #6B6A66;">家乡</span>
-    </button>
-    <button type="button" aria-label="南京，2014 到 2018" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: transparent; text-align: left;">
-      <span style="display: flex; align-items: center; width: 100%;"><span style="width: 14px; height: 14px; border-radius: 7px; background: #1B3254; flex: none;"></span><span style="flex: 1; height: 3px; background: #1B3254;"></span></span>
-      <span style="font-size: 18px; font-weight: 700;">南京</span>
-      <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">2014–2018</span>
-    </button>
-    <button type="button" aria-label="上海，2018 至今，现在" aria-pressed="true" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: transparent; text-align: left;">
-      <span style="display: flex; align-items: center; width: 100%;"><span style="width: 20px; height: 20px; border-radius: 10px; background: #1B3254; box-shadow: 0 0 0 5px #DCE5F1; flex: none;"></span><span style="flex: 1; height: 0; border-top: 3px dashed #2B4C7E; margin-left: 6px;"></span></span>
-      <span style="font-size: 18px; font-weight: 800; color: #1B3254;">上海</span>
-      <span style="font-size: 13px; font-weight: 600; color: #1B3254; font-variant-numeric: tabular-nums;">2018 至今 · 现在</span>
-    </button>
-    <button type="button" aria-label="杭州，计划中" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; border: 0; background: transparent; text-align: left;">
-      <span style="display: flex; align-items: center; width: 100%;"><span style="width: 14px; height: 14px; border-radius: 7px; background: #FFFFFF; border: 2.5px dashed #2B4C7E; flex: none;"></span></span>
-      <span style="font-size: 18px; font-weight: 700;">杭州</span>
-      <span style="font-size: 13px; color: #6B6A66;">计划中</span>
-    </button>
-  </nav>
+  <section aria-label="开图右栏：与外屏开图页同一列" style="position: absolute; right: 16px; top: 88px; width: 358px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;"><span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px; color: #4D4C48; font-variant-numeric: tabular-nums;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #1B3254;"></span>合肥 · 家乡</span><span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px; color: #4D4C48; font-variant-numeric: tabular-nums;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #1B3254;"></span>南京 · 2014–2018</span><span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #EEF2F7; box-shadow: 0 0 0 1px #D3DEEC; font-size: 13px; font-weight: 600; color: #1B3254; font-variant-numeric: tabular-nums;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #2B4C7E;"></span>上海 · 2018 至今</span><span style="display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px; color: #4D4C48; font-variant-numeric: tabular-nums;"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px dashed #2B4C7E;"></span>杭州 · 计划中</span></div>
+      <h2 style="margin: 4px 0 0; padding: 0 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">接下来往哪走</h2>
+      <div style="border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; overflow: hidden;">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">年底出一本摄影集</span><span style="font-size: 12px; color: #6B6A66;">目标</span></div>
+          <svg width="200" height="10" aria-hidden="true"><path d="M2 5H96" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><circle cx="100" cy="5" r="4" fill="#2B4C7E"></circle><path d="M108 5H198" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
+          <span style="font-size: 15px; line-height: 20px; color: #4D4C48;">下一步：把初选从 80 张挑到 30 张</span>
+        </div>
+        <div style="height: 1px; background: #E6E4DD; margin-left: 16px;"></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">开图 App</span><span style="font-size: 12px; color: #6B6A66;">项目</span></div>
+          <svg width="200" height="10" aria-hidden="true"><path d="M2 5H136" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><circle cx="140" cy="5" r="4" fill="#2B4C7E"></circle><path d="M148 5H198" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
+          <span style="font-size: 15px; line-height: 20px; color: #4D4C48;">下一步：发 TestFlight 0.6.0</span>
+        </div>
+        <div style="height: 1px; background: #E6E4DD; margin-left: 16px;"></div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;"><span style="font-size: 17px; line-height: 22px; font-weight: 600;">要不要搬去杭州</span><span style="font-size: 12px; color: #6B6A66;">方向</span></div>
+          <svg width="200" height="10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="#FFFFFF" stroke="#2B4C7E" stroke-width="1.8"></circle><path d="M14 5H198" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.5 7" stroke-opacity="0.7"></path></svg>
+          <span style="font-size: 15px; line-height: 20px; color: #6B6A66;">AI 提的 · 还没探索</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: #EEF2F7; box-shadow: inset 0 1px 0 #D3DEEC;">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #1B3254;">今天最重要的一件事</span>
+          <span style="font-size: 17px; line-height: 23px; font-weight: 600;">把摄影集初选从 80 张挑到 30 张</span>
+        </div>
+      </div>
+      <a href="Wide.dc.html" style="align-self: flex-end; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; font-size: 15px; color: #2B4C7E;">这一周与全部信息 ›</a>
+  </section>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":820}}'>
