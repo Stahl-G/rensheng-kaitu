@@ -30,7 +30,7 @@ createInterface({input:process.stdin}).on('line',line=>{
  if(m.id===9001 && m.result){if(m.result.outcome?.optionId!=='allow_once')process.exit(3);send({method:'session/update',params:{sessionId:'upstream-synthetic',update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'approved once'}}}});send({id:permitted,result:{stopReason:'end_turn'}});return;}
  if(m.method==='initialize')send({id:m.id,result:{agentCapabilities:{loadSession:true}}});
  else if(m.method==='session/new'||m.method==='session/load')send({id:m.id,result:{sessionId:p.sessionId||'upstream-synthetic',configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]}]}});
- else if(m.method==='session/set_config_option')send({id:m.id,result:{}});
+ else if(m.method==='session/set_config_option')send({id:m.id,result:{configOptions:[{id:'model',category:'model',currentValue:p.value}]}});
  else if(m.method==='session/prompt') {
    const text=p.prompt[0].text;
    if(text.endsWith('hang'))return;
@@ -109,8 +109,23 @@ test("real stdio adapter streams, persists once, resumes after restart and keeps
       .map((frame) => frame.params.prompt[0].text as string);
     expect(prompts.map((text) => text.includes("开图的完整 Agent 模式"))).toEqual([true, false]);
     expect(service.events(row.id).filter((event) => event.type === "assistant/message")).toHaveLength(2);
+    // 换了 AI 仍在原对话里继续：新 AI 收到之前的记录，对话里只显示原话。
     switchBackend();
-    await expect(service.send(row.id, "wrong backend")).rejects.toThrow(/新建对话/);
+    await service.send(row.id, "switched");
+    const last = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line))
+      .filter((frame) => frame.method === "session/prompt")
+      .at(-1);
+    expect(last.params.prompt[0].text).toContain("用户：again");
+    expect(last.params.prompt[0].text).toContain("AI：synthetic reply");
+    expect(
+      service
+        .events(row.id)
+        .filter((event) => event.type === "user/message")
+        .at(-1)?.data.content,
+    ).toEqual([{ type: "text", text: "switched" }]);
   } finally {
     await service.close();
   }

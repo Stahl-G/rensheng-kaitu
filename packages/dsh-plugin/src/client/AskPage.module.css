@@ -15,6 +15,61 @@
   min-width: 0;
   min-height: 0;
 }
+.threads > * {
+  flex-shrink: 0;
+}
+.threadRow {
+  position: relative;
+}
+.threads .threadRow > button:first-child {
+  padding-right: 32px;
+}
+.threads .threadMore {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 26px;
+  padding: 2px 0;
+  transform: translateY(-50%);
+  text-align: center;
+  color: var(--kt-muted);
+  opacity: 0;
+}
+.threadRow:hover .threadMore,
+.threads .threadMore[aria-expanded="true"],
+.threads .threadMore:focus-visible {
+  opacity: 1;
+}
+.threadMenu {
+  position: absolute;
+  top: 100%;
+  right: 4px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--kt-control);
+  border-radius: 10px;
+  background: var(--kt-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+.rename {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--kt-text);
+  background: var(--kt-card);
+}
+.threads .archivedToggle {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kt-muted);
+}
 .threads h2 {
   padding: 14px 10px 4px;
   margin: 0;
@@ -268,6 +323,17 @@
 .modelWrap {
   min-width: 0;
   max-width: 40%;
+}
+.modelSearch {
+  position: sticky;
+  top: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  color: var(--kt-text);
+  background: var(--kt-card);
 }
 .modelPopover {
   left: auto;
