@@ -114,7 +114,7 @@ function Overview({
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
   // 开图默认先看健康，然后是足迹、资讯、方向（2026-10-17 用户决定）。
-  const [explore, setExplore] = useState("overview");
+  const [explore, setExplore] = useState("health");
   const [data, setData] = useState<OverviewData | null>(null);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
@@ -242,7 +242,13 @@ function Overview({
     if (id === "me") setView("profile");
     else if (["explore", "health", "feed", "directions"].includes(id)) {
       setExplore(
-        id === "feed" ? "news" : id === "directions" ? "directions" : id === "health" ? "health" : "overview",
+        id === "feed"
+          ? "news"
+          : id === "directions"
+            ? "directions"
+            : id === "explore"
+              ? "footprints"
+              : "health",
       );
       setView("explore");
     } else openRecord(["learning", "decisions"].includes(id) ? "notes" : id);
@@ -402,7 +408,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore("overview");
+                if (id === "explore") setExplore("health");
                 setRecord("");
                 setMenu(false);
               }}
@@ -839,7 +845,6 @@ function Overview({
               </div>
               <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
                 {[
-                  ["overview", t("全景", "Overview")],
                   ["health", t("健康", "Health")],
                   ["footprints", t("足迹", "Footprints")],
                   ["news", t("资讯", "News")],
@@ -857,24 +862,23 @@ function Overview({
               </div>
             </div>
             <div className={css.child}>
-              {explore === "overview" ? (
-                <ProgressMap
-                  plans={data?.plans}
-                  projects={data?.projects ?? []}
-                  loadLifeMap={props.loadLifeMap}
-                  loadExploration={props.loadExploration}
-                  subscribe={props.subscribe}
-                  open={(section) => {
-                    if (section === "footprints") setExplore("footprints");
-                    else if (section === "directions") setExplore("directions");
-                    else if (section === "plans") setView("overview");
-                    else openSection("projects");
-                  }}
-                />
-              ) : explore === "health" ? (
+              {explore === "health" ? (
                 <HealthPage {...child} />
               ) : explore === "footprints" ? (
-                <MapPage {...child} />
+                <>
+                  <MapPage {...child} />
+                  <ProgressMap
+                    plans={data?.plans}
+                    projects={data?.projects ?? []}
+                    loadExploration={props.loadExploration}
+                    subscribe={props.subscribe}
+                    open={(section) => {
+                      if (section === "directions") setExplore("directions");
+                      else if (section === "plans") setView("overview");
+                      else openSection("projects");
+                    }}
+                  />
+                </>
               ) : explore === "news" ? (
                 <NewsPage {...child} />
               ) : (
