@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createAskService } from "../cli/dist/ui/ask.js";
@@ -56,6 +56,14 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
   });
 }
 
+const LOADING = `<!doctype html><meta charset="utf-8"><title>人生开图</title>
+<style>
+:root { color-scheme: light dark; }
+body { margin: 0; height: 100vh; display: grid; place-items: center; font: 15px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #6b6965; background: #fbfaf8; }
+@media (prefers-color-scheme: dark) { body { color: #a19e99; background: #1f1e1d; } }
+</style>
+<p>正在打开资料…</p>`;
+
 export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -66,11 +74,44 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   const hostResources = process.env.KAITU_HOST_RESOURCES || dirname(resources);
   const launcher =
     process.platform === "win32" ? app.getPath("exe") : join(dirname(app.getPath("exe")), "Kaitu");
+  // 每一步的时间记下来：启动慢时看是哪一步。
+  const log = join(state, "logs", "startup.log");
+  writeFileSync(log, "");
+  const step = (name) => appendFileSync(log, `${new Date().toISOString()} ${name}\n`);
+  await app.whenReady();
+  // 先开窗口再打开资料：资料在云盘里时读写可能要等云盘，窗口不能等它。
+  const window = new BrowserWindow({
+    title: "人生开图",
+    width: 1180,
+    height: 820,
+    minWidth: 360,
+    minHeight: 580,
+    show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+  });
+  app.on("second-instance", () => {
+    if (window.isDestroyed()) return;
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+  });
+  app.on("activate", () => {
+    if (window.isDestroyed()) return;
+    window.show();
+    window.focus();
+  });
+  const painted = new Promise((resolve) => window.once("ready-to-show", resolve));
+  await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING)}`);
+  await painted;
+  window.show();
+  // 让 macOS 先把窗口放上屏幕，再开始可能卡住的读写。
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  step("window");
   let ws = new Workspace(workspace);
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   else await upgradeWorkspace(ws);
-  await app.whenReady();
+  step("workspace");
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
   const makeBackgroundAi = () =>
@@ -163,15 +204,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
       throw new Error("请在问问页面连接内置 AI");
     },
   });
-  const window = new BrowserWindow({
-    title: "人生开图",
-    width: 1180,
-    height: 820,
-    minWidth: 360,
-    minHeight: 580,
-    show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
-  });
+  step("server");
   window.webContents.session.setPermissionRequestHandler((_webContents, permission, callback) =>
     callback(permission === "clipboard-sanitized-write"),
   );
@@ -181,18 +214,6 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   });
   window.webContents.on("will-navigate", (event, url) => {
     if (new URL(url).origin !== server.url) event.preventDefault();
-  });
-  window.once("ready-to-show", () => window.show());
-  app.on("second-instance", () => {
-    if (window.isDestroyed()) return;
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
-  });
-  app.on("activate", () => {
-    if (window.isDestroyed()) return;
-    window.show();
-    window.focus();
   });
   const updateMenu = () =>
     Menu.setApplicationMenu(
@@ -236,6 +257,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     );
   updateMenu();
   await window.loadURL(server.url);
+  step("loaded");
   app.on("window-all-closed", () => app.quit());
   let closing = false;
   app.on("before-quit", (event) => {
