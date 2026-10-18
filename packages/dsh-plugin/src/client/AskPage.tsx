@@ -528,9 +528,9 @@ export function AskPage({
           await call("askSetMode", id, modeForThread, modeForThread === "full");
           setPendingMode(null);
         }
-        await refreshThreads();
       }
       await call("askSend", id, payload, pendingAttachments);
+      await refreshThreads();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDraft((current) => (current.trim() ? current : pendingText));

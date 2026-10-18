@@ -304,21 +304,7 @@ export function createAskService(options: {
       return service;
     },
     list() {
-      ready();
-      // 清掉从没说过话的空「新对话」，避免换 AI / 开权限时侧栏被占满。
-      for (const row of [...threads]) {
-        if (row.title !== "新对话" || row.pinned || row.archived || busy.has(row.id)) continue;
-        if (events(row.id).some((item) => item.type === "user/message" || item.type === "assistant/message"))
-          continue;
-        threads.splice(
-          threads.findIndex((item) => item.id === row.id),
-          1,
-        );
-        listeners.delete(row.id);
-        if (options.transient) temporaryEvents.delete(row.id);
-        else rmSync(join(directory, `${row.id}.jsonl`), { force: true });
-      }
-      saveIndex();
+      // 只读内存：不在刷新列表时删对话或写磁盘（见 AGENTS.md）。
       return [...threads].sort((a, b) => b.updated.localeCompare(a.updated));
     },
     organize(id, change) {
@@ -344,6 +330,8 @@ export function createAskService(options: {
     },
     create() {
       ready();
+      // 不做空对话复用：资讯/引导等会 create()，复用会占到用户侧栏里的空「新对话」。
+      // 避免堆积靠前端 pendingMode，以及发送后再 refreshThreads。
       const now = new Date().toISOString();
       const row: AskThread = {
         id: `session-${randomUUID()}`,

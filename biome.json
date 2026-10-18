@@ -8,7 +8,8 @@
       "docs/reference/**",
       "packages/dsh-plugin/lib/**",
       "packages/core/data/cities.json",
-      ".claude/settings.local.json"
+      ".claude/settings.local.json",
+      "dsh-novel-workspace/**"
     ]
   },
   "formatter": {

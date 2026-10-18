@@ -263,6 +263,34 @@ test("switching AI keeps transcript after a failed first connect", async () => {
     await ask.close();
   }
 });
+test("legacy agent sessions file is used when path-scoped file is missing", async () => {
+  const f = fixture();
+  mkdirSync(join(f.state, "local-agents"), { recursive: true, mode: 0o700 });
+  writeFileSync(
+    join(f.state, "local-agents", "codebuddy-sessions.json"),
+    JSON.stringify({ t1: "upstream-legacy" }),
+    { mode: 0o600 },
+  );
+  const runtime = await createAgentRuntime({
+    ...f,
+    agent: localAgent("codebuddy"),
+    path: f.path,
+  });
+  try {
+    await runtime.request("session/prompt", {
+      sessionId: "t1",
+      contentBlocks: [{ type: "text", text: "resume" }],
+    });
+  } finally {
+    await runtime.close();
+  }
+  const loaded = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line))
+    .find((frame) => frame.method === "session/load");
+  expect(loaded?.params.sessionId).toBe("upstream-legacy");
+});
 test("same agent at two CLI paths keeps separate upstream sessions", async () => {
   const f = fixture();
   const other = join(f.workspace, "codebuddy-other");

@@ -58,7 +58,13 @@ export async function createAgentRuntime(options: {
   const root = join(options.state, "local-agents");
   mkdirSync(root, { recursive: true, mode: 0o700 });
   const file = sessionsPath(root, agent.id, bin);
-  const sessions: Record<string, string> = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  const legacy = join(root, `${agent.id}-sessions.json`);
+  // 升级后新文件按路径分存；找不到时退回读旧的单文件，避免已有对话丢上下文。
+  const sessions: Record<string, string> = existsSync(file)
+    ? JSON.parse(readFileSync(file, "utf8"))
+    : existsSync(legacy)
+      ? JSON.parse(readFileSync(legacy, "utf8"))
+      : {};
   const persistSessions = () => {
     writeFileSync(`${file}.tmp`, JSON.stringify(sessions), { mode: 0o600 });
     renameSync(`${file}.tmp`, file);

@@ -144,3 +144,25 @@ test("conversations can be pinned, renamed, archived and deleted", async () => {
     rmSync(temp, { recursive: true, force: true });
   }
 });
+test("first message of a new conversation is not lost to list()", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-ask-new-"));
+  try {
+    const ask = createAskService({
+      state: join(temp, "s"),
+      workspace: temp,
+      settings: async () => ({ configured: true, provider: "fake", model: "fake" }),
+      configure: async () => ({}),
+      models: async () => [],
+      runtime: async () => ({
+        onNotification: () => () => {},
+        request: async () => ({}),
+        close: async () => {},
+      }),
+    });
+    const row = ask.create();
+    ask.list();
+    await expect(ask.send(row.id, "hi")).resolves.toBeDefined();
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
