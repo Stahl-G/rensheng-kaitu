@@ -236,6 +236,8 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
   await processInbox(reopened, { stableMs: 0 });
   expect(readRecords(reopened, "task")).toEqual(before);
   expect(phoneReceipts(reopened).find((r) => r.ref === actions[2]?.client_id)?.status).toBe("duplicate");
+  const validate = schemas().builtin("phone-receipts.schema.json");
+  expect(validate(reopened.readJson("phone/receipts.json")), JSON.stringify(validate.errors)).toBe(true);
 });
 
 it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手机文件处理后删除远端", async () => {
