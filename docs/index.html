@@ -22,8 +22,8 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<link rel="stylesheet" href="/tokens.css?v=da5dfb17">
-<link rel="stylesheet" href="/style.css?v=1b1ea670">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=d40d0445">
 <script>document.documentElement.classList.add("js")</script>
 <script src="/app.js?v=2bff1222" defer></script>
 </head>
@@ -40,7 +40,7 @@
 <div class="wrap">
   <header class="page-head">
     <h1>文档</h1>
-    <p class="lead">本页对应开图 <span data-rel="version">0.1.0-rc.4</span>。还没装好的话，先去<a href="/download/">下载</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a>。</p>
+    <p class="lead">本页对应开图 <span data-rel="version">0.1.0-rc.4</span>。还没装好的话，先去<a href="/download/">下载</a>；资料存在哪、发给谁，见<a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a>。</p>
   </header>
   <div class="docs-layout">
     <details class="toc" data-toc open>
@@ -184,7 +184,7 @@
   <li>聊完对它说「整理给开图」，把回答贴到「把 AI 的回答贴回来」，点「读取回答并核对」，像整理一件事一样核对、采纳。</li>
 </ol>
 <ul>
-  <li>资料包里有进行中的目标、最近 30 天的结果、下一步、项目、在探索的方向和非敏感记忆。不带哪些内容、会自动去掉什么，见<a href="/privacy/">资料去向</a>。</li>
+  <li>资料包里有进行中的目标、最近 30 天的结果、下一步、项目、在探索的方向和非敏感记忆。不带哪些内容、会自动去掉什么，见<a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a>。</li>
   <li>在文本框里删改过资料包后再换勾选，开图会先问你：「重新生成」按勾选重做，你的删改会丢掉；「保留我的修改」则不变。</li>
   <li>这是手动接续，不算「已连接」：问问页仍要另外连接开图里的 AI 才能聊。</li>
   <li>提方向也一样：没连开图里的 AI 时，在「开图 → 方向」点「用你常用的 AI 提」，复制提示词发给任何 AI，把它的回复贴回，点「3 · 读取方向建议」。提示词带上你的目标、在做的事、在探索的方向、非敏感记忆，以及已经提过或不感兴趣的方向标题。贴回的建议标为「AI 建议 · 待采纳」，采纳还是「不感兴趣」由你定。</li>
@@ -238,7 +238,7 @@
   <li><strong>坚果云</strong>：默认用找到的坚果云同步文件夹。提示没找到时，先在坚果云客户端里设好一个同步文件夹，再把路径填成它里面的一个新文件夹。</li>
   <li><strong>Google Drive</strong>：云端 AI 接力用它（见<a href="#relay">云端的 AI</a>）。</li>
 </ul>
-<p>命令行：<code>kaitu sync enable icloud|drive|nutstore [--dir &lt;父目录&gt;]</code>、<code>kaitu sync disable [--to &lt;目录&gt;]</code>、<code>kaitu sync status</code>。同步后哪些文件进云盘、哪些 AI 能读到，见<a href="/privacy/">资料去向</a>。</p>
+<p>命令行：<code>kaitu sync enable icloud|drive|nutstore [--dir &lt;父目录&gt;]</code>、<code>kaitu sync disable [--to &lt;目录&gt;]</code>、<code>kaitu sync status</code>。同步后哪些文件进云盘、哪些 AI 能读到，见<a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a>。</p>
 
 <h2 id="phone">手机通道<a class="anchor" href="#phone" aria-label="#">#</a></h2>
 <p>在微信、Telegram、飞书或 QQ 里给开图发消息，由问问当前连接的 AI 回答，用「只读写开图资料」模式：能读写开图资料、搜索和读网页，不能运行命令。电脑要开着、Kaitu.app 要在运行、问问要先连好 AI。只处理文字。</p>
@@ -247,7 +247,7 @@
   <li>按页面上的步骤连接一个通道（微信扫码登录；Telegram、QQ、飞书填机器人凭据）。</li>
   <li>页面显示配对码，10 分钟内有效。用手机私聊机器人，发这个码。发来配对码的那个账号会成为唯一能收到回复的账号。</li>
 </ol>
-<p>真机测过的是 Telegram 和微信；飞书和 QQ 还没在真机上测过。消息会经过所选平台，见<a href="/privacy/">资料去向</a>。命令行：<code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>、<code>kaitu channels pair &lt;通道&gt;</code>、<code>kaitu channels status</code>。</p>
+<p>真机测过的是 Telegram 和微信；飞书和 QQ 还没在真机上测过。消息会经过所选平台，见<a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a>。命令行：<code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>、<code>kaitu channels pair &lt;通道&gt;</code>、<code>kaitu channels status</code>。</p>
 
 <h2 id="automation">自动任务与日历<a class="anchor" href="#automation" aria-label="#">#</a></h2>
 <p>第一次在问问连上开图里的 AI 后，会问一次要不要每天自动整理。它们用你刚连接的 AI 运行；选「都不要」也能随时手动问。</p>
@@ -336,7 +336,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
   <li><strong>这次发给 AI</strong>：问问把你的消息和它读到的资料发给你选的 AI 服务；完整 Agent 读到的内容都可能发出；自动任务用同一个 AI；通过 MCP 或云盘接力的外部 AI，读到的内容会发给它们背后的服务；资料包和剪贴板只发你复制的那一段。</li>
   <li><strong>其他联网</strong>：地图图块（OpenFreeMap）、行情参考价（Yahoo，只发代码）、GitHub、日历订阅、邮箱和聊天采集。</li>
 </ul>
-<p>逐项说明见<a href="/privacy/">资料去向</a>。</p>
+<p>逐项说明见<a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a>。</p>
 
 <h2 id="faq">常见问题<a class="anchor" href="#faq" aria-label="#">#</a></h2>
 <h3 id="faq-key">一定要填 API Key 吗？<a class="anchor" href="#faq-key" aria-label="#">#</a></h3>
@@ -371,7 +371,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <footer class="site-foot">
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>人生开图</b><span>生活，逐渐清晰。</span></p>
-    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
+    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
     <p class="foot-note">MIT 许可证 · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
     <p class="foot-note">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
   </div>
