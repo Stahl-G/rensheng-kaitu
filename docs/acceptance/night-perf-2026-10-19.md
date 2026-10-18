@@ -35,3 +35,22 @@ Agent/电脑 generator 正确；重复正式运行 snapshots=0 且内容/mtime �
 检查顺序：core build → typecheck → Biome → CLI build → 相关 Vitest（4 文件 / 24 测试通过）。
 日志 `/tmp/PERF-1-{corebuild,typecheck,biome,clibuild,vitest}-final.log`。
 未安装依赖。首次新增测试的依赖解析与旧 dist 问题已修复并重建验证，不能引用旧运行作为通过证据。
+
+## PERF-2 桌面复用工作区
+
+`startDesktop` 把已打开的 Workspace 传给 `createLocalAsk`，取消后者重复构造及同步维护。
+保留启动时一次正常维护、会话工作区 key 与 `getWorkspace` 的迁移读取方式。
+
+`/tmp/night-desktop-reuse-perf.mjs` 在相同 20,000 条合成训练记录上实际构造本地问问服务：
+
+| 阶段 | 修改前 ms / statSync | 修改后 ms / statSync |
+| --- | ---: | ---: |
+| 一次必要 Workspace 维护 | 298.04 / 1526 | 237.51 / 1526 |
+| createLocalAsk 首次 | 259.85 / 1526 | 1.70 / 0 |
+| createLocalAsk 重开 | 263.27 / 1526 | 0.84 / 0 |
+
+服务创建、创建会话、关闭和重开回读同一会话均通过，不启动 AI 或访问凭据。
+记录在 `/tmp/PERF-2-{before,after}.json`。
+检查 core build → typecheck → Biome → 相关 Vitest（3 文件 / 12 测试通过），
+日志 `/tmp/PERF-2-{corebuild,typecheck,biome,vitest}.log`。
+未测 Electron 原生整机冷启动，不把这段节省宣称为解决全部启动延迟。
