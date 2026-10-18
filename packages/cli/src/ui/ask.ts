@@ -306,9 +306,9 @@ export function createAskService(options: {
         throw new KaituError("AI 连接已改变，请新建对话；原对话记录仍可查看", "AI_CONNECTION");
       const mode = row.mode ?? "scoped";
       if (connection.fullOnly && mode !== "full")
-        throw new KaituError("CodeBuddy 需要完整 Agent，请在对话权限中开启", "AI_CONNECTION");
+        throw new KaituError("本机 Agent 需要完整权限，请在对话权限中开启", "AI_CONNECTION");
       if (images.length && connection.supportsAttachments === false)
-        throw new KaituError("CodeBuddy 只接收文字", "AI_ATTACHMENT");
+        throw new KaituError("本机 Agent 只接收文字", "AI_ATTACHMENT");
       if (busy.size && runtimeMode !== mode)
         throw new KaituError("请等当前回复完成后切换模式", "AI_CONNECTION");
       if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000)
