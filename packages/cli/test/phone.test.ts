@@ -5,8 +5,10 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -17,6 +19,66 @@ import { schemas } from "@kaitu/core";
 import { expect, it } from "vitest";
 
 const { zipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
+
+it.each(["metadata", "content"])("预览期间原资料发生 %s 变化时按内容判断冲突", async (mode) => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-concurrent-"));
+  const root = join(temp, "workspace");
+  const env = {
+    ...process.env,
+    KAITU_LOCAL_STATE_DIR: join(temp, "state"),
+    KAITU_APP_HOME: join(temp, "app"),
+  };
+  try {
+    await promisify(execFile)(process.execPath, ["packages/cli/dist/main.js", "init", "--dir", root], {
+      env,
+    });
+    const source = join(root, "OVERVIEW.md");
+    writeFileSync(
+      join(root, "inbox/agents/ios-3fa9c1d2-01K7M8BG000000000000000001.note.md"),
+      "---\nkind: capture\nagent: iPhone\n---\n合成并发检查原文\n",
+    );
+    utimesSync(source, 1700000000, 1700000000);
+    const before = statSync(source);
+    const bytes = readFileSync(source);
+    const hook = join(temp, "concurrent.cjs");
+    writeFileSync(
+      hook,
+      `if (process.argv[1].endsWith('/phone-worker.js')) {
+        const fs = require('node:fs');
+        const source = ${JSON.stringify(source)};
+        const before = fs.statSync(source);
+        if (${JSON.stringify(mode)} === 'metadata') fs.chmodSync(source, before.mode ^ 0o100);
+        else {
+          const bytes = fs.readFileSync(source);
+          bytes[0] ^= 1;
+          fs.writeFileSync(source, bytes);
+          fs.utimesSync(source, before.atime, before.mtime);
+        }
+      }`,
+    );
+    const result = await promisify(execFile)(
+      process.execPath,
+      ["packages/cli/dist/main.js", "phone", "run", "--dry-run", "--dir", root, "--json-out"],
+      { env: { ...env, NODE_OPTIONS: `--require=${hook}` } },
+    ).catch((error) => error);
+    const after = statSync(source);
+    expect([after.ino, after.size, after.mtimeMs]).toEqual([before.ino, before.size, before.mtimeMs]);
+    expect(after.ctimeMs).not.toBe(before.ctimeMs);
+    if (mode === "metadata") {
+      expect(readFileSync(source)).toEqual(bytes);
+      expect(
+        JSON.parse(result.stdout).changes.some((c: { path: string }) => c.path === "phone/today.json"),
+      ).toBe(true);
+      expect(result.code).toBeUndefined();
+    } else {
+      expect(readFileSync(source)).not.toEqual(bytes);
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain("预览期间原资料变化");
+    }
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
 
 it("预览 worker 退出失败时输出原错误，不被数字退出码的 TypeError 覆盖", async () => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-worker-error-"));
@@ -267,6 +329,24 @@ it("预览保留 files/cache/chats 项目、自定义模块、ZIP/XML/外部健�
     put(".kaitu/config.json", JSON.stringify({ ...config, health_inbox_external: [external] }));
     const attachment = Buffer.from([0, 255, 128, 1]);
     put("inbox/agents/synthetic.bin", attachment);
+    const redirected = join(temp, "state", "redirected");
+    renameSync(join(root, ".kaitu"), redirected);
+    put(
+      ".kaitu/config.json",
+      JSON.stringify({ ...config, health_inbox_external: [external], state_dir: redirected }),
+    );
+    await promisify(execFile)(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        'import { setStateBinding } from "./packages/core/dist/state-binding.js"; ' +
+          'setStateBinding(process.argv[1], process.argv[2], "local");',
+        root,
+        redirected,
+      ],
+      { env },
+    );
     const before = inventory();
     const preview = await run("phone", "run", "--as", "Dot", "--dry-run");
     expect(inventory()).toEqual(before);

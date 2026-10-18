@@ -20,3 +20,39 @@
 
 日志：`/tmp/NIGHT-CORR-A-{core,typecheck,biome,cli-build,vitest,package,smoke}.log`。
 详细合成证据 `/tmp/NIGHT-CORR-A-smoke/observed.json`。
+
+## B：ctime 与真实内容冲突
+
+- 修前绑定 `6b4ce4c` 的普通 dist、以及保留 main → phone-command 的薄源码入口复测：
+  复制、历史元数据与 worker 链路均未重现旧 `076b9a8` 的自发源文件 ctime 改变。
+  原源文件 stat 轨迹没有 stampChanges，内容及 mtime 清单保持不变。
+  因而旧报告当时的文件系统触发原因仍未证实，不能把猜测记为已定位。
+- 可确定复现的原因是原 guard 把 ctime 等元数据变化直接视为资料变化。
+  在副本已复制、生产 worker 执行前只 chmod 原 OVERVIEW，inode/size/mtime/内容完全不变：
+  当前基线薄入口退出 2，报预览冲突；修后相同扰动退出 0，返回正常预览。
+- 只对纳入复制的输入记录短生命周期内容摘要；stamp 变化时再核对内容。
+  删除或真正改写仍报冲突，包括同长度写入且恢复原 mtime。检查也覆盖没有输出差异的原输入。
+  不保留整树 Buffer，不复制历史对象，不访问已排除的媒体/cache，不改稳定等待和 timeout。
+- 两个并发行为案例分别验证 metadata-only 可预览、真实改写拒绝；
+  兼容性行为案例补齐重定向 state，与有效外部 body_mass=72、XML/ZIP、files/cache/chats 项目、
+  同名 cache 模块和二进制附件一起验证。预览与正式五份快照除时间字段外一致，
+  原 workspace/state/external 内容及文件/目录 mtime 无改，重复正式 snapshots=0 且零写。
+- 同 probe 159 文件 / 214,106 → 214,103 字节（临时路径/状态字段差异）：
+
+| 普通分文件 CLI | 修前 ms | 修后 ms | 修后父进程 readFileSync bytes |
+| --- | ---: | ---: | ---: |
+| 首次 note/action 预览 | 2685.9 | 2609.6 | 3503226 |
+| 重复预览 | 998.1 | 729.3 | 3500906 |
+| 加 32 MiB health/files + 16 MiB .kaitu/cache | 967.5 | 697.8 | 3501180 |
+| 外部输入及重定向 state 预览 | 3931.0 | 2761.6 | 3506362 |
+
+摘要增加约 153 KB 的小输入读取，48 MiB 惰性文件各阶段监测访问数为 0，没有约 96 MiB 双读。
+这些是单次 wall，不能证明稳定提速；首次仍超过 1 秒，默认 processInbox 1.5 秒等待保留。
+薄源码入口修前/后首次 3170.9/3554.1 ms，重复 1000.5/774.5 ms，惰性 846.3/707.3 ms，
+外部状态 3008.8/2669.5 ms，同样没有源 stampChanges，不取更快样本替代普通 CLI。
+临时薄入口首次缺 assets 的探针设置错误已补仓库 schemas/templates 链接后重跑，非产品失败。
+
+检查：core build → npm typecheck → Biome → CLI tsc → 相关 Vitest 1 文件 / 6 测试通过。
+日志 `/tmp/NIGHT-CORR-B-{core,typecheck,biome,cli-build,vitest,metadata,before,after,thin-before,thin-after}.log`。
+详细规模/访问证据 `/tmp/NIGHT-CORR-B-{before,after}/observed.json`，
+薄入口证据 `/tmp/NIGHT-CORR-B-thin-{before,after}-probe/observed.json`。

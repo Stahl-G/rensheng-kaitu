@@ -1,6 +1,8 @@
 import { isUtf8 } from "node:buffer";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
+  type Stats,
   cpSync,
   existsSync,
   lstatSync,
@@ -19,6 +21,10 @@ import { runPhone } from "@kaitu/core/phone-run";
 export { runPhone };
 import { KaituError, type PhoneGenerator, phoneHistoryMetadata, stateDirectory } from "@kaitu/core/phone-run";
 
+const stamp = (s: Stats) => `${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`;
+const digest = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+type Original = { path: string; stamp: string; digest: string };
+
 export function phoneGenerator(name?: string): PhoneGenerator {
   if (name === undefined) return { kind: "computer" };
   if (!name.trim() || [...name].length > 32)
@@ -29,7 +35,7 @@ export function phoneGenerator(name?: string): PhoneGenerator {
 function copy(
   source: string,
   target: string,
-  originals: Map<string, string>,
+  originals: Map<string, Original>,
   scope: "workspace" | "state" | "inbox" = "workspace",
 ) {
   const stateName = /^(config|phone-actions|inbox-records|inbox-state|organizer|automation|dsh-setup)\.json$/;
@@ -47,7 +53,7 @@ function copy(
         // 仅排除内置健康照片目录和根依赖；合法模块、项目以及收件箱里的同名目录照常复制。
         if (rel === "health/files" || rel.startsWith("health/files/") || rel === "node_modules") return false;
       }
-      if (info.isFile()) originals.set(destination, path);
+      if (info.isFile()) originals.set(destination, { path, stamp: stamp(info), digest: digest(path) });
       return true;
     },
   });
@@ -59,7 +65,7 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-preview-"));
   try {
     const target = join(temp, "workspace");
-    const originals = new Map<string, string>();
+    const originals = new Map<string, Original>();
     copy(root, target, originals);
     const state = stateDirectory(root, undefined, false);
     if (state !== join(root, ".kaitu") && existsSync(state))
@@ -75,10 +81,6 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
       },
     );
     writeFileSync(configFile, JSON.stringify(config));
-    const stamp = (path: string) => {
-      const s = statSync(path);
-      return `${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`;
-    };
     const contents = () =>
       new Map(
         readdirSync(target, { recursive: true, withFileTypes: true })
@@ -88,11 +90,10 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
           )
           .map((e) => {
             const abs = join(e.parentPath, e.name);
-            return [relative(target, abs), stamp(abs)] as const;
+            return [relative(target, abs), stamp(statSync(abs))] as const;
           }),
       );
     const before = contents();
-    const sourceStamps = new Map([...originals.values()].map((path) => [path, stamp(path)]));
     const history = await phoneHistoryMetadata(root, state);
     const input = join(temp, "input.json");
     writeFileSync(input, JSON.stringify({ root: target, generator, history }));
@@ -108,12 +109,17 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
         maxBuffer: 32 * 1024 * 1024,
       },
     );
+    // ctime 也会因权限等元数据变化而更新；只有原输入内容变了才会使本次预览失效。
+    // 基线只摘要已纳入复制的输入，不保留整树 Buffer，也不读取已排除的媒体/cache。
+    for (const original of originals.values()) {
+      const current = statSync(original.path, { throwIfNoEntry: false });
+      if (!current || (original.stamp !== stamp(current) && original.digest !== digest(original.path)))
+        throw new KaituError("预览期间原资料变化，请重新预览", "CONFLICT");
+    }
     const after = contents();
     const changes = [...new Set([...before.keys(), ...after.keys()])].sort().flatMap((path) => {
       if (before.get(path) === after.get(path)) return [];
-      const source = originals.get(join(target, path));
-      if (source && sourceStamps.get(source) !== stamp(source))
-        throw new KaituError("预览期间原资料变化，请重新预览", "CONFLICT");
+      const source = originals.get(join(target, path))?.path;
       const old = source ? readFileSync(source) : undefined;
       const next = after.has(path) ? readFileSync(join(target, path)) : undefined;
       if (old && next && old.equals(next)) return [];
