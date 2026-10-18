@@ -13,12 +13,34 @@
   "bytes": 297764655,
   "sha256": "9bfe430a44494151681276ee8bf18355729165a6fffe64e6f53e3f0c5e4ab1fa",
   "installerExitCode": 0,
+  "legacySyntheticWorkspace": {
+    "creatorCliVersion": "0.1.0-rc.4",
+    "creatorWorktreeSha": "7aea6a4e11e41411eefee2ea4090598d02affe36",
+    "creatorCliMainSha256": "689e027a13213450c67aa00823d841d566fc4fac9d8517293a1f4162584e27da",
+    "realUserDataUsed": false
+  },
   "installedFilesMatchUnpacked": {
     "Kaitu.exe": "bcddbcfb92eb532553365f91af7a8ee235f0f053c4bab56d35b2b6364031af0b",
     "resources/kaitu/dist/index.js": "2ce75adfdb709fb004966469c2166c8ffa0d3fc6490c613e6c3b4150d68f016b",
     "resources/kaitu/dist/client.js": "da99ef8218a1db232aa335cdca891f1c63b7978847fe880b56dde4aa257edbe5"
   },
   "nativeGuiVerified": false,
+  "finalSourceChecks": {
+    "build": "passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "testCommand": "pnpm test",
+    "testsPassed": 243,
+    "testsFailed": 7,
+    "testsSkippedExisting": 4,
+    "testFilesPassed": 80,
+    "testFilesFailed": 7,
+    "testFilesSkippedExisting": 2,
+    "testDurationSeconds": 440.19,
+    "allFailures": "EPERM while creating synthetic symlink fixtures; subsequent security assertions unverified",
+    "timeouts": 0,
+    "unhandledErrors": 0
+  },
   "realAgentVerified": false,
   "screenshots": [],
   "releaseCreated": false,

@@ -1,6 +1,6 @@
 # Windows 隔夜打包与实际验收
 
-状态：最终包已安装并完成合成接口验证，最终精确源码全量测试中；[草稿 PR #30](https://github.com/Stahl-G/rensheng-kaitu/pull/30)。仅本地测试包，不创建 Release，不更新官网，不合并 PR。
+状态：本轮打包与可执行的自测已完成，原生验收受环境阻碍；[草稿 PR #30](https://github.com/Stahl-G/rensheng-kaitu/pull/30)。仅本地测试包，不创建 Release，不更新官网，不合并 PR。
 
 ## 基线与隔离
 
@@ -19,7 +19,7 @@
 | 项目 | 当前结果 |
 |---|---|
 | frozen-lockfile 依赖安装 | 通过；Node 24.16.0，pnpm 11.25.0 |
-| 构建 / lint / 类型检查 / 全量测试 | 最终产品源码构建、lint、类型检查通过；最终全量进行中。当前 package.json 未提供 pnpm check，使用四条既有命令 |
+| 构建 / lint / 类型检查 / 全量测试 | 最终构建、lint、类型检查通过；全量 243 通过 / 7 EPERM 失败 / 4 原有跳过。当前 package.json 未提供 pnpm check，使用四条既有命令 |
 | 官方脚本重新打包 | Windows 占位文件修复后的最终包 windows.1021 已生成。官方 DSH 输入签名 Valid，不复用旧开图产物 |
 | 真正安装 / 首次启动 | 最终包静默安装 exit 0，已安装 EXE 启动并返回 HTTP 200；原生首次向导未验 |
 | 创建、重开、中文和空格路径 | 合成目录自动初始化并成功重开；原生路径选择器未验 |
@@ -42,7 +42,7 @@
 - Computer Use 的 `node_repl` 连续两次返回 `failed to write kernel assets: 系统找不到指定的路径。 (os error 3)`；按技能执行 reset 后重新初始化仍失败。三次后停止，未用其他原生 UI 自动化绕过。**全部原生点击、缩放、正常退出以及截图仍为未验。**
 - 本机有原生 Claude / Codex，但未发现其 ACP 适配器，没有新装适配器或读取登录凭据；真实本地 Agent 不算通过。
 - 本机文件符号链接创建返回 EPERM，多个隐私边界测试在准备夹具时失败。没有新增 skip、删除断言、放宽权限或改系统安全设置。
-- 基线还有默认 15 秒超时；正在使用原有参数复跑，不能把定向通过当作完整测试通过。
+- 基线和中间全量曾有默认 15 秒超时；最终精确源码全量无超时或未处理错误，但仍有 7 项 symlink EPERM，不能称完整测试通过。
 - 静默安装属于安装进程级证据；HTTP 页面与合成 ACP 属于接口证据，不替代原生验收。验收脚本先纠正了两处测试假设：桌面使用随机端口；原文从 library.inbox 回读而非笔记文档接口。失败日志保留。
 
 ## 交付与试用判断
@@ -86,8 +86,10 @@ node packages/desktop/package-windows.mjs D:/test/rensheng-kaitu-rc4-release/.ka
 - 定向回归 K-1 / Windows ACP / 占位分别 2 / 8 / 1 通过；占位命令按名称过滤其余 5 项，未新增 skip。
 - 初始基线全量：233 通过 / 15 失败 / 4 原有跳过；另有 1 未处理错误；449.62 秒。
 - K-1 + ACP 夹具全量（占位修复前启动）：241 通过 / 9 失败 / 4 原有跳过；501.60 秒。7 个 symlink EPERM、1 个 experience-imports 默认 15 秒超时、1 个已修复占位断言。保留默认检查参数，不放宽断言、权限或超时。
-- 最终精确产品源码全量：运行中，完成后补充。
+- 最终精确产品源码全量：**243 通过 / 7 失败 / 4 原有跳过（254 项）**；80 个文件通过 / 7 失败 / 2 原有跳过（89 文件）；440.19 秒。七项均为下面列出的 symlink EPERM；没有超时或未处理错误，占位和 ACP 回归在本轮也通过。第三次确认同一权限环境错误后不再重复运行。
+- 提交证据文件时补齐 JSON 末尾换行，重新运行 lint：466 文件通过，未改变产品代码或包内容。
 - 日志在 `.kaitu/night/logs/`：`install.log`、`repaired-build.log`、`repaired-lint.log`、`repaired-typecheck.log`、`test.log`、`final-test.log`、`exact-final-test.log`、`package-final.log`、`installer-final-exit.txt`、`installed-smoke-1021.log`。
+- PR #30 的在线 checks/statuses 均为空，不能把无 CI 当作 CI 通过；PR 保持 draft、open、unmerged。
 
 ## 已安装 EXE 的合成接口证据
 
@@ -109,3 +111,21 @@ node packages/desktop/package-windows.mjs D:/test/rensheng-kaitu-rc4-release/.ka
 4. `workspace-backup` 按开发流程属于“要验收”路径，需要另一家 Agent 的独立验收与用户决定合并；作者自测不替代此项。main 目前缺少计划中的 `scripts/needs-review.mjs` 和 `pnpm check`，未越界实现其他流程任务。
 
 2026-10-19 00:53（Asia/Bangkok）重新 fetch 后 main 仍是 `6e5ca015d8344b5770ab0511630b08f3d0ac045c`；夜间分支推进到 `32f4e5ed8888e3be4ce82b08f08ad889ed7bf7a8`（K-3），K-2 为 `5bf457accc5ee0957656fd8e9a1b773dd5bb66da`。本包未自动纳入这些新增内容。早间由用户决定是否发布，本轮不自动发布、合并或部署。
+
+### 符号链接阻碍定位
+
+三次全量命令均为 `pnpm test`，使用原有 Vitest 参数；各次详情保留日志。没有通过改测试规避该错误。安全断言之前即发生 `EPERM: operation not permitted, symlink`：
+
+| 测试文件 | 合成链接用途 |
+|---|---|
+| `packages/core/test/map-evidence.test.ts` | 隐藏状态链接不能作为来源读取 |
+| `packages/core/test/security-records.test.ts` | 模块目录不能链接到外部记录 |
+| `packages/dsh-plugin/test/security-files.test.ts` | 等价路径和文件别名的权限边界 |
+| `packages/cli/test/ask-filesystem.test.ts` | 越界文件和被替换的解析目标 |
+| `packages/cli/test/mcp.test.ts` | 敏感记忆别名不能被远端读取 |
+| `packages/cli/test/security-finance.test.ts` | 上传入口拒绝外部文件链接 |
+| `packages/cli/test/security-state.test.ts` | 程序状态别名不能从 scoped 入口读取 |
+
+后续应在具备合法 symlink 测试能力的隔离 Windows 环境执行原断言；本轮不改变系统设置或放宽测试。
+
+Computer Use 依据本机 `C:/Users/Guo/.codex/plugins/cache/openai-bundled/computer-use/26.1013.40934/skills/computer-use/SKILL.md`，其引用的 `../../docs/guidance.md` Recovery 说明包含 “retry once, then stop and report that the Windows Computer Use helper may have failed”。该条明确描述轻量调用超时恢复；本次错误发生得更早（kernel assets 初始化失败），参照其恢复上限执行 reset 与重试后停止，不能假装获得原生窗口或截图。
