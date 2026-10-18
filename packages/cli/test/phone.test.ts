@@ -18,6 +18,36 @@ import { expect, it } from "vitest";
 
 const { zipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
 
+it("预览 worker 退出失败时输出原错误，不被数字退出码的 TypeError 覆盖", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-worker-error-"));
+  const root = join(temp, "workspace");
+  const env = {
+    ...process.env,
+    KAITU_LOCAL_STATE_DIR: join(temp, "state"),
+    KAITU_APP_HOME: join(temp, "app"),
+  };
+  try {
+    await promisify(execFile)(process.execPath, ["packages/cli/dist/main.js", "init", "--dir", root], {
+      env,
+    });
+    const hook = join(temp, "worker-error.cjs");
+    writeFileSync(
+      hook,
+      'if (process.argv[1].endsWith("/phone-worker.js")) throw new Error("Synthetic worker failure");',
+    );
+    const failure = await promisify(execFile)(
+      process.execPath,
+      ["packages/cli/dist/main.js", "phone", "run", "--dry-run", "--dir", root],
+      { env: { ...env, NODE_OPTIONS: `--require=${hook}` } },
+    ).catch((error) => error);
+    expect(failure.code).toBe(2);
+    expect(failure.stderr).toContain("Error: Synthetic worker failure");
+    expect(failure.stderr).not.toContain("TypeError");
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 it("重复健康输入的预览不虚报历史版本，正式运行也不重写手机快照", async () => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-duplicate-health-"));
   const root = join(temp, "workspace");

@@ -19,6 +19,7 @@ const banner = [
 ].join("\n");
 for (const [entry, target] of [
   ["packages/cli/src/main.ts", "dist/cli/main.js"],
+  ["packages/cli/src/phone-worker.ts", "dist/cli/phone-worker.js"],
   ["packages/core/src/health-import-worker.ts", "dist/cli/health-import-worker.js"],
 ]) {
   await build({

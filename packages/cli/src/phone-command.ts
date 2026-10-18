@@ -30,9 +30,11 @@ async function run() {
     );
   } else console.log(JSON.stringify(await runPhone(root, generator), null, 2));
 }
-run().catch((error: Error & { code?: string }) => {
+run().catch((error: Error & { code?: string | number }) => {
   console.error(
-    error instanceof KaituError || error.code?.startsWith("ERR_PARSE_ARGS") ? error.message : error.stack,
+    error instanceof KaituError || (typeof error.code === "string" && error.code.startsWith("ERR_PARSE_ARGS"))
+      ? error.message
+      : error.stack,
   );
   process.exitCode = 2;
 });
