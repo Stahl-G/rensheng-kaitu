@@ -11,20 +11,36 @@ const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+function writeAgent(dir: string, name: string, source: string): string {
+  const windows = process.platform === "win32";
+  const script = join(dir, windows ? `${name}.mjs` : name);
+  writeFileSync(script, source, { mode: 0o755 });
+  chmodSync(script, 0o755);
+  if (!windows) return script;
+  // Exercise the same npm-shim resolution as installed Windows ACP CLIs.
+  writeFileSync(join(dir, name), `exec node "$basedir/${name}.mjs" "$@"`);
+  const path = join(dir, `${name}.cmd`);
+  writeFileSync(path, `@node "%~dp0${name}.mjs" %*\r\n`);
+  return path;
+}
+function copyAgent(path: string, dir: string, name: string): string {
+  const script = process.platform === "win32" ? path.replace(/\.cmd$/, ".mjs") : path;
+  return writeAgent(dir, name, readFileSync(script, "utf8"));
+}
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "kaitu-codebuddy-"));
   dirs.push(dir);
   const workspace = join(dir, "workspace");
   mkdirSync(workspace);
-  const path = join(dir, "codebuddy");
-  writeFileSync(
-    path,
+  const path = writeAgent(
+    dir,
+    "codebuddy",
     `#!/usr/bin/env node
 import {createInterface} from 'node:readline';
 import {appendFileSync,existsSync,unlinkSync} from 'node:fs';
 import {basename} from 'node:path';
 const send = x => process.stdout.write(JSON.stringify(x)+'\\n');
-const tag = basename(process.argv[1] || 'synthetic');
+const tag = basename(process.argv[1] || 'synthetic').replace(/\\.mjs$/, '');
 let permitted;
 createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line), p=m.params||{};
@@ -48,7 +64,6 @@ createInterface({input:process.stdin}).on('line',line=>{
 });
 `,
   );
-  chmodSync(path, 0o755);
   return {
     state: join(dir, "state"),
     workspace,
@@ -200,8 +215,7 @@ test("local agent: model choice, CLI identity, and switching back to the SDK pro
   await runtime.close();
   expect(readFileSync(join(f.workspace, "trace.jsonl"), "utf8")).toContain('"configId":"model","value":"m2"');
   // 换成另一个 CLI 就是另一个连接：旧对话不会拿去续接。
-  const other = join(f.state, "codebuddy-other");
-  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
+  const other = copyAgent(f.path, f.state, "codebuddy-other");
   await connection.configure({ choice: "local", agent: "codebuddy", path: other });
   expect((await connection.settings()).backend).not.toBe(first.backend);
   await connection.configure({ choice: "builtin", provider: "deepseek-official" });
@@ -293,9 +307,7 @@ test("legacy agent sessions file is used when path-scoped file is missing", asyn
 });
 test("same agent at two CLI paths keeps separate upstream sessions", async () => {
   const f = fixture();
-  const other = join(f.workspace, "codebuddy-other");
-  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
-  chmodSync(other, 0o755);
+  const other = copyAgent(f.path, f.workspace, "codebuddy-other");
   const agent = localAgent("codebuddy");
   const a = await createAgentRuntime({ ...f, agent, path: f.path });
   try {
