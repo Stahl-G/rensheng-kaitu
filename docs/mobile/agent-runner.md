@@ -99,6 +99,8 @@ ORGANIZER.md 的白天那一节假定电脑已有 R2–R5。测试阶段在合�
 
 ## 9. 手机端改动（`kaitu-ios`）
 
+设计稿：[design/iphone](../design/iphone/README.md) 里的 `EmptyAgent`、`Source`、`StatusAgent`，以及 `Main` 的 `source` 切换。
+
 - **I10**：状态行用 generator 显示「Dot 07:30 更新」；没有 generator 显示「电脑 07:30 更新」。
 - **I11**：一周卡片和开图页的生成者或日期与今天不同时，写一行「电脑 10-16 的数据」。
 - **I12**：设置加「更新来源」：电脑和 Agent 各自上次更新的时间；「交给 Agent 的说明」一键拷贝，自动填好资料仓库和时区。

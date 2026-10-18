@@ -1,6 +1,6 @@
 # 开图 iPhone：产品规范（v0.6，含 v0.7）
 
-更新：2026-10-18。依据 [PRODUCT.md](../PRODUCT.md) 的北极星与默认行为；实现方式见 [architecture.md](architecture.md)。
+更新：2026-10-18。依据 [PRODUCT.md](../PRODUCT.md) 的北极星与默认行为；实现方式见 [architecture.md](architecture.md)。设计稿见 [design/iphone](../design/iphone/README.md)。
 iOS 工程在独立仓库 `kaitu-ios`（SwiftUI，现为 v0.5 健康采集器），本文件是手机端的产品依据。
 
 ## 1. 定位
