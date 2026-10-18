@@ -8,6 +8,7 @@ import { KaituError } from "./errors.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
+import { refreshOverview } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { placeholderOriginal } from "./sync-files.js";
@@ -74,6 +75,10 @@ export function subscribeWorkspaceBackup(ws: Workspace, fn: () => void): () => v
     emitter(ws).off("change", fn);
   };
 }
+export function workspaceBackupEnabled(ws: Workspace): boolean {
+  return state(ws).connection?.enabled === true;
+}
+
 export function workspaceBackupStatus(ws: Workspace) {
   const s = state(ws);
   return {
@@ -371,6 +376,7 @@ export async function connectWorkspaceBackup(ws: Workspace, input: unknown, remo
     conflicts: [],
     error: undefined,
   });
+  refreshOverview(ws);
   return workspaceBackupStatus(ws);
 }
 function remoteReceipts(text: string): PhoneReceipt[] {
