@@ -18,6 +18,49 @@ import { expect, it } from "vitest";
 
 const { zipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
 
+it("重复健康输入的预览不虚报历史版本，正式运行也不重写手机快照", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-duplicate-health-"));
+  const root = join(temp, "workspace");
+  const run = async (...args: string[]) =>
+    JSON.parse(
+      (
+        await promisify(execFile)(
+          process.execPath,
+          ["packages/cli/dist/main.js", ...args, "--dir", root, "--json-out"],
+          {
+            env: {
+              ...process.env,
+              HOME: join(temp, "home"),
+              KAITU_LOCAL_STATE_DIR: join(temp, "state"),
+              KAITU_APP_HOME: join(temp, "app"),
+            },
+          },
+        )
+      ).stdout,
+    );
+  const xml =
+    '<HealthData><Record type="HKQuantityTypeIdentifierBodyMass" sourceName="Synthetic" unit="kg" value="70" ' +
+    'startDate="2026-10-17 08:00:00 +0800" endDate="2026-10-17 08:00:00 +0800"/></HealthData>';
+  try {
+    await run("init");
+    writeFileSync(join(root, "inbox/health/export.xml"), xml);
+    await run("phone", "run", "--as", "Synthetic");
+    const versions = await run("history");
+    writeFileSync(join(root, "inbox/health/export.xml"), xml);
+    const preview = await run("phone", "run", "--as", "Synthetic", "--dry-run");
+    expect(preview.changes.some((change: { path: string }) => change.path === ".kaitu/history.git")).toBe(
+      false,
+    );
+    expect(preview.changes.filter((change: { path: string }) => change.path.startsWith("phone/"))).toEqual(
+      [],
+    );
+    expect((await run("phone", "run", "--as", "Synthetic")).snapshots).toBe(0);
+    expect(await run("history")).toEqual(versions);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
 it("phone run 预览隔离工作区和状态，正式运行得到相同操作结果，重复运行不写入", async () => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-command-"));
   const env = {

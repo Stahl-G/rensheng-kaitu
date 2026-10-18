@@ -177,7 +177,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   if (batchDepth.get(ws)) return null;
   const schedule = deferred.get(ws);
   if (!schedule) return snapshotNow(ws, message, now);
-  schedule(message);
+  await schedule(message);
   return null;
 }
 
@@ -245,26 +245,55 @@ const previews = new WeakMap<Workspace, Version[]>();
 /** 预览只读取已有提交的元数据；不复制历史对象或在原位置创建版本库。 */
 export async function phoneHistoryMetadata(root: string, state: string) {
   const gitdir = join(state, "history.git");
-  if (!fs.existsSync(gitdir)) return [];
-  return (await git.log({ fs, dir: root, gitdir, depth: 100 })).map(({ oid, commit }) => ({
-    oid,
-    message: commit.message.trim(),
-    timestamp: commit.author.timestamp,
-  }));
+  let versions: { oid: string; message: string; timestamp: number }[] = [];
+  if (fs.existsSync(gitdir)) {
+    try {
+      versions = (await git.log({ fs, dir: root, gitdir, depth: 100 })).map(({ oid, commit }) => ({
+        oid,
+        message: commit.message.trim(),
+        timestamp: commit.author.timestamp,
+      }));
+    } catch (error) {
+      if ((error as { code?: string }).code !== "NotFoundError") throw error;
+    }
+  }
+  return { versions, root, gitdir };
 }
 
-export function previewSnapshots(ws: Workspace, metadata: Awaited<ReturnType<typeof phoneHistoryMetadata>>) {
-  const entries = metadata.map(({ oid, message, timestamp }) => ({
+export async function previewSnapshots(
+  ws: Workspace,
+  metadata: Awaited<ReturnType<typeof phoneHistoryMetadata>>,
+  processingInbox: boolean,
+) {
+  // 只在临时副本建立当前输入的基线；不复制原历史对象。后续沿用正式 Git 规则判断是否真有新版本。
+  if (processingInbox) await snapshotNow(ws, "手机预览基线");
+  const entries = metadata.versions.map(({ oid, message, timestamp }) => ({
     oid,
     short: oid.slice(0, 7),
     message,
     time: isoInZone(new Date(timestamp * 1000), ws.timeZone()),
   }));
   previews.set(ws, entries);
-  deferSnapshots(ws, (message) => {
-    // 与正式保存相同地维护派生文件，版本元数据留在预览内存中。
-    refreshOverview(ws);
-    maintainHistoryIgnore(ws);
+  let originalDirty: boolean | undefined;
+  deferSnapshots(ws, async (message) => {
+    // 只有需要保存版本时才只读盘点原位置，空收件箱预览不做这项工作。
+    if (originalDirty === undefined) {
+      originalDirty = metadata.versions.length === 0;
+      if (!originalDirty) {
+        const matrix = await git.statusMatrix({
+          fs,
+          dir: metadata.root,
+          gitdir: metadata.gitdir,
+          refresh: false,
+        });
+        originalDirty = matrix.some(([file, head, workdir, stage]) =>
+          neverTrack(file) ? head !== 0 || stage !== 0 : !(head === 1 && workdir === 1 && stage === 1),
+        );
+      }
+    }
+    const version = await snapshotNow(ws, message);
+    if (!version && !originalDirty) return;
+    originalDirty = false;
     entries.unshift({
       oid: "preview",
       short: "preview",

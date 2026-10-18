@@ -82,7 +82,10 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
     const contents = () =>
       new Map(
         readdirSync(target, { recursive: true, withFileTypes: true })
-          .filter((e) => e.isFile())
+          .filter(
+            (e) =>
+              e.isFile() && !relative(target, join(e.parentPath, e.name)).startsWith(".kaitu/history.git/"),
+          )
           .map((e) => {
             const abs = join(e.parentPath, e.name);
             return [relative(target, abs), stamp(abs)] as const;

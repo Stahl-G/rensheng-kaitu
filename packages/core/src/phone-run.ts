@@ -13,7 +13,6 @@ export async function runPhone(
 ) {
   const ws = new Workspace(root, { maintain: false });
   if (!ws.exists(".kaitu/config.json")) throw new KaituError("先运行 kaitu init", "NOT_INITIALIZED");
-  const versions = baseline ? previewSnapshots(ws, baseline) : undefined;
   const pending =
     ["inbox/agents", "inbox/health", "inbox/rejected"].some(
       (dir) =>
@@ -25,13 +24,14 @@ export async function runPhone(
     externalHealthPaths(ws).some(
       (dir) => existsSync(dir) && readdirSync(dir).some((f) => f.endsWith(".health.json")),
     );
+  const versions = baseline ? await previewSnapshots(ws, baseline, pending) : undefined;
   const inbox = pending ? await processInbox(ws) : { processed: [], notes: [], pending: [] };
   const snapshots = await writePhoneSnapshots(ws, new Date(), { force: true, generator });
   return {
     inbox,
     snapshots,
     receipts: phoneReceipts(ws),
-    ...(versions ? { historyChanged: versions.length !== baseline?.length } : {}),
+    ...(versions ? { historyChanged: versions.length !== baseline?.versions.length } : {}),
   };
 }
 
