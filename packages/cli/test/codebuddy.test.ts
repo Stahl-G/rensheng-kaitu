@@ -165,18 +165,32 @@ test("selecting CodeBuddy keeps the existing SDK provider to switch back to", as
     }),
   });
   await connection.configure({ choice: "local", agent: "codebuddy", path: f.path });
-  expect((await connection.settings()).provider).toBe("codebuddy");
+  const first = await connection.settings();
+  expect(first.provider).toBe("codebuddy");
+  // 换成另一个 CLI 就是另一个连接：旧对话不会拿去续接。
+  const other = join(f.state, "codebuddy-other");
+  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
+  await connection.configure({ choice: "local", agent: "codebuddy", path: other });
+  expect((await connection.settings()).backend).not.toBe(first.backend);
   await connection.configure({ choice: "builtin", provider: "deepseek-official" });
   expect((await connection.settings()).provider).toBe("deepseek-official");
   await expect(
     connection.configure({ choice: "local", agent: "codebuddy", path: join(f.state, "missing") }),
   ).rejects.toThrow(/未找到/);
 });
-test("CodeBuddy keeps its own login variables; Kaitu and Electron ones are removed", () => {
-  const env = agentEnvironment({ CODEBUDDY_API_KEY: "synthetic", KAITU_DIR: "x", ELECTRON_RUN_AS_NODE: "1" });
+test("CodeBuddy keeps only its own login variables; Kaitu, Electron and other credentials are removed", () => {
+  const env = agentEnvironment({
+    CODEBUDDY_API_KEY: "synthetic",
+    OPENAI_API_KEY: "synthetic",
+    OTHER_AUTH_TOKEN: "synthetic",
+    KAITU_DIR: "x",
+    ELECTRON_RUN_AS_NODE: "1",
+    LANG: "zh_CN.UTF-8",
+  });
   expect(env.CODEBUDDY_API_KEY).toBe("synthetic");
-  expect(env.KAITU_DIR).toBeUndefined();
-  expect(env.ELECTRON_RUN_AS_NODE).toBeUndefined();
+  for (const key of ["OPENAI_API_KEY", "OTHER_AUTH_TOKEN", "KAITU_DIR", "ELECTRON_RUN_AS_NODE"])
+    expect(env[key]).toBeUndefined();
+  expect(env.LANG).toBe("zh_CN.UTF-8");
 });
 test("Windows npm launch resolves Node entry without shell interpolation", () => {
   const f = fixture();

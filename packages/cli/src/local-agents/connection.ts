@@ -45,7 +45,8 @@ export function createAgentConnection(options: {
       model: "CodeBuddy 默认",
       supportsImages: false,
       supportsAttachments: false,
-      backend: "codebuddy",
+      // 换了 CLI（另一个安装或登录环境）就算换了连接：旧对话要新建，不拿旧会话去续接。
+      backend: `codebuddy:${detected.path ?? ""}`,
       localAgent: detected,
       fullOnly: true,
       protocols: [],

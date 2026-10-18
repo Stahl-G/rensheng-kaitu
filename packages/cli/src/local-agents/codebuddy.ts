@@ -6,9 +6,13 @@ import { KaituError } from "@kaitu/core";
 
 export function agentEnvironment(source = process.env): NodeJS.ProcessEnv {
   const env = { ...source };
-  // 只去掉开图自己的变量和 Electron 的 Node 开关；CodeBuddy 自己的登录变量（如 CODEBUDDY_API_KEY）要留着。
+  // 去掉开图自己的变量、Electron 的 Node 开关和别家的密钥；只留 CodeBuddy 自己的登录变量（如 CODEBUDDY_API_KEY）。
   for (const key of Object.keys(env))
-    if (/^(?:KAITU_|DSH_|ELECTRON_|NODE_OPTIONS$)/.test(key)) delete env[key];
+    if (
+      /^(?:KAITU_|DSH_|ELECTRON_|NODE_OPTIONS$)/.test(key) ||
+      (!key.startsWith("CODEBUDDY_") && /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key))
+    )
+      delete env[key];
   const home = env.HOME ?? env.USERPROFILE ?? homedir();
   let nvmBins: string[] = [];
   try {
