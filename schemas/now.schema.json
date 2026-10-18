@@ -20,7 +20,11 @@
           "kind": { "enum": ["event", "proposal", "task"] },
           "module": { "type": "string" },
           "ref": { "type": "string" },
-          "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] }
+          "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] },
+          "calendar": {
+            "enum": ["phone"],
+            "description": "在 iPhone 上确认，由手机写进 Apple 日历；电脑不再写系统日历"
+          }
         },
         "if": { "properties": { "kind": { "enum": ["event", "proposal"] } } },
         "then": { "required": ["start", "end"] }

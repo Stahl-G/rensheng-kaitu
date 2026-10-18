@@ -48,7 +48,7 @@ A 与 B 可并行，注意都会改 PRD §6、`agents-md.ts`、`index.ts`；B �
 
 ### C. iOS（`~/kaitu-ios`）——架构 §7
 
-v0.6.0（10-22 提交 TestFlight）：I1 KaituKitData（按 schema 的 Codable + 样例解码测试、`WorkspaceStore` iCloud / GitHub、缓存、离线队列、回执叠加）→ I2 size class 布局（窄屏 TabView、宽屏 NavigationSplitView、展开合上保留状态、MapKit 进度图）→ I3 今天 / 开图 → I4 记一下（文字、语音）→ I6 设置 → I7 发布（先 `xcrun simctl list devicetypes` 核对 iPhone Duo 模拟器）。I5 操作（完成下一步、确认日程）争取进 v0.6。
+v0.6.0（10-22 提交 TestFlight）：I1 KaituKitData（按 schema 的 Codable + 样例解码测试、`WorkspaceStore` iCloud / GitHub、缓存、离线队列、回执叠加）→ I2 size class 布局（窄屏 TabView、宽屏 NavigationSplitView、展开合上保留状态、MapKit 进度图）→ I3 今天 / 开图 → I4 记一下（文字、语音）→ I6 设置 → I7 发布（先 `xcrun simctl list devicetypes` 核对 iPhone Duo 模拟器）。I5 操作（完成下一步、确认日程）争取进 v0.6：确认日程由手机用 EventKit 写进「开图」日历再交 `decide_proposal`，电脑只记状态（已实现电脑端）。
 v0.6.1：I8 问问（`ChatProvider`，OpenAI 兼容、DeepSeek 默认，Key 存钥匙串，`ProProvider` 占位）、I9 App Intents 与小组件。
 I1 现在就能开始，不必等 A、B。
 

@@ -85,6 +85,7 @@ export interface OverviewBlock {
   end?: string;
   module?: string;
   ref?: string;
+  calendar?: "phone";
 }
 export interface OverviewNext {
   id: string;

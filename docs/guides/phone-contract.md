@@ -26,10 +26,19 @@
 - `.records.jsonl`：沿用记录入箱格式。手机文件的 `origin: user` 署名为 `by: user`，assistant 写为 agent。
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
-  执行 complete_next、complete_task、cancel_task。decide_proposal 返回 rejected，日程建议在电脑上确认。预留操作返回 rejected。
+  执行 complete_next、complete_task、cancel_task、decide_proposal。预留操作返回 rejected。
+  decide_proposal 只改今天的状态：确认的日程标 `calendar: phone`，由手机自己写进 Apple 日历，电脑不再写系统日历；
+  这条日程的时间也只能在 iPhone 上改。
 - 健康仍使用 `inbox/health/*.health.json`。照片不在本次实现范围内。
 
-执行前核对下一步仍为 todo、待办仍为 open。
+执行前核对下一步仍为 todo、待办仍为 open、日程建议仍待确认。
+
+### 手机确认日程
+
+1. 用户在手机上点「确认」，App 用 EventKit 把日程写进「开图」日历（需日历权限），提前 10 分钟提醒，
+   备注写 `开图记录：<日期>/<时间段 id>`，与电脑写入的格式一致。iCloud 会把它同步到电脑。
+2. 写完再交 `decide_proposal`（confirmed）。电脑把这条标为已确认、`calendar: phone`，推系统日历时跳过它。
+3. 没有日历权限时照样交操作，界面说明「没有日历权限，只记在开图里」。点「不要」交 rejected。
 
 ### 可信边界
 
@@ -37,8 +46,9 @@
 所以手机文件只拿到 Agent 的权限，origin 只决定署名，不是授权，核对当前状态也不等于认证来源。
 
 - 照常收：原文、普通记录，以及 Agent 本来就能做的操作（完成下一步、完成或取消待办）。
-- 不生效：只能由用户本人做的决定。确认阶段、写阶段回顾、启用方向按 Agent 权限校验，整份拒绝；
-  确认或拒绝日程建议返回 rejected。这些在电脑上确认。
+- 日程建议：确认或拒绝只改开图里的状态；写日历这一步只在手机上、由用户点按后发生。
+  伪造的文件最多改动开图里的一个状态，写不进用户的日历。
+- 不生效：只能由用户本人做的决定。确认阶段、写阶段回顾、启用方向按 Agent 权限校验，整份拒绝，在电脑上确认。
 - 未交付：手机可信确认通道。需要设备配对和签名之类的来源证明，本期不做，也不新增凭据或授权。
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
 操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重。

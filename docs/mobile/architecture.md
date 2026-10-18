@@ -75,7 +75,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 | op | args | 电脑执行 | 版本 |
 |---|---|---|---|
 | `complete_next` | `file`、`id` | `completeNext` | v0.6 |
-| `decide_proposal` | `id`、`decision`（confirmed / rejected） | `decideProposal` | v0.6 |
+| `decide_proposal` | `id`、`decision`（confirmed / rejected） | `decidePhoneProposal`：只改状态；确认的标 `calendar: phone`，日历由手机写入，电脑不再推系统日历 | v0.6 |
 | `complete_task` / `cancel_task` | `id` | `completeTask` / `cancelTask` | v0.6 |
 | `keep_draft` / `adopt_draft` | `source`（加核对后的草稿） | `keepOnboardingMatter` / `adoptOnboardingMatter` | v0.6.1 |
 | `answer_question` | `question_id`、`value` | 待定 | 预留 |
@@ -88,7 +88,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 - 电脑处理后写入 `phone/receipts.json`，每条是 `{client_id 或文件名, status, message, at}`，`status` 取 applied / duplicate / conflict / rejected。文件被移出 `inbox/agents/` 也表示已经处理。
 - 还没收到回执的操作，手机先在界面上显示成生效（划掉、标为已确认），并标「等电脑处理」。收到 conflict 或 rejected 时撤回，并说明原因。
 
-**可信边界：** 能写资料位置的 Agent 都能写收件箱，也能造出同名的手机文件，收件箱格式里没有签名或配对校验。手机文件只有 Agent 的权限，`origin` 只决定署名。只能由用户本人做的决定（确认阶段、启用方向、确认或拒绝日程建议）手机不生效，在电脑上确认。手机可信确认通道未交付，见[手机契约](../guides/phone-contract.md)。
+**可信边界：** 能写资料位置的 Agent 都能写收件箱，也能造出同名的手机文件，收件箱格式里没有签名或配对校验。手机文件只有 Agent 的权限，`origin` 只决定署名。只能由用户本人做的决定（确认阶段、启用方向）手机不生效，在电脑上确认。日程建议可以在手机上确认：写日历只在手机上由用户点按后发生，电脑只记状态，所以伪造的文件写不进日历。手机可信确认通道未交付，见[手机契约](../guides/phone-contract.md)。
 
 ## 5. 存储层（iOS）
 
@@ -137,7 +137,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
   - MapKit 画进度图，线型与电脑一致。
 - **I3 今天与开图页面：** 按 product §4.1–4.2 实现。
 - **I4 记一下：** 文字；语音（`SFSpeechRecognizer`，优先设备端识别）；可选标项目；照片（iCloud 方式）。
-- **I5 操作（争取 v0.6）：** 完成下一步、确认日程，乐观显示，按回执更新。
+- **I5 操作（争取 v0.6）：** 完成下一步；确认日程时先用 EventKit 写进「开图」日历（需日历权限，提前 10 分钟提醒，备注 `开图记录：<日期>/<时间段 id>`），再交 `decide_proposal`；没有权限时照样交操作并说明「只记在开图里」。乐观显示，按回执更新。
 - **I6 设置与首次使用：** 选存放位置、连接 GitHub、显示状态；保留健康设置；中英文。
 - **I7 发布：** 版本 0.6.0，普通 iPhone 和 iPhone Duo 模拟器截图，提交 TestFlight，写发布说明。动手前先用 `xcrun simctl list devicetypes` 核对 Xcode 里有没有对应的设备类型。
 - **I8（v0.6.1）问问：**

@@ -85,7 +85,8 @@
         "end": { "type": "string", "pattern": "^([01]\\d|2[0-4]):[0-5]\\d$" },
         "kind": { "enum": ["event", "proposal", "task"] },
         "module": { "type": "string" },
-        "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] }
+        "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] },
+        "calendar": { "enum": ["phone"], "description": "在 iPhone 上确认，日历事件由手机写入" }
       }
     },
     "goal": {
