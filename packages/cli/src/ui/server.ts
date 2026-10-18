@@ -195,7 +195,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let closed = false;
   let watchError = "";
   let polling: ReturnType<typeof setInterval> | undefined;
-  let stamps = workspaceFileStamps(ws);
+  let stamps = new Map<string, string>();
   holdOverview(ws);
   deferSnapshots(ws, (message) => {
     messages.push(message);
@@ -283,13 +283,16 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       messages.length ? (options.versionDelayMs ?? 2000) : (options.snapshotDelayMs ?? 30000),
     );
   }
-  for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
   const startPolling = () => {
     watcher?.close();
     if (polling) return;
     // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
+    stamps = workspaceFileStamps(ws);
+    // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
+    changedFile("工作区");
+    scheduleInbox();
     polling = setInterval(
       () => {
         try {
@@ -309,7 +312,6 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     watcher?.close();
     clearInterval(polling);
     polling = undefined;
-    stamps = workspaceFileStamps(ws);
     try {
       watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
@@ -753,6 +755,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;
+  // 历史盘点涉及 git 全量状态，监听已建立后放到后台，不挡住服务监听。
+  setImmediate(() => {
+    if (closed) return;
+    void exclusive(async () => {
+      for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
+    }).catch(reportError);
+  });
   const url = `http://127.0.0.1:${port}`;
   if (options.open !== false) {
     const command =
