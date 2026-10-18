@@ -31,8 +31,15 @@ it("财务提交只接收当前工作区上传目录的文件，拒绝任意本�
     rmSync(ws.resolve(preview.file, { internal: true }));
     symlinkSync(external, ws.resolve(preview.file, { internal: true }));
     await expect(productRequest(ws, "financeImportCommit", [preview.file, { account }])).rejects.toThrow();
+    rmSync(join(ws.root, preview.file));
+    const secretFile = ws.resolve(".kaitu/secrets.json", { internal: true });
+    const originalSecret = ws.readBytes(".kaitu/secrets.json");
+    ws.writeText(".kaitu/secrets.json", bytes, { internal: true, mode: 0o600 });
+    symlinkSync(secretFile, join(ws.root, preview.file));
+    await expect(productRequest(ws, "financeImportCommit", [preview.file, { account }])).rejects.toThrow();
     expect(readRecords(ws, "finance_holding_snapshot")).toHaveLength(0);
     rmSync(join(ws.root, preview.file));
+    ws.writeText(".kaitu/secrets.json", originalSecret, { internal: true, mode: 0o600 });
     ws.writeText(preview.file, original, { internal: true });
     await productRequest(ws, "financeImportCommit", [preview.file, { account }]);
     expect(readRecords(ws, "finance_holding_snapshot")).toHaveLength(1);

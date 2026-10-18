@@ -91,7 +91,16 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
       displayPath: join(root, ".kaitu/secrets.json"),
       targetKey: join(root, ".kaitu/secrets.json"),
     };
-    for (const method of ["readText", "writeText"]) {
+    for (const method of [
+      "readText",
+      "streamText",
+      "readBytes",
+      "readByteRange",
+      "watch",
+      "stat",
+      "writeText",
+      "editText",
+    ]) {
       await expect(files[method](target, "injected")).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
     }
     await expect(files.lstat(".kaitu/secrets.json")).rejects.toThrow();
@@ -157,6 +166,15 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
       else process.env.KAITU_APP_HOME = appHome;
     }
     expect(() => desktopPaths({ KAITU_DIR: root, KAITU_APP_HOME: join(root, "program") })).toThrow();
+    ws.writeText(
+      ".agents/skills/normal/SKILL.md",
+      "---\nname: normal\ndescription: synthetic\n---\nSynthetic skill",
+    );
+    symlinkSync(join(root, ".kaitu"), join(root, ".agents/skills/alias"));
+    expect(await files.readText(await files.resolve(".agents/skills/normal/SKILL.md"))).toContain(
+      "Synthetic skill",
+    );
+    await expect(files.resolve(".agents/skills/alias/secrets.json")).rejects.toThrow();
     const drive = join(temp, "drive");
     mkdirSync(drive);
     await enableDrive(reopened, { driveDir: drive });

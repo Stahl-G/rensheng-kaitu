@@ -143,7 +143,7 @@ test("native search sends protocol-specific requests and returns only structured
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   const root = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
   // @ts-expect-error Desktop adapters are native ESM.
-  const { selection } = await import("../sdk-providers.mjs");
+  const { validateConnection, selection, providerPatch } = await import("../sdk-providers.mjs");
   const cases = [
     {
       api: "anthropic-messages",
@@ -234,6 +234,10 @@ test("native search sends protocol-specific requests and returns only structured
               : "authorization"
         ],
       ).toBe(item.api.startsWith("openai") ? "Bearer fake-key" : "fake-key");
+      expect(providerPatch(settings)[0].config.providers["kaitu-custom"].api).toBe(item.api);
+      const validation = await validateConnection(settings, "fake-key");
+      expect(validation.configured).toBe(true);
+      expect(received.at(-1)?.url).toBe(item.path);
       response = { choices: [{ message: { content: source.url } }] };
       await expect(searchNative(settings, "fake-key", { query: "public query" })).rejects.toMatchObject({
         code: "AI_SEARCH_UNSUPPORTED",

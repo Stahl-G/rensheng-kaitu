@@ -25,6 +25,11 @@ it("头像只留本机，工作区迁到 Drive 后仍能读回同一张图", asy
     mkdirSync(drive);
     await enableDrive(ws, { driveDir: drive });
     expect(readAvatar(ws)).toBe(expected);
+    saveAvatar(ws, bytes);
+    expect(readdirSync(ws.root, { recursive: true }).some((p) => String(p).endsWith("avatar.jpg"))).toBe(
+      false,
+    );
+    expect(readAvatar(ws)).toBe(expected);
     removeAvatar(ws);
     expect(readAvatar(ws)).toBeNull();
   } finally {
