@@ -49,3 +49,5 @@ node packages/cli/dist/main.js init /tmp/kaitu-demo
 ## 许可证
 
 [MIT](LICENSE)。npm 包名规划为 `rensheng-kaitu`（命令行仍为 `kaitu`）。
+
+飞书资料导入（FEISHU-1，fakeCLI 合成原型）：[手动 folder → 原文用法与限制](docs/guides/feishu-folder-import.md)。

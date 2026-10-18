@@ -99,6 +99,7 @@ const HELP = `开图 kaitu
   kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
   kaitu drive disable [--to <目录>]                  搬回本机
   kaitu drive status                                查看同步状态
+  kaitu feishu import --dir <目录> --folder <token> --cli <绝对路径>  手动导入飞书 docx 原文（原型）
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
   kaitu phone run [--as <名字>] [--dry-run]           处理手机收件箱并生成快照，或只预览差异

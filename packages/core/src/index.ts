@@ -100,3 +100,5 @@ export * from "./phone-projections.js";
 export * from "./phone-snapshots.js";
 export * from "./phone-receipts.js";
 export * from "./organizer.js";
+
+export * from "./feishu-inbox.js";

@@ -30,6 +30,7 @@ export const NEVER_TRACK = [
   ".kaitu/inbox-state.json",
   ".kaitu/finance-notifications.json",
   ".kaitu/channels/",
+  ".kaitu/feishu/",
   "inbox/agents/",
   "inbox/health/",
   "inbox/rejected/",
@@ -56,6 +57,7 @@ phone/
 .kaitu/inbox-state.json
 .kaitu/finance-notifications.json
 .kaitu/channels/
+.kaitu/feishu/
 inbox/agents/
 inbox/health/
 inbox/processed/**/*.health*.json
