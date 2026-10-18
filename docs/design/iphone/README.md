@@ -1,4 +1,4 @@
-# 开图 iPhone 设计稿
+# 开图 iPhone 设计稿（含 v0.7 的 Mac 设置）
 
 更新：2026-10-18。产品规范见 [product.md](../../mobile/product.md)，v0.7 见 [agent-runner.md](../../mobile/agent-runner.md)。
 在线画布（可点、可切换状态）：https://claude.ai/artifact/QsZ4Rvn6jU16QfjRcoBvEX （只有仓库主人能打开）。本目录是同一份源文件。
@@ -21,6 +21,7 @@
 | `EmptyAgent.dc.html` | 390×844 | v0.7 空状态：在电脑上打开开图 / 让我的 Agent 来更新 | I13 |
 | `Source.dc.html` | 390×844 | v0.7 设置 › 更新来源：谁在更新、交给 Agent 的说明（拷贝） | I12 |
 | `StatusAgent.dc.html` | 390×844 | v0.7 同步状态：今天、这一周、开图各自由谁何时更新；「等 Dot 处理」与「等电脑处理」 | I10、I11、I14 |
+| `Mac.dc.html` | 1180×820 | v0.7 Mac：我的 › AI 与连接 › 云端整理员（整理员、交给 Agent 的说明、手机由谁更新、电脑不在时） | agent-runner §8 M1–M4 |
 
 ## 颜色与字号
 
