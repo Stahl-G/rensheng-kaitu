@@ -170,7 +170,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
   for (const p of data.projects)
     items.push({
       kind: "project",
-      title: p.title,
+      title: clip(p.title, 80),
       ...(p.next[0] ? { subtitle: clip(`下一步：${p.next[0]}`, 80) } : {}),
       date: null,
       path: p.file,
@@ -178,7 +178,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
   for (const g of data.plans.goals)
     items.push({
       kind: "me",
-      title: g.title,
+      title: clip(g.title, 80),
       subtitle: `记过 ${g.results} 次结果`,
       date: null,
       path: "me/goals.json",

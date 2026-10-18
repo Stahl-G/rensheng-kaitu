@@ -12,6 +12,7 @@ import {
   buildPhoneToday,
   buildPhoneWeek,
   calendarPushEntries,
+  createProject,
   editCalendarBlock,
   inboxNoteDone,
   lifeMap,
@@ -24,6 +25,7 @@ import {
   readRecords,
   schemas,
   snapshot,
+  upsertGoal,
   writePhoneSnapshots,
 } from "../src/index.js";
 import { ulid } from "../src/ulid.js";
@@ -36,6 +38,38 @@ import {
 import { freshWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
+it.each(["project", "goal"] as const)(
+  "81 字符 %s 标题写出的手机目录符合 schema 且保留原路径",
+  async (kind) => {
+    const ws = await freshWorkspace();
+    const title = `${"合成".repeat(40)}目`;
+    try {
+      let path: string;
+      let id: string | undefined;
+      if (kind === "project") {
+        const project = await createProject(ws, { title, kind: "work" });
+        path = `projects/${project.slug}/STATUS.md`;
+      } else {
+        id = upsertGoal(ws, title, "note", "2026-10-19").id;
+        path = "me/goals.json";
+      }
+      await writePhoneSnapshots(ws, new Date("2026-10-19T08:00:00Z"), { force: true });
+      const library = ws.readJson<{ items: { title: string; path: string; id?: string }[] }>(
+        "phone/library.json",
+      );
+      const validate = schemas().builtin("phone-library.schema.json");
+      expect(validate(library), JSON.stringify(validate.errors)).toBe(true);
+      const item = library.items.find((entry) => entry.path === path && entry.id === id);
+      expect(item).toBeDefined();
+      expect(item?.title).not.toBe(title);
+      expect(ws.readText(item?.path as string)).toContain(title);
+    } finally {
+      rmSync(join(ws.root, ".."), { recursive: true, force: true });
+    }
+  },
+);
+
 function remoteMock() {
   let files: BackupFiles = {};
   const remote: BackupRemote = {

@@ -56,3 +56,15 @@
 日志 `/tmp/NIGHT-CORR-B-{core,typecheck,biome,cli-build,vitest,metadata,before,after,thin-before,thin-after}.log`。
 详细规模/访问证据 `/tmp/NIGHT-CORR-B-{before,after}/observed.json`，
 薄入口证据 `/tmp/NIGHT-CORR-B-thin-{before,after}-probe/observed.json`。
+
+## C：项目与目标长标题输出
+
+- 仅 `phone-projections.ts` 两处 title 沿用当前 clip(..., 80)，不改 schema 或源资料。
+- 两个独立行为案例：生产 createProject、upsertGoal 分别接受 81 字符标题，
+  实际 writePhoneSnapshots(force=true) 写出的 library 通过现有 schema。
+  项目相对 STATUS 路径、目标 goals 路径及 id 仍可定位，原文件完整标题保留。
+- core build → npm typecheck → Biome → 相关 Vitest 2 文件 / 16 测试通过。
+  初步格式检查的模板字符串/缩进问题已修正，最终完整检查链全绿后提交。
+- 日志 `/tmp/NIGHT-CORR-C-{core,typecheck,biome,vitest}.log`。
+
+最终全套结果及现存 GUI、性能、iOS 限制同步到 PR31 说明与 `../NIGHT_CORRECTIONS_FINAL.md`、`../NIGHT_STATUS.md`。
