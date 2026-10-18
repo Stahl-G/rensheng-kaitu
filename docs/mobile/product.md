@@ -79,7 +79,7 @@ iOS 工程在独立仓库 `kaitu-ios`（SwiftUI，现为 v0.5 健康采集器）
 
 ### 4.5 问问（v0.6.1）
 
-设计稿：`docs/design/iphone/Ask.dc.html`。回答下面列出读了哪些资料；建议用卡片给出，「放进待确认」只交待确认建议，不替用户确认。
+设计稿：`docs/design/iphone/Ask.dc.html`；实现方案和选型见 [ask.md](ask.md)，任务拆分见 [tasks/](tasks/)。回答下面列出读了哪些资料；建议用卡片给出，「放进待确认」只交待确认建议，不替用户确认。
 
 - 用户自己的 AI 服务 Key：DeepSeek 默认，先支持 OpenAI 兼容的服务（DeepSeek、Kimi、智谱、OpenAI），之后加 Claude、Gemini。费用由用户的 AI 服务收取；Key 只存手机钥匙串，不同步。
 - 能读：快照和资料文件，与电脑上的问问相同，读不到 Key 和凭据。能写：只能按手机的写入方式交原文、记录和待确认建议；不能替用户采纳或确认。
