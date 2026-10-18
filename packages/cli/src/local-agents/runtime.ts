@@ -164,13 +164,17 @@ export async function createAgentRuntime(options: {
       state.fresh = method === "session/new";
       if (!state.upstream) throw new Error("no session ID");
       const choices = sessionModels(result);
-      if (options.model && choices.current !== options.model)
-        await state.rpc.request(
+      if (options.model && choices.current !== options.model) {
+        const changed = await state.rpc.request(
           choices.configId ? "session/set_config_option" : "session/set_model",
           choices.configId
             ? { sessionId: state.upstream, configId: choices.configId, value: options.model }
             : { sessionId: state.upstream, modelId: options.model },
         );
+        // 有的 agent 收下不存在的模型也不报错，回复时才拒绝；这里先核对。
+        if (choices.configId && sessionModels(changed).current !== options.model)
+          throw new Error("model unavailable");
+      }
       sessions[id] = state.upstream;
       writeFileSync(`${file}.tmp`, JSON.stringify(sessions), { mode: 0o600 });
       renameSync(`${file}.tmp`, file);
@@ -209,6 +213,11 @@ export async function createAgentRuntime(options: {
       if (method !== "session/prompt" || !id || closed)
         throw new KaituError("不支持此 Agent 请求", "AI_CONNECTION");
       const content = params.contentBlocks as { type: string; text?: string }[];
+      // 这个 agent 没见过这段对话（中途换过来的）：不续接旧会话，记录已经在提示词里。
+      if (params.fresh && sessions[id]) {
+        await cancel(id);
+        delete sessions[id];
+      }
       let state = running.get(id);
       if (state?.busy) throw new KaituError(`${agent.name} 正忙`, "AI_CONNECTION");
       try {
@@ -218,7 +227,7 @@ export async function createAgentRuntime(options: {
         state.messageId = `${agent.id}-${++seq}`;
         event(id, "user/message", { content, source: { kind: "user" } });
         const text = content.map((item) => item.text ?? "").join("\n");
-        await state.rpc.request(
+        const done = await state.rpc.request(
           "session/prompt",
           {
             sessionId: state.upstream,
@@ -227,6 +236,11 @@ export async function createAgentRuntime(options: {
           30 * 60 * 1000,
         );
         state.fresh = false;
+        if (done.stopReason === "refusal")
+          throw new KaituError(
+            `${agent.name} 拒绝了这次请求，可能是所选模型不可用，换个模型再试`,
+            "AI_CONNECTION",
+          );
         return {};
       } catch (error) {
         if (!state?.cancelled && !closed && error !== cancelledError) {

@@ -1,5 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { KaituError, type NetworkSearchSettings } from "@kaitu/core";
 
@@ -20,6 +28,10 @@ export type AskMode = "scoped" | "full";
 export interface AskThread {
   mode?: AskMode;
   backend?: string;
+  /** 每个 AI 连接看过的事件数；换回来时只补它没看过的部分。 */
+  seen?: Record<string, number>;
+  pinned?: boolean;
+  archived?: boolean;
   workspace?: string;
   id: string;
   title: string;
@@ -41,6 +53,8 @@ export interface AskService {
   background(): AskService;
   list(): AskThread[];
   create(): AskThread;
+  organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
+  remove(id: string): void;
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
   send(id: string, text: string, images?: AskAttachment[]): Promise<unknown>;
@@ -63,6 +77,24 @@ export interface AskService {
   prepareRelocation(): Promise<void>;
   relocate(workspace: string): void;
   close(): Promise<void>;
+}
+/** 换 AI 时交给新 AI 的文字记录，只取最近三万字。 */
+function transcript(rows: AskEvent[]) {
+  return rows
+    .flatMap((row) => {
+      if (row.type !== "user/message" && row.type !== "assistant/message") return [];
+      const blocks = (
+        row.type === "user/message" ? row.data.content : (row.data.message as { content?: unknown })?.content
+      ) as { type: string; text?: string }[] | undefined;
+      const text = blocks
+        ?.filter((block) => block.type === "text")
+        .map((block) => block.text)
+        .join("\n")
+        .trim();
+      return text ? [`${row.type === "user/message" ? "用户" : "AI"}：${text}`] : [];
+    })
+    .join("\n\n")
+    .slice(-30000);
 }
 const visible = new Set<AskEventType>([
   "user/message",
@@ -97,6 +129,8 @@ export function createAskService(options: {
   const threads: AskThread[] =
     !options.transient && existsSync(index) ? JSON.parse(readFileSync(index, "utf8")) : [];
   const temporaryEvents = new Map<string, AskEvent[]>();
+  // 换了 AI 时提示词里带着之前的记录；对话里只显示用户原话。
+  const echoes = new Map<string, unknown>();
   const backgrounds = new Set<AskService>();
   const listeners = new Map<string, Set<(event: AskEvent) => void>>();
   const busy = new Set<string>();
@@ -229,6 +263,10 @@ export function createAskService(options: {
               return;
             if (events(id).some((row) => row.data.sdkSeq === event.seq)) return;
             const { stream: _stream, ...data } = event.data;
+            if (event.type === "user/message" && echoes.has(id)) {
+              data.content = echoes.get(id);
+              echoes.delete(id);
+            }
             append(id, event.type, { ...data, sdkSeq: event.seq });
           }
         });
@@ -266,6 +304,27 @@ export function createAskService(options: {
       return service;
     },
     list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
+    organize(id, change) {
+      const row = thread(id);
+      if (typeof change.title === "string" && change.title.trim())
+        row.title = change.title.trim().slice(0, 80);
+      if (typeof change.pinned === "boolean") row.pinned = change.pinned || undefined;
+      if (typeof change.archived === "boolean") row.archived = change.archived || undefined;
+      saveIndex();
+      return row;
+    },
+    remove(id) {
+      thread(id);
+      if (busy.has(id)) throw new KaituError("请等这次回复完成", "AI_CONNECTION");
+      threads.splice(
+        threads.findIndex((row) => row.id === id),
+        1,
+      );
+      saveIndex();
+      listeners.delete(id);
+      if (options.transient) temporaryEvents.delete(id);
+      else rmSync(join(directory, `${id}.jsonl`), { force: true });
+    },
     create() {
       ready();
       const now = new Date().toISOString();
@@ -302,8 +361,6 @@ export function createAskService(options: {
       if (epoch !== generation) throw new KaituError("AI 连接已改变，请重新发送", "AI_CONNECTION");
       const backend = connection.backend ?? "dsh";
       const previousBackend = row.backend ?? (events(id).length ? "dsh" : undefined);
-      if (previousBackend && previousBackend !== backend)
-        throw new KaituError("AI 连接已改变，请新建对话；原对话记录仍可查看", "AI_CONNECTION");
       const mode = row.mode ?? "scoped";
       if (connection.fullOnly && mode !== "full")
         throw new KaituError("本机 Agent 需要完整权限，请在对话权限中开启", "AI_CONNECTION");
@@ -326,24 +383,44 @@ export function createAskService(options: {
       )
         throw new KaituError("当前连接未启用图片，请切换模型后重试", "AI_IMAGE");
       ready();
+      const blocks = [
+        { type: "text", text: text.trim() },
+        ...images.map((file) => ({
+          ...file,
+          type: "kind" in file && file.kind === "file" ? "file" : "image",
+        })),
+      ];
+      let history = "";
+      let fresh = false;
+      if (previousBackend && previousBackend !== backend) {
+        const all = events(id);
+        row.seen = { ...row.seen, [previousBackend]: all.length };
+        fresh = row.seen[backend] === undefined;
+        history = transcript(all.slice(row.seen[backend] ?? 0));
+      }
       row.backend = backend;
       saveIndex();
       busy.add(id);
       append(id, "session.status", { status: "running" });
       try {
         const client = await start(mode);
+        if (history) echoes.set(id, blocks);
         return await client.request("session/prompt", {
           sessionId: id,
-          contentBlocks: [
-            { type: "text", text: text.trim() },
-            ...images.map((file) => ({
-              ...file,
-              type: "kind" in file && file.kind === "file" ? "file" : "image",
-            })),
-          ],
+          fresh,
+          contentBlocks: history
+            ? [
+                {
+                  type: "text",
+                  text: `（这段对话中途换了 AI。下面是你还没看到的对话记录，接着回答最后的问题，不用复述）\n\n${history}\n\n用户：${text.trim()}`,
+                },
+                ...blocks.slice(1),
+              ]
+            : blocks,
         });
       } catch (error) {
         busy.delete(id);
+        echoes.delete(id);
         if (error instanceof KaituError) {
           append(id, "session.status", { status: "idle", error: error.message });
           throw error;

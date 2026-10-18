@@ -16,6 +16,8 @@ interface Thread {
   created: string;
   updated: string;
   workspace?: string;
+  pinned?: boolean;
+  archived?: boolean;
 }
 interface ChatEvent {
   id: number;
@@ -170,6 +172,7 @@ export function AskPage({
   const [cliPath, setCliPath] = useState("");
   const [agentId, setAgentId] = useState("codebuddy");
   const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
+  const [modelQuery, setModelQuery] = useState("");
   const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -198,6 +201,12 @@ export function AskPage({
     setModelMenu(false);
   };
   const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
+  const modeLabel =
+    mode === "full"
+      ? "完整 Agent"
+      : settings?.fullOnly
+        ? t("完整 Agent 未开启", "Full Agent off")
+        : "开图资料";
 
   const [choice, setChoice] = useState<"builtin" | "local">("local");
   const [key, setKey] = useState("");
@@ -255,11 +264,17 @@ export function AskPage({
     setAtQuery(undefined);
     input.current?.focus();
   };
+  const [threadMenu, setThreadMenu] = useState<{ id: string; confirm?: boolean } | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const groups = new Map<string, Thread[]>();
-  for (const thread of threads) {
+  for (const thread of threads.filter((row) => row.pinned && !row.archived))
+    groups.set("置顶", [...(groups.get("置顶") ?? []), thread]);
+  for (const thread of threads.filter((row) => !row.pinned && !row.archived)) {
     const label = day(thread.updated);
     groups.set(label, [...(groups.get(label) ?? []), thread]);
   }
+  const archived = threads.filter((row) => row.archived);
   useLayoutEffect(() => {
     if (!input.current) return;
     input.current.style.height = draft ? "auto" : "48px";
@@ -281,6 +296,103 @@ export function AskPage({
     };
   }, []);
   const refreshThreads = useCallback(() => call<Thread[]>("askList").then(setThreads), []);
+  const organize = (id: string, change: Partial<Pick<Thread, "title" | "pinned" | "archived">>) => {
+    setThreadMenu(null);
+    setRenaming(null);
+    void call("askOrganize", id, change)
+      .then(refreshThreads)
+      .catch((err) => setError(err.message));
+  };
+  const removeThread = (id: string) => {
+    setThreadMenu(null);
+    void call("askRemove", id)
+      .then(() => {
+        if (selected === id) selectThread(null);
+        return refreshThreads();
+      })
+      .catch((err) => setError(err.message));
+  };
+  const threadRow = (thread: Thread) => (
+    <div key={thread.id} className={css.threadRow}>
+      {renaming?.id === thread.id ? (
+        <input
+          className={css.rename}
+          value={renaming.title}
+          // biome-ignore lint/a11y/noAutofocus: 点了重命名就是要输入。
+          autoFocus
+          onChange={(event) => setRenaming({ id: thread.id, title: event.target.value })}
+          onBlur={() => organize(thread.id, { title: renaming.title })}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") organize(thread.id, { title: renaming.title });
+            if (event.key === "Escape") setRenaming(null);
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          aria-current={thread.id === selected ? "true" : undefined}
+          onClick={() => {
+            selectThread(thread.id);
+            setError("");
+          }}
+        >
+          {thread.title}
+        </button>
+      )}
+      <button
+        type="button"
+        className={css.threadMore}
+        aria-label={t("更多", "More")}
+        aria-expanded={threadMenu?.id === thread.id}
+        onClick={() => setThreadMenu(threadMenu?.id === thread.id ? null : { id: thread.id })}
+      >
+        ⋯
+      </button>
+      {threadMenu?.id === thread.id && (
+        <div className={css.threadMenu} role="menu">
+          {threadMenu.confirm ? (
+            <button type="button" role="menuitem" onClick={() => removeThread(thread.id)}>
+              {t("确认删除", "Confirm delete")}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => organize(thread.id, { pinned: !thread.pinned })}
+              >
+                {thread.pinned ? t("取消置顶", "Unpin") : t("置顶", "Pin")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setThreadMenu(null);
+                  setRenaming({ id: thread.id, title: thread.title });
+                }}
+              >
+                {t("重命名", "Rename")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => organize(thread.id, { archived: !thread.archived })}
+              >
+                {thread.archived ? t("取消归档", "Unarchive") : t("归档", "Archive")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => setThreadMenu({ id: thread.id, confirm: true })}
+              >
+                {t("删除", "Delete")}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
   useEffect(() => {
     let active = true;
     void Promise.all([
@@ -367,6 +479,10 @@ export function AskPage({
       draft.trim() ||
       (attachments.length ? "请看看这些附件" : sessionReferences.length ? "参考这些对话帮我继续" : "");
     if (!value || busy || readingFiles || !settings?.configured) return;
+    if (settings.fullOnly && mode !== "full") {
+      setModeMenu("confirm");
+      return;
+    }
     setError("");
     setSending(true);
     try {
@@ -548,6 +664,7 @@ export function AskPage({
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
     if (modelMenu || !agent) return;
     setAgentModels(null);
+    setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
       .then(setAgentModels)
       .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
@@ -623,21 +740,21 @@ export function AskPage({
         {[...groups].map(([label, rows]) => (
           <Fragment key={label}>
             <h2>{label}</h2>
-            {rows.map((thread) => (
-              <button
-                type="button"
-                key={thread.id}
-                aria-current={thread.id === selected ? "true" : undefined}
-                onClick={() => {
-                  selectThread(thread.id);
-                  setError("");
-                }}
-              >
-                {thread.title}
-              </button>
-            ))}
+            {rows.map(threadRow)}
           </Fragment>
         ))}
+        {!!archived.length && (
+          <>
+            <button
+              type="button"
+              className={css.archivedToggle}
+              onClick={() => setShowArchived(!showArchived)}
+            >
+              {t("已归档", "Archived")} {archived.length} {showArchived ? "⌃" : "⌄"}
+            </button>
+            {showArchived && archived.map(threadRow)}
+          </>
+        )}
       </nav>
       <section className={css.conversation} aria-label="问问开图">
         <div className={css.mobileNew}>
@@ -1000,14 +1117,11 @@ export function AskPage({
                 aria-expanded={modeMenu !== null}
                 onClick={() => {
                   setModelMenu(false);
-                  setModeMenu(modeMenu ? null : "select");
+                  // 本机 Agent 只有完整模式，没开就直接问要不要开。
+                  setModeMenu(modeMenu ? null : settings?.fullOnly && mode !== "full" ? "confirm" : "select");
                 }}
               >
-                {mode === "full"
-                  ? "完整 Agent"
-                  : settings?.fullOnly
-                    ? t("启用完整 Agent", "Enable full Agent")
-                    : "开图资料"}
+                {modeLabel}
                 <span aria-hidden="true">⌄</span>
               </button>
               {modeMenu && (
@@ -1060,8 +1174,8 @@ export function AskPage({
                         <span>
                           {settings?.choice === "local"
                             ? t(
-                                "使用本机 CodeBuddy 的完整能力与原生权限。",
-                                "Uses local CodeBuddy capabilities and native permissions.",
+                                `使用本机 ${settings.providerName} 的完整能力与原生权限。`,
+                                `Uses local ${settings.providerName} capabilities and native permissions.`,
                               )
                             : "开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。"}
                         </span>
@@ -1098,18 +1212,37 @@ export function AskPage({
                     ) : !agentModels.length ? (
                       <span className={css.model}>{settings.model}</span>
                     ) : (
-                      agentModels.map((item) => (
-                        <button
-                          type="button"
-                          key={item.id}
-                          className={css.model}
-                          aria-pressed={settings.model === item.id}
-                          disabled={busy || saving}
-                          onClick={() => void switchModel(settings.provider, item.id)}
-                        >
-                          {item.name ?? item.id}
-                        </button>
-                      ))
+                      <>
+                        {agentModels.length > 8 && (
+                          <input
+                            className={css.modelSearch}
+                            type="search"
+                            value={modelQuery}
+                            onChange={(event) => setModelQuery(event.target.value)}
+                            placeholder={t("搜索模型…", "Search models…")}
+                            // biome-ignore lint/a11y/noAutofocus: 打开菜单就是为了挑模型。
+                            autoFocus
+                          />
+                        )}
+                        {agentModels
+                          .filter((item) =>
+                            `${item.id} ${item.name ?? ""}`
+                              .toLowerCase()
+                              .includes(modelQuery.trim().toLowerCase()),
+                          )
+                          .map((item) => (
+                            <button
+                              type="button"
+                              key={item.id}
+                              className={css.model}
+                              aria-pressed={settings.model === item.id}
+                              disabled={busy || saving}
+                              onClick={() => void switchModel(settings.provider, item.id)}
+                            >
+                              {item.name ?? item.id}
+                            </button>
+                          ))}
+                      </>
                     ))}
                   {settings?.choice !== "local" &&
                     settings?.saved?.flatMap((row) =>
@@ -1170,7 +1303,7 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `${settings.providerName} · ${mode === "full" ? "完整 Agent" : settings?.fullOnly ? t("启用完整 Agent", "Enable full Agent") : "开图资料"}`
+            ? `${settings.providerName} · ${modeLabel}`
             : "Enter 发送 · Shift + Enter 换行"}
         </p>
       </section>
@@ -1232,7 +1365,7 @@ export function AskPage({
             {choice === "local" && (
               <div className={css.fields}>
                 {!!settings?.localAgents?.length && (
-                  <label>
+                  <label className={css.key}>
                     Agent
                     <select
                       value={agentId}
@@ -1249,7 +1382,7 @@ export function AskPage({
                     </select>
                   </label>
                 )}
-                <label>
+                <label className={css.key}>
                   {t("CLI 路径（可选，留空自动检测）", "CLI path (optional; auto-detect when empty)")}
                   <input
                     value={cliPath}
