@@ -62,7 +62,8 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
     workspaceKey,
     runtime: (mode) => connection.runtime(mode),
     settings: () => connection.settings(),
-    models: (input) => currentSdk().models(input),
+    // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
+    models: (input) => connection.models(input),
     configure: (input) => connection.configure(input),
     support: (method, input) => connection.support(method, input),
     dispose: () => sdk.closeSupport(),

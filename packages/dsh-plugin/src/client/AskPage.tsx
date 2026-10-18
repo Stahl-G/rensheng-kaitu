@@ -89,30 +89,45 @@ function day(value: string) {
   today.setDate(today.getDate() - 1);
   return date.toDateString() === today.toDateString() ? "昨天" : date.toLocaleDateString("zh-CN");
 }
+function inline(text: string) {
+  return text
+    .split(/(\*\*[^*]+\*\*)/g)
+    .map((piece) => (piece.startsWith("**") ? <strong key={piece}>{piece.slice(2, -2)}</strong> : piece));
+}
 function Body({ content }: { content: string }) {
-  // Render text as React nodes; model output never enters HTML.
+  // 按空行分段；标题只吃自己那一行，避免「## 标题\n- 列表」整段变成巨大的 h3。
   return (
     <>
       {content.split(/\n\n+/).map((part, index) => {
         const lines = part.split("\n");
+        const heading = /^(#{1,3}) (.+)$/.exec(lines[0] ?? "");
+        if (heading) {
+          const rest = lines.slice(1);
+          return (
+            <Fragment key={`${index}:${part}`}>
+              <h3>{inline(heading[2] ?? "")}</h3>
+              {rest.length > 0 &&
+                (rest.every((line) => /^[-*] /.test(line)) ? (
+                  <ul>
+                    {rest.map((line, i) => (
+                      <li key={`${i}:${line}`}>{inline(line.slice(2))}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{inline(rest.join("\n"))}</p>
+                ))}
+            </Fragment>
+          );
+        }
         if (lines.every((line) => /^[-*] /.test(line)))
           return (
             <ul key={`${index}:${part}`}>
               {lines.map((line, i) => (
-                <li key={`${i}:${line}`}>{line.slice(2)}</li>
+                <li key={`${i}:${line}`}>{inline(line.slice(2))}</li>
               ))}
             </ul>
           );
-        if (/^#{1,3} /.test(part)) return <h3 key={`${index}:${part}`}>{part.replace(/^#{1,3} /, "")}</h3>;
-        return (
-          <p key={`${index}:${part}`}>
-            {part
-              .split(/(\*\*[^*]+\*\*)/g)
-              .map((piece, i) =>
-                piece.startsWith("**") ? <strong key={`${i}:${piece}`}>{piece.slice(2, -2)}</strong> : piece,
-              )}
-          </p>
-        );
+        return <p key={`${index}:${part}`}>{inline(part)}</p>;
       })}
     </>
   );
@@ -200,7 +215,8 @@ export function AskPage({
     setModeMenu(null);
     setModelMenu(false);
   };
-  const mode = threads.find((thread) => thread.id === selected)?.mode ?? "scoped";
+  const [pendingMode, setPendingMode] = useState<AskMode | null>(null);
+  const mode = threads.find((thread) => thread.id === selected)?.mode ?? pendingMode ?? "scoped";
   const modeLabel =
     mode === "full"
       ? "完整 Agent"
@@ -295,7 +311,14 @@ export function AskPage({
       active = false;
     };
   }, []);
-  const refreshThreads = useCallback(() => call<Thread[]>("askList").then(setThreads), []);
+  const refreshThreads = useCallback(
+    () =>
+      call<Thread[]>("askList").then((list) => {
+        setThreads(list);
+        setSelected((id) => (id && !list.some((row) => row.id === id) ? null : id));
+      }),
+    [],
+  );
   const organize = (id: string, change: Partial<Pick<Thread, "title" | "pinned" | "archived">>) => {
     setThreadMenu(null);
     setRenaming(null);
@@ -483,6 +506,15 @@ export function AskPage({
       setModeMenu("confirm");
       return;
     }
+    // askSend 要等整轮回复；输入框一点发送就清掉，失败再还原（若用户已另写则不覆盖）。
+    const pendingText = value;
+    const pendingAttachments = attachments;
+    const pendingReferences = sessionReferences;
+    const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
+    const modeForThread = pendingMode;
+    setDraft("");
+    setAttachments([]);
+    setSessionReferences([]);
     setError("");
     setSending(true);
     try {
@@ -492,21 +524,18 @@ export function AskPage({
         id = thread.id;
         activeSession.current = id;
         selectThread(id);
+        if (modeForThread) {
+          await call("askSetMode", id, modeForThread, modeForThread === "full");
+          setPendingMode(null);
+        }
         await refreshThreads();
       }
-      await call(
-        "askSend",
-        id,
-        [value, ...sessionReferences.map((reference) => reference.mention)].join("\n"),
-        attachments,
-      );
-      if (activeSession.current === id) {
-        setDraft("");
-        setAttachments([]);
-        setSessionReferences([]);
-      }
+      await call("askSend", id, payload, pendingAttachments);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setDraft((current) => (current.trim() ? current : pendingText));
+      setAttachments((current) => (current.length ? current : pendingAttachments));
+      setSessionReferences((current) => (current.length ? current : pendingReferences));
     } finally {
       setSending(false);
     }
@@ -572,13 +601,13 @@ export function AskPage({
     setModeSaving(true);
     setError("");
     try {
-      let id = selected;
-      if (!id) {
-        const thread = await call<Thread>("askCreate");
-        id = thread.id;
-        selectThread(id);
+      if (!selected) {
+        // 还没开对话时不建空「新对话」；下一条发出时再带上权限。
+        setPendingMode(value);
+        setModeMenu(null);
+        return;
       }
-      await call("askSetMode", id, value, value === "full");
+      await call("askSetMode", selected, value, value === "full");
       await refreshThreads();
       setModeMenu(null);
     } catch (err) {
@@ -646,7 +675,7 @@ export function AskPage({
       });
       setKey("");
       setSettings(ai);
-      selectThread(null);
+      // 换 AI 留在当前对话；后端会把对方没看过的记录带进提示词。
       setAuth(ai.auth ?? "key");
       if (!ai.supportsImages) setAttachments([]);
       setSessionReferences([]);
