@@ -1,4 +1,4 @@
-/* 开图顶上的人生进度图。底图配色与足迹一致；线型：实线已经走过，虚线计划或在试，点线还没探索。 */
+/* 开图「全景」里的人生进度图。底图配色与足迹一致；线型：实线已经走过，虚线计划或在试，点线还没探索。 */
 .card {
   --atlas-water: #cfdee3;
   --atlas-land: #f4f5ef;
@@ -25,24 +25,15 @@ body[data-ds-dark-theme] .card,
   --pm-ink: #ecebe8;
   --pm-plan: #8faed6;
 }
-.head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.empty {
+  margin: 0;
+  color: var(--muted);
 }
-.head h2 {
+.card h2 {
   margin: 0;
   font-size: 16px;
   line-height: 24px;
   font-weight: 600;
-}
-.toggle {
-  border: 0;
-  background: transparent;
-  color: var(--link);
-  font-size: 14px;
-  padding: 4px 0;
 }
 .sub {
   margin: 6px 0 0;
@@ -53,7 +44,7 @@ body[data-ds-dark-theme] .card,
 }
 .map {
   position: relative;
-  height: 200px;
+  height: 360px;
   border-radius: 12px;
   overflow: hidden;
   background: var(--atlas-land);
@@ -140,8 +131,7 @@ body[data-ds-dark-theme] .card,
   background: var(--sunken);
 }
 .row:focus-visible,
-.mapLink:focus-visible,
-.toggle:focus-visible {
+.mapLink:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
 }
