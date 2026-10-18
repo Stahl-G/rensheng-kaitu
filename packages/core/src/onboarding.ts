@@ -964,8 +964,11 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const live = adopted
     .filter((task) => task.status !== "cancelled")
     .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts) || b.id.localeCompare(a.id));
-  // 「现在最该做的一件事」优先给还没做完的；都做完了才显示最近完成的那一步和结果。
-  const latest = live.find((task) => task.status === "open") ?? live[0];
+  // 「现在最该做的一件事」优先给还没做完的；都做完了，只在完成当天显示刚完成的那一步和结果。
+  const today = localDate(new Date(), ws.timeZone());
+  const latest =
+    live.find((task) => task.status === "open") ??
+    live.find((task) => noteLine(task.notes ?? "", "完成时间").startsWith(today));
   const items = [
     {
       id: "storage",

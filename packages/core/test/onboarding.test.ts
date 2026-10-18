@@ -315,6 +315,11 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
       due: "2026-12-01",
     });
     await expect(changeOnboardingNext(ws, next.id, next.rev, "complete", "重试")).rejects.toThrow();
+    // 做完的那一步只在当天留在今天顶上，第二天就不再显示。
+    expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next?.status).toBe("done");
+    vi.setSystemTime(Date.now() + 2 * 24 * 3600 * 1000);
+    expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next).toBeNull();
+    vi.useRealTimers();
     expect(
       onboardingStatus(ws, { stateRoot: join(root, "state") }).checklist.items.find(
         (item) => item.id === "matter",
