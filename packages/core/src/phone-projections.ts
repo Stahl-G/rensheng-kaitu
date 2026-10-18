@@ -1,4 +1,3 @@
-import { frontmatterBody } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
@@ -211,10 +210,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
     // 日期取所在的日期目录；frontmatter 里的 date 可能不是字符串。
     const date = n.path.match(/\/(\d{4}-\d{2}-\d{2})\//)?.[1];
     if (!date || date < since) continue;
-    const line = frontmatterBody(n.content)
-      .split("\n")
-      .find((l) => l.trim());
-    items.push({ kind: "note", title: clip(line?.trim() ?? "（空）", 40), date, path: n.path });
+    items.push({ kind: "note", title: clip(n.firstLine, 40), date, path: n.path });
   }
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return { ...envelope("library", generatedAt), items };
