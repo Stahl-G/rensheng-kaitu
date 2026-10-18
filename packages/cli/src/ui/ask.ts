@@ -303,7 +303,24 @@ export function createAskService(options: {
       };
       return service;
     },
-    list: () => [...threads].sort((a, b) => b.updated.localeCompare(a.updated)),
+    list() {
+      ready();
+      // 清掉从没说过话的空「新对话」，避免换 AI / 开权限时侧栏被占满。
+      for (const row of [...threads]) {
+        if (row.title !== "新对话" || row.pinned || row.archived || busy.has(row.id)) continue;
+        if (events(row.id).some((item) => item.type === "user/message" || item.type === "assistant/message"))
+          continue;
+        threads.splice(
+          threads.findIndex((item) => item.id === row.id),
+          1,
+        );
+        listeners.delete(row.id);
+        if (options.transient) temporaryEvents.delete(row.id);
+        else rmSync(join(directory, `${row.id}.jsonl`), { force: true });
+      }
+      saveIndex();
+      return [...threads].sort((a, b) => b.updated.localeCompare(a.updated));
+    },
     organize(id, change) {
       const row = thread(id);
       if (typeof change.title === "string" && change.title.trim())
