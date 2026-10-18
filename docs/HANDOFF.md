@@ -2,7 +2,7 @@
 
 ## CodeBuddy ACP 本地开发（2026-10-18）
 
-独立分支 `codex/codebuddy-acp` 接续 `origin/wip/local-agents` 的 snapshot，本轮只开放 CodeBuddy，保留现有 DeepSeek 入口。仅完整 Agent 模式，用户已有 CLI 登录；未实现反向 `kaitu acp` 服务端。Mac 已通过三次合成模型任务及会话保存、恢复、取消；打包 MCP helper 的合成待办写回通过。Windows 与原生 App 打包仍待验收，无发布。详见 [验收与交接](acceptance/codebuddy-acp-2026-10-18/README.md)。
+独立分支 `codex/codebuddy-acp` 接续 `origin/wip/local-agents` 的 snapshot，本轮只开放 CodeBuddy，保留现有 DeepSeek 入口。仅完整 Agent 模式，用户已有 CLI 登录；未实现反向 `kaitu acp` 服务端。Mac 已通过三次合成模型任务及会话保存、恢复、取消；打包 MCP helper 的合成待办写回通过。独立 Mac App 已通过签名、启动与模拟 ACP 接口验收；受控终止后子进程/端口退出通过，原生 GUI 退出菜单与 Windows 仍待验收。已有草稿 PR #16，未合并、未发布。详见 [验收与交接](acceptance/codebuddy-acp-2026-10-18/README.md)。
 
 ## 当前产品裁决（2026-10-16）
 

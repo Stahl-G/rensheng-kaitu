@@ -1,0 +1,11 @@
+{
+  "packagedApp": true,
+  "deepseekPreserved": true,
+  "realCliDetected": true,
+  "mockFlow": true,
+  "streamed": true,
+  "cancelled": true,
+  "resumed": true,
+  "saved": true,
+  "backendBlocked": true
+}
