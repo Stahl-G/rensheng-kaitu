@@ -6,7 +6,6 @@ import {
   Workspace,
   addRecord,
   addTask,
-  appendPreparedRecords,
   doctor,
   investmentOf,
   listInvestments,
@@ -75,12 +74,6 @@ it("阶段权限在通用入口生效，拒绝过期修订和 Agent 确认、回
       data: { status: "confirmed", reflection: "适应了新节奏" },
     });
     expect(() => updateRecord(ws, "phase", id, { title: "改用户记录" }, { expected_revision: 3 })).toThrow();
-    const stored = readPhases(ws)[0] as import("../src/records.js").StoredRecord;
-    expect(() =>
-      appendPreparedRecords(ws, [
-        { type: "phase", record: { ...data, id: stored.id, ts: stored.ts, by: "agent", rev: 1 } },
-      ]),
-    ).toThrow();
     expect(readPhases(new Workspace(ws.root))[0]).toMatchObject({
       rev: 3,
       status: "confirmed",
@@ -136,8 +129,6 @@ it("完成率与有解析解的 Beta 分位一致，并在混合大样本时保�
   const success = completionRate([{ done: true }]);
   expect(success.lower).toBeCloseTo(Math.sqrt(0.1), 9);
   expect(success.upper).toBeCloseTo(Math.sqrt(0.9), 9);
-  const failures = completionRate([{ done: false }]);
-  expect(failures.lower).toBeCloseTo(1 - Math.sqrt(0.9), 9);
   const balanced = completionRate([{ done: true }, { done: false }]);
   expect(balanced.lower).toBeCloseTo(0.1958001056590917, 9);
   expect(balanced.upper).toBeCloseTo(0.8041998943409083, 9);

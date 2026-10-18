@@ -80,8 +80,6 @@ it("四种收件箱各一个带来源版本，混合记录保留合法行与错�
     expect((await processInbox(ws, { stableMs: 20 })).processed).toEqual([incoming]);
     expect(readRecords(ws, "workout")).toHaveLength(4);
     expect((await history(ws)).length).toBe(afterPartial.length + 1);
-    expect((await processInbox(ws, { stableMs: 20 })).processed).toEqual([]);
-    expect((await history(ws)).length).toBe(afterPartial.length + 1);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

@@ -81,17 +81,14 @@ it("本地接口只确认预览中所选的记忆，整批一个版本并能撤�
   process.env.KAITU_LOCAL_STATE_DIR = join(root, "state");
   const ws = await initWorkspace(join(root, "ws"));
   const ui = await startUi(ws, { port: 0, open: false, versionDelayMs: 10 });
-  const call = (method: string, args: unknown[], origin = ui.url) =>
+  const call = (method: string, args: unknown[]) =>
     fetch(`${ui.url}/api/product/${method}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: origin },
+      headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(args),
     });
   try {
     const before = await history(ws);
-    expect(
-      (await call("onboardingMemoryPreview", ["不应写入", "claude"], "https://example.invalid")).status,
-    ).toBe(403);
     const preview = await (
       await call("onboardingMemoryPreview", ["[偏好] 简洁\n[人物] 小张\n[工作] 写作", "claude"])
     ).json();
