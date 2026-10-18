@@ -1,10 +1,17 @@
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { KaituError } from "@kaitu/core";
 import type { AskRuntime } from "../ui/ask.js";
 import { connectAcp, sessionModels } from "./acp.js";
 import { type LocalAgent, agentEnvironment, launchAgent, terminateAgent } from "./agents.js";
 import { localAgentPrivacy } from "./privacy.js";
+
+/** 同一 agent 的不同 CLI 路径各有一份会话表，避免串用 upstream session id。 */
+function sessionsPath(root: string, agentId: string, cliPath?: string) {
+  const key = cliPath ? createHash("sha256").update(resolve(cliPath)).digest("hex").slice(0, 16) : "default";
+  return join(root, `${agentId}-${key}-sessions.json`);
+}
 
 export interface McpCommand {
   command: string;
@@ -47,11 +54,15 @@ export async function createAgentRuntime(options: {
   const bin = options.path;
   if (!bin)
     throw new KaituError(`未找到 ${agent.name} CLI，请安装并登录，或填写已有 CLI 的路径`, "AI_CONNECTION");
-  // 开图对话 id → agent 会话 id，用来续接原会话。
+  // 开图对话 id → agent 会话 id，用来续接原会话（按 CLI 路径分开存）。
   const root = join(options.state, "local-agents");
   mkdirSync(root, { recursive: true, mode: 0o700 });
-  const file = join(root, `${agent.id}-sessions.json`);
+  const file = sessionsPath(root, agent.id, bin);
   const sessions: Record<string, string> = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+  const persistSessions = () => {
+    writeFileSync(`${file}.tmp`, JSON.stringify(sessions), { mode: 0o600 });
+    renameSync(`${file}.tmp`, file);
+  };
   type Session = {
     child: ReturnType<typeof launchAgent>;
     rpc: ReturnType<typeof connectAcp>;
@@ -138,9 +149,9 @@ export async function createAgentRuntime(options: {
         }
       },
     });
+    const resume = sessions[id];
     try {
       const init = await state.rpc.request("initialize", initialize);
-      const resume = sessions[id];
       const method = resume
         ? init.agentCapabilities?.loadSession
           ? "session/load"
@@ -176,13 +187,17 @@ export async function createAgentRuntime(options: {
           throw new Error("model unavailable");
       }
       sessions[id] = state.upstream;
-      writeFileSync(`${file}.tmp`, JSON.stringify(sessions), { mode: 0o600 });
-      renameSync(`${file}.tmp`, file);
+      persistSessions();
       return state;
     } catch {
       state.rpc.close();
       await terminateAgent(child);
       running.delete(id);
+      // 续接失败时丢掉这条映射，下次改走新建，避免坏 id 一直卡住。
+      if (resume && sessions[id] === resume) {
+        delete sessions[id];
+        persistSessions();
+      }
       if (state.cancelled || closed) throw cancelledError;
       throw new KaituError(
         `${agent.name} 未能连接或续接，请检查 CLI 登录、网络和所选模型；原记录保留，可新建对话重试`,
@@ -217,6 +232,7 @@ export async function createAgentRuntime(options: {
       if (params.fresh && sessions[id]) {
         await cancel(id);
         delete sessions[id];
+        persistSessions();
       }
       let state = running.get(id);
       if (state?.busy) throw new KaituError(`${agent.name} 正忙`, "AI_CONNECTION");

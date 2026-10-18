@@ -409,20 +409,20 @@ export function createAskService(options: {
       ];
       let history = "";
       let fresh = false;
+      // 连接成功前不改 backend/seen：失败后重试还要能带上换 AI 时的上下文。
+      let nextSeen = row.seen;
       if (previousBackend && previousBackend !== backend) {
         const all = events(id);
-        row.seen = { ...row.seen, [previousBackend]: all.length };
-        fresh = row.seen[backend] === undefined;
-        history = transcript(all.slice(row.seen[backend] ?? 0));
+        nextSeen = { ...row.seen, [previousBackend]: all.length };
+        fresh = nextSeen[backend] === undefined;
+        history = transcript(all.slice(nextSeen[backend] ?? 0));
       }
-      row.backend = backend;
-      saveIndex();
       busy.add(id);
       append(id, "session.status", { status: "running" });
       try {
         const client = await start(mode);
         if (history) echoes.set(id, blocks);
-        return await client.request("session/prompt", {
+        const result = await client.request("session/prompt", {
           sessionId: id,
           fresh,
           contentBlocks: history
@@ -435,6 +435,10 @@ export function createAskService(options: {
               ]
             : blocks,
         });
+        row.backend = backend;
+        row.seen = nextSeen;
+        saveIndex();
+        return result;
       } catch (error) {
         busy.delete(id);
         echoes.delete(id);
