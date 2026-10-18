@@ -230,9 +230,15 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
   await processInbox(reopened, { stableMs: 0 });
   expect(readRecords(reopened, "task")).toEqual(before);
   expect(phoneReceipts(reopened).find((r) => r.ref === actions[2]?.client_id)?.status).toBe("duplicate");
-  expect((await readOverviewPage(reopened)).sync.needsReview).toBeGreaterThan(0);
   const validate = schemas().builtin("phone-receipts.schema.json");
   expect(validate(reopened.readJson("phone/receipts.json")), JSON.stringify(validate.errors)).toBe(true);
+  // 冲突说明这一项已在电脑上变了，电脑今天页不该一直挂着「需要核对」。
+  const review = (await readOverviewPage(reopened)).sync.needsReview;
+  reopened.writeJson("phone/receipts.json", {
+    ...reopened.readJson<object>("phone/receipts.json"),
+    items: [],
+  });
+  expect((await readOverviewPage(reopened)).sync.needsReview).toBe(review);
 });
 
 it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手机文件处理后删除远端", async () => {

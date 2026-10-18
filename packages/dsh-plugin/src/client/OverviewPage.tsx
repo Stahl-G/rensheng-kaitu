@@ -742,11 +742,6 @@ function Overview({
                       {t("足迹需要核对", "Footprints to review")}
                     </button>
                   )}
-                  {data.phoneConflicts?.map((item) => (
-                    <span key={item.ref} className={css.small}>
-                      {item.message}
-                    </span>
-                  ))}
                   {data.inboxNotes > 0 && (
                     <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
                       {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}

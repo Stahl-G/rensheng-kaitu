@@ -134,7 +134,6 @@ export interface OverviewData {
   next: OverviewNext[];
   allNext: OverviewNext[];
   plans: PlansData;
-  phoneConflicts?: { ref: string; message?: string; at: string }[];
   sync: {
     received: number;
     /** 开了每日整理才说「等待整理」，否则原文只是已保存。 */

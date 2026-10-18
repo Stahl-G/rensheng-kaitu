@@ -81,7 +81,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 | `answer_question` | `question_id`、`value` | 待定 | 预留 |
 | `trial_checkin` | `experiment_id`、`expected_revision`、`done`、`note` | `writeExploration` | 预留，依赖数据规范 |
 
-- **执行前先核对前提**：这一项还在、仍是待办或待确认。不满足就记为 `conflict`，进今天页的「需要核对」，不硬改。
+- **执行前先核对前提**：这一项还在、仍是待办或待确认。不满足就记为 `conflict`，不硬改；手机按回执撤回并说明原因，电脑今天页不另行提示。
 - **去重：** 用 `client_id`，同一条操作交两次只执行一次。
 
 **回执和叠加显示**
