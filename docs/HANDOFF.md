@@ -1,5 +1,12 @@
 # 交接说明：人生开图（开图 Kaitu）
 
+## 手机 v0.7：电脑不在也能用（2026-10-18）
+
+用户同意方向：用户自己的云端 Agent（Dot、Grok Bot 等）当「手机更新员」，电脑不在时处理手机文件、重算今天；电脑开着时电脑优先。
+规范见 [mobile/agent-runner.md](mobile/agent-runner.md)，给 Agent 的规则见 [mobile/PHONE-RUNNER.md](mobile/PHONE-RUNNER.md)。
+顺序：用户先用合成仓库让 Dot、Grok Bot 试一轮（规范 §10）→ 再改电脑（R1–R6）和手机（I10–I14）。
+快照的 `generator` 字段是格式改动，用户点头前不改 schema。
+
 ## CodeBuddy ACP 本地开发（2026-10-18）
 
 独立分支 `codex/codebuddy-acp` 接续 `origin/wip/local-agents` 的 snapshot，本轮只开放 CodeBuddy，保留现有 DeepSeek 入口。仅完整 Agent 模式，用户已有 CLI 登录；未实现反向 `kaitu acp` 服务端。Mac 已通过三次合成模型任务及会话保存、恢复、取消；打包 MCP helper 的合成待办写回通过。独立 Mac App 已通过签名、启动与模拟 ACP 接口验收；受控终止后子进程/端口退出通过，原生 GUI 退出菜单与 Windows 仍待验收。已有草稿 PR #16，未合并、未发布。详见 [验收与交接](acceptance/codebuddy-acp-2026-10-18/README.md)。
