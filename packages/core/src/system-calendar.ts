@@ -166,10 +166,12 @@ export class CalendarPush {
       ]),
     };
   }
-  /** 这台电脑已在日历里找到该时间段的事件，包括 iPhone 写入、经 iCloud 同步来的那条。 */
+  /** 这台电脑已在日历里找到该时间段的事件（包括 iPhone 写入、经 iCloud 同步来的那条），并且改了能写回去。 */
   located(id: string) {
     const date = this.store.date();
-    return Boolean(date && this.store.read().entries[`${date}/${id}`]?.uid);
+    const state = this.store.read();
+    // 同步关着，或这里没有日历执行器（非 macOS、DSH 插件）时，改了开图也改不到日历里的那条。
+    return Boolean(this.executor && state.enabled && date && state.entries[`${date}/${id}`]?.uid);
   }
   configure(enabled: boolean) {
     const state = this.store.read();
