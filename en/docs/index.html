@@ -39,7 +39,7 @@
 <div class="wrap">
   <header class="page-head">
     <h1>Docs</h1>
-    <p class="lead">For Kaitu <span data-rel="version">0.1.0-rc.4</span>. Not installed yet? Start at <a href="/en/download/">Download</a>. For what is stored where and sent to whom, see <a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a>.</p>
+    <p class="lead">For Kaitu <span data-rel="version">0.1.0-rc.4</span>. Not installed yet? Start at <a href="/en/download/">Download</a>. For what is stored where and sent to whom, see <a href="/en/privacy/">Where your data goes</a>.</p>
   </header>
   <div class="docs-layout">
     <details class="toc" data-toc open>
@@ -185,7 +185,7 @@
   <li>When you're done, tell it to "organize this for Kaitu", paste the answer into Paste the AI's answer back, and click Read and review. Review and adopt like any other item.</li>
 </ol>
 <ul>
-  <li>The pack includes active goals, results from the last 30 days, next steps, projects, directions you're exploring and non-sensitive memories. For what's left out and removed automatically, see <a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a>.</li>
+  <li>The pack includes active goals, results from the last 30 days, next steps, projects, directions you're exploring and non-sensitive memories. For what's left out and removed automatically, see <a href="/en/privacy/">Where your data goes</a>.</li>
   <li>If you edit the pack text and then change the ticks, Kaitu asks first: Rebuild redoes the pack and drops your edits; Keep my edits leaves it alone.</li>
   <li>This is a manual hand-off, not a connection: to chat in Ask you still need to connect Kaitu's AI.</li>
   <li>Directions work the same way: without Kaitu's AI, open Explore → Directions → Use your own AI, copy the prompt to any AI, paste its reply back and click 3 · Read the suggestions. The prompt includes your goals, projects, directions, non-sensitive memories, and titles you've already seen or dismissed. Pasted ideas are marked AI suggestion · to adopt; you decide whether to adopt them or mark them Not interested.</li>
@@ -239,7 +239,7 @@
   <li><strong>Nutstore</strong>: uses the Nutstore sync folder it finds. If none is found, set up a sync folder in the Nutstore client, then enter a new folder inside it.</li>
   <li><strong>Google Drive</strong>: used for cloud AI relay (see <a href="#relay">Cloud AIs</a>).</li>
 </ul>
-<p>Command line: <code>kaitu sync enable icloud|drive|nutstore [--dir &lt;parent&gt;]</code>, <code>kaitu sync disable [--to &lt;folder&gt;]</code>, <code>kaitu sync status</code>. For which files reach the cloud and which AIs can read them, see <a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a>.</p>
+<p>Command line: <code>kaitu sync enable icloud|drive|nutstore [--dir &lt;parent&gt;]</code>, <code>kaitu sync disable [--to &lt;folder&gt;]</code>, <code>kaitu sync status</code>. For which files reach the cloud and which AIs can read them, see <a href="/en/privacy/">Where your data goes</a>.</p>
 
 <h2 id="phone">Phone channels<a class="anchor" href="#phone" aria-label="#">#</a></h2>
 <p>Message Kaitu on WeChat, Telegram, Feishu or QQ and Ask's current AI answers, in Kaitu notes only mode: it can read and write your notes, search and read web pages, but not run commands. Your computer must be on, Kaitu.app running, and Ask connected to an AI. Text only.</p>
@@ -248,7 +248,7 @@
   <li>Connect a channel by following the steps on the page (scan to sign in for WeChat; bot credentials for Telegram, QQ and Feishu).</li>
   <li>The page shows a pairing code, valid for 10 minutes. Send it to the bot in a private chat. The account that sends it becomes the only one that gets replies.</li>
 </ol>
-<p>Telegram and WeChat have been tested on real devices; Feishu and QQ haven't yet. Messages pass through the platform you choose; see <a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a>. Command line: <code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>, <code>kaitu channels pair &lt;channel&gt;</code>, <code>kaitu channels status</code>.</p>
+<p>Telegram and WeChat have been tested on real devices; Feishu and QQ haven't yet. Messages pass through the platform you choose; see <a href="/en/privacy/">Where your data goes</a>. Command line: <code>kaitu channels setup &lt;weixin|telegram|feishu|qq&gt;</code>, <code>kaitu channels pair &lt;channel&gt;</code>, <code>kaitu channels status</code>.</p>
 
 <h2 id="automation">Scheduled tasks and calendar<a class="anchor" href="#automation" aria-label="#">#</a></h2>
 <p>The first time you connect Kaitu's AI in Ask, it asks once whether to organize automatically. Tasks run on the AI you just connected; choose none and you can still ask any time.</p>
@@ -337,7 +337,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
   <li><strong>Sent to an AI this time</strong>: Ask sends your messages and the notes it reads to the AI service you chose; a full agent may send anything it reads; scheduled tasks use the same AI; external AIs over MCP or cloud relay send what they read to the services behind them; context packs and the clipboard send only what you copy.</li>
   <li><strong>Other connections</strong>: map tiles (OpenFreeMap), reference prices (Yahoo, ticker symbols only), GitHub, calendar subscriptions, and mail and chat collection.</li>
 </ul>
-<p>Details are on <a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a>.</p>
+<p>Details are on <a href="/en/privacy/">Where your data goes</a>.</p>
 
 <h2 id="faq">FAQ<a class="anchor" href="#faq" aria-label="#">#</a></h2>
 <h3 id="faq-key">Do I need an API key?<a class="anchor" href="#faq-key" aria-label="#">#</a></h3>
@@ -372,7 +372,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <footer class="site-foot">
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
-    <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
+    <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a><a href="/en/support/">Support</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
     <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
     <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
   </div>
