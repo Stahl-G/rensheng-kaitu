@@ -51,6 +51,15 @@
       "end": "11:00",
       "kind": "event",
       "status": "confirmed"
+    },
+    {
+      "id": "b-0411",
+      "title": "外景拍摄",
+      "start": "15:00",
+      "end": "16:30",
+      "kind": "proposal",
+      "status": "confirmed",
+      "calendar": "phone"
     }
   ],
   "goals": [
@@ -59,10 +68,25 @@
       "title": "年底出一本摄影集",
       "results": 3,
       "last_result": "完成第一轮选片",
-      "next": { "id": "01JAZ0W6QK8R2F4M7N9P1S3T5V", "title": "把初选从 80 张挑到 30 张", "due": "2026-10-19" }
+      "next": {
+        "id": "01JAZ0W6QK8R2F4M7N9P1S3T5V",
+        "title": "把初选从 80 张挑到 30 张",
+        "due": "2026-10-19"
+      }
     },
-    { "id": "guitar", "title": "能弹完一首完整的曲子", "results": 0, "last_result": null, "next": null }
+    {
+      "id": "guitar",
+      "title": "能弹完一首完整的曲子",
+      "results": 0,
+      "last_result": null,
+      "next": null
+    }
   ],
   "question": null,
-  "sync": { "received": 2, "needs_review": 1, "organizer": true, "updated_at": "2026-10-18T07:30:00+08:00" }
+  "sync": {
+    "received": 2,
+    "needs_review": 1,
+    "organizer": true,
+    "updated_at": "2026-10-18T07:30:00+08:00"
+  }
 }

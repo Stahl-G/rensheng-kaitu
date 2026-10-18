@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { type PhoneReceipt, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { cancelTask, completeTask, listTasks } from "./tasks.js";
-import { completeNext } from "./workbench.js";
+import { completeNext, decidePhoneProposal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export const phoneInboxName =
@@ -10,7 +10,7 @@ export const phoneInboxName =
 interface Action {
   client_id: string;
   op: string;
-  args: { id: string; file: string };
+  args: { id: string; file: string; decision: "confirmed" | "rejected" };
 }
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
@@ -47,16 +47,14 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
     const first = seen[action.client_id];
     if (first) Object.assign(receipt, first.status === "applied" ? { status: "duplicate" } : first);
     else {
-      const { id, file: target } = action.args;
+      const { id, file: target, decision } = action.args;
       try {
         switch (action.op) {
           case "complete_next":
             await completeNext(ws, target, id);
             break;
           case "decide_proposal":
-            // 收件箱文件谁都能写，证明不了是你本人；日程只由你在电脑上确认。
-            receipt.status = "rejected";
-            receipt.message = "日程建议请在电脑上确认";
+            await decidePhoneProposal(ws, id, decision);
             break;
           case "complete_task":
           case "cancel_task":

@@ -11,7 +11,7 @@ const envelope = (name: string, generatedAt: string) => ({
 });
 
 export function buildPhoneToday(data: Overview, generatedAt: string) {
-  const block = ({ id, title, kind, status, start, end, module }: Overview["blocks"][number]) => ({
+  const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
     title,
     kind,
@@ -19,6 +19,7 @@ export function buildPhoneToday(data: Overview, generatedAt: string) {
     start,
     end,
     module,
+    ...(calendar ? { calendar } : {}),
   });
   return {
     ...envelope("today", generatedAt),

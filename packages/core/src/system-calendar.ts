@@ -91,6 +91,8 @@ export function calendarPushEntries(ws: Workspace): CalendarPushEntry[] {
   return data.blocks.flatMap((block) => {
     // 读不出的时间段（没标题、没 id）留给校验报出来，这里不同步。
     if (!block || typeof block.id !== "string" || typeof block.title !== "string") return [];
+    // 在 iPhone 上确认的日程已由手机写进 Apple 日历，这里再写会重复。
+    if (block.calendar === "phone") return [];
     const id = `${data.date}/${block.id}`;
     const linkedTitle = block.ref ? related.get(block.ref) : undefined;
     if (block.kind === "task" && block.id.startsWith("next-") && block.ref && !taskIds.has(block.ref))

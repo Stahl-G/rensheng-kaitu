@@ -24,6 +24,8 @@ export interface PlanBlock {
   end?: string;
   module?: string;
   ref?: string;
+  /** 在 iPhone 上确认、由手机写进 Apple 日历；电脑不再写系统日历。 */
+  calendar?: "phone";
 }
 export interface TodayPlan {
   date: string | null;
@@ -205,6 +207,22 @@ export function decideProposal(ws: Workspace, id: string, decision: "confirmed" 
   });
 }
 
+/**
+ * 手机交来的确认或拒绝：只改今天的状态。确认的日程由手机写进 Apple 日历（经 iCloud 同步到电脑），
+ * 这里标明日历归手机，电脑不再写系统日历，所以收件箱文件伪造不出一条写进你日历的日程。
+ */
+export function decidePhoneProposal(ws: Workspace, id: string, decision: "confirmed" | "rejected") {
+  return editFrontmatter<TodayPlan>(ws, "NOW.md", "now.schema.json", (data) => {
+    const block = data.blocks.find(
+      (item) => item.id === id && item.kind === "proposal" && item.status === "pending",
+    );
+    if (!block) throw new KaituError("日程建议已处理或不存在", "CONFLICT");
+    block.status = decision;
+    if (decision === "confirmed") block.calendar = "phone";
+    return `你在 iPhone 上${decision === "confirmed" ? "确认" : "拒绝"}了日程建议：${block.title}`;
+  });
+}
+
 export function editCalendarBlock(ws: Workspace, id: string, start: string, end: string) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(start) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(end) || end <= start)
     throw new KaituError("请填写当天有效的起止时间，结束须晚于开始", "BAD_ARGS");
@@ -213,6 +231,9 @@ export function editCalendarBlock(ws: Workspace, id: string, start: string, end:
       (row) => row.id === id && ["proposal", "task"].includes(row.kind) && row.status === "confirmed",
     );
     if (!block) throw new KaituError("找不到已确认的时间段", "NOT_FOUND");
+    // 手机写进 Apple 日历的那条电脑改不到，这里改了会和日历对不上。
+    if (block.calendar === "phone")
+      throw new KaituError("这条日程由 iPhone 写进了日历，请在 iPhone 上改时间", "CONFLICT");
     Object.assign(block, { start, end });
     return `你调整了日程：${block.title}`;
   });
