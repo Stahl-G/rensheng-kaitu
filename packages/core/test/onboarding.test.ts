@@ -307,6 +307,8 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
     expect(readMe(ws).goals.map((goal) => goal.title)).toEqual([selected.goal]);
     expect(next.goalId).toBe(readMe(ws).goals[0]?.id);
     const later = await changeOnboardingNext(ws, next.id, next.rev, "defer", "2026-12-01");
+    // 胡志明市 10 月 18 日 0:30 完成；之后工作区改成 UTC，那一刻是 10 月 17 日。
+    vi.setSystemTime(new Date("2026-10-17T17:30:00Z"));
     const done = await changeOnboardingNext(ws, next.id, later.rev, "complete", "选出了三件作品");
     expect(done).toMatchObject({
       status: "done",
@@ -315,7 +317,9 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
       due: "2026-12-01",
     });
     await expect(changeOnboardingNext(ws, next.id, next.rev, "complete", "重试")).rejects.toThrow();
-    // 做完的那一步只在当天留在今天顶上，第二天就不再显示。
+    // 做完的那一步只在当天留在今天顶上，第二天就不再显示；「当天」按现在的工作区时区算。
+    expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next?.status).toBe("done");
+    ws.writeText("me/rules.md", ws.readText("me/rules.md").replace(/^timezone:.*$/m, "timezone: UTC"));
     expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next?.status).toBe("done");
     vi.setSystemTime(Date.now() + 2 * 24 * 3600 * 1000);
     expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next).toBeNull();

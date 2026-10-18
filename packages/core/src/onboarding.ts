@@ -968,7 +968,11 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
   const today = localDate(new Date(), ws.timeZone());
   const latest =
     live.find((task) => task.status === "open") ??
-    live.find((task) => noteLine(task.notes ?? "", "完成时间").startsWith(today));
+    live.find((task) => {
+      // 完成时间带着当时的时区偏移；换算到现在的工作区时区再比日期。
+      const at = Date.parse(noteLine(task.notes ?? "", "完成时间"));
+      return !Number.isNaN(at) && localDate(new Date(at), ws.timeZone()) === today;
+    });
   const items = [
     {
       id: "storage",
