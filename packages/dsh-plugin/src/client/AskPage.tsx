@@ -44,7 +44,9 @@ interface Settings {
   choice?: "builtin" | "external" | "local";
   fullOnly?: boolean;
   supportsAttachments?: boolean;
-  localAgent?: { path?: string; status: string };
+  localAgent?: { id: string; name: string; path?: string; status: string };
+  /** 本机装好的 ACP agent CLI。 */
+  localAgents?: { id: string; name: string; path: string }[];
   model: string;
   provider: string;
   providerName: string;
@@ -166,6 +168,8 @@ export function AskPage({
 }) {
   const t = useT();
   const [cliPath, setCliPath] = useState("");
+  const [agentId, setAgentId] = useState("codebuddy");
+  const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
   const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -291,6 +295,7 @@ export function AskPage({
         setProvider(ai.provider);
         setModel(ai.model);
         setCliPath(ai.localAgent?.path ?? "");
+        setAgentId(ai.localAgent?.id ?? ai.localAgents?.[0]?.id ?? "codebuddy");
         setBaseURL(ai.baseURL ?? "");
         setApi(ai.api ?? "openai-completions");
         if (!configurationRequested.current) setChoice(ai.choice === "builtin" ? "builtin" : "local");
@@ -508,7 +513,7 @@ export function AskPage({
       const ai = await call<Settings>("askConfigure", {
         choice,
         ...(choice === "local"
-          ? { agent: "codebuddy", ...(cliPath.trim() ? { path: cliPath.trim() } : {}) }
+          ? { agent: agentId, ...(cliPath.trim() ? { path: cliPath.trim() } : {}) }
           : {}),
         ...(choice === "builtin"
           ? {
@@ -538,12 +543,29 @@ export function AskPage({
       setSaving(false);
     }
   };
+  const openModelMenu = () => {
+    setModelMenu(!modelMenu);
+    const agent = settings?.choice === "local" ? settings.localAgent : undefined;
+    if (modelMenu || !agent) return;
+    setAgentModels(null);
+    void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
+      .then(setAgentModels)
+      .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
+  };
   const switchModel = async (provider: string, id: string) => {
     setModelMenu(false);
     setSaving(true);
     setError("");
     try {
-      setSettings(await call<Settings>("askConfigure", { choice: "builtin", provider, model: id }));
+      const agent = settings?.choice === "local" ? settings.localAgent : undefined;
+      setSettings(
+        await call<Settings>(
+          "askConfigure",
+          agent
+            ? { choice: "local", agent: agent.id, path: agent.path, model: id }
+            : { choice: "builtin", provider, model: id },
+        ),
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1058,8 +1080,7 @@ export function AskPage({
                 aria-expanded={modelMenu}
                 onClick={() => {
                   setModeMenu(null);
-                  if (settings?.choice === "local") return;
-                  setModelMenu(!modelMenu);
+                  openModelMenu();
                 }}
               >
                 <span className={css.modelName}>
@@ -1069,22 +1090,44 @@ export function AskPage({
               </button>
               {modelMenu && (
                 <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
-                  {settings?.saved?.flatMap((row) =>
-                    row.models.map((id) => (
-                      <button
-                        type="button"
-                        key={`${row.provider}/${id}`}
-                        className={css.model}
-                        aria-pressed={
-                          settings.configured && settings.provider === row.provider && settings.model === id
-                        }
-                        disabled={busy || saving}
-                        onClick={() => void switchModel(row.provider, id)}
-                      >
-                        {row.name} · {id}
-                      </button>
-                    )),
-                  )}
+                  {settings?.choice === "local" &&
+                    (agentModels === null ? (
+                      <span className={css.model}>{t("正在读取模型…", "Loading models…")}</span>
+                    ) : typeof agentModels === "string" ? (
+                      <span className={css.model}>{agentModels}</span>
+                    ) : !agentModels.length ? (
+                      <span className={css.model}>{settings.model}</span>
+                    ) : (
+                      agentModels.map((item) => (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className={css.model}
+                          aria-pressed={settings.model === item.id}
+                          disabled={busy || saving}
+                          onClick={() => void switchModel(settings.provider, item.id)}
+                        >
+                          {item.name ?? item.id}
+                        </button>
+                      ))
+                    ))}
+                  {settings?.choice !== "local" &&
+                    settings?.saved?.flatMap((row) =>
+                      row.models.map((id) => (
+                        <button
+                          type="button"
+                          key={`${row.provider}/${id}`}
+                          className={css.model}
+                          aria-pressed={
+                            settings.configured && settings.provider === row.provider && settings.model === id
+                          }
+                          disabled={busy || saving}
+                          onClick={() => void switchModel(row.provider, id)}
+                        >
+                          {row.name} · {id}
+                        </button>
+                      )),
+                    )}
                   <button
                     type="button"
                     className={css.model}
@@ -1093,7 +1136,7 @@ export function AskPage({
                       setStep(1);
                     }}
                   >
-                    添加服务商
+                    {settings?.choice === "local" ? t("换一个 AI", "Switch AI") : "添加服务商"}
                   </button>
                 </dialog>
               )}
@@ -1154,11 +1197,11 @@ export function AskPage({
               disabled={saving}
               onClick={() => setChoice("local")}
             >
-              <b>{t("用本机 CodeBuddy", "Use local CodeBuddy")}</b>
+              <b>{t("用本机 Agent", "Use a local agent")}</b>
               <span>
                 {t(
-                  "不填 Key，用 CodeBuddy 自己的登录和额度。",
-                  "No API key; uses your CodeBuddy login and allowance.",
+                  "不填 Key，用 CodeBuddy、Claude Code、Kimi 等 CLI 自己的登录和额度。",
+                  "No API key; uses the login and allowance of CodeBuddy, Claude Code, Kimi and others.",
                 )}
               </span>
             </button>
@@ -1188,12 +1231,30 @@ export function AskPage({
             </button>
             {choice === "local" && (
               <div className={css.fields}>
+                {!!settings?.localAgents?.length && (
+                  <label>
+                    Agent
+                    <select
+                      value={agentId}
+                      onChange={(event) => {
+                        setAgentId(event.target.value);
+                        setCliPath("");
+                      }}
+                    >
+                      {settings.localAgents.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label>
                   {t("CLI 路径（可选，留空自动检测）", "CLI path (optional; auto-detect when empty)")}
                   <input
                     value={cliPath}
                     onChange={(event) => setCliPath(event.target.value)}
-                    placeholder="/path/to/codebuddy"
+                    placeholder={settings?.localAgents?.find((item) => item.id === agentId)?.path}
                   />
                 </label>
               </div>
