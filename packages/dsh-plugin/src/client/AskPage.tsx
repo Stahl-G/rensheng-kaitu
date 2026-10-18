@@ -208,11 +208,11 @@ export function AskPage({
   }, [configureRequest, configureBuiltin]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
-  const [modeMenu, setModeMenu] = useState<"select" | "confirm" | null>(null);
+  const [modeMenu, setModeMenu] = useState(false);
   const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
     setSelected(id);
-    setModeMenu(null);
+    setModeMenu(false);
     setModelMenu(false);
   };
   const [pendingMode, setPendingMode] = useState<AskMode | null>(null);
@@ -335,6 +335,24 @@ export function AskPage({
       })
       .catch((err) => setError(err.message));
   };
+  useEffect(() => {
+    if (!threadMenu) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(`.${css.threadMenu}`) || target.closest(`.${css.threadMore}`)) return;
+      setThreadMenu(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setThreadMenu(null);
+    };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [threadMenu]);
   const threadRow = (thread: Thread) => (
     <div key={thread.id} className={css.threadRow}>
       {renaming?.id === thread.id ? (
@@ -374,9 +392,14 @@ export function AskPage({
       {threadMenu?.id === thread.id && (
         <div className={css.threadMenu} role="menu">
           {threadMenu.confirm ? (
-            <button type="button" role="menuitem" onClick={() => removeThread(thread.id)}>
-              {t("确认删除", "Confirm delete")}
-            </button>
+            <>
+              <button type="button" role="menuitem" onClick={() => removeThread(thread.id)}>
+                {t("确认删除", "Confirm delete")}
+              </button>
+              <button type="button" role="menuitem" onClick={() => setThreadMenu(null)}>
+                {t("取消", "Cancel")}
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -502,16 +525,14 @@ export function AskPage({
       draft.trim() ||
       (attachments.length ? "请看看这些附件" : sessionReferences.length ? "参考这些对话帮我继续" : "");
     if (!value || busy || readingFiles || !settings?.configured) return;
-    if (settings.fullOnly && mode !== "full") {
-      setModeMenu("confirm");
-      return;
-    }
     // askSend 要等整轮回复；输入框一点发送就清掉，失败再还原（若用户已另写则不覆盖）。
     const pendingText = value;
     const pendingAttachments = attachments;
     const pendingReferences = sessionReferences;
     const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
-    const modeForThread = pendingMode;
+    // 本机 Agent 只有完整模式：发送时直接开，不再弹确认。
+    let modeForThread = pendingMode;
+    if (settings.fullOnly && mode !== "full") modeForThread = "full";
     setDraft("");
     setAttachments([]);
     setSessionReferences([]);
@@ -524,13 +545,13 @@ export function AskPage({
         id = thread.id;
         activeSession.current = id;
         selectThread(id);
-        if (modeForThread) {
-          await call("askSetMode", id, modeForThread, modeForThread === "full");
-          setPendingMode(null);
-        }
+      }
+      if (modeForThread && modeForThread !== mode) {
+        await call("askSetMode", id, modeForThread, modeForThread === "full");
       }
       await call("askSend", id, payload, pendingAttachments);
       await refreshThreads();
+      setPendingMode(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDraft((current) => (current.trim() ? current : pendingText));
@@ -604,12 +625,12 @@ export function AskPage({
       if (!selected) {
         // 还没开对话时不建空「新对话」；下一条发出时再带上权限。
         setPendingMode(value);
-        setModeMenu(null);
+        setModeMenu(false);
         return;
       }
       await call("askSetMode", selected, value, value === "full");
       await refreshThreads();
-      setModeMenu(null);
+      setModeMenu(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -681,7 +702,11 @@ export function AskPage({
       setSessionReferences([]);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
-      if (choice === "local") setModeMenu("confirm");
+      // 本机 Agent 只有完整模式，接上后直接开，不弹确认。
+      if (choice === "local") {
+        if (selected) void changeMode("full");
+        else setPendingMode("full");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -948,14 +973,14 @@ export function AskPage({
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
-              setModeMenu(null);
+              setModeMenu(false);
               setModelMenu(false);
               closeReferences();
             }
           }}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
-              setModeMenu(null);
+              setModeMenu(false);
               setModelMenu(false);
             }
           }}
@@ -1131,7 +1156,7 @@ export function AskPage({
                 setAtQuery(undefined);
                 if (settings?.choice === "local") return;
                 setReferences(!references);
-                setModeMenu(null);
+                setModeMenu(false);
                 setModelMenu(false);
               }}
             >
@@ -1143,74 +1168,48 @@ export function AskPage({
                 className={`${css.model} ${mode === "full" ? v2["is-full"] : ""}`}
                 disabled={busy || modeSaving}
                 aria-haspopup="dialog"
-                aria-expanded={modeMenu !== null}
+                aria-expanded={modeMenu}
                 onClick={() => {
                   setModelMenu(false);
-                  // 本机 Agent 只有完整模式，没开就直接问要不要开。
-                  setModeMenu(modeMenu ? null : settings?.fullOnly && mode !== "full" ? "confirm" : "select");
+                  // 本机 Agent 只有完整模式：一点就开，不再确认。
+                  if (settings?.fullOnly && mode !== "full") {
+                    void changeMode("full");
+                    return;
+                  }
+                  setModeMenu(!modeMenu);
                 }}
               >
                 {modeLabel}
                 <span aria-hidden="true">⌄</span>
               </button>
               {modeMenu && (
-                <dialog
-                  open
-                  className={v2["mode-pop"]}
-                  aria-label={modeMenu === "confirm" ? "开启完整 Agent" : "这个对话能做什么"}
-                >
-                  {modeMenu === "confirm" ? (
-                    <>
-                      <b>{t("给这个对话开启完整 Agent？", "Enable full Agent for this conversation?")}</b>
-                      <div className={v2["dialog-foot"]}>
-                        <button
-                          type="button"
-                          className={`${v2.btn} ${v2["btn-quiet"]}`}
-                          disabled={modeSaving}
-                          onClick={() => setModeMenu(null)}
-                        >
-                          取消
-                        </button>
-                        <button
-                          type="button"
-                          className={`${v2.btn} ${v2["btn-strong"]}`}
-                          disabled={modeSaving}
-                          onClick={() => void changeMode("full")}
-                        >
-                          开启
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className={v2["mode-opt"]}
-                        aria-pressed={mode === "scoped"}
-                        disabled={settings?.fullOnly}
-                        onClick={() => void changeMode("scoped")}
-                      >
-                        <b>只读写开图资料</b>
-                        <span>只读写开图资料，可以搜索和打开网页；不能运行命令</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={v2["mode-opt"]}
-                        aria-pressed={mode === "full"}
-                        onClick={() => (mode === "full" ? setModeMenu(null) : setModeMenu("confirm"))}
-                      >
-                        <b>完整 Agent</b>
-                        <span>
-                          {settings?.choice === "local"
-                            ? t(
-                                `使用本机 ${settings.providerName} 的完整能力与原生权限。`,
-                                `Uses local ${settings.providerName} capabilities and native permissions.`,
-                              )
-                            : "开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。"}
-                        </span>
-                      </button>
-                    </>
-                  )}
+                <dialog open className={v2["mode-pop"]} aria-label="这个对话能做什么">
+                  <button
+                    type="button"
+                    className={v2["mode-opt"]}
+                    aria-pressed={mode === "scoped"}
+                    disabled={settings?.fullOnly}
+                    onClick={() => void changeMode("scoped")}
+                  >
+                    <b>只读写开图资料</b>
+                    <span>只读写开图资料，可以搜索和打开网页；不能运行命令</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={v2["mode-opt"]}
+                    aria-pressed={mode === "full"}
+                    onClick={() => (mode === "full" ? setModeMenu(false) : void changeMode("full"))}
+                  >
+                    <b>完整 Agent</b>
+                    <span>
+                      {settings?.choice === "local"
+                        ? t(
+                            `使用本机 ${settings.providerName} 的完整能力与原生权限。`,
+                            `Uses local ${settings.providerName} capabilities and native permissions.`,
+                          )
+                        : "开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。"}
+                    </span>
+                  </button>
                 </dialog>
               )}
             </span>
@@ -1222,7 +1221,7 @@ export function AskPage({
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
                 onClick={() => {
-                  setModeMenu(null);
+                  setModeMenu(false);
                   openModelMenu();
                 }}
               >
