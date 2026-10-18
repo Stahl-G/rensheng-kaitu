@@ -71,7 +71,7 @@
 - 快照不含财务明细、标为敏感的记忆、Key 和本机绝对路径。
 - Agent 读到的资料由它所在的服务处理。设置页写一句，不展开。
 
-## 7. 格式改动（待用户确认）
+## 7. 格式改动（用户已确认 2026-10-18）
 
 `today`、`week`、`map` 三份快照加可选字段 `generator`：
 
@@ -82,20 +82,20 @@
 - kind：`computer` 或 `agent`。name：显示给用户的名字，不超过 32 个字；电脑不写名字。spec：Agent 照做的 ORGANIZER.md 规则版本。
 - 没有 generator 的快照当作电脑生成，老电脑版本照常可用。
 - 现有 schema 没有禁止额外字段，手机也忽略不认识的字段，所以 version 仍为 1。
-- 确认后要改：`schemas/phone-today|week|map.schema.json`、`schemas/fixtures/phone/`、手机契约、AGENTS.md 生成模板 §11。
+- 已改：`schemas/phone-today|week|map.schema.json`、`schemas/fixtures/phone/`、手机契约、PRD §6.8、AGENTS.md 生成模板 §11。资料目录 `phone/library.json` 同日确认，同样带 generator。
 
 ## 8. 电脑端改动（本仓库）
 
 | # | 改什么 | 为什么 |
 |---|---|---|
-| R1 | 快照写 `generator: {kind: "computer"}`（待确认，见第 7 节） | 手机分清谁更新的 |
+| R1 | 快照写 `generator: {kind: "computer"}`（见第 7 节） | 手机分清谁更新的 |
 | R2 | GitHub 同步时，远端 `phone/receipts.json` 里本机没有的回执先并进本机，再上传；today、week、map 仍以电脑为准 | 现在会用本机回执整份覆盖，丢掉整理员写的 |
 | R3 | GitHub 备份双向同步 `inbox/notes/**/*.md`，不受文字开关影响 | 整理员移走的原文要回到电脑；顺带备份还没整理的原文 |
 | R4 | 手机操作去重时，`phone/receipts.json` 里已有的 client_id 也算处理过 | 去重账本在本机 `.kaitu/`，不同步 |
 | R5 | `renderOrganizer` 改成 [ORGANIZER.md](ORGANIZER.md) 的内容；`renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」；GitHub 方式也维护 `AGENT-README.md`（现在只有 Drive 方式）；AGENTS.md 模板 §11 那行跟着改 | 规则跟着开图版本更新，不靠用户手抄 |
 | R6 | `kaitu phone run [--as <名字>] [--dry-run]`：处理收件箱并生成全部快照，写 generator | 二档；也用来核对一档的结果 |
 
-R2–R4 已在本 PR 实现。ORGANIZER.md 的白天那一节还假定电脑有 R5；之前测试时在合成仓库里手动换上。
+R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product §4.4a）。ORGANIZER.md 的白天那一节还假定电脑有 R5；之前测试时在合成仓库里手动换上。
 
 ### Mac 端界面（Kaitu.app 和 DSH 插件共用页面）
 

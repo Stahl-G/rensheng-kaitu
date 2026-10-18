@@ -1,1 +1,107 @@
-{"v":3,"createdOnFiles":{"v":1,"at":"2026-10-18T10:45:00Z"},"title":"开图 iPhone 设计","launch":{"view":"canvas"},"pages":[],"boards":{"Main.dc.html":{"x":0,"y":0,"w":390,"h":1240,"title":"今天","is_interactive":true,"radius":44},"Map.dc.html":{"x":470,"y":0,"w":390,"h":1520,"title":"开图","radius":44},"Capture.dc.html":{"x":940,"y":0,"w":390,"h":844,"title":"记一下","radius":44},"Status.dc.html":{"x":1410,"y":0,"w":390,"h":844,"title":"同步状态","radius":44},"Empty.dc.html":{"x":1880,"y":0,"w":390,"h":844,"title":"还没有电脑内容","radius":44},"WideMap.dc.html":{"x":0,"y":1940,"w":1180,"h":820,"title":"展开：开图首屏","radius":32},"Wide.dc.html":{"x":1260,"y":1940,"w":1180,"h":820,"title":"展开：全部信息","radius":32},"EmptyAgent.dc.html":{"x":0,"y":3180,"w":390,"h":844,"title":"还没有内容：两条路","radius":44},"Source.dc.html":{"x":470,"y":3180,"w":390,"h":844,"title":"设置：更新来源","is_interactive":true,"radius":44},"StatusAgent.dc.html":{"x":940,"y":3180,"w":390,"h":844,"title":"同步状态：Agent 更新","radius":44},"Mac.dc.html":{"x":1410,"y":3180,"w":1180,"h":820,"title":"Mac：云端整理员","is_interactive":true,"radius":16},"Library.dc.html":{"x":2350,"y":0,"w":390,"h":844,"title":"资料（v0.7）","is_interactive":true,"radius":44},"Ask.dc.html":{"x":2820,"y":0,"w":390,"h":844,"title":"问问（v0.6.1）","is_interactive":true,"radius":44},"Unfold.dc.html":{"x":2520,"y":1940,"w":1260,"h":980,"title":"展开过渡（可点）","is_interactive":true,"radius":16}},"order":["Main.dc.html","Map.dc.html","Capture.dc.html","Status.dc.html","Empty.dc.html","WideMap.dc.html","Wide.dc.html","EmptyAgent.dc.html","Source.dc.html","StatusAgent.dc.html","Mac.dc.html","Library.dc.html","Ask.dc.html","Unfold.dc.html"],"notes":{"row1":{"x":0,"y":-300,"text":"合上管今天","kind":"title1","maxW":3210},"row2":{"x":0,"y":1640,"text":"展开看人生","kind":"title1","maxW":3780},"row3":{"x":0,"y":2880,"text":"电脑不在也能用（v0.7）","kind":"title1","maxW":2590}},"designSystems":[]}
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-10-18T10:45:00Z" },
+  "title": "开图 iPhone 设计",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 1240,
+      "title": "今天",
+      "is_interactive": true,
+      "radius": 44
+    },
+    "Map.dc.html": { "x": 470, "y": 0, "w": 390, "h": 1520, "title": "开图", "radius": 44 },
+    "Capture.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "记一下", "radius": 44 },
+    "Status.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "同步状态", "radius": 44 },
+    "Empty.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 844, "title": "还没有电脑内容", "radius": 44 },
+    "WideMap.dc.html": { "x": 0, "y": 1940, "w": 1180, "h": 820, "title": "展开：开图首屏", "radius": 32 },
+    "Wide.dc.html": { "x": 1260, "y": 1940, "w": 1180, "h": 820, "title": "展开：全部信息", "radius": 32 },
+    "EmptyAgent.dc.html": {
+      "x": 0,
+      "y": 3180,
+      "w": 390,
+      "h": 844,
+      "title": "还没有内容：两条路",
+      "radius": 44
+    },
+    "Source.dc.html": {
+      "x": 470,
+      "y": 3180,
+      "w": 390,
+      "h": 844,
+      "title": "设置：更新来源",
+      "is_interactive": true,
+      "radius": 44
+    },
+    "StatusAgent.dc.html": {
+      "x": 940,
+      "y": 3180,
+      "w": 390,
+      "h": 844,
+      "title": "同步状态：Agent 更新",
+      "radius": 44
+    },
+    "Mac.dc.html": {
+      "x": 1410,
+      "y": 3180,
+      "w": 1180,
+      "h": 820,
+      "title": "Mac：云端整理员",
+      "is_interactive": true,
+      "radius": 16
+    },
+    "Library.dc.html": {
+      "x": 2350,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "资料（v0.7）",
+      "is_interactive": true,
+      "radius": 44
+    },
+    "Ask.dc.html": {
+      "x": 2820,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "问问（v0.6.1）",
+      "is_interactive": true,
+      "radius": 44
+    },
+    "Unfold.dc.html": {
+      "x": 2520,
+      "y": 1940,
+      "w": 1260,
+      "h": 980,
+      "title": "展开过渡（可点）",
+      "is_interactive": true,
+      "radius": 16
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Map.dc.html",
+    "Capture.dc.html",
+    "Status.dc.html",
+    "Empty.dc.html",
+    "WideMap.dc.html",
+    "Wide.dc.html",
+    "EmptyAgent.dc.html",
+    "Source.dc.html",
+    "StatusAgent.dc.html",
+    "Mac.dc.html",
+    "Library.dc.html",
+    "Ask.dc.html",
+    "Unfold.dc.html"
+  ],
+  "notes": {
+    "row1": { "x": 0, "y": -300, "text": "合上管今天", "kind": "title1", "maxW": 3210 },
+    "row2": { "x": 0, "y": 1640, "text": "展开看人生", "kind": "title1", "maxW": 3780 },
+    "row3": { "x": 0, "y": 2880, "text": "电脑不在也能用（v0.7）", "kind": "title1", "maxW": 2590 }
+  },
+  "designSystems": []
+}

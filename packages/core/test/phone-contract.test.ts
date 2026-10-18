@@ -10,6 +10,7 @@ it.each([
   ["today.json", "phone-today.schema.json"],
   ["week.json", "phone-week.schema.json"],
   ["map.json", "phone-map.schema.json"],
+  ["library.json", "phone-library.schema.json"],
   ["receipts.json", "phone-receipts.schema.json"],
 ])("手机快照样例 %s 符合 %s", (file, schema) => {
   const validate = schemas().builtin(schema);
@@ -29,4 +30,12 @@ it("手机操作样例逐行符合 schema，缺参数的操作不通过", () => 
       args: { id: "b-0412" },
     }),
   ).toBe(false);
+});
+
+it("generator 可选：没有时照常通过，Agent 写名字和规则版本，未知的 kind 不通过", () => {
+  const validate = schemas().builtin("phone-today.schema.json");
+  const { generator: _generator, ...plain } = JSON.parse(fixture("today.json"));
+  expect(validate(plain)).toBe(true);
+  expect(validate({ ...plain, generator: { kind: "agent", name: "Dot", spec: 1 } })).toBe(true);
+  expect(validate({ ...plain, generator: { kind: "robot" } })).toBe(false);
 });

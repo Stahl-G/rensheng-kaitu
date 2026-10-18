@@ -82,7 +82,7 @@
 - 除了 generated_at 和 generator，和原来完全一样就不写。
 - 不写财务明细、标为敏感的记忆、Key、本机绝对路径；file 只写资料位置内的相对路径。
 
-`phone/week.json`、`phone/map.json` 不动，手机会显示它们是电脑哪天生成的。
+`phone/week.json`、`phone/map.json`、`phone/library.json` 不动，手机会显示它们是电脑哪天生成的。
 
 ### 4. 留交接
 

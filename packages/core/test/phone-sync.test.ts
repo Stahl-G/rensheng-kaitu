@@ -7,6 +7,7 @@ import {
   Workspace,
   addMemory,
   addRecord,
+  buildPhoneLibrary,
   buildPhoneMap,
   buildPhoneToday,
   buildPhoneWeek,
@@ -82,6 +83,11 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     text: "PRIVATE_MEMORY_BODY",
     sensitive: true,
   });
+  await addMemory(ws, { type: "preference", name: "合成偏好", text: "合成正文", sensitive: false });
+  ws.writeText(
+    "inbox/notes/2026-10-18/synthetic.md",
+    "---\nkind: capture\n---\n\n合成原文第一行\nPRIVATE_NOTE_SECOND_LINE\n",
+  );
   const data = await readOverviewPage(ws, now);
   const map = lifeMap(ws, now);
   const from = { name: "合成甲", lat: 10, lng: 170, precision: "city" as const };
@@ -102,6 +108,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     today: buildPhoneToday(data, now.toISOString()),
     week: buildPhoneWeek(data, now.toISOString()),
     map: buildPhoneMap(data, map, readExploration(ws), now.toISOString()),
+    library: buildPhoneLibrary(ws, data, now.toISOString()),
   };
   for (const [name, value] of Object.entries(snapshots)) {
     const validate = schemas().builtin(`phone-${name}.schema.json`);
@@ -111,6 +118,12 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(snapshots.week.projects[0]?.kind).toBe("work");
   expect(snapshots.week.health.workouts).toBe(1);
   expect(snapshots.map.rows[0]?.ahead).toBe("planned");
+  expect(snapshots.today.generator).toEqual({ kind: "computer" });
+  const items = snapshots.library.items;
+  expect(items.find((i) => i.kind === "note")).toMatchObject({ title: "合成原文第一行", date: "2026-10-18" });
+  expect(items.find((i) => i.kind === "health")?.path).toBe("health/data/workouts/2026-10.jsonl");
+  expect(items.find((i) => i.kind === "project")?.path).toBe("projects/synthetic/STATUS.md");
+  expect(items.some((i) => i.title === "合成偏好")).toBe(true);
   expect(JSON.stringify(snapshots)).not.toContain(ws.root);
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
   expect(await writePhoneSnapshots(ws, now)).toBe(0);

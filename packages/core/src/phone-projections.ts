@@ -1,13 +1,21 @@
+import { parseFrontmatter } from "./frontmatter.js";
+import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
+import { listMemories } from "./memory.js";
+import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
 import type { LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
+import { readRecords } from "./records.js";
+import { localDate, parseTs } from "./time.js";
+import type { Workspace } from "./workspace.js";
 
 type Overview = Awaited<ReturnType<typeof readOverviewPage>>;
 const envelope = (name: string, generatedAt: string) => ({
   format: `kaitu.phone.${name}`,
   version: 1,
   generated_at: generatedAt,
+  generator: { kind: "computer" },
 });
 
 export function buildPhoneToday(data: Overview, generatedAt: string) {
@@ -144,4 +152,70 @@ export function buildPhoneMap(
         : [],
     },
   };
+}
+
+/** 资料目录：只放标题、类型、日期和相对路径，手机点开哪一项才读那个文件。财务和非明确公开的记忆不进目录。 */
+export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: string) {
+  const tz = ws.timeZone();
+  const day = (ts: string) => localDate(parseTs(ts), tz);
+  const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+  const since = new Date(Date.parse(`${data.today}T12:00:00Z`) - 29 * 86400000).toISOString().slice(0, 10);
+  const items: {
+    kind: string;
+    title: string;
+    subtitle?: string;
+    date: string | null;
+    path: string;
+    id?: string;
+  }[] = [];
+  for (const p of data.projects)
+    items.push({
+      kind: "project",
+      title: p.title,
+      ...(p.next[0] ? { subtitle: clip(`下一步：${p.next[0]}`, 80) } : {}),
+      date: null,
+      path: p.file,
+    });
+  for (const g of data.plans.goals)
+    items.push({
+      kind: "me",
+      title: g.title,
+      subtitle: `记过 ${g.results} 次结果`,
+      date: null,
+      path: "me/goals.json",
+      id: g.id,
+    });
+  for (const m of listMemories(ws))
+    if (m.sensitive === false)
+      items.push({
+        kind: "me",
+        title: clip(m.name, 80),
+        date: m.updated.slice(0, 10),
+        path: `memory/${m.file}`,
+      });
+  for (const ref of listRecordTypes(ws)) {
+    if (ref.module.def.id !== "health") continue;
+    const rows = readRecords(ws, ref.type);
+    const latest = rows.at(-1);
+    if (!latest) continue;
+    const month = day(latest.ts).slice(0, 7);
+    items.push({
+      kind: "health",
+      title: ref.def.label ?? ref.type,
+      subtitle: `${rows.length} 条`,
+      date: day(latest.ts),
+      path: `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`,
+    });
+  }
+  for (const n of [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")]) {
+    // 日期取所在的日期目录；frontmatter 里的 date 可能不是字符串。
+    const date = n.path.match(/\/(\d{4}-\d{2}-\d{2})\//)?.[1];
+    if (!date || date < since) continue;
+    const line = parseFrontmatter(n.content)
+      .body.split("\n")
+      .find((l) => l.trim());
+    items.push({ kind: "note", title: clip(line?.trim() ?? "（空）", 40), date, path: n.path });
+  }
+  items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return { ...envelope("library", generatedAt), items };
 }
