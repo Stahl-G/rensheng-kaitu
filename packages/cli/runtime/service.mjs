@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSdkRuntime } from "../../desktop/sdk-runtime.mjs";
+import { createAgentConnection } from "../dist/local-agents/connection.js";
 import { createAskService } from "../dist/ui/ask.js";
 
 export function createWebAsk(ws, state) {
@@ -28,14 +29,20 @@ export function createWebAsk(ws, state) {
     }
     return current;
   };
+  const connection = createAgentConnection({
+    state,
+    workspace: () => ws.root,
+    sdk,
+    mcp: { command: process.execPath, args: [join(directory, "mcp-stdio.mjs"), ws.root] },
+  });
   return createAskService({
     state,
     workspace: ws.root,
-    runtime: (mode) => sdk().runtime(mode),
-    settings: () => sdk().settings(),
+    runtime: (mode) => connection.runtime(mode),
+    settings: () => connection.settings(),
     models: (input) => sdk().models(input),
-    configure: (input) => sdk().configure(input),
-    support: (method, input) => sdk().support(method, input),
+    configure: (input) => connection.configure(input),
+    support: (method, input) => connection.support(method, input),
     dispose: () => current.closeSupport(),
   });
 }

@@ -267,7 +267,13 @@ async function packageApplication() {
       { stdio: "inherit" },
     );
     renameHelpers();
+    // ditto can carry Finder/resource-fork metadata from the input application.
+    // Clear it only on the newly generated bundle before signing, never the source App.
+    for (const attribute of ["com.apple.FinderInfo", "com.apple.ResourceFork"])
+      execFileSync("/usr/bin/xattr", ["-dr", attribute, output]);
     await signApplication(temporary);
+    for (const attribute of ["com.apple.FinderInfo", "com.apple.ResourceFork"])
+      execFileSync("/usr/bin/xattr", ["-dr", attribute, output]);
     execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", output], { stdio: "inherit" });
     if (notaryProfile) {
       const zip = join(temporary, "Kaitu.zip");

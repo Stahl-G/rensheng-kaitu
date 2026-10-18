@@ -70,6 +70,16 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     external: ["better-sqlite3"],
   });
   await build({
+    entryPoints: [join(root, "packages/cli/dist/local-agents/mcp-stdio.js")],
+    outfile: join(payload, "dist/mcp-stdio.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["better-sqlite3"],
+  });
+  await build({
     entryPoints: [join(directory, "sdk-host.mjs")],
     outfile: join(payload, "dist/sdk-host.mjs"),
     bundle: true,
