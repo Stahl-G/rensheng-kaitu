@@ -8,6 +8,8 @@ import { KaituError } from "./errors.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
+import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
+import { schemas } from "./schema.js";
 import { placeholderOriginal } from "./sync-files.js";
 const pick = (zh: string, en: string) => translate(normalizeLocale(readPreferences().locale), zh, en);
 import { Workspace, stateDirectory } from "./workspace.js";
@@ -101,7 +103,7 @@ function selected(path: string, c: Pick<BackupConnection, "text" | "records">): 
     return false;
   if (parts[0] === "phone") return /^phone\/(today|week|map|receipts)\.json$/.test(path);
   if (parts[0] === "inbox")
-    return /^inbox\/(agents\/[^/]+\.(?:md|jsonl?|txt)|health\/[^/]+\.health\.json)$/.test(path);
+    return /^inbox\/(agents\/[^/]+\.(?:md|jsonl?|txt)|health\/[^/]+\.health\.json|notes\/.+\.md)$/.test(path);
   return (c.text && /\.(md|txt)$/i.test(path)) || (c.records && /\.(jsonl?|ya?ml|csv|ics|toml)$/i.test(path));
 }
 async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFiles> {
@@ -124,7 +126,7 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
         e.isSymbolicLink() ||
         e.name.startsWith(".") ||
         e.name === "node_modules" ||
-        (prefix === "inbox" && !["agents", "health"].includes(e.name))
+        (prefix === "inbox" && !["agents", "health", "notes"].includes(e.name))
       )
         continue;
       if (path === internal) continue;
@@ -371,6 +373,14 @@ export async function connectWorkspaceBackup(ws: Workspace, input: unknown, remo
   });
   return workspaceBackupStatus(ws);
 }
+function remoteReceipts(text: string): PhoneReceipt[] {
+  try {
+    const value = JSON.parse(text) as { items: PhoneReceipt[] };
+    return schemas().builtin("phone-receipts.schema.json")(value) ? value.items : [];
+  } catch {
+    return [];
+  }
+}
 export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRemote(ws)): Promise<void> {
   if (active.has(ws)) return active.get(ws);
   const s = state(ws);
@@ -382,6 +392,15 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       const other = await remote.read(c.repo, c.branch);
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
       const incoming = Object.fromEntries(Object.entries(other.files).filter(([path]) => selected(path, c)));
+      // 云端整理员写的回执，本机没有的先并进来；其余 phone 文件仍以本机为准。
+      if (local["phone/receipts.json"] !== undefined && incoming["phone/receipts.json"] !== undefined) {
+        const known = new Set(phoneReceipts(ws).map((r) => `${r.kind}:${r.ref}`));
+        const added = remoteReceipts(incoming["phone/receipts.json"]).filter(
+          (r) => !known.has(`${r.kind}:${r.ref}`),
+        );
+        if (added.length && writePhoneReceipts(ws, added))
+          local["phone/receipts.json"] = ws.readText("phone/receipts.json");
+      }
       // phone 由本机生成；远端删除不会清掉本机快照，也不会写回远端修改。
       const mergeIncoming = { ...incoming };
       for (const path of new Set([...Object.keys(incoming), ...Object.keys(local)])) {

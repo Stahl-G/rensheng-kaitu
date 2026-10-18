@@ -95,7 +95,7 @@
 | R5 | `renderOrganizer` 改成 [ORGANIZER.md](ORGANIZER.md) 的内容；`renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」；GitHub 方式也维护 `AGENT-README.md`（现在只有 Drive 方式）；AGENTS.md 模板 §11 那行跟着改 | 规则跟着开图版本更新，不靠用户手抄 |
 | R6 | `kaitu phone run [--as <名字>] [--dry-run]`：处理收件箱并生成全部快照，写 generator | 二档；也用来核对一档的结果 |
 
-ORGANIZER.md 的白天那一节假定电脑已有 R2–R5。测试阶段在合成仓库里手动换上。
+R2–R4 已在本 PR 实现。ORGANIZER.md 的白天那一节还假定电脑有 R5；之前测试时在合成仓库里手动换上。
 
 ## 9. 手机端改动（`kaitu-ios`）
 

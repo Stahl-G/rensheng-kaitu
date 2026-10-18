@@ -293,3 +293,34 @@ it("手机记录有一条不合格整份不写，重投不重复；冲突操作�
     expect(phoneReceipts(reopened).find((r) => r.kind === "action")?.status).toBe("conflict");
   }
 });
+
+it("云端整理员写的回执并进本机，手机重投不再执行；待整理原文随 GitHub 双向同步", async () => {
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await writePhoneSnapshots(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  const clientId = ulid();
+  const remote = JSON.parse(m.files()["phone/receipts.json"] as string);
+  remote.items.push({ ref: clientId, kind: "action", status: "applied", at: new Date().toISOString() });
+  m.deliver("phone/receipts.json", JSON.stringify(remote));
+  const agentNote = `inbox/notes/2026-10-18/ios-3fa9c1d2-${ulid()}.note.md`;
+  m.deliver(agentNote, stringifyFrontmatter({ agent: "你（iPhone）", kind: "capture" }, "整理员移来的原文"));
+  ws.writeText("inbox/notes/2026-10-18/local.md", "电脑上的待整理原文");
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(phoneReceipts(ws).some((r) => r.ref === clientId)).toBe(true);
+  expect(m.files()["phone/receipts.json"]).toBe(ws.readText("phone/receipts.json"));
+  expect(ws.exists(agentNote)).toBe(true);
+  expect(m.files()["inbox/notes/2026-10-18/local.md"]).toBe("电脑上的待整理原文");
+
+  // 待办不存在：没有回执去重时会回 conflict。
+  const action = {
+    client_id: clientId,
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "complete_task",
+  };
+  ws.writeText(phoneFile("actions.jsonl"), JSON.stringify({ ...action, args: { id: ulid() } }));
+  await processInbox(ws, { stableMs: 0 });
+  expect(phoneReceipts(ws).find((r) => r.ref === clientId)?.status).toBe("duplicate");
+});

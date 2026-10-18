@@ -17,7 +17,7 @@
 - 存放位置：本机、iCloud、同步文件夹（Google Drive、坚果云等）。
 - GitHub 备份（`workspace-backup.ts`）：
   - 用 Git Data API，每分钟同步一次，按记录 ID 和修订号三方合并。
-  - **不同步整个 `inbox/`、隐藏目录和媒体文件，并且按文本读写。**
+  - **不同步整个 `inbox/`（`agents/`、`health/` 和 v0.7 起的 `notes/` 除外）、隐藏目录和媒体文件，并且按文本读写。**
 
 v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `packages/` 里的代码。
 
