@@ -5,6 +5,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   rmSync,
   unlinkSync,
   writeFileSync,
@@ -13,7 +14,7 @@ import { dirname, join, relative, sep } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { KaituError } from "./errors.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
-import { findInboxNote, noteMetadata } from "./inbox-notes.js";
+import { noteMetadata } from "./inbox-notes.js";
 import { isoInZone, localDate } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
@@ -78,6 +79,16 @@ export function openFeishuInbox(ws: Workspace) {
         "BAD_FEISHU_STATE",
       );
     const completed = new Set<string>(saved);
+    let existingNotes: Map<string, string> | undefined;
+    function collectNotes(directory: string, notes: Map<string, string>) {
+      if (!ws.exists(directory)) return;
+      for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+        const path = `${directory}/${entry.name}`;
+        if (entry.isDirectory()) collectNotes(path, notes);
+        else if (entry.isFile() && /^feishu-[a-f0-9]{64}\.md$/.test(entry.name) && !notes.has(entry.name))
+          notes.set(entry.name, path);
+      }
+    }
     return {
       has(documentId: string, revision: number) {
         return completed.has(revisionKey(documentId, revision));
@@ -88,7 +99,12 @@ export function openFeishuInbox(ws: Workspace) {
         if (completed.has(key)) return;
         const name = `feishu-${key}.md`;
         // 仅映射缺项时恢复“已写原文但映射写失败”的窗口，包括已经归档的原文。
-        const existing = findInboxNote(ws, name);
+        // 本次导入按需枚举一次，后续新版本复用路径，不读无关正文。
+        if (!existingNotes) {
+          existingNotes = new Map();
+          collectNotes("inbox/notes", existingNotes);
+        }
+        const existing = existingNotes.get(name);
         if (existing) {
           const metadata = noteMetadata(ws.readText(existing));
           if (metadata.feishu_document_id !== doc.documentId || metadata.feishu_revision_id !== doc.revision)
@@ -126,6 +142,7 @@ export function openFeishuInbox(ws: Workspace) {
             );
             // 完整落盘后以硬链接原子发布，已有文件一律 EEXIST，不留下半篇原文。
             linkSync(temp, target);
+            existingNotes.set(name, path);
           } finally {
             rmSync(temp, { force: true });
           }

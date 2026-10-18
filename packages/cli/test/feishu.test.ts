@@ -196,6 +196,38 @@ test("同名异 ID 独立，改名和同 revision 不新增，归档/本地改�
   checkCleanCwds(f);
 });
 
+test("同批新版本只枚举一次，已有映射零遍历，缺映射的归档恢复共用一次查找", async () => {
+  const f = fixture({ pages: [{ files: [doc(), doc("docB"), doc("docC")], has_more: false }] });
+  const directory = "inbox/notes/2000-01-01";
+  f.ws.writeText(`${directory}/unrelated.md`, "unrelated original");
+  const readDirectory = fs.readdirSync;
+  const visited: string[] = [];
+  vi.spyOn(fs, "readdirSync").mockImplementation((...args: Parameters<typeof fs.readdirSync>) => {
+    visited.push(String(args[0]));
+    return readDirectory(...args);
+  });
+  syncBuiltinESMExports();
+  const first = await f.run();
+  expect(first.imported).toBe(3);
+  expect(visited.length).toBeGreaterThan(0);
+  expect(new Set(visited).size).toBe(visited.length);
+  visited.length = 0;
+  expect((await f.run()).unchanged).toBe(3);
+  expect(visited).toEqual([]);
+  const archived = first.paths.map((path) => archiveInboxNote(f.ws, path));
+  rmSync(join(f.root, ".kaitu/feishu/imports.json"));
+  visited.length = 0;
+  const recovered = await f.run();
+  expect([recovered.imported, recovered.unchanged]).toEqual([0, 3]);
+  expect(visited).toContain(f.ws.resolve("inbox/notes/done"));
+  expect(new Set(visited).size).toBe(visited.length);
+  for (const path of archived) expect(f.ws.readText(path)).toContain("# 合成原文");
+  visited.length = 0;
+  expect((await f.run()).unchanged).toBe(3);
+  expect(visited).toEqual([]);
+  checkCleanCwds(f);
+});
+
 async function rejectScenarios(cases: Scenario[]) {
   for (const scenario of cases) {
     const f = fixture(scenario);
