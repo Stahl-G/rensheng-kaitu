@@ -1,0 +1,26 @@
+{
+  "format": "kaitu.phone.receipts",
+  "version": 1,
+  "generated_at": "2026-10-18T07:31:02+08:00",
+  "items": [
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MN.note.md",
+      "kind": "file",
+      "status": "applied",
+      "at": "2026-10-18T07:31:00+08:00"
+    },
+    {
+      "ref": "01JAZ1B2C3D4E5F6G7H8J9K0MP",
+      "kind": "action",
+      "status": "applied",
+      "at": "2026-10-18T07:31:00+08:00"
+    },
+    {
+      "ref": "01JAZ1B2C3D4E5F6G7H8J9K0MQ",
+      "kind": "action",
+      "status": "conflict",
+      "message": "这条下一步已经在电脑上完成",
+      "at": "2026-10-18T07:31:01+08:00"
+    }
+  ]
+}

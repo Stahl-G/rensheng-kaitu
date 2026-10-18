@@ -69,6 +69,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     if (JSON.stringify(merged) !== JSON.stringify(existing))
       writes.set(file, `${JSON.stringify(merged, null, 2)}\n`);
   }
+  if (!ws.exists("me/ongoing.json")) writes.set("me/ongoing.json", "[]\n");
   const feedFile = "feed/feeds.json";
   if (ws.exists(feedFile)) {
     const feeds = ws.readJson<Record<string, unknown>>(feedFile);

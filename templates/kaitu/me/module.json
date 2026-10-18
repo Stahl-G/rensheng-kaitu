@@ -5,14 +5,35 @@
   "visibility": "nav",
   "description": "档案、目标、作息与规则、月度现状报告",
   "records": {
-    "task": { "path": "data/tasks/{YYYY-MM}.jsonl", "schema": "schemas/task.schema.json", "label": "待办" }
+    "task": {
+      "path": "data/tasks/{YYYY-MM}.jsonl",
+      "schema": "schemas/task.schema.json",
+      "label": "待办"
+    },
+    "phase": {
+      "path": "data/phases/{YYYY-MM}.jsonl",
+      "schema": "schemas/phase.schema.json",
+      "label": "阶段"
+    }
   },
   "views": [
-    { "type": "doc", "title": "档案", "path": "profile.md" },
-    { "type": "progress", "title": "目标", "path": "goals.json" },
-    { "type": "doc", "title": "作息与规则", "path": "rules.md" }
+    {
+      "type": "doc",
+      "title": "档案",
+      "path": "profile.md"
+    },
+    {
+      "type": "progress",
+      "title": "目标",
+      "path": "goals.json"
+    },
+    {
+      "type": "doc",
+      "title": "作息与规则",
+      "path": "rules.md"
+    }
   ],
   "agent": {
-    "instructions": "profile.md 由用户维护，Agent 只在晚间复盘时刷新末尾的「Agent 摘要」一节。修改 goals.json 与 rules.md 必须先提出建议、等用户确认。月度现状报告写入 reports/YYYY-MM.md。"
+    "instructions": "profile.md 由用户维护，Agent 只在晚间复盘时刷新末尾的「Agent 摘要」一节。修改 goals.json、ongoing.json 与 rules.md 必须先提出建议、等用户确认。月度现状报告写入 reports/YYYY-MM.md。"
   }
 }

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-receipts.schema.json",
+  "title": "手机回执（phone/receipts.json）",
+  "description": "电脑处理手机交来的文件和操作后写入，保留最近 14 天。手机据此撤销或确认本地先显示的结果。",
+  "type": "object",
+  "required": ["format", "version", "generated_at", "items"],
+  "properties": {
+    "format": { "const": "kaitu.phone.receipts" },
+    "version": { "const": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "kind", "status", "at"],
+        "properties": {
+          "ref": { "type": "string", "minLength": 1, "description": "操作的 client_id，或收件箱文件名" },
+          "kind": { "enum": ["file", "action"] },
+          "status": { "enum": ["applied", "duplicate", "conflict", "rejected"] },
+          "message": { "type": "string", "description": "conflict 和 rejected 时写明原因，给用户看" },
+          "at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

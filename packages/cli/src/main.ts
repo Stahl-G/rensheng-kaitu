@@ -43,6 +43,7 @@ import {
   inboxNotes,
   initWorkspace,
   linkProject,
+  listInvestments,
   listMemories,
   listProjects,
   listTasks,
@@ -121,7 +122,8 @@ const HELP = `开图 kaitu
   kaitu onboarding setup-confirm <token>           确认数据源设置
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
-  kaitu project new --title <标题> --kind work|personal [--link <路径>[:manuscript|repo|folder]]...
+  kaitu investments [--json]
+  kaitu project new --title <标题> --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
   kaitu project github <slug> <url>
@@ -171,6 +173,7 @@ const options = {
   due: { type: "string" },
   "remind-at": { type: "string" },
   project: { type: "string" },
+  investment: { type: "string" },
   all: { type: "boolean" },
   kind: { type: "string" },
   stage: { type: "string" },
@@ -200,6 +203,7 @@ const options = {
   limit: { type: "string" },
   timezone: { type: "string" },
   message: { type: "string", short: "m" },
+  "expected-revision": { type: "string" },
   type: { type: "string" },
   name: { type: "string" },
   text: { type: "string" },
@@ -255,7 +259,9 @@ function workspace(values: Values, maintain = true): Workspace {
 }
 
 async function run(argv: string[]): Promise<number> {
-  const { values, positionals } = parseArgs({ args: argv, options, allowPositionals: true });
+  const inputArgs =
+    argv[0] === "investments" ? argv.map((arg) => (arg === "--json" ? "--json-out" : arg)) : argv;
+  const { values, positionals } = parseArgs({ args: inputArgs, options, allowPositionals: true });
   const [cmd, ...args] = positionals;
   if (!cmd || values.help) {
     console.log(HELP);
@@ -273,6 +279,15 @@ async function run(argv: string[]): Promise<number> {
     }
     case "channels": {
       await channelsCommand(workspace(values), args, values.only, values["json-out"]);
+      return 0;
+    }
+    case "investments": {
+      const rows = listInvestments(workspace(values));
+      console.log(
+        values.json !== undefined || values["json-out"]
+          ? JSON.stringify(rows, null, 2)
+          : rows.map((r) => `${r.ref} · ${r.title} · ${r.domain} / ${r.form} / ${r.status}`).join("\n"),
+      );
       return 0;
     }
     case "project": {
@@ -582,7 +597,7 @@ async function run(argv: string[]): Promise<number> {
           ...moduleLines,
           "项目：",
           ...result.projects.flatMap((project) => [
-            `${project.title}（${project.kind === "work" ? "工作" : "个人"} / ${project.stage}）：近 7 天字数变化 ${project.recent7.words ?? "—"}，${project.recent7.commits} 次提交`,
+            `${project.title}（${project.kind === "work" ? "工作" : project.kind === "learning" ? "学习" : "个人"} / ${project.stage}）：近 7 天字数变化 ${project.recent7.words ?? "—"}，${project.recent7.commits} 次提交`,
             ...project.next.map((item) => `  ${item.title}（${item.status}）`),
           ]),
           recentSummary,
@@ -620,6 +635,7 @@ async function run(argv: string[]): Promise<number> {
                 due: values.due,
                 remind_at: values["remind-at"],
                 project: values.project,
+                investment: values.investment,
               },
               options,
             )
@@ -679,10 +695,16 @@ async function run(argv: string[]): Promise<number> {
         result = addRecord(ws, t, parseJson(values.json), { by });
         message = `${who(by)}在${ref.module.def.name}模块记录了 1 条${label}`;
       } else if (sub === "update") {
-        result = updateRecord(ws, t, need(id, "id"), parseJson(values.json), { by });
+        result = updateRecord(ws, t, need(id, "id"), parseJson(values.json), {
+          by,
+          expected_revision: values["expected-revision"] ? Number(values["expected-revision"]) : undefined,
+        });
         message = `${who(by)}修改了${ref.module.def.name}模块的 1 条${label}`;
       } else if (sub === "rm") {
-        result = deleteRecord(ws, t, need(id, "id"), { by });
+        result = deleteRecord(ws, t, need(id, "id"), {
+          by,
+          expected_revision: values["expected-revision"] ? Number(values["expected-revision"]) : undefined,
+        });
         message = `${who(by)}删除了${ref.module.def.name}模块的 1 条${label}`;
       } else {
         throw new KaituError(`未知子命令：record ${sub ?? ""}`, "BAD_ARGS");

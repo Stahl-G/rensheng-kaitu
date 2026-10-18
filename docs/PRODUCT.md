@@ -150,3 +150,5 @@ CLI/Web 安装包自带 Node 版 DSH 引擎依赖，不要求安装 Kaitu.app。
 - [PRD.md](PRD.md)：历史产品草案，其中 §6 数据规范继续有效。
 - [prd-v1.0.md](prd-v1.0.md)：历史完整功能提案，保留能力及验收依据，导航与默认行为以本文件为准。
 - [HANDOFF.md](HANDOFF.md)：实施事实、约束与历史决策。
+- [mobile/product.md](mobile/product.md)、[mobile/architecture.md](mobile/architecture.md)：iPhone 端（含折叠屏）的产品规范与架构。
+- [proposals/2026-10-18-data-spec-v2.md](proposals/2026-10-18-data-spec-v2.md)：底层架构升级——投入、阶段、尝试与手机读写。

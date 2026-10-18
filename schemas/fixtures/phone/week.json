@@ -1,0 +1,44 @@
+{
+  "format": "kaitu.phone.week",
+  "version": 1,
+  "generated_at": "2026-10-18T07:30:12+08:00",
+  "from": "2026-10-12",
+  "to": "2026-10-18",
+  "projects": [
+    {
+      "slug": "photo-book",
+      "title": "摄影集",
+      "kind": "personal",
+      "file": "projects/photo-book/STATUS.md",
+      "next": ["把初选从 80 张挑到 30 张"],
+      "words": null,
+      "commits": null,
+      "daily": []
+    },
+    {
+      "slug": "kaitu-app",
+      "title": "开图 App",
+      "kind": "work",
+      "file": "projects/kaitu-app/STATUS.md",
+      "next": ["发 TestFlight 0.6.0"],
+      "words": null,
+      "commits": 23,
+      "daily": [
+        { "date": "2026-10-16", "words": null, "commits": 9 },
+        { "date": "2026-10-17", "words": null, "commits": 14 }
+      ]
+    }
+  ],
+  "health": {
+    "workouts": 3,
+    "workout_days": 3,
+    "sleep_avg_hours": 6.8,
+    "protein_avg_g": null,
+    "weight": { "value": 71.6, "unit": "kg", "ts": "2026-10-17T08:05:00+08:00" }
+  },
+  "notes": { "captured": 5 },
+  "changes": [
+    { "time": "2026-10-17T22:41:00+08:00", "message": "你完成了下一步：交摄影集封面初稿" },
+    { "time": "2026-10-17T21:10:00+08:00", "message": "Agent（iPhone）新增了 1 条记录" }
+  ]
+}

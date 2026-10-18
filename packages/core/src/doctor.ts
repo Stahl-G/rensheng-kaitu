@@ -1,7 +1,10 @@
 import { existsSync, statSync } from "node:fs";
 import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
+import { inboxNotes } from "./inbox-notes.js";
 import { CONFIG_VERSION } from "./init.js";
-import { listModules } from "./modules.js";
+import { investmentOf, listInvestments } from "./investments.js";
+import { listModules, listRecordTypes } from "./modules.js";
+import { readRecords } from "./records.js";
 import { syncInventory } from "./sync-files.js";
 import { templateOutdated } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
@@ -119,6 +122,29 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
     for (const p of [".kaitu/secrets.json", ".kaitu/index.sqlite"])
       if (await isTracked(ws, p)) leaked.push(p);
     if (leaked.length) add("版本历史中没有密钥", false, `已被记录：${leaked.join("、")}`);
+  }
+
+  try {
+    const investments = new Set(listInvestments(ws).map((item) => item.ref));
+    const dangling: string[] = [];
+    for (const ref of listRecordTypes(ws)) {
+      for (const record of readRecords(ws, ref.type)) {
+        const refs = [
+          investmentOf(record),
+          ...(ref.type === "phase" && Array.isArray(record.investments) ? record.investments : []),
+        ];
+        for (const investment of refs)
+          if (investment && !investments.has(String(investment)))
+            dangling.push(`${ref.type}:${record.id} → ${investment}`);
+      }
+    }
+    for (const note of inboxNotes(ws)) {
+      const investment = investmentOf(note);
+      if (investment && !investments.has(investment)) dangling.push(`${note.path} → ${investment}`);
+    }
+    add("投入引用有效", !dangling.length, dangling.length ? dangling.join("、") : undefined);
+  } catch (error) {
+    add("投入引用有效", false, (error as Error).message);
   }
 
   const { conflicts } = syncInventory(ws.root);

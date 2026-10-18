@@ -191,7 +191,7 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
   const session = usePreview<OnboardingSetupPreview>(props.cancelOnboarding);
   const [mode, setMode] = useState<"folder" | "github">("folder");
   const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<"work" | "personal">("work");
+  const [kind, setKind] = useState<"work" | "learning" | "personal">("work");
   const [path, setPath] = useState("");
   const [github, setGithub] = useState("");
   const [keywords, setKeywords] = useState("");
@@ -302,9 +302,10 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
                 className={styles.select}
                 value={kind}
                 disabled={locked}
-                onChange={(event) => setKind(event.target.value as "work" | "personal")}
+                onChange={(event) => setKind(event.target.value as "work" | "learning" | "personal")}
               >
                 <option value="work">工作项目</option>
+                <option value="learning">学习项目</option>
                 <option value="personal">个人项目</option>
               </select>
             </label>

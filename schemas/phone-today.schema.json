@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-today.schema.json",
+  "title": "手机快照：今天（phone/today.json）",
+  "description": "电脑生成，手机只读。next 的第一项就是今天最重要的一件事，与电脑今天页一致。字段只增不改，手机忽略不认识的字段。",
+  "type": "object",
+  "required": [
+    "format",
+    "version",
+    "generated_at",
+    "today",
+    "timezone",
+    "next",
+    "proposals",
+    "blocks",
+    "goals",
+    "question",
+    "sync"
+  ],
+  "properties": {
+    "format": { "const": "kaitu.phone.today" },
+    "version": { "const": 1 },
+    "generated_at": { "type": "string", "format": "date-time", "description": "内容最近一次变化的时间" },
+    "today": { "type": "string", "format": "date" },
+    "timezone": { "type": "string", "minLength": 1 },
+    "next": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/next" } },
+    "proposals": {
+      "type": "array",
+      "description": "待确认的日程建议：NOW.md 里 kind 为 proposal、status 为 pending 的块",
+      "items": { "$ref": "#/$defs/block" }
+    },
+    "blocks": { "type": "array", "description": "今天其余的日程块", "items": { "$ref": "#/$defs/block" } },
+    "goals": {
+      "type": "array",
+      "description": "进行中的目标（你带来的规划）",
+      "items": { "$ref": "#/$defs/goal" }
+    },
+    "question": { "type": "null", "description": "关键问题，version 1 恒为 null，预留" },
+    "sync": {
+      "type": "object",
+      "required": ["received", "needs_review", "organizer", "updated_at"],
+      "properties": {
+        "received": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "已收到、还没整理的原文和收件箱文件数"
+        },
+        "needs_review": { "type": "integer", "minimum": 0 },
+        "organizer": { "type": "boolean", "description": "是否开着每日整理" },
+        "updated_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "资料最近一次真正更新的时间"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "description": "资料文件夹内的相对路径",
+      "pattern": "^(?![/~])(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "next": {
+      "type": "object",
+      "required": ["id", "title", "file", "section", "proposed"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "file": { "$ref": "#/$defs/path", "description": "所在 STATUS.md；complete_next 原样带回" },
+        "module": { "type": "string" },
+        "section": { "enum": ["today", "me", "health", "projects", "feed"] },
+        "proposed": { "type": "boolean", "description": "AI 提议、尚未确认" },
+        "draft": { "type": "boolean", "description": "原文整理出的待核对草稿" },
+        "due": { "type": "string" }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["id", "title", "kind", "status"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+        "end": { "type": "string", "pattern": "^([01]\\d|2[0-4]):[0-5]\\d$" },
+        "kind": { "enum": ["event", "proposal", "task"] },
+        "module": { "type": "string" },
+        "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "required": ["id", "title", "results", "next"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "results": { "type": "integer", "minimum": 0, "description": "记下的结果条数" },
+        "last_result": { "type": ["string", "null"] },
+        "next": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["id", "title"],
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "title": { "type": "string", "minLength": 1 },
+                "due": { "type": ["string", "null"] }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

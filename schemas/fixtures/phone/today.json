@@ -1,0 +1,68 @@
+{
+  "format": "kaitu.phone.today",
+  "version": 1,
+  "generated_at": "2026-10-18T07:30:12+08:00",
+  "today": "2026-10-18",
+  "timezone": "Asia/Shanghai",
+  "next": [
+    {
+      "id": "n-0301",
+      "title": "把摄影集初选从 80 张挑到 30 张",
+      "file": "projects/photo-book/STATUS.md",
+      "module": "projects",
+      "section": "projects",
+      "proposed": false,
+      "due": "2026-10-19"
+    },
+    {
+      "id": "onboarding-matter-01jaz0w6qk8r2f4m7n9p1s3t5v",
+      "title": "每周留一个晚上练吉他",
+      "file": "me/STATUS.md",
+      "module": "me",
+      "section": "me",
+      "proposed": true,
+      "draft": true
+    },
+    {
+      "id": "h-0007",
+      "title": "周六有氧 30 分钟",
+      "file": "health/STATUS.md",
+      "module": "health",
+      "section": "health",
+      "proposed": false
+    }
+  ],
+  "proposals": [
+    {
+      "id": "b-0412",
+      "title": "整理摄影集",
+      "start": "20:00",
+      "end": "21:00",
+      "kind": "proposal",
+      "module": "projects",
+      "status": "pending"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "b-0410",
+      "title": "周会",
+      "start": "10:00",
+      "end": "11:00",
+      "kind": "event",
+      "status": "confirmed"
+    }
+  ],
+  "goals": [
+    {
+      "id": "photo-book",
+      "title": "年底出一本摄影集",
+      "results": 3,
+      "last_result": "完成第一轮选片",
+      "next": { "id": "01JAZ0W6QK8R2F4M7N9P1S3T5V", "title": "把初选从 80 张挑到 30 张", "due": "2026-10-19" }
+    },
+    { "id": "guitar", "title": "能弹完一首完整的曲子", "results": 0, "last_result": null, "next": null }
+  ],
+  "question": null,
+  "sync": { "received": 2, "needs_review": 1, "organizer": true, "updated_at": "2026-10-18T07:30:00+08:00" }
+}

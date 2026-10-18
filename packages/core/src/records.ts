@@ -30,6 +30,7 @@ export interface StoredRecord {
 export interface WriteOptions {
   by?: By;
   now?: Date;
+  expected_revision?: number;
 }
 
 export interface WriteResult {
@@ -41,7 +42,25 @@ export interface WriteResult {
 
 const RESERVED = ["id", "by", "rev", "deleted"] as const;
 
-function validateRecord(ws: Workspace, ref: RecordTypeRef, record: StoredRecord): void {
+function validateRecord(
+  ws: Workspace,
+  ref: RecordTypeRef,
+  record: StoredRecord,
+  previous?: StoredRecord,
+  expectedRevision?: number,
+): void {
+  if (ref.type === "phase") {
+    if ((previous || (record.rev ?? 1) > 1) && (!previous || expectedRevision !== (previous.rev ?? 1)))
+      throw new KaituError("阶段已经更新，请携带当前预期修订号", "CONFLICT");
+    if (
+      record.by !== "user" &&
+      (record.deleted ||
+        record.status !== "suggested" ||
+        record.reflection !== undefined ||
+        (previous && (previous.by !== "agent" || previous.status !== "suggested")))
+    )
+      throw new KaituError("Agent 只能维护自己提议的阶段文字，确认与回顾由用户决定", "USER_DECISION");
+  }
   if (ref.type === "experience_source" && record.by !== "user")
     throw new KaituError("足迹来源设置由用户决定", "USER_DECISION");
   if (
@@ -90,8 +109,15 @@ function stripReserved(data: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-function write(ws: Workspace, ref: RecordTypeRef, record: StoredRecord, tz: string): WriteResult {
-  validateRecord(ws, ref, record);
+function write(
+  ws: Workspace,
+  ref: RecordTypeRef,
+  record: StoredRecord,
+  tz: string,
+  previous?: StoredRecord,
+  expectedRevision?: number,
+): WriteResult {
+  validateRecord(ws, ref, record, previous, expectedRevision);
   const file = recordFileFor(ref, localMonth(parseTs(record.ts), tz));
   resolveRecordPath(ws, ref, file);
   ws.appendLine(file, JSON.stringify(record));
@@ -203,7 +229,7 @@ export function updateRecord(
     rev: (current.rev ?? 1) + 1,
   };
   parseTs(merged.ts);
-  return write(ws, ref, merged, ws.timeZone());
+  return write(ws, ref, merged, ws.timeZone(), current, opts.expected_revision);
 }
 
 /** 删除：追加删除标记。标记写在删除时刻所在月份的文件里，读取时按 rev 全局取最新。 */
@@ -220,7 +246,7 @@ export function deleteRecord(ws: Workspace, type: string, id: string, opts: Writ
     rev: (current.rev ?? 1) + 1,
     deleted: true,
   };
-  return write(ws, ref, tomb, tz);
+  return write(ws, ref, tomb, tz, current, opts.expected_revision);
 }
 
 export interface RecordLine {
@@ -320,10 +346,13 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
 function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+  const phases = entries.some((entry) => entry.type === "phase")
+    ? new Map(readRecords(ws, "phase").map((record) => [record.id, record]))
+    : undefined;
   return entries.map(({ type, record }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
-    validateRecord(ws, ref, record);
+    validateRecord(ws, ref, record, type === "phase" ? phases?.get(record.id) : undefined);
     const file = recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
     resolveRecordPath(ws, ref, file);
     return { file, record, ref };

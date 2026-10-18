@@ -18,6 +18,22 @@
     "./experience-time": {
       "types": "./dist/experience-time.d.ts",
       "default": "./dist/experience-time.js"
+    },
+    "./completion-rate": {
+      "types": "./dist/completion-rate.d.ts",
+      "default": "./dist/completion-rate.js"
+    },
+    "./progress-map": {
+      "types": "./dist/progress-map.d.ts",
+      "default": "./dist/progress-map.js"
+    },
+    "./journey-routes": {
+      "types": "./dist/journey-routes.d.ts",
+      "default": "./dist/journey-routes.js"
+    },
+    "./phone-projections": {
+      "types": "./dist/phone-projections.d.ts",
+      "default": "./dist/phone-projections.js"
     }
   },
   "scripts": {

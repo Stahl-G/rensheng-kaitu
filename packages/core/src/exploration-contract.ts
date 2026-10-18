@@ -13,6 +13,10 @@ const direction = z
   .strict();
 const experiment = z
   .object({
+    investment: z
+      .string()
+      .regex(/^(project|learning|ongoing):[^/\\:]+$/)
+      .optional(),
     question: text,
     action: text,
     budget: text,
@@ -51,7 +55,10 @@ export const explorationCommandSchema: z.ZodType<ExplorationCommand> = z.discrim
     })
     .strict(),
   z
-    .object({ operation: z.literal("create_experiment"), data: experiment.extend({ direction_id: text }) })
+    .object({
+      operation: z.literal("create_experiment"),
+      data: experiment.extend({ direction_id: text.optional() }),
+    })
     .strict(),
   z
     .object({
@@ -69,6 +76,20 @@ export const explorationCommandSchema: z.ZodType<ExplorationCommand> = z.discrim
     .object({
       operation: z.literal("add_note"),
       data: note.extend({ direction_id: text, experiment_id: text.optional() }),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal("create_checkin"),
+      data: z
+        .object({
+          experiment_id: text,
+          date: z.iso.date(),
+          done: z.boolean(),
+          note: z.string().optional(),
+          investment: experiment.shape.investment,
+        })
+        .strict(),
     })
     .strict(),
   z.object({ operation: z.literal("update_note"), ...revision, data: note.partial() }).strict(),
