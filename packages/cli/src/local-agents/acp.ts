@@ -1,10 +1,38 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 
+interface AcpChoice {
+  value?: string;
+  name?: string;
+}
 interface AcpResult {
   sessionId?: string;
   agentCapabilities?: { loadSession?: boolean; sessionCapabilities?: { resume?: boolean } };
   stopReason?: string;
+  configOptions?: {
+    id: string;
+    category?: string;
+    currentValue?: unknown;
+    options?: (AcpChoice & { options?: AcpChoice[] })[];
+  }[];
+  models?: { currentModelId?: string; availableModels?: { modelId: string; name?: string }[] };
+}
+
+/** 会话可选的模型：新版 ACP 放在 configOptions 的 model 项里，旧版放在 models 里。 */
+export function sessionModels(result: AcpResult) {
+  const option = result.configOptions?.find((item) => item.category === "model" || item.id === "model");
+  if (option)
+    return {
+      configId: option.id,
+      current: typeof option.currentValue === "string" ? option.currentValue : undefined,
+      models: (option.options ?? [])
+        .flatMap((item): AcpChoice[] => item.options ?? [item])
+        .map((item) => ({ id: item.value ?? "", name: item.name })),
+    };
+  return {
+    current: result.models?.currentModelId,
+    models: (result.models?.availableModels ?? []).map((item) => ({ id: item.modelId, name: item.name })),
+  };
 }
 
 export function connectAcp(

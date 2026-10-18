@@ -4,13 +4,47 @@ import { homedir } from "node:os";
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { KaituError } from "@kaitu/core";
 
-export function agentEnvironment(source = process.env): NodeJS.ProcessEnv {
+export interface LocalAgent {
+  id: string;
+  name: string;
+  bins: string[];
+  /** 让 CLI 以 ACP 方式在 stdio 上运行的参数。 */
+  args: string[];
+  /** 这个 agent 自己的登录变量前缀，其余密钥不传给它。 */
+  env: string[];
+}
+// 启动参数参考 Open Design 的 runtime 清单（Apache-2.0）；claude、codex 用 Zed 的 ACP 适配器。
+export const localAgents: LocalAgent[] = [
+  { id: "codebuddy", name: "CodeBuddy", bins: ["codebuddy", "cbc"], args: ["--acp"], env: ["CODEBUDDY_"] },
+  { id: "claude", name: "Claude Code", bins: ["claude-agent-acp"], args: [], env: ["ANTHROPIC_", "CLAUDE_"] },
+  { id: "codex", name: "Codex", bins: ["codex-acp"], args: [], env: ["OPENAI_", "CODEX_"] },
+  { id: "opencode", name: "OpenCode", bins: ["opencode"], args: ["acp"], env: ["OPENCODE_"] },
+  { id: "kimi", name: "Kimi Code", bins: ["kimi"], args: ["acp"], env: ["KIMI_", "MOONSHOT_"] },
+  { id: "hermes", name: "Hermes", bins: ["hermes"], args: ["acp"], env: ["HERMES_"] },
+  {
+    id: "reasonix",
+    name: "DeepSeek Reasonix",
+    bins: ["reasonix", "dsnix"],
+    args: ["acp"],
+    env: ["DEEPSEEK_"],
+  },
+  { id: "kilo", name: "Kilo", bins: ["kilo"], args: ["acp"], env: ["KILO_"] },
+  { id: "kiro", name: "Kiro", bins: ["kiro-cli"], args: ["acp"], env: ["KIRO_"] },
+  { id: "vibe", name: "Mistral Vibe", bins: ["vibe-acp"], args: [], env: ["MISTRAL_"] },
+];
+export function localAgent(id = "codebuddy"): LocalAgent {
+  const agent = localAgents.find((item) => item.id === id);
+  if (!agent) throw new KaituError("不支持这个本机 Agent", "AI_CONFIG");
+  return agent;
+}
+export function agentEnvironment(agent: LocalAgent, source = process.env): NodeJS.ProcessEnv {
   const env = { ...source };
-  // 去掉开图自己的变量、Electron 的 Node 开关和别家的密钥；只留 CodeBuddy 自己的登录变量（如 CODEBUDDY_API_KEY）。
+  // 去掉开图自己的变量、Electron 的 Node 开关和别家的密钥；只留这个 agent 自己的登录变量（如 CODEBUDDY_API_KEY）。
   for (const key of Object.keys(env))
     if (
       /^(?:KAITU_|DSH_|ELECTRON_|NODE_OPTIONS$)/.test(key) ||
-      (!key.startsWith("CODEBUDDY_") && /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key))
+      (!agent.env.some((prefix) => key.startsWith(prefix)) &&
+        /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key))
     )
       delete env[key];
   const home = env.HOME ?? env.USERPROFILE ?? homedir();
@@ -28,6 +62,8 @@ export function agentEnvironment(source = process.env): NodeJS.ProcessEnv {
       [
         ...(env.PATH ?? env.Path ?? "").split(delimiter),
         join(home, ".local/bin"),
+        join(home, ".kimi-code/bin"),
+        join(home, ".opencode/bin"),
         join(home, ".npm-global/bin"),
         join(home, ".volta/bin"),
         ...nvmBins,
@@ -40,16 +76,20 @@ export function agentEnvironment(source = process.env): NodeJS.ProcessEnv {
   const { Path: _path, ...normalized } = env;
   return normalized;
 }
-export function findCodeBuddy(custom?: string, env = agentEnvironment()): string | undefined {
+export function findAgent(
+  agent: LocalAgent,
+  custom: string | undefined,
+  env: NodeJS.ProcessEnv,
+): string | undefined {
   const extensions = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
   const candidates = custom
     ? [custom]
-    : ["codebuddy", "cbc"].flatMap((name) =>
+    : agent.bins.flatMap((name) =>
         (env.PATH ?? "").split(delimiter).flatMap((dir) => extensions.map((ext) => join(dir, name + ext))),
       );
   for (const candidate of candidates) {
     if (custom && !isAbsolute(candidate))
-      throw new KaituError("请填写 CodeBuddy CLI 的绝对路径", "AI_CONFIG");
+      throw new KaituError(`请填写 ${agent.name} CLI 的绝对路径`, "AI_CONFIG");
     try {
       accessSync(candidate, constants.X_OK);
       if (statSync(candidate).isFile()) return resolve(candidate);
@@ -68,24 +108,24 @@ export function cliCommand(
   const sibling = bin.slice(0, -extname(bin).length);
   const text = existsSync(sibling) ? readFileSync(sibling, "utf8") : "";
   const match = /"\$basedir\/([^"\r\n]+)"\s+"\$@"/.exec(text);
-  if (!match?.[1]) throw new KaituError("无法识别 CodeBuddy 启动文件，请填写原生程序的路径", "AI_CONNECTION");
+  if (!match?.[1]) throw new KaituError("无法识别 CLI 启动文件，请填写原生程序的路径", "AI_CONNECTION");
   const entry = resolve(dirname(bin), match[1]);
   const node = [
     join(dirname(bin), "node.exe"),
     ...(env.PATH ?? "").split(delimiter).map((dir) => join(dir, "node.exe")),
   ].find(existsSync);
-  if (!node || !existsSync(entry))
-    throw new KaituError("CodeBuddy CLI 缺少 Node 或入口文件", "AI_CONNECTION");
+  if (!node || !existsSync(entry)) throw new KaituError("CLI 缺少 Node 或入口文件", "AI_CONNECTION");
   return [node, entry];
 }
-export function launchCodeBuddy(
+export function launchAgent(
+  agent: LocalAgent,
   bin: string,
   cwd: string,
   env: NodeJS.ProcessEnv,
 ): ChildProcessWithoutNullStreams {
   const [command, ...args] = cliCommand(bin, env);
   const childEnv = { ...env, PATH: [dirname(bin), env.PATH ?? ""].join(delimiter) };
-  return spawn(command, [...args, "--acp"], {
+  return spawn(command, [...args, ...agent.args], {
     cwd,
     env: childEnv,
     windowsHide: true,

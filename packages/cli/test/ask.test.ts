@@ -115,3 +115,32 @@ test("SDK turns persist and replay only their own visible events through SSE", a
     rmSync(temp, { recursive: true, force: true });
   }
 });
+test("conversations can be pinned, renamed, archived and deleted", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-ask-organize-"));
+  try {
+    const options = {
+      state: join(temp, "state"),
+      workspace: temp,
+      settings: async () => ({ configured: true, provider: "fake", model: "fake" }),
+      configure: async () => ({}),
+      models: async () => [],
+      runtime: async (): Promise<AskRuntime> => {
+        throw Error("not used");
+      },
+    };
+    const ask = createAskService(options);
+    const row = ask.create();
+    ask.organize(row.id, { pinned: true, title: "  计划  " });
+    ask.organize(row.id, { archived: true });
+    expect(createAskService(options).list()[0]).toMatchObject({
+      title: "计划",
+      pinned: true,
+      archived: true,
+    });
+    ask.remove(row.id);
+    expect(createAskService(options).list()).toEqual([]);
+    expect(() => ask.events(row.id)).toThrow(/不存在/);
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});

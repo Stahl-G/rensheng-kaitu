@@ -2,21 +2,21 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import { KaituError } from "@kaitu/core";
 import type { AskMode, AskService } from "../ui/ask.js";
-import { agentEnvironment, findCodeBuddy } from "./codebuddy.js";
-import { type McpCommand, createCodeBuddyRuntime } from "./runtime.js";
+import { agentEnvironment, findAgent, localAgent, localAgents } from "./agents.js";
+import { type McpCommand, agentModels, createAgentRuntime } from "./runtime.js";
 
 export function createAgentConnection(options: {
   state: string;
   workspace: () => string;
   mcp: McpCommand;
   sdk: () => Pick<AskService, "settings" | "configure" | "models"> & {
-    runtime(mode: AskMode): ReturnType<typeof createCodeBuddyRuntime>;
+    runtime(mode: AskMode): ReturnType<typeof createAgentRuntime>;
     support(method: string, input: Record<string, unknown>): Promise<unknown>;
   };
   env?: NodeJS.ProcessEnv;
 }) {
   const file = join(options.state, "local-agent.json");
-  let saved: { choice?: string; path?: string } = existsSync(file)
+  let saved: { choice?: string; agent?: string; path?: string; model?: string } = existsSync(file)
     ? JSON.parse(readFileSync(file, "utf8"))
     : {};
   const save = (next: typeof saved) => {
@@ -24,30 +24,42 @@ export function createAgentConnection(options: {
     writeFileSync(`${file}.tmp`, JSON.stringify(next), { mode: 0o600 });
     renameSync(`${file}.tmp`, file);
     saved = next;
-    found = undefined;
   };
   const local = () => saved.choice === "local";
-  // 每次发消息都会读设置；CLI 位置只在启动和重新连接时找一次。
-  let found: { path?: string } | undefined;
-  const detection = () => {
-    found ??= { path: findCodeBuddy(saved.path, agentEnvironment(options.env)) };
-    const { path } = found;
-    return { id: "codebuddy", name: "CodeBuddy", path, status: path ? "installed" : "missing" };
+  // 每次发消息都会读设置；CLI 位置只在启动时找一次，模型列表按 CLI 缓存。
+  let installed: { id: string; name: string; path: string }[] | undefined;
+  const models = new Map<string, Promise<{ id: string; name?: string }[]>>();
+  const find = (id: string, custom?: string) => {
+    const agent = localAgent(id);
+    return findAgent(agent, custom, agentEnvironment(agent, options.env));
+  };
+  const detected = () => {
+    installed ??= localAgents.flatMap((agent) => {
+      const path = find(agent.id);
+      return path ? [{ id: agent.id, name: agent.name, path }] : [];
+    });
+    return installed;
+  };
+  const current = () => {
+    const agent = localAgent(saved.agent);
+    const path = saved.path ?? detected().find((item) => item.id === agent.id)?.path;
+    return { agent, path };
   };
   const settings = async () => {
-    if (!local()) return { ...(await options.sdk().settings()), backend: "dsh" };
-    const detected = detection();
+    if (!local()) return { ...(await options.sdk().settings()), backend: "dsh", localAgents: detected() };
+    const { agent, path } = current();
     return {
       choice: "local" as const,
-      configured: !!detected.path,
-      provider: "codebuddy",
-      providerName: "CodeBuddy",
-      model: "CodeBuddy 默认",
+      configured: !!path,
+      provider: agent.id,
+      providerName: agent.name,
+      model: saved.model ?? "默认模型",
       supportsImages: false,
       supportsAttachments: false,
-      // 换了 CLI（另一个安装或登录环境）就算换了连接：旧对话要新建，不拿旧会话去续接。
-      backend: `codebuddy:${detected.path ?? ""}`,
-      localAgent: detected,
+      // 换了 agent 或 CLI（另一个安装或登录环境）就算换了连接：旧对话要新建；换模型仍续接原会话。
+      backend: `${agent.id}:${path ?? ""}`,
+      localAgent: { id: agent.id, name: agent.name, path, status: path ? "installed" : "missing" },
+      localAgents: detected(),
       fullOnly: true,
       protocols: [],
       providers: [],
@@ -57,31 +69,52 @@ export function createAgentConnection(options: {
     settings,
     async configure(input: Record<string, unknown>) {
       if (input.choice === "local") {
+        const agent = localAgent(typeof input.agent === "string" ? input.agent : undefined);
         const selected = typeof input.path === "string" && input.path.trim() ? input.path.trim() : undefined;
-        if (!findCodeBuddy(selected, agentEnvironment(options.env)))
+        if (!find(agent.id, selected))
           throw new KaituError(
-            "未找到 CodeBuddy CLI，请安装并登录，或填写已有 CLI 的绝对路径",
+            `未找到 ${agent.name} CLI，请安装并登录，或填写已有 CLI 的绝对路径`,
             "AI_CONNECTION",
           );
-        save({ choice: "local", ...(selected ? { path: selected } : {}) });
+        save({
+          choice: "local",
+          agent: agent.id,
+          ...(selected ? { path: selected } : {}),
+          ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
+        });
         return settings();
       }
       const result = await options.sdk().configure(input);
       if (input.choice) save({ choice: String(input.choice) });
       return result;
     },
-    models: (input: Record<string, unknown>) => options.sdk().models(input),
+    async models(input: Record<string, unknown>) {
+      if (typeof input.agent !== "string") return options.sdk().models(input);
+      const agent = localAgent(input.agent);
+      const path = find(agent.id, typeof input.path === "string" && input.path ? input.path : undefined);
+      if (!path) throw new KaituError(`未找到 ${agent.name} CLI`, "AI_CONNECTION");
+      let list = models.get(path);
+      if (!list) {
+        list = agentModels(agent, path, options.state, options.env);
+        models.set(path, list);
+        list.catch(() => models.delete(path));
+      }
+      return list;
+    },
     async support(method: string, input: Record<string, unknown>) {
       if (method === "builtinSettings") return options.sdk().settings();
-      if (local()) throw new KaituError("CodeBuddy 只接收文字，不能用附件和引用", "AI_CONNECTION");
+      if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },
     runtime(mode: AskMode) {
       if (!local()) return options.sdk().runtime(mode);
-      return createCodeBuddyRuntime({
+      const { agent, path } = current();
+      return createAgentRuntime({
+        agent,
+        model: saved.model,
         workspace: options.workspace(),
         state: options.state,
-        path: detection().path,
+        path,
         mcp: options.mcp,
         env: options.env,
       });
