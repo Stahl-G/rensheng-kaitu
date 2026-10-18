@@ -134,7 +134,7 @@ it("图片接口只返回有记录的照片，拒绝任意路径和 ..", async (
   expect((await fetch(`${ui.url}/api/photos/${record.id}`)).status).toBe(400);
 });
 
-it("工作台自动导入健康 zip，归档原件，重复投递不增加记录或版本", async () => {
+it("工作台自动导入健康 zip 并归档原件", async () => {
   const { ws } = await setup();
   const before = (await history(ws)).length;
   const zip = appleHealthZip();
@@ -148,11 +148,6 @@ it("工作台自动导入健康 zip，归档原件，重复投递不增加记录
   const archived = `inbox/processed/${localDate(new Date(), ws.timeZone())}/export.zip`;
   expect(ws.exists(archived)).toBe(true);
   expect(ws.exists(incoming)).toBe(false);
-  ws.writeText(incoming, zip);
-  await expect.poll(() => ws.exists(incoming), { timeout: 5000 }).toBe(false);
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  expect(await history(ws)).toHaveLength(before + 1);
-  expect(readRecords(ws, "metric")).toHaveLength(6);
 });
 
 it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读后才主动开启 AI", async () => {

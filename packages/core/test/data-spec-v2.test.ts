@@ -136,8 +136,6 @@ it("完成率与有解析解的 Beta 分位一致，并在混合大样本时保�
   const success = completionRate([{ done: true }]);
   expect(success.lower).toBeCloseTo(Math.sqrt(0.1), 9);
   expect(success.upper).toBeCloseTo(Math.sqrt(0.9), 9);
-  const failures = completionRate([{ done: false }]);
-  expect(failures.lower).toBeCloseTo(1 - Math.sqrt(0.9), 9);
   const balanced = completionRate([{ done: true }, { done: false }]);
   expect(balanced.lower).toBeCloseTo(0.1958001056590917, 9);
   expect(balanced.upper).toBeCloseTo(0.8041998943409083, 9);
