@@ -232,6 +232,10 @@ export async function productRequest(
         return ask.list();
       case "askCreate":
         return ask.create();
+      case "askOrganize":
+        return ask.organize(text(0), (args[1] ?? {}) as Record<string, unknown>);
+      case "askRemove":
+        return ask.remove(text(0));
       case "askEvents":
         return ask.events(text(0));
       case "askSend":

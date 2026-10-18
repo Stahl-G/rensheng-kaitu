@@ -215,11 +215,51 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         : [];
     })
     .slice(0, 30);
+  const directionState: Record<string, string> = {
+    suggested: "还没探索",
+    active: "在试",
+    paused: "已暂停",
+    archived: "已归档",
+    dismissed: "已忽略",
+  };
+  const recordTitle = (row: { [key: string]: unknown }) => {
+    for (const key of ["title", "name", "text", "summary", "topic"] as const) {
+      const value = row[key];
+      if (typeof value === "string" && value.trim()) return value.trim().replace(/\s+/g, " ");
+    }
+    return "";
+  };
+  const topicTitle = (topic: (typeof data.statuses)[number]) => {
+    const titled = (topic.data as { title?: string }).title?.trim();
+    if (titled) return titled;
+    const heading = topic.body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+    if (heading) return heading;
+    if (topic.data.progress?.label) return topic.data.progress.label;
+    const parts = topic.file.split("/");
+    return parts.length >= 2 ? (parts[parts.length - 2] ?? topic.file) : topic.file;
+  };
+  const keepPreview = (list: { at: number; line: string }[], at: number, line: string) => {
+    if (!line) return;
+    list.push({ at, line });
+    list.sort((a, b) => b.at - a.at);
+    if (list.length > 2) list.length = 2;
+  };
+  const bumpLatest = (current: { latest: string | null; at: number }, value: string | null | undefined) => {
+    const at = value ? Date.parse(value) : Number.NaN;
+    if (Number.isFinite(at) && at > current.at) {
+      current.latest = value as string;
+      current.at = at;
+    }
+  };
   const sections = data.modules.flatMap(({ dir, def }) => {
-    const records = Object.keys(def.records ?? {}).flatMap<{ ts: string }>((type) => {
+    const typed = Object.keys(def.records ?? {}).flatMap((type) => {
       if (["experience_batch", "experience_source", "finance_fx_rate"].includes(type)) return [];
-      return type === "experience" ? experiences : (data.records[type] ?? []);
+      const rows = (type === "experience" ? experiences : (data.records[type] ?? [])) as Array<
+        StoredRecord & { [key: string]: unknown }
+      >;
+      return rows.map((row) => ({ type, row }));
     });
+    const records = typed.map((item) => item.row);
     const topics = data.statuses.filter(
       (item) => item.file.startsWith(`${dir}/`) && item.file !== `${dir}/STATUS.md`,
     );
@@ -234,20 +274,64 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
               ? data.memories.length + data.goals.length
               : records.length + topics.length;
     if (!count) return [];
-    // 只要最新的一个时间，扫一遍即可，不排序。
-    let latest: string | null = null;
-    let latestAt = Number.NEGATIVE_INFINITY;
-    for (const value of [
-      ...records.map((record) => record.ts),
-      ...topics.map((topic) => topic.data.updated),
-    ]) {
-      const at = value ? Date.parse(value) : Number.NaN;
-      if (Number.isFinite(at) && at > latestAt) {
-        latest = value as string;
-        latestAt = at;
+    // 扫一遍：最新时间 + 最近两条标题（财务与敏感记忆不进预览）。
+    const latestState = { latest: null as string | null, at: Number.NEGATIVE_INFINITY };
+    const previewRows: { at: number; line: string }[] = [];
+    for (const record of records) bumpLatest(latestState, record.ts);
+    for (const topic of topics) bumpLatest(latestState, topic.data.updated);
+    if (def.id === "me") {
+      for (const memory of data.memories) bumpLatest(latestState, memory.updated);
+    }
+    if (def.id !== "finance") {
+      for (const { type, row } of typed) {
+        const at = Date.parse(row.ts);
+        if (!Number.isFinite(at)) continue;
+        let line = recordTitle(row);
+        if (!line) continue;
+        if (type === "direction") {
+          const state = directionState[String(row.status)] ?? "";
+          line = state ? `${line} · ${state}` : line;
+        } else if (type === "news_item" && typeof row.source === "string" && row.source.trim()) {
+          line = `${line} · ${row.source.trim()}`;
+        }
+        keepPreview(previewRows, at, line);
+      }
+      for (const topic of topics) {
+        const at = topic.data.updated ? Date.parse(topic.data.updated) : Number.NaN;
+        keepPreview(previewRows, Number.isFinite(at) ? at : 0, topicTitle(topic));
+      }
+      if (def.id === "me") {
+        for (const goal of data.goals) {
+          const at = goal.due ? Date.parse(goal.due) : Number.NaN;
+          keepPreview(previewRows, Number.isFinite(at) ? at : 0, goal.title.trim());
+        }
+        for (const memory of data.memories) {
+          if (memory.sensitive) continue;
+          const at = Date.parse(memory.updated);
+          if (!Number.isFinite(at)) continue;
+          keepPreview(previewRows, at, memory.name.trim() || memory.text.trim().slice(0, 40));
+        }
+      }
+      if (def.id === "feed") {
+        for (const digest of data.digests) {
+          const stamp = digest.file.match(/(\d{4}-\d{2}-\d{2})/)?.[1];
+          const at = stamp ? Date.parse(stamp) : Number.NaN;
+          bumpLatest(latestState, stamp ?? null);
+          const heading = digest.body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+          const name = digest.file.split("/").pop()?.replace(/\.md$/, "") ?? digest.file;
+          keepPreview(previewRows, Number.isFinite(at) ? at : 0, heading || name);
+        }
       }
     }
-    return [{ id: def.id, label: def.name, count, latest }];
+    return [
+      {
+        id: def.id,
+        label: def.name,
+        count,
+        latest: latestState.latest,
+        preview: previewRows.map((row) => row.line),
+      },
+    ];
   });
   return {
     root: data.root,

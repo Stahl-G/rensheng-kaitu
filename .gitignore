@@ -2,6 +2,10 @@
 node_modules/
 dist/
 .kaitu/
+*.tsbuildinfo
+
+# 误克隆进开图仓库根目录的独立项目，勿提交
+dsh-novel-workspace/
 
 # 访谈逐字稿仅本地参考，不公开（版权）
 docs/reference/interview-transcript.*

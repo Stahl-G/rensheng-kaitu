@@ -7,9 +7,24 @@ import type {
 } from "../types.js";
 import type { FinancePageProps } from "./FinancePage.js";
 import css from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { useLocale, useT } from "./i18n.js";
 
 const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
+
+function formatCardDate(iso: string | null, today: string, locale: "zh-CN" | "en") {
+  if (!iso) return "";
+  const day = iso.slice(0, 10);
+  const todayAt = Date.parse(`${today}T12:00:00`);
+  const dayAt = Date.parse(`${day}T12:00:00`);
+  if (!Number.isFinite(todayAt) || !Number.isFinite(dayAt)) return day;
+  const diff = Math.round((todayAt - dayAt) / 86_400_000);
+  if (diff === 0) return locale === "en" ? "Today" : "今天";
+  if (diff === 1) return locale === "en" ? "Yesterday" : "昨天";
+  if (diff > 1 && diff < 7) return locale === "en" ? `${diff} days ago` : `${diff} 天前`;
+  const date = new Date(`${day}T12:00:00`);
+  if (locale === "en") return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
+}
 const money = (metric: { amount: string | null; record_ids: string[] } | undefined, currency: string) =>
   metric?.amount !== null && metric?.amount !== undefined && metric.record_ids.length
     ? `${currency} ${metric.amount}`
@@ -114,6 +129,7 @@ export function TodayFinance({
 }
 export function DataSummaries({ data, open }: { data: OverviewData; open: (id: string) => void }) {
   const t = useT();
+  const locale = useLocale();
   const sections = data.sections.filter((section) => section.id !== "finance");
   if (!sections.length) return null;
   return (
@@ -122,91 +138,99 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
         <h2 className={css.eyebrow}>{t("你的数据", "Your data")}</h2>
       </div>
       <div className={css.grid}>
-        {sections.map((section) => (
-          <button
-            type="button"
-            className={`${css.sum} ${css.card} ${css.summaryButton}`}
-            key={section.id}
-            onClick={() => open(section.id)}
-          >
-            <span className={css["sum-h"]}>
-              <i
-                className={css.dot}
-                style={{
-                  background: `var(--${({ health: "health", projects: "doing", feed: "news", calendar: "news", me: "me" } as Record<string, string>)[section.id] ?? "explore"})`,
-                }}
-              />
-              {t(
-                (
-                  { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
-                    string,
-                    string
-                  >
-                )[section.id] ?? section.label,
-                (
-                  {
-                    feed: "News",
-                    me: "Profile",
-                    explore: "Directions",
-                    projects: "Projects",
-                    health: "Health",
-                    calendar: "Schedule",
-                    learning: "Learning",
-                    decisions: "Decisions",
-                    reviews: "Reviews",
-                  } as Record<string, string>
-                )[section.id] ?? section.label,
-              )}
-              <span>{t(`${section.count} 条`, `${section.count}`)}</span>
-            </span>
-            {section.id === "health" && data.metrics.length ? (
-              <>
-                <div className={css.pair}>
-                  {data.metrics.slice(0, 2).map((metric) => (
-                    <span className={css.stack} key={metric.key}>
-                      <span className={`${css.big} ${css.num}`}>
-                        {metric.value === null
-                          ? "尚无记录"
-                          : `${metric.estimated ? "约 " : ""}${nf.format(metric.value)} ${metric.unit}`}
-                      </span>
-                      <span className={css.small}>
-                        {metric.label} · {metric.days} 天有记录
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                <div className={css.week}>
-                  {data.metrics
-                    .find((m) => m.key === "workouts")
-                    ?.daily.map((day) => (
-                      <span
-                        key={day.date}
-                        title={`${day.date}：${day.value === null ? "没记" : `${day.value} 次`}`}
-                      >
-                        <i style={day.value !== null ? { background: "var(--health)" } : {}} />
-                        {day.date.slice(8)}
+        {sections.map((section) => {
+          const when = formatCardDate(section.latest, data.today, locale);
+          return (
+            <button
+              type="button"
+              className={`${css.sum} ${css.card} ${css.summaryButton}`}
+              key={section.id}
+              onClick={() => open(section.id)}
+            >
+              <span className={css["sum-h"]}>
+                <i
+                  className={css.dot}
+                  style={{
+                    background: `var(--${({ health: "health", projects: "doing", feed: "news", calendar: "news", me: "me" } as Record<string, string>)[section.id] ?? "explore"})`,
+                  }}
+                />
+                {t(
+                  (
+                    { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
+                      string,
+                      string
+                    >
+                  )[section.id] ?? section.label,
+                  (
+                    {
+                      feed: "News",
+                      me: "Profile",
+                      explore: "Directions",
+                      projects: "Projects",
+                      health: "Health",
+                      calendar: "Schedule",
+                      learning: "Learning",
+                      decisions: "Decisions",
+                      reviews: "Reviews",
+                    } as Record<string, string>
+                  )[section.id] ?? section.label,
+                )}
+                <span>
+                  {t(`${section.count} 条`, `${section.count}`)}
+                  {when ? ` · ${when}` : ""}
+                </span>
+              </span>
+              {section.id === "health" && data.metrics.length ? (
+                <>
+                  <div className={css.pair}>
+                    {data.metrics.slice(0, 2).map((metric) => (
+                      <span className={css.stack} key={metric.key}>
+                        <span className={`${css.big} ${css.num}`}>
+                          {metric.value === null
+                            ? "尚无记录"
+                            : `${metric.estimated ? "约 " : ""}${nf.format(metric.value)} ${metric.unit}`}
+                        </span>
+                        <span className={css.small}>
+                          {metric.label} · {metric.days} 天有记录
+                        </span>
                       </span>
                     ))}
-                </div>
-              </>
-            ) : section.id === "projects" && data.projects.length ? (
-              data.projects.slice(0, 2).map((project) => (
-                <span className={css.stack} key={project.slug}>
-                  <b>{project.title}</b>
-                  <span className={css.small}>
-                    {project.next[0] ?? t("还没有下一步", "No next step yet")}
+                  </div>
+                  <div className={css.week}>
+                    {data.metrics
+                      .find((m) => m.key === "workouts")
+                      ?.daily.map((day) => (
+                        <span
+                          key={day.date}
+                          title={`${day.date}：${day.value === null ? "没记" : `${day.value} 次`}`}
+                        >
+                          <i style={day.value !== null ? { background: "var(--health)" } : {}} />
+                          {day.date.slice(8)}
+                        </span>
+                      ))}
+                  </div>
+                </>
+              ) : section.id === "projects" && data.projects.length ? (
+                data.projects.slice(0, 2).map((project) => (
+                  <span className={css.stack} key={project.slug}>
+                    <b>{project.title}</b>
+                    <span className={css.small}>
+                      {project.next[0] ?? t("还没有下一步", "No next step yet")}
+                    </span>
                   </span>
+                ))
+              ) : section.preview?.length ? (
+                <span className={css.sumPreview}>
+                  {section.preview.map((line, index) => (
+                    <span key={`${index}-${line}`}>{line}</span>
+                  ))}
                 </span>
-              ))
-            ) : (
-              <span className={css.small}>
-                {section.latest
-                  ? t(`记录日期 ${section.latest.slice(0, 10)}`, `Recorded ${section.latest.slice(0, 10)}`)
-                  : t("查看全部资料与来源", "See all notes and sources")}
-              </span>
-            )}
-          </button>
-        ))}
+              ) : (
+                <span className={css.small}>{t("查看全部资料与来源", "See all notes and sources")}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
