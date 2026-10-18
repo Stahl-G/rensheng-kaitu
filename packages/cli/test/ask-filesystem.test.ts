@@ -32,6 +32,12 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
     async readText(target: Target) {
       return readFileSync(target.targetKey, "utf8");
     }
+    async writeText(target: Target, text: string) {
+      writeFileSync(target.targetKey, text);
+    }
+    async editText(target: Target, text: string) {
+      return this.writeText(target, text);
+    }
   }
   try {
     const { mkdirSync } = await import("node:fs");
@@ -46,6 +52,14 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
     await expect(files.resolve(outside)).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
     await expect(files.resolve("../outside.txt")).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
     await expect(files.resolve("link")).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
+    mkdirSync(join(root, "me"));
+    writeFileSync(join(root, "me/goals.json"), "[]");
+    for (const path of ["NOW.md", "me/goals.json"]) {
+      const managed = await files.resolve(path);
+      await expect(files.writeText(managed, "AI 决定")).rejects.toThrow();
+      await expect(files.editText(managed, "AI 决定")).rejects.toThrow();
+    }
+    expect(readFileSync(join(root, "me/goals.json"), "utf8")).toBe("[]");
     const target = await files.resolve("NOW.md");
     unlinkSync(join(root, "NOW.md"));
     symlinkSync(outside, join(root, "NOW.md"));

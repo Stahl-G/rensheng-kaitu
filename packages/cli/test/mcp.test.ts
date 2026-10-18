@@ -3,7 +3,15 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { addMemory, history, initWorkspace, mcpToken, readRecords } from "@kaitu/core";
+import {
+  addMemory,
+  calendarPushEntries,
+  history,
+  initWorkspace,
+  mcpToken,
+  parseFrontmatter,
+  readRecords,
+} from "@kaitu/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -154,6 +162,48 @@ it("公网 remote 读不到标为敏感的记忆：列表、搜索、索引和�
       "合成公开记忆",
     );
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("MCP 日程回执仍待确认，模型不能伪造用户署名或经记录接口写目标", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-decisions-"));
+  const client = new Client({ name: "synthetic-agent", version: "1" });
+  const server = await initWorkspace(root);
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  try {
+    await createMcpServer(server).connect(serverSide);
+    await client.connect(clientSide);
+    const response = await client.callTool({
+      name: "propose_block",
+      arguments: { title: "合成日程", start: "10:00", end: "11:00" },
+    });
+    expect(response.isError).not.toBe(true);
+    const receipt = JSON.parse((response.content as { text: string }[])[0]?.text ?? "");
+    expect(receipt).toMatchObject({
+      block: { kind: "proposal", status: "pending" },
+      version: expect.any(String),
+    });
+    expect(parseFrontmatter<{ blocks: unknown[] }>(server.readText("NOW.md")).data.blocks).toContainEqual(
+      receipt.block,
+    );
+    expect(calendarPushEntries(server)).toEqual([]);
+    const spoof = await client.callTool({
+      name: "record_add",
+      arguments: { type: "task", data: { title: "伪造决定", status: "open", by: "user" } },
+    });
+    expect(spoof.isError).not.toBe(true);
+    expect(readRecords(server, "task")).toEqual([
+      expect.objectContaining({ title: "伪造决定", by: "agent" }),
+    ]);
+    const goal = await client.callTool({
+      name: "record_add",
+      arguments: { type: "goal", data: { title: "未经确认的目标", status: "active" } },
+    });
+    expect(goal.isError).toBe(true);
+    expect(server.readJson("me/goals.json")).toEqual([]);
+  } finally {
+    await client.close();
     rmSync(root, { recursive: true, force: true });
   }
 });
