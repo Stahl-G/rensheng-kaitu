@@ -1,0 +1,71 @@
+{
+  "exe": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\安装 测试\\Installed Kaitu\\Kaitu.exe",
+  "root": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\最终1021 合成\\中文 空格 工作区",
+  "scope": "Installed EXE + HTTP and process lifecycle only; native GUI remains unverified",
+  "checks": [
+    {
+      "name": "process-started",
+      "pid": 29564,
+      "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\最终1021 合成\\中文 空格 工作区",
+      "base": "http://127.0.0.1:59837"
+    },
+    {
+      "name": "fresh-profile-has-no-credentials"
+    },
+    {
+      "name": "page-api-overview"
+    },
+    {
+      "name": "page-api-health"
+    },
+    {
+      "name": "page-api-projects"
+    },
+    {
+      "name": "page-api-library"
+    },
+    {
+      "name": "page-api-doing"
+    },
+    {
+      "name": "capture-saved",
+      "path": "inbox/notes/2026-10-19/01m582dxyqqma9exs41y6qmzme.md"
+    },
+    {
+      "name": "project-create-read",
+      "slug": "windows"
+    },
+    {
+      "name": "missing-local-agent-error"
+    },
+    {
+      "name": "synthetic-acp-first-connect-failure"
+    },
+    {
+      "name": "synthetic-acp-retry"
+    },
+    {
+      "name": "synthetic-acp-switch-keeps-thread",
+      "thread": "session-f711c318-9c13-4233-80a3-6757b7f00b03"
+    },
+    {
+      "name": "process-started",
+      "pid": 8492,
+      "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\最终1021 合成\\中文 空格 工作区",
+      "base": "http://127.0.0.1:63287"
+    },
+    {
+      "name": "process-restart-record-and-synthetic-session-readback"
+    },
+    {
+      "name": "process-started",
+      "pid": 33400,
+      "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\最终1021 合成\\旧版 RC4 工作区",
+      "base": "http://127.0.0.1:63100"
+    },
+    {
+      "name": "rc4-workspace-open-and-upgrade-retains-note"
+    }
+  ],
+  "passed": true
+}

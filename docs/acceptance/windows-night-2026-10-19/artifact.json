@@ -1,0 +1,27 @@
+{
+  "baselineSha": "6e5ca015d8344b5770ab0511630b08f3d0ac045c",
+  "productSourceSha": "acaddb3ed671011bf1b206c909164f95a13ff555",
+  "branch": "codex/windows-night-1019",
+  "version": "0.1.0-rc.5",
+  "installerRevision": "1021",
+  "dshVersion": "0.2.1-rc.2",
+  "electronVersion": "44.7.0",
+  "platform": "win32",
+  "arch": "x64",
+  "signed": false,
+  "installer": "D:\\test\\rensheng-kaitu-windows-night-1019\\dist\\windows-night-1019-final\\Kaitu-Setup-0.1.0-rc.5-windows.1021-x64.exe",
+  "bytes": 297764655,
+  "sha256": "9bfe430a44494151681276ee8bf18355729165a6fffe64e6f53e3f0c5e4ab1fa",
+  "installerExitCode": 0,
+  "installedFilesMatchUnpacked": {
+    "Kaitu.exe": "bcddbcfb92eb532553365f91af7a8ee235f0f053c4bab56d35b2b6364031af0b",
+    "resources/kaitu/dist/index.js": "2ce75adfdb709fb004966469c2166c8ffa0d3fc6490c613e6c3b4150d68f016b",
+    "resources/kaitu/dist/client.js": "da99ef8218a1db232aa335cdca891f1c63b7978847fe880b56dde4aa257edbe5"
+  },
+  "nativeGuiVerified": false,
+  "realAgentVerified": false,
+  "screenshots": [],
+  "releaseCreated": false,
+  "websiteDeployed": false,
+  "suitableForUserTrial": false
+}
