@@ -87,9 +87,9 @@ export function statusFiles(ws: Workspace): { file: string; module: string }[] {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
       if (ws.conflictCopy(file)) continue;
-      // 模块的附件与已声明的记录目录不含状态文档；保留自建模块的任意层级主题。
+      // 只排除已知健康附件与声明的记录目录；files 也可以是合法主题名。
       if (entry.isDirectory()) {
-        if (entry.name !== "files" && !recordDirectories.has(file)) walk(file, module);
+        if (file !== "health/files" && !recordDirectories.has(file)) walk(file, module);
       } else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }

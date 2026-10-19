@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { inboxNotes } from "../src/inbox-notes.js";
 import { readLibrary, readLibraryDocument } from "../src/library.js";
-import { statusFiles } from "../src/workbench.js";
+import { completeNext, statusFiles } from "../src/workbench.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
 it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，单份详情不读取无关资料或附件", async () => {
@@ -31,6 +31,11 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
       JSON.stringify({ id: "custom", name: "合成模块", version: 1, visibility: "agent" }),
     );
     create("custom/nested/topic/STATUS.md", "---\nupdated: null\n---\n自建嵌套主题\n");
+    create(
+      "learning/files/STATUS.md",
+      "---\nupdated: null\nnext:\n  - id: topic-next\n    title: 合法主题下一步\n    status: todo\n---\n# files 主题\n",
+    );
+    create("custom/nested/files/STATUS.md", "---\nupdated: null\n---\n合法自建主题\n");
     const reads = vi.spyOn(ws, "readBytes");
     const summary = readLibrary(ws, { section: "summary" });
     expect(summary.sections.some((section) => section.id === "inbox")).toBe(true);
@@ -70,7 +75,14 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
     expect(statuses.some((row) => row.file === "custom/nested/topic/STATUS.md")).toBe(true);
     expect(paths.mock.calls.some(([file]) => file.startsWith("health/files/"))).toBe(false);
     expect(paths.mock.calls.some(([file]) => file === "health/data/workouts")).toBe(false);
+    expect(statuses.some((row) => row.file === "learning/files/STATUS.md")).toBe(true);
+    expect(statuses.some((row) => row.file === "custom/nested/files/STATUS.md")).toBe(true);
     paths.mockRestore();
+    expect(
+      readLibrary(ws, { section: "notes" }).notes.some((row) => row.file === "learning/files/STATUS.md"),
+    ).toBe(true);
+    await completeNext(ws, "learning/files/STATUS.md", "topic-next");
+    expect(ws.readText("learning/files/STATUS.md")).toContain("status: done");
     rmSync(outside, { recursive: true, force: true });
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
