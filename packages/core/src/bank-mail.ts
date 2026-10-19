@@ -48,5 +48,6 @@ export function quarantineBankNotes(ws: Workspace): void {
         rmSync(ws.resolve(file));
     }
   }
-  walk("inbox");
+  for (const directory of ["inbox/agents", "inbox/notes", "inbox/processed"])
+    if (ws.exists(directory)) walk(directory);
 }

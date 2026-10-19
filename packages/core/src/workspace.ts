@@ -16,7 +16,7 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
 import { maintainHistoryIgnore } from "./history.js";
-import { overviewDeferred, refreshOverview } from "./overview.js";
+import { holdOverview, overviewDeferred, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
@@ -96,8 +96,9 @@ export class Workspace {
     this.zone = null;
   }
 
-  constructor(root: string, options: { maintain?: boolean } = {}) {
+  constructor(root: string, options: { maintain?: boolean; deferOverview?: boolean } = {}) {
     this.root = resolve(root);
+    if (options.deferOverview) holdOverview(this);
     if (options.maintain === false) return;
     try {
       const state = stateDirectory(this.root, this.icloud);
@@ -116,7 +117,7 @@ export class Workspace {
         ensureTaskModule,
         quarantineBankNotes,
         maintainHistoryIgnore,
-        refreshOverview,
+        ...(options.deferOverview ? [] : [refreshOverview]),
       ]) {
         try {
           maintain(this);
