@@ -7,6 +7,7 @@ import {
   Workspace,
   addMemory,
   addRecord,
+  buildPhoneLibrary,
   buildPhoneMap,
   buildPhoneToday,
   buildPhoneWeek,
@@ -82,6 +83,13 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     text: "PRIVATE_MEMORY_BODY",
     sensitive: true,
   });
+  await addMemory(ws, { type: "preference", name: "合成偏好", text: "合成正文", sensitive: false });
+  ws.writeText(
+    "inbox/notes/2026-10-18/synthetic.md",
+    "---\nkind: capture\n---\n\n合成原文第一行\nPRIVATE_NOTE_SECOND_LINE\n",
+  );
+  // 写坏的 frontmatter 只影响这一条，不让整份快照停更。
+  ws.writeText("inbox/notes/2026-10-17/broken.md", "---\nkind: [capture\n---\n\n写坏的 frontmatter\n");
   const data = await readOverviewPage(ws, now);
   const map = lifeMap(ws, now);
   const from = { name: "合成甲", lat: 10, lng: 170, precision: "city" as const };
@@ -102,6 +110,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     today: buildPhoneToday(data, now.toISOString()),
     week: buildPhoneWeek(data, now.toISOString()),
     map: buildPhoneMap(data, map, readExploration(ws), now.toISOString()),
+    library: buildPhoneLibrary(ws, data, now.toISOString()),
   };
   for (const [name, value] of Object.entries(snapshots)) {
     const validate = schemas().builtin(`phone-${name}.schema.json`);
@@ -111,6 +120,13 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(snapshots.week.projects[0]?.kind).toBe("work");
   expect(snapshots.week.health.workouts).toBe(1);
   expect(snapshots.map.rows[0]?.ahead).toBe("planned");
+  expect(snapshots.today.generator).toEqual({ kind: "computer" });
+  const items = snapshots.library.items;
+  expect(items.find((i) => i.kind === "note")).toMatchObject({ title: "合成原文第一行", date: "2026-10-18" });
+  expect(items.find((i) => i.kind === "health")?.path).toBe("health/data/workouts/2026-10.jsonl");
+  expect(items.find((i) => i.kind === "project")?.path).toBe("projects/synthetic/STATUS.md");
+  expect(items.some((i) => i.title === "合成偏好")).toBe(true);
+  expect(items.some((i) => i.title === "写坏的 frontmatter")).toBe(true);
   expect(JSON.stringify(snapshots)).not.toContain(ws.root);
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
   expect(await writePhoneSnapshots(ws, now)).toBe(0);
@@ -292,4 +308,35 @@ it("手机记录有一条不合格整份不写，重投不重复；冲突操作�
     await processInbox(reopened, { stableMs: 0 });
     expect(phoneReceipts(reopened).find((r) => r.kind === "action")?.status).toBe("conflict");
   }
+});
+
+it("云端整理员写的回执并进本机，手机重投不再执行；待整理原文随 GitHub 双向同步", async () => {
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await writePhoneSnapshots(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  const clientId = ulid();
+  const remote = JSON.parse(m.files()["phone/receipts.json"] as string);
+  remote.items.push({ ref: clientId, kind: "action", status: "applied", at: new Date().toISOString() });
+  m.deliver("phone/receipts.json", JSON.stringify(remote));
+  const agentNote = `inbox/notes/2026-10-18/ios-3fa9c1d2-${ulid()}.note.md`;
+  m.deliver(agentNote, stringifyFrontmatter({ agent: "你（iPhone）", kind: "capture" }, "整理员移来的原文"));
+  ws.writeText("inbox/notes/2026-10-18/local.md", "电脑上的待整理原文");
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(phoneReceipts(ws).some((r) => r.ref === clientId)).toBe(true);
+  expect(m.files()["phone/receipts.json"]).toBe(ws.readText("phone/receipts.json"));
+  expect(ws.exists(agentNote)).toBe(true);
+  expect(m.files()["inbox/notes/2026-10-18/local.md"]).toBe("电脑上的待整理原文");
+
+  // 待办不存在：没有回执去重时会回 conflict。
+  const action = {
+    client_id: clientId,
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "complete_task",
+  };
+  ws.writeText(phoneFile("actions.jsonl"), JSON.stringify({ ...action, args: { id: ulid() } }));
+  await processInbox(ws, { stableMs: 0 });
+  expect(phoneReceipts(ws).find((r) => r.ref === clientId)?.status).toBe("duplicate");
 });

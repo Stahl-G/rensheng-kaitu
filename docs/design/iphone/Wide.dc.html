@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图 · 展开后的双栏</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
+</style>
+</helmet>
+<div style="width: 1180px; height: 820px; overflow: hidden; display: flex; background: #F5F5F3; color: #1F1E1D; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
+
+  <nav aria-label="页面" style="width: 232px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 28px 12px 20px; background: #EEEDE9; border-right: 1px solid #E4E3DD;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 10px 18px;">
+      <svg width="28" height="28" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#1B3254" stroke="#1B3254" stroke-width="1.5" stroke-linejoin="round"></path>
+        <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2B4C7E" stroke="#2B4C7E" stroke-width="1.5" stroke-linejoin="round"></path>
+        <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#B8CBE4" stroke="#B8CBE4" stroke-width="1.5" stroke-linejoin="round"></path>
+        <path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+        <path d="M30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1B3254" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span style="font-size: 17px; font-weight: 700;">人生开图</span>
+    </div>
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 10px; color: #1F1E1D; font-size: 17px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4D4C48" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"></path></svg>
+      今天
+    </a>
+    <a href="WideMap.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 10px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(31,30,29,0.08); color: #1B3254; font-size: 17px; font-weight: 600;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B4C7E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"></path><path d="M9 4v14M15 6v14"></path></svg>
+      开图
+    </a>
+    <div aria-disabled="true" style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 10px; color: #6B6A66; font-size: 17px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14v10H10l-5 4z"></path></svg>
+      <span style="flex: 1;">问问</span>
+      <span style="font-size: 12px;">下一版</span>
+    </div>
+    <div style="flex: 1;"></div>
+    <a href="Status.dc.html" style="display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; color: #4D4C48; font-size: 13px;">
+      <span style="display: inline-flex; align-items: center; gap: 7px;"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 4px; background: #3E8A5A;"></span>电脑 07:30 更新</span>
+      <span style="padding-left: 14px; color: #6B6A66;">2 条在路上</span>
+    </a>
+    <button type="button" style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; color: #1F1E1D; font-size: 17px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4D4C48" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      设置
+    </button>
+  </nav>
+
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 26px 28px 24px;">
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;">
+      <div style="display: flex; align-items: baseline; gap: 14px;">
+        <a href="WideMap.dc.html" style="display: inline-flex; align-items: center; gap: 2px; min-height: 44px; font-size: 17px; color: #2B4C7E;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>地图</a>
+        <h1 style="margin: 0; font-size: 30px; line-height: 36px; font-weight: 700;">全部信息</h1>
+        <span style="font-size: 15px; color: #6B6A66;">截至 10月18日 · 周日</span>
+      </div>
+      <a href="Capture.dc.html" style="display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 22px; background: #1F1E1D; color: #FFFFFF; font-size: 15px; font-weight: 600;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+        记一下
+      </a>
+    </div>
+
+    <div style="flex: 1; min-height: 0; display: flex; gap: 24px;">
+      <div style="flex: 3 1 0; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="border-radius: 22px; overflow: hidden; background: #EEF1EC; box-shadow: 0 0 0 1px #E6E4DD;">
+          <svg width="100%" height="300" viewBox="0 0 520 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="人生进度图：从合肥到南京，再到现在的上海，计划去杭州">
+            <rect x="0" y="0" width="520" height="300" fill="#EEF1EC"></rect>
+            <path d="M0 60H520M0 120H520M0 180H520M0 240H520M65 0V300M130 0V300M195 0V300M260 0V300M325 0V300M390 0V300M455 0V300" stroke="#DDE2DA" stroke-width="1"></path>
+            <path d="M430 0 C420 40 418 80 452 112 C470 128 466 155 455 180 C435 205 395 230 352 258 C368 276 410 286 520 280 L520 0 Z" fill="#F4F6F7"></path>
+            <path d="M520 280 C410 286 368 276 352 258 C348 280 370 296 400 300 L520 300 Z" fill="#F4F6F7"></path>
+            <ellipse cx="325" cy="156" rx="24" ry="19" fill="#F4F6F7"></ellipse>
+            <path d="M0 290 C30 270 60 245 69 237 C110 200 150 170 179 144 C195 110 200 75 211 56 C230 40 250 36 264 40 C290 50 315 68 333 75 C380 92 420 108 455 121" fill="none" stroke="#DCE4E8" stroke-width="3" stroke-linecap="round"></path>
+            <path d="M83.5 84 Q150 50 211 56.5 Q330 64 428.5 152" fill="none" stroke="#2B4C7E" stroke-width="3.5" stroke-linecap="round"></path>
+            <path d="M428.5 152 Q402 225 321 262.6" fill="none" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 7"></path>
+            <circle cx="83.5" cy="84" r="7" fill="#1B3254" stroke="#FFFFFF" stroke-width="2.5"></circle>
+            <circle cx="211" cy="56.5" r="6" fill="#1B3254" stroke="#FFFFFF" stroke-width="2.5"></circle>
+            <circle cx="428.5" cy="152" r="16" fill="#2B4C7E" fill-opacity="0.16"></circle>
+            <circle cx="428.5" cy="152" r="8" fill="#2B4C7E" stroke="#FFFFFF" stroke-width="2.5"></circle>
+            <circle cx="321" cy="262.6" r="7" fill="#FFFFFF" stroke="#2B4C7E" stroke-width="2.2" stroke-dasharray="3 2.5"></circle>
+            <text x="96" y="107" font-size="13" font-weight="600" fill="#1F1E1D" stroke="#EEF1EC" stroke-width="4" paint-order="stroke">合肥 · 家乡</text>
+            <text x="211" y="40" font-size="13" font-weight="600" fill="#1F1E1D" stroke="#EEF1EC" stroke-width="4" paint-order="stroke" text-anchor="middle">南京 · 2014–2018</text>
+            <text x="412" y="185" font-size="13" font-weight="700" fill="#1B3254" stroke="#EEF1EC" stroke-width="4" paint-order="stroke" text-anchor="end">上海 · 2018 至今</text>
+            <text x="305" y="289" font-size="13" font-weight="600" fill="#1F1E1D" stroke="#EEF1EC" stroke-width="4" paint-order="stroke" text-anchor="end">杭州 · 计划</text>
+          </svg>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; min-width: 0;">
+            <span style="font-size: 12px; color: #6B6A66;">目标</span>
+            <span style="font-size: 16px; line-height: 21px; font-weight: 600;">年底出一本摄影集</span>
+            <svg width="100%" height="10" viewBox="0 0 140 10" preserveAspectRatio="none" aria-hidden="true"><path d="M2 5H66" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><circle cx="70" cy="5" r="4" fill="#2B4C7E"></circle><path d="M78 5H138" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
+            <span style="font-size: 14px; line-height: 19px; color: #4D4C48;">下一步：把初选从 80 张挑到 30 张</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; min-width: 0;">
+            <span style="font-size: 12px; color: #6B6A66;">项目</span>
+            <span style="font-size: 16px; line-height: 21px; font-weight: 600;">开图 App</span>
+            <svg width="100%" height="10" viewBox="0 0 140 10" preserveAspectRatio="none" aria-hidden="true"><path d="M2 5H96" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><circle cx="100" cy="5" r="4" fill="#2B4C7E"></circle><path d="M108 5H138" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg>
+            <span style="font-size: 14px; line-height: 19px; color: #4D4C48;">下一步：发 TestFlight 0.6.0</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; min-width: 0;">
+            <span style="font-size: 12px; color: #6B6A66;">方向 · AI 提的</span>
+            <span style="font-size: 16px; line-height: 21px; font-weight: 600;">要不要搬去杭州</span>
+            <svg width="100%" height="10" viewBox="0 0 140 10" preserveAspectRatio="none" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="#FFFFFF" stroke="#2B4C7E" stroke-width="1.8"></circle><path d="M14 5H138" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round" stroke-dasharray="0.5 7" stroke-opacity="0.7"></path></svg>
+            <span style="font-size: 14px; line-height: 19px; color: #6B6A66;">还没探索</span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 20px; padding: 14px 16px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">这一周 · 10月12日 – 18日</span>
+            <span style="font-size: 15px; line-height: 21px;">训练 3 次，平均睡眠 6.8 小时，体重 71.6 kg，记下 5 条原文。</span>
+          </div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none;">
+            <span style="font-size: 13px; color: #4D4C48;">开图 App · 23 次提交</span>
+            <div aria-hidden="true" style="display: flex; gap: 5px;">
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #F0EFEC;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #F0EFEC;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #F0EFEC;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #F0EFEC;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #8FAED6;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #2B4C7E;"></span>
+              <span style="width: 12px; height: 12px; border-radius: 6px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #2B4C7E;"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section aria-labelledby="wide-today" style="flex: 2 1 0; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding-left: 24px; border-left: 1px solid #E4E3DD;">
+        <h2 id="wide-today" style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">今天</h2>
+
+        <div style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 20px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06), 0 0 0 1px #E6E4DD;">
+          <div style="display: flex; justify-content: space-between; gap: 12px;">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: #2B4C7E;">最重要的一件事</span>
+            <span style="font-size: 12px; color: #6B6A66;">明天截止</span>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: flex-start;">
+            <button type="button" aria-label="完成：把摄影集初选从 80 张挑到 30 张" style="flex: none; width: 44px; height: 44px; margin: -6px 0 0 -6px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0;">
+              <span style="width: 28px; height: 28px; border-radius: 14px; border: 2px solid #2B4C7E; background: #FFFFFF;"></span>
+            </button>
+            <span style="flex: 1; min-width: 0; font-size: 19px; line-height: 25px; font-weight: 600;">把摄影集初选从 80 张挑到 30 张</span>
+          </div>
+        </div>
+
+        <div style="border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; overflow: hidden;">
+          <div style="display: flex; gap: 4px; align-items: center; padding: 6px 14px 6px 4px; min-height: 56px;">
+            <span aria-hidden="true" style="flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 1.5px dashed #85837E;"></span></span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 16px; line-height: 21px;">每周留一个晚上练吉他</span>
+              <span style="font-size: 12px; color: #6B6A66;">草稿 · 去电脑核对</span>
+            </div>
+          </div>
+          <div style="height: 1px; background: #E6E4DD; margin-left: 48px;"></div>
+          <div style="display: flex; gap: 4px; align-items: center; padding: 6px 14px 6px 4px; min-height: 56px;">
+            <button type="button" aria-label="完成：周六有氧 30 分钟" style="flex: none; width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0;"><span style="width: 22px; height: 22px; border-radius: 11px; border: 2px solid #85837E;"></span></button>
+            <span style="flex: 1; min-width: 0; font-size: 16px; line-height: 21px;">周六有氧 30 分钟</span>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 16px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
+          <div style="display: flex; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums;">
+            <span style="width: 92px; flex: none; font-size: 14px; color: #6B6A66;">10:00–11:00</span>
+            <span style="flex: 1; min-width: 0; font-size: 16px;">周会</span>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums;">
+            <span style="width: 92px; flex: none; font-size: 14px; color: #6B6A66;">15:00–16:30</span>
+            <span style="flex: 1; min-width: 0; font-size: 16px;">外景拍摄</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6A66" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="在 iPhone 日历里"><rect x="3.5" y="5" width="17" height="15" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #EEF2F7; border: 1px dashed #D3DEEC;">
+            <div style="display: flex; gap: 12px; align-items: baseline; font-variant-numeric: tabular-nums;">
+              <span style="width: 80px; flex: none; font-size: 14px; color: #1B3254;">20:00–21:00</span>
+              <span style="flex: 1; min-width: 0; font-size: 16px;">整理摄影集</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" style="height: 34px; padding: 0 14px; border-radius: 17px; border: 0; background: #1F1E1D; color: #FFFFFF; font-size: 14px; font-weight: 600;">加进日历</button>
+              <button type="button" style="height: 34px; padding: 0 14px; border-radius: 17px; border: 0; background: #F0EFEC; color: #1F1E1D; font-size: 14px;">不要</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

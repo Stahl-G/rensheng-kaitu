@@ -2,6 +2,7 @@
   "format": "kaitu.phone.map",
   "version": 1,
   "generated_at": "2026-10-18T07:30:12+08:00",
+  "generator": { "kind": "computer" },
   "as_of": "2026-10-18",
   "rows": [
     {

@@ -2,6 +2,7 @@
   "format": "kaitu.phone.today",
   "version": 1,
   "generated_at": "2026-10-18T07:30:12+08:00",
+  "generator": { "kind": "computer" },
   "today": "2026-10-18",
   "timezone": "Asia/Shanghai",
   "next": [

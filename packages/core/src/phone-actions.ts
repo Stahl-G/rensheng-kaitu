@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import { type PhoneReceipt, writePhoneReceipts } from "./phone-receipts.js";
+import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { cancelTask, completeTask, listTasks } from "./tasks.js";
 import { completeNext, decidePhoneProposal } from "./workbench.js";
@@ -19,6 +19,13 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   const seen: Record<string, Pick<PhoneReceipt, "status" | "message">> = ws.exists(ledgerFile)
     ? ws.readJson(ledgerFile)
     : {};
+  // 云端整理员处理过的操作只留在回执里，本机账本没有。
+  for (const r of phoneReceipts(ws))
+    if (r.kind === "action" && !seen[r.ref])
+      seen[r.ref] =
+        r.status === "conflict" || r.status === "rejected"
+          ? { status: r.status, message: r.message }
+          : { status: "applied" };
   const receipts: PhoneReceipt[] = [];
   let openTasks: Set<string> | undefined;
   const validate = schemas().builtin("phone-action.schema.json");

@@ -1,7 +1,7 @@
 import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
 import { readOverviewPage } from "./overview-page.js";
-import { buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
+import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
 import { lifeMap } from "./places.js";
 import { syncMode } from "./sync-location.js";
@@ -20,6 +20,7 @@ export async function writePhoneSnapshots(ws: Workspace, now = new Date()) {
     today: buildPhoneToday(data, at),
     week: buildPhoneWeek(data, at),
     map: buildPhoneMap(data, lifeMap(ws, now), readExploration(ws), at),
+    library: buildPhoneLibrary(ws, data, at),
   };
   let writes = 0;
   for (const [name, value] of Object.entries(snapshots)) {

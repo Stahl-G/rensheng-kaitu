@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/phone-library.schema.json",
+  "title": "手机快照：资料目录（phone/library.json）",
+  "description": "电脑生成，手机只读。只有标题、类型、日期和相对路径，不含正文；手机点开哪一项才读那个文件。财务和没有明确标为不敏感的记忆不进目录。按日期倒序，没有日期的在最后。",
+  "type": "object",
+  "required": ["format", "version", "generated_at", "items"],
+  "properties": {
+    "format": {
+      "const": "kaitu.phone.library"
+    },
+    "version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator": {
+      "type": "object",
+      "required": ["kind"],
+      "description": "谁生成的这份快照；没有这个字段当作电脑生成",
+      "properties": {
+        "kind": {
+          "enum": ["computer", "agent"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "显示给用户的名字，Agent 才写"
+        },
+        "spec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Agent 照做的 ORGANIZER.md 规则版本"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "description": "资料文件夹内的相对路径",
+      "pattern": "^(?![/~])(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+    },
+    "item": {
+      "type": "object",
+      "required": ["kind", "title", "date", "path"],
+      "properties": {
+        "kind": {
+          "enum": ["project", "health", "note", "me"],
+          "description": "对应资料页的分类：项目、健康、原文、我的"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "原文取第一行，最多 40 字"
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "一行说明，例如项目的下一步、目标记过几次结果、健康记录条数"
+        },
+        "date": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "path": {
+          "$ref": "#/$defs/path",
+          "description": "健康是最近一个月的记录文件"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "同一文件里有多项时（me/goals.json）指明是哪一项"
+        }
+      }
+    }
+  }
+}

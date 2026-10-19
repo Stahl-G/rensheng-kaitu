@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图 Mac · 云端整理员</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+a{color:#2B4C7E;text-decoration:none;font-weight:500}a:hover{text-decoration:underline dotted;text-underline-offset:3px}
+</style>
+</helmet>
+<div style="position: relative; width: 1180px; height: 820px; overflow: hidden; background: #FCFCFB; color: #1F1E1D; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;">
+  <header style="display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 20px; padding: 12px 20px 12px 84px;">
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600;">
+      <svg width="26" height="26" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#1B3254"></path>
+        <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2B4C7E"></path>
+        <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#B8CBE4"></path>
+        <path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"></path>
+        <path d="M30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1B3254" stroke-width="3" stroke-linecap="round"></path>
+      </svg>
+      人生开图
+    </div>
+    <nav aria-label="主要导航" style="display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #F0EFEC;">
+      <span style="height: 40px; display: flex; align-items: center; padding: 0 22px; border-radius: 9px; color: #4D4C48; font-weight: 500;">今天</span>
+      <span style="height: 40px; display: flex; align-items: center; padding: 0 22px; border-radius: 9px; color: #4D4C48; font-weight: 500;">开图</span>
+      <span style="height: 40px; display: flex; align-items: center; padding: 0 22px; border-radius: 9px; color: #4D4C48; font-weight: 500;">资料</span>
+      <span style="height: 40px; display: flex; align-items: center; padding: 0 22px; border-radius: 9px; color: #4D4C48; font-weight: 500;">问问</span>
+    </nav>
+    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 14px;">
+      <span style="display: flex; align-items: center; gap: 8px; color: #4D4C48; font-size: 14px;"><i style="width: 7px; height: 7px; border-radius: 50%; background: #3E8A5A;"></i>08:12 已更新</span>
+      <span aria-label="我的" style="width: 36px; height: 36px; border-radius: 18px; background: #F6E7ED; color: #8A3A5A; display: flex; align-items: center; justify-content: center; font-weight: 600; box-shadow: 0 0 0 2px #1B3254;">林</span>
+    </div>
+  </header>
+
+  <div style="max-width: 1040px; margin: 0 auto; padding: 10px 16px 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 40px;">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <h1 style="margin: 0; font-size: 28px; line-height: 36px; font-weight: 700;">我的</h1>
+      <nav aria-label="个人" style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 9px; color: #4D4C48;">个人档案</span>
+        <span aria-current="page" style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 9px; background: #F0EFEC; font-weight: 600;">AI 与连接</span>
+        <span style="height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 9px; color: #4D4C48;">设置</span>
+      </nav>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 18px; padding-top: 2px; min-width: 0;">
+      <section style="display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">云端整理员</h2>
+        <div style="border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; padding: 4px 20px;">
+          <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; padding: 16px 0;">
+            <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 20px; background: #1B3254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700;">D</span>
+            <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+              <b style="font-weight: 600;">Dot</b>
+              <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">白天 07:30 更新了手机 · 写了今天的每日整理</span>
+            </span>
+            <button type="button" onClick="{{toggleBrief}}" style="height: 40px; padding: 0 16px; border-radius: 10px; border: 0; background: #F0EFEC; color: #1F1E1D;">{{briefLabel}}</button>
+          </div>
+
+          <sc-if value="{{briefOpen}}" hint-placeholder-val="{{false}}">
+            <div style="display: flex; flex-direction: column; gap: 12px; padding: 0 0 18px 54px;">
+              <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 10px; background: #F5F5F3; font-size: 14px; line-height: 22px;">
+                <span>你是我的「开图整理员」。</span>
+                <span>资料位置：GitHub 私有仓库 <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 13px; color: #1B3254;">xiaolin/kaitu</span>（只用这个仓库）。</span>
+                <span>每天 06:30、12:30、18:30、22:30 和凌晨 3:00（北京时间）各运行一次；我说「更新开图」时也运行一次。</span>
+                <span>每次运行先读仓库根目录的 ORGANIZER.md，照做，不做它没写的事。</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <button type="button" onClick="{{copy}}" style="height: 40px; padding: 0 18px; border-radius: 10px; border: 0; background: {{copyBg}}; color: #FFFFFF; font-weight: 500;">{{copyLabel}}</button>
+                <span style="font-size: 13px; color: #6B6A66;">Agent 会读写这个仓库，读到的内容由它所在的服务处理。</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 2px 14px; align-items: center; padding: 16px 0; border-top: 1px solid #E6E4DD;">
+            <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 20px; background: #F0EFEC; color: #4D4C48; display: flex; align-items: center; justify-content: center;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"></rect><path d="M11 18.5h2"></path></svg>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+              <b style="font-weight: 600;">手机由谁更新</b>
+              <span style="font-size: 13px; color: #6B6A66;">电脑开着时由这台电脑更新，其余时间由 Dot 更新。</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 8px; padding: 4px 12px; border-radius: 8px; background: #E5F1E9; color: #2A6A41; font-size: 13px; font-weight: 600;"><i style="width: 7px; height: 7px; border-radius: 50%; background: #3E8A5A;"></i>现在：这台电脑</span>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+          <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">电脑不在时</h2>
+          <span style="font-size: 13px; color: #6B6A66;">10月18日 00:15 – 08:10</span>
+        </div>
+        <div style="border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; padding: 4px 20px;">
+          <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 12px 0;">
+            <span style="font-size: 14px; color: #6B6A66; font-variant-numeric: tabular-nums;">07:30</span>
+            <span>Dot 处理了 3 条手机操作，<span style="color: #1B3254; font-weight: 600;">1 条要核对</span></span>
+            <a href="StatusAgent.dc.html">查看</a>
+          </div>
+          <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 12px 0; border-top: 1px solid #E6E4DD;">
+            <span style="font-size: 14px; color: #6B6A66;">夜里</span>
+            <span>Dot 写了每日整理</span>
+            <a href="#">打开</a>
+          </div>
+          <div style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 12px 0; border-top: 1px solid #E6E4DD;">
+            <span style="font-size: 14px; color: #6B6A66; font-variant-numeric: tabular-nums;">08:10</span>
+            <span style="color: #4D4C48;">电脑回来了，手机改由这台电脑更新</span>
+            <span></span>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">GitHub 备份</h2>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 20px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
+          <span style="display: flex; flex-direction: column; gap: 2px;">
+            <b style="font-weight: 600;">xiaolin/kaitu</b>
+            <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">私有仓库 · 08:11 同步</span>
+          </span>
+          <span style="height: 40px; display: flex; align-items: center; padding: 0 16px; border-radius: 10px; background: #F0EFEC;">管理</span>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1180,"height":820}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: true, copied: false };
+  }
+  renderVals() {
+    const s = this.state;
+    return {
+      briefOpen: s.open,
+      briefLabel: s.open ? '收起说明' : '交给 Agent 的说明',
+      toggleBrief: () => this.setState({ open: !this.state.open }),
+      copyLabel: s.copied ? '已拷贝' : '拷贝说明',
+      copyBg: s.copied ? '#2B4C7E' : '#1F1E1D',
+      copy: () => this.setState({ copied: !this.state.copied }),
+    };
+  }
+}
+</script>
+</body>
+</html>
