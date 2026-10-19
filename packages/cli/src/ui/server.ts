@@ -195,7 +195,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let closed = false;
   let watchError = "";
-  let polling: ReturnType<typeof setInterval> | undefined;
+  let polling: ReturnType<typeof setTimeout> | undefined;
   let stamps = new Map<string, string>();
   holdOverview(ws);
   deferSnapshots(ws, (message) => {
@@ -295,24 +295,26 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
     changedFile("工作区");
     scheduleInbox();
-    polling = setInterval(
-      () => {
-        try {
-          const next = workspaceFileStamps(ws);
-          for (const file of new Set([...stamps.keys(), ...next.keys()])) {
-            if (stamps.get(file) !== next.get(file)) changedFile(file);
-          }
-          stamps = next;
-        } catch {
-          reportError();
+    const delay = Math.max(50, options.refreshDelayMs ?? 1000);
+    function poll() {
+      const started = performance.now();
+      try {
+        const next = workspaceFileStamps(ws);
+        for (const file of new Set([...stamps.keys(), ...next.keys()])) {
+          if (stamps.get(file) !== next.get(file)) changedFile(file);
         }
-      },
-      Math.max(50, options.refreshDelayMs ?? 1000),
-    );
+        stamps = next;
+      } catch {
+        reportError();
+      }
+      // 慢扫描后至少留出同等空档，让后台文件 I/O 运行，避免轮询占满事件循环。
+      polling = setTimeout(poll, Math.max(delay, performance.now() - started));
+    }
+    polling = setTimeout(poll, delay);
   };
   function startWatching() {
     watcher?.close();
-    clearInterval(polling);
+    clearTimeout(polling);
     polling = undefined;
     try {
       watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
@@ -717,7 +719,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
-    clearInterval(polling);
+    clearTimeout(polling);
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
@@ -746,7 +748,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
-    clearInterval(polling);
+    clearTimeout(polling);
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);

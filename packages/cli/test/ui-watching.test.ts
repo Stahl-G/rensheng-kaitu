@@ -67,6 +67,38 @@ it("原生监听不可用时，启动前改动与后续外部编辑、删除仍�
   }
 });
 
+it("慢速 polling 扫描后至少让出同等时间，让后台文件 I/O 继续运行", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-ui-slow-polling-"));
+  const ws = await initWorkspace(root);
+  ws.writeText("synthetic-scan/note.md", "synthetic");
+  const resolve = ws.resolve.bind(ws);
+  const gaps: number[] = [];
+  let previousEnd = 0;
+  let measuring = false;
+  const spy = vi.spyOn(ws, "resolve").mockImplementation((path, options) => {
+    if (measuring && path === "synthetic-scan" && options?.internal) {
+      const start = performance.now();
+      if (previousEnd) gaps.push(start - previousEnd);
+      // 模拟一轮比 50ms polling 间隔更慢的同步文件扫描。
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 80);
+      previousEnd = performance.now();
+    }
+    return resolve(path, options);
+  });
+  let ui: Awaited<ReturnType<typeof startUi>> | undefined;
+  try {
+    ui = await startUi(ws, { port: 0, open: false, refreshDelayMs: 30 });
+    measuring = true;
+    await vi.waitFor(() => expect(gaps.length).toBeGreaterThanOrEqual(2));
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(75);
+  } finally {
+    measuring = false;
+    spy.mockRestore();
+    await ui?.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("startup 版本出现后，同秒同长度改写并恢复精确 mtime 仍保存真实内容", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-startup-race-"));
   const path = join(root, "me/synthetic.md");
