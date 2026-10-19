@@ -84,3 +84,14 @@ release.md R3。审核员没有电脑和资料位置；首批试用的人也要�
 ## IOS-6 截图（最后做）
 
 用示例资料截：iPhone 6.9 英寸（iPhone 17 Pro Max）、6.5 英寸、iPhone Duo 外屏和内屏，今天、开图、资料三页，中英文各一套，放 `docs/acceptance/screenshots/0.6.0/`。需要的尺寸以 App Store Connect 当前要求为准（Grok 核对）。
+
+## IOS-7 手机看全部资料（2026-10-19 用户决定）
+
+电脑端已改：`phone/library.json` 列出财务（`kind: "finance"`，按记录类型各一项，路径是最近一个月的记录文件）和全部记忆（标为敏感的 subtitle 为「标为敏感」）；格式见 `schemas/phone-library.schema.json`、样例 `schemas/fixtures/phone/library.json`。
+
+- 资料页分类胶囊加「财务」；删掉页尾「为保护隐私，当前不展示财务和敏感记忆」。设计稿 `Library.dc.html` 已更新。
+- 财务详情：那个月的记录文件，同一 id 取 rev 最大的一行，新的在上，每行「日期 · 金额 · 对方或说明」。
+- 标为敏感的记忆照常能点开看。
+- 问问（Debug）：设置里加「让问问读财务」开关，默认开；标为敏感的记忆仍不发给 AI（ask.md §4）。
+
+验收：用更新后的样例，资料页能看到「流水」一项并点开；「我的」里能看到标为敏感的记忆；页尾那句话不再出现。

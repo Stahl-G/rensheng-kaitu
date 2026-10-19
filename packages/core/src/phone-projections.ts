@@ -88,10 +88,7 @@ export function buildPhoneWeek(data: Overview, generatedAt: string) {
           : null,
     },
     notes: { captured: data.capturedWeek },
-    changes: data.versions
-      .filter((v) => !/财务|finance|交易|账户|记忆|记住了|memory/i.test(v.message))
-      .slice(0, 3)
-      .map(({ time, text }) => ({ time, message: text })),
+    changes: data.versions.slice(0, 3).map(({ time, text }) => ({ time, message: text })),
   };
 }
 
@@ -153,7 +150,7 @@ export function buildPhoneMap(
   };
 }
 
-/** 资料目录：只放标题、类型、日期和相对路径，手机点开哪一项才读那个文件。财务和非明确公开的记忆不进目录。 */
+/** 资料目录：只放标题、类型、日期和相对路径，手机点开哪一项才读那个文件。手机是用户自己的设备，财务和全部记忆都列出。 */
 export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: string) {
   const tz = ws.timeZone();
   const day = (ts: string) => localDate(parseTs(ts), tz);
@@ -185,21 +182,22 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
       id: g.id,
     });
   for (const m of listMemories(ws))
-    if (m.sensitive === false)
-      items.push({
-        kind: "me",
-        title: clip(m.name, 80),
-        date: m.updated.slice(0, 10),
-        path: `memory/${m.file}`,
-      });
+    items.push({
+      kind: "me",
+      title: clip(m.name, 80),
+      ...(m.sensitive ? { subtitle: "标为敏感" } : {}),
+      date: m.updated.slice(0, 10),
+      path: `memory/${m.file}`,
+    });
   for (const ref of listRecordTypes(ws)) {
-    if (ref.module.def.id !== "health") continue;
+    const kind = ref.module.def.id;
+    if (kind !== "health" && kind !== "finance") continue;
     const rows = readRecords(ws, ref.type);
     const latest = rows.at(-1);
     if (!latest) continue;
     const month = day(latest.ts).slice(0, 7);
     items.push({
-      kind: "health",
+      kind,
       title: clip(ref.def.label?.trim() || ref.type, 80),
       subtitle: `${rows.length} 条`,
       date: day(latest.ts),

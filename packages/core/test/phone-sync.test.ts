@@ -78,9 +78,22 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     ),
   );
   addRecord(ws, "workout", { ...workout, ts: now.toISOString() });
+  addRecord(ws, "finance_transaction", {
+    ts: now.toISOString(),
+    account: "synthetic-card",
+    amount: "-32.00",
+    currency: "CNY",
+    category: "expense",
+    counterparty: null,
+    description: "PRIVATE_FINANCE_DESCRIPTION",
+    source: "manual",
+    source_transaction_id: null,
+    related_ids: [],
+    reconciliation: "ok",
+  });
   await addMemory(ws, {
     type: "fact",
-    name: "PRIVATE_MEMORY_NAME",
+    name: "合成敏感记忆",
     text: "PRIVATE_MEMORY_BODY",
     sensitive: true,
   });
@@ -127,6 +140,9 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(items.find((i) => i.kind === "health")?.path).toBe("health/data/workouts/2026-10.jsonl");
   expect(items.find((i) => i.kind === "project")?.path).toBe("projects/synthetic/STATUS.md");
   expect(items.some((i) => i.title === "合成偏好")).toBe(true);
+  // 手机是用户自己的设备：财务和标为敏感的记忆也列出，正文仍要点开才读。
+  expect(items.find((i) => i.title === "合成敏感记忆")?.subtitle).toBe("标为敏感");
+  expect(items.find((i) => i.kind === "finance")?.path).toBe("finance/data/transaction/2026-10.jsonl");
   expect(items.some((i) => i.title === "写坏的 frontmatter")).toBe(true);
   expect(JSON.stringify(snapshots)).not.toContain(ws.root);
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
