@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { inboxNotes } from "../src/inbox-notes.js";
 import { readLibrary, readLibraryDocument } from "../src/library.js";
+import { readStatus } from "../src/status.js";
 import { completeNext, statusFiles } from "../src/workbench.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
@@ -58,6 +59,15 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
     reads.mockClear();
     expect(readLibraryDocument(ws, doc)).toContain("合成决定");
     expect(reads.mock.calls.map(([file]) => file)).toEqual([doc]);
+    create("feed/digests/example.md", "合成简报正文");
+    create("me/reports/example.md", "合成报告正文");
+    reads.mockClear();
+    const status = readStatus(ws);
+    expect(status.inboxNotes).toBe(64);
+    expect(status.warnings.some((warning) => warning.includes("workout"))).toBe(true);
+    expect(reads.mock.calls.some(([file]) => /^(inbox\/notes|feed\/digests|me\/reports)\//.test(file))).toBe(
+      false,
+    );
     const outside = tmp();
     mkdirSync(join(outside, "topic"));
     writeFileSync(join(outside, "topic/STATUS.md"), "不能读取");
