@@ -19,6 +19,7 @@ export interface MePageProps {
   setAvatar: (base64: string) => Promise<string | null>;
   removeAvatar: () => Promise<void>;
   onPrompt: (text: string) => void;
+  onImportMemory: () => void;
 }
 const areas: Record<string, string> = {
   today: "今天",
@@ -104,7 +105,7 @@ function downloadResume(data: MeData, t: Translate) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProps) {
+export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt, onImportMemory }: MePageProps) {
   const t = useT();
   const [data, setData] = useState<MeData | null>(null);
   const [error, setError] = useState("");
@@ -205,6 +206,9 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt }: MePageProp
               <b>{data.name ?? "还没有填写名字"}</b>
               <span className={css.small}>{data.bio}</span>
             </span>
+            <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} onClick={onImportMemory}>
+              {t("从 AI 搬来记忆", "Bring memories from your AI")}
+            </button>
             <button
               type="button"
               className={`${css.btn} ${css["btn-quiet"]}`}

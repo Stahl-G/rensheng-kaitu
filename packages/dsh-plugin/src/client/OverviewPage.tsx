@@ -24,7 +24,7 @@ import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
-  extends MePageProps,
+  extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
     OnboardingServices,
     Omit<NewsPageProps, "onPrompt">,
@@ -908,6 +908,7 @@ function Overview({
             {...child}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
+            onImportMemory={() => startGuide(5)}
             refreshWorkspace={refresh}
             channelSettings={props.channelSettings}
             channelFocus={channelFocus}
