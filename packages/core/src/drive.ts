@@ -150,6 +150,7 @@ function suggestedFolders() {
     icloud: process.platform === "darwin" && existsSync(icloud) ? icloud : null,
     drive,
     nutstore: nutstoreDirectory(),
+    home: process.env.HOME || homedir(),
   };
 }
 

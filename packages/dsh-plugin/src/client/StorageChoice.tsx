@@ -3,12 +3,15 @@ import { useState } from "react";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 
+// GitHub 不是同步盘：资料放在这台电脑，再接上私有仓库同步。
+type Choice = SyncProvider | "github";
 export const PROVIDERS: {
-  id: SyncProvider;
+  id: Choice;
   zh: string;
   en: string;
   key?: "icloud" | "drive" | "nutstore";
 }[] = [
+  { id: "github", zh: "这台电脑 + 私有 GitHub 仓库", en: "This computer + a private GitHub repo" },
   { id: "local", zh: "这台电脑（不同步）", en: "This computer (no sync)" },
   { id: "icloud", zh: "iCloud 云盘", en: "iCloud Drive", key: "icloud" },
   { id: "google-drive", zh: "Google Drive", en: "Google Drive", key: "drive" },
@@ -19,7 +22,9 @@ export const PROVIDERS: {
 export interface StorageInfo {
   provider?: SyncProvider;
   root: string;
-  suggested?: { icloud: string | null; drive: string | null; nutstore: string | null };
+  /** 已接上 GitHub 同步。 */
+  github?: boolean;
+  suggested?: { icloud: string | null; drive: string | null; nutstore: string | null; home: string };
 }
 
 /** 选资料放哪：本机或某个云盘。引导第一步和设置里的「换一个存放位置」共用。 */
@@ -33,21 +38,28 @@ export function StorageChoice({
   storage: StorageInfo;
   moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
   pickStorageFolder: () => Promise<string | null>;
-  onDone: (moved: boolean) => Promise<void> | void;
+  onDone: (moved: boolean, github: boolean) => Promise<void> | void;
   submitLabel: string;
 }) {
   const t = useT();
-  const current = storage.provider ?? "local";
-  const suggestion = (id: SyncProvider) => {
+  const current: Choice =
+    storage.github && (storage.provider ?? "local") === "local" ? "github" : (storage.provider ?? "local");
+  const suggestion = (id: Choice) => {
+    if (id === "github" || id === "local")
+      return current === "local" || current === "github"
+        ? storage.root
+        : storage.suggested
+          ? `${storage.suggested.home}/kaitu`
+          : "";
     const key = PROVIDERS.find((entry) => entry.id === id)?.key;
     const folder = key ? storage.suggested?.[key] : null;
     return folder ? `${folder}/kaitu` : id === current ? storage.root : "";
   };
-  const [provider, setProvider] = useState<SyncProvider>(current);
+  const [provider, setProvider] = useState<Choice>(current);
   const [path, setPath] = useState(storage.root);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const choose = (next: SyncProvider) => {
+  const choose = (next: Choice) => {
     setProvider(next);
     if (!path.trim() || PROVIDERS.some((item) => suggestion(item.id) === path) || path === storage.root)
       setPath(suggestion(next));
@@ -70,8 +82,10 @@ export function StorageChoice({
         event.preventDefault();
         void run(async () => {
           const moved = path.trim() !== storage.root;
-          if (moved) await moveStorage(path.trim(), provider !== "local", provider);
-          await onDone(moved);
+          const github = provider === "github";
+          const target = github ? "local" : provider;
+          if (moved) await moveStorage(path.trim(), target !== "local", target);
+          await onDone(moved, github);
         });
       }}
     >

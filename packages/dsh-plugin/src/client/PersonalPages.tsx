@@ -185,7 +185,7 @@ export function PersonalPages(
             </div>
             {moving && (
               <StorageChoice
-                storage={data.storage}
+                storage={{ ...data.storage, github: !!data.backup.connection }}
                 moveStorage={props.moveStorage}
                 pickStorageFolder={props.pickStorageFolder}
                 submitLabel={t("迁移到这里", "Move here")}
