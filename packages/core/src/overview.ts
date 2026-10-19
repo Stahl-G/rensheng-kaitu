@@ -27,7 +27,8 @@ ${timeZoneNotice(ws.timeZone(), now)}
 
 ## 两个角色与文件
 
-- 任何 Agent 都能交：只在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录、不改已有文件。
+- 任何 Agent 都能交：在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录。
+- 做了某个项目的事，就更新这个项目的 projects/<项目>/STATUS.md 正文和 next，在 log.md 记一条并写明对应哪份交接；只改自己做过的项目。档案、偏好、目标、规则不直接改，建议交到 inbox/agents/，用户明确让改的照做。
 - 用户指定的整理员负责整理和更新手机：按 ORGANIZER.md 白天处理手机文件、更新手机，夜里写每日整理、更新下一步并归档交接。
 - ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md 由本机 kaitu 维护，云端只读；整理员可改的资料范围见 ORGANIZER.md。
 

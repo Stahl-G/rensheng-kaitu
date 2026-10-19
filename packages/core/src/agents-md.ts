@@ -178,14 +178,14 @@ ${skills()
 
 - 本机、iCloud、Google Drive 三选一；用 \`kaitu sync enable icloud|drive [--dir <同步目录>]\` 开启，换云盘前先 disable。
 - 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
-- 云端 Agent 白天只追加（规则见 \`AGENT-README.md\`）；用户指定的整理员白天更新手机、夜里整理（规则见 \`ORGANIZER.md\`）。
+- 云端 Agent 交新文件、更新自己做过的项目进度（规则见 \`AGENT-README.md\`）；用户指定的整理员白天更新手机、夜里整理（规则见 \`ORGANIZER.md\`）。
 - 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
 - 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
 - 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
 - Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
 - 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
 - \`phone/\` 是电脑生成的手机快照（today、week、map、资料目录 library、回执 receipts），只读，不进本机版本历史；整理员按 ORGANIZER.md 更新 today.json 时写 generator（kind=agent 必须有 name 和 spec；电脑只写 kind=computer；旧快照可省略）；手机通过 \`inbox/agents/ios-*\` 提交新文件与操作。
-- GitHub 备份和同步盘均维护云端接力入口 \`AGENT-README.md\`；本机与 iCloud 同样维护 OVERVIEW.md 和每日整理规则 ORGANIZER.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
+- GitHub 备份和同步盘均维护云端接力入口 \`AGENT-README.md\`；本机与 iCloud 同样维护 OVERVIEW.md 和每日整理规则 ORGANIZER.md。iCloud 只在多台 Mac 之间同步，云端 Agent 接力用 GitHub 或 Drive。
 
 ## 12. MCP
 
