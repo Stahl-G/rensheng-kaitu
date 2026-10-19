@@ -1,5 +1,7 @@
 import fs, {
   cpSync,
+  chmodSync,
+  mkdirSync,
   existsSync,
   readFileSync,
   renameSync,
@@ -10,7 +12,7 @@ import fs, {
 } from "node:fs";
 import { join, relative } from "node:path";
 import git from "isomorphic-git";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { historyDirectory, invalidateHistoryFile, pendingWorkspaceFiles } from "../src/history.js";
 import {
   Workspace,
@@ -23,6 +25,57 @@ import {
   snapshot,
 } from "../src/index.js";
 import { freshWorkspace, tmp, workout } from "./helpers.js";
+
+it("批量存版本遇到可降级权限错误时保留正文并可重试，混合未知错误仍抛出", async () => {
+  const ws = await freshWorkspace();
+  const files = ["me/readonly-a.md", "me/readonly-b.md"];
+  const contents = ["真实批量权限回归 A\n", "真实批量权限回归 B\n"];
+  const directories: string[] = [];
+  for (const [i, file] of files.entries()) {
+    ws.writeText(file, contents[i] as string);
+    const { oid } = await git.hashBlob({ object: Buffer.from(contents[i] as string) });
+    const dir = join(historyDirectory(ws), "objects", oid.slice(0, 2));
+    mkdirSync(dir, { recursive: true });
+    directories.push(dir);
+  }
+  // Windows 不使用 POSIX 目录写权限；该平台仍执行后面的真实未知错误与重试旅程。
+  if (process.platform !== "win32") {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (const dir of directories) chmodSync(dir, 0o555);
+      await expect(snapshot(ws, "只读对象目录")).resolves.toBeNull();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("数据已保存，版本稍后"));
+      for (const [i, file] of files.entries()) expect(ws.readText(file)).toBe(contents[i]);
+    } finally {
+      for (const dir of directories) chmodSync(dir, 0o755);
+      warn.mockRestore();
+    }
+  }
+  // 把第二个对象的父目录变成普通文件，真实产生不可降级的 ENOTDIR / EEXIST。
+  const unknown = directories[1] as string;
+  renameSync(unknown, `${unknown}.backup`);
+  writeFileSync(unknown, "合成路径冲突\n");
+  try {
+    if (process.platform !== "win32") chmodSync(directories[0] as string, 0o555);
+    await expect(snapshot(ws, "权限与未知错误混合")).rejects.toMatchObject({ code: "MultipleGitError" });
+  } finally {
+    chmodSync(directories[0] as string, 0o755);
+    rmSync(unknown);
+    renameSync(`${unknown}.backup`, unknown);
+  }
+  const oid = await snapshot(ws, "恢复对象目录后重试");
+  expect(oid).toBeTruthy();
+  for (const [i, filepath] of files.entries()) {
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: oid as string,
+      filepath,
+    });
+    expect(Buffer.from(blob).toString()).toBe(contents[i]);
+  }
+});
 
 it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
   const original = await freshWorkspace();

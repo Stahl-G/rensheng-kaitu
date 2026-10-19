@@ -246,6 +246,14 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
 
 type SnapshotMessage = string | ((files: readonly string[]) => string | null);
 
+function unavailableHistoryWrite(error: unknown): boolean {
+  if (error instanceof git.Errors.MultipleGitError)
+    return error.errors.length > 0 && error.errors.every(unavailableHistoryWrite);
+  return ["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(
+    (error as NodeJS.ErrnoException | undefined)?.code ?? "",
+  );
+}
+
 /** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */
 export async function snapshotNow(
   ws: Workspace,
@@ -256,9 +264,8 @@ export async function snapshotNow(
   try {
     return await saveSnapshot(ws, message, now);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
-    if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
+    if (!unavailableHistoryWrite(error)) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
     return null;
   }

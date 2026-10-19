@@ -249,7 +249,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     messages = [];
     let pending = true;
     const version = await snapshotNow(ws, (files) => {
-      pending = files.length > 0;
+      // 外部收件箱仍等处理；用户显式保存的原文不能因只剩 inbox 文件而丢掉版本请求。
+      pending = files.length > 0 || own.length > 0;
       if (!pending) return null;
       return own.length
         ? own.join("；")
@@ -355,7 +356,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试
       }
     }
-    stopPhone = startPhoneSnapshots(ws, () => reportError());
+    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher);
     scheduleInbox();
   }
   await startWatching();

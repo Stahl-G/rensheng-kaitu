@@ -1,0 +1,660 @@
+{
+  "mode": "file-import",
+  "at": "2026-10-19T19:29:28.664Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "base": "/tmp/kaitu-v2-run-F7J16I",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "workspace-open-new-process",
+      "ms": 330.63637800000015,
+      "maxEventLoopGapMs": 330.6564479999997
+    },
+    {
+      "name": "ui-listen-local",
+      "ms": 37.26430399999981,
+      "maxEventLoopGapMs": 36.2790729999997
+    },
+    {
+      "name": "http-file-import-preview",
+      "ms": 246.6946670000002,
+      "maxEventLoopGapMs": 67.8597109999996
+    },
+    {
+      "name": "http-file-import-confirm",
+      "ms": 127.19024999999965,
+      "maxEventLoopGapMs": 61.87600199999997
+    },
+    {
+      "name": "file-import-background-end-to-end",
+      "ms": 3565.123543,
+      "maxEventLoopGapMs": 126.15911800000003
+    }
+  ],
+  "head": "c1ead5aa78f46dfa420f22d22e29271cc8a51595",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex a22bceb..162001e 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -355,7 +355,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试\n       }\n     }\n-    stopPhone = startPhoneSnapshots(ws, () => reportError());\n+    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher);\n     scheduleInbox();\n   }\n   await startWatching();\ndiff --git a/packages/core/src/phone-snapshots.ts b/packages/core/src/phone-snapshots.ts\nindex baf87fc..fece9ed 100644\n--- a/packages/core/src/phone-snapshots.ts\n+++ b/packages/core/src/phone-snapshots.ts\n@@ -55,7 +55,11 @@ export async function writePhoneSnapshots(\n }\n \n /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */\n-export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {\n+export function startPhoneSnapshots(\n+  ws: Workspace,\n+  report: (error: unknown) => void = () => {},\n+  sharedWatcher?: ReturnType<typeof watchWorkspace>,\n+) {\n   let timer: NodeJS.Timeout | undefined;\n   let running: Promise<void> | undefined;\n   let again = false;\n@@ -87,13 +91,16 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n   };\n   let watcher: ReturnType<typeof watchWorkspace> | undefined;\n   try {\n-    watcher = watchWorkspace(ws.root, (file) => {\n-      if (!ignoredWorkspaceChange(file)) schedule();\n-    });\n-    watcher.on(\"error\", () => {\n-      watcher?.close();\n-      watcher = undefined;\n-    });\n+    if (sharedWatcher) sharedWatcher.on(\"all\", schedule).on(\"ready\", schedule);\n+    else {\n+      watcher = watchWorkspace(ws.root, (file) => {\n+        if (!ignoredWorkspaceChange(file)) schedule();\n+      });\n+      watcher.on(\"error\", () => {\n+        watcher?.close();\n+        watcher = undefined;\n+      });\n+    }\n   } catch {\n     /* 不支持递归监听时由定时器刷新。 */\n   }\n@@ -106,6 +113,8 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n     clearTimeout(timer);\n     clearInterval(interval);\n     off();\n+    // 借用 UI 的监听时只退订，关闭仍由 UI 在迁移 / 退出前负责。\n+    sharedWatcher?.off(\"all\", schedule).off(\"ready\", schedule);\n     await watcher?.close();\n     await running;\n   };\n",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "origin": "http://127.0.0.1:46221",
+  "importScale": {
+    "conversations": 100,
+    "messages": 2000,
+    "bytes": 1133981
+  },
+  "fileImport": {
+    "result": {
+      "added": 100,
+      "updated": 0,
+      "skipped": 0,
+      "entries": [
+        {
+          "id": "v2-import-0",
+          "title": "合成文件导入 0",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-0.jsonl"
+        },
+        {
+          "id": "v2-import-1",
+          "title": "合成文件导入 1",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-1.jsonl"
+        },
+        {
+          "id": "v2-import-2",
+          "title": "合成文件导入 2",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-2.jsonl"
+        },
+        {
+          "id": "v2-import-3",
+          "title": "合成文件导入 3",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-3.jsonl"
+        },
+        {
+          "id": "v2-import-4",
+          "title": "合成文件导入 4",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-4.jsonl"
+        },
+        {
+          "id": "v2-import-5",
+          "title": "合成文件导入 5",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-5.jsonl"
+        },
+        {
+          "id": "v2-import-6",
+          "title": "合成文件导入 6",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-6.jsonl"
+        },
+        {
+          "id": "v2-import-7",
+          "title": "合成文件导入 7",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-7.jsonl"
+        },
+        {
+          "id": "v2-import-8",
+          "title": "合成文件导入 8",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-8.jsonl"
+        },
+        {
+          "id": "v2-import-9",
+          "title": "合成文件导入 9",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-9.jsonl"
+        },
+        {
+          "id": "v2-import-10",
+          "title": "合成文件导入 10",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-10.jsonl"
+        },
+        {
+          "id": "v2-import-11",
+          "title": "合成文件导入 11",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-11.jsonl"
+        },
+        {
+          "id": "v2-import-12",
+          "title": "合成文件导入 12",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-12.jsonl"
+        },
+        {
+          "id": "v2-import-13",
+          "title": "合成文件导入 13",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-13.jsonl"
+        },
+        {
+          "id": "v2-import-14",
+          "title": "合成文件导入 14",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-14.jsonl"
+        },
+        {
+          "id": "v2-import-15",
+          "title": "合成文件导入 15",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-15.jsonl"
+        },
+        {
+          "id": "v2-import-16",
+          "title": "合成文件导入 16",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-16.jsonl"
+        },
+        {
+          "id": "v2-import-17",
+          "title": "合成文件导入 17",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-17.jsonl"
+        },
+        {
+          "id": "v2-import-18",
+          "title": "合成文件导入 18",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-18.jsonl"
+        },
+        {
+          "id": "v2-import-19",
+          "title": "合成文件导入 19",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-19.jsonl"
+        },
+        {
+          "id": "v2-import-20",
+          "title": "合成文件导入 20",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-20.jsonl"
+        },
+        {
+          "id": "v2-import-21",
+          "title": "合成文件导入 21",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-21.jsonl"
+        },
+        {
+          "id": "v2-import-22",
+          "title": "合成文件导入 22",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-22.jsonl"
+        },
+        {
+          "id": "v2-import-23",
+          "title": "合成文件导入 23",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-23.jsonl"
+        },
+        {
+          "id": "v2-import-24",
+          "title": "合成文件导入 24",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-24.jsonl"
+        },
+        {
+          "id": "v2-import-25",
+          "title": "合成文件导入 25",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-25.jsonl"
+        },
+        {
+          "id": "v2-import-26",
+          "title": "合成文件导入 26",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-26.jsonl"
+        },
+        {
+          "id": "v2-import-27",
+          "title": "合成文件导入 27",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-27.jsonl"
+        },
+        {
+          "id": "v2-import-28",
+          "title": "合成文件导入 28",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-28.jsonl"
+        },
+        {
+          "id": "v2-import-29",
+          "title": "合成文件导入 29",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-29.jsonl"
+        },
+        {
+          "id": "v2-import-30",
+          "title": "合成文件导入 30",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-30.jsonl"
+        },
+        {
+          "id": "v2-import-31",
+          "title": "合成文件导入 31",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-31.jsonl"
+        },
+        {
+          "id": "v2-import-32",
+          "title": "合成文件导入 32",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-32.jsonl"
+        },
+        {
+          "id": "v2-import-33",
+          "title": "合成文件导入 33",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-33.jsonl"
+        },
+        {
+          "id": "v2-import-34",
+          "title": "合成文件导入 34",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-34.jsonl"
+        },
+        {
+          "id": "v2-import-35",
+          "title": "合成文件导入 35",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-35.jsonl"
+        },
+        {
+          "id": "v2-import-36",
+          "title": "合成文件导入 36",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-36.jsonl"
+        },
+        {
+          "id": "v2-import-37",
+          "title": "合成文件导入 37",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-37.jsonl"
+        },
+        {
+          "id": "v2-import-38",
+          "title": "合成文件导入 38",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-38.jsonl"
+        },
+        {
+          "id": "v2-import-39",
+          "title": "合成文件导入 39",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-39.jsonl"
+        },
+        {
+          "id": "v2-import-40",
+          "title": "合成文件导入 40",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-40.jsonl"
+        },
+        {
+          "id": "v2-import-41",
+          "title": "合成文件导入 41",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-41.jsonl"
+        },
+        {
+          "id": "v2-import-42",
+          "title": "合成文件导入 42",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-42.jsonl"
+        },
+        {
+          "id": "v2-import-43",
+          "title": "合成文件导入 43",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-43.jsonl"
+        },
+        {
+          "id": "v2-import-44",
+          "title": "合成文件导入 44",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-44.jsonl"
+        },
+        {
+          "id": "v2-import-45",
+          "title": "合成文件导入 45",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-45.jsonl"
+        },
+        {
+          "id": "v2-import-46",
+          "title": "合成文件导入 46",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-46.jsonl"
+        },
+        {
+          "id": "v2-import-47",
+          "title": "合成文件导入 47",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-47.jsonl"
+        },
+        {
+          "id": "v2-import-48",
+          "title": "合成文件导入 48",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-48.jsonl"
+        },
+        {
+          "id": "v2-import-49",
+          "title": "合成文件导入 49",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-49.jsonl"
+        },
+        {
+          "id": "v2-import-50",
+          "title": "合成文件导入 50",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-50.jsonl"
+        },
+        {
+          "id": "v2-import-51",
+          "title": "合成文件导入 51",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-51.jsonl"
+        },
+        {
+          "id": "v2-import-52",
+          "title": "合成文件导入 52",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-52.jsonl"
+        },
+        {
+          "id": "v2-import-53",
+          "title": "合成文件导入 53",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-53.jsonl"
+        },
+        {
+          "id": "v2-import-54",
+          "title": "合成文件导入 54",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-54.jsonl"
+        },
+        {
+          "id": "v2-import-55",
+          "title": "合成文件导入 55",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-55.jsonl"
+        },
+        {
+          "id": "v2-import-56",
+          "title": "合成文件导入 56",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-56.jsonl"
+        },
+        {
+          "id": "v2-import-57",
+          "title": "合成文件导入 57",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-57.jsonl"
+        },
+        {
+          "id": "v2-import-58",
+          "title": "合成文件导入 58",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-58.jsonl"
+        },
+        {
+          "id": "v2-import-59",
+          "title": "合成文件导入 59",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-59.jsonl"
+        },
+        {
+          "id": "v2-import-60",
+          "title": "合成文件导入 60",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-60.jsonl"
+        },
+        {
+          "id": "v2-import-61",
+          "title": "合成文件导入 61",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-61.jsonl"
+        },
+        {
+          "id": "v2-import-62",
+          "title": "合成文件导入 62",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-62.jsonl"
+        },
+        {
+          "id": "v2-import-63",
+          "title": "合成文件导入 63",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-63.jsonl"
+        },
+        {
+          "id": "v2-import-64",
+          "title": "合成文件导入 64",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-64.jsonl"
+        },
+        {
+          "id": "v2-import-65",
+          "title": "合成文件导入 65",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-65.jsonl"
+        },
+        {
+          "id": "v2-import-66",
+          "title": "合成文件导入 66",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-66.jsonl"
+        },
+        {
+          "id": "v2-import-67",
+          "title": "合成文件导入 67",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-67.jsonl"
+        },
+        {
+          "id": "v2-import-68",
+          "title": "合成文件导入 68",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-68.jsonl"
+        },
+        {
+          "id": "v2-import-69",
+          "title": "合成文件导入 69",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-69.jsonl"
+        },
+        {
+          "id": "v2-import-70",
+          "title": "合成文件导入 70",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-70.jsonl"
+        },
+        {
+          "id": "v2-import-71",
+          "title": "合成文件导入 71",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-71.jsonl"
+        },
+        {
+          "id": "v2-import-72",
+          "title": "合成文件导入 72",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-72.jsonl"
+        },
+        {
+          "id": "v2-import-73",
+          "title": "合成文件导入 73",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-73.jsonl"
+        },
+        {
+          "id": "v2-import-74",
+          "title": "合成文件导入 74",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-74.jsonl"
+        },
+        {
+          "id": "v2-import-75",
+          "title": "合成文件导入 75",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-75.jsonl"
+        },
+        {
+          "id": "v2-import-76",
+          "title": "合成文件导入 76",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-76.jsonl"
+        },
+        {
+          "id": "v2-import-77",
+          "title": "合成文件导入 77",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-77.jsonl"
+        },
+        {
+          "id": "v2-import-78",
+          "title": "合成文件导入 78",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-78.jsonl"
+        },
+        {
+          "id": "v2-import-79",
+          "title": "合成文件导入 79",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-79.jsonl"
+        },
+        {
+          "id": "v2-import-80",
+          "title": "合成文件导入 80",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-80.jsonl"
+        },
+        {
+          "id": "v2-import-81",
+          "title": "合成文件导入 81",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-81.jsonl"
+        },
+        {
+          "id": "v2-import-82",
+          "title": "合成文件导入 82",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-82.jsonl"
+        },
+        {
+          "id": "v2-import-83",
+          "title": "合成文件导入 83",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-83.jsonl"
+        },
+        {
+          "id": "v2-import-84",
+          "title": "合成文件导入 84",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-84.jsonl"
+        },
+        {
+          "id": "v2-import-85",
+          "title": "合成文件导入 85",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-85.jsonl"
+        },
+        {
+          "id": "v2-import-86",
+          "title": "合成文件导入 86",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-86.jsonl"
+        },
+        {
+          "id": "v2-import-87",
+          "title": "合成文件导入 87",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-87.jsonl"
+        },
+        {
+          "id": "v2-import-88",
+          "title": "合成文件导入 88",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-88.jsonl"
+        },
+        {
+          "id": "v2-import-89",
+          "title": "合成文件导入 89",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-89.jsonl"
+        },
+        {
+          "id": "v2-import-90",
+          "title": "合成文件导入 90",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-90.jsonl"
+        },
+        {
+          "id": "v2-import-91",
+          "title": "合成文件导入 91",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-91.jsonl"
+        },
+        {
+          "id": "v2-import-92",
+          "title": "合成文件导入 92",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-92.jsonl"
+        },
+        {
+          "id": "v2-import-93",
+          "title": "合成文件导入 93",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-93.jsonl"
+        },
+        {
+          "id": "v2-import-94",
+          "title": "合成文件导入 94",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-94.jsonl"
+        },
+        {
+          "id": "v2-import-95",
+          "title": "合成文件导入 95",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-95.jsonl"
+        },
+        {
+          "id": "v2-import-96",
+          "title": "合成文件导入 96",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-96.jsonl"
+        },
+        {
+          "id": "v2-import-97",
+          "title": "合成文件导入 97",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-97.jsonl"
+        },
+        {
+          "id": "v2-import-98",
+          "title": "合成文件导入 98",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-98.jsonl"
+        },
+        {
+          "id": "v2-import-99",
+          "title": "合成文件导入 99",
+          "action": "added",
+          "file": "chats/2026/10/v2-import-99.jsonl"
+        }
+      ],
+      "version": null
+    },
+    "before": "27e8dea4e95f5c137ac6eea7cc1c976bd8039b6a"
+  },
+  "fileImportVersion": "abdca50c6fbf4108f487bfc0fdc6ef044fe6bf48",
+  "importedMessagesVerified": 2000
+}

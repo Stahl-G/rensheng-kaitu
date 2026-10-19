@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   history,
+  historyDirectory,
   initWorkspace,
   localDate,
   parseFrontmatter,
@@ -48,6 +50,30 @@ async function setup(input: Parameters<typeof startUi>[1] = {}) {
   cleanup.push(ui.close);
   return { ws, ui };
 }
+it("只有用户显式记下的原文时也保存版本，下一次保存不会丢掉后续原文", async () => {
+  const { ws, ui } = await setup({ versionDelayMs: 80 });
+  const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
+  for (const text of ["合成仅原文第一条", "合成仅原文后续条"]) {
+    const before = (await history(ws))[0]?.oid;
+    const response = await fetch(`${ui.url}/api/product/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui.url },
+      body: JSON.stringify([text]),
+    });
+    expect(response.status).toBe(200);
+    const saved = await response.json();
+    expect(ws.readText(saved.path)).toContain(text);
+    await expect.poll(async () => (await history(ws))[0]?.oid).not.toBe(before);
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: (await history(ws))[0]?.oid,
+      filepath: saved.path,
+    });
+    expect(Buffer.from(blob).toString()).toContain(text);
+  }
+});
 it("拒绝错误 Host、缺少 X-Kaitu 或非本机 Origin 的写操作", async () => {
   const { ws, ui } = await setup();
   const before = await history(ws);

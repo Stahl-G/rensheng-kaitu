@@ -244,7 +244,7 @@ try {
           if (!response.ok) throw new Error(`${method}: ${response.status} ${text}`);
           return JSON.parse(text);
         }
-        if (mode === "file-import" || mode === "file-profile") {
+        if (["file-import", "file-profile", "preview-profile"].includes(mode)) {
           const now = Date.now() / 1000;
           const exports = Array.from({ length: 100 }, (_, i) => ({
             id: `v2-import-${i}`,
@@ -275,6 +275,16 @@ try {
           result.importScale = { conversations: 100, messages: 2000, bytes: bytes.length };
           const { readChat } = await load("packages/core/dist/chats.js");
           await measure("file-import-background-end-to-end", async () => {
+            const previewSession = mode === "preview-profile" ? new inspector.Session() : undefined;
+            const previewPost = (method) =>
+              new Promise((resolve, reject) =>
+                previewSession.post(method, (error, value) => (error ? reject(error) : resolve(value))),
+              );
+            if (previewSession) {
+              previewSession.connect();
+              await previewPost("Profiler.enable");
+              await previewPost("Profiler.start");
+            }
             const preview = await measure("http-file-import-preview", () =>
               product("onboardingImportPreview", [
                 "chatgpt-conversations",
@@ -282,6 +292,11 @@ try {
                 bytes.toString("base64"),
               ]),
             );
+            if (previewSession) {
+              const { profile } = await previewPost("Profiler.stop");
+              fs.writeFileSync(path.join(output, "preview.cpuprofile"), JSON.stringify(profile));
+              previewSession.disconnect();
+            }
             const session = mode === "file-profile" ? new inspector.Session() : undefined;
             const post = (method) =>
               new Promise((resolve, reject) =>
