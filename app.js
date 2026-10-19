@@ -99,12 +99,14 @@
   /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
   const rel = document;
   if (document.querySelector("[data-rel]") && "fetch" in window) {
-    const KEY = "kaitu-release-v4";
+    const KEY = "kaitu-release-v5";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
       const tgz = r.assets.find((a) => /^rensheng-kaitu-.*\.tgz$/i.test(a.name));
-      const exe = r.assets.filter((a) => /^Kaitu-Setup-.*-x64\.exe$/i.test(a.name)).sort((a, b) => b.id - a.id)[0];
+      /* Windows 安装器不是每版都有：用最近一个带 EXE 的版本，版本号和发布说明也跟它走 */
+      const win = r.win || r;
+      const exe = win.assets.filter((a) => /^Kaitu-Setup-.*-x64\.exe$/i.test(a.name)).sort((a, b) => b.id - a.id)[0];
       const set = (name, fn) => rel.querySelectorAll(`[data-rel="${name}"]`).forEach(fn);
       const version = r.tag.replace(/^v/, "");
       const date = new Date(r.published);
@@ -120,6 +122,8 @@
         set("exe-name", (el) => { el.textContent = exe.name; });
         set("exe-size", (el) => { el.textContent = `${Math.round(exe.size / 1048576)} MB`; });
         set("exe-sha", (el) => { el.textContent = exe.digest ? exe.digest.replace(/^sha256:/, "") : "—"; });
+        set("exe-version", (el) => { el.textContent = win.tag.replace(/^v/, ""); });
+        set("exe-page", (el) => { el.href = win.page; });
       }
       set("sha", (el) => { el.textContent = dmg.digest ? dmg.digest.replace(/^sha256:/, "") : "—"; });
       set("page", (el) => { el.href = r.page; });
@@ -145,12 +149,15 @@
       fetch("https://api.github.com/repos/Stahl-G/rensheng-kaitu/releases?per_page=10", { headers: { Accept: "application/vnd.github+json" }, signal: ctrl?.signal })
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
         .then((list) => {
-          const pick = Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => /\.dmg$/i.test(a.name)));
+          const find = (re) => Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => re.test(a.name)));
+          const pack = (x) => ({
+            tag: x.tag_name, published: x.published_at || x.created_at, prerelease: !!x.prerelease, page: x.html_url,
+            assets: x.assets.map((a) => ({ id: a.id, name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
+          });
+          const pick = find(/\.dmg$/i);
           if (!pick) return;
-          const r = {
-            tag: pick.tag_name, published: pick.published_at || pick.created_at, prerelease: !!pick.prerelease, page: pick.html_url,
-            assets: pick.assets.map((a) => ({ id: a.id, name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
-          };
+          const winPick = find(/^Kaitu-Setup-.*-x64\.exe$/i);
+          const r = { ...pack(pick), win: winPick ? pack(winPick) : null };
           fill(r);
           try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), r })); } catch {}
         })
