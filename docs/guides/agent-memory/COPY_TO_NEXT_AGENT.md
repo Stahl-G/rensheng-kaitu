@@ -1,9 +1,9 @@
-# 复制给其他 Agent
+# 复制给第二位全新 Agent
 
-Claude、Devin、Cursor 或全新 Codex 都使用接入入口，各自独立 clone，串行接续。优先粘贴第一个 Codex 生成的实际版本；没有时复制下面一段，由它询问唯一仓库和项目编号。
+目标、项目与接收 Agent 由用户明确确认后才读取。复制下面一段，完整步骤由 Agent 自行读取。
 
 ```text
-请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/e99184c26fcde2903d9619b85af41b0ce752fa1a/docs/guides/agent-memory/ADD_DEVICE.md ，接入第一个 Codex 已建好的同一私有测试记忆库。先向我要它生成的仓库地址和项目编号，使用你自己的全新会话与独立克隆目录；不要重新初始化、建库或重铺模板。本轮只读合成资料，不接真实工作区、不改全局配置，不要求 App 或新运行时。先引用库中最新交接，复述历史失败、阻塞和下一步，再经我确认完成一项合成核验，写带 follows 的唯一交接并正常同步。等本轮推送完成再让下一个 Agent 接续，未验证的部分如实说明。
+请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/622fee9ad77d908d6224fab91922e1c1e6fb8471/docs/guides/agent-memory/ADD_DEVICE.md，作为第二个全新 Agent 独立理解我的现有私人记忆。先确认同一精确仓库、项目、允许路径及接收方资格，未确认就等待。使用全新会话和我指定的独立目录，不看第一个 Agent 的答案；只读获准资料，引用来源复述现状、历史失败、阻塞、完整下一步和未知项。保留旧文件及格式，不初始化、建库、铺模板、装技能或改全局配置，不要求 App 或新运行时。此轮不写文件、提交或推送，等我比较理解并指定真实小任务与写回路径；不要把真实资料传给其他 Agent。
 ```
 
-[完整接入规则](ADD_DEVICE.md) · [用户亲测顺序](USER_TEST.md)
+[用户亲测顺序](https://github.com/Stahl-G/rensheng-kaitu/blob/622fee9ad77d908d6224fab91922e1c1e6fb8471/docs/guides/agent-memory/USER_TEST.md)
