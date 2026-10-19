@@ -1,7 +1,15 @@
-import { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import fs, {
+  cpSync,
+  existsSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { pendingWorkspaceFiles } from "../src/history.js";
+import { historyDirectory, invalidateHistoryFile, pendingWorkspaceFiles } from "../src/history.js";
 import {
   Workspace,
   addRecord,
@@ -13,6 +21,36 @@ import {
   snapshot,
 } from "../src/index.js";
 import { freshWorkspace, tmp, workout } from "./helpers.js";
+
+it("目录事件重读用户内容但不会使内部 Git 索引反复失效", async () => {
+  const ws = await freshWorkspace();
+  for (let i = 0; i < 30; i++) ws.writeText(`me/synthetic-${i}.md`, "before\n");
+  await snapshot(ws, "合成目录基线");
+  const source = ws.resolve("me/synthetic-0.md");
+  const before = statSync(source);
+  writeFileSync(source, "after!\n");
+  utimesSync(source, before.atimeMs / 1000, before.mtimeMs / 1000);
+  const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
+  ws.writeJson(".kaitu/config.json", { ...config, synthetic: true }, { internal: true });
+  invalidateHistoryFile(ws, "me");
+  invalidateHistoryFile(ws, ".kaitu");
+  const read = fs.promises.readFile;
+  let indexReads = 0;
+  fs.promises.readFile = (async (path, ...args) => {
+    if (String(path) === join(historyDirectory(ws), "index")) indexReads++;
+    return read(path, ...args);
+  }) as typeof read;
+  try {
+    expect(await pendingWorkspaceFiles(ws)).toEqual(
+      expect.arrayContaining(["me/synthetic-0.md", ".kaitu/config.json"]),
+    );
+    expect(indexReads).toBeLessThan(5);
+  } finally {
+    fs.promises.readFile = read;
+  }
+  await snapshot(ws, "目录事件后保存");
+  expect(await pendingWorkspaceFiles(ws)).toEqual([]);
+});
 
 it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
   const original = await freshWorkspace();

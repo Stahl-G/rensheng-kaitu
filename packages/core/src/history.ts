@@ -141,6 +141,10 @@ function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map
   }) as typeof fs.promises.readFile;
   const lstat = (async (...args: Parameters<typeof fs.promises.lstat>) => {
     const stat = await fs.promises.lstat(...args);
+    const path = String(args[0]);
+    const gitdir = historyDirectory(ws);
+    // 用户目录事件不能使 Git 自己的索引失效，否则每个工作区条目都会重读整份 index。
+    if (path === gitdir || path.startsWith(`${gitdir}${sep}`)) return stat;
     const file = relative(ws.root, String(args[0])).split(sep).join("/");
     let affected = changed.has(file);
     for (
