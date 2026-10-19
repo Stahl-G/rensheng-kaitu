@@ -7,7 +7,7 @@
 默认 PRIVATE kaitu-ai-memory，自动采用明确账号和安全新目录；有歧义才询问。已有任何仓库和文件保留不覆盖、不自动迁移。普通只读不反复确认，官方新增授权、安装及系统权限正常处理。已有可用 kaitu 可复用，没有则普通 Git/官方 gh；不要求 App、Node、Python、MCP 或新 runtime，不改全局配置，不虚构 Gitee 镜像。
 
 ```text
-请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/9c66f1011a4c21b1a1da8556277297138c5b805e/docs/guides/agent-memory/INSTALL.md ，帮我建立跨设备、系统和 Agent 的私人开图共享记忆。先自动检查工具、现有登录、账号和安全新目录，默认 kaitu-ai-memory。先整理已知上下文，通过简短对话补偏好、目标和事情，可跳过；没有项目也要能完成记忆骨架与当前 Agent 入口。项目或资料只是可选填充，可来自本机、我指定的 GitHub repo 或文档，不扫描其他设备或账号。复用既有 me/memory/projects 格式，不造平行体系；个人内容写入上传前合并确认一次。保留已有仓库和文件，正常处理官方授权，不改全局设置、不装新运行时，最后回读同步并生成填好真实地址的第二设备接入提示词。
+请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/379a7656eeaebbe01523f4dc8a6357ac6c514253/docs/guides/agent-memory/INSTALL.md ，帮我建立跨设备、系统和 Agent 的私人开图共享记忆。先自动检查工具、现有登录、账号和安全新目录，默认 kaitu-ai-memory。先整理已知上下文，通过简短对话补偏好、目标和事情，可跳过；没有项目也要能完成记忆骨架与当前 Agent 入口。项目或资料只是可选填充，可来自本机、我指定的 GitHub repo 或文档，不扫描其他设备或账号。复用既有 me/memory/projects 格式，不造平行体系；个人内容写入上传前合并确认一次。保留已有仓库和文件，正常处理官方授权，不改全局设置、不装新运行时，最后回读同步并生成填好真实地址的第二设备接入提示词。
 ```
 
 ## 同一份个人资料
