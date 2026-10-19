@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readdirSync, rmSync } from "node:fs";
+import { lstatSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { isAbsolute, relative, sep } from "node:path";
 import { type BankMail, isBankNotificationMail } from "./finance/bank-notifications.js";
 import type { Workspace } from "./workspace.js";
 
@@ -40,6 +41,10 @@ export function quarantineBankContent(ws: Workspace, file: string, bytes: Uint8A
 export function quarantineBankNotes(ws: Workspace): void {
   if (!ws.exists("inbox")) return;
   function walk(directory: string) {
+    const target = ws.resolve(directory);
+    if (!lstatSync(target).isDirectory()) return;
+    const path = relative(realpathSync(ws.root), realpathSync(target));
+    if (isAbsolute(path) || path === ".." || path.startsWith(`..${sep}`)) return;
     for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
       if (entry.isSymbolicLink()) continue;
       const file = `${directory}/${entry.name}`;
