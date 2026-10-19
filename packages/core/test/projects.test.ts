@@ -168,31 +168,65 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     expect(log.split("<!-- sync:commits -->")).toHaveLength(2);
     expect(await git.resolveRef({ fs, dir: repo, ref: "HEAD" })).toBe(head);
     expect(files(repo)).toEqual(before);
-    const shallow = join(tmp(), "shallow");
-    execFileSync("git", ["clone", "--depth", "1", "--branch", "work-0", pathToFileURL(repo).href, shallow], {
-      stdio: "pipe",
-    });
-    const shallowHead = await git.resolveRef({ fs, dir: shallow, ref: "HEAD" });
-    const parent = (await git.readCommit({ fs, dir: shallow, oid: shallowHead })).commit.parent[0];
-    expect(parent).toBeTruthy();
-    await expect(git.readCommit({ fs, dir: shallow, oid: parent as string })).rejects.toThrow();
-    const linked = await createProject(ws, {
-      title: "synthetic-shallow-and-full",
-      kind: "work",
-      links: [
-        { path: shallow, role: "repo" },
-        { path: repo, role: "repo" },
-      ],
-    });
-    const shallowResult = await syncProject(ws, linked.slug, { now: new Date("2026-10-15T06:00:00Z") });
-    expect(shallowResult.issues).toEqual([]);
-    expect(
-      readRecords(ws, "project_metric")
-        .filter((row) => row.project === linked.slug)
-        .map((row) => row.value),
-    ).toEqual([2]);
-    expect(fs.readFileSync(join(shallow, ".git/shallow"), "utf8").trim()).toBe(shallowHead);
-    fs.rmSync(shallow, { recursive: true, force: true });
+    const cloneRoot = tmp();
+    try {
+      const source = join(cloneRoot, "source");
+      fs.mkdirSync(source);
+      await git.init({ fs, dir: source, defaultBranch: "main" });
+      for (const title of ["recent A", "recent B"]) {
+        fs.writeFileSync(join(source, "chapter.txt"), title);
+        await git.add({ fs, dir: source, filepath: "chapter.txt" });
+        await git.commit({
+          fs,
+          dir: source,
+          message: title,
+          author: {
+            name: "Test",
+            email: "test@localhost",
+            timestamp: Date.parse("2026-10-14T01:00:00Z") / 1000,
+            timezoneOffset: 0,
+          },
+        });
+      }
+      const shallow = join(cloneRoot, "shallow");
+      const full = join(cloneRoot, "full");
+      for (const [target, extra] of [
+        [shallow, ["--depth", "1"]],
+        [full, []],
+      ] as const)
+        execFileSync(
+          "git",
+          ["clone", "--single-branch", "--branch", "main", ...extra, pathToFileURL(source).href, target],
+          { stdio: "pipe" },
+        );
+      const shallowHead = await git.resolveRef({ fs, dir: shallow, ref: "HEAD" });
+      expect(await git.resolveRef({ fs, dir: full, ref: "HEAD" })).toBe(shallowHead);
+      expect(await git.listBranches({ fs, dir: full })).toEqual(["main"]);
+      expect(await git.listBranches({ fs, dir: shallow })).toEqual(["main"]);
+      const parent = (await git.readCommit({ fs, dir: shallow, oid: shallowHead })).commit.parent[0];
+      expect(parent).toBeTruthy();
+      await expect(git.readCommit({ fs, dir: shallow, oid: parent as string })).rejects.toThrow();
+      for (const [title, paths] of [
+        ["shallow-first", [shallow, full]],
+        ["full-first", [full, shallow]],
+      ] as const) {
+        const linked = await createProject(ws, {
+          title,
+          kind: "work",
+          links: paths.map((path) => ({ path, role: "repo" as const })),
+        });
+        const result = await syncProject(ws, linked.slug, { now: new Date("2026-10-15T06:00:00Z") });
+        expect(result.issues).toEqual([]);
+        expect(
+          readRecords(ws, "project_metric")
+            .filter((row) => row.project === linked.slug)
+            .map((row) => row.value),
+        ).toEqual([2]);
+      }
+      expect(fs.readFileSync(join(shallow, ".git/shallow"), "utf8").trim()).toBe(shallowHead);
+    } finally {
+      fs.rmSync(cloneRoot, { recursive: true, force: true });
+    }
   } finally {
     vi.restoreAllMocks();
     fs.rmSync(repo, { recursive: true, force: true });
