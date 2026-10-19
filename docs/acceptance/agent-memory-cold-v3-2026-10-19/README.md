@@ -18,7 +18,7 @@
 
 按原步骤第 7 步提交推送，第 8 步按无 kaitu 明确跳过手机生成，第 9 步新建交接，第 10 步查看文件和提交。结果 `git status` 有 `?? handoffs/20261019T2030-cold-agent.md`，第二独立克隆缺这份交接。档案、STATUS、manifest 已从远端回读，副本在 evidence。**这些是普通文件回读，不等于 App 校验通过**：本 Agent 当时还误把 STATUS.updated 写成日期、next 写成字符串列表。
 
-已生成填本地地址的 [第二 Agent 测试提示词](evidence/second-agent-local-prompt.txt)，并实际独立克隆回读。没有启动第二个模型/Agent，也没有声称已验证第二 Agent 的指令遵循或 GitHub 私有性。
+已生成填本地地址的 [第二 Agent 测试提示词](evidence/second-agent-local-prompt.txt)，并实际独立克隆回读。该初始阶段没有启动第二个模型/Agent，也没有声称已验证第二 Agent 的指令遵循或 GitHub 私有性。后续真正的无上下文独立 Agent 补验见 [独立接入与许可澄清后的持久交接](independent-agent.md)。
 
 ## 封存后诊断与最小修正
 
@@ -44,10 +44,14 @@
 | 选中项目的真实 PR/issue 检索 | 未验：只用合成项目和本地 Git，无本地等价 API |
 | 原版无 kaitu 路径生成手机内容 | 跳过：原说明要求等待有开图的电脑恢复；没有计为原版成功 |
 | 真实 kaitu CLI、App 自动恢复/同步、iPhone 展示 | 未验：本次只执行 core 真实函数与本地 Git，未跑 App/真机 |
-| 第二 Agent 接入 | 已生成本地测试提示词并独立克隆回读；第二模型、真实设备与 GitHub 权限未验 |
+| 第二 Agent 接入 | 后续独立 Agent 已实际冷读并写交接；首次未推送，许可澄清后推送并由另一新克隆回读。见 [独立补验](independent-agent.md)；真实设备与 GitHub 权限仍未验 |
 
 脚本绑定 `/tmp/kaitu-cold-v3`，是此次实验的可审计操作记录；需要从干净目录按原版 → 复验顺序运行，勿在已有实验目录重复运行。所有可持久审查的原始响应、日志、回读文件随本报告提交；无需访问测试机临时目录。`SHA256SUMS.initial` 覆盖最初封存的文件；后续证据另附，不修改已封存输入。
 
 ## CI 跟进
 
 初始 head `9b0bdc31016e065e1a79d918a40f2f3b3a336029` 的 [CI run 39319397312](https://github.com/Stahl-G/rensheng-kaitu/actions/runs/39319397312) 在 macOS/Windows 的 lint 阶段失败，后续 build/typecheck/test 跳过。失败源于本报告的 3 个操作脚本格式和 2 个原始 JSON 的排版。随后只规范化脚本，并将原始手机快照附件统一用 `.json.txt` 后缀保留，内容字节不变，避免格式化原始证据；没有改 CI 配置、产品实现或最初封存输入。精确新 head 的 CI 结果单独向主线程报告。
+
+## 独立 Agent 补验
+
+用户后续要求启动真正无上下文的独立 Agent，仅给必要入口。首次冷读准确但未推送；先封存原始回答，再仅澄清允许写入指定合成 bare 远端，由同一 Agent 完成真实推送。另一新临时克隆已回读交接并核对 remote main `c01e542e393527b9c0e17d3a052481b682251889`。原始回答、事实对照、许可澄清和回读证据见 [补验报告](independent-agent.md)。这不是原提示词首次无干预全过。

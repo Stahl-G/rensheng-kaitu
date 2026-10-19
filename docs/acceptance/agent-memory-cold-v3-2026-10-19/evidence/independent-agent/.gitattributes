@@ -1,0 +1,3 @@
+# Raw Git transcripts include literal blank context lines containing a space.
+agent-commits.txt -text whitespace=-blank-at-eol
+fresh-clone-readback.log -text whitespace=-blank-at-eol
