@@ -86,6 +86,7 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { channelsCommand, installShutdown } from "./channels.js";
 import { dshCommand, installDsh } from "./dsh.js";
+import { importFeishuFolder } from "./feishu.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
 import { startUi } from "./ui/server.js";
@@ -102,6 +103,7 @@ const HELP = `开图 kaitu
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
   kaitu phone run [--as <名字>]                     处理手机收件箱并重写手机快照
+  kaitu feishu import --folder <文件夹 token> [--cli <lark-cli 路径>]  把飞书文件夹里的云文档存成原文
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
   kaitu dsh [--install] [--no-automation]         把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令；开图 App 已在用同一工作区时加 --no-automation）
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
@@ -215,6 +217,8 @@ const options = {
   "dry-run": { type: "boolean" },
   calendar: { type: "string" },
   as: { type: "string" },
+  folder: { type: "string" },
+  cli: { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -386,6 +390,20 @@ async function run(argv: string[]): Promise<number> {
         name === undefined ? { kind: "computer" } : { kind: "agent", name, spec: 1 },
       );
       out(values, result, JSON.stringify(result, null, 2));
+      return 0;
+    }
+    case "feishu": {
+      if (args[0] !== "import" || !values.folder)
+        throw new KaituError("使用 feishu import --folder <文件夹 token>", "BAD_ARGS");
+      const result = await importFeishuFolder(workspace(values), values.folder, values.cli);
+      out(
+        values,
+        result,
+        [
+          `${result.documents} 篇云文档：新存 ${result.imported.length} 条原文，${result.unchanged} 篇没变。`,
+          ...result.skipped.map((item) => `跳过「${item.title}」：${item.reason}`),
+        ].join("\n"),
+      );
       return 0;
     }
     case "inbox": {
