@@ -514,6 +514,20 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         });
         continue;
       }
+      // 手机每次提交都新建文件；同步盘重送同名文件时复用已有入账结果。
+      // 用持久账本而非十四天的展示回执，重启及回执过期后仍不能重复入账。
+      if (
+        phoneInboxName.test(basename(file)) &&
+        file.endsWith(".records.jsonl") &&
+        readReceipts(ws)[basename(file)]
+      ) {
+        moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+        result.processed.push(file);
+        writePhoneReceipts(ws, [
+          { ref: basename(file), kind: "file", status: "duplicate", at: new Date().toISOString() },
+        ]);
+        continue;
+      }
       let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
       let errors: string[] = [];
       if (!file.endsWith(".md") || file.endsWith(".digest.md")) {

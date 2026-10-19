@@ -1,0 +1,18 @@
+{
+  "inbox": {
+    "processed": [
+      "inbox/agents/ios-3fa9c1d2-01K7XT00000000000000000001.records.jsonl"
+    ],
+    "notes": [],
+    "pending": []
+  },
+  "snapshots": 2,
+  "receipts": [
+    {
+      "ref": "ios-3fa9c1d2-01K7XT00000000000000000001.records.jsonl",
+      "kind": "file",
+      "status": "applied",
+      "at": "2026-10-19T20:24:27.065Z"
+    }
+  ]
+}

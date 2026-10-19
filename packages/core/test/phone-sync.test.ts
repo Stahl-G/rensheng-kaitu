@@ -37,6 +37,32 @@ import { freshWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
 
+it("手机记录同名重投跨重开及回执清理仍只入账一次，新文件仍能记相同内容", async () => {
+  const ws = await freshWorkspace();
+  const file = phoneFile("records.jsonl");
+  const text = JSON.stringify({ type: "task", title: "合成重复投递", status: "open", origin: "user" });
+  ws.writeText(file, text);
+  await processInbox(ws, { stableMs: 0 });
+  const first = readRecords(ws, "task");
+  expect(first).toHaveLength(1);
+  ws.writeJson("phone/receipts.json", {
+    format: "kaitu.phone.receipts",
+    version: 1,
+    generated_at: new Date().toISOString(),
+    items: [],
+  });
+  const reopened = new Workspace(ws.root);
+  reopened.writeText(file, text);
+  await processInbox(reopened, { stableMs: 0 });
+  expect(readRecords(reopened, "task")).toEqual(first);
+  expect(phoneReceipts(reopened)).toContainEqual(
+    expect.objectContaining({ ref: basename(file), status: "duplicate" }),
+  );
+  reopened.writeText(phoneFile("records.jsonl"), text);
+  await processInbox(reopened, { stableMs: 0 });
+  expect(readRecords(reopened, "task")).toHaveLength(2);
+});
+
 function remoteMock() {
   let files: BackupFiles = {};
   const remote: BackupRemote = {
