@@ -426,6 +426,11 @@ const WHEN = new RegExp(
   "i",
 );
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
+// 有的 AI 复制出来的回答没有换行，多条挤在一行里；在每个已知类别标签前断开。
+const INLINE_TAG = new RegExp(
+  `\\s+(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
+  "gi",
+);
 
 export function parseMemoryPaste(
   text: string,
@@ -436,45 +441,51 @@ export function parseMemoryPaste(
   // 已有记忆只和要记成记忆的条目去重：同样的话也可以设为目标、项目或方向。
   const known = new Set(existing.map((entry) => withoutPrefix(entry.text.trim())));
   const seen = new Set<string>();
-  return text.split(/\r?\n/).flatMap((line, index) => {
-    const original = line.trim();
-    if (!original) return [];
-    const match = /^[[【]([^\]】]+)[\]】]\s*[:：]?\s*(.+)$/.exec(withoutPrefix(original));
-    const category = match?.[1]?.trim().toLowerCase();
-    let group = category
-      ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
-      : undefined;
-    let body = group ? (match?.[2]?.trim() ?? original) : original;
-    let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
-    if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
-    let content = time ? body.slice(0, time.index).trim() : body;
-    if (!content) {
-      group = undefined;
-      body = original;
-      content = original;
-      time = null;
-    }
-    const raw = !group;
-    const target: OnboardingTarget = group && "target" in group ? group.target : "memory";
-    const key = withoutPrefix(body);
-    if (target === "memory" && known.has(key)) return [];
-    if (seen.has(`${target}\0${key}`)) return [];
-    seen.add(`${target}\0${key}`);
-    return [
-      {
-        id: `line-${index + 1}`,
-        type: (group?.type ?? "context") as MemoryType,
-        name: content.slice(0, 60),
-        text: body,
-        content,
-        when: time?.[1] ?? null,
-        category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
-        raw,
-        original,
-        target,
-      },
-    ];
-  });
+  return text
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const prefix = /^\s*(?:[-*+]\s+|\d+[.)、]\s*)?/.exec(line)?.[0] ?? "";
+      return (prefix + line.slice(prefix.length).replace(INLINE_TAG, "\n")).split("\n");
+    })
+    .flatMap((line, index) => {
+      const original = line.trim();
+      if (!original) return [];
+      const match = /^[[【]([^\]】]+)[\]】]\s*[:：]?\s*(.+)$/.exec(withoutPrefix(original));
+      const category = match?.[1]?.trim().toLowerCase();
+      let group = category
+        ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
+        : undefined;
+      let body = group ? (match?.[2]?.trim() ?? original) : original;
+      let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
+      if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
+      let content = time ? body.slice(0, time.index).trim() : body;
+      if (!content) {
+        group = undefined;
+        body = original;
+        content = original;
+        time = null;
+      }
+      const raw = !group;
+      const target: OnboardingTarget = group && "target" in group ? group.target : "memory";
+      const key = withoutPrefix(body);
+      if (target === "memory" && known.has(key)) return [];
+      if (seen.has(`${target}\0${key}`)) return [];
+      seen.add(`${target}\0${key}`);
+      return [
+        {
+          id: `line-${index + 1}`,
+          type: (group?.type ?? "context") as MemoryType,
+          name: content.slice(0, 60),
+          text: body,
+          content,
+          when: time?.[1] ?? null,
+          category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
+          raw,
+          original,
+          target,
+        },
+      ];
+    });
 }
 
 interface MemoryPreview {
