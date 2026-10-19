@@ -113,6 +113,8 @@ node scripts/learning-smoke.mjs --check
 - 外部 ACP：实际安装的 claude-agent-acp 0.55.0，独立 HOME / CLAUDE_CONFIG_DIR、明确列出的环境变量和本机受控 Anthropic HTTP 响应。通过实际 Kaitu MCP read_file 和 Claude 自有 Read / Write 保存同一 Markdown；重建 Ask/UI 后真实 session/load 可继续读取，共 14 个本机请求。无 kaitu_learning/card/widget 时使用文字反馈；没有把 DSH 卡片能力算进 ACP。首次 notes.md 尚不存在是预期空记录。
 - 这次真实 ACP 发现内容块为 `{type:"content",content:{type:"text",text}}`，原问问详情显示为空。现转换成既有平面文本块；真实 CLI 的缺文件错误已在浏览器展开可见，已有适配器测试补了对应回归。接续提示及技能说明新主题可尚无 notes.md。
 - 真实模型：Ollama 0.24.0 + 已存在的 qwen2.5:14b，无下载、无付费账号。通过真实 DSH 从合成来源提问 → 对学习者回答反馈 → 工具实际保存理解/问题/下一步 → 关闭重开后工具读回并从“连续复利为什么出现 e”接续，共 8 个本机模型端点请求。先前一次把 questions/next 写成数组、operationId 放错层，被校验拒绝且未写入；补充工具说明中的明确参数示例后重跑通过。首次大上下文耗时明显，曾在 180 秒内未完成；不能据此承诺响应速度、通用模型可靠性或 3–6 步教学质量。
+- 未通过路线：真实 Claude ACP CLI 接本机 Qwen 的首轮，在 330 秒内未完成；验收脚本超时终止了该 CLI 和本机代理请求。不能据受控响应链路宣称 ACP 真实模型的自动保存或完整教学已通过。原生 DSH App 中安装本分支、PPT 与用户付费模型也未验收。
+- 本轮改动的 CLI 类型检查、插件与引擎构建、Biome（506 文件）通过；本机 Agent 回归 8 项、core 学习 5 项、插件 16 项、学习 HTTP 2 项通过。HTTP 两项初跑受沙箱 localhost 监听权限阻止，获准本机监听后复跑通过；未把权限失败说成产品回归，也未把上一轮全量 286 项称为本轮重跑。
 - 父线程独立 Linux 动态 QA：准确 SHA `929d7fc85ea8fe7756519b593920cce2c0357bca`、Node 24.19，完整 build 通过；来源去重 → 保存并完成旧下一步 → 服务端 200 后丢响应使客户端 fetch failed → SIGKILL → 新 PID 重启 → 回读 → 同 operationId 并发重试均 replayed:true，notes / STATUS 字节不变；同 ID 改内容返回 400 且无写入。该检查没有浏览器或真实模型，不扩大为这些路线已验收。
 
 重复运行真实运行时合成验收（构建后）：
