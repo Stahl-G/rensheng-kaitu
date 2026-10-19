@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { searchChats } from "../src/chat-search.js";
 import { isTracked, snapshot } from "../src/history.js";
@@ -29,8 +29,8 @@ describe("对话检索", () => {
     }
     for (let i = 0; i < 120; i++) {
       const other = `chats/2026/10/archive-${i}.jsonl`;
-      ws.writeText(
-        other,
+      writeFileSync(
+        ws.resolve(other),
         `${JSON.stringify({ ...rows[0], id: `archive-${i}`, title: "旧对话" })}\n${JSON.stringify({ ...rows[1], text: "归档正文".repeat(1000) })}\n`,
       );
     }

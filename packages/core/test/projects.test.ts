@@ -143,7 +143,7 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     objectReads.mockClear();
     expect((await syncProject(ws, slug, { now: new Date("2026-10-14T05:00:00Z") })).metrics).toEqual([]);
     const commitsRead = objectReads.mock.calls.filter(([file]) =>
-      String(file).startsWith(join(repo, ".git/objects/")),
+      String(file).replaceAll("\\", "/").startsWith(join(repo, ".git/objects/").replaceAll("\\", "/")),
     );
     expect(commitsRead).toHaveLength(3);
     objectReads.mockRestore();
