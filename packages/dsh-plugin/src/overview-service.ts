@@ -387,7 +387,7 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("learningSave")
   async learningSave(
     input: LearningCheckinInput,
-  ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
+  ): Promise<LearningTopic & { version: string | null; versionError?: string; replayed?: boolean }> {
     return this.write(() =>
       saveLearningCheckin(this.workspace, input, new Date(), this.scheduleLearningVersion),
     );

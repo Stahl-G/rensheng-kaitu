@@ -159,12 +159,14 @@ function Tool({
 export function AskPage({
   workspace,
   initialPrompt = "",
+  initialPromptRequest = 0,
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
 }: {
   workspace: string;
   initialPrompt?: string;
+  initialPromptRequest?: number;
   configureRequest?: number;
   configureBuiltin?: boolean;
   onConnections?: () => void;
@@ -180,8 +182,8 @@ export function AskPage({
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [draft, setDraft] = useState(initialPrompt);
   useEffect(() => {
-    if (initialPrompt) setDraft(initialPrompt);
-  }, [initialPrompt]);
+    if (initialPrompt || initialPromptRequest) setDraft(initialPrompt);
+  }, [initialPrompt, initialPromptRequest]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const configurationRequested = useRef(false);

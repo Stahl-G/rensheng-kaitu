@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { z } from "zod";
+import { normalizeStatus } from "./doc-input.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
@@ -49,8 +50,11 @@ export const learningCheckinSchema = z
       .max(16 * 1024),
     next: z.string().trim().max(500),
     completedNextId: short.optional(),
+    completedNextTitle: short.optional(),
+    operationId: z.string().trim().min(8).max(100),
   })
   .strict()
+  .refine((v) => !v.completedNextId || !!v.completedNextTitle, "完成下一步前请先读取并传入原任务标题")
   .refine(
     (v) => v.understanding || v.questions || v.next || v.completedNextId,
     "请写下一点理解、疑问或下一步",
@@ -72,7 +76,11 @@ function status(ws: Workspace, topic: string) {
   const file = `${directory(topic)}/STATUS.md`;
   if (!ws.exists(file)) throw new KaituError("找不到这个学习主题", "NOT_FOUND");
   const parsed = ws.scanParsed(file, "learning-status", (text) => {
-    const value = parseFrontmatter<ModuleStatus & { title?: string }>(text);
+    const parsed = parseFrontmatter(text);
+    const value = {
+      ...parsed,
+      data: normalizeStatus(parsed.data) as unknown as ModuleStatus & { title?: string },
+    };
     if (!schemas().builtin("status.schema.json")(value.data))
       throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");
     return value;
@@ -189,13 +197,25 @@ export async function saveLearningCheckin(
   scheduleVersion?: (message: string) => void,
 ) {
   const value = learningCheckinSchema.parse(input);
+  const { operationId, ...content } = value;
+  const inputHash = createHash("sha256").update(JSON.stringify(content)).digest("hex");
+  const receipt = `.kaitu/cache/learning-operations/${createHash("sha256").update(operationId).digest("hex")}.json`;
+  if (ws.exists(receipt)) {
+    const previous = ws.readJson<{ topic: string; inputHash: string }>(receipt);
+    if (previous.topic !== value.topic || previous.inputHash !== inputHash)
+      throw new KaituError("这次保存编号已用于其他内容，请为新记录使用新编号", "BAD_ARGS");
+    return { ...readLearning(ws, value.topic), version: null, replayed: true };
+  }
   const dir = directory(value.topic);
   const parsed = status(ws, value.topic);
   const stamp = isoInZone(now, ws.timeZone());
   const next = (parsed.data.next ?? []).map((item) => ({ ...item }));
   if (value.completedNextId) {
     const item = next.find(
-      (item) => item.id === value.completedNextId && ["todo", "proposed"].includes(item.status),
+      (item) =>
+        item.id === value.completedNextId &&
+        item.title === value.completedNextTitle &&
+        ["todo", "proposed"].includes(item.status),
     );
     if (!item) throw new KaituError("这条下一步已变化，请重新读取后选择", "BAD_ARGS");
     item.status = "done";
@@ -220,5 +240,6 @@ export async function saveLearningCheckin(
     `${dir}/STATUS.md`,
     stringifyFrontmatter({ ...parsed.data, updated: stamp, next }, parsed.body),
   );
-  return saved(ws, value.topic, scheduleVersion);
+  ws.writeJson(receipt, { topic: value.topic, inputHash }, { internal: true });
+  return { ...(await saved(ws, value.topic, scheduleVersion)), replayed: false };
 }

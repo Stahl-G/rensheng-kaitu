@@ -48,6 +48,7 @@ export interface OverviewPageProps
     configureRequest: number,
     configureBuiltin: boolean,
     onConnections: () => void,
+    promptRequest: number,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -128,6 +129,7 @@ function Overview({
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState("");
+  const [promptRequest, setPromptRequest] = useState(0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -228,6 +230,7 @@ function Overview({
   };
   const prompt = (text: string) => {
     setPromptDraft(text);
+    setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
@@ -930,7 +933,13 @@ function Overview({
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div className={css.askPanel} hidden={view !== "ask"}>
-            {props.renderAsk(promptDraft, configureRequest, configureBuiltin, () => setView("connections"))}
+            {props.renderAsk(
+              promptDraft,
+              configureRequest,
+              configureBuiltin,
+              () => setView("connections"),
+              promptRequest,
+            )}
           </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (

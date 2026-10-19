@@ -73,6 +73,7 @@ it("DSH Remote 沿用相同主题并通过生成契约返回，保存资料不�
     expect(created.version).toBeNull();
     const saved = await service.learningSave({
       topic: created.topic,
+      operationId: "remote-study-0001",
       understanding: "A real learner statement.",
       questions: "An unresolved question.",
       next: "One small step",

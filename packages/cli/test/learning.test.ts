@@ -30,6 +30,7 @@ it("独立资料接口在无模型下保存来源与真实学习结果，返回�
     const result = await post("learningSave", [
       {
         topic: topic.topic,
+        operationId: "http-study-0001",
         understanding: "I can explain the example.",
         questions: "When does it fail?",
         next: "Try a counterexample",

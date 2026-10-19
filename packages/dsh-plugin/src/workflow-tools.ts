@@ -148,7 +148,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
   }
   register(
     "kaitu_learning",
-    "学习主题：list/read 读已存资料，start 保存主题与来源，save 追加用户实际表达的理解、疑问与下一步。不能把 AI 的讲解写成用户已学会。不要自动完成下一步；completedNextId 仅在用户明确完成时传。",
+    "学习主题：list/read 读已存资料，start 保存主题与来源，save 追加用户实际表达的理解、疑问与下一步。不能把 AI 的讲解写成用户已学会。不要自动完成下一步；completedNextId 仅在用户明确完成时传，并传入读取时的 completedNextTitle；任务已变化先重新读取。每次 save 用一个 operationId；结果不确定时重试沿用该 ID，另一次学习用新 ID。",
     z.discriminatedUnion("action", [
       z.object({ action: z.literal("list") }).strict(),
       z.object({ action: z.literal("read"), topic: text }).strict(),

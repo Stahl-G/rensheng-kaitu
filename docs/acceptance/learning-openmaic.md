@@ -17,7 +17,7 @@
 ## 验证结果与边界
 
 - core/channels/cli TypeScript 编译、插件 host/client 类型与两个 UI 构建通过。
-- 7 个针对性测试文件、17 个测试通过：DSH Remote 生成契约与后台版本、新学习文件读写、来源去重与 slug 碰撞保护、取消/超限、教学 metadata、受限 HTTP 帧，以及既有工具、skill、HTTP/SSE 回归。
+- 9 个针对性测试文件、29 个测试通过：DSH Remote 生成契约与后台版本、新学习文件读写、来源去重与 slug 碰撞保护、取消/超限、教学 metadata、受限 HTTP 帧，以及既有工具、skill、HTTP/SSE、ACP 会话回归。
 - Computer Use 在隔离工作区验证：资讯 → 保存主题/来源 → 接续问问草稿 → 固定样例提问 → 回答后展示小测/模拟 → 手填理解/问题/下一步 → 重载后读回。
 - 实际点击「11 元」显示正确反馈；模拟从第 2 期调到第 3 期显示 133.10 元。卡片从持久对话元数据重开可见，交互状态会重置。
 - 这些结果证明本地链路与渲染可用，**不代表真实模型教学质量、真实模型自动保存、用户 DSH 新分支安装或 PPT 已验收**。原插件的用户亲测成功与本分支验收分开。
@@ -50,3 +50,59 @@
 3. 要一个小测或模拟，操作一次，再把理由告诉 AI；确认 AI 没有假装已经看到卡片里的答案。
 4. 用自己的话留一条理解、一条没懂的问题和一个很小的下一步；看今天页是否出现该动作，不把看完算作学会。
 5. 关掉再开，从资料里回到同一主题，看它能否读到上次的问题并接着问。PPT 只在你明确需要时另试。
+
+## PR 审查后的五项修复
+
+| 问题 | 最小处理 | 回归证据 |
+|---|---|---|
+| 旧 STATUS 简写在详情被拒绝 | 与校验器、列表一样先 normalizeStatus；正文保留 | learning.test.ts 的无 updated / next 字符串旧文档可读、添资料、保存 |
+| 已保存但响应丢失后重试重复总结 / 完成报错 | 新 save API 要求 operationId；界面同一未确认请求重用 ID，本地 `.kaitu/cache/learning-operations/<hash>.json` 记 topic 与输入 hash；完成回执先于下一步检查 | 跨 Workspace 重开重试不追加，换 ID 可记录相同理解；同 ID 换内容拒绝 |
+| 保存 A 期间切 B 导致迟到响应覆盖 | 保存中锁主题切换、编辑、接续与取消；组件卸载后忽略写回本地 UI | 挂起服务桩下 B 与编辑框 disabled，释放保存后可编辑 B |
+| 另一 Agent 保留 id 但改任务标题，旧界面误完成 | 完成须同时提交已读的 completedNextTitle；当前标题/status 不符则拒绝；重读主题保留本次输入 | 改名后旧提交失败，状态与笔记未变化 |
+| 同主题同文字二次接续无草稿 | Overview 每次点击增加 promptRequest；独立 AskPage 和原生 PluginAsk 都接收该动作 | 实际独立页发送→回主题→再接续恢复草稿；原生适配器服务桩清空→再点击注入次数 1→2 |
+
+操作回执是本机可丢弃的缓存，不是学习资料格式；不改 STATUS、notes 或来源 schema，不同步到第二台设备。
+只保障已完成且回执仍在的同一次请求重试；不宣称多文件写入具有崩溃事务语义。另一次学习必须用新 ID，不按内容做全局去重。
+
+## 运行环境与能力边界
+
+| 环境 | OpenMAIC 插件未安装 | OpenMAIC 插件已安装 |
+|---|---|---|
+| 安装本分支开图插件的 DSH 原生会话 | 开图自带 kaitu_learning 和 card/widget；来源、保存、接续及教学卡片不依赖上游插件；无 PPT 工具则文字教学 | 在**同一 DSH profile** 安装时，开图的独立工具名不会覆盖上游；用户明确要求且会话列出 openmaic_slide 时可选 PPT |
+| Kaitu.app / CLI-Web 内置 DSH（含自带登录或用户配置的外部 API 服务商） | 构建产物自带开图 SDK 插件和复用的 UI；card/widget 从已有工具元数据呈现。默认不打包 OpenMAIC SDK/课堂/PPT | 用户在另一个 DeepSeek Harness App 装插件，不会自动进入开图隔离的 DSH profile；本次能力与左列相同，不因此声称 PPT 可用 |
+| 外部本机 Agent 的 ACP 模式（choice=local） | ACP 会话只注入现有开图 MCP；目前 MCP 无 kaitu_learning/card/widget，ACP 适配器也不传教学 meta。提示改为读技能/主题文件、文字练习；若该 Agent 有文件写权限，可写现有 Markdown，否则用户回资料页手填 | 装在 DSH 的 OpenMAIC 不会自动进入 ACP Agent。此 PR 不新增 ACP 卡片或 MCP 教学协议，行为同左列 |
+
+“外部 API 服务商”仍走内置 DSH；“外部 ACP Agent”是不同运行时，不应混称。
+源码依据：`packages/dsh-plugin/src/tools.ts`、`learning-tools.ts`、`client/index.tsx`、`packages/desktop/sdk-runtime.mjs`、`packages/cli/runtime/service.mjs`、`local-agents/runtime.ts`、`mcp/server.ts`。
+以上模式说明来自源码与合成运行；没有使用用户付费账号测试真实模型、真实 ACP CLI 或用户 DSH 安装。真实模型教学质量和自动写回仍是验收缺口。
+
+## 可复现的独立合成验收
+
+前置：仓库依赖已就绪。这次只复用现有依赖，没有 npm/pnpm 安装。先生成本分支构建产物：
+
+```sh
+node node_modules/typescript/bin/tsc -p packages/core/tsconfig.json
+node node_modules/typescript/bin/tsc -p packages/channels/tsconfig.json
+node node_modules/typescript/bin/tsc -p packages/cli/tsconfig.json
+node packages/dsh-plugin/scripts/build.mjs
+node scripts/learning-smoke.mjs --check
+```
+
+`--check` 在全新临时目录中自动走来源保存、固定问答事件、受限教学帧、保存与同 ID 重试、重开读取，输出 PASS 后清理。
+它不证明浏览器执行 JS 或真实模型理解，仅验证本地 HTTP/文件/元数据链路。
+
+浏览器体验：运行 `node scripts/learning-smoke.mjs --port 4890`，打开输出的 URL。
+该脚本只生成合成工作区和固定回复，不启动真实 AI Runtime、不读取用户资料或模型配置；Ctrl+C 清理。
+使用 `scripts/fixtures/learning-openmaic.json` 中的标题、回答与 checkin，按上面的五个动作操作。
+第一次问问若出现自动任务引导，选「都不要」。同主题二次接续额外步骤：发送草稿后回资料→笔记与决策→原主题→再次「接着学」，应再次填入同一文字，而非空草稿。
+
+竞态与原生草稿桩页：运行 `node scripts/learning-ui-smoke.mjs` 并打开输出 URL。
+输入 A 的理解→保存但不点「完成挂起保存」，核对 B 和编辑框禁用；完成挂起保存后再切 B，B 输入可正常编辑。
+下方是实际 PluginAsk 组件配合合成会话服务：先清空草稿，再点「再次接着学（相同文字）」，草稿恢复、注入次数增加。
+这是适配器逻辑回归，不是原生 DSH App 的真人验收；Ctrl+C 清理构建临时目录。
+
+![挂起保存锁定编辑](learning-openmaic/save-lock.jpg)
+
+![原生适配器相同文字重新注入](learning-openmaic/native-repeat-draft.jpg)
+
+![独立问问同主题二次接续](learning-openmaic/repeat-draft.jpg)

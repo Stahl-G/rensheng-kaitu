@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LearningCheckinInput, LearningTopic, LibraryData, StartLearningInput } from "../types.js";
 import { DocumentBody } from "./DocumentBody.js";
 import styles from "./LearningPage.module.css";
@@ -13,8 +13,8 @@ export interface LearningServices {
 export type LearningSource = NonNullable<StartLearningInput["source"]>;
 export function learningPrompt(topic: LearningTopic, english = false) {
   if (english)
-    return `Use learn-topic to resume “${topic.title}”. First call kaitu_learning read for topic ${topic.topic} to read sources, actual understanding, unanswered questions and next steps. Ask ONE concrete question at a time and wait for my attempt. Use gradual hints and feedback across about 3–6 steps. Use kaitu_learning_card or kaitu_learning_widget only as useful aids after my attempt. Quizzes are graded inside the card; ask me to share my reasoning. Save only understanding I actually expressed, unresolved questions and one small next step. Do not infer mastery from your explanation or visuals. No PPT by default, no openmaic_generate or classroom upload. Consider installed openmaic_slide only if I explicitly request slides. Start with one question.`;
-  return `使用 learn-topic 技能继续学习「${topic.title}」。先用 kaitu_learning read 读取主题 ${topic.topic} 的来源、笔记与下一步，不要另建主题。从上次真实理解和未解决问题接上，一次只问一个问题，等我回答后再反馈或给逐级提示，每轮约 3–6 步。需要时用 kaitu_learning_card 或 kaitu_learning_widget 辅助。最后引用我实际说出的理解，保存待解问题和一个小的下一步；不要把你的讲解当成我已掌握。小测在卡片内自判，若要讨论请我把答案告诉你。默认不做 PPT，不调用 openmaic_generate，不上传材料；我明确要求幻灯片时才考虑已安装的 openmaic_slide。现在先问一个和这个主题有关的具体问题。`;
+    return `Resume “${topic.title}” using learn-topic. If kaitu_learning is available, read topic ${topic.topic}. Otherwise read .agents/skills/learn-topic/SKILL.md and learning/${topic.topic}/STATUS.md, notes.md and sources/ using your existing workspace file tools. Reuse this topic. Resume from my actual understanding, unanswered questions and next step. Ask ONE concrete question and wait for my attempt; use gradual hints and feedback across about 3–6 steps. Use kaitu_learning_card/widget only if those tools exist, after my attempt; otherwise use a short text exercise. Do not invent tool calls, rendered cards or quiz results. Card answers are local; ask me to share my reasoning. Save only understanding I actually expressed, unresolved questions and one small next step: prefer kaitu_learning save, otherwise append to the same Markdown files with your existing file tools. If you cannot write, tell me to use the learning form in Library. Only claim a save after it succeeds. No mastery inferred from explanations or visuals. No PPT by default, no openmaic_generate or classroom upload. Use openmaic_slide only if I explicitly request it AND the tool exists in this session. Start with one question.`;
+  return `按 learn-topic 继续学习「${topic.title}」。如果有 kaitu_learning，先 read 主题 ${topic.topic}；否则用当前已有的工作区文件工具读取 .agents/skills/learn-topic/SKILL.md 和 learning/${topic.topic}/ 下的 STATUS.md、notes.md、sources/，沿用这个主题。从我上次实际表达的理解、未解问题和下一步接上，一次只问一个具体问题，等我尝试后再反馈或逐级提示，每轮约 3–6 小步。仅在当前会话确有 kaitu_learning_card/widget 时展示辅助卡片，否则用简短文字练习，不捏造工具、卡片或小测结果。卡片答案只在本地，若需讨论让我说出理由。总结只记录我实际表达的理解、未解问题和一个小的下一步：优先 kaitu_learning save；工具缺失时用既有文件工具追加到同一主题的 Markdown，不具备写入能力就让我回资料页填写学习记录。保存成功后才能说已保存，不把你的讲解或看过卡片算作掌握。默认不做 PPT，不调用 openmaic_generate，不上传课堂；只有我明确要求且本会话有 openmaic_slide 时才考虑幻灯片。现在先问一个问题。`;
 }
 export function LearningPage(
   props: LearningServices & {
@@ -41,6 +41,14 @@ export function LearningPage(
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const saveAttempt = useRef<{ content: string; id: string }>();
   const topics = props.data?.notes.filter((item) => item.file.startsWith("learning/")) ?? [];
   useEffect(() => {
     let active = true;
@@ -89,6 +97,7 @@ export function LearningPage(
             }
           : {}),
       });
+      if (!mounted.current) return;
       props.onTopic(value.topic);
       setDetail(value);
       setCompose(false);
@@ -105,18 +114,29 @@ export function LearningPage(
     }
   };
   const save = async () => {
-    if (!detail) return;
+    if (!detail || busy) return;
     setBusy(true);
     setError("");
     setReceipt("");
     try {
-      const value = await props.saveLearning({
+      const input = {
         topic: detail.topic,
         understanding,
         questions,
         next,
-        ...(completed ? { completedNextId: completed } : {}),
-      });
+        ...(completed
+          ? {
+              completedNextId: completed,
+              completedNextTitle: detail.next.find((item) => item.id === completed)?.title,
+            }
+          : {}),
+      };
+      const content = JSON.stringify(input);
+      if (saveAttempt.current?.content !== content)
+        saveAttempt.current = { content, id: crypto.randomUUID() };
+      const value = await props.saveLearning({ ...input, operationId: saveAttempt.current.id });
+      if (!mounted.current) return;
+      saveAttempt.current = undefined;
       setDetail(value);
       setUnderstanding("");
       setQuestions("");
@@ -140,6 +160,7 @@ export function LearningPage(
         <h2>{t("学习主题", "Learning topics")}</h2>
         <button
           type="button"
+          disabled={busy}
           className={css.btn}
           onClick={() => {
             setCompose(true);
@@ -152,7 +173,35 @@ export function LearningPage(
           {t("开始一个主题 / 添加资料", "Start a topic / add material")}
         </button>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <div role="alert">
+          <p>{error}</p>
+          {detail && (
+            <button
+              type="button"
+              className={css.link}
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  const value = await props.loadLearning(detail.topic);
+                  if (mounted.current) {
+                    setDetail(value);
+                    setCompleted("");
+                    setError("");
+                  }
+                } catch (err) {
+                  if (mounted.current) setError(String(err));
+                } finally {
+                  if (mounted.current) setBusy(false);
+                }
+              }}
+            >
+              {t("重新读取主题（保留本次输入）", "Reload topic (keep this draft)")}
+            </button>
+          )}
+        </div>
+      )}
       {receipt && <output>{receipt}</output>}
       {compose ? (
         <form
@@ -165,6 +214,7 @@ export function LearningPage(
           <label>
             {t("主题 / 资料标题", "Topic / source title")}
             <input
+              disabled={busy}
               required
               maxLength={500}
               value={title}
@@ -173,7 +223,11 @@ export function LearningPage(
           </label>
           <label>
             {t("保存到", "Save to")}
-            <select value={destination} onChange={(event) => setDestination(event.target.value)}>
+            <select
+              disabled={busy}
+              value={destination}
+              onChange={(event) => setDestination(event.target.value)}
+            >
               <option value="">{t("新主题（同名会接着保存）", "New topic (same title resumes)")}</option>
               {topics.map((item) => (
                 <option key={item.file} value={item.file.split("/")[1]}>
@@ -184,11 +238,12 @@ export function LearningPage(
           </label>
           <label>
             {t("来源链接（可选）", "Source URL (optional)")}
-            <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} />
+            <input disabled={busy} type="url" value={url} onChange={(event) => setUrl(event.target.value)} />
           </label>
           <label>
             {t("已有摘要或粘贴的材料（可选）", "Existing summary or pasted material (optional)")}
             <textarea
+              disabled={busy}
               rows={5}
               maxLength={128 * 1024}
               value={material}
@@ -207,6 +262,7 @@ export function LearningPage(
             </button>
             <button
               type="button"
+              disabled={busy}
               className={css.link}
               onClick={() => {
                 setCompose(false);
@@ -223,6 +279,7 @@ export function LearningPage(
             {topics.map((item) => (
               <button
                 type="button"
+                disabled={busy}
                 className={css.btn}
                 key={item.file}
                 aria-pressed={props.topic === item.file.split("/")[1]}
@@ -258,6 +315,7 @@ export function LearningPage(
               )}
               <button
                 type="button"
+                disabled={busy}
                 className={css.btn}
                 onClick={() => props.onPrompt(learningPrompt(detail, t("zh", "en") === "en"))}
               >
@@ -265,8 +323,8 @@ export function LearningPage(
               </button>
               <p className={css.small}>
                 {t(
-                  "可用概念卡、小测和互动模拟辅助；PPT 按需。",
-                  "Concept cards, quizzes and simulations are available; slides are optional.",
+                  "有卡片工具时可用概念卡、小测和模拟；外部 Agent 可用文字练习，PPT 按需。",
+                  "Cards, quizzes and simulations require the matching tools; external agents can use text exercises. Slides are optional.",
                 )}
               </p>
               <details>
@@ -302,6 +360,7 @@ export function LearningPage(
                 <label>
                   {t("用自己的话：我现在怎么理解", "In my own words: what I understand")}
                   <textarea
+                    disabled={busy}
                     rows={3}
                     maxLength={16384}
                     value={understanding}
@@ -311,6 +370,7 @@ export function LearningPage(
                 <label>
                   {t("还没弄懂 / 想核实的问题", "Questions I still have")}
                   <textarea
+                    disabled={busy}
                     rows={2}
                     maxLength={16384}
                     value={questions}
@@ -319,12 +379,21 @@ export function LearningPage(
                 </label>
                 <label>
                   {t("一个小的下一步", "One small next step")}
-                  <input maxLength={500} value={next} onChange={(event) => setNext(event.target.value)} />
+                  <input
+                    disabled={busy}
+                    maxLength={500}
+                    value={next}
+                    onChange={(event) => setNext(event.target.value)}
+                  />
                 </label>
                 {!!pending.length && (
                   <label>
                     {t("这次实际完成了（可选）", "Completed this time (optional)")}
-                    <select value={completed} onChange={(event) => setCompleted(event.target.value)}>
+                    <select
+                      disabled={busy}
+                      value={completed}
+                      onChange={(event) => setCompleted(event.target.value)}
+                    >
                       <option value="">{t("暂不标完成", "Leave unchanged")}</option>
                       {pending.map((item) => (
                         <option key={item.id} value={item.id}>
