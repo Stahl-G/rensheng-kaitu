@@ -25,7 +25,9 @@ async function lark<T>(cli: string, args: string[]): Promise<T> {
     throw new KaituError(
       code === "ENOENT"
         ? "没有找到 lark-cli，请先安装并登录飞书"
-        : `飞书读取失败：${stderr?.trim() || (error as Error).message}`,
+        : stderr?.includes('"authentication"')
+          ? "飞书登录已过期，请运行 lark-cli auth login"
+          : `飞书读取失败：${stderr?.trim() || (error as Error).message}`,
       "FEISHU",
     );
   }
