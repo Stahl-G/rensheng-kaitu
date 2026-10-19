@@ -11,6 +11,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./teaching-frame": {
+      "types": "./dist/teaching-frame.d.ts",
+      "default": "./dist/teaching-frame.js"
+    },
     "./direction-copy": {
       "types": "./dist/direction-copy.d.ts",
       "default": "./dist/direction-copy.js"

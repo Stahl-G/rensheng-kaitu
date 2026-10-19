@@ -25,9 +25,11 @@ import {
   importNutAi,
   inboxNoteDone,
   inboxNotes,
+  learningCheckinSchema,
   lifeMap,
   linkProject,
   listInvestments,
+  listLearning,
   listMemories,
   listProjects,
   listTasks,
@@ -46,6 +48,7 @@ import {
   readAgentFile,
   readExperienceImports,
   readExploration,
+  readLearning,
   readOnboardingMatter,
   readPhases,
   readProject,
@@ -55,11 +58,14 @@ import {
   removePhoto,
   resolvePlace,
   restore,
+  saveLearningCheckin,
   saveOnboardingChoices,
   searchChats,
   searchMemories,
   setProject,
   snapshot,
+  startLearning,
+  startLearningSchema,
   stringifyFrontmatter,
   syncProject,
   syncProjects,
@@ -140,6 +146,28 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         }),
     });
   }
+  register(
+    "kaitu_learning",
+    "学习主题：list/read 读已存资料，start 保存主题与来源，save 追加用户实际表达的理解、疑问与下一步。不能把 AI 的讲解写成用户已学会。不要自动完成下一步；completedNextId 仅在用户明确完成时传。",
+    z.discriminatedUnion("action", [
+      z.object({ action: z.literal("list") }).strict(),
+      z.object({ action: z.literal("read"), topic: text }).strict(),
+      z.object({ action: z.literal("start"), input: startLearningSchema }).strict(),
+      z.object({ action: z.literal("save"), input: learningCheckinSchema }).strict(),
+    ]),
+    (input) => {
+      switch (input.action) {
+        case "list":
+          return listLearning(ws);
+        case "read":
+          return readLearning(ws, input.topic);
+        case "start":
+          return startLearning(ws, input.input);
+        case "save":
+          return saveLearningCheckin(ws, input.input);
+      }
+    },
+  );
   register(
     "kaitu_onboarding",
     "首次使用：保存原文后的整理草稿、内容与清单、选择和记忆预览。草稿只进待核对，用户采纳才生成待办。",

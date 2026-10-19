@@ -14,6 +14,8 @@ import {
   type Hometown,
   type ImportSource,
   KaituError,
+  type LearningCheckinInput,
+  type LearningTopic,
   type LibraryData,
   type NewsFeedback,
   type OnboardingAi,
@@ -37,6 +39,7 @@ import {
   type Preferences,
   type ProjectGoal,
   type SettingsData,
+  type StartLearningInput,
   type SyncProvider,
   Workspace,
   addCalendarSubscription,
@@ -68,6 +71,7 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  listLearning,
   markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
@@ -88,6 +92,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLearning,
   readLibrary,
   readLibraryDocument,
   readNews,
@@ -105,6 +110,7 @@ import {
   restore,
   saveAvatar,
   saveHometown,
+  saveLearningCheckin,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -113,6 +119,8 @@ import {
   scheduleNext,
   setExperienceSource,
   setNewsFeedback,
+  snapshot,
+  startLearning,
   syncProject,
   tryNews,
   unhideExperience,
@@ -150,6 +158,7 @@ declare module "@deepseek-ai/cordis" {
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
+  private readonly scheduleLearningVersion: (message: string) => void;
 
   constructor(
     ctx: Context,
@@ -162,6 +171,13 @@ export class KaituOverviewService extends TypertRemoteService {
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
     ctx.effect(() => () => this.files.dispose());
+    this.scheduleLearningVersion = (message) => {
+      setImmediate(() => {
+        void this.write(() => snapshot(this.workspace, message)).catch((error) =>
+          ctx.logger.warn(`学习资料已保存，后台版本记录未完成：${String(error)}`),
+        );
+      });
+    };
     const performWrite = this.write;
     this.write = async (operation) => {
       try {
@@ -349,6 +365,32 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("libraryDocument")
   async libraryDocument(file: string): Promise<string> {
     return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("learningList")
+  async learningList(): Promise<{ topic: string; title: string; next: string | null }[]> {
+    return listLearning(this.workspace);
+  }
+
+  @Remote("learningRead")
+  async learningRead(topic: string): Promise<LearningTopic> {
+    return readLearning(this.workspace, topic);
+  }
+
+  @Remote("learningStart")
+  async learningStart(
+    input: StartLearningInput,
+  ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
+    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleLearningVersion));
+  }
+
+  @Remote("learningSave")
+  async learningSave(
+    input: LearningCheckinInput,
+  ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
+    return this.write(() =>
+      saveLearningCheckin(this.workspace, input, new Date(), this.scheduleLearningVersion),
+    );
   }
 
   @Remote("calendar")
