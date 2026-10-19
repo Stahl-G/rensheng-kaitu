@@ -9,6 +9,7 @@ import {
   configureAutomation,
   initWorkspace,
   readAutomation,
+  splitImportedBlobs,
   upgradeWorkspace,
 } from "../core/dist/index.js";
 import { createAiProcess } from "./ai-process.mjs";
@@ -133,9 +134,11 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   // 有文件还在云盘没下载时先不升级，下次启动再做；不能让启动停在这里。
   else
-    await upgradeWorkspace(ws).catch((error) => {
-      if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
-    });
+    await upgradeWorkspace(ws)
+      .then(() => splitImportedBlobs(ws))
+      .catch((error) => {
+        if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
+      });
   step("workspace");
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
