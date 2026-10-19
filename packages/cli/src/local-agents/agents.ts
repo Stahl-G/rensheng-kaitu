@@ -100,10 +100,11 @@ export function findAgent(
 }
 /** Resolve a standard npm shim without running a shell or interpreting user command strings. */
 export function cliCommand(
-  bin: string,
+  binary: string,
   env: NodeJS.ProcessEnv,
   platform = process.platform,
 ): [string, ...string[]] {
+  let bin = binary;
   if (platform === "win32" && !isAbsolute(bin) && !/[\\/]/.test(bin)) {
     bin =
       (env.PATH ?? "")
