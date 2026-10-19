@@ -19,7 +19,9 @@
     "generator": {
       "type": "object",
       "required": ["kind"],
-      "description": "谁生成的这份快照；没有这个字段当作电脑生成",
+      "if": { "properties": { "kind": { "const": "agent" } } },
+      "then": { "required": ["name", "spec"] },
+      "description": "谁生成的这份快照；Agent 必须写 name 和 spec，没有这个字段当作电脑生成",
       "properties": {
         "kind": {
           "enum": ["computer", "agent"]

@@ -1,4 +1,3 @@
-import { frontmatterBody } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
@@ -171,7 +170,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
   for (const p of data.projects)
     items.push({
       kind: "project",
-      title: p.title,
+      title: clip(p.title, 80),
       ...(p.next[0] ? { subtitle: clip(`下一步：${p.next[0]}`, 80) } : {}),
       date: null,
       path: p.file,
@@ -179,7 +178,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
   for (const g of data.plans.goals)
     items.push({
       kind: "me",
-      title: g.title,
+      title: clip(g.title, 80),
       subtitle: `记过 ${g.results} 次结果`,
       date: null,
       path: "me/goals.json",
@@ -201,7 +200,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
     const month = day(latest.ts).slice(0, 7);
     items.push({
       kind: "health",
-      title: ref.def.label ?? ref.type,
+      title: clip(ref.def.label?.trim() || ref.type, 80),
       subtitle: `${rows.length} 条`,
       date: day(latest.ts),
       path: `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`,
@@ -211,10 +210,7 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
     // 日期取所在的日期目录；frontmatter 里的 date 可能不是字符串。
     const date = n.path.match(/\/(\d{4}-\d{2}-\d{2})\//)?.[1];
     if (!date || date < since) continue;
-    const line = frontmatterBody(n.content)
-      .split("\n")
-      .find((l) => l.trim());
-    items.push({ kind: "note", title: clip(line?.trim() ?? "（空）", 40), date, path: n.path });
+    items.push({ kind: "note", title: clip(n.firstLine, 40), date, path: n.path });
   }
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return { ...envelope("library", generatedAt), items };

@@ -36,6 +36,7 @@ import {
 import { freshWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
 function remoteMock() {
   let files: BackupFiles = {};
   const remote: BackupRemote = {
@@ -339,4 +340,75 @@ it("云端整理员写的回执并进本机，手机重投不再执行；待整�
   ws.writeText(phoneFile("actions.jsonl"), JSON.stringify({ ...action, args: { id: ulid() } }));
   await processInbox(ws, { stableMs: 0 });
   expect(phoneReceipts(ws).find((r) => r.ref === clientId)?.status).toBe("duplicate");
+});
+
+it("同目录 Agent 快照覆盖前保存来源与离线回执，已读记录在重开后保留", async () => {
+  const { markOrganizerSeen, organizerStatus, writePhoneReceipts } = await import("../src/index.js");
+  const ws = await freshWorkspace();
+  const now = new Date();
+  await writePhoneSnapshots(ws, now, { force: true });
+  const today = ws.readJson<Record<string, unknown>>("phone/today.json");
+  const generatedAt = new Date(now.getTime() + 2000).toISOString();
+  ws.writeJson("phone/today.json", {
+    ...today,
+    generated_at: generatedAt,
+    generator: { kind: "agent", name: "Dot", spec: 1 },
+  });
+  const at = new Date(now.getTime() + 1000).toISOString();
+  writePhoneReceipts(
+    ws,
+    [
+      { ref: "computer-action", kind: "action", status: "applied", at },
+      { ref: "remote-action", kind: "action", status: "applied", at },
+      { ref: "remote-review", kind: "action", status: "conflict", at },
+    ],
+    now,
+  );
+  ws.writeJson(".kaitu/phone-actions.json", { "computer-action": { status: "applied" } }, { internal: true });
+  await writePhoneSnapshots(ws, new Date(now.getTime() + 3000), { force: true });
+  expect(ws.readJson<{ generator: unknown }>("phone/today.json").generator).toEqual({ kind: "computer" });
+  expect(organizerStatus(ws)).toMatchObject({
+    agent: { name: "Dot", generatedAt },
+    unread: true,
+    away: { actions: 2, needsReview: 1 },
+  });
+  markOrganizerSeen(ws);
+  const reopened = new Workspace(ws.root);
+  expect(organizerStatus(reopened)).toMatchObject({
+    agent: { name: "Dot" },
+    unread: false,
+    away: { actions: 2 },
+  });
+  expect(await writePhoneSnapshots(reopened, new Date(now.getTime() + 4000), { force: true })).toBe(0);
+  expect(organizerStatus(reopened).unread).toBe(false);
+  await snapshot(ws, "合成整理员状态");
+  const versions = await import("../src/history.js");
+  expect(await versions.isTracked(ws, ".kaitu/organizer.json")).toBe(false);
+});
+
+it("GitHub 在回写电脑快照之前记住远端整理员和新回执，重复同步不重复计数", async () => {
+  const { markOrganizerSeen, organizerStatus } = await import("../src/index.js");
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/organizer", text: true, records: false }, m.remote);
+  await writePhoneSnapshots(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  const today = JSON.parse(m.files()["phone/today.json"] as string);
+  m.deliver(
+    "phone/today.json",
+    JSON.stringify({ ...today, generator: { kind: "agent", name: "Dot", spec: 1 } }),
+  );
+  const receipts = JSON.parse(m.files()["phone/receipts.json"] as string);
+  receipts.items.push({ ref: ulid(), kind: "action", status: "rejected", at: new Date().toISOString() });
+  m.deliver("phone/receipts.json", JSON.stringify(receipts));
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(JSON.parse(m.files()["phone/today.json"] as string).generator).toEqual({ kind: "computer" });
+  expect(organizerStatus(ws)).toMatchObject({
+    agent: { name: "Dot" },
+    unread: true,
+    away: { actions: 1, needsReview: 1 },
+  });
+  markOrganizerSeen(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(organizerStatus(ws)).toMatchObject({ unread: false, away: { actions: 1, needsReview: 1 } });
 });

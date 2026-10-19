@@ -1,4 +1,6 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
@@ -7,6 +9,7 @@ import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
 import { timeZoneNotice } from "./time.js";
+import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
 export function renderAgentReadme(ws: Workspace, now = new Date()): string {
@@ -24,9 +27,9 @@ ${timeZoneNotice(ws.timeZone(), now)}
 
 ## 两个角色与文件
 
-- 接力者（任何 Agent）：只在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录、不改已有文件。
-- 整理员（用户设定的夜间定时任务）：按 ORGANIZER.md 写 handoffs/daily/<YYYY-MM-DD>.md，更新各模块 STATUS.md 的下一步，归档已整理的交接。
-- ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md、<模块>/data/、me/* 由本机 kaitu 维护，云端只读。
+- 任何 Agent 都能交：只在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录、不改已有文件。
+- 用户指定的整理员负责整理和更新手机：按 ORGANIZER.md 白天处理手机文件、更新手机，夜里写每日整理、更新下一步并归档交接。
+- ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md 由本机 kaitu 维护，云端只读；整理员可改的资料范围见 ORGANIZER.md。
 
 ## 交接记录
 
@@ -72,34 +75,11 @@ project_metric 的 project 填已存在的项目 slug。photo 只记录已有文
 `;
 }
 
+let organizer: string | undefined;
+
 export function renderOrganizer(): string {
-  return `# 开图夜间整理员
-
-开图自带的「开图每日整理」定时任务（Kaitu.app 或 DSH）按此执行；也可以由用户给其他 Agent 设夜间定时任务（建议凌晨 3 点），多家错开半小时互为备份。
-日期按 me/rules.md 的 timezone 判断。
-
-1. handoffs/daily/<今天>.md 已存在：今晚已经有人整理过，直接结束。
-2. 读最新的每日整理（没有就读 OVERVIEW.md），再读它之后的全部交接记录（handoffs/ 根目录）和 inbox/agents/ 文件。没有交接记录时跳过第 3、6 步。
-3. 把交接合并进各模块 STATUS.md 的 next，不整份照抄交接：
-   - 改之前先重读，以 STATUS.md 现在的 next 为起点。
-   - 只应用交接明确写出的变化（完成、新增、改期、取消）；交接没提到的条目原样保留。
-   - STATUS.md 的 updated 晚于最新一份交接的 at：用户在交接之后改过，这个文件的 next 不动，把交接和现状的差异写进「未决事项」。
-   - 只改 next 和 updated 两个字段，不动其他字段和正文；next 有改动才更新 updated。
-4. 整理用户随手记下的原文。要用开图工具：Kaitu.app 或 DSH 里的 AI 用 kaitu_inbox 和 kaitu_onboarding，命令行用 kaitu inbox notes / done 和 kaitu onboarding matter-read / matter-draft。
-   - 读待整理笔记，只处理 kind 为 capture 的原文，逐条用 matter-read 读取；已经带草稿的不重写，直接归档。
-   - 写的是想改变或推进的事：用 matter-draft 存一份待核对草稿，写当前目标、已知现状和一个下一步；看不出该做什么时给 2–3 条可能路径，不预填下一步。
-   - 其他内容（一餐、一次训练、一个念头）：不写记录，在每日整理的「原文整理」里写一句可以怎么记，由用户决定。
-   - 每条处理完用 inbox done 归档，它就不再算等待整理；原文仍能在资料里读回，草稿留给用户在开图核对、采纳或只留原文。
-   - 不创建待办、记录或记忆，不替用户采纳任何草稿或建议。
-   - 没有这些工具（例如只能读写云盘文件的云端 Agent）：不动原文，只在每日整理里写还有几条原文待整理。
-5. 写 handoffs/daily/<今天>.md，frontmatter 为 organizer（你的 Agent 名）、date（YYYY-MM-DD）。
-   正文包含「昨天做了什么」（附来源文件）、「当前下一步」（完整清单）、「原文整理」、「未决事项」、「收件箱里还没导入的记录」。
-6. 把已整理的交接记录移到 handoffs/archive/<今天>/（Kaitu.app 或 DSH 里的 AI 用 kaitu_workspace archive-handoffs）。不删除文件，不动 inbox/agents/，留给本机导入。
-   无法移动时，在每日整理中列出已整理的文件；接手者只读比每日整理新的交接。
-7. 拿不准的地方（如两份交接互相矛盾）写进每日整理的「未决事项」，不要猜。
-
-不能做：删除任何文件；直接改 NOW.md、inbox/、<模块>/data/、me/、memory/ 和本机生成的文件（原文只按第 4 步用工具归档）；写外部日历或替用户联系任何人。
-`;
+  organizer ??= readFileSync(join(templateDir(), "ORGANIZER.md"), "utf8");
+  return organizer;
 }
 
 function recentHandoffs(ws: Workspace) {
@@ -262,8 +242,9 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     ...data.warnings.map((warning) => `- ${warning}`),
     "",
   );
-  // 每日整理在任何存放位置都可能开着，规则文件都要有；云端接力入口只在 Drive 模式需要。
-  if (syncMode(ws.root) === "drive") put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
+  // 接力说明与整理规则随版本维护，GitHub 与同步盘使用同一份入口。
+  if (syncMode(ws.root) === "drive" || workspaceBackupEnabled(ws))
+    put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
   put(ws, "ORGANIZER.md", renderOrganizer());
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。

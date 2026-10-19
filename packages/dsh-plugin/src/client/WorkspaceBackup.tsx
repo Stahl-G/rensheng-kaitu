@@ -51,7 +51,7 @@ export function WorkspaceBackup({
   };
   const c = status?.connection;
   return (
-    <section className={css.sec}>
+    <section id="workspace-backup" className={css.sec}>
       <h2 className={css.eyebrow}>{t("GitHub 备份", "GitHub backup")}</h2>
       <div className={`${css.card} ${css["sub-form"]}`}>
         {c && (

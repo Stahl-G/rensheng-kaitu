@@ -9,6 +9,7 @@ import { batchOverview, renderOrganizer } from "./overview.js";
 import { syncMode } from "./sync-location.js";
 import { templateOutdated, templateVersion } from "./template-version.js";
 import { validateWorkspace } from "./validate.js";
+import { workspaceBackupEnabled } from "./workspace-backup.js";
 import { type Workspace, migrateHistory } from "./workspace.js";
 
 function templateFiles(directory: string): Map<string, Buffer> {
@@ -111,7 +112,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     ...writes.keys(),
     ...deletes.map((file) => `删除 ${file}`),
     "AGENTS.md",
-    ...(syncMode(ws.root) === "drive" ? ["AGENT-README.md"] : []),
+    ...(syncMode(ws.root) === "drive" || workspaceBackupEnabled(ws) ? ["AGENT-README.md"] : []),
     "ORGANIZER.md",
     "OVERVIEW.md",
     ".kaitu/config.json",
@@ -127,7 +128,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     for (const file of deletes) rmSync(ws.resolve(file));
     writeAgentsMd(ws);
     // 现状刷新在缺 NOW.md 等文件时会跳过；规则文件直接补上，免得每次启动都重跑升级。
-    if (!ws.exists("ORGANIZER.md")) ws.writeText("ORGANIZER.md", renderOrganizer());
+    ws.writeText("ORGANIZER.md", renderOrganizer());
     const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
     ws.writeJson(
       ".kaitu/config.json",

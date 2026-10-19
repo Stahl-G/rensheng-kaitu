@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { basename, dirname, relative } from "node:path";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
 import { isoInZone, localDate } from "./time.js";
@@ -59,7 +59,15 @@ export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
         .flatMap((file) => {
           const path = `${dir}/${file.name}`;
           // 原文没变时不重新读取和解析。
-          const note = ws.scanParsed(path, "note", (content) => ({ content, data: noteMetadata(content) }));
+          const note = ws.scanParsed(path, "note", (content) => ({
+            content,
+            data: noteMetadata(content),
+            firstLine:
+              frontmatterBody(content)
+                .split("\n")
+                .find((line) => line.trim())
+                ?.trim() ?? "（空）",
+          }));
           return note
             ? [
                 {
@@ -69,6 +77,7 @@ export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
                   kind: note.data.kind,
                   investment: note.data.investment,
                   content: note.content,
+                  firstLine: note.firstLine,
                 },
               ]
             : [];

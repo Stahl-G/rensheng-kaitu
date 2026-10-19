@@ -4,6 +4,7 @@ import {
   type Workspace,
   agentRelativePath,
   assertAgentWrite,
+  proposeAgentDocument,
   readAgentFile,
   snapshot,
   validateWorkspace,
@@ -43,7 +44,8 @@ export async function writeFiles(
     previous.set(path, ws.exists(path) ? readAgentFile(ws, path) : undefined);
   }
   try {
-    for (const { path, content } of files) ws.writeText(path, content);
+    for (const { path, content } of files)
+      ws.writeText(path, proposeAgentDocument(path, content, previous.get(path)));
     const issues = validateWorkspace(ws).filter((issue) => files.some((file) => issue.file === file.path));
     if (issues.length) throw new Error(JSON.stringify(issues));
   } catch (error) {

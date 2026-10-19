@@ -296,6 +296,7 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file === "phone" ||
     file.startsWith("phone/") ||
     file === ".kaitu/inbox-state.json" ||
+    file === ".kaitu/organizer.json" ||
     file === ".kaitu/channels" ||
     file.startsWith(".kaitu/channels/") ||
     file.startsWith("inbox/processed/") ||

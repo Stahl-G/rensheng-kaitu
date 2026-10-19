@@ -416,7 +416,7 @@ account_last4（本方银行卡尾四位，四位数字或 null）；原交易�
 `today.json`、`week.json`、`map.json`、`library.json`（资料目录，2026-10-18 用户确认）、`receipts.json` 的契约见 `schemas/phone-*.schema.json`，样例见 `schemas/fixtures/phone/`。
 只有手机可读的同步存放位置或启用 GitHub 备份时，后台防抖生成读快照；内容不变不写。
 手机新建 `inbox/agents/ios-<8位设备号>-<ULID>.note.md / .records.jsonl / .actions.jsonl`。
-快照可选 `generator`（`computer` 或 `agent` 加名字和规则版本，2026-10-18 用户确认），没有时当作电脑生成。
+快照可选 `generator`（`computer` 或 `agent` 加名字和规则版本，2026-10-18 用户确认），kind=agent 必须有 name 和 spec，kind=computer 只写 kind 即可；没有 generator 时当作电脑生成。
 原文保留 capture 与作者，手机记录 origin 映射署名 by，权限按 Agent 校验；操作按 client_id 去重并先核对当前状态，结果写十四天回执。
 支持完成下一步、完成或取消待办、确认或拒绝日程建议；手机确认的日程由手机写进 Apple 日历（`calendar: phone`），电脑不替它新建；Mac 在日历里找到那条后可以在电脑上改时间。阶段确认、方向启用只在电脑上由用户确认。其他操作预留。GitHub 手机路径独立于备份内容开关。
 详细读写、隐私边界与失败语义见 [手机契约](guides/phone-contract.md)。本次不支持照片。
