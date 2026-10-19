@@ -33,6 +33,7 @@ export function WorkspaceBackup({
   }>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [restored, setRestored] = useState("");
   const [gh, setGh] = useState<Awaited<ReturnType<typeof githubCliStatus>>>();
   const [via, setVia] = useState<"gh" | "token">("gh");
@@ -43,6 +44,7 @@ export function WorkspaceBackup({
       .then((s) => {
         const current = s as Status;
         setStatus(current);
+        setStatusError("");
         if (!scopeInitialized.current) {
           scopeInitialized.current = true;
           if (!scopeEdited.current) {
@@ -55,7 +57,7 @@ export function WorkspaceBackup({
           }
         }
       })
-      .catch((e) => setMessage((e as Error).message));
+      .catch((e) => setStatusError((e as Error).message));
   }, [request]);
   const checkGh = useCallback(
     () =>
@@ -509,9 +511,9 @@ export function WorkspaceBackup({
             </button>
           </output>
         )}
-        {message && (
+        {(message || statusError) && (
           <p className={css.error} role="alert">
-            {message}
+            {message || statusError}
           </p>
         )}
       </div>
