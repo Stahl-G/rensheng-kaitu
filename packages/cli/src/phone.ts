@@ -23,7 +23,24 @@ import { KaituError, type PhoneGenerator, phoneHistoryMetadata, stateDirectory }
 
 const stamp = (s: Stats) => `${s.ino}:${s.size}:${s.mtimeMs}:${s.ctimeMs}`;
 const digest = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
-type Original = { path: string; stamp: string; digest: string };
+type Original = { path: string; stamp: string; digest?: string };
+
+function derivedFile(path: string) {
+  return (
+    path === "OVERVIEW.md" ||
+    path === ".kaitu/inbox-state.json" ||
+    path === ".kaitu/organizer.json" ||
+    /^phone\/(week|map|library)\.json$/.test(path)
+  );
+}
+
+function computerToday(path: string) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8")).generator?.kind !== "agent";
+  } catch {
+    return false;
+  }
+}
 
 export function phoneGenerator(name?: string): PhoneGenerator {
   if (name === undefined) return { kind: "computer" };
@@ -53,7 +70,7 @@ function copy(
         // 仅排除内置健康照片目录和根依赖；合法模块、项目以及收件箱里的同名目录照常复制。
         if (rel === "health/files" || rel.startsWith("health/files/") || rel === "node_modules") return false;
       }
-      if (info.isFile()) originals.set(destination, { path, stamp: stamp(info), digest: digest(path) });
+      if (info.isFile()) originals.set(destination, { path, stamp: stamp(info) });
       return true;
     },
   });
@@ -72,6 +89,8 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
       copy(state, join(target, ".kaitu"), originals, "state");
     const configFile = join(target, ".kaitu/config.json");
     const config = JSON.parse(readFileSync(join(root, ".kaitu/config.json"), "utf8"));
+    const originalConfig = originals.get(configFile);
+    if (originalConfig) originalConfig.digest = digest(originalConfig.path);
     config.state_dir = undefined;
     config.health_inbox_external = (config.health_inbox_external ?? []).map(
       (source: string, index: number) => {
@@ -96,7 +115,10 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
     const before = contents();
     const history = await phoneHistoryMetadata(root, state);
     const input = join(temp, "input.json");
-    writeFileSync(input, JSON.stringify({ root: target, generator, history }));
+    const inputs = Object.fromEntries([...originals.keys()].map((path) => [path, stamp(statSync(path))]));
+    const wasComputerToday =
+      existsSync(join(target, "phone/today.json")) && computerToday(join(target, "phone/today.json"));
+    writeFileSync(input, JSON.stringify({ root: target, generator, history, inputs }));
     const { stdout } = await promisify(execFile)(
       process.execPath,
       [fileURLToPath(new URL("./phone-worker.js", import.meta.url)), input],
@@ -109,14 +131,29 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
         maxBuffer: 32 * 1024 * 1024,
       },
     );
-    // ctime 也会因权限等元数据变化而更新；只有原输入内容变了才会使本次预览失效。
-    // 基线只摘要已纳入复制的输入，不保留整树 Buffer，也不读取已排除的媒体/cache。
-    for (const original of originals.values()) {
+    const { readDependencies, ...result } = JSON.parse(stdout);
+    const after = contents();
+    // 保护实际读过的输入和将要覆盖的原件。派生刷新不使预览失效，Agent today 仍是来源输入。
+    const checked = new Set<string>([
+      ...Object.keys(readDependencies),
+      ...[...before.keys()]
+        .filter((path) => before.get(path) !== after.get(path))
+        .map((path) => join(target, path)),
+    ]);
+    for (const path of checked) {
+      const original = originals.get(path);
+      if (!original) continue;
+      const rel = relative(target, path).replaceAll("\\", "/");
+      if (derivedFile(rel)) continue;
+      if (rel === "phone/today.json" && wasComputerToday && computerToday(original.path)) continue;
       const current = statSync(original.path, { throwIfNoEntry: false });
-      if (!current || (original.stamp !== stamp(current) && original.digest !== digest(original.path)))
+      if (
+        !current ||
+        (original.stamp !== stamp(current) &&
+          (original.digest ?? readDependencies[path]) !== digest(original.path))
+      )
         throw new KaituError("预览期间原资料变化，请重新预览", "CONFLICT");
     }
-    const after = contents();
     const changes = [...new Set([...before.keys(), ...after.keys()])].sort().flatMap((path) => {
       if (before.get(path) === after.get(path)) return [];
       const source = originals.get(join(target, path))?.path;
@@ -135,7 +172,6 @@ export async function previewPhone(directory: string, generator: PhoneGenerator)
         },
       ];
     });
-    const result = JSON.parse(stdout);
     if (result.historyChanged) changes.push({ path: ".kaitu/history.git" });
     return { ...result, changes };
   } finally {

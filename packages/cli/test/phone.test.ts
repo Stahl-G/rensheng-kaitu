@@ -20,7 +20,12 @@ import { expect, it } from "vitest";
 
 const { zipSync } = createRequire(new URL("../../core/package.json", import.meta.url))("fflate");
 
-it.each(["metadata", "content"])("预览期间原资料发生 %s 变化时按内容判断冲突", async (mode) => {
+it.each([
+  { mode: "metadata", file: "health/STATUS.md" },
+  { mode: "content", file: "health/STATUS.md" },
+  { mode: "content", file: "inbox/notes/2026-10-19/01k7m8bg000000000000000009.md" },
+  { mode: "content", file: "phone/today.json" },
+])("预览期间 $file 发生 $mode 变化时按内容判断冲突", async ({ mode, file }) => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-phone-concurrent-"));
   const root = join(temp, "workspace");
   const env = {
@@ -32,7 +37,21 @@ it.each(["metadata", "content"])("预览期间原资料发生 %s 变化时按内
     await promisify(execFile)(process.execPath, ["packages/cli/dist/main.js", "init", "--dir", root], {
       env,
     });
-    const source = join(root, "OVERVIEW.md");
+    const source = join(root, file);
+    if (file.startsWith("inbox/notes/")) {
+      mkdirSync(join(source, ".."), { recursive: true });
+      writeFileSync(source, "---\nkind: capture\ndate: 2026-10-19\n---\n合成已保存原文\n");
+    }
+    if (file === "phone/today.json") {
+      await promisify(execFile)(
+        process.execPath,
+        ["packages/cli/dist/main.js", "phone", "run", "--dir", root],
+        { env },
+      );
+      const today = JSON.parse(readFileSync(source, "utf8"));
+      today.generator = { kind: "agent", name: "Synthetic", spec: 1 };
+      writeFileSync(source, JSON.stringify(today));
+    }
     writeFileSync(
       join(root, "inbox/agents/ios-3fa9c1d2-01K7M8BG000000000000000001.note.md"),
       "---\nkind: capture\nagent: iPhone\n---\n合成并发检查原文\n",
@@ -70,6 +89,7 @@ it.each(["metadata", "content"])("预览期间原资料发生 %s 变化时按内
         JSON.parse(result.stdout).changes.some((c: { path: string }) => c.path === "phone/today.json"),
       ).toBe(true);
       expect(result.code).toBeUndefined();
+      expect(JSON.parse(result.stdout).changes.some((c: { path: string }) => c.path === file)).toBe(false);
     } else {
       expect(readFileSync(source)).not.toEqual(bytes);
       expect(result.code).toBe(2);

@@ -1,4 +1,5 @@
-import { existsSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { type phoneHistoryMetadata, previewSnapshots } from "./history.js";
 import { externalHealthPaths, processInbox } from "./inbox.js";
@@ -10,8 +11,22 @@ export async function runPhone(
   root: string,
   generator: PhoneGenerator,
   baseline?: Awaited<ReturnType<typeof phoneHistoryMetadata>>,
+  inputs?: Record<string, string>,
 ) {
-  const ws = new Workspace(root, { maintain: false });
+  const readDependencies: Record<string, string> = {};
+  class PreviewWorkspace extends Workspace {
+    readBytes(file: string) {
+      const bytes = super.readBytes(file);
+      const path = this.resolve(file, { internal: true });
+      if (inputs?.[path] && readDependencies[path] === undefined) {
+        const stat = statSync(path);
+        if (inputs[path] === `${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`)
+          readDependencies[path] = createHash("sha256").update(bytes).digest("hex");
+      }
+      return bytes;
+    }
+  }
+  const ws = new (baseline ? PreviewWorkspace : Workspace)(root, { maintain: false });
   if (!ws.exists(".kaitu/config.json")) throw new KaituError("先运行 kaitu init", "NOT_INITIALIZED");
   const pending =
     ["inbox/agents", "inbox/health", "inbox/rejected"].some(
@@ -32,6 +47,7 @@ export async function runPhone(
     snapshots,
     receipts: phoneReceipts(ws),
     ...(versions ? { historyChanged: versions.length !== baseline?.versions.length } : {}),
+    ...(inputs ? { readDependencies } : {}),
   };
 }
 

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import git from "isomorphic-git";
@@ -316,8 +317,6 @@ export async function previewSnapshots(
   metadata: Awaited<ReturnType<typeof phoneHistoryMetadata>>,
   processingInbox: boolean,
 ) {
-  // 只在临时副本建立当前输入的基线；不复制原历史对象。后续沿用正式 Git 规则判断是否真有新版本。
-  if (processingInbox) await snapshotNow(ws, "手机预览基线");
   const entries = metadata.versions.map(({ oid, message, timestamp }) => ({
     oid,
     short: oid.slice(0, 7),
@@ -325,26 +324,81 @@ export async function previewSnapshots(
     time: isoInZone(new Date(timestamp * 1000), ws.timeZone()),
   }));
   previews.set(ws, entries);
-  let originalDirty: boolean | undefined;
+  if (!processingInbox) return entries;
+  const stamp = (stat: fs.Stats) => `${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+  const baseline = new Map(
+    fs
+      .readdirSync(ws.root, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => {
+        const path = join(entry.parentPath, entry.name);
+        return [path, stamp(fs.statSync(path))];
+      }),
+  );
+  const workingPath = (path: fs.PathLike) => {
+    if (typeof path !== "string") return;
+    if (path === metadata.gitdir || path.startsWith(`${metadata.gitdir}${sep}`)) return;
+    const rel = relative(metadata.root, path);
+    if (isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) return;
+    return { rel, path: join(ws.root, rel) };
+  };
+  // 原 HEAD/index/objects 只读复用。未改的临时文件借用原 stat，避免因复制后的 inode/ctime 重新 hash 全库。
+  const io = {
+    ...fs,
+    promises: {
+      ...fs.promises,
+      readdir: (async (path, ...args) =>
+        Reflect.apply(fs.promises.readdir, fs.promises, [
+          workingPath(path)?.path ?? path,
+          ...args,
+        ])) as typeof fs.promises.readdir,
+      lstat: (async (path, ...args) => {
+        const work = workingPath(path);
+        if (!work) return fs.promises.lstat(path, ...args);
+        const stat = await fs.promises.lstat(work.path, ...args);
+        if (stat.isFile() && baseline.get(work.path) === stamp(stat as fs.Stats)) {
+          try {
+            return await fs.promises.lstat(path, ...args);
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          }
+        }
+        if (stat.isFile()) stat.mtimeMs = Number.NaN;
+        return stat;
+      }) as typeof fs.promises.lstat,
+      readFile: (async (path, options) => {
+        const work = workingPath(path as fs.PathLike);
+        if (!work) return fs.promises.readFile(path, options);
+        // 预览把配置中的状态目录和外部收件箱重定向了；未改的配置仍代表原始配置。
+        if (work.rel === ".kaitu/config.json" && baseline.get(work.path) === stamp(fs.statSync(work.path)))
+          return fs.promises.readFile(path, options);
+        const bytes = ws.readBytes(work.rel);
+        const encoding = typeof options === "string" ? options : options?.encoding;
+        return encoding ? bytes.toString(encoding) : bytes;
+      }) as typeof fs.promises.readFile,
+    },
+  };
+  let previous = "[]";
   deferSnapshots(ws, async (message) => {
-    // 只有需要保存版本时才只读盘点原位置，空收件箱预览不做这项工作。
-    if (originalDirty === undefined) {
-      originalDirty = metadata.versions.length === 0;
-      if (!originalDirty) {
-        const matrix = await git.statusMatrix({
-          fs,
-          dir: metadata.root,
-          gitdir: metadata.gitdir,
-          refresh: false,
-        });
-        originalDirty = matrix.some(([file, head, workdir, stage]) =>
-          neverTrack(file) ? head !== 0 || stage !== 0 : !(head === 1 && workdir === 1 && stage === 1),
-        );
-      }
-    }
-    const version = await snapshotNow(ws, message);
-    if (!version && !originalDirty) return;
-    originalDirty = false;
+    refreshOverview(ws);
+    const matrix = await git.statusMatrix({
+      fs: io,
+      dir: metadata.root,
+      gitdir: metadata.gitdir,
+      refresh: false,
+      filter: (file) => snapshotFile(ws, file),
+    });
+    const dirty = matrix.filter(([file, head, workdir, stage]) =>
+      neverTrack(file) ? head !== 0 || stage !== 0 : !(head === 1 && workdir === 1 && stage === 1),
+    );
+    const signature = JSON.stringify(
+      dirty.map(([file, , workdir]) => [
+        file,
+        workdir && !neverTrack(file) ? createHash("sha256").update(ws.readBytes(file)).digest("hex") : null,
+      ]),
+    );
+    if (signature === previous) return;
+    previous = signature;
     entries.unshift({
       oid: "preview",
       short: "preview",
