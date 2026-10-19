@@ -6,6 +6,7 @@
 |---|---|---|
 | [IOS-0.6](IOS-0.6.md) | 0.6.0 收尾：推本地、格式、上架准备、示例资料、清理、截图 | — |
 | [WIDE-duo](WIDE-duo.md) | 展开后用满大屏：今天、资料、问问、开图 | IOS-1 |
+| [PHOTOS](PHOTOS.md) | v0.7 从照片找出去过的城市（手机读拍摄时间和地点，电脑核对） | — |
 | [ASK-1](ASK-1-provider.md) | 选接口库，做 ChatProvider | — |
 | [ASK-2](ASK-2-loop.md) | Agent 循环 | ASK-1 |
 | [ASK-3](ASK-3-tools.md) | 读写工具 | ASK-2 |
