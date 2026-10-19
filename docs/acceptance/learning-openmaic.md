@@ -167,7 +167,7 @@ ACP 命令只使用已安装 CLI，不安装依赖。两个脚本都使用临时
 
 - 当前安装 App 元数据版本为 0.2.1-rc.2；Computer Use 插件页显示 `@openmaic/dsh-openmaic` v0.4.0、启用、组件运行中。仅检查插件状态，没有向其在线模型发送合成或私人材料，没有切换其模型或改配置。
 - 实际 installDsh 在独立临时 DSH_HOME 的 desktop profile 中连续安装两次，结果相同、受管段外文字保留、引用本分支构建产物；路径 `/tmp/kaitu-learning-native-profile-nqgvEW/profiles/desktop/cordis.patch.yml`。没有改真实 desktop profile。这证明安装入口，不代替真实 App 加载本分支后的 GUI 验收。第一次检查中误触 Workspace 构造的默认状态目录写入被沙箱阻止，随后用安装函数所需的 root 数据完成隔离检查，未申请写用户状态目录。
-- 本分支原生客户端已注册 kaitu_learning_card/widget 的 toolview，问问通过 PluginAsk 复用 Harness 会话、输入和停止控件；保持既有调用方式。真实 App 当前没有加载这个开发分支，且当前会话不是已授权本机模型路线，因此未把原生端到端问答判为通过。要补验需专用 native profile 加载本分支并连接同一本地模型，不替换用户正在使用的 profile。
+- 本分支原生客户端已注册 kaitu_learning_card/widget 的 toolview，问问通过 PluginAsk 复用 Harness 会话、输入和停止控件；保持既有调用方式。用户原有 App profile 没有加载这个开发分支，且原会话不是已授权本机模型路线，因此没有在那里发送请求。专用 native profile 的后续补验见下一节，不替换用户正在使用的 profile。
 - 上游 `src/slide.ts` 的 openmaic_slide 接收模型写的本地 slide JSON，输出持久 meta；`src/client/SlideCard.tsx` 用已有 SlideCanvas 显示和展开。这是内联幻灯片，不等于导出 .pptx 文件；该路径本身不要求 open.maic.chat。完整 classroom 的 openmaic_generate 是另一条云端路径，本轮未调用。
 - 本分支没有打包上游 SlideCanvas 或自行实现 PPT 框架；SDK 隔离 profile 没有 openmaic_slide，故可选入口仍是“明确要求且同会话已具备该工具”。未新增依赖或自动安装上游插件。尝试上游独立 slide 测试未返回结果，已终止，只算未完成，不能报告为测试成功。
 - 期间系统曾报 ENOSPC，临时目录创建和日志缓存失败；仅清理本任务可重建的 Swift 模块缓存，之后空间恢复，隔离安装检查已完成。没有清理用户文件。原生 GUI/PPT 仍未验收，不以曾经磁盘不足代替当前具体边界。
@@ -175,3 +175,30 @@ ACP 命令只使用已安装 CLI，不安装依赖。两个脚本都使用临时
 ![单问题实际回复](learning-openmaic/computer-use-single-question.jpg)
 
 ![实际请求取消后恢复输入](learning-openmaic/computer-use-cancel.jpg)
+
+
+## 完整 Harness 隔离宿主补验（2026-10-20）
+
+固定代码 `133d75b021547671e4813e85e0c44c9404e33db4` 的 [CI 39309103256](https://github.com/Stahl-G/rensheng-kaitu/actions/runs/39309103256) 已完成：macOS 成功，Windows 279 通过、2 失败、7 跳过，仍为同一 ask-filesystem / feishu 错误。使用已安装的官方 Harness 0.2.1-rc.2 可执行文件。DSH_HOME、Electron user-data-dir 和开图状态均指定本任务临时目录，插件指向当前分支 dist，本地模型仍为原 Ollama Qwen，不使用用户真实 profile、模型账号或私人材料。
+
+- Computer Use 绑定原生 App 时返回的是用户原窗口，故没有在那里发送请求；改用该隔离原生进程实际提供的完整 Harness Web 客户端验证相同插件宿主与原生组件。不是 CLI-Web 的独立 AskPage，也不是合成会话桩；不据此声称 Electron 窗口本身已操作验收。
+- 完整宿主中打开开图→资料→原学习主题，理解、e 的疑问、下一步、一个来源均读回；“接着学”进入 Harness 自有会话输入，正确带入最新笔记和单问题约束。本地模型菜单仅配置本地 Qwen，选择并实际发送。
+- 首轮用时界面显示 3 分 50 秒，模型却给“检查工具是否存在”的命令说明，未提问。不能判作自然接续体验通过。补一句直接调用已提供 kaitu_learning read 的明确指令后，模型先传错参数，被校验拒绝，随后自行改为 `{action:"read",topic:"topic-7a91ffaa09a4"}`；展开真实工具结果可见 ok:true 及原笔记/来源/next，然后从 e 的疑问问出一个问题。此轮界面显示 32 秒。证明真实工具和客户端接入可用，但仍保留本地模型需要纠正、首轮偏离的体验限制。
+- 停止隔离宿主并重启后，从 Harness 侧栏重新打开“复利与e的理解探讨”，真实对话及工具记录仍存在。没有将模型首次错误当成应用写入故障，也没有把其改正后的成功冒充首次即成功。
+- 父线程独立 Linux QA 针对准确代码 `133d75b`：全量 build exit 0；真实 HTTP 来源→主题去重→保存后丢响应→SIGKILL→新 PID 回读→两次并发同 operationId 重试均 replayed 且无重复→同 ID 改内容 400 且文件不变，均通过。仅隔离合成数据，无模型/账号；不覆盖本节 GUI、此次 SDK 取消或半写入时崩溃。
+
+![完整 Harness 宿主实际读回并接续](learning-openmaic/native-host-read.jpg)
+
+
+### 可选内联幻灯片实际补验
+
+同一个隔离 native profile 加载本任务已有 dsh-openmaic/lib 构建（0.4.0），未执行安装、下载或修改上游源码；仍只用本机 Qwen。仅此测试 profile 将课堂 baseUrl 指向关闭的 localhost 端口，避免误走云端。用户原 profile 不变。
+
+- 明确要求一次 openmaic_slide，给定只有“复利：100 → 110 → 121”的合成 slide JSON，不保存学习总结。实际工具结果出现 OpenMAIC · slide；展开原生“已完成→已调用工具”后，画布中可见相同文字。刷新后工具 metadata 和画布仍能重开。说明现成内联渲染及对话持久化可复用；没有调用课堂生成或验证 .pptx 导出。
+- 此轮完整原生界面显示 4 分 16 秒。工具调用成功不等于呈现体验完整：默认折叠的工具步骤会把幻灯片藏起来，模型额外编了一个 Markdown 图片引用，显示“图片无法预览”；这不代表实际工具画布失败。
+- “⛶ 展开”的实测没有得到可用全屏画布，关闭按钮也不能正常命中。只读 DOM 检查发现 overlay 仍嵌在原生工具滚动体和消息裁切层内，源组件用 position:fixed 直接嵌套（上游 src/client/SlideCard.tsx），与裁切表现一致。刷新可退出该临时展开状态；不把 DOM 有文字当成可用全屏。此项保留为上游兼容问题，PPT 可选且不阻塞核心学习，不新建生成/渲染框架或将其纳入默认依赖。
+- 本轮 native 验收结论：本分支页面、资料回读、接续草稿、实际 read 及会话重开通过；本地模型首次自然接续需要纠正。现成幻灯片内联显示/刷新重开通过，全屏展开未通过；课堂/PPTX 导出和用户原 Electron 窗口仍未验收。
+
+![实际内联幻灯片，需展开工具步骤](learning-openmaic/native-slide-inline.jpg)
+
+![展开层实测裁切，未判为通过](learning-openmaic/native-slide-expand-clipped.jpg)
