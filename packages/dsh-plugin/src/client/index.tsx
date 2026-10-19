@@ -369,8 +369,8 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              loadLibrary: async () => {
-                const r = await ctx.remote.kaitu.library();
+              loadLibrary: async (query?: import("@kaitu/core").LibraryQuery) => {
+                const r = await ctx.remote.kaitu.library(query);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },

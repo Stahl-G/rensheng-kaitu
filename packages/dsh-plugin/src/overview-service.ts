@@ -342,8 +342,8 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("library")
-  async library(): Promise<LibraryData> {
-    return readLibrary(this.workspace);
+  async library(query?: Parameters<typeof readLibrary>[1]): Promise<LibraryData> {
+    return readLibrary(this.workspace, query);
   }
 
   @Remote("libraryDocument")

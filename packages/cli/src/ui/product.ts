@@ -247,7 +247,7 @@ export async function productRequest(
   }
   switch (method) {
     case "library":
-      return readLibrary(ws);
+      return readLibrary(ws, args[0] as Parameters<typeof readLibrary>[1]);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
     case "calendarPush":
