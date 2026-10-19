@@ -1240,11 +1240,11 @@ function matterNotes(draft: OnboardingMatterDraft) {
   return `当前目标：${draft.goal}\n已知现状：${draft.current}\n`;
 }
 const goalSource = /^me\/goals\.json#([a-z0-9-]+)$/;
+const onboardingNoteSource = /^inbox\/notes\/\d{4}-\d{2}-\d{2}\/(?:[0-9a-z]{26}|feishu-[a-f0-9]{64})\.md$/;
 function isOnboardingTask(task: Task): boolean {
   return (
     typeof task.source === "string" &&
-    (/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) ||
-      goalSource.test(task.source)) &&
+    (onboardingNoteSource.test(task.source) || goalSource.test(task.source)) &&
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
@@ -1269,7 +1269,7 @@ function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
   };
 }
 export function readOnboardingMatter(ws: Workspace, source: string): OnboardingMatter {
-  if (typeof source !== "string" || !/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(source))
+  if (typeof source !== "string" || !onboardingNoteSource.test(source))
     throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
   const file = findInboxNote(ws, basename(source));
   const text = file ? ws.scanText(file) : undefined;
