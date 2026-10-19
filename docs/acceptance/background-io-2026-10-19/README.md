@@ -27,15 +27,21 @@
 
 ### 正确性与清理证据
 
+集合校验更正：原 stream-lifecycle.mjs 错误地把新归档的文件名集合与自身比较，旧 PASS 不能证明文件集合完整。现比较旧实现 expected 与新归档 observed 两个独立集合，集合相等后按 expected 全集逐文件比较字节。2026-10-19 本机重新执行：expected 36、observed 36，集合和内容全部一致；缺少已构建基线会在创建合成工作区前以非零码失败。更新后的 stream-lifecycle-results.json 来自这次重跑。
+
 - stream-lifecycle.mjs：8 MiB 多块随机二进制、36 份导出文件，与已构建 PR58 逐文件名/字节相等；64 MiB 压缩中按真实字节进度取消后目录为零，源文件保留；真实 ENOENT 后目录为零；HTTP 读取首块后真实中断、重复启动、令牌重用/无效令牌均验证。并发追加 1 MiB 时，原打开范围的 64 MiB 导出哈希仍一致。使用 fflate 流式解压校验，不在这项内存实验中构造全集解压结果。
 - http-export-stream-results.json：真实 startUi 产品接口→URL→HTTP ZIP，224 份文件，含最后一份 chat/note；导出时 library 可响应；取消后 idle。
 - dsh-web-download.mjs：真实已安装 Cordis + dsh-host-webserver 0.2.1-rc.2 + 构建后的 Kaitu service，同源下载在 gzip 配置下通过并清理；没有 HTTP 服务替身。既有 DSH 只读旅程也覆盖 Electron 回环后备下载与一次性令牌。
 - bundle-stream-smoke-results.json：实际 CLI engine worker 置于桌面 dist/data-worker.mjs 布局，检索与文件 ZIP 通过。
 - 默认同步五条远端正文修改，真实配置扫描标记验证汇总次数 5 → 1；6000 记录 no-op 的 parse/stringify 各 36000 → 18000，推送 0，原记录内容不变。完整本地读取（70 次）、目录遍历（73 层）及约 1.92 MB 状态重写均保留，见 sync-noop-results.json。计数只包装真实 JSON/文件函数，不替代返回值，不模拟 Git 或时间。
 
-复验：先完整 build。zip-memory.mjs、restore-tail.mjs 和 dsh-web-download.mjs 可直接运行。stream-lifecycle.mjs 可选传已构建 PR58 根目录；有基线时对比完整文件名/字节，无基线时明确输出未运行旧实现对照。sync-noop.mjs 需传已构建旧分支根目录，默认使用本机相邻 desktop-demand-io。所有脚本只操作自建临时目录；dsh-web-download 使用锁文件中已安装的 host-webserver，不下载依赖。
+复验：先完整 build。zip-memory.mjs、restore-tail.mjs 和 dsh-web-download.mjs 可直接运行。stream-lifecycle.mjs 需要已构建的旧实现基线（可传根目录，默认本机相邻 desktop-demand-io）；缺失或 API 不符直接失败，不跳过完整文件集合/逐文件字节比较。sync-noop.mjs 需传已构建旧分支根目录，默认使用本机相邻 desktop-demand-io。所有脚本只操作自建临时目录；dsh-web-download 使用锁文件中已安装的 host-webserver，不下载依赖。
 
 检查：完整 build、typecheck 通过；流式实现完整测试 96 文件/282 项通过；随后 core sync 两处最小改动由原备份往返/冲突/取消七项回归验证，断言与默认超时未放宽。最新 CI 与准确 head 记录在 PR59 说明。浏览器 GUI 输入仍有既有工具缺口，HTTP/实际 DSH WebServer/回环路径不是 GUI 点击验收。
+
+### 父线程独立 Linux 复验（实现 head 418c423）
+
+以下是父线程回传的 Linux 结果，和上述 Mac 本机观测分开；不是本机重新测得：五条修改实际 overview 一次；6000 记录 no-op 的 parse/stringify 各 18000 次；40 原文/600 行记录恢复 2.76 秒（旧 26.72 秒），overview 两次（初始化和最终），原文正文读取零。真实压缩取消、ENOENT、下载中断均清理，令牌重用 404，并发追加保留初始完整 64 MiB。父线程在脚本修正前明确未认可文件集合完整性；修正后的集合和逐字节比较以本机本次新结果为据。GUI 点击下载及进程强杀后的临时文件清理仍未验证。
 
 以下保留此前分阶段记录和原失败证据，不代表最新流式实现仍返回 base64。
 

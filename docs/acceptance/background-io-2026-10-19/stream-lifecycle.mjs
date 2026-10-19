@@ -8,14 +8,21 @@ import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 const project = resolve(import.meta.dirname, "../../..");
+const baseline = resolve(process.argv[2] ?? join(project, "../desktop-demand-io"));
+const baselineModule = join(baseline, "packages/core/dist/index.js");
+if (!fs.existsSync(baselineModule))
+  throw new Error(
+    "A compiled baseline is required for full archive comparison; pass its repository root as the first argument",
+  );
 const temporary = fs.mkdtempSync(join(tmpdir(), "kaitu-stream-lifecycle-"));
 process.env.KAITU_LOCAL_STATE_DIR = join(temporary, "state");
 process.env.KAITU_APP_HOME = join(temporary, "app");
 const core = await import(pathToFileURL(join(project, "packages/core/dist/index.js")));
-const baseline = resolve(process.argv[2] ?? join(project, "../desktop-demand-io"));
-const legacy = fs.existsSync(join(baseline, "packages/core/dist/index.js"))
-  ? await import(pathToFileURL(join(baseline, "packages/core/dist/index.js")))
-  : undefined;
+const legacy = await import(pathToFileURL(baselineModule));
+if (typeof legacy.exportWorkspace !== "function") {
+  fs.rmSync(temporary, { recursive: true, force: true });
+  throw new Error("The compiled baseline must expose the legacy exportWorkspace API");
+}
 const { unzipSync, Unzip, UnzipInflate } = createRequire(join(project, "packages/core/package.json"))(
   "fflate",
 );
@@ -36,12 +43,13 @@ try {
   fs.mkdirSync(folder, { recursive: true });
   for (let i = 0; i < 8; i++) fs.writeFileSync(join(folder, `${i} 中文.bin`), randomBytes(1024 * 1024));
   fs.writeFileSync(join(ws.root, ".hidden"), "excluded");
-  const expected = legacy ? unzipSync(Buffer.from(legacy.exportWorkspace(ws).base64, "base64")) : undefined;
+  const expected = unzipSync(Buffer.from(legacy.exportWorkspace(ws).base64, "base64"));
   const archive = await core.exportWorkspaceAsync(ws);
   const observed = unzipSync(fs.readFileSync(archive.path));
-  const names = Object.keys(observed).sort();
+  const names = Object.keys(expected).sort();
+  const observedNames = Object.keys(observed).sort();
   if (
-    JSON.stringify(names) !== JSON.stringify(Object.keys(observed).sort()) ||
+    JSON.stringify(names) !== JSON.stringify(observedNames) ||
     !names.every((name) => Buffer.from(expected[name]).equals(Buffer.from(observed[name])))
   )
     throw new Error("Archive range/content changed");
@@ -49,8 +57,10 @@ try {
   await archive.dispose();
   const integrity = {
     completeFileCount: names.length,
+    expectedFileCount: names.length,
+    observedFileCount: observedNames.length,
     multiChunkBinaryBytes: 8 * 1024 * 1024,
-    equalsLegacyNamesAndBytes: expected ? true : null,
+    equalsLegacyNamesAndBytes: true,
     archiveMode,
     cleanup: empty(),
   };
