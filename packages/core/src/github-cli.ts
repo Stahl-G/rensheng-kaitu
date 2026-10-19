@@ -79,16 +79,25 @@ export async function githubCliRequest(repo: string, path: string, method = "GET
   }
 }
 
-export async function createPrivateGithubRepository(repo: string) {
+export const memoryRepositoryDescription = "开图个人记忆与项目进度；Agent 请先读 AGENT-README.md";
+
+export async function createPrivateGithubRepository(repo: string, keepLegacy = false) {
   const name = parseGithubRepo(repo);
   const owner = name.split("/")[0];
-  const candidates = name.endsWith("/kaitu-ai-memory") ? [name, `${owner}/my-ai-memory`] : [name];
+  const candidates = name.toLowerCase().endsWith("/kaitu-ai-memory")
+    ? [name, `${owner}/my-ai-memory`]
+    : [name];
   for (const candidate of candidates) {
     const existing = await run(["repo", "view", candidate, "--json", "nameWithOwner,isPrivate"]);
     if (existing.loginRequired) throw new KaituError("GitHub 登录已失效，请重新登录后重试", "GH_REQUEST");
-    if (existing.ok)
+    if (existing.ok && candidate === name)
       throw new KaituError(
-        `已找到 ${candidate}，原库保持不变。请核对后连接已有开图仓库，或明确换一个名称创建`,
+        `目标仓库 ${candidate} 已存在，已拒绝覆盖。请核对后连接已有开图仓库，或换一个名称创建`,
+        "GH_REQUEST",
+      );
+    if (existing.ok && !keepLegacy)
+      throw new KaituError(
+        `已找到 ${candidate}，原库保持不变。可核对后复用，或明确选择保留旧库并另建 ${name}，再用 --create --keep-legacy 重试`,
         "GH_REQUEST",
       );
   }
@@ -97,7 +106,7 @@ export async function createPrivateGithubRepository(repo: string) {
     "create",
     "--private",
     "--description",
-    "开图个人记忆与项目进度；Agent 请先读 AGENT-README.md",
+    memoryRepositoryDescription,
     "--",
     name,
   ]);

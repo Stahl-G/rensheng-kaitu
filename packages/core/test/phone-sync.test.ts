@@ -148,7 +148,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
   expect(await writePhoneSnapshots(ws, now)).toBe(0);
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: true, records: true }, m.remote);
   await writePhoneSnapshots(ws, now);
   expect(await writePhoneSnapshots(ws, new Date(now.getTime() + 1000))).toBe(0);
   expect(listModules(ws).some((m) => m.dir === "phone")).toBe(false);
@@ -273,10 +273,10 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
   expect(validate(reopened.readJson("phone/receipts.json")), JSON.stringify(validate.errors)).toBe(true);
 });
 
-it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手机文件处理后删除远端", async () => {
+it("本地 GitHub 按选中范围往返，快照只上传，手机文件处理后删除远端", async () => {
   const ws = await freshWorkspace();
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: true, records: true }, m.remote);
   await writePhoneSnapshots(ws);
   await syncWorkspaceBackup(ws, m.remote);
   expect(m.files()["phone/today.json"]).toBe(ws.readText("phone/today.json"));
@@ -330,7 +330,7 @@ it("手机记录有一条不合格整份不写，重投不重复；冲突操作�
 it("云端整理员写的回执并进本机，手机重投不再执行；待整理原文随 GitHub 双向同步", async () => {
   const ws = await freshWorkspace();
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: true, records: true }, m.remote);
   await writePhoneSnapshots(ws);
   await syncWorkspaceBackup(ws, m.remote);
   const clientId = ulid();
@@ -406,7 +406,7 @@ it("GitHub 在回写电脑快照之前记住远端整理员和新回执，重复
   const { markOrganizerSeen, organizerStatus } = await import("../src/index.js");
   const ws = await freshWorkspace();
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/organizer", text: true, records: false }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/organizer", text: true, records: true }, m.remote);
   await writePhoneSnapshots(ws);
   await syncWorkspaceBackup(ws, m.remote);
   const today = JSON.parse(m.files()["phone/today.json"] as string);

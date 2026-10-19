@@ -56,14 +56,23 @@ export async function installProjectMemory(ws: Workspace, directory: string, sel
   const files = [".agents", ".claude"].map((base) =>
     join(context.root, base, "skills/kaitu-project-memory/SKILL.md"),
   );
-  for (const file of files)
-    if (fs.existsSync(file) && fs.readFileSync(file, "utf8") !== text)
-      throw new KaituError("已有同名技能，已保留；请人工核对", "CONFLICT");
-  for (const file of files)
-    if (!fs.existsSync(file)) {
-      fs.mkdirSync(dirname(file), { recursive: true });
-      fs.writeFileSync(file, text, { flag: "wx" });
-    }
+  try {
+    for (const file of files)
+      if (fs.existsSync(file) && fs.readFileSync(file, "utf8") !== text)
+        throw new KaituError("已有同名技能，已保留；请人工核对", "CONFLICT");
+    for (const file of files)
+      if (!fs.existsSync(file)) {
+        fs.mkdirSync(dirname(file), { recursive: true });
+        fs.writeFileSync(file, text, { flag: "wx" });
+      }
+  } catch (error) {
+    if (["EPERM", "EACCES"].includes((error as NodeJS.ErrnoException).code ?? ""))
+      throw new KaituError(
+        `项目技能安装需要正常权限审批。待写路径：\n${files.join("\n")}\n请同一个 Agent 展示待写内容，通过正常审批重试原 install 命令：${cli} project memory --install --from ${quote(context.root)} --project ${quote(context.project.slug)} --dir ${quote(ws.root)}。不要绕过沙箱、chmod、换写法或让其他 Agent 代装。当前会话若以 -a never 禁止审批，请停止并在支持正常审批的新 Agent 窗口继续；安装尚未完成。`,
+        "AGENT_PERMISSION_REQUIRED",
+      );
+    throw error;
+  }
   return {
     files,
     project: context.project.slug,

@@ -12,7 +12,12 @@ if (!state.authenticated) {
 }
 if (args[0] === "repo") {
   if (args[1] === "view") {
-    if (args[2] !== state.repo) process.exit(1);
+    const requested = args[2]?.toLowerCase();
+    if (requested === state.legacy?.toLowerCase()) {
+      console.log(JSON.stringify(state.legacyMetadata ?? { nameWithOwner: state.legacy, isPrivate: true }));
+      process.exit(0);
+    }
+    if (requested !== state.repo?.toLowerCase()) process.exit(1);
     console.log(JSON.stringify({ nameWithOwner: state.repo, isPrivate: state.private }));
     process.exit(0);
   }
@@ -34,7 +39,13 @@ const body = input ? JSON.parse(input) : {};
 const oid = () => `object-${++state.sequence}`;
 let status = 200;
 let value;
-if (route === "") value = { full_name: state.repo, private: state.private, default_branch: "main" };
+if (route === "")
+  value = {
+    full_name: state.repo,
+    private: state.private,
+    default_branch: "main",
+    description: state.description ?? null,
+  };
 else if (route === "/git/ref/heads/main") {
   if (!state.head) {
     status = 409;

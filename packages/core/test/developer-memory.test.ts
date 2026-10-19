@@ -1,16 +1,24 @@
+import { execFile } from "node:child_process";
 import fs from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import git from "isomorphic-git";
 import { expect, it, vi } from "vitest";
 import {
+  KaituError,
+  Workspace,
+  connectWorkspaceBackup,
   createProject,
   installProjectMemory,
+  invalidateWorkspaceBackup,
   logProject,
   projectMemoryContext,
   readProjectPage,
   resolveWorkspaceBackup,
+  restoreWorkspaceBackup,
   syncWorkspaceBackup,
+  workspaceBackupPrompts,
   workspaceBackupRequest,
   workspaceBackupStatus,
 } from "../src/index.js";
@@ -31,6 +39,12 @@ it.skipIf(process.platform === "win32")(
     const initial = {
       authenticated: true,
       repo: null,
+      legacy: "synthetic/my-ai-memory",
+      legacyMetadata: {
+        nameWithOwner: "synthetic/my-ai-memory",
+        isPrivate: true,
+        description: "keep legacy metadata",
+      },
       private: true,
       head: null,
       sequence: 0,
@@ -42,18 +56,76 @@ it.skipIf(process.platform === "win32")(
     vi.stubEnv("KAITU_TEST_GH_STATE", stateFile);
     const ws = await freshWorkspace();
     const secretsBefore = ws.readText(".kaitu/secrets.json");
+    const home = tmp();
+    const cli = fileURLToPath(new URL("../../cli/dist/main.js", import.meta.url));
+    const runCli = (...args: string[]) =>
+      promisify(execFile)(process.execPath, [cli, "backup", ...args], {
+        cwd: home,
+        env: {
+          ...process.env,
+          HOME: home,
+          KAITU_DIR: "",
+          KAITU_APP_HOME: join(home, "app"),
+          KAITU_LOCAL_STATE_DIR: join(home, "state"),
+          XDG_STATE_HOME: join(home, "xdg"),
+        },
+      });
     try {
-      await workspaceBackupRequest(ws, "create", { repo: "synthetic/kaitu-ai-memory" });
+      const auth = await runCli("auth-status");
+      expect(JSON.parse(auth.stdout)).toMatchObject({ authenticated: true, login: "synthetic" });
+      expect(fs.readdirSync(home)).toEqual([]);
+      await expect(
+        workspaceBackupRequest(ws, "create", { repo: "synthetic/kaitu-ai-memory" }),
+      ).rejects.toMatchObject({ code: "BACKUP_SCOPE_REQUIRED" });
+      expect(JSON.parse(fs.readFileSync(stateFile, "utf8")).repo).toBeNull();
+      const proposed = await workspaceBackupRequest(ws, "preview", { repo: "synthetic/kaitu-ai-memory" });
+      expect(proposed).toMatchObject({ existingReadme: false, connected: false });
+      const readme = "# Existing synthetic README\nprojects/ original content\n";
+      ws.writeText("README.md", readme);
+      await expect(
+        workspaceBackupRequest(ws, "create", {
+          repo: "SYNTHETIC/KAITU-AI-MEMORY",
+          text: true,
+          records: true,
+        }),
+      ).rejects.toMatchObject({ code: "GH_REQUEST" });
+      expect(JSON.parse(fs.readFileSync(stateFile, "utf8"))).toMatchObject({
+        repo: null,
+        legacy: initial.legacy,
+        legacyMetadata: initial.legacyMetadata,
+      });
+      await workspaceBackupRequest(ws, "create", {
+        repo: "synthetic/kaitu-ai-memory",
+        text: true,
+        records: true,
+        keepLegacy: true,
+      });
       await syncWorkspaceBackup(ws);
       expect(workspaceBackupStatus(ws)).toMatchObject({
         connection: { via: "gh", private: true },
         error: null,
       });
       expect(ws.readText(".kaitu/secrets.json")).toBe(secretsBefore);
+      await expect(
+        workspaceBackupRequest(ws, "create", {
+          repo: "SYNTHETIC/KAITU-AI-MEMORY",
+          text: true,
+          records: true,
+          keepLegacy: true,
+        }),
+      ).rejects.toMatchObject({ code: "GH_REQUEST" });
       const state = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+      expect(state).toMatchObject({
+        repo: "synthetic/kaitu-ai-memory",
+        legacy: initial.legacy,
+        legacyMetadata: initial.legacyMetadata,
+      });
       const before = state.trees[state.commits[state.head].tree.sha];
       expect(before["AGENT-README.md"]).toContain("接手顺序");
-      expect(before["README.md"]).toContain("projects/");
+      expect(before["README.md"]).toBe(readme);
+      expect(
+        await workspaceBackupRequest(ws, "preview", { repo: "synthetic/kaitu-ai-memory" }),
+      ).toMatchObject({ existingReadme: true, connected: true, readme, description: state.description });
       state.trees.remote = { ...before, "notes/remote.md": "synthetic remote edit\n" };
       state.commits.remote = { tree: { sha: "remote" }, parent: state.head };
       state.head = "remote";
@@ -82,6 +154,97 @@ it.skipIf(process.platform === "win32")(
         .split("\n")
         .map((line) => JSON.parse(line));
       expect(calls.filter((args) => args.includes("repos/synthetic/kaitu-ai-memory"))).toHaveLength(1);
+      expect(calls.filter((args) => args[0] === "repo" && args[1] === "create")).toHaveLength(1);
+      const restoreTarget = join(home, "restored");
+      await runCli("restore", "synthetic/kaitu-ai-memory", "--to", restoreTarget, "--via", "gh");
+      const restored = new Workspace(restoreTarget, { maintain: false });
+      expect(restored.readText("notes/remote.md")).toBe("local kept\n");
+      expect(restored.readJson(".kaitu/secrets.json")).toEqual({});
+      const occupied = join(home, "occupied");
+      fs.mkdirSync(occupied);
+      fs.writeFileSync(join(occupied, "keep.txt"), "keep existing data");
+      const remote = {
+        inspect: async () => ({ private: true, branch: "main" }),
+        read: async () => ({ head: "synthetic", files: before }),
+        push: async () => "synthetic",
+      };
+      for (const target of [restoreTarget, occupied])
+        await expect(
+          restoreWorkspaceBackup(target, undefined, { repo: "synthetic/kaitu-ai-memory", via: "gh" }, remote),
+        ).rejects.toBeInstanceOf(KaituError);
+      expect(fs.readdirSync(occupied)).toEqual(["keep.txt"]);
+      expect(fs.readFileSync(join(occupied, "keep.txt"), "utf8")).toBe("keep existing data");
+
+      const selectedPrompt = workspaceBackupPrompts(ws, "synthetic/kaitu-ai-memory", {
+        text: false,
+        records: false,
+      });
+      const cachedStatus = workspaceBackupStatus(restored);
+      expect(cachedStatus.connection).toMatchObject({ text: true, records: true });
+      const connectFlags = (prompt: string) =>
+        /kaitu backup connect [^\n]+/.exec(prompt)?.[0].match(/--(?:no-)?(?:text|records)\b/g) ?? [];
+      const flags = connectFlags(selectedPrompt.create);
+      const prompted = JSON.parse(
+        (await runCli("connect", "synthetic/kaitu-ai-memory", ...flags, "--dir", restoreTarget)).stdout,
+      );
+      expect(prompted.connection).toMatchObject({ text: false, records: false });
+      expect(workspaceBackupStatus(restored)).toEqual(cachedStatus);
+      invalidateWorkspaceBackup(restored);
+      expect(workspaceBackupStatus(restored)).toMatchObject({
+        connection: { text: false, records: false },
+        lastSync: prompted.lastSync,
+      });
+      expect(prompted.lastSync).not.toBe(cachedStatus.lastSync);
+      restored.writeText("notes/excluded.md", "must stay local");
+      restored.writeJson("phone/today.json", { private: "must stay local" });
+      restored.writeText("inbox/agents/excluded.md", "must stay local");
+      restored.writeJson("inbox/health/excluded.health.json", { private: "must stay local" });
+      const reconnected = JSON.parse(
+        (await runCli("connect", "synthetic/kaitu-ai-memory", "--dir", restoreTarget)).stdout,
+      );
+      expect(reconnected).toMatchObject({ connection: { text: false, records: false }, error: null });
+      invalidateWorkspaceBackup(restored);
+      expect(workspaceBackupStatus(restored)).toMatchObject({
+        connection: { text: false, records: false },
+        lastSync: reconnected.lastSync,
+      });
+      const reopened = new Workspace(restoreTarget, { maintain: false });
+      const fallback = workspaceBackupPrompts(reopened, "synthetic/kaitu-ai-memory");
+      const fallbackFlags = connectFlags(fallback.create);
+      await connectWorkspaceBackup(
+        reopened,
+        {
+          repo: "synthetic/kaitu-ai-memory",
+          text: fallbackFlags.includes("--text"),
+          records: fallbackFlags.includes("--records"),
+        },
+        remote,
+      );
+      expect(workspaceBackupStatus(reopened).connection).toMatchObject({ text: false, records: false });
+      const filtered = JSON.parse(fs.readFileSync(stateFile, "utf8"));
+      const uploaded = filtered.trees[filtered.commits[filtered.head].tree.sha];
+      for (const path of [
+        "notes/excluded.md",
+        "phone/today.json",
+        "inbox/agents/excluded.md",
+        "inbox/health/excluded.health.json",
+      ])
+        expect(uploaded[path]).toBeUndefined();
+      expect(uploaded["notes/remote.md"]).toBe("local kept\n");
+      await connectWorkspaceBackup(
+        reopened,
+        { repo: "synthetic/other" },
+        {
+          inspect: async () => ({ private: true, branch: "main" }),
+          read: async () => ({ head: null, files: {} }),
+          push: async () => "synthetic",
+        },
+      );
+      expect(workspaceBackupStatus(reopened).connection).toMatchObject({
+        repo: "synthetic/other",
+        text: false,
+        records: false,
+      });
       const loggedOut = JSON.parse(fs.readFileSync(stateFile, "utf8"));
       loggedOut.authenticated = false;
       fs.writeFileSync(stateFile, JSON.stringify(loggedOut));
@@ -108,7 +271,28 @@ it("新项目会话读取既有状态并写回现有项目日志；薄入口保�
   });
   const start = await projectMemoryContext(ws, code);
   expect(start.project?.slug).toBe(project.slug);
+  const skillFiles = [".agents", ".claude"].map((base) =>
+    join(code, base, "skills/kaitu-project-memory/SKILL.md"),
+  );
+  const mkdir = fs.mkdirSync;
+  const denied = vi.spyOn(fs, "mkdirSync").mockImplementation(((path, options) => {
+    if (String(path).startsWith(join(code, ".agents")))
+      throw Object.assign(new Error("synthetic permission denied"), { code: "EPERM" });
+    return mkdir(path, options);
+  }) as typeof fs.mkdirSync);
+  try {
+    const error = await installProjectMemory(ws, code).catch((error) => error);
+    expect(error).toBeInstanceOf(KaituError);
+    expect(error.code).toBe("AGENT_PERMISSION_REQUIRED");
+    for (const path of skillFiles) expect(error.message).toContain(path);
+    expect(skillFiles.some((path) => fs.existsSync(path))).toBe(false);
+  } finally {
+    denied.mockRestore();
+  }
   await installProjectMemory(ws, code);
+  fs.writeFileSync(skillFiles[1] as string, "user-owned skill\n");
+  await expect(installProjectMemory(ws, code)).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(fs.readFileSync(skillFiles[1] as string, "utf8")).toBe("user-owned skill\n");
   expect(fs.readFileSync(join(code, "AGENTS.md"), "utf8")).toBe("existing instructions\n");
   expect(fs.readFileSync(join(code, "CLAUDE.md"), "utf8")).toBe("existing Claude config\n");
   const log =

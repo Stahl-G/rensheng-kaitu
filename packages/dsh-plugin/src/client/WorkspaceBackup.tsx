@@ -1,5 +1,5 @@
 import type { githubCliStatus, workspaceBackupPrompts, workspaceBackupStatus } from "@kaitu/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 type Status = ReturnType<typeof workspaceBackupStatus>;
@@ -19,8 +19,18 @@ export function WorkspaceBackup({
   const [status, setStatus] = useState<Status>();
   const [repo, setRepo] = useState("");
   const [token, setToken] = useState("");
-  const [text, setText] = useState(true);
-  const [records, setRecords] = useState(true);
+  const [text, setText] = useState(false);
+  const [records, setRecords] = useState(false);
+  const [keepLegacy, setKeepLegacy] = useState(false);
+  const canKeepLegacy = !status?.connection && /^[^/]+\/kaitu-ai-memory$/i.test(repo.trim());
+  const scopeInitialized = useRef(false);
+  const scopeEdited = useRef(false);
+  const [preview, setPreview] = useState<{
+    readme: string;
+    existingReadme: boolean;
+    description: string | null;
+    connected: boolean;
+  }>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [restored, setRestored] = useState("");
@@ -30,7 +40,21 @@ export function WorkspaceBackup({
   const loginPending = status?.ghLogin?.pending ?? false;
   const refresh = useCallback(() => {
     void request("status")
-      .then((s) => setStatus(s as Status))
+      .then((s) => {
+        const current = s as Status;
+        setStatus(current);
+        if (!scopeInitialized.current) {
+          scopeInitialized.current = true;
+          if (!scopeEdited.current) {
+            setText(current.connection?.text ?? false);
+            setRecords(current.connection?.records ?? false);
+          }
+          if (current.connection) {
+            setRepo(current.connection.repo);
+            setVia(current.connection.via ?? "token");
+          }
+        }
+      })
       .catch((e) => setMessage((e as Error).message));
   }, [request]);
   const checkGh = useCallback(
@@ -39,7 +63,6 @@ export function WorkspaceBackup({
         .then((value) => {
           const current = value as Awaited<ReturnType<typeof githubCliStatus>>;
           setGh(current);
-          setVia(current.authenticated ? "gh" : "token");
           if (current.login) setRepo((old) => old || `${current.login}/kaitu-ai-memory`);
         })
         .catch((error) => setMessage((error as Error).message)),
@@ -50,11 +73,29 @@ export function WorkspaceBackup({
   useEffect(() => {
     if (!loginPending) void checkGh();
   }, [checkGh, loginPending]);
+  useEffect(() => {
+    let disposed = false;
+    setPreview(undefined);
+    if (status && repo.trim())
+      void request("preview", { repo })
+        .then((value) => {
+          if (!disposed) setPreview(value as NonNullable<typeof preview>);
+        })
+        .catch((error) => {
+          if (!disposed) setMessage((error as Error).message);
+        });
+    return () => {
+      disposed = true;
+    };
+  }, [repo, request, status]);
   const copyPrompt = async (kind: "create" | "connect") => {
     try {
-      const prompts = (await request("prompts", { repo: status?.connection?.repo ?? repo })) as ReturnType<
-        typeof workspaceBackupPrompts
-      >;
+      const prompts = (await request("prompts", {
+        repo: kind === "connect" ? (status?.connection?.repo ?? repo) : repo,
+        text,
+        records,
+        ...(kind === "create" && canKeepLegacy && keepLegacy ? { keepLegacy: true } : {}),
+      })) as ReturnType<typeof workspaceBackupPrompts>;
       await navigator.clipboard.writeText(prompts[kind]);
       setCopied(
         t("提示词已复制，粘贴给一个新 Agent 即可开始核对", "Prompt copied; paste into a new agent to begin"),
@@ -120,6 +161,14 @@ export function WorkspaceBackup({
               : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
           </output>
         )}
+        {c && (
+          <p className={css.small}>
+            {t(
+              `已保存同步范围：文字 ${c.text ? "启用" : "关闭"}；结构化资料 ${c.records ? "启用" : "关闭"}`,
+              `Saved sync scope: text ${c.text ? "on" : "off"}; structured data ${c.records ? "on" : "off"}`,
+            )}
+          </p>
+        )}
         {status?.error && (
           <p className={css.error} role="alert">
             {status.error}
@@ -127,6 +176,29 @@ export function WorkspaceBackup({
         )}
         {c && !c.private && !c.enabled && (
           <p role="alert">{t("公开仓库，未开启上传", "Public repository; upload is off")}</p>
+        )}
+        {preview && (
+          <details>
+            <summary>{t("README 与描述预览（只读）", "README and description preview (read-only)")}</summary>
+            <p className={css.small}>
+              {preview.connected
+                ? t("现有仓库描述：", "Existing repository description: ")
+                : t(
+                    "新建仓库的描述预览（接入已有仓库后显示实际描述）：",
+                    "Proposed description for a new repository (actual description shown after connecting): ",
+                  )}
+              {preview.description ?? t("无描述 / 尚未读取", "No description / not loaded")}
+            </p>
+            <p className={css.small}>
+              {preview.existingReadme
+                ? t("现有工作区 README，保留原文", "Existing workspace README, preserved as written")
+                : t(
+                    "新建 README 预览（仅新建仓库时写入）",
+                    "New README preview (written only when creating a repository)",
+                  )}
+            </p>
+            <pre className={css.pre}>{preview.readme}</pre>
+          </details>
         )}
         <details open={!c}>
           <summary>
@@ -139,7 +211,11 @@ export function WorkspaceBackup({
             <input
               aria-label={t("同步仓库", "Sync repository")}
               value={repo}
-              onChange={(e) => setRepo(e.target.value)}
+              onChange={(e) => {
+                setRepo(e.target.value);
+                setKeepLegacy(false);
+                setCopied("");
+              }}
               placeholder="owner/kaitu-ai-memory"
             />
           </label>
@@ -213,20 +289,64 @@ export function WorkspaceBackup({
             </>
           )}
           <label>
-            <input type="checkbox" checked={text} onChange={(e) => setText(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={text}
+              onChange={(e) => {
+                scopeEdited.current = true;
+                setText(e.target.checked);
+                setCopied("");
+              }}
+            />
             {t("文字（Markdown / TXT）", "Text (Markdown / TXT)")}
           </label>{" "}
           <label>
-            <input type="checkbox" checked={records} onChange={(e) => setRecords(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={records}
+              onChange={(e) => {
+                scopeEdited.current = true;
+                setRecords(e.target.checked);
+                setCopied("");
+              }}
+            />
             {t("结构化资料（JSON / JSONL 等）", "Structured data (JSON / JSONL, etc.)")}
           </label>
+          <p className={css.small}>
+            {t("新建 / 接入前核对的选中范围：", "Selected scope to review before creating / connecting: ")}
+            {t(
+              `文字：${text ? "启用" : "关闭"}；结构化资料：${records ? "启用" : "关闭"}`,
+              `Text: ${text ? "on" : "off"}; structured data: ${records ? "on" : "off"}`,
+            )}
+          </p>
+          {canKeepLegacy && (
+            <label>
+              <input
+                type="checkbox"
+                checked={keepLegacy}
+                onChange={(e) => {
+                  setKeepLegacy(e.target.checked);
+                  setCopied("");
+                }}
+              />
+              {t("保留 my-ai-memory，另建此仓库", "Keep my-ai-memory and create this separate repository")}
+            </label>
+          )}
           <p>
             {!c && (
               <button
                 className={`${css.btn} ${css["btn-primary"]}`}
                 type="button"
                 disabled={busy || status?.running || !repo.trim() || !gh?.authenticated}
-                onClick={() => void run("create", { repo, via: "gh", text, records })}
+                onClick={() =>
+                  void run("create", {
+                    repo,
+                    via: "gh",
+                    text,
+                    records,
+                    ...(canKeepLegacy && keepLegacy ? { keepLegacy: true } : {}),
+                  })
+                }
               >
                 {busy
                   ? t("正在创建并连接…", "Creating and connecting…")
@@ -293,7 +413,10 @@ export function WorkspaceBackup({
             disabled={!repo.trim() && !c}
             onClick={() => void copyPrompt("create")}
           >
-            {t("复制本机 Agent 接入提示词", "Copy local agent setup prompt")}
+            {t(
+              "复制新建 / 接入前核对提示词（当前选中范围）",
+              "Copy pre-connection review prompt (selected scope)",
+            )}
           </button>{" "}
           <button type="button" className={css.link} disabled={!c} onClick={() => void copyPrompt("connect")}>
             {t("复制第二设备接入提示词", "Copy setup prompt for another device")}

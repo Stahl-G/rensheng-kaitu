@@ -34,6 +34,7 @@ import {
   ignoredWorkspaceChange,
   importUpload,
   invalidateHistoryFile,
+  invalidateWorkspaceBackup,
   onboardingStatus,
   processInbox,
   pullCalendarSubscriptions,
@@ -275,7 +276,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   }
   function changedFile(file: string) {
     files.invalidate();
-    if (closed || ignoredWorkspaceChange(file)) return;
+    if (closed) return;
+    if (file === ".kaitu/workspace-backup.json") {
+      invalidateWorkspaceBackup(ws);
+      notify();
+      return;
+    }
+    if (ignoredWorkspaceChange(file)) return;
     invalidateHistoryFile(ws, file);
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
