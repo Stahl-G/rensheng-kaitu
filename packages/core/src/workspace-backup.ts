@@ -1,10 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { promises as fs, rmSync } from "node:fs";
+import { promises as fs, existsSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { z } from "zod";
+import { assetsRoot } from "./assets.js";
 import { rememberWorkspace } from "./drive.js";
 import { KaituError } from "./errors.js";
+import {
+  beginGithubCliLogin,
+  cancelGithubCliLogin,
+  createPrivateGithubRepository,
+  githubCliLoginState,
+  githubCliRequest,
+  githubCliStatus,
+  memoryRepositoryDescription,
+} from "./github-cli.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
@@ -18,17 +28,19 @@ import { Workspace, stateDirectory } from "./workspace.js";
 
 export type BackupFiles = Record<string, string>;
 export interface BackupRemote {
-  inspect(repo: string): Promise<{ private: boolean; branch: string }>;
+  inspect(repo: string): Promise<{ private: boolean; branch: string; description?: string | null }>;
   read(repo: string, branch: string): Promise<{ head: string | null; files: BackupFiles }>;
   push(repo: string, branch: string, head: string | null, files: BackupFiles): Promise<string>;
 }
 export interface BackupConnection {
+  via?: "gh" | "token";
   repo: string;
   branch: string;
   private: boolean;
   enabled: boolean;
   text: boolean;
   records: boolean;
+  description?: string | null;
   checkedAt: string;
 }
 export interface BackupConflict {
@@ -46,6 +58,8 @@ interface BackupState {
   error?: string;
 }
 const stateFile = ".kaitu/workspace-backup.json";
+const memoryRepositoryReadme =
+  "# 开图私人记忆仓库\n\n这里保存所选的工作区文字与结构化记录，项目目标、状态和开发日志仍在 projects/，记忆仍在 memory/。\n\nAgent 先读 AGENT-README.md，再按入口读 OVERVIEW.md、项目 STATUS.md 和 log.md；写入遵守既有 inbox/agents/ 与 handoffs/ 接力约定，不覆盖已有文件。照片、视频、凭据和本机状态不在同步范围。\n";
 const manifest = "kaitu-backup.json";
 const states = new WeakMap<Workspace, { root: string; value: BackupState }>();
 const active = new WeakMap<Workspace, Promise<void>>();
@@ -64,6 +78,9 @@ function state(ws: Workspace): BackupState {
   const value = ws.exists(stateFile) ? ws.readJson<BackupState>(stateFile) : { base: {}, conflicts: [] };
   states.set(ws, { root: ws.root, value });
   return value;
+}
+export function invalidateWorkspaceBackup(ws: Workspace): void {
+  states.delete(ws);
 }
 function store(ws: Workspace, value: BackupState) {
   states.set(ws, { root: ws.root, value });
@@ -89,6 +106,7 @@ export function workspaceBackupStatus(ws: Workspace) {
     error: s.error ?? null,
     conflicts: s.conflicts,
     tokenConfigured: !!token(ws),
+    ghLogin: githubCliLoginState(),
   };
 }
 function token(ws: Workspace): string {
@@ -244,10 +262,14 @@ export function mergeBackup(base: BackupFiles, local: BackupFiles, remote: Backu
 }
 
 /** GitHub Git Data API：凭据复用现有 secrets.json，所有本机状态排除在备份之外。 */
-export function githubBackupRemote(ws: Workspace): BackupRemote {
+export function githubBackupRemote(
+  ws?: Workspace,
+  via = ws ? state(ws).connection?.via : "gh",
+): BackupRemote {
   let previous: { head: string; tree: string; files: BackupFiles } | undefined;
   const request = async (repo: string, path: string, method = "GET", body?: unknown) => {
-    const credential = token(ws);
+    if (via === "gh") return githubCliRequest(repo, path, method, body);
+    const credential = ws ? token(ws) : "";
     const response = await fetch(`https://api.github.com/repos/${repo}${path}`, {
       method,
       signal: AbortSignal.timeout(30000),
@@ -275,7 +297,11 @@ export function githubBackupRemote(ws: Workspace): BackupRemote {
   return {
     async inspect(repo) {
       const info = await request(repo, "");
-      return { private: info.private === true, branch: info.default_branch };
+      return {
+        private: info.private === true,
+        branch: info.default_branch,
+        description: info.description ?? null,
+      };
     },
     async read(repo, branch) {
       const ref = await request(repo, `/git/ref/heads/${encodeURIComponent(branch)}`);
@@ -295,11 +321,11 @@ export function githubBackupRemote(ws: Workspace): BackupRemote {
         await Promise.all(
           entries.slice(i, i + 8).map(async (e: { path: string; sha: string }) => {
             const cache = `.kaitu/cache/github-blobs/${e.sha}`;
-            if (ws.exists(cache)) files[e.path] = ws.readText(cache);
+            if (ws?.exists(cache)) files[e.path] = ws.readText(cache);
             else {
               const blob = await request(repo, `/git/blobs/${e.sha}`);
               const content = Buffer.from(blob.content, "base64").toString("utf8");
-              ws.writeText(cache, content, { internal: true });
+              ws?.writeText(cache, content, { internal: true });
               files[e.path] = content;
             }
           }),
@@ -349,24 +375,42 @@ export function githubBackupRemote(ws: Workspace): BackupRemote {
   };
 }
 
-export async function connectWorkspaceBackup(ws: Workspace, input: unknown, remote = githubBackupRemote(ws)) {
+function backupSelection(ws: Workspace, input: { text?: boolean; records?: boolean }) {
+  const previous = state(ws).connection;
+  const text = input.text ?? previous?.text;
+  const records = input.records ?? previous?.records;
+  if (text === undefined || records === undefined)
+    throw new KaituError(
+      pick(
+        "请明确选择文字和记录范围：--text / --no-text 与 --records / --no-records",
+        "Choose both scopes explicitly: --text / --no-text and --records / --no-records",
+      ),
+      "BACKUP_SCOPE_REQUIRED",
+    );
+  return { text, records };
+}
+
+export async function connectWorkspaceBackup(ws: Workspace, input: unknown, providedRemote?: BackupRemote) {
   if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
   const args = z
     .object({
       repo: z.string(),
-      text: z.boolean().default(true),
-      records: z.boolean().default(true),
+      via: z.enum(["gh", "token"]).default("token"),
+      text: z.boolean().optional(),
+      records: z.boolean().optional(),
       allowPublic: z.boolean().default(false),
     })
     .parse(input);
+  const selection = backupSelection(ws, args);
   const repo = parseGithubRepo(args.repo);
+  const remote = providedRemote ?? githubBackupRemote(ws, args.via);
   const info = await remote.inspect(repo);
   const connection = {
+    via: args.via,
     repo,
     ...info,
     enabled: info.private || args.allowPublic,
-    text: args.text,
-    records: args.records,
+    ...selection,
     checkedAt: new Date().toISOString(),
   };
   const previous = state(ws);
@@ -416,7 +460,8 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         if (local[path] === undefined) delete mergeIncoming[path];
         else mergeIncoming[path] = local[path];
       }
-      const merged = mergeBackup(s.base, local, mergeIncoming);
+      const base = Object.fromEntries(Object.entries(s.base).filter(([path]) => selected(path, c)));
+      const merged = mergeBackup(base, local, mergeIncoming);
       if (merged.conflicts.length) {
         store(ws, { ...s, conflicts: merged.conflicts, error: undefined });
         return;
@@ -447,7 +492,8 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       store(ws, {
         ...s,
         error:
-          error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE"
+          error instanceof KaituError &&
+          ["CLOUD_UNAVAILABLE", "GH_REQUEST", "GH_MISSING"].includes(error.code)
             ? error.message
             : pick(
                 "同步未完成：请检查网络、GitHub 授权或远端新修改。本地资料已保留，可重试。",
@@ -469,6 +515,42 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
 export function requestWorkspaceBackup(ws: Workspace) {
   void syncWorkspaceBackup(ws);
   return workspaceBackupStatus(ws);
+}
+
+export function workspaceBackupPrompts(
+  ws: Workspace,
+  repository: string,
+  selection: { text?: boolean; records?: boolean } = {},
+) {
+  const repo = parseGithubRepo(repository);
+  const text = selection.text ?? state(ws).connection?.text ?? false;
+  const records = selection.records ?? state(ws).connection?.records ?? false;
+  const flags = `${text ? "--text" : "--no-text"} ${records ? "--records" : "--no-records"}`;
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  const packaged = join(assetsRoot(), "dist/cli.mjs");
+  const entry = existsSync(packaged) ? packaged : join(assetsRoot(), "packages/cli/dist/main.js");
+  const kaitu = existsSync(entry)
+    ? `ELECTRON_RUN_AS_NODE=1 ${quote(process.execPath)} ${quote(entry)}`
+    : "kaitu";
+  const dir = quote(ws.root);
+  return {
+    command: existsSync(entry)
+      ? { executable: process.execPath, args: [entry], env: { ELECTRON_RUN_AS_NODE: "1" } }
+      : null,
+    create: [
+      `请把我的开图资料接到私有 GitHub 仓库 ${repo}。下面的 kaitu 指 ${kaitu}。`,
+      `1. kaitu backup connect ${repo} --create --via gh ${flags} --dir ${dir}`,
+      `2. kaitu backup status --dir ${dir}，确认是私有仓库、已同步。`,
+      `3. 在我的代码项目目录里运行 kaitu project memory --from <代码目录> --install --dir ${dir}，装上项目技能。`,
+      "之后按项目技能读写项目状态和日志。",
+    ].join("\n"),
+    connect: [
+      `请在这台设备接上我的开图私有仓库 ${repo}。`,
+      `1. kaitu backup restore ${repo} --to <新目录> --via gh`,
+      `2. kaitu backup connect ${repo} --via gh ${flags} --dir <新目录>`,
+      "3. 读 AGENT-README.md 和 OVERVIEW.md，告诉我现在的项目和下一步。",
+    ].join("\n"),
+  };
 }
 export function disconnectWorkspaceBackup(ws: Workspace) {
   if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
@@ -507,11 +589,20 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
 }
 export async function restoreWorkspaceBackup(
   root: string,
-  credentials: Workspace,
+  credentials: Workspace | undefined,
   input: unknown,
-  remote = githubBackupRemote(credentials),
+  providedRemote?: BackupRemote,
 ) {
-  const args = z.object({ repo: z.string(), allowPublic: z.boolean().default(false) }).parse(input);
+  const args = z
+    .object({
+      repo: z.string(),
+      via: z.enum(["gh", "token"]).default("token"),
+      allowPublic: z.boolean().default(false),
+    })
+    .parse(input);
+  if (args.via === "token" && !credentials && !providedRemote)
+    throw new KaituError("token 恢复需要用 --dir 指向存有凭据的原工作区", "BAD_ARGS");
+  const remote = providedRemote ?? githubBackupRemote(credentials, args.via);
   const repo = parseGithubRepo(args.repo);
   const info = await remote.inspect(repo);
   if (!info.private && !args.allowPublic)
@@ -534,10 +625,11 @@ export async function restoreWorkspaceBackup(
   const ws = await initWorkspace(root);
   for (const [path, text] of Object.entries(data.files))
     if (path !== manifest && selected(path, selection)) ws.writeText(path, text);
-  const credential = token(credentials);
+  const credential = args.via === "token" && credentials ? token(credentials) : "";
   if (credential) setGithubToken(ws, credential);
   store(ws, {
     connection: {
+      via: args.via,
       repo,
       ...info,
       enabled: true,
@@ -568,6 +660,7 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
   const args = z
     .object({
       repo: z.string().optional(),
+      via: z.enum(["gh", "token"]).optional(),
       token: z.string().optional(),
       text: z.boolean().optional(),
       records: z.boolean().optional(),
@@ -578,6 +671,31 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
     })
     .parse(input);
   switch (operation) {
+    case "prompts":
+      return workspaceBackupPrompts(
+        ws,
+        args.repo ?? state(ws).connection?.repo ?? "your-account/kaitu-ai-memory",
+        args,
+      );
+    case "gh-status":
+      return githubCliStatus();
+    case "gh-login":
+      beginGithubCliLogin(() => emitter(ws).emit("change"));
+      return workspaceBackupStatus(ws);
+    case "gh-login-cancel":
+      cancelGithubCliLogin();
+      return workspaceBackupStatus(ws);
+    case "create": {
+      if (!args.repo) throw new KaituError("请填写新仓库名称", "BAD_ARGS");
+      backupSelection(ws, args);
+      if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+      await createPrivateGithubRepository(args.repo);
+      if (!ws.exists("README.md")) ws.writeText("README.md", memoryRepositoryReadme);
+      const status = await connectWorkspaceBackup(ws, { ...args, via: "gh" });
+      if (!status.connection?.private) throw new KaituError("仓库不是私有仓库，尚未开启同步", "GH_REQUEST");
+      requestWorkspaceBackup(ws);
+      return workspaceBackupStatus(ws);
+    }
     case "status":
       return workspaceBackupStatus(ws);
     case "connect": {

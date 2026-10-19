@@ -262,6 +262,11 @@ export function OnboardingPage(props: Props) {
         ) : (
           !error && <p className={v2.small}>{t("正在读取…", "Loading…")}</p>
         )}
+        <p className={v2.small}>
+          <button type="button" className={v2.link} onClick={() => finish("connections")}>
+            {t("从 GitHub 仓库恢复", "Restore from GitHub")}
+          </button>
+        </p>
         <div className={css.footer}>
           <button type="button" className={quiet} onClick={() => move(0)}>
             {t("上一步", "Back")}

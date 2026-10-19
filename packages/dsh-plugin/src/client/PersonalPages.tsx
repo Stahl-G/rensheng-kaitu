@@ -164,6 +164,50 @@ export function PersonalPages(
           </p>
         )}
         {receipt && <output className={css.small}>{receipt}</output>}
+        {data && props.view === "settings" && (
+          <section className={css.sec}>
+            <h2 className={css.eyebrow}>{t("资料位置", "Workspace location")}</h2>
+            <div className={`${css.card} ${css["list-card"]}`}>
+              <div className={css["switch-row"]}>
+                <span>
+                  <b>{storageName(data.storage.provider)}</b>
+                  <br />
+                  <span className={css.small}>{data.storage.root}</span>
+                </span>
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  onClick={() => setMoving(!moving)}
+                >
+                  {t("更换本地文件夹", "Change local folder")}
+                </button>
+              </div>
+            </div>
+            {moving && (
+              <StorageChoice
+                storage={data.storage}
+                moveStorage={props.moveStorage}
+                pickStorageFolder={props.pickStorageFolder}
+                submitLabel={t("迁移到这里", "Move here")}
+                onDone={async (moved) => {
+                  setMoving(false);
+                  if (moved) {
+                    await props.refreshWorkspace();
+                    setReceipt(t("资料已迁移", "Notes moved"));
+                  }
+                }}
+              />
+            )}
+          </section>
+        )}
+        {data && props.view !== "profile" && props.workspaceBackup && (
+          <WorkspaceBackup
+            request={props.workspaceBackup}
+            subscribe={props.subscribe}
+            pickFolder={props.pickStorageFolder}
+            onActivated={props.refreshWorkspace}
+          />
+        )}
         {props.view === "profile" ? (
           <MePage {...props} />
         ) : !data ? (
@@ -362,14 +406,6 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
-            {props.workspaceBackup && (
-              <WorkspaceBackup
-                request={props.workspaceBackup}
-                subscribe={props.subscribe}
-                pickFolder={props.pickStorageFolder}
-                onActivated={props.refreshWorkspace}
-              />
-            )}
             {props.phoneChannels && props.channelSettings && (
               <PhoneChannels request={props.channelSettings} />
             )}
@@ -569,22 +605,6 @@ export function PersonalPages(
                     {t("打开", "Open")}
                   </button>
                 </div>
-                <div className={css["switch-row"]}>
-                  <span>
-                    <b>{t("换一个存放位置", "Change where notes live")}</b>
-                    <br />
-                    <span className={css.small}>
-                      {storageName(data.storage.provider)} · {data.storage.root}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className={`${css.btn} ${css["btn-quiet"]}`}
-                    onClick={() => setMoving(!moving)}
-                  >
-                    {t("更换", "Change")}
-                  </button>
-                </div>
               </div>
             </section>
             {history && (
@@ -625,21 +645,6 @@ export function PersonalPages(
                   {t("取消", "Cancel")}
                 </button>
               </section>
-            )}
-            {moving && (
-              <StorageChoice
-                storage={data.storage}
-                moveStorage={props.moveStorage}
-                pickStorageFolder={props.pickStorageFolder}
-                submitLabel={t("迁移到这里", "Move here")}
-                onDone={async (moved) => {
-                  setMoving(false);
-                  if (moved) {
-                    await props.refreshWorkspace();
-                    setReceipt(t("资料已迁移", "Notes moved"));
-                  }
-                }}
-              />
             )}
             {props.plugins && <Plugins request={props.plugins} />}
             <section className={css.sec}>

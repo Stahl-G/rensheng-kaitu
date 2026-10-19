@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
+import { type FSWatcher, existsSync, readFileSync, unwatchFile, watch, watchFile } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import {
   assetsRoot,
   calendarPushEntries,
   calendarPushStore,
+  cancelGithubCliLogin,
   completeNext,
   completeTask,
   decideProposal,
@@ -33,6 +34,7 @@ import {
   ignoredWorkspaceChange,
   importUpload,
   invalidateHistoryFile,
+  invalidateWorkspaceBackup,
   onboardingStatus,
   processInbox,
   pullCalendarSubscriptions,
@@ -290,6 +292,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   }
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
+  // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。
+  const backupState = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
+  const backupChanged = () => {
+    invalidateWorkspaceBackup(ws);
+    notify();
+  };
+  watchFile(backupState, { persistent: false, interval: 2000 }, backupChanged);
   const startPolling = () => {
     watcher?.close();
     if (polling) return;
@@ -471,7 +480,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
-        if (productMutations.has(method)) notify();
+        const backupRead =
+          method === "workspaceBackup" && ["status", "prompts", "gh-status"].includes(String(args[0]));
+        if (productMutations.has(method) && !backupRead) notify();
         if (
           method === "openAi" &&
           draftId &&
@@ -716,7 +727,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
     }
     closed = true;
+    cancelGithubCliLogin();
     watcher?.close();
+    unwatchFile(backupState, backupChanged);
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
@@ -745,6 +758,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    unwatchFile(backupState, backupChanged);
     stopBackup();
     stopOrganizer();
     stopPhone();

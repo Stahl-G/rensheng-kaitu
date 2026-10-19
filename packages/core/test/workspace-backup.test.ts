@@ -80,7 +80,7 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   a.writeJson("secrets.json", { value: "synthetic-only" });
   a.writeJson("credentials.json", { value: "synthetic-only" });
   const m = remoteMock();
-  await connectWorkspaceBackup(a, { repo: "synthetic/backup" }, m.remote);
+  await connectWorkspaceBackup(a, { repo: "synthetic/backup", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(a, m.remote);
   expect(Object.keys(m.files()).some((p) => /\.kaitu|\.git|\.mp4|secrets|credentials/.test(p))).toBe(false);
   const target = join(tmp(), "restored");
@@ -108,7 +108,7 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
   const a = await freshWorkspace();
   const first = addRecord(a, "workout", workout);
   const m = remoteMock();
-  await connectWorkspaceBackup(a, { repo: "synthetic/records" }, m.remote);
+  await connectWorkspaceBackup(a, { repo: "synthetic/records", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(a, m.remote);
   const root = join(tmp(), "b");
   await restoreWorkspaceBackup(root, a, { repo: "synthetic/records" }, m.remote);
@@ -148,12 +148,12 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
 it("公开仓库默认不上传；后台等待与授权失败不挡住本地写入", async () => {
   const ws = await freshWorkspace();
   const pub = remoteMock(false);
-  await connectWorkspaceBackup(ws, { repo: "synthetic/public" }, pub.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/public", text: true, records: true }, pub.remote);
   await syncWorkspaceBackup(ws, pub.remote);
   expect(workspaceBackupStatus(ws).connection?.enabled).toBe(false);
   expect(pub.pushes()).toBe(0);
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/private" }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/private", text: true, records: true }, m.remote);
   let reject: (e: Error) => void = () => {};
   let reached: () => void = () => {};
   const reading = new Promise<void>((resolve) => {
@@ -243,7 +243,7 @@ it("GitHub API 接通空仓库初始化、缓存回读和非强推提交，可�
     return Response.json(value);
   });
   try {
-    await connectWorkspaceBackup(ws, { repo: "synthetic/api" });
+    await connectWorkspaceBackup(ws, { repo: "synthetic/api", text: true, records: true });
     await syncWorkspaceBackup(ws);
     expect(workspaceBackupStatus(ws).error).toBeNull();
     const first = head;
@@ -266,7 +266,7 @@ it("iCloud 占位不作为本地删除上传，下载后可继续，真实删除
   setStateBinding(original.root, directory, "icloud");
   const ws = new Workspace(original.root);
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/icloud" }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/icloud", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(ws, m.remote);
   const before = m.files()["me/profile.md"];
   const count = m.pushes();

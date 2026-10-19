@@ -33,6 +33,7 @@ import {
   draftOnboardingMatter,
   enableSync,
   findRecordType,
+  githubCliStatus,
   history,
   importAppleHealth,
   importChatgptConversations,
@@ -42,6 +43,7 @@ import {
   inboxNoteDone,
   inboxNotes,
   initWorkspace,
+  installProjectMemory,
   linkProject,
   listInvestments,
   listMemories,
@@ -53,6 +55,7 @@ import {
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
+  projectMemoryContext,
   readOnboardingMatter,
   readProject,
   readRecords,
@@ -66,6 +69,7 @@ import {
   renderRecordReference,
   resetOnboarding,
   restore,
+  restoreWorkspaceBackup,
   runPhone,
   saveOnboardingChoices,
   searchChats,
@@ -76,10 +80,13 @@ import {
   syncProject,
   syncProjects,
   syncStatus,
+  syncWorkspaceBackup,
   updateMemory,
   updateRecord,
   upgradeWorkspace,
   validateWorkspace,
+  workspaceBackupRequest,
+  workspaceBackupStatus,
   writeAgentsMd,
 } from "@kaitu/core";
 
@@ -129,6 +136,10 @@ const HELP = `开图 kaitu
   kaitu investments [--json]
   kaitu project new --title <标题> --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
+  kaitu project memory [--from <代码目录>] [--project <slug>] [--install]
+  kaitu backup status | auth-status | sync
+  kaitu backup connect <owner/repo> [--create] [--via gh|token] [--text|--no-text] [--records|--no-records]
+  kaitu backup restore <owner/repo> --to <新目录> [--via gh|token]
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
   kaitu project github <slug> <url>
   kaitu project github-token [--clear]  从 stdin 读取 token，仅保存在本机
@@ -169,6 +180,12 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  via: { type: "string" },
+  create: { type: "boolean" },
+  "backup-text": { type: "boolean" },
+  "no-text": { type: "boolean" },
+  records: { type: "boolean" },
+  "no-records": { type: "boolean" },
   channels: { type: "boolean" },
   install: { type: "boolean" },
   "no-automation": { type: "boolean" },
@@ -267,7 +284,11 @@ function workspace(values: Values, maintain = true): Workspace {
 
 async function run(argv: string[]): Promise<number> {
   const inputArgs =
-    argv[0] === "investments" ? argv.map((arg) => (arg === "--json" ? "--json-out" : arg)) : argv;
+    argv[0] === "backup"
+      ? argv.map((arg) => (arg === "--text" ? "--backup-text" : arg))
+      : argv[0] === "investments"
+        ? argv.map((arg) => (arg === "--json" ? "--json-out" : arg))
+        : argv;
   const { values, positionals } = parseArgs({ args: inputArgs, options, allowPositionals: true });
   const [cmd, ...args] = positionals;
   if (!cmd || values.help) {
@@ -276,6 +297,50 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "backup": {
+      const action = args[0];
+      const via = values.via ?? "gh";
+      if (!["gh", "token"].includes(via)) throw new KaituError("--via 只能是 gh 或 token", "BAD_ARGS");
+      // gh 查询与恢复不构造原工作区，也不创建默认绑定。
+      const ws =
+        action === "auth-status" || (action === "restore" && via === "gh") ? undefined : workspace(values);
+      let result: unknown;
+      if (action === "auth-status") result = await githubCliStatus();
+      else if (action === "restore") {
+        result = await restoreWorkspaceBackup(resolve(need(values.to, "--to")), ws, {
+          repo: need(args[1], "owner/repo"),
+          via,
+        });
+      } else if (!ws) throw new KaituError("需要开图工作区", "NOT_INITIALIZED");
+      else if (action === "status") result = workspaceBackupStatus(ws);
+      else if (action === "connect") {
+        if (values.create && via !== "gh")
+          throw new KaituError("建库使用已登录的 gh；token 方式请连接已有仓库", "BAD_ARGS");
+        if ((values["backup-text"] && values["no-text"]) || (values.records && values["no-records"]))
+          throw new KaituError("同一范围不能同时启用和关闭", "BAD_ARGS");
+        result = await workspaceBackupRequest(ws, values.create ? "create" : "connect", {
+          repo: need(args[1], "owner/repo"),
+          via,
+          text: values["no-text"] ? false : values["backup-text"],
+          records: values["no-records"] ? false : values.records,
+        });
+        await syncWorkspaceBackup(ws);
+        result = workspaceBackupStatus(ws);
+      } else if (action === "sync") {
+        await syncWorkspaceBackup(ws);
+        result = workspaceBackupStatus(ws);
+      } else
+        throw new KaituError(
+          "使用 backup status / connect <owner/repo> [--create] [--via gh|token] / sync",
+          "BAD_ARGS",
+        );
+      if (result && typeof result === "object") {
+        const { ghLogin: _login, ...safe } = result as Record<string, unknown>;
+        if (typeof safe.error === "string" && safe.error) throw new KaituError(safe.error, "BACKUP_SYNC");
+        console.log(JSON.stringify(safe, null, 2));
+      }
+      return 0;
+    }
     case "dsh": {
       let ws = new Workspace(values.dir ?? defaultRoot());
       if (!values.install && !ws.exists(".kaitu/config.json")) {
@@ -314,6 +379,12 @@ async function run(argv: string[]): Promise<number> {
           kind: need(values.kind, "--kind") as ProjectStatus["kind"],
           links,
         });
+      } else if (action === "memory") {
+        result = await (values.install ? installProjectMemory : projectMemoryContext)(
+          ws,
+          values.from ?? process.cwd(),
+          values.project,
+        );
       } else if (action === "list") result = listProjects(ws);
       else if (action === "show") result = readProject(ws, need(slug, "slug"));
       else if (action === "log")
@@ -346,7 +417,7 @@ async function run(argv: string[]): Promise<number> {
         });
       else
         throw new KaituError(
-          "使用 project new / list / show / log / link / github / github-token / sync / set",
+          "使用 project new / list / show / log / memory / link / github / github-token / sync / set",
           "BAD_ARGS",
         );
       out(values, result, JSON.stringify(result, null, 2));
