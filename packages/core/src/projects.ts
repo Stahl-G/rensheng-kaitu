@@ -540,29 +540,31 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       try {
         const dir = linkedPath(link);
         if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
-        const refs: string[] = [];
+        const pending: string[] = [];
         for (const namespace of ["refs/heads", "refs/remotes"]) {
           for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
-            refs.push(`${namespace}/${ref}`);
+            pending.push(await git.resolveRef({ fs, dir, ref: `${namespace}/${ref}` }));
           }
         }
-        // 只读取所有分支的对象与引用，不执行 status、checkout 或任何写命令。
-        for (const ref of refs) {
-          for (const { oid, commit } of await git.log({ fs, dir, ref })) {
-            if (seenCommits.has(oid)) continue;
-            seenCommits.add(oid);
-            const timestamp = commit.author.timestamp;
-            const day = localDate(new Date(timestamp * 1000), tz);
-            if (day < from || day >= today) continue;
-            const item = counts.get(day) ?? { count: 0, titles: [] };
-            item.count++;
-            item.titles.push({
-              timestamp,
-              oid,
-              title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
-            });
-            counts.set(day, item);
-          }
+        // 所有分支共用一次提交图遍历；合并和本地/远端引用不会重复读取祖先。
+        // 作者日期不保证随父提交递减，仍须检查完整可达图，不能按日期提前截断。
+        while (pending.length) {
+          const oid = pending.pop() as string;
+          if (seenCommits.has(oid)) continue;
+          const { commit } = await git.readCommit({ fs, dir, oid });
+          seenCommits.add(oid);
+          pending.push(...commit.parent);
+          const timestamp = commit.author.timestamp;
+          const day = localDate(new Date(timestamp * 1000), tz);
+          if (day < from || day >= today) continue;
+          const item = counts.get(day) ?? { count: 0, titles: [] };
+          item.count++;
+          item.titles.push({
+            timestamp,
+            oid,
+            title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
+          });
+          counts.set(day, item);
         }
       } catch (error) {
         reposOk = false;

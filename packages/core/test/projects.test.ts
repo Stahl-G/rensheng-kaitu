@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { join } from "node:path";
 import { strToU8, zipSync } from "fflate";
 import git from "isomorphic-git";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   createProject,
   listProjects,
@@ -127,6 +127,7 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     });
     await git.checkout({ fs, dir: repo, ref: "main" });
     const before = files(repo);
+    const objectReads = vi.spyOn(fs.promises, "readFile");
     const head = await git.resolveRef({ fs, dir: repo, ref: "HEAD" });
     const { slug } = await createProject(ws, {
       title: "synthetic-code",
@@ -137,7 +138,13 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
       (date) => `## ${date}\n\n- 手写 ${date}\n`,
     );
     ws.writeText(`projects/${slug}/log.md`, `# 项目进展\n\n${sections.join("\n")}`);
+    objectReads.mockClear();
     expect((await syncProject(ws, slug, { now: new Date("2026-10-14T05:00:00Z") })).metrics).toEqual([]);
+    const commitsRead = objectReads.mock.calls.filter(([file]) =>
+      String(file).startsWith(join(repo, ".git/objects/")),
+    );
+    expect(commitsRead).toHaveLength(3);
+    objectReads.mockRestore();
     expect(readProject(ws, slug).log).toBe(
       `# 项目进展\n\n${[...sections].sort((a, b) => b.localeCompare(a)).join("\n")}`,
     );
@@ -160,6 +167,7 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     expect(await git.resolveRef({ fs, dir: repo, ref: "HEAD" })).toBe(head);
     expect(files(repo)).toEqual(before);
   } finally {
+    vi.restoreAllMocks();
     fs.rmSync(repo, { recursive: true, force: true });
     fs.rmSync(ws.root, { recursive: true, force: true });
   }
