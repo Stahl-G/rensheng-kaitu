@@ -6,6 +6,7 @@
 
 ```sh
 pnpm --filter @kaitu/core build     # dsh-plugin 按 core 的 dist 做类型检查，core 改过要先构建，否则会报旧类型的错
+pnpm --filter @kaitu/dsh-plugin build   # 界面用的 Remote 类型生成在 dsh-plugin/lib/，服务端加过 @Remote 方法要先构建
 npm run typecheck
 npx biome check .
 npx vitest run <改到的包>/test      # 最后整体跑一次 npx vitest run

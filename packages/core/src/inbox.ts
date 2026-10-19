@@ -431,7 +431,8 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
     for (const dir of ["inbox/agents", "inbox/health"]) {
       if (!ws.exists(dir)) continue;
       for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
-        if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name === ".DS_Store") continue;
+        // 隐藏文件（.DS_Store、占位用的 .gitkeep）不是交来的资料。
+        if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name.startsWith(".")) continue;
         const file = `${dir}/${entry.name}`;
         if (ws.conflictCopy(file) || placeholderOriginal(file)) continue;
         if (unavailable.some((path) => file === path || file.startsWith(`${path}/`))) {

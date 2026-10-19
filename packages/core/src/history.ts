@@ -92,7 +92,22 @@ export async function ensureHistory(ws: Workspace): Promise<void> {
   maintainHistoryIgnore(ws);
 }
 
+/** 纯 Git 建的记忆仓库（根目录有 kaitu-backup.json）：根目录 .gitignore 属于用户推到 GitHub 的仓库。 */
+export function userOwnsGitignore(ws: Workspace): boolean {
+  return ws.exists("kaitu-backup.json");
+}
+
+export function historyExcludeFile(ws: Workspace): string {
+  return join(historyDirectory(ws), "info", "exclude");
+}
+
 export function maintainHistoryIgnore(ws: Workspace): void {
+  if (userOwnsGitignore(ws)) {
+    // 手机快照和收件箱要随仓库推上去，开图版本历史的排除规则只写进版本库自己的 info/exclude。
+    fs.mkdirSync(join(historyDirectory(ws), "info"), { recursive: true });
+    fs.writeFileSync(historyExcludeFile(ws), GITIGNORE);
+    return;
+  }
   const ignore = ws.exists(".gitignore") ? ws.scanText(".gitignore") : "";
   if (ignore === undefined) return;
   const missing = GITIGNORE.split("\n").filter(
