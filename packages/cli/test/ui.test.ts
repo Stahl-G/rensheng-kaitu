@@ -225,11 +225,11 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
 });
 
 it("监听失效的完整元数据扫描等待 IO 时仍能浏览，完成前不发布半份盘点，关闭会取消后续扫描", async () => {
-  const root = mkdtempSync(join(tmpdir(), "kaitu-polling-ui-"));
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "kaitu-polling-ui-")));
   const ws = await initWorkspace(root);
   mkdirSync(join(root, "poll"));
   for (let i = 0; i < 40; i++) writeFileSync(join(root, "poll", `${i}.txt`), "synthetic");
-  const held = realpathSync(join(root, "poll/0.txt"));
+  const held = realpathSync.native(join(root, "poll/0.txt"));
   let release!: () => void;
   let entered!: () => void;
   const waiting = new Promise<void>((resolve) => {
