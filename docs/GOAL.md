@@ -78,7 +78,7 @@ CLI / 工作台提供开关与状态，云端 Agent 通过收件箱写入；入�
 
 - 前端：Vite + Preact（轻、MIT），图表 ECharts（Apache-2.0），全部打包进本地静态文件，不用 CDN。
 - 后端：`kaitu ui` 用 Node 自带 `http`，只监听 127.0.0.1；接口全部调用 `@kaitu/core`，不另写读写逻辑。
-- 实时：监听 `~/kaitu` 文件变化，用 SSE 通知页面刷新；同一进程里实现 PRD §7.3 的「外部修改 30 秒防抖自动存版本」。
+- 实时：监听 `~/kaitu` 文件变化，用 SSE 通知页面刷新；外部修改按首个未保存事件的约 2 秒窗口在后台合并存版本，连续编辑不延后。
 - 对话面板：M2 不内置对话；页面提示「在这个文件夹里打开 Codex / Claude Code」。内置 Agent（DeepSeek Harness 或 LibreChat）在 M4 之后再评估。
 
 ## 待核实

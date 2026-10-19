@@ -166,6 +166,18 @@ function snapshotFile(ws: Workspace, file: string): boolean {
   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {
+  return matrix
+    .filter(
+      ([file, head, workdir, stage]) =>
+        file !== "OVERVIEW.md" &&
+        !file.startsWith("inbox/") &&
+        !neverTrack(file) &&
+        !(head === 1 && workdir === 1 && stage === 1),
+    )
+    .map(([file]) => file);
+}
+
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
   await ensureHistory(ws);
   const changedFiles = new Map(invalidated.get(ws));
@@ -176,15 +188,7 @@ export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
     gitdir: historyDirectory(ws),
     filter: (file) => snapshotFile(ws, file),
   });
-  const files = matrix
-    .filter(
-      ([file, head, workdir, stage]) =>
-        file !== "OVERVIEW.md" &&
-        !file.startsWith("inbox/") &&
-        !neverTrack(file) &&
-        !(head === 1 && workdir === 1 && stage === 1),
-    )
-    .map(([file]) => file);
+  const files = pendingFiles(matrix);
   if (!files.length) clearInvalidated(ws, changedFiles);
   return files;
 }
@@ -223,8 +227,14 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   return null;
 }
 
-/** 立刻存版本，不经过后台。 */
-export async function snapshotNow(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
+type SnapshotMessage = string | ((files: readonly string[]) => string | null);
+
+/** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */
+export async function snapshotNow(
+  ws: Workspace,
+  message: SnapshotMessage,
+  now = new Date(),
+): Promise<string | null> {
   refreshOverview(ws, now);
   try {
     return await saveSnapshot(ws, message, now);
@@ -237,7 +247,7 @@ export async function snapshotNow(ws: Workspace, message: string, now = new Date
   }
 }
 
-async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
+async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date): Promise<string | null> {
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
@@ -249,6 +259,16 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     gitdir: historyDirectory(ws),
     filter: (file) => snapshotFile(ws, file),
   });
+  let description: string;
+  if (typeof message === "function") {
+    const files = pendingFiles(matrix);
+    const result = message(files);
+    if (result === null) {
+      if (!files.length) clearInvalidated(ws, changedFiles);
+      return null;
+    }
+    description = result;
+  } else description = message;
   let changed = 0;
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
@@ -272,7 +292,7 @@ async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<
     fs,
     dir,
     gitdir: historyDirectory(ws),
-    message,
+    message: description,
     author: { ...AUTHOR, timestamp, timezoneOffset: now.getTimezoneOffset() },
   });
   clearInvalidated(ws, changedFiles);

@@ -137,3 +137,90 @@ it("旧版本库打开即迁移，历史不丢且可恢复，版本库不跟踪�
   expect(opened.readText("me/profile.md")).toMatch(/^# 档案/);
   expect(await isTracked(opened, ".kaitu/history.git/HEAD")).toBe(false);
 });
+
+it("提交期间同秒同长度的新失效保留到下一版本，真实正文不被旧盘点吃掉", async () => {
+  const ws = await freshWorkspace();
+  const file = "me/synthetic-race.md";
+  ws.writeText(file, "before\n");
+  await snapshot(ws, "基线");
+  const source = ws.resolve(file);
+  const stable = statSync(source);
+  const git = (await import("isomorphic-git")).default;
+  const commit = git.commit;
+  let changedDuringCommit = false;
+  git.commit = (async (options) => {
+    if (!changedDuringCommit) {
+      changedDuringCommit = true;
+      writeFileSync(source, "second\n");
+      utimesSync(source, stable.atimeMs / 1000, stable.mtimeMs / 1000);
+      invalidateHistoryFile(ws, file);
+    }
+    return commit(options);
+  }) as typeof commit;
+  try {
+    writeFileSync(source, "first!\n");
+    utimesSync(source, stable.atimeMs / 1000, stable.mtimeMs / 1000);
+    invalidateHistoryFile(ws, file);
+    await snapshot(ws, "第一版");
+  } finally {
+    git.commit = commit;
+  }
+  const text = async () => {
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: (await history(ws))[0]?.oid as string,
+      filepath: file,
+    });
+    return Buffer.from(blob).toString();
+  };
+  expect(changedDuringCommit).toBe(true);
+  expect(await text()).toBe("first!\n");
+  expect(await pendingWorkspaceFiles(ws)).toContain(file);
+  await snapshot(ws, "后续版");
+  expect(await text()).toBe("second\n");
+  expect(await pendingWorkspaceFiles(ws)).toEqual([]);
+});
+
+it("取消有改动的快照后仍保留强制重读，下一版本保存恢复mtime的真实正文", async () => {
+  const ws = await freshWorkspace();
+  const file = "me/synthetic-cancel.md";
+  const source = ws.resolve(file);
+  const git = (await import("isomorphic-git")).default;
+  const lstat = fs.promises.lstat;
+  fs.promises.lstat = (async (...args: Parameters<typeof lstat>) => {
+    const stat = await lstat(...args);
+    if (String(args[0]) === source) stat.ctimeMs = 1700000000000 + (Number(stat.ctimeMs) % 1000);
+    return stat;
+  }) as typeof lstat;
+  try {
+    ws.writeText(file, "before\n");
+    await snapshot(ws, "基线");
+    const before = (await history(ws))[0]?.oid;
+    const stable = statSync(source);
+    writeFileSync(source, "after!\n");
+    utimesSync(source, stable.atimeMs / 1000, stable.mtimeMs / 1000);
+    invalidateHistoryFile(ws, file);
+    const { snapshotNow } = await import("../src/history.js");
+    const cancelled = await snapshotNow(ws, (files) => {
+      expect(files).toContain(file);
+      return null;
+    });
+    expect(cancelled).toBeNull();
+    expect((await history(ws))[0]?.oid).toBe(before);
+    expect(await pendingWorkspaceFiles(ws)).toContain(file);
+    await snapshot(ws, "取消之后保存");
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: (await history(ws))[0]?.oid as string,
+      filepath: file,
+    });
+    expect(Buffer.from(blob).toString()).toBe("after!\n");
+    expect(await pendingWorkspaceFiles(ws)).toEqual([]);
+  } finally {
+    fs.promises.lstat = lstat;
+  }
+});
