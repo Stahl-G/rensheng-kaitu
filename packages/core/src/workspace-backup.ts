@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { promises as fs, existsSync, rmSync } from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { setImmediate as yieldToIO } from "node:timers/promises";
 import { z } from "zod";
 import { writeAgentsMd } from "./agents-md.js";
 import { assetsRoot } from "./assets.js";
@@ -20,7 +21,7 @@ import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
 import { rememberOrganizer } from "./organizer.js";
-import { latestDaily, refreshOverview } from "./overview.js";
+import { holdOverview, latestDaily, refreshOverview } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { placeholderOriginal } from "./sync-files.js";
@@ -29,7 +30,7 @@ import { Workspace, stateDirectory } from "./workspace.js";
 
 export type BackupFiles = Record<string, string>;
 export interface BackupProgress {
-  phase: "scan" | "download" | "merge" | "upload";
+  phase: "scan" | "download" | "merge" | "upload" | "restore";
   completed: number;
   total?: number;
 }
@@ -38,7 +39,10 @@ export interface BackupRunOptions {
   progress?: (value: BackupProgress) => void;
 }
 export interface BackupRemote {
-  inspect(repo: string): Promise<{ private: boolean; branch: string; description?: string | null }>;
+  inspect(
+    repo: string,
+    options?: BackupRunOptions,
+  ): Promise<{ private: boolean; branch: string; description?: string | null }>;
   read(
     repo: string,
     branch: string,
@@ -84,6 +88,13 @@ const manifest = "kaitu-backup.json";
 const states = new WeakMap<Workspace, { root: string; value: BackupState }>();
 const active = new WeakMap<Workspace, Promise<void>>();
 const events = new WeakMap<Workspace, EventEmitter>();
+export interface BackupRestoreState {
+  target: string;
+  status: "running" | "completed" | "cancelled" | "failed";
+  root?: string;
+  error?: string;
+}
+const restorations = new WeakMap<Workspace, { owner: string; value: BackupRestoreState }>();
 const jobs = new WeakMap<Workspace, { controller: AbortController; progress?: BackupProgress }>();
 function emitter(ws: Workspace) {
   let e = events.get(ws);
@@ -120,10 +131,12 @@ export function workspaceBackupEnabled(ws: Workspace): boolean {
 
 export function workspaceBackupStatus(ws: Workspace) {
   const s = state(ws);
+  if (restorations.get(ws)?.owner !== ws.root) restorations.delete(ws);
   return {
     connection: s.connection ?? null,
     running: active.has(ws),
     progress: jobs.get(ws)?.progress ?? null,
+    restore: restorations.get(ws)?.value ?? null,
     lastSync: s.lastSync ?? null,
     error: s.error ?? null,
     conflicts: s.conflicts,
@@ -347,8 +360,8 @@ export function githubBackupRemote(
     return response.json();
   };
   return {
-    async inspect(repo) {
-      const info = await request(repo, "");
+    async inspect(repo, options = {}) {
+      const info = await request(repo, "", "GET", undefined, options.signal);
       return {
         private: info.private === true,
         branch: info.default_branch,
@@ -697,6 +710,7 @@ export async function restoreWorkspaceBackup(
   credentials: Workspace | undefined,
   input: unknown,
   providedRemote?: BackupRemote,
+  options: BackupRunOptions = {},
 ) {
   const args = z
     .object({
@@ -707,9 +721,30 @@ export async function restoreWorkspaceBackup(
     .parse(input);
   if (args.via === "token" && !credentials && !providedRemote)
     throw new KaituError("token 恢复需要用 --dir 指向存有凭据的原工作区", "BAD_ARGS");
-  const remote = providedRemote ?? githubBackupRemote(credentials, args.via);
+  const assertEmptyTarget = async () => {
+    options.signal?.throwIfAborted();
+    try {
+      const info = await fs.lstat(root);
+      if (
+        info.isSymbolicLink() ||
+        !info.isDirectory() ||
+        (await fs.readdir(root)).some((file) => file !== ".DS_Store")
+      )
+        throw new KaituError(
+          "恢复需要新的空目录，已有资料未改动 / Choose a new empty restore folder",
+          "TARGET_EXISTS",
+        );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  };
+  await assertEmptyTarget();
+  const source = credentials ? new Workspace(credentials.root, { maintain: false }) : undefined;
+  const credential = args.via === "token" && source ? token(source) : "";
+  const remote = providedRemote ?? githubBackupRemote(source, args.via);
   const repo = parseGithubRepo(args.repo);
-  const info = await remote.inspect(repo);
+  const info = await remote.inspect(repo, options);
+  options.signal?.throwIfAborted();
   if (!info.private && !args.allowPublic)
     throw new Error(
       pick(
@@ -717,7 +752,8 @@ export async function restoreWorkspaceBackup(
         "This repository is public; choose a private repository or explicitly allow public sync",
       ),
     );
-  const data = await remote.read(repo, info.branch);
+  const data = await remote.read(repo, info.branch, options);
+  options.signal?.throwIfAborted();
   if (!data.files[manifest]) throw new Error(pick("仓库中没有开图备份", "No Kaitu backup found"));
   const selection = z
     .object({
@@ -727,12 +763,29 @@ export async function restoreWorkspaceBackup(
       records: z.boolean(),
     })
     .parse(JSON.parse(data.files[manifest] as string));
+  await assertEmptyTarget();
   const ws = await initWorkspace(root);
-  for (const [path, text] of Object.entries(data.files))
-    if (path !== manifest && selected(path, selection)) ws.writeText(path, text);
+  holdOverview(ws);
+  const files = Object.entries(data.files).filter(([path]) => path !== manifest && selected(path, selection));
+  let completed = 0;
+  options.progress?.({ phase: "restore", completed, total: files.length });
+  for (const [path, text] of files) {
+    options.signal?.throwIfAborted();
+    const target = ws.resolve(path);
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    try {
+      await fs.mkdir(dirname(target), { recursive: true });
+      await fs.writeFile(temporary, text, { signal: options.signal });
+      options.signal?.throwIfAborted();
+      await fs.rename(temporary, target);
+    } finally {
+      await fs.rm(temporary, { force: true });
+    }
+    options.progress?.({ phase: "restore", completed: ++completed, total: files.length });
+  }
+  options.signal?.throwIfAborted();
   // 用纯 Git 模板建的仓库带的是简版入口，恢复后换回本机工作区的完整入口。
   writeAgentsMd(ws);
-  const credential = args.via === "token" && credentials ? token(credentials) : "";
   if (credential) setGithubToken(ws, credential);
   store(ws, {
     connection: {
@@ -748,7 +801,53 @@ export async function restoreWorkspaceBackup(
     conflicts: [],
     lastSync: new Date().toISOString(),
   });
+  await yieldToIO();
+  options.signal?.throwIfAborted();
+  refreshOverview(ws);
   return { root: ws.root };
+}
+
+function requestWorkspaceRestore(ws: Workspace, target: string, input: unknown) {
+  if (active.has(ws)) throw new KaituError("请等待本次同步或恢复完成", "BACKUP_BUSY");
+  const controller = new AbortController();
+  const job: { controller: AbortController; progress?: BackupProgress } = { controller };
+  const restore: BackupRestoreState = { target, status: "running" };
+  jobs.set(ws, job);
+  restorations.set(ws, { owner: ws.root, value: restore });
+  const run = restoreWorkspaceBackup(target, ws, input, undefined, {
+    signal: controller.signal,
+    progress: (value) => {
+      job.progress = value;
+    },
+  })
+    .then(
+      (result) => {
+        restore.status = "completed";
+        restore.root = result.root;
+      },
+      (error) => {
+        restore.status = controller.signal.aborted ? "cancelled" : "failed";
+        restore.error = controller.signal.aborted
+          ? pick(
+              "恢复已取消；新目录中已写入的内容已保留，未启用。请选另一个空目录重试。",
+              "Restore cancelled. Written files are kept in the new folder; it was not activated. Retry in another empty folder.",
+            )
+          : error instanceof KaituError
+            ? error.message
+            : pick(
+                "恢复未完成，目标目录已保留，未启用",
+                "Restore incomplete. The target folder is kept and was not activated.",
+              );
+      },
+    )
+    .finally(() => {
+      active.delete(ws);
+      jobs.delete(ws);
+      emitter(ws).emit("change");
+    });
+  active.set(ws, run);
+  emitter(ws).emit("change");
+  return workspaceBackupStatus(ws);
 }
 export function startWorkspaceBackup(ws: Workspace, notify: () => void = () => {}, intervalMs = 60000) {
   const off = subscribeWorkspaceBackup(ws, notify);
@@ -836,7 +935,7 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
     case "restore": {
       if (!args.root) throw new Error(pick("请选择一个新的恢复目录", "Choose a new restore folder"));
       if (args.token) setGithubToken(ws, args.token);
-      return restoreWorkspaceBackup(args.root, ws, args);
+      return requestWorkspaceRestore(ws, args.root, args);
     }
     default:
       throw new Error(pick("未知的备份操作", "Unknown backup action"));

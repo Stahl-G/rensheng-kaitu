@@ -126,6 +126,26 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   expect(a.readText("me/profile.md")).toBe("# From A\n");
   await syncWorkspaceBackup(a, m.remote);
   expect(workspaceBackupStatus(a).error).toBeNull();
+  const partial = join(tmp(), "cancelled-restore");
+  const restoreAbort = new AbortController();
+  let restoredFiles = 0;
+  await expect(
+    restoreWorkspaceBackup(partial, a, { repo: "synthetic/backup" }, m.remote, {
+      signal: restoreAbort.signal,
+      progress: (value) => {
+        if (value.phase === "restore") {
+          restoredFiles = value.completed;
+          if (value.completed === 1) restoreAbort.abort();
+        }
+      },
+    }),
+  ).rejects.toMatchObject({ name: "AbortError" });
+  expect(restoredFiles).toBe(1);
+  expect(fs.existsSync(partial)).toBe(true);
+  expect(a.readText("me/profile.md")).toBe("# From A\n");
+  await expect(
+    restoreWorkspaceBackup(partial, a, { repo: "synthetic/backup" }, m.remote),
+  ).rejects.toMatchObject({ code: "TARGET_EXISTS" });
   const switching = new Workspace(a.root);
   await workspaceBackupRequest(switching, "activate", { root: target });
   expect(switching.root).toBe(target);
