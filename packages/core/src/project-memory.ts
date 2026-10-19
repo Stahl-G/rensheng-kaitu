@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import git from "isomorphic-git";
-import { templateDir } from "./assets.js";
+import { assetsRoot, templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseGithubRepo } from "./github.js";
 import { projectStatusFiles, readProject } from "./projects.js";
@@ -46,7 +46,13 @@ export async function installProjectMemory(ws: Workspace, directory: string, sel
         : "尚无绑定项目，请先绑定 GitHub 仓库",
       "BAD_ARGS",
     );
-  const text = `${fs.readFileSync(join(templateDir(), ".agents/skills/kaitu-project-memory/SKILL.md"), "utf8")}\n开图工作区：${JSON.stringify(ws.root)}；所属项目：${context.project.slug}。\n`;
+  const packaged = join(assetsRoot(), "dist/cli.mjs");
+  const entry = fs.existsSync(packaged) ? packaged : join(assetsRoot(), "packages/cli/dist/main.js");
+  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+  const cli = fs.existsSync(entry)
+    ? `ELECTRON_RUN_AS_NODE=1 ${quote(process.execPath)} ${quote(entry)}`
+    : "当前安装缺少 CLI，请先通过 App 更新；不要猜测 npx 包名";
+  const text = `${fs.readFileSync(join(templateDir(), ".agents/skills/kaitu-project-memory/SKILL.md"), "utf8")}\n开图工作区：${JSON.stringify(ws.root)}；所属项目：${context.project.slug}。\n本机 kaitu 的实际入口：${cli}。上文所有 kaitu 命令使用这个入口，并加 --dir ${quote(ws.root)}。\n`;
   const files = [".agents", ".claude"].map((base) =>
     join(context.root, base, "skills/kaitu-project-memory/SKILL.md"),
   );
