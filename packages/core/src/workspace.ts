@@ -15,7 +15,7 @@ import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
-import { maintainHistoryIgnore } from "./history.js";
+import { invalidateHistoryFile, maintainHistoryIgnore } from "./history.js";
 import { refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
@@ -274,6 +274,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
   writeJson(rel: string, value: unknown, opts: { internal?: boolean; mode?: number } = {}): void {
@@ -285,6 +286,7 @@ export class Workspace {
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
+    invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
   /** 用户时区：me/rules.md 的 timezone，缺省用系统时区。rules.md 没变时不重新读取。 */
