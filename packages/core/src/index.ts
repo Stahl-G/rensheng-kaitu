@@ -104,3 +104,5 @@ export * from "./phone-snapshots.js";
 export * from "./phone-receipts.js";
 export * from "./phone-run.js";
 export * from "./organizer.js";
+
+export type { DataProgress, DataRunOptions } from "./data-worker.js";

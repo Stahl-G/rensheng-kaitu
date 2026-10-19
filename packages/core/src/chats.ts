@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { unzipSync } from "fflate";
-import { updateChatIndex } from "./chat-search.js";
+import { updateChatIndexAsync } from "./chat-search.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { schemas } from "./schema.js";
@@ -61,12 +61,14 @@ function chatPath(ws: Workspace, file: string): string {
   return ws.resolve(file);
 }
 
-export function listChatFiles(ws: Workspace): string[] {
+export function listChatFiles(ws: Workspace, check?: () => void): string[] {
   const files: string[] = [];
   function visit(dir: string): void {
+    check?.();
     const abs = ws.resolve(dir);
     if (!ws.exists(dir)) return;
     for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      check?.();
       const file = `${dir}/${entry.name}`;
       if (entry.isDirectory()) visit(file);
       else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
@@ -238,6 +240,6 @@ export async function importChatgptConversations(
     if (previous && previous.file !== document.file) rmSync(chatPath(ws, previous.file));
   }
   result.version = await snapshot(ws, `导入（chatgpt）了 ${changed.length} 段对话`);
-  updateChatIndex(ws, changed);
+  await updateChatIndexAsync(ws, changed);
   return result;
 }
