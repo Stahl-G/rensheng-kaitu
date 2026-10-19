@@ -14,9 +14,9 @@
 | 收件箱 → `readLibrary` | 全部原文正文、排序、全部 render | 每页 40 条及一条前瞻；按存放日期目录/文件名倒序续读。继续加载可遍历全部原文；来源筛选在服务端续读，必要时扫描到较旧目录，不只过滤第一页。日期目录仅列名字，未进入的旧目录不读正文；单日目录 `readdir/sort` 仍与该层条目数有关 |
 | 点开一份决定/学习主题 → `readLibraryDocument` | 重建整个资料库作 membership 判断，然后再读目标，O(R+I) | 只接受原目录页对应的 `learning/<topic>/STATUS.md`、`decisions/<topic>/STATUS.md`，校验范围与链接，读目标一次。无关损坏记录不再阻断详情 |
 | 搜索对话 → `searchChats/syncIndex/listChatFiles` | 为列文件名 `scanText` 全部对话正文，再比较索引 mtime/ctime/size；热查询仍 O(全部正文 bytes) | 列路径只检查可用性与冲突；热查询 0 对话正文读取，新增/修改才解析；仍核对 C 份文件元数据以保留外部改写、删除与完整检索语义 |
-| 今天/完成下一步/系统日历 → `statusFiles` | 为找 STATUS 递归进入健康附件和月记录目录，O(A) | 排除明确的 files 附件目录、module.json 声明的记录目录；仍发现自建模块任意深度主题 |
+| 今天/完成下一步/系统日历 → `statusFiles` | 为找 STATUS 递归进入健康附件和月记录目录，O(A) | 只排除已知的 health/files 附件路径、module.json 声明的记录目录；仍发现自建模块任意深度主题 |
 | 今天汇总 → `readOverviewPage/summarizeStatus/workoutSessions` | 对同一 ts 在多次投影/7 天分组中反复换算当地日期 | 仅在单次计算中复用已换算日期；不引入跨请求缓存或失效机制，记录修订/时区语义保留 |
-| 问问正文 grep → `agentSearch` | 先遍历所有候选到数组（超过 10,000 直接报错），之后才分批 rg | 边遍历边以 128 个文件执行真实 rg；沿用 250 条结果上限，达到上限即停止遍历；未满上限仍检索完整范围，glob 仍完整列举并保留原范围保护/取消信号 |
+| 问问正文 grep → `agentSearch` | 先遍历所有候选到数组（超过 10,000 直接报错），之后才分批 rg | 边遍历边以 128 个文件执行真实 rg；沿用 250 条结果上限，达到上限即停止遍历；候选仍以 10,000 个为范围保护；未达到 250 条也可能因候选上限返回 partial。grep/glob 显式返回 truncated、scannedFiles 和缩小范围说明，不把零匹配或少量匹配冒充全范围完成；保留取消信号 |
 | 项目同步 → 每个本地/远端 ref 各 `git.log` | B 份完整祖先历史先返回后再按 oid 去重，重叠祖先重复 IO，最坏 O(B×V) | 从所有 ref 的 head 开始，一次遍历完整可达提交图，每个 oid 读一次，O(B+V+E)。保留 author 日期与时区；作者日期可倒序，不能用日期提前断开祖先 |
 | 后台手机资料快照 → `buildPhoneLibrary` → `inboxNotes` | 先读取所有历史原文，再丢弃 30 天外条目 | 先用该投影原本使用的日期目录筛选，再读取正文。未改手机格式、内容范围或 iOS |
 | GitHub 后台同步 → `syncWorkspaceBackup/localFiles/githubBackupRemote` | 必要全量扫描/三方合并；界面只有“正在同步” | 保留完整范围、冲突、云占位暂停、并发写保护和 SHA blob 缓存。显示本机读取/远端读取/核对/上传阶段及实际文件计数；可取消本轮本机读、fetch 和 gh 子进程，之后可重试。进度只轮询同步面板，避免每读一个文件就广播全工作区刷新 |
@@ -65,3 +65,12 @@
 ## 检查
 
 构建、typecheck、lint 通过。全仓 95 个测试文件、280 项通过；最后的项目提交图修改另用原真实 Git 旅程回归 3 项。检查只复用现有依赖；pnpm 使用空 user/global npm 配置，并关闭会自动安装依赖的 verify-deps-before-run。localhost 集成测试在允许监听的执行环境运行。
+
+## 审查补正
+
+- 状态隔离入口补回根目录 lstat/realpath 边界；外部目录符号链接不读取、不隔离、不删除。
+- 项目提交图尊重每个仓库的 .git/shallow；真实 file:// depth-1 clone 和完整仓库可混合统计。
+- 搜索说明已纠正：10,000 候选保护仍在。稀疏匹配/零匹配到达保护上限均返回显式 partial，保留已经找到的结果。复现脚本 sparse-search.mjs 使用 11,000 份真实合成文件和真实 rg，不提升资源上限。
+
+- 状态发现仅跳过已知 health/files，不按 basename 排除 files；合法 learning/files 与 custom/nested/files 的下一步仍可读取和完成。
+- gh stdin 错误有独立 listener：取消映射 AbortError；非取消写管道错误仍拒绝为 GH_REQUEST，不吞真正的传输失败。cancel-gh-stdin.mjs 在真实 gh 2.101.0 + Node 26 上用暂停的 localhost 代理回归；取消时真实 stdin 缓冲仍有 16,777,228 bytes，进程正常收尾。未读取已有 gh 配置，使用临时配置和合成授权。

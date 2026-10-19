@@ -9,8 +9,10 @@ export async function agentSearch(root, name, args, signal, executable, execute 
   const base = assertAgentPath(root, resolve(root, args.path ?? "."));
   const files = [];
   let visited = 0;
+  let rangeLimited = false;
   async function* walk(path) {
     signal?.throwIfAborted();
+    if (rangeLimited) return;
     const info = await lstat(path);
     if (info.isSymbolicLink()) return;
     try {
@@ -20,6 +22,7 @@ export async function agentSearch(root, name, args, signal, executable, execute 
     }
     if (info.isDirectory()) {
       for (const entry of await readdir(path, { withFileTypes: true })) {
+        if (rangeLimited) return;
         if ([".kaitu", ".git", "node_modules"].includes(entry.name)) continue;
         yield* walk(join(path, entry.name));
       }
@@ -27,7 +30,10 @@ export async function agentSearch(root, name, args, signal, executable, execute 
       const filter = name === "glob" ? args.pattern : args.include;
       const pathName = relative(base, path) || relative(root, path);
       if (!filter || matchesGlob(pathName, filter) || matchesGlob(entryName(pathName), filter)) {
-        if (++visited > 10000) throw new Error("搜索范围过大，请选择具体目录");
+        if (++visited > 10000) {
+          rangeLimited = true;
+          return;
+        }
         yield path;
       }
     }
@@ -71,9 +77,21 @@ export async function agentSearch(root, name, args, signal, executable, execute 
       }
     }
   }
-  if (name === "glob") return { root, paths: files.map((path) => relative(root, path)) };
-  if (batch.length && matches.length < 250) await searchBatch(batch);
-  return { matches };
+  if (name !== "glob" && batch.length && matches.length < 250) await searchBatch(batch);
+  const scope = {
+    scannedFiles: Math.min(visited, 10000),
+    truncated: rangeLimited || matches.length === 250,
+    ...(rangeLimited
+      ? {
+          reason:
+            "仅搜索前 10000 个候选文件，请缩小目录继续搜索 / Partial results: candidate limit reached; narrow the directory",
+        }
+      : matches.length === 250
+        ? { reason: "已达到 250 条结果上限，可能还有匹配 / Result limit reached; more matches may exist" }
+        : {}),
+  };
+  if (name === "glob") return { root, paths: files.map((path) => relative(root, path)), ...scope };
+  return { matches, ...scope };
 }
 function entryName(path) {
   return path.split(/[\\/]/).at(-1);
