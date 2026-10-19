@@ -9,7 +9,11 @@
 
 ## 写入
 
-只在 `inbox/agents/` 和 `handoffs/` 新建文件，不改别的文件。交接文件 `handoffs/<YYYYMMDDTHHMM>-<agent>.md`：
+- 做了某个项目的事，就更新这个项目：`projects/<项目>/STATUS.md` 的正文（做到哪、卡在哪）和 `next`，在 `log.md` 记一条，写明对应哪份交接。只改自己做过的项目。
+- 档案、偏好、目标、规则（`me/`、`memory/`）不直接改；想法和建议写进 `inbox/agents/`，等用户确认。用户明确让你改的，照做。
+- 结束前新建一份交接。
+
+交接文件 `handoffs/<YYYYMMDDTHHMM>-<agent>.md`：
 
 ```markdown
 ---
@@ -26,4 +30,4 @@ follows: handoffs/20261019T0900-previous-agent.md
 
 ## Git
 
-改之前先 `git pull`；只提交自己新建的文件；冲突保留两边，不强推。
+改之前先 `git pull`；只提交自己改过和新建的文件；冲突保留两边，不强推。
