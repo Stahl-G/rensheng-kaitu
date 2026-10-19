@@ -4,6 +4,10 @@
 
 复制 [首位 Agent 的短初始化入口](COPY_TO_YOUR_AGENT.md)，后续使用 [新 Agent 短接入入口](COPY_TO_NEXT_AGENT.md)。完整规则见 [INSTALL](INSTALL.md)、[ADD_DEVICE](ADD_DEVICE.md)，验收顺序见 [USER_TEST](USER_TEST.md)。这里只交付提示词，没有读取或上传真实资料、创建新库或启动模型测试。下面的模板只用于明确确认后的新库，不能覆盖现有私人库。
 
+```text
+请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/3e96c40b902254d4ae7ab5b0dc5299995f862832/docs/guides/agent-memory/INSTALL.md 及同目录 USER_TEST.md，帮我新建私人 kaitu-ai-memory，保留 my-ai-memory 作基准，不复制或迁移旧库。先向我确认唯一真实项目，列出必要读取文件和用途；我确认后才读，再预览提取的真实进度、决策、失败尝试、阻塞、完整下一步及来源。等我确认摘要、精确仓库和文字范围后才初始化一次并上传。优先复用可用 kaitu，没有就用普通 Git 和官方 gh，不要求 App 或新运行时，不改全局设置。完成回读后生成填好新库地址和项目编号的接入提示词，由我交给新 Agent 亲测理解与接续。
+```
+
 开图 App、kaitu CLI、特定操作系统、Node、Python、MCP 和后台服务均不是独立模板路径的安装条件。Git/gh 缺失时，由 Agent 说明官方来源，经用户确认后处理；不安装自制 runtime。GitHub 登录只由用户在官方页面/设备流程完成。
 
 已有源码环境则优先复用实际可用入口：先核 `kaitu --help` 或仓库根 `pnpm kaitu --help`；已有编译产物时也可核 `pnpm --dir packages/cli exec node dist/main.js --help`。只使用返回正确帮助的入口，不猜 npm/npx 已发布，不增加另一套 CLI，不自动安装依赖、改锁文件或全局配置。后者依赖用户已经具备的源码工具链；没有它时直接走普通文件＋Git 路径。
