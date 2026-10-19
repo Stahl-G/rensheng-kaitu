@@ -1,27 +1,25 @@
-# 从指定真实项目建立新的私人记忆
+# 一次复制，接上项目记忆
 
-复制下面完整区域。用户已选择保留 my-ai-memory 作为基准，另建 PRIVATE kaitu-ai-memory。具体 owner、真实项目读取范围、摘要和上传内容仍由用户在执行会话确认。这里只交付提示词，维护者没有读取真实项目或私人库。无需 App 或特定 runtime；已有 CLI 可优先复用。
+把下面完整提示词交给能操作本机文件和终端的 Agent。它负责发现项目、读上下文、生成摘要和同步；你只需选择项目，并在上传前确认一次目标和文字范围。已经指定项目时直接开始，不重新问目录、项目名或现状。
 
 ```text
-你是我的开图开发者记忆初始化助手。请实际完成一个项目的私人记忆接入，不只给教程。保留 my-ai-memory 作为基准，不读取或复制其中内容冒充初始化，不自动迁移旧库。先列出拟读取的真实项目文件和用途，等我在本会话确认范围后才读；只读必要上下文，再预览提取的进度、决策、失败尝试、阻塞、完整下一步与来源，让我确认摘要后才创建或上传。先简短说明拟使用的全新记忆目录、会创建哪些普通文件、哪些步骤需要我确认；问我唯一要接入的代码项目完整目录、项目名和一段允许保存的项目现状，只读这个项目的 AGENTS.md、CLAUDE.md、README 及我明确指定的必要文件，不扫描其他项目、不上传源码、不收集个人资料。只记录我确认的摘要、失败尝试、阻塞、下一步和来源，不建立 USER/MEMORY/PROJECTS 平行体系。
+你是我的开图项目记忆助手。请实际完成接入，不只给教程，也不要让我填写项目现状、整理文件清单或手动运行命令。先用三句话以内说明会检查环境、发现项目、生成带来源的摘要，并在上传前合并确认一次。普通只读检查和已选项目的上下文读取直接做，不逐项请求确认；官方登录、新增授权、安装或系统权限仍按正常流程处理，不能绕过审批。
 
-先检查现有入口。若我正使用开图源码环境，优先核实当前目录和 kaitu --help / pnpm kaitu --help；已有编译产物也可核 pnpm --dir packages/cli exec node dist/main.js --help。只有帮助实际成功才采用该入口；探测不可自动安装依赖、改锁文件、改全局配置或执行不明下载脚本。pnpm 若会自动校验安装，使用仅本进程的 verify-deps-before-run=warn 设置，不能改用户全局设置。若旧包装器失效，如实说明并换已验证的源码入口；没有源码/CLI 时直接走下述普通 Git 路径，不要求 App、Node、Python、MCP 或新 runtime，不猜 npm/npx 已发布。两条路径只选一条负责初始化和同步，不在同一份本机资料上同时启用两套同步写入。
+1. 自动检查系统、当前目录、Git、官方 gh 和已有登录。复用已登录账号，不退出重登、不索取或读取 token、密码、验证码、Cookie、钥匙串或私钥；认证检查只报告账号和状态，不回显凭据。多账号且目标账号不明确时才问选哪个。已有 kaitu／源码 pnpm kaitu 则只探测真实帮助成功的入口；失效就诊断并继续普通 Git/gh，不猜 npm/npx 已发布，不新增 runtime，不自动安装依赖或改锁文件。没有 CLI 也不要求 App、Node、Python 或 MCP。缺必要工具时说明官方安装来源，经正常确认处理；只读文件和本机 Git 能先完成的继续做。
 
-检查 Git 与官方 gh。缺失时说明官方安装来源，取得我确认后处理；未登录时由我在 GitHub 官方网页/设备流程完成 gh 登录，绝不读取、打印、复制或索取 token、密码、验证码、Cookie、钥匙串或私钥。用 gh auth status 和 gh api user --jq .login 核对账号，只展示 login。提出精确的 <该login>/kaitu-ai-memory（可改）、PRIVATE、text=true/records=false，及唯一项目的摘要预览；等我明确确认目标、范围和待写路径后才建库或上传。只查这个目标和同账号 my-ai-memory；保留旧库，发现旧库先让我选择，不能擅自覆盖、迁移或读取内容。目标存在、权限不明、403 或网络错误均先停下核对；只有明确 404 才把目标视为不存在，不能把任意命令失败当成空仓库。不强推、不删库重来。
+2. 用户已在消息或当前任务中指定项目就采用，不再问。否则先检查当前目录是否属于 Git 项目，再浅层枚举实际存在的常用开发目录，如 ~/Developer、~/Projects、~/Code、~/src、~/repos 或当前目录的父级。只看这些目录下至多两层的目录名与 .git 标记（包括 worktree 的 .git 文件），跳过符号链接、隐藏目录、依赖、构建及缓存目录，不扫整盘、不递归读取候选内容、不访问凭据。对结果按路径去重，列出最多八个名称和路径，标出当前项目，让用户选编号，可多选；不要求输入完整目录。没有候选时只问项目在哪里，不能用虚构项目代替。
 
-若已有可用 kaitu 入口：仅在刚确认的新记忆目录 init；每个 project 和 backup status/connect/sync 都显式带 --dir <新记忆目录>，不得使用我的其他工作区。经我确认后 project new --title <项目名> --kind work --link <唯一代码目录>:repo，以实际返回 slug 为准。用 backup connect <确认repo> --create --via gh --text --no-records 建私库；只有我明确同意保留 my-ai-memory 并另建时才加 --keep-legacy，目标已存在则停下核对。用 project log 保存我确认的初始现状与来源，project show 回读；backup sync/status 核实 private、范围、lastSync 和冲突。此路径只复用既有命令，不新增 CLI 或全局设置。
+3. 项目选定后自动读取相关 README、AGENTS、CLAUDE，以及它们指向的进度、决策、交接和必要项目说明；查看真实 git status、近期 git log（先最近二十条），需要时只查看相关提交的文件列表或有限 diff。不要执行仓库内脚本、下载依赖或全量读源码，不跟随链接到未选项目，不读 .env、凭据、浏览器或无关个人资料。尊重项目已有规则和实际权限。自己识别项目名称、当前进度、关键决策、失败尝试、阻塞和完整下一步，区分事实、候选、过期记录及未知项，引用文件、日期或提交；缺少决定性信息才问一个具体问题，不把一般未知项变成问卷，也不让用户代写摘要。多项目分别摘要，不能混淆来源。
 
-若没有可用 kaitu：在另一个临时位置只读获取开图公开仓库 Stahl-G/rensheng-kaitu 的固定提交 7f7ea1b912ec68ee16a76ca473974fb9a90a606f 中 docs/guides/agent-memory/template，或使用我附带的同目录 template。可以用普通 Git 获取该提交并稀疏检出这些文本；不运行源码、安装程序或构建命令。只复制 template 中的普通文件到刚确认的全新记忆目录，不复制来源仓库的 .git，不改公开模板仓库的 remote。按实际项目名把 example-project 目录改成安全唯一 slug（小写字母、数字、连字符），替换全部 {{...}}：项目名、带实际时区偏移的当前时间、日期、我确认的摘要、真实决策/失败尝试/阻塞/下一步。对 YAML 字符串正确转义，不用不安全替换破坏引号；STATUS 保留 title/kind/stage/updated/links/next 既有字段，links 可为空、next 不臆造任务；log 用现有日期标题和条目。AGENT-README、OVERVIEW、projects/<slug>/STATUS.md/log.md/notes.md、projects/module.json、memory/MEMORY.md、inbox/agents/、handoffs/、AGENTS/CLAUDE 薄入口和 MIT 许可保持同一套事实来源。kaitu-backup.json 沿用 format=kaitu-workspace、version=1、text=true、records=false。不要创建 .kaitu 本机状态或模拟完整 App 工作区。拿不到模板时如实停止获取，不改成要求安装 App/runtime。
+4. 自动提出当前明确账号下的 PRIVATE kaitu-ai-memory，以及本机 ~/kaitu-ai-memory；本机目录非空时保留原样，提出可用的新目录。只查询精确目标仓库元数据，不枚举私人库。已有任何仓库都保留，不清空、不覆盖、不自动迁移或复制其内容；目标重名时说明并提供复用既有记忆库或新名称的选择，复用走 ADD_DEVICE，不再 init。只有明确不存在才新建，权限错误、403 或网络失败不能当作不存在。默认只保存选中项目的文字摘要和来源，不上传代码、附件、完整聊天或凭据。展示一份合并预览：账号/精确仓库、PRIVATE、本机新目录、选中项目、实际将保存的文字摘要及排除范围。这里一次确认创建与首次上传，不在前面为普通只读重复确认；只有多账号、重名、项目选择或范围含糊时提前问必要问题。用户调整摘要就更新这份预览，不另起一轮同义审批。
 
-普通 Git 路径中，确认后用官方 gh 创建空的 PRIVATE 目标仓库，立即核验 nameWithOwner、visibility=PRIVATE 和 isPrivate=true，再为全新记忆目录初始化自己的 Git 并绑定已核实目标。Git 提交身份沿用已有配置；缺失时问我，得到同意后仅在这个记忆仓库设置，不改全局。凭据交给 gh 的官方 Git 凭据机制，不提取 token，不往 remote URL 填凭据。后续同步沿用首次连接时确认的政策，不反复索取或扩大权限。
+5. 确认后执行一种同步路径。若已有实际可用 kaitu：仅在上述新目录 init，各 project/backup 命令显式 --dir <记忆目录>，按实际 --help 创建选中的项目并保留返回的 slug；初始现状用既有 STATUS/log 表达，用 backup connect <确认repo> --create --via gh --text --no-records 建私库。若 CLI 报旧库保留选项，把保留旧库且另建新目标纳入同一次预览确认，再使用其 --keep-legacy，不读取或迁移旧库。backup sync/status 与 project show 回读实际结果。不将代码目录作为记忆工作区，不同时对同一本机资料运行另一套 Git 同步。
 
-两条路径都先读刚建立的 AGENT-README。普通后续 Agent 只在 inbox/agents/ 与 handoffs/ 根目录新建唯一文件，不擅改 STATUS/log/OVERVIEW、规则、目标或正式记忆。用真实时间和匿名 Agent 名新建 handoffs/<YYYYMMDDTHHMM>-<agent>-<唯一后缀>.md，沿用 agent/at/follows（可选）与“做了什么 / 当前下一步 / 未决或需要用户”格式；写我确认的初始结果、失败尝试、阻塞、完整下一步及来源。候选原文写唯一 *.note.md，不假称已导入。没有指定整理员就保留候选和交接，不依赖 App 才能接续，也不承诺自动回写快照、整理记忆、手机快照或自动归档。
+没有可用 kaitu 时，用普通 Git 获取本文固定提交同目录的 template（完整 SHA 取入口 URL），只获取这些普通文本，不运行来源仓库代码，不复制它的 .git，不改模板仓库 remote。把模板写入上述全新记忆目录，为每个选中项目建立独立 projects/<slug>/{STATUS.md,log.md,notes.md}，slug 唯一；填入已确认摘要和真实时间，正确转义 YAML，保留现有字段与日志格式。OVERVIEW 索引所有选中项目，保留 AGENT-README、memory/MEMORY.md、inbox/agents、handoffs、projects/module.json、薄入口及 MIT 许可；不建立根 USER/MEMORY/PROJECTS 平行体系。kaitu-backup.json 使用既有 kaitu-workspace v1、text=true/records=false，不模拟 App 本机状态。用官方 gh 建空 PRIVATE 私库，核实精确目标和可见性后初始化自己的 Git。沿用提交身份，缺失才问，仅设置本仓库；通过官方凭据机制认证，不把秘密写进 remote URL。只暂存这些记忆文件，检查实际 diff 和凭据模式，只报告结论、不回显秘密，正常提交推送并核对远端。模板获取失败就如实报告，不改成要求安装 runtime。
 
-如果我要求项目技能接入，先展示两个项目内薄文件 .agents/skills/kaitu-project-memory/SKILL.md、.claude/skills/kaitu-project-memory/SKILL.md 的具体路径和内容，经正常审批写入，仅指向本次实际记忆路径、repo 与 slug。已有同名或原 AGENTS/CLAUDE/README 保留，不改全局设置。纯 Git 路径使用 template/skills/kaitu-project-memory/SKILL.md，不能安装依赖 kaitu 的技能；CLI 路径可用实际 project memory --install。EPERM/EACCES 按原路径正常申请审批，不换写法、chmod、关闭沙箱或让其他 Agent 代装。技能安装是可选适配，直接提示词读取同一资料也能接续。
+6. 写入遵循既有角色和格式。初始化助手仅创建已确认的初始 STATUS/log/OVERVIEW。普通后续 Agent 新建唯一 inbox/agents/*.note.md 与 handoffs/<真实时间>-<agent>-<唯一后缀>.md，沿用 agent/at/follows 及“做了什么 / 当前下一步 / 未决或需要用户”；有前序就填真实 follows，候选不能假称已采纳。不擅改正式快照、目标、规则或正式记忆，不承诺自动整理、归档、手机快照或 App 索引已更新。项目内薄技能可选，不把安装作为完成前提；只写实际选中项目，保留已有 AGENTS/CLAUDE/README 和同名文件，不改全局设置。需要权限时正常申请，不换写法绕过。
 
-同步前检查当前记忆目录 git status/变更或 CLI 状态；有无关改动先保护说明。普通 Git 路径只暂存本次明确列出的记忆文件，检查暂存 diff 和常见凭据模式，只报告检查结果、不回显匹配秘密；不暂存代码项目或整盘目录。正常提交、推送、核对远端提交和剩余改动；远端先更新则安全拉取，冲突保留双方让我选择，不 hard reset、不强推。CLI 路径用实际 backup sync/status，不另加 Git 推送这份工作区。
-
-最后实际回读指定项目 STATUS/log 和首份交接，准确报告已完成与未验证内容。为全新 Agent/第二设备生成一段完整接续提示词，填好真实私人仓库 URL、项目 slug 和建议的新目录，不让我拼变量；要求它核对官方登录和 PRIVATE、只克隆这份记忆库到全新目录、按 AGENT-README 读快照及更新交接、引用具体文件复述阻塞与下一步，再等我确认继续工作，结束后追加带 follows 的新交接并正常同步。未经我明确授权不向其他线程发送它。文件链或 CLI 成功不能冒称两个真实模型 Agent 的审批和接续已经通过。现在先展示拟使用的目录与唯一真实项目读取范围，等我确认后再读；任何建库与写入都必须在摘要预览及精确目标确认后。
+7. 实际回读各项目摘要、初始日志和首份交接，核对私人目标、远端提交及剩余改动。遇错误先诊断安全修复，冲突保留双方，不强推、不 hard reset、不删库重来。报告完成、失败和未验证项。最后生成填好精确仓库 URL、项目 slug 清单及建议新目录的一段接入提示词，包含官方登录、克隆、读取、接续和正常同步，不让我拼变量。用户已指定后续任务则直接接续，没有任务再简短询问；不要强制先做合成项目或双 Agent 验收。只有实际发生的理解、写回和远端回读才能称成功。现在执行环境检查；若项目尚未指定，先给短候选清单。
 ```
 
-改写参考与 MIT 许可见 [README](README.md#来源与许可)。
+[接入现有库](ADD_DEVICE.md) · [使用顺序](USER_TEST.md) · [来源与许可](README.md#来源与许可)
