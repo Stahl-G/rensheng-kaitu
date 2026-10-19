@@ -1,7 +1,10 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import {
   history,
   initWorkspace,
@@ -97,6 +100,94 @@ it("外部改动自动生成版本，接口写入不会被监听器重复保存"
   await expect.poll(async () => (await history(ws)).length, { timeout: 15000 }).toBe(before + 3);
   await new Promise((resolve) => setTimeout(resolve, 300));
   expect((await history(ws)).length).toBe(before + 3);
+
+  const cloud = mkdtempSync(join(tmpdir(), "kaitu-ui-cloud-"));
+  cleanup.unshift(async () => rmSync(cloud, { recursive: true, force: true }));
+  const migrated = await fetch(`${ui.url}/api/sync/enable`, {
+    method: "POST",
+    headers: { "X-Kaitu": "1", Origin: ui.url },
+    body: JSON.stringify({ mode: "drive", dir: cloud }),
+  });
+  expect(migrated.status).toBe(200);
+  const statusFile = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
+  expect(relative(ws.root, statusFile).startsWith("..")).toBe(true);
+  const bin = join(cloud, "fake-bin");
+  mkdirSync(bin);
+  const ghState = join(cloud, "fake-gh.json");
+  writeFileSync(
+    ghState,
+    JSON.stringify({
+      authenticated: true,
+      repo: "synthetic/external-state",
+      private: true,
+      head: null,
+      sequence: 0,
+      trees: {},
+      commits: {},
+    }),
+  );
+  writeFileSync(
+    join(bin, "gh"),
+    `#!${process.execPath}\nimport ${JSON.stringify(fileURLToPath(new URL("../../core/test/fixtures/github-cli.mjs", import.meta.url)))};\n`,
+    { mode: 0o755 },
+  );
+  const status = async () =>
+    (
+      await fetch(`${ui.url}/api/product/workspaceBackup`, {
+        method: "POST",
+        headers: { "X-Kaitu": "1", Origin: ui.url },
+        body: JSON.stringify(["status"]),
+      })
+    ).json();
+  expect((await status()).connection).toBeNull();
+  const stream = await fetch(`${ui.url}/api/events`);
+  if (!stream.body) throw new Error("Missing SSE response body");
+  const reader = stream.body.getReader();
+  let events = 0;
+  const pump = (async () => {
+    while (!(await reader.read()).done) events++;
+  })();
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const text of [true, false]) {
+      const beforeEvents = events;
+      await promisify(execFile)(
+        process.execPath,
+        [
+          fileURLToPath(new URL("../dist/main.js", import.meta.url)),
+          "backup",
+          "connect",
+          "synthetic/external-state",
+          "--via",
+          "gh",
+          text ? "--text" : "--no-text",
+          "--no-records",
+          "--dir",
+          ws.root,
+        ],
+        { env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, KAITU_TEST_GH_STATE: ghState } },
+      );
+      await expect.poll(() => events).toBeGreaterThan(beforeEvents);
+      await expect
+        .poll(status)
+        .toMatchObject({ connection: { repo: "synthetic/external-state", text, records: false } });
+    }
+    // Atomic replacement must keep working after the original inode has gone.
+    for (const error of ["replacement A", "replacement B"]) {
+      const value = JSON.parse(ws.readText(".kaitu/workspace-backup.json", { internal: true }));
+      writeFileSync(`${statusFile}.tmp`, JSON.stringify({ ...value, error }));
+      renameSync(`${statusFile}.tmp`, statusFile);
+      await expect.poll(status).toMatchObject({ error });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const settled = events;
+    for (let i = 0; i < 3; i++) await status();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(events).toBe(settled);
+  } finally {
+    await reader.cancel();
+    await pump;
+  }
 });
 
 it("图片接口只返回有记录的照片，拒绝任意路径和 ..", async () => {

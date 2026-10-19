@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
+import { type FSWatcher, existsSync, readFileSync, unwatchFile, watch, watchFile } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
-import { extname, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
@@ -298,6 +298,42 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   }
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
+  let stopBackupWatching = () => {};
+  function watchBackupState() {
+    stopBackupWatching();
+    stopBackupWatching = () => {};
+    const file = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
+    const path = relative(ws.root, file);
+    if (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path)) return;
+    let stopped = false;
+    let directoryWatcher: FSWatcher | undefined;
+    const changed = () => {
+      if (closed || stopped) return;
+      invalidateWorkspaceBackup(ws);
+      notify();
+    };
+    const fallback = () => {
+      if (closed || stopped) return;
+      directoryWatcher?.close();
+      directoryWatcher = undefined;
+      // Only this local state file is polled when directory events are unavailable.
+      watchFile(file, { persistent: false, interval: 1000 }, changed);
+    };
+    stopBackupWatching = () => {
+      stopped = true;
+      directoryWatcher?.close();
+      unwatchFile(file, changed);
+    };
+    try {
+      // Watch the directory, not the inode: CLI writes replace the file atomically.
+      directoryWatcher = watch(dirname(file), (_event, filename) => {
+        if (filename === null || filename.toString() === basename(file)) changed();
+      });
+      directoryWatcher.on("error", fallback);
+    } catch {
+      fallback();
+    }
+  }
   const startPolling = () => {
     watcher?.close();
     if (polling) return;
@@ -324,6 +360,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     polling = setTimeout(poll, delay);
   };
   function startWatching() {
+    watchBackupState();
     watcher?.close();
     clearTimeout(polling);
     polling = undefined;
@@ -479,7 +516,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
-        if (productMutations.has(method)) notify();
+        const backupRead =
+          method === "workspaceBackup" &&
+          ["status", "preview", "prompts", "gh-status"].includes(String(args[0]));
+        if (productMutations.has(method) && !backupRead) notify();
         if (
           method === "openAi" &&
           draftId &&
@@ -726,6 +766,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     closed = true;
     cancelGithubCliLogin();
     watcher?.close();
+    stopBackupWatching();
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
@@ -754,6 +795,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    stopBackupWatching();
     stopBackup();
     stopOrganizer();
     stopPhone();
