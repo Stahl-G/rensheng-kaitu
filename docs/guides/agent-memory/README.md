@@ -1,12 +1,16 @@
 # 开图开发者记忆：先用提示词
 
-把 [INSTALL.md](INSTALL.md) 的完整复制区发给一个能操作文件、Git 和官方 gh 的 Agent。只选一个项目，确认私有仓库名和文字摘要范围，再允许创建与上传。完成后把它填好实际仓库地址的 [第二设备提示词](ADD_DEVICE.md) 发给另一台设备或全新 Agent。
+复制下面一段给能操作文件和终端的 Agent 即可，完整步骤由它读取并执行。也可打开 [单独复制页](COPY_TO_YOUR_AGENT.md)。
+
+```text
+请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/72b3a1376a9387b32369a1bb822d2f1c93023f76/docs/guides/agent-memory/INSTALL.md 及同目录 USER_TEST.md，作为第一个 Codex 帮我初始化一次开图测试记忆。本轮只用一个全新合成项目，不接真实工作区；先确认新目录、私库名和文字范围。优先复用可用的 kaitu／pnpm kaitu，没有就用普通 Git 和官方 gh，不要求 App 或新运行时。保留已有文件和旧库，登录及权限由我正常确认。完成后回读项目与首份交接，核对同步，生成填好地址和项目编号的接入提示词，供其他 Agent 各自独立克隆、串行接续；未验证的结果如实说明。
+```
+
+只由第一个 Codex 初始化一次；其他 Agent 复制 [短接入入口](COPY_TO_NEXT_AGENT.md)，各自独立克隆、串行接续。具体合成项目与检查项见 [用户亲测顺序](USER_TEST.md)。
 
 开图 App、kaitu CLI、特定操作系统、Node、Python、MCP 和后台服务均不是独立模板路径的安装条件。Git/gh 缺失时，由 Agent 说明官方来源，经用户确认后处理；不安装自制 runtime。GitHub 登录只由用户在官方页面/设备流程完成。
 
 已有源码环境则优先复用实际可用入口：先核 `kaitu --help` 或仓库根 `pnpm kaitu --help`；已有编译产物时也可核 `pnpm --dir packages/cli exec node dist/main.js --help`。只使用返回正确帮助的入口，不猜 npm/npx 已发布，不增加另一套 CLI，不自动安装依赖、改锁文件或全局配置。后者依赖用户已经具备的源码工具链；没有它时直接走普通文件＋Git 路径。
-
-本机 2026-10-19 检查：两个仓库根 package.json 均无 `kaitu` script；`pnpm kaitu --help` 实际落到 `~/.local/bin/kaitu`，错误是缺失 `rensheng-kaitu-runtime/packages/cli/dist/main.js`。直接源码入口 `pnpm --dir packages/cli exec node dist/main.js --help` 可用。没有修改该全局包装器；用户更新后应重新探测，不能根据旧检查假称已修复。
 
 ## 同一份资料
 
