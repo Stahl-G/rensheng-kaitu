@@ -1,0 +1,81 @@
+{
+  "mode": "cli",
+  "at": "2026-10-19T18:41:11.690Z",
+  "repo": "/tmp/kaitu-v2-pr58",
+  "base": "/tmp/kaitu-v2-run-fxsyHn",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "cli-search-first",
+      "ms": 955.5203820000002,
+      "maxEventLoopGapMs": 7.622196000000258
+    },
+    {
+      "name": "cli-search-indexed",
+      "ms": 776.6844580000002,
+      "maxEventLoopGapMs": 8.802503999999772
+    },
+    {
+      "name": "cli-phone-run-first",
+      "ms": 960.2119669999997,
+      "maxEventLoopGapMs": 8.035208000000239
+    },
+    {
+      "name": "cli-phone-run-repeat",
+      "ms": 945.2968259999998,
+      "maxEventLoopGapMs": 8.151832999999897
+    }
+  ],
+  "head": "46b91c2aa73272c49df7f88f62e556f5f784d4a1",
+  "productPatch": "",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "searchFirst": [
+    {
+      "id": "01M5AQ4TW0DP91VGJT2AHBRVY5",
+      "title": "合成对话 999",
+      "date": "2026-10-19T18:35:23.932Z",
+      "file": "chats/2026/10/01M5AQ4TW0DP91VGJT2AHBRVY5.jsonl",
+      "snippet": "合成对话 999 合成检索标记 999 合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合…"
+    }
+  ],
+  "searchWarm": [
+    {
+      "id": "01M5AQ4TW0DP91VGJT2AHBRVY5",
+      "title": "合成对话 999",
+      "date": "2026-10-19T18:35:23.932Z",
+      "file": "chats/2026/10/01M5AQ4TW0DP91VGJT2AHBRVY5.jsonl",
+      "snippet": "合成对话 999 合成检索标记 999 合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合…"
+    }
+  ],
+  "phone": {
+    "inbox": {
+      "processed": [],
+      "notes": [],
+      "pending": []
+    },
+    "snapshots": 5,
+    "receipts": []
+  },
+  "phoneSchemas": {
+    "today": {
+      "bytes": 19864,
+      "valid": true
+    },
+    "week": {
+      "bytes": 302802,
+      "valid": true
+    },
+    "map": {
+      "bytes": 64189,
+      "valid": true
+    },
+    "library": {
+      "bytes": 144074,
+      "valid": true
+    }
+  }
+}

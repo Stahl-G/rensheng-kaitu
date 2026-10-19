@@ -1,0 +1,81 @@
+{
+  "mode": "cli",
+  "at": "2026-10-19T18:44:51.705Z",
+  "repo": "/tmp/kaitu-v2-pr59",
+  "base": "/tmp/kaitu-v2-run-31VZ3B",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "cli-search-first",
+      "ms": 1085.033677,
+      "maxEventLoopGapMs": 8.143612999999732
+    },
+    {
+      "name": "cli-search-indexed",
+      "ms": 880.2290750000002,
+      "maxEventLoopGapMs": 8.537867000000006
+    },
+    {
+      "name": "cli-phone-run-first",
+      "ms": 941.603967,
+      "maxEventLoopGapMs": 6.458177000000433
+    },
+    {
+      "name": "cli-phone-run-repeat",
+      "ms": 1005.3195810000007,
+      "maxEventLoopGapMs": 8.058384999999362
+    }
+  ],
+  "head": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+  "productPatch": "diff --git a/packages/core/src/health-page.ts b/packages/core/src/health-page.ts\nindex d2c9d7c..47e47b3 100644\n--- a/packages/core/src/health-page.ts\n+++ b/packages/core/src/health-page.ts\n@@ -66,6 +66,13 @@ export function readHealthPage(ws: Workspace, now = new Date()) {\n   const month = data.today.slice(0, 7);\n   const previousMonth = offset(`${month}-01`, -1).slice(0, 7);\n   const monday = offset(data.today, -(new Date(`${data.today}T12:00:00Z`).getUTCDay() + 6) % 7);\n+  // 训练页只投影上月、本月、近 30 天及热力图。先折叠完整记录修订，再筛掉这些视图用不到的历史训练，\n+  // 避免为多年前的每一组训练换算时区、分组并构造 exercises。UTC 粗筛留足所有时区的偏移。\n+  const trainingFrom = [from, `${previousMonth}-01`, offset(monday, -28)].sort()[0] as string;\n+  const trainingEarliest = Date.parse(`${trainingFrom}T00:00:00Z`) - 14 * 3600000;\n+  const workouts = records(\"workout\").filter(\n+    (row) => Date.parse(row.ts) >= trainingEarliest && day(row.ts) >= trainingFrom,\n+  );\n   const cloud = cloudWorkouts(ws);\n   const recorder = (row: StoredRecord) => {\n     if (row.by === \"user\") return \"你\";\n@@ -79,7 +86,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {\n     if (row.by === \"agent\") return \"本机 Agent\";\n     return row.by === \"import:apple-health\" ? \"Apple 健康导入\" : \"导入记录\";\n   };\n-  const sessions = workoutSessions(records(\"workout\"), data.timeZone).map((rows) => {\n+  const sessions = workoutSessions(workouts, data.timeZone).map((rows) => {\n     const first = rows[0] as StoredRecord;\n     const durations = rows.flatMap((r) => (typeof r.duration_min === \"number\" ? [r.duration_min] : []));\n     const reps = rows\ndiff --git a/packages/dsh-plugin/src/client/OverviewPage.tsx b/packages/dsh-plugin/src/client/OverviewPage.tsx\nindex f3bebaf..65dd26f 100644\n--- a/packages/dsh-plugin/src/client/OverviewPage.tsx\n+++ b/packages/dsh-plugin/src/client/OverviewPage.tsx\n@@ -134,6 +134,8 @@ function Overview({\n   const [theme, setTheme] = useState(\"light\");\n   const account = useRef<HTMLDivElement>(null);\n   const sequence = useRef(0);\n+  const writing = useRef(false);\n+  const refreshPending = useRef(false);\n   const refresh = useCallback(async () => {\n     if (!locale) return;\n     const seq = ++sequence.current;\n@@ -166,7 +168,15 @@ function Overview({\n       sequence.current++;\n     };\n   }, [refresh]);\n-  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);\n+  useEffect(\n+    () =>\n+      props.subscribe?.(() => {\n+        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。\n+        if (writing.current) refreshPending.current = true;\n+        else void refresh();\n+      }),\n+    [props.subscribe, refresh],\n+  );\n   // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。\n   useEffect(() => {\n     if (view !== \"records\") return;\n@@ -221,15 +231,23 @@ function Overview({\n     };\n   }, [menu]);\n   const run = async (operation: () => Promise<unknown>) => {\n+    writing.current = true;\n     setBusy(true);\n     setError(\"\");\n     try {\n       await operation();\n+      // 到这里之前的通知已被本次读取覆盖；读取期间的新变化仍要补读，不能丢外部编辑。\n+      refreshPending.current = false;\n       await refresh();\n     } catch (err) {\n       setError(err instanceof Error ? err.message : String(err));\n     } finally {\n+      writing.current = false;\n       setBusy(false);\n+      if (refreshPending.current) {\n+        refreshPending.current = false;\n+        void refresh();\n+      }\n     }\n   };\n   const openRecord = (id: string) => {\n",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "searchFirst": [
+    {
+      "id": "01M5AQ4TW0DP91VGJT2AHBRVY5",
+      "title": "合成对话 999",
+      "date": "2026-10-19T18:35:23.932Z",
+      "file": "chats/2026/10/01M5AQ4TW0DP91VGJT2AHBRVY5.jsonl",
+      "snippet": "合成对话 999 合成检索标记 999 合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合…"
+    }
+  ],
+  "searchWarm": [
+    {
+      "id": "01M5AQ4TW0DP91VGJT2AHBRVY5",
+      "title": "合成对话 999",
+      "date": "2026-10-19T18:35:23.932Z",
+      "file": "chats/2026/10/01M5AQ4TW0DP91VGJT2AHBRVY5.jsonl",
+      "snippet": "合成对话 999 合成检索标记 999 合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合成对话正文。合…"
+    }
+  ],
+  "phone": {
+    "inbox": {
+      "processed": [],
+      "notes": [],
+      "pending": []
+    },
+    "snapshots": 5,
+    "receipts": []
+  },
+  "phoneSchemas": {
+    "today": {
+      "bytes": 19864,
+      "valid": true
+    },
+    "week": {
+      "bytes": 302802,
+      "valid": true
+    },
+    "map": {
+      "bytes": 64189,
+      "valid": true
+    },
+    "library": {
+      "bytes": 144074,
+      "valid": true
+    }
+  }
+}

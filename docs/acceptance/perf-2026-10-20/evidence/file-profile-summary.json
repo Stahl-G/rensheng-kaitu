@@ -1,0 +1,215 @@
+{
+  "sampledMs": 1705.51,
+  "inclusive": [
+    {
+      "function": "(root)",
+      "file": "",
+      "line": 0,
+      "ms": 1705.51,
+      "percent": 100.0
+    },
+    {
+      "function": "",
+      "file": "recursive_watch",
+      "line": 187,
+      "ms": 1055.541,
+      "percent": 61.89
+    },
+    {
+      "function": "emit",
+      "file": "node:events",
+      "line": 456,
+      "ms": 1055.541,
+      "percent": 61.89
+    },
+    {
+      "function": "FSWatcher._handle.onchange",
+      "file": "watchers",
+      "line": 258,
+      "ms": 1055.541,
+      "percent": 61.89
+    },
+    {
+      "function": "#watchFolder",
+      "file": "recursive_watch",
+      "line": 121,
+      "ms": 830.836,
+      "percent": 48.71
+    },
+    {
+      "function": "join",
+      "file": "node:path",
+      "line": 1332,
+      "ms": 477.456,
+      "percent": 27.99
+    },
+    {
+      "function": "runMicrotasks",
+      "file": "",
+      "line": 0,
+      "ms": 369.186,
+      "percent": 21.65
+    },
+    {
+      "function": "runNextTicks",
+      "file": "task_queues",
+      "line": 63,
+      "ms": 323.632,
+      "percent": 18.98
+    },
+    {
+      "function": "processTimers",
+      "file": "timers",
+      "line": 556,
+      "ms": 323.632,
+      "percent": 18.98
+    },
+    {
+      "function": "",
+      "file": "server.js",
+      "line": 225,
+      "ms": 323.632,
+      "percent": 18.98
+    },
+    {
+      "function": "refreshOverview",
+      "file": "overview.js",
+      "line": 156,
+      "ms": 322.573,
+      "percent": 18.91
+    },
+    {
+      "function": "readStatus",
+      "file": "status.js",
+      "line": 28,
+      "ms": 321.455,
+      "percent": 18.85
+    },
+    {
+      "function": "readWorkbench",
+      "file": "workbench.js",
+      "line": 69,
+      "ms": 313.313,
+      "percent": 18.37
+    },
+    {
+      "function": "read",
+      "file": "workbench.js",
+      "line": 74,
+      "ms": 248.297,
+      "percent": 14.56
+    },
+    {
+      "function": "stat",
+      "file": "",
+      "line": 0,
+      "ms": 246.388,
+      "percent": 14.45
+    },
+    {
+      "function": "relative",
+      "file": "node:path",
+      "line": 1356,
+      "ms": 237.572,
+      "percent": 13.93
+    },
+    {
+      "function": "listOnTimeout",
+      "file": "timers",
+      "line": 576,
+      "ms": 222.849,
+      "percent": 13.07
+    },
+    {
+      "function": "resolve",
+      "file": "node:path",
+      "line": 1245,
+      "ms": 163.985,
+      "percent": 9.62
+    },
+    {
+      "function": "",
+      "file": "workbench.js",
+      "line": 101,
+      "ms": 132.521,
+      "percent": 7.77
+    },
+    {
+      "function": "listProjects",
+      "file": "projects.js",
+      "line": 154,
+      "ms": 132.521,
+      "percent": 7.77
+    },
+    {
+      "function": "existsSync",
+      "file": "",
+      "line": 0,
+      "ms": 131.665,
+      "percent": 7.72
+    },
+    {
+      "function": "existsSync",
+      "file": "node:fs",
+      "line": 281,
+      "ms": 131.665,
+      "percent": 7.72
+    },
+    {
+      "function": "(garbage collector)",
+      "file": "",
+      "line": 0,
+      "ms": 131.199,
+      "percent": 7.69
+    },
+    {
+      "function": "",
+      "file": "projects.js",
+      "line": 172,
+      "ms": 127.121,
+      "percent": 7.45
+    },
+    {
+      "function": "statSync",
+      "file": "node:fs",
+      "line": 1794,
+      "ms": 124.466,
+      "percent": 7.3
+    },
+    {
+      "function": "exists",
+      "file": "workspace.js",
+      "line": 133,
+      "ms": 117.394,
+      "percent": 6.88
+    },
+    {
+      "function": "",
+      "file": "measure.mjs",
+      "line": 253,
+      "ms": 99.142,
+      "percent": 5.81
+    },
+    {
+      "function": "",
+      "file": "measure.mjs",
+      "line": 256,
+      "ms": 99.142,
+      "percent": 5.81
+    },
+    {
+      "function": "post",
+      "file": "measure.mjs",
+      "line": 256,
+      "ms": 99.142,
+      "percent": 5.81
+    },
+    {
+      "function": "post",
+      "file": "node:inspector",
+      "line": 115,
+      "ms": 99.142,
+      "percent": 5.81
+    }
+  ]
+}
