@@ -12,7 +12,9 @@
 | 1 | ui-watching 的 startup 等待 | 失败发生在等待首个后台版本的 poll 截止前，未执行到改写断言；单独运行通过。原用例还伪造 ctime。删除单独伪造 stat 的用例，将真实同长度且保留 mtime 的外部编辑合入已有监听/保存/删除用例，保留原超时、保存与敏感状态断言 |
 | 1 | feishu | 两层问题：原 Unix shebang 夹具 Windows ENOENT；产品直接 execFile 启动 npm `.cmd` 也 EINVAL，是实际兼容缺陷。复用已有安全 npm shim 解析，按 PATH 找入口后直接运行 Node，不引入 shell；替换无效夹具，保留导入、去重和更新原文的一个业务用例 |
 
-没有以删除安全断言、提高超时或新增 skip 来得到通过结果。ui-watching 从三个用例合并为两个；清理 history 测试中已无引用的 stat/mtime 及失效函数 import。
+没有删除安全断言、提高超时或新增 skip。ui-watching 最终从三个用例合并为一个真实流程：启动前写入、持续编辑中自动存版本、同长度且保留 mtime 的最终原文读回、退出保存删除、敏感状态不入历史。删除精确版本数量的短 poll 和伪造 ctime 夹具；清理 history 测试中已无引用的 stat/mtime 及失效函数 import。
+
+平台行为核对：[Node 官方 child_process 文档](https://nodejs.org/download/release/v22.23.3/docs/api/child_process.html)说明 Windows 的 `.cmd` 不能直接用 execFile 执行；[Microsoft CreateSymbolicLink 文档](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createsymboliclinka)说明符号链接创建的权限条件。本次分别用合成 CLI 与失败栈实证，没有调整系统权限。
 
 ## 性能证据
 
@@ -30,6 +32,8 @@
 
 同一机器、相同往返断言的隔离因果实验：仅暂时推迟派生摘要刷新到恢复结束，恢复 1,023ms；随后原逻辑对照恢复 10,786ms。两次的备份、恢复、往返、原文及重复同步断言全通过。实验不进入产品，不改安全检查；正式修复直接删除低层刷新调用，不保留临时抑制开关。
 
+正式修复重新构建后，不启用任何诊断抑制开关，同一脚本的恢复为 **932ms**、普通资料准备写入为 **7ms**（原 515ms）；全部往返、原文和去重断言通过。日志 `backup-fixed.log`。
+
 原始日志及 CPU profile 在 `.kaitu/rc6/diagnosis/`：`profile-backup.log`、`backup-control.log`、`backup-deferred.log`、`backup.cpuprofile`、`profile-adopt.log`。飞书合成复现 `feishu.log` 确认：extensionless ENOENT、npm `.cmd` EINVAL、原产品调用 FEISHU 错误、已有安全解析器成功。
 
 ## 提交与检查
@@ -40,5 +44,6 @@
 - 备份与监听定向：8 项通过，39.05 秒，原断言与默认超时不变。
 - 飞书与本机 Agent 定向：9 项通过，11.16 秒。
 - developer-memory 和 history 在首轮修复定向中通过；完整修复后的 build、lint、typecheck 和全量检查进行中。
+- 首轮完整复跑：262 通过 / 8 失败 / 7 原有跳过，381.46 秒；三个原性能超时与飞书失败消失，剩七项 EPERM 与一个版本数 poll。随后将监听三个用例进一步合成一个真实操作流程，单独通过（7.03 秒）；最后完整复跑进行中，不隐去首轮失败。
 
 当前已安装包仍是前一份 rc.6/main 基线，不能冒称包含这些后续修复。新包及安装验证完成后再更新。没有正式 Release、官网部署或合并；Computer Use 初始化阻碍及真实 Agent 未验的边界不变。
