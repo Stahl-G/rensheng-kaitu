@@ -1,0 +1,197 @@
+{
+  "baselineSha": "62a28fca521a62e4b587f3e8e18bc58d5c4c11ff",
+  "checkedSourceSha": "a8b64f66d2e9bab30489163c67afc06921d5d32a",
+  "functionalSourceSha": "c9f1c5a8da83aeb4a40e3c23dd0c13b0c0733e80",
+  "version": "0.1.0-rc.6",
+  "installerRevision": 2,
+  "dshVersion": "0.2.1-rc.2",
+  "electronVersion": "44.7.0",
+  "platform": "win32",
+  "arch": "x64",
+  "signed": false,
+  "installer": "D:\\test\\rensheng-kaitu-windows-night-1019\\dist\\windows-rc6-fix\\Kaitu-Setup-0.1.0-rc.6-windows.2-x64.exe",
+  "bytes": 300077183,
+  "sha256": "4cfaedcce5515423d172d21d996de56a0c2061e82d02db4869a8d3e01621f5fe",
+  "installerExitCode": 0,
+  "installedFiles": [
+    {
+      "path": "Kaitu.exe",
+      "sha256": "bcddbcfb92eb532553365f91af7a8ee235f0f053c4bab56d35b2b6364031af0b",
+      "matches": true
+    },
+    {
+      "path": "resources/app.asar",
+      "sha256": "464f0ab1e6b1a35216d9998a5657295a248537a1689dc767740a7c28788e3efa",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu-loader.mjs",
+      "sha256": "5578bb069de2dc379c18312d6663da179b46ea95e93bef1388aa2a4a52192cf1",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/payload.json",
+      "sha256": "1400a2e57c310793884150487aa26fd86637f4afb06ab5c34b98a7d5aa5173b0",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/dist/local.mjs",
+      "sha256": "e6c2673fb3925d0cae3144554106d0dc8f727748227ba866be74099b1039ec91",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/dist/index.js",
+      "sha256": "e1df6f024cb77c83fe5dc18d6978a990764ab4fb0e92e2847020f35e6fe27cc2",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/dist/client.js",
+      "sha256": "48b58770727da09cb4c896e4f24f4e4f81983a745af8913c9b59796f6a581887",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/dist/cli.mjs",
+      "sha256": "9f1b9260537eb931fd9afcc2c37f0898f8a095fbc6b9a50af357e4d4dda7358d",
+      "matches": true
+    },
+    {
+      "path": "resources/kaitu/web/index.html",
+      "sha256": "9f80780a3a3711091adbc443c184600780827f0390923795e43245f0f5eb0bd4",
+      "matches": true
+    }
+  ],
+  "checks": {
+    "build": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "fullPassed": 262,
+    "fullFailed": 7,
+    "existingSkipped": 7,
+    "testTotal": 276,
+    "durationSeconds": 441.75,
+    "remainingFailures": "EPERM creating synthetic symlink fixtures; subsequent security assertions unverified",
+    "watcherCasesBefore": 3,
+    "watcherCasesAfter": 1,
+    "addedSkips": 0,
+    "timeoutsRaised": false
+  },
+  "benchmark": {
+    "controlRestoreMs": 10786,
+    "profiledOriginalRestoreMs": 13564,
+    "fixedRestoreMs": 932,
+    "originalPrepareMs": 515,
+    "fixedPrepareMs": 7,
+    "originalStatCalls": 109056,
+    "fixedStatCalls": 5128,
+    "writesBefore": 122,
+    "writesAfter": 122,
+    "roundtripAndIdempotencePassed": true
+  },
+  "installedSmoke": {
+    "exe": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\安装 测试\\Installed Kaitu\\Kaitu.exe",
+    "root": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\rc6\\RC6 精简修复验收\\中文 空格 工作区",
+    "scope": "Installed EXE + HTTP and process lifecycle only; native GUI remains unverified",
+    "checks": [
+      {
+        "name": "process-started",
+        "pid": 28120,
+        "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\rc6\\RC6 精简修复验收\\中文 空格 工作区",
+        "base": "http://127.0.0.1:51267"
+      },
+      {
+        "name": "installed-feature-version",
+        "version": "0.1.0-rc.6"
+      },
+      {
+        "name": "fresh-profile-has-no-credentials"
+      },
+      {
+        "name": "page-api-overview"
+      },
+      {
+        "name": "page-api-health"
+      },
+      {
+        "name": "page-api-projects"
+      },
+      {
+        "name": "page-api-library"
+      },
+      {
+        "name": "page-api-doing"
+      },
+      {
+        "name": "capture-saved",
+        "path": "inbox/notes/2026-10-19/01m5a785j4gbh7vjx62kmjq8w7.md"
+      },
+      {
+        "name": "project-create-read",
+        "slug": "windows"
+      },
+      {
+        "name": "missing-local-agent-error"
+      },
+      {
+        "name": "synthetic-acp-first-connect-failure"
+      },
+      {
+        "name": "synthetic-acp-retry"
+      },
+      {
+        "name": "synthetic-acp-switch-keeps-thread",
+        "thread": "session-fbee6efe-0009-4bce-80b3-bbbb53297511"
+      },
+      {
+        "name": "process-started",
+        "pid": 21072,
+        "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\rc6\\RC6 精简修复验收\\中文 空格 工作区",
+        "base": "http://127.0.0.1:54800"
+      },
+      {
+        "name": "process-restart-record-and-synthetic-session-readback"
+      },
+      {
+        "name": "process-started",
+        "pid": 10276,
+        "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\rc6\\RC6 精简修复验收\\旧版 RC4 工作区",
+        "base": "http://127.0.0.1:56727"
+      },
+      {
+        "name": "rc4-workspace-open-and-upgrade-retains-note"
+      },
+      {
+        "name": "process-started",
+        "pid": 28580,
+        "workspace": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\最终1021 合成\\中文 空格 工作区",
+        "base": "http://127.0.0.1:61803"
+      },
+      {
+        "name": "rc5-synthetic-workspace-upgrade-keeps-original"
+      }
+    ],
+    "passed": true
+  },
+  "packagedCliFeishu": {
+    "exe": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\night\\安装 测试\\Installed Kaitu\\Kaitu.exe",
+    "root": "D:\\test\\rensheng-kaitu-windows-night-1019\\.kaitu\\rc6\\diagnosis\\packaged-cli-1792418341642\\中文 CLI 资料",
+    "scope": "Actual installed EXE running its packaged CLI; synthetic npm shim and synthetic documents only",
+    "first": {
+      "documents": 1,
+      "imported": 1
+    },
+    "repeat": {
+      "imported": 0,
+      "unchanged": 1
+    },
+    "passed": true
+  },
+  "nativeGuiVerified": false,
+  "realAgentVerified": false,
+  "realFeishuServiceVerified": false,
+  "screenshots": [],
+  "independentReviewPending": true,
+  "releaseCreated": false,
+  "websiteDeployed": false,
+  "realWorkspaceUsed": false,
+  "systemSecurityChanged": false
+}
