@@ -1,7 +1,7 @@
 # 学习主题与 OpenMAIC 薄接入
 
 基线：main `e2d9cd83a176bf2fc6b35bc1dabe7f92f32bc9d6`。分支：`codex/learning-openmaic`。
-验证日期：2026-10-19 UTC。仅合成资料；未安装到用户正在运行的开图或 DSH，未调用真实模型。
+验证日期：2026-10-19 UTC。仅合成资料；未安装到用户正在运行的开图或 DSH。已补真实 DSH SDK、真实 ACP CLI 与一次本机 Qwen 流程，具体范围见末节。
 
 ## 实现范围
 
@@ -74,7 +74,7 @@
 
 “外部 API 服务商”仍走内置 DSH；“外部 ACP Agent”是不同运行时，不应混称。
 源码依据：`packages/dsh-plugin/src/tools.ts`、`learning-tools.ts`、`client/index.tsx`、`packages/desktop/sdk-runtime.mjs`、`packages/cli/runtime/service.mjs`、`local-agents/runtime.ts`、`mcp/server.ts`。
-以上模式说明来自源码与合成运行；没有使用用户付费账号测试真实模型、真实 ACP CLI 或用户 DSH 安装。真实模型教学质量和自动写回仍是验收缺口。
+以上模式边界来自源码和运行验证。真实 DSH / ACP 补验见末节；未使用用户付费账号或用户正在运行的 DSH 安装，教学质量仍需用户体验。
 
 ## 可复现的独立合成验收
 
@@ -106,3 +106,27 @@ node scripts/learning-smoke.mjs --check
 ![原生适配器相同文字重新注入](learning-openmaic/native-repeat-draft.jpg)
 
 ![独立问问同主题二次接续](learning-openmaic/repeat-draft.jpg)
+
+## 真实运行时补验（2026-10-19 UTC）
+
+- 内置 DSH：使用仓库自带 Node 版 0.2.1-rc.2 引擎、实际 SDK 插件和真实工具执行，以本机受控 OpenAI HTTP 响应提供固定工具请求。read → card/widget → save → 关闭并重开 Ask/UI → read 通过，共 10 个本机 HTTP 请求。不是直接注入 Ask 事件，也不算模型教学质量验收。浏览器从保存的会话重开小测，错答有提示、正确答案有反馈；模拟调到第 3 期显示 133.10 元。资料页读回相同理解、问题、下一步，再点接续可填入草稿。
+- 外部 ACP：实际安装的 claude-agent-acp 0.55.0，独立 HOME / CLAUDE_CONFIG_DIR、明确列出的环境变量和本机受控 Anthropic HTTP 响应。通过实际 Kaitu MCP read_file 和 Claude 自有 Read / Write 保存同一 Markdown；重建 Ask/UI 后真实 session/load 可继续读取，共 14 个本机请求。无 kaitu_learning/card/widget 时使用文字反馈；没有把 DSH 卡片能力算进 ACP。首次 notes.md 尚不存在是预期空记录。
+- 这次真实 ACP 发现内容块为 `{type:"content",content:{type:"text",text}}`，原问问详情显示为空。现转换成既有平面文本块；真实 CLI 的缺文件错误已在浏览器展开可见，已有适配器测试补了对应回归。接续提示及技能说明新主题可尚无 notes.md。
+- 真实模型：Ollama 0.24.0 + 已存在的 qwen2.5:14b，无下载、无付费账号。通过真实 DSH 从合成来源提问 → 对学习者回答反馈 → 工具实际保存理解/问题/下一步 → 关闭重开后工具读回并从“连续复利为什么出现 e”接续，共 8 个本机模型端点请求。先前一次把 questions/next 写成数组、operationId 放错层，被校验拒绝且未写入；补充工具说明中的明确参数示例后重跑通过。首次大上下文耗时明显，曾在 180 秒内未完成；不能据此承诺响应速度、通用模型可靠性或 3–6 步教学质量。
+- 父线程独立 Linux 动态 QA：准确 SHA `929d7fc85ea8fe7756519b593920cce2c0357bca`、Node 24.19，完整 build 通过；来源去重 → 保存并完成旧下一步 → 服务端 200 后丢响应使客户端 fetch failed → SIGKILL → 新 PID 重启 → 回读 → 同 operationId 并发重试均 replayed:true，notes / STATUS 字节不变；同 ID 改内容返回 400 且无写入。该检查没有浏览器或真实模型，不扩大为这些路线已验收。
+
+重复运行真实运行时合成验收（构建后）：
+
+```sh
+node packages/cli/scripts/build-engine.mjs
+node scripts/learning-runtime-smoke.mjs
+node scripts/learning-acp-smoke.mjs /absolute/path/to/claude-agent-acp
+```
+
+ACP 命令只使用已安装 CLI，不安装依赖。两个脚本都使用临时合成工作区、本机固定响应、独立登录目录，不读取用户资料或登录，不产生模型推理费用。输出实际临时目录；可加 `--hold`，按最后输出的 URL 做浏览器回看，Ctrl+C 关闭。未把本机 Qwen 探索脚本纳入默认检查，避免隐式启动模型。
+
+![实际 DSH 工具结果的小测与模拟](learning-openmaic/actual-sdk-cards.jpg)
+
+![实际工具保存后从资料页回读](learning-openmaic/actual-sdk-reopen.jpg)
+
+![实际 ACP 工具错误详情可见](learning-openmaic/actual-acp-error.jpg)
