@@ -104,6 +104,13 @@ export function cliCommand(
   env: NodeJS.ProcessEnv,
   platform = process.platform,
 ): [string, ...string[]] {
+  if (platform === "win32" && !isAbsolute(bin) && !/[\\/]/.test(bin)) {
+    bin =
+      (env.PATH ?? "")
+        .split(delimiter)
+        .flatMap((dir) => [".exe", ".cmd", ".bat", ""].map((ext) => join(dir, bin + ext)))
+        .find((path) => existsSync(path) && statSync(path).isFile()) ?? bin;
+  }
   if (platform !== "win32" || !/\.(cmd|bat)$/i.test(bin)) return [bin];
   const sibling = bin.slice(0, -extname(bin).length);
   const text = existsSync(sibling) ? readFileSync(sibling, "utf8") : "";
