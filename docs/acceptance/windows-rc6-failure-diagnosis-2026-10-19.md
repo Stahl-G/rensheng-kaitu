@@ -1,8 +1,19 @@
-# RC6 十二项失败的定位与精简
+# RC6 Windows CI 两项失败与本机旧基线诊断
+
+## 以 #55 的 CI 为准
+
+用户纠正后已核对 [Windows 原始 CI 日志](https://github.com/Stahl-G/rensheng-kaitu/actions/runs/39258742103/job/118080568381)：**269 通过 / 2 失败 / 7 原有跳过**。PR #55 head 是 `7e46e0705803186b4bf9c4c5a902f2645aeb7f5a`，工作流检出合成 merge `3f3c03d70308aa20273d1d2c558e0cb0ba941335`；合入后的 main 为 `60ba38d052148d50039bced016dfb742f7585d67`。本分支已合入该 main 的 CI 工作流。
+
+后文十二项是此前 main `62a28fc` **在本机**的历史结果，不是最新 main 的 GitHub CI 结果。本机七项 symlink EPERM 也不是 hosted runner 的失败。
+
+- **问问真实 SDK 写入**：Windows 8.3 短名与长名身份不一致。`realpathSync` 保留短名，SDK 的异步 `realpath` 展开长名，路径入口误拒绝同一个工作区；相对路径计算也必须统一物理身份。在本机将现有 SDK 测试根目录改为真实短名后，修复前复现相同的 `FS_SANDBOX_DENIED`；修复后通过。原测试继续覆盖 STATUS 用户决定/Agent 建议、旧版本与取消写入，并补充越界、`.kaitu`、`.git` 拒绝断言。物理身份统一用 `realpathSync.native`，保留词法目录检查与物理链接边界。
+- **飞书 CLI**：无后缀 Unix 夹具在 Windows 无法执行，真实 npm `.cmd` 也不能直接交给 `execFile`。本分支已有安全 shim 解析与 Windows 合成夹具修复，详见下文。
+
+当前增量检查：build、lint、typecheck 通过；上述两个业务测试均通过（名称筛选未运行符号链接用例，不是新增 skip）。正在执行本机全量并提交 PR CI，未把尚未完成的 CI 写成通过。`windows.2` 包是下文旧产物，**不含本次短路径修复**；新包须另行生成并记录来源。
 
 原始安装包来源 main `62a28fca521a62e4b587f3e8e18bc58d5c4c11ff`。用户随后要求查清十二项失败、删除逐文件重算摘要、清理冗余测试。本轮在 PR #54 继续，未改真实资料、系统权限、数据格式或发布状态。
 
-## 十二项分别是什么
+## 本机旧基线十二项分别是什么
 
 | 数量 | 原失败 | 实际原因及处理 |
 |---|---|---|
