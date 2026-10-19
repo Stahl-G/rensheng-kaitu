@@ -57,3 +57,55 @@ PR58 最新 CI（head `b0b1b5a`，run `39291008801`）已终态：macOS 成功�
 - 同文件 `listLearning:124-130` 调用 `readDoing(ws).learning`，先读取 decisions 后丢弃非 learning 结果。
 - `packages/dsh-plugin/src/client/LearningPage.tsx:62-82` `loadLearning(topic)` 整个响应完成后才 setDetail，来源集越大，主题打开越慢。
 - topic 列表仍来自 notes 中 learning 项；需结合 PR58 按 section 读取后的列表路径核对，而非再次修改 LearningPage。共享通用 UI/product/service 文件存在合并冲突可能。
+
+
+## 追加实测：ZIP 内存与恢复尾段
+
+`zip-memory.mjs` 每种规模用独立真实进程和随机二进制附件，防止前一组高重复文本的压缩率掩盖内存代价。RSS 是进程及 worker 的实际采样值，采样峰值只是下界；不是仅 V8 heap，不是内存上限断言。
+
+| 合成附件 | ZIP 字节 | base64 字符 | 导出前 RSS → 采样峰值 | 总耗时 |
+| --- | ---: | ---: | ---: | ---: |
+| 16 MiB | 16,815,818 | 22,421,092 | 118,058,528 → 347,590,096 bytes | 725.21 ms |
+| 64 MiB | 67,164,219 | 89,552,292 | 167,571,144 → 789,827,168 bytes | 1903.04 ms |
+
+必要的全量读取/压缩应保留；残留是全量 entries、压缩结果、base64 和线程消息/前端转换产生的同存副本。最小后续方案：在现有 export job 中用 fflate 的 ZIP 分块接口写一个程序管理的临时 ZIP；原过滤和完整范围不变；结果保存临时文件引用，受保护下载接口用流返回，前端直接下载而非 atob/Uint8Array。取消/关闭清理该作业自己的临时文件。需要同时适配独立工作台与 DSH 的下载入口，不能只修改一个返回值就声称完成。无需持久任务库或新增缓存框架。本轮仅给证据和方案，没有改归档协议。
+
+`restore-tail.mjs` 对真实恢复的最后一份文件落盘后开始计数，范围含 writeAgentsMd、备份状态、一次 setImmediate 和最终 refreshOverview；仅统计自建工作区的应用层同步 fs 调用。
+
+| 原文 / 训练记录 | 恢复文件 | 恢复总耗时 | 尾段 / 最大主线程观察间隔 | 尾段同步 readFile / 字节 |
+| --- | ---: | ---: | ---: | ---: |
+| 200 / 1000 | 201 | 687.35 ms | 87.86 ms | 271 / 867,350 |
+| 2400 / 12000 | 2401 | 1793.24 ms | 346.72 ms | 2471 / 9,349,350 |
+
+两组尾段均 45 次 writeFileSync、150 次 readdirSync；statSync 随原文数由 1449 增至 3649。最小后续方案：复用已有 data worker 增加单次派生 overview 操作，使用目标目录的 fresh Workspace，完成后才发布 restore completed；同一目标仍不并发写派生文件，原文不迁移、不改格式，不引入派生缓存。必要汇总计算保留。本轮仍明确保留同步尾段，未把它描述为零阻塞。
+
+## 完整覆盖账本（截至本轮）
+
+| 范围 | 分类与残留 |
+| --- | --- |
+| 冷启动/首屏 | 已修：构造推迟 overview、请求独立呈现。必要迁移/安全入口保留。完整 overview 聚合仍有同步成本（PR58 大样本约 310ms），不是所有页面请求恒定耗时。 |
+| 资料列表/搜索 | 已修：导航零正文 IO、40+1 分页、单文档一次读、热搜索零正文读、首次完整索引 worker。保留完整元数据核对；SDK grep 10k 候选/250 结果明确 partial。 |
+| 目录选择 | 已核实：原生 picker、云盘账号层及顶层单层枚举；没有桌面远端账号全树选择器。首次无路径模糊候选索引仍有有界元数据建库，属于已安装 DSH 行为，未修改。 |
+| GitHub 同步/恢复 | 必要完整备份及三方冲突语义保留；进度/取消、恢复逐文件异步已修。尾段与 ZIP 协议残留见实测；PR54 与本分支共享 workspace-backup/打包文件，合并需协调。 |
+| 版本保存 | 原本后台排队，保留完整 Git 状态盘点。Windows 状态缓存遗漏已有 PR54 对应修复，本任务不复制实现或放宽版本断言。 |
+| 文件监听 | native 保留；fallback 异步逐项 metadata、防重入、完整成功后替换基线、关闭切换取消已修；进度接口可查，没有新手动暂停 UI。 |
+| 手机快照 | 已修：30 天原文窗口在读正文前筛选。完整记录修订折叠仍必要，后台快照调度保留；不改 iOS。 |
+| 图片/附件 | 已核实只读当前选中日期/附件，无进入页面预读整库图片路径；ZIP 全量附件内存另列残留。 |
+| 学习页 | 明确残留并交 PR57：来源全集正文、保存后重读、列表读入无关 decisions；精确行号见上节。未重复修改 LearningPage/core learning。 |
+| 项目同步/稿件统计 | Git 图单仓单遍、跨仓仅计数去重，并尊重各自 shallow；仅 main 同 HEAD 的浅/完整真实 clone 正反顺序均覆盖。显式稿件总字数必须读所选全集，当前同步解析与无逐文件进度仍是后续残留，未分页截断。 |
+
+此账本区分代码路径审计、合成验收和平台缺口，未声明全仓所有残留已完成。
+
+## 首轮 PR59 CI 与 PR54 对照
+
+首轮 head beeb733、run 39292316251 已终态 failure：macOS 279 通过 / 1 失败 / 2 原有跳过；Windows 271 通过 / 4 失败 / 7 原有跳过。新后台核心旅程在 macOS 通过，Windows 两条新增旅程 timeout 必须由本任务跟进，不能都归给基线。
+
+- macOS 唯一失败是 ui-watching 原有“同秒同长度恢复 mtime”用例（期望 after，读到 before）。PR54 diff 明确删除该固定 ctime 的伪造夹具，将真实外部编辑合入原监听旅程；本分支未修改该用例/版本实现，不复制 PR54 的清理。
+- Windows ask-filesystem 的 FS_SANDBOX_DENIED 与飞书 lark-cli 失败，分别对应 PR54 的 native realpath/8.3 身份修复和安全 npm shim/Windows 夹具修复；PR54 诊断文档记录了 #55 同两项 CI 失败。不是仅凭文件名相同推断。
+- PR58 前轮 workbench 版本计数失败，对应 PR54 4f08f1c 的 Workspace 写入后按路径失效 Git 状态缓存；PR59 本轮未复现，不声称已由 PR59 修复。
+- 新 fallback UI 用例的门闩比较了 sync realpath 短名与 async realpath 长名，Windows 无法进入等待点。已将合成根目录/门闩路径用 realpathSync.native 统一物理身份；不改产品权限。
+- 新核心旅程（多次索引/导出同一 150 份正文）在 Windows 超过默认总 15 秒；首轮无阶段日志，具体等待点尚未证实。正确性夹具改为 80 份较短正文，末尾命中/取消回滚/完整 ZIP 断言全部保留，新增失败阶段输出；规模证据仍用独立 600 份 / 64.9MB 脚本。此项是缩减重复正确性夹具成本，尚待新 Windows CI 确认，未提高 timeout、未改时间/Git。
+- 修正后定向 3 文件 / 11 项本机通过，9.97 秒；其中含 PR58 新的真实 clone 顺序回归。
+- GUI 现有授权下只重试一次：新建仅指向合成 localhost 的标签，菜单点击仍在 CDP 分派前超时；新按钮点击/下载验收缺口保留。合成服务器已停止并清理。
+
+PR54 对照来源：该 PR head 4cc51db6c912ab6b4f5ed0ff819c84065109c7d6 的公开 diff，以及 docs/acceptance/windows-rc6-failure-diagnosis-2026-10-19.md、windows-rc6-ci-fix-2026-10-19.md。未读取 Windows 用户机器或私人日志。

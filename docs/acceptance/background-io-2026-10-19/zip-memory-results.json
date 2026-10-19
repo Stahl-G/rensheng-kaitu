@@ -1,0 +1,29 @@
+{
+  "node": "v26.11.1",
+  "platform": "darwin/arm64",
+  "method": "Independent real processes; 1 MiB random binary files. RSS sampled every 10ms includes all worker threads; sampled peak is a lower bound. maxRSS is also retained as raw Node resourceUsage output. No pass/fail timing or memory limit.",
+  "rows": [
+    {
+      "syntheticAttachmentBytes": 16777216,
+      "zipBytes": 16815818,
+      "base64Characters": 22421092,
+      "rssBeforeBytes": 118058528,
+      "sampledPeakRssBytes": 347590096,
+      "sampledRssIncreaseBytes": 229531568,
+      "rssAfterBytes": 347590096,
+      "nodeResourceUsageMaxRSSRaw": 373184,
+      "elapsedMs": 725.21
+    },
+    {
+      "syntheticAttachmentBytes": 67108864,
+      "zipBytes": 67164219,
+      "base64Characters": 89552292,
+      "rssBeforeBytes": 167571144,
+      "sampledPeakRssBytes": 789827168,
+      "sampledRssIncreaseBytes": 622256024,
+      "rssAfterBytes": 789827168,
+      "nodeResourceUsageMaxRSSRaw": 805184,
+      "elapsedMs": 1903.04
+    }
+  ]
+}
