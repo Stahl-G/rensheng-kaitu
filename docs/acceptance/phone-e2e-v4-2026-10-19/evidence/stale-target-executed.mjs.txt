@@ -1,0 +1,32 @@
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
+import { performance } from 'node:perf_hooks';
+const repo='/workspace/rensheng-kaitu';
+const base=mkdtempSync('/tmp/kaitu-v4-withdrawal-');
+const root=join(base,'workspace');
+process.env.KAITU_LOCAL_STATE_DIR=join(base,'state');
+cpSync(join(repo,'docs/guides/agent-memory/template'),root,{recursive:true});
+const { ulid }=await import(join(repo,'packages/core/dist/ulid.js'));
+const { Workspace,readRecords }=await import(join(repo,'packages/core/dist/index.js'));
+const commands=[];
+function run(label,...args){
+const at=performance.now();const r=spawnSync(process.execPath,[join(repo,'packages/cli/dist/main.js'),...args,'--dir',root],{env:process.env,encoding:'utf8'});
+writeFileSync(join(base,label+'.log'),r.stdout+r.stderr);commands.push({label,args,ms:performance.now()-at,exit:r.status});if(r.status!==0)throw Error(r.stderr);return r.stdout;
+}
+run('init','init',root);
+const counts=[];const names={};
+const phone=()=>`ios-3fa9c1d2-${ulid()}.records.jsonl`;
+const put=(name,text)=>writeFileSync(join(root,'inbox/agents',name),text);
+const count=(stage)=>{const rows=readRecords(new Workspace(root),'task');counts.push({stage,count:rows.length,titles:rows.map(x=>x.title)});};
+names.A=phone();const a=JSON.stringify({type:'task',agent:'iPhone',origin:'user',title:'V4 withdrawal A',status:'open'})+'\n';
+put(names.A,a);run('A-added','phone','run');count('A-added');
+names.B=phone();const b=JSON.stringify({replaces:names.A,agent:'iPhone'})+'\n'+JSON.stringify({type:'task',agent:'iPhone',origin:'user',title:'V4 replacement B',status:'open'})+'\n';
+put(names.B,b);run('B-withdraws-A','phone','run');count('B-withdraws-A');
+put(names.A,a);run('A-late-replay','phone','run');count('A-late-replay');
+names.stale=phone();put(names.stale,JSON.stringify({replaces:names.A,agent:'iPhone'})+'\n'+JSON.stringify({type:'task',agent:'iPhone',origin:'user',title:'V4 stale replacement C',status:'open'})+'\n');run('stale-C-replaces-A','phone','run');count('stale-C-replaces-A');
+names.C=phone();put(names.C,JSON.stringify({replaces:names.B,agent:'iPhone'})+'\n'+JSON.stringify({type:'task',agent:'iPhone',origin:'user',title:'V4 new operation C',status:'open'})+'\n');
+run('C-new-content-replaces-B','phone','run');count('C-new-content-replaces-B');
+put(names.B,b);run('B-late-replay','phone','run');count('B-late-replay');
+const result={base,root,names,counts,commands,receipts:JSON.parse(readFileSync(join(root,'phone/receipts.json'))),ledger:JSON.parse(readFileSync(join(root,'.kaitu/inbox-records.json')))};
+writeFileSync(join(base,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

@@ -106,7 +106,7 @@ function inboxContent(file: string, text: string): InboxContent {
 
 /** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
 const RECEIPTS = ".kaitu/inbox-records.json";
-type Receipt = { agent: string; records: { type: string; id: string }[] };
+type Receipt = { agent: string; records: { type: string; id: string }[]; superseded?: true };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
   ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
 
@@ -201,7 +201,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const previous = replaces ? receipts[basename(replaces)] : undefined;
     const refused = !replaces
       ? null
-      : !previous
+      : !previous || previous.superseded
         ? `找不到要替换的 ${replaces}：只能替换开图已经记下的收件箱记录文件，写文件名即可`
         : previous.agent !== agents
           ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
@@ -237,9 +237,10 @@ async function prepare(ws: Workspace, file: string, text: string) {
         const next = { ...receipts, [basename(file)]: { agent: agents, records } };
         if (replaces) {
           const replaced = basename(replaces);
-          // 被替换的手机提交也已经处理过：保留空记录回执，防止延迟重送复活旧记录。
-          // 记录已撤回，后续新文件仍可沿 replaces 链提交新内容。
-          if (phoneInboxName.test(replaced)) next[replaced] = { agent: agents, records: [] };
+          // 旧手机提交只留本机去重凭据，不能再作为 replaces 目标。
+          // 单独标记，避免把合法的空撤回回执也误判为已被替换。
+          if (phoneInboxName.test(replaced))
+            next[replaced] = { agent: agents, records: [], superseded: true };
           else delete next[replaced];
         }
         ws.writeJson(RECEIPTS, next, { internal: true });

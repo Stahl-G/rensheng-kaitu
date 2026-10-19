@@ -104,6 +104,17 @@ PR #62 首版去重仍遗漏同一本机上的现有 replaces 旅程，与跨整
 | 新文件 C 用 replaces B 提交新内容 | 2（包括错误复活的 A） | 1（C applied） |
 | 旧撤回文件 B 延迟重送 | 1（再次执行） | 1（duplicate，C 保持） |
 
-根因是 replaces 成功后删除了旧来源的 `.kaitu/inbox-records.json` 键；首版只查当前键，因而撤回后的 A 没有去重依据。最小修复在替换来源为合法手机文件时保留原键与来源，把 records 置为空数组。仍使用原有 `{agent, records}` 格式，表示该提交已处理、当前没有存活记录；普通 Agent 来源仍用原来的删除路径。没有新增 schema、状态文件或跨端字段。
+根因是 replaces 成功后删除了旧来源的 `.kaitu/inbox-records.json` 键；首版只查当前键，因而撤回后的 A 没有去重依据。`6513a67` 的第一轮补修在替换来源为合法手机文件时保留原键与来源，把 records 置为空数组；随后独立审查发现它还缺少当前/已被替换来源的区分，最终修复见下一节。普通 Agent 来源仍用原来的删除路径。
 
 新操作必须按原协议使用新文件名；新内容和沿 replaces 链的后续操作仍能应用。同名旧操作不重新执行，不把延迟重送当作恢复任务的意图。新增第二个回归测试覆盖撤回、重开、延迟重送、新文件新内容与旧撤回文件重送。[相关测试](evidence/withdrawal-focused.log) 3 文件、19 项通过。固定提交后的全量检查及 GitHub exact-head CI 状态以本轮交审回复为准，不沿用首版结果冒充复验。
+
+
+## 陈旧 replaces 目标回归与最终修复
+
+独立审查继续确认第一轮补修会错误接受新的 C 再次 replaces 已过期 A：A 入账 → B replaces A 且包含新记录 → A 旧件重送 → C replaces A，任务数从 1/1/1 变为 2。此问题在同一本机发生，既非跨整理器问题，也不依赖回执过期。前一修复保留了去重依据，却把它继续当作有效替换目标。
+
+最终仅在本机私有 `.kaitu/inbox-records.json` 的旧来源回执中增加可选 `superseded: true`。旧来源仍可用于同文件去重，但 replaces 校验将其视作失效目标，沿用原有拒绝及待整理原文路径。当前来源即使 records=[]（合法撤回）也不带该标记，允许后继新文件替换。新生成来源回执保持 `{agent, records}`；旧正常账本兼容，公开手机文件、phone receipts、记录数据和所有 schemas 均不变。尚未发布的第一轮合成账本不迁移为真实用户数据。
+
+实际 CLI 证据：[脚本](evidence/stale-target-executed.mjs.txt)、[修复前](evidence/stale-target-before.json.txt)、[修复后](evidence/stale-target-after.json.txt)。修复后六阶段任务数全部为 1：A 入账、B 替 A、A duplicate、陈旧 C 替 A rejected、合法后继替 B applied、B duplicate。拒绝 C 时 B 的 ID 与内容保留，没有第二条活记录。
+
+空撤回旅程也在最终实现上重跑：[原始结果](evidence/withdrawal-final.json.txt)，任务数 1 → 0 → 0 → 1 → 1，确保不以空 records 判定失效。第二个行为测试合并覆盖空撤回和非空替换两种情况；相关 19 项测试通过，见 [最新相关检查](evidence/stale-focused.log)。固定最终 head 后重跑全量检查与 exact-head CI，不以 `6513a67` 的检查代替最终结果。

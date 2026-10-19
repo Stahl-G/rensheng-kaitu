@@ -63,40 +63,59 @@ it("手机记录同名重投跨重开及回执清理仍只入账一次，新文�
   expect(readRecords(reopened, "task")).toHaveLength(2);
 });
 
-it("手机记录撤回及替换后，旧文件延迟重送不复活或撤回新内容", async () => {
-  const ws = await freshWorkspace();
-  const original = phoneFile("records.jsonl");
-  const text = JSON.stringify({ type: "task", agent: "iPhone", title: "合成原任务", status: "open" });
-  ws.writeText(original, text);
-  await processInbox(ws, { stableMs: 0 });
-  expect(readRecords(ws, "task")).toHaveLength(1);
-  const withdrawal = phoneFile("records.jsonl");
-  const withdraw = JSON.stringify({ replaces: basename(original), agent: "iPhone" });
-  ws.writeText(withdrawal, withdraw);
-  await processInbox(ws, { stableMs: 0 });
-  expect(readRecords(ws, "task")).toHaveLength(0);
-  const reopened = new Workspace(ws.root);
-  reopened.writeText(original, text);
-  await processInbox(reopened, { stableMs: 0 });
-  expect(readRecords(reopened, "task")).toHaveLength(0);
-  expect(phoneReceipts(reopened)).toContainEqual(
-    expect.objectContaining({ ref: basename(original), status: "duplicate" }),
-  );
-  const replacement = phoneFile("records.jsonl");
-  reopened.writeText(
-    replacement,
-    `${JSON.stringify({ replaces: basename(withdrawal), agent: "iPhone" })}\n${JSON.stringify({ type: "task", agent: "iPhone", title: "合成新内容", status: "open" })}`,
-  );
-  await processInbox(reopened, { stableMs: 0 });
-  const current = readRecords(reopened, "task");
-  expect(current).toHaveLength(1);
-  expect(current[0]?.title).toBe("合成新内容");
-  reopened.writeText(withdrawal, withdraw);
-  await processInbox(reopened, { stableMs: 0 });
-  expect(readRecords(reopened, "task")).toEqual(current);
-  expect(phoneReceipts(reopened)).toContainEqual(
-    expect.objectContaining({ ref: basename(withdrawal), status: "duplicate" }),
-  );
+it("手机记录撤回及替换后，旧文件去重、陈旧替换拒绝，当前来源可继续替换", async () => {
+  for (const withdrawOnly of [true, false]) {
+    const ws = await freshWorkspace();
+    const row = (title: string) => ({ type: "task", agent: "iPhone", title, status: "open" });
+    const original = phoneFile("records.jsonl");
+    const text = JSON.stringify(row("合成原任务"));
+    ws.writeText(original, text);
+    await processInbox(ws, { stableMs: 0 });
+    expect(readRecords(ws, "task")).toHaveLength(1);
+    const replacement = phoneFile("records.jsonl");
+    const replace =
+      JSON.stringify({ replaces: basename(original), agent: "iPhone" }) +
+      (withdrawOnly ? "" : `\n${JSON.stringify(row("合成替换内容"))}`);
+    ws.writeText(replacement, replace);
+    await processInbox(ws, { stableMs: 0 });
+    const current = readRecords(ws, "task");
+    expect(current).toHaveLength(withdrawOnly ? 0 : 1);
+    const reopened = new Workspace(ws.root);
+    reopened.writeText(original, text);
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(current);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(original), status: "duplicate" }),
+    );
+    const stale = phoneFile("records.jsonl");
+    reopened.writeText(
+      stale,
+      `${JSON.stringify({ replaces: basename(original), agent: "iPhone" })}\n${JSON.stringify(row("陈旧分支内容"))}`,
+    );
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(current);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(stale), status: "rejected" }),
+    );
+    const successor = phoneFile("records.jsonl");
+    reopened.writeText(
+      successor,
+      `${JSON.stringify({ replaces: basename(replacement), agent: "iPhone" })}\n${JSON.stringify(row("合成后继内容"))}`,
+    );
+    await processInbox(reopened, { stableMs: 0 });
+    const next = readRecords(reopened, "task");
+    expect(next).toHaveLength(1);
+    expect(next[0]?.title).toBe("合成后继内容");
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(successor), status: "applied" }),
+    );
+    reopened.writeText(replacement, replace);
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(next);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(replacement), status: "duplicate" }),
+    );
+  }
 });
 
 function remoteMock() {
