@@ -91,3 +91,19 @@ V3 草稿 PR #61 只修首次交接推送和项目 STATUS 说明。本分支从 
 辅助脚本只测原有三个投影；Library 五阶段 schema 与实际原文回读见主流程，不将这里的 3.218 ms 宣称为四投影总成本。首次试图取消 adapter、仅用 force 生成快照时，后台刷新在 15 秒超时：普通 local 工作区没有启用同步，后台按设计不生成；恢复现有脚本的门槛设置后测得上表，不作为产品故障修复。
 
 最终 `pnpm build`、`pnpm typecheck`、`pnpm lint`、`pnpm test` 和 `git diff --check` 全部通过。[全量测试输出](evidence/tests.log)：93 文件通过、1 文件跳过；278 测试通过、2 跳过，108.63 秒。跳过项为环境未具备的桌面 providers 测试，未当作通过。手机两份相关测试 15/15 通过，新增真实重复投递回归包含在内。原始构建、类型、lint 和相关测试日志保存在 evidence。
+
+## 独立审查补验：撤回后的延迟重送
+
+PR #62 首版去重仍遗漏同一本机上的现有 replaces 旅程，与跨整理器状态丢失无关。实际 CLI 复现：[执行脚本](evidence/withdrawal-executed.mjs.txt)、[修复前](evidence/withdrawal-before.json.txt)、[修复后](evidence/withdrawal-after.json.txt)。脚本每一步均为独立 CLI 进程，目录、命令、耗时、回执和本机账本原样保存在 JSON 中。
+
+| 旅程 | 修复前任务数 | 修复后任务数 |
+|---|---:|---:|
+| 手机 A 入账 | 1 | 1 |
+| 新文件 B 用 replaces 撤回 A | 0 | 0 |
+| 同字节 A 延迟重送 | 1（错误复活） | 0（duplicate） |
+| 新文件 C 用 replaces B 提交新内容 | 2（包括错误复活的 A） | 1（C applied） |
+| 旧撤回文件 B 延迟重送 | 1（再次执行） | 1（duplicate，C 保持） |
+
+根因是 replaces 成功后删除了旧来源的 `.kaitu/inbox-records.json` 键；首版只查当前键，因而撤回后的 A 没有去重依据。最小修复在替换来源为合法手机文件时保留原键与来源，把 records 置为空数组。仍使用原有 `{agent, records}` 格式，表示该提交已处理、当前没有存活记录；普通 Agent 来源仍用原来的删除路径。没有新增 schema、状态文件或跨端字段。
+
+新操作必须按原协议使用新文件名；新内容和沿 replaces 链的后续操作仍能应用。同名旧操作不重新执行，不把延迟重送当作恢复任务的意图。新增第二个回归测试覆盖撤回、重开、延迟重送、新文件新内容与旧撤回文件重送。[相关测试](evidence/withdrawal-focused.log) 3 文件、19 项通过。固定提交后的全量检查及 GitHub exact-head CI 状态以本轮交审回复为准，不沿用首版结果冒充复验。

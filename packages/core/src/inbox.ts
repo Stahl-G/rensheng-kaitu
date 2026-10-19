@@ -235,7 +235,13 @@ async function prepare(ws: Workspace, file: string, text: string) {
               records.push({ type, id: result.record.id });
         }
         const next = { ...receipts, [basename(file)]: { agent: agents, records } };
-        if (replaces) delete next[basename(replaces)];
+        if (replaces) {
+          const replaced = basename(replaces);
+          // 被替换的手机提交也已经处理过：保留空记录回执，防止延迟重送复活旧记录。
+          // 记录已撤回，后续新文件仍可沿 replaces 链提交新内容。
+          if (phoneInboxName.test(replaced)) next[replaced] = { agent: agents, records: [] };
+          else delete next[replaced];
+        }
         ws.writeJson(RECEIPTS, next, { internal: true });
       },
     };
