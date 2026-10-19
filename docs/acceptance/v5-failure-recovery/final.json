@@ -1,0 +1,2554 @@
+{
+  "at": "2026-10-19T20:35:45.849Z",
+  "head": "6afa5e68c75fa194203709a267c2db97e6c1c722",
+  "root": "/tmp/kaitu-v5-3HUN7l",
+  "http": [
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterSave",
+      "payload": "[\"V5 synthetic original: learn safely.\"]",
+      "status": 200,
+      "body": {
+        "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+        "text": "V5 synthetic original: learn safely.",
+        "kind": "note",
+        "draft": null
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterPaste",
+      "payload": "[\"inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md\",\"{\\\"goal\\\":42,\\\"next\\\":[]}\"]",
+      "status": 400,
+      "body": {
+        "error": "没读到【目标】。请把 AI 按格式回复的内容整段贴回来"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterSave",
+      "payload": "{\"broken\":",
+      "status": 400,
+      "body": {
+        "error": "请求内容不是合法 JSON，请修正格式后重试。"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterSave",
+      "payload": "{}",
+      "status": 400,
+      "body": {
+        "error": "参数必须是数组"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/decideProposal",
+      "payload": "[\"v5\",\"confirmed\"]",
+      "status": 400,
+      "body": {
+        "error": "NOW.md 的 frontmatter 无法读取（YAML BAD_INDENT）。文件已保留，请修正格式后重试。"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/decideProposal",
+      "payload": "[\"v5\",\"confirmed\"]",
+      "status": 200,
+      "body": {
+        "version": null,
+        "calendarPush": {
+          "enabled": true,
+          "entries": {}
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/decideProposal",
+      "payload": "[\"v5\",\"confirmed\"]",
+      "status": 200,
+      "body": {
+        "version": null,
+        "calendarPush": {
+          "enabled": true,
+          "entries": {}
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/workspaceBackup",
+      "payload": "[\"status\"]",
+      "status": 200,
+      "body": {
+        "connection": {
+          "via": "token",
+          "repo": "synthetic/v5",
+          "private": true,
+          "branch": "main",
+          "enabled": true,
+          "text": true,
+          "records": false,
+          "checkedAt": "2026-10-19T20:35:46.603Z"
+        },
+        "running": false,
+        "lastSync": "2026-10-19T20:35:46.652Z",
+        "error": null,
+        "conflicts": [
+          {
+            "path": "me/profile.md",
+            "reason": "file",
+            "local": "Local synthetic change\n",
+            "remote": "Remote synthetic change\n"
+          }
+        ],
+        "tokenConfigured": false,
+        "ghLogin": {
+          "pending": false
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/workspaceBackup",
+      "payload": "[\"resolve\",{\"path\":\"me/profile.md\",\"choice\":\"remote\"}]",
+      "status": 409,
+      "body": {
+        "error": "本机文件又有修改，已更新对照内容，请重新选择"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/workspaceBackup",
+      "payload": "[\"resolve\",{\"path\":\"me/profile.md\",\"choice\":\"remote\"}]",
+      "status": 200,
+      "body": {
+        "connection": {
+          "via": "token",
+          "repo": "synthetic/v5",
+          "private": true,
+          "branch": "main",
+          "enabled": true,
+          "text": true,
+          "records": false,
+          "checkedAt": "2026-10-19T20:35:46.603Z"
+        },
+        "running": false,
+        "lastSync": "2026-10-19T20:35:46.652Z",
+        "error": null,
+        "conflicts": [],
+        "tokenConfigured": false,
+        "ghLogin": {
+          "pending": false
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/workspaceBackup",
+      "payload": "[\"resolve\",{\"path\":\"me/profile.md\",\"choice\":\"remote\"}]",
+      "status": 409,
+      "body": {
+        "error": "找不到待处理的冲突，请刷新"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/askConfigure",
+      "payload": "[{\"choice\":\"builtin\",\"provider\":\"kaitu-custom\",\"api\":\"openai-completions\",\"model\":\"v5-synthetic\",\"baseURL\":\"http://127.0.0.1:42057/v1\",\"apiKey\":\"v5-synthetic-key\"}]",
+      "status": 400,
+      "body": {
+        "code": "AI_NETWORK",
+        "error": "网络连不上 AI 服务，请检查网络、代理和 Base URL 后重试。"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/askConfigure",
+      "payload": "[{\"choice\":\"builtin\",\"provider\":\"kaitu-custom\",\"api\":\"openai-completions\",\"model\":\"v5-synthetic\",\"baseURL\":\"http://127.0.0.1:42057/v1\",\"apiKey\":\"v5-synthetic-key\"}]",
+      "status": 200,
+      "body": {
+        "choice": "builtin",
+        "provider": "custom-127-0-0-1",
+        "model": "v5-synthetic",
+        "supportsImages": false,
+        "configured": true,
+        "providerName": "127.0.0.1",
+        "providers": [
+          {
+            "id": "deepseek-official",
+            "name": "DeepSeek",
+            "recommended": true,
+            "api": "anthropic-messages",
+            "baseURL": "https://api.deepseek.com/anthropic",
+            "keyUrl": "https://platform.deepseek.com/api_keys",
+            "modelsURL": "https://api.deepseek.com/models",
+            "modelsApi": "openai-completions"
+          },
+          {
+            "id": "openai",
+            "name": "OpenAI",
+            "api": "openai-responses",
+            "baseURL": "https://api.openai.com/v1",
+            "keyUrl": "https://platform.openai.com/api-keys",
+            "authKey": "llm-pi-ai/openai",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with ChatGPT"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenAI API key"
+              }
+            ]
+          },
+          {
+            "id": "anthropic",
+            "name": "Anthropic Claude",
+            "api": "anthropic-messages",
+            "baseURL": "https://api.anthropic.com",
+            "keyUrl": "https://console.anthropic.com/settings/keys",
+            "authKey": "llm-pi-ai/anthropic",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Anthropic (Claude Pro/Max)"
+              },
+              {
+                "id": "api-key",
+                "label": "Anthropic API key"
+              }
+            ]
+          },
+          {
+            "id": "google",
+            "name": "Google Gemini",
+            "api": "google-generative-ai",
+            "baseURL": "https://generativelanguage.googleapis.com/v1beta",
+            "keyUrl": "https://aistudio.google.com/apikey",
+            "authKey": "llm-pi-ai/google",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Gemini API key"
+              }
+            ]
+          },
+          {
+            "id": "openrouter",
+            "name": "OpenRouter",
+            "api": "openai-completions",
+            "baseURL": "https://openrouter.ai/api/v1",
+            "keyUrl": "https://openrouter.ai/keys",
+            "authKey": "llm-pi-ai/openrouter",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with OpenRouter"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenRouter API key"
+              }
+            ]
+          },
+          {
+            "id": "moonshotai-cn",
+            "name": "Kimi",
+            "api": "openai-completions",
+            "baseURL": "https://api.moonshot.cn/v1",
+            "keyUrl": "https://platform.kimi.com/console/api-keys",
+            "authKey": "llm-pi-ai/moonshotai-cn",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ]
+          },
+          {
+            "id": "kaitu-zhipu",
+            "name": "智谱",
+            "api": "openai-completions",
+            "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+            "keyUrl": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys"
+          },
+          {
+            "id": "kaitu-qwen",
+            "name": "通义千问",
+            "api": "openai-completions",
+            "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "keyUrl": "https://bailian.console.aliyun.com/"
+          },
+          {
+            "id": "amazon-bedrock",
+            "name": "Amazon Bedrock",
+            "baseURL": "https://bedrock-runtime.us-east-1.amazonaws.com",
+            "api": "bedrock-converse-stream",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "AWS credentials or bearer token"
+              }
+            ],
+            "authKey": "llm-pi-ai/amazon-bedrock"
+          },
+          {
+            "id": "ant-ling",
+            "name": "Ant Ling",
+            "baseURL": "https://api.ant-ling.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Ant Ling API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/ant-ling"
+          },
+          {
+            "id": "azure",
+            "name": "Azure",
+            "baseURL": "",
+            "api": "azure-openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Azure OpenAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/azure"
+          },
+          {
+            "id": "baseten",
+            "name": "Baseten",
+            "baseURL": "https://inference.baseten.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Baseten API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/baseten"
+          },
+          {
+            "id": "cerebras",
+            "name": "Cerebras",
+            "baseURL": "https://api.cerebras.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cerebras API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cerebras"
+          },
+          {
+            "id": "cloudflare-ai-gateway",
+            "name": "Cloudflare AI Gateway",
+            "baseURL": "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-ai-gateway"
+          },
+          {
+            "id": "cloudflare-workers-ai",
+            "name": "Cloudflare Workers AI",
+            "baseURL": "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-workers-ai"
+          },
+          {
+            "id": "deepseek",
+            "name": "DeepSeek",
+            "baseURL": "https://api.deepseek.com",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "DeepSeek API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/deepseek"
+          },
+          {
+            "id": "fireworks",
+            "name": "Fireworks",
+            "baseURL": "https://api.fireworks.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Fireworks API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/fireworks"
+          },
+          {
+            "id": "github-copilot",
+            "name": "GitHub Copilot",
+            "baseURL": "https://api.individual.githubcopilot.com",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "GitHub Copilot"
+              },
+              {
+                "id": "api-key",
+                "label": "GitHub Copilot token"
+              }
+            ],
+            "authKey": "llm-pi-ai/github-copilot"
+          },
+          {
+            "id": "google-vertex",
+            "name": "Google Vertex AI",
+            "baseURL": "https://{location}-aiplatform.googleapis.com",
+            "api": "google-vertex",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Google Cloud credentials"
+              }
+            ],
+            "authKey": "llm-pi-ai/google-vertex"
+          },
+          {
+            "id": "groq",
+            "name": "Groq",
+            "baseURL": "https://api.groq.com/openai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Groq API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/groq"
+          },
+          {
+            "id": "huggingface",
+            "name": "Hugging Face",
+            "baseURL": "https://router.huggingface.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Hugging Face token"
+              }
+            ],
+            "authKey": "llm-pi-ai/huggingface"
+          },
+          {
+            "id": "kimi-coding",
+            "name": "Kimi For Coding",
+            "baseURL": "https://api.kimi.com/coding/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Kimi Code"
+              },
+              {
+                "id": "api-key",
+                "label": "Kimi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/kimi-coding"
+          },
+          {
+            "id": "meta",
+            "name": "Meta",
+            "baseURL": "https://api.meta.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Meta"
+              },
+              {
+                "id": "api-key",
+                "label": "Meta Model API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/meta"
+          },
+          {
+            "id": "minimax",
+            "name": "MiniMax",
+            "baseURL": "https://api.minimax.io/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax"
+          },
+          {
+            "id": "minimax-cn",
+            "name": "MiniMax CN",
+            "baseURL": "https://api.minimaxi.com/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax-cn"
+          },
+          {
+            "id": "mistral",
+            "name": "Mistral",
+            "baseURL": "https://api.mistral.ai",
+            "api": "mistral-conversations",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Mistral API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/mistral"
+          },
+          {
+            "id": "moonshotai",
+            "name": "Moonshot AI",
+            "baseURL": "https://api.moonshot.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/moonshotai"
+          },
+          {
+            "id": "nvidia",
+            "name": "NVIDIA",
+            "baseURL": "https://integrate.api.nvidia.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "NVIDIA API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/nvidia"
+          },
+          {
+            "id": "openai-codex",
+            "name": "OpenAI Codex (legacy)",
+            "baseURL": "https://chatgpt.com/backend-api",
+            "api": "openai-codex-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "OpenAI (ChatGPT Plus/Pro)"
+              }
+            ],
+            "authKey": "llm-pi-ai/openai-codex"
+          },
+          {
+            "id": "opencode",
+            "name": "OpenCode Zen",
+            "baseURL": "https://opencode.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode"
+          },
+          {
+            "id": "opencode-go",
+            "name": "OpenCode Go",
+            "baseURL": "https://opencode.ai/inference/go",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode-go"
+          },
+          {
+            "id": "qwen-token-plan",
+            "name": "Qwen Token Plan",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan"
+          },
+          {
+            "id": "qwen-token-plan-cn",
+            "name": "Qwen Token Plan CN",
+            "baseURL": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-cn"
+          },
+          {
+            "id": "qwen-token-plan-individual",
+            "name": "Qwen Token Plan Individual",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan Individual API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-individual"
+          },
+          {
+            "id": "radius",
+            "name": "Radius",
+            "baseURL": "https://radius.pi.dev/v1",
+            "api": "pi-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Radius"
+              },
+              {
+                "id": "api-key",
+                "label": "Radius API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/radius"
+          },
+          {
+            "id": "together",
+            "name": "Together",
+            "baseURL": "https://api.together.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Together API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/together"
+          },
+          {
+            "id": "typesafe",
+            "name": "TypeSafe",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "TypeSafe API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/typesafe"
+          },
+          {
+            "id": "vercel-ai-gateway",
+            "name": "Vercel AI Gateway",
+            "baseURL": "https://ai-gateway.vercel.sh",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Vercel AI Gateway API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/vercel-ai-gateway"
+          },
+          {
+            "id": "xai",
+            "name": "xAI",
+            "baseURL": "https://api.x.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with SuperGrok or X Premium"
+              },
+              {
+                "id": "api-key",
+                "label": "xAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xai"
+          },
+          {
+            "id": "xiaomi",
+            "name": "Xiaomi",
+            "baseURL": "https://api.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi"
+          },
+          {
+            "id": "xiaomi-token-plan-ams",
+            "name": "Xiaomi Token Plan AMS",
+            "baseURL": "https://token-plan-ams.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan AMS API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-ams"
+          },
+          {
+            "id": "xiaomi-token-plan-cn",
+            "name": "Xiaomi Token Plan CN",
+            "baseURL": "https://token-plan-cn.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-cn"
+          },
+          {
+            "id": "xiaomi-token-plan-sgp",
+            "name": "Xiaomi Token Plan SGP",
+            "baseURL": "https://token-plan-sgp.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan SGP API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-sgp"
+          },
+          {
+            "id": "zai",
+            "name": "Z.AI",
+            "baseURL": "https://api.z.ai/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai"
+          },
+          {
+            "id": "zai-coding-cn",
+            "name": "Z.AI Coding CN",
+            "baseURL": "https://open.bigmodel.cn/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI Coding CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai-coding-cn"
+          },
+          {
+            "id": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1"
+          },
+          {
+            "id": "kaitu-custom",
+            "name": "自定义服务",
+            "api": "openai-completions"
+          }
+        ],
+        "protocols": [
+          {
+            "id": "openai-completions",
+            "name": "Chat Completions"
+          },
+          {
+            "id": "openai-responses",
+            "name": "Responses"
+          },
+          {
+            "id": "anthropic-messages",
+            "name": "Anthropic Messages"
+          },
+          {
+            "id": "google-generative-ai",
+            "name": "Gemini"
+          }
+        ],
+        "saved": [
+          {
+            "provider": "custom-127-0-0-1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1",
+            "models": ["v5-synthetic"],
+            "name": "127.0.0.1"
+          }
+        ],
+        "search": {
+          "provider": "custom-127-0-0-1",
+          "configured": true,
+          "name": "127.0.0.1",
+          "native": {
+            "provider": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "supported": true,
+            "configured": true
+          },
+          "preferred": "perplexity",
+          "providers": [
+            {
+              "id": "perplexity",
+              "name": "Perplexity",
+              "keyUrl": "https://www.perplexity.ai/settings/api",
+              "configured": false
+            },
+            {
+              "id": "exa",
+              "name": "Exa",
+              "keyUrl": "https://dashboard.exa.ai/api-keys",
+              "configured": false
+            },
+            {
+              "id": "tavily",
+              "name": "Tavily",
+              "keyUrl": "https://app.tavily.com/home",
+              "configured": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/askSettings",
+      "payload": "[]",
+      "status": 200,
+      "body": {
+        "choice": "builtin",
+        "provider": "custom-127-0-0-1",
+        "model": "v5-synthetic",
+        "supportsImages": false,
+        "configured": true,
+        "providerName": "127.0.0.1",
+        "providers": [
+          {
+            "id": "deepseek-official",
+            "name": "DeepSeek",
+            "recommended": true,
+            "api": "anthropic-messages",
+            "baseURL": "https://api.deepseek.com/anthropic",
+            "keyUrl": "https://platform.deepseek.com/api_keys",
+            "modelsURL": "https://api.deepseek.com/models",
+            "modelsApi": "openai-completions"
+          },
+          {
+            "id": "openai",
+            "name": "OpenAI",
+            "api": "openai-responses",
+            "baseURL": "https://api.openai.com/v1",
+            "keyUrl": "https://platform.openai.com/api-keys",
+            "authKey": "llm-pi-ai/openai",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with ChatGPT"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenAI API key"
+              }
+            ]
+          },
+          {
+            "id": "anthropic",
+            "name": "Anthropic Claude",
+            "api": "anthropic-messages",
+            "baseURL": "https://api.anthropic.com",
+            "keyUrl": "https://console.anthropic.com/settings/keys",
+            "authKey": "llm-pi-ai/anthropic",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Anthropic (Claude Pro/Max)"
+              },
+              {
+                "id": "api-key",
+                "label": "Anthropic API key"
+              }
+            ]
+          },
+          {
+            "id": "google",
+            "name": "Google Gemini",
+            "api": "google-generative-ai",
+            "baseURL": "https://generativelanguage.googleapis.com/v1beta",
+            "keyUrl": "https://aistudio.google.com/apikey",
+            "authKey": "llm-pi-ai/google",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Gemini API key"
+              }
+            ]
+          },
+          {
+            "id": "openrouter",
+            "name": "OpenRouter",
+            "api": "openai-completions",
+            "baseURL": "https://openrouter.ai/api/v1",
+            "keyUrl": "https://openrouter.ai/keys",
+            "authKey": "llm-pi-ai/openrouter",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with OpenRouter"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenRouter API key"
+              }
+            ]
+          },
+          {
+            "id": "moonshotai-cn",
+            "name": "Kimi",
+            "api": "openai-completions",
+            "baseURL": "https://api.moonshot.cn/v1",
+            "keyUrl": "https://platform.kimi.com/console/api-keys",
+            "authKey": "llm-pi-ai/moonshotai-cn",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ]
+          },
+          {
+            "id": "kaitu-zhipu",
+            "name": "智谱",
+            "api": "openai-completions",
+            "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+            "keyUrl": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys"
+          },
+          {
+            "id": "kaitu-qwen",
+            "name": "通义千问",
+            "api": "openai-completions",
+            "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "keyUrl": "https://bailian.console.aliyun.com/"
+          },
+          {
+            "id": "amazon-bedrock",
+            "name": "Amazon Bedrock",
+            "baseURL": "https://bedrock-runtime.us-east-1.amazonaws.com",
+            "api": "bedrock-converse-stream",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "AWS credentials or bearer token"
+              }
+            ],
+            "authKey": "llm-pi-ai/amazon-bedrock"
+          },
+          {
+            "id": "ant-ling",
+            "name": "Ant Ling",
+            "baseURL": "https://api.ant-ling.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Ant Ling API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/ant-ling"
+          },
+          {
+            "id": "azure",
+            "name": "Azure",
+            "baseURL": "",
+            "api": "azure-openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Azure OpenAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/azure"
+          },
+          {
+            "id": "baseten",
+            "name": "Baseten",
+            "baseURL": "https://inference.baseten.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Baseten API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/baseten"
+          },
+          {
+            "id": "cerebras",
+            "name": "Cerebras",
+            "baseURL": "https://api.cerebras.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cerebras API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cerebras"
+          },
+          {
+            "id": "cloudflare-ai-gateway",
+            "name": "Cloudflare AI Gateway",
+            "baseURL": "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-ai-gateway"
+          },
+          {
+            "id": "cloudflare-workers-ai",
+            "name": "Cloudflare Workers AI",
+            "baseURL": "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-workers-ai"
+          },
+          {
+            "id": "deepseek",
+            "name": "DeepSeek",
+            "baseURL": "https://api.deepseek.com",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "DeepSeek API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/deepseek"
+          },
+          {
+            "id": "fireworks",
+            "name": "Fireworks",
+            "baseURL": "https://api.fireworks.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Fireworks API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/fireworks"
+          },
+          {
+            "id": "github-copilot",
+            "name": "GitHub Copilot",
+            "baseURL": "https://api.individual.githubcopilot.com",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "GitHub Copilot"
+              },
+              {
+                "id": "api-key",
+                "label": "GitHub Copilot token"
+              }
+            ],
+            "authKey": "llm-pi-ai/github-copilot"
+          },
+          {
+            "id": "google-vertex",
+            "name": "Google Vertex AI",
+            "baseURL": "https://{location}-aiplatform.googleapis.com",
+            "api": "google-vertex",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Google Cloud credentials"
+              }
+            ],
+            "authKey": "llm-pi-ai/google-vertex"
+          },
+          {
+            "id": "groq",
+            "name": "Groq",
+            "baseURL": "https://api.groq.com/openai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Groq API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/groq"
+          },
+          {
+            "id": "huggingface",
+            "name": "Hugging Face",
+            "baseURL": "https://router.huggingface.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Hugging Face token"
+              }
+            ],
+            "authKey": "llm-pi-ai/huggingface"
+          },
+          {
+            "id": "kimi-coding",
+            "name": "Kimi For Coding",
+            "baseURL": "https://api.kimi.com/coding/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Kimi Code"
+              },
+              {
+                "id": "api-key",
+                "label": "Kimi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/kimi-coding"
+          },
+          {
+            "id": "meta",
+            "name": "Meta",
+            "baseURL": "https://api.meta.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Meta"
+              },
+              {
+                "id": "api-key",
+                "label": "Meta Model API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/meta"
+          },
+          {
+            "id": "minimax",
+            "name": "MiniMax",
+            "baseURL": "https://api.minimax.io/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax"
+          },
+          {
+            "id": "minimax-cn",
+            "name": "MiniMax CN",
+            "baseURL": "https://api.minimaxi.com/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax-cn"
+          },
+          {
+            "id": "mistral",
+            "name": "Mistral",
+            "baseURL": "https://api.mistral.ai",
+            "api": "mistral-conversations",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Mistral API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/mistral"
+          },
+          {
+            "id": "moonshotai",
+            "name": "Moonshot AI",
+            "baseURL": "https://api.moonshot.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/moonshotai"
+          },
+          {
+            "id": "nvidia",
+            "name": "NVIDIA",
+            "baseURL": "https://integrate.api.nvidia.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "NVIDIA API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/nvidia"
+          },
+          {
+            "id": "openai-codex",
+            "name": "OpenAI Codex (legacy)",
+            "baseURL": "https://chatgpt.com/backend-api",
+            "api": "openai-codex-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "OpenAI (ChatGPT Plus/Pro)"
+              }
+            ],
+            "authKey": "llm-pi-ai/openai-codex"
+          },
+          {
+            "id": "opencode",
+            "name": "OpenCode Zen",
+            "baseURL": "https://opencode.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode"
+          },
+          {
+            "id": "opencode-go",
+            "name": "OpenCode Go",
+            "baseURL": "https://opencode.ai/inference/go",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode-go"
+          },
+          {
+            "id": "qwen-token-plan",
+            "name": "Qwen Token Plan",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan"
+          },
+          {
+            "id": "qwen-token-plan-cn",
+            "name": "Qwen Token Plan CN",
+            "baseURL": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-cn"
+          },
+          {
+            "id": "qwen-token-plan-individual",
+            "name": "Qwen Token Plan Individual",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan Individual API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-individual"
+          },
+          {
+            "id": "radius",
+            "name": "Radius",
+            "baseURL": "https://radius.pi.dev/v1",
+            "api": "pi-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Radius"
+              },
+              {
+                "id": "api-key",
+                "label": "Radius API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/radius"
+          },
+          {
+            "id": "together",
+            "name": "Together",
+            "baseURL": "https://api.together.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Together API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/together"
+          },
+          {
+            "id": "typesafe",
+            "name": "TypeSafe",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "TypeSafe API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/typesafe"
+          },
+          {
+            "id": "vercel-ai-gateway",
+            "name": "Vercel AI Gateway",
+            "baseURL": "https://ai-gateway.vercel.sh",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Vercel AI Gateway API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/vercel-ai-gateway"
+          },
+          {
+            "id": "xai",
+            "name": "xAI",
+            "baseURL": "https://api.x.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with SuperGrok or X Premium"
+              },
+              {
+                "id": "api-key",
+                "label": "xAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xai"
+          },
+          {
+            "id": "xiaomi",
+            "name": "Xiaomi",
+            "baseURL": "https://api.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi"
+          },
+          {
+            "id": "xiaomi-token-plan-ams",
+            "name": "Xiaomi Token Plan AMS",
+            "baseURL": "https://token-plan-ams.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan AMS API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-ams"
+          },
+          {
+            "id": "xiaomi-token-plan-cn",
+            "name": "Xiaomi Token Plan CN",
+            "baseURL": "https://token-plan-cn.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-cn"
+          },
+          {
+            "id": "xiaomi-token-plan-sgp",
+            "name": "Xiaomi Token Plan SGP",
+            "baseURL": "https://token-plan-sgp.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan SGP API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-sgp"
+          },
+          {
+            "id": "zai",
+            "name": "Z.AI",
+            "baseURL": "https://api.z.ai/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai"
+          },
+          {
+            "id": "zai-coding-cn",
+            "name": "Z.AI Coding CN",
+            "baseURL": "https://open.bigmodel.cn/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI Coding CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai-coding-cn"
+          },
+          {
+            "id": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1"
+          },
+          {
+            "id": "kaitu-custom",
+            "name": "自定义服务",
+            "api": "openai-completions"
+          }
+        ],
+        "protocols": [
+          {
+            "id": "openai-completions",
+            "name": "Chat Completions"
+          },
+          {
+            "id": "openai-responses",
+            "name": "Responses"
+          },
+          {
+            "id": "anthropic-messages",
+            "name": "Anthropic Messages"
+          },
+          {
+            "id": "google-generative-ai",
+            "name": "Gemini"
+          }
+        ],
+        "saved": [
+          {
+            "provider": "custom-127-0-0-1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1",
+            "models": ["v5-synthetic"],
+            "name": "127.0.0.1"
+          }
+        ],
+        "search": {
+          "provider": "custom-127-0-0-1",
+          "configured": true,
+          "name": "127.0.0.1",
+          "native": {
+            "provider": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "supported": true,
+            "configured": true
+          },
+          "preferred": "perplexity",
+          "providers": [
+            {
+              "id": "perplexity",
+              "name": "Perplexity",
+              "keyUrl": "https://www.perplexity.ai/settings/api",
+              "configured": false
+            },
+            {
+              "id": "exa",
+              "name": "Exa",
+              "keyUrl": "https://dashboard.exa.ai/api-keys",
+              "configured": false
+            },
+            {
+              "id": "tavily",
+              "name": "Tavily",
+              "keyUrl": "https://app.tavily.com/home",
+              "configured": false
+            }
+          ]
+        },
+        "backend": "dsh",
+        "localAgents": []
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/askConfigure",
+      "payload": "[{\"choice\":\"builtin\",\"provider\":\"kaitu-custom\",\"api\":\"openai-completions\",\"model\":\"v5-synthetic\",\"baseURL\":\"http://127.0.0.1:42057/v1\"}]",
+      "status": 200,
+      "body": {
+        "choice": "builtin",
+        "provider": "custom-127-0-0-1",
+        "model": "v5-synthetic",
+        "supportsImages": false,
+        "configured": true,
+        "providerName": "127.0.0.1",
+        "providers": [
+          {
+            "id": "deepseek-official",
+            "name": "DeepSeek",
+            "recommended": true,
+            "api": "anthropic-messages",
+            "baseURL": "https://api.deepseek.com/anthropic",
+            "keyUrl": "https://platform.deepseek.com/api_keys",
+            "modelsURL": "https://api.deepseek.com/models",
+            "modelsApi": "openai-completions"
+          },
+          {
+            "id": "openai",
+            "name": "OpenAI",
+            "api": "openai-responses",
+            "baseURL": "https://api.openai.com/v1",
+            "keyUrl": "https://platform.openai.com/api-keys",
+            "authKey": "llm-pi-ai/openai",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with ChatGPT"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenAI API key"
+              }
+            ]
+          },
+          {
+            "id": "anthropic",
+            "name": "Anthropic Claude",
+            "api": "anthropic-messages",
+            "baseURL": "https://api.anthropic.com",
+            "keyUrl": "https://console.anthropic.com/settings/keys",
+            "authKey": "llm-pi-ai/anthropic",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Anthropic (Claude Pro/Max)"
+              },
+              {
+                "id": "api-key",
+                "label": "Anthropic API key"
+              }
+            ]
+          },
+          {
+            "id": "google",
+            "name": "Google Gemini",
+            "api": "google-generative-ai",
+            "baseURL": "https://generativelanguage.googleapis.com/v1beta",
+            "keyUrl": "https://aistudio.google.com/apikey",
+            "authKey": "llm-pi-ai/google",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Gemini API key"
+              }
+            ]
+          },
+          {
+            "id": "openrouter",
+            "name": "OpenRouter",
+            "api": "openai-completions",
+            "baseURL": "https://openrouter.ai/api/v1",
+            "keyUrl": "https://openrouter.ai/keys",
+            "authKey": "llm-pi-ai/openrouter",
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with OpenRouter"
+              },
+              {
+                "id": "api-key",
+                "label": "OpenRouter API key"
+              }
+            ]
+          },
+          {
+            "id": "moonshotai-cn",
+            "name": "Kimi",
+            "api": "openai-completions",
+            "baseURL": "https://api.moonshot.cn/v1",
+            "keyUrl": "https://platform.kimi.com/console/api-keys",
+            "authKey": "llm-pi-ai/moonshotai-cn",
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ]
+          },
+          {
+            "id": "kaitu-zhipu",
+            "name": "智谱",
+            "api": "openai-completions",
+            "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+            "keyUrl": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys"
+          },
+          {
+            "id": "kaitu-qwen",
+            "name": "通义千问",
+            "api": "openai-completions",
+            "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "keyUrl": "https://bailian.console.aliyun.com/"
+          },
+          {
+            "id": "amazon-bedrock",
+            "name": "Amazon Bedrock",
+            "baseURL": "https://bedrock-runtime.us-east-1.amazonaws.com",
+            "api": "bedrock-converse-stream",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "AWS credentials or bearer token"
+              }
+            ],
+            "authKey": "llm-pi-ai/amazon-bedrock"
+          },
+          {
+            "id": "ant-ling",
+            "name": "Ant Ling",
+            "baseURL": "https://api.ant-ling.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Ant Ling API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/ant-ling"
+          },
+          {
+            "id": "azure",
+            "name": "Azure",
+            "baseURL": "",
+            "api": "azure-openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Azure OpenAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/azure"
+          },
+          {
+            "id": "baseten",
+            "name": "Baseten",
+            "baseURL": "https://inference.baseten.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Baseten API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/baseten"
+          },
+          {
+            "id": "cerebras",
+            "name": "Cerebras",
+            "baseURL": "https://api.cerebras.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cerebras API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cerebras"
+          },
+          {
+            "id": "cloudflare-ai-gateway",
+            "name": "Cloudflare AI Gateway",
+            "baseURL": "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-ai-gateway"
+          },
+          {
+            "id": "cloudflare-workers-ai",
+            "name": "Cloudflare Workers AI",
+            "baseURL": "https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Cloudflare API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/cloudflare-workers-ai"
+          },
+          {
+            "id": "deepseek",
+            "name": "DeepSeek",
+            "baseURL": "https://api.deepseek.com",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "DeepSeek API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/deepseek"
+          },
+          {
+            "id": "fireworks",
+            "name": "Fireworks",
+            "baseURL": "https://api.fireworks.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Fireworks API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/fireworks"
+          },
+          {
+            "id": "github-copilot",
+            "name": "GitHub Copilot",
+            "baseURL": "https://api.individual.githubcopilot.com",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "GitHub Copilot"
+              },
+              {
+                "id": "api-key",
+                "label": "GitHub Copilot token"
+              }
+            ],
+            "authKey": "llm-pi-ai/github-copilot"
+          },
+          {
+            "id": "google-vertex",
+            "name": "Google Vertex AI",
+            "baseURL": "https://{location}-aiplatform.googleapis.com",
+            "api": "google-vertex",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Google Cloud credentials"
+              }
+            ],
+            "authKey": "llm-pi-ai/google-vertex"
+          },
+          {
+            "id": "groq",
+            "name": "Groq",
+            "baseURL": "https://api.groq.com/openai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Groq API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/groq"
+          },
+          {
+            "id": "huggingface",
+            "name": "Hugging Face",
+            "baseURL": "https://router.huggingface.co/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Hugging Face token"
+              }
+            ],
+            "authKey": "llm-pi-ai/huggingface"
+          },
+          {
+            "id": "kimi-coding",
+            "name": "Kimi For Coding",
+            "baseURL": "https://api.kimi.com/coding/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Kimi Code"
+              },
+              {
+                "id": "api-key",
+                "label": "Kimi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/kimi-coding"
+          },
+          {
+            "id": "meta",
+            "name": "Meta",
+            "baseURL": "https://api.meta.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with Meta"
+              },
+              {
+                "id": "api-key",
+                "label": "Meta Model API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/meta"
+          },
+          {
+            "id": "minimax",
+            "name": "MiniMax",
+            "baseURL": "https://api.minimax.io/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax"
+          },
+          {
+            "id": "minimax-cn",
+            "name": "MiniMax CN",
+            "baseURL": "https://api.minimaxi.com/anthropic",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "MiniMax CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/minimax-cn"
+          },
+          {
+            "id": "mistral",
+            "name": "Mistral",
+            "baseURL": "https://api.mistral.ai",
+            "api": "mistral-conversations",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Mistral API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/mistral"
+          },
+          {
+            "id": "moonshotai",
+            "name": "Moonshot AI",
+            "baseURL": "https://api.moonshot.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Moonshot AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/moonshotai"
+          },
+          {
+            "id": "nvidia",
+            "name": "NVIDIA",
+            "baseURL": "https://integrate.api.nvidia.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "NVIDIA API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/nvidia"
+          },
+          {
+            "id": "openai-codex",
+            "name": "OpenAI Codex (legacy)",
+            "baseURL": "https://chatgpt.com/backend-api",
+            "api": "openai-codex-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "OpenAI (ChatGPT Plus/Pro)"
+              }
+            ],
+            "authKey": "llm-pi-ai/openai-codex"
+          },
+          {
+            "id": "opencode",
+            "name": "OpenCode Zen",
+            "baseURL": "https://opencode.ai/inference",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode"
+          },
+          {
+            "id": "opencode-go",
+            "name": "OpenCode Go",
+            "baseURL": "https://opencode.ai/inference/go",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "OpenCode API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/opencode-go"
+          },
+          {
+            "id": "qwen-token-plan",
+            "name": "Qwen Token Plan",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan"
+          },
+          {
+            "id": "qwen-token-plan-cn",
+            "name": "Qwen Token Plan CN",
+            "baseURL": "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-cn"
+          },
+          {
+            "id": "qwen-token-plan-individual",
+            "name": "Qwen Token Plan Individual",
+            "baseURL": "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Qwen Token Plan Individual API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/qwen-token-plan-individual"
+          },
+          {
+            "id": "radius",
+            "name": "Radius",
+            "baseURL": "https://radius.pi.dev/v1",
+            "api": "pi-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Radius"
+              },
+              {
+                "id": "api-key",
+                "label": "Radius API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/radius"
+          },
+          {
+            "id": "together",
+            "name": "Together",
+            "baseURL": "https://api.together.ai/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Together API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/together"
+          },
+          {
+            "id": "typesafe",
+            "name": "TypeSafe",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "TypeSafe API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/typesafe"
+          },
+          {
+            "id": "vercel-ai-gateway",
+            "name": "Vercel AI Gateway",
+            "baseURL": "https://ai-gateway.vercel.sh",
+            "api": "anthropic-messages",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Vercel AI Gateway API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/vercel-ai-gateway"
+          },
+          {
+            "id": "xai",
+            "name": "xAI",
+            "baseURL": "https://api.x.ai/v1",
+            "api": "openai-responses",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "oauth",
+                "label": "Sign in with SuperGrok or X Premium"
+              },
+              {
+                "id": "api-key",
+                "label": "xAI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xai"
+          },
+          {
+            "id": "xiaomi",
+            "name": "Xiaomi",
+            "baseURL": "https://api.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi"
+          },
+          {
+            "id": "xiaomi-token-plan-ams",
+            "name": "Xiaomi Token Plan AMS",
+            "baseURL": "https://token-plan-ams.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan AMS API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-ams"
+          },
+          {
+            "id": "xiaomi-token-plan-cn",
+            "name": "Xiaomi Token Plan CN",
+            "baseURL": "https://token-plan-cn.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-cn"
+          },
+          {
+            "id": "xiaomi-token-plan-sgp",
+            "name": "Xiaomi Token Plan SGP",
+            "baseURL": "https://token-plan-sgp.xiaomimimo.com/v1",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Xiaomi Token Plan SGP API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/xiaomi-token-plan-sgp"
+          },
+          {
+            "id": "zai",
+            "name": "Z.AI",
+            "baseURL": "https://api.z.ai/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai"
+          },
+          {
+            "id": "zai-coding-cn",
+            "name": "Z.AI Coding CN",
+            "baseURL": "https://open.bigmodel.cn/api/coding/paas/v4",
+            "api": "openai-completions",
+            "catalog": true,
+            "authMethods": [
+              {
+                "id": "api-key",
+                "label": "Z.AI Coding CN API key"
+              }
+            ],
+            "authKey": "llm-pi-ai/zai-coding-cn"
+          },
+          {
+            "id": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1"
+          },
+          {
+            "id": "kaitu-custom",
+            "name": "自定义服务",
+            "api": "openai-completions"
+          }
+        ],
+        "protocols": [
+          {
+            "id": "openai-completions",
+            "name": "Chat Completions"
+          },
+          {
+            "id": "openai-responses",
+            "name": "Responses"
+          },
+          {
+            "id": "anthropic-messages",
+            "name": "Anthropic Messages"
+          },
+          {
+            "id": "google-generative-ai",
+            "name": "Gemini"
+          }
+        ],
+        "saved": [
+          {
+            "provider": "custom-127-0-0-1",
+            "api": "openai-completions",
+            "baseURL": "http://127.0.0.1:42057/v1",
+            "models": ["v5-synthetic"],
+            "name": "127.0.0.1"
+          }
+        ],
+        "search": {
+          "provider": "custom-127-0-0-1",
+          "configured": true,
+          "name": "127.0.0.1",
+          "native": {
+            "provider": "custom-127-0-0-1",
+            "name": "127.0.0.1",
+            "api": "openai-completions",
+            "supported": true,
+            "configured": true
+          },
+          "preferred": "perplexity",
+          "providers": [
+            {
+              "id": "perplexity",
+              "name": "Perplexity",
+              "keyUrl": "https://www.perplexity.ai/settings/api",
+              "configured": false
+            },
+            {
+              "id": "exa",
+              "name": "Exa",
+              "keyUrl": "https://dashboard.exa.ai/api-keys",
+              "configured": false
+            },
+            {
+              "id": "tavily",
+              "name": "Tavily",
+              "keyUrl": "https://app.tavily.com/home",
+              "configured": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterPaste",
+      "payload": "[\"inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md\",\"{\\\"goal\\\":\\\"V5 recovery goal\\\",\\\"current\\\":\\\"Synthetic only\\\",\\\"next\\\":\\\"Read one page\\\"}\"]",
+      "status": 200,
+      "body": {
+        "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+        "text": "V5 synthetic original: learn safely.",
+        "kind": "note",
+        "draft": {
+          "goal": "V5 recovery goal",
+          "current": "Synthetic only",
+          "next": "Read one page"
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterAdopt",
+      "payload": "[\"inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md\",{\"goal\":\"V5 recovery goal\",\"current\":\"Synthetic only\",\"next\":\"Read one page\"}]",
+      "status": 200,
+      "body": {
+        "kind": "note",
+        "id": "01M5AY1BFXHJYD42TKAB4TN695",
+        "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+        "goalId": "note-20261020-ea3a22",
+        "next": "Read one page",
+        "goal": "V5 recovery goal",
+        "current": "Synthetic only",
+        "result": "",
+        "status": "open",
+        "due": null,
+        "rev": 1
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/product/onboardingMatterAdopt",
+      "payload": "[\"inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md\",{\"goal\":\"V5 recovery goal\",\"current\":\"Synthetic only\",\"next\":\"Read one page\"}]",
+      "status": 200,
+      "body": {
+        "kind": "note",
+        "id": "01M5AY1BFXHJYD42TKAB4TN695",
+        "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+        "goalId": "note-20261020-ea3a22",
+        "next": "Read one page",
+        "goal": "V5 recovery goal",
+        "current": "Synthetic only",
+        "result": "",
+        "status": "open",
+        "due": null,
+        "rev": 1
+      }
+    }
+  ],
+  "syncHttp": [
+    {
+      "method": "GET",
+      "path": "/inspect",
+      "request": null,
+      "response": {
+        "private": true,
+        "branch": "main"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/read",
+      "request": null,
+      "response": {
+        "head": null,
+        "files": {
+          "count": 0
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/push",
+      "request": {
+        "head": null,
+        "files": {
+          "count": 18,
+          "profile": "# 档案\n\n## 基本情况\n\n（年龄、所在城市、职业、家庭情况……）\n\n## 现在在做什么\n\n## 兴趣与擅长\n\n## 健康概况\n\n（身高、体重、既往情况。不想写可以留空。）\n\n## Agent 摘要\n\n（由 Agent 在晚间复盘时根据记忆与记录刷新，用户不必手写。）\n"
+        }
+      },
+      "response": "fixture-1"
+    },
+    {
+      "method": "GET",
+      "path": "/read",
+      "request": null,
+      "response": {
+        "head": "fixture-external",
+        "files": {
+          "count": 18,
+          "profile": "Remote synthetic change\n"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/read",
+      "request": null,
+      "response": {
+        "head": "fixture-external",
+        "files": {
+          "count": 18,
+          "profile": "Remote synthetic change\n"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/read",
+      "request": null,
+      "response": {
+        "head": "fixture-external",
+        "files": {
+          "count": 18,
+          "profile": "Remote synthetic change\n"
+        }
+      }
+    }
+  ],
+  "paste": {
+    "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+    "original": "---\nagent: 你\ndate: 2026-10-20\ncreated: 2026-10-20T04:35:46+08:00\nkind: capture\n---\nV5 synthetic original: learn safely.",
+    "after": "---\nagent: 你\ndate: 2026-10-20\ncreated: 2026-10-20T04:35:46+08:00\nkind: capture\n---\nV5 synthetic original: learn safely.",
+    "recovery": {
+      "task": "01M5AY1BFXHJYD42TKAB4TN695",
+      "retryTask": "01M5AY1BFXHJYD42TKAB4TN695",
+      "tasks": [
+        {
+          "id": "01M5AY1BFXHJYD42TKAB4TN695",
+          "ts": "2026-10-20T04:35:50+08:00",
+          "by": "user",
+          "title": "Read one page",
+          "source": "inbox/notes/2026-10-20/01m5ay17qyktb4xp5tjkajmkez.md",
+          "notes": "当前目标：V5 recovery goal\n已知现状：Synthetic only\n目标编号：note-20261020-ea3a22\n",
+          "status": "open"
+        }
+      ],
+      "goals": [
+        {
+          "id": "note-20261020-ea3a22",
+          "title": "V5 recovery goal",
+          "status": "active"
+        }
+      ],
+      "text": "V5 synthetic original: learn safely."
+    }
+  },
+  "invalidRequest": {
+    "profileBefore": "# 档案\n\n## 基本情况\n\n（年龄、所在城市、职业、家庭情况……）\n\n## 现在在做什么\n\n## 兴趣与擅长\n\n## 健康概况\n\n（身高、体重、既往情况。不想写可以留空。）\n\n## Agent 摘要\n\n（由 Agent 在晚间复盘时根据记忆与记录刷新，用户不必手写。）\n",
+    "profileAfter": "# 档案\n\n## 基本情况\n\n（年龄、所在城市、职业、家庭情况……）\n\n## 现在在做什么\n\n## 兴趣与擅长\n\n## 健康概况\n\n（身高、体重、既往情况。不想写可以留空。）\n\n## Agent 摘要\n\n（由 Agent 在晚间复盘时根据记忆与记录刷新，用户不必手写。）\n"
+  },
+  "frontmatter": {
+    "before": "---\ndate: [unterminated\nblocks:\n  - id: v5\n    title: Synthetic proposal\n    kind: proposal\n    status: pending\n    start: \"18:00\"\n    end: \"19:00\"\n---\nRetain this body.\n",
+    "afterFailure": "---\ndate: [unterminated\nblocks:\n  - id: v5\n    title: Synthetic proposal\n    kind: proposal\n    status: pending\n    start: \"18:00\"\n    end: \"19:00\"\n---\nRetain this body.\n",
+    "afterRecovery": "---\ndate: 2026-10-19\nblocks:\n  - id: v5\n    title: Synthetic proposal\n    kind: proposal\n    status: confirmed\n    start: 18:00\n    end: 19:00\n---\nRetain this body.\n",
+    "retryUnchanged": true
+  },
+  "conflict": {
+    "staleStatus": 409,
+    "before": "Local second synthetic change\n",
+    "afterFailure": "Local second synthetic change\n",
+    "afterResolve": "Remote synthetic change\n",
+    "archives": [
+      {
+        "path": "me/profile.md",
+        "reason": "file",
+        "local": "Local second synthetic change\n",
+        "remote": "Remote synthetic change\n"
+      }
+    ],
+    "pushesAfterRecovery": 1,
+    "pushesAfterRetry": 1
+  },
+  "connection": {
+    "settingsExistedBefore": false,
+    "settingsExistsAfterFailure": false,
+    "request": {
+      "path": "/v1/chat/completions",
+      "body": {
+        "model": "v5-synthetic",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Reply OK"
+          }
+        ],
+        "max_tokens": 16
+      }
+    },
+    "settingsExistsAfterRecovery": true
+  },
+  "icloud": "NOT TESTED: Linux; no real iCloud placeholder available."
+}
