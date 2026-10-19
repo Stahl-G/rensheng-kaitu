@@ -38,6 +38,7 @@ import { isoInZone, localDate } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { ulid } from "./ulid.js";
 import { type Goal, type ModuleStatus, readWorkbench } from "./workbench.js";
+import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
 /** 搬来记忆时的类别：中英文标签都认；目标、项目、在考虑的事默认进对应模块，其余进记忆。 */
@@ -1001,7 +1002,12 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     {
       id: "sources",
       title: content.checklist.sources,
-      done: !!choices?.starts?.length && sources.every((source) => source.done),
+      // 接上一个就算：GitHub 同步、任一数据源，或用户跳过；不要求每个都连上。
+      done:
+        !!choices?.starts?.length &&
+        (workspaceBackupEnabled(ws) ||
+          sources.length === 0 ||
+          sources.some((source) => source.done || source.skipped)),
       // 还没选要管的事时先去选，选完接着接数据，不让这一项变成点不动的灰按钮。
       action: choices?.starts?.length
         ? { kind: "source", target: "sources" }

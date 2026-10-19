@@ -110,7 +110,12 @@ export function readProject(ws: Workspace, slug: string) {
   const parsed = { ...raw, data: projectStatus(raw.data, slug) };
   parsed.data.links ??= [];
   checkStatus(parsed.data);
-  return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
+  return {
+    slug,
+    dir,
+    ...parsed,
+    log: ws.exists(`${dir}/log.md`) ? (ws.scanText(`${dir}/log.md`) ?? "") : "",
+  };
 }
 /** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
 function projectSnapshot(ws: Workspace, slug: string) {

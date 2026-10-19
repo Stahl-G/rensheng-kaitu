@@ -1,6 +1,12 @@
 // Adapted from OpenClaw (MIT), Copyright (c) 2026 OpenClaw Foundation
 
-import { KaituError, archiveBankMail, isBankNotificationMail, receiveBankNotification } from "@kaitu/core";
+import {
+  KaituError,
+  archiveBankMail,
+  isBankNotificationMail,
+  receiveBankNotification,
+  systemProxy,
+} from "@kaitu/core";
 import { type FetchMessageObject, ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import { receiveMessage } from "../inbox.js";
@@ -20,6 +26,7 @@ const createTransport: ImapFactory = (account) =>
     host: account.host,
     port: account.port,
     secure: true,
+    proxy: systemProxy(),
     auth: account.accessToken
       ? { user: account.user, accessToken: account.accessToken }
       : { user: account.user, pass: account.password },
