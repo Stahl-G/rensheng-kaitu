@@ -1,5 +1,7 @@
 # 用一个 Agent 接上开图项目记忆
 
+无需 App、CLI 或特定 runtime 的首次试用，先看 [一次复制初始化](agent-memory/INSTALL.md) 和 [第二设备接续](agent-memory/ADD_DEVICE.md)。已有源码/CLI 时会优先核对并复用真实入口；没有时用普通 Git 与官方 gh，仍使用同一套开图资料与接力格式。
+
 在 App 的「设置 → GitHub 同步」核对目标仓库和资料范围，查看只读 README、描述预览与选中范围，再复制「新建 / 接入前核对提示词（当前选中范围）」到新 Agent。默认仓库名 `kaitu-ai-memory` 可改；已有同名仓库或 `my-ai-memory` 时先选择复用或新建，不覆盖、不迁移。真实建库和全局配置修改均须用户明确目标后确认。
 
 提示词包含本机实际 CLI 入口。新功能包内有 `dist/cli.mjs`，可用 App 自带的 Electron Node 执行；无须先把 kaitu 安装到 PATH。旧包缺入口时先通过 App 更新，不运行臆造的 `npx rensheng-kaitu`。
