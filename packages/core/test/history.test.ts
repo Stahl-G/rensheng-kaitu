@@ -3,11 +3,13 @@ import fs, {
   existsSync,
   readFileSync,
   renameSync,
+  rmSync,
   statSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { join, relative } from "node:path";
+import git from "isomorphic-git";
 import { describe, expect, it } from "vitest";
 import { historyDirectory, invalidateHistoryFile, pendingWorkspaceFiles } from "../src/history.js";
 import {
@@ -56,6 +58,24 @@ describe("版本历史", () => {
       "改档案",
       "初始化开图工作区",
     ]);
+    const batch = new Map([
+      ["me/batch-a.md", "合成批量 A\n"],
+      ["me/batch-b.md", "合成批量 B\n"],
+    ]);
+    for (const [file, text] of batch) ws.writeText(file, text);
+    rmSync(ws.resolve("me/profile.md"));
+    const oid = await snapshot(ws, "批量新增与删除");
+    expect(await isTracked(ws, "me/profile.md")).toBe(false);
+    for (const [filepath, text] of batch) {
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: oid as string,
+        filepath,
+      });
+      expect(Buffer.from(blob).toString()).toBe(text);
+    }
   });
 
   it("恢复整个工作区，并且恢复本身可以撤销", async () => {

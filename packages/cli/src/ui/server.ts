@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
-import { startPhoneSnapshots } from "@kaitu/core";
+import { startPhoneSnapshots, watchWorkspace } from "@kaitu/core";
 import {
   type CalendarExecutor,
   CalendarPush,
@@ -290,7 +290,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
-  let watcher: FSWatcher | undefined;
+  let watcher: ReturnType<typeof watchWorkspace> | undefined;
   let externalWatchers: FSWatcher[] = [];
   // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。
   const backupState = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
@@ -329,9 +329,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearTimeout(polling);
     polling = undefined;
     try {
-      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
-        changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
-      });
+      watcher = watchWorkspace(ws.root, changedFile);
       watcher.on("error", startPolling);
     } catch {
       startPolling();
@@ -728,7 +726,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     closed = true;
     cancelGithubCliLogin();
-    watcher?.close();
+    await watcher?.close();
     unwatchFile(backupState, backupChanged);
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
@@ -757,7 +755,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       server.listen(requestedPort, "127.0.0.1", resolve);
     });
   } catch (error) {
-    watcher?.close();
+    await watcher?.close();
     unwatchFile(backupState, backupChanged);
     stopBackup();
     stopOrganizer();

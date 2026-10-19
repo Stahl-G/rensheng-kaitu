@@ -1,0 +1,65 @@
+{
+  "checks": {
+    "build": {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "logTail": [
+        "packages/web build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting",
+        "packages/web build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.",
+        "packages/web build: Done",
+        "packages/core build: Done",
+        "packages/channels build$ tsc -p tsconfig.json",
+        "packages/channels build: Done",
+        "packages/dsh-plugin build$ node scripts/build.mjs",
+        "packages/dsh-plugin build: Done",
+        "packages/cli build$ tsc -p tsconfig.json && node scripts/build-engine.mjs",
+        "packages/cli build: Done"
+      ]
+    },
+    "lint": {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "logTail": ["$ biome check .", "Checked 529 files in 397ms. No fixes applied."]
+    },
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "logTail": [
+        "packages/core typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck$ tsc --noEmit -p tsconfig.json",
+        "packages/core typecheck: Done",
+        "packages/channels typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck: Done",
+        "packages/channels typecheck: Done",
+        "packages/dsh-plugin typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+        "packages/dsh-plugin typecheck: Done",
+        "packages/cli typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/cli typecheck: Done"
+      ]
+    },
+    "test": {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "logTail": [
+        "$ vitest run",
+        "",
+        " RUN  v4.1.11 /tmp/kaitu-v2-perf",
+        "",
+        "",
+        " Test Files  95 passed | 1 skipped (96)",
+        "      Tests  279 passed | 2 skipped (281)",
+        "   Start at  19:02:59",
+        "   Duration  65.22s (transform 2.64s, setup 561ms, import 23.45s, tests 98.10s, environment 5ms)",
+        ""
+      ]
+    }
+  },
+  "sourceSha256": {
+    "packages/core/src/workspace-watch.ts": "5d464f6fbcc761499795a6417bd789818c7ecdf09d06bdaf815937da1cb6fb63",
+    "packages/core/src/history.ts": "347acad82a09b33af0aa4cefa31486705eaec99035e62ac6a570e1674a64de22",
+    "packages/core/src/phone-snapshots.ts": "966c821f85721fe5d39e8049a08d7d08138a1caa802299f237f2266f0ac55762",
+    "packages/cli/src/ui/server.ts": "6e4f769064631dfbec867eda2685ba7c3aae1704bbcb4a0b9a65700f3229ab5c",
+    "packages/core/package.json": "4c24018dffa5289125024f731eaf3feac3047b69da45e424ee6b3856413171fa",
+    "pnpm-lock.yaml": "345ed0bb87546f924e332390b7442e2ca54e0563a68af9ac39005fbd0fa74ccf"
+  }
+}

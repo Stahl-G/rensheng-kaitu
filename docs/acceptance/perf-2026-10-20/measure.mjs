@@ -53,6 +53,12 @@ const result = {
       "--",
       "packages/core/src/health-page.ts",
       "packages/dsh-plugin/src/client/OverviewPage.tsx",
+      "packages/core/src/workspace-watch.ts",
+      "packages/core/src/history.ts",
+      "packages/core/src/phone-snapshots.ts",
+      "packages/cli/src/ui/server.ts",
+      "packages/core/package.json",
+      "pnpm-lock.yaml",
     ],
     {
       encoding: "utf8",
@@ -348,7 +354,38 @@ try {
             if (!result.fileImportVersion) throw new Error("file import not completely versioned");
           });
           result.importedMessagesVerified = 2000;
-        } else if (mode === "background") {
+        } else if (mode === "background" || mode === "version-profile") {
+          const timingStart = performance.now();
+          const timeline = [];
+          const indexIo = {};
+          const writeSync = fs.writeFileSync;
+          fs.writeFileSync = (file, ...args) => {
+            if (String(file).endsWith("/kaitu-internal-history"))
+              timeline.push({ event: "save-start", ms: performance.now() - timingStart });
+            return writeSync(file, ...args);
+          };
+          const original = {};
+          for (const method of ["lstat", "readFile", "writeFile"]) {
+            original[method] = fs.promises[method];
+            fs.promises[method] = async (file, ...args) => {
+              const name = String(file).replaceAll("\\", "/");
+              if (name.endsWith("/history.git/index")) indexIo[method] = (indexIo[method] ?? 0) + 1;
+              const value = await original[method](file, ...args);
+              if (method === "writeFile" && name.endsWith("/history.git/refs/heads/main"))
+                timeline.push({ event: "ref-written", ms: performance.now() - timingStart });
+              return value;
+            };
+          }
+          const session = mode === "version-profile" ? new inspector.Session() : undefined;
+          const post = (method) =>
+            new Promise((resolve, reject) =>
+              session.post(method, (error, value) => (error ? reject(error) : resolve(value))),
+            );
+          if (session) {
+            session.connect();
+            await post("Profiler.enable");
+            await post("Profiler.start");
+          }
           const readVersion = (oid, file) => {
             const child = spawnSync(
               "git",
@@ -424,6 +461,15 @@ try {
             });
             result.imported = imported.entries.length;
           });
+          if (session) {
+            const { profile } = await post("Profiler.stop");
+            fs.writeFileSync(path.join(output, "version.cpuprofile"), JSON.stringify(profile));
+            session.disconnect();
+          }
+          fs.writeFileSync = writeSync;
+          for (const method of Object.keys(original)) fs.promises[method] = original[method];
+          result.saveTimeline = timeline;
+          result.indexIo = indexIo;
         } else {
           result.firstOverview = await measure("http-overview-first", () => product("overview"));
           for (const method of ["health", "library", "me"])

@@ -1,4 +1,3 @@
-import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
@@ -8,6 +7,7 @@ import { lifeMap } from "./places.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange } from "./workbench.js";
 import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
+import { watchWorkspace } from "./workspace-watch.js";
 import type { Workspace } from "./workspace.js";
 
 export function phoneReadable(ws: Workspace) {
@@ -84,10 +84,10 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
     timer = setTimeout(() => void run(), 2000);
     timer.unref();
   };
-  let watcher: ReturnType<typeof watch> | undefined;
+  let watcher: ReturnType<typeof watchWorkspace> | undefined;
   try {
-    watcher = watch(ws.root, { recursive: true }, (_event, file) => {
-      if (file && !ignoredWorkspaceChange(file)) schedule();
+    watcher = watchWorkspace(ws.root, (file) => {
+      if (!ignoredWorkspaceChange(file)) schedule();
     });
     watcher.on("error", () => {
       watcher?.close();

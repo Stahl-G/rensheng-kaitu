@@ -268,8 +268,11 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
+  // 只在这次完整保存里共享 Git 对象与索引解析，不跨版本缓存工作区状态。
+  const cache = {};
   const changedFiles = new Map(invalidated.get(ws));
   const matrix = await git.statusMatrix({
+    cache,
     fs: historyFs(ws, changedFiles),
     refresh: !changedFiles.size,
     dir,
@@ -286,26 +289,30 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
     }
     description = result;
   } else description = message;
-  let changed = 0;
+  const additions: string[] = [];
+  const removals: string[] = [];
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
       if (head !== 0 || stage !== 0) {
-        await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-        changed++;
+        removals.push(filepath);
       }
       continue;
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
-    if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
-    changed++;
+    if (workdir === 0) removals.push(filepath);
+    else additions.push(filepath);
   }
-  if (changed === 0) {
+  if (!additions.length && !removals.length) {
     clearInvalidated(ws, changedFiles);
     return null;
   }
+  if (removals.length) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath: removals, cache });
+  // git.add 支持多路径，但会并行打开该数组里的文件；小批限制文件句柄，同时避免逐文件重写全索引。
+  for (let i = 0; i < additions.length; i += 32)
+    await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath: additions.slice(i, i + 32), cache });
   const timestamp = Math.floor(now.getTime() / 1000);
   const oid = await git.commit({
+    cache,
     fs,
     dir,
     gitdir: historyDirectory(ws),

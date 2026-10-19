@@ -40,6 +40,7 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [saxes](https://github.com/lddubeau/saxes) | Apple Health XML 解析 | ISC |
 | [ical.js](https://github.com/kewisch/ical.js) | ICS 日历解析与订阅数据处理 | MPL-2.0 |
 | [isomorphic-git](https://github.com/isomorphic-git/isomorphic-git) | 资料版本历史与撤销 | MIT |
+| [Chokidar](https://github.com/paulmillr/chokidar) | 工作区文件监听，遍历前排除内部历史与缓存 | MIT |
 | [Ajv](https://github.com/ajv-validator/ajv) | JSON Schema 数据校验 | MIT |
 | [ajv-formats](https://github.com/ajv-validator/ajv-formats) | Ajv 的日期等格式校验 | MIT |
 | [yaml](https://github.com/eemeli/yaml) | YAML 配置与文档 frontmatter 解析 | ISC |
