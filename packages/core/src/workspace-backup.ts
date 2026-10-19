@@ -21,7 +21,7 @@ import { parseGithubRepo, setGithubToken } from "./github.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
 import { rememberOrganizer } from "./organizer.js";
-import { holdOverview, latestDaily, refreshOverview } from "./overview.js";
+import { batchOverview, holdOverview, latestDaily, refreshOverview } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
 import { placeholderOriginal } from "./sync-files.js";
@@ -557,9 +557,15 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         : [];
       rememberOrganizer(ws, incoming["phone/today.json"], added, latestDaily(ws));
       // 云端整理员写的回执，本机没有的先并进来；其余 phone 文件仍以本机为准。
-      if (added.length && writePhoneReceipts(ws, added))
+      let receiptsChanged = false;
+      if (added.length && writePhoneReceipts(ws, added)) {
         local["phone/receipts.json"] = ws.readText("phone/receipts.json");
-      const merged = mergeBackup(base, withoutManifest(local), phoneFromLocal(local));
+        receiptsChanged = true;
+      }
+      // 未写入新回执时，三个输入未变，复用刚校验过的合并，避免再解析/编码整份 JSONL。
+      const merged = receiptsChanged
+        ? mergeBackup(base, withoutManifest(local), phoneFromLocal(local))
+        : check;
       // 远端清单记的是仓库里有哪些范围：保留远端已有的范围，本机连接范围不变。
       const remoteScope = manifestScope(incoming[manifest]);
       const scope = {
@@ -576,11 +582,16 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       // 网络期间作者可能继续写：这次结果留待下轮，不覆盖刚保存的内容。
       if (changes.some((path) => (ws.exists(path) ? ws.readText(path) : undefined) !== local[path])) return;
       controller.signal.throwIfAborted();
-      for (const path of changes) {
-        if (merged.files[path] === undefined) rmSync(ws.resolve(path));
-        else ws.writeText(path, merged.files[path] as string);
-      }
-      rememberOrganizer(ws, undefined, [], latestDaily(ws));
+      const applyChanges = async () => {
+        for (const path of changes) {
+          if (merged.files[path] === undefined) rmSync(ws.resolve(path));
+          else ws.writeText(path, merged.files[path] as string);
+        }
+        rememberOrganizer(ws, undefined, [], latestDaily(ws));
+      };
+      // CLI/default 调用也在操作边界只刷新一次；无内容改动不新增汇总，UI 原有 hold 继续生效。
+      if (changes.length) await batchOverview(ws, applyChanges);
+      else await applyChanges();
       if (!sameFiles(merged.files, incoming)) {
         const outgoing = { ...other.files, ...merged.files };
         for (const path of Object.keys(incoming)) if (!(path in merged.files)) delete outgoing[path];
