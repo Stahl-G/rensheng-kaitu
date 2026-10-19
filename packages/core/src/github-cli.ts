@@ -33,6 +33,11 @@ function run(
           resolve({ output: stdout, ok: !error, loginRequired: /gh auth login|not logged/i.test(stderr) });
       },
     );
+    child.stdin?.on("error", () => {
+      reject(
+        signal?.aborted ? signal.reason : new KaituError("GitHub 请求正文未能写入，请重试", "GH_REQUEST"),
+      );
+    });
     child.stdin?.end(body === undefined ? undefined : JSON.stringify(body));
   });
 }
