@@ -1,5 +1,7 @@
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { strToU8, zipSync } from "fflate";
 import git from "isomorphic-git";
 import { expect, it, vi } from "vitest";
@@ -166,6 +168,31 @@ it("同步修正日志日期倒序、同日标题去重，保留计数与原仓�
     expect(log.split("<!-- sync:commits -->")).toHaveLength(2);
     expect(await git.resolveRef({ fs, dir: repo, ref: "HEAD" })).toBe(head);
     expect(files(repo)).toEqual(before);
+    const shallow = join(tmp(), "shallow");
+    execFileSync("git", ["clone", "--depth", "1", "--branch", "work-0", pathToFileURL(repo).href, shallow], {
+      stdio: "pipe",
+    });
+    const shallowHead = await git.resolveRef({ fs, dir: shallow, ref: "HEAD" });
+    const parent = (await git.readCommit({ fs, dir: shallow, oid: shallowHead })).commit.parent[0];
+    expect(parent).toBeTruthy();
+    await expect(git.readCommit({ fs, dir: shallow, oid: parent as string })).rejects.toThrow();
+    const linked = await createProject(ws, {
+      title: "synthetic-shallow-and-full",
+      kind: "work",
+      links: [
+        { path: shallow, role: "repo" },
+        { path: repo, role: "repo" },
+      ],
+    });
+    const shallowResult = await syncProject(ws, linked.slug, { now: new Date("2026-10-15T06:00:00Z") });
+    expect(shallowResult.issues).toEqual([]);
+    expect(
+      readRecords(ws, "project_metric")
+        .filter((row) => row.project === linked.slug)
+        .map((row) => row.value),
+    ).toEqual([2]);
+    expect(fs.readFileSync(join(shallow, ".git/shallow"), "utf8").trim()).toBe(shallowHead);
+    fs.rmSync(shallow, { recursive: true, force: true });
   } finally {
     vi.restoreAllMocks();
     fs.rmSync(repo, { recursive: true, force: true });

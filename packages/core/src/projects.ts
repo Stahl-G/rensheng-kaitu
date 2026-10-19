@@ -540,6 +540,10 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       try {
         const dir = linkedPath(link);
         if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
+        const shallowFile = join(dir, ".git/shallow");
+        const shallow = new Set(
+          fs.existsSync(shallowFile) ? fs.readFileSync(shallowFile, "utf8").trim().split(/\s+/) : [],
+        );
         const pending: string[] = [];
         for (const namespace of ["refs/heads", "refs/remotes"]) {
           for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
@@ -553,7 +557,7 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
           if (seenCommits.has(oid)) continue;
           const { commit } = await git.readCommit({ fs, dir, oid });
           seenCommits.add(oid);
-          pending.push(...commit.parent);
+          if (!shallow.has(oid)) pending.push(...commit.parent);
           const timestamp = commit.author.timestamp;
           const day = localDate(new Date(timestamp * 1000), tz);
           if (day < from || day >= today) continue;
