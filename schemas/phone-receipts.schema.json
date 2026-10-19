@@ -19,6 +19,14 @@
           "kind": { "enum": ["file", "action"] },
           "status": { "enum": ["applied", "duplicate", "conflict", "rejected"] },
           "message": { "type": "string", "description": "conflict 和 rejected 时写明原因，给用户看" },
+          "target": {
+            "type": "object",
+            "required": ["id", "rev"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "rev": { "type": "integer", "minimum": 1 }
+            }
+          },
           "at": { "type": "string", "format": "date-time" }
         }
       }
