@@ -150,7 +150,9 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
     expect(ws.readText(".kaitu/config.json")).toBe(config);
     const initial = onboardingStatus(ws, options);
     expect(initial.sources.map((source) => source.id)).toEqual(["calendar", "health", "projects", "news"]);
-    expect(initial.checklist.completed).toBe(1);
+    // 跳过了一个数据源，「接上数据」就算完成，不要求每个都接上。
+    expect(initial.checklist.items.find((item) => item.id === "sources")?.done).toBe(true);
+    expect(initial.checklist.completed).toBe(2);
     expect(initial.sources.find((item) => item.id === "health")).toMatchObject({
       done: false,
       skipped: true,
@@ -190,10 +192,10 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
       options,
     );
     const newsPreview = previewOnboardingSetup(ws, { source: "news", keywords: ["合成方向"] }, options);
-    expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
+    expect(onboardingStatus(ws, options).checklist.completed).toBe(5);
     await confirmOnboardingSetup(ws, projectPreview.token, options);
     await confirmOnboardingSetup(ws, newsPreview.token, options);
-    expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
+    expect(onboardingStatus(ws, options).checklist.completed).toBe(5);
     expect(onboardingStatus(ws, { stateRoot: join(root, "another-computer") }).showGuide).toBe(false);
     await restore(ws, before[0]?.oid as string);
     const restored = onboardingStatus(ws, options);

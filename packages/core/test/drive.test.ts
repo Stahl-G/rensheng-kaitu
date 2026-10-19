@@ -13,6 +13,9 @@ import { expect, it, vi } from "vitest";
 import {
   Workspace,
   addRecord,
+  calendarPushEntries,
+  captureNote,
+  createProject,
   defaultRoot,
   disableDrive,
   doctor,
@@ -24,6 +27,9 @@ import {
   initWorkspace,
   listModules,
   mcpToken,
+  readCalendar,
+  readLibrary,
+  readProject,
   readRecords,
   reindexChats,
   restore,
@@ -119,6 +125,36 @@ it.skipIf(process.platform === "win32")("Drive 里还没下载的文件不会卡
     const reopened = new Workspace(ws.root);
     expect(() => reopened.readText("learning/module.json")).toThrow("还没从云盘下载");
     expect(listModules(reopened).some((module) => module.dir === "me")).toBe(true);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it.skipIf(process.platform === "win32")("Drive 里有文件没下载时，页面照常读出其余内容", async () => {
+  const home = tmp();
+  vi.stubEnv("HOME", home);
+  vi.stubEnv("XDG_STATE_HOME", join(home, "state"));
+  vi.stubEnv("LOCALAPPDATA", join(home, "local"));
+  vi.stubEnv("KAITU_DIR", "");
+  try {
+    const drive = join(home, "Library/CloudStorage/GoogleDrive-x/我的云端硬盘");
+    mkdirSync(drive, { recursive: true });
+    const ws = await initWorkspace(join(home, "kaitu"));
+    await enableDrive(ws, { driveDir: drive });
+    const note = (await captureNote(ws, "随手记一条")).path;
+    await createProject(ws, { title: "合成项目", slug: "synthetic", kind: "work" });
+    for (const file of ["NOW.md", note, "projects/synthetic/log.md"]) {
+      const path = ws.resolve(file);
+      rmSync(path, { force: true });
+      const fd = openSync(path, "w");
+      ftruncateSync(fd, 200);
+      closeSync(fd);
+    }
+    const reopened = new Workspace(ws.root);
+    expect(readLibrary(reopened).inbox.some((entry) => entry.file === note)).toBe(false);
+    expect(readCalendar(reopened)).toBeTruthy();
+    expect(readProject(reopened, "synthetic").log).toBe("");
+    expect(calendarPushEntries(reopened)).toEqual([]);
   } finally {
     vi.unstubAllEnvs();
   }

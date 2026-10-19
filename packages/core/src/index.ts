@@ -94,6 +94,7 @@ export { dshFiles } from "./dsh-files.js";
 export * from "./workspace-backup.js";
 export * from "./github-cli.js";
 export * from "./project-memory.js";
+export * from "./system-proxy.js";
 
 export * from "./investments.js";
 export * from "./phases.js";

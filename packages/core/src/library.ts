@@ -32,35 +32,40 @@ export interface LibraryData {
 export function readLibrary(ws: Workspace): LibraryData {
   const calendar = readCalendar(ws);
   const doing = readDoing(ws);
-  const entry = (file: string, organized: boolean): InboxEntry => {
-    const { data, body } = parseFrontmatter(ws.readText(file));
+  // 还没从云盘下载的笔记先不列，下载后自然出现。
+  const entry = (file: string, organized: boolean): InboxEntry[] => {
+    const text = ws.scanText(file);
+    if (text === undefined) return [];
+    const { data, body } = parseFrontmatter(text);
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
         : undefined;
-    return {
-      file,
-      text: body.trim(),
-      source:
-        data.kind === "capture"
-          ? "me"
-          : channelSource === "gmail" || channelSource === "imap"
-            ? "mail"
-            : (channelSource ?? "other"),
-      date:
-        typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
-      status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
-      destination: null,
-    };
+    return [
+      {
+        file,
+        text: body.trim(),
+        source:
+          data.kind === "capture"
+            ? "me"
+            : channelSource === "gmail" || channelSource === "imap"
+              ? "mail"
+              : (channelSource ?? "other"),
+        date:
+          typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
+        status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
+        destination: null,
+      },
+    ];
   };
-  const inbox = inboxNotes(ws).map((note) => entry(note.path, false));
+  const inbox = inboxNotes(ws).flatMap((note) => entry(note.path, false));
   const done = "inbox/notes/done";
   if (ws.exists(done))
     for (const day of readdirSync(ws.resolve(done), { withFileTypes: true })) {
       if (!day.isDirectory() || !/^\d{4}-\d{2}-\d{2}$/.test(day.name)) continue;
       for (const file of readdirSync(ws.resolve(`${done}/${day.name}`), { withFileTypes: true })) {
         if (file.isFile() && file.name.endsWith(".md"))
-          inbox.push(entry(`${done}/${day.name}/${file.name}`, true));
+          inbox.push(...entry(`${done}/${day.name}/${file.name}`, true));
       }
     }
   inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));

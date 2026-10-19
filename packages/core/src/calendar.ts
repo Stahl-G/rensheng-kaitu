@@ -128,9 +128,11 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     pending: false,
   }));
   let planDate: string | null = null;
-  if (ws.exists("NOW.md")) {
+  // 云盘里还没下载的 NOW.md 当作没有计划，不让整页读取失败。
+  const nowText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
+  if (nowText !== undefined) {
     // 和今天页读同一份补齐 id 后的计划。
-    const data = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as unknown as TodayPlan;
+    const data = normalizeNow(parseFrontmatter(nowText).data) as unknown as TodayPlan;
     const date = data.date;
     planDate = data.blocks?.length ? date : null;
     for (const block of data.blocks ?? []) {

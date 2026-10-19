@@ -53,13 +53,15 @@ export interface CalendarExecutor {
   upsert(entry: CalendarPushEntry, uid?: string, changed?: boolean): Promise<string | null>;
   remove(uid: string, entry: CalendarPushEntry): Promise<void>;
 }
+// NOW.md 还在云盘没下载时当作没有计划：不推送，也不让设置页读取失败。
 function nowPlan(ws: Workspace): TodayPlan {
-  return normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as unknown as TodayPlan;
+  const text = ws.scanText("NOW.md");
+  return normalizeNow(text === undefined ? {} : parseFrontmatter(text).data) as unknown as TodayPlan;
 }
 export function calendarPushStore(ws: Workspace): CalendarPushStore {
   const file = () => join(localStateRoot(), "system-calendar", `${stateBinding(ws.root).id}.json`);
   return {
-    date: () => (ws.exists("NOW.md") ? nowPlan(ws).date : null),
+    date: () => (ws.exists("NOW.md") ? (nowPlan(ws).date ?? null) : null),
     read: () =>
       existsSync(file()) ? JSON.parse(readFileSync(file(), "utf8")) : { enabled: true, entries: {} },
     write: (state) => {
