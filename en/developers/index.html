@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>For developers · Kaitu</title>
+<meta name="description" content="Set up a Kaitu workspace in one sentence: give it to Claude Code, Codex or Cursor and get a private workspace in your own GitHub account.">
+<link rel="canonical" href="https://kaitu.si/en/developers/">
+<link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/developers/">
+<link rel="alternate" hreflang="en" href="https://kaitu.si/en/developers/">
+<link rel="alternate" hreflang="x-default" href="https://kaitu.si/developers/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kaitu">
+<meta property="og:title" content="For developers · Kaitu">
+<meta property="og:description" content="Set up a Kaitu workspace in one sentence: give it to Claude Code, Codex or Cursor and get a private workspace in your own GitHub account.">
+<meta property="og:url" content="https://kaitu.si/en/developers/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=d40d0445">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/app.js?v=2bff1222" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-top">
+  <div class="wrap">
+    <a class="brand" href="/en/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>Kaitu</span></a>
+    <a class="lang" href="/developers/" hreflang="zh-CN" lang="zh-CN" data-lang-switch="zh">中文</a>
+    <nav class="site-nav" aria-label="Site"><a href="/en/#tour">Product</a><a href="/en/vision/">Vision</a><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/#inspiration">Inspiration</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+  </div>
+</header>
+<main id="main" tabindex="-1">
+<div class="wrap narrow">
+  <header class="page-head"><h1>For developers: set up a Kaitu workspace in one sentence</h1><p class="lead">For people who already use coding agents like Claude Code, Codex or Cursor. No app needed: your agent creates a private Kaitu workspace in your own GitHub account, so you can pick up where you left off on any computer, with any agent.</p></header>
+  <div class="doc">
+<h2 id="start">Start with one sentence<a class="anchor" href="#start" aria-label="#">#</a></h2>
+<p>Give this to your agent:</p>
+<div class="codeblock"><pre style="white-space:pre-wrap;overflow-wrap:anywhere;padding-right:4.5rem"><code>Set up my Kaitu memory by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md. Do it end to end, don't just give me instructions.</code></pre><button type="button" class="copy">Copy</button></div>
+<p>Any agent that can work with files and a terminal will do. You need git and GitHub's official CLI, gh. If you are not signed in, the agent sends you to GitHub's own sign-in page.</p>
+<h2 id="what">What it does<a class="anchor" href="#what" aria-label="#">#</a></h2>
+<ol>
+<li>Checks git, gh and your sign-in. If this computer already has Kaitu data, it uses that instead of making a second copy.</li>
+<li>Asks you at most three questions. The first is always "Besides this, what else are you working on?", so it does not stop at the project in the current folder.</li>
+<li>For every project you mention, it reads the latest docs, commits and open PRs itself, and writes where it stands, what is blocking it and what comes next, with the date it read them.</li>
+<li>Shows you what it will save. After you confirm, it creates the private repository <code>kaitu-ai-memory</code> and uploads.</li>
+<li>Writes the first handoff and gives you a sentence to paste into another computer or agent.</li>
+</ol>
+<h2 id="never">What it will not do<a class="anchor" href="#never" aria-label="#">#</a></h2>
+<ul>
+<li>Create a public repository. It checks the repository is private before every push.</li>
+<li>Touch your existing repositories or files.</li>
+<li>Ask for passwords, tokens or codes. Sign-in only happens on GitHub's own page.</li>
+<li>Upload anything before you confirm.</li>
+</ul>
+<h2 id="join">Another computer or another agent<a class="anchor" href="#join" aria-label="#">#</a></h2>
+<div class="codeblock"><pre style="white-space:pre-wrap;overflow-wrap:anywhere;padding-right:4.5rem"><code>Connect to my Kaitu memory at &lt;repo URL&gt; by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/ADD_DEVICE.md. Tell me what you remember, then continue with what I ask.</code></pre><button type="button" class="copy">Copy</button></div>
+<p>The new agent first tells you what it remembers. When it finishes work, it updates the progress of the project it worked on and leaves a handoff. Your profile, preferences and goals it only suggests changes to, and waits for you.</p>
+<h2 id="folder">What is in the workspace<a class="anchor" href="#folder" aria-label="#">#</a></h2>
+<div class="codeblock"><pre><code>kaitu-ai-memory/
+├── AGENT-README.md      agents start here
+├── me/                  profile, goals, routines
+├── memory/              preferences, facts, decisions
+├── projects/&lt;project&gt;/  STATUS.md · log.md
+├── handoffs/            a handoff after each session
+├── inbox/agents/        suggestions not yet accepted
+└── kaitu-backup.json    lets the Kaitu app recognize it</code></pre></div>
+<p>Plain Markdown and JSON in the same format as the Kaitu app. You can read and edit them any time.</p>
+<h2 id="app">See it in the app<a class="anchor" href="#app" aria-label="#">#</a></h2>
+<p>After installing Kaitu (see <a href="/en/download/">Download</a>), open Settings → GitHub sync and restore from this repository into a new folder. The same data then shows up in Today, Map and Library.</p>
+<p>The full steps your agent follows: <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md" rel="noopener">INSTALL.md</a> · <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/ADD_DEVICE.md" rel="noopener">ADD_DEVICE.md</a> · <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/README.md" rel="noopener">guide</a>. The guide is written in Chinese; agents read it fine.</p>
+  </div>
+</div>
+</main>
+<footer class="site-foot">
+  <div class="wrap">
+    <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
+    <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/developers/">For developers</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a><a href="/en/support/">Support</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
+    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
+    <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
+  </div>
+</footer>
+</body>
+</html>
