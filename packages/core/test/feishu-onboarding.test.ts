@@ -67,6 +67,7 @@ it("ULID 原文仍可读取采纳，飞书路径白名单及原有 kind/date 检
     const name = `feishu-${"a".repeat(64)}.md`;
     const source = `inbox/notes/2026-10-19/${name}`;
     ws.writeText(source, "---\nkind: capture\ndate: 2026-10-19\n---\nsentinel");
+    ws.writeText(`${source}\n`, "---\nkind: capture\ndate: 2026-10-19\n---\nnewline sentinel");
     for (const bad of [
       `../${source}`,
       `${source}/../${name}`,
