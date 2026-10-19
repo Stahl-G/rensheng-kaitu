@@ -262,6 +262,15 @@ export function OnboardingPage(props: Props) {
         ) : (
           !error && <p className={v2.small}>{t("正在读取…", "Loading…")}</p>
         )}
+        <p className={v2.small}>
+          {t(
+            "已有手机上的 GitHub 开图仓库？可以连接同一仓库或恢复到新文件夹。照片、视频等附件暂不同步。",
+            "Already use a Kaitu repository on GitHub with your phone? Connect it or restore into a new folder. Photos, videos and other attachments are not synced yet.",
+          )}{" "}
+          <button type="button" className={v2.link} onClick={() => finish("connections")}>
+            {t("打开 GitHub 同步", "Open GitHub sync")}
+          </button>
+        </p>
         <div className={css.footer}>
           <button type="button" className={quiet} onClick={() => move(0)}>
             {t("上一步", "Back")}

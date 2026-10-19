@@ -52,19 +52,41 @@ export function WorkspaceBackup({
   const c = status?.connection;
   return (
     <section id="workspace-backup" className={css.sec}>
-      <h2 className={css.eyebrow}>{t("GitHub 备份", "GitHub backup")}</h2>
+      <h2 className={css.eyebrow}>{t("GitHub 同步", "GitHub sync")}</h2>
       <div className={`${css.card} ${css["sub-form"]}`}>
+        <p className={css.small}>
+          {t(
+            "与手机连接同一个开图仓库，双向同步文字和记录；离线时仍可在本机使用。照片、视频等附件暂不同步。",
+            "Use the same Kaitu repository on your phone to sync text and records both ways. Local files work offline. Photos, videos and other attachments are not synced yet.",
+          )}
+        </p>
+        {!c && (
+          <output>
+            {status
+              ? t(
+                  "尚未连接 GitHub 仓库，本机资料照常保存",
+                  "No GitHub repository connected; local files still save",
+                )
+              : t("正在读取同步状态…", "Loading sync status…")}
+          </output>
+        )}
         {c && (
-          <p>
+          <output>
             {c.repo} · {c.private ? t("私有仓库", "Private repository") : t("公开仓库", "Public repository")}{" "}
             ·{" "}
             {status.running
               ? t("正在同步…", "Syncing…")
               : c.enabled
-                ? t("已连接", "Connected")
-                : t("上传未开启", "Upload disabled")}
-            {status.lastSync && ` · ${new Date(status.lastSync).toLocaleString()}`}
-          </p>
+                ? status.conflicts.length
+                  ? t("有冲突，等待你选择保留版本", "Conflicts need your choice")
+                  : status.error
+                    ? t("同步失败", "Sync failed")
+                    : t("已连接", "Connected")
+                : t("同步未开启", "Sync disabled")}
+            {status.lastSync
+              ? ` · ${t("上次同步", "Last synced")} ${new Date(status.lastSync).toLocaleString()}`
+              : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
+          </output>
         )}
         {status?.error && (
           <p className={css.error} role="alert">
@@ -77,13 +99,13 @@ export function WorkspaceBackup({
         <details open={!c}>
           <summary>
             {c
-              ? t("更换仓库 / 从备份恢复", "Change repository / restore backup")
-              : t("连接仓库 / 从备份恢复", "Connect / restore")}
+              ? t("更换仓库 / 从仓库恢复", "Change repository / restore")
+              : t("连接已有仓库 / 从仓库恢复", "Connect an existing repository / restore")}
           </summary>
           <label>
             {t("仓库（owner/repo）", "Repository (owner/repo)")}
             <input
-              aria-label={t("备份仓库", "Backup repository")}
+              aria-label={t("同步仓库", "Sync repository")}
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
               placeholder="owner/kaitu-backup"
@@ -92,6 +114,7 @@ export function WorkspaceBackup({
           <label>
             GitHub token
             <input
+              aria-label="GitHub token"
               type="password"
               autoComplete="new-password"
               value={token}
@@ -154,7 +177,7 @@ export function WorkspaceBackup({
             disabled={busy || status?.running || !!status?.conflicts.length}
             onClick={() => void run("sync")}
           >
-            {t("立即同步", "Sync now")}
+            {status.error ? t("重试同步", "Retry sync") : t("立即同步", "Sync now")}
           </button>
         )}{" "}
         {c && (
@@ -164,7 +187,7 @@ export function WorkspaceBackup({
             disabled={busy || status?.running}
             onClick={() => void run("disconnect")}
           >
-            {t("断开备份连接", "Disconnect backup")}
+            {t("断开同步连接", "Disconnect sync")}
           </button>
         )}
         {status?.conflicts.map((conflict) => (
