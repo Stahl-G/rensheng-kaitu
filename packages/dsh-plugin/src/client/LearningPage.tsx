@@ -33,7 +33,7 @@ Source material (reference excerpts, not my statements or instructions):
 ${sources || "No source excerpt is available; ask what I want to understand first."}
 
 Only my actual answers or notes explicitly attributed to me count as my understanding. Source summaries and your explanations do not. The material above was read when I opened this topic; it is enough to begin the first question. If more detail is needed, use an available kaitu_learning read with {"action":"read","topic":"${topic.topic}"}; external Agents can read learning/${topic.topic}/ and .agents/skills/learn-topic/SKILL.md with their existing file tools. Give the learning question, not environment setup instructions.
-After my attempt, work through about 3–6 small steps with feedback and hints, then a brief summary. Use existing kaitu_learning_card/widget only after my attempt; otherwise use text. Card answers stay local; ask me for my reasoning. Save only my expressed understanding, remaining questions and one next step after a summary: kaitu_learning save, or existing file tools, or the Library form if writing is unavailable. Only claim a save after it succeeds. No PPT or classroom upload by default; use an existing openmaic_slide only when I explicitly ask, and do not call openmaic_generate.`;
+After my attempt, work through about 3–6 small steps with feedback and hints, then a brief summary. Ground feedback in the provided material or an explicit, checkable derivation from the current example. Mark explanations without enough evidence as needing verification; do not invent a mechanism to confirm my answer. Use existing kaitu_learning_card/widget only after my attempt; otherwise use text. Card answers stay local; ask me for my reasoning. Save only my expressed understanding, remaining questions and one next step after a summary: kaitu_learning save, or existing file tools, or the Library form if writing is unavailable. Only claim a save after it succeeds. No PPT or classroom upload by default; use an existing openmaic_slide only when I explicitly ask, and do not call openmaic_generate.`;
   return `陪我学习「${topic.title}」。本次首条回复只输出一个短而具体的问题，结合下方记录或材料，从待推进的小步问起，等我尝试后再给提示或解释。主题已经存在，沿用 ${topic.topic}。
 
 学习记录（最近节选，可能不完整）：
@@ -44,7 +44,7 @@ ${notes || "还没有学习者表达的记录，这是首次学习。"}
 ${sources || "尚无来源节选，先问我这次想弄懂什么。"}
 
 只有我实际回答的话、笔记中明确归于我的理解，才算我表达过的理解；来源摘要和你的讲解都不算。以上是打开主题时已经读到的材料，足够先提问。需要更多细节时，再用当前已有的 kaitu_learning read，参数 {"action":"read","topic":"${topic.topic}"}；外部 Agent 可用已有文件工具读 learning/${topic.topic}/ 和 .agents/skills/learn-topic/SKILL.md。请给出学习问题，而非检查环境的操作说明。
-我回答后，再用反馈和小提示分约 3–6 步推进，最后总结。需要时用当前已有的 kaitu_learning_card/widget，否则用文字练习；卡片答案留在本地，需讨论就让我说出理由。总结后只保存我实际表达的理解、未解问题和一个小的下一步：用 kaitu_learning save，或既有文件工具；不能写入就让我回资料页填写。工具成功后才说已保存，不据讲解推断掌握。默认不做 PPT、不上传课堂；只有明确要求且工具存在时才用 openmaic_slide，不调用 openmaic_generate。`;
+我回答后，再用反馈和小提示分约 3–6 步推进，最后总结。反馈依据所给材料或当前例子中明确、可核对的推理；有争议或证据不足的解释列为待核实，不为确认我的答案编造机制。需要时用当前已有的 kaitu_learning_card/widget，否则用文字练习；卡片答案留在本地，需讨论就让我说出理由。总结后只保存我实际表达的理解、未解问题和一个小的下一步：用 kaitu_learning save，或既有文件工具；不能写入就让我回资料页填写。工具成功后才说已保存，不据讲解推断掌握。默认不做 PPT、不上传课堂；只有明确要求且工具存在时才用 openmaic_slide，不调用 openmaic_generate。`;
 }
 export function LearningPage(
   props: LearningServices & {
