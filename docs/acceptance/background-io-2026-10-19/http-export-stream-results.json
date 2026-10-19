@@ -1,0 +1,11 @@
+{
+  "start": "running",
+  "libraryResponsive": true,
+  "completed": "ready",
+  "exportedFileCount": 224,
+  "includesLastChat": true,
+  "includesLastNote": true,
+  "cancel": "cancelled",
+  "afterCancel": "idle",
+  "status": "passed"
+}

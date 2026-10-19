@@ -82,7 +82,10 @@ try {
     }),
   );
   const indexProgress = progress;
-  const syncExport = await measure(() => core.exportWorkspace(ws));
+  const legacy = await import(
+    pathToFileURL(join(project, "../desktop-demand-io/packages/core/dist/index.js"))
+  );
+  const syncExport = await measure(() => legacy.exportWorkspace(ws));
   const asyncExport = await measure(() =>
     core.exportWorkspaceAsync(ws, {
       progress: (p) => {
@@ -92,7 +95,7 @@ try {
   );
   const exportProgress = progress;
   const originalArchive = unzipSync(Buffer.from(syncExport.value.base64, "base64"));
-  const workerArchive = unzipSync(Buffer.from(asyncExport.value.base64, "base64"));
+  const workerArchive = unzipSync(fs.readFileSync(asyncExport.value.path));
   const sameFiles =
     Object.keys(originalArchive).length === Object.keys(workerArchive).length &&
     Object.entries(originalArchive).every(([path, bytes]) =>
@@ -153,7 +156,8 @@ try {
       sync: strip(syncExport),
       worker: strip(asyncExport),
       sameFiles,
-      base64Bytes: asyncExport.value.base64.length,
+      zipBytes: asyncExport.value.bytes,
+      base64Bytes: 0,
       progress: exportProgress,
     },
     fallbackMetadataScan: {
@@ -167,6 +171,7 @@ try {
     limitations:
       "Single local run, real wall time; no timing pass/fail thresholds. Export still buffers full archive. Restore has one final synchronous derived overview refresh.",
   };
+  await asyncExport.value.dispose();
   console.log(JSON.stringify(report, null, 2));
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });

@@ -49,15 +49,16 @@ try {
   const { runDataWorker } = await import(pathToFileURL(join(payload, "dist/launcher.mjs")));
   const found = await runDataWorker(ws, "search", { query: "bundle-needle", options: {} });
   if (found.length !== 1 || found[0].id !== "bundled") throw new Error("Bundled search incomplete");
-  const zip = await runDataWorker(ws, "export", undefined);
-  if (!zip.base64 || !zip.name.endsWith(".zip")) throw new Error("Bundled export missing");
+  const zipPath = join(temporary, "bundled.zip");
+  const zip = await runDataWorker(ws, "export", { output: zipPath });
+  if (!zip.bytes || !zip.name.endsWith(".zip")) throw new Error("Bundled export missing");
   console.log(
     JSON.stringify(
       {
         worker: "CLI build-engine output in desktop dist/data-worker.mjs layout",
         bundledSearchResult: found[0].id,
         bundledExport: zip.name,
-        base64Bytes: zip.base64.length,
+        zipBytes: zip.bytes,
         status: "passed",
       },
       null,

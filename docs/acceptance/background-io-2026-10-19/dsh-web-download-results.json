@@ -1,0 +1,10 @@
+{
+  "actualHostWebServer": "0.2.1-rc.2",
+  "compressionConfiguration": "gzip",
+  "sameOriginPath": true,
+  "status": 200,
+  "contentType": "application/zip",
+  "zipBytes": 33487,
+  "managedDirectoriesRemaining": 0,
+  "outcome": "passed"
+}

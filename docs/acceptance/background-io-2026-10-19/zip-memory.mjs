@@ -52,11 +52,12 @@ if (process.argv[2] !== "--child") {
     const after = process.memoryUsage();
     peakRss = Math.max(peakRss, after.rss);
     clearInterval(timer);
+    await result.dispose?.();
     console.log(
       JSON.stringify({
         syntheticAttachmentBytes: size * 1024 * 1024,
-        zipBytes: Buffer.byteLength(result.base64, "base64"),
-        base64Characters: result.base64.length,
+        zipBytes: result.bytes ?? Buffer.byteLength(result.base64, "base64"),
+        base64Characters: result.base64?.length ?? 0,
         rssBeforeBytes: before.rss,
         sampledPeakRssBytes: peakRss,
         sampledRssIncreaseBytes: peakRss - before.rss,

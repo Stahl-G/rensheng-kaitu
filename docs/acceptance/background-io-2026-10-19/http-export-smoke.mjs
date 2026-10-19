@@ -26,7 +26,8 @@ for (let i = 0; i < 1000; i++) {
 }
 if (started.status !== "running" || state.status !== "ready") throw new Error("Export did not finish");
 const result = await request("exportWorkspaceRequest", ["result"]);
-const entries = unzipSync(Buffer.from(result.file.base64, "base64"));
+const response = await fetch(new URL(result.file.url, url));
+const entries = unzipSync(new Uint8Array(await response.arrayBuffer()));
 if (!entries["chats/2026/10/99.jsonl"] || !entries["inbox/notes/2026-10-19/0094.md"])
   throw new Error("Export incomplete");
 await request("exportWorkspaceRequest", ["start"]);

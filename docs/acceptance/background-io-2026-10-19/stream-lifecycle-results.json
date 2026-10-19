@@ -1,0 +1,35 @@
+{
+  "node": "v26.11.1",
+  "integrity": {
+    "completeFileCount": 36,
+    "multiChunkBinaryBytes": 8388608,
+    "equalsLegacyNamesAndBytes": true,
+    "archiveMode": 384,
+    "cleanup": true
+  },
+  "compressionCancel": {
+    "inputBytes": 67108864,
+    "processedBytesAtCancel": 11075996,
+    "status": "cancelled",
+    "managedDirectoriesRemaining": 0,
+    "sourcePreservedBytes": 67108864
+  },
+  "failedRead": {
+    "code": "ENOENT",
+    "managedDirectoriesRemaining": 0
+  },
+  "concurrentAppend": {
+    "sourceAfterAppendBytes": 68157440,
+    "exportedBytes": 67108864,
+    "exportedBytesEqualOriginal": true,
+    "cleanup": true
+  },
+  "interruptedDownload": {
+    "receivedBytesBeforeClientAbort": 65222,
+    "repeatStartDuringTransfer": "downloading",
+    "oneUseTokenAfterAbort": 404,
+    "invalidToken": 404,
+    "managedDirectoriesRemaining": 0
+  },
+  "status": "passed"
+}

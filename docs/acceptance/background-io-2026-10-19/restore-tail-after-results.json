@@ -1,0 +1,39 @@
+{
+  "node": "v26.11.1",
+  "platform": "darwin/arm64",
+  "scope": "Tail begins after final restored file progress; includes writeAgentsMd, backup state save, one setImmediate yield and final refreshOverview. Counters are application fs sync calls, not physical disk or SQLite IO. No timing pass/fail threshold.",
+  "rows": [
+    {
+      "syntheticNotes": 200,
+      "syntheticRecords": 1000,
+      "restoredFiles": 201,
+      "totalMs": 801.17,
+      "tailWallMs": 80.69,
+      "maxObservedTailMainThreadGapMs": 80.69,
+      "tailWorkspaceSyncCalls": {
+        "writeFileSync": 45,
+        "readdirSync": 146,
+        "statSync": 1249,
+        "lstatSync": 16,
+        "readFileSync": 70
+      },
+      "tailWorkspaceSyncReadBytes": 255546
+    },
+    {
+      "syntheticNotes": 2400,
+      "syntheticRecords": 12000,
+      "restoredFiles": 2401,
+      "totalMs": 1611.54,
+      "tailWallMs": 166.78,
+      "maxObservedTailMainThreadGapMs": 166.78,
+      "tailWorkspaceSyncCalls": {
+        "writeFileSync": 45,
+        "readdirSync": 146,
+        "statSync": 1249,
+        "lstatSync": 16,
+        "readFileSync": 70
+      },
+      "tailWorkspaceSyncReadBytes": 2008546
+    }
+  ]
+}

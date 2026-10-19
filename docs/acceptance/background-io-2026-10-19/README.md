@@ -1,5 +1,46 @@
 # 必要全量任务的后台执行验收
 
+
+## 最新追加：流式 ZIP、汇总投影、同步批量边界
+
+本节覆盖下方历史记录中仍标为残留的 ZIP 内存/base64 和汇总无用正文读取。继续沿 PR59，未合并发布，未改 PR57 学习文件或 PR54 的 Windows 功能。
+
+- ZIP 在既有 worker 内按 256 KiB 读取，使用 ZipDeflate 分块压缩并直接写程序管理的私有临时文件。每文件以打开时大小为上限，持续追加不会无限延长导出。保留原完整范围、目录/符号链接/程序状态排除和云文件可用性检查。
+- 主线程只持有文件描述信息；UI 不再接收 base64 或构造全集 Blob。独立工作台复用 /api/export/ 路由；DSH Web 复用已安装的 webServer.register 同源路由，Electron IPC 无该服务时才启用严格 Host 的回环下载入口。随机令牌只消费一次，不接收文件路径。
+- 压缩中取消等待 worker 退出再清理；正常下载、客户端中断、错误、取消、服务关闭都清理该作业目录。已完成但无人领取的结果十分钟后清理，不限制全量工作的执行时间。下载期间重复 start 返回现有 downloading 状态，不打断传输。没有任务数据库或新缓存框架。
+- 原内存 exportWorkspace 与旧 base64 RPC/前端 prop 已移除；内部 exportWorkspaceAsync 返回受管理的 WorkspaceArchive（path/bytes/dispose），RPC 只返回下载 URL。ZIP 标准与解压后的文件名/内容保持一致。
+- readStatus 使用汇总投影，跳过未消费的 profile、简报、报告、daily、labs 和 memories 正文；完整 readWorkbench 默认接口保留原字段。原文计数按可用文件元数据进行，保留冲突/占位/不可用文件过滤，不解析正文或排序。汇总仍完整折叠记录修订，并保留相关记录错误提示。
+- 默认 core sync 把接收修改放入 batchOverview，CLI/default 五份远端修改只刷新一次，UI 既有 hold 继续生效；无修改不新增汇总。无实际新 phone receipt 内容时，复用首次已校验的 mergeBackup；只有 receipt 改变 local 输入才重算。
+
+### 实测前后
+
+相同生成方式，独立进程，每文件 1 MiB 随机二进制。下表为本机一次观测，RSS 含 worker，采样峰值是下界，无固定时间/内存合格线。
+
+| 附件规模 | 旧采样 RSS 峰值 → 流式 | 旧耗时 → 流式 | base64 字符 |
+| --- | ---: | ---: | ---: |
+| 16 MiB | 347,590,096 → 245,649,088 bytes | 725.21 → 669.67 ms | 22,421,092 → 0 |
+| 64 MiB | 789,827,168 → 247,221,808 bytes | 1903.04 → 1953.40 ms | 89,552,292 → 0 |
+
+64 MiB 的进程采样峰值约下降 69%；必要压缩总工作仍保留，磁盘空间约等于最终 ZIP。另一次与完整检查并发的观测为 1442.57/5792.59 ms，保留在 zip-memory-stream-concurrent-checks.json，不用它或本表承诺跨机器延迟。原始前后为 zip-memory-results.json / zip-memory-stream-results.json，通用脚本 zip-memory.mjs 兼容旧 base64 和新文件返回值。
+
+2400 原文/12000 记录的真实恢复尾段：346.72 → 166.78 ms，readFileSync 2471 → 70，读取 9,349,350 → 2,008,546 bytes，statSync 3649 → 1249。见 restore-tail-results.json / restore-tail-after-results.json；必要的记录折叠仍同步，未宣称任意规模零阻塞。
+
+### 正确性与清理证据
+
+- stream-lifecycle.mjs：8 MiB 多块随机二进制、36 份导出文件，与已构建 PR58 逐文件名/字节相等；64 MiB 压缩中按真实字节进度取消后目录为零，源文件保留；真实 ENOENT 后目录为零；HTTP 读取首块后真实中断、重复启动、令牌重用/无效令牌均验证。并发追加 1 MiB 时，原打开范围的 64 MiB 导出哈希仍一致。使用 fflate 流式解压校验，不在这项内存实验中构造全集解压结果。
+- http-export-stream-results.json：真实 startUi 产品接口→URL→HTTP ZIP，224 份文件，含最后一份 chat/note；导出时 library 可响应；取消后 idle。
+- dsh-web-download.mjs：真实已安装 Cordis + dsh-host-webserver 0.2.1-rc.2 + 构建后的 Kaitu service，同源下载在 gzip 配置下通过并清理；没有 HTTP 服务替身。既有 DSH 只读旅程也覆盖 Electron 回环后备下载与一次性令牌。
+- bundle-stream-smoke-results.json：实际 CLI engine worker 置于桌面 dist/data-worker.mjs 布局，检索与文件 ZIP 通过。
+- 默认同步五条远端正文修改，真实配置扫描标记验证汇总次数 5 → 1；6000 记录 no-op 的 parse/stringify 各 36000 → 18000，推送 0，原记录内容不变。完整本地读取（70 次）、目录遍历（73 层）及约 1.92 MB 状态重写均保留，见 sync-noop-results.json。计数只包装真实 JSON/文件函数，不替代返回值，不模拟 Git 或时间。
+
+复验：先完整 build。zip-memory.mjs、restore-tail.mjs 和 dsh-web-download.mjs 可直接运行。stream-lifecycle.mjs 可选传已构建 PR58 根目录；有基线时对比完整文件名/字节，无基线时明确输出未运行旧实现对照。sync-noop.mjs 需传已构建旧分支根目录，默认使用本机相邻 desktop-demand-io。所有脚本只操作自建临时目录；dsh-web-download 使用锁文件中已安装的 host-webserver，不下载依赖。
+
+检查：完整 build、typecheck 通过；流式实现完整测试 96 文件/282 项通过；随后 core sync 两处最小改动由原备份往返/冲突/取消七项回归验证，断言与默认超时未放宽。最新 CI 与准确 head 记录在 PR59 说明。浏览器 GUI 输入仍有既有工具缺口，HTTP/实际 DSH WebServer/回环路径不是 GUI 点击验收。
+
+以下保留此前分阶段记录和原失败证据，不代表最新流式实现仍返回 base64。
+
+---
+
 基于 PR58（`codex/desktop-demand-io`），独立后续分支 `codex/desktop-background-io`；不改 iOS、PR57 的 LearningPage/core learning、Windows PR54。资料格式、搜索覆盖范围、ZIP 内容、备份选择语义不变。所有数据为本任务临时生成，未遍历私人资料、账号或日志；未读取 npm 凭据，复用已装依赖并隔离 npm 配置。
 
 ## 已证实的阻塞与改动
