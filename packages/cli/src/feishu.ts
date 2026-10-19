@@ -53,7 +53,6 @@ export async function importFeishuFolder(ws: Workspace, folder: string, cli = "l
   } while (page);
   const seen: Record<string, string> = ws.exists(seenFile) ? ws.readJson(seenFile) : {};
   const imported: string[] = [];
-  const skipped: { title: string; reason: string }[] = [];
   for (const doc of docs) {
     if (seen[doc.token] === doc.modified_time) continue;
     const { document } = await lark<{ document: { content: string } }>(cli, [
@@ -63,20 +62,13 @@ export async function importFeishuFolder(ws: Workspace, folder: string, cli = "l
       "--doc-format",
       "markdown",
     ]);
-    try {
-      const { path } = await captureNote(ws, `# ${doc.name}\n\n${doc.url}\n\n${document.content.trim()}`);
-      imported.push(path);
-    } catch (error) {
-      skipped.push({ title: doc.name, reason: (error as Error).message });
-      continue;
-    }
+    // 手动输入的 10 万字上限不适用于导入的长文档（如访谈逐字稿）。
+    // 飞书导出的正文通常自带标题行，不再重复。
+    const body = document.content.trim().replace(`# ${doc.name}\n`, "").trim();
+    const text = `# ${doc.name}\n\n${doc.url}\n\n${body}`;
+    imported.push((await captureNote(ws, text, undefined, Number.POSITIVE_INFINITY)).path);
     seen[doc.token] = doc.modified_time;
     ws.writeJson(seenFile, seen, { internal: true });
   }
-  return {
-    documents: docs.length,
-    imported,
-    unchanged: docs.length - imported.length - skipped.length,
-    skipped,
-  };
+  return { documents: docs.length, imported, unchanged: docs.length - imported.length };
 }

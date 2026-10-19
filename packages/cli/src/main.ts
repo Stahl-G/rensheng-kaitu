@@ -399,10 +399,7 @@ async function run(argv: string[]): Promise<number> {
       out(
         values,
         result,
-        [
-          `${result.documents} 篇云文档：新存 ${result.imported.length} 条原文，${result.unchanged} 篇没变。`,
-          ...result.skipped.map((item) => `跳过「${item.title}」：${item.reason}`),
-        ].join("\n"),
+        `${result.documents} 篇云文档：新存 ${result.imported.length} 条原文，${result.unchanged} 篇没变。`,
       );
       return 0;
     }

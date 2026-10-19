@@ -22,13 +22,13 @@ const data = args[0] === "drive"
       { token: "doc1", name: "合成周报", type: "docx", url: "https://example.feishu.cn/docx/doc1", modified_time: readFileSync(${JSON.stringify(modified)}, "utf8") },
       { token: "sheet1", name: "表格", type: "sheet", url: "https://example.feishu.cn/sheets/sheet1", modified_time: "1" },
     ] }
-  : { document: { content: "第 " + readFileSync(${JSON.stringify(modified)}, "utf8") + " 版正文" } };
+  : { document: { content: "# 合成周报\\n第 " + readFileSync(${JSON.stringify(modified)}, "utf8") + " 版正文" } };
 process.stdout.write(JSON.stringify({ ok: true, data }));
 `,
     );
     chmodSync(cli, 0o755);
     const first = await importFeishuFolder(ws, "folder1", cli);
-    expect(first).toMatchObject({ documents: 1, unchanged: 0, skipped: [] });
+    expect(first).toMatchObject({ documents: 1, unchanged: 0 });
     expect(inboxNotes(ws)[0]?.content).toContain(
       "# 合成周报\n\nhttps://example.feishu.cn/docx/doc1\n\n第 1 版正文",
     );
