@@ -1,0 +1,7 @@
+{
+  "worker": "CLI build-engine output in desktop dist/data-worker.mjs layout",
+  "bundledSearchResult": "bundled",
+  "bundledExport": "kaitu-2026-10-19.zip",
+  "base64Bytes": 44392,
+  "status": "passed"
+}
