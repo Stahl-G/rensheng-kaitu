@@ -8,6 +8,18 @@
 
 > 灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。
 
+## 一键开始
+
+把这句话交给你的 Agent（Claude Code、Codex、Cursor 等能操作文件和终端的都行）：
+
+```text
+帮我按 https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md 建立我的开图记忆，直接做完。
+```
+
+它会在你的 GitHub 下建私有仓库 `kaitu-ai-memory`，本机对应的文件夹就是你的开图文件夹（已有开图资料就用原来那份，没有就新建 `~/kaitu-ai-memory`）。接着它会问你最近在推进什么，自己读项目写出进度和下一步，上传前给你看一次。做完给你一段话，贴给另一台电脑或另一个 Agent 就能接上。详见 [开图私人共享记忆](docs/guides/agent-memory/README.md)。
+
+不用 GitHub 也行：装下面的 App，第一次打开时选好存放位置（默认 `~/kaitu`）；以后想同步到 GitHub，在「设置 → GitHub 同步」连接或新建。命令行用户：`kaitu init ~/kaitu`。
+
 ## 下载
 
 [Windows 10 / 11 x64 安装包](https://kaitu.si/download/#windows) · [macOS（Apple 芯片）](https://kaitu.si/download/) · [GitHub Releases](https://github.com/Stahl-G/rensheng-kaitu/releases)
