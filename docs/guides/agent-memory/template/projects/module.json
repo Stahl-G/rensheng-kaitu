@@ -1,1 +1,8 @@
-{"id":"projects","name":"项目","version":1,"visibility":"agent","description":"个人项目与工作","records":{}}
+{
+  "id": "projects",
+  "name": "项目",
+  "version": 1,
+  "visibility": "agent",
+  "description": "个人项目与工作",
+  "records": {}
+}
