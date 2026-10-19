@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  ftruncateSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
 import {
@@ -13,6 +22,7 @@ import {
   history,
   historyDirectory,
   initWorkspace,
+  listModules,
   mcpToken,
   readRecords,
   reindexChats,
@@ -85,5 +95,31 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
   } finally {
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// 云盘只留占位文件时（大小非零、没有数据块），同步读会一直等云盘下载；打开工作区不能读它。
+it.skipIf(process.platform === "win32")("Drive 里还没下载的文件不会卡住打开工作区", async () => {
+  const home = tmp();
+  vi.stubEnv("HOME", home);
+  vi.stubEnv("XDG_STATE_HOME", join(home, "state"));
+  vi.stubEnv("LOCALAPPDATA", join(home, "local"));
+  vi.stubEnv("KAITU_DIR", "");
+  try {
+    const drive = join(home, "Library/CloudStorage/GoogleDrive-x/我的云端硬盘");
+    mkdirSync(drive, { recursive: true });
+    const ws = await initWorkspace(join(home, "kaitu"));
+    await enableDrive(ws, { driveDir: drive });
+    const file = ws.resolve("learning/module.json");
+    rmSync(file);
+    const fd = openSync(file, "w");
+    ftruncateSync(fd, 379);
+    closeSync(fd);
+    expect(statSync(file).blocks).toBe(0);
+    const reopened = new Workspace(ws.root);
+    expect(() => reopened.readText("learning/module.json")).toThrow("还没从云盘下载");
+    expect(listModules(reopened).some((module) => module.dir === "me")).toBe(true);
+  } finally {
+    vi.unstubAllEnvs();
   }
 });

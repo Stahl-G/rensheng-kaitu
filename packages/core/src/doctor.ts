@@ -57,7 +57,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   add(
     "iCloud 文件已下载",
     !unavailable.length,
-    unavailable.length ? `还没从 iCloud 下载：${unavailable.join("、")}` : undefined,
+    unavailable.length ? `还没从云盘下载：${unavailable.join("、")}` : undefined,
     unavailable,
   );
   if (ws.scanText(".kaitu/config.json") === undefined) return checks;

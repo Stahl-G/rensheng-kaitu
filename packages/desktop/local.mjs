@@ -131,7 +131,11 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   let ws = new Workspace(workspace);
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-  else await upgradeWorkspace(ws);
+  // 有文件还在云盘没下载时先不升级，下次启动再做；不能让启动停在这里。
+  else
+    await upgradeWorkspace(ws).catch((error) => {
+      if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
+    });
   step("workspace");
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;

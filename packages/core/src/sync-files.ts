@@ -66,7 +66,7 @@ export function isEvictedICloudFile(path: string): boolean {
 }
 
 export function assertCloudDownloaded(path: string): void {
-  if (isEvictedICloudFile(path)) throw new KaituError(`还没从 iCloud 下载：${path}`, "CLOUD_UNAVAILABLE");
+  if (isEvictedICloudFile(path)) throw new KaituError(`还没从云盘下载：${path}`, "CLOUD_UNAVAILABLE");
 }
 
 export function placeholderOriginal(file: string): string | undefined {

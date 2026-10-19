@@ -174,7 +174,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
       read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
     ),
     memories: read("记忆", () => listMemories(ws), []),
-    warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从 iCloud 下载：${file}`)],
+    warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从云盘下载：${file}`)],
   };
 }
 export type WorkbenchData = ReturnType<typeof readWorkbench>;
