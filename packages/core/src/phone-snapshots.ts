@@ -57,27 +57,28 @@ export async function writePhoneSnapshots(
 /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */
 export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {
   let timer: NodeJS.Timeout | undefined;
-  let running = false;
+  let running: Promise<void> | undefined;
   let again = false;
   let closed = false;
-  const run = async () => {
+  const run = () => {
     if (closed) return;
     if (running) {
       again = true;
       return;
     }
-    running = true;
-    try {
-      await writePhoneSnapshots(ws);
-    } catch (error) {
-      report(error);
-    } finally {
-      running = false;
-      if (again) {
-        again = false;
-        schedule();
+    running = (async () => {
+      try {
+        await writePhoneSnapshots(ws);
+      } catch (error) {
+        report(error);
+      } finally {
+        running = undefined;
+        if (again && !closed) {
+          again = false;
+          schedule();
+        }
       }
-    }
+    })();
   };
   const schedule = () => {
     clearTimeout(timer);
@@ -100,11 +101,12 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
   const interval = setInterval(schedule, 60000);
   interval.unref();
   schedule();
-  return () => {
+  return async () => {
     closed = true;
     clearTimeout(timer);
     clearInterval(interval);
-    watcher?.close();
     off();
+    await watcher?.close();
+    await running;
   };
 }

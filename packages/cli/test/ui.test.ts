@@ -11,7 +11,8 @@ import {
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import * as workspaceWatch from "../../core/src/workspace-watch.js";
 import { appleHealthZip } from "../../core/test/helpers.js";
 import { startUi } from "../src/ui/server.js";
 
@@ -19,7 +20,7 @@ const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup() {
+async function setup(input: Parameters<typeof startUi>[1] = {}) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(root);
@@ -42,6 +43,7 @@ async function setup() {
     snapshotDelayMs: 80,
     refreshDelayMs: 10,
     inboxStableMs: 30,
+    ...input,
   });
   cleanup.push(ui.close);
   return { ws, ui };
@@ -196,30 +198,57 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 });
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
-  const { ws, ui } = await setup();
-  const post = (path: string, body: unknown) =>
-    fetch(`${ui.url}${path}`, {
-      method: "POST",
-      headers: { "X-Kaitu": "1", Origin: ui.url },
-      body: JSON.stringify(body),
+  const watch = workspaceWatch.watchWorkspace;
+  const watchers: ReturnType<typeof watch>[] = [];
+  const settled = new Set<ReturnType<typeof watch>>();
+  let settledAtMove = false;
+  const spy = vi.spyOn(workspaceWatch, "watchWorkspace").mockImplementation((...args) => {
+    const watcher = watch(...args);
+    watchers.push(watcher);
+    const close = watcher.close.bind(watcher);
+    watcher.close = async () => {
+      await close();
+      settled.add(watcher);
+    };
+    return watcher;
+  });
+  try {
+    const { ws, ui } = await setup({
+      onWorkspaceChanging: async () => {
+        settledAtMove = watchers.length > 0 && watchers.every((watcher) => settled.has(watcher));
+      },
     });
-  for (const [enable, disable, body] of [
-    ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
-    ["/api/drive/enable", "/api/drive/disable", {}],
-  ] as const) {
-    const folder = mkdtempSync(join(tmpdir(), "kaitu-ui-sync-"));
-    const back = mkdtempSync(join(tmpdir(), "kaitu-ui-back-"));
-    // 放到最前面：先关掉服务（后台存版本），再删目录。
-    cleanup.unshift(async () => {
-      rmSync(folder, { recursive: true, force: true });
-      rmSync(back, { recursive: true, force: true });
-    });
-    const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
-    const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
-    expect(ws.root).toBe(join(back, "kaitu"));
+    const post = (path: string, body: unknown) =>
+      fetch(`${ui.url}${path}`, {
+        method: "POST",
+        headers: { "X-Kaitu": "1", Origin: ui.url },
+        body: JSON.stringify(body),
+      });
+    for (const [enable, disable, body] of [
+      ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
+      ["/api/drive/enable", "/api/drive/disable", {}],
+    ] as const) {
+      const folder = mkdtempSync(join(tmpdir(), "kaitu-ui-sync-"));
+      const back = mkdtempSync(join(tmpdir(), "kaitu-ui-back-"));
+      // 放到最前面：先关掉服务（后台存版本），再删目录。
+      cleanup.unshift(async () => {
+        rmSync(folder, { recursive: true, force: true });
+        rmSync(back, { recursive: true, force: true });
+      });
+      settledAtMove = false;
+      const enabled = await post(enable, { ...body, dir: folder });
+      const enabledResult = await enabled.json();
+      expect(settledAtMove, "迁移前必须等待真实工作区监听全部关闭").toBe(true);
+      expect(enabled.status, JSON.stringify(enabledResult)).toBe(200);
+      expect(enabledResult.mode).toBe("drive");
+      settledAtMove = false;
+      const disabled = await post(disable, { to: join(back, "kaitu") });
+      expect(settledAtMove, "迁回本机前也必须等待监听关闭").toBe(true);
+      expect(disabled.status).toBe(200);
+      expect((await disabled.json()).mode).toBe("local");
+      expect(ws.root).toBe(join(back, "kaitu"));
+    }
+  } finally {
+    spy.mockRestore();
   }
 });

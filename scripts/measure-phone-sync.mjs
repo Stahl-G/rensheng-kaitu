@@ -142,7 +142,7 @@ try {
       ),
     );
   });
-  stop();
+  await stop();
   // 可用时才测 A 任务的导出，不复制或临时实现另一分支的函数。
   if (core.listInvestments) {
     start = performance.now();

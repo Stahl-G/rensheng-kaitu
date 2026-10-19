@@ -220,7 +220,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError());
+  let stopPhone = async () => {};
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -324,10 +324,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     polling = setTimeout(poll, delay);
   };
-  function startWatching() {
-    watcher?.close();
+  async function stopWatching() {
     clearTimeout(polling);
     polling = undefined;
+    clearTimeout(refreshTimer);
+    clearTimeout(inboxTimer);
+    await watcher?.close();
+    watcher = undefined;
+    for (const external of externalWatchers) external.close();
+    externalWatchers = [];
+    await stopPhone();
+  }
+  async function startWatching() {
+    await stopWatching();
     try {
       watcher = watchWorkspace(ws.root, changedFile);
       watcher.on("error", startPolling);
@@ -346,9 +355,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试
       }
     }
+    stopPhone = startPhoneSnapshots(ws, () => reportError());
     scheduleInbox();
   }
-  startWatching();
+  await startWatching();
   const heartbeat = setInterval(() => {
     for (const client of clients) client.write(": heartbeat\n\n");
     for (const [id, upload] of uploads) {
@@ -460,13 +470,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                     await saveExternal();
                     await options.ask?.prepareRelocation();
                     await phones.stop();
-                    const oldRoot = ws.root;
+                    await stopWatching();
                     try {
                       if (relocate) await options.onWorkspaceChanging?.();
                       return await productRequest(ws, method, args, options.ask, calendarPush);
                     } finally {
                       try {
-                        if (ws.root !== oldRoot) startWatching();
+                        await startWatching();
                         if (relocate) await options.onWorkspaceChanged?.();
                       } finally {
                         options.ask?.relocate(ws.root);
@@ -600,6 +610,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/drive/disable": {
             await options.ask?.prepareRelocation();
             await phones.stop();
+            await stopWatching();
             const oldRoot = ws.root;
             try {
               await options.onWorkspaceChanging?.();
@@ -623,7 +634,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               });
             } finally {
               try {
-                startWatching();
+                await startWatching();
                 if (ws.root !== oldRoot) {
                   aiChild?.kill();
                   aiChild = undefined;
@@ -657,10 +668,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/restore": {
             await options.ask?.prepareRelocation();
             await phones.stop();
+            await stopWatching();
             try {
               return await restore(ws, field(data, "version"));
             } finally {
               options.ask?.relocate(ws.root);
+              await startWatching();
               phones.start();
             }
           }
@@ -726,7 +739,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     closed = true;
     cancelGithubCliLogin();
-    await watcher?.close();
+    await stopWatching();
     unwatchFile(backupState, backupChanged);
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
@@ -739,7 +752,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await collectors.stop();
     stopBackup();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
@@ -755,11 +768,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       server.listen(requestedPort, "127.0.0.1", resolve);
     });
   } catch (error) {
-    await watcher?.close();
+    await stopWatching();
     unwatchFile(backupState, backupChanged);
     stopBackup();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
