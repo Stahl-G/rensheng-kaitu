@@ -92,6 +92,8 @@ export { saveHometown } from "./hometown.js";
 export { dshFiles } from "./dsh-files.js";
 
 export * from "./workspace-backup.js";
+export * from "./github-cli.js";
+export * from "./project-memory.js";
 
 export * from "./investments.js";
 export * from "./phases.js";
