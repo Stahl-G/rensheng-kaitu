@@ -6,8 +6,11 @@ import type { Workspace } from "./workspace.js";
 /** 同一天同一 session_id 算一次训练。 */
 export function workoutSessions(rows: StoredRecord[], timeZone: string): StoredRecord[][] {
   const groups = new Map<string, StoredRecord[]>();
+  const dates = new Map<string, string>();
   for (const row of rows) {
-    const key = `${localDate(parseTs(String(row.ts)), timeZone)}:${row.session_id ?? row.id}`;
+    const date = dates.get(row.ts) ?? localDate(parseTs(row.ts), timeZone);
+    dates.set(row.ts, date);
+    const key = `${date}:${row.session_id ?? row.id}`;
     const group = groups.get(key) ?? [];
     group.push(row);
     groups.set(key, group);
@@ -39,7 +42,16 @@ export function readStatus(ws: Workspace, now = new Date(), remote = false) {
 
 export function summarizeStatus(data: WorkbenchData) {
   const from = new Date(Date.parse(`${data.today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-  const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
+  const localDays = new Map<string, string>();
+  const day = (ts: unknown) => {
+    const key = String(ts);
+    let date = localDays.get(key);
+    if (date === undefined) {
+      date = localDate(parseTs(key), data.timeZone);
+      localDays.set(key, date);
+    }
+    return date;
+  };
   // 当地日期与 UTC 日期最多差 14 小时（UTC−12 到 UTC+14）：窗口外的记录不用逐条换算当地日期。
   const earliest = Date.parse(`${from}T00:00:00Z`) - 14 * 3600000;
   const latest = Date.parse(`${data.today}T00:00:00Z`) + 86400000 + 12 * 3600000;
