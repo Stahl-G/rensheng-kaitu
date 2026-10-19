@@ -63,7 +63,7 @@ import {
   dshFiles,
   editCalendarBlock,
   editExperience,
-  exportWorkspace,
+  exportWorkspaceAsync,
   handoverPack,
   hideExperience,
   keepOnboardingMatter,
@@ -117,6 +117,8 @@ import {
   tryNews,
   unhideExperience,
   workspaceBackupRequest,
+  workspaceBackupStatus,
+  workspaceExportRequest,
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
@@ -139,6 +141,7 @@ import type {
   NewsData,
   OverviewData,
   ProjectDetailData,
+  WorkspaceExportState,
 } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
@@ -162,7 +165,10 @@ export class KaituOverviewService extends TypertRemoteService {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => this.files.dispose());
+    ctx.effect(() => () => {
+      this.files.dispose();
+      workspaceExportRequest(this.workspace, "cancel");
+    });
     const performWrite = this.write;
     this.write = async (operation) => {
       try {
@@ -382,9 +388,15 @@ export class KaituOverviewService extends TypertRemoteService {
     return markOrganizerSeen(this.workspace);
   }
 
+  @Remote("exportWorkspaceRequest")
+  async exportWorkspaceRequest(
+    action: "start" | "status" | "cancel" | "result",
+  ): Promise<WorkspaceExportState> {
+    return workspaceExportRequest(this.workspace, action);
+  }
   @Remote("exportWorkspace")
   async exportWorkspace(): Promise<{ name: string; base64: string }> {
-    return exportWorkspace(this.workspace);
+    return exportWorkspaceAsync(this.workspace);
   }
 
   @Remote("restoreVersion")
@@ -394,7 +406,11 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("moveStorage")
   async moveStorage(path: string, drive: boolean, provider?: SyncProvider): Promise<SettingsData["storage"]> {
-    return this.write(() => moveWorkspace(this.workspace, path, drive, provider));
+    return this.write(() => {
+      if (workspaceBackupStatus(this.workspace).running)
+        throw new KaituError("备份或恢复进行中，请先取消或等候完成", "CONFLICT");
+      return moveWorkspace(this.workspace, path, drive, provider);
+    });
   }
 
   @Remote("automation")

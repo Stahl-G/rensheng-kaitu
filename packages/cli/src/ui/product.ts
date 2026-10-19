@@ -46,7 +46,7 @@ import {
   draftOnboardingMatter,
   editCalendarBlock,
   editExperience,
-  exportWorkspace,
+  exportWorkspaceAsync,
   financeAccounts,
   financeCashflow,
   financeOverview,
@@ -109,6 +109,8 @@ import {
   tryNews,
   unhideExperience,
   workspaceBackupRequest,
+  workspaceBackupStatus,
+  workspaceExportRequest,
   writeExploration,
 } from "@kaitu/core";
 import { directionGeneration } from "./directions-ai.js";
@@ -280,11 +282,19 @@ export async function productRequest(
       data.ai = ask ? await ask.settings() : null;
       return data;
     }
+    case "exportWorkspaceRequest": {
+      const action = text(0);
+      if (!["start", "status", "cancel", "result"].includes(action))
+        throw new KaituError("无效的导出操作", "BAD_ARGS");
+      return workspaceExportRequest(ws, action as "start" | "status" | "cancel" | "result");
+    }
     case "exportWorkspace":
-      return exportWorkspace(ws);
+      return exportWorkspaceAsync(ws);
     case "restoreVersion":
       return restore(ws, text(0));
     case "moveStorage": {
+      if (workspaceBackupStatus(ws).running)
+        throw new KaituError("备份或恢复进行中，请先取消或等候完成", "CONFLICT");
       if (typeof args[1] !== "boolean") throw new KaituError("缺少存放方式", "BAD_ARGS");
       return moveWorkspace(ws, text(0), args[1], (args[2] ?? undefined) as SyncProvider | undefined);
     }

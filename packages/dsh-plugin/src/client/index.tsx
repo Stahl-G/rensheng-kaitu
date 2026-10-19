@@ -343,6 +343,11 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              exportWorkspaceRequest: async (action: "start" | "status" | "cancel" | "result") => {
+                const r = await ctx.remote.kaitu.exportWorkspaceRequest(action);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               exportWorkspace: async () => {
                 const r = await ctx.remote.kaitu.exportWorkspace();
                 if (!r.ok) throw new Error(r.error.message);

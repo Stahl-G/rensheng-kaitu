@@ -235,3 +235,5 @@ export interface ProjectDetailData extends DoingProject {
   metrics: { date: string; kind: string; value: number }[];
   sources: string[];
 }
+
+export type { WorkspaceExportState } from "@kaitu/core";
