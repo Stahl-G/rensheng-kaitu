@@ -230,7 +230,10 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
       path: `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`,
     });
   }
-  for (const n of [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")]) {
+  for (const n of [
+    ...inboxNotes(ws, "inbox/notes", { from: since }),
+    ...inboxNotes(ws, "inbox/notes/done", { from: since }),
+  ]) {
     // 日期取所在的日期目录；frontmatter 里的 date 可能不是字符串。
     const date = n.path.match(/\/(\d{4}-\d{2}-\d{2})\//)?.[1];
     if (!date || date < since) continue;

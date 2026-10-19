@@ -6,7 +6,7 @@ import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./fron
 import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { listMemories } from "./memory.js";
-import { listModules, listRecordTypes } from "./modules.js";
+import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
@@ -81,13 +81,16 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
 
 export function statusFiles(ws: Workspace): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
+  const recordDirectories = new Set(listRecordTypes(ws).map((ref) => recordFilePattern(ref).dir));
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
       if (ws.conflictCopy(file)) continue;
-      if (entry.isDirectory()) walk(file, module);
-      else if (entry.name === "STATUS.md") out.push({ file, module });
+      // 模块的附件与已声明的记录目录不含状态文档；保留自建模块的任意层级主题。
+      if (entry.isDirectory()) {
+        if (entry.name !== "files" && !recordDirectories.has(file)) walk(file, module);
+      } else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }
   for (const module of listModules(ws)) {
