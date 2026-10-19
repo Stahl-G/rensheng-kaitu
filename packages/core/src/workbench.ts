@@ -1,5 +1,7 @@
-import { readdirSync, statSync } from "node:fs";
+import { promises as fs, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { publicRecords } from "./agent-tools.js";
+import type { DataRunOptions } from "./data-worker.js";
 import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
@@ -329,5 +331,39 @@ export function workspaceFileStamps(ws: Workspace): Map<string, string> {
     }
   }
   walk("");
+  return stamps;
+}
+
+/** 监听不可用时完整盘点元数据，逐项异步 IO，不阻塞页面或与下一轮重叠。 */
+export async function workspaceFileStampsAsync(
+  ws: Workspace,
+  options: DataRunOptions = {},
+): Promise<Map<string, string>> {
+  const root = await fs.realpath(ws.root);
+  const stamps = new Map<string, string>();
+  let completed = 0;
+  async function walk(dir: string): Promise<void> {
+    options.signal?.throwIfAborted();
+    const absolute = join(root, dir);
+    if ((await fs.lstat(absolute)).isSymbolicLink()) return;
+    for await (const entry of await fs.opendir(absolute)) {
+      options.signal?.throwIfAborted();
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink() || ignoredWorkspaceChange(file)) continue;
+      if (entry.isDirectory()) await walk(file);
+      else {
+        try {
+          const info = await fs.lstat(join(root, file));
+          if (info.isSymbolicLink()) continue;
+          stamps.set(file, `${info.mtimeMs}:${info.ctimeMs}:${info.size}`);
+          options.progress?.({ phase: "scan", completed: ++completed });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      }
+    }
+  }
+  await walk("");
+  options.signal?.throwIfAborted();
   return stamps;
 }
