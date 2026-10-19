@@ -121,7 +121,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     },
   ];
   const snapshots = {
-    today: buildPhoneToday(data, now.toISOString()),
+    today: buildPhoneToday(data, now.toISOString(), ws),
     week: buildPhoneWeek(data, now.toISOString()),
     map: buildPhoneMap(data, map, readExploration(ws), now.toISOString()),
     library: buildPhoneLibrary(ws, data, now.toISOString()),

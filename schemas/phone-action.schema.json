@@ -14,6 +14,8 @@
         "complete_next",
         "decide_proposal",
         "complete_task",
+        "create_task",
+        "update_task",
         "cancel_task",
         "keep_draft",
         "adopt_draft",
@@ -122,6 +124,61 @@
           }
         }
       }
+    },
+    {
+      "if": { "properties": { "op": { "const": "create_task" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["id", "expected_rev", "title"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "expected_rev": { "const": 0 },
+              "title": { "type": "string", "minLength": 1 },
+              "due": {
+                "type": ["string", "null"],
+                "anyOf": [{ "format": "date" }, { "format": "date-time" }, { "type": "null" }]
+              },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "update_task" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["id", "expected_rev"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "expected_rev": { "type": "integer", "minimum": 1 },
+              "title": { "type": "string", "minLength": 1 },
+              "due": {
+                "type": ["string", "null"],
+                "anyOf": [{ "format": "date" }, { "format": "date-time" }, { "type": "null" }]
+              },
+              "notes": { "type": "string" }
+            },
+            "anyOf": [{ "required": ["title"] }, { "required": ["due"] }, { "required": ["notes"] }]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "enum": ["complete_task", "cancel_task"] } } },
+      "then": {
+        "properties": { "args": { "properties": { "expected_rev": { "type": "integer", "minimum": 1 } } } }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "complete_next" } } },
+      "then": { "properties": { "args": { "properties": { "expected_next": { "type": "object" } } } } }
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
@@ -6,6 +7,7 @@ import type { readOverviewPage } from "./overview-page.js";
 import type { LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
+import { listTasks } from "./tasks.js";
 import { localDate, parseTs } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -17,7 +19,8 @@ const envelope = (name: string, generatedAt: string) => ({
   generator: { kind: "computer" },
 });
 
-export function buildPhoneToday(data: Overview, generatedAt: string) {
+export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
+  const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
     title,
@@ -32,6 +35,22 @@ export function buildPhoneToday(data: Overview, generatedAt: string) {
     ...envelope("today", generatedAt),
     today: data.today,
     timezone: data.timeZone,
+    mobile: {
+      version: 1,
+      actions: hasTasks
+        ? ["create_task", "update_task", "complete_task", "cancel_task", "complete_next"]
+        : ["complete_next"],
+      tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
+        ({ id, rev, title, status, ts, due }) => ({
+          id,
+          rev: rev ?? 1,
+          title,
+          status,
+          ts,
+          ...(due ? { due } : {}),
+        }),
+      ),
+    },
     next: data.next.slice(0, 3).map(({ id, title, file, module, section, proposed }) => ({
       id,
       title,
@@ -39,6 +58,13 @@ export function buildPhoneToday(data: Overview, generatedAt: string) {
       module,
       section,
       proposed,
+      ...(ws.exists(file)
+        ? {
+            source_precondition: parseFrontmatter<{ next?: { id: string }[] }>(
+              ws.readText(file),
+            ).data.next?.find((item) => item.id === id),
+          }
+        : {}),
     })),
     proposals: data.blocks.filter((b) => b.kind === "proposal" && b.status === "pending").map(block),
     blocks: data.blocks.filter((b) => b.status === "confirmed").map(block),
