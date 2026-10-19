@@ -69,7 +69,7 @@ export function OnboardingPage(props: Props) {
     if (step !== STORAGE_STEP) return;
     void props
       .loadSettings()
-      .then((settings) => setStorage(settings.storage))
+      .then((settings) => setStorage({ ...settings.storage, github: !!settings.backup.connection }))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [step, props.loadSettings]);
   const [error, setError] = useState("");
@@ -251,11 +251,13 @@ export function OnboardingPage(props: Props) {
             moveStorage={props.moveStorage}
             pickStorageFolder={props.pickStorageFolder}
             submitLabel={t("下一步", "Next")}
-            onDone={async (moved) => {
+            onDone={async (moved, github) => {
               const firstRun = status.checklist.completed === 0;
               await save({ storage: true });
               if (moved) await props.refresh();
-              if (firstRun) move(1);
+              // GitHub 同步在「AI 与连接」里建库或连接已有仓库。
+              if (github) finish("connections");
+              else if (firstRun) move(1);
               else finish("today");
             }}
           />
