@@ -41,7 +41,9 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
   if (existsSync(join(root, ".kaitu", "config.json"))) {
     throw new KaituError(`${root} 已经是开图工作区`, "ALREADY_INITIALIZED");
   }
-  if (existsSync(root) && readdirSync(root).some((n) => n !== ".DS_Store")) {
+  // 用纯 Git 模板建的记忆仓库（根目录有 kaitu-backup.json）可以直接接管：只补缺的文件，已有的一律不动。
+  const adopt = existsSync(join(root, "kaitu-backup.json"));
+  if (!adopt && existsSync(root) && readdirSync(root).some((n) => n !== ".DS_Store")) {
     throw new KaituError(`${root} 不是空目录，换一个位置或先清空`, "NOT_EMPTY");
   }
   const tz = opts.timeZone ?? "Asia/Shanghai";
@@ -49,11 +51,17 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
   const now = opts.now ?? new Date();
 
   mkdirSync(root, { recursive: true });
-  cpSync(templateDir(), root, { recursive: true });
+  const template = templateDir();
+  cpSync(template, root, {
+    recursive: true,
+    force: !adopt,
+    // 模板的 .gitignore 不同步手机和收件箱文件，不能放进要推到 GitHub 的仓库。
+    filter: (src) => !adopt || src !== join(template, ".gitignore"),
+  });
   const ws = new Workspace(root);
   for (const d of EMPTY_DIRS) mkdirSync(join(ws.root, d), { recursive: true });
 
-  if (tz !== "Asia/Shanghai") {
+  if (tz !== "Asia/Shanghai" && !adopt) {
     const text = ws.readText("me/rules.md");
     const end = text.indexOf("\n---", 4);
     const doc = parseDocument(text.slice(4, end).trim());

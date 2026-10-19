@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
   type By,
@@ -505,11 +505,14 @@ async function run(argv: string[]): Promise<number> {
     }
     case "init": {
       const root = resolve(args[0] ?? values.dir ?? defaultRoot());
+      const adopted = existsSync(join(root, "kaitu-backup.json"));
       const ws = await initWorkspace(root, { timeZone: values.timezone, sample: values.sample });
       out(
         values,
-        { root: ws.root },
-        `已创建开图工作区：${ws.root}\n下一步：在这个文件夹里打开 Codex，说「开始使用开图」。`,
+        { root: ws.root, adopted },
+        adopted
+          ? `已接管这个记忆仓库：${ws.root}\n只补了缺的文件，已有资料没动；AGENTS.md、OVERVIEW.md 换成开图维护的版本。运行 kaitu phone run 生成手机内容。`
+          : `已创建开图工作区：${ws.root}\n下一步：在这个文件夹里打开 Codex，说「开始使用开图」。`,
       );
       return 0;
     }

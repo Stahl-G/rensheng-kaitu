@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { doctor } from "./doctor.js";
-import { GITIGNORE, snapshot } from "./history.js";
+import { GITIGNORE, snapshot, userOwnsGitignore } from "./history.js";
 import { type ModuleDef, listModules } from "./modules.js";
 import { batchOverview, renderOrganizer } from "./overview.js";
 import { syncMode } from "./sync-location.js";
@@ -103,9 +103,11 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     }
   }
   const ignore = ws.exists(".gitignore") ? ws.readText(".gitignore") : "";
-  const missingIgnores = GITIGNORE.split("\n").filter(
-    (line) => line && !line.startsWith("#") && !ignore.split("\n").includes(line),
-  );
+  const missingIgnores = userOwnsGitignore(ws)
+    ? []
+    : GITIGNORE.split("\n").filter(
+        (line) => line && !line.startsWith("#") && !ignore.split("\n").includes(line),
+      );
   if (missingIgnores.length)
     writes.set(".gitignore", `${ignore}${ignore.endsWith("\n") ? "" : "\n"}${missingIgnores.join("\n")}\n`);
   const changes = [
