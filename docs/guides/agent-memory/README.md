@@ -1,12 +1,8 @@
 # 开图开发者记忆：先用提示词
 
-先用自己的现有 ai-memory 做只读理解检查。具体库、项目和接收 Agent 待用户确认；不要默认另建测试仓库。复制 [第一位 Agent 的短入口](COPY_TO_YOUR_AGENT.md)，第二位使用 [独立理解入口](COPY_TO_NEXT_AGENT.md)。两者都先只读，再由用户比较答案并指定真实小任务与写回范围；步骤见 [用户亲测顺序](USER_TEST.md)。完整规则见 [INSTALL](INSTALL.md) 和 [ADD_DEVICE](ADD_DEVICE.md)。
+保留 `my-ai-memory` 作为基准，新建 PRIVATE `kaitu-ai-memory`，由用户亲自启动 Agent 执行。先展示指定真实项目的读取范围，确认后读取并预览摘要，再由用户确认精确目标与文字范围后建库；不复制旧库冒充初始化，不自动迁移。其他 Agent 只接入新库，各用全新会话与独立目录，先比较理解，再做用户指定的真实小任务。
 
-```text
-请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/622fee9ad77d908d6224fab91922e1c1e6fb8471/docs/guides/agent-memory/INSTALL.md 及同目录 USER_TEST.md，帮我复用已有私人记忆。先向我确认精确仓库、项目、允许读取的路径和你是否为指定接收方；目标未定就等待，不猜 my-ai-memory。只在我确认后只读核对，保留原目录、文件和规则，不初始化、建库、铺模板或安装技能。优先复用可用 kaitu，没有就用普通 Git 和官方 gh，不要求 App 或新运行时。引用来源复述现状、失败尝试、阻塞、完整下一步及未知项；先不写回，等我比较两个新 Agent 的理解后再指定真实小任务，不转发资料或改全局设置。
-```
-
-以下最小模板是明确另建新库时的可选路径，不能覆盖或改造现有私人库。新库初始化细则保留在 [NEW_MEMORY](NEW_MEMORY.md)，本次亲测不执行。
+复制 [首位 Agent 的短初始化入口](COPY_TO_YOUR_AGENT.md)，后续使用 [新 Agent 短接入入口](COPY_TO_NEXT_AGENT.md)。完整规则见 [INSTALL](INSTALL.md)、[ADD_DEVICE](ADD_DEVICE.md)，验收顺序见 [USER_TEST](USER_TEST.md)。这里只交付提示词，没有读取或上传真实资料、创建新库或启动模型测试。下面的模板只用于明确确认后的新库，不能覆盖现有私人库。
 
 开图 App、kaitu CLI、特定操作系统、Node、Python、MCP 和后台服务均不是独立模板路径的安装条件。Git/gh 缺失时，由 Agent 说明官方来源，经用户确认后处理；不安装自制 runtime。GitHub 登录只由用户在官方页面/设备流程完成。
 
