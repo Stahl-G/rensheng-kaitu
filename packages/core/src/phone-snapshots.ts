@@ -46,6 +46,8 @@ export async function writePhoneSnapshots(
       const previous = ws.readJson<typeof value>(file);
       if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
         continue;
+      if (name === "today" && Date.parse(previous.generated_at) >= Date.parse(value.generated_at))
+        value.generated_at = new Date(Date.parse(previous.generated_at) + 1).toISOString();
     }
     ws.writeJson(file, value);
     if (name === "today" && computer) rememberComputerSnapshot(ws, now);

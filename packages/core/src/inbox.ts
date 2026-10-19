@@ -27,9 +27,10 @@ import { type MemoryInput, importMemories, memoryInput, memoryType } from "./mem
 import { listRecordTypes } from "./modules.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
+import { phoneRecordLedger, preparePhoneRecords, recoverPhoneRecords } from "./phone-records.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
 import { recordReference, recordRejectionHelp } from "./record-reference.js";
-import { addRecords, deleteRecord } from "./records.js";
+import { type StoredRecord, addRecords, deleteRecord, readRecords } from "./records.js";
 import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone, localDate, localTimeToInstant } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -110,6 +111,15 @@ type Receipt = { agent: string; records: { type: string; id: string }[] };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
   ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
 
+function finishPhoneRecords(ws: Workspace, ref: string, plan: import("./phone-records.js").PhoneRecordPlan) {
+  writeRecordReceipt(ws, ref, plan.receipt, plan.replaces);
+}
+function writeRecordReceipt(ws: Workspace, ref: string, receipt: Receipt, replaces?: string | null) {
+  const next = { ...readReceipts(ws), [basename(ref)]: receipt };
+  if (replaces) delete next[basename(replaces)];
+  ws.writeJson(RECEIPTS, next, { internal: true });
+}
+
 async function prepare(ws: Workspace, file: string, text: string) {
   if (file.endsWith(".digest.md")) {
     if (text.startsWith("---") && !hasFrontmatter(text))
@@ -140,6 +150,17 @@ async function prepare(ws: Workspace, file: string, text: string) {
       apply: () => writeDigest(ws, date, text, actor, sourceAgent(data.agent)),
     };
   }
+  const phonePlan =
+    phoneInboxName.test(basename(file)) && file.endsWith(".records.jsonl")
+      ? phoneRecordLedger(ws)[basename(file)]
+      : undefined;
+  if (phonePlan && !phonePlan.consumed)
+    return {
+      errors: [],
+      agent: phonePlan.receipt.agent,
+      message: "恢复手机记录",
+      apply: () => recoverPhoneRecords(ws, (ref, plan) => finishPhoneRecords(ws, ref, plan)),
+    };
   const content = inboxContent(file, text);
   if (content.kind === "records") {
     // 第一行可以是 {"replaces": "之前的文件名"}：先撤掉那份文件记下的记录，再记这份；只有这一行就是撤回。
@@ -218,6 +239,44 @@ async function prepare(ws: Workspace, file: string, text: string) {
         ? `Agent（Drive 收件箱：${agents}）${added ? `修改了 ${replaces}，现在 ${added} 条记录` : `撤回了 ${replaces}`}`
         : `Agent（Drive 收件箱：${agents}）新增了 ${added} 条记录`,
       apply: async () => {
+        if (
+          phone &&
+          ([...groups.keys()].some((key) => key.startsWith("meal|")) ||
+            previous?.records.some((item) => item.type === "meal"))
+        ) {
+          const entries: { type: string; record: StoredRecord }[] = [];
+          for (const item of previous?.records ?? []) {
+            const current = readRecords(ws, item.type).find((row) => row.id === item.id);
+            if (current)
+              entries.push({
+                type: item.type,
+                record: {
+                  id: current.id,
+                  ts: isoInZone(new Date(), ws.timeZone()),
+                  by: "agent",
+                  rev: (current.rev ?? 1) + 1,
+                  deleted: true,
+                },
+              });
+          }
+          const records: Receipt["records"] = [];
+          for (const [key, rows] of groups) {
+            const [type, by] = key.split("|") as [string, "user" | "agent"];
+            // experience 有自己的来源/批次事务；不改变它的协议。
+            if (type === "experience") throw new KaituError("手机经历请通过原文提交", "BAD_INBOX");
+            for (const result of addRecords(ws, type, rows, { by, dryRun: true })) {
+              entries.push({ type, record: result.record });
+              records.push({ type, id: result.record.id });
+            }
+          }
+          preparePhoneRecords(ws, basename(file), {
+            entries,
+            receipt: { agent: agents, records },
+            ...(replaces ? { replaces: basename(replaces) } : {}),
+          });
+          await recoverPhoneRecords(ws, (ref, plan) => finishPhoneRecords(ws, ref, plan));
+          return;
+        }
         for (const item of previous?.records ?? []) {
           try {
             deleteRecord(ws, item.type, item.id, { by: "agent" });
@@ -234,9 +293,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
             for (const result of addRecords(ws, type, rows, { by }))
               records.push({ type, id: result.record.id });
         }
-        const next = { ...receipts, [basename(file)]: { agent: agents, records } };
-        if (replaces) delete next[basename(replaces)];
-        ws.writeJson(RECEIPTS, next, { internal: true });
+        writeRecordReceipt(ws, file, { agent: agents, records }, replaces);
       },
     };
   }
@@ -407,6 +464,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
   }
   try {
     writeFileSync(fd, String(process.pid));
+    await recoverPhoneRecords(ws, (ref, plan) => finishPhoneRecords(ws, ref, plan));
     if (ws.exists("inbox/rejected")) {
       for (const entry of readdirSync(ws.resolve("inbox/rejected"), { withFileTypes: true })) {
         if (!entry.isFile() || entry.name.endsWith(".error.txt")) continue;
@@ -545,6 +603,8 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
             try {
               await prepared.apply();
             } catch (error) {
+              if (phoneRecordLedger(ws)[basename(file)] && !phoneRecordLedger(ws)[basename(file)]?.consumed)
+                throw error;
               errors.push(`${(error as Error).message}\n\n${INBOX_FORMATS}`);
             }
           }
