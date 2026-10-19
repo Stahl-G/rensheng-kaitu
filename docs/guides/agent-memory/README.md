@@ -1,22 +1,20 @@
-# 开图项目记忆：复制一次，由 Agent 完成
+# 开图私人共享记忆：跨设备、系统和 Agent
 
-把 [短初始化入口](COPY_TO_YOUR_AGENT.md) 交给能操作文件和终端的 Agent；它会自动检查工具与现有登录、发现项目候选、读取所选项目上下文并生成带来源的摘要。已经指定项目就不再问。上传前只合并确认一次目标和文字范围，不让你填写项目现状或逐项批准普通只读。
+[短初始化入口](COPY_TO_YOUR_AGENT.md) 让 Agent 建立私人记忆骨架和当前 Agent 薄入口，从已知上下文与短对话整理偏好、目标和事情，在个人内容写入上传前一次确认。可以零项目、零目标或暂不填个人内容；本机项目发现、GitHub repo 和资料导入只是可选填充，不得阻塞初始化。
 
-[完整初始化规则](INSTALL.md) · [新 Agent 接入](ADD_DEVICE.md) · [实际使用顺序](USER_TEST.md)
+[完整规则](INSTALL.md) · [第二设备/Agent](ADD_DEVICE.md) · [存放位置](DATA_LOCATIONS.md) · [实际使用](USER_TEST.md)
 
-默认 PRIVATE `kaitu-ai-memory` 和新的本机记忆目录，可接入多个选中项目。已有任何仓库或非空目录都保留，不覆盖、不自动迁移。官方新增授权、工具安装和系统权限正常处理，不绕过审批。已有实际可用 kaitu 入口就复用，没有则用普通 Git 和官方 gh；不要求 App、Node、Python、MCP 或新 runtime，不假设 npm/npx 已发布，不改全局配置。
+默认 PRIVATE kaitu-ai-memory，自动采用明确账号和安全新目录；有歧义才询问。已有任何仓库和文件保留不覆盖、不自动迁移。普通只读不反复确认，官方新增授权、安装及系统权限正常处理。已有可用 kaitu 可复用，没有则普通 Git/官方 gh；不要求 App、Node、Python、MCP 或新 runtime，不改全局配置，不虚构 Gitee 镜像。
 
 ```text
-请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/94401e66797b149a73395d42140f4cf442cda990/docs/guides/agent-memory/INSTALL.md ，实际帮我接上开图项目记忆。先自动检查工具、现有 gh 登录和当前目录；项目已指定就直接用，否则浅层发现常用开发目录的 Git 项目，列短清单让我选，可多选。选定后自动读相关说明、进度决策交接和近期 Git 记录，自己生成带来源的摘要，不让我填现状、文件清单或逐项批准普通读取。默认私人 kaitu-ai-memory 和新目录，上传前把目标、项目及文字摘要范围合并确认一次。保留已有仓库和文件，官方新增授权正常处理，不改全局设置、不装新运行时；完成后核对同步并生成填好地址的新 Agent 接入提示词。
+请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/9c66f1011a4c21b1a1da8556277297138c5b805e/docs/guides/agent-memory/INSTALL.md ，帮我建立跨设备、系统和 Agent 的私人开图共享记忆。先自动检查工具、现有登录、账号和安全新目录，默认 kaitu-ai-memory。先整理已知上下文，通过简短对话补偏好、目标和事情，可跳过；没有项目也要能完成记忆骨架与当前 Agent 入口。项目或资料只是可选填充，可来自本机、我指定的 GitHub repo 或文档，不扫描其他设备或账号。复用既有 me/memory/projects 格式，不造平行体系；个人内容写入上传前合并确认一次。保留已有仓库和文件，正常处理官方授权，不改全局设置、不装新运行时，最后回读同步并生成填好真实地址的第二设备接入提示词。
 ```
 
-## 同一份资料
+## 同一份个人资料
 
-[template/](template/) 只使用开图已有目录与字段：AGENT-README、OVERVIEW、projects/<slug>/STATUS.md/log.md/notes.md、memory/MEMORY.md、inbox/agents/、handoffs/ 和薄入口。选中的每个项目有自己的 slug；只保存确认的文字摘要与来源，不复制代码目录，不建立根 USER/MEMORY/PROJECTS 平行体系。kaitu-backup.json 沿用 kaitu-workspace v1、text=true/records=false。
+[template/](template/) 是实际零项目模板：me/profile.md、me/rules.md、空 me/goals.json/ongoing.json、me/STATUS.md、memory/MEMORY.md、projects/module.json、OVERVIEW、AGENT-README、根 AGENTS/CLAUDE、inbox/agents、handoffs 和许可。没有 projects/example-project。只有添加项目时才参考 [可选项目例子](examples/project/STATUS.md)。
 
-初始化助手创建初始项目快照。普通 Agent 按既有格式追加候选和交接，不擅改正式现状、目标或规则。没有整理员时，较新进度从 handoffs 读取；不宣称自动整理记忆、归档、手机快照或 App 索引已经更新。项目内技能是可选的薄适配，保留现有 AGENTS/CLAUDE/README，不作为接入前提。
-
-新 Agent 自动读取上下文并继续用户已给的任务；接入不要求先做合成测试或理解考试。只有实际读取、执行、写回和远端回读才能证明接续结果，文件存在或命令成功不能代替。
+偏好用既有 memory/preference_<slug>.md 与索引，目标用 me/goals.json，作息与时区用 me/rules.md，档案用 me/profile.md；详情见 DATA_LOCATIONS。空值表示未知，不猜个人背景，不建 USER/根 MEMORY/PROJECTS 平行体系，不上传源码、完整对话或凭据。普通后续 Agent 追加候选/交接，不擅改正式内容；未安装的整理器、App 索引和手机功能不宣称已启用。
 
 ## 来源与许可
 

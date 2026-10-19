@@ -1,9 +1,9 @@
-# 开图私人项目记忆
+# 开图私人共享记忆
 
-这是普通 Git 仓库中的开图资料子集。使用支持文件与 Git 的 Agent 即可读写；不需要开图 App、kaitu 命令、Node、Python、MCP 或后台服务。
+普通文件和 Git 保存同一份个人记忆，供不同设备、系统与 Agent 接续；无需 App、Node、Python、MCP 或新 runtime。
 
-先读 [AGENT-README.md](AGENT-README.md)，再读初始 [OVERVIEW.md](OVERVIEW.md)、指定项目 STATUS.md/log.md 和更新的 handoffs/。开始工作前先安全拉取，结束后追加唯一交接文件并正常推送。只同步用户确认的文字摘要，不收集代码目录或其他项目。
+先读 [AGENT-README.md](AGENT-README.md)。me/ 保存档案、目标、正在考虑和规则；memory/ 保存偏好等条目与索引；projects/ 可为空，仅有 module.json 不代表已有项目。当前 Agent 使用根 AGENTS.md，CLAUDE.md 指向同一入口，不改全局设置。没有项目时也能初始化、同步和接入第二设备。
 
-STATUS/log/OVERVIEW 是初始化快照。没有用户指定整理员时，后续状态以更新的交接为补充，不自动回写快照，不假称收件箱已处理或 App 已刷新。App 是之后可选的可视化入口；这个子集不是完整本机工作区。
+只保存用户确认的内容，不猜偏好、目标或个人背景。初始快照之后，普通 Agent 追加既有格式的候选/交接；不承诺自动整理、归档或 App/手机刷新。本资料子集不是完整本机 App 工作区。
 
-安装与接续流程参考 Cody Qin 的 shared-ai-memory（MIT），沿用开图自身的目录与接力格式；许可见 LICENSE.shared-ai-memory。
+安装与接续思路参考 Cody Qin/shared-ai-memory（MIT）；许可见 LICENSE.shared-ai-memory。

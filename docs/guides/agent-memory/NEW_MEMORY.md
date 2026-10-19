@@ -1,3 +1,3 @@
-# 新记忆库入口
+# 新共享记忆入口
 
-统一使用 [INSTALL.md](INSTALL.md)。它先自动检查环境、发现或复用已选项目，自动提取上下文，并在上传前合并确认目标和文字范围。不要使用旧版逐项读前确认流程；已有仓库走 [ADD_DEVICE.md](ADD_DEVICE.md)，保留原内容。
+统一使用 [INSTALL.md](INSTALL.md)：先建立个人共享记忆与当前 Agent 入口，项目可以为零。项目发现、GitHub repo 或资料填充都是可选项，不得阻塞初始化。已有记忆库使用 [ADD_DEVICE.md](ADD_DEVICE.md)，保留原内容。

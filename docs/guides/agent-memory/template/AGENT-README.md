@@ -2,15 +2,17 @@
 
 ## 接手顺序
 
-1. 本文件。
+1. 本文件和 me/profile.md、me/rules.md、memory/MEMORY.md。
 2. handoffs/daily/ 最新每日整理；没有则读 OVERVIEW.md。
-3. handoffs/ 根目录里比它更新的交接，按时间排序。
-4. inbox/agents/ 里更新的文件；它们是待处理原文，不等于已采纳事实。
-5. 仅按需读取指定项目 projects/<slug>/STATUS.md、log.md、notes.md，以及 memory/MEMORY.md。
+3. handoffs/ 根目录里比它更新的交接，按时间排序；再看相关 inbox/agents/ 候选，候选不等于已采纳事实。
+4. 按需读 me/goals.json、me/ongoing.json、me/STATUS.md 和记忆索引链接的条目。
+5. 有相关项目时才读 projects/<slug>/STATUS.md、log.md、notes.md；没有项目直接跳过。
+
+这是跨设备、系统和 Agent 的个人共享记忆。空 goals/ongoing 数组、空记忆索引和无项目目录都是有效初始状态。偏好存 memory/preference_<slug>.md 并加入 memory/MEMORY.md，目标存 me/goals.json，规则存 me/rules.md；不要另建 USER.md 或根 MEMORY/PROJECTS 平行体系。
 
 ## 两个角色与文件
 
-任何 Agent 都只在 inbox/agents/ 和 handoffs/ 根目录新建唯一文件，不覆盖、删除、移动原文件，不擅改目标、规则、STATUS/log 或初始摘要。初始化助手仅在新仓库中、用户确认后创建初始 STATUS/log；这不是后续 Agent 的持续写权限。没有指定整理员就保留候选与交接，通过接手顺序接续；不自动整理、不生成手机快照。
+任何 Agent 都只在 inbox/agents/ 和 handoffs/ 根目录新建唯一文件，不覆盖、删除、移动原文件，不擅改个人档案、正式记忆、目标、规则、STATUS/log 或初始摘要。初始化助手仅在新仓库中、一次内容确认后创建初始个人档案、记忆、目标/规则及可选项目 STATUS/log；这不是后续 Agent 的持续写权限。没有指定整理员就保留候选与交接，通过接手顺序接续；不自动整理、不生成手机快照。
 
 用户指定的整理员应遵守既有 ORGANIZER.md 的权限；此最小模板未安装或启用整理员。正式记忆提炼、收件箱转换、手机快照、App 派生索引和自动归档都不在本轮承诺内。
 
