@@ -89,6 +89,7 @@ iOS 工程在独立仓库 `kaitu-ios`（SwiftUI，现为 v0.5 健康采集器）
 
 ### 4.6 设置与首次使用
 
+- 新手第一次打开的完整流程见 [onboarding.md](onboarding.md)（草案，待确认）。
 - 选资料位置，和电脑用同一个：
   - iCloud：选电脑上用的那个 kaitu 文件夹。
   - GitHub：填 `owner/repo` 和只授权这个仓库 Contents 读写的 fine-grained token（v0.6 手动填写；GitHub 登录以后再做）。公开仓库默认不连，与电脑规则一致。
