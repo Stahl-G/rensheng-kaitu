@@ -28,10 +28,29 @@ const pick = (zh: string, en: string) => translate(normalizeLocale(readPreferenc
 import { Workspace, stateDirectory } from "./workspace.js";
 
 export type BackupFiles = Record<string, string>;
+export interface BackupProgress {
+  phase: "scan" | "download" | "merge" | "upload";
+  completed: number;
+  total?: number;
+}
+export interface BackupRunOptions {
+  signal?: AbortSignal;
+  progress?: (value: BackupProgress) => void;
+}
 export interface BackupRemote {
   inspect(repo: string): Promise<{ private: boolean; branch: string; description?: string | null }>;
-  read(repo: string, branch: string): Promise<{ head: string | null; files: BackupFiles }>;
-  push(repo: string, branch: string, head: string | null, files: BackupFiles): Promise<string>;
+  read(
+    repo: string,
+    branch: string,
+    options?: BackupRunOptions,
+  ): Promise<{ head: string | null; files: BackupFiles }>;
+  push(
+    repo: string,
+    branch: string,
+    head: string | null,
+    files: BackupFiles,
+    options?: BackupRunOptions,
+  ): Promise<string>;
 }
 export interface BackupConnection {
   via?: "gh" | "token";
@@ -65,6 +84,7 @@ const manifest = "kaitu-backup.json";
 const states = new WeakMap<Workspace, { root: string; value: BackupState }>();
 const active = new WeakMap<Workspace, Promise<void>>();
 const events = new WeakMap<Workspace, EventEmitter>();
+const jobs = new WeakMap<Workspace, { controller: AbortController; progress?: BackupProgress }>();
 function emitter(ws: Workspace) {
   let e = events.get(ws);
   if (!e) {
@@ -103,6 +123,7 @@ export function workspaceBackupStatus(ws: Workspace) {
   return {
     connection: s.connection ?? null,
     running: active.has(ws),
+    progress: jobs.get(ws)?.progress ?? null,
     lastSync: s.lastSync ?? null,
     error: s.error ?? null,
     conflicts: s.conflicts,
@@ -131,12 +152,20 @@ function selected(path: string, c: Pick<BackupConnection, "text" | "records">): 
     return /^inbox\/(agents\/[^/]+\.(?:md|jsonl?|txt)|health\/[^/]+\.health\.json|notes\/.+\.md)$/.test(path);
   return (c.text && /\.(md|txt)$/i.test(path)) || (c.records && /\.(jsonl?|ya?ml|csv|ics|toml)$/i.test(path));
 }
-async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFiles> {
+async function localFiles(
+  ws: Workspace,
+  c: BackupConnection,
+  options: BackupRunOptions,
+): Promise<BackupFiles> {
+  let completed = 0;
+  options.progress?.({ phase: "scan", completed });
   const files: BackupFiles = {};
   const basePaths = Object.keys(state(ws).base);
   const internal = relative(ws.root, stateDirectory(ws.root, ws.isICloud)).split(sep).join("/");
   const walk = async (prefix: string) => {
+    options.signal?.throwIfAborted();
     for (const e of await fs.readdir(join(ws.root, prefix), { withFileTypes: true })) {
+      options.signal?.throwIfAborted();
       const path = prefix ? `${prefix}/${e.name}` : e.name;
       const pending = placeholderOriginal(path)?.split(sep).join("/");
       if (pending && (selected(pending, c) || basePaths.some((path) => path.startsWith(`${pending}/`))))
@@ -157,7 +186,8 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
       if (path === internal) continue;
       if (e.isDirectory()) await walk(path);
       else if (e.isFile() && selected(path, c)) {
-        files[path] = await fs.readFile(ws.resolve(path), "utf8");
+        files[path] = await fs.readFile(ws.resolve(path), { encoding: "utf8", signal: options.signal });
+        options.progress?.({ phase: "scan", completed: ++completed });
       }
     }
   };
@@ -282,12 +312,19 @@ export function githubBackupRemote(
   via = ws ? state(ws).connection?.via : "gh",
 ): BackupRemote {
   let previous: { head: string; tree: string; files: BackupFiles } | undefined;
-  const request = async (repo: string, path: string, method = "GET", body?: unknown) => {
-    if (via === "gh") return githubCliRequest(repo, path, method, body);
+  const request = async (
+    repo: string,
+    path: string,
+    method = "GET",
+    body?: unknown,
+    signal?: AbortSignal,
+  ) => {
+    signal?.throwIfAborted();
+    if (via === "gh") return githubCliRequest(repo, path, method, body, signal);
     const credential = ws ? token(ws) : "";
     const response = await fetch(`https://api.github.com/repos/${repo}${path}`, {
       method,
-      signal: AbortSignal.timeout(30000),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
       headers: {
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
@@ -318,11 +355,13 @@ export function githubBackupRemote(
         description: info.description ?? null,
       };
     },
-    async read(repo, branch) {
-      const ref = await request(repo, `/git/ref/heads/${encodeURIComponent(branch)}`);
+    async read(repo, branch, options = {}) {
+      const requestRead = (path: string) => request(repo, path, "GET", undefined, options.signal);
+      options.progress?.({ phase: "download", completed: 0 });
+      const ref = await requestRead(`/git/ref/heads/${encodeURIComponent(branch)}`);
       if (!ref) return { head: null, files: {} };
-      const commit = await request(repo, `/git/commits/${ref.object.sha}`);
-      const tree = await request(repo, `/git/trees/${commit.tree.sha}?recursive=1`);
+      const commit = await requestRead(`/git/commits/${ref.object.sha}`);
+      const tree = await requestRead(`/git/trees/${commit.tree.sha}?recursive=1`);
       if (tree.truncated)
         throw new Error(
           pick("仓库过大，请使用专门的开图备份仓库", "Use a dedicated repository for this workspace backup"),
@@ -332,17 +371,21 @@ export function githubBackupRemote(
         (e: { type: string; mode: string; path: string }) =>
           e.type === "blob" && e.mode === "100644" && selected(e.path, { text: true, records: true }),
       );
+      let completed = 0;
+      options.progress?.({ phase: "download", completed, total: entries.length });
       for (let i = 0; i < entries.length; i += 8)
         await Promise.all(
           entries.slice(i, i + 8).map(async (e: { path: string; sha: string }) => {
+            options.signal?.throwIfAborted();
             const cache = `.kaitu/cache/github-blobs/${e.sha}`;
             if (ws?.exists(cache)) files[e.path] = ws.readText(cache);
             else {
-              const blob = await request(repo, `/git/blobs/${e.sha}`);
+              const blob = await requestRead(`/git/blobs/${e.sha}`);
               const content = Buffer.from(blob.content, "base64").toString("utf8");
               ws?.writeText(cache, content, { internal: true });
               files[e.path] = content;
             }
+            options.progress?.({ phase: "download", completed: ++completed, total: entries.length });
           }),
         );
       if (!files[manifest] || JSON.parse(files[manifest] as string).format !== "kaitu-workspace")
@@ -355,10 +398,13 @@ export function githubBackupRemote(
       previous = { head: ref.object.sha, tree: commit.tree.sha, files };
       return { head: ref.object.sha as string, files };
     },
-    async push(repo, branch, expectedHead, files) {
+    async push(repo, branch, expectedHead, files, options = {}) {
+      const requestWrite = (path: string, method: string, body: unknown) =>
+        request(repo, path, method, body, options.signal);
+      options.progress?.({ phase: "upload", completed: 0 });
       let head = expectedHead;
       if (!head) {
-        const initial = await request(repo, `/contents/${manifest}`, "PUT", {
+        const initial = await requestWrite(`/contents/${manifest}`, "PUT", {
           message: "初始化开图备份",
           branch,
           content: Buffer.from(files[manifest] as string).toString("base64"),
@@ -375,16 +421,17 @@ export function githubBackupRemote(
         .map(([path, content]) => ({ path, mode: "100644", type: "blob", content }));
       for (const path of Object.keys(previous?.files ?? {}))
         if (!(path in files)) entries.push({ path, mode: "100644", type: "blob", sha: null });
-      const tree = await request(repo, "/git/trees", "POST", { base_tree: previous?.tree, tree: entries });
-      const commit = await request(repo, "/git/commits", "POST", {
+      const tree = await requestWrite("/git/trees", "POST", { base_tree: previous?.tree, tree: entries });
+      const commit = await requestWrite("/git/commits", "POST", {
         message: "开图工作区同步",
         tree: tree.sha,
         parents: head ? [head] : [],
       });
-      await request(repo, `/git/refs/heads/${encodeURIComponent(branch)}`, "PATCH", {
+      await requestWrite(`/git/refs/heads/${encodeURIComponent(branch)}`, "PATCH", {
         sha: commit.sha,
         force: false,
       });
+      options.progress?.({ phase: "upload", completed: entries.length, total: entries.length });
       return commit.sha as string;
     },
   };
@@ -454,11 +501,22 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
   if (s.conflicts.some((c) => c.path === manifest))
     s.conflicts = s.conflicts.filter((c) => c.path !== manifest);
   if (!s.connection?.enabled || s.conflicts.length) return;
+  const controller = new AbortController();
+  const job: { controller: AbortController; progress?: BackupProgress } = { controller };
+  jobs.set(ws, job);
+  const options: BackupRunOptions = {
+    signal: controller.signal,
+    progress: (value) => {
+      job.progress = value;
+    },
+  };
   const run = async () => {
     const c = s.connection as BackupConnection;
     try {
-      const local = await localFiles(ws, c);
-      const other = await remote.read(c.repo, c.branch);
+      const local = await localFiles(ws, c, options);
+      const other = await remote.read(c.repo, c.branch, options);
+      controller.signal.throwIfAborted();
+      options.progress?.({ phase: "merge", completed: 0 });
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
       const incoming = Object.fromEntries(Object.entries(other.files).filter(([path]) => selected(path, c)));
       // phone 由本机生成；远端删除不会清掉本机快照，也不会写回远端修改。
@@ -504,6 +562,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       );
       // 网络期间作者可能继续写：这次结果留待下轮，不覆盖刚保存的内容。
       if (changes.some((path) => (ws.exists(path) ? ws.readText(path) : undefined) !== local[path])) return;
+      controller.signal.throwIfAborted();
       for (const path of changes) {
         if (merged.files[path] === undefined) rmSync(ws.resolve(path));
         else ws.writeText(path, merged.files[path] as string);
@@ -512,7 +571,8 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       if (!sameFiles(merged.files, incoming)) {
         const outgoing = { ...other.files, ...merged.files };
         for (const path of Object.keys(incoming)) if (!(path in merged.files)) delete outgoing[path];
-        await remote.push(c.repo, c.branch, other.head, outgoing);
+        await remote.push(c.repo, c.branch, other.head, outgoing, options);
+        controller.signal.throwIfAborted();
       }
       store(ws, {
         ...s,
@@ -524,9 +584,10 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
     } catch (error) {
       store(ws, {
         ...s,
-        error:
-          error instanceof KaituError &&
-          ["CLOUD_UNAVAILABLE", "GH_REQUEST", "GH_MISSING"].includes(error.code)
+        error: controller.signal.aborted
+          ? pick("同步已取消，可随时重试", "Sync cancelled; retry when ready")
+          : error instanceof KaituError &&
+              ["CLOUD_UNAVAILABLE", "GH_REQUEST", "GH_MISSING"].includes(error.code)
             ? error.message
             : pick(
                 "同步未完成：请检查网络、GitHub 授权或远端新修改。本地资料已保留，可重试。",
@@ -539,11 +600,16 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
     .then(run)
     .finally(() => {
       active.delete(ws);
+      jobs.delete(ws);
       emitter(ws).emit("change");
     });
   active.set(ws, promise);
   emitter(ws).emit("change");
   return promise;
+}
+export function cancelWorkspaceBackup(ws: Workspace) {
+  jobs.get(ws)?.controller.abort();
+  return workspaceBackupStatus(ws);
 }
 export function requestWorkspaceBackup(ws: Workspace) {
   void syncWorkspaceBackup(ws);
@@ -747,6 +813,8 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
     }
     case "sync":
       return requestWorkspaceBackup(ws);
+    case "cancel":
+      return cancelWorkspaceBackup(ws);
     case "disconnect":
       return disconnectWorkspaceBackup(ws);
     case "resolve": {

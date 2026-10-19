@@ -18,14 +18,16 @@ function executable() {
 function run(
   args: string[],
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<{ output: string; ok: boolean; loginRequired: boolean }> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       executable(),
       args,
-      { encoding: "utf8", timeout: 30000, maxBuffer: 32 * 1024 * 1024 },
+      { encoding: "utf8", timeout: 30000, maxBuffer: 32 * 1024 * 1024, signal },
       (error, stdout, stderr) => {
-        if (error && "code" in error && error.code === "ENOENT") {
+        if (signal?.aborted) reject(signal.reason);
+        else if (error && "code" in error && error.code === "ENOENT") {
           reject(new KaituError("请先安装 GitHub CLI，或改用单仓库 token", "GH_MISSING"));
         } else
           resolve({ output: stdout, ok: !error, loginRequired: /gh auth login|not logged/i.test(stderr) });
@@ -49,7 +51,13 @@ export async function githubCliStatus() {
   }
 }
 
-export async function githubCliRequest(repo: string, path: string, method = "GET", body?: unknown) {
+export async function githubCliRequest(
+  repo: string,
+  path: string,
+  method = "GET",
+  body?: unknown,
+  signal?: AbortSignal,
+) {
   const args = [
     "api",
     "--hostname",
@@ -60,7 +68,7 @@ export async function githubCliRequest(repo: string, path: string, method = "GET
     `repos/${parseGithubRepo(repo)}${path}`,
   ];
   if (body !== undefined) args.push("--input", "-");
-  const { output, ok, loginRequired } = await run(args, body);
+  const { output, ok, loginRequired } = await run(args, body, signal);
   const status = Number(/^HTTP\/\S+\s+(\d+)/m.exec(output)?.[1]);
   if ([404, 409].includes(status) && path.startsWith("/git/ref/")) return null;
   if (!ok || status >= 400)
