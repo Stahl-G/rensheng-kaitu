@@ -4,8 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import { unzipSync } from "fflate";
 import { expect, it, onTestFailed } from "vitest";
 import { reindexChatsAsync, searchChatsAsync } from "../src/chat-search.js";
+import { localStateRoot } from "../src/local-state.js";
 import { exportWorkspaceAsync, workspaceExportRequest } from "../src/settings.js";
 import { workspaceFileStampsAsync } from "../src/workbench.js";
+import { Workspace } from "../src/workspace.js";
 import { freshWorkspace } from "./helpers.js";
 
 it("首次完整索引与 ZIP 在后台保留完整范围，取消索引回滚，取消压缩不产生结果，轮询只读元数据且可中止", async () => {
@@ -72,13 +74,20 @@ it("首次完整索引与 ZIP 在后台保留完整范围，取消索引回滚�
     ).rejects.toMatchObject({ name: "AbortError" });
     stage = "complete export";
     const file = await exportWorkspaceAsync(ws);
-    const entries = unzipSync(Buffer.from(file.base64, "base64"));
+    const entries = unzipSync(fs.readFileSync(file.path));
+    await file.dispose();
+    stage = "failed export cleanup";
+    await expect(
+      exportWorkspaceAsync(new Workspace(join(ws.root, "missing"), { maintain: false })),
+    ).rejects.toThrow();
+    expect(fs.readdirSync(join(localStateRoot(), "exports"))).toEqual([]);
     expect(Buffer.from(entries["chats/2026/10/0079.jsonl"] ?? []).toString()).toContain("only-last-file");
     expect(Object.keys(entries).some((path) => path.startsWith(".kaitu/"))).toBe(false);
     stage = "export job cancellation";
-    expect(workspaceExportRequest(ws, "start").status).toBe("running");
-    expect(workspaceExportRequest(ws, "cancel").status).toBe("cancelled");
-    expect(workspaceExportRequest(ws, "status").status).toBe("idle");
+    expect((await workspaceExportRequest(ws, "start")).status).toBe("running");
+    expect((await workspaceExportRequest(ws, "cancel")).status).toBe("cancelled");
+    expect((await workspaceExportRequest(ws, "status")).status).toBe("idle");
+    expect(fs.readdirSync(join(localStateRoot(), "exports"))).toEqual([]);
     stage = "metadata scans";
     const scan = new AbortController();
     await expect(

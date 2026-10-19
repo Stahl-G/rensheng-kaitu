@@ -159,6 +159,23 @@ it("写队列悬挂时 onboarding 及其他只读 Remote 立即返回", async ()
     ]);
     expect(result).not.toBe("blocked");
     expect(write).toHaveBeenCalledTimes(1);
+    expect((await service.exportWorkspaceRequest("start")).status).toBe("running");
+    await vi.waitFor(async () =>
+      expect((await service.exportWorkspaceRequest("status")).status).toBe("ready"),
+    );
+    const download = await service.exportWorkspaceRequest("result");
+    expect(download.file?.url).toMatch(/^http:\/\/127\.0\.0\.1:/);
+    const response = await fetch(download.file?.url as string);
+    expect(response.status).toBe(200);
+    const zip = Buffer.from(await response.arrayBuffer());
+    expect(response.headers.get("content-type")).toBe("application/zip");
+    expect(zip.readUInt32LE(0)).toBe(0x04034b50);
+    expect(zip.includes(Buffer.from("NOW.md"))).toBe(true);
+    expect(zip.includes(Buffer.from(".kaitu/secrets.json"))).toBe(false);
+    await vi.waitFor(async () =>
+      expect((await service.exportWorkspaceRequest("status")).status).toBe("idle"),
+    );
+    expect((await fetch(download.file?.url as string)).status).toBe(404);
     release();
     const matter = await saving;
     // 两个名称都是只读的，不能再失效文件索引或等待写队列。

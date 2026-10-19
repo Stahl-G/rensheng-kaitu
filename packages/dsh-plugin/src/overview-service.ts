@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { CollectorService } from "@kaitu/channels/collectors";
@@ -63,7 +65,6 @@ import {
   dshFiles,
   editCalendarBlock,
   editExperience,
-  exportWorkspaceAsync,
   handoverPack,
   hideExperience,
   keepOnboardingMatter,
@@ -111,8 +112,10 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  serveWorkspaceExport,
   setExperienceSource,
   setNewsFeedback,
+  startWorkspaceExportDownloads,
   syncProject,
   tryNews,
   unhideExperience,
@@ -151,8 +154,19 @@ declare module "@deepseek-ai/cordis" {
 }
 
 /** 工作区页面数据、资讯与地点核对、本机头像。 */
+interface ExportWebServer {
+  register(route: {
+    kind: "prefix";
+    path: string;
+    handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  }): () => void;
+}
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
+  private readonly exportContext: Context;
+  private exportRoute?: () => void;
+  private exportBase?: string;
+  private exportDownloads?: Promise<Awaited<ReturnType<typeof startWorkspaceExportDownloads>>>;
   private readonly files: ReturnType<typeof dshFiles>;
 
   constructor(
@@ -163,11 +177,14 @@ export class KaituOverviewService extends TypertRemoteService {
     private readonly collectors?: CollectorService,
   ) {
     super(ctx, "kaitu");
+    this.exportContext = ctx;
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => {
+    ctx.effect(() => async () => {
       this.files.dispose();
-      workspaceExportRequest(this.workspace, "cancel");
+      this.exportRoute?.();
+      await workspaceExportRequest(this.workspace, "cancel");
+      if (this.exportDownloads) await (await this.exportDownloads).close();
     });
     const performWrite = this.write;
     this.write = async (operation) => {
@@ -392,11 +409,36 @@ export class KaituOverviewService extends TypertRemoteService {
   async exportWorkspaceRequest(
     action: "start" | "status" | "cancel" | "result",
   ): Promise<WorkspaceExportState> {
-    return workspaceExportRequest(this.workspace, action);
-  }
-  @Remote("exportWorkspace")
-  async exportWorkspace(): Promise<{ name: string; base64: string }> {
-    return exportWorkspaceAsync(this.workspace);
+    if (action !== "result") return workspaceExportRequest(this.workspace, action);
+    if (!this.exportBase) {
+      // dsh-host-webserver 0.2.1-rc.2 的已安装公开 register 接口；Electron IPC 没有该服务。
+      const web = (this.exportContext as unknown as { get(name: string): ExportWebServer | undefined }).get(
+        "webServer",
+      );
+      if (web) {
+        const path = `/kaitu-export-${randomUUID()}`;
+        this.exportRoute = web.register({
+          kind: "prefix",
+          path,
+          handler: async (req, res) => {
+            const token = new URL(req.url ?? "/", "http://localhost").pathname.slice(path.length + 1);
+            if (req.method !== "GET" || !/^[a-f0-9-]+$/.test(token)) {
+              res.writeHead(404);
+              res.end();
+              return;
+            }
+            await serveWorkspaceExport(this.workspace, token, res);
+          },
+        });
+        this.exportBase = `${path}/`;
+      }
+    }
+    if (this.exportBase) return workspaceExportRequest(this.workspace, action, this.exportBase);
+    this.exportDownloads ??= startWorkspaceExportDownloads(this.workspace).catch((error) => {
+      this.exportDownloads = undefined;
+      throw error;
+    });
+    return workspaceExportRequest(this.workspace, action, (await this.exportDownloads).base);
   }
 
   @Remote("restoreVersion")

@@ -348,11 +348,6 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              exportWorkspace: async () => {
-                const r = await ctx.remote.kaitu.exportWorkspace();
-                if (!r.ok) throw new Error(r.error.message);
-                return r.value;
-              },
               restoreVersion: async (oid: string) => {
                 const r = await ctx.remote.kaitu.restoreVersion(oid);
                 if (!r.ok) throw new Error(r.error.message);

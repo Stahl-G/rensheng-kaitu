@@ -7,6 +7,7 @@ export interface DataProgress {
   phase: string;
   completed: number;
   total?: number;
+  bytes?: number;
 }
 export interface DataRunOptions {
   signal?: AbortSignal;
@@ -46,8 +47,7 @@ export async function runDataWorker<T>(
       Atomics.store(cancelled, 0, 1);
       // 导出只读，可直接停止压缩；SQLite 作业在文件间检查标记并回滚事务。
       if (operation === "export") {
-        void worker.terminate();
-        finish(new DOMException("Operation cancelled", "AbortError"));
+        void worker.terminate().then(() => finish(new DOMException("Operation cancelled", "AbortError")));
       }
     };
     options.signal?.addEventListener("abort", abort, { once: true });
@@ -64,7 +64,12 @@ export async function runDataWorker<T>(
     });
     worker.on("error", (error) => finish(error));
     worker.on("exit", (code) => {
-      if (!settled) finish(new Error(`Background operation exited (${code})`));
+      if (!settled)
+        finish(
+          options.signal?.aborted
+            ? new DOMException("Operation cancelled", "AbortError")
+            : new Error(`Background operation exited (${code})`),
+        );
     });
   });
 }

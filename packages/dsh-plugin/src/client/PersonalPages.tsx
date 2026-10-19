@@ -28,7 +28,6 @@ export interface PersonalServices extends CalendarPushServices {
     tasks: Partial<Record<AutomationKey, boolean>>,
     times?: Partial<Record<AutomationKey, string>>,
   ) => Promise<AutomationSettings>;
-  exportWorkspace: () => Promise<{ name: string; base64: string }>;
   exportWorkspaceRequest: (
     action: "start" | "status" | "cancel" | "result",
   ) => Promise<import("@kaitu/core").WorkspaceExportState>;

@@ -44,6 +44,7 @@ import {
   removeMemory,
   removePhoto,
   restore,
+  serveWorkspaceExport,
   snapshotNow,
   stageUpload,
   startWorkspaceBackup,
@@ -522,6 +523,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         return json(res, 200, result ?? null);
       }
       if (req.method === "GET") {
+        if (url.pathname.startsWith("/api/export/"))
+          return await serveWorkspaceExport(ws, url.pathname.slice("/api/export/".length), res);
         if (url.pathname === "/api/ask/events" && options.ask) {
           const id = url.searchParams.get("session") ?? "";
           const history = options.ask.events(id);
@@ -755,7 +758,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     closed = true;
     stopPolling();
-    workspaceExportRequest(ws, "cancel");
+    await workspaceExportRequest(ws, "cancel");
     cancelGithubCliLogin();
     watcher?.close();
     unwatchFile(backupState, backupChanged);

@@ -1,6 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { reindexChats, searchChats, updateChatIndexFiles } from "./chat-search.js";
-import { exportWorkspace } from "./settings.js";
+import type { DataProgress } from "./data-worker.js";
+import { writeWorkspaceArchive } from "./workspace-export.js";
 import { Workspace } from "./workspace.js";
 
 const { root, operation, args, cancelled } = workerData;
@@ -11,7 +12,7 @@ const controls = {
   check: () => {
     if (Atomics.load(flag, 0)) throw new DOMException("Operation cancelled", "AbortError");
   },
-  progress: (progress: { phase: string; completed: number; total?: number }) => {
+  progress: (progress: DataProgress) => {
     if (
       progress.phase !== lastPhase ||
       performance.now() - lastProgress >= 200 ||
@@ -29,7 +30,7 @@ try {
   let result: unknown;
   switch (operation) {
     case "export":
-      result = exportWorkspace(ws, controls);
+      result = writeWorkspaceArchive(ws, args.output, controls);
       break;
     case "search":
       result = searchChats(ws, args.query, { ...args.options, controls });

@@ -80,7 +80,6 @@ const props: OverviewPageProps = {
   desktopUpdate: (action) => call("desktopUpdate", action),
   plugins: (action, input) => call("plugins", action, input),
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
-  exportWorkspace: () => call("exportWorkspace"),
   exportWorkspaceRequest: (action) => call("exportWorkspaceRequest", action),
   restoreVersion: (oid) => call("restoreVersion", oid),
   moveStorage: (path, drive, provider) => call("moveStorage", path, drive, provider),

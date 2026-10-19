@@ -46,7 +46,6 @@ import {
   draftOnboardingMatter,
   editCalendarBlock,
   editExperience,
-  exportWorkspaceAsync,
   financeAccounts,
   financeCashflow,
   financeOverview,
@@ -288,8 +287,6 @@ export async function productRequest(
         throw new KaituError("无效的导出操作", "BAD_ARGS");
       return workspaceExportRequest(ws, action as "start" | "status" | "cancel" | "result");
     }
-    case "exportWorkspace":
-      return exportWorkspaceAsync(ws);
     case "restoreVersion":
       return restore(ws, text(0));
     case "moveStorage": {
