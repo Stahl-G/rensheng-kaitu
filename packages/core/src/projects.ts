@@ -544,6 +544,7 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
         const shallow = new Set(
           fs.existsSync(shallowFile) ? fs.readFileSync(shallowFile, "utf8").trim().split(/\s+/) : [],
         );
+        const expanded = new Set<string>();
         const pending: string[] = [];
         for (const namespace of ["refs/heads", "refs/remotes"]) {
           for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
@@ -554,10 +555,13 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
         // 作者日期不保证随父提交递减，仍须检查完整可达图，不能按日期提前截断。
         while (pending.length) {
           const oid = pending.pop() as string;
-          if (seenCommits.has(oid)) continue;
+          if (expanded.has(oid)) continue;
           const { commit } = await git.readCommit({ fs, dir, oid });
-          seenCommits.add(oid);
+          expanded.add(oid);
           if (!shallow.has(oid)) pending.push(...commit.parent);
+          // 跨库只去重计数；浅库见过的 oid 不能截断完整库中的父链。
+          if (seenCommits.has(oid)) continue;
+          seenCommits.add(oid);
           const timestamp = commit.author.timestamp;
           const day = localDate(new Date(timestamp * 1000), tz);
           if (day < from || day >= today) continue;
