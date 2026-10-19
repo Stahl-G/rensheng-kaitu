@@ -32,6 +32,27 @@ await saveOnboardingChoices(ws, { seen: true });
 const topic = await startLearning(ws, { title: fixture.title, source: fixture.source });
 const requests = [];
 const calls = [];
+let receiveCancellation;
+let closeCancellation;
+const cancellationStarted = new Promise((resolve) => {
+  receiveCancellation = resolve;
+});
+const cancellationClosed = new Promise((resolve) => {
+  closeCancellation = resolve;
+});
+async function within(promise, label) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout`)), 10000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 let sequence = 0;
 const textOf = (m) => (typeof m?.content === "string" ? m.content : JSON.stringify(m?.content ?? ""));
@@ -62,10 +83,17 @@ const fake = createServer(async (req, res) => {
   if (input.stream) {
     const msgs = input.messages ?? [];
     const lastUser = msgs.findLastIndex(
-      (m) => m.role === "user" && /ACTUAL_(START|ANSWER|SAVE|RESUME)/.test(textOf(m)),
+      (m) => m.role === "user" && /ACTUAL_(START|ANSWER|SAVE|RESUME|CANCEL)/.test(textOf(m)),
     );
     const command = textOf(msgs[lastUser]);
-    const action = [...command.matchAll(/ACTUAL_(START|ANSWER|SAVE|RESUME)/g)].at(-1)?.[1];
+    const action = [...command.matchAll(/ACTUAL_(START|ANSWER|SAVE|RESUME|CANCEL)/g)].at(-1)?.[1];
+    if (action === "CANCEL") {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      res.write(": waiting for actual SDK cancellation\n\n");
+      res.on("close", () => closeCancellation());
+      receiveCancellation();
+      return;
+    }
     const after = msgs.slice(lastUser + 1);
     const used = after.flatMap((m) => m.tool_calls ?? []).map((t) => t.function?.name);
     requests.at(-1).debug = { command: command.slice(-100), used, roles: msgs.map((m) => m.role) };
@@ -233,7 +261,41 @@ try {
   ask = create();
   ui = await startUi(ws, { port: 0, open: false, ask });
   await turn("ACTUAL_RESUME");
-  console.log(JSON.stringify({ passed: true, calls, requestCount: requests.length, notesSaved: true }));
+  const cancelStart = ask.events(thread.id).length;
+  await ask.send(thread.id, "ACTUAL_CANCEL");
+  await within(cancellationStarted, "provider request start");
+  assert.deepEqual(await ask.cancel(thread.id), { accepted: true });
+  await within(cancellationClosed, "provider request abort");
+  await within(
+    (async () => {
+      while (
+        ask
+          .events(thread.id)
+          .slice(cancelStart)
+          .filter((event) => event.type === "session.status")
+          .at(-1)?.data.status !== "idle"
+      )
+        await new Promise((resolve) => setTimeout(resolve, 25));
+    })(),
+    "cancel idle",
+  );
+  assert.ok(
+    !ask
+      .events(thread.id)
+      .slice(cancelStart)
+      .some((event) => event.type === "session.status" && event.data.error),
+  );
+  await turn("ACTUAL_RESUME");
+  console.log(
+    JSON.stringify({
+      passed: true,
+      calls,
+      requestCount: requests.length,
+      notesSaved: true,
+      cancellationAbortedProvider: true,
+      resumedAfterCancel: true,
+    }),
+  );
   if (process.argv.includes("--hold")) {
     console.log(JSON.stringify({ hold: true, url: ui.url, base }));
     await new Promise((r) => process.once("SIGINT", r));

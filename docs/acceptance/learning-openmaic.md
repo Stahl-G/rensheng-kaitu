@@ -150,3 +150,28 @@ ACP 命令只使用已安装 CLI，不安装依赖。两个脚本都使用临时
 ![实际 GUI 保存后重开读回学习记录](learning-openmaic/computer-use-reopened.jpg)
 
 ![真实模型从已存疑问接续](learning-openmaic/computer-use-resumed.jpg)
+
+
+## 单问题、等待与取消收口（2026-10-20）
+
+- 精确提交 `6d29fcd45b1c033594f297bbd095f9a00d7efca9` 的 [CI 39306913550](https://github.com/Stahl-G/rensheng-kaitu/actions/runs/39306913550)：macOS 成功；Windows lint/build/typecheck 成功，测试 279 通过、2 失败、7 跳过。失败仍为 ask-filesystem 的 FS_SANDBOX_DENIED 和 feishu 缺 lark-cli，属于既有 PR54 范围；没有新增学习失败。这不是后续提交的 CI 结果。
+- “一次一问”原约束没有明确排除候选题列表。仅改现有中英文接续提示和技能：本条回复选一个具体问题、问完停、不列候选问题、不附加追问。相同合成主题、本机 Qwen 的实际接续回复只问“为什么连续复利会用到 e”；回答“不清楚，请问更小的问题”后，只问复利基本公式。此为两次观察，不承诺所有模型/对话均遵守；未增加输出过滤或重试模型框架。
+- 单问题接续：发送至“停止”按钮可见约 284ms；等待中切到今天页并看到下一步约 398ms。另一次发送首反馈约 805ms。这些是含 Computer Use/浏览器自动化开销的单次观察，不当作浏览器渲染性能基准或普遍 0.3 秒承诺。
+- 本机代理仅记录时间和请求大小，不记录凭据：约 82KB 工具/对话上下文的首轮，模型首文字 198.42 秒、模型请求总时长 204.85 秒；紧接小问题的首文字 1.68 秒、总时长 4.37 秒。等待时状态和导航正常，因此慢主要在本地推理首文字之前，未把它混称为应用页面阻塞。
+- 实际点击“停止”发现 SDK 转发层未实现 session/cancel，原先报连接错误且继续运行。修复在 `packages/desktop/sdk-rpc.mjs`，调用固定版本原生 session controller 同样使用的 `ctx.agents.get(...).cancel({kind:"user"},{keepInbox:true})`；沿用 SDK 的 turn/end 和 idle 通知，不新建取消状态机。
+- 修复后 GUI：模型请求已进入本机代理并开始输出，点击停止约 382ms 后恢复输入；代理出现 AbortError，SDK 记录 turn/end kind=aborted、reason.kind=user，随后 idle，无连接错误。另一次在首文字前取消约 276ms。没有把仅隐藏按钮算作中断成功。
+- GUI 取消后，同一会话继续学习成功并只问复利基本公式；但随后直接给出了公式示例，没有严格等待学习者尝试。因此单问题数量有所改善，严格先答后提示仍是模型遵循限制，不继续堆叠提示或新增答案过滤。
+- `scripts/learning-runtime-smoke.mjs` 增加真实 SDK 挂起请求→取消→服务端连接关闭→idle→再次接续回归，完整运行通过（13 个本机受控请求）。它验证真实入口和取消，不是模型推理；实际模型 GUI 另验。插件构建、引擎构建、相关 3 文件 6 项测试、目标 Biome 和 diff 检查通过。
+
+### 原生 Harness 与可选幻灯片边界
+
+- 当前安装 App 元数据版本为 0.2.1-rc.2；Computer Use 插件页显示 `@openmaic/dsh-openmaic` v0.4.0、启用、组件运行中。仅检查插件状态，没有向其在线模型发送合成或私人材料，没有切换其模型或改配置。
+- 实际 installDsh 在独立临时 DSH_HOME 的 desktop profile 中连续安装两次，结果相同、受管段外文字保留、引用本分支构建产物；路径 `/tmp/kaitu-learning-native-profile-nqgvEW/profiles/desktop/cordis.patch.yml`。没有改真实 desktop profile。这证明安装入口，不代替真实 App 加载本分支后的 GUI 验收。第一次检查中误触 Workspace 构造的默认状态目录写入被沙箱阻止，随后用安装函数所需的 root 数据完成隔离检查，未申请写用户状态目录。
+- 本分支原生客户端已注册 kaitu_learning_card/widget 的 toolview，问问通过 PluginAsk 复用 Harness 会话、输入和停止控件；保持既有调用方式。真实 App 当前没有加载这个开发分支，且当前会话不是已授权本机模型路线，因此未把原生端到端问答判为通过。要补验需专用 native profile 加载本分支并连接同一本地模型，不替换用户正在使用的 profile。
+- 上游 `src/slide.ts` 的 openmaic_slide 接收模型写的本地 slide JSON，输出持久 meta；`src/client/SlideCard.tsx` 用已有 SlideCanvas 显示和展开。这是内联幻灯片，不等于导出 .pptx 文件；该路径本身不要求 open.maic.chat。完整 classroom 的 openmaic_generate 是另一条云端路径，本轮未调用。
+- 本分支没有打包上游 SlideCanvas 或自行实现 PPT 框架；SDK 隔离 profile 没有 openmaic_slide，故可选入口仍是“明确要求且同会话已具备该工具”。未新增依赖或自动安装上游插件。尝试上游独立 slide 测试未返回结果，已终止，只算未完成，不能报告为测试成功。
+- 期间系统曾报 ENOSPC，临时目录创建和日志缓存失败；仅清理本任务可重建的 Swift 模块缓存，之后空间恢复，隔离安装检查已完成。没有清理用户文件。原生 GUI/PPT 仍未验收，不以曾经磁盘不足代替当前具体边界。
+
+![单问题实际回复](learning-openmaic/computer-use-single-question.jpg)
+
+![实际请求取消后恢复输入](learning-openmaic/computer-use-cancel.jpg)

@@ -244,6 +244,12 @@ export function apply(ctx) {
       opened.add(params.sessionId);
       return result;
     }
+    if (method === "session/cancel") {
+      const agent = ctx.agents.get(params.sessionId);
+      if (!agent) throw new Error("会话尚未打开");
+      agent.cancel({ kind: "user" }, { keepInbox: true });
+      return { accepted: true };
+    }
     if (method === "session/wait") return sdk.handleRequest(method, params);
 
     if (method === "shutdown") {
