@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kaitu.local/schemas/phone-library.schema.json",
   "title": "手机快照：资料目录（phone/library.json）",
-  "description": "电脑生成，手机只读。只有标题、类型、日期和相对路径，不含正文；手机点开哪一项才读那个文件。财务和没有明确标为不敏感的记忆不进目录。按日期倒序，没有日期的在最后。",
+  "description": "电脑生成，手机只读。只有标题、类型、日期和相对路径，不含正文；手机点开哪一项才读那个文件。手机是用户自己的设备，财务和全部记忆都列出；标为敏感的记忆 subtitle 为「标为敏感」。按日期倒序，没有日期的在最后。",
   "type": "object",
   "required": ["format", "version", "generated_at", "items"],
   "properties": {
@@ -19,7 +19,9 @@
     "generator": {
       "type": "object",
       "required": ["kind"],
-      "description": "谁生成的这份快照；没有这个字段当作电脑生成",
+      "if": { "properties": { "kind": { "const": "agent" } } },
+      "then": { "required": ["name", "spec"] },
+      "description": "谁生成的这份快照；Agent 必须写 name 和 spec，没有这个字段当作电脑生成",
       "properties": {
         "kind": {
           "enum": ["computer", "agent"]
@@ -55,8 +57,8 @@
       "required": ["kind", "title", "date", "path"],
       "properties": {
         "kind": {
-          "enum": ["project", "health", "note", "me"],
-          "description": "对应资料页的分类：项目、健康、原文、我的"
+          "enum": ["project", "health", "finance", "note", "me"],
+          "description": "对应资料页的分类：项目、健康、财务、原文、我的"
         },
         "title": {
           "type": "string",

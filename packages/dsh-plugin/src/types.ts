@@ -136,6 +136,7 @@ export interface OverviewData {
   allNext: OverviewNext[];
   plans: PlansData;
   sync: {
+    cloudOrganizer?: import("@kaitu/core").OrganizerStatus;
     received: number;
     /** 开了每日整理才说「等待整理」，否则原文只是已保存。 */
     organizer: boolean;

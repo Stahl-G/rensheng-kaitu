@@ -18,7 +18,14 @@ import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 
-export function createLocalAsk({ state, resources, executable, getWorkspace, conversationState = state }) {
+export function createLocalAsk({
+  state,
+  resources,
+  executable,
+  getWorkspace,
+  workspace: ws,
+  conversationState = state,
+}) {
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
   const makeSdk = () =>
     createSdkRuntime({
@@ -30,7 +37,6 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
       hostPlugin: join(resources, "dist/sdk-host.mjs"),
       helper: join(resources, "dist/sdk-credentials.mjs"),
     });
-  const ws = new Workspace(getWorkspace());
   let sdkRoot = ws.root;
   let sdk = makeSdk();
   const currentSdk = () => {
@@ -163,6 +169,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     resources,
     executable: app.getPath("exe"),
     getWorkspace: () => ws.root,
+    workspace: ws,
   });
   const startAutomation = async () => {
     const settings = readAutomation(ws);

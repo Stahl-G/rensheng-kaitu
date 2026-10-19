@@ -421,25 +421,36 @@ function Overview({
           <button
             type="button"
             className={`${css.link} ${css.sync}`}
-            onClick={() => (savedOnly ? openRecord("inbox") : void refresh())}
+            onClick={() =>
+              data?.sync.cloudOrganizer?.unread
+                ? setView("connections")
+                : savedOnly
+                  ? openRecord("inbox")
+                  : void refresh()
+            }
           >
             <i className={css.dot} style={{ background: error ? "var(--news)" : "var(--health)" }} />
             {error
               ? t("读取失败", "Couldn't load")
               : !data
                 ? t("正在读取…", "Loading…")
-                : data.sync.needsReview
-                  ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
-                  : data.sync.received
-                    ? data.sync.organizer
-                      ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
-                      : t(
-                          `已保存 ${data.sync.received} 条原文`,
-                          `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
-                        )
-                    : data.sync.updatedAt
-                      ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
-                      : t("本机资料", "On this computer")}
+                : data.sync.cloudOrganizer?.unread && data.sync.cloudOrganizer.away
+                  ? t(
+                      `电脑不在时 ${data.sync.cloudOrganizer.away.agent.name} 处理了 ${data.sync.cloudOrganizer.away.actions} 条`,
+                      `${data.sync.cloudOrganizer.away.agent.name} handled ${data.sync.cloudOrganizer.away.actions} while away`,
+                    )
+                  : data.sync.needsReview
+                    ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
+                    : data.sync.received
+                      ? data.sync.organizer
+                        ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
+                        : t(
+                            `已保存 ${data.sync.received} 条原文`,
+                            `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
+                          )
+                      : data.sync.updatedAt
+                        ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
+                        : t("本机资料", "On this computer")}
           </button>
           <div className={css.account} ref={account}>
             <button

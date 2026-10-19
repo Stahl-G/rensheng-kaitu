@@ -1,7 +1,8 @@
 import { realpathSync } from "node:fs";
 import { extname, relative, sep } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { assertAgentPath } from "./agent-file-policy.js";
-import { normalizeNow } from "./doc-input.js";
+import { normalizeNow, normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
@@ -165,6 +166,28 @@ export async function writeDigest(
   }
   ws.writeText(file, merged);
   return { file, version: await snapshot(ws, `${actor}写入了 ${date} 的动态简报`) };
+}
+
+/** Agent 文档入口只把新增或改动的安排写成建议，原有用户决定原样保留。 */
+export function proposeAgentDocument(file: string, content: string, previous = ""): string {
+  const plan = file === "NOW.md";
+  if (!plan && !file.endsWith("/STATUS.md")) return content;
+  const normalize = plan ? normalizeNow : normalizeStatus;
+  const next = parseFrontmatter(content);
+  const before = normalize(parseFrontmatter(previous).data);
+  const data = normalize(next.data);
+  const key = plan ? "blocks" : "next";
+  const old = plan && before.date !== data.date ? [] : ((before[key] as Record<string, unknown>[]) ?? []);
+  data[key] = ((data[key] as Record<string, unknown>[]) ?? []).map((item) => {
+    if (old.some((entry) => isDeepStrictEqual(entry, item))) return item;
+    return {
+      ...item,
+      ...(plan ? { kind: "proposal" } : {}),
+      status: plan ? "pending" : "proposed",
+      ...("by" in item ? { by: "agent" } : {}),
+    };
+  });
+  return stringifyFrontmatter(data, next.body);
 }
 
 export interface ProposedBlock {

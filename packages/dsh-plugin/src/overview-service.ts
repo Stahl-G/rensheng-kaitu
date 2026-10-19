@@ -33,6 +33,7 @@ import {
   type OnboardingSetupResult,
   type OnboardingStatus,
   type OnboardingTarget,
+  type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
   type SettingsData,
@@ -67,6 +68,7 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
   normalizeLocale,
@@ -199,11 +201,11 @@ export class KaituOverviewService extends TypertRemoteService {
   }
   @Remote("onboardingMatterRead")
   async onboardingMatterRead(source: string): Promise<OnboardingMatter> {
-    return this.write(async () => readOnboardingMatter(this.workspace, source));
+    return readOnboardingMatter(this.workspace, source);
   }
   @Remote("onboardingMatterOrganize")
   async onboardingMatterOrganize(source: string): Promise<OnboardingMatter> {
-    return this.write(async () => readOnboardingMatter(this.workspace, source));
+    return readOnboardingMatter(this.workspace, source);
   }
   @Remote("onboardingMatterPrompt")
   async onboardingMatterPrompt(source: string, locale?: string): Promise<string> {
@@ -233,7 +235,7 @@ export class KaituOverviewService extends TypertRemoteService {
   }
   @Remote("preferences")
   async preferences(hint?: string): Promise<Preferences> {
-    return this.write(async () => resolvePreferences(this.workspace, hint));
+    return resolvePreferences(this.workspace, hint);
   }
   @Remote("savePreferences")
   async savePreferences(input: Preferences): Promise<Preferences> {
@@ -263,7 +265,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("onboarding")
   async onboarding(locale?: string): Promise<OnboardingStatus> {
-    return this.write(async () => onboardingStatus(this.workspace, { locale: normalizeLocale(locale) }));
+    return onboardingStatus(this.workspace, { locale: normalizeLocale(locale) });
   }
 
   @Remote("onboardingMemoryPreview")
@@ -356,7 +358,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("addCalendarSubscription")
   async addCalendarSubscription(url: string, name: string): Promise<CalendarData> {
-    return this.write(() => addCalendarSubscription(this.workspace, url, name));
+    return addCalendarSubscription(this.workspace, url, name, this.write);
   }
 
   @Remote("completeNext")
@@ -372,6 +374,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("settings")
   async settings(): Promise<SettingsData> {
     return readSettings(this.workspace);
+  }
+
+  @Remote("organizerSeen")
+  async organizerSeen(): Promise<OrganizerStatus> {
+    return markOrganizerSeen(this.workspace);
   }
 
   @Remote("exportWorkspace")
@@ -409,16 +416,14 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("aiDraft")
   async aiDraft(id?: string): Promise<{ id: string; text: string } | null> {
-    return this.write(async () => {
-      const file = ".kaitu/cache/ai-draft.json";
-      if (!this.workspace.exists(file)) return null;
-      const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
-      if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
-      const value = draft.text;
-      if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
-        throw new KaituError("会话草稿不合法", "BAD_ARGS");
-      return { id: draft.id, text: value };
-    });
+    const file = ".kaitu/cache/ai-draft.json";
+    if (!this.workspace.exists(file)) return null;
+    const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
+    if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
+    const value = draft.text;
+    if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
+      throw new KaituError("会话草稿不合法", "BAD_ARGS");
+    return { id: draft.id, text: value };
   }
 
   @Remote("ackAiDraft")

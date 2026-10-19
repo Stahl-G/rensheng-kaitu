@@ -6,6 +6,7 @@ import { type TimedExperience, experienceLayer } from "./experience-time.js";
 import { history } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
+import { organizerStatus } from "./organizer.js";
 import { latestDaily } from "./overview.js";
 import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
@@ -356,6 +357,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     plans: readPlans(data),
     capturedWeek,
     sync: {
+      cloudOrganizer: organizerStatus(ws),
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
       // 只有开了每日整理才说「等待整理」；没开时原文就是已保存，不暗示后台在处理。
       organizer: organizerOn(ws),

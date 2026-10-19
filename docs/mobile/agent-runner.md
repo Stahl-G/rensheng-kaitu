@@ -79,7 +79,7 @@
 "generator": { "kind": "agent", "name": "Dot", "spec": 1 }
 ```
 
-- kind：`computer` 或 `agent`。name：显示给用户的名字，不超过 32 个字；电脑不写名字。spec：Agent 照做的 ORGANIZER.md 规则版本。
+- kind：`computer` 或 `agent`；`agent` 必须有 name 和 spec，`computer` 只写 kind 即可。name：显示给用户的名字，不超过 32 个字；电脑不写名字。spec：Agent 照做的 ORGANIZER.md 规则版本。
 - 没有 generator 的快照当作电脑生成，老电脑版本照常可用。
 - 现有 schema 没有禁止额外字段，手机也忽略不认识的字段，所以 version 仍为 1。
 - 已改：`schemas/phone-today|week|map.schema.json`、`schemas/fixtures/phone/`、手机契约、PRD §6.8、AGENTS.md 生成模板 §11。资料目录 `phone/library.json` 同日确认，同样带 generator。

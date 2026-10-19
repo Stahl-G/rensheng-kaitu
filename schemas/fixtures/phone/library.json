@@ -27,6 +27,13 @@
       "path": "health/data/sleep/2026-10.jsonl"
     },
     {
+      "kind": "finance",
+      "title": "流水",
+      "subtitle": "86 条",
+      "date": "2026-10-16",
+      "path": "finance/data/transaction/2026-10.jsonl"
+    },
+    {
       "kind": "me",
       "title": "每周最多安排三次外景",
       "date": "2026-10-12",

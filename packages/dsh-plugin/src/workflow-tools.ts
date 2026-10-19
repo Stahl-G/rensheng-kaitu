@@ -37,10 +37,12 @@ import {
   onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
+  parseFrontmatter,
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
   projectDirectory,
+  proposeAgentDocument,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -58,6 +60,7 @@ import {
   searchMemories,
   setProject,
   snapshot,
+  stringifyFrontmatter,
   syncProject,
   syncProjects,
   updateMemory,
@@ -509,8 +512,15 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
           return input.slug ? syncProject(ws, input.slug) : syncProjects(ws);
         case "link":
           return linkProject(ws, input.slug, input.link);
-        case "set":
-          return setProject(ws, input.slug, input.patch);
+        case "set": {
+          const project = readProject(ws, input.slug);
+          const content = proposeAgentDocument(
+            `${project.dir}/STATUS.md`,
+            stringifyFrontmatter({ ...project.data, ...input.patch }, project.body),
+            stringifyFrontmatter(project.data, project.body),
+          );
+          return setProject(ws, input.slug, parseFrontmatter(content).data);
+        }
         case "log":
           return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
         case "project-read": {

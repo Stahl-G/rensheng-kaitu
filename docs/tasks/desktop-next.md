@@ -90,18 +90,19 @@ npx vitest run <改到的包>/test      # 最后整体跑一次 npx vitest run
   - **AI 的建议不会被记成用户的决定**：Agent / MCP / 收件箱写入的下一步、目标、日程都是 proposed 或待确认，`by` 不是 user。找出所有写入口，每个入口一条测试，缺的补上。
 - **G4 值得反复打开**：今天页的「今天最值得做的三件事」和「这个项目本周推进了什么」都能直接看到，不用点进去；缺哪样写进晨报，不在今晚加新模块。
 
-## K-8 出口统一过滤
+## K-8 一个地方执行用户的读取选择
 
-依据：[../research/2026-10-19-architecture-review.md](../research/2026-10-19-architecture-review.md) 第 1 节。
+依据：[../research/2026-10-19-architecture-review.md](../research/2026-10-19-architecture-review.md) 第 1 节（用户 2026-10-19 定的口径）。
 
-- 新建 `packages/core/src/exposure.ts`：`shareable(ws, path, scope)` 和 `shareableMemories(ws, scope)`，scope 为 agent / phone / share / backup，规则按文件判断（见评估 1.3 的表）。
-- 远程 MCP、`agent-tools.ts`、`handover.ts`、手机资料目录改为调用它；删掉各处自己写的过滤。
-- 手机一周的「最近变化」不再匹配版本说明文字，改为看这个版本改了哪些文件。
-- GitHub 备份的口径（敏感记忆和财务明细放不放）等用户定，定之前 `selected` 不动。
+- 新建 `packages/core/src/exposure.ts`：`agentCanRead(ws, path, connection)`。`.kaitu/` 和密钥类文件永远不给；标为敏感的记忆不给；`finance/` 看这个连接的开关；其他都给。
+- 每个连接一个「能读财务」开关：本机 MCP、本机问问、手机问问默认开；远程 MCP 默认关。资料包生成时问一次。
+- 远程 MCP、`agent-tools.ts`、`handover.ts` 改为调用它，删掉各自的过滤。
+- GitHub 备份保持完整，不动 `selected`；设置页加一句「你配的整理员能读这个仓库里的全部内容」。
+- 手机快照已经改完（资料目录列出财务和全部记忆，最近变化不再按文字过滤），不用再动。
 
-不要做：不做标签传播、污点追踪；不改数据格式。
+不要做：不做标签传播、污点追踪；不替用户藏手机和备份里的东西。
 
-验收：表格驱动测试，逐个出口断言不含 `PRIVATE_` 标记；一条版本说明里不含关键词的财务改动不出现在手机近况里。
+验收：表格驱动测试，每种连接 × 开关开 / 关，断言能否读到财务和敏感记忆；远程 MCP 默认读不到财务、打开后能读到。
 
 ## K-9 趋势体重
 

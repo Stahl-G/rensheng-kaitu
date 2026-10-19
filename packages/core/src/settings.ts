@@ -5,6 +5,7 @@ import { assertAgentPath } from "./agent-file-policy.js";
 import { readAutomation } from "./automation.js";
 import { driveStatus } from "./drive.js";
 import { history } from "./history.js";
+import { organizerStatus } from "./organizer.js";
 import { workspaceBackupStatus } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
@@ -26,6 +27,7 @@ export interface NetworkSearchSettings {
 export async function readSettings(ws: Workspace) {
   return {
     automation: readAutomation(ws),
+    organizer: organizerStatus(ws),
     backup: workspaceBackupStatus(ws),
     storage: driveStatus(ws),
     versions: await history(ws),

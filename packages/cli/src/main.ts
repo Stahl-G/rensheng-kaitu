@@ -66,6 +66,7 @@ import {
   renderRecordReference,
   resetOnboarding,
   restore,
+  runPhone,
   saveOnboardingChoices,
   searchChats,
   searchMemories,
@@ -100,6 +101,7 @@ const HELP = `开图 kaitu
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
+  kaitu phone run [--as <名字>]                     处理手机收件箱并重写手机快照
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
   kaitu dsh [--install] [--no-automation]         把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令；开图 App 已在用同一工作区时加 --no-automation）
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
@@ -212,6 +214,7 @@ const options = {
   "no-sensitive": { type: "boolean" },
   "dry-run": { type: "boolean" },
   calendar: { type: "string" },
+  as: { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -371,6 +374,18 @@ async function run(argv: string[]): Promise<number> {
         result,
         `模式：${result.mode}（${result.provider}）\n工作区：${result.root}\n状态目录：${result.stateDir}\n上次处理收件箱：${result.lastInboxProcessed ?? "尚未处理"}${result.hint ? `\n${result.hint}` : ""}`,
       );
+      return 0;
+    }
+    case "phone": {
+      if (args[0] !== "run") throw new KaituError("使用 phone run", "BAD_ARGS");
+      const name = values.as;
+      if (name !== undefined && (!name.trim() || [...name].length > 32))
+        throw new KaituError("--as 需要 1–32 个字的整理员名字", "BAD_ARGS");
+      const result = await runPhone(
+        workspace(values),
+        name === undefined ? { kind: "computer" } : { kind: "agent", name, spec: 1 },
+      );
+      out(values, result, JSON.stringify(result, null, 2));
       return 0;
     }
     case "inbox": {

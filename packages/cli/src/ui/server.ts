@@ -32,6 +32,7 @@ import {
   holdOverview,
   ignoredWorkspaceChange,
   importUpload,
+  invalidateHistoryFile,
   onboardingStatus,
   pendingWorkspaceFiles,
   processInbox,
@@ -45,6 +46,7 @@ import {
   snapshotNow,
   stageUpload,
   startWorkspaceBackup,
+  subscribeOrganizer,
   syncProject,
   syncProjects,
   syncStatus,
@@ -193,8 +195,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let closed = false;
   let watchError = "";
-  let polling: ReturnType<typeof setInterval> | undefined;
-  let stamps = workspaceFileStamps(ws);
+  let polling: ReturnType<typeof setTimeout> | undefined;
+  let stamps = new Map<string, string>();
   holdOverview(ws);
   deferSnapshots(ws, (message) => {
     messages.push(message);
@@ -216,6 +218,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
+  const stopOrganizer = subscribeOrganizer(ws, notify);
   const stopPhone = startPhoneSnapshots(ws, () => reportError());
   void pullCalendars().catch(() => {});
   const reportError = () => {
@@ -265,6 +268,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   function changedFile(file: string) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
+    invalidateHistoryFile(ws, file);
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
@@ -281,33 +285,37 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       messages.length ? (options.versionDelayMs ?? 2000) : (options.snapshotDelayMs ?? 30000),
     );
   }
-  for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
   const startPolling = () => {
     watcher?.close();
     if (polling) return;
     // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
-    polling = setInterval(
-      () => {
-        try {
-          const next = workspaceFileStamps(ws);
-          for (const file of new Set([...stamps.keys(), ...next.keys()])) {
-            if (stamps.get(file) !== next.get(file)) changedFile(file);
-          }
-          stamps = next;
-        } catch {
-          reportError();
+    stamps = workspaceFileStamps(ws);
+    // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
+    changedFile("工作区");
+    scheduleInbox();
+    const delay = Math.max(50, options.refreshDelayMs ?? 1000);
+    function poll() {
+      const started = performance.now();
+      try {
+        const next = workspaceFileStamps(ws);
+        for (const file of new Set([...stamps.keys(), ...next.keys()])) {
+          if (stamps.get(file) !== next.get(file)) changedFile(file);
         }
-      },
-      Math.max(50, options.refreshDelayMs ?? 1000),
-    );
+        stamps = next;
+      } catch {
+        reportError();
+      }
+      // 慢扫描后至少留出同等空档，让后台文件 I/O 运行，避免轮询占满事件循环。
+      polling = setTimeout(poll, Math.max(delay, performance.now() - started));
+    }
+    polling = setTimeout(poll, delay);
   };
   function startWatching() {
     watcher?.close();
-    clearInterval(polling);
+    clearTimeout(polling);
     polling = undefined;
-    stamps = workspaceFileStamps(ws);
     try {
       watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
@@ -711,11 +719,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
-    clearInterval(polling);
+    clearTimeout(polling);
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
@@ -734,11 +743,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   } catch (error) {
     watcher?.close();
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
-    clearInterval(polling);
+    clearTimeout(polling);
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
@@ -749,6 +759,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;
+  // 历史盘点涉及 git 全量状态，监听已建立后放到后台，不挡住服务监听。
+  setImmediate(() => {
+    if (closed) return;
+    void exclusive(async () => {
+      for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
+    }).catch(reportError);
+  });
   const url = `http://127.0.0.1:${port}`;
   if (options.open !== false) {
     const command =
