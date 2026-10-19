@@ -177,7 +177,7 @@ export function WorkspaceBackup({
             disabled={busy || status?.running || !!status?.conflicts.length}
             onClick={() => void run("sync")}
           >
-            {status.error ? t("重试同步", "Retry sync") : t("立即同步", "Sync now")}
+            {status?.error ? t("重试同步", "Retry sync") : t("立即同步", "Sync now")}
           </button>
         )}{" "}
         {c && (
