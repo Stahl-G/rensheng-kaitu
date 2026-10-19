@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { promises as fs, existsSync, rmSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { z } from "zod";
+import { writeAgentsMd } from "./agents-md.js";
 import { assetsRoot } from "./assets.js";
 import { rememberWorkspace } from "./drive.js";
 import { KaituError } from "./errors.js";
@@ -625,6 +626,8 @@ export async function restoreWorkspaceBackup(
   const ws = await initWorkspace(root);
   for (const [path, text] of Object.entries(data.files))
     if (path !== manifest && selected(path, selection)) ws.writeText(path, text);
+  // 用纯 Git 模板建的仓库带的是简版入口，恢复后换回本机工作区的完整入口。
+  writeAgentsMd(ws);
   const credential = args.via === "token" && credentials ? token(credentials) : "";
   if (credential) setGithubToken(ws, credential);
   store(ws, {

@@ -3,7 +3,9 @@
 给 Agent 的步骤：
 
 1. 用用户给的仓库地址；没给就看当前账号下的 `kaitu-ai-memory`。确认是私有仓库。
-2. 克隆到 `~/kaitu-ai-memory`（已存在且是同一仓库就 `git pull`；不是就换新目录）。有 kaitu 时可用 `kaitu backup restore <仓库> --to <目录> --via gh`。
-3. 读 `AGENT-README.md`，再读 `me/profile.md`、`me/rules.md`、`memory/MEMORY.md`、`OVERVIEW.md` 和较新的 `handoffs/`；用到时再读目标和项目。
-4. 用几条话告诉用户你记住了什么（偏好、目标、在做的事、下一步），然后接着做用户给的事。
-5. 做完按 `AGENT-README.md` 在 `handoffs/` 写一份交接，提交并推送；有冲突保留两边，不强推。
+2. 本机已有开图工作区（`kaitu status` 能看到）并已连接这个仓库时，直接用它。否则克隆到 `~/kaitu-ai-memory`（已存在且是同一仓库就 `git pull`；不是就换新目录）。有 kaitu 时用 `kaitu backup restore <仓库> --to <目录> --via gh`。
+3. 读 `AGENT-README.md`，再读 `me/profile.md`、`me/rules.md`、`memory/MEMORY.md`、`OVERVIEW.md`、各项目的 `STATUS.md` 和较新的 `handoffs/`。
+4. 用几条话告诉用户你记住了什么：用户是谁、目标、各项目做到哪和下一步。项目进度是空的就直说，并提出按 INSTALL 第 5 步补上。
+5. 接着做用户给的事。做完在 `handoffs/` 写一份交接，新的想法和建议写进 `inbox/agents/`，不直接改档案、目标和项目状态。提交并推送（有 kaitu 用 `kaitu backup sync`）；有冲突保留两边，不强推。
+
+仓库根目录没有 `kaitu-backup.json` 时，补一个 `{ "format": "kaitu-workspace", "version": 1, "text": true, "records": true }` 并推送，开图 App 才能接上。

@@ -134,7 +134,7 @@ const HELP = `开图 kaitu
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
   kaitu investments [--json]
-  kaitu project new --title <标题> --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
+  kaitu project new --title <标题> [--slug <英文短名>] --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
   kaitu project memory [--from <代码目录>] [--project <slug>] [--install]
   kaitu backup status | auth-status | sync
@@ -191,6 +191,7 @@ const options = {
   "no-automation": { type: "boolean" },
   only: { type: "string" },
   title: { type: "string" },
+  slug: { type: "string" },
   due: { type: "string" },
   "remind-at": { type: "string" },
   project: { type: "string" },
@@ -378,6 +379,7 @@ async function run(argv: string[]): Promise<number> {
           title: need(values.title, "--title"),
           kind: need(values.kind, "--kind") as ProjectStatus["kind"],
           links,
+          slug: values.slug,
         });
       } else if (action === "memory") {
         result = await (values.install ? installProjectMemory : projectMemoryContext)(
