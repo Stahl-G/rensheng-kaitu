@@ -1,0 +1,104 @@
+{
+  "V2": {
+    "head": "ea35cea7221358053d702441124e7b44557315e4",
+    "productPatchSha256": "b72ae57aa131992ed3e8a01d5af8835001131317a89825681418de080035692c",
+    "pointerToDispatchMs": 0.5,
+    "mutationBodyMs": 29.600000000558794,
+    "beforeRefreshMs": 0.0,
+    "refreshBodyMs": 465.5,
+    "bodyToContentTwoRafMs": 17.699999999254942,
+    "contentMs": 513.2999999998137,
+    "firstRefreshRequests": [
+      {
+        "url": "/api/product/completeNext",
+        "at": 2618.2999999998137,
+        "headersMs": 29.200000000186265,
+        "bodyMs": 29.600000000558794
+      },
+      {
+        "url": "/api/product/overview",
+        "at": 2647.9000000003725,
+        "headersMs": 450.79999999981374,
+        "bodyMs": 465.5
+      },
+      {
+        "url": "/api/product/calendar",
+        "at": 2648.2999999998137,
+        "headersMs": 114.79999999981374,
+        "bodyMs": 115.1000000005588
+      },
+      {
+        "url": "/api/product/library",
+        "at": 2648.2999999998137,
+        "headersMs": 221.90000000037253,
+        "bodyMs": 237.5
+      },
+      {
+        "url": "/api/product/me",
+        "at": 2648.4000000003725,
+        "headersMs": 237.19999999925494,
+        "bodyMs": 237.5
+      },
+      {
+        "url": "/api/product/onboarding",
+        "at": 2648.5999999996275,
+        "headersMs": 324.6000000005588,
+        "bodyMs": 325
+      },
+      {
+        "url": "/api/product/calendarPush",
+        "at": 2648.5999999996275,
+        "headersMs": 424.30000000074506,
+        "bodyMs": 424.70000000018626
+      }
+    ]
+  },
+  "PR59+V2": {
+    "head": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+    "productPatchSha256": "832cdc758e77bc9f3371120544c28a3a3a60b3107b5a61a198e4bbc8a6e85427",
+    "pointerToDispatchMs": 0.2999999998137355,
+    "mutationBodyMs": 25.700000000186265,
+    "beforeRefreshMs": 0.10000000055879354,
+    "refreshBodyMs": 246.5,
+    "bodyToContentTwoRafMs": 12.599999999627471,
+    "contentMs": 285.20000000018626,
+    "firstRefreshRequests": [
+      {
+        "url": "/api/product/completeNext",
+        "at": 2422.5999999996275,
+        "headersMs": 25.300000000745058,
+        "bodyMs": 25.700000000186265
+      },
+      {
+        "url": "/api/product/overview",
+        "at": 2448.4000000003725,
+        "headersMs": 229.79999999981374,
+        "bodyMs": 246.5
+      },
+      {
+        "url": "/api/product/calendar",
+        "at": 2448.7999999998137,
+        "headersMs": 106.1000000005588,
+        "bodyMs": 106.79999999981374
+      },
+      {
+        "url": "/api/product/me",
+        "at": 2448.7999999998137,
+        "headersMs": 106.79999999981374,
+        "bodyMs": 108.29999999981374
+      },
+      {
+        "url": "/api/product/onboarding",
+        "at": 2448.9000000003725,
+        "headersMs": 204.29999999981374,
+        "bodyMs": 205.09999999962747
+      },
+      {
+        "url": "/api/product/calendarPush",
+        "at": 2449.0999999996275,
+        "headersMs": 204.40000000037253,
+        "bodyMs": 205
+      }
+    ]
+  }
+}

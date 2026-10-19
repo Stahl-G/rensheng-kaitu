@@ -1,0 +1,107 @@
+{
+  "at": "2026-10-19T20:02:05.876Z",
+  "base": "/tmp/kaitu-v2-raw-retry-8zDXZC",
+  "repo": "/tmp/kaitu-v2-perf",
+  "node": "v24.19.0",
+  "head": "ea35cea7221358053d702441124e7b44557315e4",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex ad95432..ea5b124 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -248,18 +248,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     const own = [...new Set(messages)];\n     messages = [];\n     let pending = true;\n-    const version = await snapshotNow(ws, (files) => {\n-      // 外部收件箱仍等处理；用户显式保存的原文不能因只剩 inbox 文件而丢掉版本请求。\n-      pending = files.length > 0 || own.length > 0;\n-      if (!pending) return null;\n-      return own.length\n-        ? own.join(\"；\")\n-        : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n-            .slice(0, 3)\n-            .map((file) => file.split(\"/\").at(-1))\n-            .join(\"、\")}等 ${files.length} 个文件`;\n-    });\n+    let version: string | null;\n+    try {\n+      version = await snapshotNow(ws, (files, hasPendingFiles) => {\n+        // 外部收件箱仍等处理；显式原文要补存，但已经在版本里的原文不应无限重试。\n+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);\n+        if (!pending) return null;\n+        return own.length\n+          ? own.join(\"；\")\n+          : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n+              .slice(0, 3)\n+              .map((file) => file.split(\"/\").at(-1))\n+              .join(\"、\")}等 ${files.length} 个文件`;\n+      });\n+    } catch (error) {\n+      messages.unshift(...own);\n+      throw error;\n+    }\n     if (!version && pending) {\n+      messages.unshift(...own);\n       reportError();\n       scheduleSave(snapshotDelay);\n     } else watchError = \"\";\ndiff --git a/packages/core/src/history.ts b/packages/core/src/history.ts\nindex 8a164ad..8606b7a 100644\n--- a/packages/core/src/history.ts\n+++ b/packages/core/src/history.ts\n@@ -183,12 +183,12 @@ function snapshotFile(ws: Workspace, file: string): boolean {\n   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);\n }\n \n-function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {\n+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {\n   return matrix\n     .filter(\n       ([file, head, workdir, stage]) =>\n         file !== \"OVERVIEW.md\" &&\n-        !file.startsWith(\"inbox/\") &&\n+        (includeInbox || !file.startsWith(\"inbox/\")) &&\n         !neverTrack(file) &&\n         !(head === 1 && workdir === 1 && stage === 1),\n     )\n@@ -244,7 +244,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())\n   return null;\n }\n \n-type SnapshotMessage = string | ((files: readonly string[]) => string | null);\n+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);\n \n function unavailableHistoryWrite(error: unknown): boolean {\n   if (error instanceof git.Errors.MultipleGitError)\n@@ -289,7 +289,8 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):\n   let description: string;\n   if (typeof message === \"function\") {\n     const files = pendingFiles(matrix);\n-    const result = message(files);\n+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。\n+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);\n     if (result === null) {\n       if (!files.length) clearInvalidated(ws, changedFiles);\n       return null;\n",
+  "configuredDelays": "startUi defaults: versionDelayMs=2000, snapshotDelayMs=30000",
+  "phases": [
+    {
+      "recovery": "timer",
+      "path": "inbox/notes/2026-10-20/01m5aw3je77kx8f9s3qjtekm5k.md",
+      "before": "5187a6b27fa2a62390a7d3dc3b8402c38489ee1e",
+      "bytes": 111,
+      "failedAt": 1792440127975.8423,
+      "restoredAt": 1792440127977.9553,
+      "verifiedAt": 1792440158003.7769,
+      "waitAfterRestoreMs": 30025.821533203125,
+      "version": "17097800ca732fcca2014a6ea21609d94efa86f0",
+      "gitText": "---\nagent: 你\ndate: 2026-10-20\ncreated: 2026-10-20T03:02:05+07:00\nkind: capture\n---\nV2真实权限恢复 timer"
+    },
+    {
+      "recovery": "close",
+      "path": "inbox/notes/2026-10-20/01m5aw4hspwhpsfyk0ac1mwcwv.md",
+      "before": "17097800ca732fcca2014a6ea21609d94efa86f0",
+      "bytes": 111,
+      "failedAt": 1792440160072.6304,
+      "restoredAt": 1792440160074.948,
+      "verifiedAt": 1792440160121.0078,
+      "waitAfterRestoreMs": 46.059814453125,
+      "version": "a4480aea4baad1b9fc77185aefee9255869ffb17",
+      "gitText": "---\nagent: 你\ndate: 2026-10-20\ncreated: 2026-10-20T03:02:38+07:00\nkind: capture\n---\nV2真实权限恢复 close"
+    }
+  ],
+  "warnings": [
+    {
+      "at": 1792440127925.5896,
+      "message": "数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）"
+    },
+    {
+      "at": 1792440160042.442,
+      "message": "数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）"
+    }
+  ],
+  "filesystemErrors": [
+    {
+      "at": 1792440127924.8926,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/57/4d462183ac061327e7f33cd2fefa069be09dee"
+    },
+    {
+      "at": 1792440127925.4326,
+      "code": "EACCES",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/a2/63c8a0cdd91254b3a21b9d291d54a043a04754"
+    },
+    {
+      "at": 1792440127925.4946,
+      "code": "EACCES",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/a2/63c8a0cdd91254b3a21b9d291d54a043a04754"
+    },
+    {
+      "at": 1792440157970.009,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/be/a2199e5011ec1b7d841acecdac3338a42e891c"
+    },
+    {
+      "at": 1792440157971.8005,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/c7/82697c539ec156d930ce165c1930b445cf32b3"
+    },
+    {
+      "at": 1792440160041.8733,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/9d/5462a6fa3a1096778ad22da5eed8268a9bbe90"
+    },
+    {
+      "at": 1792440160042.3555,
+      "code": "EACCES",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/3a/d419b2b212c5a10d4c0fa9e9348f244363313f"
+    },
+    {
+      "at": 1792440160042.4072,
+      "code": "EACCES",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/3a/d419b2b212c5a10d4c0fa9e9348f244363313f"
+    },
+    {
+      "at": 1792440160114.5999,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/22/ceab00eaeec87e49e11309b846b58bd8c8a710"
+    },
+    {
+      "at": 1792440160115.0273,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/d8/e7aa988b441885610d552291e253eecfab654d"
+    },
+    {
+      "at": 1792440160115.49,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/00/36e03e68f80264ec37baf10090c583fe64027d"
+    },
+    {
+      "at": 1792440160117.518,
+      "code": "ENOENT",
+      "path": "/tmp/kaitu-v2-raw-retry-8zDXZC/KAITU_DIR/.kaitu/history.git/objects/ac/5c3655b127ff10926338b866dad5f8107907ea"
+    }
+  ]
+}

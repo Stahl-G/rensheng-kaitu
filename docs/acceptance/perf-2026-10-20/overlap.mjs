@@ -132,31 +132,63 @@ if (!isMainThread) {
     // Starting at the history marker alone would miss synchronous overview work before that marker.
     await phase("continuous");
     const captures = result.samples.filter((row) => row.method === "capture");
+    const completions = result.samples
+      .filter((row) => row.method === "completeNext")
+      .map((row) => {
+        const index = (row.phase === "idle" ? 10 : 20) + row.round;
+        return { path: `projects/synthetic-${index}/STATUS.md`, id: `next-${index}` };
+      });
+    const readVersion = (oid, file) => {
+      const read = spawnSync(
+        "git",
+        ["--git-dir", ws.resolve(".kaitu/history.git", { internal: true }), "show", `${oid}:${file}`],
+        { encoding: "utf8" },
+      );
+      return read.status === 0 ? read.stdout : undefined;
+    };
     const deadline = performance.now() + 15000;
     while (performance.now() < deadline) {
       const version = (await core.history(ws, { limit: 1 }))[0];
       if (
         version &&
-        captures.every((row) => {
-          const read = spawnSync(
-            "git",
-            [
-              "--git-dir",
-              ws.resolve(".kaitu/history.git", { internal: true }),
-              "show",
-              `${version.oid}:${row.path}`,
-            ],
-            { encoding: "utf8" },
-          );
-          return read.status === 0 && read.stdout.includes(`V2 overlap ${row.phase} ${row.round}`);
+        captures.every((row) =>
+          readVersion(version.oid, row.path)?.includes(`V2 overlap ${row.phase} ${row.round}`),
+        ) &&
+        completions.every((entry) => {
+          const text = readVersion(version.oid, entry.path);
+          if (!text) return false;
+          const { data } = core.parseFrontmatter(text);
+          return data.next?.some((item) => item.id === entry.id && item.status === "done");
         })
       ) {
         result.verifiedVersion = version.oid;
+        result.completedProjectGitReadback = completions.map((entry) => ({
+          ...entry,
+          text: readVersion(version.oid, entry.path),
+        }));
         break;
       }
       await delay(100);
     }
     if (!result.verifiedVersion) throw new Error("subsequent captures missing from real Git version");
+    result.gitVerifiedAt = performance.timeOrigin + performance.now();
+    const continuous = result.samples.filter((row) => row.phase === "continuous");
+    const from = Math.min(...continuous.map((row) => row.at));
+    const to = Math.max(...continuous.map((row) => row.at + row.ms));
+    result.requestCoverage = { from, to, saves: [] };
+    let started;
+    for (const event of result.timeline) {
+      if (event.event === "save-start") started = event.at;
+      else if (event.event === "ref-written" && started !== undefined) {
+        result.requestCoverage.saves.push({
+          from: started,
+          to: event.at,
+          overlapMs: Math.max(0, Math.min(to, event.at) - Math.max(from, started)),
+          fullSaveCovered: from <= started && to >= event.at,
+        });
+        started = undefined;
+      }
+    }
   } catch (error) {
     result.failure = String(error);
     throw error;

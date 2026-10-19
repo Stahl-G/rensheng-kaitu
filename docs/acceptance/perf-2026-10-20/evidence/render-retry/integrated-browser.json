@@ -1,0 +1,819 @@
+{
+  "at": "2026-10-19T20:04:03.190Z",
+  "repo": "/tmp/kaitu-v2-pr59",
+  "serverReadyMs": 81.94016999999985,
+  "samples": [
+    {
+      "name": "explore-health-first",
+      "at": 908.9000000003725,
+      "target": "开图",
+      "feedbackMs": 27.199999999254942,
+      "completeMs": 243,
+      "driverObservedMs": 261.5,
+      "requests": [
+        {
+          "url": "/api/product/health",
+          "at": 912.0999999996275,
+          "headersMs": 122.40000000037253,
+          "bodyMs": 124.6000000005588
+        }
+      ]
+    },
+    {
+      "name": "library-first",
+      "at": 1238.4000000003725,
+      "target": "资料",
+      "completeMs": 47.799999999813735,
+      "feedbackMs": 31.09999999962747,
+      "driverObservedMs": 49.19999999925494,
+      "requests": [
+        {
+          "url": "/api/product/library",
+          "at": 1246.5,
+          "headersMs": 11.299999999813735,
+          "bodyMs": 12.299999999813735
+        }
+      ]
+    },
+    {
+      "name": "today-warm",
+      "at": 1358.5999999996275,
+      "target": "今天",
+      "completeMs": 28.700000000186265,
+      "feedbackMs": 28.700000000186265,
+      "driverObservedMs": 296.30000000074506,
+      "requests": [
+        {
+          "url": "/api/product/overview",
+          "at": 1358.9000000003725,
+          "headersMs": 245,
+          "bodyMs": 271.29999999981374
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 1364.5,
+          "headersMs": 121.70000000018626,
+          "bodyMs": 122.70000000018626
+        },
+        {
+          "url": "/api/product/me",
+          "at": 1364.7999999998137,
+          "headersMs": 122.29999999981374,
+          "bodyMs": 125.40000000037253
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 1365,
+          "headersMs": 216.09999999962747,
+          "bodyMs": 217.70000000018626
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 1365.0999999996275,
+          "headersMs": 217.40000000037253,
+          "bodyMs": 220.5
+        }
+      ]
+    },
+    {
+      "name": "capture",
+      "at": 1722.4000000003725,
+      "target": "记下",
+      "completeMs": 48,
+      "feedbackMs": 31.899999999441206,
+      "readyForNextMs": 282.3999999994412,
+      "driverObservedMs": 414.79999999981374,
+      "requests": [
+        {
+          "url": "/api/product/capture",
+          "at": 1723.2999999998137,
+          "headersMs": 14.100000000558794,
+          "bodyMs": 14.700000000186265
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 1738,
+          "headersMs": 243.90000000037253,
+          "bodyMs": 262.90000000037253
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 1738.2999999998137,
+          "headersMs": 115.70000000018626,
+          "bodyMs": 116.29999999981374
+        },
+        {
+          "url": "/api/product/me",
+          "at": 1738.5,
+          "headersMs": 116.29999999981374,
+          "bodyMs": 117.5
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 1738.7000000001863,
+          "headersMs": 214.3999999994412,
+          "bodyMs": 214.8999999994412
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 1738.7999999998137,
+          "headersMs": 214.5,
+          "bodyMs": 215
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 2135.0999999996275
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 2135.7000000001863
+        },
+        {
+          "url": "/api/product/me",
+          "at": 2135.9000000003725
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 2136
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 2136.0999999996275
+        }
+      ]
+    },
+    {
+      "name": "complete",
+      "at": 2422.2999999998137,
+      "target": "✓",
+      "feedbackMs": 30.600000000558794,
+      "completeMs": 285.20000000018626,
+      "readyForNextMs": 285.20000000018626,
+      "driverObservedMs": 314.6000000005588,
+      "requests": [
+        {
+          "url": "/api/product/completeNext",
+          "at": 2422.5999999996275,
+          "headersMs": 25.300000000745058,
+          "bodyMs": 25.700000000186265
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 2448.4000000003725,
+          "headersMs": 229.79999999981374,
+          "bodyMs": 246.5
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 2448.7999999998137,
+          "headersMs": 106.1000000005588,
+          "bodyMs": 106.79999999981374
+        },
+        {
+          "url": "/api/product/me",
+          "at": 2448.7999999998137,
+          "headersMs": 106.79999999981374,
+          "bodyMs": 108.29999999981374
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 2448.9000000003725,
+          "headersMs": 204.29999999981374,
+          "bodyMs": 205.09999999962747
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 2449.0999999996275,
+          "headersMs": 204.40000000037253,
+          "bodyMs": 205
+        }
+      ]
+    },
+    {
+      "name": "explore-health-warm",
+      "at": 3078.7999999998137,
+      "target": "开图",
+      "feedbackMs": 10,
+      "completeMs": 209,
+      "driverObservedMs": 231.20000000018626,
+      "requests": [
+        {
+          "url": "/api/product/health",
+          "at": 3080.4000000003725,
+          "headersMs": 98.8999999994412,
+          "bodyMs": 100.5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "serverTimeOrigin": 1792440240405.163,
+  "serverRequests": [
+    {
+      "url": "/api/product/preferences",
+      "at": 3223.796843,
+      "finishedMs": 1.9410130000001118
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 3233.084008,
+      "finishedMs": 566.9711540000003
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 3638.168955,
+      "finishedMs": 1.1305579999998372
+    },
+    {
+      "url": "/api/product/me",
+      "at": 3642.329122,
+      "finishedMs": 1.3887190000000373
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 3644.314632,
+      "finishedMs": 121.95138700000007
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 3766.873777,
+      "finishedMs": 0.617493000000195
+    },
+    {
+      "url": "/api/product/health",
+      "at": 3988.591988,
+      "finishedMs": 120.24897499999952
+    },
+    {
+      "url": "/api/product/library",
+      "at": 4326.877164,
+      "finishedMs": 0.7519839999995384
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 4439.95582,
+      "finishedMs": 240.2420750000001
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 4559.622164,
+      "finishedMs": 0.8986459999996441
+    },
+    {
+      "url": "/api/product/me",
+      "at": 4560.575943,
+      "finishedMs": 0.8276780000005601
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 4561.458023,
+      "finishedMs": 93.41557399999965
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 4656.286518,
+      "finishedMs": 0.4512510000004113
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 4799.751557,
+      "finishedMs": 3.518227000000479
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 4815.067896,
+      "finishedMs": 241.5576430000001
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 4927.350697,
+      "finishedMs": 1.0577350000003207
+    },
+    {
+      "url": "/api/product/me",
+      "at": 4928.470977,
+      "finishedMs": 0.7649940000001152
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 4929.289742,
+      "finishedMs": 97.87892499999998
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 5027.272584,
+      "finishedMs": 0.4827479999994466
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 5211.965094,
+      "finishedMs": 248.49333399999978
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 5318.5165,
+      "finishedMs": 0.9264579999999114
+    },
+    {
+      "url": "/api/product/me",
+      "at": 5319.521897,
+      "finishedMs": 0.7371520000006058
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 5320.305609,
+      "finishedMs": 113.72955399999955
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 5434.136196,
+      "finishedMs": 0.4973599999993894
+    },
+    {
+      "url": "/api/product/completeNext",
+      "at": 5499.067385,
+      "finishedMs": 23.15321700000004
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 5524.416113,
+      "finishedMs": 228.39242699999977
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 5627.773803,
+      "finishedMs": 1.252599000000373
+    },
+    {
+      "url": "/api/product/me",
+      "at": 5629.084159,
+      "finishedMs": 0.9438440000003538
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 5630.098349,
+      "finishedMs": 96.95753599999989
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 5727.160403,
+      "finishedMs": 0.47554700000000594
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 5918.10208,
+      "finishedMs": 218.39805400000023
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 6021.066736,
+      "finishedMs": 0.7348190000002432
+    },
+    {
+      "url": "/api/product/me",
+      "at": 6021.855626,
+      "finishedMs": 1.0147810000007667
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 6022.95202,
+      "finishedMs": 92.33399199999985
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 6115.401206,
+      "finishedMs": 0.539864000000307
+    },
+    {
+      "url": "/api/product/health",
+      "at": 6156.60219,
+      "finishedMs": 96.96042000000034
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 6414.529844,
+      "finishedMs": 202.05277600000045
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 6510.84432,
+      "finishedMs": 0.728809999999612
+    },
+    {
+      "url": "/api/product/me",
+      "at": 6511.612709,
+      "finishedMs": 0.6638519999996788
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 6512.313326,
+      "finishedMs": 83.7869299999993
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 6596.191684,
+      "finishedMs": 0.3743949999998222
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 6687.506648,
+      "finishedMs": 0.9294120000004114
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 6701.022545,
+      "finishedMs": 0.821259000000282
+    },
+    {
+      "url": "/api/product/me",
+      "at": 6701.882492,
+      "finishedMs": 1.1079720000007
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 6703.914407,
+      "finishedMs": 85.45042899999953
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 6789.459148,
+      "finishedMs": 0.33186099999966245
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 6793.426052,
+      "finishedMs": 214.5053079999998
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 8135.424934,
+      "finishedMs": 1.032230000000709
+    },
+    {
+      "url": "/api/product/me",
+      "at": 8136.561081,
+      "finishedMs": 0.7297020000005432
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 8137.333258,
+      "finishedMs": 88.57702999999947
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 8226.012332,
+      "finishedMs": 0.36062499999934516
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 8227.055177,
+      "finishedMs": 127.92948099999921
+    }
+  ],
+  "head": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex 1b3f83b..6002d9a 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -6,7 +6,7 @@ import { extname, resolve, sep } from \"node:path\";\n import { fileURLToPath } from \"node:url\";\n import { PhoneService } from \"@kaitu/channels\";\n import { CollectorService } from \"@kaitu/channels/collectors\";\n-import { startPhoneSnapshots } from \"@kaitu/core\";\n+import { startPhoneSnapshots, watchWorkspace } from \"@kaitu/core\";\n import {\n   type CalendarExecutor,\n   CalendarPush,\n@@ -226,7 +226,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n   };\n   const stopBackup = startWorkspaceBackup(ws, notify);\n   const stopOrganizer = subscribeOrganizer(ws, notify);\n-  const stopPhone = startPhoneSnapshots(ws, () => reportError());\n+  let stopPhone = async () => {};\n   void pullCalendars().catch(() => {});\n   const reportError = () => {\n     watchError = \"自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。\";\n@@ -254,17 +254,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     const own = [...new Set(messages)];\n     messages = [];\n     let pending = true;\n-    const version = await snapshotNow(ws, (files) => {\n-      pending = files.length > 0;\n-      if (!pending) return null;\n-      return own.length\n-        ? own.join(\"；\")\n-        : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n-            .slice(0, 3)\n-            .map((file) => file.split(\"/\").at(-1))\n-            .join(\"、\")}等 ${files.length} 个文件`;\n-    });\n+    let version: string | null;\n+    try {\n+      version = await snapshotNow(ws, (files, hasPendingFiles) => {\n+        // 外部收件箱仍等处理；显式原文要补存，但已经在版本里的原文不应无限重试。\n+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);\n+        if (!pending) return null;\n+        return own.length\n+          ? own.join(\"；\")\n+          : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n+              .slice(0, 3)\n+              .map((file) => file.split(\"/\").at(-1))\n+              .join(\"、\")}等 ${files.length} 个文件`;\n+      });\n+    } catch (error) {\n+      messages.unshift(...own);\n+      throw error;\n+    }\n     if (!version && pending) {\n+      messages.unshift(...own);\n       reportError();\n       scheduleSave(snapshotDelay);\n     } else watchError = \"\";\n@@ -296,7 +304,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     }, options.refreshDelayMs ?? 300);\n     scheduleSave(messages.length ? versionDelay : snapshotDelay);\n   }\n-  let watcher: FSWatcher | undefined;\n+  let watcher: FSWatcher | ReturnType<typeof watchWorkspace> | undefined;\n   let externalWatchers: FSWatcher[] = [];\n   // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。\n   const backupState = ws.resolve(\".kaitu/workspace-backup.json\", { internal: true });\n@@ -351,14 +359,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     };\n     void poll();\n   };\n-  function startWatching() {\n-    watcher?.close();\n+  async function stopWatching() {\n     stopPolling();\n+    clearTimeout(refreshTimer);\n+    clearTimeout(inboxTimer);\n+    await watcher?.close();\n+    watcher = undefined;\n+    for (const external of externalWatchers) external.close();\n+    externalWatchers = [];\n+    await stopPhone();\n+  }\n+  async function startWatching() {\n+    await stopWatching();\n     watchStatus = { mode: \"native\", running: false, scanned: 0 };\n     try {\n-      watcher = (options.watch ?? watch)(ws.root, { recursive: true }, (_event, filename) => {\n-        changedFile(filename?.toString().replaceAll(\"\\\\\", \"/\") ?? \"工作区\");\n-      });\n+      watcher = options.watch\n+        ? options.watch(ws.root, { recursive: true }, (_event, filename) => {\n+            changedFile(filename?.toString().replaceAll(\"\\\\\", \"/\") ?? \"工作区\");\n+          })\n+        : watchWorkspace(ws.root, changedFile);\n       watcher.on(\"error\", startPolling);\n     } catch {\n       startPolling();\n@@ -375,9 +394,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试\n       }\n     }\n+    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher && \"getWatched\" in watcher ? watcher : undefined);\n     scheduleInbox();\n   }\n-  startWatching();\n+  await startWatching();\n   const heartbeat = setInterval(() => {\n     for (const client of clients) client.write(\": heartbeat\\n\\n\");\n     for (const [id, upload] of uploads) {\n@@ -490,13 +510,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n                     await saveExternal();\n                     await options.ask?.prepareRelocation();\n                     await phones.stop();\n-                    const oldRoot = ws.root;\n+                    await stopWatching();\n                     try {\n                       if (relocate) await options.onWorkspaceChanging?.();\n                       return await productRequest(ws, method, args, options.ask, calendarPush);\n                     } finally {\n                       try {\n-                        if (ws.root !== oldRoot) startWatching();\n+                        await startWatching();\n                         if (relocate) await options.onWorkspaceChanged?.();\n                       } finally {\n                         options.ask?.relocate(ws.root);\n@@ -632,6 +652,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n           case \"/api/drive/disable\": {\n             await options.ask?.prepareRelocation();\n             await phones.stop();\n+            await stopWatching();\n             const oldRoot = ws.root;\n             try {\n               await options.onWorkspaceChanging?.();\n@@ -655,7 +676,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n               });\n             } finally {\n               try {\n-                startWatching();\n+                await startWatching();\n                 if (ws.root !== oldRoot) {\n                   aiChild?.kill();\n                   aiChild = undefined;\n@@ -689,10 +710,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n           case \"/api/restore\": {\n             await options.ask?.prepareRelocation();\n             await phones.stop();\n+            await stopWatching();\n             try {\n               return await restore(ws, field(data, \"version\"));\n             } finally {\n               options.ask?.relocate(ws.root);\n+              await startWatching();\n               phones.start();\n             }\n           }\n@@ -760,7 +783,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     stopPolling();\n     await workspaceExportRequest(ws, \"cancel\");\n     cancelGithubCliLogin();\n-    watcher?.close();\n+    await stopWatching();\n     unwatchFile(backupState, backupChanged);\n     for (const external of externalWatchers) external.close();\n     clearTimeout(inboxTimer);\n@@ -773,7 +796,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     await collectors.stop();\n     stopBackup();\n     stopOrganizer();\n-    stopPhone();\n+    await stopPhone();\n     clearInterval(calendarTimer);\n     await options.ask?.close();\n     files.dispose();\n@@ -789,12 +812,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n       server.listen(requestedPort, \"127.0.0.1\", resolve);\n     });\n   } catch (error) {\n-    stopPolling();\n-    watcher?.close();\n+    await stopWatching();\n     unwatchFile(backupState, backupChanged);\n     stopBackup();\n     stopOrganizer();\n-    stopPhone();\n+    await stopPhone();\n     clearInterval(calendarTimer);\n     for (const external of externalWatchers) external.close();\n     clearInterval(heartbeat);\ndiff --git a/packages/core/package.json b/packages/core/package.json\nindex 9afea70..428d0c5 100644\n--- a/packages/core/package.json\n+++ b/packages/core/package.json\n@@ -45,6 +45,7 @@\n     \"@deepseek-ai/dsh-native-command\": \"0.2.1-rc.2\",\n     \"ajv\": \"^8.17.1\",\n     \"ajv-formats\": \"^3.0.1\",\n+    \"chokidar\": \"5.0.0\",\n     \"fflate\": \"^0.8.3\",\n     \"ical.js\": \"^2.2.1\",\n     \"isomorphic-git\": \"^1.27.0\",\ndiff --git a/packages/core/src/health-page.ts b/packages/core/src/health-page.ts\nindex d2c9d7c..47e47b3 100644\n--- a/packages/core/src/health-page.ts\n+++ b/packages/core/src/health-page.ts\n@@ -66,6 +66,13 @@ export function readHealthPage(ws: Workspace, now = new Date()) {\n   const month = data.today.slice(0, 7);\n   const previousMonth = offset(`${month}-01`, -1).slice(0, 7);\n   const monday = offset(data.today, -(new Date(`${data.today}T12:00:00Z`).getUTCDay() + 6) % 7);\n+  // 训练页只投影上月、本月、近 30 天及热力图。先折叠完整记录修订，再筛掉这些视图用不到的历史训练，\n+  // 避免为多年前的每一组训练换算时区、分组并构造 exercises。UTC 粗筛留足所有时区的偏移。\n+  const trainingFrom = [from, `${previousMonth}-01`, offset(monday, -28)].sort()[0] as string;\n+  const trainingEarliest = Date.parse(`${trainingFrom}T00:00:00Z`) - 14 * 3600000;\n+  const workouts = records(\"workout\").filter(\n+    (row) => Date.parse(row.ts) >= trainingEarliest && day(row.ts) >= trainingFrom,\n+  );\n   const cloud = cloudWorkouts(ws);\n   const recorder = (row: StoredRecord) => {\n     if (row.by === \"user\") return \"你\";\n@@ -79,7 +86,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {\n     if (row.by === \"agent\") return \"本机 Agent\";\n     return row.by === \"import:apple-health\" ? \"Apple 健康导入\" : \"导入记录\";\n   };\n-  const sessions = workoutSessions(records(\"workout\"), data.timeZone).map((rows) => {\n+  const sessions = workoutSessions(workouts, data.timeZone).map((rows) => {\n     const first = rows[0] as StoredRecord;\n     const durations = rows.flatMap((r) => (typeof r.duration_min === \"number\" ? [r.duration_min] : []));\n     const reps = rows\ndiff --git a/packages/core/src/history.ts b/packages/core/src/history.ts\nindex 82caea5..8606b7a 100644\n--- a/packages/core/src/history.ts\n+++ b/packages/core/src/history.ts\n@@ -183,12 +183,12 @@ function snapshotFile(ws: Workspace, file: string): boolean {\n   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);\n }\n \n-function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {\n+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {\n   return matrix\n     .filter(\n       ([file, head, workdir, stage]) =>\n         file !== \"OVERVIEW.md\" &&\n-        !file.startsWith(\"inbox/\") &&\n+        (includeInbox || !file.startsWith(\"inbox/\")) &&\n         !neverTrack(file) &&\n         !(head === 1 && workdir === 1 && stage === 1),\n     )\n@@ -244,7 +244,15 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())\n   return null;\n }\n \n-type SnapshotMessage = string | ((files: readonly string[]) => string | null);\n+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);\n+\n+function unavailableHistoryWrite(error: unknown): boolean {\n+  if (error instanceof git.Errors.MultipleGitError)\n+    return error.errors.length > 0 && error.errors.every(unavailableHistoryWrite);\n+  return [\"EPERM\", \"EACCES\", \"EROFS\", \"ENOSPC\"].includes(\n+    (error as NodeJS.ErrnoException | undefined)?.code ?? \"\",\n+  );\n+}\n \n /** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */\n export async function snapshotNow(\n@@ -256,9 +264,8 @@ export async function snapshotNow(\n   try {\n     return await saveSnapshot(ws, message, now);\n   } catch (error) {\n-    const code = (error as NodeJS.ErrnoException).code;\n     if (error instanceof KaituError && error.code === \"CLOUD_UNAVAILABLE\") return null;\n-    if (![\"EPERM\", \"EACCES\", \"EROFS\", \"ENOSPC\"].includes(code ?? \"\")) throw error;\n+    if (!unavailableHistoryWrite(error)) throw error;\n     console.warn(\"数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）\");\n     return null;\n   }\n@@ -268,8 +275,11 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):\n   await ensureHistory(ws);\n   const dir = ws.root;\n   const io = historyFs(ws);\n+  // 只在这次完整保存里共享 Git 对象与索引解析，不跨版本缓存工作区状态。\n+  const cache = {};\n   const changedFiles = new Map(invalidated.get(ws));\n   const matrix = await git.statusMatrix({\n+    cache,\n     fs: historyFs(ws, changedFiles),\n     refresh: !changedFiles.size,\n     dir,\n@@ -279,33 +289,38 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):\n   let description: string;\n   if (typeof message === \"function\") {\n     const files = pendingFiles(matrix);\n-    const result = message(files);\n+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。\n+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);\n     if (result === null) {\n       if (!files.length) clearInvalidated(ws, changedFiles);\n       return null;\n     }\n     description = result;\n   } else description = message;\n-  let changed = 0;\n+  const additions: string[] = [];\n+  const removals: string[] = [];\n   for (const [filepath, head, workdir, stage] of matrix) {\n     if (neverTrack(filepath)) {\n       if (head !== 0 || stage !== 0) {\n-        await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });\n-        changed++;\n+        removals.push(filepath);\n       }\n       continue;\n     }\n     if (head === 1 && workdir === 1 && stage === 1) continue;\n-    if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });\n-    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });\n-    changed++;\n+    if (workdir === 0) removals.push(filepath);\n+    else additions.push(filepath);\n   }\n-  if (changed === 0) {\n+  if (!additions.length && !removals.length) {\n     clearInvalidated(ws, changedFiles);\n     return null;\n   }\n+  if (removals.length) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath: removals, cache });\n+  // git.add 支持多路径，但会并行打开该数组里的文件；小批限制文件句柄，同时避免逐文件重写全索引。\n+  for (let i = 0; i < additions.length; i += 32)\n+    await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath: additions.slice(i, i + 32), cache });\n   const timestamp = Math.floor(now.getTime() / 1000);\n   const oid = await git.commit({\n+    cache,\n     fs,\n     dir,\n     gitdir: historyDirectory(ws),\ndiff --git a/packages/core/src/index.ts b/packages/core/src/index.ts\nindex a8f0eb4..1266600 100644\n--- a/packages/core/src/index.ts\n+++ b/packages/core/src/index.ts\n@@ -101,6 +101,7 @@ export * from \"./phases.js\";\n export * from \"./completion-rate.js\";\n export * from \"./phone-projections.js\";\n export * from \"./phone-snapshots.js\";\n+export { watchWorkspace } from \"./workspace-watch.js\";\n export * from \"./phone-receipts.js\";\n export * from \"./phone-run.js\";\n export * from \"./organizer.js\";\ndiff --git a/packages/core/src/phone-snapshots.ts b/packages/core/src/phone-snapshots.ts\nindex 50df686..fece9ed 100644\n--- a/packages/core/src/phone-snapshots.ts\n+++ b/packages/core/src/phone-snapshots.ts\n@@ -1,4 +1,3 @@\n-import { watch } from \"node:fs\";\n import { readExploration } from \"./exploration.js\";\n import { rememberComputerSnapshot, rememberOrganizer } from \"./organizer.js\";\n import { readOverviewPage } from \"./overview-page.js\";\n@@ -8,6 +7,7 @@ import { lifeMap } from \"./places.js\";\n import { syncMode } from \"./sync-location.js\";\n import { ignoredWorkspaceChange } from \"./workbench.js\";\n import { subscribeWorkspaceBackup, workspaceBackupStatus } from \"./workspace-backup.js\";\n+import { watchWorkspace } from \"./workspace-watch.js\";\n import type { Workspace } from \"./workspace.js\";\n \n export function phoneReadable(ws: Workspace) {\n@@ -55,44 +55,52 @@ export async function writePhoneSnapshots(\n }\n \n /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */\n-export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {\n+export function startPhoneSnapshots(\n+  ws: Workspace,\n+  report: (error: unknown) => void = () => {},\n+  sharedWatcher?: ReturnType<typeof watchWorkspace>,\n+) {\n   let timer: NodeJS.Timeout | undefined;\n-  let running = false;\n+  let running: Promise<void> | undefined;\n   let again = false;\n   let closed = false;\n-  const run = async () => {\n+  const run = () => {\n     if (closed) return;\n     if (running) {\n       again = true;\n       return;\n     }\n-    running = true;\n-    try {\n-      await writePhoneSnapshots(ws);\n-    } catch (error) {\n-      report(error);\n-    } finally {\n-      running = false;\n-      if (again) {\n-        again = false;\n-        schedule();\n+    running = (async () => {\n+      try {\n+        await writePhoneSnapshots(ws);\n+      } catch (error) {\n+        report(error);\n+      } finally {\n+        running = undefined;\n+        if (again && !closed) {\n+          again = false;\n+          schedule();\n+        }\n       }\n-    }\n+    })();\n   };\n   const schedule = () => {\n     clearTimeout(timer);\n     timer = setTimeout(() => void run(), 2000);\n     timer.unref();\n   };\n-  let watcher: ReturnType<typeof watch> | undefined;\n+  let watcher: ReturnType<typeof watchWorkspace> | undefined;\n   try {\n-    watcher = watch(ws.root, { recursive: true }, (_event, file) => {\n-      if (file && !ignoredWorkspaceChange(file)) schedule();\n-    });\n-    watcher.on(\"error\", () => {\n-      watcher?.close();\n-      watcher = undefined;\n-    });\n+    if (sharedWatcher) sharedWatcher.on(\"all\", schedule).on(\"ready\", schedule);\n+    else {\n+      watcher = watchWorkspace(ws.root, (file) => {\n+        if (!ignoredWorkspaceChange(file)) schedule();\n+      });\n+      watcher.on(\"error\", () => {\n+        watcher?.close();\n+        watcher = undefined;\n+      });\n+    }\n   } catch {\n     /* 不支持递归监听时由定时器刷新。 */\n   }\n@@ -100,11 +108,14 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n   const interval = setInterval(schedule, 60000);\n   interval.unref();\n   schedule();\n-  return () => {\n+  return async () => {\n     closed = true;\n     clearTimeout(timer);\n     clearInterval(interval);\n-    watcher?.close();\n     off();\n+    // 借用 UI 的监听时只退订，关闭仍由 UI 在迁移 / 退出前负责。\n+    sharedWatcher?.off(\"all\", schedule).off(\"ready\", schedule);\n+    await watcher?.close();\n+    await running;\n   };\n }\ndiff --git a/packages/core/src/workspace-watch.ts b/packages/core/src/workspace-watch.ts\nnew file mode 100644\nindex 0000000..7e58723\n--- /dev/null\n+++ b/packages/core/src/workspace-watch.ts\n@@ -0,0 +1,19 @@\n+import { relative } from \"node:path\";\n+import { watch } from \"chokidar\";\n+import { ignoredWorkspaceChange } from \"./workbench.js\";\n+\n+/** 在遍历前排除内部历史、缓存等目录；事件范围与既有工作区失效规则一致。 */\n+export function watchWorkspace(root: string, changed: (file: string) => void) {\n+  const file = (path: string) => relative(root, path).replaceAll(\"\\\\\", \"/\");\n+  return (\n+    watch(root, {\n+      ignoreInitial: true,\n+      followSymlinks: false,\n+      atomic: false,\n+      ignored: (path) => ignoredWorkspaceChange(file(path)),\n+    })\n+      .on(\"all\", (_event, path) => changed(file(path)))\n+      // 异步建立监听期间的改动也要补读，不能把首次扫描当成资料没变。\n+      .on(\"ready\", () => changed(\"\"))\n+  );\n+}\ndiff --git a/packages/dsh-plugin/src/client/OverviewPage.tsx b/packages/dsh-plugin/src/client/OverviewPage.tsx\nindex f3bebaf..65dd26f 100644\n--- a/packages/dsh-plugin/src/client/OverviewPage.tsx\n+++ b/packages/dsh-plugin/src/client/OverviewPage.tsx\n@@ -134,6 +134,8 @@ function Overview({\n   const [theme, setTheme] = useState(\"light\");\n   const account = useRef<HTMLDivElement>(null);\n   const sequence = useRef(0);\n+  const writing = useRef(false);\n+  const refreshPending = useRef(false);\n   const refresh = useCallback(async () => {\n     if (!locale) return;\n     const seq = ++sequence.current;\n@@ -166,7 +168,15 @@ function Overview({\n       sequence.current++;\n     };\n   }, [refresh]);\n-  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);\n+  useEffect(\n+    () =>\n+      props.subscribe?.(() => {\n+        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。\n+        if (writing.current) refreshPending.current = true;\n+        else void refresh();\n+      }),\n+    [props.subscribe, refresh],\n+  );\n   // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。\n   useEffect(() => {\n     if (view !== \"records\") return;\n@@ -221,15 +231,23 @@ function Overview({\n     };\n   }, [menu]);\n   const run = async (operation: () => Promise<unknown>) => {\n+    writing.current = true;\n     setBusy(true);\n     setError(\"\");\n     try {\n       await operation();\n+      // 到这里之前的通知已被本次读取覆盖；读取期间的新变化仍要补读，不能丢外部编辑。\n+      refreshPending.current = false;\n       await refresh();\n     } catch (err) {\n       setError(err instanceof Error ? err.message : String(err));\n     } finally {\n+      writing.current = false;\n       setBusy(false);\n+      if (refreshPending.current) {\n+        refreshPending.current = false;\n+        void refresh();\n+      }\n     }\n   };\n   const openRecord = (id: string) => {\ndiff --git a/pnpm-lock.yaml b/pnpm-lock.yaml\nindex 41e9d25..7f5da94 100644\n--- a/pnpm-lock.yaml\n+++ b/pnpm-lock.yaml\n@@ -154,6 +154,9 @@ importers:\n       ajv-formats:\n         specifier: ^3.0.1\n         version: 3.0.1(ajv@8.20.0)\n+      chokidar:\n+        specifier: 5.0.0\n+        version: 5.0.0\n       fflate:\n         specifier: ^0.8.3\n         version: 0.8.3\n",
+  "browser": "154.0.8037.57",
+  "browserTimeOrigin": 1792440243480.3,
+  "firstContentMs": 769.5999999996275,
+  "paint": [
+    {
+      "name": "first-paint",
+      "start": 148
+    },
+    {
+      "name": "first-contentful-paint",
+      "start": 148
+    }
+  ],
+  "capturePersisted": true,
+  "externalDuringRefreshPreserved": true,
+  "requests": [
+    {
+      "url": "/api/product/preferences",
+      "at": 144.29999999981374,
+      "headersMs": 7.900000000372529,
+      "bodyMs": 9.200000000186265
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 155.40000000037253,
+      "headersMs": 568.7999999998137,
+      "bodyMs": 587.3999999994412
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 157.20000000018626,
+      "headersMs": 408.09999999962747,
+      "bodyMs": 408.59999999962747
+    },
+    {
+      "url": "/api/product/me",
+      "at": 157.40000000037253,
+      "headersMs": 417.69999999925494,
+      "bodyMs": 418
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 157.5,
+      "headersMs": 534.7000000001863,
+      "bodyMs": 535.4000000003725
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 157.70000000018626,
+      "headersMs": 535.0999999996275,
+      "bodyMs": 537.5
+    },
+    {
+      "url": "/api/product/health",
+      "at": 912.0999999996275,
+      "headersMs": 122.40000000037253,
+      "bodyMs": 124.6000000005588
+    },
+    {
+      "url": "/api/product/library",
+      "at": 1246.5,
+      "headersMs": 11.299999999813735,
+      "bodyMs": 12.299999999813735
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 1358.9000000003725,
+      "headersMs": 245,
+      "bodyMs": 271.29999999981374
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 1364.5,
+      "headersMs": 121.70000000018626,
+      "bodyMs": 122.70000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 1364.7999999998137,
+      "headersMs": 122.29999999981374,
+      "bodyMs": 125.40000000037253
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 1365,
+      "headersMs": 216.09999999962747,
+      "bodyMs": 217.70000000018626
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 1365.0999999996275,
+      "headersMs": 217.40000000037253,
+      "bodyMs": 220.5
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 1723.2999999998137,
+      "headersMs": 14.100000000558794,
+      "bodyMs": 14.700000000186265
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 1738,
+      "headersMs": 243.90000000037253,
+      "bodyMs": 262.90000000037253
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 1738.2999999998137,
+      "headersMs": 115.70000000018626,
+      "bodyMs": 116.29999999981374
+    },
+    {
+      "url": "/api/product/me",
+      "at": 1738.5,
+      "headersMs": 116.29999999981374,
+      "bodyMs": 117.5
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 1738.7000000001863,
+      "headersMs": 214.3999999994412,
+      "bodyMs": 214.8999999994412
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 1738.7999999998137,
+      "headersMs": 214.5,
+      "bodyMs": 215
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 2135.0999999996275,
+      "headersMs": 249.90000000037253,
+      "bodyMs": 266.40000000037253
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 2135.7000000001863,
+      "headersMs": 109.5,
+      "bodyMs": 110.09999999962747
+    },
+    {
+      "url": "/api/product/me",
+      "at": 2135.9000000003725,
+      "headersMs": 109.5,
+      "bodyMs": 110
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 2136,
+      "headersMs": 224.20000000018626,
+      "bodyMs": 224.70000000018626
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 2136.0999999996275,
+      "headersMs": 224.1000000005588,
+      "bodyMs": 224.80000000074506
+    },
+    {
+      "url": "/api/product/completeNext",
+      "at": 2422.5999999996275,
+      "headersMs": 25.300000000745058,
+      "bodyMs": 25.700000000186265
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 2448.4000000003725,
+      "headersMs": 229.79999999981374,
+      "bodyMs": 246.5
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 2448.7999999998137,
+      "headersMs": 106.1000000005588,
+      "bodyMs": 106.79999999981374
+    },
+    {
+      "url": "/api/product/me",
+      "at": 2448.7999999998137,
+      "headersMs": 106.79999999981374,
+      "bodyMs": 108.29999999981374
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 2448.9000000003725,
+      "headersMs": 204.29999999981374,
+      "bodyMs": 205.09999999962747
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 2449.0999999996275,
+      "headersMs": 204.40000000037253,
+      "bodyMs": 205
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 2841.5999999996275,
+      "headersMs": 219.5,
+      "bodyMs": 235.6000000005588
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 2842.2000000001863,
+      "headersMs": 105.29999999981374,
+      "bodyMs": 105.70000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 2842.2999999998137,
+      "headersMs": 106.79999999981374,
+      "bodyMs": 107.20000000018626
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 2842.2999999998137,
+      "headersMs": 199.1000000005588,
+      "bodyMs": 199.70000000018626
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 2842.5,
+      "headersMs": 199.09999999962747,
+      "bodyMs": 199.59999999962747
+    },
+    {
+      "url": "/api/product/health",
+      "at": 3080.4000000003725,
+      "headersMs": 98.8999999994412,
+      "bodyMs": 100.5
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 3338.2000000001863,
+      "headersMs": 204.29999999981374,
+      "bodyMs": 234.09999999962747
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 3338.7000000001863,
+      "headersMs": 98.70000000018626,
+      "bodyMs": 99.20000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 3338.9000000003725,
+      "headersMs": 98.69999999925494,
+      "bodyMs": 99.09999999962747
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 3339.0999999996275,
+      "headersMs": 182.6000000005588,
+      "bodyMs": 183.30000000074506
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 3339.2000000001863,
+      "headersMs": 182.70000000018626,
+      "bodyMs": 183.29999999981374
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 3607.4000000003725,
+      "headersMs": 14,
+      "bodyMs": 14.399999999441206
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 3621.9000000003725,
+      "headersMs": 1420.199999999255,
+      "bodyMs": 1435.199999999255
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 3622.2000000001863,
+      "headersMs": 5.2999999998137355,
+      "bodyMs": 5.5
+    },
+    {
+      "url": "/api/product/me",
+      "at": 3622.4000000003725,
+      "headersMs": 6.199999999254942,
+      "bodyMs": 6.2999999998137355
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 3622.5,
+      "headersMs": 93.40000000037253,
+      "bodyMs": 94.29999999981374
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 3622.5999999996275,
+      "headersMs": 93.6000000005588,
+      "bodyMs": 94.40000000037253
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 5057.200000000186,
+      "headersMs": 223.70000000018626,
+      "bodyMs": 239.09999999962747
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 5057.799999999814,
+      "headersMs": 4.7000000001862645,
+      "bodyMs": 5
+    },
+    {
+      "url": "/api/product/me",
+      "at": 5058,
+      "headersMs": 7,
+      "bodyMs": 7.2000000001862645
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 5058.0999999996275,
+      "headersMs": 96.40000000037253,
+      "bodyMs": 96.80000000074506
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 5058.299999999814,
+      "headersMs": 98,
+      "bodyMs": 99.5
+    }
+  ],
+  "longTasks": [
+    {
+      "start": 1037,
+      "duration": 52
+    },
+    {
+      "start": 1090.0999999996275,
+      "duration": 54
+    },
+    {
+      "start": 3181,
+      "duration": 50
+    }
+  ],
+  "completePersisted": true
+}

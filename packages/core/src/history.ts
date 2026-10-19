@@ -183,12 +183,12 @@ function snapshotFile(ws: Workspace, file: string): boolean {
   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
-function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {
+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {
   return matrix
     .filter(
       ([file, head, workdir, stage]) =>
         file !== "OVERVIEW.md" &&
-        !file.startsWith("inbox/") &&
+        (includeInbox || !file.startsWith("inbox/")) &&
         !neverTrack(file) &&
         !(head === 1 && workdir === 1 && stage === 1),
     )
@@ -244,7 +244,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   return null;
 }
 
-type SnapshotMessage = string | ((files: readonly string[]) => string | null);
+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);
 
 function unavailableHistoryWrite(error: unknown): boolean {
   if (error instanceof git.Errors.MultipleGitError)
@@ -289,7 +289,8 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
   let description: string;
   if (typeof message === "function") {
     const files = pendingFiles(matrix);
-    const result = message(files);
+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。
+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);
     if (result === null) {
       if (!files.length) clearInvalidated(ws, changedFiles);
       return null;

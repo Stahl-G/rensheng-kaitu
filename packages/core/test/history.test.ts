@@ -13,7 +13,12 @@ import fs, {
 import { join, relative } from "node:path";
 import git from "isomorphic-git";
 import { describe, expect, it, vi } from "vitest";
-import { historyDirectory, invalidateHistoryFile, pendingWorkspaceFiles } from "../src/history.js";
+import {
+  historyDirectory,
+  invalidateHistoryFile,
+  pendingWorkspaceFiles,
+  snapshotNow,
+} from "../src/history.js";
 import {
   Workspace,
   addRecord,
@@ -140,6 +145,28 @@ describe("版本历史", () => {
       });
       expect(Buffer.from(blob).toString()).toBe(text);
     }
+    const note = "inbox/notes/2026-10-20/synthetic-save-intent.md";
+    ws.writeText(note, "显式原文保存与已经存好后的 no-op\n");
+    const noteVersion = await snapshotNow(ws, (files, pending) => {
+      expect(files).not.toContain(note);
+      expect(pending).toBe(true);
+      return "显式原文";
+    });
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: noteVersion as string,
+      filepath: note,
+    });
+    expect(Buffer.from(blob).toString()).toBe(ws.readText(note));
+    expect(
+      await snapshotNow(ws, (_files, pending) => {
+        expect(pending).toBe(false);
+        return null;
+      }),
+    ).toBeNull();
+    expect((await history(ws))[0]?.oid).toBe(noteVersion);
   });
 
   it("恢复整个工作区，并且恢复本身可以撤销", async () => {

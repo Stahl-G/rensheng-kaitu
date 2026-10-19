@@ -50,9 +50,23 @@ async function setup(input: Parameters<typeof startUi>[1] = {}) {
   cleanup.push(ui.close);
   return { ws, ui };
 }
-it("只有用户显式记下的原文时也保存版本，下一次保存不会丢掉后续原文", async () => {
-  const { ws, ui } = await setup({ versionDelayMs: 80 });
+it("只有用户显式记下的原文时也保存版本，失败后定时重试和关闭仍补存后续原文", async () => {
+  const { ws, ui } = await setup({ versionDelayMs: 80, snapshotDelayMs: 80 });
   const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
+  const versionText = async (file: string) => {
+    try {
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: (await history(ws))[0]?.oid,
+        filepath: file,
+      });
+      return Buffer.from(blob).toString();
+    } catch {
+      return undefined;
+    }
+  };
   for (const text of ["合成仅原文第一条", "合成仅原文后续条"]) {
     const before = (await history(ws))[0]?.oid;
     const response = await fetch(`${ui.url}/api/product/capture`, {
@@ -63,7 +77,12 @@ it("只有用户显式记下的原文时也保存版本，下一次保存不会�
     expect(response.status).toBe(200);
     const saved = await response.json();
     expect(ws.readText(saved.path)).toContain(text);
-    await expect.poll(async () => (await history(ws))[0]?.oid).not.toBe(before);
+    await expect
+      .poll(async () => {
+        const oid = (await history(ws))[0]?.oid;
+        return !!oid && oid !== before;
+      })
+      .toBe(true);
     const { blob } = await git.readBlob({
       fs,
       dir: ws.root,
@@ -72,6 +91,41 @@ it("只有用户显式记下的原文时也保存版本，下一次保存不会�
       filepath: saved.path,
     });
     expect(Buffer.from(blob).toString()).toContain(text);
+  }
+  // Windows 不提供 POSIX 目录写权限；该平台仍执行上面的真实 HTTP / Git 旅程。
+  if (process.platform !== "win32") {
+    for (const recovery of ["retry", "close"]) {
+      const response = await fetch(`${ui.url}/api/product/capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui.url },
+        body: JSON.stringify([`真实权限恢复合成原文 ${recovery}`]),
+      });
+      expect(response.status).toBe(200);
+      const saved = await response.json();
+      const text = ws.readText(saved.path);
+      const { oid } = await git.hashBlob({ object: Buffer.from(text) });
+      const objects = join(historyDirectory(ws), "objects", oid.slice(0, 2));
+      fs.mkdirSync(objects, { recursive: true });
+      const mode = fs.statSync(objects).mode & 0o777;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        fs.chmodSync(objects, 0o555);
+        await expect
+          .poll(() => warn.mock.calls.some(([message]) => String(message).includes("数据已保存，版本稍后")))
+          .toBe(true);
+        expect(ws.readText(saved.path)).toBe(text);
+        expect(await versionText(saved.path)).toBeUndefined();
+        fs.chmodSync(objects, mode);
+        if (recovery === "close") {
+          await ui.close();
+          cleanup.splice(cleanup.lastIndexOf(ui.close), 1);
+        }
+        await expect.poll(() => versionText(saved.path)).toBe(text);
+      } finally {
+        fs.chmodSync(objects, mode);
+        warn.mockRestore();
+      }
+    }
   }
 });
 it("拒绝错误 Host、缺少 X-Kaitu 或非本机 Origin 的写操作", async () => {

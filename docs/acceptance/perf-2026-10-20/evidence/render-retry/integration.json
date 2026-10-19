@@ -1,0 +1,24 @@
+{
+  "baseHead": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+  "v2BaseHead": "ea35cea7221358053d702441124e7b44557315e4",
+  "primaryProductDelta": "history callback metadata + retain raw-note save intent on failure",
+  "temporaryOnly": true,
+  "resolutions": [
+    "retain PR58 incremental page updates/lazy library and V2 mutation refresh coalescing",
+    "retain PR59 abortable polling/test watch adapter, with V2 await-close and shared phone watcher"
+  ],
+  "sourceSha256": {
+    "packages/core/src/health-page.ts": "641534f67261c4e290b8675e41368bea0d39ae3a4389cecf0ba5389bd94d6ec8",
+    "packages/core/src/history.ts": "cfa738b87b1aaa87a8abbd7e0f1f9da336957cc23071e185266d29b30cdb1351",
+    "packages/core/src/phone-snapshots.ts": "741deaf0ef729dbea48db08a115d72f0de8b094c0714d2adc55703e63c071054",
+    "packages/core/src/workspace-watch.ts": "5d464f6fbcc761499795a6417bd789818c7ecdf09d06bdaf815937da1cb6fb63",
+    "packages/core/src/index.ts": "4556188f516dbfe85a16c94ea4e0ef3dfe459235f514f0a27acb19109242e3f8",
+    "packages/cli/src/ui/server.ts": "31c58527f796302eb80311d4e7063dec207fb218e6e5ad47467f50a7d057eb21",
+    "packages/dsh-plugin/src/client/OverviewPage.tsx": "272e30a8264117f2288a10ae52fbf011285f1ee23a5457ea25b40096ac518173",
+    "packages/core/package.json": "4c24018dffa5289125024f731eaf3feac3047b69da45e424ee6b3856413171fa",
+    "pnpm-lock.yaml": "345ed0bb87546f924e332390b7442e2ca54e0563a68af9ac39005fbd0fa74ccf"
+  },
+  "buildCoreLog": "$ tsc -p tsconfig.json\n",
+  "buildCliLog": "$ tsc -p tsconfig.json && node scripts/build-engine.mjs\n",
+  "scope": "browser journey only; not a merge or a complete integration acceptance"
+}
