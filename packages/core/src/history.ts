@@ -400,7 +400,7 @@ export async function restore(
       ws.isUnavailable(file),
   );
   if (unavailable.length)
-    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+    throw new KaituError(`还没从云盘下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
   await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
   if (await headOid(ws))
     currentFiles = (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: "HEAD" })).filter(

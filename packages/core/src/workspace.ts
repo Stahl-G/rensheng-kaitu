@@ -71,6 +71,8 @@ function isInside(root: string, target: string): boolean {
 export class Workspace {
   private location = "";
   private icloud = false;
+  // iCloud 与 Google Drive 都可能只留占位文件；同步读占位文件会等云盘下载，卡住主进程。
+  private cloud = false;
   private unread = new Set<string>();
   /** 按文件状态缓存的解析结果，见 scanParsed。 */
   private parsed = new Map<string, { stamp: string; value: unknown }>();
@@ -86,7 +88,9 @@ export class Workspace {
 
   set root(value: string) {
     this.location = value;
-    this.icloud = isICloudPath(value) || stateBinding(value).mode === "icloud";
+    const mode = stateBinding(value).mode;
+    this.icloud = isICloudPath(value) || mode === "icloud";
+    this.cloud = this.icloud || mode === "drive";
     this.unread.clear();
     this.parsed.clear();
     this.zone = null;
@@ -152,7 +156,7 @@ export class Workspace {
 
   readBytes(rel: string): Buffer {
     const abs = this.resolve(rel, { internal: true });
-    if (this.isUnavailable(rel)) throw new KaituError(`还没从 iCloud 下载：${rel}`, "CLOUD_UNAVAILABLE");
+    if (this.isUnavailable(rel)) throw new KaituError(`还没从云盘下载：${rel}`, "CLOUD_UNAVAILABLE");
     return readFileSync(abs);
   }
 
@@ -217,7 +221,7 @@ export class Workspace {
   }
 
   isUnavailable(rel: string): boolean {
-    if (!this.icloud || (rel.startsWith(".kaitu/") && rel !== ".kaitu/config.json")) return false;
+    if (!this.cloud || (rel.startsWith(".kaitu/") && rel !== ".kaitu/config.json")) return false;
     const pending = isEvictedICloudFile(this.resolve(rel, { internal: true }));
     if (pending) this.unread.add(rel);
     else this.unread.delete(rel);
@@ -229,7 +233,7 @@ export class Workspace {
   }
 
   unavailableFiles(prefix = ""): string[] {
-    if (!this.icloud) return [];
+    if (!this.cloud) return [];
     const absolute = resolve(this.root, prefix);
     if (isAbsolute(prefix) || !isInside(this.root, absolute))
       throw new ScopeError(`路径超出工作区：${prefix}`);
@@ -247,11 +251,11 @@ export class Workspace {
   assertDownloaded(prefix = ""): void {
     const unavailable = this.unavailableFiles(prefix);
     if (unavailable.length)
-      throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+      throw new KaituError(`还没从云盘下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
   }
 
   private protectWrite(rel: string): void {
-    if (this.isUnavailable(rel)) throw new KaituError(`还没从 iCloud 下载：${rel}`, "CLOUD_UNAVAILABLE");
+    if (this.isUnavailable(rel)) throw new KaituError(`还没从云盘下载：${rel}`, "CLOUD_UNAVAILABLE");
   }
 
   readJson<T = unknown>(rel: string): T {
