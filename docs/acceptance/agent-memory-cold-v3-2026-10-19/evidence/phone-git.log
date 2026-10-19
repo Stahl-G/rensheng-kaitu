@@ -1,0 +1,43 @@
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid init --bare --initial-branch=main /tmp/kaitu-cold-v3/phone.git
+Initialized empty Git repository in /tmp/kaitu-cold-v3/phone.git/
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid init -b main
+Initialized empty Git repository in /tmp/kaitu-cold-v3/phone-memory/.git/
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid add phone/today.json phone/week.json phone/map.json phone/library.json phone/receipts.json projects/paperboat/STATUS.md projects/paperboat/log.md me/profile.md me/rules.md me/goals.json handoffs/20261019T2030-cold-agent.md AGENT-README.md kaitu-backup.json
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid commit -m Supplementary real phone output with valid synthetic status
+[main (root-commit) 63618a9] Supplementary real phone output with valid synthetic status
+ 13 files changed, 270 insertions(+)
+ create mode 100644 AGENT-README.md
+ create mode 100644 handoffs/20261019T2030-cold-agent.md
+ create mode 100644 kaitu-backup.json
+ create mode 100644 me/goals.json
+ create mode 100644 me/profile.md
+ create mode 100644 me/rules.md
+ create mode 100644 phone/library.json
+ create mode 100644 phone/map.json
+ create mode 100644 phone/receipts.json
+ create mode 100644 phone/today.json
+ create mode 100644 phone/week.json
+ create mode 100644 projects/paperboat/STATUS.md
+ create mode 100644 projects/paperboat/log.md
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid remote add origin /tmp/kaitu-cold-v3/phone.git
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid push -u origin main
+branch 'main' set up to track 'origin/main'.
+To /tmp/kaitu-cold-v3/phone.git
+ * [new branch]      main -> main
+
+exit=0
+$ git clone /tmp/kaitu-cold-v3/phone.git /tmp/kaitu-cold-v3/phone-second
+Cloning into '/tmp/kaitu-cold-v3/phone-second'...
+done.
+
+exit=0

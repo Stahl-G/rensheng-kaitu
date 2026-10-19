@@ -1,0 +1,27 @@
+{
+  "format": "kaitu.phone.library",
+  "version": 1,
+  "generated_at": "2026-10-19T20:24:51.615Z",
+  "generator": {
+    "kind": "agent",
+    "name": "synthetic-cold-agent",
+    "spec": 1
+  },
+  "items": [
+    {
+      "kind": "project",
+      "title": "合成纸舟",
+      "subtitle": "下一步：确认 CSV 字段顺序后实现导出",
+      "date": null,
+      "path": "projects/paperboat/STATUS.md"
+    },
+    {
+      "kind": "me",
+      "title": "完成合成 CSV 导出",
+      "subtitle": "记过 0 次结果",
+      "date": null,
+      "path": "me/goals.json",
+      "id": "synthetic-csv"
+    }
+  ]
+}

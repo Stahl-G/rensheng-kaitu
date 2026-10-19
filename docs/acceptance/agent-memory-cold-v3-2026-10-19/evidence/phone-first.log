@@ -1,0 +1,22 @@
+node:fs:622
+  return binding.open(
+                 ^
+
+Error: ENOENT: no such file or directory, open '/tmp/kaitu-cold-v3/original-second/.kaitu/config.json'
+    at Object.openSync (node:fs:622:18)
+    at readFileSync (node:fs:488:35)
+    at Workspace.readBytes (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/workspace.js:138:16)
+    at Workspace.readText (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/workspace.js:141:21)
+    at Workspace.readJson (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/workspace.js:246:32)
+    at templateOutdated (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/template-version.js:32:16)
+    at readWorkbench (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/workbench.js:67:9)
+    at readOverviewPage (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/overview-page.js:58:18)
+    at writePhoneSnapshots (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/phone-snapshots.js:17:24)
+    at runPhone (file:///tmp/kaitu-cold-v3/repo/packages/core/dist/phone-run.js:7:29) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/tmp/kaitu-cold-v3/original-second/.kaitu/config.json'
+}
+
+Node.js v24.19.0

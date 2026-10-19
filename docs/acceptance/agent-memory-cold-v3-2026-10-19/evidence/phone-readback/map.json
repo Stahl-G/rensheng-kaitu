@@ -1,0 +1,37 @@
+{
+  "format": "kaitu.phone.map",
+  "version": 1,
+  "generated_at": "2026-10-19T20:24:51.615Z",
+  "generator": {
+    "kind": "agent",
+    "name": "synthetic-cold-agent",
+    "spec": 1
+  },
+  "as_of": "2026-10-19",
+  "rows": [
+    {
+      "id": "synthetic-csv",
+      "kind": "goal",
+      "title": "完成合成 CSV 导出",
+      "done": false,
+      "ahead": "unexplored",
+      "next": null,
+      "suggested": false
+    },
+    {
+      "id": "paperboat",
+      "kind": "project",
+      "title": "合成纸舟",
+      "done": false,
+      "ahead": "planned",
+      "next": "确认 CSV 字段顺序后实现导出",
+      "suggested": false
+    }
+  ],
+  "places": [],
+  "hometown": null,
+  "routes": {
+    "walked": [],
+    "planned": []
+  }
+}
