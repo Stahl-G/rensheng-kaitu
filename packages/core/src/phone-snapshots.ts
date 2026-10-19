@@ -33,7 +33,7 @@ export async function writePhoneSnapshots(
     );
   const at = now.toISOString();
   const snapshots = {
-    today: buildPhoneToday(data, at),
+    today: buildPhoneToday(data, at, ws),
     week: buildPhoneWeek(data, at),
     map: buildPhoneMap(data, lifeMap(ws, now), readExploration(ws), at),
     library: buildPhoneLibrary(ws, data, at),

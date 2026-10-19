@@ -39,6 +39,29 @@
       }
     },
     "today": { "type": "string", "format": "date" },
+    "mobile": {
+      "type": "object",
+      "required": ["version", "actions", "tasks"],
+      "properties": {
+        "version": { "const": 1 },
+        "actions": { "type": "array", "items": { "type": "string" } },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "rev", "ts", "title", "status"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "rev": { "type": "integer", "minimum": 1 },
+              "ts": { "type": "string", "format": "date-time" },
+              "title": { "type": "string", "minLength": 1 },
+              "status": { "enum": ["open", "done", "cancelled"] },
+              "due": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "timezone": { "type": "string", "minLength": 1 },
     "next": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/next" } },
     "proposals": {
@@ -88,6 +111,10 @@
         "module": { "type": "string" },
         "section": { "enum": ["today", "me", "health", "projects", "feed"] },
         "proposed": { "type": "boolean", "description": "AI 提议、尚未确认" },
+        "source_precondition": {
+          "type": "object",
+          "description": "目标下一步的精确条目，完成时作为expected_next原样带回"
+        },
         "draft": { "type": "boolean", "description": "原文整理出的待核对草稿" },
         "due": { "type": "string" }
       }

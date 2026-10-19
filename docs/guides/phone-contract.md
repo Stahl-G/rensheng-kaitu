@@ -27,7 +27,7 @@
 - `.records.jsonl`：沿用记录入箱格式。手机文件的 `origin: user` 署名为 `by: user`，assistant 写为 agent。
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
-  执行 complete_next、complete_task、cancel_task、decide_proposal。预留操作返回 rejected。
+  执行 complete_next、complete_task、cancel_task、decide_proposal；声明mobile能力的消费者还支持create_task/update_task。其余预留操作返回 rejected。
   decide_proposal 只改今天的状态：确认的日程标 `calendar: phone`，由手机自己写进 Apple 日历，电脑从不替它新建日历事件。
 - 健康仍使用 `inbox/health/*.health.json`。照片不在本次实现范围内。
 
@@ -65,3 +65,23 @@ agents 文本、health JSON 收件箱和 `inbox/notes/` 下的待整理原文始
 网络期间本机文件有变化时保留本机内容，下轮重试。原有同记录冲突规则、Host / Origin 和 Agent / MCP 写入策略保留。
 
 iCloud 和其他同步文件夹直接交换同样的路径，无需额外协议。真实手机、真实同步盘和真实 GitHub 的联调另行验收。
+
+## 本机基础事项与修订同步（2026-10-19）
+
+手机即使未连接或没有today也能在本机创建、查看、编辑、完成/取消待办及保存/回读笔记，先原子持久化，再显示结果。
+本机完成与跨端应用分开。笔记从inbox消失不能作为成功证据；file applied只说明已收下，不代表整理完成。
+
+新版today可选mobile={version:1,actions:[...],tasks:[{id,rev,title,status,ts,due?}]}，tasks包括完成/取消项。
+缺少能力声明时，新任务与修订保留手机上，不投递给旧消费者；已有四动作的旧格式继续兼容。
+新建create_task的args含稳定ULID id、title、expected_rev:0，可有due/notes；正式记录rev1，id不再重生。
+update_task只允许title/due/notes与expected_rev；complete/cancel携带expected_rev。保留字段by/rev/deleted不能由客户端指定。
+回执可带target:{id,rev}。当前rev不匹配则conflict，保留两端内容，不静默覆盖。
+同target前序未取得真实成功回执前不投后续动作，本机继续编辑不受阻；不用文件名字典序假定跨文件到达顺序。
+
+next可选source_precondition是所见目标条目原对象，complete_next.args.expected_next原样带回；
+消费者比较该条目精确内容后才完成，不给所有STATUS额外增加修订框架。
+
+消费者在已有phone-actions账本先保存受控任务的准备记录，再通过现有record-transaction追加。
+中断后重投同client_id复用准备记录，已有相同rev/内容不再追加；终态账本成功后才发布回执。
+不同内容的同rev或陈旧目标返回冲突；持久化故障保留作业可重试，不落永久conflict。
+手机仍只新建inbox，不能伪写phone快照或desktop receipt。实际跨语言文件旅程另行验证，真机/同步盘验收不由合成测试代替。

@@ -5,6 +5,7 @@ export interface PhoneReceipt {
   kind: "file" | "action";
   status: "applied" | "duplicate" | "conflict" | "rejected";
   message?: string;
+  target?: { id: string; rev: number };
   at: string;
 }
 export function phoneReceipts(ws: Workspace): PhoneReceipt[] {
