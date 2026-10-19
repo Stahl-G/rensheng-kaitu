@@ -63,7 +63,7 @@ import {
   recordReference,
   recordReferences,
   recordTypeSummary,
-  reindexChats,
+  reindexChatsAsync,
   removeMemory,
   removePhoto,
   renderRecordReference,
@@ -72,7 +72,7 @@ import {
   restoreWorkspaceBackup,
   runPhone,
   saveOnboardingChoices,
-  searchChats,
+  searchChatsAsync,
   searchMemories,
   setGithubToken,
   setProject,
@@ -941,21 +941,36 @@ async function run(argv: string[]): Promise<number> {
     case "chats": {
       const [sub, query] = args;
       const ws = workspace(values);
-      if (sub === "reindex") {
-        const count = reindexChats(ws);
-        out(values, { count }, `已重建 ${count} 段对话的索引。`);
-      } else if (sub === "search") {
-        const results = searchChats(ws, need(query, "词"), {
-          limit: values.limit === undefined ? undefined : Number(values.limit),
-        });
-        out(
-          values,
-          results,
-          results.map((r) => `${r.id}  ${r.title}  ${r.date}\n${r.file}\n${r.snippet}`).join("\n\n") ||
-            "（没有匹配的对话）",
-        );
-      } else {
-        throw new KaituError(`未知子命令：chats ${sub ?? ""}`, "BAD_ARGS");
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      process.once("SIGINT", cancel);
+      try {
+        if (sub === "reindex") {
+          const count = await reindexChatsAsync(ws, {
+            signal: controller.signal,
+            progress: (p) => {
+              if (!values["json-out"])
+                process.stderr.write(`\r索引 ${p.completed}${p.total === undefined ? "" : ` / ${p.total}`}`);
+            },
+          });
+          if (!values["json-out"]) process.stderr.write("\n");
+          out(values, { count }, `已重建 ${count} 段对话的索引。`);
+        } else if (sub === "search") {
+          const results = await searchChatsAsync(ws, need(query, "词"), {
+            signal: controller.signal,
+            limit: values.limit === undefined ? undefined : Number(values.limit),
+          });
+          out(
+            values,
+            results,
+            results.map((r) => `${r.id}  ${r.title}  ${r.date}\n${r.file}\n${r.snippet}`).join("\n\n") ||
+              "（没有匹配的对话）",
+          );
+        } else {
+          throw new KaituError(`未知子命令：chats ${sub ?? ""}`, "BAD_ARGS");
+        }
+      } finally {
+        process.removeListener("SIGINT", cancel);
       }
       return 0;
     }
