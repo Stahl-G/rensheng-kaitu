@@ -50,11 +50,13 @@ it("新项目会话读取既有状态并写回现有项目日志；入口保留�
   fs.writeFileSync(join(code, "AGENTS.md"), "existing instructions\n");
   fs.writeFileSync(join(code, "CLAUDE.md"), "existing Claude config\n");
   const project = await createProject(ws, {
-    title: "Synthetic code",
+    title: "合成代码",
+    slug: "code",
     kind: "work",
     links: [{ path: code, role: "repo" }],
   });
-  expect((await projectMemoryContext(ws, code)).project?.slug).toBe(project.slug);
+  expect(project.slug).toBe("code");
+  expect((await projectMemoryContext(ws, code)).project?.slug).toBe("code");
   const skill = join(code, ".claude/skills/kaitu-project-memory/SKILL.md");
   await installProjectMemory(ws, code);
   fs.writeFileSync(skill, "user-owned skill\n");

@@ -34,7 +34,8 @@ export interface ProjectStatus extends ModuleStatus {
   github?: { repo: string };
   blocked?: unknown[];
 }
-export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> & Partial<Pick<ProjectStatus, "links">>;
+export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
+  Partial<Pick<ProjectStatus, "links">> & { slug?: string };
 
 function slugCheck(slug: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ["data", "projects"].includes(slug)) {
@@ -264,8 +265,9 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
     ws.writeJson(".kaitu/config.json", config, { internal: true });
     writeAgentsMd(ws);
   }
+  const { slug: wanted, ...fields } = input;
   const data: ProjectStatus = {
-    ...input,
+    ...fields,
     title: typeof input.title === "string" ? input.title.trim() : "",
     stage: "active",
     links: input.links ?? [],
@@ -273,12 +275,16 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
     next: [],
   };
   checkStatus(data);
+  if (wanted) slugCheck(wanted);
+  // 中文标题生成不了可读目录名，Agent 可指定一个英文短名。
   const base =
+    wanted ||
     data.title
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .replace(/-+/g, "-") || ulid().slice(-8).toLowerCase();
+      .replace(/-+/g, "-") ||
+    ulid().slice(-8).toLowerCase();
   let slug = ["data", "projects"].includes(base) ? `${base}-project` : base;
   while (slugs(ws).includes(slug)) slug = `${base}-${ulid().slice(-8).toLowerCase()}`;
   const dir = `projects/${slug}`;
