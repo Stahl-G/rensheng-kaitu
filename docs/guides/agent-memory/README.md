@@ -1,12 +1,8 @@
 # 开图开发者记忆：先用提示词
 
-复制下面一段给能操作文件和终端的 Agent 即可，完整步骤由它读取并执行。也可打开 [单独复制页](COPY_TO_YOUR_AGENT.md)。
+先用自己的现有 ai-memory 做只读理解检查。具体库、项目和接收 Agent 待用户确认；不要默认另建测试仓库。复制 [第一位 Agent 的短入口](COPY_TO_YOUR_AGENT.md)，第二位使用 [独立理解入口](COPY_TO_NEXT_AGENT.md)。两者都先只读，再由用户比较答案并指定真实小任务与写回范围；步骤见 [用户亲测顺序](USER_TEST.md)。完整规则见 [INSTALL](INSTALL.md) 和 [ADD_DEVICE](ADD_DEVICE.md)。
 
-```text
-请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/e99184c26fcde2903d9619b85af41b0ce752fa1a/docs/guides/agent-memory/INSTALL.md 及同目录 USER_TEST.md，作为第一个 Codex 帮我初始化一次开图测试记忆。本轮只用一个全新合成项目，不接真实工作区；先确认新目录、私库名和文字范围。优先复用可用的 kaitu／pnpm kaitu，没有就用普通 Git 和官方 gh，不要求 App 或新运行时。保留已有文件和旧库，登录及权限由我正常确认。完成后回读项目与首份交接，核对同步，生成填好地址和项目编号的接入提示词，供其他 Agent 各自独立克隆、串行接续；未验证的结果如实说明。
-```
-
-只由第一个 Codex 初始化一次；其他 Agent 复制 [短接入入口](COPY_TO_NEXT_AGENT.md)，各自独立克隆、串行接续。具体合成项目与检查项见 [用户亲测顺序](USER_TEST.md)。
+以下最小模板是明确另建新库时的可选路径，不能覆盖或改造现有私人库。新库初始化细则保留在 [NEW_MEMORY](NEW_MEMORY.md)，本次亲测不执行。
 
 开图 App、kaitu CLI、特定操作系统、Node、Python、MCP 和后台服务均不是独立模板路径的安装条件。Git/gh 缺失时，由 Agent 说明官方来源，经用户确认后处理；不安装自制 runtime。GitHub 登录只由用户在官方页面/设备流程完成。
 
@@ -28,7 +24,7 @@
 
 ## 已能做与尚未承诺
 
-纯 Git 路径能初始化上述普通文件、同步到用户确认的私库、在另一设备读取项目快照及更新的 handoffs，再追加一份带 follows 的接续；无需运行开图整理器。首次实测只用合成资料、fake gh 和本地 bare Git 远端，不创建真实私人仓库。
+纯 Git 路径能初始化上述普通文件、同步到用户确认的私库、在另一设备读取项目快照及更新的 handoffs，再追加一份带 follows 的接续；无需运行开图整理器。既有开发检查只用合成资料、fake gh 和本地 bare Git 远端，没有创建真实私人仓库；它不能作为当前真实环境的最终验收。
 
 普通 Agent **不会**自动把 note 候选变成正式记录/记忆，也不持续回写初始 STATUS/log/OVERVIEW、不重算手机快照、不自动归档或刷新 App 索引。这些是既有整理员或 App/CLI 的工作；未启用它们时，最新进度从 handoffs 读取。初始化助手经用户确认在新仓库中写初始 STATUS/log，不代表所有后续 Agent 有权改写它们。可选的 App 导入和视觉结果未由本纯 Git 验证覆盖。
 
