@@ -162,14 +162,28 @@ async function localFiles(ws: Workspace, c: BackupConnection): Promise<BackupFil
     }
   };
   await walk("");
-  files[manifest] = JSON.stringify({
-    format: "kaitu-workspace",
-    version: 1,
-    text: c.text,
-    records: c.records,
-  });
+  files[manifest] = manifestText(c);
   return files;
 }
+/**
+ * kaitu-backup.json 不是工作区里的实体文件：本机按连接范围生成，远端写的是仓库里有哪些范围。
+ * 比较只看范围，不参与三方合并，也不会成为冲突。
+ */
+function manifestText(scope: { text: boolean; records: boolean }) {
+  return JSON.stringify({ format: "kaitu-workspace", version: 1, text: scope.text, records: scope.records });
+}
+function manifestScope(text?: string) {
+  try {
+    const value = JSON.parse(text ?? "");
+    return value?.format === "kaitu-workspace"
+      ? { text: value.text === true, records: value.records === true }
+      : null;
+  } catch {
+    return null;
+  }
+}
+const withoutManifest = (files: BackupFiles) =>
+  Object.fromEntries(Object.entries(files).filter(([path]) => path !== manifest));
 function sameFiles(a: BackupFiles, b: BackupFiles) {
   return Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((key) => a[key] === b[key]);
 }
@@ -436,6 +450,9 @@ function remoteReceipts(text: string): PhoneReceipt[] {
 export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRemote(ws)): Promise<void> {
   if (active.has(ws)) return active.get(ws);
   const s = state(ws);
+  // 旧版会把 kaitu-backup.json 记成冲突；它按范围生成，留着只会挡住同步。
+  if (s.conflicts.some((c) => c.path === manifest))
+    s.conflicts = s.conflicts.filter((c) => c.path !== manifest);
   if (!s.connection?.enabled || s.conflicts.length) return;
   const run = async () => {
     const c = s.connection as BackupConnection;
@@ -444,29 +461,44 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       const other = await remote.read(c.repo, c.branch);
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
       const incoming = Object.fromEntries(Object.entries(other.files).filter(([path]) => selected(path, c)));
+      // phone 由本机生成；远端删除不会清掉本机快照，也不会写回远端修改。
+      const phoneFromLocal = (files: BackupFiles) => {
+        const result = withoutManifest(incoming);
+        for (const path of new Set([...Object.keys(incoming), ...Object.keys(files)])) {
+          if (!path.startsWith("phone/")) continue;
+          if (files[path] === undefined) delete result[path];
+          else result[path] = files[path] as string;
+        }
+        return result;
+      };
+      const base = Object.fromEntries(
+        Object.entries(s.base).filter(([path]) => path !== manifest && selected(path, c)),
+      );
+      // 先确认没有冲突再动本机：有冲突时回执和整理员状态都不提前写入。
+      const check = mergeBackup(base, withoutManifest(local), phoneFromLocal(local));
+      if (check.conflicts.length) {
+        store(ws, { ...s, conflicts: check.conflicts, error: undefined });
+        return;
+      }
       const known = new Set(phoneReceipts(ws).map((r) => `${r.kind}:${r.ref}`));
       const added = incoming["phone/receipts.json"]
         ? remoteReceipts(incoming["phone/receipts.json"]).filter((r) => !known.has(`${r.kind}:${r.ref}`))
         : [];
       rememberOrganizer(ws, incoming["phone/today.json"], added, latestDaily(ws));
       // 云端整理员写的回执，本机没有的先并进来；其余 phone 文件仍以本机为准。
-      if (incoming["phone/receipts.json"] !== undefined) {
-        if (added.length && writePhoneReceipts(ws, added))
-          local["phone/receipts.json"] = ws.readText("phone/receipts.json");
-      }
-      // phone 由本机生成；远端删除不会清掉本机快照，也不会写回远端修改。
-      const mergeIncoming = { ...incoming };
-      for (const path of new Set([...Object.keys(incoming), ...Object.keys(local)])) {
-        if (!path.startsWith("phone/")) continue;
-        if (local[path] === undefined) delete mergeIncoming[path];
-        else mergeIncoming[path] = local[path];
-      }
-      const base = Object.fromEntries(Object.entries(s.base).filter(([path]) => selected(path, c)));
-      const merged = mergeBackup(base, local, mergeIncoming);
-      if (merged.conflicts.length) {
-        store(ws, { ...s, conflicts: merged.conflicts, error: undefined });
-        return;
-      }
+      if (added.length && writePhoneReceipts(ws, added))
+        local["phone/receipts.json"] = ws.readText("phone/receipts.json");
+      const merged = mergeBackup(base, withoutManifest(local), phoneFromLocal(local));
+      // 远端清单记的是仓库里有哪些范围：保留远端已有的范围，本机连接范围不变。
+      const remoteScope = manifestScope(incoming[manifest]);
+      const scope = {
+        text: c.text || remoteScope?.text === true,
+        records: c.records || remoteScope?.records === true,
+      };
+      merged.files[manifest] =
+        remoteScope && remoteScope.text === scope.text && remoteScope.records === scope.records
+          ? (incoming[manifest] as string)
+          : manifestText(scope);
       const changes = [...new Set([...Object.keys(local), ...Object.keys(merged.files)])].filter(
         (path) => path !== manifest && local[path] !== merged.files[path],
       );
@@ -484,7 +516,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       }
       store(ws, {
         ...s,
-        base: merged.files,
+        base: withoutManifest(merged.files),
         conflicts: [],
         lastSync: new Date().toISOString(),
         error: undefined,
@@ -565,6 +597,12 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   const s = state(ws);
   const conflict = s.conflicts.find((c) => c.path === path);
   if (!conflict) throw new Error(pick("找不到待处理的冲突", "Conflict not found"));
+  // 清单按连接范围生成，本机没有这个文件：不读写磁盘，用户范围保持不变。
+  if (path === manifest) {
+    s.conflicts = s.conflicts.filter((c) => c.path !== path);
+    store(ws, s);
+    return workspaceBackupStatus(ws);
+  }
   const current = ws.exists(path) ? ws.readText(path) : undefined;
   if (current !== conflict.local) {
     conflict.local = current;

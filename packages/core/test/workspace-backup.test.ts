@@ -145,6 +145,57 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
   expect(fs.readdirSync(b.resolve(".kaitu/backup-conflicts", { internal: true })).length).toBeGreaterThan(0);
 });
 
+it("本机只开手机与待整理、远端全开且没有共同基线：清单不算冲突，解决真冲突后同步，远端其余文件和范围都留着", async () => {
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  const remoteNote = "inbox/agents/synthetic-handoff.md";
+  await m.remote.push("synthetic/memory", "main", null, {
+    "kaitu-backup.json": JSON.stringify({ format: "kaitu-workspace", version: 1, text: true, records: true }),
+    "projects/synthetic/STATUS.md": "远端的项目状态",
+    "health/synthetic.jsonl": '{"id":"r1"}\n',
+    [remoteNote]: "远端写的交接",
+    "phone/receipts.json": JSON.stringify({
+      format: "kaitu.phone.receipts",
+      version: 1,
+      generated_at: new Date().toISOString(),
+      items: [
+        {
+          ref: "01JAZ1B2C3D4E5F6G7H8J9K0MP",
+          kind: "action",
+          status: "applied",
+          at: new Date().toISOString(),
+        },
+      ],
+    }),
+  });
+  ws.writeText(remoteNote, "本机写的交接");
+  await connectWorkspaceBackup(ws, { repo: "synthetic/memory", text: false, records: false }, m.remote);
+
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(workspaceBackupStatus(ws).conflicts.map((c) => c.path)).toEqual([remoteNote]);
+  expect(ws.readText(remoteNote)).toBe("本机写的交接");
+  // 冲突没解决前，云端回执不提前写进本机。
+  expect(ws.exists("phone/receipts.json")).toBe(false);
+
+  resolveWorkspaceBackup(ws, remoteNote, "local");
+  await syncWorkspaceBackup(ws, m.remote);
+  const status = workspaceBackupStatus(ws);
+  expect(status).toMatchObject({ conflicts: [], error: null, connection: { text: false, records: false } });
+  expect(m.files()).toMatchObject({
+    "projects/synthetic/STATUS.md": "远端的项目状态",
+    "health/synthetic.jsonl": '{"id":"r1"}\n',
+    [remoteNote]: "本机写的交接",
+  });
+  expect(JSON.parse(m.files()["kaitu-backup.json"] as string)).toMatchObject({ text: true, records: true });
+  expect(ws.exists("kaitu-backup.json")).toBe(false);
+  expect(ws.readText("phone/receipts.json")).toContain("01JAZ1B2C3D4E5F6G7H8J9K0MP");
+  expect(ws.exists("projects/synthetic/STATUS.md")).toBe(false);
+
+  const pushes = m.pushes();
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(m.pushes()).toBe(pushes);
+});
+
 it("公开仓库默认不上传；后台等待与授权失败不挡住本地写入", async () => {
   const ws = await freshWorkspace();
   const pub = remoteMock(false);
