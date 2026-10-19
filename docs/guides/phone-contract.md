@@ -85,3 +85,15 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 中断后重投同client_id复用准备记录，已有相同rev/内容不再追加；终态账本成功后才发布回执。
 不同内容的同rev或陈旧目标返回冲突；持久化故障保留作业可重试，不落永久conflict。
 手机仍只新建inbox，不能伪写phone快照或desktop receipt。实际跨语言文件旅程另行验证，真机/同步盘验收不由合成测试代替。
+
+## 饮食快照小扩展（2026-10-19 已批准）
+
+Today 顶层仍为 version:1，新增可选 `nutrition?: {version:1,kcal:number,protein_g:number,accounted_refs:string[]}`；meal、records、receipts 格式不变。
+按该快照 today 日期、timezone（IANA）汇总最新非 deleted canonical meal。总量与覆盖编号必须在同份原子快照发布。
+accounted_refs 是已消费 phone records 原文件 basename，包含已撤回、已删除、改日期及已 superseded 的来源，不随十四天显示回执裁剪。
+手机确认先本机显示；有可识别的 nutrition v1 时，仅叠加 accounted_refs 未覆盖的本机明确确认餐。receipt applied 或时间戳不能证明覆盖。
+缺字段或未知 nutrition.version 回退本机确认区，不假造 zero；有效 v1 的零合计才表示已知空日。
+同一 today 内容变化时 generated_at 必须严格递增（必要时旧值加 1ms），旧快照不得倒灌。
+仅在单权威 consumer 且私有 ledger 完整时提供该能力；跨整理器丢失 ledger 不在本切片保证内。不扩展新入账餐的手机编辑/撤回协议。
+phone records 须先持久化 prepared records，再复用现有 commitRecordTransaction；准备态不算 consumed，全部恢复并落终态账本后才发布 nutrition。
+依赖 PR #62（a092270ff37f20200ddf5a7e8446684d54b46fc3）的同名去重与过期替换来源修复，本 PR 不复制该修复或合并 main。

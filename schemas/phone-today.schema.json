@@ -18,79 +18,215 @@
     "sync"
   ],
   "properties": {
-    "format": { "const": "kaitu.phone.today" },
-    "version": { "const": 1 },
-    "generated_at": { "type": "string", "format": "date-time", "description": "内容最近一次变化的时间" },
+    "format": {
+      "const": "kaitu.phone.today"
+    },
+    "version": {
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "内容最近一次变化的时间"
+    },
     "generator": {
       "type": "object",
-      "required": ["kind"],
-      "if": { "properties": { "kind": { "const": "agent" } } },
-      "then": { "required": ["name", "spec"] },
+      "required": [
+        "kind"
+      ],
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "agent"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "name",
+          "spec"
+        ]
+      },
       "description": "谁生成的这份快照；Agent 必须写 name 和 spec，没有这个字段当作电脑生成",
       "properties": {
-        "kind": { "enum": ["computer", "agent"] },
+        "kind": {
+          "enum": [
+            "computer",
+            "agent"
+          ]
+        },
         "name": {
           "type": "string",
           "minLength": 1,
           "maxLength": 32,
           "description": "显示给用户的名字，Agent 才写"
         },
-        "spec": { "type": "integer", "minimum": 1, "description": "Agent 照做的 ORGANIZER.md 规则版本" }
+        "spec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Agent 照做的 ORGANIZER.md 规则版本"
+        }
       }
     },
-    "today": { "type": "string", "format": "date" },
+    "today": {
+      "type": "string",
+      "format": "date"
+    },
     "mobile": {
       "type": "object",
-      "required": ["version", "actions", "tasks"],
+      "required": [
+        "version",
+        "actions",
+        "tasks"
+      ],
       "properties": {
-        "version": { "const": 1 },
-        "actions": { "type": "array", "items": { "type": "string" } },
+        "version": {
+          "const": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "tasks": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "rev", "ts", "title", "status"],
+            "required": [
+              "id",
+              "rev",
+              "ts",
+              "title",
+              "status"
+            ],
             "properties": {
-              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
-              "rev": { "type": "integer", "minimum": 1 },
-              "ts": { "type": "string", "format": "date-time" },
-              "title": { "type": "string", "minLength": 1 },
-              "status": { "enum": ["open", "done", "cancelled"] },
-              "due": { "type": "string" }
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "rev": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "ts": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": [
+                  "open",
+                  "done",
+                  "cancelled"
+                ]
+              },
+              "due": {
+                "type": "string"
+              }
             }
           }
         }
       }
     },
-    "timezone": { "type": "string", "minLength": 1 },
-    "next": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/next" } },
+    "timezone": {
+      "type": "string",
+      "minLength": 1
+    },
+    "next": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/next"
+      }
+    },
     "proposals": {
       "type": "array",
       "description": "待确认的日程建议：NOW.md 里 kind 为 proposal、status 为 pending 的块",
-      "items": { "$ref": "#/$defs/block" }
+      "items": {
+        "$ref": "#/$defs/block"
+      }
     },
-    "blocks": { "type": "array", "description": "今天其余的日程块", "items": { "$ref": "#/$defs/block" } },
+    "blocks": {
+      "type": "array",
+      "description": "今天其余的日程块",
+      "items": {
+        "$ref": "#/$defs/block"
+      }
+    },
     "goals": {
       "type": "array",
       "description": "进行中的目标（你带来的规划）",
-      "items": { "$ref": "#/$defs/goal" }
+      "items": {
+        "$ref": "#/$defs/goal"
+      }
     },
-    "question": { "type": "null", "description": "关键问题，version 1 恒为 null，预留" },
+    "question": {
+      "type": "null",
+      "description": "关键问题，version 1 恒为 null，预留"
+    },
     "sync": {
       "type": "object",
-      "required": ["received", "needs_review", "organizer", "updated_at"],
+      "required": [
+        "received",
+        "needs_review",
+        "organizer",
+        "updated_at"
+      ],
       "properties": {
         "received": {
           "type": "integer",
           "minimum": 0,
           "description": "已收到、还没整理的原文和收件箱文件数"
         },
-        "needs_review": { "type": "integer", "minimum": 0 },
-        "organizer": { "type": "boolean", "description": "是否开着每日整理" },
+        "needs_review": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "organizer": {
+          "type": "boolean",
+          "description": "是否开着每日整理"
+        },
         "updated_at": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time",
           "description": "资料最近一次真正更新的时间"
+        }
+      }
+    },
+    "nutrition": {
+      "type": "object",
+      "required": [
+        "version",
+        "kcal",
+        "protein_g",
+        "accounted_refs"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "kcal": {
+          "type": "number",
+          "minimum": 0
+        },
+        "protein_g": {
+          "type": "number",
+          "minimum": 0
+        },
+        "accounted_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ios-[0-9a-f]{8}-[0-9A-HJKMNP-TV-Z]{26}\\.records\\.jsonl$"
+          }
         }
       }
     }
@@ -103,54 +239,161 @@
     },
     "next": {
       "type": "object",
-      "required": ["id", "title", "file", "section", "proposed"],
+      "required": [
+        "id",
+        "title",
+        "file",
+        "section",
+        "proposed"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1 },
-        "file": { "$ref": "#/$defs/path", "description": "所在 STATUS.md；complete_next 原样带回" },
-        "module": { "type": "string" },
-        "section": { "enum": ["today", "me", "health", "projects", "feed"] },
-        "proposed": { "type": "boolean", "description": "AI 提议、尚未确认" },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "$ref": "#/$defs/path",
+          "description": "所在 STATUS.md；complete_next 原样带回"
+        },
+        "module": {
+          "type": "string"
+        },
+        "section": {
+          "enum": [
+            "today",
+            "me",
+            "health",
+            "projects",
+            "feed"
+          ]
+        },
+        "proposed": {
+          "type": "boolean",
+          "description": "AI 提议、尚未确认"
+        },
         "source_precondition": {
           "type": "object",
           "description": "目标下一步的精确条目，完成时作为expected_next原样带回"
         },
-        "draft": { "type": "boolean", "description": "原文整理出的待核对草稿" },
-        "due": { "type": "string" }
+        "draft": {
+          "type": "boolean",
+          "description": "原文整理出的待核对草稿"
+        },
+        "due": {
+          "type": "string"
+        }
       }
     },
     "block": {
       "type": "object",
-      "required": ["id", "title", "kind", "status"],
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "status"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1 },
-        "start": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
-        "end": { "type": "string", "pattern": "^([01]\\d|2[0-4]):[0-5]\\d$" },
-        "kind": { "enum": ["event", "proposal", "task"] },
-        "module": { "type": "string" },
-        "status": { "enum": ["confirmed", "pending", "done", "skipped", "rejected"] },
-        "calendar": { "enum": ["phone"], "description": "在 iPhone 上确认，日历事件由手机写入" }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-4]):[0-5]\\d$"
+        },
+        "kind": {
+          "enum": [
+            "event",
+            "proposal",
+            "task"
+          ]
+        },
+        "module": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "confirmed",
+            "pending",
+            "done",
+            "skipped",
+            "rejected"
+          ]
+        },
+        "calendar": {
+          "enum": [
+            "phone"
+          ],
+          "description": "在 iPhone 上确认，日历事件由手机写入"
+        }
       }
     },
     "goal": {
       "type": "object",
-      "required": ["id", "title", "results", "next"],
+      "required": [
+        "id",
+        "title",
+        "results",
+        "next"
+      ],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1 },
-        "results": { "type": "integer", "minimum": 0, "description": "记下的结果条数" },
-        "last_result": { "type": ["string", "null"] },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "results": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "记下的结果条数"
+        },
+        "last_result": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "next": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
-              "required": ["id", "title"],
+              "required": [
+                "id",
+                "title"
+              ],
               "properties": {
-                "id": { "type": "string", "minLength": 1 },
-                "title": { "type": "string", "minLength": 1 },
-                "due": { "type": ["string", "null"] }
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "due": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
               }
             }
           ]
