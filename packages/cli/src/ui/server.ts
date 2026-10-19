@@ -19,6 +19,7 @@ import {
   assetsRoot,
   calendarPushEntries,
   calendarPushStore,
+  cancelGithubCliLogin,
   completeNext,
   completeTask,
   decideProposal,
@@ -713,6 +714,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
     }
     closed = true;
+    cancelGithubCliLogin();
     watcher?.close();
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);

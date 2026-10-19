@@ -1,4 +1,4 @@
-import type { workspaceBackupStatus } from "@kaitu/core";
+import type { githubCliStatus, workspaceBackupPrompts, workspaceBackupStatus } from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
@@ -24,13 +24,45 @@ export function WorkspaceBackup({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [restored, setRestored] = useState("");
+  const [gh, setGh] = useState<Awaited<ReturnType<typeof githubCliStatus>>>();
+  const [via, setVia] = useState<"gh" | "token">("gh");
+  const [copied, setCopied] = useState("");
+  const loginPending = status?.ghLogin?.pending ?? false;
   const refresh = useCallback(() => {
     void request("status")
       .then((s) => setStatus(s as Status))
       .catch((e) => setMessage((e as Error).message));
   }, [request]);
+  const checkGh = useCallback(
+    () =>
+      request("gh-status")
+        .then((value) => {
+          const current = value as Awaited<ReturnType<typeof githubCliStatus>>;
+          setGh(current);
+          setVia(current.authenticated ? "gh" : "token");
+          if (current.login) setRepo((old) => old || `${current.login}/kaitu-ai-memory`);
+        })
+        .catch((error) => setMessage((error as Error).message)),
+    [request],
+  );
   useEffect(() => refresh(), [refresh]);
   useEffect(() => subscribe?.(refresh), [subscribe, refresh]);
+  useEffect(() => {
+    if (!loginPending) void checkGh();
+  }, [checkGh, loginPending]);
+  const copyPrompt = async (kind: "create" | "connect") => {
+    try {
+      const prompts = (await request("prompts", { repo: status?.connection?.repo ?? repo })) as ReturnType<
+        typeof workspaceBackupPrompts
+      >;
+      await navigator.clipboard.writeText(prompts[kind]);
+      setCopied(
+        t("提示词已复制，粘贴给一个新 Agent 即可开始核对", "Prompt copied; paste into a new agent to begin"),
+      );
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  };
   const run = async (action: string, input: Record<string, unknown> = {}) => {
     setBusy(true);
     setMessage("");
@@ -108,24 +140,78 @@ export function WorkspaceBackup({
               aria-label={t("同步仓库", "Sync repository")}
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
-              placeholder="owner/kaitu-backup"
+              placeholder="owner/kaitu-ai-memory"
             />
           </label>
           <label>
-            GitHub token
-            <input
-              aria-label="GitHub token"
-              type="password"
-              autoComplete="new-password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
+            {t("连接方式", "Connection method")}
+            <select
+              aria-label={t("连接方式", "Connection method")}
+              value={via}
+              onChange={(event) => setVia(event.target.value as "gh" | "token")}
+            >
+              <option value="gh">{t("已登录的 GitHub CLI（gh）", "Existing GitHub CLI login (gh)")}</option>
+              <option value="token">{t("单仓库 token", "Repository-specific token")}</option>
+            </select>
           </label>
-          <p className={css.small}>
-            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
-              {t("在 GitHub 创建 token", "Create a token on GitHub")}
-            </a>
-          </p>
+          {via === "gh" ? (
+            <>
+              <p className={css.small}>
+                {t(
+                  "gh 自行管理凭据，存储方式取决于系统；开图不复制 token。选择 gh 后，开图可使用它现有授权范围内的访问能力，可能涵盖多个仓库。",
+                  "gh manages credentials using your system configuration; Kaitu does not copy the token. Kaitu can use gh's existing authorization, which may cover multiple repositories.",
+                )}
+              </p>
+              {gh?.authenticated ? (
+                <p>{t(`已登录：${gh.login}`, `Signed in: ${gh.login}`)}</p>
+              ) : gh?.installed ? (
+                <>
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy || loginPending}
+                    onClick={() => void run("gh-login")}
+                  >
+                    {t("用 GitHub 登录", "Sign in with GitHub")}
+                  </button>
+                  <button type="button" className={css.link} disabled={busy} onClick={() => void checkGh()}>
+                    {t("重新检查登录", "Check login again")}
+                  </button>
+                </>
+              ) : (
+                gh && (
+                  <a href="https://cli.github.com/" target="_blank" rel="noreferrer">
+                    {t(
+                      "安装 GitHub CLI，也可改用单仓库 token",
+                      "Install GitHub CLI or use a repository token",
+                    )}
+                  </a>
+                )
+              )}
+            </>
+          ) : (
+            <>
+              <label>
+                GitHub token
+                <input
+                  aria-label="GitHub token"
+                  type="password"
+                  autoComplete="new-password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </label>
+              <p className={css.small}>
+                <a
+                  href="https://github.com/settings/personal-access-tokens/new"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("在 GitHub 创建 token", "Create a token on GitHub")}
+                </a>
+              </p>
+            </>
+          )}
           <label>
             <input type="checkbox" checked={text} onChange={(e) => setText(e.target.checked)} />
             {t("文字（Markdown / TXT）", "Text (Markdown / TXT)")}
@@ -135,11 +221,25 @@ export function WorkspaceBackup({
             {t("结构化资料（JSON / JSONL 等）", "Structured data (JSON / JSONL, etc.)")}
           </label>
           <p>
+            {!c && (
+              <button
+                className={`${css.btn} ${css["btn-primary"]}`}
+                type="button"
+                disabled={busy || status?.running || !repo.trim() || !gh?.authenticated}
+                onClick={() => void run("create", { repo, via: "gh", text, records })}
+              >
+                {busy
+                  ? t("正在创建并连接…", "Creating and connecting…")
+                  : t("建一个私有记忆仓库", "Create a private memory repository")}
+              </button>
+            )}{" "}
             <button
               className={`${css.btn} ${css["btn-quiet"]}`}
               type="button"
               disabled={busy || status?.running || !repo.trim()}
-              onClick={() => void run("connect", { repo, token, text, records })}
+              onClick={() =>
+                void run("connect", { repo, via, ...(via === "token" ? { token } : {}), text, records })
+              }
             >
               {busy ? t("正在处理…", "Working…") : t("检查并连接", "Check and connect")}
             </button>{" "}
@@ -149,8 +249,18 @@ export function WorkspaceBackup({
               disabled={busy || status?.running || !repo.trim()}
               onClick={() =>
                 void (async () => {
-                  const folder = await pickFolder();
-                  if (folder) await run("restore", { repo, token, root: folder });
+                  try {
+                    const folder = await pickFolder();
+                    if (folder)
+                      await run("restore", {
+                        repo,
+                        via,
+                        ...(via === "token" ? { token } : {}),
+                        root: folder,
+                      });
+                  } catch (error) {
+                    setMessage((error as Error).message);
+                  }
                 })()
               }
             >
@@ -158,13 +268,51 @@ export function WorkspaceBackup({
             </button>
           </p>
         </details>
+        {loginPending && (
+          <div>
+            <p>
+              {t(
+                "请在 GitHub 官方页面完成登录；开图不会代你确认授权。",
+                "Complete sign-in on GitHub; Kaitu does not approve authorization for you.",
+              )}
+            </p>
+            {status?.ghLogin.code && <output>{status.ghLogin.code}</output>}{" "}
+            <a href="https://github.com/login/device" target="_blank" rel="noreferrer">
+              GitHub
+            </a>{" "}
+            <button type="button" className={css.link} onClick={() => void run("gh-login-cancel")}>
+              {t("取消登录", "Cancel sign-in")}
+            </button>
+          </div>
+        )}
+        {status?.ghLogin?.error && <p role="alert">{status.ghLogin.error}</p>}
+        <p>
+          <button
+            type="button"
+            className={css.link}
+            disabled={!repo.trim() && !c}
+            onClick={() => void copyPrompt("create")}
+          >
+            {t("复制本机 Agent 接入提示词", "Copy local agent setup prompt")}
+          </button>{" "}
+          <button type="button" className={css.link} disabled={!c} onClick={() => void copyPrompt("connect")}>
+            {t("复制第二设备接入提示词", "Copy setup prompt for another device")}
+          </button>
+        </p>
+        {copied && <output>{copied}</output>}
         {c && !c.enabled && !c.private && (
           <button
             className={`${css.btn} ${css["btn-quiet"]}`}
             type="button"
             disabled={busy}
             onClick={() =>
-              void run("connect", { repo: c.repo, text: c.text, records: c.records, allowPublic: true })
+              void run("connect", {
+                repo: c.repo,
+                via: c.via,
+                text: c.text,
+                records: c.records,
+                allowPublic: true,
+              })
             }
           >
             {t("我允许内容公开，启用同步", "Allow public contents and enable sync")}
