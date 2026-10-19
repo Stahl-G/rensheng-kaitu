@@ -93,7 +93,7 @@
 | R3 | GitHub 备份双向同步 `inbox/notes/**/*.md`，不受文字开关影响 | 整理员移走的原文要回到电脑；顺带备份还没整理的原文 |
 | R4 | 手机操作去重时，`phone/receipts.json` 里已有的 client_id 也算处理过 | 去重账本在本机 `.kaitu/`，不同步 |
 | R5 | `renderOrganizer` 改成 [ORGANIZER.md](ORGANIZER.md) 的内容；`renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」；GitHub 方式也维护 `AGENT-README.md`（现在只有 Drive 方式）；AGENTS.md 模板 §11 那行跟着改 | 规则跟着开图版本更新，不靠用户手抄 |
-| R6 | `kaitu phone run [--as <名字>] [--dry-run]`：处理收件箱并生成全部快照，写 generator | 二档；也用来核对一档的结果 |
+| R6 | `kaitu phone run [--as <名字>]`：处理收件箱并生成全部快照，写 generator | 二档；也用来核对一档的结果 |
 
 R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product §4.4a）。ORGANIZER.md 的白天那一节还假定电脑有 R5；之前测试时在合成仓库里手动换上。
 
@@ -154,7 +154,7 @@ R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product 
 | T12 | 最后打开电脑上的开图 | 一分钟内快照换回电脑生成；之后 Agent 白天运行时不动手；R5 之前 ORGANIZER.md 会换回旧模板 |
 | T13 | 检查所有快照 | 没有绝对路径、财务明细、敏感记忆、Key |
 
-5. 对照：同一仓库状态下用电脑（以后用 `kaitu phone run --dry-run`）生成一份，除 generated_at、generator 外逐字段比较，差异写进验收记录。
+5. 对照：同一仓库状态下在资料副本上用电脑（`kaitu phone run`）生成一份，除 generated_at、generator 外逐字段比较，差异写进验收记录。
 6. 记录写到 `docs/acceptance/agent-runner-<日期>.md`：每个用例的结果、每次运行用时、Agent 能写哪种存放位置。
 
 ## 11. 这次不做

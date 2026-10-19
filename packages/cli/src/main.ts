@@ -382,6 +382,7 @@ async function run(argv: string[]): Promise<number> {
     }
     case "phone": {
       if (args[0] !== "run") throw new KaituError("使用 phone run", "BAD_ARGS");
+      if (values["dry-run"]) throw new KaituError("phone run 已不支持 --dry-run，本次未执行", "BAD_ARGS");
       const name = values.as;
       if (name !== undefined && (!name.trim() || [...name].length > 32))
         throw new KaituError("--as 需要 1–32 个字的整理员名字", "BAD_ARGS");
