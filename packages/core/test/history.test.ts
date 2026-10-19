@@ -51,13 +51,24 @@ it("批量存版本遇到可降级权限错误时保留正文并可重试，混�
       warn.mockRestore();
     }
   }
-  // 把第二个对象的父目录变成普通文件，真实产生不可降级的 ENOTDIR / EEXIST。
+  // 把第二个对象的父目录变成普通文件，真实产生不可降级的路径冲突。
   const unknown = directories[1] as string;
   renameSync(unknown, `${unknown}.backup`);
   writeFileSync(unknown, "合成路径冲突\n");
   try {
     if (process.platform !== "win32") chmodSync(directories[0] as string, 0o555);
-    await expect(snapshot(ws, "权限与未知错误混合")).rejects.toMatchObject({ code: "MultipleGitError" });
+    const failure = await snapshot(ws, "权限与未知错误混合").catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    const errors = failure instanceof git.Errors.MultipleGitError ? failure.errors : [failure];
+    expect(
+      errors.some((error) =>
+        ["ENOTDIR", "EEXIST", "ENOENT"].includes((error as NodeJS.ErrnoException).code ?? ""),
+      ),
+    ).toBe(true);
+    if (process.platform !== "win32") {
+      expect(failure).toBeInstanceOf(git.Errors.MultipleGitError);
+      expect(errors.some((error) => (error as NodeJS.ErrnoException).code === "EACCES")).toBe(true);
+    }
   } finally {
     chmodSync(directories[0] as string, 0o755);
     rmSync(unknown);

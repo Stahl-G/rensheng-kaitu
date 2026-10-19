@@ -1,0 +1,53 @@
+{
+  "baseHead": "e6472a344ae5075e9b1b1760ada60c002a65d752",
+  "checks": {
+    "lint": {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "logTail": ["$ biome check .", "Checked 544 files in 644ms. No fixes applied."]
+    },
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "logTail": [
+        "$ pnpm -r typecheck",
+        "Scope: 6 of 7 workspace projects",
+        "packages/core typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck$ tsc --noEmit -p tsconfig.json",
+        "packages/web typecheck: Done",
+        "packages/core typecheck: Done",
+        "packages/channels typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/channels typecheck: Done",
+        "packages/dsh-plugin typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+        "packages/dsh-plugin typecheck: Done",
+        "packages/cli typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/cli typecheck: Done"
+      ]
+    },
+    "test": {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "logTail": [
+        "$ vitest run",
+        "",
+        " RUN  v4.1.11 /tmp/kaitu-v2-perf",
+        "",
+        "",
+        " Test Files  95 passed | 1 skipped (96)",
+        "      Tests  282 passed | 2 skipped (284)",
+        "   Start at  19:44:25",
+        "   Duration  69.55s (transform 5.31s, setup 637ms, import 26.97s, tests 102.68s, environment 5ms)",
+        ""
+      ]
+    }
+  },
+  "build": "unchanged product sources; prior successful full build retained",
+  "sourceSha256": {
+    "packages/core/src/history.ts": "588d840aa26b17f94a2e790f10faa0d13d717d953a5815b920ee31aa8ea6673e",
+    "packages/core/src/phone-snapshots.ts": "741deaf0ef729dbea48db08a115d72f0de8b094c0714d2adc55703e63c071054",
+    "packages/cli/src/ui/server.ts": "399e46eb1ecd3d9d4709c7c3617782d04b761b195803d6f6d4a61ada74af3140",
+    "packages/core/test/history.test.ts": "4c9c6fb71598da07c0b01af11ee4310d2f5949d54fb0b65a1e99fd9311ab9f7e"
+  },
+  "targetedHistoryLog": "\n RUN  v4.1.11 /tmp/kaitu-v2-perf\n\n\n Test Files  1 passed (1)\n      Tests  9 passed (9)\n   Start at  19:43:39\n   Duration  3.52s (transform 466ms, setup 17ms, import 684ms, tests 2.73s, environment 0ms)\n\n",
+  "scope": "test-only correction for native unknown errors; no product code, clock, Git or timeout change"
+}
