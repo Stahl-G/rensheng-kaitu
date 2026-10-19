@@ -2,6 +2,7 @@ import { realpathSync, statSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
+import { proposeAgentDocument } from "../core/dist/agent-tools.js";
 
 export function confinedFileSystem(
   LocalFileSystem,
@@ -85,15 +86,38 @@ export function confinedFileSystem(
     async watch(target, ...args) {
       return super.watch(await this.checked(target), ...args);
     }
-    async writeText(target, ...args) {
+    async writeText(target, content, expected, signal) {
       const checked = await this.checked(target);
-      assertAgentWrite(root, checked.targetKey);
-      return super.writeText(checked, ...args);
+      const file = assertAgentWrite(root, checked.targetKey);
+      if (!file.endsWith("/STATUS.md")) return super.writeText(checked, content, expected, signal);
+      const info = await super.stat(checked, signal);
+      const previous = info ? await super.readText(checked, signal) : "";
+      return super.writeText(
+        checked,
+        proposeAgentDocument(file, content, previous),
+        expected ?? (info ? { kind: "replaceIfVersion", version: info.version } : { kind: "createIfAbsent" }),
+        signal,
+      );
     }
-    async editText(target, ...args) {
+    async editText(target, edit, expected, signal) {
       const checked = await this.checked(target);
-      assertAgentWrite(root, checked.targetKey);
-      return super.editText(checked, ...args);
+      const file = assertAgentWrite(root, checked.targetKey);
+      if (!file.endsWith("/STATUS.md")) return super.editText(checked, edit, expected, signal);
+      const info = await super.stat(checked, signal);
+      if (!info || (expected && expected.version !== info.version))
+        throw new FsError("资料已变化，请重新读取", "FS_STALE_VERSION");
+      const previous = (await super.readText(checked, signal)).replaceAll("\r\n", "\n");
+      const old = edit.oldString.replaceAll("\r\n", "\n");
+      const matches = old ? previous.split(old).length - 1 : 0;
+      if (!matches) throw new FsError("没有找到要修改的内容", "FS_EDIT_NOT_FOUND");
+      if (matches > 1 && !edit.replaceAll) throw new FsError("修改内容不唯一", "FS_AMBIGUOUS_EDIT");
+      const content = previous.split(old).join(edit.newString.replaceAll("\r\n", "\n"));
+      return super.editText(
+        checked,
+        { oldString: previous, newString: proposeAgentDocument(file, content, previous) },
+        { version: info.version },
+        signal,
+      );
     }
   };
 }
