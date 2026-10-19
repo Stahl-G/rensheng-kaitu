@@ -11,7 +11,7 @@
 
 - 做了某个项目的事，就更新这个项目：`projects/<项目>/STATUS.md` 的正文（做到哪、卡在哪）和 `next`，在 `log.md` 记一条，写明对应哪份交接。只改自己做过的项目。
 - 档案、偏好、目标、规则（`me/`、`memory/`）不直接改；想法和建议写进 `inbox/agents/`，等用户确认。用户明确让你改的，照做。
-- 结束前新建一份交接。
+- 结束前新建一份交接；能运行 `kaitu` 就再跑 `kaitu phone run --as <你的名字>` 更新手机内容。
 
 交接文件 `handoffs/<YYYYMMDDTHHMM>-<agent>.md`：
 

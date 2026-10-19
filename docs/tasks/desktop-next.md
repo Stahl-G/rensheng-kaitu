@@ -6,6 +6,7 @@
 
 ```sh
 pnpm --filter @kaitu/core build     # dsh-plugin 按 core 的 dist 做类型检查，core 改过要先构建，否则会报旧类型的错
+pnpm --filter @kaitu/dsh-plugin build   # 界面用的 Remote 类型生成在 dsh-plugin/lib/，服务端加过 @Remote 方法要先构建
 npm run typecheck
 npx biome check .
 npx vitest run <改到的包>/test      # 最后整体跑一次 npx vitest run
@@ -113,3 +114,16 @@ npx vitest run <改到的包>/test      # 最后整体跑一次 npx vitest run
 - 只在电脑上显示，不改手机快照格式；不推算代谢、不预测日期。
 
 验收：三个测试（等间隔、不规则间隔、称重太少）。
+
+## K-10 记忆的「当前 / 已归档」和不变的文件名
+
+依据：[../research/2026-10-19-architecture-review.md](../research/2026-10-19-architecture-review.md) 第 3 节（用户 2026-10-19 同意）。
+
+1. **文件名不再变**：`memory.ts` 的 `updateMemory` 改标题或类型时不再生成新文件名、不再删旧文件（删掉 `renamed` / `availableFile` / `rmSync` 那几行）。文件名就是这条记忆不变的编号；标题和类型以 frontmatter 为准。相关测试跟着改。
+2. **两个可选字段**：`ended: YYYY-MM-DD`、`replaced_by: <文件名>`（文件名不再变，引用不会断）。改 `schemas/memory.schema.json` 和 AGENTS.md 生成模板。
+3. **列表**：没有 `ended` 的是「当前生效」，`MEMORY.md`、Agent 读到的记忆、手机资料目录只列这些；有 `ended` 的是「已归档」，文件保留、能读，电脑「我的 › 记忆」折叠成「已归档」一栏，写「于 10-19 替换为：…」。不把 `created` 说成事情开始的时间。
+4. **谁来标**：用户在电脑或手机上点「这条不再成立」或「用新说法替换」。AI 只能提议：收件箱的记忆候选加可选 `replaces: <文件名>`，用户确认前两条都不变。手机上的确认走 `.actions.jsonl` 新 op（`replace_memory`，参数为旧文件名和候选内容），属于手机操作格式的扩展，和第 2 步一起改 `schemas/phone-action.schema.json`。
+
+不要做：不做图谱、自动衰减、双时间轴；不自动标结束。
+
+验收：改一条记忆的标题后文件名不变；替换后 `MEMORY.md` 只有新的，旧的带 `ended` 和 `replaced_by` 且能读；Agent 交来带 `replaces` 的候选，用户确认前两条都不变；手机确认后电脑上看到同样的结果。
