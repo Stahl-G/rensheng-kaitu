@@ -6,6 +6,10 @@
 
 默认 PRIVATE `kaitu-ai-memory` 和新的本机记忆目录，可接入多个选中项目。已有任何仓库或非空目录都保留，不覆盖、不自动迁移。官方新增授权、工具安装和系统权限正常处理，不绕过审批。已有实际可用 kaitu 入口就复用，没有则用普通 Git 和官方 gh；不要求 App、Node、Python、MCP 或新 runtime，不假设 npm/npx 已发布，不改全局配置。
 
+```text
+请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/94401e66797b149a73395d42140f4cf442cda990/docs/guides/agent-memory/INSTALL.md ，实际帮我接上开图项目记忆。先自动检查工具、现有 gh 登录和当前目录；项目已指定就直接用，否则浅层发现常用开发目录的 Git 项目，列短清单让我选，可多选。选定后自动读相关说明、进度决策交接和近期 Git 记录，自己生成带来源的摘要，不让我填现状、文件清单或逐项批准普通读取。默认私人 kaitu-ai-memory 和新目录，上传前把目标、项目及文字摘要范围合并确认一次。保留已有仓库和文件，官方新增授权正常处理，不改全局设置、不装新运行时；完成后核对同步并生成填好地址的新 Agent 接入提示词。
+```
+
 ## 同一份资料
 
 [template/](template/) 只使用开图已有目录与字段：AGENT-README、OVERVIEW、projects/<slug>/STATUS.md/log.md/notes.md、memory/MEMORY.md、inbox/agents/、handoffs/ 和薄入口。选中的每个项目有自己的 slug；只保存确认的文字摘要与来源，不复制代码目录，不建立根 USER/MEMORY/PROJECTS 平行体系。kaitu-backup.json 沿用 kaitu-workspace v1、text=true/records=false。

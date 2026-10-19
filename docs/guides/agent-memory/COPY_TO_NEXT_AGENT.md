@@ -1,9 +1,7 @@
-# 复制给后续全新 Agent
+# 复制给新设备或全新 Agent
 
-仅交付提示词；具体项目、owner 与接收 Agent 由用户在执行会话确认。
+复制下面一段即可；完整规则已固定到修正后的提交。
 
 ```text
-请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/3e96c40b902254d4ae7ab5b0dc5299995f862832/docs/guides/agent-memory/ADD_DEVICE.md ，接入首位 Agent 已建好的私人 kaitu-ai-memory。先向我要准确新库地址、项目编号、允许读取范围和独立空目录，确认你是指定接收方后才读取。使用全新会话，不看前一 Agent 的口头答案，不初始化、建库、铺模板或访问 my-ai-memory。引用新库来源复述真实进度、决策、失败尝试、阻塞、完整下一步及未知项，先交理解报告；等我核对并指定真实小任务和写回范围后才行动。保留原格式、旧文件及全局设置，不要求 App 或新运行时；获准同步时正常推送、冲突保留双方，不转发真实资料。
+请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/94401e66797b149a73395d42140f4cf442cda990/docs/guides/agent-memory/ADD_DEVICE.md ，实际接入我的开图项目记忆。已有仓库地址和项目直接采用，自动检查当前目录、工具与现有 gh 登录；只在目标不明或多账号时问必要选择。核对私人仓库后使用安全目录接入，自动读项目状态、决策、失败和最新交接，引用来源说明进度与下一步，不让我重新介绍背景或逐项批准普通读取。已有任务就继续，没有才问下一步，不强制先做验收。保留原文件、格式和全局设置，不重复建库、不装新运行时；写回沿用已有授权，新增上传范围合并确认一次，正常同步并回读，冲突保留双方。
 ```
-
-[用户亲测顺序](https://github.com/Stahl-G/rensheng-kaitu/blob/3e96c40b902254d4ae7ab5b0dc5299995f862832/docs/guides/agent-memory/USER_TEST.md)

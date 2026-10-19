@@ -1,9 +1,7 @@
-# 复制给首位初始化 Agent
+# 复制给初始化 Agent
 
-仅交付提示词；具体项目、owner 与接收 Agent 由用户在执行会话确认。
+复制下面一段即可；完整规则已固定到修正后的提交。
 
 ```text
-请读取并遵循 https://github.com/Stahl-G/rensheng-kaitu/blob/3e96c40b902254d4ae7ab5b0dc5299995f862832/docs/guides/agent-memory/INSTALL.md 及同目录 USER_TEST.md，帮我新建私人 kaitu-ai-memory，保留 my-ai-memory 作基准，不复制或迁移旧库。先向我确认唯一真实项目，列出必要读取文件和用途；我确认后才读，再预览提取的真实进度、决策、失败尝试、阻塞、完整下一步及来源。等我确认摘要、精确仓库和文字范围后才初始化一次并上传。优先复用可用 kaitu，没有就用普通 Git 和官方 gh，不要求 App 或新运行时，不改全局设置。完成回读后生成填好新库地址和项目编号的接入提示词，由我交给新 Agent 亲测理解与接续。
+请读取并执行 https://github.com/Stahl-G/rensheng-kaitu/blob/94401e66797b149a73395d42140f4cf442cda990/docs/guides/agent-memory/INSTALL.md ，实际帮我接上开图项目记忆。先自动检查工具、现有 gh 登录和当前目录；项目已指定就直接用，否则浅层发现常用开发目录的 Git 项目，列短清单让我选，可多选。选定后自动读相关说明、进度决策交接和近期 Git 记录，自己生成带来源的摘要，不让我填现状、文件清单或逐项批准普通读取。默认私人 kaitu-ai-memory 和新目录，上传前把目标、项目及文字摘要范围合并确认一次。保留已有仓库和文件，官方新增授权正常处理，不改全局设置、不装新运行时；完成后核对同步并生成填好地址的新 Agent 接入提示词。
 ```
-
-[用户亲测顺序](https://github.com/Stahl-G/rensheng-kaitu/blob/3e96c40b902254d4ae7ab5b0dc5299995f862832/docs/guides/agent-memory/USER_TEST.md)
