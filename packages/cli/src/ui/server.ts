@@ -35,7 +35,6 @@ import {
   importUpload,
   invalidateHistoryFile,
   onboardingStatus,
-  pendingWorkspaceFiles,
   processInbox,
   pullCalendarSubscriptions,
   readPhoto,
@@ -194,18 +193,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let inboxTimer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let saveAt = Number.POSITIVE_INFINITY;
+  let saveQueued = false;
   let closed = false;
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
   let stamps = new Map<string, string>();
+  const versionDelay = options.versionDelayMs ?? 2000;
+  const snapshotDelay = options.snapshotDelayMs ?? 30000;
   holdOverview(ws);
   deferSnapshots(ws, (message) => {
     messages.push(message);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(
-      () => void exclusive(saveExternal).catch(reportError),
-      options.versionDelayMs ?? 2000,
-    );
+    scheduleSave(versionDelay);
   });
   const syncCalendar = () => {
     if (!options.calendarExecutor) return;
@@ -227,32 +226,40 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     notify();
   };
   let messages: string[] = [];
-  async function saveExternal() {
+  function scheduleSave(delay: number) {
+    if (closed || saveQueued) return;
+    const due = performance.now() + delay;
+    // 第一条未保存改动确定本轮最晚开始时间，连续编辑只能提前、不能延后。
+    if (saveTimer && saveAt <= due) return;
     clearTimeout(saveTimer);
-    refreshOverview(ws);
-    const files = await pendingWorkspaceFiles(ws);
+    saveAt = due;
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined;
+      saveAt = Number.POSITIVE_INFINITY;
+      saveQueued = true;
+      void exclusive(async () => {
+        saveQueued = false;
+        await saveExternal();
+      }).catch(reportError);
+    }, delay);
+  }
+  async function saveExternal() {
     const own = [...new Set(messages)];
     messages = [];
-    if (!files.length) {
-      watchError = "";
-      return;
-    }
-    const version = await snapshotNow(
-      ws,
-      own.length
+    let pending = true;
+    const version = await snapshotNow(ws, (files) => {
+      pending = files.length > 0;
+      if (!pending) return null;
+      return own.length
         ? own.join("；")
         : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
             .slice(0, 3)
             .map((file) => file.split("/").at(-1))
-            .join("、")}等 ${files.length} 个文件`,
-    );
-    if (!version && (await pendingWorkspaceFiles(ws)).length) {
+            .join("、")}等 ${files.length} 个文件`;
+    });
+    if (!version && pending) {
       reportError();
-      if (!closed)
-        saveTimer = setTimeout(
-          () => void exclusive(saveExternal).catch(reportError),
-          options.snapshotDelayMs ?? 30000,
-        );
+      scheduleSave(snapshotDelay);
     } else watchError = "";
   }
   function scheduleInbox() {
@@ -280,11 +287,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         notify();
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(
-      () => void exclusive(saveExternal).catch(reportError),
-      messages.length ? (options.versionDelayMs ?? 2000) : (options.snapshotDelayMs ?? 30000),
-    );
+    scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
@@ -761,12 +764,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;
-  // 历史盘点涉及 git 全量状态，监听已建立后放到后台，不挡住服务监听。
+  // 启动前已有的改动也走后台保存；与提交共用一次盘点，不另做全量查找。
   setImmediate(() => {
     if (closed) return;
-    void exclusive(async () => {
-      for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
-    }).catch(reportError);
+    changedFile("工作区");
+    scheduleInbox();
   });
   const url = `http://127.0.0.1:${port}`;
   if (options.open !== false) {

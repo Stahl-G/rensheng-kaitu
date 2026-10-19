@@ -9,8 +9,8 @@ import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
 
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
-export async function captureNote(ws: Workspace, text: string, investment?: string) {
-  if (typeof text !== "string" || !text.trim() || text.length > 100000)
+export async function captureNote(ws: Workspace, text: string, investment?: string, limit = 100000) {
+  if (typeof text !== "string" || !text.trim() || text.length > limit)
     throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
   const now = new Date();
   const date = localDate(now, ws.timeZone());

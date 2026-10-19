@@ -111,3 +111,40 @@ it("startup 版本出现后，同秒同长度改写并恢复精确 mtime 仍保�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("持续编辑跨过保存窗口时，停止输入前已有真实版本，随后内容全部追上", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-ui-continuous-"));
+  let ui: Awaited<ReturnType<typeof startUi>> | undefined;
+  let editing: ReturnType<typeof setInterval> | undefined;
+  try {
+    const ws = await initWorkspace(root);
+    const before = (await history(ws))[0]?.oid;
+    const written = new Set<string>();
+    let sequence = 0;
+    const edit = () => {
+      const value = `synthetic ${++sequence}\n`;
+      written.add(value);
+      writeFileSync(join(root, "me/synthetic.md"), value);
+    };
+    ui = await startUi(ws, {
+      port: 0,
+      open: false,
+      snapshotDelayMs: 500,
+      refreshDelayMs: 30,
+    });
+    edit();
+    editing = setInterval(edit, 100);
+    await expect.poll(async () => (await history(ws))[0]?.oid, { timeout: 1800 }).not.toBe(before);
+    expect(written.has(await latestText(ws))).toBe(true);
+    clearInterval(editing);
+    editing = undefined;
+    const final = "synthetic final\n";
+    writeFileSync(join(root, "me/synthetic.md"), final);
+    await expect.poll(() => latestText(ws)).toBe(final);
+    expect(await pendingWorkspaceFiles(ws)).toEqual([]);
+  } finally {
+    clearInterval(editing);
+    await ui?.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
