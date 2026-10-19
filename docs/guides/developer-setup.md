@@ -22,4 +22,6 @@ kaitu backup restore owner/existing --to /path/to/new-folder --via gh
 - 结束：`kaitu project log <slug> --text '改动：…；失败尝试：…；阻塞：…；建议下一步：…' --by agent --dir /path/to/workspace`，项目页「最近日志」能看到。
 - 装项目技能：`kaitu project memory --from /path/to/code --install --dir /path/to/workspace`，写进该项目的 `.agents/skills/` 和 `.claude/skills/`，不动 AGENTS.md、CLAUDE.md 和全局配置；已有同名技能内容不同时停下。
 
+没有装开图 App 也想用：见 [私人共享记忆](agent-memory/README.md)，Agent 用普通 Git 和 gh 就能建。
+
 另一台设备复制「第二设备接入提示词」：先 `backup restore` 到新目录，再 `backup connect` 固定同步范围。没有 kaitu 的 Agent 可以直接读仓库里的 Markdown/JSONL，写入按 AGENT-README.md 的接力约定。照片、视频暂不同步。
