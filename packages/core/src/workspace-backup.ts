@@ -526,7 +526,6 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
   const run = async () => {
     const c = s.connection as BackupConnection;
     try {
-      refreshOverview(ws);
       const local = await localFiles(ws, c, options);
       const other = await remote.read(c.repo, c.branch, options);
       controller.signal.throwIfAborted();

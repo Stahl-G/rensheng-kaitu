@@ -393,10 +393,16 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   async function startWatching() {
     await stopWatching();
     watchStatus = { mode: "native", running: false, scanned: 0 };
+    let sharedWatcher: ReturnType<typeof watchWorkspace> | undefined;
     try {
-      watcher = options.watch
-        ? options.watch(ws.root, { recursive: true }, (_event, filename) => changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区"))
-        : watchWorkspace(ws.root, changedFile);
+      if (options.watch) {
+        watcher = options.watch(ws.root, { recursive: true }, (_event, filename) =>
+          changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区"),
+        );
+      } else {
+        sharedWatcher = watchWorkspace(ws.root, changedFile);
+        watcher = sharedWatcher;
+      }
       watcher.on("error", startPolling);
     } catch {
       startPolling();
@@ -413,7 +419,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试
       }
     }
-    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher);
+    stopPhone = startPhoneSnapshots(ws, () => reportError(), sharedWatcher);
     scheduleInbox();
   }
   await startWatching();
