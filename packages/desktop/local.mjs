@@ -49,8 +49,13 @@ export function createLocalAsk({
     return sdk;
   };
   const keyFile = ".kaitu/ask-workspace.json";
-  const workspaceKey = ws.exists(keyFile) ? ws.readJson(keyFile).key : ws.root;
-  if (!ws.exists(keyFile)) ws.writeJson(keyFile, { key: workspaceKey }, { internal: true });
+  const workspaceKeyFor = (root) => {
+    const target = root === ws.root ? ws : new Workspace(root, { maintain: false });
+    if (!target.exists(".kaitu/config.json")) throw new Error("不是开图工作区");
+    const key = target.exists(keyFile) ? target.readJson(keyFile).key : root;
+    if (!target.exists(keyFile)) target.writeJson(keyFile, { key }, { internal: true });
+    return key;
+  };
   const connection = createAgentConnection({
     state,
     workspace: getWorkspace,
@@ -66,7 +71,8 @@ export function createLocalAsk({
   return createAskService({
     state: conversationState,
     workspace: ws.root,
-    workspaceKey,
+    workspaceKey: workspaceKeyFor(ws.root),
+    workspaceKeyFor,
     runtime: (mode) => connection.runtime(mode),
     settings: () => connection.settings(),
     // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
