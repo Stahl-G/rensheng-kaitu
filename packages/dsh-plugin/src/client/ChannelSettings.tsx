@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
 export type ChannelRequest = (operation: string, input?: Record<string, unknown>) => Promise<unknown>;
 export interface ChannelAccount {
@@ -84,6 +85,7 @@ export function ChannelSettings({
   focus = false,
   onFocused,
 }: { request: ChannelRequest; focus?: boolean; onFocused?: () => void }) {
+  const t = useT();
   const [settings, setSettings] = useState<ChannelState>();
   const [dialog, setDialog] = useState<string | null>(null);
   const [selection, setSelection] = useState<ChannelAccount>();
@@ -295,7 +297,9 @@ export function ChannelSettings({
               >
                 用 Google 账号登录
               </button>
-              <p className={css.small}>只读取邮件，不会发送、删除或标记已读</p>
+              <p className={css.small}>
+                {t("只读收取邮件，保留已读状态。", "Read-only email collection, preserving read status.")}
+              </p>
               {waiting && <output className={css.small}>等待浏览器完成授权…连接结果会自动更新</output>}
               {settings?.accounts
                 .filter((a) => a.kind === "gmail")
@@ -412,7 +416,12 @@ export function ChannelSettings({
                           field("IMAP OAuth access token（需自行取得）", "accessToken", true)}
                       </div>
                     </details>
-                    <p className={css.small}>首次连接从新邮件开始。只读收取，不改变已读状态。</p>
+                    <p className={css.small}>
+                      {t(
+                        "首次连接从新邮件开始。只读收取，保留已读状态。",
+                        "Starts with new messages. Read-only collection preserves read status.",
+                      )}
+                    </p>
                   </>
                 ) : dialog === "slack" ? (
                   <>

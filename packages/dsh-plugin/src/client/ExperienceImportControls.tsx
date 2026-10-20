@@ -149,7 +149,12 @@ export function ExperienceImportControls(
               {data.pending.length > 0 && (
                 <div className={css.reviewItem}>
                   <strong>{data.pending.length} 次导入操作尚未完成</strong>
-                  <p className={css.secondary}>继续时只补完未写入的部分，已保存的经历不会重复添加。</p>
+                  <p className={css.secondary}>
+                    {t(
+                      "从上次进度继续，保留已保存的经历。",
+                      "Continue from the last saved step, keeping saved experiences.",
+                    )}
+                  </p>
                   <button
                     type="button"
                     className={css.control}
