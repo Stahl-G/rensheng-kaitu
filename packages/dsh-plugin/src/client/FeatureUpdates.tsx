@@ -6,6 +6,7 @@ export interface FeatureUpdateState {
   version: string;
   dshVersion: string;
   configured: boolean;
+  automatic: boolean;
   phase: string;
   availableVersion: string | null;
   notes: string;
@@ -14,19 +15,31 @@ export interface FeatureUpdateState {
 }
 export type FeatureUpdateRequest = (action: string) => Promise<FeatureUpdateState | null>;
 
-export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
+export function FeatureUpdates({
+  request,
+  compact = false,
+}: { request: FeatureUpdateRequest; compact?: boolean }) {
   const t = useT();
   const [state, setState] = useState<FeatureUpdateState | null>(null);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  const [dismissed, setDismissed] = useState("");
+  const [acted, setActed] = useState(false);
   const busy = sending || state?.phase === "checking" || state?.phase === "downloading";
   useEffect(() => {
     let active = true;
-    void request("status")
-      .then((value) => active && setState(value))
-      .catch((err) => active && setError(err.message));
+    const refresh = () =>
+      void request("status")
+        .then((value) => active && setState(value))
+        .catch((err) => active && setError(err.message));
+    refresh();
+    // Status is in memory. Network checks run in the desktop process, independently of this view.
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
     return () => {
       active = false;
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
     };
   }, [request]);
   useEffect(() => {
@@ -39,6 +52,7 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
     return () => clearInterval(timer);
   }, [request, state?.phase]);
   const run = async (action: string) => {
+    setActed(true);
     setSending(true);
     setError("");
     try {
@@ -50,13 +64,43 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
     }
   };
   if (!state) return error ? <p role="alert">{error}</p> : null;
+  const notice = `${state.phase}:${state.availableVersion}`;
+  if (
+    compact &&
+    (!state.configured ||
+      notice === dismissed ||
+      !(["available", "downloading", "ready"].includes(state.phase) || (acted && (error || state.error))))
+  )
+    return null;
   return (
-    <div className={`${css.card} ${css.sum}`}>
+    <div className={`${css.card} ${css.sum}`} role={compact ? "status" : undefined}>
       <b>{t("开图功能更新", "Kaitu feature updates")}</b>
-      <p className={css.small}>
-        {t("功能版本", "Feature version")} {state.version} · {t("固定内核", "Pinned engine")} DSH{" "}
-        {state.dshVersion}
-      </p>
+      {!compact && (
+        <>
+          <p className={css.small}>
+            {t("功能版本", "Feature version")} {state.version} · {t("固定内核", "Pinned engine")} DSH{" "}
+            {state.dshVersion}
+          </p>
+          <label className={css.small}>
+            <input
+              type="checkbox"
+              checked={state.automatic}
+              disabled={busy || !state.configured}
+              onChange={(event) => void run(event.target.checked ? "automatic:on" : "automatic:off")}
+            />
+            {t(
+              "自动检查更新（下载和重启前询问我）",
+              "Automatically check for updates (ask before downloading or restarting)",
+            )}
+          </label>
+          <p className={css.small}>
+            {t(
+              "功能更新保留你的资料。原生内核升级仍需下载完整安装包。",
+              "Feature updates keep your data. Native engine updates require the full installer.",
+            )}
+          </p>
+        </>
+      )}
       {!state.configured && <p className={css.small}>{t("未配置更新源", "No update source configured")}</p>}
       {state.phase === "current" && <p>{t("已是最新功能版本", "Features are up to date")}</p>}
       {state.phase === "checking" && <output>{t("正在检查更新…", "Checking for updates…")}</output>}
@@ -98,6 +142,11 @@ export function FeatureUpdates({ request }: { request: FeatureUpdateRequest }) {
         {state.canRollback && (
           <button type="button" className={css.link} disabled={busy} onClick={() => void run("rollback")}>
             {t("恢复上一版功能", "Restore previous features")}
+          </button>
+        )}
+        {compact && !busy && (
+          <button type="button" className={css.link} onClick={() => setDismissed(notice)}>
+            {state.phase === "ready" ? t("稍后重启", "Restart later") : t("稍后", "Later")}
           </button>
         )}
       </div>

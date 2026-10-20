@@ -39,6 +39,8 @@ node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windo
 
 这次没有改变 npm 发布方式，也没有单独的 Windows 后端包。普通功能改动继续在同一仓库维护；宿主升级才需要分别适配桌面壳。
 
+从 0.1.1 起，正式版打包须加 `--update-public-key <Ed25519公钥文件>`，使用与 Mac 相同的签名功能包更新频道；测试源可用 `--update-config <配置文件>`。检查、下载、重启与完整安装包兜底见 [desktop.md](desktop.md#开图功能包独立更新)。旧 RC 安装包需先覆盖安装一次新版，无须先卸载。
+
 ## 隔离调试
 
 ```powershell
