@@ -9,13 +9,11 @@ import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
-import { type AskMode, modeChangeForSend } from "./ask-mode.js";
 import { useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
 
 interface Thread {
-  mode?: AskMode;
   id: string;
   title: string;
   created: string;
@@ -50,6 +48,7 @@ interface Settings {
   configured: boolean;
   choice?: "builtin" | "external" | "local";
   fullOnly?: boolean;
+  mode?: "full" | "scoped";
   supportsAttachments?: boolean;
   localAgent?: { id: string; name: string; path?: string; status: string };
   /** 本机装好的 ACP agent CLI。 */
@@ -198,22 +197,12 @@ export function AskPage({
   }, [configureRequest, configureBuiltin]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
-  const [modeMenu, setModeMenu] = useState(false);
-  const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
     setSelected(id);
-    setPendingMode(null);
-    setModeMenu(false);
     setModelMenu(false);
   };
-  const [pendingMode, setPendingMode] = useState<AskMode | null>(null);
-  const mode = threads.find((thread) => thread.id === selected)?.mode ?? pendingMode ?? "scoped";
-  const modeLabel =
-    mode === "full"
-      ? "完整 Agent"
-      : settings?.fullOnly
-        ? t("完整 Agent 未开启", "Full Agent off")
-        : "开图资料";
+  const localRuntime = settings?.mode ? settings.mode === "full" : !!settings?.fullOnly;
+  const runtimeLabel = localRuntime ? t("本机 Agent", "Local Agent") : t("开图资料", "Kaitu files");
 
   const [choice, setChoice] = useState<"builtin" | "local">("local");
   const [key, setKey] = useState("");
@@ -521,7 +510,6 @@ export function AskPage({
     const pendingAttachments = attachments;
     const pendingReferences = sessionReferences;
     const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
-    // 本机 Agent 只有完整模式：发送时直接开，不再弹确认。
     setDraft("");
     setAttachments([]);
     setSessionReferences([]);
@@ -529,26 +517,14 @@ export function AskPage({
     setSending(true);
     try {
       let id = selected;
-      let actualMode = threads.find((thread) => thread.id === id)?.mode;
       if (!id) {
         const thread = await call<Thread>("askCreate");
         id = thread.id;
-        actualMode = thread.mode;
         activeSession.current = id;
         selectThread(id);
       }
-      const modeForThread = modeChangeForSend(
-        actualMode ?? "scoped",
-        pendingMode,
-        !!selected,
-        !!settings.fullOnly,
-      );
-      if (modeForThread) {
-        await call("askSetMode", id, modeForThread, modeForThread === "full");
-      }
       await call("askSend", id, payload, pendingAttachments);
       await refreshThreads();
-      setPendingMode(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setDraft((current) => (current.trim() ? current : pendingText));
@@ -613,26 +589,6 @@ export function AskPage({
     setReferences(false);
     setAtQuery(undefined);
     input.current?.focus();
-  };
-  const changeMode = async (value: AskMode) => {
-    if (busy || modeSaving) return;
-    setModeSaving(true);
-    setError("");
-    try {
-      if (!selected) {
-        // 还没开对话时不建空「新对话」；下一条发出时再带上权限。
-        setPendingMode(value);
-        setModeMenu(false);
-        return;
-      }
-      await call("askSetMode", selected, value, value === "full");
-      await refreshThreads();
-      setModeMenu(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setModeSaving(false);
-    }
   };
   // 服务、接口或 Key 变了，之前获取的模型和还没回来的请求都作废。
   const dropModels = () => {
@@ -699,11 +655,6 @@ export function AskPage({
       setSessionReferences([]);
       if (choice === "builtin" && !asked) setStep(2);
       else setStep(0);
-      // 本机 Agent 只有完整模式，接上后直接开，不弹确认。
-      if (choice === "local") {
-        if (selected) void changeMode("full");
-        else setPendingMode("full");
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -990,14 +941,12 @@ export function AskPage({
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
-              setModeMenu(false);
               setModelMenu(false);
               closeReferences();
             }
           }}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
-              setModeMenu(false);
               setModelMenu(false);
             }
           }}
@@ -1173,63 +1122,11 @@ export function AskPage({
                 setAtQuery(undefined);
                 if (settings?.choice === "local") return;
                 setReferences(!references);
-                setModeMenu(false);
                 setModelMenu(false);
               }}
             >
               引用资料
             </button>
-            <span className={v2["mode-wrap"]}>
-              <button
-                type="button"
-                className={`${css.model} ${mode === "full" ? v2["is-full"] : ""}`}
-                disabled={busy || modeSaving}
-                aria-haspopup="dialog"
-                aria-expanded={modeMenu}
-                onClick={() => {
-                  setModelMenu(false);
-                  // 本机 Agent 只有完整模式：一点就开，不再确认。
-                  if (settings?.fullOnly && mode !== "full") {
-                    void changeMode("full");
-                    return;
-                  }
-                  setModeMenu(!modeMenu);
-                }}
-              >
-                {modeLabel}
-                <span aria-hidden="true">⌄</span>
-              </button>
-              {modeMenu && (
-                <dialog open className={v2["mode-pop"]} aria-label="这个对话能做什么">
-                  <button
-                    type="button"
-                    className={v2["mode-opt"]}
-                    aria-pressed={mode === "scoped"}
-                    disabled={settings?.fullOnly}
-                    onClick={() => void changeMode("scoped")}
-                  >
-                    <b>只读写开图资料</b>
-                    <span>只读写开图资料，可以搜索和打开网页；不能运行命令</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={v2["mode-opt"]}
-                    aria-pressed={mode === "full"}
-                    onClick={() => (mode === "full" ? setModeMenu(false) : void changeMode("full"))}
-                  >
-                    <b>完整 Agent</b>
-                    <span>
-                      {settings?.choice === "local"
-                        ? t(
-                            `使用本机 ${settings.providerName} 的完整能力与原生权限。`,
-                            `Uses local ${settings.providerName} capabilities and native permissions.`,
-                          )
-                        : "开图背后就是完整的 DSH：能运行命令、读写电脑上的文件、上网，适合让它帮你干活。"}
-                    </span>
-                  </button>
-                </dialog>
-              )}
-            </span>
             <span className={css.modelWrap}>
               <button
                 type="button"
@@ -1237,18 +1134,30 @@ export function AskPage({
                 disabled={busy}
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
-                onClick={() => {
-                  setModeMenu(false);
-                  openModelMenu();
-                }}
+                title={
+                  settings?.configured
+                    ? `${runtimeLabel} · ${settings.providerName} · ${settings.model}`
+                    : undefined
+                }
+                onClick={openModelMenu}
               >
                 <span className={css.modelName}>
-                  {settings?.configured ? `${settings.providerName} · ${settings.model}` : "连接 AI"}
+                  {settings?.configured
+                    ? `${localRuntime ? `${runtimeLabel} · ` : ""}${settings.providerName} · ${settings.model}`
+                    : t("连接 AI", "Connect AI")}
                 </span>
                 <span aria-hidden="true">⌄</span>
               </button>
               {modelMenu && (
                 <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
+                  {localRuntime && (
+                    <p className={v2.small}>
+                      {t(
+                        "使用所选 Agent 的本机能力，操作审批由 Agent 自己处理。",
+                        "Uses the selected Agent's local capabilities and its own approval flow.",
+                      )}
+                    </p>
+                  )}
                   {settings?.choice === "local" &&
                     (agentModels === null ? (
                       <span className={css.model}>{t("正在读取模型…", "Loading models…")}</span>
@@ -1348,7 +1257,7 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `${settings.providerName} · ${modeLabel}`
+            ? `${settings.providerName} · ${runtimeLabel}`
             : "Enter 发送 · Shift + Enter 换行"}
         </p>
       </section>
@@ -1378,8 +1287,8 @@ export function AskPage({
               <b>{t("用本机 Agent", "Use a local agent")}</b>
               <span>
                 {t(
-                  "使用 CodeBuddy、Claude Code、Kimi 等 CLI 的账号登录和额度。",
-                  "Uses the account login and allowance of CodeBuddy, Claude Code, Kimi and other CLIs.",
+                  "使用 CodeBuddy、Claude Code、Kimi 等 CLI 的账号和本机能力，操作审批由 Agent 自己处理。",
+                  "Uses the accounts and local capabilities of CodeBuddy, Claude Code, Kimi and other CLIs, with the Agent's own approval flow.",
                 )}
               </span>
             </button>
