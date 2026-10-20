@@ -8,6 +8,7 @@ import { setStateBinding } from "../src/state-binding.js";
 import {
   type BackupFiles,
   type BackupRemote,
+  cancelWorkspaceBackup,
   connectWorkspaceBackup,
   resolveWorkspaceBackup,
   restoreWorkspaceBackup,
@@ -99,6 +100,32 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   await syncWorkspaceBackup(a, m.remote);
   expect(m.pushes()).toBe(count);
   expect(m.inspect.calls).toBe(checks);
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const stalled: BackupRemote = {
+    ...m.remote,
+    async read(_repo, _branch, options) {
+      options?.progress?.({ phase: "download", completed: 2, total: 20 });
+      entered();
+      await new Promise<void>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      });
+      throw new Error("cancelled");
+    },
+  };
+  const syncing = syncWorkspaceBackup(a, stalled);
+  await reading;
+  expect(workspaceBackupStatus(a).progress).toEqual({ phase: "download", completed: 2, total: 20 });
+  cancelWorkspaceBackup(a);
+  await syncing;
+  expect(workspaceBackupStatus(a).running).toBe(false);
+  expect(workspaceBackupStatus(a).error).toBeTruthy();
+  expect(m.pushes()).toBe(count);
+  expect(a.readText("me/profile.md")).toBe("# From A\n");
+  await syncWorkspaceBackup(a, m.remote);
+  expect(workspaceBackupStatus(a).error).toBeNull();
   const switching = new Workspace(a.root);
   await workspaceBackupRequest(switching, "activate", { root: target });
   expect(switching.root).toBe(target);

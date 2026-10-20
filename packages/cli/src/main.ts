@@ -276,8 +276,8 @@ function out(values: Values, data: unknown, text: string): void {
   console.log(values["json-out"] ? JSON.stringify(data, null, 2) : text);
 }
 
-function workspace(values: Values, maintain = true): Workspace {
-  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain });
+function workspace(values: Values, maintain = true, deferOverview = false): Workspace {
+  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain, deferOverview });
   if (!ws.exists(".kaitu/config.json"))
     throw new KaituError(`${ws.root} 还不是开图工作区，先运行 kaitu init`, "NOT_INITIALIZED");
   return ws;
@@ -517,7 +517,7 @@ async function run(argv: string[]): Promise<number> {
       return 0;
     }
     case "ui": {
-      const ws = workspace(values);
+      const ws = workspace(values, true, true);
       const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],

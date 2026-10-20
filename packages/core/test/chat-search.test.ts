@@ -1,5 +1,5 @@
-import { rmSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { rmSync, writeFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { searchChats } from "../src/chat-search.js";
 import { isTracked, snapshot } from "../src/history.js";
 import { freshWorkspace } from "./helpers.js";
@@ -27,7 +27,26 @@ describe("对话检索", () => {
         q,
       ).toEqual([file]);
     }
-    const before = searchChats(ws, "力量训练");
+    for (let i = 0; i < 120; i++) {
+      const other = `chats/2026/10/archive-${i}.jsonl`;
+      writeFileSync(
+        ws.resolve(other),
+        `${JSON.stringify({ ...rows[0], id: `archive-${i}`, title: "旧对话" })}\n${JSON.stringify({ ...rows[1], text: "归档正文".repeat(1000) })}\n`,
+      );
+    }
+    searchChats(ws, "力量训练");
+    const reads = vi.spyOn(ws, "readBytes");
+    let before = searchChats(ws, "力量训练");
+    expect(reads).not.toHaveBeenCalled();
+    ws.writeText(
+      file,
+      `${rows.map((r) => JSON.stringify(r)).join("\n")}\n${JSON.stringify({ ...rows[1], id: "m2", text: "增量更新的内容" })}\n`,
+    );
+    reads.mockClear();
+    expect(searchChats(ws, "增量更新").map((r) => r.file)).toEqual([file]);
+    expect(reads.mock.calls.map(([path]) => path)).toEqual([file]);
+    reads.mockRestore();
+    before = searchChats(ws, "力量训练");
     rmSync(ws.resolve(".kaitu/index.sqlite", { internal: true }));
     expect(searchChats(ws, "力量训练")).toEqual(before);
 

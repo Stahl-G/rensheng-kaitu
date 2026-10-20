@@ -132,6 +132,7 @@ import type {
   ExplorationCommand,
   ExplorationData,
   HealthData,
+  LibraryQuery,
   LifeMapData,
   MeData,
   NewsAction,
@@ -342,8 +343,8 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("library")
-  async library(): Promise<LibraryData> {
-    return readLibrary(this.workspace);
+  async library(query?: LibraryQuery): Promise<LibraryData> {
+    return readLibrary(this.workspace, query);
   }
 
   @Remote("libraryDocument")

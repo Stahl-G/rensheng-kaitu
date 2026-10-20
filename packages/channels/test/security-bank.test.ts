@@ -1,9 +1,21 @@
 import { EventEmitter } from "node:events";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Workspace, bankNotificationCandidates, initWorkspace, restore, snapshot } from "@kaitu/core";
 import { expect, it, vi } from "vitest";
+import { quarantineBankNotes } from "../../core/src/bank-mail.js";
 import type { MailAuthenticator } from "../src/collectors/imap/sender-gate.js";
 import { ImapCollector, type ImapTransport, imapProvider } from "../src/collectors/imap/watcher.js";
 import { receiveMessage } from "../src/collectors/inbox.js";
@@ -133,6 +145,31 @@ it("银行邮件先进入本机隔离，只有完整对齐签名可生成候选�
     transport.emit("exists");
     await vi.waitFor(() => expect(readdirSync(ws.resolve("inbox/agents"))).toHaveLength(1));
     expect(ws.readText(`inbox/agents/${readdirSync(ws.resolve("inbox/agents"))[0]}`)).toContain(body);
+    await service.stop();
+    const outside = join(temp, "outside");
+    mkdirSync(outside);
+    const name = `channel-${"a".repeat(64)}.note.md`;
+    const external = join(outside, name);
+    const original =
+      "来源：imap\n发件人：notice@cmbchina.com\n标题：交易通知\n时间：2026-10-19\n外部合成原文\n";
+    writeFileSync(external, original);
+    for (const folder of ["agents", "notes", "processed"]) {
+      const root = ws.resolve(`inbox/${folder}`);
+      const saved = join(temp, `saved-${folder}`);
+      const existed = existsSync(root);
+      if (existed) renameSync(root, saved);
+      symlinkSync(outside, root, process.platform === "win32" ? "junction" : "dir");
+      const reads = vi.spyOn(ws, "readBytes");
+      try {
+        quarantineBankNotes(ws);
+        expect(reads.mock.calls.some(([path]) => path.startsWith(`inbox/${folder}/`))).toBe(false);
+        expect(readFileSync(external, "utf8")).toBe(original);
+      } finally {
+        reads.mockRestore();
+        unlinkSync(root);
+        if (existed) renameSync(saved, root);
+      }
+    }
   } finally {
     await service.stop();
     rmSync(temp, { recursive: true, force: true });

@@ -8,7 +8,7 @@ import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listMemories } from "./memory.js";
-import { listModules, listRecordTypes } from "./modules.js";
+import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
@@ -83,13 +83,16 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
 
 export function statusFiles(ws: Workspace): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
+  const recordDirectories = new Set(listRecordTypes(ws).map((ref) => recordFilePattern(ref).dir));
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
       if (ws.conflictCopy(file)) continue;
-      if (entry.isDirectory()) walk(file, module);
-      else if (entry.name === "STATUS.md") out.push({ file, module });
+      // 只排除已知健康附件与声明的记录目录；files 也可以是合法主题名。
+      if (entry.isDirectory()) {
+        if (file !== "health/files" && !recordDirectories.has(file)) walk(file, module);
+      } else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }
   for (const module of listModules(ws)) {

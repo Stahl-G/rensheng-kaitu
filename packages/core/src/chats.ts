@@ -71,7 +71,7 @@ export function listChatFiles(ws: Workspace): string[] {
       if (entry.isDirectory()) visit(file);
       else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
         chatPath(ws, file);
-        if (ws.scanText(file) !== undefined) files.push(file);
+        if (!ws.conflictCopy(file) && !ws.isUnavailable(file)) files.push(file);
       }
     }
   }
