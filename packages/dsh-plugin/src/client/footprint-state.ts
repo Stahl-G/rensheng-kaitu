@@ -110,6 +110,8 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
     properties: { kind: string; opacity: number };
     geometry: { type: "LineString"; coordinates: number[][] };
   }[] = [];
+  let origin: Place | undefined = timed.length === 1 ? timed[0]?.e.place : undefined;
+  let previousResidence: Place | undefined;
   for (let i = 1; i < timed.length; i++) {
     const previous = timed[i - 1];
     const next = timed[i];
@@ -124,12 +126,17 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
       );
     if (ambiguous(previous) || ambiguous(next)) continue;
     const arc = greatCircle(previous.e.place, next.e.place);
-    if (arc)
+    if (arc) {
+      // Keep factual endpoints: rendered arcs unwrap longitude at the date line.
+      origin ??= previous.e.place;
+      if (next === timed.at(-1) && me && cityKey(next.e.place) === cityKey(me))
+        previousResidence = previous.e.place;
       features.push({
         type: "Feature",
         properties: { kind: "history", opacity: 1 },
         geometry: { type: "LineString", coordinates: arc },
       });
+    }
   }
   const historyRoutes = features.filter((f) => f.properties.kind === "history");
   historyRoutes.forEach((feature, index) => {
@@ -146,36 +153,10 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
           geometry: { type: "LineString", coordinates: arc },
         });
     }
-  const firstRoutePoint = historyRoutes[0]?.geometry.coordinates[0];
-  const origin = firstRoutePoint
-    ? timed.find(
-        ({ e }) =>
-          Math.abs((e.place.lng ?? 0) - (firstRoutePoint[0] ?? 0)) < 1e-6 &&
-          Math.abs((e.place.lat ?? 0) - (firstRoutePoint[1] ?? 0)) < 1e-6,
-      )?.e.place
-    : timed.length === 1
-      ? timed[0]?.e.place
-      : undefined;
-  const lastRoute = historyRoutes.at(-1);
-  const lastPoint = lastRoute?.geometry.coordinates.at(-1);
-  const previousPoint = lastRoute?.geometry.coordinates[0];
-  const previous =
-    me &&
-    cityKey(timed.at(-1)?.e.place ?? me) === cityKey(me) &&
-    lastPoint &&
-    previousPoint &&
-    Math.abs((me.lng ?? 0) - (lastPoint[0] ?? 0)) < 1e-6 &&
-    Math.abs((me.lat ?? 0) - (lastPoint[1] ?? 0)) < 1e-6
-      ? timed.find(
-          ({ e }) =>
-            Math.abs((e.place.lng ?? 0) - (previousPoint[0] ?? 0)) < 1e-6 &&
-            Math.abs((e.place.lat ?? 0) - (previousPoint[1] ?? 0)) < 1e-6,
-        )?.e.place
-      : undefined;
   return {
     me,
     origin,
-    previous,
+    previous: previousResidence,
     all: points([...actual, ...possible]),
     lived: points(lived),
     history: points(timed.map((v) => v.e)),

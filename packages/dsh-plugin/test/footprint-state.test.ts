@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { tailRotation } from "../src/client/footprint-me-marker.js";
 import { footprintAnchor, footprintData, greatCircle } from "../src/client/footprint-state.js";
 import type { Experience } from "../src/types.js";
 
@@ -107,4 +108,35 @@ it("真实时间顺序的首末来路线透明度覆盖 0.35 到 0.9，未知日
   const data = footprintData(rows.reverse(), "2026-10-20");
   expect(data.routes.features.map((f) => f.properties.opacity)).toEqual([0.35, 0.9]);
   expect(data.history.map((p) => p.geonameid)).toEqual([1, 2, 3]);
+});
+
+it("重返同城的最新居住冲突不借用多年前来路，尾迹回到默认左下", () => {
+  const shanghai = city(20, 121.4581, 31.2222);
+  const rows = [
+    item(1, "2010-01-01", "2011-12-31", { place: city(1, 116.3972, 39.9075) }),
+    item(2, "2012-01-01", "2013-12-31", { place: shanghai }),
+    item(3, "2014-01-01", "2016-12-31", { place: city(3, 104.0667, 30.6667) }),
+    item(4, "2015-01-01", undefined, { place: shanghai }),
+  ];
+  const data = footprintData(rows, "2026-10-20", shanghai);
+  expect(data.routes.features).toHaveLength(1); // The old Beijing → Shanghai fact remains.
+  expect(data.previous).toBeUndefined();
+  expect(tailRotation(data.me, data.previous, 90)).toBe(tailRotation(shanghai));
+});
+
+it("跨日界线来路用真实居住端点确定上一站，尾迹仍朝苏瓦", () => {
+  const suva = city(1, 178.4419, -18.1416);
+  const apia = city(2, -171.7514, -13.8507);
+  const data = footprintData(
+    [item(1, "2010-01-01", "2011-12-31", { place: suva }), item(2, "2012-01-01", undefined, { place: apia })],
+    "2026-10-20",
+    apia,
+  );
+  expect(data.routes.features[0]?.geometry.coordinates.at(-1)?.[0]).toBeCloseTo(188.2486);
+  expect(data.previous).toEqual(suva);
+  expect(data.origin).toEqual(suva);
+  const angle =
+    ((tailRotation(data.me, data.previous) + (Math.atan2(13.5, -8.83) * 180) / Math.PI) * Math.PI) / 180;
+  expect(Math.cos(angle)).toBeLessThan(0); // West toward Suva.
+  expect(Math.sin(angle)).toBeGreaterThan(0); // South toward Suva.
 });
