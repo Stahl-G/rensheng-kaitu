@@ -124,7 +124,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     { id: "claude", name: "Claude", hint: "开了记忆的话，把「设置」里的记忆内容也一起复制过来。" },
     { id: "gemini", name: "Gemini", hint: "把「保存的信息」页面里的内容也一起复制过来。" },
     { id: "doubao", name: "豆包", hint: "开了记忆的话，把设置里的记忆列表也一起复制过来。" },
-    { id: "other", name: "其他", hint: "任何 AI 都可以，回答格式对不上也没关系，对不上的行会原样留着。" },
+    { id: "other", name: "其他", hint: "粘贴常用 AI 的回答；未识别的行会保留原文。" },
   ],
   prompt: `请把你记住的关于我的所有信息完整列出来，尽量保持原文，不要总结或省略。包括：
 1. 你保存的记忆条目
@@ -252,7 +252,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     {
       id: "mine",
       title: "在原来的 AI 里继续",
-      description: "复制一份简短的资料包给你常用的 AI，再把它的回答贴回来，不用 API Key",
+      description: "把资料包复制给常用的 AI，再贴回回答继续整理",
       target: "connections",
     },
     { id: "none", title: "先不用 AI", description: "随手记和导入都能用，等你连上再整理", target: "today" },

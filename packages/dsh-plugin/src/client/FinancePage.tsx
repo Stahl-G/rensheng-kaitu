@@ -11,6 +11,7 @@ import type {
   FinanceRemoteViewOptions,
 } from "../types.js";
 import css from "./FinancePage.module.css";
+import { useT } from "./i18n.js";
 
 export interface FinancePageProps {
   loadFinanceOverview: (options?: FinanceRemoteViewOptions) => Promise<FinanceOverviewData>;
@@ -587,6 +588,7 @@ function ImportPanel({
 }
 
 export function FinancePage(props: FinancePageProps & { initialImport?: boolean }) {
+  const t = useT();
   const {
     loadFinanceOverview,
     loadFinanceCashflow,
@@ -682,7 +684,12 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   return (
     <div className={css.page} aria-busy={loading}>
       <header className={css.header}>
-        <p className={css.muted}>只记录和分析，不连交易账户 · 明细存在资料文件夹，开了云盘同步会一起同步</p>
+        <p className={css.muted}>
+          {t(
+            "财务记录与分析 · 明细保存在资料文件夹，随已开启的云盘同步",
+            "Financial records and analysis · Details stay in your workspace and follow its cloud sync settings",
+          )}
+        </p>
         <div className={css.actions}>
           <button type="button" className={css.button} disabled={loading} onClick={() => void refresh()}>
             {loading ? "刷新中…" : "刷新"}

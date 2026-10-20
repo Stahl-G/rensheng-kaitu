@@ -1378,8 +1378,8 @@ export function AskPage({
               <b>{t("用本机 Agent", "Use a local agent")}</b>
               <span>
                 {t(
-                  "不填 Key，用 CodeBuddy、Claude Code、Kimi 等 CLI 自己的登录和额度。",
-                  "No API key; uses the login and allowance of CodeBuddy, Claude Code, Kimi and others.",
+                  "使用 CodeBuddy、Claude Code、Kimi 等 CLI 的账号登录和额度。",
+                  "Uses the account login and allowance of CodeBuddy, Claude Code, Kimi and other CLIs.",
                 )}
               </span>
             </button>

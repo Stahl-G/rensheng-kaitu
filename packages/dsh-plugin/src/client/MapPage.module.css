@@ -6,7 +6,7 @@
   --atlas-green: #e6dcc5;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -709,7 +709,9 @@ body[data-ds-dark-theme] .page,
 /* One full map, with the existing records available in a secondary panel. */
 .layout {
   position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
   order: -1;
 }
 .mapPane {
@@ -717,26 +719,60 @@ body[data-ds-dark-theme] .page,
   border-radius: 12px;
 }
 .layout .listPane {
-  display: none;
+  display: block;
+  position: static;
+  max-height: none;
+  padding: 16px;
+  overflow: visible;
+  background: var(--kt-card);
+  border: 1px solid var(--kt-control);
+  border-radius: 12px;
+  scrollbar-gutter: auto;
 }
 .layout[data-view="list"] .listPane,
 .layout[data-selected="true"] .listPane {
-  display: block;
-  position: absolute;
-  z-index: 3;
-  right: 16px;
-  top: 16px;
-  bottom: 100px;
-  width: min(340px, calc(100% - 32px));
-  max-height: none;
-  padding: 12px;
-  overflow: auto;
-  background: var(--kt-card);
-  border-radius: 12px;
-  box-shadow: var(--kt-shadow);
+  position: static;
 }
 .layout[data-view="list"] .mapPane {
   display: block;
+}
+.listControls,
+.mapControls .listToggle {
+  display: none;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@container (max-width: 1000px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 12px;
+  }
+}
+@container (max-width: 740px) {
+  .layout {
+    display: block;
+  }
+  .layout .listPane {
+    margin-top: 12px;
+  }
+  .layout[data-view="map"]:not([data-selected="true"]) .listPane {
+    display: none;
+  }
+  .listControls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .mapControls .listToggle {
+    display: block;
+    min-height: 44px;
+  }
 }
 .stateCaption {
   position: absolute;

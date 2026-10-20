@@ -282,8 +282,8 @@ export function LearningPage(
           </label>
           <p className={css.small}>
             {t(
-              "保存到你的学习资料。链接不会自动下载；开始对话时，材料由你当前选择的 AI 阅读。",
-              "Saved with your learning notes. Links are not downloaded automatically; your selected AI reads the material when you start a conversation.",
+              "保存文字与链接到学习资料。开始对话时，由你当前选择的 AI 阅读材料。",
+              "Save text and links with your learning notes. Your selected AI reads the material when you start a conversation.",
             )}
           </p>
           <div className={styles.toolbar}>
