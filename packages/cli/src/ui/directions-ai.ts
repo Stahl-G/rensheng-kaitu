@@ -44,7 +44,7 @@ async function generate(ws: Workspace, parent: AskService, job: DirectionGenerat
   try {
     service = parent.background();
     const ask = service;
-    const thread = ask.create();
+    const thread = await ask.create();
     const response = new Promise<string>((resolve, reject) => {
       timer = setTimeout(
         () => reject(new KaituError("生成建议超时，请重试或检查 AI 连接", "AI_TIMEOUT")),

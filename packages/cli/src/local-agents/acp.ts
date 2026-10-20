@@ -38,7 +38,7 @@ export function sessionModels(result: AcpResult) {
 export function connectAcp(
   child: ChildProcessWithoutNullStreams,
   options: {
-    full: boolean;
+    permission?: (params: Record<string, unknown>) => Promise<string | null>;
     update: (params: Record<string, unknown>) => void;
     timeout?: number;
   },
@@ -70,19 +70,25 @@ export function connectAcp(
       const frame = JSON.parse(line);
       if (frame.method && frame.id !== undefined) {
         if (frame.method === "session/request_permission") {
-          const allow =
-            options.full &&
-            frame.params?.options?.find(
-              (item: { kind: string; optionId: string }) =>
-                item.kind === "allow_once" || (item.kind === "allow" && item.optionId === "allow_once"),
-            );
-          write({
-            jsonrpc: "2.0",
-            id: frame.id,
-            result: {
-              outcome: allow ? { outcome: "selected", optionId: allow.optionId } : { outcome: "cancelled" },
-            },
-          });
+          void (options.permission?.(frame.params ?? {}) ?? Promise.resolve(null))
+            .catch(() => null)
+            .then((selected) => {
+              const offered = frame.params?.options?.find(
+                (item: { kind: string; optionId: string }) =>
+                  item.optionId === selected &&
+                  (["allow_once", "reject_once"].includes(item.kind) ||
+                    (item.kind === "allow" && item.optionId === "allow_once")),
+              );
+              write({
+                jsonrpc: "2.0",
+                id: frame.id,
+                result: {
+                  outcome: offered
+                    ? { outcome: "selected", optionId: offered.optionId }
+                    : { outcome: "cancelled" },
+                },
+              });
+            });
         } else
           write({
             jsonrpc: "2.0",

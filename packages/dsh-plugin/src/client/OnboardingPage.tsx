@@ -12,6 +12,7 @@ import { OnboardingFileImport, OnboardingSetup } from "./OnboardingSources.js";
 import type { PersonalServices } from "./PersonalPages.js";
 import v2 from "./Prototype.module.css";
 import { StorageChoice, type StorageInfo } from "./StorageChoice.js";
+import { TodayStart } from "./TodayPage.js";
 import { useLocale, useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -24,6 +25,7 @@ interface Props
   step: number;
   builtin: boolean;
   initialSource?: string;
+  initialText?: string;
   setStep: (step: number) => void;
   onStatus: (status: OnboardingStatus) => void;
   refresh: () => Promise<void>;
@@ -42,6 +44,7 @@ export function OnboardingPage(props: Props) {
   const locale = useLocale();
   const { status, step } = props;
   const { content, choices } = status;
+  const [matterText, setMatterText] = useState(props.initialText ?? "");
   const [entry, setEntry] = useState<"matter" | "memory">("matter");
   const memoryMode = step === 5 || (step === 1 && entry === "memory");
   const firstAi = content.ais.find((ai) => ai.id === choices?.memoryAi) ?? content.ais[0];
@@ -278,33 +281,28 @@ export function OnboardingPage(props: Props) {
     );
   if (step === 0)
     return (
-      <section
-        className={`${v2.welcome} ${css.welcome}`}
-        aria-label={t("欢迎来到人生开图", "Welcome to Kaitu")}
-        aria-busy={busy}
-      >
-        <span className={v2.eyebrow}>{t("欢迎来到人生开图", "Welcome to Kaitu")}</span>
-        <h1 key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
-          {content.welcome.title}
-        </h1>
-        <div className={css.how}>
-          <div>
-            <b>1 · {content.welcome.first}</b>
-          </div>
-          <div>
-            <b>{t("2 · 核对，选一个下一步", "2 · Review and pick one next step")}</b>
-          </div>
-          <div>
-            <b>{t("3 · 记下结果，换个 AI 也能接着", "3 · Log the result; any AI can pick it up")}</b>
-          </div>
-        </div>
+      <>
+        <TodayStart
+          busy={busy}
+          start={(text) => {
+            setMatterText(text);
+            setEntry("matter");
+            void run(next);
+          }}
+          memory={() => {
+            setEntry("memory");
+            move(5);
+          }}
+        />
         {error && (
           <p role="alert" className={v2.error}>
             {error}
           </p>
         )}
-        {footer(t("开始", "Start"), t("先随便看看", "Look around first"))}
-      </section>
+        <button type="button" className={v2.link} disabled={busy} onClick={() => void run(skipStep)}>
+          {t("先随便看看", "Look around first")}
+        </button>
+      </>
     );
   return (
     <section className={`${css.flow} ${v2.card}`} aria-label={t("开始使用", "Get started")} aria-busy={busy}>
@@ -341,6 +339,7 @@ export function OnboardingPage(props: Props) {
             {...props}
             onBusy={setBusy}
             initial={status.draft}
+            initialText={matterText}
             content={content.matter}
             onDone={async () => {
               await save({ seen: true });

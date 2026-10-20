@@ -18,6 +18,7 @@ export type AskEventType =
   | "tool/call"
   | "tool/result"
   | "approval/asked"
+  | "approval/resolved"
   | "session.status";
 export interface AskEvent {
   id: number;
@@ -25,6 +26,9 @@ export interface AskEvent {
   data: Record<string, unknown>;
 }
 export type AskMode = "scoped" | "full";
+export function effectiveAskMode(settings: { fullOnly?: boolean }, connection = "local-ask"): AskMode {
+  return settings.fullOnly && connection === "local-ask" ? "full" : "scoped";
+}
 export interface AskThread {
   mode?: AskMode;
   backend?: string;
@@ -52,7 +56,7 @@ export interface AskService {
   support?(method: string, input: Record<string, unknown>): Promise<unknown>;
   background(connection?: AgentConnectionId): AskService;
   list(): AskThread[];
-  create(): AskThread;
+  create(): Promise<AskThread>;
   organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
   remove(id: string): void;
   events(id: string): AskEvent[];
@@ -67,12 +71,14 @@ export interface AskService {
     backend?: string;
     supportsAttachments?: boolean;
     fullOnly?: boolean;
+    mode?: AskMode;
     provider: string;
     model: string;
   }>;
   configure(input: Record<string, unknown>): Promise<unknown>;
   models(input: Record<string, unknown>): Promise<{ id: string; name?: string; image?: boolean }[]>;
   cancel(id: string): Promise<unknown>;
+  permission(id: string, requestId: string, optionId: string | null): Promise<unknown>;
   setMode(id: string, mode: AskMode, confirmed: boolean): Promise<AskMode>;
   prepareRelocation(workspace?: string): Promise<void>;
   relocate(workspace: string): void;
@@ -102,6 +108,7 @@ const visible = new Set<AskEventType>([
   "tool/call",
   "tool/result",
   "approval/asked",
+  "approval/resolved",
 ]);
 
 export function createAskService(options: {
@@ -172,6 +179,17 @@ export function createAskService(options: {
           .filter(Boolean)
           .map((line) => JSON.parse(line))
       : [];
+  };
+  const discardEmptyThread = (id: string) => {
+    if (busy.has(id) || events(id).some((event) => event.type !== "session.status")) return;
+    threads.splice(
+      threads.findIndex((row) => row.id === id),
+      1,
+    );
+    saveIndex();
+    listeners.delete(id);
+    if (options.transient) temporaryEvents.delete(id);
+    else rmSync(join(directory, `${id}.jsonl`), { force: true });
   };
   const append = (id: string, type: AskEventType, data: Record<string, unknown>) => {
     const row = thread(id);
@@ -333,8 +351,14 @@ export function createAskService(options: {
       if (options.transient) temporaryEvents.delete(id);
       else rmSync(join(directory, `${id}.jsonl`), { force: true });
     },
-    create() {
+    async create() {
       ready();
+      const settings = await options.settings();
+      ready();
+      if (!settings.configured) throw new KaituError("请先连接 AI，再开始对话", "AI_CONNECTION");
+      const mode = effectiveAskMode(settings, options.connection);
+      if (settings.fullOnly && mode !== "full")
+        throw new KaituError("当前入口只支持开图资料权限，请使用支持该范围的 AI", "AI_CONNECTION");
       // 不做空对话复用：资讯/引导等会 create()，复用会占到用户侧栏里的空「新对话」。
       // 避免堆积靠前端 pendingMode，以及发送后再 refreshThreads。
       const now = new Date().toISOString();
@@ -343,7 +367,7 @@ export function createAskService(options: {
         title: "新对话",
         created: now,
         updated: now,
-        mode: "scoped",
+        mode,
         workspace: options.workspace,
       };
       threads.push(row);
@@ -371,15 +395,24 @@ export function createAskService(options: {
       if (epoch !== generation) throw new KaituError("AI 连接已改变，请重新发送", "AI_CONNECTION");
       const backend = connection.backend ?? "dsh";
       const previousBackend = row.backend ?? (events(id).length ? "dsh" : undefined);
-      const mode = row.mode ?? "scoped";
+      const mode = effectiveAskMode(connection, options.connection);
+      if (!connection.configured) {
+        discardEmptyThread(id);
+        throw new KaituError("请先连接 AI，再发送消息", "AI_CONNECTION");
+      }
       if (connection.fullOnly && mode !== "full")
-        throw new KaituError("本机 Agent 需要完整权限，请在对话权限中开启", "AI_CONNECTION");
+        throw new KaituError(
+          "此资料连接不支持本机 Agent 完整能力；请用普通模型或在本机问问继续",
+          "AI_CONNECTION",
+        );
       if (images.length && connection.supportsAttachments === false)
         throw new KaituError("本机 Agent 只接收文字", "AI_ATTACHMENT");
       if (busy.size && runtimeMode !== mode)
         throw new KaituError("请等当前回复完成后切换模式", "AI_CONNECTION");
-      if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000)
+      if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000) {
+        discardEmptyThread(id);
         throw new KaituError("请输入有效消息（最多十万字）", "AI_CONNECTION");
+      }
       if (busy.has(id)) throw new KaituError("请等这次回复完成", "AI_CONNECTION");
       if (
         !Array.isArray(images) ||
@@ -411,6 +444,7 @@ export function createAskService(options: {
         history = transcript(all.slice(nextSeen[backend] ?? 0));
       }
       busy.add(id);
+      row.mode = mode;
       append(id, "session.status", { status: "running" });
       try {
         const client = await start(mode);
@@ -437,11 +471,19 @@ export function createAskService(options: {
         echoes.delete(id);
         if (error instanceof KaituError) {
           append(id, "session.status", { status: "idle", error: error.message });
+          discardEmptyThread(id);
           throw error;
         }
         append(id, "session.status", { status: "idle", error: "消息未发送，请检查 AI 连接后重试" });
+        discardEmptyThread(id);
         throw new KaituError("消息未发送，请检查 AI 连接后重试", "AI_CONNECTION");
       }
+    },
+    async permission(id, requestId, optionId) {
+      ready();
+      thread(id);
+      if (!runtime || !busy.has(id)) throw new KaituError("操作审批已处理或过期", "CONFLICT");
+      return runtime.request("session/permission", { sessionId: id, requestId, optionId });
     },
     async cancel(id) {
       ready();
@@ -450,12 +492,14 @@ export function createAskService(options: {
       if (!client || !busy.has(id)) return {};
       return client.request("session/cancel", { sessionId: id });
     },
-    async setMode(id, mode, confirmed) {
+    async setMode(id, mode, _confirmed) {
       ready();
       const row = thread(id);
       if (mode !== "scoped" && mode !== "full") throw new KaituError("无效模式", "AI_CONNECTION");
-      if (mode === "full" && confirmed !== true)
-        throw new KaituError("开启完整 Agent 需要确认", "AI_CONNECTION");
+      const selected = effectiveAskMode(await options.settings(), options.connection);
+      ready();
+      if (mode !== selected)
+        throw new KaituError("对话能力由所选 AI 连接决定，请切换 AI 连接", "AI_CONNECTION");
       if (busy.size) throw new KaituError("请等回复完成后切换模式", "AI_CONNECTION");
       changing = true;
       try {
@@ -497,7 +541,10 @@ export function createAskService(options: {
       options.workspace = workspace;
       relocating = false;
     },
-    settings: options.settings,
+    settings: async () => {
+      const settings = await options.settings();
+      return { ...settings, mode: effectiveAskMode(settings, options.connection) };
+    },
     support: options.support,
     models: options.models,
     async configure(input) {

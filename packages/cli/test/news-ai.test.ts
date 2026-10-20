@@ -37,7 +37,7 @@ it("已连接模型的关注草稿可编辑确认，生成不会改当前方案�
     }),
   });
   try {
-    const current = ask.create();
+    const current = await ask.create();
     const before = ws.readText("feed/feeds.json");
     const result = await productRequest(ws, "suggestNewsKeywords", [], ask);
     expect(result).toEqual(proposed);
