@@ -12,6 +12,7 @@ import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Experience } from "../types.js";
 import css from "./MapPage.module.css";
+import { createMeMarker, tailRotation } from "./footprint-me-marker.js";
 import { type FootprintState, type Place, coordinate, footprintData } from "./footprint-state.js";
 import { useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
@@ -25,6 +26,8 @@ const animate = () => (window.matchMedia("(prefers-reduced-motion: reduce)").mat
 type City = { id: string; place: Place; experiences: Experience[] };
 export function PaperMap({
   cities,
+  cityNames = {},
+  previous,
   selected,
   onSelect,
   onShowList,
@@ -36,6 +39,8 @@ export function PaperMap({
   onAdd,
 }: {
   cities: City[];
+  cityNames?: Record<string, string>;
+  previous?: Place;
   selected: string | null;
   onSelect: (id: string | null) => void;
   onShowList: () => void;
@@ -66,15 +71,37 @@ export function PaperMap({
       ),
     [cities, asOf, current],
   );
-  const latest = useRef({ mode, data, cities, onSelect, selected, showRoutes, showAllPlaces });
-  latest.current = { mode, data, cities, onSelect, selected, showRoutes, showAllPlaces };
+  const latest = useRef({
+    mode,
+    data,
+    cities,
+    cityNames,
+    previous,
+    t,
+    onSelect,
+    selected,
+    showRoutes,
+    showAllPlaces,
+  });
+  latest.current = {
+    mode,
+    data,
+    cities,
+    cityNames,
+    previous,
+    t,
+    onSelect,
+    selected,
+    showRoutes,
+    showAllPlaces,
+  };
   const camera = useCallback((snapshot: Pick<typeof latest.current, "mode" | "data"> = latest.current) => {
     const m = map.current;
     const { mode, data } = snapshot;
     if (!m) return;
     m.stop();
     if (mode === "now" && coordinate(data.me))
-      m.flyTo({ center: [data.me.lng, data.me.lat], zoom: 10, duration: animate() });
+      m.flyTo({ center: [data.me.lng, data.me.lat], zoom: 8, duration: animate() });
     else if (mode === "history" && data.history.length) {
       const bounds = new LngLatBounds();
       const anchor = data.history[0]?.lng ?? 0;
@@ -94,7 +121,19 @@ export function PaperMap({
             bounds.extend([lng, point[1] as number]);
           }
         }
-      m.fitBounds(bounds, { padding: 100, maxZoom: 5, duration: animate() });
+      const width = m.getContainer().clientWidth;
+      const height = m.getContainer().clientHeight;
+      const base = Math.min(100, width * 0.12, height * 0.15);
+      m.fitBounds(bounds, {
+        padding: {
+          top: base + Math.min(70, height * 0.12),
+          right: base,
+          bottom: base + Math.min(80, height * 0.14),
+          left: base + Math.min(80, width * 0.12),
+        },
+        maxZoom: 5,
+        duration: animate(),
+      });
     } else m.flyTo({ center: [20, 20], zoom: 1.5, duration: animate() });
   }, []);
   const update = useCallback(
@@ -102,10 +141,19 @@ export function PaperMap({
       m: LibreMap,
       snapshot: Pick<
         typeof latest.current,
-        "mode" | "data" | "cities" | "showRoutes" | "selected" | "showAllPlaces"
+        | "mode"
+        | "data"
+        | "cities"
+        | "cityNames"
+        | "previous"
+        | "t"
+        | "showRoutes"
+        | "selected"
+        | "showAllPlaces"
       > = latest.current,
     ) => {
-      const { mode, data, cities, showRoutes, selected, showAllPlaces } = snapshot;
+      const { mode, data, cities, cityNames, previous, t, showRoutes, selected, showAllPlaces } = snapshot;
+      const nameOf = (place: Place) => t(cityNames[String(place.geonameid)] ?? place.name, place.name);
       if (!m.getSource("footprint-cities")) return;
       const places = showAllPlaces
         ? data.all
@@ -129,7 +177,7 @@ export function PaperMap({
           type: "Feature",
           properties: {
             id: cityKey(p),
-            name: p.name,
+            name: nameOf(p),
             years: [...(yearsByCity.get(cityKey(p)) ?? [])].sort().join(" · "),
             lived: data.lived.some((l) => cityKey(l) === cityKey(p)),
           },
@@ -152,18 +200,28 @@ export function PaperMap({
       if (coordinate(data.me)) meMarker.current?.setLngLat([data.me.lng, data.me.lat]).addTo(m);
       else meMarker.current?.remove();
       const meLabel = meMarker.current?.getElement().querySelector("span");
-      if (meLabel) meLabel.textContent = data.me ? `我 · ${data.me.name}` : "";
+      if (meLabel)
+        meLabel.textContent = data.me ? t(`我 · ${nameOf(data.me)}`, `Me · ${nameOf(data.me)}`) : "";
       originLabel.current?.remove();
       const origin = data.origin;
       if (mode === "history" && coordinate(origin) && cityKey(origin) !== (data.me && cityKey(data.me))) {
         const label = document.createElement("span");
         label.className = css.cityLabel ?? "";
-        label.textContent = `起点 · ${origin.name}`;
+        label.textContent = t(`起点 · ${nameOf(origin)}`, `Start · ${nameOf(origin)}`);
         originLabel.current = new Marker({ element: label, anchor: "bottom-left", offset: [10, -10] })
           .setLngLat([origin.lng, origin.lat])
           .addTo(m);
       }
-      meMarker.current?.getElement().setAttribute("data-breathe", String(mode === "now"));
+      const marker = meMarker.current?.getElement();
+      marker?.setAttribute("data-breathe", String(mode === "now"));
+      marker?.setAttribute("data-mode", mode);
+      marker?.setAttribute(
+        "aria-label",
+        data.me ? t(`我 · ${nameOf(data.me)}`, `Me · ${nameOf(data.me)}`) : t("我", "Me"),
+      );
+      const direction = marker?.querySelector("[data-me-direction]");
+      direction?.setAttribute("transform", `rotate(${tailRotation(data.me, previous, m.getBearing())})`);
+      if (marker) marker.dataset.mapBearing = String(m.getBearing());
     },
     [],
   );
@@ -181,11 +239,12 @@ export function PaperMap({
     let styleGeneration = 0;
     let remoteLoading = false;
     let remoteLoaded = false;
+    let attributionInitialized = false;
     let m: LibreMap | undefined;
     let remoteStyle: StyleSpecification | undefined;
     const controller = new AbortController();
     const details = async () => {
-      if (!m || m.getZoom() < 6 || remoteLoaded || remoteLoading || !m.isStyleLoaded()) return;
+      if (!m || m.getZoom() < 5 || remoteLoaded || remoteLoading || !m.isStyleLoaded()) return;
       if (!navigator.onLine) {
         setDetailStatus(navigator.onLine ? "unavailable" : "offline");
         return;
@@ -200,50 +259,46 @@ export function PaperMap({
           if (!response.ok) throw new Error("Map style unavailable");
           remoteStyle = (await response.json()) as StyleSpecification;
         }
-        if (disposed || generation !== styleGeneration || !m.isStyleLoaded() || m.getZoom() < 6) return;
-        for (const [id, source] of Object.entries(remoteStyle.sources)) {
-          if (source.type === "vector" && !m.getSource(id)) m.addSource(id, { ...source, minzoom: 6 });
-        }
-        for (const layer of remoteStyle.layers) {
-          const sourceLayer = "source-layer" in layer ? layer["source-layer"] : "";
-          if (
-            !sourceLayer ||
-            !["water", "waterway", "boundary", "landcover"].includes(sourceLayer) ||
-            !["line", "fill"].includes(layer.type)
-          )
-            continue;
-          const color =
-            sourceLayer === "water"
-              ? isDark()
-                ? "#1c293c"
-                : "#27495e"
-              : sourceLayer === "landcover"
-                ? isDark()
-                  ? "#554d43"
-                  : "#e6dcc5"
-                : isDark()
-                  ? "#728185"
-                  : "#aaa58e";
-          const next = {
-            ...layer,
-            id: `detail-${layer.id}`,
-            minzoom: Math.max(6, layer.minzoom ?? 0),
-            paint: {
-              ...layer.paint,
-              [`${layer.type}-color`]:
-                getComputedStyle(el)
-                  .getPropertyValue(
-                    sourceLayer === "water"
-                      ? "--atlas-water"
-                      : sourceLayer === "landcover"
-                        ? "--atlas-land"
-                        : "--atlas-border",
-                  )
-                  .trim() || color,
+        if (disposed || generation !== styleGeneration || !m.isStyleLoaded() || m.getZoom() < 5) return;
+        const vector = Object.entries(remoteStyle.sources).find(([, source]) => source.type === "vector");
+        if (!vector || vector[1].type !== "vector") throw new Error("Vector map unavailable");
+        const [id, source] = vector;
+        if (!m.getSource(id)) m.addSource(id, { ...source, minzoom: 5 });
+        const water = isDark() ? "#1c293c" : "#27495e";
+        if (!m.getLayer("detail-water"))
+          m.addLayer(
+            {
+              id: "detail-water",
+              type: "fill",
+              source: id,
+              "source-layer": "water",
+              minzoom: 5,
+              filter: ["!=", ["get", "brunnel"], "tunnel"],
+              paint: {
+                "fill-color": water,
+                "fill-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0, 7, 1],
+              },
             },
-          };
-          if (!m.getLayer(next.id)) m.addLayer(next as typeof layer, "footprint-history");
-        }
+            "footprint-history",
+          );
+        if (!m.getLayer("detail-river"))
+          m.addLayer(
+            {
+              id: "detail-river",
+              type: "line",
+              source: id,
+              "source-layer": "waterway",
+              minzoom: 6,
+              filter: ["all", ["==", ["get", "class"], "river"], ["!=", ["get", "brunnel"], "tunnel"]],
+              layout: { "line-cap": "round", "line-join": "round" },
+              paint: {
+                "line-color": water,
+                "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 8, 0.7, 12, 1.2],
+                "line-opacity": 0.9,
+              },
+            },
+            "footprint-history",
+          );
         if (!m.getSource("paper-terrain"))
           m.addSource("paper-terrain", {
             type: "raster-dem",
@@ -264,10 +319,10 @@ export function PaperMap({
               paint: {
                 "hillshade-shadow-color": isDark() ? "#121c22" : "#817761",
                 "hillshade-highlight-color": isDark() ? "#a9aaa0" : "#fff8e8",
-                "hillshade-exaggeration": isDark() ? 0.12 : 0.3,
+                "hillshade-exaggeration": isDark() ? 0.12 : 0.18,
               },
             },
-            "footprint-history",
+            "detail-water",
           );
         remoteLoaded = true;
         setDetailStatus(null);
@@ -292,7 +347,10 @@ export function PaperMap({
         center: [20, 20],
         zoom: 1.5,
         maxZoom: 12,
-        attributionControl: { compact: true },
+        attributionControl: {
+          compact: true,
+          customAttribution: '<a href="https://www.naturalearthdata.com/">Natural Earth</a>',
+        },
         cooperativeGestures: false,
       });
       map.current = m;
@@ -326,7 +384,7 @@ export function PaperMap({
           type: "circle",
           source: "footprint-cities",
           paint: {
-            "circle-radius": ["case", ["get", "lived"], 5, 3.5],
+            "circle-radius": ["case", ["get", "lived"], 2.5, 1.5],
             "circle-color": "rgba(255,255,255,0)",
             "circle-stroke-color": isDark() ? "#fff" : "#263f64",
             "circle-stroke-width": 1.5,
@@ -344,22 +402,40 @@ export function PaperMap({
             "circle-stroke-width": 1,
           },
         });
-        // Existing neutral dot remains until the user chooses a marker design.
+        // One persistent A marker; positioning is owned by MapLibre, rotation and glow by its children.
         if (!meMarker.current) {
-          const marker = document.createElement("div");
-          marker.className = css.meMarker ?? "";
-          const label = document.createElement("span");
-          label.className = css.cityLabel ?? "";
-          marker.append(label);
-          marker.setAttribute("role", "img");
-          marker.setAttribute("aria-label", "我 / Me");
+          const marker = createMeMarker(
+            css.meMarker ?? "",
+            css.meIcon ?? "",
+            css.meGlow ?? "",
+            css.cityLabel ?? "",
+          );
           meMarker.current = new Marker({ element: marker });
         }
         update(instance);
         setReady(true);
         void details();
       });
+      m.on("rotate", () => {
+        const marker = meMarker.current?.getElement();
+        marker
+          ?.querySelector("[data-me-direction]")
+          ?.setAttribute(
+            "transform",
+            `rotate(${tailRotation(latest.current.data.me, latest.current.previous, instance.getBearing())})`,
+          );
+        if (marker) marker.dataset.mapBearing = String(instance.getBearing());
+      });
       m.on("idle", () => {
+        if (!attributionInitialized) {
+          const attribution = el.querySelector(
+            ".maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-attrib-empty)",
+          );
+          if (attribution) {
+            attribution.classList.remove("maplibregl-compact-show");
+            attributionInitialized = true;
+          }
+        }
         setCityZoom(instance.getZoom() >= 6);
         void details();
       });
@@ -450,8 +526,18 @@ export function PaperMap({
   }, [cameraKey, ready, camera]);
   useEffect(() => {
     if (map.current && ready)
-      update(map.current, { mode, data, cities, selected, showRoutes, showAllPlaces });
-  }, [mode, data, cities, selected, showRoutes, showAllPlaces, ready, update]);
+      update(map.current, {
+        mode,
+        data,
+        cities,
+        cityNames,
+        previous,
+        t,
+        selected,
+        showRoutes,
+        showAllPlaces,
+      });
+  }, [mode, data, cities, cityNames, previous, t, selected, showRoutes, showAllPlaces, ready, update]);
   const empty =
     mode === "now" ? !data.me : mode === "history" ? !data.history.length : !data.possible.length || !data.me;
   return (
@@ -474,7 +560,7 @@ export function PaperMap({
         {showAllPlaces && <p>{t("已叠加全部城市", "All city records overlaid")}</p>}
         {mode === "now" && data.me && (
           <p>
-            {data.me.name} ·{" "}
+            {t(cityNames[String(data.me.geonameid)] ?? data.me.name, data.me.name)} ·{" "}
             {t(
               currentFromProfile ? "来自档案现居城市" : "最近的居住记录，不代表实时位置",
               currentFromProfile
@@ -579,9 +665,11 @@ export function PaperMap({
         </button>
       </fieldset>
       <span className={css.routeKey}>
-        {mode === "possible"
-          ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
-          : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines show experience order")}
+        {mode === "now"
+          ? t("城市级位置 · 现居记录，不是实时定位", "City-level record · Not live location")
+          : mode === "possible"
+            ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
+            : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines show experience order")}
       </span>
     </section>
   );

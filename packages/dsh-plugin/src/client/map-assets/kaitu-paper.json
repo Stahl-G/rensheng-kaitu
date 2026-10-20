@@ -20,11 +20,20 @@
       }
     },
     {
+      "id": "paper-regional-land",
+      "type": "background",
+      "minzoom": 5,
+      "paint": {
+        "background-color": "#e6dcc5"
+      }
+    },
+    {
       "id": "paper-relief",
       "type": "raster",
       "source": "paper-earth",
       "paint": {
-        "raster-fade-duration": 0
+        "raster-fade-duration": 0,
+        "raster-opacity": ["interpolate", ["linear"], ["zoom"], 5, 1, 7, 0]
       }
     }
   ]

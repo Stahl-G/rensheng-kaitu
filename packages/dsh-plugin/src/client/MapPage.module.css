@@ -803,30 +803,55 @@ body[data-ds-dark-theme] .page,
   position: absolute;
   left: 14px;
   bottom: 12px;
-  color: #fff;
+  color: #263f64;
+  background: #f4eddfeb;
+  padding: 4px 7px;
+  border-radius: 5px;
   font-size: 11px;
-  text-shadow: 0 1px 3px #102536;
 }
 .meMarker {
-  width: 18px;
-  height: 18px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: #2b4c7e;
-  box-shadow: 0 0 0 5px #b8cbe435, 0 1px 6px #102536;
+  width: 0;
+  height: 0;
+  color: #2b4c7e;
 }
-.meMarker[data-breathe="true"] {
-  animation: footprint-breathe 3s ease-in-out infinite;
+.meIcon {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  width: 64px;
+  height: 64px;
+  transform-origin: center;
+}
+.meMarker:not([data-mode="now"]) .meIcon {
+  transform: scale(0.85);
+}
+.meGlow {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.15;
+  filter: blur(2px);
+}
+.meMarker[data-breathe="true"] .meGlow {
+  animation: footprint-breathe 2.4s ease-in-out infinite;
 }
 @keyframes footprint-breathe {
   50% {
-    box-shadow: 0 0 0 9px #b8cbe415, 0 1px 6px #102536;
+    transform: scale(1.15);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .meMarker[data-breathe="true"] {
+  .meMarker[data-breathe="true"] .meGlow {
     animation: none;
   }
+}
+[data-theme="dark"] .meMarker,
+body[data-ds-dark-theme] .meMarker {
+  color: #f4eddf;
 }
 .currentEditor {
   position: absolute;
@@ -880,8 +905,8 @@ body[data-ds-dark-theme] .page,
 }
 .meMarker .cityLabel {
   position: absolute;
-  left: 24px;
-  top: -6px;
+  left: 14px;
+  top: -11px;
 }
 .cityPopup {
   color: #263f64;
@@ -895,5 +920,11 @@ body[data-ds-dark-theme] .stateCaption {
 [data-theme="dark"] .cityLabel,
 body[data-ds-dark-theme] .cityLabel {
   color: #f6efdf;
+  background: #241f1bed;
+}
+
+[data-theme="dark"] .routeKey,
+body[data-ds-dark-theme] .routeKey {
+  color: #f4eddf;
   background: #241f1bed;
 }

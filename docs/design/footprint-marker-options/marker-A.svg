@@ -1,1 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-36 -32 72 64" role="img" aria-label="路线尾迹" style="color:#2B4C7E;--paper:#f2eadf"><path d="M-30 17C-23 8-16 6-11 10S-3 13 0 0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle r="6" fill="currentColor" stroke="var(--paper,#fff)" stroke-width="2"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="-32 -32 64 64" style="color:var(--kaitu-me-color,#2b4c7e)" role="img" aria-label="开图 A 路线尾迹">
+<defs><linearGradient id="kaitu-production-tail" gradientUnits="userSpaceOnUse" x1="30.67" y1="29.5" x2="39.5" y2="16"><stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor" stop-opacity=".9"/></linearGradient></defs>
+<g transform="rotate(11.812341322343599)"><g transform="scale(1.1) translate(-39.5 -16)"><path d="M30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="url(#kaitu-production-tail)" stroke-width="1.8181818181818181" stroke-linecap="round"/></g></g><circle r="6.25" fill="none" stroke="currentColor" stroke-width="1.5"/><circle r="4" fill="currentColor"/>
+</svg>

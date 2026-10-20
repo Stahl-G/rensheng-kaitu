@@ -8,7 +8,9 @@ it("现居和家乡独立保存，保留其他档案，歧义和冲突不猜测"
   try {
     ws.writeText("me/profile.md", "# Profile\n家乡：成都\n职业：设计\n现居城市：Shanghai\n");
     expect(readCurrentCity(ws)?.name).toBe("Shanghai");
-    const { resolvePlace } = await import("../src/places.js");
+    const { resolvePlace, lifeMap } = await import("../src/places.js");
+    expect(lifeMap(ws).cityNames?.["1796236"]).toBe("上海");
+    expect(readCurrentCity(ws)?.name).toBe("Shanghai");
     const city = resolvePlace("Beijing").find((c) => c.country === "CN");
     expect(city).toBeDefined();
     await saveCurrentCity(ws, "Beijing", city?.geonameid as number);

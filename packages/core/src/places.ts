@@ -79,9 +79,12 @@ export interface LifeMapData {
   hometown?: Hometown;
   /** Resolved explicit current-city profile text; no live location. */
   currentPlace?: Experience["place"];
+  /** Chinese labels for referenced city IDs only; no raw record renaming. */
+  cityNames?: Record<string, string>;
 }
 
 let cities: City[] | undefined;
+let citiesById: Map<number, City> | undefined;
 function cityTable(): City[] {
   if (!cities) {
     const data = JSON.parse(readFileSync(new URL("../data/cities.json", import.meta.url), "utf8")) as {
@@ -100,6 +103,18 @@ function cityTable(): City[] {
     }));
   }
   return cities;
+}
+
+function chineseCityNames(places: Experience["place"][]) {
+  if (!places.some((place) => place.geonameid !== undefined)) return {};
+  if (!citiesById) citiesById = new Map(cityTable().map((city) => [city.geonameid, city]));
+  const labels: Record<string, string> = {};
+  for (const place of places) {
+    if (place.geonameid === undefined) continue;
+    const name = citiesById.get(place.geonameid)?.zh[0];
+    if (name) labels[String(place.geonameid)] = name;
+  }
+  return labels;
 }
 
 export function resolvePlace(name: string, country?: string): City[] {
@@ -345,11 +360,13 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
     }
     feature.properties.experiences.push(item);
   }
+  const currentPlace = readCurrentCity(ws);
   return {
     type: "FeatureCollection",
     asOf,
     hometown: readHometown(ws),
-    currentPlace: readCurrentCity(ws),
+    currentPlace,
+    cityNames: chineseCityNames([...rows.map((row) => row.place), ...(currentPlace ? [currentPlace] : [])]),
     features: [...groups.values()],
     review: rows.filter((item) => item.review || !experienceLayer(item, asOf)),
     undated: rows.filter((item) => !experienceInterval(item)).length,

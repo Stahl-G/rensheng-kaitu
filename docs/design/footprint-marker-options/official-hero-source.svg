@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="开图标志：一张正在展开的三折地图">
+      <defs>
+        <clipPath id="hm-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
+        <clipPath id="hm-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
+      </defs>
+      <g class="hm-fold hm-f0"><path class="hm-face" d="M4 10L17.33 6L17.33 38L4 42Z"/></g>
+      <g class="hm-fold hm-f1"><path class="hm-face" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="hm-shade" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></g>
+      <g class="hm-fold hm-f2"><path class="hm-face" d="M30.67 10L44 6L44 38L30.67 42Z"/><path class="hm-shade" d="M30.67 10L44 6L44 38L30.67 42Z"/></g>
+      <g clip-path="url(#hm-folded)"><path class="hm-route hm-route-folded" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
+      <g clip-path="url(#hm-open)"><path class="hm-route hm-route-open" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
+      <circle class="hm-ring" cx="39.5" cy="16" r="2.2"/>
+    </svg>

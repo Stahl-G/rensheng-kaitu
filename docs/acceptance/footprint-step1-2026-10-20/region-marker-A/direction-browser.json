@@ -1,0 +1,72 @@
+[
+  {
+    "name": "north",
+    "label": "我 · 上海",
+    "vector": {
+      "x": -7.194659062127016,
+      "y": -16.220411943868044
+    },
+    "rotation": "rotate(-237.1076265641865)",
+    "head": 8,
+    "records": [
+      {
+        "place": {
+          "name": "Beijing",
+          "geonameid": 1816670,
+          "country": "CN",
+          "lat": 39.9075,
+          "lng": 116.3972,
+          "precision": "city"
+        },
+        "start": "2000-01-01",
+        "end": "2009-12-31"
+      },
+      {
+        "place": {
+          "name": "Shanghai",
+          "geonameid": 1796236,
+          "country": "CN",
+          "lat": 31.2222,
+          "lng": 121.4581,
+          "precision": "city"
+        },
+        "start": "2010-01-01"
+      }
+    ]
+  },
+  {
+    "name": "south",
+    "label": "我 · 上海",
+    "vector": {
+      "x": -9.534285439353539,
+      "y": 14.96536948457856
+    },
+    "rotation": "rotate(-360.6868585416894)",
+    "head": 8,
+    "records": [
+      {
+        "place": {
+          "name": "Singapore",
+          "geonameid": 1880252,
+          "country": "SG",
+          "lat": 1.2897,
+          "lng": 103.8501,
+          "precision": "city"
+        },
+        "start": "2000-01-01",
+        "end": "2009-12-31"
+      },
+      {
+        "place": {
+          "name": "Shanghai",
+          "geonameid": 1796236,
+          "country": "CN",
+          "lat": 31.2222,
+          "lng": 121.4581,
+          "precision": "city"
+        },
+        "start": "2010-01-01"
+      }
+    ]
+  }
+]

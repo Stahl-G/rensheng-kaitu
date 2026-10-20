@@ -156,9 +156,26 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
     : timed.length === 1
       ? timed[0]?.e.place
       : undefined;
+  const lastRoute = historyRoutes.at(-1);
+  const lastPoint = lastRoute?.geometry.coordinates.at(-1);
+  const previousPoint = lastRoute?.geometry.coordinates[0];
+  const previous =
+    me &&
+    cityKey(timed.at(-1)?.e.place ?? me) === cityKey(me) &&
+    lastPoint &&
+    previousPoint &&
+    Math.abs((me.lng ?? 0) - (lastPoint[0] ?? 0)) < 1e-6 &&
+    Math.abs((me.lat ?? 0) - (lastPoint[1] ?? 0)) < 1e-6
+      ? timed.find(
+          ({ e }) =>
+            Math.abs((e.place.lng ?? 0) - (previousPoint[0] ?? 0)) < 1e-6 &&
+            Math.abs((e.place.lat ?? 0) - (previousPoint[1] ?? 0)) < 1e-6,
+        )?.e.place
+      : undefined;
   return {
     me,
     origin,
+    previous,
     all: points([...actual, ...possible]),
     lived: points(lived),
     history: points(timed.map((v) => v.e)),

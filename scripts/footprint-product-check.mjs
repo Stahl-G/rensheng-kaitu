@@ -249,7 +249,7 @@ if (tag === "sample") {
   await pause(1000);
   await click("重置筛选");
 }
-if (tag === "large" || tag === "design-large") {
+if (tag.endsWith("large")) {
   result.switches = [];
   for (const label of ["来路", "可能", "此刻"]) {
     const began = performance.now();

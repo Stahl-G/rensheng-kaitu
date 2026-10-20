@@ -12,7 +12,7 @@ import { HometownEditor } from "./HometownEditor.js";
 import css from "./MapPage.module.css";
 import { PaperMap } from "./PaperMap.js";
 import { SourceEvidence } from "./SourceEvidence.js";
-import { footprintAnchor } from "./footprint-state.js";
+import { footprintAnchor, footprintData } from "./footprint-state.js";
 import { useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 
@@ -295,6 +295,11 @@ export function MapPage({
     [data],
   );
   const home = data?.hometown?.status === "ready" ? data.hometown.place : undefined;
+  const previousPlace = useMemo(
+    () => (data ? footprintData(data.experiences, data.asOf, anchor ?? null).previous : undefined),
+    [data, anchor],
+  );
+
   const homeId = home ? cityId(home) : null;
   const timeline = cities
     .flatMap((city) => city.experiences.map((item) => ({ city, item })))
@@ -698,6 +703,8 @@ export function MapPage({
           <div className={css.layout} data-view={view} data-selected={!!city}>
             <PaperMap
               cities={cities}
+              cityNames={data.cityNames}
+              previous={previousPlace}
               selected={city?.id ?? null}
               onSelect={setSelected}
               onShowList={showMapList}
