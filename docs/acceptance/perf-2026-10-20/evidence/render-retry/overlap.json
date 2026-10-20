@@ -1,0 +1,503 @@
+{
+  "at": "2026-10-19T20:04:38.852Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "base": "/tmp/kaitu-v2-overlap-hPEdJg",
+  "head": "ea35cea7221358053d702441124e7b44557315e4",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex ad95432..ea5b124 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -248,18 +248,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     const own = [...new Set(messages)];\n     messages = [];\n     let pending = true;\n-    const version = await snapshotNow(ws, (files) => {\n-      // 外部收件箱仍等处理；用户显式保存的原文不能因只剩 inbox 文件而丢掉版本请求。\n-      pending = files.length > 0 || own.length > 0;\n-      if (!pending) return null;\n-      return own.length\n-        ? own.join(\"；\")\n-        : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n-            .slice(0, 3)\n-            .map((file) => file.split(\"/\").at(-1))\n-            .join(\"、\")}等 ${files.length} 个文件`;\n-    });\n+    let version: string | null;\n+    try {\n+      version = await snapshotNow(ws, (files, hasPendingFiles) => {\n+        // 外部收件箱仍等处理；显式原文要补存，但已经在版本里的原文不应无限重试。\n+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);\n+        if (!pending) return null;\n+        return own.length\n+          ? own.join(\"；\")\n+          : `${syncStatus(ws).mode === \"drive\" ? \"云端改动\" : \"文件夹有改动\"}：${files\n+              .slice(0, 3)\n+              .map((file) => file.split(\"/\").at(-1))\n+              .join(\"、\")}等 ${files.length} 个文件`;\n+      });\n+    } catch (error) {\n+      messages.unshift(...own);\n+      throw error;\n+    }\n     if (!version && pending) {\n+      messages.unshift(...own);\n       reportError();\n       scheduleSave(snapshotDelay);\n     } else watchError = \"\";\ndiff --git a/packages/core/src/history.ts b/packages/core/src/history.ts\nindex 8a164ad..8606b7a 100644\n--- a/packages/core/src/history.ts\n+++ b/packages/core/src/history.ts\n@@ -183,12 +183,12 @@ function snapshotFile(ws: Workspace, file: string): boolean {\n   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);\n }\n \n-function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {\n+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {\n   return matrix\n     .filter(\n       ([file, head, workdir, stage]) =>\n         file !== \"OVERVIEW.md\" &&\n-        !file.startsWith(\"inbox/\") &&\n+        (includeInbox || !file.startsWith(\"inbox/\")) &&\n         !neverTrack(file) &&\n         !(head === 1 && workdir === 1 && stage === 1),\n     )\n@@ -244,7 +244,7 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())\n   return null;\n }\n \n-type SnapshotMessage = string | ((files: readonly string[]) => string | null);\n+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);\n \n function unavailableHistoryWrite(error: unknown): boolean {\n   if (error instanceof git.Errors.MultipleGitError)\n@@ -289,7 +289,8 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):\n   let description: string;\n   if (typeof message === \"function\") {\n     const files = pendingFiles(matrix);\n-    const result = message(files);\n+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。\n+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);\n     if (result === null) {\n       if (!files.length) clearInvalidated(ws, changedFiles);\n       return null;\n",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "samples": [
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "capture",
+      "at": 1792440280366.2998,
+      "ms": 30.1953125,
+      "path": "inbox/notes/2026-10-20/01m5aw89a5z1abw9fcfc00jhvf.md"
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "completeNext",
+      "at": 1792440280396.5007,
+      "ms": 25.786865234375
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "overview",
+      "at": 1792440280422.291,
+      "ms": 163.6796875
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "health",
+      "at": 1792440280585.9778,
+      "ms": 123.29345703125
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "findWorkspaceFiles",
+      "at": 1792440280709.289,
+      "ms": 132.506591796875
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "capture",
+      "at": 1792440280841.8086,
+      "ms": 3.52392578125,
+      "path": "inbox/notes/2026-10-20/01m5aw89rcsckw2qf11t28xw3r.md"
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "completeNext",
+      "at": 1792440280845.3364,
+      "ms": 23.36376953125
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "overview",
+      "at": 1792440280868.7078,
+      "ms": 145.804443359375
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "health",
+      "at": 1792440281014.5183,
+      "ms": 116.91650390625
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "findWorkspaceFiles",
+      "at": 1792440281131.4407,
+      "ms": 4.7392578125
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "capture",
+      "at": 1792440281136.2249,
+      "ms": 2.905029296875,
+      "path": "inbox/notes/2026-10-20/01m5aw8a1jdxq95zc30jtacf98.md"
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "completeNext",
+      "at": 1792440281139.133,
+      "ms": 23.11767578125
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "overview",
+      "at": 1792440281162.2542,
+      "ms": 143.418212890625
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "health",
+      "at": 1792440281305.6763,
+      "ms": 118.911865234375
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "findWorkspaceFiles",
+      "at": 1792440281424.5916,
+      "ms": 4.4189453125
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "capture",
+      "at": 1792440281429.569,
+      "ms": 2.878173828125,
+      "path": "inbox/notes/2026-10-20/01m5aw8aaqqkcc0rs0haytxytt.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "completeNext",
+      "at": 1792440281432.4534,
+      "ms": 26.04248046875
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "overview",
+      "at": 1792440281458.4995,
+      "ms": 151.815185546875
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "health",
+      "at": 1792440281610.3208,
+      "ms": 116.852294921875
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "findWorkspaceFiles",
+      "at": 1792440281727.1765,
+      "ms": 3.96435546875
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "capture",
+      "at": 1792440281731.1458,
+      "ms": 2.65185546875,
+      "path": "inbox/notes/2026-10-20/01m5aw8am4kq97kp256e404mwe.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "completeNext",
+      "at": 1792440281733.8018,
+      "ms": 23.607177734375
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "overview",
+      "at": 1792440281757.413,
+      "ms": 139.453369140625
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "health",
+      "at": 1792440281896.8713,
+      "ms": 113.04296875
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "findWorkspaceFiles",
+      "at": 1792440282009.918,
+      "ms": 2.972412109375
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "capture",
+      "at": 1792440282012.896,
+      "ms": 2.535400390625,
+      "path": "inbox/notes/2026-10-20/01m5aw8awyx1efpcv4predrpms.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "completeNext",
+      "at": 1792440282015.434,
+      "ms": 21.24072265625
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "overview",
+      "at": 1792440282036.678,
+      "ms": 141.18310546875
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "health",
+      "at": 1792440282177.865,
+      "ms": 113.2587890625
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "findWorkspaceFiles",
+      "at": 1792440282291.1277,
+      "ms": 3.754638671875
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "capture",
+      "at": 1792440282294.8884,
+      "ms": 2.520263671875,
+      "path": "inbox/notes/2026-10-20/01m5aw8b5rp0ystq4pj17per3v.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "completeNext",
+      "at": 1792440282297.413,
+      "ms": 22.88427734375
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "overview",
+      "at": 1792440282320.3013,
+      "ms": 247.119384765625
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "health",
+      "at": 1792440282567.426,
+      "ms": 113.00830078125
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "findWorkspaceFiles",
+      "at": 1792440282680.438,
+      "ms": 12.671142578125
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "capture",
+      "at": 1792440282693.1162,
+      "ms": 11.30419921875,
+      "path": "inbox/notes/2026-10-20/01m5aw8bj6v5wt4k1t8nrws3pe.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "completeNext",
+      "at": 1792440282704.4224,
+      "ms": 35.87158203125
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "overview",
+      "at": 1792440282740.297,
+      "ms": 289.23193359375
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "health",
+      "at": 1792440283029.533,
+      "ms": 114.62353515625
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "findWorkspaceFiles",
+      "at": 1792440283144.1597,
+      "ms": 3.2294921875
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "capture",
+      "at": 1792440283147.3933,
+      "ms": 2.10107421875,
+      "path": "inbox/notes/2026-10-20/01m5aw8c0c8vebbzw1f6bpd5m6.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "completeNext",
+      "at": 1792440283149.4956,
+      "ms": 22.268310546875
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "overview",
+      "at": 1792440283171.7654,
+      "ms": 139.712158203125
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "health",
+      "at": 1792440283311.4814,
+      "ms": 111.146728515625
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "findWorkspaceFiles",
+      "at": 1792440283422.6316,
+      "ms": 2.786865234375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "capture",
+      "at": 1792440283425.4229,
+      "ms": 2.25537109375,
+      "path": "inbox/notes/2026-10-20/01m5aw8c93avh4ndd3waab5r9q.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "completeNext",
+      "at": 1792440283427.6814,
+      "ms": 22.08740234375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "overview",
+      "at": 1792440283449.7703,
+      "ms": 138.7685546875
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "health",
+      "at": 1792440283588.5427,
+      "ms": 110.626708984375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "findWorkspaceFiles",
+      "at": 1792440283699.173,
+      "ms": 3.4326171875
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "capture",
+      "at": 1792440283702.6104,
+      "ms": 2.23291015625,
+      "path": "inbox/notes/2026-10-20/01m5aw8chrwaa4mx4ss20df8qs.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "completeNext",
+      "at": 1792440283704.8457,
+      "ms": 20.758056640625
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "overview",
+      "at": 1792440283725.6055,
+      "ms": 138.4423828125
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "health",
+      "at": 1792440283864.0515,
+      "ms": 110.490478515625
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "findWorkspaceFiles",
+      "at": 1792440283974.5457,
+      "ms": 3.395751953125
+    }
+  ],
+  "timeline": [
+    {
+      "event": "save-start",
+      "at": 1792440282526.2375
+    },
+    {
+      "event": "ref-written",
+      "at": 1792440284704.165
+    },
+    {
+      "event": "save-start",
+      "at": 1792440284999.8254
+    },
+    {
+      "event": "ref-written",
+      "at": 1792440286306.7446
+    }
+  ],
+  "verifiedVersion": "01552bd9eff0d6487492eade0855b2c7df2227fa",
+  "completedProjectGitReadback": [
+    {
+      "path": "projects/synthetic-10/STATUS.md",
+      "id": "next-10",
+      "text": "---\ntitle: 合成项目 10\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:40+07:00\nnext:\n  - id: next-10\n    title: 推进合成项目 10\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-11/STATUS.md",
+      "id": "next-11",
+      "text": "---\ntitle: 合成项目 11\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:40+07:00\nnext:\n  - id: next-11\n    title: 推进合成项目 11\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-12/STATUS.md",
+      "id": "next-12",
+      "text": "---\ntitle: 合成项目 12\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:41+07:00\nnext:\n  - id: next-12\n    title: 推进合成项目 12\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-20/STATUS.md",
+      "id": "next-20",
+      "text": "---\ntitle: 合成项目 20\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:41+07:00\nnext:\n  - id: next-20\n    title: 推进合成项目 20\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-21/STATUS.md",
+      "id": "next-21",
+      "text": "---\ntitle: 合成项目 21\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:41+07:00\nnext:\n  - id: next-21\n    title: 推进合成项目 21\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-22/STATUS.md",
+      "id": "next-22",
+      "text": "---\ntitle: 合成项目 22\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:42+07:00\nnext:\n  - id: next-22\n    title: 推进合成项目 22\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-23/STATUS.md",
+      "id": "next-23",
+      "text": "---\ntitle: 合成项目 23\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:42+07:00\nnext:\n  - id: next-23\n    title: 推进合成项目 23\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-24/STATUS.md",
+      "id": "next-24",
+      "text": "---\ntitle: 合成项目 24\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:42+07:00\nnext:\n  - id: next-24\n    title: 推进合成项目 24\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-25/STATUS.md",
+      "id": "next-25",
+      "text": "---\ntitle: 合成项目 25\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:43+07:00\nnext:\n  - id: next-25\n    title: 推进合成项目 25\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-26/STATUS.md",
+      "id": "next-26",
+      "text": "---\ntitle: 合成项目 26\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:43+07:00\nnext:\n  - id: next-26\n    title: 推进合成项目 26\n    status: done\n---\n# 合成项目\n"
+    },
+    {
+      "path": "projects/synthetic-27/STATUS.md",
+      "id": "next-27",
+      "text": "---\ntitle: 合成项目 27\nkind: personal\nstage: active\nlinks: []\nupdated: 2026-10-20T03:04:43+07:00\nnext:\n  - id: next-27\n    title: 推进合成项目 27\n    status: done\n---\n# 合成项目\n"
+    }
+  ],
+  "gitVerifiedAt": 1792440286563.6055,
+  "requestCoverage": {
+    "from": 1792440281429.569,
+    "to": 1792440283977.9414,
+    "saves": [
+      {
+        "from": 1792440282526.2375,
+        "to": 1792440284704.165,
+        "overlapMs": 1451.703857421875,
+        "fullSaveCovered": false
+      },
+      {
+        "from": 1792440284999.8254,
+        "to": 1792440286306.7446,
+        "overlapMs": 0,
+        "fullSaveCovered": false
+      }
+    ]
+  }
+}

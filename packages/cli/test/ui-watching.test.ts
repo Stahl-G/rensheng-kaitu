@@ -13,9 +13,9 @@ import {
 import { expect, it, vi } from "vitest";
 import { startUi } from "../src/ui/server.js";
 
-vi.mock("node:fs", async (original) => ({
-  ...(await original<typeof import("node:fs")>()),
-  watch: () => {
+vi.mock("@kaitu/core", async (original) => ({
+  ...(await original<typeof import("@kaitu/core")>()),
+  watchWorkspace: () => {
     throw Object.assign(new Error("Synthetic native watch unavailable"), { code: "EMFILE" });
   },
 }));

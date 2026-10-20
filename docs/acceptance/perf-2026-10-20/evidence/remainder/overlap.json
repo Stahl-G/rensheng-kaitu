@@ -1,0 +1,427 @@
+{
+  "at": "2026-10-19T19:34:30.244Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "base": "/tmp/kaitu-v2-overlap-bz5inP",
+  "head": "c1ead5aa78f46dfa420f22d22e29271cc8a51595",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex a22bceb..ad95432 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -249,7 +249,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     messages = [];\n     let pending = true;\n     const version = await snapshotNow(ws, (files) => {\n-      pending = files.length > 0;\n+      // 外部收件箱仍等处理；用户显式保存的原文不能因只剩 inbox 文件而丢掉版本请求。\n+      pending = files.length > 0 || own.length > 0;\n       if (!pending) return null;\n       return own.length\n         ? own.join(\"；\")\n@@ -355,7 +356,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试\n       }\n     }\n-    stopPhone = startPhoneSnapshots(ws, () => reportError());\n+    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher);\n     scheduleInbox();\n   }\n   await startWatching();\ndiff --git a/packages/core/src/history.ts b/packages/core/src/history.ts\nindex ef217ca..8a164ad 100644\n--- a/packages/core/src/history.ts\n+++ b/packages/core/src/history.ts\n@@ -246,6 +246,14 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())\n \n type SnapshotMessage = string | ((files: readonly string[]) => string | null);\n \n+function unavailableHistoryWrite(error: unknown): boolean {\n+  if (error instanceof git.Errors.MultipleGitError)\n+    return error.errors.length > 0 && error.errors.every(unavailableHistoryWrite);\n+  return [\"EPERM\", \"EACCES\", \"EROFS\", \"ENOSPC\"].includes(\n+    (error as NodeJS.ErrnoException | undefined)?.code ?? \"\",\n+  );\n+}\n+\n /** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */\n export async function snapshotNow(\n   ws: Workspace,\n@@ -256,9 +264,8 @@ export async function snapshotNow(\n   try {\n     return await saveSnapshot(ws, message, now);\n   } catch (error) {\n-    const code = (error as NodeJS.ErrnoException).code;\n     if (error instanceof KaituError && error.code === \"CLOUD_UNAVAILABLE\") return null;\n-    if (![\"EPERM\", \"EACCES\", \"EROFS\", \"ENOSPC\"].includes(code ?? \"\")) throw error;\n+    if (!unavailableHistoryWrite(error)) throw error;\n     console.warn(\"数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）\");\n     return null;\n   }\ndiff --git a/packages/core/src/phone-snapshots.ts b/packages/core/src/phone-snapshots.ts\nindex baf87fc..fece9ed 100644\n--- a/packages/core/src/phone-snapshots.ts\n+++ b/packages/core/src/phone-snapshots.ts\n@@ -55,7 +55,11 @@ export async function writePhoneSnapshots(\n }\n \n /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */\n-export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {\n+export function startPhoneSnapshots(\n+  ws: Workspace,\n+  report: (error: unknown) => void = () => {},\n+  sharedWatcher?: ReturnType<typeof watchWorkspace>,\n+) {\n   let timer: NodeJS.Timeout | undefined;\n   let running: Promise<void> | undefined;\n   let again = false;\n@@ -87,13 +91,16 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n   };\n   let watcher: ReturnType<typeof watchWorkspace> | undefined;\n   try {\n-    watcher = watchWorkspace(ws.root, (file) => {\n-      if (!ignoredWorkspaceChange(file)) schedule();\n-    });\n-    watcher.on(\"error\", () => {\n-      watcher?.close();\n-      watcher = undefined;\n-    });\n+    if (sharedWatcher) sharedWatcher.on(\"all\", schedule).on(\"ready\", schedule);\n+    else {\n+      watcher = watchWorkspace(ws.root, (file) => {\n+        if (!ignoredWorkspaceChange(file)) schedule();\n+      });\n+      watcher.on(\"error\", () => {\n+        watcher?.close();\n+        watcher = undefined;\n+      });\n+    }\n   } catch {\n     /* 不支持递归监听时由定时器刷新。 */\n   }\n@@ -106,6 +113,8 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n     clearTimeout(timer);\n     clearInterval(interval);\n     off();\n+    // 借用 UI 的监听时只退订，关闭仍由 UI 在迁移 / 退出前负责。\n+    sharedWatcher?.off(\"all\", schedule).off(\"ready\", schedule);\n     await watcher?.close();\n     await running;\n   };\n",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "samples": [
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "capture",
+      "at": 1792438471755.1816,
+      "ms": 29.94580078125,
+      "path": "inbox/notes/2026-10-20/01m5ath3325ap97x6zddzzh93t.md"
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "completeNext",
+      "at": 1792438471785.1345,
+      "ms": 25.8916015625
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "overview",
+      "at": 1792438471811.0303,
+      "ms": 162.67041015625
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "health",
+      "at": 1792438471973.706,
+      "ms": 117.603271484375
+    },
+    {
+      "phase": "idle",
+      "round": 0,
+      "method": "findWorkspaceFiles",
+      "at": 1792438472091.3264,
+      "ms": 16.68994140625
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "capture",
+      "at": 1792438472108.025,
+      "ms": 2.86083984375,
+      "path": "inbox/notes/2026-10-20/01m5ath3deas59mr0qm0kebgh2.md"
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "completeNext",
+      "at": 1792438472110.8882,
+      "ms": 121.130615234375
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "overview",
+      "at": 1792438472232.0242,
+      "ms": 145.91943359375
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "health",
+      "at": 1792438472377.9502,
+      "ms": 115.6494140625
+    },
+    {
+      "phase": "idle",
+      "round": 1,
+      "method": "findWorkspaceFiles",
+      "at": 1792438472493.6052,
+      "ms": 4.138916015625
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "capture",
+      "at": 1792438472497.7654,
+      "ms": 2.47607421875,
+      "path": "inbox/notes/2026-10-20/01m5ath3skrytyq591qd4ddbhe.md"
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "completeNext",
+      "at": 1792438472500.2432,
+      "ms": 22.78076171875
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "overview",
+      "at": 1792438472523.0269,
+      "ms": 137.222412109375
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "health",
+      "at": 1792438472660.2527,
+      "ms": 119.6044921875
+    },
+    {
+      "phase": "idle",
+      "round": 2,
+      "method": "findWorkspaceFiles",
+      "at": 1792438472779.8604,
+      "ms": 3.557861328125
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "capture",
+      "at": 1792438472783.8704,
+      "ms": 2.281005859375,
+      "path": "inbox/notes/2026-10-20/01m5ath42hw5666paaw215ymze.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "completeNext",
+      "at": 1792438472786.1562,
+      "ms": 22.30908203125
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "overview",
+      "at": 1792438472808.4673,
+      "ms": 136.622314453125
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "health",
+      "at": 1792438472945.0938,
+      "ms": 113.58203125
+    },
+    {
+      "phase": "continuous",
+      "round": 0,
+      "method": "findWorkspaceFiles",
+      "at": 1792438473058.6794,
+      "ms": 3.852783203125
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "capture",
+      "at": 1792438473062.5366,
+      "ms": 2.35888671875,
+      "path": "inbox/notes/2026-10-20/01m5ath4b822jdp0c32ac9gr3n.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "completeNext",
+      "at": 1792438473064.8982,
+      "ms": 22.699951171875
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "overview",
+      "at": 1792438473087.6008,
+      "ms": 140.46728515625
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "health",
+      "at": 1792438473228.0718,
+      "ms": 112.024658203125
+    },
+    {
+      "phase": "continuous",
+      "round": 1,
+      "method": "findWorkspaceFiles",
+      "at": 1792438473340.099,
+      "ms": 5.00634765625
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "capture",
+      "at": 1792438473345.1104,
+      "ms": 2.398193359375,
+      "path": "inbox/notes/2026-10-20/01m5ath4m2zyes5n3xbhaeffgs.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "completeNext",
+      "at": 1792438473347.5112,
+      "ms": 22.932861328125
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "overview",
+      "at": 1792438473370.4465,
+      "ms": 138.825439453125
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "health",
+      "at": 1792438473509.276,
+      "ms": 112.21533203125
+    },
+    {
+      "phase": "continuous",
+      "round": 2,
+      "method": "findWorkspaceFiles",
+      "at": 1792438473621.4949,
+      "ms": 3.488525390625
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "capture",
+      "at": 1792438473624.9878,
+      "ms": 2.137451171875,
+      "path": "inbox/notes/2026-10-20/01m5ath4wtx7t7awem9btbnt27.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "completeNext",
+      "at": 1792438473627.1282,
+      "ms": 22.23046875
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "overview",
+      "at": 1792438473649.3604,
+      "ms": 136.324462890625
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "health",
+      "at": 1792438473785.6885,
+      "ms": 206.421875
+    },
+    {
+      "phase": "continuous",
+      "round": 3,
+      "method": "findWorkspaceFiles",
+      "at": 1792438473992.1135,
+      "ms": 4.4521484375
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "capture",
+      "at": 1792438473996.5706,
+      "ms": 12.415283203125,
+      "path": "inbox/notes/2026-10-20/01m5ath58rktnycnqsynb3nw89.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "completeNext",
+      "at": 1792438474008.9897,
+      "ms": 23.510986328125
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "overview",
+      "at": 1792438474032.5037,
+      "ms": 184.480712890625
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "health",
+      "at": 1792438474216.9883,
+      "ms": 132.64794921875
+    },
+    {
+      "phase": "continuous",
+      "round": 4,
+      "method": "findWorkspaceFiles",
+      "at": 1792438474349.6406,
+      "ms": 27.558349609375
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "capture",
+      "at": 1792438474377.2097,
+      "ms": 16.771240234375,
+      "path": "inbox/notes/2026-10-20/01m5ath5mrg1jrdrsaqjjw5gy7.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "completeNext",
+      "at": 1792438474393.9875,
+      "ms": 113.70947265625
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "overview",
+      "at": 1792438474507.7012,
+      "ms": 146.91943359375
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "health",
+      "at": 1792438474654.626,
+      "ms": 113.685546875
+    },
+    {
+      "phase": "continuous",
+      "round": 5,
+      "method": "findWorkspaceFiles",
+      "at": 1792438474768.3167,
+      "ms": 5.3037109375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "capture",
+      "at": 1792438474773.6252,
+      "ms": 2.5703125,
+      "path": "inbox/notes/2026-10-20/01m5ath60qhweh52wng5x9683n.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "completeNext",
+      "at": 1792438474776.1995,
+      "ms": 21.435302734375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "overview",
+      "at": 1792438474797.637,
+      "ms": 139.40380859375
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "health",
+      "at": 1792438474937.065,
+      "ms": 112.0341796875
+    },
+    {
+      "phase": "continuous",
+      "round": 6,
+      "method": "findWorkspaceFiles",
+      "at": 1792438475049.1035,
+      "ms": 4.3857421875
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "capture",
+      "at": 1792438475053.496,
+      "ms": 2.5087890625,
+      "path": "inbox/notes/2026-10-20/01m5ath69fvn1c6cfmbdjm95ck.md"
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "completeNext",
+      "at": 1792438475056.0098,
+      "ms": 21.617919921875
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "overview",
+      "at": 1792438475077.6309,
+      "ms": 141.06884765625
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "health",
+      "at": 1792438475218.705,
+      "ms": 111.64794921875
+    },
+    {
+      "phase": "continuous",
+      "round": 7,
+      "method": "findWorkspaceFiles",
+      "at": 1792438475330.3574,
+      "ms": 3.80712890625
+    }
+  ],
+  "timeline": [
+    {
+      "event": "save-start",
+      "at": 1792438473882.7239
+    },
+    {
+      "event": "ref-written",
+      "at": 1792438475930.8606
+    },
+    {
+      "event": "save-start",
+      "at": 1792438476335.7754
+    },
+    {
+      "event": "ref-written",
+      "at": 1792438477648.4514
+    }
+  ],
+  "verifiedVersion": "accd1871cab458f09543e88f54aa76f73806c5d7"
+}

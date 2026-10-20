@@ -1,0 +1,4 @@
+{
+  "excluded": ["/tmp/kaitu-v2-render/exact-ea35-profile"],
+  "reason": "one exploratory profile overlapped an integration build; excluded from all reported timing/profile evidence. Serial replacement is journey.cpuprofile."
+}

@@ -1,0 +1,87 @@
+{
+  "mode": "version-profile",
+  "at": "2026-10-19T18:57:39.386Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "base": "/tmp/kaitu-v2-run-wVkDgp",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "workspace-open-new-process",
+      "ms": 385.5942049999999,
+      "maxEventLoopGapMs": 385.6626189999997
+    },
+    {
+      "name": "ui-listen-local",
+      "ms": 40.586457999999766,
+      "maxEventLoopGapMs": 39.39469300000019
+    },
+    {
+      "name": "http-capture-return",
+      "ms": 25.308641999999963,
+      "maxEventLoopGapMs": 14.236317999999756
+    },
+    {
+      "name": "http-complete-return",
+      "ms": 86.00158099999999,
+      "maxEventLoopGapMs": 60.36153699999977
+    },
+    {
+      "name": "write-background-end-to-end",
+      "ms": 3000.861802,
+      "maxEventLoopGapMs": 226.1919069999999
+    },
+    {
+      "name": "http-import-preview-100",
+      "ms": 5.977713999999651,
+      "maxEventLoopGapMs": 5.136395000000448
+    },
+    {
+      "name": "http-import-confirm-100",
+      "ms": 79.89565000000039,
+      "maxEventLoopGapMs": 63.93997899999977
+    },
+    {
+      "name": "import-background-end-to-end",
+      "ms": 4221.876853999999,
+      "maxEventLoopGapMs": 127.9191179999998
+    }
+  ],
+  "head": "5b0bc1e808c80a375da28e249aa550e06b2ee284",
+  "productPatch": "diff --git a/packages/cli/src/ui/server.ts b/packages/cli/src/ui/server.ts\nindex 781ba5d..b80ba49 100644\n--- a/packages/cli/src/ui/server.ts\n+++ b/packages/cli/src/ui/server.ts\n@@ -6,7 +6,7 @@ import { extname, resolve, sep } from \"node:path\";\n import { fileURLToPath } from \"node:url\";\n import { PhoneService } from \"@kaitu/channels\";\n import { CollectorService } from \"@kaitu/channels/collectors\";\n-import { startPhoneSnapshots } from \"@kaitu/core\";\n+import { startPhoneSnapshots, watchWorkspace } from \"@kaitu/core\";\n import {\n   type CalendarExecutor,\n   CalendarPush,\n@@ -290,7 +290,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     }, options.refreshDelayMs ?? 300);\n     scheduleSave(messages.length ? versionDelay : snapshotDelay);\n   }\n-  let watcher: FSWatcher | undefined;\n+  let watcher: ReturnType<typeof watchWorkspace> | undefined;\n   let externalWatchers: FSWatcher[] = [];\n   // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。\n   const backupState = ws.resolve(\".kaitu/workspace-backup.json\", { internal: true });\n@@ -329,9 +329,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     clearTimeout(polling);\n     polling = undefined;\n     try {\n-      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {\n-        changedFile(filename?.toString().replaceAll(\"\\\\\", \"/\") ?? \"工作区\");\n-      });\n+      watcher = watchWorkspace(ws.root, changedFile);\n       watcher.on(\"error\", startPolling);\n     } catch {\n       startPolling();\n@@ -728,7 +726,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n     }\n     closed = true;\n     cancelGithubCliLogin();\n-    watcher?.close();\n+    await watcher?.close();\n     unwatchFile(backupState, backupChanged);\n     for (const external of externalWatchers) external.close();\n     clearTimeout(inboxTimer);\n@@ -757,7 +755,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {\n       server.listen(requestedPort, \"127.0.0.1\", resolve);\n     });\n   } catch (error) {\n-    watcher?.close();\n+    await watcher?.close();\n     unwatchFile(backupState, backupChanged);\n     stopBackup();\n     stopOrganizer();\ndiff --git a/packages/core/package.json b/packages/core/package.json\nindex 9afea70..428d0c5 100644\n--- a/packages/core/package.json\n+++ b/packages/core/package.json\n@@ -45,6 +45,7 @@\n     \"@deepseek-ai/dsh-native-command\": \"0.2.1-rc.2\",\n     \"ajv\": \"^8.17.1\",\n     \"ajv-formats\": \"^3.0.1\",\n+    \"chokidar\": \"5.0.0\",\n     \"fflate\": \"^0.8.3\",\n     \"ical.js\": \"^2.2.1\",\n     \"isomorphic-git\": \"^1.27.0\",\ndiff --git a/packages/core/src/phone-snapshots.ts b/packages/core/src/phone-snapshots.ts\nindex 50df686..20ec5f1 100644\n--- a/packages/core/src/phone-snapshots.ts\n+++ b/packages/core/src/phone-snapshots.ts\n@@ -1,4 +1,3 @@\n-import { watch } from \"node:fs\";\n import { readExploration } from \"./exploration.js\";\n import { rememberComputerSnapshot, rememberOrganizer } from \"./organizer.js\";\n import { readOverviewPage } from \"./overview-page.js\";\n@@ -8,6 +7,7 @@ import { lifeMap } from \"./places.js\";\n import { syncMode } from \"./sync-location.js\";\n import { ignoredWorkspaceChange } from \"./workbench.js\";\n import { subscribeWorkspaceBackup, workspaceBackupStatus } from \"./workspace-backup.js\";\n+import { watchWorkspace } from \"./workspace-watch.js\";\n import type { Workspace } from \"./workspace.js\";\n \n export function phoneReadable(ws: Workspace) {\n@@ -84,10 +84,10 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v\n     timer = setTimeout(() => void run(), 2000);\n     timer.unref();\n   };\n-  let watcher: ReturnType<typeof watch> | undefined;\n+  let watcher: ReturnType<typeof watchWorkspace> | undefined;\n   try {\n-    watcher = watch(ws.root, { recursive: true }, (_event, file) => {\n-      if (file && !ignoredWorkspaceChange(file)) schedule();\n+    watcher = watchWorkspace(ws.root, (file) => {\n+      if (!ignoredWorkspaceChange(file)) schedule();\n     });\n     watcher.on(\"error\", () => {\n       watcher?.close();\ndiff --git a/packages/core/src/workspace-watch.ts b/packages/core/src/workspace-watch.ts\nnew file mode 100644\nindex 0000000..7e58723\n--- /dev/null\n+++ b/packages/core/src/workspace-watch.ts\n@@ -0,0 +1,19 @@\n+import { relative } from \"node:path\";\n+import { watch } from \"chokidar\";\n+import { ignoredWorkspaceChange } from \"./workbench.js\";\n+\n+/** 在遍历前排除内部历史、缓存等目录；事件范围与既有工作区失效规则一致。 */\n+export function watchWorkspace(root: string, changed: (file: string) => void) {\n+  const file = (path: string) => relative(root, path).replaceAll(\"\\\\\", \"/\");\n+  return (\n+    watch(root, {\n+      ignoreInitial: true,\n+      followSymlinks: false,\n+      atomic: false,\n+      ignored: (path) => ignoredWorkspaceChange(file(path)),\n+    })\n+      .on(\"all\", (_event, path) => changed(file(path)))\n+      // 异步建立监听期间的改动也要补读，不能把首次扫描当成资料没变。\n+      .on(\"ready\", () => changed(\"\"))\n+  );\n+}\ndiff --git a/pnpm-lock.yaml b/pnpm-lock.yaml\nindex 41e9d25..7f5da94 100644\n--- a/pnpm-lock.yaml\n+++ b/pnpm-lock.yaml\n@@ -154,6 +154,9 @@ importers:\n       ajv-formats:\n         specifier: ^3.0.1\n         version: 3.0.1(ajv@8.20.0)\n+      chokidar:\n+        specifier: 5.0.0\n+        version: 5.0.0\n       fflate:\n         specifier: ^0.8.3\n         version: 0.8.3\n",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "origin": "http://127.0.0.1:34983",
+  "capture": {
+    "path": "inbox/notes/2026-10-20/01m5ardnd435q9nzemhsxdypw8.md",
+    "version": null
+  },
+  "writeVersion": "4978d956d2d5b564b8504778a7d88490eabeede7",
+  "importVersion": "957e58a702d442b4d8e8c8a2a2686f2c41822a79",
+  "imported": 100,
+  "saveTimeline": [
+    {
+      "event": "save-start",
+      "ms": 2210.5067160000003
+    },
+    {
+      "event": "ref-written",
+      "ms": 3071.2724709999998
+    },
+    {
+      "event": "save-start",
+      "ms": 5266.011305
+    },
+    {
+      "event": "ref-written",
+      "ms": 7269.426007
+    }
+  ],
+  "indexIo": {
+    "lstat": 7009,
+    "readFile": 108,
+    "writeFile": 104
+  }
+}

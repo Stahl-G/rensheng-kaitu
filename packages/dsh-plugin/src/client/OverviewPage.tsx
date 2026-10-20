@@ -139,6 +139,8 @@ function Overview({
   const [theme, setTheme] = useState("light");
   const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
+  const writing = useRef(false);
+  const refreshPending = useRef(false);
   const refresh = useCallback(async () => {
     if (!locale) return;
     const seq = ++sequence.current;
@@ -171,7 +173,15 @@ function Overview({
       sequence.current++;
     };
   }, [refresh]);
-  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(
+    () =>
+      props.subscribe?.(() => {
+        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。
+        if (writing.current) refreshPending.current = true;
+        else void refresh();
+      }),
+    [props.subscribe, refresh],
+  );
   // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
   useEffect(() => {
     if (view !== "records") return;
@@ -226,15 +236,23 @@ function Overview({
     };
   }, [menu]);
   const run = async (operation: () => Promise<unknown>) => {
+    writing.current = true;
     setBusy(true);
     setError("");
     try {
       await operation();
+      // 到这里之前的通知已被本次读取覆盖；读取期间的新变化仍要补读，不能丢外部编辑。
+      refreshPending.current = false;
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      writing.current = false;
       setBusy(false);
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        void refresh();
+      }
     }
   };
   const openRecord = (id: string) => {

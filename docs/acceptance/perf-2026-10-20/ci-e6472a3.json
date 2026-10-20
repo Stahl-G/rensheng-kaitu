@@ -1,0 +1,46 @@
+{
+  "head": "e6472a344ae5075e9b1b1760ada60c002a65d752",
+  "run": 39312566668,
+  "mac": {
+    "job": 118265679986,
+    "conclusion": "success",
+    "passed": 282,
+    "existingSkipped": 2,
+    "seconds": 94.95
+  },
+  "windows": {
+    "job": 118265680331,
+    "conclusion": "failure",
+    "passed": 272,
+    "failed": 5,
+    "existingSkipped": 7,
+    "seconds": 205.01,
+    "failures": [
+      {
+        "file": "packages/cli/test/ask-filesystem.test.ts",
+        "reason": "FS_SANDBOX_DENIED",
+        "classification": "previous exact-head baseline failure"
+      },
+      {
+        "file": "packages/cli/test/feishu.test.ts",
+        "reason": "missing lark-cli",
+        "classification": "previous exact-head baseline failure"
+      },
+      {
+        "file": "packages/core/test/history.test.ts",
+        "reason": "test expected MultipleGitError, actual unknown filesystem error ENOENT propagated",
+        "classification": "owned test contract corrected; no product error handling relaxed"
+      },
+      {
+        "file": "packages/core/test/onboarding.test.ts:415",
+        "reason": "15000 ms timeout; previous c1 exact case 2200 ms",
+        "classification": "unresolved observation; exact c1 Windows rerun requested, no timeout changed"
+      },
+      {
+        "file": "packages/core/test/workbench.test.ts:56",
+        "reason": "expected version count 5, actual 4",
+        "classification": "unresolved observation; exact c1 rerun requested; no fake timestamp reproduction"
+      }
+    ]
+  }
+}

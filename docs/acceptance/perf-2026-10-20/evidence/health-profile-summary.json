@@ -1,0 +1,856 @@
+{
+  "pr59": {
+    "sampledMs": 1012.927,
+    "inclusive": [
+      {
+        "function": "(root)",
+        "file": "",
+        "line": 0,
+        "ms": 1012.927,
+        "percent": 100.0
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 0,
+        "ms": 973.34,
+        "percent": 96.09
+      },
+      {
+        "function": "measure",
+        "file": "measure.mjs",
+        "line": 56,
+        "ms": 907.245,
+        "percent": 89.57
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 208,
+        "ms": 905.266,
+        "percent": 89.37
+      },
+      {
+        "function": "readHealthPage",
+        "file": "health-page.js",
+        "line": 54,
+        "ms": 905.266,
+        "percent": 89.37
+      },
+      {
+        "function": "readWorkbench",
+        "file": "workbench.js",
+        "line": 69,
+        "ms": 459.528,
+        "percent": 45.37
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 78,
+        "ms": 344.47,
+        "percent": 34.01
+      },
+      {
+        "function": "read",
+        "file": "workbench.js",
+        "line": 74,
+        "ms": 331.841,
+        "percent": 32.76
+      },
+      {
+        "function": "existsSync",
+        "file": "node:fs",
+        "line": 281,
+        "ms": 169.358,
+        "percent": 16.72
+      },
+      {
+        "function": "existsSync",
+        "file": "",
+        "line": 0,
+        "ms": 169.358,
+        "percent": 16.72
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 101,
+        "ms": 165.269,
+        "percent": 16.32
+      },
+      {
+        "function": "listProjects",
+        "file": "projects.js",
+        "line": 154,
+        "ms": 165.269,
+        "percent": 16.32
+      },
+      {
+        "function": "",
+        "file": "projects.js",
+        "line": 172,
+        "ms": 144.492,
+        "percent": 14.26
+      },
+      {
+        "function": "projectGithub",
+        "file": "github.js",
+        "line": 302,
+        "ms": 115.178,
+        "percent": 11.37
+      },
+      {
+        "function": "readProject",
+        "file": "projects.js",
+        "line": 93,
+        "ms": 115.178,
+        "percent": 11.37
+      },
+      {
+        "function": "readFileSync",
+        "file": "node:fs",
+        "line": 474,
+        "ms": 112.882,
+        "percent": 11.14
+      },
+      {
+        "function": "statusFiles",
+        "file": "workbench.js",
+        "line": 27,
+        "ms": 110.343,
+        "percent": 10.89
+      },
+      {
+        "function": "projectStatusFiles",
+        "file": "projects.js",
+        "line": 142,
+        "ms": 109.162,
+        "percent": 10.78
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 102,
+        "ms": 100.251,
+        "percent": 9.9
+      },
+      {
+        "function": "document",
+        "file": "workbench.js",
+        "line": 55,
+        "ms": 96.71,
+        "percent": 9.55
+      },
+      {
+        "function": "",
+        "file": "projects.js",
+        "line": 143,
+        "ms": 95.311,
+        "percent": 9.41
+      },
+      {
+        "function": "openSync",
+        "file": "node:fs",
+        "line": 621,
+        "ms": 94.742,
+        "percent": 9.35
+      },
+      {
+        "function": "open",
+        "file": "",
+        "line": 0,
+        "ms": 94.742,
+        "percent": 9.35
+      },
+      {
+        "function": "readRecords",
+        "file": "records.js",
+        "line": 250,
+        "ms": 68.869,
+        "percent": 6.8
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 202,
+        "ms": 67.052,
+        "percent": 6.62
+      },
+      {
+        "function": "post",
+        "file": "measure.mjs",
+        "line": 201,
+        "ms": 67.052,
+        "percent": 6.62
+      },
+      {
+        "function": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "ms": 67.052,
+        "percent": 6.62
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 84,
+        "ms": 66.624,
+        "percent": 6.58
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 86,
+        "ms": 66.624,
+        "percent": 6.58
+      },
+      {
+        "function": "parseDocument",
+        "file": "public-api.js",
+        "line": 40,
+        "ms": 54.57,
+        "percent": 5.39
+      }
+    ],
+    "self": [
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 78,
+        "ms": 264.466,
+        "percent": 26.11
+      },
+      {
+        "function": "existsSync",
+        "file": "",
+        "line": 0,
+        "ms": 169.358,
+        "percent": 16.72
+      },
+      {
+        "function": "open",
+        "file": "",
+        "line": 0,
+        "ms": 94.742,
+        "percent": 9.35
+      },
+      {
+        "function": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "ms": 67.052,
+        "percent": 6.62
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 91,
+        "ms": 45.848,
+        "percent": 4.53
+      },
+      {
+        "function": "stat",
+        "file": "",
+        "line": 0,
+        "ms": 38.621,
+        "percent": 3.81
+      },
+      {
+        "function": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "ms": 37.825,
+        "percent": 3.73
+      },
+      {
+        "function": "partsIn",
+        "file": "time.js",
+        "line": 3,
+        "ms": 37.244,
+        "percent": 3.68
+      },
+      {
+        "function": "workoutSessions",
+        "file": "status.js",
+        "line": 4,
+        "ms": 35.173,
+        "percent": 3.47
+      },
+      {
+        "function": "readRecords",
+        "file": "records.js",
+        "line": 250,
+        "ms": 33.57,
+        "percent": 3.31
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 165,
+        "ms": 15.231,
+        "percent": 1.5
+      },
+      {
+        "function": "latestById",
+        "file": "records.js",
+        "line": 241,
+        "ms": 13.169,
+        "percent": 1.3
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 167,
+        "ms": 12.863,
+        "percent": 1.27
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 57,
+        "ms": 12.489,
+        "percent": 1.23
+      },
+      {
+        "function": "readdir",
+        "file": "",
+        "line": 0,
+        "ms": 11.739,
+        "percent": 1.16
+      },
+      {
+        "function": "next",
+        "file": "parser.js",
+        "line": 176,
+        "ms": 10.976,
+        "percent": 1.08
+      },
+      {
+        "function": "read",
+        "file": "",
+        "line": 0,
+        "ms": 8.548,
+        "percent": 0.84
+      },
+      {
+        "function": "fstat",
+        "file": "",
+        "line": 0,
+        "ms": 7.436,
+        "percent": 0.73
+      },
+      {
+        "function": "readHealthPage",
+        "file": "health-page.js",
+        "line": 54,
+        "ms": 7.279,
+        "percent": 0.72
+      },
+      {
+        "function": "records",
+        "file": "health-page.js",
+        "line": 57,
+        "ms": 6.225,
+        "percent": 0.61
+      },
+      {
+        "function": "relative",
+        "file": "node:path",
+        "line": 1356,
+        "ms": 5.89,
+        "percent": 0.58
+      },
+      {
+        "function": "parseDocument",
+        "file": "lexer.js",
+        "line": 319,
+        "ms": 5.353,
+        "percent": 0.53
+      },
+      {
+        "function": "resolve",
+        "file": "workspace.js",
+        "line": 113,
+        "ms": 5.308,
+        "percent": 0.52
+      },
+      {
+        "function": "resolveProps",
+        "file": "resolve-props.js",
+        "line": 3,
+        "ms": 4.389,
+        "percent": 0.43
+      },
+      {
+        "function": "step",
+        "file": "parser.js",
+        "line": 240,
+        "ms": 4.358,
+        "percent": 0.43
+      },
+      {
+        "function": "parsePlainScalar",
+        "file": "lexer.js",
+        "line": 572,
+        "ms": 3.247,
+        "percent": 0.32
+      },
+      {
+        "function": "read",
+        "file": "workbench.js",
+        "line": 74,
+        "ms": 3.238,
+        "percent": 0.32
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 105,
+        "ms": 2.771,
+        "percent": 0.27
+      },
+      {
+        "function": "pushNewline",
+        "file": "lexer.js",
+        "line": 692,
+        "ms": 2.431,
+        "percent": 0.24
+      },
+      {
+        "function": "NodeBase",
+        "file": "Node.js",
+        "line": 8,
+        "ms": 2.315,
+        "percent": 0.23
+      }
+    ]
+  },
+  "pr59-v2": {
+    "sampledMs": 590.501,
+    "inclusive": [
+      {
+        "function": "(root)",
+        "file": "",
+        "line": 0,
+        "ms": 590.501,
+        "percent": 100.0
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 0,
+        "ms": 573.415,
+        "percent": 97.11
+      },
+      {
+        "function": "measure",
+        "file": "measure.mjs",
+        "line": 67,
+        "ms": 515.512,
+        "percent": 87.3
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 220,
+        "ms": 513.47,
+        "percent": 86.95
+      },
+      {
+        "function": "readHealthPage",
+        "file": "health-page.js",
+        "line": 54,
+        "ms": 513.47,
+        "percent": 86.95
+      },
+      {
+        "function": "readWorkbench",
+        "file": "workbench.js",
+        "line": 69,
+        "ms": 424.937,
+        "percent": 71.96
+      },
+      {
+        "function": "read",
+        "file": "workbench.js",
+        "line": 74,
+        "ms": 309.003,
+        "percent": 52.33
+      },
+      {
+        "function": "existsSync",
+        "file": "node:fs",
+        "line": 281,
+        "ms": 169.53,
+        "percent": 28.71
+      },
+      {
+        "function": "existsSync",
+        "file": "",
+        "line": 0,
+        "ms": 169.53,
+        "percent": 28.71
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 101,
+        "ms": 148.28,
+        "percent": 25.11
+      },
+      {
+        "function": "listProjects",
+        "file": "projects.js",
+        "line": 154,
+        "ms": 148.28,
+        "percent": 25.11
+      },
+      {
+        "function": "",
+        "file": "projects.js",
+        "line": 172,
+        "ms": 130.068,
+        "percent": 22.03
+      },
+      {
+        "function": "readFileSync",
+        "file": "node:fs",
+        "line": 474,
+        "ms": 112.336,
+        "percent": 19.02
+      },
+      {
+        "function": "projectGithub",
+        "file": "github.js",
+        "line": 302,
+        "ms": 106.658,
+        "percent": 18.06
+      },
+      {
+        "function": "readProject",
+        "file": "projects.js",
+        "line": 93,
+        "ms": 106.658,
+        "percent": 18.06
+      },
+      {
+        "function": "statusFiles",
+        "file": "workbench.js",
+        "line": 27,
+        "ms": 104.089,
+        "percent": 17.63
+      },
+      {
+        "function": "projectStatusFiles",
+        "file": "projects.js",
+        "line": 142,
+        "ms": 101.921,
+        "percent": 17.26
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 102,
+        "ms": 97.635,
+        "percent": 16.53
+      },
+      {
+        "function": "document",
+        "file": "workbench.js",
+        "line": 55,
+        "ms": 94.997,
+        "percent": 16.09
+      },
+      {
+        "function": "openSync",
+        "file": "node:fs",
+        "line": 621,
+        "ms": 89.294,
+        "percent": 15.12
+      },
+      {
+        "function": "open",
+        "file": "",
+        "line": 0,
+        "ms": 89.294,
+        "percent": 15.12
+      },
+      {
+        "function": "",
+        "file": "projects.js",
+        "line": 143,
+        "ms": 87.041,
+        "percent": 14.74
+      },
+      {
+        "function": "readRecords",
+        "file": "records.js",
+        "line": 250,
+        "ms": 62.462,
+        "percent": 10.58
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 84,
+        "ms": 62.462,
+        "percent": 10.58
+      },
+      {
+        "function": "",
+        "file": "workbench.js",
+        "line": 86,
+        "ms": 62.462,
+        "percent": 10.58
+      },
+      {
+        "function": "",
+        "file": "measure.mjs",
+        "line": 214,
+        "ms": 59.945,
+        "percent": 10.15
+      },
+      {
+        "function": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "ms": 59.945,
+        "percent": 10.15
+      },
+      {
+        "function": "post",
+        "file": "measure.mjs",
+        "line": 213,
+        "ms": 59.945,
+        "percent": 10.15
+      },
+      {
+        "function": "compose",
+        "file": "composer.js",
+        "line": 132,
+        "ms": 40.033,
+        "percent": 6.78
+      },
+      {
+        "function": "parse",
+        "file": "public-api.js",
+        "line": 60,
+        "ms": 40.033,
+        "percent": 6.78
+      }
+    ],
+    "self": [
+      {
+        "function": "existsSync",
+        "file": "",
+        "line": 0,
+        "ms": 169.53,
+        "percent": 28.71
+      },
+      {
+        "function": "open",
+        "file": "",
+        "line": 0,
+        "ms": 89.294,
+        "percent": 15.12
+      },
+      {
+        "function": "post",
+        "file": "node:inspector",
+        "line": 115,
+        "ms": 59.798,
+        "percent": 10.13
+      },
+      {
+        "function": "readRecords",
+        "file": "records.js",
+        "line": 250,
+        "ms": 38.961,
+        "percent": 6.6
+      },
+      {
+        "function": "stat",
+        "file": "",
+        "line": 0,
+        "ms": 35.301,
+        "percent": 5.98
+      },
+      {
+        "function": "partsIn",
+        "file": "time.js",
+        "line": 3,
+        "ms": 18.46,
+        "percent": 3.13
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 57,
+        "ms": 18.078,
+        "percent": 3.06
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 96,
+        "ms": 16.892,
+        "percent": 2.86
+      },
+      {
+        "function": "readdir",
+        "file": "",
+        "line": 0,
+        "ms": 13.974,
+        "percent": 2.37
+      },
+      {
+        "function": "",
+        "file": "health-page.js",
+        "line": 67,
+        "ms": 13.724,
+        "percent": 2.32
+      },
+      {
+        "function": "(garbage collector)",
+        "file": "",
+        "line": 0,
+        "ms": 12.142,
+        "percent": 2.06
+      },
+      {
+        "function": "read",
+        "file": "",
+        "line": 0,
+        "ms": 9.418,
+        "percent": 1.59
+      },
+      {
+        "function": "fstat",
+        "file": "",
+        "line": 0,
+        "ms": 8.554,
+        "percent": 1.45
+      },
+      {
+        "function": "readHealthPage",
+        "file": "health-page.js",
+        "line": 54,
+        "ms": 8.041,
+        "percent": 1.36
+      },
+      {
+        "function": "parseDocument",
+        "file": "lexer.js",
+        "line": 319,
+        "ms": 6.612,
+        "percent": 1.12
+      },
+      {
+        "function": "next",
+        "file": "parser.js",
+        "line": 176,
+        "ms": 6.207,
+        "percent": 1.05
+      },
+      {
+        "function": "step",
+        "file": "parser.js",
+        "line": 240,
+        "ms": 4.303,
+        "percent": 0.73
+      },
+      {
+        "function": "parseTs",
+        "file": "time.js",
+        "line": 61,
+        "ms": 3.913,
+        "percent": 0.66
+      },
+      {
+        "function": "blockMap",
+        "file": "parser.js",
+        "line": 484,
+        "ms": 3.316,
+        "percent": 0.56
+      },
+      {
+        "function": "close",
+        "file": "",
+        "line": 0,
+        "ms": 3.212,
+        "percent": 0.54
+      },
+      {
+        "function": "records",
+        "file": "health-page.js",
+        "line": 57,
+        "ms": 3.031,
+        "percent": 0.51
+      },
+      {
+        "function": "resolve",
+        "file": "workspace.js",
+        "line": 113,
+        "ms": 2.24,
+        "percent": 0.38
+      },
+      {
+        "function": "read",
+        "file": "workbench.js",
+        "line": 74,
+        "ms": 2.216,
+        "percent": 0.38
+      },
+      {
+        "function": "parse",
+        "file": "parser.js",
+        "line": 165,
+        "ms": 2.198,
+        "percent": 0.37
+      },
+      {
+        "function": "",
+        "file": "projects.js",
+        "line": 143,
+        "ms": 2.174,
+        "percent": 0.37
+      },
+      {
+        "function": "lstat",
+        "file": "",
+        "line": 0,
+        "ms": 2.162,
+        "percent": 0.37
+      },
+      {
+        "function": "resolveBlockMap",
+        "file": "resolve-block-map.js",
+        "line": 11,
+        "ms": 2.133,
+        "percent": 0.36
+      },
+      {
+        "function": "writeBuffer",
+        "file": "",
+        "line": 0,
+        "ms": 2.042,
+        "percent": 0.35
+      },
+      {
+        "function": "day",
+        "file": "health-page.js",
+        "line": 56,
+        "ms": 1.869,
+        "percent": 0.32
+      },
+      {
+        "function": "tryStatSync",
+        "file": "node:fs",
+        "line": 388,
+        "ms": 1.858,
+        "percent": 0.31
+      }
+    ]
+  }
+}

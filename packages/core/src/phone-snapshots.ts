@@ -1,4 +1,3 @@
-import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
@@ -8,6 +7,7 @@ import { lifeMap } from "./places.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange } from "./workbench.js";
 import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
+import { watchWorkspace } from "./workspace-watch.js";
 import type { Workspace } from "./workspace.js";
 
 export function phoneReadable(ws: Workspace) {
@@ -55,44 +55,52 @@ export async function writePhoneSnapshots(
 }
 
 /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */
-export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {
+export function startPhoneSnapshots(
+  ws: Workspace,
+  report: (error: unknown) => void = () => {},
+  sharedWatcher?: ReturnType<typeof watchWorkspace>,
+) {
   let timer: NodeJS.Timeout | undefined;
-  let running = false;
+  let running: Promise<void> | undefined;
   let again = false;
   let closed = false;
-  const run = async () => {
+  const run = () => {
     if (closed) return;
     if (running) {
       again = true;
       return;
     }
-    running = true;
-    try {
-      await writePhoneSnapshots(ws);
-    } catch (error) {
-      report(error);
-    } finally {
-      running = false;
-      if (again) {
-        again = false;
-        schedule();
+    running = (async () => {
+      try {
+        await writePhoneSnapshots(ws);
+      } catch (error) {
+        report(error);
+      } finally {
+        running = undefined;
+        if (again && !closed) {
+          again = false;
+          schedule();
+        }
       }
-    }
+    })();
   };
   const schedule = () => {
     clearTimeout(timer);
     timer = setTimeout(() => void run(), 2000);
     timer.unref();
   };
-  let watcher: ReturnType<typeof watch> | undefined;
+  let watcher: ReturnType<typeof watchWorkspace> | undefined;
   try {
-    watcher = watch(ws.root, { recursive: true }, (_event, file) => {
-      if (file && !ignoredWorkspaceChange(file)) schedule();
-    });
-    watcher.on("error", () => {
-      watcher?.close();
-      watcher = undefined;
-    });
+    if (sharedWatcher) sharedWatcher.on("all", schedule).on("ready", schedule);
+    else {
+      watcher = watchWorkspace(ws.root, (file) => {
+        if (!ignoredWorkspaceChange(file)) schedule();
+      });
+      watcher.on("error", () => {
+        watcher?.close();
+        watcher = undefined;
+      });
+    }
   } catch {
     /* 不支持递归监听时由定时器刷新。 */
   }
@@ -100,11 +108,14 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
   const interval = setInterval(schedule, 60000);
   interval.unref();
   schedule();
-  return () => {
+  return async () => {
     closed = true;
     clearTimeout(timer);
     clearInterval(interval);
-    watcher?.close();
     off();
+    // 借用 UI 的监听时只退订，关闭仍由 UI 在迁移 / 退出前负责。
+    sharedWatcher?.off("all", schedule).off("ready", schedule);
+    await watcher?.close();
+    await running;
   };
 }

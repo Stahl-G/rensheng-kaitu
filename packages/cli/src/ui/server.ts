@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
-import { startPhoneSnapshots } from "@kaitu/core";
+import { startPhoneSnapshots, watchWorkspace } from "@kaitu/core";
 import {
   type CalendarExecutor,
   CalendarPush,
@@ -228,7 +228,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError());
+  let stopPhone = async () => {};
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -256,17 +256,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     const own = [...new Set(messages)];
     messages = [];
     let pending = true;
-    const version = await snapshotNow(ws, (files) => {
-      pending = files.length > 0;
-      if (!pending) return null;
-      return own.length
-        ? own.join("；")
-        : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
-            .slice(0, 3)
-            .map((file) => file.split("/").at(-1))
-            .join("、")}等 ${files.length} 个文件`;
-    });
+    let version: string | null;
+    try {
+      version = await snapshotNow(ws, (files, hasPendingFiles) => {
+        // 外部收件箱仍等处理；显式原文要补存，但已经在版本里的原文不应无限重试。
+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);
+        if (!pending) return null;
+        return own.length
+          ? own.join("；")
+          : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+              .slice(0, 3)
+              .map((file) => file.split("/").at(-1))
+              .join("、")}等 ${files.length} 个文件`;
+      });
+    } catch (error) {
+      messages.unshift(...own);
+      throw error;
+    }
     if (!version && pending) {
+      messages.unshift(...own);
       reportError();
       scheduleSave(snapshotDelay);
     } else watchError = "";
@@ -298,7 +306,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
-  let watcher: FSWatcher | undefined;
+  let watcher: ReturnType<typeof watchWorkspace> | ReturnType<typeof watch> | undefined;
   let externalWatchers: FSWatcher[] = [];
   // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。
   const backupState = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
@@ -353,14 +361,23 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     };
     void poll();
   };
-  function startWatching() {
-    watcher?.close();
+  async function stopWatching() {
     stopPolling();
+    clearTimeout(refreshTimer);
+    clearTimeout(inboxTimer);
+    await watcher?.close();
+    watcher = undefined;
+    for (const external of externalWatchers) external.close();
+    externalWatchers = [];
+    await stopPhone();
+  }
+  async function startWatching() {
+    await stopWatching();
     watchStatus = { mode: "native", running: false, scanned: 0 };
     try {
-      watcher = (options.watch ?? watch)(ws.root, { recursive: true }, (_event, filename) => {
-        changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
-      });
+      watcher = options.watch
+        ? options.watch(ws.root, { recursive: true }, (_event, filename) => changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区"))
+        : watchWorkspace(ws.root, changedFile);
       watcher.on("error", startPolling);
     } catch {
       startPolling();
@@ -377,9 +394,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         // 目录暂不存在（iCloud 未同步或未配置），启动拉取与后续事件会重试
       }
     }
+    stopPhone = startPhoneSnapshots(ws, () => reportError(), watcher);
     scheduleInbox();
   }
-  startWatching();
+  await startWatching();
   const heartbeat = setInterval(() => {
     for (const client of clients) client.write(": heartbeat\n\n");
     for (const [id, upload] of uploads) {
@@ -492,13 +510,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                     await saveExternal();
                     await options.ask?.prepareRelocation();
                     await phones.stop();
-                    const oldRoot = ws.root;
+                    await stopWatching();
                     try {
                       if (relocate) await options.onWorkspaceChanging?.();
                       return await productRequest(ws, method, args, options.ask, calendarPush);
                     } finally {
                       try {
-                        if (ws.root !== oldRoot) startWatching();
+                        await startWatching();
                         if (relocate) await options.onWorkspaceChanged?.();
                       } finally {
                         options.ask?.relocate(ws.root);
@@ -656,6 +674,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/drive/disable": {
             await options.ask?.prepareRelocation();
             await phones.stop();
+            await stopWatching();
             const oldRoot = ws.root;
             try {
               await options.onWorkspaceChanging?.();
@@ -679,7 +698,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               });
             } finally {
               try {
-                startWatching();
+                await startWatching();
                 if (ws.root !== oldRoot) {
                   aiChild?.kill();
                   aiChild = undefined;
@@ -713,10 +732,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/restore": {
             await options.ask?.prepareRelocation();
             await phones.stop();
+            await stopWatching();
             try {
               return await restore(ws, field(data, "version"));
             } finally {
               options.ask?.relocate(ws.root);
+              await startWatching();
               phones.start();
             }
           }
@@ -784,7 +805,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     stopPolling();
     await workspaceExportRequest(ws, "cancel");
     cancelGithubCliLogin();
-    watcher?.close();
+    await stopWatching();
     unwatchFile(backupState, backupChanged);
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
@@ -797,7 +818,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await collectors.stop();
     stopBackup();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
@@ -813,12 +834,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       server.listen(requestedPort, "127.0.0.1", resolve);
     });
   } catch (error) {
-    stopPolling();
-    watcher?.close();
+    await stopWatching();
     unwatchFile(backupState, backupChanged);
     stopBackup();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);

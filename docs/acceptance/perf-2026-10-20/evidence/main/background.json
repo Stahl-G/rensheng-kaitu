@@ -1,0 +1,64 @@
+{
+  "mode": "background",
+  "at": "2026-10-19T18:40:39.750Z",
+  "repo": "/tmp/kaitu-v2-main",
+  "base": "/tmp/kaitu-v2-run-9xLzHY",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "workspace-open-new-process",
+      "ms": 321.2009680000001,
+      "maxEventLoopGapMs": 321.22421299999996
+    },
+    {
+      "name": "ui-listen-local",
+      "ms": 145.51055600000018,
+      "maxEventLoopGapMs": 145.29918599999974
+    },
+    {
+      "name": "http-capture-return",
+      "ms": 16.96402399999988,
+      "maxEventLoopGapMs": 8.780377999999928
+    },
+    {
+      "name": "http-complete-return",
+      "ms": 41.090760000000046,
+      "maxEventLoopGapMs": 34.32905299999993
+    },
+    {
+      "name": "write-background-end-to-end",
+      "ms": 2961.0388350000003,
+      "maxEventLoopGapMs": 110.51719800000001
+    },
+    {
+      "name": "http-import-preview-100",
+      "ms": 4.911157999999887,
+      "maxEventLoopGapMs": 4.9105970000000525
+    },
+    {
+      "name": "http-import-confirm-100",
+      "ms": 147.38007200000084,
+      "maxEventLoopGapMs": 89.36527399999977
+    },
+    {
+      "name": "import-background-end-to-end",
+      "ms": 4104.9657910000005,
+      "maxEventLoopGapMs": 119.515942
+    }
+  ],
+  "head": "e2d9cd83a176bf2fc6b35bc1dabe7f92f32bc9d6",
+  "productPatch": "",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "origin": "http://127.0.0.1:42063",
+  "capture": {
+    "path": "inbox/notes/2026-10-20/01m5aqehmf4559mfbze2cp6zsp.md",
+    "version": null
+  },
+  "writeVersion": "802ede8791711f6c6c94391bf73e353b1a289c46",
+  "importVersion": "ca349a6e3e643bad98c319e20db2fe59e715ddb0",
+  "imported": 100
+}

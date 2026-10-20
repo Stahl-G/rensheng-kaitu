@@ -1,9 +1,11 @@
 import fs, { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   history,
+  historyDirectory,
   initWorkspace,
   localDate,
   parseFrontmatter,
@@ -12,6 +14,7 @@ import {
   stringifyFrontmatter,
 } from "@kaitu/core";
 import { afterEach, expect, it, vi } from "vitest";
+import * as workspaceWatch from "../../core/src/workspace-watch.js";
 import { appleHealthZip } from "../../core/test/helpers.js";
 import { type UiOptions, startUi } from "../src/ui/server.js";
 
@@ -19,7 +22,7 @@ const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup() {
+async function setup(input: Parameters<typeof startUi>[1] = {}) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(root);
@@ -42,10 +45,89 @@ async function setup() {
     snapshotDelayMs: 80,
     refreshDelayMs: 10,
     inboxStableMs: 30,
+    ...input,
   });
   cleanup.push(ui.close);
   return { ws, ui };
 }
+it("只有用户显式记下的原文时也保存版本，失败后定时重试和关闭仍补存后续原文", async () => {
+  const { ws, ui } = await setup({ versionDelayMs: 80, snapshotDelayMs: 80 });
+  const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
+  const versionText = async (file: string) => {
+    try {
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: (await history(ws))[0]?.oid,
+        filepath: file,
+      });
+      return Buffer.from(blob).toString();
+    } catch {
+      return undefined;
+    }
+  };
+  for (const text of ["合成仅原文第一条", "合成仅原文后续条"]) {
+    const before = (await history(ws))[0]?.oid;
+    const response = await fetch(`${ui.url}/api/product/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui.url },
+      body: JSON.stringify([text]),
+    });
+    expect(response.status).toBe(200);
+    const saved = await response.json();
+    expect(ws.readText(saved.path)).toContain(text);
+    await expect
+      .poll(async () => {
+        const oid = (await history(ws))[0]?.oid;
+        return !!oid && oid !== before;
+      })
+      .toBe(true);
+    const { blob } = await git.readBlob({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      oid: (await history(ws))[0]?.oid,
+      filepath: saved.path,
+    });
+    expect(Buffer.from(blob).toString()).toContain(text);
+  }
+  // Windows 不提供 POSIX 目录写权限；该平台仍执行上面的真实 HTTP / Git 旅程。
+  if (process.platform !== "win32") {
+    for (const recovery of ["retry", "close"]) {
+      const response = await fetch(`${ui.url}/api/product/capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui.url },
+        body: JSON.stringify([`真实权限恢复合成原文 ${recovery}`]),
+      });
+      expect(response.status).toBe(200);
+      const saved = await response.json();
+      const text = ws.readText(saved.path);
+      const { oid } = await git.hashBlob({ object: Buffer.from(text) });
+      const objects = join(historyDirectory(ws), "objects", oid.slice(0, 2));
+      fs.mkdirSync(objects, { recursive: true });
+      const mode = fs.statSync(objects).mode & 0o777;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        fs.chmodSync(objects, 0o555);
+        await expect
+          .poll(() => warn.mock.calls.some(([message]) => String(message).includes("数据已保存，版本稍后")))
+          .toBe(true);
+        expect(ws.readText(saved.path)).toBe(text);
+        expect(await versionText(saved.path)).toBeUndefined();
+        fs.chmodSync(objects, mode);
+        if (recovery === "close") {
+          await ui.close();
+          cleanup.splice(cleanup.lastIndexOf(ui.close), 1);
+        }
+        await expect.poll(() => versionText(saved.path)).toBe(text);
+      } finally {
+        fs.chmodSync(objects, mode);
+        warn.mockRestore();
+      }
+    }
+  }
+});
 it("拒绝错误 Host、缺少 X-Kaitu 或非本机 Origin 的写操作", async () => {
   const { ws, ui } = await setup();
   const before = await history(ws);
@@ -196,31 +278,58 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 });
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
-  const { ws, ui } = await setup();
-  const post = (path: string, body: unknown) =>
-    fetch(`${ui.url}${path}`, {
-      method: "POST",
-      headers: { "X-Kaitu": "1", Origin: ui.url },
-      body: JSON.stringify(body),
+  const watch = workspaceWatch.watchWorkspace;
+  const watchers: ReturnType<typeof watch>[] = [];
+  const settled = new Set<ReturnType<typeof watch>>();
+  let settledAtMove = false;
+  const spy = vi.spyOn(workspaceWatch, "watchWorkspace").mockImplementation((...args) => {
+    const watcher = watch(...args);
+    watchers.push(watcher);
+    const close = watcher.close.bind(watcher);
+    watcher.close = async () => {
+      await close();
+      settled.add(watcher);
+    };
+    return watcher;
+  });
+  try {
+    const { ws, ui } = await setup({
+      onWorkspaceChanging: async () => {
+        settledAtMove = watchers.length > 0 && watchers.every((watcher) => settled.has(watcher));
+      },
     });
-  for (const [enable, disable, body] of [
-    ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
-    ["/api/drive/enable", "/api/drive/disable", {}],
-  ] as const) {
-    const folder = mkdtempSync(join(tmpdir(), "kaitu-ui-sync-"));
-    const back = mkdtempSync(join(tmpdir(), "kaitu-ui-back-"));
-    // 放到最前面：先关掉服务（后台存版本），再删目录。
-    cleanup.unshift(async () => {
-      rmSync(folder, { recursive: true, force: true });
-      rmSync(back, { recursive: true, force: true });
-    });
-    const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
-    const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
-    expect(ws.root).toBe(join(back, "kaitu"));
+    const post = (path: string, body: unknown) =>
+      fetch(`${ui.url}${path}`, {
+        method: "POST",
+        headers: { "X-Kaitu": "1", Origin: ui.url },
+        body: JSON.stringify(body),
+      });
+    for (const [enable, disable, body] of [
+      ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
+      ["/api/drive/enable", "/api/drive/disable", {}],
+    ] as const) {
+      const folder = mkdtempSync(join(tmpdir(), "kaitu-ui-sync-"));
+      const back = mkdtempSync(join(tmpdir(), "kaitu-ui-back-"));
+      // 放到最前面：先关掉服务（后台存版本），再删目录。
+      cleanup.unshift(async () => {
+        rmSync(folder, { recursive: true, force: true });
+        rmSync(back, { recursive: true, force: true });
+      });
+      settledAtMove = false;
+      const enabled = await post(enable, { ...body, dir: folder });
+      const enabledResult = await enabled.json();
+      expect(settledAtMove, "迁移前必须等待真实工作区监听全部关闭").toBe(true);
+      expect(enabled.status, JSON.stringify(enabledResult)).toBe(200);
+      expect(enabledResult.mode).toBe("drive");
+      settledAtMove = false;
+      const disabled = await post(disable, { to: join(back, "kaitu") });
+      expect(settledAtMove, "迁回本机前也必须等待监听关闭").toBe(true);
+      expect(disabled.status).toBe(200);
+      expect((await disabled.json()).mode).toBe("local");
+      expect(ws.root).toBe(join(back, "kaitu"));
+    }
+  } finally {
+    spy.mockRestore();
   }
 });
 

@@ -1,0 +1,77 @@
+{
+  "baseHead": "c1ead5aa78f46dfa420f22d22e29271cc8a51595",
+  "checks": {
+    "build": {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "logTail": [
+        "packages/web build: (!) Some chunks are larger than 500 kB after minification. Consider:",
+        "packages/web build: - Using dynamic import() to code-split the application",
+        "packages/web build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting",
+        "packages/web build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.",
+        "packages/web build: Done",
+        "packages/core build: Done",
+        "packages/channels build$ tsc -p tsconfig.json",
+        "packages/channels build: Done",
+        "packages/dsh-plugin build$ node scripts/build.mjs",
+        "packages/dsh-plugin build: Done",
+        "packages/cli build$ tsc -p tsconfig.json && node scripts/build-engine.mjs",
+        "packages/cli build: Done"
+      ]
+    },
+    "lint": {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "logTail": ["$ biome check .", "Checked 543 files in 576ms. No fixes applied."]
+    },
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "logTail": [
+        "$ pnpm -r typecheck",
+        "Scope: 6 of 7 workspace projects",
+        "packages/core typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck$ tsc --noEmit -p tsconfig.json",
+        "packages/core typecheck: Done",
+        "packages/channels typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck: Done",
+        "packages/channels typecheck: Done",
+        "packages/dsh-plugin typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+        "packages/dsh-plugin typecheck: Done",
+        "packages/cli typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/cli typecheck: Done"
+      ]
+    },
+    "test": {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "logTail": [
+        "$ vitest run",
+        "",
+        " RUN  v4.1.11 /tmp/kaitu-v2-perf",
+        "",
+        "",
+        " Test Files  95 passed | 1 skipped (96)",
+        "      Tests  282 passed | 2 skipped (284)",
+        "   Start at  19:36:01",
+        "   Duration  69.57s (transform 4.85s, setup 616ms, import 26.54s, tests 103.47s, environment 5ms)",
+        ""
+      ]
+    }
+  },
+  "sourceSha256": {
+    "packages/core/src/history.ts": "588d840aa26b17f94a2e790f10faa0d13d717d953a5815b920ee31aa8ea6673e",
+    "packages/core/src/phone-snapshots.ts": "741deaf0ef729dbea48db08a115d72f0de8b094c0714d2adc55703e63c071054",
+    "packages/cli/src/ui/server.ts": "399e46eb1ecd3d9d4709c7c3617782d04b761b195803d6f6d4a61ada74af3140",
+    "packages/core/test/history.test.ts": "84174d8fcc10be6618b0fd5c9f2c5c7d4d4fc1323f1799788f70876f372ece85",
+    "packages/core/test/workspace-watch.test.ts": "929df4de8f78d47c137e6e1674b28ceb7822b6acbb6f4f580fa77957530e528f",
+    "packages/cli/test/ui.test.ts": "966d139984bc4f7baeb7c9ff81e7ed0bd9f5ca04f2e1738e8c0db1ea38df9703",
+    "docs/acceptance/perf-2026-10-20/measure.mjs": "c9576b732ddb1689309325261add3eba9de81cdf9eeb48a9d59150dffff4b895",
+    "docs/acceptance/perf-2026-10-20/overlap.mjs": "bfa7be8e81f25e60ec58a5e784f093239ffd93002d05edc02790def2dfcfac89"
+  },
+  "notes": [
+    "All checks use temporary HOME/state; no fake Git/time, increased timeout or new skip.",
+    "Test POSIX directory permissions run on Linux/macOS; Windows still executes actual path-conflict/retry.",
+    "Performance runs were completed before the parallel checks."
+  ]
+}

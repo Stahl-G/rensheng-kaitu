@@ -9,6 +9,7 @@
 | saxes | ISC | https://github.com/lddubeau/saxes |
 | ical.js | MPL-2.0 | https://github.com/kewisch/ical.js |
 | isomorphic-git | MIT | https://github.com/isomorphic-git/isomorphic-git |
+| chokidar | MIT | https://github.com/paulmillr/chokidar |
 | ajv | MIT | https://github.com/ajv-validator/ajv |
 | yaml | ISC | https://github.com/eemeli/yaml |
 | Preact | MIT | https://github.com/preactjs/preact |

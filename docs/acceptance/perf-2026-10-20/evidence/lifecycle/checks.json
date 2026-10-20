@@ -1,0 +1,62 @@
+{
+  "checks": {
+    "build": {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "logTail": [
+        "packages/web build: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting",
+        "packages/web build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.",
+        "packages/web build: Done",
+        "packages/core build: Done",
+        "packages/channels build$ tsc -p tsconfig.json",
+        "packages/channels build: Done",
+        "packages/dsh-plugin build$ node scripts/build.mjs",
+        "packages/dsh-plugin build: Done",
+        "packages/cli build$ tsc -p tsconfig.json && node scripts/build-engine.mjs",
+        "packages/cli build: Done"
+      ]
+    },
+    "lint": {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "logTail": ["$ biome check .", "Checked 530 files in 532ms. No fixes applied."]
+    },
+    "typecheck": {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "logTail": [
+        "packages/core typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/web typecheck$ tsc --noEmit -p tsconfig.json",
+        "packages/web typecheck: Done",
+        "packages/core typecheck: Done",
+        "packages/channels typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/channels typecheck: Done",
+        "packages/dsh-plugin typecheck$ tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+        "packages/dsh-plugin typecheck: Done",
+        "packages/cli typecheck$ tsc -p tsconfig.json --noEmit",
+        "packages/cli typecheck: Done"
+      ]
+    },
+    "test": {
+      "command": "pnpm test",
+      "exitCode": 0,
+      "logTail": [
+        "$ vitest run",
+        "",
+        " RUN  v4.1.11 /tmp/kaitu-v2-perf",
+        "",
+        "",
+        " Test Files  95 passed | 1 skipped (96)",
+        "      Tests  279 passed | 2 skipped (281)",
+        "   Start at  19:16:17",
+        "   Duration  64.98s (transform 2.68s, setup 543ms, import 23.60s, tests 97.47s, environment 5ms)",
+        ""
+      ]
+    }
+  },
+  "sourceSha256": {
+    "packages/core/src/phone-snapshots.ts": "33a81a492f87d2c8211fa8972be54af6dcdf10fb5d635e05ee5297b1a0b872e3",
+    "packages/cli/src/ui/server.ts": "450ee1ad5bd4f016d1c21ce9cd1cb457669c1bac32c2d803fef01446bcbfaa8b",
+    "packages/cli/test/ui.test.ts": "4d84d1a2e595e49315de7a0447fe2fe870733e2a1b85518a45b8e510a52299fd"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "mode": "seed",
+  "at": "2026-10-19T18:35:23.931Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "base": "/tmp/kaitu-v2-run-JmRmT5",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "seed-real-snapshot",
+      "ms": 18412.907740000002,
+      "maxEventLoopGapMs": 231.926512
+    }
+  ],
+  "validation": [],
+  "scale": {
+    "records": 20000,
+    "notes": 2000,
+    "projects": 300,
+    "chats": 1000
+  },
+  "fixture": "/tmp/kaitu-v2-run-JmRmT5/workspace"
+}

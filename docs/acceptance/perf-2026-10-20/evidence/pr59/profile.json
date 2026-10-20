@@ -1,0 +1,46 @@
+{
+  "mode": "profile",
+  "at": "2026-10-19T18:41:46.009Z",
+  "repo": "/tmp/kaitu-v2-pr59",
+  "base": "/tmp/kaitu-v2-run-7vZre9",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "workspace-open-new-process",
+      "ms": 300.03754800000024,
+      "maxEventLoopGapMs": 300.083357
+    },
+    {
+      "name": "health-profile-warm",
+      "ms": 196.6024010000001,
+      "maxEventLoopGapMs": 196.6758030000001
+    },
+    {
+      "name": "health-profile-warm",
+      "ms": 208.66482399999995,
+      "maxEventLoopGapMs": 208.631484
+    },
+    {
+      "name": "health-profile-warm",
+      "ms": 175.79815000000008,
+      "maxEventLoopGapMs": 175.758781
+    },
+    {
+      "name": "health-profile-warm",
+      "ms": 180.50514900000007,
+      "maxEventLoopGapMs": 180.43909900000017
+    },
+    {
+      "name": "health-profile-warm",
+      "ms": 183.07803099999956,
+      "maxEventLoopGapMs": 182.55133700000033
+    }
+  ],
+  "head": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+  "productPatch": "",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s"
+}

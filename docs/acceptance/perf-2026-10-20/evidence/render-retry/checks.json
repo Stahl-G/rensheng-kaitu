@@ -1,0 +1,20 @@
+{
+  "baselineRetryFailure": "\n RUN  v4.1.11 /tmp/kaitu-v2-perf\n\n ❯ packages/cli/test/ui.test.ts (7 tests | 1 failed | 6 skipped) 1973ms\n   × 只有用户显式记下的原文时也保存版本，失败后定时重试和关闭仍补存后续原文 1972ms\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  packages/cli/test/ui.test.ts > 只有用户显式记下的原文时也保存版本，失败后定时重试和关闭仍补存后续原文\nAssertionError: expected undefined to be '---\\nagent: 你\\ndate: 2026-10-20\\ncrea…' // Object.is equality\n\n- Expected:\n\"---\nagent: 你\ndate: 2026-10-20\ncreated: 2026-10-20T04:00:06+08:00\nkind: capture\n---\n真实权限恢复合成原文 retry\"\n\n+ Received:\nundefined\n\n ❯ packages/cli/test/ui.test.ts:105:58\n    103|         fs.chmodSync(objects, mode);\n    104|         if (recovery === \"close\") await ui.close();\n    105|         await expect.poll(() => versionText(saved.path)).toBe(text);\n       |                                                          ^\n    106|       } finally {\n    107|         fs.chmodSync(objects, mode);\n\nCaused by: Error: Matcher did not succeed in time.\n ❯ packages/cli/test/ui.test.ts:105:9\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n\n Test Files  1 failed (1)\n      Tests  1 failed | 6 skipped (7)\n   Start at  20:00:04\n   Duration  3.23s (transform 649ms, setup 18ms, import 1.16s, tests 1.97s, environment 0ms)\n\n",
+  "targetedTests": "\n RUN  v4.1.11 /tmp/kaitu-v2-perf\n\n\n Test Files  2 passed (2)\n      Tests  16 passed (16)\n   Start at  20:01:25\n   Duration  9.06s (transform 1.04s, setup 34ms, import 1.74s, tests 11.41s, environment 0ms)\n\n",
+  "buildCore": "$ tsc -p tsconfig.json\n",
+  "buildCli": "$ tsc -p tsconfig.json && node scripts/build-engine.mjs\n",
+  "typecheckCore": "$ tsc -p tsconfig.json --noEmit\n",
+  "typecheckCli": "$ tsc -p tsconfig.json --noEmit\n",
+  "scope": "UI7 + history9 actual tests; no new test count/skip/timeout increase. Default recovery separately uses real2s/30s windows. No unrelated local full-suite rerun.",
+  "lint": "$ biome check .\nChecked 557 files in 388ms. No fixes applied.\n",
+  "sourceSha256": {
+    "packages/core/src/history.ts": "cfa738b87b1aaa87a8abbd7e0f1f9da336957cc23071e185266d29b30cdb1351",
+    "packages/cli/src/ui/server.ts": "8ef24625aa8ec055233b345626dbadb909ac04a44dccbc44bb2a1ba8ad823506",
+    "packages/core/test/history.test.ts": "705888fb0f2a032675a2f7051b5fa16dcab436f116c9d2c217af58a672773f03",
+    "packages/cli/test/ui.test.ts": "0477cc78bda3ca4d0da02d28d390ee0f578d0775f860ad7672100eff6e28c89d",
+    "docs/acceptance/perf-2026-10-20/browser.mjs": "38f714b83cbcc31e4f84b37298869e58823c4fa7f0da0d277049ad65d40861fa",
+    "docs/acceptance/perf-2026-10-20/overlap.mjs": "5192a645d19c7f7654639c6904f7a1694322b8c0f517e578bf82625bc5ff6807",
+    "docs/acceptance/perf-2026-10-20/raw-note-retry.mjs": "eb7e4eb5e79dfa359d4cde0c373eafb8d845b62eebc032964bbed891146849c2"
+  },
+  "syntaxCheck": "node --check browser.mjs / overlap.mjs / raw-note-retry.mjs: exit 0"
+}

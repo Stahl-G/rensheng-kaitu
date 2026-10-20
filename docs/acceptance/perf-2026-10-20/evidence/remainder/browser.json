@@ -1,0 +1,576 @@
+{
+  "at": "2026-10-19T19:34:48.058Z",
+  "repo": "/tmp/kaitu-v2-perf",
+  "serverReadyMs": 357.4640409999997,
+  "samples": [
+    {
+      "name": "explore-health-first",
+      "at": 877.7999999998137,
+      "target": "开图",
+      "feedbackMs": 28.100000000093132,
+      "completeMs": 236.60000000009313,
+      "driverObservedMs": 262.10000000009313,
+      "requests": [
+        {
+          "url": "/api/product/health",
+          "at": 880.5,
+          "headersMs": 124.20000000018626
+        }
+      ]
+    },
+    {
+      "name": "library-first",
+      "at": 1208.7000000001863,
+      "target": "资料",
+      "completeMs": 30.399999999906868,
+      "feedbackMs": 30.399999999906868,
+      "driverObservedMs": 47.799999999813735,
+      "requests": []
+    },
+    {
+      "name": "today-warm",
+      "at": 1324.7999999998137,
+      "target": "今天",
+      "completeMs": 31,
+      "feedbackMs": 31,
+      "driverObservedMs": 389.70000000018626,
+      "requests": [
+        {
+          "url": "/api/product/overview",
+          "at": 1325.1000000000931,
+          "headersMs": 353.89999999990687
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 1325.8999999999069,
+          "headersMs": 112.20000000018626
+        },
+        {
+          "url": "/api/product/library",
+          "at": 1326.1000000000931,
+          "headersMs": 220.39999999990687
+        },
+        {
+          "url": "/api/product/me",
+          "at": 1326.2999999998137,
+          "headersMs": 220.5
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 1326.3999999999069,
+          "headersMs": 320.39999999990687
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 1326.3999999999069,
+          "headersMs": 322
+        }
+      ]
+    },
+    {
+      "name": "capture",
+      "at": 1775.6000000000931,
+      "target": "记下",
+      "completeMs": 46.89999999990687,
+      "feedbackMs": 31.600000000093132,
+      "readyForNextMs": 513.6000000000931,
+      "driverObservedMs": 868.3999999999069,
+      "requests": [
+        {
+          "url": "/api/product/capture",
+          "at": 1776.5,
+          "headersMs": 13.700000000186265
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 1792,
+          "headersMs": 456.60000000009313
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 1792.2999999998137,
+          "headersMs": 116.10000000009313
+        },
+        {
+          "url": "/api/product/library",
+          "at": 1792.5,
+          "headersMs": 223.5
+        },
+        {
+          "url": "/api/product/me",
+          "at": 1792.6000000000931,
+          "headersMs": 229.29999999981374
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 1792.7999999998137,
+          "headersMs": 326.8000000002794
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 1792.7999999998137,
+          "headersMs": 426
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 2269.899999999907,
+          "headersMs": 355.20000000018626
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 2270.399999999907,
+          "headersMs": 116.10000000009313
+        },
+        {
+          "url": "/api/product/library",
+          "at": 2270.5,
+          "headersMs": 223.5
+        },
+        {
+          "url": "/api/product/me",
+          "at": 2270.600000000093,
+          "headersMs": 229.89999999990687
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 2270.7000000001863,
+          "headersMs": 327.29999999981374
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 2270.7999999998137,
+          "headersMs": 328.70000000018626
+        }
+      ]
+    },
+    {
+      "name": "complete",
+      "at": 2674.7000000001863,
+      "target": "✓",
+      "feedbackMs": 31,
+      "completeMs": 515.0999999996275,
+      "readyForNextMs": 515.0999999996275,
+      "driverObservedMs": 882,
+      "requests": [
+        {
+          "url": "/api/product/completeNext",
+          "at": 2675,
+          "headersMs": 24.200000000186265
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 2699.7999999998137,
+          "headersMs": 456
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 2700.2000000001863,
+          "headersMs": 115.89999999990687
+        },
+        {
+          "url": "/api/product/library",
+          "at": 2700.2999999998137,
+          "headersMs": 222.70000000018626
+        },
+        {
+          "url": "/api/product/me",
+          "at": 2700.5,
+          "headersMs": 228.29999999981374
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 2700.600000000093,
+          "headersMs": 326.6999999997206
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 2700.7000000001863,
+          "headersMs": 426.89999999990687
+        },
+        {
+          "url": "/api/product/overview",
+          "at": 3171,
+          "headersMs": 367.20000000018626
+        },
+        {
+          "url": "/api/product/calendar",
+          "at": 3171.600000000093,
+          "headersMs": 121.60000000009313
+        },
+        {
+          "url": "/api/product/library",
+          "at": 3171.7999999998137,
+          "headersMs": 228.70000000018626
+        },
+        {
+          "url": "/api/product/me",
+          "at": 3171.899999999907,
+          "headersMs": 246.89999999990687
+        },
+        {
+          "url": "/api/product/onboarding",
+          "at": 3172,
+          "headersMs": 339.20000000018626
+        },
+        {
+          "url": "/api/product/calendarPush",
+          "at": 3172.100000000093,
+          "headersMs": 340
+        }
+      ]
+    },
+    {
+      "name": "explore-health-warm",
+      "at": 3591.399999999907,
+      "target": "开图",
+      "feedbackMs": 31,
+      "completeMs": 245.39999999990687,
+      "driverObservedMs": 341.70000000018626,
+      "requests": [
+        {
+          "url": "/api/product/health",
+          "at": 3593.399999999907,
+          "headersMs": 117
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "head": "c1ead5aa78f46dfa420f22d22e29271cc8a51595",
+  "productPatch": "",
+  "browser": "154.0.8037.57",
+  "firstContentMs": 769.8999999999069,
+  "paint": [
+    {
+      "name": "first-paint",
+      "start": 160
+    },
+    {
+      "name": "first-contentful-paint",
+      "start": 160
+    }
+  ],
+  "capturePersisted": true,
+  "externalDuringRefreshPreserved": true,
+  "requests": [
+    {
+      "url": "/api/product/preferences",
+      "at": 150.20000000018626,
+      "headersMs": 9.599999999627471
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 162,
+      "headersMs": 557.2000000001863
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 162.20000000018626,
+      "headersMs": 274.29999999981374
+    },
+    {
+      "url": "/api/product/library",
+      "at": 162.29999999981374,
+      "headersMs": 395.20000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 162.5,
+      "headersMs": 408.89999999990687
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 162.60000000009313,
+      "headersMs": 519.6000000000931
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 162.79999999981374,
+      "headersMs": 520.2000000001863
+    },
+    {
+      "url": "/api/product/health",
+      "at": 880.5,
+      "headersMs": 124.20000000018626
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 1325.1000000000931,
+      "headersMs": 353.89999999990687
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 1325.8999999999069,
+      "headersMs": 112.20000000018626
+    },
+    {
+      "url": "/api/product/library",
+      "at": 1326.1000000000931,
+      "headersMs": 220.39999999990687
+    },
+    {
+      "url": "/api/product/me",
+      "at": 1326.2999999998137,
+      "headersMs": 220.5
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 1326.3999999999069,
+      "headersMs": 320.39999999990687
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 1326.3999999999069,
+      "headersMs": 322
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 1776.5,
+      "headersMs": 13.700000000186265
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 1792,
+      "headersMs": 456.60000000009313
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 1792.2999999998137,
+      "headersMs": 116.10000000009313
+    },
+    {
+      "url": "/api/product/library",
+      "at": 1792.5,
+      "headersMs": 223.5
+    },
+    {
+      "url": "/api/product/me",
+      "at": 1792.6000000000931,
+      "headersMs": 229.29999999981374
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 1792.7999999998137,
+      "headersMs": 326.8000000002794
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 1792.7999999998137,
+      "headersMs": 426
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 2269.899999999907,
+      "headersMs": 355.20000000018626
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 2270.399999999907,
+      "headersMs": 116.10000000009313
+    },
+    {
+      "url": "/api/product/library",
+      "at": 2270.5,
+      "headersMs": 223.5
+    },
+    {
+      "url": "/api/product/me",
+      "at": 2270.600000000093,
+      "headersMs": 229.89999999990687
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 2270.7000000001863,
+      "headersMs": 327.29999999981374
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 2270.7999999998137,
+      "headersMs": 328.70000000018626
+    },
+    {
+      "url": "/api/product/completeNext",
+      "at": 2675,
+      "headersMs": 24.200000000186265
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 2699.7999999998137,
+      "headersMs": 456
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 2700.2000000001863,
+      "headersMs": 115.89999999990687
+    },
+    {
+      "url": "/api/product/library",
+      "at": 2700.2999999998137,
+      "headersMs": 222.70000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 2700.5,
+      "headersMs": 228.29999999981374
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 2700.600000000093,
+      "headersMs": 326.6999999997206
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 2700.7000000001863,
+      "headersMs": 426.89999999990687
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 3171,
+      "headersMs": 367.20000000018626
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 3171.600000000093,
+      "headersMs": 121.60000000009313
+    },
+    {
+      "url": "/api/product/library",
+      "at": 3171.7999999998137,
+      "headersMs": 228.70000000018626
+    },
+    {
+      "url": "/api/product/me",
+      "at": 3171.899999999907,
+      "headersMs": 246.89999999990687
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 3172,
+      "headersMs": 339.20000000018626
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 3172.100000000093,
+      "headersMs": 340
+    },
+    {
+      "url": "/api/product/health",
+      "at": 3593.399999999907,
+      "headersMs": 117
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 4141.399999999907,
+      "headersMs": 357.10000000009313
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 4142.100000000093,
+      "headersMs": 120.5
+    },
+    {
+      "url": "/api/product/library",
+      "at": 4142.399999999907,
+      "headersMs": 228.3000000002794
+    },
+    {
+      "url": "/api/product/me",
+      "at": 4142.700000000186,
+      "headersMs": 241.89999999990687
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 4143.100000000093,
+      "headersMs": 329.5
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 4143.299999999814,
+      "headersMs": 330.60000000009313
+    },
+    {
+      "url": "/api/product/capture",
+      "at": 4558.600000000093,
+      "headersMs": 14.600000000093132
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 4574.299999999814,
+      "headersMs": 1286.6000000000931
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 4574.5,
+      "headersMs": 4.7999999998137355
+    },
+    {
+      "url": "/api/product/library",
+      "at": 4574.600000000093,
+      "headersMs": 115.89999999990687
+    },
+    {
+      "url": "/api/product/me",
+      "at": 4574.700000000186,
+      "headersMs": 116
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 4574.799999999814,
+      "headersMs": 217
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 4575,
+      "headersMs": 217.29999999981374
+    },
+    {
+      "url": "/api/product/overview",
+      "at": 5876,
+      "headersMs": 365.39999999990687
+    },
+    {
+      "url": "/api/product/calendar",
+      "at": 5876.299999999814,
+      "headersMs": 12.600000000093132
+    },
+    {
+      "url": "/api/product/library",
+      "at": 5876.399999999907,
+      "headersMs": 118.5
+    },
+    {
+      "url": "/api/product/me",
+      "at": 5876.600000000093,
+      "headersMs": 118.5
+    },
+    {
+      "url": "/api/product/onboarding",
+      "at": 5876.600000000093,
+      "headersMs": 220.10000000009313
+    },
+    {
+      "url": "/api/product/calendarPush",
+      "at": 5876.700000000186,
+      "headersMs": 220.29999999981374
+    }
+  ],
+  "longTasks": [
+    {
+      "start": 1007.3999999999069,
+      "duration": 53
+    },
+    {
+      "start": 1060.5,
+      "duration": 53
+    },
+    {
+      "start": 3712.2999999998137,
+      "duration": 53
+    },
+    {
+      "start": 3765.399999999907,
+      "duration": 71
+    }
+  ],
+  "completePersisted": true
+}

@@ -1,0 +1,87 @@
+{
+  "mode": "version-profile",
+  "at": "2026-10-19T18:57:08.742Z",
+  "repo": "/tmp/kaitu-v2-before-watch",
+  "base": "/tmp/kaitu-v2-run-86hWTG",
+  "node": "v24.19.0",
+  "platform": "linux 6.18.55 x64",
+  "cpu": "AMD EPYC 9V45 96-Core Processor",
+  "cpus": 5,
+  "totalMemory": 18882674688,
+  "samples": [
+    {
+      "name": "workspace-open-new-process",
+      "ms": 326.3296540000001,
+      "maxEventLoopGapMs": 326.34965399999965
+    },
+    {
+      "name": "ui-listen-local",
+      "ms": 135.78825899999993,
+      "maxEventLoopGapMs": 135.56382200000007
+    },
+    {
+      "name": "http-capture-return",
+      "ms": 20.238013000000137,
+      "maxEventLoopGapMs": 10.206727999999657
+    },
+    {
+      "name": "http-complete-return",
+      "ms": 40.947651999999835,
+      "maxEventLoopGapMs": 39.70204199999989
+    },
+    {
+      "name": "write-background-end-to-end",
+      "ms": 2997.783876,
+      "maxEventLoopGapMs": 116.09433799999988
+    },
+    {
+      "name": "http-import-preview-100",
+      "ms": 6.094154000000344,
+      "maxEventLoopGapMs": 5.184451000000081
+    },
+    {
+      "name": "http-import-confirm-100",
+      "ms": 162.90022300000055,
+      "maxEventLoopGapMs": 97.72046800000044
+    },
+    {
+      "name": "import-background-end-to-end",
+      "ms": 4265.475486,
+      "maxEventLoopGapMs": 137.095241
+    }
+  ],
+  "head": "5b0bc1e808c80a375da28e249aa550e06b2ee284",
+  "productPatch": "",
+  "cacheCondition": "new process, OS page cache not dropped; copied fixture mtimes aged 2.1 s",
+  "origin": "http://127.0.0.1:40375",
+  "capture": {
+    "path": "inbox/notes/2026-10-20/01m5arcqgb91bthprymj2p5g9w.md",
+    "version": null
+  },
+  "writeVersion": "552c170c9f81c5b28dcefa6755a564eb4410721f",
+  "importVersion": "fdf478155830b4611532021c77f4281759928dcc",
+  "imported": 100,
+  "saveTimeline": [
+    {
+      "event": "save-start",
+      "ms": 2226.0975690000005
+    },
+    {
+      "event": "ref-written",
+      "ms": 3081.9709060000005
+    },
+    {
+      "event": "save-start",
+      "ms": 5301.018178
+    },
+    {
+      "event": "ref-written",
+      "ms": 7356.02476
+    }
+  ],
+  "indexIo": {
+    "lstat": 7009,
+    "readFile": 108,
+    "writeFile": 104
+  }
+}

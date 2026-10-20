@@ -183,12 +183,12 @@ function snapshotFile(ws: Workspace, file: string): boolean {
   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
-function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>): string[] {
+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {
   return matrix
     .filter(
       ([file, head, workdir, stage]) =>
         file !== "OVERVIEW.md" &&
-        !file.startsWith("inbox/") &&
+        (includeInbox || !file.startsWith("inbox/")) &&
         !neverTrack(file) &&
         !(head === 1 && workdir === 1 && stage === 1),
     )
@@ -244,7 +244,15 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   return null;
 }
 
-type SnapshotMessage = string | ((files: readonly string[]) => string | null);
+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);
+
+function unavailableHistoryWrite(error: unknown): boolean {
+  if (error instanceof git.Errors.MultipleGitError)
+    return error.errors.length > 0 && error.errors.every(unavailableHistoryWrite);
+  return ["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(
+    (error as NodeJS.ErrnoException | undefined)?.code ?? "",
+  );
+}
 
 /** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */
 export async function snapshotNow(
@@ -256,9 +264,8 @@ export async function snapshotNow(
   try {
     return await saveSnapshot(ws, message, now);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
-    if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
+    if (!unavailableHistoryWrite(error)) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
     return null;
   }
@@ -268,8 +275,11 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
+  // 只在这次完整保存里共享 Git 对象与索引解析，不跨版本缓存工作区状态。
+  const cache = {};
   const changedFiles = new Map(invalidated.get(ws));
   const matrix = await git.statusMatrix({
+    cache,
     fs: historyFs(ws, changedFiles),
     refresh: !changedFiles.size,
     dir,
@@ -279,33 +289,38 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
   let description: string;
   if (typeof message === "function") {
     const files = pendingFiles(matrix);
-    const result = message(files);
+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。
+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);
     if (result === null) {
       if (!files.length) clearInvalidated(ws, changedFiles);
       return null;
     }
     description = result;
   } else description = message;
-  let changed = 0;
+  const additions: string[] = [];
+  const removals: string[] = [];
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
       if (head !== 0 || stage !== 0) {
-        await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-        changed++;
+        removals.push(filepath);
       }
       continue;
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
-    if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
-    changed++;
+    if (workdir === 0) removals.push(filepath);
+    else additions.push(filepath);
   }
-  if (changed === 0) {
+  if (!additions.length && !removals.length) {
     clearInvalidated(ws, changedFiles);
     return null;
   }
+  if (removals.length) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath: removals, cache });
+  // git.add 支持多路径，但会并行打开该数组里的文件；小批限制文件句柄，同时避免逐文件重写全索引。
+  for (let i = 0; i < additions.length; i += 32)
+    await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath: additions.slice(i, i + 32), cache });
   const timestamp = Math.floor(now.getTime() / 1000);
   const oid = await git.commit({
+    cache,
     fs,
     dir,
     gitdir: historyDirectory(ws),
