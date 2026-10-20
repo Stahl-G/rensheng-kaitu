@@ -395,8 +395,8 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              loadLibrary: async () => {
-                const r = await ctx.remote.kaitu.library();
+              loadLibrary: async (query?: import("@kaitu/core").LibraryQuery) => {
+                const r = await ctx.remote.kaitu.library(query);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
@@ -537,7 +537,7 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
-              previewExperienceBatch: async (id: string, operation: "undo" | "restore") => {
+              previewExperienceBatch: async (id: string, operation: "confirm" | "undo" | "restore") => {
                 const result = await ctx.remote.kaitu.experienceBatchPreview(id, operation);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
@@ -546,7 +546,11 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.setExperienceSource(locator, excluded, revision);
                 if (!result.ok) throw new Error(result.error.message);
               },
-              changeExperienceBatch: async (id: string, operation: "undo" | "restore", revision: number) => {
+              changeExperienceBatch: async (
+                id: string,
+                operation: "confirm" | "undo" | "restore",
+                revision: number,
+              ) => {
                 const result = await ctx.remote.kaitu.changeExperienceBatch(id, operation, revision);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;

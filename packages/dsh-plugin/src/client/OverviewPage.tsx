@@ -143,35 +143,28 @@ function Overview({
     if (!locale) return;
     const seq = ++sequence.current;
     try {
-      const [overview, agenda, files, me, introduction, calendarPush] = await Promise.all([
-        props.load(),
-        props.loadCalendar(),
-        props.loadLibrary(),
-        props.loadMe(),
-        props.loadOnboarding(locale),
-        props.loadCalendarPush(),
-      ]);
-      if (seq !== sequence.current) return;
-      setData(overview);
-      setPush(calendarPush);
-      setCalendar(agenda);
-      setLibrary(files);
-      setPersonal(me);
-      setOnboarding(introduction);
-      setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
       setError("");
+      const update = <T,>(load: () => Promise<T>, apply: (value: T) => void) =>
+        load().then((value) => {
+          if (seq === sequence.current) apply(value);
+        });
+      await Promise.all([
+        update(props.load, setData),
+        update(props.loadCalendar, setCalendar),
+        update(props.loadMe, setPersonal),
+        update(
+          () => props.loadOnboarding(locale),
+          (introduction) => {
+            setOnboarding(introduction);
+            setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
+          },
+        ),
+        update(props.loadCalendarPush, setPush),
+      ]);
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [
-    locale,
-    props.load,
-    props.loadCalendar,
-    props.loadLibrary,
-    props.loadMe,
-    props.loadOnboarding,
-    props.loadCalendarPush,
-  ]);
+  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding, props.loadCalendarPush]);
   useEffect(() => {
     void refresh();
     return () => {
@@ -179,6 +172,28 @@ function Overview({
     };
   }, [refresh]);
   useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
+  useEffect(() => {
+    if (view !== "records") return;
+    let sequence = 0;
+    const load = async () => {
+      const seq = ++sequence;
+      try {
+        const value = await props.loadLibrary({
+          section: record === "notes" || record === "health" ? record : "summary",
+        });
+        if (seq === sequence) setLibrary(value);
+      } catch (err) {
+        if (seq === sequence) setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void load();
+    const off = props.subscribe?.(() => void load());
+    return () => {
+      sequence++;
+      off?.();
+    };
+  }, [view, record, props.loadLibrary, props.subscribe]);
   useEffect(() => {
     if (view === "ask") setAskVisited(true);
   }, [view]);
@@ -842,7 +857,8 @@ function Overview({
               />
             ) : record === "inbox" ? (
               <InboxPage
-                data={library}
+                loadLibrary={props.loadLibrary}
+                subscribe={props.subscribe}
                 channelSettings={props.channelSettings}
                 connect={() => {
                   setView("connections");

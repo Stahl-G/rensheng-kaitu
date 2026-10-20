@@ -140,6 +140,7 @@ import type {
   ExplorationCommand,
   ExplorationData,
   HealthData,
+  LibraryQuery,
   LifeMapData,
   MeData,
   NewsAction,
@@ -358,8 +359,8 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("library")
-  async library(): Promise<LibraryData> {
-    return readLibrary(this.workspace);
+  async library(query?: LibraryQuery): Promise<LibraryData> {
+    return readLibrary(this.workspace, query);
   }
 
   @Remote("libraryDocument")
@@ -603,7 +604,10 @@ export class KaituOverviewService extends TypertRemoteService {
     return readExperienceImports(this.workspace);
   }
   @Remote("experienceBatchPreview")
-  async experienceBatchPreview(id: string, operation: "undo" | "restore"): Promise<ExperienceBatchPreview> {
+  async experienceBatchPreview(
+    id: string,
+    operation: "confirm" | "undo" | "restore",
+  ): Promise<ExperienceBatchPreview> {
     return previewExperienceBatch(this.workspace, id, operation);
   }
   @Remote("setExperienceSource")
@@ -613,7 +617,7 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("changeExperienceBatch")
   async changeExperienceBatch(
     id: string,
-    operation: "undo" | "restore",
+    operation: "confirm" | "undo" | "restore",
     revision: number,
   ): Promise<{ affected: number; preserved: number; version: string | null }> {
     return this.write(() => changeExperienceBatch(this.workspace, id, operation, revision));

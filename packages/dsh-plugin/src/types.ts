@@ -219,7 +219,7 @@ export type FinanceNotificationReceiveData = ReturnType<typeof receiveBankNotifi
 export type FinanceNotificationCandidatesData = ReturnType<typeof bankNotificationCandidates>;
 export type { CalendarData, CalendarEntry, AutomationSettings, AutomationKey } from "@kaitu/core";
 
-export type { LibraryData, InboxEntry } from "@kaitu/core";
+export type { LibraryData, LibraryQuery, InboxEntry } from "@kaitu/core";
 
 export type { NewsFeedback } from "@kaitu/core";
 import type { NewsFeedback, PlansData } from "@kaitu/core";

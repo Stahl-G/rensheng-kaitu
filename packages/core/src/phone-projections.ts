@@ -4,6 +4,7 @@ import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
+import { phoneInboxName } from "./phone-actions.js";
 import type { LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
@@ -19,7 +20,27 @@ const envelope = (name: string, generatedAt: string) => ({
   generator: { kind: "computer" },
 });
 
+// 当天饮食合计，以及已经算进去的手机提交文件：手机只再叠加不在其中的本机确认。
+function nutrition(ws: Workspace, data: Overview) {
+  if (!listRecordTypes(ws).some((ref) => ref.type === "meal")) return undefined;
+  const meals = readRecords(ws, "meal").filter(
+    (meal) => localDate(parseTs(meal.ts), data.timeZone) === data.today,
+  );
+  const receipts = ws.exists(".kaitu/inbox-records.json")
+    ? Object.keys(ws.readJson<object>(".kaitu/inbox-records.json"))
+    : [];
+  return {
+    version: 1,
+    kcal: meals.reduce((sum, meal) => sum + (Number(meal.kcal) || 0), 0),
+    protein_g: meals.reduce((sum, meal) => sum + (Number(meal.protein_g) || 0), 0),
+    accounted_refs: receipts
+      .filter((ref) => phoneInboxName.test(ref) && ref.endsWith(".records.jsonl"))
+      .sort(),
+  };
+}
+
 export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
+  const food = nutrition(ws, data);
   const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
@@ -35,6 +56,7 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
     ...envelope("today", generatedAt),
     today: data.today,
     timezone: data.timeZone,
+    ...(food ? { nutrition: food } : {}),
     mobile: {
       version: 1,
       actions: hasTasks
@@ -230,7 +252,10 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
       path: `${ref.module.dir}/${ref.def.path.replace("{YYYY-MM}", month)}`,
     });
   }
-  for (const n of [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")]) {
+  for (const n of [
+    ...inboxNotes(ws, "inbox/notes", { from: since }),
+    ...inboxNotes(ws, "inbox/notes/done", { from: since }),
+  ]) {
     // 日期取所在的日期目录；frontmatter 里的 date 可能不是字符串。
     const date = n.path.match(/\/(\d{4}-\d{2}-\d{2})\//)?.[1];
     if (!date || date < since) continue;

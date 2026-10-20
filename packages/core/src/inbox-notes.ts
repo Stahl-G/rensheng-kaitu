@@ -48,10 +48,15 @@ export function noteMetadata(text: string): Record<string, unknown> {
   }
 }
 
-export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
+export function inboxNotes(ws: Workspace, directory = "inbox/notes", options: { from?: string } = {}) {
   if (!ws.exists(directory)) return [];
   return readdirSync(ws.resolve(directory), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name))
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        /^\d{4}-\d{2}-\d{2}$/.test(entry.name) &&
+        (!options.from || entry.name >= options.from),
+    )
     .flatMap((entry) => {
       const dir = `${directory}/${entry.name}`;
       return readdirSync(ws.resolve(dir), { withFileTypes: true })

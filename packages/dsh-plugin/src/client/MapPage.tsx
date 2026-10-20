@@ -908,6 +908,7 @@ export function MapPage({
           subscribe={subscribe}
           onChanged={refresh}
           pending={data?.importsPending ?? 0}
+          reviewPending={data?.review.length ?? 0}
         />
         <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
           {home ? `⌂ ${t("家乡", "Hometown")}：${home.name}` : t("设置家乡", "Set hometown")}

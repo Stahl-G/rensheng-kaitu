@@ -64,7 +64,16 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const data = readWorkbench(ws, now);
   const status = summarizeStatus(data);
   const cutoff = now.toISOString();
-  const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
+  const localDays = new Map<string, string>();
+  const day = (ts: unknown) => {
+    const key = String(ts);
+    let date = localDays.get(key);
+    if (date === undefined) {
+      date = localDate(parseTs(key), data.timeZone);
+      localDays.set(key, date);
+    }
+    return date;
+  };
   // 先按时间粗筛（任何时区的当地零点都不早于 UTC 零点前 14 小时），只给近几天的记录换算当地日期。
   const earliest = Date.parse(`${status.recent7.from}T00:00:00Z`) - 14 * 3600000;
   const rows = (type: string, field = "ts") =>

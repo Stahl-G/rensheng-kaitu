@@ -12,7 +12,7 @@ export function assertAgentPath(root: string, path: string): string {
     return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
   };
   const homeWithin =
-    inside(root, home) || (existsSync(home) && inside(realpathSync(root), realpathSync(home)));
+    inside(root, home) || (existsSync(home) && inside(realpathSync.native(root), realpathSync.native(home)));
   const managed = [localStateRoot(), ...(homeWithin ? [home] : [])];
   if (managed.some((directory) => inside(directory, target)))
     throw new ScopeError("本机程序状态不对 AI 开放");
@@ -26,7 +26,9 @@ export function assertAgentPath(root: string, path: string): string {
     )
       throw new ScopeError("只能访问开图资料，程序目录不对 AI 开放");
   };
-  check(root, target);
+  // Windows SDK realpath expands 8.3 aliases even when the workspace root keeps its short spelling.
+  // Check both root spellings lexically before checking the physical target below.
+  check(inside(root, target) ? root : realpathSync.native(root), target);
   let probe = target;
   while (!existsSync(probe)) {
     try {
@@ -38,11 +40,11 @@ export function assertAgentPath(root: string, path: string): string {
     if (parent === probe) break;
     probe = parent;
   }
-  const realTarget = realpathSync(probe);
-  check(realpathSync(root), realTarget);
+  const realTarget = realpathSync.native(probe);
+  check(realpathSync.native(root), realTarget);
   for (const directory of [...managed, join(root, ".kaitu"), join(root, ".git")]) {
     if (!existsSync(directory)) continue;
-    const rel = relative(realpathSync(directory), realTarget);
+    const rel = relative(realpathSync.native(directory), realTarget);
     if (rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`)))
       throw new ScopeError("程序状态不对 AI 开放");
   }
@@ -53,7 +55,7 @@ export function agentRelativePath(root: string, file: string): string {
   const target = assertAgentPath(root, file);
   let probe = target;
   while (!existsSync(probe)) probe = dirname(probe);
-  return relative(realpathSync(root), resolve(realpathSync(probe), relative(probe, target)))
+  return relative(realpathSync.native(root), resolve(realpathSync.native(probe), relative(probe, target)))
     .split(sep)
     .join("/");
 }

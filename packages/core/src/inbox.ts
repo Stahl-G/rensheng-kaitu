@@ -106,7 +106,7 @@ function inboxContent(file: string, text: string): InboxContent {
 
 /** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
 const RECEIPTS = ".kaitu/inbox-records.json";
-type Receipt = { agent: string; records: { type: string; id: string }[] };
+type Receipt = { agent: string; records: { type: string; id: string }[]; superseded?: true };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
   ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
 
@@ -201,7 +201,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const previous = replaces ? receipts[basename(replaces)] : undefined;
     const refused = !replaces
       ? null
-      : !previous
+      : !previous || previous.superseded
         ? `找不到要替换的 ${replaces}：只能替换开图已经记下的收件箱记录文件，写文件名即可`
         : previous.agent !== agents
           ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
@@ -235,7 +235,14 @@ async function prepare(ws: Workspace, file: string, text: string) {
               records.push({ type, id: result.record.id });
         }
         const next = { ...receipts, [basename(file)]: { agent: agents, records } };
-        if (replaces) delete next[basename(replaces)];
+        if (replaces) {
+          const replaced = basename(replaces);
+          // 旧手机提交只留本机去重凭据，不能再作为 replaces 目标。
+          // 单独标记，避免把合法的空撤回回执也误判为已被替换。
+          if (phoneInboxName.test(replaced))
+            next[replaced] = { agent: agents, records: [], superseded: true };
+          else delete next[replaced];
+        }
         ws.writeJson(RECEIPTS, next, { internal: true });
       },
     };
@@ -512,6 +519,20 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
           moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
           result.processed.push(file);
         });
+        continue;
+      }
+      // 手机每次提交都新建文件；同步盘重送同名文件时复用已有入账结果。
+      // 用持久账本而非十四天的展示回执，重启及回执过期后仍不能重复入账。
+      if (
+        phoneInboxName.test(basename(file)) &&
+        file.endsWith(".records.jsonl") &&
+        readReceipts(ws)[basename(file)]
+      ) {
+        moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+        result.processed.push(file);
+        writePhoneReceipts(ws, [
+          { ref: basename(file), kind: "file", status: "duplicate", at: new Date().toISOString() },
+        ]);
         continue;
       }
       let prepared: Awaited<ReturnType<typeof prepare>> | undefined;

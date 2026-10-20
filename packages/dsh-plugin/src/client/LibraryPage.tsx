@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useState } from "react";
-import type { LibraryData } from "../types.js";
+import type { LibraryQuery } from "@kaitu/core";
+import { Fragment, useEffect, useRef, useState } from "react";
+import type { InboxEntry, LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
 import css from "./Prototype.module.css";
@@ -14,7 +15,7 @@ const LIBRARY_EN: Record<string, string> = {
   inbox: "Inbox",
 };
 export interface LibraryProps extends LearningServices {
-  loadLibrary: () => Promise<LibraryData>;
+  loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
 export function LibraryPage({ data, open }: { data: LibraryData | null; open: (id: string) => void }) {
@@ -41,7 +42,9 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
             {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
             <span>›</span>
           </span>
-          {section.count ? (
+          {section.count === null ? (
+            <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
+          ) : section.count ? (
             <span className={`${css.big} ${css.num}`}>
               {t(
                 `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
@@ -74,10 +77,16 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
   );
 }
 export function InboxPage({
-  data,
+  loadLibrary,
+  subscribe,
   channelSettings,
   connect,
-}: { data: LibraryData | null; channelSettings?: ChannelRequest; connect: () => void }) {
+}: Pick<LibraryProps, "loadLibrary"> & {
+  subscribe?: (refresh: () => void) => () => void;
+  channelSettings?: ChannelRequest;
+  connect: () => void;
+}) {
+  const t = useT();
   const [channels, setChannels] = useState<ChannelState>();
   useEffect(() => {
     void channelSettings?.("list")
@@ -85,6 +94,53 @@ export function InboxPage({
       .catch(() => {});
   }, [channelSettings]);
   const [source, setSource] = useState("all");
+  const [entries, setEntries] = useState<InboxEntry[] | null>(null);
+  const [next, setNext] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const generation = useRef(0);
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const seq = ++generation.current;
+      setLoading(true);
+      try {
+        const page = await loadLibrary({ section: "inbox", source });
+        if (!active || seq !== generation.current) return;
+        setEntries(page.inbox);
+        setNext(page.next ?? null);
+        setError("");
+      } catch (err) {
+        if (active && seq === generation.current) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (active && seq === generation.current) setLoading(false);
+      }
+    };
+    setEntries(null);
+    void load();
+    const off = subscribe?.(() => void load());
+    return () => {
+      active = false;
+      generation.current++;
+      off?.();
+    };
+  }, [loadLibrary, source, subscribe]);
+  const more = async () => {
+    if (!next || loading) return;
+    const seq = generation.current;
+    setLoading(true);
+    try {
+      const page = await loadLibrary({ section: "inbox", source, before: next });
+      if (seq !== generation.current) return;
+      setEntries((current) => [...(current ?? []), ...page.inbox]);
+      setNext(page.next ?? null);
+      setError("");
+    } catch (err) {
+      if (seq === generation.current) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (seq === generation.current) setLoading(false);
+    }
+  };
   const filters = [
     ["all", "全部"],
     ["me", "随手记"],
@@ -93,7 +149,6 @@ export function InboxPage({
     ["feishu", "飞书"],
     ["other", "其他原文"],
   ];
-  const entries = data?.inbox.filter((row) => source === "all" || row.source === source);
   return (
     <div className={css.sec}>
       <div className={css["conn-strip"]}>
@@ -125,8 +180,9 @@ export function InboxPage({
           </button>
         ))}
       </div>
-      {!data ? (
-        <p className={css.small}>正在读取收件箱…</p>
+      {error && <p role="alert">{error}</p>}
+      {!entries ? (
+        <p className={css.small}>{t("正在读取收件箱…", "Loading inbox…")}</p>
       ) : !entries?.length ? (
         <p className={css.emptyState}>
           {["mail", "slack", "feishu", "ding"].includes(source)
@@ -164,6 +220,11 @@ export function InboxPage({
             </span>
           </div>
         ))
+      )}
+      {next && (
+        <button type="button" className={css.link} disabled={loading} onClick={() => void more()}>
+          {loading ? t("正在读取…", "Loading…") : t("加载更多", "Load more")}
+        </button>
       )}
     </div>
   );

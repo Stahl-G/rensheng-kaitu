@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import {
   mkdtempSync,
   readFileSync,
@@ -77,7 +78,16 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
 });
 
 test("native SDK writes and literal edits retain user decisions and propose Agent changes", async () => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-sdk-status-")));
+  const temp = mkdtempSync(join(tmpdir(), "kaitu SDK status "));
+  // Hosted Windows runners can expose TEMP through an 8.3 alias (RUNNER~1).
+  const root = realpathSync(
+    process.platform === "win32"
+      ? execFileSync("cmd.exe", ["/d", "/c", `for %I in ("${temp}") do @echo %~sI`], {
+          encoding: "utf8",
+          windowsVerbatimArguments: true,
+        }).trim()
+      : temp,
+  );
   const ctx = new Context();
   try {
     await initWorkspace(root);
@@ -85,6 +95,9 @@ test("native SDK writes and literal edits retain user decisions and propose Agen
       cwd: root,
       diffBasisMaxBytes: 1024 * 1024,
     });
+    for (const path of ["../outside.md", ".kaitu/secrets.json", ".git/config"]) {
+      await expect(files.resolve(path)).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
+    }
     const initial =
       "---\nnext:\n  - id: user-step\n    title: User choice\n    status: done\n    by: user\n---\nOriginal body\n";
     for (const path of ["health/STATUS.md", "projects/example/STATUS.md"]) {
