@@ -1,6 +1,7 @@
 # 新手开图 · 第一轮设计反馈
 
 日期：2026-10-20。对象：iPhone「第一次打开」设计稿第一轮（欢迎、认识我、我的世界地图三屏）。
+流程和屏号已由[第二轮反馈](../onboarding-r2/README.md)和 onboarding.md v2 取代；本文第 3 节的技术限制、第 4 节的颜色、第 6 节的交付格式仍然有效。
 品牌与设计原则：[BRAND.md](../../../BRAND.md)，每屏按它第 11 节的七个问题自查。
 产品依据：[onboarding.md](../../../mobile/onboarding.md)（下称 PRD）、[FOOTPRINT-style.md](../../../tasks/FOOTPRINT-style.md)（足迹地图）、[现有 iPhone 设计稿](../README.md)。
 本目录三张图是第一轮在浏览器里逐步点过的截图：`1-welcome-form.jpg`、`2-import-confirm.jpg`、`3-map-note.jpg`。
