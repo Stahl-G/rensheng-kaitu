@@ -1,0 +1,34 @@
+{
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl": {
+    "entries": [
+      {
+        "type": "meal",
+        "record": {
+          "id": "01M5B9PHRWZ6H8TE9AFSJX6J8M",
+          "ts": "2026-10-20T12:40:00+08:00",
+          "by": "user",
+          "meal": "午",
+          "items": [
+            {
+              "name": "牛肉饭",
+              "grams": 380
+            }
+          ],
+          "kcal": 720,
+          "protein_g": 38,
+          "source": "manual"
+        }
+      }
+    ],
+    "receipt": {
+      "agent": "iPhone",
+      "records": [
+        {
+          "type": "meal",
+          "id": "01M5B9PHRWZ6H8TE9AFSJX6J8M"
+        }
+      ]
+    },
+    "consumed": true
+  }
+}

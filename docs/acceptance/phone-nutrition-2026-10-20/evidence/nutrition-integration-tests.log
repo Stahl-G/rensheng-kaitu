@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /tmp/kaitu-nutrition-integration
+
+
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Start at  23:58:46
+   Duration  13.16s (transform 2.10s, setup 96ms, import 3.67s, tests 13.88s, environment 0ms)
+

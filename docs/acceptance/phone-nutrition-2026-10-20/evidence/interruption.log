@@ -1,0 +1,11 @@
+Error: synthetic interruption before consumed ledger rename
+    at fs.renameSync (/tmp/kaitu-nutrition-cli-dD2UHC/interrupt.cjs:2:195)
+    at Workspace.writeText (file:///tmp/kaitu-nutrition-integration/packages/core/dist/workspace.js:255:9)
+    at Workspace.writeJson (file:///tmp/kaitu-nutrition-integration/packages/core/dist/workspace.js:259:14)
+    at recoverPhoneRecords (file:///tmp/kaitu-nutrition-integration/packages/core/dist/phone-records.js:26:12)
+    at async Object.apply (file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:251:21)
+    at async file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:593:25
+    at async batchOverview (file:///tmp/kaitu-nutrition-integration/packages/core/dist/overview.js:142:16)
+    at async batchSnapshot (file:///tmp/kaitu-nutrition-integration/packages/core/dist/history.js:199:18)
+    at async processInbox (file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:588:13)
+    at async runPhone (file:///tmp/kaitu-nutrition-integration/packages/core/dist/phone-run.js:6:19)

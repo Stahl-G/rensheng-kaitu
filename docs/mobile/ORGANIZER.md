@@ -134,3 +134,22 @@ v0.7 计划提供，发布前跳过本步。在资料位置根目录运行 `kait
   - 用开图工具整理原文（夜里第 4 步）。
 - 规则、目标、`me/` 和 `memory/` 里除待办以外的内容、各模块 `data/` 里除待办以外的内容、`AGENTS.md` 等本机维护的文件，都只读。
 - 把 token 写进任何文件，把资料内容发到资料位置以外的地方。
+
+## 饮食快照小扩展（2026-10-19 已批准）
+
+Today 顶层仍为 version:1，新增可选 `nutrition?: {version:1,kcal:number,protein_g:number,accounted_refs:string[]}`；meal、records、receipts 格式不变。
+按该快照 today 日期、timezone（IANA）汇总最新非 deleted canonical meal。总量与覆盖编号必须在同份原子快照发布。
+accounted_refs 是已消费 phone records 原文件 basename，包含已撤回、已删除、改日期及已 superseded 的来源，不随十四天显示回执裁剪。
+手机确认先本机显示；有可识别的 nutrition v1 时，仅叠加 accounted_refs 未覆盖的本机明确确认餐。receipt applied 或时间戳不能证明覆盖。
+缺字段或未知 nutrition.version 回退本机确认区，不假造 zero；有效 v1 的零合计才表示已知空日。
+同一 today 内容变化时 generated_at 必须严格递增（必要时旧值加 1ms），旧快照不得倒灌。
+仅在单权威 consumer 且私有 ledger 完整时提供该能力；跨整理器丢失 ledger 不在本切片保证内。不扩展新入账餐的手机编辑/撤回协议。
+phone records 须先持久化 prepared records，再复用现有 commitRecordTransaction；准备态不算 consumed，全部恢复并落终态账本后才发布 nutrition。
+依赖 PR #62（a092270ff37f20200ddf5a7e8446684d54b46fc3）的同名去重与过期替换来源修复，本 PR 不复制该修复或合并 main。
+
+### nutrition 能力降级与水位
+
+正式 producer 始终产完整 v1；shared Today schema 容纳缺整个 nutrition、块内缺 version/kcal/protein_g/accounted_refs 及未来未知正整数版本，以上情况整份 Today 仍可接受，营养块视为不可用并回退本机确认区。v1 已有字段仍校验有限非负 JSON number 与唯一 basename 列表；客户端只在 version=1 且三项数据齐全合法时启用 nutrition，不把缺字段补成零或空覆盖。
+客户端以整个 Today envelope 的 generated_at 为严格递增水位，today、IANA timezone、营养总量与覆盖列表不可拆开接受；新到快照 generated_at 小于或等于已接受水位时拒绝（相等的同内容是无改动）。
+更高水位的 Today 即使缺 nutrition 或版本未知，也接受其余内容并清除当前营养能力/总量/覆盖显示，回退本机确认区；同时保留这个新水位，不能让较旧的 v1 倒灌。不能沿用旧 v1 总量或把缺能力当零。
+换日期/时区也只随更高水位完整 envelope 切换；本机未覆盖餐按所接受 envelope 的日期和时区归日，覆盖编号始终以该 envelope 为准，不从另一份 snapshot/receipt 拼接。

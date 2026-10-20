@@ -1,0 +1,13 @@
+{
+  "format": "kaitu.phone.receipts",
+  "version": 1,
+  "generated_at": "2026-10-19T23:59:42.250Z",
+  "items": [
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl",
+      "kind": "file",
+      "status": "duplicate",
+      "at": "2026-10-19T23:59:42.250Z"
+    }
+  ]
+}

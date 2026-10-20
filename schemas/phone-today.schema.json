@@ -62,6 +62,45 @@
         }
       }
     },
+    "nutrition": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "if": {
+        "properties": {
+          "version": {
+            "const": 1
+          }
+        },
+        "required": ["version"]
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "kcal": {
+            "type": "number",
+            "minimum": 0
+          },
+          "protein_g": {
+            "type": "number",
+            "minimum": 0
+          },
+          "accounted_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^ios-[0-9a-f]{8}-[0-9A-HJKMNP-TV-Z]{26}\\.records\\.jsonl$"
+            }
+          }
+        }
+      },
+      "description": "producer 始终写完整 v1；缺字段或未知版本由手机降级营养区，不拒绝整份 Today。v1 已有字段仍须合法。"
+    },
     "timezone": { "type": "string", "minLength": 1 },
     "next": { "type": "array", "maxItems": 3, "items": { "$ref": "#/$defs/next" } },
     "proposals": {

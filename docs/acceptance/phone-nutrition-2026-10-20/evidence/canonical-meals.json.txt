@@ -1,0 +1,17 @@
+[
+  {
+    "id": "01M5B9PZ8V5FN6BJT5S71ZSDYT",
+    "ts": "2026-10-20T12:40:00+08:00",
+    "by": "user",
+    "meal": "午",
+    "items": [
+      {
+        "name": "牛肉饭",
+        "grams": 380
+      }
+    ],
+    "kcal": 720,
+    "protein_g": 38,
+    "source": "manual"
+  }
+]

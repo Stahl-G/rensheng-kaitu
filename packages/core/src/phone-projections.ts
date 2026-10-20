@@ -4,6 +4,8 @@ import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
+import { phoneInboxName } from "./phone-actions.js";
+import { phoneRecordLedger } from "./phone-records.js";
 import type { LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
@@ -20,6 +22,31 @@ const envelope = (name: string, generatedAt: string) => ({
 });
 
 export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
+  const ledger = phoneRecordLedger(ws);
+  const ready = Object.values(ledger).every((plan) => plan.consumed);
+  const hasMeals = listRecordTypes(ws).some((ref) => ref.type === "meal");
+  const meals =
+    ready && hasMeals
+      ? readRecords(ws, "meal").filter((meal) => localDate(parseTs(meal.ts), data.timeZone) === data.today)
+      : [];
+  const nutrition =
+    ready && hasMeals
+      ? {
+          version: 1,
+          kcal: meals.reduce((sum, meal) => sum + Number(meal.kcal), 0),
+          protein_g: meals.reduce((sum, meal) => sum + Number(meal.protein_g), 0),
+          accounted_refs: [
+            ...new Set([
+              ...Object.keys(ledger).filter((ref) => ledger[ref]?.consumed),
+              ...Object.keys(
+                ws.exists(".kaitu/inbox-records.json")
+                  ? ws.readJson<object>(".kaitu/inbox-records.json")
+                  : {},
+              ).filter((ref) => phoneInboxName.test(ref) && ref.endsWith(".records.jsonl")),
+            ]),
+          ].sort(),
+        }
+      : undefined;
   const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
@@ -35,6 +62,7 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
     ...envelope("today", generatedAt),
     today: data.today,
     timezone: data.timeZone,
+    ...(nutrition ? { nutrition } : {}),
     mobile: {
       version: 1,
       actions: hasTasks

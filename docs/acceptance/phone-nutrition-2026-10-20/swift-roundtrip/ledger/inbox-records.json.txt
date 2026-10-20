@@ -1,0 +1,11 @@
+{
+  "ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl": {
+    "agent": "云端 Agent",
+    "records": [
+      {
+        "type": "meal",
+        "id": "01M5BAAGEFTY2FZPKX9GMW597K"
+      }
+    ]
+  }
+}
