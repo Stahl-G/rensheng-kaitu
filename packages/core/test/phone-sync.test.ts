@@ -141,6 +141,46 @@ function remoteMock() {
   };
 }
 
+it("today 的饮食合计只算当天，已入账的手机文件撤回后仍记在 accounted_refs", async () => {
+  const ws = await freshWorkspace();
+  const items = [{ name: "米饭", grams: 200 }];
+  const meal = (kcal: number) =>
+    JSON.stringify({ type: "meal", origin: "user", meal: "午", items, kcal, protein_g: 20, source: "user" });
+  const first = phoneFile("records.jsonl");
+  ws.writeText(first, meal(500));
+  await processInbox(ws, { stableMs: 0 });
+  addRecord(ws, "meal", { meal: "晚", items, kcal: 300, protein_g: 10, source: "user" });
+  addRecord(ws, "meal", {
+    ts: "2020-01-01T12:00:00+08:00",
+    meal: "午",
+    items,
+    kcal: 900,
+    protein_g: 50,
+    source: "user",
+  });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  const today = () =>
+    ws.readJson<{ nutrition: { kcal: number; protein_g: number; accounted_refs: string[] } }>(
+      "phone/today.json",
+    );
+  expect(today().nutrition).toEqual({
+    version: 1,
+    kcal: 800,
+    protein_g: 30,
+    accounted_refs: [basename(first)],
+  });
+  const validate = schemas().builtin("phone-today.schema.json");
+  expect(validate(today()), JSON.stringify(validate.errors)).toBe(true);
+  const withdraw = phoneFile("records.jsonl");
+  ws.writeText(withdraw, JSON.stringify({ replaces: basename(first) }));
+  await processInbox(ws, { stableMs: 0 });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  expect(today().nutrition).toMatchObject({
+    kcal: 300,
+    accounted_refs: [basename(first), basename(withdraw)].sort(),
+  });
+});
+
 it("快照投影符合手机契约且不带原文、凭据、链接路径或财务明细；生成目录不可被 Agent 改写或进历史", async () => {
   const ws = await freshWorkspace();
   const now = new Date("2026-10-18T12:00:00Z");
