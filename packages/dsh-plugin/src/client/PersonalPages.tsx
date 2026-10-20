@@ -311,12 +311,6 @@ export function PersonalPages(
                     />
                   </label>
                 ))}
-                <p className={css.small}>
-                  {t(
-                    "开图工具按这些开关读取财务。完整 Agent 可直接访问磁盘；你配的整理员能读 GitHub 备份仓库里的全部内容。",
-                    "These switches control finance access through Kaitu tools. Full Agent can access files directly; your organizer can read everything in the GitHub backup repository.",
-                  )}
-                </p>
               </div>
             </section>
             <section className={css.sec}>
