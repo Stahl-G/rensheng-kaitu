@@ -23,8 +23,12 @@ def check_path(name):
         raise ValueError('Invalid content path')
     if p.parts[0] not in ROOTS or p.suffix not in {'.md', '.json', '.jsonl'}:
         raise ValueError('Path outside explicit content scope')
-    if any(re.search(r'cache|backup|logs?|secret|token|credential|auth|private.?key|备份', x, re.I) for x in p.parts):
-        raise ValueError('Excluded content path')
+    project_log = len(p.parts) == 3 and p.parts[0] == 'projects' and p.name == 'log.md'
+    for i, part in enumerate(p.parts):
+        if project_log and i == 2:
+            continue
+        if re.search(r'cache|backup|logs?|runtime|debug|secret|token|credential|auth|private.?key|备份', part, re.I):
+            raise ValueError('Excluded content path')
     if HEALTH.search(name):
         raise ValueError('Health content excluded')
     return name

@@ -2,7 +2,7 @@
 
 这是作者手动运行的实验工具，独立于 iOS 产品。无后台服务、模型调用或云端 API；只读写两个已经下载到本机的文件夹。云端上传、手机收到与否仍由云盘负责。缓存文件可读并不能证明网络在线；脚本不声称能检测云端断网。
 
-先在两边建立相同的普通内容副本，把要同步的相对路径写成 JSON 字符串数组（例如 `["projects/demo/STATUS.md"]`），保存在两云目录之外。只接受普通 Markdown / JSON / JSONL；显式列出的既有文件才会同步，新文件需另行审核加入新的共同基线。此版本不自动发现新文件。原始 Git、状态、认证、健康和 phone 快照不能进入双向清单。可识别的凭据与健康混合内容会停止整次预检，规则不是完整的秘密检测器，清单仍须先在本机审核。
+先在两边建立相同的普通内容副本，把要同步的相对路径写成 JSON 字符串数组（例如 `["projects/demo/STATUS.md"]`），保存在两云目录之外。只接受普通 Markdown / JSON / JSONL；显式列出的既有文件才会同步，新文件需另行审核加入新的共同基线。此版本不自动发现新文件。项目 `projects/<slug>/log.md` 是正式项目记忆，可以和 STATUS、notes 一起审核纳入。真正的 runtime/debug 日志仍排除。原始 Git、状态、认证、健康和 phone 快照不能进入双向清单。可识别的凭据与健康混合内容会停止整次预检，规则不是完整的秘密检测器，清单仍须先在本机审核。
 
 ```sh
 python3 scripts/personal-sync/sync.py --left /path/to/drive-copy --right /path/to/icloud-copy --state /path/to/local-state --files /path/to/approved-files.json --initialize

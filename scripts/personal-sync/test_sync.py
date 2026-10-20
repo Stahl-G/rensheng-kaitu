@@ -56,6 +56,11 @@ class SyncTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.run_sync(apply=True)
         self.assertFalse(self.left.exists())
 
+    def test_project_log_is_content_but_runtime_logs_are_excluded(self):
+        self.assertEqual(sync.check_path('projects/demo/log.md'), 'projects/demo/log.md')
+        for name in ['projects/demo/runtime/log.md', 'projects/demo/debug.md', 'inbox/log.md']:
+            with self.assertRaises(ValueError): sync.check_path(name)
+
     def test_scope_and_symlink(self):
         for path in ['phone/today.json', '.git/config', 'health/data.json', '../memory/a.md']:
             with self.assertRaises(ValueError): sync.check_path(path)
