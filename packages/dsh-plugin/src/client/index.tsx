@@ -5,6 +5,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
 import type {
+  AgentConnectionId,
   LearningCheckinInput,
   OnboardingAi,
   OnboardingChoices,
@@ -209,8 +210,13 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              loadHandover: async (locale?: string) => {
-                const r = await ctx.remote.kaitu.handoverPack(locale);
+              loadHandover: async (locale?: string, includeFinance?: boolean) => {
+                const r = await ctx.remote.kaitu.handoverPack(locale, includeFinance);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              configureFinanceAccess: async (id: AgentConnectionId, allowed: boolean) => {
+                const r = await ctx.remote.kaitu.setFinanceAccess(id, allowed);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },

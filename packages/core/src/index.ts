@@ -27,6 +27,7 @@ export * from "./workbench.js";
 export * from "./ui-imports.js";
 export * from "./sample.js";
 export * from "./agent-tools.js";
+export * from "./exposure.js";
 export * from "./secrets.js";
 
 export * from "./drive.js";

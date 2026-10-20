@@ -9,6 +9,7 @@ it("手机回复跟随问问连接，始终使用默认权限并等待完整回�
   const directory = mkdtempSync(join(tmpdir(), "kaitu-phone-answer-"));
   let configured = false;
   const modes: string[] = [];
+  const connections: string[] = [];
   let notify!: (method: string, params: Record<string, unknown>) => void;
   const runtime: AskRuntime = {
     onNotification(listener) {
@@ -31,7 +32,8 @@ it("手机回复跟随问问连接，始终使用默认权限并等待完整回�
   const ask = createAskService({
     state: directory,
     workspace: directory,
-    runtime: async (mode) => {
+    runtime: async (mode, connection) => {
+      connections.push(connection);
       modes.push(mode);
       return runtime;
     },
@@ -46,6 +48,8 @@ it("手机回复跟随问问连接，始终使用默认权限并等待完整回�
     configured = true;
     expect(await reply("记录训练", signal)).toBe("训练已记录");
     expect(modes).toEqual(["scoped"]);
+    expect(connections).toEqual(["phone-ask"]);
+    expect(ask.list()).toHaveLength(0);
   } finally {
     await ask.close();
     rmSync(directory, { recursive: true, force: true });

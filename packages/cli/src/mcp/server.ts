@@ -1,8 +1,10 @@
 import {
+  type AgentConnectionId,
   type Workspace,
   addExperiences,
   addMemory,
   addTask,
+  agentCanRead,
   completeTask,
   dismissNews,
   explorationCommandSchema,
@@ -57,7 +59,12 @@ export function writeQueue() {
   };
 }
 
-export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = writeQueue()) {
+export function createMcpServer(
+  ws: Workspace,
+  tools: ToolSet = "all",
+  write = writeQueue(),
+  connection: AgentConnectionId = tools === "remote" ? "remote-mcp" : "local-mcp",
+) {
   const server = new McpServer({ name: "kaitu", version: "0.0.0" });
   server.server.oninitialized = () => {
     recordOnboardingAiConnection(ws, server.server.getClientVersion()?.name ?? "MCP");
@@ -117,7 +124,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     onboardingStatus(ws),
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
-    readStatus(ws, new Date(), tools === "remote"),
+    readStatus(ws, new Date(), connection),
   );
   register("inbox_notes", "读取未整理的收件箱笔记及来源。", {}, () => inboxNotes(ws));
   register("news_read", "读取近期新闻推荐、今天 X 热门和来源数量。", {}, () => readNews(ws));
@@ -142,7 +149,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     { type, from: date.optional(), to: date.optional() },
     ({ type, from, to }) => {
       const rows = readRecords(ws, type, { from, to });
-      return tools === "remote" ? publicRecords(ws, type, rows) : rows;
+      return publicRecords(ws, type, rows, connection);
     },
   );
   register(
@@ -168,7 +175,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
     (input) => {
       const rows = listTasks(ws, { ...input });
-      return tools === "remote" ? publicRecords(ws, "task", rows) : rows;
+      return publicRecords(ws, "task", rows, connection);
     },
   );
   const experience = z
@@ -217,9 +224,8 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     {},
     () => readExperienceImports(ws),
   );
-  // 公网连接（remote）读不到标为敏感的记忆。
   const visible = (memories: ReturnType<typeof listMemories>) =>
-    tools === "remote" ? memories.filter((memory) => !memory.sensitive) : memories;
+    memories.filter((memory) => agentCanRead(ws, `memory/${memory.file}`, connection));
   register("memory_list", "列出已保存记忆，无需确认。", {}, () => visible(listMemories(ws)));
   register("memory_search", "按关键词查找记忆，无需确认。", { query: text }, ({ query }) =>
     visible(searchMemories(ws, query)),
@@ -234,7 +240,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "read_file",
     "只读工作区内 .md / .json，不读 .kaitu/ 和版本库目录，无需确认。",
     { path: text },
-    ({ path }) => readAgentFile(ws, path, tools === "remote"),
+    ({ path }) => readAgentFile(ws, path, connection),
   );
   register(
     "record_add",

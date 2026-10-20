@@ -2,11 +2,13 @@ import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import {
+  type AgentConnectionId,
   ONBOARDING,
   type Workspace,
   addMemory,
   addPhoto,
   addTask,
+  agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
   completeTask,
@@ -45,6 +47,7 @@ import {
   processInbox,
   projectDirectory,
   proposeAgentDocument,
+  publicRecords,
   readAgentFile,
   readExperienceImports,
   readExploration,
@@ -119,7 +122,14 @@ const next = z
   })
   .passthrough();
 
-export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: MutationQueue) {
+export function registerWorkflowTools(
+  ctx: Context,
+  ws: Workspace,
+  queue: MutationQueue,
+  connection: AgentConnectionId = "local-ask",
+) {
+  const visibleMemories = (rows: ReturnType<typeof listMemories>) =>
+    rows.filter((row) => agentCanRead(ws, `memory/${row.file}`, connection));
   function register<T extends z.ZodType>(
     name: string,
     description: string,
@@ -266,7 +276,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     ]),
     (input) =>
       input.operation === "list"
-        ? readRecords(ws, input.type, input)
+        ? publicRecords(ws, input.type, readRecords(ws, input.type, input), connection)
         : writeAgentRecord(
             ws,
             input.operation,
@@ -311,9 +321,12 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     async (input) => {
       switch (input.operation) {
         case "read":
-          return { path: input.path, content: readAgentFile(ws, input.path) };
+          return { path: input.path, content: readAgentFile(ws, input.path, connection) };
         case "list":
-          return listFiles(ws, input.path);
+          if (!agentCanRead(ws, input.path, connection)) throw new Error("这个连接不能读取该目录");
+          return listFiles(ws, input.path).filter((entry) =>
+            agentCanRead(ws, `${input.path}/${entry.name}`.replace(/^\//, ""), connection),
+          );
         case "write":
           return writeFiles(ws, input.files, false);
         case "snapshot":
@@ -353,9 +366,9 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     (input) => {
       switch (input.operation) {
         case "list":
-          return listMemories(ws);
+          return visibleMemories(listMemories(ws));
         case "search":
-          return searchMemories(ws, input.query);
+          return visibleMemories(searchMemories(ws, input.query));
         case "add":
           return addMemory(ws, memoryInput(input.entry), { by: "agent", actor: "DeepSeek" });
         case "update": {

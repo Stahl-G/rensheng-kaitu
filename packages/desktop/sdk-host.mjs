@@ -12,13 +12,14 @@ const [{ LocalFileSystem }, { FsError }] = await Promise.all([
   load("@deepseek-ai/dsh-fs"),
 ]);
 const root = realpathSync(process.env.KAITU_DIR);
+const connection = process.env.KAITU_AGENT_CONNECTION === "phone-ask" ? "phone-ask" : "local-ask";
 export const name = "kaitu-sdk-host";
 export const inject = ["loader", "tools"];
 export async function apply(ctx) {
   const attachments = new Set();
   ctx.provide("kaituAttachmentPaths", attachments);
   await ctx.plugin(
-    confinedFileSystem(LocalFileSystem, FsError, root, attachments, ctx.get("attachments")?.root),
+    confinedFileSystem(LocalFileSystem, FsError, root, attachments, ctx.get("attachments")?.root, connection),
     { cwd: root },
   );
   ctx.inject(["fs"], (services) => {
@@ -40,6 +41,8 @@ export async function apply(ctx) {
           { ...args, path: target.targetKey },
           exec.signal,
           executable,
+          undefined,
+          connection,
         );
         return { isError: false, value, content: [{ type: "text", text: JSON.stringify(value) }] };
       }

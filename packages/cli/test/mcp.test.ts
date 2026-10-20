@@ -5,12 +5,14 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   addMemory,
+  addRecord,
   calendarPushEntries,
   history,
   initWorkspace,
   mcpToken,
   parseFrontmatter,
   readRecords,
+  setFinanceAccess,
 } from "@kaitu/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -117,7 +119,7 @@ it("HTTP 拒绝缺失或错误 token 和错误 Host，有效 token 能连接，�
   }
 });
 
-it("公网 remote 读不到标为敏感的记忆：列表、搜索、索引和单个文件都不给，本机 all 照常", async () => {
+it("本机和远程 MCP 按连接读取财务，列表、搜索、索引和别名都保留敏感记忆边界", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-sensitive-"));
   try {
     const ws = await initWorkspace(root);
@@ -152,15 +154,38 @@ it("公网 remote 读不到标为敏感的记忆：列表、搜索、索引和�
       const remote = await call("remote", name, args);
       expect(remote.text).toContain("合成公开记忆");
       expect(remote.text).not.toContain("合成敏感记忆");
-      expect((await call("all", name, args)).text).toContain("合成敏感记忆");
+      expect((await call("all", name, args)).text).not.toContain("合成敏感记忆");
     }
     for (const path of [`memory/${secret.file}`, "alias.md"]) {
       expect((await call("remote", "read_file", { path })).error).toBe(true);
-      expect((await call("all", "read_file", { path })).text).toContain("合成敏感记忆");
+      expect((await call("all", "read_file", { path })).error).toBe(true);
     }
     expect((await call("remote", "read_file", { path: `memory/${open.file}` })).text).toContain(
       "合成公开记忆",
     );
+    addRecord(ws, "finance_account", {
+      name: "Synthetic wallet",
+      kind: "wallet",
+      source: "manual",
+      currency: "CNY",
+    });
+    expect((await call("remote", "record_list", { type: "finance_account" })).text).not.toContain(
+      "Synthetic wallet",
+    );
+    expect((await call("all", "record_list", { type: "finance_account" })).text).toContain(
+      "Synthetic wallet",
+    );
+    for (const [tools, id] of [
+      ["remote", "remote-mcp"],
+      ["all", "local-mcp"],
+    ] as const) {
+      for (const allowed of [true, false]) {
+        setFinanceAccess(ws, id, allowed);
+        const records = await call(tools, "record_list", { type: "finance_account" });
+        expect(records.text.includes("Synthetic wallet")).toBe(allowed);
+        expect((await call(tools, "read_file", { path: "finance/STATUS.md" })).error).toBe(!allowed);
+      }
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

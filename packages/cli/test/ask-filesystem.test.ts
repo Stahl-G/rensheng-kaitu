@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import { FsError as BackendError } from "@deepseek-ai/dsh-fs";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
-import { initWorkspace, parseFrontmatter } from "@kaitu/core";
+import { addMemory, initWorkspace, parseFrontmatter, setFinanceAccess } from "@kaitu/core";
 import { expect, test } from "vitest";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
@@ -89,8 +89,9 @@ test("native SDK writes and literal edits retain user decisions and propose Agen
       : temp,
   );
   const ctx = new Context();
+  const contexts = [ctx];
   try {
-    await initWorkspace(root);
+    const ws = await initWorkspace(root);
     const files = new (confinedFileSystem(LocalFileSystem, BackendError, root))(ctx, {
       cwd: root,
       diffBasisMaxBytes: 1024 * 1024,
@@ -151,8 +152,48 @@ test("native SDK writes and literal edits retain user decisions and propose Agen
       },
     );
     expect(readFileSync(join(root, "health/plain.md"), "utf8")).toBe("edited text");
+    const open = await addMemory(ws, { type: "fact", name: "Open", text: "Synthetic open memory" });
+    const secret = await addMemory(ws, {
+      type: "fact",
+      name: "Secret",
+      text: "Synthetic private memory",
+      sensitive: true,
+    });
+    for (const connection of ["local-ask", "phone-ask"] as const) {
+      const readerContext = new Context();
+      contexts.push(readerContext);
+      const reader = new (confinedFileSystem(
+        LocalFileSystem,
+        BackendError,
+        root,
+        new Set(),
+        undefined,
+        connection,
+      ))(readerContext, { cwd: root, diffBasisMaxBytes: 1024 * 1024 });
+      await expect(reader.resolve(`memory/${secret.file}`)).rejects.toThrow();
+      expect(await reader.readText(await reader.resolve(`memory/${open.file}`))).toContain(
+        "Synthetic open memory",
+      );
+      const index = await reader.resolve("memory/MEMORY.md");
+      expect(await reader.readText(index)).not.toContain("Synthetic private memory");
+      expect(Buffer.from(await reader.readBytes(index, undefined, 100000)).toString()).not.toContain(
+        "Synthetic private memory",
+      );
+      expect(
+        Buffer.from(await reader.readByteRange(index, { offset: 0, length: 100000 })).toString(),
+      ).not.toContain("Synthetic private memory");
+      let text = "";
+      for await (const chunk of await reader.streamText(index)) text += chunk;
+      expect(text).toContain("Synthetic open memory");
+      expect(text).not.toContain("Synthetic private memory");
+      for (const allowed of [false, true]) {
+        setFinanceAccess(ws, connection, allowed);
+        if (allowed) expect(await reader.resolve("finance/STATUS.md")).toBeDefined();
+        else await expect(reader.resolve("finance/STATUS.md")).rejects.toThrow();
+      }
+    }
   } finally {
-    await ctx.fiber.dispose();
+    for (const context of contexts) await context.fiber.dispose();
     rmSync(root, { recursive: true, force: true });
   }
 });

@@ -1,3 +1,4 @@
+import type { AgentConnection } from "./exposure.js";
 import type { StoredRecord } from "./records.js";
 import { localDate, parseTs } from "./time.js";
 import { type WorkbenchData, readWorkbench } from "./workbench.js";
@@ -35,7 +36,7 @@ export function dailyRecordTotals(
   return totals;
 }
 
-export function readStatus(ws: Workspace, now = new Date(), remote = false) {
+export function readStatus(ws: Workspace, now = new Date(), remote: boolean | AgentConnection = false) {
   const data = readWorkbench(ws, now, remote, true);
   return summarizeStatus(data);
 }

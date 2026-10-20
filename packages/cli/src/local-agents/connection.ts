@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { KaituError } from "@kaitu/core";
+import { type AgentConnectionId, KaituError } from "@kaitu/core";
 import type { AskMode, AskService } from "../ui/ask.js";
 import { agentEnvironment, findAgent, localAgent, localAgents } from "./agents.js";
 import { type McpCommand, agentModels, createAgentRuntime } from "./runtime.js";
@@ -10,7 +10,11 @@ export function createAgentConnection(options: {
   workspace: () => string;
   mcp: McpCommand;
   sdk: () => Pick<AskService, "settings" | "configure" | "models"> & {
-    runtime(mode: AskMode): ReturnType<typeof createAgentRuntime>;
+    runtime(
+      mode: AskMode,
+      capabilities?: boolean,
+      connection?: AgentConnectionId,
+    ): ReturnType<typeof createAgentRuntime>;
     support(method: string, input: Record<string, unknown>): Promise<unknown>;
   };
   env?: NodeJS.ProcessEnv;
@@ -106,8 +110,8 @@ export function createAgentConnection(options: {
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },
-    runtime(mode: AskMode) {
-      if (!local()) return options.sdk().runtime(mode);
+    runtime(mode: AskMode, connection: AgentConnectionId = "local-ask") {
+      if (!local()) return options.sdk().runtime(mode, false, connection);
       const { agent, path } = current();
       return createAgentRuntime({
         agent,
@@ -115,7 +119,7 @@ export function createAgentConnection(options: {
         workspace: options.workspace(),
         state: options.state,
         path,
-        mcp: options.mcp,
+        mcp: { ...options.mcp, env: { ...options.mcp.env, KAITU_AGENT_CONNECTION: connection } },
         env: options.env,
       });
     },
