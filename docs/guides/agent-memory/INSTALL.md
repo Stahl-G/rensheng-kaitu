@@ -21,6 +21,6 @@
 8. 生成手机要读的内容，开图 iPhone 连上这个仓库就能看到：
    - 走「有 kaitu」：`kaitu phone run --as <你的名字> --dir <目录>`，再 `kaitu backup sync --dir <目录>`。
    - 走「没有 kaitu」：跳过这步。用户在装了开图的电脑上从这个仓库恢复后，开图会自动生成并同步上去。
-9. 在 `handoffs/` 写第一份交接（见 AGENT-README.md 的格式），写明这次整理了什么、各项目的下一步。
-10. 读回 `me/profile.md`、各项目 `STATUS.md` 和远端最新提交，确认已推送。
+9. 在 `handoffs/` 写第一份交接（见 AGENT-README.md 的格式），写明这次整理了什么、各项目的下一步。交接写好后再上传一次：有 kaitu 用 `kaitu backup sync --dir <目录>`；没有 kaitu 就提交本次新增的交接文件并推送。第 7 步的推送不包含后来新写的交接。
+10. 从远端读回 `me/profile.md`、各项目 `STATUS.md`、`log.md` 和这次的交接文件，核对内容及远端最新提交，确认全部已推送；只看到本机文件或远端提交号不算完成。
 11. 最后给用户一段填好仓库地址的「另一台设备接入」提示词（见 [README](README.md)），并告诉用户：想在开图 App 里看，就在「设置 → GitHub 同步」从这个仓库恢复。

@@ -562,7 +562,10 @@ export class KaituOverviewService extends TypertRemoteService {
     return readExperienceImports(this.workspace);
   }
   @Remote("experienceBatchPreview")
-  async experienceBatchPreview(id: string, operation: "undo" | "restore"): Promise<ExperienceBatchPreview> {
+  async experienceBatchPreview(
+    id: string,
+    operation: "confirm" | "undo" | "restore",
+  ): Promise<ExperienceBatchPreview> {
     return previewExperienceBatch(this.workspace, id, operation);
   }
   @Remote("setExperienceSource")
@@ -572,7 +575,7 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("changeExperienceBatch")
   async changeExperienceBatch(
     id: string,
-    operation: "undo" | "restore",
+    operation: "confirm" | "undo" | "restore",
     revision: number,
   ): Promise<{ affected: number; preserved: number; version: string | null }> {
     return this.write(() => changeExperienceBatch(this.workspace, id, operation, revision));

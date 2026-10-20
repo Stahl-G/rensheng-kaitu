@@ -513,6 +513,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
   const run = async () => {
     const c = s.connection as BackupConnection;
     try {
+      refreshOverview(ws);
       const local = await localFiles(ws, c, options);
       const other = await remote.read(c.repo, c.branch, options);
       controller.signal.throwIfAborted();
@@ -662,7 +663,11 @@ export function disconnectWorkspaceBackup(ws: Workspace) {
 export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "local" | "remote") {
   const s = state(ws);
   const conflict = s.conflicts.find((c) => c.path === path);
-  if (!conflict) throw new Error(pick("找不到待处理的冲突", "Conflict not found"));
+  if (!conflict)
+    throw new KaituError(
+      pick("找不到待处理的冲突，请刷新", "Conflict not found; refresh the list"),
+      "CONFLICT",
+    );
   // 清单按连接范围生成，本机没有这个文件：不读写磁盘，用户范围保持不变。
   if (path === manifest) {
     s.conflicts = s.conflicts.filter((c) => c.path !== path);
@@ -673,11 +678,12 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   if (current !== conflict.local) {
     conflict.local = current;
     store(ws, s);
-    throw new Error(
+    throw new KaituError(
       pick(
         "本机文件又有修改，已更新对照内容，请重新选择",
         "The local file changed; review the updated comparison and choose again",
       ),
+      "CONFLICT",
     );
   }
   // 两份原文保留在本机历史文件，作者选择后也能回看。
@@ -690,6 +696,7 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   else s.base[path] = conflict.remote;
   s.conflicts = s.conflicts.filter((c) => c.path !== path);
   store(ws, s);
+  if (choice === "remote") refreshOverview(ws);
   return workspaceBackupStatus(ws);
 }
 export async function restoreWorkspaceBackup(
@@ -748,6 +755,7 @@ export async function restoreWorkspaceBackup(
     conflicts: [],
     lastSync: new Date().toISOString(),
   });
+  refreshOverview(ws);
   return { root: ws.root };
 }
 export function startWorkspaceBackup(ws: Workspace, notify: () => void = () => {}, intervalMs = 60000) {
@@ -829,9 +837,17 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
       const opened = new Workspace(args.root);
       if (!opened.exists(".kaitu/config.json"))
         throw new Error(pick("不是开图工作区", "Not a Kaitu workspace"));
-      ws.root = opened.root;
-      rememberWorkspace(opened.root);
-      return workspaceBackupStatus(ws);
+      // 先读取目标状态；损坏的备份或凭据文件不能把当前工作区切走。
+      const status = workspaceBackupStatus(opened);
+      const previous = ws.root;
+      try {
+        ws.root = opened.root;
+        rememberWorkspace(opened.root);
+      } catch (error) {
+        ws.root = previous;
+        throw error;
+      }
+      return status;
     }
     case "restore": {
       if (!args.root) throw new Error(pick("请选择一个新的恢复目录", "Choose a new restore folder"));
