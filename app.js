@@ -99,7 +99,7 @@
   /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
   const rel = document;
   if (document.querySelector("[data-rel]") && "fetch" in window) {
-    const KEY = "kaitu-release-v3";
+    const KEY = "kaitu-release-v6";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
@@ -138,12 +138,14 @@
       fetch("https://api.github.com/repos/Stahl-G/rensheng-kaitu/releases?per_page=10", { headers: { Accept: "application/vnd.github+json" }, signal: ctrl?.signal })
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
         .then((list) => {
-          const pick = Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => /\.dmg$/i.test(a.name)));
+          const find = (re) => Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => re.test(a.name)));
+          const pack = (x) => ({
+            tag: x.tag_name, published: x.published_at || x.created_at, prerelease: !!x.prerelease, page: x.html_url,
+            assets: x.assets.map((a) => ({ id: a.id, name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
+          });
+          const pick = find(/\.dmg$/i);
           if (!pick) return;
-          const r = {
-            tag: pick.tag_name, published: pick.published_at || pick.created_at, prerelease: !!pick.prerelease, page: pick.html_url,
-            assets: pick.assets.map((a) => ({ id: a.id, name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
-          };
+          const r = pack(pick);
           fill(r);
           try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), r })); } catch {}
         })

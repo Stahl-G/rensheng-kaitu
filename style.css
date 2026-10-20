@@ -84,16 +84,20 @@ main { display: block; }
 /* hero */
 .hero { padding: 72px 0 64px; }
 .hero .wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 32px 56px; }
-.hero h1 { font-size: 48px; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
+.hero h1 { font-size: 64px; line-height: 1.12; font-weight: 600; letter-spacing: -0.015em; }
 .hero .lead { margin-top: 18px; max-width: 30em; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .meta { margin-top: 18px; font-size: 13px; color: var(--muted); }
+.hero-dev { margin-top: 28px; max-width: 36em; }
+.hero-dev p { font-size: 15px; margin-bottom: 8px; }
+.hero-dev pre { white-space: pre-wrap; overflow-wrap: anywhere; padding-right: 4.5rem; }
+.hero-dev .more { display: inline-block; margin-top: 8px; font-size: 14px; }
 .hero-mark { width: 240px; height: 240px; overflow: visible; }
 @media (max-width: 760px) {
   .hero { padding: 40px 0 44px; }
   .hero .wrap { grid-template-columns: 1fr; }
   .hero-mark { width: 112px; height: 112px; grid-row: 1; }
-  .hero h1 { font-size: 34px; }
+  .hero h1 { font-size: 42px; }
 }
 
 /* hero mark motion (from research-site/motion/demo.html) */

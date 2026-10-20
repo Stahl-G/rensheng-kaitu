@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>人生开图 · AI可以换，人生不能</title>
-<meta name="description" content="开图把散在各个 AI 里的目标、在做的事和下一步排成一张进度图。资料放在你自己的文件夹里，换一个 AI 也能接着做。开源，macOS。">
+<title>人生开图 · AI 可以换，人生不能</title>
+<meta name="description" content="目标、计划和每天的记录存在你自己的文件夹里，排成一张进度图；换哪个 AI，读完都能接着做。开源，macOS。">
 <link rel="canonical" href="https://kaitu.si/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/">
 <link rel="alternate" hreflang="x-default" href="https://kaitu.si/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="人生开图">
-<meta property="og:title" content="人生开图 · AI可以换，人生不能">
-<meta property="og:description" content="一张看得见、接得上、每周往前走的人生进度图。资料在你自己的文件夹里。">
+<meta property="og:title" content="人生开图 · AI 可以换，人生不能">
+<meta property="og:description" content="建议找得回，计划看得见，记录变成认识。资料在你自己的文件夹里。">
 <meta property="og:url" content="https://kaitu.si/">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
@@ -21,15 +21,15 @@
 <meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=da5dfb17">
-<link rel="stylesheet" href="/style.css?v=1b1ea670">
-<link rel="stylesheet" href="/mock/mock.css?v=e002b650">
-<script src="/mock/persona.js?v=bf4bbe25" defer></script>
-<script src="/mock/mock.js?v=de896050" defer></script>
-<script src="/mock/lifemap.js?v=b4557c74" defer></script>
+<link rel="stylesheet" href="/tokens.css?v=906e6266">
+<link rel="stylesheet" href="/style.css?v=61a374f1">
+<link rel="stylesheet" href="/mock/mock.css?v=9954b9ff">
+<script src="/mock/persona.js?v=ddadd7d1" defer></script>
+<script src="/mock/mock.js?v=c411fc6e" defer></script>
+<script src="/mock/lifemap.js?v=8313b27b" defer></script>
 <script>document.documentElement.classList.add("js")</script>
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<script src="/app.js?v=04009e06" defer></script>
+<script src="/app.js?v=205c3cab" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -37,7 +37,7 @@
   <div class="wrap">
     <a class="brand" href="/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>人生开图</span></a>
     <a class="lang" href="/en/" hreflang="en" lang="en" data-lang-switch="en">English</a>
-    <nav class="site-nav" aria-label="网站导航"><a href="/#tour">产品</a><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/#inspiration">灵感</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+    <nav class="site-nav" aria-label="网站导航"><a href="/#tour">产品</a><a href="/vision/">愿景</a><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/#inspiration">灵感</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
   </div>
 </header>
 <main id="main" tabindex="-1">
@@ -45,13 +45,18 @@
   <div class="wrap">
     <div>
       <p class="eyebrow">人生进度图</p>
-      <h1 id="hero-title">AI可以换，人生不能</h1>
-      <p class="lead">把散在各个 AI 里的目标和计划，排成一张看得见的进度图。<br>每周往前走一步；换一个 AI，也接得上。</p>
+      <h1 id="hero-title">AI 可以换，人生不能</h1>
+      <p class="lead">目标、计划和每天的记录，存在你自己的文件夹里，排成一张进度图。每件事落到一个下一步，做完记一句结果；换哪个 AI，读完都能接着做。</p>
       <div class="cta">
         <a class="btn btn-big btn-primary" href="/download/" data-dl>下载 macOS 版</a>
         <a class="btn btn-big btn-quiet" href="/docs/">看文档</a>
       </div>
       <p class="meta"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a> · <span data-dl-meta>macOS Apple 芯片</span> · 开源 MIT</p>
+      <div class="hero-dev">
+        <p><strong>开发者</strong>：已经在用 Claude Code、Codex 或 Cursor？把这句话交给它，在你的 GitHub 上建好私有的开图工作区。</p>
+        <div class="codeblock"><pre><code>帮我按 https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md 建立我的开图记忆，直接做完。</code></pre><button type="button" class="copy">复制</button></div>
+        <a class="more" href="/developers/">开发者指南 →</a>
+      </div>
     </div>
     <svg class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="开图标志：一张正在展开的三折地图">
       <defs>
@@ -232,7 +237,7 @@
 <footer class="site-foot">
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>人生开图</b><span>生活，逐渐清晰。</span></p>
-    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
+    <nav class="foot-links" aria-label="页脚"><a href="/docs/">文档</a><a href="/developers/">开发者指南</a><a href="/download/">下载</a><a href="/privacy/">资料去向</a><a href="/privacy/iphone/">iPhone 隐私政策</a><a href="/support/">支持</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">开源致谢</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">反馈与建议 ↗</a></nav>
     <p class="foot-note">MIT 许可证 · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
     <p class="foot-note">灵感来自邵艾伦 × 孙宇晨的访谈。本项目为独立开源项目，与二人及其公司无关联。</p>
   </div>
