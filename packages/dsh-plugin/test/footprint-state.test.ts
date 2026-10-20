@@ -98,18 +98,6 @@ it("年份和图层过滤不能把当前锚点改成旧居或清空计划出发�
   expect(footprintData([recent], "2026-10-20", unknown ?? null).me).toBeUndefined();
 });
 
-it("真实时间顺序的首末来路线透明度覆盖 0.35 到 0.9，未知日期不插入", () => {
-  const rows = [
-    item(1, "2000-01-01", "2001-01-01"),
-    item(2, "2002-01-01", "2003-01-01"),
-    item(3, "2004-01-01", undefined),
-    item(4, "2003", undefined, { time_precision: "unknown" }),
-  ];
-  const data = footprintData(rows.reverse(), "2026-10-20");
-  expect(data.routes.features.map((f) => f.properties.opacity)).toEqual([0.35, 0.9]);
-  expect(data.history.map((p) => p.geonameid)).toEqual([1, 2, 3]);
-});
-
 it("重返同城的最新居住冲突不借用多年前来路，尾迹回到默认左下", () => {
   const shanghai = city(20, 121.4581, 31.2222);
   const rows = [

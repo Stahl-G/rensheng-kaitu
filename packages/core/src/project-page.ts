@@ -75,7 +75,6 @@ export function readProjectPage(ws: Workspace, slug: string) {
     sources: [summary.file, ...summary.metricFiles],
   };
 }
-export type ProjectPage = ReturnType<typeof readProjectPage>;
 
 export function validateProjectGoal(input: ProjectGoal): ProjectGoal {
   if (

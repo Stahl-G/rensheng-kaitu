@@ -13,7 +13,6 @@
  */
 
 /** Wire name of the tool, the keyed toolview, and the streaming-preview match. */
-export const OPENMAIC_RENDER_TOOL_NAME = "openmaic_render";
 
 /** The `tool/result` meta descriptor persisted for replay-stable rendering. */
 export interface OpenmaicMeta {

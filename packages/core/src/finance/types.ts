@@ -67,8 +67,3 @@ export interface FinanceNumber {
   record_ids: string[];
   missing: string[];
 }
-export interface FinancePeriod {
-  from: string | null;
-  to: string | null;
-  as_of: string;
-}

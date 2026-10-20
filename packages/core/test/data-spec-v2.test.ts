@@ -16,7 +16,6 @@ import {
   updateRecord,
   writeAgentRecord,
   writeExploration,
-  writePhase,
 } from "../src/index.js";
 import { freshWorkspace } from "./helpers.js";
 
@@ -62,18 +61,17 @@ it("阶段权限在通用入口生效，拒绝过期修订和 Agent 确认、回
     const created = await writeAgentRecord(ws, "add", "phase", "Synthetic agent", data);
     const id = (created as { record: { id: string } }).record.id;
     expect(() => updateRecord(ws, "phase", id, { title: "修正" })).toThrow();
-    writePhase(ws, { operation: "update", id, expected_revision: 1, data: { title: "新工作期" } }, "agent");
-    expect(() =>
-      writePhase(ws, { operation: "update", id, expected_revision: 1, data: { status: "confirmed" } }),
-    ).toThrow();
+    updateRecord(ws, "phase", id, { title: "新工作期" }, { by: "agent", expected_revision: 1 });
+    expect(() => updateRecord(ws, "phase", id, { status: "confirmed" }, { expected_revision: 1 })).toThrow();
     expect(() => updateRecord(ws, "phase", id, { status: "confirmed" }, { expected_revision: 2 })).toThrow();
     expect(() => updateRecord(ws, "phase", id, { reflection: "回顾" }, { expected_revision: 2 })).toThrow();
-    writePhase(ws, {
-      operation: "update",
+    updateRecord(
+      ws,
+      "phase",
       id,
-      expected_revision: 2,
-      data: { status: "confirmed", reflection: "适应了新节奏" },
-    });
+      { status: "confirmed", reflection: "适应了新节奏" },
+      { by: "user", expected_revision: 2 },
+    );
     expect(() => updateRecord(ws, "phase", id, { title: "改用户记录" }, { expected_revision: 3 })).toThrow();
     const stored = readPhases(ws)[0] as import("../src/records.js").StoredRecord;
     expect(() =>
