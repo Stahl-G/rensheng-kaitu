@@ -21,6 +21,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
+import { createDmg } from "./package-dmg.mjs";
 import { writePayload as buildPayload } from "./package-payload.mjs";
 import { readUpdateConfig } from "./update-config.mjs";
 
@@ -93,7 +94,7 @@ const plan = [
     : []),
   ...(values.dmg
     ? [
-        `DMG hdiutil makehybrid + convert：Kaitu.app + Applications 链接 → ${dmg}`,
+        `DMG hdiutil create + 挂载验签：Kaitu.app + Applications 链接 → ${dmg}`,
         ...(identity
           ? ["SIGN codesign --sign Developer-ID --timestamp Kaitu.dmg；codesign --verify Kaitu.dmg"]
           : []),
@@ -290,7 +291,8 @@ async function packageApplication() {
       execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", output, zip]);
       notarize(zip, output);
     }
-    if (values.dmg) createDmg(temporary);
+    if (values.dmg)
+      createDmg({ app: output, dmg, temporary, identity, notarize: notaryProfile ? notarize : undefined });
     console.log(`完成：${output}`);
   } catch (error) {
     // 输出目录由本次调用创建；失败不留下一个貌似可用的应用。
@@ -406,31 +408,6 @@ function notarize(artifact, target) {
   for (const action of ["staple", "validate"]) {
     execFileSync("/usr/bin/xcrun", ["stapler", action, target], { stdio: "inherit" });
   }
-}
-
-function createDmg(temporary) {
-  const staging = join(temporary, "dmg");
-  mkdirSync(staging);
-  execFileSync("/usr/bin/ditto", [output, join(staging, "Kaitu.app")]);
-  symlinkSync("/Applications", join(staging, "Applications"));
-  const hybrid = join(temporary, "Kaitu-hybrid.dmg");
-  const image = join(temporary, "Kaitu.dmg");
-  // 不挂载临时磁盘设备，也能生成保留应用与符号链接的 HFS+ 映像。
-  execFileSync(
-    "/usr/bin/hdiutil",
-    ["makehybrid", "-hfs", "-hfs-volume-name", "Kaitu", "-o", hybrid, staging],
-    { stdio: "inherit" },
-  );
-  execFileSync("/usr/bin/hdiutil", ["convert", hybrid, "-format", "UDZO", "-o", image], { stdio: "inherit" });
-  if (identity) {
-    execFileSync("/usr/bin/codesign", ["--force", "--sign", identity, "--timestamp", image], {
-      stdio: "inherit",
-    });
-    execFileSync("/usr/bin/codesign", ["--verify", "--strict", image], { stdio: "inherit" });
-  }
-  if (notaryProfile) notarize(image, image);
-  renameSync(image, dmg);
-  console.log(`完成：${dmg}`);
 }
 
 function markBody() {
