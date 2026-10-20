@@ -25,6 +25,7 @@
 | `Source.dc.html` | 390×844 | v0.7 设置 › 更新来源：谁在更新、交给 Agent 的说明（拷贝） | I12 |
 | `StatusAgent.dc.html` | 390×844 | v0.7 同步状态：今天、这一周、开图各自由谁何时更新；「等 Dot 处理」与「等电脑处理」 | I10、I11、I14 |
 | `Photos.dc.html` | 390×844 | v0.7 从照片找城市：开图页入口 → 正在看照片 → 找到的城市（点卡片切换） | tasks/PHOTOS.md |
+| `onboarding-r1/` | — | 新手开图第一轮设计稿的截图与反馈（含设计时要知道的技术限制） | onboarding.md |
 | `Mac.dc.html` | 1180×820 | v0.7 Mac：我的 › AI 与连接 › 云端整理员（整理员、交给 Agent 的说明、手机由谁更新、电脑不在时） | agent-runner §8 M1–M4 |
 
 ## 验收记录
