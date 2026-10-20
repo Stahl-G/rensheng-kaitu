@@ -1,4 +1,5 @@
-import { readdirSync, statSync } from "node:fs";
+import { promises as fs, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
@@ -349,5 +350,38 @@ export function workspaceFileStamps(ws: Workspace): Map<string, string> {
     }
   }
   walk("");
+  return stamps;
+}
+
+/** Async metadata scan used only when native file watching is unavailable. */
+export async function workspaceFileStampsAsync(
+  ws: Workspace,
+  options: { signal?: AbortSignal; progress?: (completed: number) => void } = {},
+): Promise<Map<string, string>> {
+  const root = await fs.realpath(ws.root);
+  const stamps = new Map<string, string>();
+  let completed = 0;
+  async function walk(dir: string): Promise<void> {
+    options.signal?.throwIfAborted();
+    for await (const entry of await fs.opendir(join(root, dir))) {
+      options.signal?.throwIfAborted();
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink() || ignoredWorkspaceChange(file)) continue;
+      if (entry.isDirectory()) {
+        await walk(file);
+      } else {
+        try {
+          const stat = await fs.lstat(join(root, file));
+          if (stat.isSymbolicLink()) continue;
+          stamps.set(file, `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`);
+          options.progress?.(++completed);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      }
+    }
+  }
+  await walk("");
+  options.signal?.throwIfAborted();
   return stamps;
 }

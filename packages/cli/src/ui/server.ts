@@ -56,7 +56,7 @@ import {
   syncProject,
   syncProjects,
   syncStatus,
-  workspaceFileStamps,
+  workspaceFileStampsAsync,
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
@@ -221,6 +221,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
   let stamps = new Map<string, string>();
+  let pollingAbort: AbortController | undefined;
   const versionDelay = options.versionDelayMs ?? 2000;
   const snapshotDelay = options.snapshotDelayMs ?? 30000;
   holdOverview(ws);
@@ -328,35 +329,51 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     notify();
   };
   watchFile(backupState, { persistent: false, interval: 2000 }, backupChanged);
+  const stopPolling = () => {
+    pollingAbort?.abort();
+    pollingAbort = undefined;
+    clearTimeout(polling);
+    polling = undefined;
+  };
   const startPolling = () => {
     watcher?.close();
-    if (polling) return;
+    if (pollingAbort) return;
     // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
-    stamps = workspaceFileStamps(ws);
+    const controller = new AbortController();
+    pollingAbort = controller;
     // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
     changedFile("工作区");
     scheduleInbox();
     const delay = Math.max(50, options.refreshDelayMs ?? 1000);
-    function poll() {
+    let baseline = true;
+    async function poll() {
       const started = performance.now();
       try {
-        const next = workspaceFileStamps(ws);
-        for (const file of new Set([...stamps.keys(), ...next.keys()])) {
-          if (stamps.get(file) !== next.get(file)) changedFile(file);
+        const next = await workspaceFileStampsAsync(ws, { signal: controller.signal });
+        if (closed || controller.signal.aborted) return;
+        if (baseline) {
+          baseline = false;
+          // A file may change during the first scan after the initial catch-up was queued.
+          changedFile("工作区");
+        } else {
+          for (const file of new Set([...stamps.keys(), ...next.keys()])) {
+            if (stamps.get(file) !== next.get(file)) changedFile(file);
+          }
         }
         stamps = next;
       } catch {
-        reportError();
+        if (!controller.signal.aborted) reportError();
+      } finally {
+        // One scan at a time; a stopped watcher cannot schedule another scan.
+        if (!closed && !controller.signal.aborted)
+          polling = setTimeout(() => void poll(), Math.max(delay, performance.now() - started));
       }
-      // 慢扫描后至少留出同等空档，让后台文件 I/O 运行，避免轮询占满事件循环。
-      polling = setTimeout(poll, Math.max(delay, performance.now() - started));
     }
-    polling = setTimeout(poll, delay);
+    void poll();
   };
   function startWatching() {
     watcher?.close();
-    clearTimeout(polling);
-    polling = undefined;
+    stopPolling();
     try {
       watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
@@ -787,7 +804,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
-    clearTimeout(polling);
+    stopPolling();
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
@@ -817,7 +834,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
-    clearTimeout(polling);
+    stopPolling();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
