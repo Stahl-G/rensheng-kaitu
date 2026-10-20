@@ -10,7 +10,7 @@ import base64, io, json, math, sys, hashlib
 root = Path(__file__).resolve().parents[1]
 source = Path(sys.argv[1])
 im = Image.open(source).convert('RGB').resize((4096, 2048), Image.Resampling.LANCZOS)
-themes = {'light': ((230, 220, 197), (39, 73, 94)), 'dark': ((76, 78, 74), (16, 37, 54))}
+themes = {'light': ((230, 220, 197), (39, 73, 94)), 'dark': ((85, 77, 67), (28, 41, 60))}
 output = {}
 for theme, (land, water) in themes.items():
     paper = Image.new('RGB', im.size)
@@ -18,7 +18,7 @@ for theme, (land, water) in themes.items():
     for r, g, b in im.getdata():
         sea = b > r + 10 and b > g + 5
         base = water if sea else land
-        shade = (r * .3 + g * .59 + b * .11 - 170) * (.12 if sea else .34)
+        shade = (r * .3 + g * .59 + b * .11 - 170) * ((.06 if sea else .12) if theme == 'dark' else (.12 if sea else .34))
         pixels.append(tuple(max(0, min(255, round(v + shade))) for v in base))
     paper.putdata(pixels)
     merc = Image.new('RGB', (4096, 4096))

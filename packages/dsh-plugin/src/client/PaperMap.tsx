@@ -3,6 +3,7 @@ import {
   Map as LibreMap,
   LngLatBounds,
   Marker,
+  Popup,
   type StyleSpecification,
   setWorkerUrl,
 } from "maplibre-gl";
@@ -54,6 +55,8 @@ export function PaperMap({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
   const meMarker = useRef<Marker | null>(null);
+  const originLabel = useRef<Marker | null>(null);
+  const cityPopup = useRef<Popup | null>(null);
   const data = useMemo(
     () =>
       footprintData(
@@ -63,8 +66,8 @@ export function PaperMap({
       ),
     [cities, asOf, current],
   );
-  const latest = useRef({ mode, data, onSelect, selected, showRoutes, showAllPlaces });
-  latest.current = { mode, data, onSelect, selected, showRoutes, showAllPlaces };
+  const latest = useRef({ mode, data, cities, onSelect, selected, showRoutes, showAllPlaces });
+  latest.current = { mode, data, cities, onSelect, selected, showRoutes, showAllPlaces };
   const camera = useCallback((snapshot: Pick<typeof latest.current, "mode" | "data"> = latest.current) => {
     const m = map.current;
     const { mode, data } = snapshot;
@@ -99,10 +102,10 @@ export function PaperMap({
       m: LibreMap,
       snapshot: Pick<
         typeof latest.current,
-        "mode" | "data" | "showRoutes" | "selected" | "showAllPlaces"
+        "mode" | "data" | "cities" | "showRoutes" | "selected" | "showAllPlaces"
       > = latest.current,
     ) => {
-      const { mode, data, showRoutes, selected, showAllPlaces } = snapshot;
+      const { mode, data, cities, showRoutes, selected, showAllPlaces } = snapshot;
       if (!m.getSource("footprint-cities")) return;
       const places = showAllPlaces
         ? data.all
@@ -111,11 +114,25 @@ export function PaperMap({
           : mode === "possible"
             ? data.possible
             : [];
+      const yearsByCity = new Map<string, Set<string>>();
+      for (const city of cities)
+        for (const e of city.experiences) {
+          if (e.review || e.fact_status === "inferred" || e.time_precision === "unknown") continue;
+          const key = cityKey(e.place);
+          const years = yearsByCity.get(key) ?? new Set<string>();
+          for (const date of [e.start, e.end]) if (date && /^\d{4}/.test(date)) years.add(date.slice(0, 4));
+          yearsByCity.set(key, years);
+        }
       (m.getSource("footprint-cities") as GeoJSONSource).setData({
         type: "FeatureCollection",
         features: places.filter(coordinate).map((p) => ({
           type: "Feature",
-          properties: { id: cityKey(p), lived: data.lived.some((l) => cityKey(l) === cityKey(p)) },
+          properties: {
+            id: cityKey(p),
+            name: p.name,
+            years: [...(yearsByCity.get(cityKey(p)) ?? [])].sort().join(" · "),
+            lived: data.lived.some((l) => cityKey(l) === cityKey(p)),
+          },
           geometry: { type: "Point", coordinates: [p.lng, p.lat] },
         })),
       });
@@ -134,6 +151,18 @@ export function PaperMap({
       m.setFilter("footprint-selected", ["==", ["get", "id"], selected ?? ""]);
       if (coordinate(data.me)) meMarker.current?.setLngLat([data.me.lng, data.me.lat]).addTo(m);
       else meMarker.current?.remove();
+      const meLabel = meMarker.current?.getElement().querySelector("span");
+      if (meLabel) meLabel.textContent = data.me ? `我 · ${data.me.name}` : "";
+      originLabel.current?.remove();
+      const origin = data.history[0];
+      if (mode === "history" && coordinate(origin) && cityKey(origin) !== (data.me && cityKey(data.me))) {
+        const label = document.createElement("span");
+        label.className = css.cityLabel ?? "";
+        label.textContent = `起点 · ${origin.name}`;
+        originLabel.current = new Marker({ element: label, anchor: "bottom-left", offset: [10, -10] })
+          .setLngLat([origin.lng, origin.lat])
+          .addTo(m);
+      }
       meMarker.current?.getElement().setAttribute("data-breathe", String(mode === "now"));
     },
     [],
@@ -186,11 +215,11 @@ export function PaperMap({
           const color =
             sourceLayer === "water"
               ? isDark()
-                ? "#102536"
+                ? "#1c293c"
                 : "#27495e"
               : sourceLayer === "landcover"
                 ? isDark()
-                  ? "#4c4e4a"
+                  ? "#554d43"
                   : "#e6dcc5"
                 : isDark()
                   ? "#728185"
@@ -213,7 +242,7 @@ export function PaperMap({
                   .trim() || color,
             },
           };
-          if (!m.getLayer(next.id)) m.addLayer(next as typeof layer, "footprint-history-contrast");
+          if (!m.getLayer(next.id)) m.addLayer(next as typeof layer, "footprint-history");
         }
         if (!m.getSource("paper-terrain"))
           m.addSource("paper-terrain", {
@@ -235,10 +264,10 @@ export function PaperMap({
               paint: {
                 "hillshade-shadow-color": isDark() ? "#121c22" : "#817761",
                 "hillshade-highlight-color": isDark() ? "#a9aaa0" : "#fff8e8",
-                "hillshade-exaggeration": 0.3,
+                "hillshade-exaggeration": isDark() ? 0.12 : 0.3,
               },
             },
-            "footprint-history-contrast",
+            "footprint-history",
           );
         remoteLoaded = true;
         setDetailStatus(null);
@@ -250,6 +279,7 @@ export function PaperMap({
       }
     };
     const loadStyle = () => {
+      cityPopup.current?.remove();
       ++styleGeneration;
       if (disposed) return;
       const style = structuredClone(isDark() ? dark : light) as StyleSpecification;
@@ -276,21 +306,6 @@ export function PaperMap({
           ["planned", [6, 4]],
           ["suggested", [1, 5]],
         ] as const) {
-          // Keep white ink, with a narrow casing on pale paper. Scale the dash
-          // units with line width so planned/suggested gaps stay aligned.
-          instance.addLayer({
-            id: `footprint-${kind}-contrast`,
-            type: "line",
-            source: "footprint-routes",
-            filter: ["==", ["get", "kind"], kind],
-            layout: { "line-cap": "round", "line-join": "round" },
-            paint: {
-              "line-color": "#344b56",
-              "line-width": 3,
-              "line-opacity": isDark() ? 0 : ["*", ["get", "opacity"], 0.75],
-              ...(dash ? { "line-dasharray": dash.map((n) => n / 2) } : {}),
-            },
-          });
           instance.addLayer({
             id: `footprint-${kind}`,
             type: "line",
@@ -298,7 +313,7 @@ export function PaperMap({
             filter: ["==", ["get", "kind"], kind],
             layout: { "line-cap": "round", "line-join": "round" },
             paint: {
-              "line-color": "#ffffff",
+              "line-color": isDark() ? "#ffffff" : "#263f64",
               "line-width": 1.5,
               "line-opacity": ["get", "opacity"],
               ...(dash ? { "line-dasharray": [...dash] } : {}),
@@ -307,25 +322,13 @@ export function PaperMap({
         }
         instance.addSource("footprint-cities", { type: "geojson", data: empty });
         instance.addLayer({
-          id: "footprint-cities-contrast",
-          type: "circle",
-          source: "footprint-cities",
-          paint: {
-            "circle-radius": ["case", ["get", "lived"], 4.25, 2.75],
-            "circle-color": "rgba(255,255,255,0)",
-            "circle-stroke-color": "#344b56",
-            "circle-stroke-width": 3,
-            "circle-stroke-opacity": isDark() ? 0 : 0.75,
-          },
-        });
-        instance.addLayer({
           id: "footprint-cities",
           type: "circle",
           source: "footprint-cities",
           paint: {
             "circle-radius": ["case", ["get", "lived"], 5, 3.5],
             "circle-color": "rgba(255,255,255,0)",
-            "circle-stroke-color": "#fff",
+            "circle-stroke-color": isDark() ? "#fff" : "#263f64",
             "circle-stroke-width": 1.5,
           },
         });
@@ -337,7 +340,7 @@ export function PaperMap({
           paint: {
             "circle-radius": 12,
             "circle-color": "rgba(255,255,255,.15)",
-            "circle-stroke-color": "#fff",
+            "circle-stroke-color": isDark() ? "#fff" : "#263f64",
             "circle-stroke-width": 1,
           },
         });
@@ -345,6 +348,9 @@ export function PaperMap({
         if (!meMarker.current) {
           const marker = document.createElement("div");
           marker.className = css.meMarker ?? "";
+          const label = document.createElement("span");
+          label.className = css.cityLabel ?? "";
+          marker.append(label);
           marker.setAttribute("role", "img");
           marker.setAttribute("aria-label", "我 / Me");
           meMarker.current = new Marker({ element: marker });
@@ -365,8 +371,28 @@ export function PaperMap({
         if ("sourceId" in e && e.sourceId === "paper-earth") setFailure(true);
         else setDetailStatus(navigator.onLine ? "unavailable" : "offline");
       });
+      const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+      cityPopup.current = popup;
+      const showCity = (e: { point: { x: number; y: number }; lngLat: { lng: number; lat: number } }) => {
+        const feature = instance.queryRenderedFeatures([e.point.x, e.point.y], {
+          layers: ["footprint-cities"],
+        })[0];
+        if (!feature) {
+          popup.remove();
+          return;
+        }
+        const content = document.createElement("div");
+        content.className = css.cityPopup ?? "";
+        content.textContent = `${feature.properties?.name} · ${feature.properties?.years || "时间未知"}`;
+        popup.setLngLat(e.lngLat).setDOMContent(content).addTo(instance);
+      };
+      m.on("mousemove", showCity);
+      m.on("mouseout", () => popup.remove());
       m.on("click", (e) => {
-        const features = instance.queryRenderedFeatures(e.point, { layers: ["footprint-cities"] });
+        showCity(e);
+        const features = instance.queryRenderedFeatures([e.point.x, e.point.y], {
+          layers: ["footprint-cities"],
+        });
         const id = features[0]?.properties?.id;
         latest.current.onSelect(typeof id === "string" ? id : null);
       });
@@ -397,6 +423,9 @@ export function PaperMap({
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", online);
       meMarker.current?.remove();
+      originLabel.current?.remove();
+      cityPopup.current?.remove();
+      cityPopup.current = null;
       meMarker.current = null;
       map.current = null;
       m?.remove();
@@ -420,8 +449,9 @@ export function PaperMap({
     if (map.current && ready && cameraKey) camera();
   }, [cameraKey, ready, camera]);
   useEffect(() => {
-    if (map.current && ready) update(map.current, { mode, data, selected, showRoutes, showAllPlaces });
-  }, [mode, data, selected, showRoutes, showAllPlaces, ready, update]);
+    if (map.current && ready)
+      update(map.current, { mode, data, cities, selected, showRoutes, showAllPlaces });
+  }, [mode, data, cities, selected, showRoutes, showAllPlaces, ready, update]);
   const empty =
     mode === "now" ? !data.me : mode === "history" ? !data.history.length : !data.possible.length || !data.me;
   return (
@@ -520,6 +550,7 @@ export function PaperMap({
             key={id}
             aria-pressed={mode === id}
             onClick={() => {
+              cityPopup.current?.remove();
               onSelect(null);
               setMode(id);
             }}

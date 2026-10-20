@@ -127,10 +127,15 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
     if (arc)
       features.push({
         type: "Feature",
-        properties: { kind: "history", opacity: 0.35 + (0.55 * i) / Math.max(1, timed.length - 1) },
+        properties: { kind: "history", opacity: 1 },
         geometry: { type: "LineString", coordinates: arc },
       });
   }
+  const historyRoutes = features.filter((f) => f.properties.kind === "history");
+  historyRoutes.forEach((feature, index) => {
+    feature.properties.opacity =
+      historyRoutes.length === 1 ? 0.9 : 0.35 + (0.55 * index) / (historyRoutes.length - 1);
+  });
   if (me)
     for (const e of possible) {
       const arc = greatCircle(me, e.place);

@@ -576,11 +576,11 @@
 /* 与开图探索页共用青绿、字体和卡片；海陆使用独立对比层级。 */
 body[data-ds-dark-theme] .page,
 [data-theme="dark"] .page {
-  --atlas-water: #102536;
-  --atlas-land: #4c4e4a;
+  --atlas-water: #1c293c;
+  --atlas-land: #554d43;
   --atlas-border: #728185;
   --atlas-muted: #a3bfba;
-  --atlas-green: #4c4e4a;
+  --atlas-green: #554d43;
 }
 .tools {
   display: flex;
@@ -742,10 +742,13 @@ body[data-ds-dark-theme] .page,
   position: absolute;
   top: 24px;
   left: 24px;
-  right: 90px;
+  max-width: calc(100% - 150px);
   pointer-events: none;
-  color: #fff;
-  text-shadow: 0 1px 4px #102536;
+  color: #263f64;
+  background: #f4eddfeb;
+  padding: 14px 18px;
+  border-radius: 10px;
+  text-shadow: none;
 }
 .stateCaption h1 {
   font-size: 24px;
@@ -805,8 +808,8 @@ body[data-ds-dark-theme] .page,
   text-shadow: 0 1px 3px #102536;
 }
 .meMarker {
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border: 2px solid #fff;
   border-radius: 50%;
   background: #2b4c7e;
@@ -864,4 +867,33 @@ body[data-ds-dark-theme] .page,
   z-index: 1;
   background: var(--kt-card);
   padding-bottom: 12px;
+}
+
+.cityLabel {
+  white-space: nowrap;
+  color: #263f64;
+  background: #f4eddfed;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font: 12px / 1.4 system-ui;
+  pointer-events: none;
+}
+.meMarker .cityLabel {
+  position: absolute;
+  left: 24px;
+  top: -6px;
+}
+.cityPopup {
+  color: #263f64;
+  font: 13px / 1.5 system-ui;
+}
+[data-theme="dark"] .stateCaption,
+body[data-ds-dark-theme] .stateCaption {
+  color: #f6efdf;
+  background: #241f1bd9;
+}
+[data-theme="dark"] .cityLabel,
+body[data-ds-dark-theme] .cityLabel {
+  color: #f6efdf;
+  background: #241f1bed;
 }

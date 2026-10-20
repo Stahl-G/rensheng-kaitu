@@ -249,7 +249,7 @@ if (tag === "sample") {
   await pause(1000);
   await click("重置筛选");
 }
-if (tag === "large") {
+if (tag === "large" || tag === "design-large") {
   result.switches = [];
   for (const label of ["来路", "可能", "此刻"]) {
     const began = performance.now();
@@ -259,7 +259,7 @@ if (tag === "large") {
     );
     result.switches.push({ label, feedbackObservedUpperMs: performance.now() - began });
     await pause(1500);
-    await shot(`large-${label === "来路" ? "history" : label === "可能" ? "possible" : "now"}`);
+    await shot(`${prefix}${label === "来路" ? "history" : label === "可能" ? "possible" : "now"}`);
   }
 }
 if (tag === "empty") {
