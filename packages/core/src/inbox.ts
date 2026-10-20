@@ -607,6 +607,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
             try {
               await prepared.apply();
             } catch (error) {
+              if (phoneInboxName.test(basename(file)) && !(error instanceof KaituError)) throw error;
               if (phoneRecordLedger(ws)[basename(file)] && !phoneRecordLedger(ws)[basename(file)]?.consumed)
                 throw error;
               errors.push(`${(error as Error).message}\n\n${INBOX_FORMATS}`);
