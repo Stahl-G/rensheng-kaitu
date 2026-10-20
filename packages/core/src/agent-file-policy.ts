@@ -4,15 +4,15 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ScopeError } from "./errors.js";
 import { localStateRoot } from "./local-state.js";
 
-export function assertAgentPath(root: string, path: string): string {
+function checkedAgentPath(root: string, path: string) {
+  const realRoot = realpathSync.native(root);
   const target = resolve(root, path);
   const home = resolve(process.env.KAITU_APP_HOME || join(process.env.HOME || homedir(), ".kaitu-app"));
   const inside = (base: string, path: string) => {
     const rel = relative(base, path);
     return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
   };
-  const homeWithin =
-    inside(root, home) || (existsSync(home) && inside(realpathSync.native(root), realpathSync.native(home)));
+  const homeWithin = inside(root, home) || (existsSync(home) && inside(realRoot, realpathSync.native(home)));
   const managed = [localStateRoot(), ...(homeWithin ? [home] : [])];
   if (managed.some((directory) => inside(directory, target)))
     throw new ScopeError("本机程序状态不对 AI 开放");
@@ -28,7 +28,7 @@ export function assertAgentPath(root: string, path: string): string {
   };
   // Windows SDK realpath expands 8.3 aliases even when the workspace root keeps its short spelling.
   // Check both root spellings lexically before checking the physical target below.
-  check(inside(root, target) ? root : realpathSync.native(root), target);
+  check(inside(root, target) ? root : realRoot, target);
   let probe = target;
   while (!existsSync(probe)) {
     try {
@@ -41,23 +41,27 @@ export function assertAgentPath(root: string, path: string): string {
     probe = parent;
   }
   const realTarget = realpathSync.native(probe);
-  check(realpathSync.native(root), realTarget);
+  check(realRoot, realTarget);
   for (const directory of [...managed, join(root, ".kaitu"), join(root, ".git")]) {
     if (!existsSync(directory)) continue;
     const rel = relative(realpathSync.native(directory), realTarget);
     if (rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`)))
       throw new ScopeError("程序状态不对 AI 开放");
   }
-  return target;
+  return {
+    target,
+    relativePath: relative(realRoot, resolve(realTarget, relative(probe, target)))
+      .split(sep)
+      .join("/"),
+  };
+}
+
+export function assertAgentPath(root: string, path: string): string {
+  return checkedAgentPath(root, path).target;
 }
 
 export function agentRelativePath(root: string, file: string): string {
-  const target = assertAgentPath(root, file);
-  let probe = target;
-  while (!existsSync(probe)) probe = dirname(probe);
-  return relative(realpathSync.native(root), resolve(realpathSync.native(probe), relative(probe, target)))
-    .split(sep)
-    .join("/");
+  return checkedAgentPath(root, file).relativePath;
 }
 
 export function assertAgentWrite(root: string, file: string, confirmed = false, managedPlan = false): string {

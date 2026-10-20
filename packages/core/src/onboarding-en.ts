@@ -41,7 +41,7 @@ ChatGPT: Then start with the other two and add the scheduling project once you h
     {
       id: "other",
       name: "Other",
-      hint: "Any AI works. Lines that don't match the format are kept as they are.",
+      hint: "Paste the answer from your usual AI; unrecognized lines keep their original text.",
     },
   ],
   prompt: `Please list everything you remember about me, as close to the original wording as possible. Don't summarize or leave things out. Include:
@@ -175,7 +175,7 @@ Output one item per line in this format, choosing the category from Work, Goal, 
     {
       id: "mine",
       title: "Keep going in the AI you already use",
-      description: "Copy a short context pack into your AI and paste its answer back. No API key needed.",
+      description: "Copy the context pack into your usual AI, then paste its answer back to continue.",
       target: "connections",
     },
     {

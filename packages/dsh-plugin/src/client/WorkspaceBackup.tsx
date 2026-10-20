@@ -336,10 +336,7 @@ export function WorkspaceBackup({
         {loginPending && (
           <div>
             <p>
-              {t(
-                "请在 GitHub 官方页面完成登录；开图不会代你确认授权。",
-                "Complete sign-in on GitHub; Kaitu does not approve authorization for you.",
-              )}
+              {t("请在 GitHub 官方页面完成登录与授权。", "Complete sign-in and authorization on GitHub.")}
             </p>
             {status?.ghLogin.code && <output>{status.ghLogin.code}</output>}{" "}
             <a href="https://github.com/login/device" target="_blank" rel="noreferrer">

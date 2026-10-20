@@ -439,13 +439,7 @@ export function MapPage({
   return (
     <div ref={page} className={css.page}>
       <header className={css.header}>
-        <div>
-          <h1>
-            <span className={css.dot} aria-hidden="true" />
-            人生地图
-          </h1>
-          <p className={css.secondary}>从家乡出发，记录走过的城市和现在的生活</p>
-        </div>
+        <h2 className={css.sr}>{t("足迹工具", "Footprint tools")}</h2>
         {/* 还没有经历时，下方空白处已有同一个入口。 */}
         {!(data && !data.experiences.length && !home) && (
           <button type="button" className={css.primary} onClick={() => ask(prompt)}>
@@ -711,8 +705,7 @@ export function MapPage({
                 }
               }}
             >
-              <div className={css.listHeading}>
-                <strong>{t("城市与工具", "Cities and tools")}</strong>
+              <div className={css.listControls}>
                 <button
                   type="button"
                   className={css.control}

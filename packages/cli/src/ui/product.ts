@@ -1,4 +1,5 @@
 import {
+  type AgentConnectionId,
   type AutomationKey,
   type BankMail,
   CalendarPush,
@@ -112,6 +113,7 @@ import {
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
+  setFinanceAccess,
   setNewsFeedback,
   stageFinanceUpload,
   startLearning,
@@ -309,6 +311,8 @@ export async function productRequest(
       data.ai = ask ? await ask.settings() : null;
       return data;
     }
+    case "setFinanceAccess":
+      return setFinanceAccess(ws, text(0) as AgentConnectionId, args[1] as boolean);
     case "exportWorkspace":
       return exportWorkspace(ws);
     case "restoreVersion":
@@ -351,7 +355,7 @@ export async function productRequest(
     case "goalNextAdd":
       return addGoalNext(ws, text(0), text(1));
     case "handoverPack":
-      return handoverPack(ws, locale(0));
+      return handoverPack(ws, locale(0), undefined, args[1] === true);
     case "directionsPrompt":
       return directionsPrompt(ws, locale(0));
     case "directionsPaste":

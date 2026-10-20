@@ -2,6 +2,8 @@ import { conciseDirection } from "./direction-copy.js";
 import { KaituError } from "./errors.js";
 import type { Direction, ExplorationCommand, ExplorationExperiment } from "./exploration.js";
 import { writeExploration } from "./exploration.js";
+import { type AgentConnection, agentCanRead } from "./exposure.js";
+import { financeOverview } from "./finance/views.js";
 import { batchSnapshot } from "./history.js";
 import { type Locale, normalizeLocale, pick } from "./locale.js";
 import { listMemories } from "./memory.js";
@@ -237,7 +239,7 @@ export async function pasteOnboardingMatter(
 }
 
 export interface HandoverSection {
-  id: "goals" | "results" | "next" | "projects" | "directions" | "about" | "people";
+  id: "goals" | "results" | "next" | "projects" | "directions" | "about" | "people" | "finance";
   title: string;
   lines: string[];
   /** 默认放进资料包；关于他人的记忆默认不放。 */
@@ -304,6 +306,7 @@ const records = (ws: Workspace, type: string) => attempt(() => readRecords(ws, t
 /** 资料包和方向提示词只读用得到的几样，不扫整个工作区。 */
 function handoverData(ws: Workspace, now: Date) {
   return {
+    ws,
     goals: attempt(() => ws.readJson<Goal[]>("me/goals.json"), []),
     records: {
       task: records(ws, "task"),
@@ -315,7 +318,12 @@ function handoverData(ws: Workspace, now: Date) {
   };
 }
 
-function sections(locale: Locale, now: Date, data: ReturnType<typeof handoverData>): HandoverSection[] {
+function sections(
+  locale: Locale,
+  now: Date,
+  data: ReturnType<typeof handoverData>,
+  connection: AgentConnection = "local-ask",
+): HandoverSection[] {
   const plans = readPlans(data);
   const since = now.getTime() - 30 * 86400000;
   const tasks = (data.records.task ?? []) as Task[];
@@ -378,7 +386,9 @@ function sections(locale: Locale, now: Date, data: ReturnType<typeof handoverDat
       (item) =>
         `- ${clip(item.hypothesis ? `${item.title}${t("：", ": ")}${item.hypothesis}` : item.title, locale)}`,
     );
-  const memories = data.memories.filter((memory) => !memory.sensitive);
+  const memories = data.memories.filter((memory) =>
+    agentCanRead(data.ws, `memory/${memory.file}`, connection),
+  );
   const about = memories
     .filter((memory) => ["preference", "fact", "context"].includes(memory.type))
     .slice(0, 12)
@@ -419,7 +429,12 @@ export function composeHandover(
 }
 
 /** 「在原来的 AI 里继续」的资料包：只含目标、结果、下一步、项目、方向和非敏感记忆。 */
-export function handoverPack(ws: Workspace, localeInput?: Locale, now = new Date()): HandoverPack {
+export function handoverPack(
+  ws: Workspace,
+  localeInput?: Locale,
+  now = new Date(),
+  includeFinance = false,
+): HandoverPack {
   const locale = normalizeLocale(localeInput);
   const today = localDate(now, ws.timeZone());
   const header = pick(
@@ -434,10 +449,25 @@ export function handoverPack(ws: Workspace, localeInput?: Locale, now = new Date
   );
   const excluded = pick(
     locale,
-    "不含健康记录、财务明细和敏感记忆，密钥和本机路径会自动去掉。",
-    "Health records, finance details and sensitive memories stay out; keys and local paths are removed automatically.",
+    "资料包带上勾选的内容，发送前会去掉密钥与本机路径。健康原始记录与敏感记忆保留在工作区。",
+    "The pack includes your selected sections. Keys and local paths are removed before sharing; raw health records and sensitive memories stay in your workspace.",
   );
-  const list = sections(locale, now, handoverData(ws, now));
+  const connection = { id: "handover", finance: includeFinance } as const;
+  const list = sections(locale, now, handoverData(ws, now), connection);
+  if (agentCanRead(ws, "finance", connection)) {
+    const lines = attempt(
+      () =>
+        financeOverview(ws)
+          .currencies.slice(0, 8)
+          .map(
+            (item) =>
+              `- ${clip(`${item.currency} · ${pick(locale, "净资产", "net assets")} ${item.net_assets.amount ?? pick(locale, "未知", "unknown")}`, locale)}`,
+          ),
+      [],
+    );
+    if (lines.length)
+      list.push({ id: "finance", title: pick(locale, "财务近况", "Finance"), lines, defaultOn: true });
+  }
   const pack = { header, sections: list, footer };
   return {
     ...pack,

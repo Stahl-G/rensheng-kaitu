@@ -12,7 +12,7 @@ export const PROVIDERS: {
   key?: "icloud" | "drive" | "nutstore";
 }[] = [
   { id: "github", zh: "这台电脑 + 私有 GitHub 仓库", en: "This computer + a private GitHub repo" },
-  { id: "local", zh: "这台电脑（不同步）", en: "This computer (no sync)" },
+  { id: "local", zh: "仅存这台电脑", en: "This computer only" },
   { id: "icloud", zh: "iCloud 云盘", en: "iCloud Drive", key: "icloud" },
   { id: "google-drive", zh: "Google Drive", en: "Google Drive", key: "drive" },
   { id: "nutstore", zh: "坚果云", en: "Nutstore (坚果云)", key: "nutstore" },

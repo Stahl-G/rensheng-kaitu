@@ -547,7 +547,7 @@ export function OnboardingPage(props: Props) {
             {t("把数据接进来", "Connect your data")}
           </h1>
           <div className={css.sources}>
-            {!status.sources.length && <p className={v2.small}>{t("不需要接数据", "No data needed")}</p>}
+            {!status.sources.length && <p className={v2.small}>{t("可直接继续", "Ready to continue")}</p>}
             {status.sources.map((source) => {
               const item = source;
               return (

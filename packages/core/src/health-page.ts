@@ -240,4 +240,3 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     ),
   };
 }
-export type HealthPageData = ReturnType<typeof readHealthPage>;
