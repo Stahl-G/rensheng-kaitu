@@ -148,6 +148,7 @@
 │  ├─ module.json
 │  ├─ profile.md             # 基本情况（用户主动维护）
 │  ├─ goals.json             # 目标
+│  ├─ topics.json            # 可以聊的话题（可选，字符串数组）
 │  ├─ rules.md               # 作息与排程约束
 │  ├─ STATUS.md
 │  ├─ data/tasks/YYYY-MM.jsonl # 待办与提醒，按创建时间 ts 分月
@@ -305,7 +306,7 @@ attention:
 - `status`：`confirmed` | `pending` | `done` | `skipped` | `rejected`。
 - 人确认 `proposal` 后才写入外部日历，写入成功后改为 `event`。
 
-### 6.5 `me/goals.json` 与 `me/rules.md`
+### 6.5 `me/goals.json`、`me/rules.md` 与 `me/topics.json`
 
 ```json
 [
@@ -327,6 +328,8 @@ nutrition: { protein_g: [140, 150], deficit_kcal_max: 600 }
 goal_priority: [g1]
 ---
 ```
+
+`me/topics.json` 保存用户确认的「可以聊的话题」，格式为 JSON 字符串数组，例如 `["摄影", "周末徒步"]`（2026-10-20 用户同意）。允许空数组 `[]`；文件缺失时按空数组读取，已有文件格式不合法时报错。手机独立模式与所选资料文件夹均使用此路径。新增话题在用户确认后按字符串全等去重并保留顺序；确认前文件被修改时提示冲突，重复确认保持幂等。格式见 `schemas/topics.schema.json`。
 
 ### 6.6 记录 schema（v1 内置）
 
