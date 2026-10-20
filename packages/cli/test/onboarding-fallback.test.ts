@@ -152,6 +152,14 @@ it("所选连接统一决定问问、整理和恢复的能力，切换普通模�
     expect(ask.list()[0]?.mode).toBe("scoped");
     await request("onboardingMatterOrganize", [matter.source]);
     expect(modes).toEqual(["full", "full", "full", "scoped", "scoped"]);
+    const oversized = `${"文".repeat(100000)}\n\n会话引用：合成上一轮的内容`;
+    const oversizedEmpty = await ask.create();
+    await expect(ask.send(oversizedEmpty.id, oversized)).rejects.toMatchObject({ code: "AI_CONNECTION" });
+    expect(ask.list().map((row) => row.id)).toEqual([existing.id]);
+    const savedEvents = ask.events(existing.id);
+    await expect(ask.send(existing.id, oversized)).rejects.toMatchObject({ code: "AI_CONNECTION" });
+    expect(ask.list().map((row) => row.id)).toEqual([existing.id]);
+    expect(ask.events(existing.id)).toEqual(savedEvents);
     fail = true;
     const empty = await ask.create();
     await expect(ask.send(empty.id, "失败的首次消息")).rejects.toBeInstanceOf(Error);

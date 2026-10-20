@@ -181,7 +181,7 @@ export function createAskService(options: {
       : [];
   };
   const discardEmptyThread = (id: string) => {
-    if (events(id).some((event) => event.type !== "session.status")) return;
+    if (busy.has(id) || events(id).some((event) => event.type !== "session.status")) return;
     threads.splice(
       threads.findIndex((row) => row.id === id),
       1,
@@ -401,13 +401,18 @@ export function createAskService(options: {
         throw new KaituError("请先连接 AI，再发送消息", "AI_CONNECTION");
       }
       if (connection.fullOnly && mode !== "full")
-        throw new KaituError("本机 Agent 需要完整权限，请在对话权限中开启", "AI_CONNECTION");
+        throw new KaituError(
+          "此资料连接不支持本机 Agent 完整能力；请用普通模型或在本机问问继续",
+          "AI_CONNECTION",
+        );
       if (images.length && connection.supportsAttachments === false)
         throw new KaituError("本机 Agent 只接收文字", "AI_ATTACHMENT");
       if (busy.size && runtimeMode !== mode)
         throw new KaituError("请等当前回复完成后切换模式", "AI_CONNECTION");
-      if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000)
+      if (typeof text !== "string" || (!text.trim() && !images.length) || text.length > 100000) {
+        discardEmptyThread(id);
         throw new KaituError("请输入有效消息（最多十万字）", "AI_CONNECTION");
+      }
       if (busy.has(id)) throw new KaituError("请等这次回复完成", "AI_CONNECTION");
       if (
         !Array.isArray(images) ||
