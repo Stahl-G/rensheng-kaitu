@@ -15,7 +15,7 @@ export function confinedFileSystem(
   connection = "local-ask",
 ) {
   const ws = new Workspace(root, { maintain: false });
-  const memoryIndex = (target) => target.targetKey === join(realpathSync(root), "memory", "MEMORY.md");
+  const memoryIndex = (target) => target.targetKey === join(realpathSync.native(root), "memory", "MEMORY.md");
   const contains = (path) => {
     if (attachments.has(path)) return true;
     try {

@@ -1,12 +1,13 @@
 import { execFile } from "node:child_process";
 import { lstat, readdir } from "node:fs/promises";
-import { join, matchesGlob, relative, resolve } from "node:path";
+import { join, matchesGlob, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import { assertAgentPath } from "../core/dist/agent-file-policy.js";
 import { agentCanRead } from "../core/dist/exposure.js";
 import { Workspace } from "../core/dist/workspace.js";
 
 const run = promisify(execFile);
+const relativePath = (root, path) => relative(root, path).split(sep).join("/");
 export async function agentSearch(
   root,
   name,
@@ -39,7 +40,7 @@ export async function agentSearch(
       }
     } else if (info.isFile()) {
       const filter = name === "glob" ? args.pattern : args.include;
-      const pathName = relative(base, path) || relative(root, path);
+      const pathName = relativePath(base, path) || relativePath(root, path);
       if (!filter || matchesGlob(pathName, filter) || matchesGlob(entryName(pathName), filter)) {
         if (++visited > 10000) {
           rangeLimited = true;
@@ -69,7 +70,7 @@ export async function agentSearch(
       const matchedPath = assertAgentPath(root, row.data.path.text);
       if (!batch.includes(matchedPath)) throw new Error("搜索返回了范围外路径");
       matches.push({
-        path: relative(root, matchedPath),
+        path: relativePath(root, matchedPath),
         lineNumber: row.data.line_number,
         line: row.data.lines.text.trimEnd().slice(0, 2000),
       });
@@ -80,7 +81,7 @@ export async function agentSearch(
   for await (const path of walk(base)) {
     if (name === "glob") files.push(path);
     else {
-      if (relative(root, path).replaceAll("\\", "/") === "memory/MEMORY.md") {
+      if (relativePath(root, path) === "memory/MEMORY.md") {
         // Its entries are already searched in the individual allowed memory files.
         continue;
       }
@@ -105,7 +106,7 @@ export async function agentSearch(
         ? { reason: "已达到 250 条结果上限，可能还有匹配 / Result limit reached; more matches may exist" }
         : {}),
   };
-  if (name === "glob") return { root, paths: files.map((path) => relative(root, path)), ...scope };
+  if (name === "glob") return { root, paths: files.map((path) => relativePath(root, path)), ...scope };
   return { matches, ...scope };
 }
 function entryName(path) {
