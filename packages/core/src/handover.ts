@@ -434,8 +434,8 @@ export function handoverPack(ws: Workspace, localeInput?: Locale, now = new Date
   );
   const excluded = pick(
     locale,
-    "不含健康记录、财务明细和敏感记忆，密钥和本机路径会自动去掉。",
-    "Health records, finance details and sensitive memories stay out; keys and local paths are removed automatically.",
+    "资料包可选择目标、结果、下一步、项目、方向和非敏感记忆。健康记录与财务明细留在工作区；发送前会去掉密钥与本机路径。",
+    "Choose goals, results, next steps, projects, directions and non-sensitive memories for the pack. Health and finance details stay in your workspace; keys and local paths are removed before sharing.",
   );
   const list = sections(locale, now, handoverData(ws, now));
   const pack = { header, sections: list, footer };
