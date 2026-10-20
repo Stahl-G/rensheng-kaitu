@@ -42,7 +42,7 @@
 - D1：把 `progressRows`、`journeyRoutes` 从 dsh-plugin 前端移进 core（浏览器可用子路径）；`buildPhoneToday/Week/Map` 纯函数投影已有读数；`writePhoneSnapshots` 后台防抖、只在手机能读到时写、内容不变不写；`phone/` 加入 `NOT_MODULES`、排除本机版本历史、Agent 只读；不含财务明细、敏感记忆、Key、绝对路径。
 - D2：`workspace-backup.ts` 连接后始终同步 `phone/`（上传）与 `inbox/agents/`、`inbox/health/`（拉下手机新文件；电脑处理后删远端），不受开关影响；照片（二进制）暂不做。
 - D3：`inbox/agents/ios-<8位>-<ULID>.*`：`.note.md`（`kind: capture`）收作原文；`.records.jsonl` 的 `origin` 映射 `by`；新 `.actions.jsonl` 执行 `complete_next`、`decide_proposal`、`complete_task`、`cancel_task`（其余预留 op 记 rejected），先核对前提、按 `client_id` 去重；写 `phone/receipts.json`。
-- 文档：`docs/guides/phone-contract.md`、PRD §6 新增小节、`docs/github-workspace-backup.md`、必要时隐私页；在合成大工作区实测耗时，写 `docs/acceptance/phone-sync-2026-10-18.md`。
+- 文档：`docs/guides/phone-contract.md`、PRD §6 新增小节、`docs/github-workspace-backup.md`、必要时隐私页；在合成大工作区实测耗时，结果写在 PR 描述里。
 
 A 与 B 可并行，注意都会改 PRD §6、`agents-md.ts`、`index.ts`；B 不依赖 A。
 

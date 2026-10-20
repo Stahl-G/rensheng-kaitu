@@ -1,2 +1,0 @@
-requests [{"model":"local-first","image":false},{"model":"local-second","image":false},{"model":"local-second","image":false}]
-new conversation mode scoped
