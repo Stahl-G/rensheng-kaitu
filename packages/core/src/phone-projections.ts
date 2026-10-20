@@ -165,6 +165,7 @@ function mapFootprint(map: LifeMapData) {
     if (
       place &&
       item.event_type === "lived" &&
+      !item.end &&
       (item.fact_status === "observed" || item.fact_status === "user_reported") &&
       interval &&
       interval.from <= map.asOf &&

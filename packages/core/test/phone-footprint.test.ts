@@ -33,6 +33,7 @@ it("手机足迹从事实经历区分现居、到过和计划，现居冲突时�
       entry("Tokyo", "JP", "lived", "user_reported", "2020"),
       entry("Osaka", "JP", "worked", "observed", "2021"),
       entry("胡志明市", "VN", "travel", "user_reported", "2022"),
+      { ...entry("Hanoi", "VN", "lived", "user_reported", "2023"), end: "2026" },
       entry("Paris", "FR", "travel", "inferred", "2023"),
       entry("Paris", "FR", "travel", "planned", "2027"),
       entry("Hanoi", "VN", "travel", "suggested", "2027"),
@@ -44,7 +45,7 @@ it("手机足迹从事实经历区分现居、到过和计划，现居冲突时�
     const validate = schemas().builtin("phone-map.schema.json");
     expect(validate(map), JSON.stringify(validate.errors)).toBe(true);
     expect(map.footprint.current?.name).toBe("Tokyo");
-    expect(map.footprint.visited.map((city) => city.name)).toEqual(["Ho Chi Minh City", "Osaka"]);
+    expect(map.footprint.visited.map((city) => city.name)).toEqual(["Hanoi", "Ho Chi Minh City", "Osaka"]);
     expect(map.footprint.planned.map(({ name, status }) => [name, status])).toEqual([
       ["Hanoi", "suggested"],
       ["Paris", "planned"],
