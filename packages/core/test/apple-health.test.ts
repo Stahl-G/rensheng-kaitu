@@ -341,6 +341,22 @@ it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏�
         source: "Watch",
       },
       {
+        type: "body_temperature",
+        start: "2026-10-04T08:00:00+08:00",
+        end: "2026-10-04T08:00:00+08:00",
+        value: 99.1,
+        unit: "degF",
+        source: "Watch",
+      },
+      {
+        type: "VO2Max",
+        start: "2026-10-04T09:00:00+08:00",
+        end: "2026-10-04T09:00:00+08:00",
+        value: 41.2,
+        unit: "mL/min·kg",
+        source: "Watch",
+      },
+      {
         type: "height",
         start: "2026-10-01T08:00:00+08:00",
         end: "2026-10-01T08:00:00+08:00",
@@ -360,7 +376,7 @@ it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏�
   };
   writeFileSync(file, JSON.stringify(raw));
   const result = await importHealthShortcut(ws, file);
-  expect(result.added).toBe(6);
+  expect(result.added).toBe(8);
   const metrics = readRecords(ws, "metric").map(({ kind, value, unit }) => ({ kind, value, unit }));
   expect(metrics).toEqual(
     expect.arrayContaining([
@@ -368,6 +384,8 @@ it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏�
       { kind: "vo2max", value: 42.5, unit: "ml/kg·min" },
       { kind: "respiratory_rate", value: 14, unit: "count/min" },
       { kind: "body_temperature", unit: "°C", value: 37 },
+      { kind: "body_temperature", unit: "°C", value: (99.1 - 32) * (5 / 9) },
+      { kind: "vo2max", value: 41.2, unit: "ml/kg·min" },
       { kind: "height", value: 175, unit: "cm" },
       { kind: "glucose", value: 5.6, unit: "mmol/L" },
     ]),

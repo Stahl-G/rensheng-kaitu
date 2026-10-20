@@ -313,14 +313,18 @@ export function healthCandidates(zone: string) {
         metric("walking_hr", convert({ bpm: 1, "count/min": 1 }), "bpm");
         break;
       case "VO2Max":
-        metric("vo2max", convert({ "ml/kg·min": 1 }), "ml/kg·min");
+        // Apple 官方 XML 导出用 mL/min·kg 拼写，手机端用 ml/kg·min，两种都认。
+        metric("vo2max", convert({ "ml/kg·min": 1, "mL/min·kg": 1 }), "ml/kg·min");
         break;
       case "RespiratoryRate":
         metric("respiratory_rate", convert({ "count/min": 1 }), "count/min");
         break;
       case "BodyTemperature": {
-        // 华氏度是仿射换算，不能走倍率表。
-        const celsius = unit === "°F" || unit === "F" ? (value - 32) * (5 / 9) : value;
+        // 华氏度是仿射换算，不能走倍率表；XML 用 degF/degC 拼写，其余单位拒绝而非当摄氏度。
+        const warm = unit === "°F" || unit === "F" || unit === "degF";
+        const cold = unit === "°C" || unit === "C" || unit === "degC";
+        if (!warm && !cold) throw new Error("Unsupported unit");
+        const celsius = warm ? (value - 32) * (5 / 9) : value;
         metric("body_temperature", celsius, "°C");
         break;
       }
@@ -695,9 +699,8 @@ const SHORTCUT_TYPE_NAMES: Record<string, string> = {
   体能训练: "workout",
   height: "height",
   身高: "height",
-  oxygensaturation: "blood_oxygen",
-  bloodoxygen: "blood_oxygen",
-  血氧: "blood_oxygen",
+  // 注意：oxygensaturation / 血氧 不做别名——原始 SpO2 样本会撞上预聚合的
+  // blood_oxygen 复合值校验而整份转待整理；原始逐样本血氧暂不支持。
   bloodpressure: "blood_pressure",
   血压: "blood_pressure",
   walkingheartrateaverage: "walking_heart_rate",
