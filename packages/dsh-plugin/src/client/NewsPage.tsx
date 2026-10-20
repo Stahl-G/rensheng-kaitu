@@ -3,6 +3,7 @@ import type { NewsAction, NewsData, NewsFeedback, NewsItem, NewsVia } from "../t
 import { NewsExtra, NewsImage, TrendDetails } from "./NewsContent.js";
 import css from "./NewsPage.module.css";
 import { NewsRules } from "./NewsRules.js";
+import { useT } from "./i18n.js";
 
 export interface NewsPageProps {
   loadNews: () => Promise<NewsData>;
@@ -13,6 +14,7 @@ export interface NewsPageProps {
   saveNewsKeywords: (keywords: string[]) => Promise<string[]>;
   suggestNewsKeywords?: () => Promise<string[]>;
   onPrompt: (text: string) => void;
+  onLearn?: (item: NewsItem) => void;
 }
 
 const viaNames: Record<NewsVia, string> = {
@@ -51,6 +53,7 @@ function Source({ item }: { item: NewsItem }) {
 }
 
 export function NewsPage(props: NewsPageProps) {
+  const t = useT();
   const [data, setData] = useState<NewsData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -113,6 +116,11 @@ export function NewsPage(props: NewsPageProps) {
           <div className={css.cardFooter}>
             {related && <span className={css.meta}>和你有关：{related}</span>}
             <span className={css.actions}>
+              {props.onLearn && (
+                <button type="button" className={css.button} onClick={() => props.onLearn?.(item)}>
+                  {t("开始学习", "Start learning")}
+                </button>
+              )}
               <button
                 type="button"
                 className={`${css.button} ${css.primary}`}
@@ -168,6 +176,11 @@ export function NewsPage(props: NewsPageProps) {
           </a>
         </h3>
         <Source item={item} />
+        {props.onLearn && (
+          <button type="button" className={css.button} onClick={() => props.onLearn?.(item)}>
+            {t("开始学习", "Start learning")}
+          </button>
+        )}
       </div>
     </article>
   );

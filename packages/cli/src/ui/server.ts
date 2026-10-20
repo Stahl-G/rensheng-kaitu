@@ -10,6 +10,7 @@ import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
   CalendarPush,
+  FRAME_CSP,
   type ImportSource,
   KaituError,
   MAX_PHOTO_BYTES,
@@ -43,6 +44,7 @@ import {
   refreshOverview,
   removeMemory,
   removePhoto,
+  renderTeachingFrame,
   restore,
   snapshotNow,
   stageUpload,
@@ -495,6 +497,28 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         return json(res, 200, result ?? null);
       }
       if (req.method === "GET") {
+        if (url.pathname === "/api/ask/teaching-frame" && options.ask) {
+          const session = url.searchParams.get("session") ?? "";
+          const call = url.searchParams.get("call") ?? "";
+          const event = options.ask
+            .events(session)
+            .findLast(
+              (event) =>
+                event.type === "tool/result" &&
+                (event.data.message as { toolCallId?: string; isError?: boolean })?.toolCallId === call &&
+                !(event.data.message as { isError?: boolean })?.isError,
+            );
+          const html = event ? renderTeachingFrame(event.data.meta, call) : undefined;
+          if (!html) return json(res, 404, { error: "找不到教学卡片" });
+          // A separate HTTP document does not inherit the main page's script restriction.
+          // Both response policy and iframe sandbox keep it away from workspace APIs/cookies.
+          res.setHeader(
+            "Content-Security-Policy",
+            `${FRAME_CSP}; sandbox allow-scripts; frame-ancestors 'self'`,
+          );
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(html);
+        }
         if (url.pathname === "/api/ask/events" && options.ask) {
           const id = url.searchParams.get("session") ?? "";
           const history = options.ask.events(id);

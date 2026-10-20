@@ -57,6 +57,7 @@ createInterface({input:process.stdin}).on('line',line=>{
    if(text.endsWith('hang'))return;
    if(text.endsWith('permit')){permitted=m.id;send({id:9001,method:'session/request_permission',params:{options:[{kind:'allow',optionId:'allow_once',name:'Allow once'}]}});return;}
    if(text.endsWith('fail')){send({id:m.id,error:{message:'private upstream detail'}});return;}
+   if(text.endsWith('missing-note')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'read-note',title:'read_file',rawInput:{path:'learning/new/notes.md'}}}});send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'read-note',status:'failed',content:[{type:'content',content:{type:'text',text:'notes.md does not exist yet'}}]}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(text.endsWith('tool')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t1',title:'task_add'}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    for(const text of ['synthetic ','reply'])send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}});
    send({id:m.id,result:{stopReason:'end_turn'}});
@@ -169,6 +170,13 @@ test("cancel terminates the owned prompt and failures are actionable without ups
     await expect(ask.send(row.id, "fail")).rejects.toThrow(/CodeBuddy/);
     expect(JSON.stringify(ask.events(row.id))).not.toContain("private upstream detail");
     await ask.send(row.id, "recover");
+    // A real ACP tool error must retain its text in Ask's tool details.
+    await ask.send(row.id, "missing-note");
+    expect(ask.events(row.id).find((e) => e.type === "tool/result")?.data.message).toEqual({
+      toolCallId: "read-note",
+      isError: true,
+      content: [{ type: "text", text: "notes.md does not exist yet" }],
+    });
     // 只调了工具、没回文字也算完成。
     await ask.send(row.id, "tool");
     await ask.send(row.id, "permit");

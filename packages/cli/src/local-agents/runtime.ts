@@ -143,7 +143,12 @@ export async function createAgentRuntime(options: {
               toolCallId: u.toolCallId,
               isError: u.status === "failed",
               content: Array.isArray(u.content)
-                ? u.content
+                ? u.content.map((block) => {
+                    // ACP wraps ContentBlock in { type: "content", content }.
+                    // Ask renders the same flat text blocks as the native SDK.
+                    const value = block as { type?: string; content?: { type?: string } };
+                    return value?.type === "content" && value.content?.type ? value.content : block;
+                  })
                 : [
                     {
                       type: "text",

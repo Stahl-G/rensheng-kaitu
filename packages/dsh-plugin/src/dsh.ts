@@ -9,6 +9,7 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>;
   output: {
     readonly schema: Record<string, unknown>;
+    presentationMeta?(args: unknown, value: JsonValue): JsonValue;
     render(args: unknown, value: JsonValue): { type: "text"; text: string }[];
   };
   execute(args: unknown, exec: { readonly signal: AbortSignal }): Promise<unknown>;

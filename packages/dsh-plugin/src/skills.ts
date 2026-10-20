@@ -18,6 +18,8 @@ export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径�
 - 读取、列目录、写 Markdown/JSON → kaitu_workspace（read/list/write）；创建模块时一次提交 module.json、STATUS.md 和 schema。
 - validate → kaitu_validate；snapshot / agents-md → kaitu_workspace（snapshot/agents-md）；history → kaitu_history；确认恢复 → kaitu_restore。
 - memory list/search/add/update/rm/import → kaitu_memory；批量 import 先 dryRun，用户确认后使用完全相同的候选。
+- 学习主题 → kaitu_learning（list/read/start/save）；用 save 追加用户实际表达的理解、疑问与下一步，不把 AI 讲解当作学会。
+- 概念卡/自判小测 → kaitu_learning_card；互动模拟 → kaitu_learning_widget。先问后展示，答案不自动回传模型。PPT 仅用户明确要求时用已安装的 openmaic_slide；不默认调用 openmaic_generate。
 - task add/list/done/cancel → kaitu_tasks；inbox notes/done/process → kaitu_inbox。
 - project list/new/show/link/set/log/sync → kaitu_projects；项目内文件用 project-read/project-write；自定义视图用 project_view_write（slug、view），格式按 project 技能。
 - import apple-health/nut-ai/ics/chatgpt-conversations → kaitu_import，先 dryRun，再确认执行；文件用用户指定的本机绝对路径或工作区内相对路径。

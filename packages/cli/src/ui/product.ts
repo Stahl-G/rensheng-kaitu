@@ -8,6 +8,7 @@ import {
   type FinanceViewOptions,
   type ImportSource,
   KaituError,
+  type LearningCheckinInput,
   type Locale,
   type NewsFeedback,
   type OnboardingAi,
@@ -19,6 +20,7 @@ import {
   type OnboardingTarget,
   type ProjectGoal,
   type SettingsData,
+  type StartLearningInput,
   type SyncProvider,
   type Workspace,
   addCalendarSubscription,
@@ -54,6 +56,7 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  listLearning,
   loadFinanceInvestments,
   markOrganizerSeen,
   matterPrompt,
@@ -76,6 +79,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLearning,
   readLibrary,
   readLibraryDocument,
   readMe,
@@ -96,6 +100,7 @@ import {
   restore,
   saveAvatar,
   saveHometown,
+  saveLearningCheckin,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -105,6 +110,7 @@ import {
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
+  startLearning,
   syncProject,
   tryNews,
   unhideExperience,
@@ -122,6 +128,8 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "learningStart",
+  "learningSave",
   "organizerSeen",
   "workspaceBackup",
   "askModels",
@@ -250,6 +258,14 @@ export async function productRequest(
       return readLibrary(ws);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
+    case "learningList":
+      return listLearning(ws);
+    case "learningRead":
+      return readLearning(ws, text(0));
+    case "learningStart":
+      return startLearning(ws, args[0] as StartLearningInput);
+    case "learningSave":
+      return saveLearningCheckin(ws, args[0] as LearningCheckinInput);
     case "calendarPush":
       return calendarPush.settings();
     case "configureCalendarPush":
