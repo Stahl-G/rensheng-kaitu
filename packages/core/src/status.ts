@@ -36,7 +36,7 @@ export function dailyRecordTotals(
 }
 
 export function readStatus(ws: Workspace, now = new Date(), remote = false) {
-  const data = readWorkbench(ws, now, remote);
+  const data = readWorkbench(ws, now, remote, true);
   return summarizeStatus(data);
 }
 

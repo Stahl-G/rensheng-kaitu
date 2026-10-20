@@ -48,6 +48,22 @@ export function noteMetadata(text: string): Record<string, unknown> {
   }
 }
 
+/** Count usable notes for summary views without reading their bodies. */
+export function countInboxNotes(ws: Workspace, directory = "inbox/notes") {
+  if (!ws.exists(directory)) return 0;
+  let count = 0;
+  for (const date of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+    if (!date.isDirectory() || !/^\d{4}-\d{2}-\d{2}$/.test(date.name)) continue;
+    const dir = `${directory}/${date.name}`;
+    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const path = `${dir}/${entry.name}`;
+      if (!ws.conflictCopy(path) && !ws.isUnavailable(path)) count++;
+    }
+  }
+  return count;
+}
+
 export function inboxNotes(ws: Workspace, directory = "inbox/notes", options: { from?: string } = {}) {
   if (!ws.exists(directory)) return [];
   return readdirSync(ws.resolve(directory), { withFileTypes: true })

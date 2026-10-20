@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { rmSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { normalizeStatus } from "../src/doc-input.js";
 import {
   completeNext,
   decideProposal,
   history,
+  inboxNotes,
   initWorkspace,
   parseFrontmatter,
   readStatus,
+  readWorkbench,
   refreshOverview,
   scheduleNext,
   snapshot,
@@ -14,6 +17,37 @@ import {
   validateWorkspace,
 } from "../src/index.js";
 import { freshWorkspace, tmp } from "./helpers.js";
+
+it("现状只计数原文，打开原文列表仍读取完整内容", async () => {
+  const ws = await freshWorkspace();
+  try {
+    for (let i = 0; i < 20; i++)
+      ws.writeText(`inbox/notes/2026-10-20/${i}.md`, `合成原文 ${i}\n`);
+    ws.writeText("me/profile.md", "合成档案\n");
+    ws.writeText("me/reports/synthetic.md", "合成报告\n");
+    ws.writeText("feed/digests/synthetic.md", "合成简报\n");
+    const reads = vi.spyOn(ws, "readBytes");
+    expect(readStatus(ws).inboxNotes).toBe(20);
+    expect(
+      reads.mock.calls.filter(
+        ([file]) =>
+          file.startsWith("inbox/notes/") ||
+          file === "me/profile.md" ||
+          file.startsWith("me/reports/") ||
+          file.startsWith("feed/digests/"),
+      ),
+    ).toHaveLength(0);
+    const full = readWorkbench(ws);
+    expect(full.profile).toBe("合成档案\n");
+    expect(full.reports[0]?.body).toBe("合成报告\n");
+    expect(full.digests[0]?.body).toBe("合成简报\n");
+    expect(inboxNotes(ws)).toHaveLength(20);
+    expect(reads.mock.calls.filter(([file]) => file.startsWith("inbox/notes/"))).toHaveLength(20);
+    reads.mockRestore();
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 describe("工作台写入", () => {
   it("确认建议和完成 next 只修改目标字段，保留正文并各生成一个合法版本", async () => {
