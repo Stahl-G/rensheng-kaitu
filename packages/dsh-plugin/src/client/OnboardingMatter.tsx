@@ -392,7 +392,7 @@ export function OnboardingMatter(
             {props.builtin ? (
               !noAi && (
                 <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                  {t("请开图里的 AI 整理", "Ask Kaitu's AI")}
+                  {t("用当前 AI 整理", "Organize with the current AI")}
                 </button>
               )
             ) : (
