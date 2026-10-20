@@ -53,7 +53,6 @@ export function createLocalAsk({
     const target = root === ws.root ? ws : new Workspace(root, { maintain: false });
     if (!target.exists(".kaitu/config.json")) throw new Error("不是开图工作区");
     const key = target.exists(keyFile) ? target.readJson(keyFile).key : root;
-    if (typeof key !== "string" || !key) throw new Error("工作区会话标识格式不合法");
     if (!target.exists(keyFile)) target.writeJson(keyFile, { key }, { internal: true });
     return key;
   };
