@@ -9,6 +9,7 @@ import {
   hideExperience,
   lifeMap,
   previewExperienceBatch,
+  processInbox,
   readExperienceImports,
   readRecordRevisions,
   recoverExperienceImports,
@@ -125,6 +126,186 @@ it("跨文件导入中断后重启能补完批次，不重复已写入经历，�
     expect(readRecordRevisions(reopened, "experience")).toHaveLength(1);
     expect(readExperienceImports(reopened).pending).toHaveLength(0);
     expect(validateWorkspace(reopened)).toEqual([]);
+  } finally {
+    vi.restoreAllMocks();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+const photos = (): ExperienceInput[] => [
+  {
+    ...experience("住过京都", "2019-01", "apple-photos"),
+    place: { name: "京都", country: "JP" },
+    event_type: "lived",
+    end: "2019-03",
+    time_precision: "month",
+    fact_status: "inferred",
+  },
+  {
+    ...experience("巴黎旅行", "2020-05-02", "apple-photos"),
+    end: "2020-05-06",
+    time_precision: "day",
+    fact_status: "inferred",
+  },
+  {
+    ...experience("伦敦旅行", "2021-07-03", "apple-photos"),
+    place: { name: "伦敦", country: "GB" },
+    end: "2021-07-07",
+    time_precision: "day",
+    fact_status: "inferred",
+  },
+];
+
+it("照片收件的三城市一批先待核对，确认后整批撤销恢复，重扫去重且关闭来源阻止新增", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const deliver = async (name: string, rows = photos()) => {
+      ws.writeText(
+        `inbox/agents/${name}.records.jsonl`,
+        `${rows.map((row) => JSON.stringify({ type: "experience", origin: "assistant", ...row })).join("\n")}\n`,
+      );
+      const result = await processInbox(ws, { stableMs: 0 });
+      expect(result.notes).toEqual([]);
+    };
+    await expect(
+      addExperiences(ws, [
+        {
+          ...photos()[0],
+          place: { name: "京都", country: "JP", lat: 35.0211, lng: 135.7538 },
+        } as ExperienceInput,
+      ]),
+    ).rejects.toMatchObject({ code: "BAD_ARGS" });
+    await deliver("ios-synthetic-01");
+    expect(lifeMap(ws).features).toHaveLength(0);
+    expect(lifeMap(ws).review).toHaveLength(3);
+    expect(lifeMap(ws).review.every((row) => row.by === "agent")).toBe(true);
+    const [batch] = readExperienceImports(ws).batches;
+    if (!batch) throw new Error("缺少照片批次");
+    expect(batch.confirmable).toBe(3);
+    const confirmed = await changeExperienceBatch(ws, batch.id, "confirm", batch.revision);
+    expect(confirmed.affected).toBe(3);
+    expect(lifeMap(ws).review).toHaveLength(0);
+    expect(lifeMap(ws).features).toHaveLength(3);
+    expect(readRecordRevisions(ws, "experience_batch").at(-1)?.items).toEqual(
+      lifeMap(ws).experiences.map((row) => ({ id: row.id, revision: 2 })),
+    );
+    await expect(changeExperienceBatch(ws, batch.id, "confirm", 1)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    expect((await changeExperienceBatch(ws, batch.id, "confirm", 2)).version).toBeNull();
+    await deliver("ios-synthetic-02");
+    expect(readExperienceImports(ws).batches).toHaveLength(1);
+    expect(lifeMap(ws).experiences).toHaveLength(3);
+    expect((await changeExperienceBatch(ws, batch.id, "undo", 2)).affected).toBe(3);
+    expect(lifeMap(ws).features).toHaveLength(0);
+    expect(lifeMap(ws).experiences).toHaveLength(0);
+    await deliver("ios-synthetic-03");
+    expect(lifeMap(ws).experiences).toHaveLength(0);
+    await expect(changeExperienceBatch(ws, batch.id, "restore", 2)).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    expect((await changeExperienceBatch(ws, batch.id, "restore", 3)).affected).toBe(3);
+    expect(lifeMap(ws).features).toHaveLength(3);
+    expect(lifeMap(ws).experiences.every((row) => row.fact_status === "observed" && row.rev === 4)).toBe(
+      true,
+    );
+    await setExperienceSource(ws, "apple-photos", true, 0);
+    await deliver(
+      "ios-synthetic-04",
+      photos().map((row) => ({ ...row, start: "2022-01-01", end: "2022-01-05", time_precision: "day" })),
+    );
+    expect(lifeMap(ws).experiences).toHaveLength(3);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("批量确认跳过独立编辑隐藏、未知城市和非推测项，确认后的编辑隐藏仍不被撤销恢复回滚", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const input = [
+      ...photos(),
+      {
+        ...(photos()[0] as ExperienceInput),
+        start: "2018",
+        end: undefined,
+        time_precision: "year" as const,
+        place: { name: "synthetic-unknown-city" },
+      },
+      { ...experience("已报告", "2017", "apple-photos") },
+      { ...(photos()[1] as ExperienceInput), start: "2023-05-02", end: "2023-05-06" },
+    ];
+    const imported = await addExperiences(ws, input);
+    const [edited, hidden, confirmed, unresolved, reported, laterHidden] = imported.entries;
+    const id = imported.batch_id;
+    if (!id || !edited || !hidden || !confirmed || !unresolved || !reported || !laterHidden)
+      throw new Error("缺少经历");
+    const stalePreview = previewExperienceBatch(ws, id, "confirm");
+    expect(stalePreview.affected).toHaveLength(4);
+    await editExperience(ws, edited.id, { ...(input[0] as ExperienceInput), title: "用户修改" }, 1);
+    await hideExperience(ws, hidden.id, 1);
+    expect(await changeExperienceBatch(ws, id, "confirm", stalePreview.revision)).toMatchObject({
+      affected: 2,
+      preserved: 4,
+    });
+    expect(lifeMap(ws).review.find((row) => row.id === edited.id)?.fact_status).toBe("inferred");
+    expect(lifeMap(ws).review.find((row) => row.id === unresolved.id)?.fact_status).toBe("inferred");
+    await editExperience(
+      ws,
+      confirmed.id,
+      { ...(input[2] as ExperienceInput), fact_status: "observed", title: "确认后用户修改" },
+      2,
+    );
+    await hideExperience(ws, laterHidden.id, 2);
+    expect(previewExperienceBatch(ws, id, "undo").preserved.map((row) => row.id)).toEqual([
+      edited.id,
+      hidden.id,
+      confirmed.id,
+      laterHidden.id,
+    ]);
+    expect((await changeExperienceBatch(ws, id, "undo", 2)).affected).toBe(2);
+    expect((await changeExperienceBatch(ws, id, "restore", 3)).affected).toBe(2);
+    const map = lifeMap(ws);
+    expect(map.experiences.find((row) => row.id === edited.id)).toMatchObject({
+      title: "用户修改",
+      rev: 2,
+      fact_status: "inferred",
+    });
+    expect(map.experiences.find((row) => row.id === confirmed.id)).toMatchObject({
+      title: "确认后用户修改",
+      rev: 3,
+    });
+    expect(map.hidden.map(({ item }) => item.id).sort()).toEqual([hidden.id, laterHidden.id].sort());
+    expect(map.experiences.find((row) => row.id === unresolved.id)?.fact_status).toBe("inferred");
+    expect(map.experiences.find((row) => row.id === reported.id)?.fact_status).toBe("user_reported");
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("确认中途存储中断不显示半批路线，重启补完成员和批次指针后可整批撤销", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const imported = await addExperiences(ws, photos());
+    if (!imported.batch_id) throw new Error("缺少批次");
+    const append = ws.appendLine.bind(ws);
+    const fault = vi.spyOn(ws, "appendLine").mockImplementation((path, line) => {
+      if (path.startsWith("explore/data/imports/")) throw new Error("模拟确认中断");
+      append(path, line);
+    });
+    await expect(changeExperienceBatch(ws, imported.batch_id, "confirm", 1)).rejects.toThrow("模拟确认中断");
+    fault.mockRestore();
+    const reopened = new Workspace(ws.root);
+    expect(readExperienceImports(reopened).pending).toHaveLength(1);
+    expect(lifeMap(reopened).features).toHaveLength(0);
+    expect(lifeMap(reopened).review).toHaveLength(3);
+    expect(await recoverExperienceImports(reopened)).toHaveLength(1);
+    expect(lifeMap(reopened).features).toHaveLength(3);
+    expect(readRecordRevisions(reopened, "experience")).toHaveLength(6);
+    expect(readExperienceImports(reopened).batches[0]?.revision).toBe(2);
+    expect((await changeExperienceBatch(reopened, imported.batch_id, "undo", 2)).affected).toBe(3);
+    expect(lifeMap(reopened).experiences).toHaveLength(0);
   } finally {
     vi.restoreAllMocks();
     rmSync(ws.root, { recursive: true, force: true });

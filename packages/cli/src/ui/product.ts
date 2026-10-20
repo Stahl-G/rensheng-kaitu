@@ -361,12 +361,12 @@ export async function productRequest(
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":
-      return previewExperienceBatch(ws, text(0), text(1) as "undo" | "restore");
+      return previewExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore");
     case "setExperienceSource":
       if (typeof args[1] !== "boolean") throw new KaituError("缺少来源开关", "BAD_ARGS");
       return setExperienceSource(ws, text(0), args[1], revision(2));
     case "changeExperienceBatch":
-      return changeExperienceBatch(ws, text(0), text(1) as "undo" | "restore", revision(2));
+      return changeExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore", revision(2));
     case "recoverExperienceImports":
       return { recovered: (await recoverExperienceImports(ws)).length };
     case "exploration":

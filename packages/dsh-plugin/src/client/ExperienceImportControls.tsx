@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExperienceBatchPreview, ExperienceImportsData } from "../types.js";
 import css from "./MapPage.module.css";
+import { useT } from "./i18n.js";
 
 export interface ExperienceImportControlProps {
   loadExperienceImports: () => Promise<ExperienceImportsData>;
-  previewExperienceBatch: (id: string, operation: "undo" | "restore") => Promise<ExperienceBatchPreview>;
+  previewExperienceBatch: (
+    id: string,
+    operation: "confirm" | "undo" | "restore",
+  ) => Promise<ExperienceBatchPreview>;
   setExperienceSource: (locator: string, excluded: boolean, revision: number) => Promise<unknown>;
   changeExperienceBatch: (
     id: string,
-    operation: "undo" | "restore",
+    operation: "confirm" | "undo" | "restore",
     revision: number,
   ) => Promise<{
     affected: number;
@@ -23,12 +27,15 @@ export function ExperienceImportControls(
     subscribe?: (refresh: () => void) => () => void;
     onChanged: () => Promise<void>;
     pending: number;
+    reviewPending: number;
   },
 ) {
+  const t = useT();
+  const sourceName = (locator: string) => (locator === "apple-photos" ? t("照片", "Photos") : locator);
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    if (props.pending > 0) setOpen(true);
-  }, [props.pending]);
+    if (props.pending > 0 || props.reviewPending > 0) setOpen(true);
+  }, [props.pending, props.reviewPending]);
   const [data, setData] = useState<ExperienceImportsData | null>(null);
   const [preview, setPreview] = useState<ExperienceBatchPreview | null>(null);
   const [source, setSource] = useState<ExperienceImportsData["sources"][number] | null>(null);
@@ -80,6 +87,17 @@ export function ExperienceImportControls(
       setBusy(false);
     }
   };
+  const loadPreview = (id: string, operation: "confirm" | "undo" | "restore") => {
+    setSource(null);
+    setNotice(null);
+    setBusy(true);
+    setError(null);
+    void props
+      .previewExperienceBatch(id, operation)
+      .then(setPreview)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setBusy(false));
+  };
   return (
     <details open={open} className={css.review} onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>来源与导入</summary>
@@ -120,7 +138,7 @@ export function ExperienceImportControls(
               {source && (
                 <section ref={confirmation} tabIndex={-1} className={css.notice} aria-label="来源变更确认">
                   <strong>{source.excluded ? "重新启用来源" : "排除来源"}</strong>
-                  <p className={css.source}>{source.locator}</p>
+                  <p className={css.source}>{sourceName(source.locator)}</p>
                   <p>
                     {source.excluded
                       ? "允许从这份资料新增足迹。已隐藏或已撤销的经历仍保留当前状态。"
@@ -153,14 +171,29 @@ export function ExperienceImportControls(
               )}
               {preview && (
                 <section ref={confirmation} tabIndex={-1} className={css.notice} aria-label="导入影响预览">
-                  <strong>{preview.operation === "undo" ? "撤销这次导入" : "恢复这次导入"}</strong>
+                  <strong>
+                    {preview.operation === "confirm"
+                      ? t("这批全部确认", "Confirm this batch")
+                      : preview.operation === "undo"
+                        ? "撤销这次导入"
+                        : "恢复这次导入"}
+                  </strong>
                   <p>
-                    {preview.operation === "undo" ? "将隐藏" : "将恢复"} {preview.affected.length}{" "}
-                    段经历，保留 {preview.preserved.length} 段后续已修改的资料或隐藏状态。
+                    {preview.operation === "confirm" ? (
+                      t(
+                        `将确认 ${preview.affected.length} 段经历，保留 ${preview.preserved.length} 段已修改、隐藏、无需确认或城市未解析的资料。`,
+                        `Confirm ${preview.affected.length} experiences; preserve ${preview.preserved.length} edited, hidden, unresolved or other experiences.`,
+                      )
+                    ) : (
+                      <>
+                        {preview.operation === "undo" ? "将隐藏" : "将恢复"} {preview.affected.length}{" "}
+                        段经历，保留 {preview.preserved.length} 段后续已修改的资料或隐藏状态。
+                      </>
+                    )}
                   </p>
                   {preview.affected.slice(0, 20).map((item) => (
                     <p key={item.id} className={css.source}>
-                      {item.title} · {item.source}
+                      {item.title} · {sourceName(item.source)}
                     </p>
                   ))}
                   {preview.affected.length > 20 && (
@@ -183,11 +216,20 @@ export function ExperienceImportControls(
                             preview.operation,
                             preview.revision,
                           );
-                          return `已${preview.operation === "undo" ? "撤销" : "恢复"} ${result.affected} 段经历，保留 ${result.preserved} 段后续资料`;
+                          return preview.operation === "confirm"
+                            ? t(
+                                `已确认 ${result.affected} 段经历，保留 ${result.preserved} 段其他资料`,
+                                `Confirmed ${result.affected} experiences; preserved ${result.preserved} others`,
+                              )
+                            : `已${preview.operation === "undo" ? "撤销" : "恢复"} ${result.affected} 段经历，保留 ${result.preserved} 段后续资料`;
                         })
                       }
                     >
-                      {preview.operation === "undo" ? "确认撤销导入" : "确认恢复导入"}
+                      {preview.operation === "confirm"
+                        ? t("确认这批经历", "Confirm experiences")
+                        : preview.operation === "undo"
+                          ? "确认撤销导入"
+                          : "确认恢复导入"}
                     </button>
                     <button
                       type="button"
@@ -200,11 +242,50 @@ export function ExperienceImportControls(
                   </div>
                 </section>
               )}
+              {data.batches.some((batch) => batch.confirmable > 0) && (
+                <>
+                  <h3>{t("待核对", "To review")}</h3>
+                  {data.batches
+                    .filter((batch) => batch.confirmable > 0)
+                    .slice(0, limit)
+                    .map((batch) => (
+                      <article key={batch.id} className={css.reviewItem}>
+                        <strong>
+                          {batch.sources.map(sourceName).join("、")} ·{" "}
+                          {batch.ts.slice(0, 16).replace("T", " ")}
+                        </strong>
+                        <p className={css.secondary}>
+                          {t(
+                            `${batch.confirmable} 段经历待确认`,
+                            `${batch.confirmable} experiences to confirm`,
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          className={css.control}
+                          disabled={busy}
+                          onClick={() => loadPreview(batch.id, "confirm")}
+                        >
+                          {t("这批全部确认", "Confirm this batch")}
+                        </button>
+                      </article>
+                    ))}
+                  {data.batches.filter((batch) => batch.confirmable > 0).length > limit && (
+                    <button type="button" className={css.link} onClick={() => setLimit((n) => n + 10)}>
+                      {t("更多待核对批次", "More batches to review")}
+                    </button>
+                  )}
+                </>
+              )}
               <h3>资料来源</h3>
               {!data.sources.length && <p className={css.secondary}>还没有足迹来源。</p>}
               {data.sources.slice(0, sourceLimit).map((item) => (
-                <article key={item.locator} className={css.reviewItem} aria-label={`来源 ${item.locator}`}>
-                  <p className={css.source}>{item.locator}</p>
+                <article
+                  key={item.locator}
+                  className={css.reviewItem}
+                  aria-label={`来源 ${sourceName(item.locator)}`}
+                >
+                  <p className={css.source}>{sourceName(item.locator)}</p>
                   <p className={css.secondary}>
                     {item.excluded ? "已排除" : "已启用"} · {item.active} 段可见 · {item.hidden} 段隐藏
                   </p>
@@ -240,22 +321,12 @@ export function ExperienceImportControls(
                     {batch.state === "undone" ? "已撤销" : "已导入"} · {batch.duplicates} 段重复 ·{" "}
                     {batch.excluded} 段来源已排除
                   </p>
-                  <p className={css.source}>{batch.sources.join("、")}</p>
+                  <p className={css.source}>{batch.sources.map(sourceName).join("、")}</p>
                   <button
                     type="button"
                     className={css.link}
                     disabled={busy}
-                    onClick={() => {
-                      setSource(null);
-                      setNotice(null);
-                      setBusy(true);
-                      setError(null);
-                      void props
-                        .previewExperienceBatch(batch.id, batch.state === "undone" ? "restore" : "undo")
-                        .then(setPreview)
-                        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-                        .finally(() => setBusy(false));
-                    }}
+                    onClick={() => loadPreview(batch.id, batch.state === "undone" ? "restore" : "undo")}
                   >
                     {batch.state === "undone" ? "查看恢复范围" : "查看撤销范围"}
                   </button>
