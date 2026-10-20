@@ -45,6 +45,7 @@ export function OnboardingPage(props: Props) {
   const { status, step } = props;
   const { content, choices } = status;
   const [matterText, setMatterText] = useState(props.initialText ?? "");
+  const [matterDestination, setMatterDestination] = useState<Destination | null>(null);
   const [entry, setEntry] = useState<"matter" | "memory">("matter");
   const memoryMode = step === 5 || (step === 1 && entry === "memory");
   const firstAi = content.ais.find((ai) => ai.id === choices?.memoryAi) ?? content.ais[0];
@@ -138,6 +139,7 @@ export function OnboardingPage(props: Props) {
     }
   };
   const move = (nextStep: number) => {
+    if (nextStep === 0) setMatterDestination(null);
     if (alive.current) props.setStep(nextStep);
   };
   const finish = (destination: Destination) => {
@@ -258,6 +260,11 @@ export function OnboardingPage(props: Props) {
               const firstRun = status.checklist.completed === 0;
               await save({ storage: true });
               if (moved) await props.refresh();
+              if (matterDestination !== null) {
+                setMatterDestination(github ? "connections" : "today");
+                move(1);
+                return;
+              }
               // GitHub 同步在「AI 与连接」里建库或连接已有仓库。
               if (github) finish("connections");
               else if (firstRun) move(1);
@@ -286,6 +293,7 @@ export function OnboardingPage(props: Props) {
           busy={busy}
           start={(text) => {
             setMatterText(text);
+            setMatterDestination("today");
             setEntry("matter");
             void run(next);
           }}
@@ -338,13 +346,13 @@ export function OnboardingPage(props: Props) {
           <OnboardingMatter
             {...props}
             onBusy={setBusy}
-            initial={status.draft}
+            initial={matterDestination === null ? status.draft : null}
             initialText={matterText}
             content={content.matter}
             onDone={async () => {
               await save({ seen: true });
               await props.refresh();
-              finish("today");
+              finish(matterDestination ?? "today");
             }}
           />
           <div className={css.footer}>
