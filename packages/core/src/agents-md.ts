@@ -53,7 +53,7 @@ export function renderAgentsMd(ws: Workspace): string {
 
 ## 1. 用户是谁
 
-- 档案：\`me/profile.md\`；「\`## 想聊的话题\`」小节存用户确认的话题，修改时保留其他正文。
+- 档案：\`me/profile.md\`；「\`## 想聊的话题\`」小节存用户确认的话题，每条一行「- 话题」，修改时保留其他正文。
 - 记忆索引：\`memory/MEMORY.md\`（每条一行，详情在同目录的单独文件里）
 
 ## 2. 进入后的读取顺序
