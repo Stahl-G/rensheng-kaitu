@@ -604,10 +604,15 @@ export function AskPage({
       await call("askSend", id, payload, pendingAttachments);
       await refreshThreads();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
       setDraft((current) => (current.trim() ? current : pendingText));
       setAttachments((current) => (current.length ? current : pendingAttachments));
       setSessionReferences((current) => (current.length ? current : pendingReferences));
+      try {
+        await refreshThreads();
+      } catch {
+        // 刷新列表失败时保留原始发送错误，避免覆盖真正的失败原因。
+      }
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
     }
