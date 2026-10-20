@@ -17,7 +17,6 @@
 // linking the SDK into the browser bundle.
 
 /** Wire name of the tool and of the keyed toolview. */
-export const OPENMAIC_WIDGET_TOOL_NAME = "openmaic_widget";
 
 /** The widget types v0.3 wires up first. */
 export const SUPPORTED_WIDGET_TYPES = ["simulation", "game", "code"] as const;

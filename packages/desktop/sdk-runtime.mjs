@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 
 import { KaituError } from "../core/dist/index.js";
 import { assertDesktopIsolation } from "./environment.mjs";
@@ -424,5 +424,3 @@ export function createSdkRuntime({
   };
   return api;
 }
-
-export const sdkSupportFiles = dirname(fileURLToPath(import.meta.url));
