@@ -74,7 +74,7 @@ export interface AskService {
   models(input: Record<string, unknown>): Promise<{ id: string; name?: string; image?: boolean }[]>;
   cancel(id: string): Promise<unknown>;
   setMode(id: string, mode: AskMode, confirmed: boolean): Promise<AskMode>;
-  prepareRelocation(): Promise<void>;
+  prepareRelocation(workspace?: string): Promise<void>;
   relocate(workspace: string): void;
   close(): Promise<void>;
 }
@@ -109,6 +109,7 @@ export function createAskService(options: {
   state: string;
   workspace: string;
   workspaceKey?: string;
+  workspaceKeyFor?: (workspace: string) => string;
   runtime: (mode: AskMode) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
@@ -116,18 +117,21 @@ export function createAskService(options: {
   support?: AskService["support"];
   dispose?: () => Promise<void>;
 }): AskService {
-  const directory = join(
-    options.state,
-    "ask",
-    createHash("sha256")
-      .update(options.workspaceKey ?? options.workspace)
-      .digest("hex")
-      .slice(0, 20),
-  );
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const index = join(directory, "index.json");
-  const threads: AskThread[] =
-    !options.transient && existsSync(index) ? JSON.parse(readFileSync(index, "utf8")) : [];
+  const loadStore = (workspace: string, key: string) => {
+    const directory = join(options.state, "ask", createHash("sha256").update(key).digest("hex").slice(0, 20));
+    const index = join(directory, "index.json");
+    const threads: AskThread[] =
+      !options.transient && existsSync(index) ? JSON.parse(readFileSync(index, "utf8")) : [];
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    return { workspace, key, directory, index, threads };
+  };
+  let {
+    key: workspaceKey,
+    directory,
+    index,
+    threads,
+  } = loadStore(options.workspace, options.workspaceKey ?? options.workspace);
+  let pendingStore: ReturnType<typeof loadStore> | undefined;
   const temporaryEvents = new Map<string, AskEvent[]>();
   // 换了 AI 时提示词里带着之前的记录；对话里只显示用户原话。
   const echoes = new Map<string, unknown>();
@@ -291,7 +295,7 @@ export function createAskService(options: {
   return {
     background() {
       ready();
-      const service = createAskService({ ...options, transient: true });
+      const service = createAskService({ ...options, workspaceKey, transient: true });
       backgrounds.add(service);
       const close = service.close.bind(service);
       service.close = async () => {
@@ -358,7 +362,7 @@ export function createAskService(options: {
     async send(id, text, images = []) {
       ready();
       const row = thread(id);
-      if ((row.workspace ?? options.workspaceKey ?? options.workspace) !== options.workspace)
+      if ((row.workspace ?? workspaceKey) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");
       const epoch = generation;
       const connection = await options.settings();
@@ -464,20 +468,31 @@ export function createAskService(options: {
         changing = false;
       }
     },
-    async prepareRelocation() {
+    async prepareRelocation(workspace) {
       ready();
       if (busy.size || backgrounds.size)
         throw new KaituError("请等回复完成后更换资料位置或恢复版本", "AI_CONNECTION");
       relocating = true;
       try {
+        pendingStore = workspace
+          ? loadStore(workspace, options.workspaceKeyFor?.(workspace) ?? workspace)
+          : undefined;
         await stopRuntime();
         await options.dispose?.();
       } catch (error) {
+        pendingStore = undefined;
         relocating = false;
         throw error;
       }
     },
     relocate(workspace) {
+      if (pendingStore?.workspace === workspace) {
+        ({ key: workspaceKey, directory, index, threads } = pendingStore);
+        temporaryEvents.clear();
+        echoes.clear();
+        listeners.clear();
+      }
+      pendingStore = undefined;
       options.workspace = workspace;
       relocating = false;
     },
