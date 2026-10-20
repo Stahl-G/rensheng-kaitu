@@ -1,21 +1,30 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { City } from "../types.js";
 import css from "./MapPage.module.css";
 import { useT } from "./i18n.js";
 
 export function HometownEditor({
   initial,
+  current = false,
   search,
   save,
   cancel,
 }: {
   initial: string;
+  current?: boolean;
   search: (name: string) => Promise<City[]>;
   save: (name: string, id: number) => Promise<void>;
   cancel?: () => void;
 }) {
   const t = useT();
   const errorId = useId();
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (current) {
+      form.current?.scrollIntoView({ block: "center" });
+      form.current?.querySelector("input")?.focus({ preventScroll: true });
+    }
+  }, [current]);
   const [name, setName] = useState(initial);
   const [candidates, setCandidates] = useState<City[]>([]);
   const [busy, setBusy] = useState(false);
@@ -46,15 +55,16 @@ export function HometownEditor({
   };
   return (
     <form
+      ref={form}
       className={css.editor}
-      aria-label={t("设置家乡", "Set hometown")}
+      aria-label={current ? t("设置现居城市", "Set current city") : t("设置家乡", "Set hometown")}
       onSubmit={(event) => {
         event.preventDefault();
         void choose();
       }}
     >
       <label>
-        {t("家乡", "Hometown")}
+        {current ? t("现居城市", "Current city") : t("家乡", "Hometown")}
         <input
           aria-invalid={!!error}
           aria-describedby={error ? errorId : undefined}
@@ -93,7 +103,11 @@ export function HometownEditor({
       )}
       <div className={css.actions}>
         <button className={css.primary} type="submit" disabled={busy || !name.trim()}>
-          {busy ? t("保存中…", "Saving…") : t("保存家乡", "Save hometown")}
+          {busy
+            ? t("保存中…", "Saving…")
+            : current
+              ? t("保存现居城市", "Save current city")
+              : t("保存家乡", "Save hometown")}
         </button>
         {cancel && (
           <button type="button" className={css.control} disabled={busy} onClick={cancel}>

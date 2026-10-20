@@ -1,0 +1,33 @@
+{
+  "themes": [
+    {
+      "theme": "light",
+      "online": {
+        "onLine": true,
+        "waterRequests": 2,
+        "terrainRequests": 24,
+        "caption": "开图",
+        "me": "我 · Shanghai"
+      },
+      "offline": {
+        "onLine": false,
+        "notice": true
+      }
+    },
+    {
+      "theme": "dark",
+      "online": {
+        "onLine": true,
+        "waterRequests": 4,
+        "terrainRequests": 48,
+        "caption": "开图",
+        "me": "我 · Shanghai"
+      },
+      "offline": {
+        "onLine": false,
+        "notice": true
+      }
+    }
+  ],
+  "errors": []
+}

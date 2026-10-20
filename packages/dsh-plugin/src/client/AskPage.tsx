@@ -158,6 +158,7 @@ function Tool({
 
 export function AskPage({
   workspace,
+  active = true,
   initialPrompt = "",
   initialPromptRequest = 0,
   configureRequest = 0,
@@ -165,6 +166,7 @@ export function AskPage({
   onConnections,
 }: {
   workspace: string;
+  active?: boolean;
   initialPrompt?: string;
   initialPromptRequest?: number;
   configureRequest?: number;
@@ -471,9 +473,9 @@ export function AskPage({
     return () => window.removeEventListener("kaitu-ai-changed", refresh);
   }, []);
   useEffect(() => {
-    if (step) dialog.current?.showModal();
+    if (step && active) dialog.current?.showModal();
     else dialog.current?.close();
-  }, [step]);
+  }, [step, active]);
   useEffect(() => {
     activeSession.current = selected;
     setEvents([]);

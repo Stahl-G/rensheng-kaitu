@@ -49,6 +49,7 @@ export interface OverviewPageProps
     configureBuiltin: boolean,
     onConnections: () => void,
     promptRequest: number,
+    active: boolean,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -533,7 +534,9 @@ function Overview({
           </div>
         </div>
       </header>
-      <main className={`${css.content} ${view === "ask" ? css.askContent : ""}`}>
+      <main
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" && explore === "footprints" ? css.footprintContent : ""}`}
+      >
         {error && (
           <p className={css.error} role="alert">
             {error}
@@ -973,6 +976,7 @@ function Overview({
               configureBuiltin,
               () => setView("connections"),
               promptRequest,
+              view === "ask",
             )}
           </div>
         )}

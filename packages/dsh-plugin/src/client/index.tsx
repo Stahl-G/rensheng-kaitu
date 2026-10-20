@@ -522,6 +522,11 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              saveCurrentCity: async (name: string, id: number) => {
+                const result = await ctx.remote.kaitu.saveCurrentCity(name, id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               saveHometown: async (name: string, id: number) => {
                 const result = await ctx.remote.kaitu.saveHometown(name, id);
                 if (!result.ok) throw new Error(result.error.message);

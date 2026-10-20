@@ -88,7 +88,7 @@ export * from "./project-view.js";
 
 export type { Hometown } from "./hometown.js";
 export { conciseDirection, directionText } from "./direction-copy.js";
-export { saveHometown } from "./hometown.js";
+export { saveHometown, saveCurrentCity } from "./hometown.js";
 export { dshFiles } from "./dsh-files.js";
 
 export * from "./workspace-backup.js";
