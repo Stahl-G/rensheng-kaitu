@@ -2816,3 +2816,13 @@
   max-height: 250px;
   overflow: auto;
 }
+
+.footprintContent {
+  max-width: none;
+  padding-top: 12px;
+  gap: 12px;
+  --footprint-map-height: calc(100dvh - 150px);
+}
+.footprintContent > .sec > .head {
+  display: none;
+}

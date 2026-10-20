@@ -4,18 +4,17 @@ import {
   experienceOverlaps,
   experienceYears,
 } from "@kaitu/core/experience-time";
-import { type GeoJSONSource, Map as LibreMap, LngLatBounds, setWorkerUrl } from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
-import workerSource from "maplibre-gl/dist/maplibre-gl-worker.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Experience, ExperienceChanges, LifeMapData } from "../types.js";
 import { ExperienceEditor } from "./ExperienceEditor.js";
 import { type ExperienceImportControlProps, ExperienceImportControls } from "./ExperienceImportControls.js";
 import { HometownEditor } from "./HometownEditor.js";
 import css from "./MapPage.module.css";
+import { PaperMap } from "./PaperMap.js";
 import { SourceEvidence } from "./SourceEvidence.js";
+import { footprintAnchor, footprintData } from "./footprint-state.js";
 import { useT } from "./i18n.js";
-import { atlasStyle, cityKey, journeyRoutes } from "./life-map-visuals.js";
+import { cityKey } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
   subscribe?: (refresh: () => void) => () => void;
@@ -175,454 +174,6 @@ function ExperienceDetails({
   );
 }
 
-function markerImage(ids: Layer[], ink: string, paper: string, home = false) {
-  const canvas = document.createElement("canvas");
-  canvas.width = (home ? 1 : ids.length) * 48;
-  canvas.height = 48;
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  context.scale(2, 2);
-  if (home) {
-    context.fillStyle = ink;
-    context.strokeStyle = paper;
-    context.lineWidth = 2;
-    context.beginPath();
-    context.arc(12, 12, 10, 0, Math.PI * 2);
-    context.fill();
-    context.stroke();
-    context.beginPath();
-    context.moveTo(6, 12);
-    context.lineTo(12, 6);
-    context.lineTo(18, 12);
-    context.moveTo(8, 11);
-    context.lineTo(8, 18);
-    context.lineTo(16, 18);
-    context.lineTo(16, 11);
-    context.moveTo(11, 18);
-    context.lineTo(11, 13);
-    context.lineTo(13, 13);
-    context.lineTo(13, 18);
-    context.lineWidth = 1.5;
-    context.stroke();
-  }
-  ids.forEach((id, i) => {
-    const x = i * 24 + 12;
-    context.strokeStyle = paper;
-    context.lineWidth = 4;
-    context.setLineDash([]);
-    context.beginPath();
-    context.arc(x, 12, 8, 0, Math.PI * 2);
-    context.stroke();
-    context.strokeStyle = ink;
-    context.fillStyle = ink;
-    context.lineWidth = 2;
-    context.setLineDash(id === "planned" ? [3, 2] : []);
-    context.beginPath();
-    context.arc(x, 12, id === "been" ? 6 : 8, 0, Math.PI * 2);
-    if (id === "been") context.fill();
-    else context.stroke();
-    if (id === "now") {
-      context.beginPath();
-      context.arc(x, 12, 3, 0, Math.PI * 2);
-      context.fill();
-    }
-  });
-  return context.getImageData(0, 0, canvas.width, canvas.height);
-}
-function CityMap({
-  cities,
-  selected,
-  onSelect,
-  onShowList,
-  showRoutes,
-  home,
-  asOf,
-}: {
-  cities: CityGroup[];
-  selected: string | null;
-  onSelect: (id: string) => void;
-  onShowList: () => void;
-  showRoutes: boolean;
-  home?: Experience["place"];
-  asOf: string;
-}) {
-  const container = useRef<HTMLDivElement>(null);
-  const map = useRef<LibreMap | null>(null);
-  const latest = useRef({ cities, onSelect, selected });
-  latest.current = { cities, onSelect, selected };
-  const fitted = useRef(false);
-  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
-  const geojson = useMemo(
-    () => ({
-      type: "FeatureCollection" as const,
-      features: cities
-        .filter(
-          (city) =>
-            (city.layers.length || city.home) &&
-            city.place.precision === "city" &&
-            city.place.lng !== undefined &&
-            city.place.lat !== undefined,
-        )
-        .map((city) => ({
-          type: "Feature" as const,
-          geometry: {
-            type: "Point" as const,
-            coordinates: [city.place.lng as number, city.place.lat as number] as [number, number],
-          },
-          properties: {
-            id: city.id,
-            name: city.place.name,
-            home: !!city.home,
-            icon: city.home
-              ? "home"
-              : city.layers.includes("now")
-                ? "now"
-                : city.layers.includes("been")
-                  ? "been"
-                  : "planned",
-          },
-        })),
-    }),
-    [cities],
-  );
-  const routes = useMemo(
-    () =>
-      showRoutes && home
-        ? journeyRoutes(
-            cities.flatMap((city) => city.experiences),
-            asOf,
-            home,
-          )
-        : { type: "FeatureCollection" as const, features: [] },
-    [cities, asOf, home, showRoutes],
-  );
-  const latestRoutes = useRef(routes);
-  latestRoutes.current = routes;
-  const fitCities = useCallback((duration = 600) => {
-    const instance = map.current;
-    if (!instance) return;
-    const points = latestGeojson.current.features;
-    if (!points.length) {
-      instance.fitBounds(
-        [
-          [-180, -60],
-          [180, 80],
-        ],
-        { padding: 24, duration },
-      );
-      return;
-    }
-    const bounds = new LngLatBounds();
-    const longitudes = points
-      .map((point) => (point.geometry.coordinates[0] + 360) % 360)
-      .sort((a, b) => a - b);
-    let start = longitudes[0] ?? 0;
-    let largestGap = -1;
-    for (let i = 0; i < longitudes.length; i++) {
-      const current = longitudes[i] as number;
-      const next =
-        (longitudes[(i + 1) % longitudes.length] as number) + (i === longitudes.length - 1 ? 360 : 0);
-      if (next - current > largestGap) {
-        largestGap = next - current;
-        start = next % 360;
-      }
-    }
-    for (const point of points) {
-      let longitude = (point.geometry.coordinates[0] + 360) % 360;
-      if (longitude < start) longitude += 360;
-      bounds.extend([longitude, point.geometry.coordinates[1]]);
-    }
-    instance.fitBounds(bounds, { padding: 64, maxZoom: 5, duration });
-    fitted.current = true;
-  }, []);
-  const latestGeojson = useRef(geojson);
-  latestGeojson.current = geojson;
-  useEffect(() => {
-    if (!container.current) return;
-    const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
-    setWorkerUrl(workerUrl);
-    let instance: LibreMap | undefined;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const waitForMap = () => {
-      setState("loading");
-      clearTimeout(timer);
-      timer = setTimeout(() => setState("failed"), 8000);
-    };
-    const themeRoot = container.current.closest("[data-theme]") ?? document.body;
-    const styleTransform = (_previous: unknown, next: Parameters<typeof atlasStyle>[0]) => {
-      const theme = getComputedStyle(container.current as HTMLDivElement);
-      const value = (name: string) => theme.getPropertyValue(name).trim();
-      return atlasStyle(next, {
-        water: value("--atlas-water"),
-        land: value("--atlas-land"),
-        border: value("--atlas-border"),
-        muted: value("--atlas-muted"),
-        green: value("--atlas-green"),
-      });
-    };
-    const styleUrl = () => {
-      const theme = themeRoot.getAttribute("data-theme");
-      const dark = theme === "dark" || (!theme && document.body.hasAttribute("data-ds-dark-theme"));
-      return `https://tiles.openfreemap.org/styles/${dark ? "dark" : "positron"}`;
-    };
-    try {
-      instance = new LibreMap({
-        container: container.current,
-        center: [20, 25],
-        zoom: 1,
-        cooperativeGestures: false,
-        attributionControl: {
-          compact: true,
-          customAttribution:
-            '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a>',
-        },
-        locale: {
-          "NavigationControl.ZoomIn": "放大",
-          "NavigationControl.ZoomOut": "缩小",
-          "AttributionControl.ToggleAttribution": "显示地图署名",
-          "Map.Title": "城市地图",
-          "CooperativeGesturesHandler.WindowsHelpText": "按住 Ctrl 并滚动以缩放地图",
-          "CooperativeGesturesHandler.MacHelpText": "按住 ⌘ 并滚动以缩放地图",
-          "CooperativeGesturesHandler.MobileHelpText": "使用双指移动地图",
-        },
-      });
-      map.current = instance;
-      fitted.current = false;
-      const m = instance;
-      waitForMap();
-      m.on("style.load", () => {
-        const theme = getComputedStyle(container.current as HTMLDivElement);
-        const ink = theme.getPropertyValue("--kt-map").trim();
-        const paper = theme.getPropertyValue("--kt-card").trim();
-        const text = theme.getPropertyValue("--kt-text").trim();
-        const house = markerImage([], ink, paper, true);
-        if (house) m.addImage("home", house, { pixelRatio: 2 });
-        for (let mask = 1; mask < 8; mask++) {
-          const ids = layers.filter((_, i) => mask & (1 << i)).map((layer) => layer.id);
-          const image = markerImage(ids, ink, paper);
-          if (image) m.addImage(ids.join("-"), image, { pixelRatio: 2 });
-        }
-        m.addSource("experience-order", { type: "geojson", data: latestRoutes.current });
-        m.addLayer({
-          id: "experience-order",
-          type: "line",
-          source: "experience-order",
-          paint: {
-            "line-color": ink,
-            "line-width": ["interpolate", ["linear"], ["zoom"], 1, 1.5, 6, 2.5],
-            "line-opacity": 0.8,
-          },
-          layout: { "line-cap": "round", "line-join": "round" },
-        });
-        m.addSource("cities", {
-          type: "geojson",
-          data: latestGeojson.current,
-          cluster: true,
-          clusterRadius: 48,
-          clusterMaxZoom: 10,
-        });
-        m.addLayer({
-          id: "clusters",
-          type: "circle",
-          source: "cities",
-          filter: ["has", "point_count"],
-          paint: {
-            "circle-color": ink,
-            "circle-radius": 18,
-            "circle-stroke-color": paper,
-            "circle-stroke-width": 2,
-          },
-        });
-        m.addLayer({
-          id: "counts",
-          type: "symbol",
-          source: "cities",
-          filter: ["has", "point_count"],
-          layout: {
-            "text-field": ["get", "point_count_abbreviated"],
-            "text-size": 13,
-          },
-          paint: { "text-color": paper },
-        });
-        m.addLayer({
-          id: "selected-city",
-          type: "circle",
-          source: "cities",
-          filter: ["==", ["get", "id"], latest.current.selected ?? ""],
-          paint: {
-            "circle-radius": 20,
-            "circle-color": ink,
-            "circle-opacity": 0.13,
-            "circle-stroke-color": ink,
-            "circle-stroke-width": 1,
-          },
-        });
-        m.addLayer({
-          id: "places",
-          type: "symbol",
-          source: "cities",
-          filter: ["!", ["has", "point_count"]],
-          layout: {
-            "icon-image": ["get", "icon"],
-            "icon-allow-overlap": false,
-            "symbol-sort-key": ["case", ["get", "home"], 0, 1],
-            "text-field": ["get", "name"],
-            "text-font": ["Noto Sans Regular"],
-            "text-size": ["interpolate", ["linear"], ["zoom"], 1, 12, 5, 15],
-            "text-anchor": "left",
-            "text-offset": [1.2, 0],
-            "text-optional": true,
-          },
-          paint: { "text-color": text, "text-halo-color": paper, "text-halo-width": 2 },
-        });
-        if (!fitted.current && latestGeojson.current.features.length) fitCities(0);
-      });
-      m.on("idle", () => {
-        if (!m.isStyleLoaded() || !m.areTilesLoaded()) return;
-        clearTimeout(timer);
-        setState("ready");
-      });
-      m.on("error", (event) => {
-        if ("sourceId" in event && event.sourceId === "cities") return;
-        clearTimeout(timer);
-        setState("failed");
-      });
-      m.on("click", "places", (event) => {
-        const id = event.features?.[0]?.properties.id;
-        if (typeof id === "string") latest.current.onSelect(id);
-      });
-      m.on("click", "clusters", async (event) => {
-        const point = event.features?.[0];
-        if (!point || point.geometry.type !== "Point") return;
-        try {
-          const zoom = await (m.getSource("cities") as GeoJSONSource).getClusterExpansionZoom(
-            Number(point.properties.cluster_id),
-          );
-          if (map.current === m) m.easeTo({ center: point.geometry.coordinates as [number, number], zoom });
-        } catch {
-          // 图层切换后原来的聚合可能已消失。
-        }
-      });
-      for (const layer of ["places", "clusters"]) {
-        m.on("mouseenter", layer, () => {
-          m.getCanvas().style.cursor = "pointer";
-        });
-        m.on("mouseleave", layer, () => {
-          m.getCanvas().style.cursor = "";
-        });
-      }
-      m.setStyle(styleUrl(), { diff: false, transformStyle: styleTransform });
-    } catch {
-      clearTimeout(timer);
-      setState("failed");
-    }
-    const observer = new MutationObserver(() => {
-      if (!instance) return;
-      waitForMap();
-      instance.setStyle(styleUrl(), { diff: false, transformStyle: styleTransform });
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
-    if (themeRoot !== document.body)
-      observer.observe(themeRoot, { attributes: true, attributeFilter: ["data-theme"] });
-    const resize = new ResizeObserver(() => instance?.resize());
-    resize.observe(container.current);
-    return () => {
-      clearTimeout(timer);
-      observer.disconnect();
-      resize.disconnect();
-      map.current = null;
-      instance?.remove();
-      URL.revokeObjectURL(workerUrl);
-    };
-  }, [fitCities]);
-  useEffect(() => {
-    const source = map.current?.getSource("cities") as GeoJSONSource | undefined;
-    source?.setData(geojson);
-    if (source && !fitted.current && geojson.features.length) fitCities(0);
-  }, [geojson, fitCities]);
-  useEffect(() => {
-    const source = map.current?.getSource("experience-order") as GeoJSONSource | undefined;
-    source?.setData(routes);
-  }, [routes]);
-  useEffect(() => {
-    const instance = map.current;
-    const city = latest.current.cities.find((city) => city.id === selected);
-    if (
-      instance &&
-      fitted.current &&
-      instance.isStyleLoaded() &&
-      city?.place.lng !== undefined &&
-      city.place.lat !== undefined
-    ) {
-      const position = instance.project([city.place.lng, city.place.lat]);
-      const canvas = instance.getCanvas();
-      const outside =
-        position.x < 48 ||
-        position.y < 48 ||
-        position.x > canvas.clientWidth - 48 ||
-        position.y > canvas.clientHeight - 48;
-      if (outside) {
-        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        instance.easeTo({
-          center: [city.place.lng, city.place.lat],
-          zoom: Math.max(2.5, Math.min(instance.getZoom(), 5)),
-          duration: reduced ? 0 : 500,
-        });
-      }
-    }
-    if (instance?.getLayer("selected-city"))
-      instance.setFilter("selected-city", ["==", ["get", "id"], selected ?? ""]);
-  }, [selected]);
-  return (
-    <section className={css.mapPane} aria-label="城市地图">
-      <div ref={container} className={css.map} />
-      {state !== "ready" && (
-        <output className={css.mapNotice}>
-          {state === "failed" ? (
-            <>
-              底图暂时不可用，仍可查看城市记录。
-              <button type="button" className={css.control} onClick={onShowList}>
-                显示城市列表
-              </button>
-            </>
-          ) : (
-            "正在加载地图…"
-          )}
-        </output>
-      )}
-      <fieldset className={css.mapControls} aria-label="地图视野">
-        <button type="button" aria-label="放大" onClick={() => map.current?.zoomIn()}>
-          +
-        </button>
-        <button type="button" aria-label="缩小" onClick={() => map.current?.zoomOut()}>
-          −
-        </button>
-        <button type="button" onClick={() => fitCities()}>
-          我的足迹
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            map.current?.fitBounds(
-              [
-                [-180, -60],
-                [180, 80],
-              ],
-              { padding: 24, duration: 600 },
-            )
-          }
-        >
-          全世界
-        </button>
-      </fieldset>
-      <span className={css.precision}>
-        {home ? `⌂ ${home.name} · 家乡起点` : "城市级位置"}
-        {routes.features.length > 0 && " · 连线表示经历顺序"}
-      </span>
-    </section>
-  );
-}
-
 export function MapPage({
   subscribe,
   loadExperienceSource,
@@ -650,10 +201,11 @@ export function MapPage({
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState("map");
   const [showRoutes, setShowRoutes] = useState(true);
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
   const [chapterLimit, setChapterLimit] = useState(30);
   const [detailLimit, setDetailLimit] = useState(30);
   const [compact, setCompact] = useState(false);
-  const showMapList = useCallback(() => setView("list"), []);
+  const showMapList = useCallback(() => setView((value) => (value === "list" ? "map" : "list")), []);
   const page = useRef<HTMLDivElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
@@ -735,15 +287,14 @@ export function MapPage({
       group.layers.sort((a, b) => layers.findIndex((l) => l.id === a) - layers.findIndex((l) => l.id === b));
     return [...groups.values()].sort((a, b) => Number(!!b.home) - Number(!!a.home));
   }, [data, enabled, year, from, to]);
+  const anchor = useMemo(() => (data ? footprintAnchor(data.experiences, data.asOf) : undefined), [data]);
   const home = data?.hometown?.status === "ready" ? data.hometown.place : undefined;
+  const previousPlace = useMemo(
+    () => (data ? footprintData(data.experiences, data.asOf, anchor ?? null).previous : undefined),
+    [data, anchor],
+  );
+
   const homeId = home ? cityId(home) : null;
-  const initialized = useRef(false);
-  useEffect(() => {
-    if (data && !initialized.current) {
-      initialized.current = true;
-      if (homeId && !compact) setSelected(homeId);
-    }
-  }, [data, homeId, compact]);
   const timeline = cities
     .flatMap((city) => city.experiences.map((item) => ({ city, item })))
     .sort(
@@ -914,7 +465,7 @@ export function MapPage({
           {home ? `⌂ ${t("家乡", "Hometown")}：${home.name}` : t("设置家乡", "Set hometown")}
         </button>
       </div>
-      {data && (!home || editingHome) && (
+      {data && editingHome && (
         <HometownEditor
           initial={home?.name ?? ""}
           search={hometownCities}
@@ -973,19 +524,19 @@ export function MapPage({
       )}
       {!data ? (
         <output className={css.empty}>{error ? "经历读取失败，请重试。" : "正在读取经历…"}</output>
-      ) : !data.experiences.length && !home ? (
-        <div className={css.empty}>
-          <h2>让开图从你的记忆里生成地图</h2>
-          <p>和开图聊聊，整理去过和住过的城市。</p>
-          <button type="button" className={css.primary} onClick={() => ask(prompt)}>
-            从记忆生成
-          </button>
-        </div>
       ) : (
         <>
           <details className={css.review}>
             <summary>地图工具 · 图层与时间</summary>
             <div className={css.toolbar}>
+              <label className={css.routeToggle}>
+                <input
+                  type="checkbox"
+                  checked={showAllPlaces}
+                  onChange={(event) => setShowAllPlaces(event.target.checked)}
+                />
+                {t("显示全部城市（含旅行）", "Show all cities, including travel")}
+              </label>
               <label className={css.routeToggle}>
                 <input
                   type="checkbox"
@@ -1126,17 +677,54 @@ export function MapPage({
               </button>
             </div>
           )}
-          <div className={css.layout} data-view={view}>
-            <CityMap
+          <div className={css.layout} data-view={view} data-selected={!!city}>
+            <PaperMap
               cities={cities}
+              cityNames={data.cityNames}
+              previous={previousPlace}
               selected={city?.id ?? null}
               onSelect={setSelected}
               onShowList={showMapList}
               showRoutes={showRoutes}
-              home={home}
+              showAllPlaces={showAllPlaces}
+              current={anchor ?? null}
               asOf={data.asOf}
+              onAdd={(mode) =>
+                mode === "now"
+                  ? ask(
+                      "请帮我核对目前居住的城市，并确认对应经历的时间和事实状态。不要把计划或推测写成已发生。",
+                    )
+                  : ask(
+                      mode === "history"
+                        ? prompt
+                        : "我想记一个计划去的城市，请先问我要去哪里，区分计划与 AI 建议，不写成已经去过。",
+                    )
+              }
             />
-            <section className={css.listPane} aria-label="城市列表">
+            <section
+              className={css.listPane}
+              aria-label="城市列表"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setView("map");
+                  setSelected(null);
+                }
+              }}
+            >
+              <div className={css.listHeading}>
+                <strong>{t("城市与工具", "Cities and tools")}</strong>
+                <button
+                  type="button"
+                  className={css.control}
+                  onClick={() => {
+                    setView("map");
+                    setSelected(null);
+                  }}
+                  aria-label={t("关闭城市列表", "Close city list")}
+                >
+                  {t("关闭", "Close")}
+                </button>
+              </div>
               {!!data.review.length && (
                 <details className={css.review}>
                   <summary>
@@ -1279,7 +867,16 @@ export function MapPage({
               {showRoutes ? "隐藏经历连线" : "显示经历连线"}
             </button>
           </div>
-          <p className={css.mapFootnote}>城市级位置 · 连线只表示经历顺序，不代表实际交通路线</p>
+          <p className={css.mapFootnote}>城市级位置 · 连线表示经历顺序</p>
+          <details className={css.review}>
+            <summary>{t("地图资料去向", "Map data and connections")}</summary>
+            <p>
+              {t(
+                "全球底图保存在本机。拉近城市时，按视野向 OpenFreeMap 和 AWS Terrain Tiles 下载瓦片；请求包含地图区域与常规网络信息。",
+                "The global map is local. Zooming into cities downloads visible tiles from OpenFreeMap and AWS Terrain Tiles. Requests include the map area and ordinary network metadata.",
+              )}
+            </p>
+          </details>
           {compact && details}
         </>
       )}
