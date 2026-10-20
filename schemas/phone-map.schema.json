@@ -74,6 +74,28 @@
         }
       ]
     },
+    "footprint": {
+      "type": "object",
+      "description": "可选的城市经历语义：current 只来自正在居住的事实经历；visited 只表示确曾到过；planned 保留计划与建议的区别。旧快照可省略整个字段。",
+      "required": ["current", "visited", "planned"],
+      "properties": {
+        "current": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/city" }] },
+        "visited": { "type": "array", "items": { "$ref": "#/$defs/city" } },
+        "planned": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/city" },
+              {
+                "type": "object",
+                "required": ["status"],
+                "properties": { "status": { "enum": ["planned", "suggested"] } }
+              }
+            ]
+          }
+        }
+      }
+    },
     "routes": {
       "type": "object",
       "required": ["walked", "planned"],
@@ -84,6 +106,15 @@
     }
   },
   "$defs": {
+    "city": {
+      "type": "object",
+      "required": ["name", "lat", "lng"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    },
     "line": {
       "type": "array",
       "minItems": 2,

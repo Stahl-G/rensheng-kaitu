@@ -1,3 +1,4 @@
+import { experienceInterval, experienceLayer, partialDateBounds } from "./experience-time.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
@@ -5,7 +6,7 @@ import { listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
 import { phoneInboxName } from "./phone-actions.js";
-import type { LifeMapData } from "./places.js";
+import type { Experience, LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
@@ -140,6 +141,66 @@ export function buildPhoneWeek(data: Overview, generatedAt: string) {
   };
 }
 
+function mapFootprint(map: LifeMapData) {
+  type City = { name: string; lat: number; lng: number };
+  const city = (item: Experience): City | null => {
+    const { place } = item;
+    return !item.review &&
+      place.precision === "city" &&
+      place.name.trim() &&
+      typeof place.lat === "number" &&
+      Number.isFinite(place.lat) &&
+      typeof place.lng === "number" &&
+      Number.isFinite(place.lng)
+      ? { name: place.name, lat: place.lat, lng: place.lng }
+      : null;
+  };
+  const key = (item: Experience) =>
+    String(item.place.geonameid ?? `${item.place.name}:${item.place.lat}:${item.place.lng}`);
+  const compare = (a: City, b: City) => a.name.localeCompare(b.name) || a.lat - b.lat || a.lng - b.lng;
+  const livedNow = new Map<string, City>();
+  for (const item of map.experiences) {
+    const place = city(item);
+    const interval = experienceInterval(item);
+    if (
+      place &&
+      item.event_type === "lived" &&
+      !item.end &&
+      (item.fact_status === "observed" || item.fact_status === "user_reported") &&
+      interval &&
+      interval.from <= map.asOf &&
+      (!interval.to || interval.to >= map.asOf)
+    )
+      livedNow.set(key(item), place);
+  }
+  const [currentKey, currentCity] =
+    livedNow.size === 1 ? (livedNow.entries().next().value ?? [null, null]) : [null, null];
+  const visited = new Map<string, City>();
+  const planned = new Map<string, City & { status: "planned" | "suggested" }>();
+  for (const item of map.experiences) {
+    const place = city(item);
+    if (!place) continue;
+    const id = key(item);
+    const start = partialDateBounds(item.start)?.from;
+    if (
+      (item.fact_status === "observed" || item.fact_status === "user_reported") &&
+      (!start || start <= map.asOf) &&
+      experienceLayer(item, map.asOf) !== null &&
+      id !== currentKey
+    )
+      visited.set(id, place);
+    if (item.fact_status === "planned" || item.fact_status === "suggested") {
+      const prior = planned.get(id);
+      if (!prior || item.fact_status === "planned") planned.set(id, { ...place, status: item.fact_status });
+    }
+  }
+  return {
+    current: currentCity,
+    visited: [...visited.values()].sort(compare),
+    planned: [...planned.values()].sort(compare),
+  };
+}
+
 export function buildPhoneMap(
   data: Overview,
   map: LifeMapData,
@@ -185,6 +246,7 @@ export function buildPhoneMap(
       end: experiences.at(-1)?.end,
     })),
     hometown: home ? { name: home.name, lat: home.lat, lng: home.lng } : null,
+    footprint: mapFootprint(map),
     routes: {
       walked: journeyRoutes(map.experiences, map.asOf, home).features.flatMap((f) =>
         split(f.geometry.coordinates),
