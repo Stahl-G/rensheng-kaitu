@@ -353,8 +353,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         if (closed || controller.signal.aborted) return;
         if (baseline) {
           baseline = false;
-          // A file may change during the first scan after the initial catch-up was queued.
+          // Files may arrive during the first scan after the initial catch-up was queued.
           changedFile("工作区");
+          scheduleInbox();
         } else {
           for (const file of new Set([...stamps.keys(), ...next.keys()])) {
             if (stamps.get(file) !== next.get(file)) changedFile(file);

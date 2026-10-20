@@ -1,4 +1,4 @@
-import fs, { mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import fs, { mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +6,7 @@ import {
   type Workspace,
   history,
   historyDirectory,
+  inboxNotes,
   initWorkspace,
   isTracked,
   pendingWorkspaceFiles,
@@ -74,6 +75,45 @@ it("监听不可用时持续编辑仍自动保存，保留 mtime 的最终内容
     expect(await pendingWorkspaceFiles(ws)).toEqual([]);
   } finally {
     clearInterval(editing);
+    await ui?.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("首次异步盘点期间收到的收件箱文件仍会自动处理", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-ui-inbox-baseline-"));
+  let ui: Awaited<ReturnType<typeof startUi>> | undefined;
+  let releaseScan = () => {};
+  const scanHeld = new Promise<void>((resolve) => {
+    releaseScan = resolve;
+  });
+  let signalScan!: () => void;
+  const scanStarted = new Promise<void>((resolve) => {
+    signalScan = resolve;
+  });
+  const actualOpendir = fs.promises.opendir.bind(fs.promises);
+  let held = false;
+  const opening = vi.spyOn(fs.promises, "opendir").mockImplementation(async (path, options) => {
+    if (!held && String(path) === realpathSync(root)) {
+      held = true;
+      signalScan();
+      await scanHeld;
+    }
+    return actualOpendir(path, options);
+  });
+  try {
+    const ws = await initWorkspace(root);
+    ws.writeText("inbox/agents/before.note.md", "合成初始原文");
+    ui = await startUi(ws, { port: 0, open: false, refreshDelayMs: 30, inboxStableMs: 0 });
+    await scanStarted;
+    await expect.poll(() => ws.exists("inbox/agents/before.note.md")).toBe(false);
+    ws.writeText("inbox/agents/during.note.md", "合成盘点期间原文");
+    releaseScan();
+    await expect.poll(() => ws.exists("inbox/agents/during.note.md")).toBe(false);
+    expect(inboxNotes(ws).some((note) => note.content.includes("合成盘点期间原文"))).toBe(true);
+  } finally {
+    releaseScan();
+    opening.mockRestore();
     await ui?.close();
     rmSync(root, { recursive: true, force: true });
   }
