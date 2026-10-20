@@ -80,7 +80,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   const seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
   // 云端整理员处理过的操作只留在回执里，本机账本没有。
   for (const r of phoneReceipts(ws))
-    if (r.kind === "action" && !seen[r.ref]?.status)
+    if (r.kind === "action" && !seen[r.ref]?.status && !seen[r.ref]?.memory && !seen[r.ref]?.task)
       seen[r.ref] =
         r.status === "conflict" || r.status === "rejected"
           ? { status: r.status, message: r.message }
@@ -118,7 +118,12 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
           ? { status: "duplicate", ...(first.target ? { target: first.target } : {}) }
           : first,
       );
-    else {
+    else if (first?.memory && action.op !== "replace_memory") {
+      receipt.status = "conflict";
+      receipt.message = "这个 client_id 已绑定记忆操作，请沿首次操作重试";
+      receipts.push(receipt);
+      continue;
+    } else {
       const { id, file: target, decision } = action.args;
       try {
         switch (action.op) {

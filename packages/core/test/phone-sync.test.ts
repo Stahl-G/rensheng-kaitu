@@ -30,6 +30,7 @@ import {
   updateMemory,
   writePhoneSnapshots,
 } from "../src/index.js";
+import { applyPhoneActions } from "../src/phone-actions.js";
 import { ulid } from "../src/ulid.js";
 import {
   type BackupFiles,
@@ -40,6 +41,52 @@ import {
 import { freshWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
+it("未完成的记忆操作绑定首次 client_id，改投其他 op 不覆盖计划且原操作仍可恢复", async () => {
+  const ws = await freshWorkspace();
+  const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
+  const action = {
+    client_id: ulid(),
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "replace_memory",
+    args: {
+      file: old.file,
+      candidate: { type: "fact", name: "new", text: "合成新说法" },
+      expected: memoryExpectation(old),
+    },
+  };
+  const plan = {
+    file: old.file,
+    candidate: action.args.candidate,
+    expected: action.args.expected,
+    at: action.at,
+  };
+  ws.writeJson(".kaitu/phone-actions.json", { [action.client_id]: { memory: plan } }, { internal: true });
+  const file = phoneFile("actions.jsonl");
+  await applyPhoneActions(
+    ws,
+    file,
+    JSON.stringify({
+      ...action,
+      op: "decide_proposal",
+      args: { id: ulid(), decision: "confirmed" },
+    }),
+  );
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "conflict" }),
+  );
+  expect(
+    ws.readJson<Record<string, { memory: typeof plan }>>(".kaitu/phone-actions.json")[action.client_id]
+      ?.memory,
+  ).toEqual(plan);
+  expect(normalizedMemory(ws, old.file)?.ended).toBeUndefined();
+  await applyPhoneActions(ws, file, JSON.stringify(action));
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "applied" }),
+  );
+  expect(listMemories(ws).map((memory) => memory.text)).toEqual(["合成新说法"]);
+});
 
 it.each([null, { type: "context", name: "new", text: "合成新记忆" }])(
   "手机记忆决定写完文件但回执前中断，重开可恢复：%j",

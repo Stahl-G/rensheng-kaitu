@@ -25,6 +25,30 @@ import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
 describe("记忆", () => {
+  it.each([undefined, false])("替换敏感记忆时候选 sensitive=%j 仍保留敏感标记", async (sensitive) => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, {
+      type: "fact",
+      name: "私下记录",
+      text: "合成敏感旧说法",
+      sensitive: true,
+    });
+    const next = await replaceMemory(
+      ws,
+      old.file,
+      {
+        type: "fact",
+        name: "新说法",
+        text: "合成敏感新说法",
+        ...(sensitive === undefined ? {} : { sensitive }),
+      },
+      { by: "user", expected: memoryExpectation(old) },
+    );
+    expect(next.sensitive).toBe(true);
+    expect(normalizedMemory(ws, next.file)?.sensitive).toBe(true);
+    expect(handoverPack(ws, "zh-CN").text).not.toContain("合成敏感新说法");
+  });
+
   it.each([
     { type: "context" },
     { name: "changed" },

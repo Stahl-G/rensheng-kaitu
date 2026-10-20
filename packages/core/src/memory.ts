@@ -340,7 +340,8 @@ export async function replaceMemory(
   const candidate = memoryInput(input as unknown as Record<string, unknown>);
   const data: Memory = {
     ...candidate,
-    sensitive: candidate.sensitive ?? false,
+    // A replacement cannot silently make an existing private memory readable to agents.
+    sensitive: !!current.data.sensitive || !!candidate.sensitive,
     created: date,
     updated: date,
   };
