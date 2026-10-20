@@ -99,14 +99,11 @@
   /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
   const rel = document;
   if (document.querySelector("[data-rel]") && "fetch" in window) {
-    const KEY = "kaitu-release-v5";
+    const KEY = "kaitu-release-v6";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
       const tgz = r.assets.find((a) => /^rensheng-kaitu-.*\.tgz$/i.test(a.name));
-      /* Windows 安装器不是每版都有：用最近一个带 EXE 的版本，版本号和发布说明也跟它走 */
-      const win = r.win || r;
-      const exe = win.assets.filter((a) => /^Kaitu-Setup-.*-x64\.exe$/i.test(a.name)).sort((a, b) => b.id - a.id)[0];
       const set = (name, fn) => rel.querySelectorAll(`[data-rel="${name}"]`).forEach(fn);
       const version = r.tag.replace(/^v/, "");
       const date = new Date(r.published);
@@ -117,14 +114,6 @@
       set("size", (el) => { el.textContent = `${mb} MB`; });
       set("dmg", (el) => { el.href = dmg.url; });
       set("dmg-name", (el) => { el.textContent = dmg.name; });
-      if (exe) {
-        set("exe", (el) => { el.href = exe.url; });
-        set("exe-name", (el) => { el.textContent = exe.name; });
-        set("exe-size", (el) => { el.textContent = `${Math.round(exe.size / 1048576)} MB`; });
-        set("exe-sha", (el) => { el.textContent = exe.digest ? exe.digest.replace(/^sha256:/, "") : "—"; });
-        set("exe-version", (el) => { el.textContent = win.tag.replace(/^v/, ""); });
-        set("exe-page", (el) => { el.href = win.page; });
-      }
       set("sha", (el) => { el.textContent = dmg.digest ? dmg.digest.replace(/^sha256:/, "") : "—"; });
       set("page", (el) => { el.href = r.page; });
       set("pre", (el) => { el.hidden = !r.prerelease; });
@@ -156,8 +145,7 @@
           });
           const pick = find(/\.dmg$/i);
           if (!pick) return;
-          const winPick = find(/^Kaitu-Setup-.*-x64\.exe$/i);
-          const r = { ...pack(pick), win: winPick ? pack(winPick) : null };
+          const r = pack(pick);
           fill(r);
           try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), r })); } catch {}
         })
@@ -167,7 +155,7 @@
   }
 })();
 
-/* Windows 访客直达 EXE；Linux 继续使用 DSH 插件。 */
+/* Windows 和 Linux 访客进入 DSH 插件指引；Mac 保留原下载入口。 */
 (() => {
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const agent = navigator.userAgent || "";
@@ -180,10 +168,10 @@
   const en = location.pathname.startsWith("/en/");
   for (const el of document.querySelectorAll("[data-dl]")) {
     el.href = `${en ? "/en" : ""}/download/#${os === "Windows" ? "windows" : "plugin"}`;
-    el.textContent = os === "Windows" ? (en ? "Download for Windows" : "下载 Windows 版") : (en ? "Install on Linux" : "Linux 版安装指引");
+    el.textContent = os === "Windows" ? (en ? "Install DSH plugin on Windows" : "Windows 插件安装指引") : (en ? "Install on Linux" : "Linux 版安装指引");
   }
   for (const el of document.querySelectorAll("[data-dl-meta]"))
-    el.textContent = os === "Windows" ? (en ? "Windows 10 / 11 · x64" : "Windows 10 / 11 · x64") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");
+    el.textContent = os === "Windows" ? (en ? "Windows · DeepSeek Harness plugin" : "Windows · DeepSeek Harness 插件") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");
   if (/\/download\/?$/.test(location.pathname) && !location.hash) {
     const target = document.getElementById(os === "Windows" ? "windows" : "plugin");
     if (target) requestAnimationFrame(() => target.scrollIntoView());
