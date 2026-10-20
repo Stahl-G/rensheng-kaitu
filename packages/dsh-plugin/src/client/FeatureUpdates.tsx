@@ -88,17 +88,8 @@ export function FeatureUpdates({
               disabled={busy || !state.configured}
               onChange={(event) => void run(event.target.checked ? "automatic:on" : "automatic:off")}
             />
-            {t(
-              "自动检查更新（下载和重启前询问我）",
-              "Automatically check for updates (ask before downloading or restarting)",
-            )}
+            {t("自动检查更新", "Automatically check for updates")}
           </label>
-          <p className={css.small}>
-            {t(
-              "功能更新保留你的资料。原生内核升级仍需下载完整安装包。",
-              "Feature updates keep your data. Native engine updates require the full installer.",
-            )}
-          </p>
         </>
       )}
       {!state.configured && <p className={css.small}>{t("未配置更新源", "No update source configured")}</p>}
