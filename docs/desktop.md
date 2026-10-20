@@ -35,10 +35,12 @@ DSH 固定为 `0.2.1-rc.2`，宿主接口版本为 `1`。功能更新不修改 `
 启动器仍从签名 App 读取。功能包的 `node_modules` 只链接宿主中的固定 DSH 桥接，包内不能分发内核依赖。
 
 发布配置是只含公钥的 JSON：`{"feedUrl":"https://你的发布地址/latest.json","publicKey":"PEM 格式 Ed25519 公钥"}`。
-Mac 和 Windows 打包宿主均支持 `--update-public-key <Ed25519公钥文件>`，使用已有 GitHub Releases 的正式版频道：
-`https://github.com/Stahl-G/rensheng-kaitu/releases/latest/download/latest.json`。
-同一 Release 上传 `latest.json` 与 `kaitu-features.zip`；此频道只跟随正式版，不向正式版用户推送预发布版本。
-测试源可用 `--update-config <配置文件>`，配置在签名前写入 App。正式版宿主未提供验签配置时拒绝打包；预发布版省略时设置明确提示尚未配置更新源。
+Mac 和 Windows 打包宿主默认嵌入 `packages/desktop/update-public-key.pem` 中经批准的公开验签公钥，也支持 `--update-public-key <Ed25519公钥文件>` 指定公钥。使用已有 GitHub Releases 的正式版频道：
+`https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.2-host-1/latest.json`。
+这是独立的兼容频道，不依赖 GitHub 的 latest Release，也不固定到 0.1.1。应用版本的 Release 保存不可覆盖的 `kaitu-features.zip`；频道 Release 只更新签名 `latest.json`，指向新的版本 ZIP。
+频道 Release 标为预发布，避免成为官网或 GitHub 的最新应用版本；它只是分发入口，清单内容只指向已发布的正式功能版本，不向正式版用户推送 RC。
+将来更换 DSH 或宿主接口时创建新的兼容频道，保留旧频道的最后一个兼容版本，不能用不兼容清单覆盖旧频道。
+测试源可用 `--update-config <配置文件>`，配置在签名前写入 App。正式版宿主读取不到有效验签公钥或配置时拒绝打包。
 私钥由发布者保管，通过 `--key <私钥文件>` 交给本机发布工具，不打包、不上传、不写入工作区。
 
 日常发布不必构建完整 App：
@@ -53,13 +55,13 @@ node packages/desktop/package-update.mjs \
   --url https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.1/kaitu-features.zip --notes '本版更新说明'
 ```
 
-产物为 `kaitu-features.zip` 和带 Ed25519 签名的 `latest.json`。先上传版本目录中的 ZIP，再更新频道清单。
+产物为 `kaitu-features.zip` 和带 Ed25519 签名的 `latest.json`。先上传并核对版本 Release 中的 ZIP，再更新独立频道 Release 的清单；不能只创建新的应用 Release 而忘记更新频道。
 这些命令只生成本地产物，不执行上传。版本目录不可覆盖。正式版和 RC 使用不同的 feed URL。
 下载入口检查签名、包哈希、允许的目录与确切的 DSH/宿主接口版本，再切换版本指针；不在每次读资料时重查。
 HTTP 只允许回环地址以便本机验收，对外发布使用 HTTPS。支持 GitHub Release 附件的有限次 HTTPS 重定向，拒绝降级至 HTTP；清单仍须验签、功能包仍须核对哈希。
 需要原生能力、原生依赖或新的 DSH 适配时升级宿主；不要伪造相同的适配版本号来强行安装。
 
-正式频道地址已接线；正式签名公钥仍须由发布者批准后通过打包参数提供。生成或配置持久签名密钥另行确认，未提供前不能发布可更新的正式宿主。
+正式频道地址与公钥已接线；私钥由发布者在 Git 与云同步之外的本机受限目录保管，不随源码或应用分发。更换信任公钥必须另行确认并重新分发宿主，不能直接让旧公钥信任未经授权的新签名者。正式频道清单及新宿主尚须完成验收并按发布流程确认后上线。
 旧 `0.1.0-rc.6` 未配置正式更新源，不能靠发布一个新功能包补上：须退出 App，覆盖安装一次带公钥的新宿主；不需卸载，也不删除资料。
 新版 Mac 仍下载 DMG 拖入应用程序替换，Windows 仍运行同 App ID 的安装器覆盖安装，作为手动更新兜底。
 

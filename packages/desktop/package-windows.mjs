@@ -42,7 +42,9 @@ const version = JSON.parse(readFileSync(join(root, "packages/cli/package.json"),
 const updateConfig = readUpdateConfig({
   version,
   configFile: values["update-config"],
-  publicKeyFile: values["update-public-key"],
+  publicKeyFile:
+    values["update-public-key"] ??
+    (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
 });
 const dshVersion = "0.2.1-rc.2";
 if (manifest.version !== dshVersion || manifest.main !== "lib/main.js")

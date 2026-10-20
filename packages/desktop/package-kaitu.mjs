@@ -68,7 +68,9 @@ const updateConfig = values["payload-only"]
   : readUpdateConfig({
       version,
       configFile: values["update-config"],
-      publicKeyFile: values["update-public-key"],
+      publicKeyFile:
+        values["update-public-key"] ??
+        (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
     });
 const plan = [
   `COPY ${source} → ${output}；校验 DSH 0.2.1-rc.2 / arm64 / 主入口`,

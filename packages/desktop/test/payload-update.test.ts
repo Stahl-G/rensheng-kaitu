@@ -74,7 +74,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   expect(() => readUpdateConfig({ version: "0.1.1" })).toThrow();
   const official = readUpdateConfig({ version: "0.1.1", publicKeyFile: keyFile });
   expect(official.feedUrl).toBe(
-    "https://github.com/Stahl-G/rensheng-kaitu/releases/latest/download/latest.json",
+    "https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.2-host-1/latest.json",
   );
   writeFileSync(
     join(resources, "kaitu-update.json"),
@@ -116,6 +116,27 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     served.bytes = Buffer.from("interrupted download");
     await updated.request("install");
     await expect.poll(async () => (await updated.request()).phase).toBe("error");
+    expect(selectPayload(state, resources)).toBe(active);
+    // The same channel can advance again; it is not pinned to the first released version.
+    served.bytes = Buffer.from(
+      zipSync({
+        ...entries,
+        "payload.json": Buffer.from(JSON.stringify({ ...metadata, version: "0.1.2" })),
+      }),
+    );
+    served.envelope = signed({
+      ...release,
+      version: "0.1.2",
+      size: served.bytes.length,
+      sha256: createHash("sha256").update(served.bytes).digest("hex"),
+    });
+    await updated.checkAutomatically();
+    await updated.request("install");
+    await expect.poll(async () => (await updated.request()).phase).toBe("ready");
+    expect(
+      JSON.parse(readFileSync(join(selectPayload(state, resources), "payload.json"), "utf8")).version,
+    ).toBe("0.1.2");
+    rollback(state);
     expect(selectPayload(state, resources)).toBe(active);
     rollback(state);
     expect(selectPayload(state, resources)).toBe(payload);

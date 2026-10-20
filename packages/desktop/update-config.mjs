@@ -1,8 +1,10 @@
 import { createPublicKey } from "node:crypto";
 import { readFileSync } from "node:fs";
 import semver from "semver";
+import { DSH_VERSION, HOST_API } from "./payload-loader.mjs";
 
-export const RELEASE_FEED = "https://github.com/Stahl-G/rensheng-kaitu/releases/latest/download/latest.json";
+const channel = `desktop-stable-dsh-${DSH_VERSION}-host-${HOST_API}`;
+export const RELEASE_FEED = `https://github.com/Stahl-G/rensheng-kaitu/releases/download/${channel}/latest.json`;
 
 // Only public verification material is embedded in the signed host.
 export function readUpdateConfig({ version, configFile, publicKeyFile }) {
