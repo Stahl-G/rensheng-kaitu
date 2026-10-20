@@ -761,9 +761,17 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
       const opened = new Workspace(args.root);
       if (!opened.exists(".kaitu/config.json"))
         throw new Error(pick("不是开图工作区", "Not a Kaitu workspace"));
-      ws.root = opened.root;
-      rememberWorkspace(opened.root);
-      return workspaceBackupStatus(ws);
+      // 先读取目标状态；损坏的备份或凭据文件不能把当前工作区切走。
+      const status = workspaceBackupStatus(opened);
+      const previous = ws.root;
+      try {
+        ws.root = opened.root;
+        rememberWorkspace(opened.root);
+      } catch (error) {
+        ws.root = previous;
+        throw error;
+      }
+      return status;
     }
     case "restore": {
       if (!args.root) throw new Error(pick("请选择一个新的恢复目录", "Choose a new restore folder"));
