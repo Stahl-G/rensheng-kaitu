@@ -1,15 +1,7 @@
-import fs, {
-  cpSync,
-  existsSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  utimesSync,
-  writeFileSync,
-} from "node:fs";
+import fs, { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import { historyDirectory, invalidateHistoryFile, pendingWorkspaceFiles } from "../src/history.js";
+import { pendingWorkspaceFiles } from "../src/history.js";
 import {
   Workspace,
   addRecord,
