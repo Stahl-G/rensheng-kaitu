@@ -20,7 +20,8 @@
         "keep_draft",
         "adopt_draft",
         "answer_question",
-        "trial_checkin"
+        "trial_checkin",
+        "replace_memory"
       ]
     },
     "args": { "type": "object" }
@@ -179,6 +180,86 @@
     {
       "if": { "properties": { "op": { "const": "complete_next" } } },
       "then": { "properties": { "args": { "properties": { "expected_next": { "type": "object" } } } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "replace_memory"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["file", "candidate", "expected"],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "pattern": "^[^./\\\\][^/\\\\]*\\.md$"
+              },
+              "candidate": {
+                "oneOf": [
+                  {
+                    "type": "null",
+                    "description": "用户确认这条不再成立，仅归档，不替换"
+                  },
+                  {
+                    "type": "object",
+                    "required": ["type", "name", "text"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "enum": ["preference", "fact", "context", "person", "decision"]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "sensitive": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              },
+              "expected": {
+                "type": "object",
+                "required": ["type", "name", "text", "source", "sensitive"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "enum": ["preference", "fact", "context", "person", "decision"]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "type": ["string", "null"]
+                  },
+                  "sensitive": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

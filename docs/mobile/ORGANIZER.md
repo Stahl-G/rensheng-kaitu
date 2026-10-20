@@ -35,6 +35,7 @@
 3. 按 op 执行。前提不满足时回 conflict，message 写括号里的原因，不硬改：
    - `complete_next`（file、id）：file 必须是某个模块或项目的 `STATUS.md`（「找不到模块状态」）。frontmatter 的 next 里 id 相同、status 为 todo 的那条改成 done（「这一步已处理或不存在，请刷新」），updated 改成现在，带时区偏移，例如 `2026-10-19T07:42:00+08:00`。
    - `decide_proposal`（id、decision）：`NOW.md` frontmatter 的 blocks 里 id 相同、kind 为 proposal、status 为 pending 的那条（「日程建议已处理或不存在」），status 改成 decision；decision 为 confirmed 时再加 `calendar: phone`。日历由手机自己写，你不碰日历。
+   - `replace_memory`（file、candidate、expected）：这是用户在手机上确认的记忆决定。file 只能是 memory/ 下不含路径的记忆文件名；expected 必填 type、name、text、source、sensitive（缺 source 读作 null，缺 sensitive 读作 false）；当前旧条五项必须与 expected 逐项相等且未归档，否则 conflict。candidate 为 null 时给旧记忆写 ended（操作 at 在用户时区的日期）、updated；有候选时先校验 type/name/text/source/sensitive，新建独立记忆文件，旧文件保留并写 ended、updated、replaced_by（新文件名）。更改标题/类型也不重命名旧文件。刷新 MEMORY.md，只列没有 ended 的记忆。同一 client_id 重投不能再新建记忆。AI 自己提出的替换必须以 .memory.json 候选的 replaces 字段交给用户，不能直接归档。
    - `complete_task` / `cancel_task`（id）：在 `me/data/tasks/*.jsonl` 里找这个 id 的最新一行（rev 最大）。它的 status 必须是 open（「待办已处理或不存在」）。把这一行完整复制，status 改成 done 或 cancelled，rev 加 1，by 写 user，追加到同一个文件末尾。旧行不改、不删。
    - 其他 op：回 rejected，「当前版本尚不支持这个操作」。
 4. 每行一条回执：`{ref: client_id, kind: "action", status, message, at: 现在}`，只有 conflict 和 rejected 写 message。

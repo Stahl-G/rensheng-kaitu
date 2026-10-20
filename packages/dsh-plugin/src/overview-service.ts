@@ -17,6 +17,8 @@ import {
   type LearningCheckinInput,
   type LearningTopic,
   type LibraryData,
+  type MemoryExpectation,
+  type MemoryInput,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoiceResult,
@@ -45,6 +47,7 @@ import {
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  archiveMemory,
   bindGithub,
   calendarPushEntries,
   calendarPushStore,
@@ -104,6 +107,7 @@ import {
   readSettings,
   recoverExperienceImports,
   removeAvatar,
+  replaceMemory,
   resolveExperience,
   resolvePlace,
   resolvePreferences,
@@ -530,6 +534,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("capture")
   async capture(text: string): Promise<{ path: string; version: string | null }> {
     return this.write(() => captureNote(this.workspace, text));
+  }
+
+  @Remote("archiveMemory")
+  async archiveMemory(file: string, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => archiveMemory(this.workspace, file, { by: "user", expected }));
+  }
+
+  @Remote("replaceMemory")
+  async replaceMemory(file: string, candidate: MemoryInput, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => replaceMemory(this.workspace, file, candidate, { by: "user", expected }));
   }
 
   @Remote("news")

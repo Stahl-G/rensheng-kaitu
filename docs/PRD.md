@@ -441,8 +441,14 @@ source: chats/2026/10/01J....jsonl
 created: 2026-10-15
 updated: 2026-10-15
 sensitive: false
+ended: 2026-10-20         # 可选；用户确认不再成立的日期
+replaced_by: context_new.md  # 可选；替换它的新记忆文件名
 ---
 ```
+
+文件名是稳定编号；改标题或类型不改名。`created` 是保存日期，不代表事情开始。没有 `ended` 的是当前记忆；有 `ended` 的保留在已归档中，仍能按文件名读取。`MEMORY.md`、Agent 默认记忆列表和手机资料目录只列当前记忆。
+
+用户确认归档或替换后才写 `ended` / `replaced_by`。AI 只能交带 `replaces: <旧文件名>` 的收件箱记忆候选；确认前不写新记忆，也不改旧记忆。手机确认用 `replace_memory`（`args.file` 是不含目录的旧文件名，`args.candidate` 是新候选；为 `null` 时只归档）。`args.expected` 必填 type、name、text、source、sensitive 五项，source 缺省读成 null、sensitive 缺省读成 false；当前旧条必须逐项相等且没有 ended，否则 conflict。created/updated 不充当版本。ended 按操作 at 换算为工作区时区后的日期；client_id 首计划先落账本，重投复用它或首结果，回执沿用 action 格式且不写 target。
 
 `MEMORY.md` 每条一行：`- [类型] 名称 —— 一句话（文件名）`，总量上限约 3k tokens，超出时在晚间复盘中合并。
 

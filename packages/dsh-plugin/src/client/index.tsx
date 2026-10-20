@@ -493,6 +493,18 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              archiveMemory: async (file: string, expected: import("./MePage.js").MemoryExpectation) => {
+                const result = await ctx.remote.kaitu.archiveMemory(file, expected);
+                if (!result.ok) throw new Error(result.error.message);
+              },
+              replaceMemory: async (
+                file: string,
+                candidate: import("../types.js").MeData["memoryReplacements"][number]["candidate"],
+                expected: import("./MePage.js").MemoryExpectation,
+              ) => {
+                const result = await ctx.remote.kaitu.replaceMemory(file, candidate, expected);
+                if (!result.ok) throw new Error(result.error.message);
+              },
               loadExperienceSource: async (id: string) => {
                 const result = await ctx.remote.kaitu.experienceSource(id);
                 if (!result.ok) throw new Error(result.error.message);

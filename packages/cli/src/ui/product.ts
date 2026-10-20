@@ -10,6 +10,8 @@ import {
   KaituError,
   type LearningCheckinInput,
   type Locale,
+  type MemoryExpectation,
+  type MemoryInput,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoices,
@@ -26,6 +28,7 @@ import {
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  archiveMemory,
   bankNotificationCandidates,
   bindGithub,
   calendarPushEntries,
@@ -94,6 +97,7 @@ import {
   recordOnboardingAiConnection,
   recoverExperienceImports,
   removeAvatar,
+  replaceMemory,
   resolveExperience,
   resolvePlace,
   resolvePreferences,
@@ -128,6 +132,8 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "archiveMemory",
+  "replaceMemory",
   "learningStart",
   "learningSave",
   "organizerSeen",
@@ -197,6 +203,13 @@ export async function productRequest(
     return args[i] as number;
   };
   const locale = (i: number): Locale => normalizeLocale(args[i]);
+  if (method === "archiveMemory")
+    return archiveMemory(ws, text(0), { by: "user", expected: args[1] as MemoryExpectation });
+  if (method === "replaceMemory")
+    return replaceMemory(ws, text(0), args[1] as MemoryInput, {
+      by: "user",
+      expected: args[2] as MemoryExpectation,
+    });
   if (method === "organizerSeen") return markOrganizerSeen(ws);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
