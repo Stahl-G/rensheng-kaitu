@@ -1,9 +1,0 @@
-
- RUN  v4.1.11 /workspace/rensheng-kaitu
-
-
- Test Files  3 passed (3)
-      Tests  19 passed (19)
-   Start at  20:34:52
-   Duration  7.26s (transform 1.48s, setup 62ms, import 2.50s, tests 9.46s, environment 0ms)
-
