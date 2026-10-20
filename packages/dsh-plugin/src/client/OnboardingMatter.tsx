@@ -134,6 +134,7 @@ export function OnboardingMatter(
   const [organizing, setOrganizing] = useState(false);
   const [error, setError] = useState("");
   const [raw, setRaw] = useState(false);
+  const [approvalRequired, setApprovalRequired] = useState(false);
   const [externalRequested, setExternalRequested] = useState(false);
   const [noAi, setNoAi] = useState(false);
   const [manual, setManual] = useState(!props.initial?.draft);
@@ -148,6 +149,7 @@ export function OnboardingMatter(
   const apply = (result: Matter) => {
     setMatter(result);
     setError("");
+    setApprovalRequired(false);
     if (!result.draft) return;
     applied.current = JSON.stringify(result.draft);
     setDraft(editable(result.draft));
@@ -163,16 +165,24 @@ export function OnboardingMatter(
       setPaths(props.initial.draft.paths ?? []);
       setPath(-1);
       setManual(false);
+      setError("");
+      setApprovalRequired(false);
     }
   }, [props.initial, matter?.source]);
   const run = async (operation: () => Promise<void>) => {
     setBusy(true);
     props.onBusy(true);
     setError("");
+    setApprovalRequired(false);
     try {
       await operation();
     } catch (err) {
-      if (alive.current) setError(err instanceof Error ? err.message : String(err));
+      if (alive.current) {
+        setError(err instanceof Error ? err.message : String(err));
+        setApprovalRequired(
+          !!err && typeof err === "object" && "code" in err && err.code === "AI_APPROVAL_REQUIRED",
+        );
+      }
     } finally {
       if (alive.current) {
         setBusy(false);
@@ -250,6 +260,19 @@ export function OnboardingMatter(
         <p role="alert" className={v2.error}>
           {error}
         </p>
+      )}
+      {approvalRequired && matter && (
+        <div>
+          <p className={v2.small}>
+            {t(
+              "原文已保留。问问会显示 Agent 请求的具体操作，由你批准或拒绝；消息会先放入输入框。",
+              "Your text is saved. Ask will show the Agent's requested action for you to approve or reject; the message will first be placed in the composer.",
+            )}
+          </p>
+          <button type="button" className={primary} disabled={busy} onClick={() => external(matter)}>
+            {t("在问问继续", "Continue in Ask")}
+          </button>
+        </div>
       )}
       {!matter ? (
         <>
