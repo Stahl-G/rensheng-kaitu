@@ -1,1 +1,0 @@
-补充诊断（非原始冷读）：直接在未初始化模板调用 runPhone 报缺 .kaitu/config.json，属跳过 ADD_DEVICE 的 init 前置条件，不是产品缺陷。按 ADD_DEVICE 先 init 后报 INVALID_DOCUMENT，查 schema 确认合成数据 updated 只填日期、next 自填字符串列表不合法。两者是本 Agent 的原始理解错误，原公开说明未给这两项格式；DATA_LOCATIONS 只补这两个具体格式，未更改 schema 或代码。修正数据后真实 runPhone 返回 snapshots=5。初次回读校验脚本还误以为 phone/week 的 next 为对象；实际投影是字符串列表，调整断言后验证成功，此项不是产品问题。

@@ -1,1 +1,0 @@
-请按 ADD_DEVICE.md 接上我的合成开图记忆 /tmp/kaitu-cold-v3/memory.git，读完告诉我你记住了什么。本地址是普通本地 bare Git，仅验证文件和 Git，不能验证 GitHub 私有性或开图 iPhone 接入。

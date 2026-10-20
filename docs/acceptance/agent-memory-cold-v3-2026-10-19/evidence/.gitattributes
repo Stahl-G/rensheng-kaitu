@@ -1,2 +1,0 @@
-# Preserve captured HTTP response bytes for the original SHA256 record.
-*.headers -text

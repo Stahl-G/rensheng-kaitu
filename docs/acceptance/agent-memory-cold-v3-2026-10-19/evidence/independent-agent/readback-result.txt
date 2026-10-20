@@ -1,7 +1,0 @@
-new clone=/tmp/kaitu-third-readback-d21ydzte/memory
-agent HEAD=c01e542e393527b9c0e17d3a052481b682251889
-clone HEAD=c01e542e393527b9c0e17d3a052481b682251889
-remote main=c01e542e393527b9c0e17d3a052481b682251889
-handoff SHA256=f67a71c6c05f7d931327726a17d4c00ae7b5092617f80ecc15f23fa7b3292c17
-changed since seed=handoffs/20261019T2034-independent-agent.md
-原远端基线至新远端只新增该交接；与独立Agent克隆逐字节一致。

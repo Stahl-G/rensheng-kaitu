@@ -1,1 +1,0 @@
-测试许可澄清：允许向 /tmp/kaitu-cold-v3/second-agent.git 这个合成 bare 远端推送本次交接，其他约束不变。请继续完成原 ADD_DEVICE 流程。
