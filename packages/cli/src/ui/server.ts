@@ -267,17 +267,25 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     const own = [...new Set(messages)];
     messages = [];
     let pending = true;
-    const version = await snapshotNow(ws, (files) => {
-      pending = files.length > 0;
-      if (!pending) return null;
-      return own.length
-        ? own.join("；")
-        : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
-            .slice(0, 3)
-            .map((file) => file.split("/").at(-1))
-            .join("、")}等 ${files.length} 个文件`;
-    });
+    let version: string | null;
+    try {
+      version = await snapshotNow(ws, (files, hasPendingFiles) => {
+        // 显式原文要补存，但已经在版本里的原文不应无限重试。
+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);
+        if (!pending) return null;
+        return own.length
+          ? own.join("；")
+          : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+              .slice(0, 3)
+              .map((file) => file.split("/").at(-1))
+              .join("、")}等 ${files.length} 个文件`;
+      });
+    } catch (error) {
+      messages.unshift(...own);
+      throw error;
+    }
     if (!version && pending) {
+      messages.unshift(...own);
       reportError();
       scheduleSave(snapshotDelay);
     } else watchError = "";
