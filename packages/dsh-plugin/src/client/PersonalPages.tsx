@@ -216,12 +216,6 @@ export function PersonalPages(
                   );
                 }}
               >
-                <p className={css.small}>
-                  {t(
-                    "选择已有的开图资料文件夹，直接沿用其中的资料。当前资料保留在原位置，不搬迁、不合并。",
-                    "Open the folder containing your existing Kaitu notes. Current notes stay in their original folder; nothing is moved or merged.",
-                  )}
-                </p>
                 <label>
                   {t("已有工作区路径", "Existing workspace path")}
                   <input
