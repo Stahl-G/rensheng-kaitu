@@ -331,6 +331,7 @@ export function TodayTasks({
 }) {
   const t = useT();
   const focus = data.next[0];
+  const upcoming = focusCard ? data.allNext : data.allNext.slice(1);
   const [remainingOpen, setRemainingOpen] = useState(false);
   const extra = (item: OverviewNext, inRow = true) => (
     <details className={todayCss.more}>
@@ -416,19 +417,19 @@ export function TodayTasks({
             ))}
         </section>
       )}
-      {data.next.length > 1 && (
+      {upcoming.length > 0 && (
         <section className={css.sec}>
           <h2 className={css.eyebrow}>{t("接下来", "Up next")}</h2>
-          <div className={css.card}>{data.next.slice(1, 3).map(row)}</div>
-          {data.allNext.length > 3 && (
+          <div className={css.card}>{upcoming.slice(0, 2).map(row)}</div>
+          {upcoming.length > 2 && (
             <details
               className={todayCss.remaining}
               onToggle={(event) => setRemainingOpen(event.currentTarget.open)}
             >
               <summary className={css.link}>
-                {t(`还有 ${data.allNext.length - 3} 件`, `${data.allNext.length - 3} more`)}
+                {t(`还有 ${upcoming.length - 2} 件`, `${upcoming.length - 2} more`)}
               </summary>
-              {remainingOpen && <div className={css.card}>{data.allNext.slice(3).map(row)}</div>}
+              {remainingOpen && <div className={css.card}>{upcoming.slice(2).map(row)}</div>}
             </details>
           )}
         </section>

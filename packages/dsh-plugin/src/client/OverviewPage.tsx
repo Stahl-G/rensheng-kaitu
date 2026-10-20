@@ -654,7 +654,7 @@ function Overview({
                 ask={askNext}
                 schedule={(item) => setSlot({ file: item.file, id: item.id })}
                 review={() => startGuide(1)}
-                focusCard={!focus && onboarding?.next?.status !== "done" ? adoptedCard : undefined}
+                focusCard={onboarding?.next?.status !== "done" ? adoptedCard : undefined}
               />
               {!focus && !adoptedCard && (
                 <button type="button" className={css.link} onClick={() => startMatter("")}>
@@ -694,7 +694,7 @@ function Overview({
                 {todayDetails && (
                   <div>
                     {plansCard}
-                    {focus || onboarding?.next?.status === "done" ? adoptedCard : null}
+                    {onboarding?.next?.status === "done" ? adoptedCard : null}
                     {onboarding && (
                       <OnboardingChecklist
                         status={onboarding}
