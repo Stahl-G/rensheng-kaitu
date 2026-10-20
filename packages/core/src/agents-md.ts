@@ -53,8 +53,7 @@ export function renderAgentsMd(ws: Workspace): string {
 
 ## 1. 用户是谁
 
-- 档案：\`me/profile.md\`
-- 可以聊的话题：\`me/topics.json\`（可选的字符串数组，缺文件按空数组读取）
+- 档案：\`me/profile.md\`；「\`## 想聊的话题\`」小节存用户确认的话题，修改时保留其他正文。
 - 记忆索引：\`memory/MEMORY.md\`（每条一行，详情在同目录的单独文件里）
 
 ## 2. 进入后的读取顺序
@@ -122,7 +121,7 @@ ${renderRecordReference(ws)}
 | 写入外部日历 | 是 |
 | 批量导入 | 是（一屏列出，默认全选） |
 | 删除模块、删除超过 10 条记录 | 是 |
-| 修改 \`me/rules.md\`、\`me/goals.json\`、\`me/ongoing.json\`、\`me/topics.json\` | 是：先提出修改建议，用户确认后再改 |
+| 修改 \`me/rules.md\`、\`me/goals.json\`、\`me/ongoing.json\` | 是：先提出修改建议，用户确认后再改 |
 
 ## 6. 撤销与历史
 
