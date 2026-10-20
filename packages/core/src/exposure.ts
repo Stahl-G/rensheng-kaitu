@@ -66,8 +66,8 @@ function allowedPath(ws: Workspace, relative: string, connection: AgentConnectio
     parts.some((part) => part === ".kaitu" || part === ".git") ||
     name === ".env" ||
     name.startsWith(".env.") ||
-    /^(?:id_rsa|id_ed25519|credentials|secrets)(?:\.|$)/i.test(name) ||
-    /\.(?:key|pem|p12|pfx|keystore)$/i.test(name)
+    /^(?:id_(?:rsa|dsa|ecdsa|ed25519)(?:_sk)?|credentials|secrets)(?:\.|$)/i.test(name) ||
+    /\.(?:key|pem|p8|p12|pfx|ppk|jks|keystore)$/i.test(name)
   )
     return false;
   if (parts[0] === "memory" && parts.length === 2 && name.endsWith(".md") && name !== "memory.md") {

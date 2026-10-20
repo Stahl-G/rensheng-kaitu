@@ -28,6 +28,9 @@ it("各连接独立保存财务读取选择，敏感记忆、密钥和链接遵�
     });
     ws.writeText("finance/note.md", "Synthetic finance");
     ws.writeText("me/secrets.json", "{}");
+    for (const file of ["me/id_ecdsa", "me/id_ed25519_sk", "me/private.p8", "me/keys.jks"])
+      ws.writeText(file, "Synthetic key material");
+    symlinkSync(ws.resolve("me/id_ecdsa"), join(root, "key-alias.md"));
     symlinkSync(ws.resolve(`memory/${secret.file}`), join(root, "alias.md"));
     symlinkSync(ws.resolve("finance/note.md"), join(root, "finance-alias.md"));
     for (const connection of agentConnections) {
@@ -38,7 +41,17 @@ it("各连接独立保存财务读取选择，敏感记忆、密钥和链接遵�
         expect(agentCanRead(ws, "finance/note.md", connection)).toBe(allowed);
         expect(agentCanRead(ws, "finance-alias.md", connection)).toBe(allowed);
         expect(agentCanRead(ws, `memory/${open.file}`, connection)).toBe(true);
-        for (const file of [".kaitu/config.json", "me/secrets.json", `memory/${secret.file}`, "alias.md"])
+        for (const file of [
+          ".kaitu/config.json",
+          "me/secrets.json",
+          "me/id_ecdsa",
+          "me/id_ed25519_sk",
+          "me/private.p8",
+          "me/keys.jks",
+          "key-alias.md",
+          `memory/${secret.file}`,
+          "alias.md",
+        ])
           expect(agentCanRead(ws, file, connection)).toBe(false);
         expect(readAgentFile(ws, "memory/MEMORY.md", connection)).toContain("Synthetic open memory");
         expect(readAgentFile(ws, "memory/MEMORY.md", connection)).not.toContain("Synthetic private memory");
