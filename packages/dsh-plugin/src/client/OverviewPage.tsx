@@ -8,6 +8,7 @@ import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import type { LearningSource } from "./LearningPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
@@ -27,7 +28,7 @@ export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
     OnboardingServices,
-    Omit<NewsPageProps, "onPrompt">,
+    Omit<NewsPageProps, "onPrompt" | "onLearn">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals" | "onConnect">,
     Omit<MapPageProps, "onPrompt">,
@@ -47,6 +48,7 @@ export interface OverviewPageProps
     configureRequest: number,
     configureBuiltin: boolean,
     onConnections: () => void,
+    promptRequest: number,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -120,11 +122,14 @@ function Overview({
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
+  const [learningTopic, setLearningTopic] = useState("");
+  const [learningSource, setLearningSource] = useState<LearningSource>();
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState("");
+  const [promptRequest, setPromptRequest] = useState(0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -258,6 +263,7 @@ function Overview({
   };
   const prompt = (text: string) => {
     setPromptDraft(text);
+    setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
@@ -878,7 +884,24 @@ function Overview({
                 }}
               />
             ) : (
-              <NotesPage data={library} loadLibraryDocument={props.loadLibraryDocument} />
+              <NotesPage
+                data={library}
+                loadLibraryDocument={props.loadLibraryDocument}
+                loadLearning={props.loadLearning}
+                startLearning={props.startLearning}
+                saveLearning={props.saveLearning}
+                topic={learningTopic}
+                onTopic={setLearningTopic}
+                source={learningSource}
+                onSourceConsumed={() => setLearningSource(undefined)}
+                onPrompt={prompt}
+                onSaved={() => {
+                  void props
+                    .loadLibrary()
+                    .then(setLibrary)
+                    .catch((err) => setError(String(err)));
+                }}
+              />
             )}
           </>
         )}
@@ -925,7 +948,17 @@ function Overview({
                   />
                 </>
               ) : explore === "news" ? (
-                <NewsPage {...child} />
+                <NewsPage
+                  {...child}
+                  onLearn={(item) => {
+                    setLearningSource({
+                      title: item.title,
+                      ...(item.url ? { url: item.url } : {}),
+                      ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
+                    });
+                    openRecord("notes");
+                  }}
+                />
               ) : (
                 <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
               )}
@@ -934,7 +967,13 @@ function Overview({
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div className={css.askPanel} hidden={view !== "ask"}>
-            {props.renderAsk(promptDraft, configureRequest, configureBuiltin, () => setView("connections"))}
+            {props.renderAsk(
+              promptDraft,
+              configureRequest,
+              configureBuiltin,
+              () => setView("connections"),
+              promptRequest,
+            )}
           </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (

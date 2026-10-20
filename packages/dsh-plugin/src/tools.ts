@@ -16,6 +16,7 @@ import {
   validateWorkspace,
 } from "@kaitu/core";
 import type { Context, MutationQueue } from "./dsh.js";
+import { registerLearningAids } from "./learning-tools.js";
 import { skillToolGuide } from "./skills.js";
 import { registerWorkflowTools } from "./workflow-tools.js";
 
@@ -69,6 +70,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     return result;
   };
   registerWorkflowTools(ctx, ws, queue);
+  registerLearningAids(ctx);
   function register(
     toolName: string,
     description: string,

@@ -55,11 +55,13 @@ export function AskChat({
 export function PluginAsk({
   services,
   prompt,
+  promptRequest = 0,
   SessionProvider,
   renderSlot,
 }: {
   services: PluginAskServices;
   prompt: string;
+  promptRequest?: number;
 } & PropsRenderSlots<"kaitu.ask.chat">) {
   const [reference, setReference] = useState<SessionReference | null>(null);
   const [error, setError] = useState("");
@@ -88,10 +90,10 @@ export function PluginAsk({
     };
   }, [services]);
   useEffect(() => {
-    if (!reference || !prompt) return;
+    if (!reference || (!prompt && !promptRequest)) return;
     const scope = services.sessions.scope(reference.sessionId);
     if (scope) services.conversation.input.for(scope).setDraft(prompt);
-  }, [reference, prompt, services]);
+  }, [reference, prompt, promptRequest, services]);
   if (error) return <p role="alert">{error}</p>;
   if (!reference) return null;
   return (

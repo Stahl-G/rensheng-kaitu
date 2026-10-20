@@ -104,3 +104,6 @@ export * from "./phone-snapshots.js";
 export * from "./phone-receipts.js";
 export * from "./phone-run.js";
 export * from "./organizer.js";
+
+export * from "./learning.js";
+export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";

@@ -3,7 +3,9 @@ import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
+import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
 import type {
+  LearningCheckinInput,
   OnboardingAi,
   OnboardingChoices,
   OnboardingMatterDraft,
@@ -11,6 +13,7 @@ import type {
   OnboardingSetupInput,
   OnboardingTarget,
   Preferences,
+  StartLearningInput,
   SyncProvider,
 } from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
@@ -25,11 +28,19 @@ import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
+import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
+import { WidgetCard } from "./openmaic/WidgetCard.js";
 
 export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
 
 export async function apply(ctx: Context) {
+  ctx.slots.inject("tool.call.toolview", () =>
+    ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_card" }, OpenmaicCard),
+  );
+  ctx.slots.inject("tool.call.toolview", () =>
+    ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_widget" }, WidgetCard),
+  );
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
@@ -366,6 +377,21 @@ export async function apply(ctx: Context) {
               },
               addCalendar: async (url: string, name: string) => {
                 const r = await ctx.remote.kaitu.addCalendarSubscription(url, name);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLearning: async (topic: string) => {
+                const r = await ctx.remote.kaitu.learningRead(topic);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              startLearning: async (input: StartLearningInput) => {
+                const r = await ctx.remote.kaitu.learningStart(input);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              saveLearning: async (input: LearningCheckinInput) => {
+                const r = await ctx.remote.kaitu.learningSave(input);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },

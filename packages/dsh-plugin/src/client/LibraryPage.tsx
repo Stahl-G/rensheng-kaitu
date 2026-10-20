@@ -2,6 +2,7 @@ import type { LibraryQuery } from "@kaitu/core";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
+import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 
@@ -13,7 +14,7 @@ const LIBRARY_EN: Record<string, string> = {
   notes: "Notes and decisions",
   inbox: "Inbox",
 };
-export interface LibraryProps {
+export interface LibraryProps extends LearningServices {
   loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
@@ -231,7 +232,17 @@ export function InboxPage({
 export function NotesPage({
   data,
   loadLibraryDocument,
-}: { data: LibraryData | null } & Pick<LibraryProps, "loadLibraryDocument">) {
+  ...learning
+}: {
+  data: LibraryData | null;
+  topic: string;
+  onTopic: (topic: string) => void;
+  source?: LearningSource;
+  onSourceConsumed: () => void;
+  onPrompt: (text: string) => void;
+  onSaved: () => void;
+} & Pick<LibraryProps, "loadLibraryDocument"> &
+  LearningServices) {
   const [file, setFile] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
@@ -253,6 +264,7 @@ export function NotesPage({
   }, [file, loadLibraryDocument]);
   return (
     <div className={css.sec}>
+      <LearningPage {...learning} data={data} />
       {error && <p role="alert">{error}</p>}
       {file ? (
         <>
@@ -263,25 +275,27 @@ export function NotesPage({
         </>
       ) : !data ? (
         <p>正在读取…</p>
-      ) : !data.notes.length ? (
-        <p className={css.emptyState}>还没有笔记或决定</p>
+      ) : !data.notes.some((item) => !item.file.startsWith("learning/")) ? (
+        <p className={css.small}>决策记录也会显示在这里。</p>
       ) : (
         <div className={`${css.card} ${css["list-card"]}`}>
-          {data.notes.map((row) => (
-            <button
-              type="button"
-              className={`${css["note-row"]} ${css.summaryButton}`}
-              key={row.file}
-              onClick={() => setFile(row.file)}
-            >
-              <span className={css.chip}>{row.kind}</span>
-              <span className={css.stack}>
-                <b>{row.title}</b>
-                <span className={css.small}>{row.status ?? row.file}</span>
-              </span>
-              <span>›</span>
-            </button>
-          ))}
+          {data.notes
+            .filter((item) => !item.file.startsWith("learning/"))
+            .map((row) => (
+              <button
+                type="button"
+                className={`${css["note-row"]} ${css.summaryButton}`}
+                key={row.file}
+                onClick={() => setFile(row.file)}
+              >
+                <span className={css.chip}>{row.kind}</span>
+                <span className={css.stack}>
+                  <b>{row.title}</b>
+                  <span className={css.small}>{row.status ?? row.file}</span>
+                </span>
+                <span>›</span>
+              </button>
+            ))}
         </div>
       )}
     </div>
