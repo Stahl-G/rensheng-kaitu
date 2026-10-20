@@ -155,7 +155,7 @@ R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product 
 | T13 | 检查所有快照 | 没有绝对路径、财务明细、敏感记忆、Key |
 
 5. 对照：同一仓库状态下在资料副本上用电脑（`kaitu phone run`）生成一份，除 generated_at、generator 外逐字段比较，差异写进验收记录。
-6. 记录写到 `docs/acceptance/agent-runner-<日期>.md`：每个用例的结果、每次运行用时、Agent 能写哪种存放位置。
+6. 记录写在 PR 描述里：每个用例的结果、每次运行用时、Agent 能写哪种存放位置。
 
 ## 11. 这次不做
 
