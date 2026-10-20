@@ -2,6 +2,7 @@ import { relative, resolve, sep } from "node:path";
 import { agentRelativePath } from "./agent-file-policy.js";
 import { KaituError } from "./errors.js";
 import { normalizedMemory } from "./memory.js";
+import { moduleAtDirectory } from "./modules.js";
 import type { Workspace } from "./workspace.js";
 
 export const agentConnections = ["local-mcp", "remote-mcp", "local-ask", "phone-ask"] as const;
@@ -77,6 +78,12 @@ function allowedPath(ws: Workspace, relative: string, connection: AgentConnectio
       return false;
     }
   }
-  if (parts[0] !== "finance") return true;
+  let finance = parts[0] === "finance";
+  try {
+    finance ||= moduleAtDirectory(ws, parts[0] ?? "")?.def.id === "finance";
+  } catch {
+    return false;
+  }
+  if (!finance) return true;
   return typeof connection === "string" ? readFinanceAccess(ws)[connection] : connection.finance;
 }
