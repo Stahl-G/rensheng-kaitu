@@ -1,4 +1,4 @@
-import { experienceInterval, experienceLayer } from "./experience-time.js";
+import { experienceInterval, experienceLayer, partialDateBounds } from "./experience-time.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
@@ -181,8 +181,10 @@ function mapFootprint(map: LifeMapData) {
     const place = city(item);
     if (!place) continue;
     const id = key(item);
+    const start = partialDateBounds(item.start)?.from;
     if (
       (item.fact_status === "observed" || item.fact_status === "user_reported") &&
+      (!start || start <= map.asOf) &&
       experienceLayer(item, map.asOf) !== null &&
       id !== currentKey
     )

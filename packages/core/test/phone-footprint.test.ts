@@ -38,12 +38,18 @@ it("手机足迹从事实经历区分现居、到过和计划，现居冲突时�
       entry("Paris", "FR", "travel", "planned", "2027"),
       entry("Hanoi", "VN", "travel", "suggested", "2027"),
       entry("Osaka", "JP", "lived", "user_reported", "2028"),
+      { ...entry("Beijing", "CN", "visit", "user_reported", "2028"), time_precision: "unknown" },
     ]);
     const overview = await readOverviewPage(ws, now);
     const project = () => buildPhoneMap(overview, lifeMap(ws, now), readExploration(ws), now.toISOString());
     const map = project();
     const validate = schemas().builtin("phone-map.schema.json");
     expect(validate(map), JSON.stringify(validate.errors)).toBe(true);
+    expect(lifeMap(ws, now).experiences.find((item) => item.place.name === "Beijing")).toMatchObject({
+      start: "2028",
+      time_precision: "unknown",
+      fact_status: "user_reported",
+    });
     expect(map.footprint.current?.name).toBe("Tokyo");
     expect(map.footprint.visited.map((city) => city.name)).toEqual(["Hanoi", "Ho Chi Minh City", "Osaka"]);
     expect(map.footprint.planned.map(({ name, status }) => [name, status])).toEqual([
