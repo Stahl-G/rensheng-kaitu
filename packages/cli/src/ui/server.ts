@@ -460,7 +460,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               : relocate || method === "restoreVersion"
                 ? await exclusive(async () => {
                     await saveExternal();
-                    await options.ask?.prepareRelocation();
+                    const opening = method === "workspaceBackup" && args[0] === "activate";
+                    const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
+                    await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
                     await phones.stop();
                     const oldRoot = ws.root;
                     try {
