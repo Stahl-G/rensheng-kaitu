@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 import { expect, it } from "vitest";
-import { addRecords, recordReferences } from "../src/index.js";
+import { addRecords, recordReferences, writeAgentsMd } from "../src/index.js";
 import { freshWorkspace } from "./helpers.js";
 
 it("所有内置与自定义记录的生成示例均通过实际写入校验", async () => {
@@ -27,9 +27,14 @@ it("所有内置与自定义记录的生成示例均通过实际写入校验", a
       },
       $defs: { edition: { type: "string", pattern: "^v[0-9]+$", examples: ["v2"] } },
     });
+    writeAgentsMd(ws);
     const references = recordReferences(ws);
     for (const { type, examples } of references) {
-      for (const example of examples) {
+      const published = [...ws.readText("RECORDS.md").matchAll(/示例 JSONL：`([^`]+)`/g)]
+        .map((match) => JSON.parse(match[1] ?? ""))
+        .filter((example) => example.type === type);
+      expect(published).toHaveLength(examples.length);
+      for (const example of published) {
         const { type: _type, ...input } = example;
         const [result] = addRecords(ws, type, [input], { dryRun: true });
         expect(result?.record).toMatchObject(input);

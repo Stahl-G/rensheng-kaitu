@@ -18,9 +18,9 @@ description: 新建个人或工作项目、记录进展、更新下一步，或�
 ## 记录与下一步
 
 用 `kaitu project log <slug> --text "实际进展"` 记录。背景、要点、相关人写入项目的 notes.md。
-先 `kaitu project show <slug> --json-out` 取得 STATUS 正文、frontmatter 与日志。
+只对目标项目用 `kaitu project show <slug> --json-out` 取得 STATUS 与需要的日志，不读其他项目。
 更新 STATUS 的 progress、next、blocked、updated 时保留其他字段与正文，next 沿用通用格式。
-项目的 Markdown 更新后运行 `kaitu validate`，再保存一个版本。
+直接更新 Markdown 后只校验该项目，再保存一个版本；专用命令回执已含版本时直接采用该结果，不重复校验和存版本。
 下一步用
 `kaitu project set <slug> --next-json '[{"id":"p1","title":"具体动作","status":"todo"}]'` 更新。
 阶段变更用 `kaitu project set <slug> --stage idea|active|paused|done`。

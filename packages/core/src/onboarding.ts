@@ -962,6 +962,7 @@ function hasUserFiles(ws: Workspace): boolean {
     ".agents",
     ".claude",
     "AGENTS.md",
+    "RECORDS.md",
     "AGENT-README.md",
     "OVERVIEW.md",
     "ORGANIZER.md",

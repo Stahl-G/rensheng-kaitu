@@ -72,7 +72,6 @@ describe("init / doctor / validate", () => {
     const { addRecord } = await import("../src/index.js");
     expect(addRecord(ws, "book", { title: "置身事内" }).file).toBe("books/data/2026-10.jsonl");
     expect(() => addRecord(ws, "book", { author: "x" })).toThrow(/title/);
-    expect(renderAgentsMd(ws)).toContain("`books/`");
   });
 
   it.skipIf(process.platform === "win32")("密钥文件权限不对时 doctor 报错", async () => {
@@ -83,6 +82,8 @@ describe("init / doctor / validate", () => {
 
   it("重新生成 AGENTS.md 保留用户追加的内容", async () => {
     const ws = await freshWorkspace();
+    expect(renderAgentsMd(ws).length).toBeLessThanOrEqual(4000);
+    expect(ws.exists("SKILL.md")).toBe(false);
     ws.writeText("AGENTS.md", `${ws.readText("AGENTS.md")}我喜欢简短的回答。\n`);
     expect(renderAgentsMd(ws)).toMatch(/我喜欢简短的回答。\n$/);
   });
