@@ -1,12 +1,14 @@
 import { readdirSync, statSync } from "node:fs";
+import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listMemories } from "./memory.js";
-import { listModules, listRecordTypes } from "./modules.js";
+import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
@@ -81,13 +83,16 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
 
 export function statusFiles(ws: Workspace): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
+  const recordDirectories = new Set(listRecordTypes(ws).map((ref) => recordFilePattern(ref).dir));
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
       if (ws.conflictCopy(file)) continue;
-      if (entry.isDirectory()) walk(file, module);
-      else if (entry.name === "STATUS.md") out.push({ file, module });
+      // 只排除已知健康附件与声明的记录目录；files 也可以是合法主题名。
+      if (entry.isDirectory()) {
+        if (file !== "health/files" && !recordDirectories.has(file)) walk(file, module);
+      } else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }
   for (const module of listModules(ws)) {
@@ -180,7 +185,20 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
 export type WorkbenchData = ReturnType<typeof readWorkbench>;
 
 async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, edit: (data: T) => string) {
-  const raw = parseFrontmatter<T>(ws.readText(file));
+  let raw: Frontmatter<T>;
+  try {
+    raw = parseFrontmatter<T>(ws.readText(file));
+  } catch (error) {
+    if (!(error instanceof YAMLParseError)) throw error;
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `${file} 的 frontmatter 无法读取（YAML ${error.code}）。文件已保留，请修正格式后重试。`,
+        `Cannot read frontmatter in ${file} (YAML ${error.code}). The file is kept; correct its format and retry.`,
+      ),
+      "INVALID_DOCUMENT",
+    );
+  }
   const parsed = { ...raw, data: normalizeDocument(schema, raw.data) as T };
   const message = edit(parsed.data);
   const validate = schemas().builtin(schema);

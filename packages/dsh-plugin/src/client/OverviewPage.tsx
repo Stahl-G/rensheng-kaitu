@@ -8,6 +8,7 @@ import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import type { LearningSource } from "./LearningPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
@@ -27,7 +28,7 @@ export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
     OnboardingServices,
-    Omit<NewsPageProps, "onPrompt">,
+    Omit<NewsPageProps, "onPrompt" | "onLearn">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals" | "onConnect">,
     Omit<MapPageProps, "onPrompt">,
@@ -47,6 +48,7 @@ export interface OverviewPageProps
     configureRequest: number,
     configureBuiltin: boolean,
     onConnections: () => void,
+    promptRequest: number,
     active: boolean,
   ) => ReactNode;
 }
@@ -121,11 +123,14 @@ function Overview({
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
+  const [learningTopic, setLearningTopic] = useState("");
+  const [learningSource, setLearningSource] = useState<LearningSource>();
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState("");
+  const [promptRequest, setPromptRequest] = useState(0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -135,46 +140,71 @@ function Overview({
   const [theme, setTheme] = useState("light");
   const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
+  const writing = useRef(false);
+  const refreshPending = useRef(false);
   const refresh = useCallback(async () => {
     if (!locale) return;
     const seq = ++sequence.current;
     try {
-      const [overview, agenda, files, me, introduction, calendarPush] = await Promise.all([
-        props.load(),
-        props.loadCalendar(),
-        props.loadLibrary(),
-        props.loadMe(),
-        props.loadOnboarding(locale),
-        props.loadCalendarPush(),
-      ]);
-      if (seq !== sequence.current) return;
-      setData(overview);
-      setPush(calendarPush);
-      setCalendar(agenda);
-      setLibrary(files);
-      setPersonal(me);
-      setOnboarding(introduction);
-      setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
       setError("");
+      const update = <T,>(load: () => Promise<T>, apply: (value: T) => void) =>
+        load().then((value) => {
+          if (seq === sequence.current) apply(value);
+        });
+      await Promise.all([
+        update(props.load, setData),
+        update(props.loadCalendar, setCalendar),
+        update(props.loadMe, setPersonal),
+        update(
+          () => props.loadOnboarding(locale),
+          (introduction) => {
+            setOnboarding(introduction);
+            setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
+          },
+        ),
+        update(props.loadCalendarPush, setPush),
+      ]);
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [
-    locale,
-    props.load,
-    props.loadCalendar,
-    props.loadLibrary,
-    props.loadMe,
-    props.loadOnboarding,
-    props.loadCalendarPush,
-  ]);
+  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding, props.loadCalendarPush]);
   useEffect(() => {
     void refresh();
     return () => {
       sequence.current++;
     };
   }, [refresh]);
-  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(
+    () =>
+      props.subscribe?.(() => {
+        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。
+        if (writing.current) refreshPending.current = true;
+        else void refresh();
+      }),
+    [props.subscribe, refresh],
+  );
+  // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
+  useEffect(() => {
+    if (view !== "records") return;
+    let sequence = 0;
+    const load = async () => {
+      const seq = ++sequence;
+      try {
+        const value = await props.loadLibrary({
+          section: record === "notes" || record === "health" ? record : "summary",
+        });
+        if (seq === sequence) setLibrary(value);
+      } catch (err) {
+        if (seq === sequence) setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void load();
+    const off = props.subscribe?.(() => void load());
+    return () => {
+      sequence++;
+      off?.();
+    };
+  }, [view, record, props.loadLibrary, props.subscribe]);
   useEffect(() => {
     if (view === "ask") setAskVisited(true);
   }, [view]);
@@ -207,15 +237,23 @@ function Overview({
     };
   }, [menu]);
   const run = async (operation: () => Promise<unknown>) => {
+    writing.current = true;
     setBusy(true);
     setError("");
     try {
       await operation();
+      // 到这里之前的通知已被本次读取覆盖；读取期间的新变化仍要补读，不能丢外部编辑。
+      refreshPending.current = false;
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      writing.current = false;
       setBusy(false);
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        void refresh();
+      }
     }
   };
   const openRecord = (id: string) => {
@@ -226,6 +264,7 @@ function Overview({
   };
   const prompt = (text: string) => {
     setPromptDraft(text);
+    setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
@@ -839,7 +878,8 @@ function Overview({
               />
             ) : record === "inbox" ? (
               <InboxPage
-                data={library}
+                loadLibrary={props.loadLibrary}
+                subscribe={props.subscribe}
                 channelSettings={props.channelSettings}
                 connect={() => {
                   setView("connections");
@@ -847,7 +887,24 @@ function Overview({
                 }}
               />
             ) : (
-              <NotesPage data={library} loadLibraryDocument={props.loadLibraryDocument} />
+              <NotesPage
+                data={library}
+                loadLibraryDocument={props.loadLibraryDocument}
+                loadLearning={props.loadLearning}
+                startLearning={props.startLearning}
+                saveLearning={props.saveLearning}
+                topic={learningTopic}
+                onTopic={setLearningTopic}
+                source={learningSource}
+                onSourceConsumed={() => setLearningSource(undefined)}
+                onPrompt={prompt}
+                onSaved={() => {
+                  void props
+                    .loadLibrary()
+                    .then(setLibrary)
+                    .catch((err) => setError(String(err)));
+                }}
+              />
             )}
           </>
         )}
@@ -894,7 +951,17 @@ function Overview({
                   />
                 </>
               ) : explore === "news" ? (
-                <NewsPage {...child} />
+                <NewsPage
+                  {...child}
+                  onLearn={(item) => {
+                    setLearningSource({
+                      title: item.title,
+                      ...(item.url ? { url: item.url } : {}),
+                      ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
+                    });
+                    openRecord("notes");
+                  }}
+                />
               ) : (
                 <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
               )}
@@ -908,6 +975,7 @@ function Overview({
               configureRequest,
               configureBuiltin,
               () => setView("connections"),
+              promptRequest,
               view === "ask",
             )}
           </div>

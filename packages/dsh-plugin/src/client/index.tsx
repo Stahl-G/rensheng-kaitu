@@ -3,7 +3,9 @@ import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
+import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
 import type {
+  LearningCheckinInput,
   OnboardingAi,
   OnboardingChoices,
   OnboardingMatterDraft,
@@ -11,6 +13,7 @@ import type {
   OnboardingSetupInput,
   OnboardingTarget,
   Preferences,
+  StartLearningInput,
   SyncProvider,
 } from "@kaitu/core";
 import contribution from "../../lib/typert.remote-client.js";
@@ -25,11 +28,19 @@ import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
+import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
+import { WidgetCard } from "./openmaic/WidgetCard.js";
 
 export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
 
 export async function apply(ctx: Context) {
+  ctx.slots.inject("tool.call.toolview", () =>
+    ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_card" }, OpenmaicCard),
+  );
+  ctx.slots.inject("tool.call.toolview", () =>
+    ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_widget" }, WidgetCard),
+  );
   const unmount = await ctx.remote.$mount(contribution);
   ctx.effect(() => unmount);
   ctx.plugin({
@@ -369,8 +380,23 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              loadLibrary: async () => {
-                const r = await ctx.remote.kaitu.library();
+              loadLearning: async (topic: string) => {
+                const r = await ctx.remote.kaitu.learningRead(topic);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              startLearning: async (input: StartLearningInput) => {
+                const r = await ctx.remote.kaitu.learningStart(input);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              saveLearning: async (input: LearningCheckinInput) => {
+                const r = await ctx.remote.kaitu.learningSave(input);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              loadLibrary: async (query?: import("@kaitu/core").LibraryQuery) => {
+                const r = await ctx.remote.kaitu.library(query);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
@@ -496,11 +522,6 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
-              saveCurrentCity: async (name: string, id: number) => {
-                const result = await ctx.remote.kaitu.saveCurrentCity(name, id);
-                if (!result.ok) throw new Error(result.error.message);
-                return result.value;
-              },
               saveHometown: async (name: string, id: number) => {
                 const result = await ctx.remote.kaitu.saveHometown(name, id);
                 if (!result.ok) throw new Error(result.error.message);
@@ -516,7 +537,7 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
-              previewExperienceBatch: async (id: string, operation: "undo" | "restore") => {
+              previewExperienceBatch: async (id: string, operation: "confirm" | "undo" | "restore") => {
                 const result = await ctx.remote.kaitu.experienceBatchPreview(id, operation);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
@@ -525,7 +546,11 @@ export async function apply(ctx: Context) {
                 const result = await ctx.remote.kaitu.setExperienceSource(locator, excluded, revision);
                 if (!result.ok) throw new Error(result.error.message);
               },
-              changeExperienceBatch: async (id: string, operation: "undo" | "restore", revision: number) => {
+              changeExperienceBatch: async (
+                id: string,
+                operation: "confirm" | "undo" | "restore",
+                revision: number,
+              ) => {
                 const result = await ctx.remote.kaitu.changeExperienceBatch(id, operation, revision);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;

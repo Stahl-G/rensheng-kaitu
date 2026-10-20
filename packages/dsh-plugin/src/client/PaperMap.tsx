@@ -35,7 +35,6 @@ export function PaperMap({
   showAllPlaces = false,
   asOf,
   current,
-  currentFromProfile = !!current,
   onAdd,
 }: {
   cities: City[];
@@ -48,7 +47,6 @@ export function PaperMap({
   showAllPlaces?: boolean;
   asOf: string;
   current?: Place | null;
-  currentFromProfile?: boolean;
   onAdd: (state: FootprintState) => void;
 }) {
   const t = useT();
@@ -561,12 +559,7 @@ export function PaperMap({
         {mode === "now" && data.me && (
           <p>
             {t(cityNames[String(data.me.geonameid)] ?? data.me.name, data.me.name)} ·{" "}
-            {t(
-              currentFromProfile ? "来自档案现居城市" : "最近的居住记录，不代表实时位置",
-              currentFromProfile
-                ? "Current city from your profile"
-                : "Latest residence record, not live location",
-            )}
+            {t("最近的居住记录，不代表实时位置", "Latest residence record, not live location")}
           </p>
         )}
         {mode === "history" && data.undated > 0 && (

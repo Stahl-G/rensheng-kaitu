@@ -64,6 +64,12 @@ export function WorkspaceBackup({
   );
   useEffect(() => refresh(), [refresh]);
   useEffect(() => subscribe?.(refresh), [subscribe, refresh]);
+  // 进度只刷新本面板；不为每个文件广播工作区变更、触发所有页面重新读取。
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [status?.running, refresh]);
   useEffect(() => {
     if (!loginPending) void checkGh();
   }, [checkGh, loginPending]);
@@ -130,6 +136,26 @@ export function WorkspaceBackup({
               ? ` · ${t("上次同步", "Last synced")} ${new Date(status.lastSync).toLocaleString()}`
               : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
           </output>
+        )}
+        {status?.running && (
+          <div>
+            <output aria-live="polite">
+              {
+                {
+                  scan: t("正在读取本机资料", "Reading local files"),
+                  download: t("正在读取远端资料", "Reading remote files"),
+                  merge: t("正在核对改动", "Checking changes"),
+                  upload: t("正在上传改动", "Uploading changes"),
+                }[status.progress?.phase ?? "scan"]
+              }
+              {status.progress
+                ? ` · ${status.progress.completed}${status.progress.total === undefined ? "" : ` / ${status.progress.total}`}`
+                : ""}
+            </output>
+            <button type="button" className={css.link} disabled={busy} onClick={() => void run("cancel")}>
+              {t("取消本次同步", "Cancel this sync")}
+            </button>
+          </div>
         )}
         {c && (
           <p className={css.small}>

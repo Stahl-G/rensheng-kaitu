@@ -77,7 +77,7 @@ try {
   const exploration = core.readExploration(ws);
   let start = performance.now();
   const snapshots = {
-    today: core.buildPhoneToday(data, now.toISOString()),
+    today: core.buildPhoneToday(data, now.toISOString(), ws),
     week: core.buildPhoneWeek(data, now.toISOString()),
     map: core.buildPhoneMap(data, map, exploration, now.toISOString()),
   };

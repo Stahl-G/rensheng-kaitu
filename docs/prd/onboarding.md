@@ -147,7 +147,7 @@ reset 只清除本机选择，不删资料、不清除实际连接证据，也�
 ## 阶段划分与验证
 
 阶段 1 不改页面组件，提供完整的内容、状态、选择与预览确认接口。
-接口名称、参数、数据源边界与手动验证步骤见 [阶段 1 交审说明](../acceptance/onboarding-stage-1.md)。
-阶段 2 交审记录见 [onboarding-stage-2.md](../acceptance/onboarding-stage-2.md)，首发流程调整见 [onboarding-launch.md](../acceptance/onboarding-launch.md)。
+接口名称、参数、数据源边界与手动验证步骤见 阶段 1 交审说明。
+阶段 2 交审记录见 onboarding-stage-2.md，首发流程调整见 onboarding-launch.md。
 本轮只新增一个采纳行为测试，既有清单测试随六条目语义调整。全部使用临时目录和合成数据，不访问外部服务或真实个人资料。
-北极星首批的交审与实测见 [north-star-p0-2026-10-16.md](../acceptance/north-star-p0-2026-10-16.md)。
+北极星首批的交审与实测见 north-star-p0-2026-10-16.md。

@@ -23,6 +23,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: "@kaitu/core/teaching-frame",
+        replacement: fileURLToPath(new URL("./packages/core/src/teaching-frame.ts", import.meta.url)),
+      },
+      {
         find: "@kaitu/core/experience-time",
         replacement: fileURLToPath(new URL("./packages/core/src/experience-time.ts", import.meta.url)),
       },

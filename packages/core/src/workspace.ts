@@ -15,8 +15,8 @@ import { currentWorkspace } from "./drive.js";
 import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
-import { maintainHistoryIgnore } from "./history.js";
-import { overviewDeferred, refreshOverview } from "./overview.js";
+import { invalidateHistoryFile, maintainHistoryIgnore } from "./history.js";
+import { holdOverview, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
@@ -96,8 +96,9 @@ export class Workspace {
     this.zone = null;
   }
 
-  constructor(root: string, options: { maintain?: boolean } = {}) {
+  constructor(root: string, options: { maintain?: boolean; deferOverview?: boolean } = {}) {
     this.root = resolve(root);
+    if (options.deferOverview) holdOverview(this);
     if (options.maintain === false) return;
     try {
       const state = stateDirectory(this.root, this.icloud);
@@ -116,7 +117,7 @@ export class Workspace {
         ensureTaskModule,
         quarantineBankNotes,
         maintainHistoryIgnore,
-        refreshOverview,
+        ...(options.deferOverview ? [] : [refreshOverview]),
       ]) {
         try {
           maintain(this);
@@ -274,7 +275,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
-    this.refreshAfterWrite(rel);
+    invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
   writeJson(rel: string, value: unknown, opts: { internal?: boolean; mode?: number } = {}): void {
@@ -286,20 +287,7 @@ export class Workspace {
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
-    this.refreshAfterWrite(rel);
-  }
-
-  private refreshAfterWrite(rel: string): void {
-    if (
-      overviewDeferred(this) ||
-      /^projects\/[a-z0-9-]+\/view\.json$/.test(rel) ||
-      rel.startsWith(".kaitu/") ||
-      rel.startsWith("phone/") ||
-      ["AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(rel) ||
-      !this.exists("OVERVIEW.md")
-    )
-      return;
-    refreshOverview(this);
+    invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
   /** 用户时区：me/rules.md 的 timezone，缺省用系统时区。rules.md 没变时不重新读取。 */

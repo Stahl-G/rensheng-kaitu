@@ -853,17 +853,6 @@ body[data-ds-dark-theme] .page,
 body[data-ds-dark-theme] .meMarker {
   color: #f4eddf;
 }
-.currentEditor {
-  position: absolute;
-  z-index: 4;
-  top: 150px;
-  left: 24px;
-  width: min(360px, calc(100% - 48px));
-  padding: 20px;
-  border-radius: 12px;
-  background: var(--kt-card);
-  box-shadow: var(--kt-shadow);
-}
 .page {
   position: relative;
 }

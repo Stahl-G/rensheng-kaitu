@@ -55,11 +55,12 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, active) => (
+  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, promptRequest, active) => (
     <AskPage
       workspace={workspace}
       active={active}
       initialPrompt={prompt}
+      initialPromptRequest={promptRequest}
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}
@@ -87,7 +88,10 @@ const props: OverviewPageProps = {
   pickStorageFolder: () => call("pickStorageFolder"),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
-  loadLibrary: () => call("library"),
+  loadLibrary: (query) => call("library", query),
+  loadLearning: (topic) => call("learningRead", topic),
+  startLearning: (input) => call("learningStart", input),
+  saveLearning: (input) => call("learningSave", input),
   loadLibraryDocument: (file) => call("libraryDocument", file),
   completeNext: (file, id) => call("completeNext", file, id),
   decideProposal: (id, decision) => call("decideProposal", id, decision),
@@ -113,7 +117,6 @@ const props: OverviewPageProps = {
   loadLifeMap: () => call("lifeMap"),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
-  saveCurrentCity: (name, id) => call("saveCurrentCity", name, id),
   loadExperienceImports: () => call("experienceImports"),
   previewExperienceBatch: (id, operation) => call("experienceBatchPreview", id, operation),
   setExperienceSource: (locator, excluded, revision) =>

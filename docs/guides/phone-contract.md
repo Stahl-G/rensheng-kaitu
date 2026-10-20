@@ -85,3 +85,8 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 中断后重投同client_id复用准备记录，已有相同rev/内容不再追加；终态账本成功后才发布回执。
 不同内容的同rev或陈旧目标返回冲突；持久化故障保留作业可重试，不落永久conflict。
 手机仍只新建inbox，不能伪写phone快照或desktop receipt。实际跨语言文件旅程另行验证，真机/同步盘验收不由合成测试代替。
+
+## 饮食合计（2026-10-20）
+
+开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
+手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。

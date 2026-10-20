@@ -28,10 +28,11 @@ export function SessionPage(props: Props) {
         {...props}
         onPrompt={(text) => void open(text)}
         onAgent={() => void open()}
-        renderAsk={(prompt) => (
+        renderAsk={(prompt, _configure, _builtin, _connections, promptRequest) => (
           <PluginAsk
             services={props.askServices}
             prompt={prompt}
+            promptRequest={promptRequest}
             SessionProvider={props.SessionProvider}
             renderSlot={props.renderSlot}
           />

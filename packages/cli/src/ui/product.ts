@@ -8,6 +8,7 @@ import {
   type FinanceViewOptions,
   type ImportSource,
   KaituError,
+  type LearningCheckinInput,
   type Locale,
   type NewsFeedback,
   type OnboardingAi,
@@ -19,6 +20,7 @@ import {
   type OnboardingTarget,
   type ProjectGoal,
   type SettingsData,
+  type StartLearningInput,
   type SyncProvider,
   type Workspace,
   addCalendarSubscription,
@@ -54,6 +56,7 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  listLearning,
   loadFinanceInvestments,
   markOrganizerSeen,
   matterPrompt,
@@ -76,6 +79,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLearning,
   readLibrary,
   readLibraryDocument,
   readMe,
@@ -97,6 +101,7 @@ import {
   saveAvatar,
   saveCurrentCity,
   saveHometown,
+  saveLearningCheckin,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -106,6 +111,7 @@ import {
   setExperienceSource,
   setNewsFeedback,
   stageFinanceUpload,
+  startLearning,
   syncProject,
   tryNews,
   unhideExperience,
@@ -123,6 +129,8 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "learningStart",
+  "learningSave",
   "organizerSeen",
   "workspaceBackup",
   "askModels",
@@ -249,9 +257,17 @@ export async function productRequest(
   }
   switch (method) {
     case "library":
-      return readLibrary(ws);
+      return readLibrary(ws, args[0] as Parameters<typeof readLibrary>[1]);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
+    case "learningList":
+      return listLearning(ws);
+    case "learningRead":
+      return readLearning(ws, text(0));
+    case "learningStart":
+      return startLearning(ws, args[0] as StartLearningInput);
+    case "learningSave":
+      return saveLearningCheckin(ws, args[0] as LearningCheckinInput);
     case "calendarPush":
       return calendarPush.settings();
     case "configureCalendarPush":
@@ -363,12 +379,12 @@ export async function productRequest(
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":
-      return previewExperienceBatch(ws, text(0), text(1) as "undo" | "restore");
+      return previewExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore");
     case "setExperienceSource":
       if (typeof args[1] !== "boolean") throw new KaituError("缺少来源开关", "BAD_ARGS");
       return setExperienceSource(ws, text(0), args[1], revision(2));
     case "changeExperienceBatch":
-      return changeExperienceBatch(ws, text(0), text(1) as "undo" | "restore", revision(2));
+      return changeExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore", revision(2));
     case "recoverExperienceImports":
       return { recovered: (await recoverExperienceImports(ws)).length };
     case "exploration":

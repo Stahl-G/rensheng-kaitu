@@ -22,7 +22,6 @@ export interface MapPageProps extends ExperienceImportControlProps {
   loadLifeMap: () => Promise<LifeMapData>;
   hometownCities: (name: string) => Promise<import("../types.js").City[]>;
   saveHometown: (name: string, id: number) => Promise<unknown>;
-  saveCurrentCity: (name: string, id: number) => Promise<unknown>;
   resolveExperience: (id: string, geonameid: number) => Promise<unknown>;
   editExperience: (id: string, changes: ExperienceChanges, revision: number) => Promise<void>;
   hideExperience: (id: string, revision: number) => Promise<number>;
@@ -181,7 +180,6 @@ export function MapPage({
   loadLifeMap,
   hometownCities,
   saveHometown,
-  saveCurrentCity,
   resolveExperience,
   editExperience,
   hideExperience,
@@ -191,7 +189,6 @@ export function MapPage({
 }: MapPageProps) {
   const t = useT();
   const [editingHome, setEditingHome] = useState(false);
-  const [editingCurrent, setEditingCurrent] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; revision: number } | null>(null);
   const [data, setData] = useState<LifeMapData | null>(null);
@@ -290,10 +287,7 @@ export function MapPage({
       group.layers.sort((a, b) => layers.findIndex((l) => l.id === a) - layers.findIndex((l) => l.id === b));
     return [...groups.values()].sort((a, b) => Number(!!b.home) - Number(!!a.home));
   }, [data, enabled, year, from, to]);
-  const anchor = useMemo(
-    () => (data ? footprintAnchor(data.experiences, data.asOf, data.currentPlace) : undefined),
-    [data],
-  );
+  const anchor = useMemo(() => (data ? footprintAnchor(data.experiences, data.asOf) : undefined), [data]);
   const home = data?.hometown?.status === "ready" ? data.hometown.place : undefined;
   const previousPlace = useMemo(
     () => (data ? footprintData(data.experiences, data.asOf, anchor ?? null).previous : undefined),
@@ -465,29 +459,12 @@ export function MapPage({
           subscribe={subscribe}
           onChanged={refresh}
           pending={data?.importsPending ?? 0}
+          reviewPending={data?.review.length ?? 0}
         />
-        <button type="button" className={css.control} onClick={() => setEditingCurrent(true)}>
-          {t("设置现居城市", "Set current city")}
-        </button>
         <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
           {home ? `⌂ ${t("家乡", "Hometown")}：${home.name}` : t("设置家乡", "Set hometown")}
         </button>
       </div>
-      {data && editingCurrent && (
-        <div className={css.currentEditor}>
-          <HometownEditor
-            current
-            initial={data.currentPlace?.name ?? ""}
-            search={hometownCities}
-            save={async (name, id) => {
-              await saveCurrentCity(name, id);
-              await refresh();
-              setEditingCurrent(false);
-            }}
-            cancel={() => setEditingCurrent(false)}
-          />
-        </div>
-      )}
       {data && editingHome && (
         <HometownEditor
           initial={home?.name ?? ""}
@@ -711,11 +688,12 @@ export function MapPage({
               showRoutes={showRoutes}
               showAllPlaces={showAllPlaces}
               current={anchor ?? null}
-              currentFromProfile={!!data.currentPlace}
               asOf={data.asOf}
               onAdd={(mode) =>
                 mode === "now"
-                  ? setEditingCurrent(true)
+                  ? ask(
+                      "请帮我核对目前居住的城市，并确认对应经历的时间和事实状态。不要把计划或推测写成已发生。",
+                    )
                   : ask(
                       mode === "history"
                         ? prompt
