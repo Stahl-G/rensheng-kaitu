@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {readFileSync,writeFileSync,existsSync,mkdirSync,copyFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+const result=JSON.parse(readFileSync('/tmp/nutrition-cli-evidence/result.json','utf8'));
+const root=result.root, cli='/tmp/kaitu-nutrition-integration/packages/cli/dist/main.js';
+const name='ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MT.records.jsonl';
+const input=`${root}/data/inbox/agents/${name}`;
+const meal=JSON.parse(readFileSync('/workspace/rensheng-kaitu/schemas/fixtures/phone/records.jsonl','utf8'));
+meal.ts=`${result.day}T12:50:00+08:00`;
+writeFileSync(input,`${JSON.stringify(meal)}\n`);
+const hook=`${root}/fail-before-prepare.cjs`;
+writeFileSync(hook,`const fs=require('node:fs'),m=require('node:module');const rename=fs.renameSync;fs.renameSync=function(a,b){if(String(b).endsWith('phone-records.json'))throw new Error('synthetic failure before prepared ledger');return rename.apply(this,arguments)};m.syncBuiltinESMExports();`);
+const env={...process.env,KAITU_LOCAL_STATE_DIR:`${root}/state`};
+let failed=false;
+try{execFileSync(process.execPath,['--require',hook,cli,'phone','run','--dir',`${root}/data`],{env,stdio:'pipe'})}catch(e){failed=true;writeFileSync('/tmp/nutrition-before-prepare.log',e.stderr)}
+assert(failed);assert(existsSync(input));
+assert(!JSON.parse(readFileSync(`${root}/data/.kaitu/phone-records.json`,'utf8'))[name]);
+const before=JSON.parse(readFileSync(`${root}/data/phone/today.json`,'utf8'));
+assert.equal(before.nutrition.kcal,720);assert(!before.nutrition.accounted_refs.includes(name));
+execFileSync(process.execPath,[cli,'phone','run','--dir',`${root}/data`],{env,stdio:'pipe'});
+const after=JSON.parse(readFileSync(`${root}/data/phone/today.json`,'utf8'));
+assert.equal(after.nutrition.kcal,1440);assert(after.nutrition.accounted_refs.includes(name));assert(!existsSync(input));
+mkdirSync('/tmp/nutrition-before-prepare',{recursive:true});
+copyFileSync(`${root}/data/phone/today.json`,'/tmp/nutrition-before-prepare/today.json');
+writeFileSync('/tmp/nutrition-before-prepare/result.json',JSON.stringify({failed,sourceRetained:true,retried:true,after:after.nutrition},null,2));
+console.log('before-prepared ledger failure: source retained; retry consumed exactly once; totals 720→1440');

@@ -1,0 +1,11 @@
+Error: synthetic failure before prepared ledger
+    at fs.renameSync (/tmp/kaitu-nutrition-cli-dD2UHC/fail-before-prepare.cjs:1:159)
+    at Workspace.writeText (file:///tmp/kaitu-nutrition-integration/packages/core/dist/workspace.js:255:9)
+    at Workspace.writeJson (file:///tmp/kaitu-nutrition-integration/packages/core/dist/workspace.js:259:14)
+    at preparePhoneRecords (file:///tmp/kaitu-nutrition-integration/packages/core/dist/phone-records.js:9:8)
+    at Object.apply (file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:248:21)
+    at file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:597:40
+    at batchOverview (file:///tmp/kaitu-nutrition-integration/packages/core/dist/overview.js:142:22)
+    at batchSnapshot (file:///tmp/kaitu-nutrition-integration/packages/core/dist/history.js:199:24)
+    at processInbox (file:///tmp/kaitu-nutrition-integration/packages/core/dist/inbox.js:592:19)
+    at async runPhone (file:///tmp/kaitu-nutrition-integration/packages/core/dist/phone-run.js:6:19)

@@ -32,3 +32,8 @@ node scripts/verify-phone-nutrition.mjs <独立集成代码目录> <证据输出
 ## CI
 
 最终 exact-head CI 以 PR64 评论/正文回执为准。已知基线 Windows 两项失败（ask-filesystem 的 FS_SANDBOX_DENIED、feishu 缺 lark-cli）须与新失败分列；不修改 CI、增加 skip 或放宽 timeout。
+
+## 最后定向收口
+
+- Phone 持久化异常即使发生在 prepared ledger 首次 rename 前，也保留原文件可重试；不降格为永久 rejected 笔记。在加入相同尾部修复的独立集成副本，用真实 CLI + 显式 rename 故障验证：新文件保留、账本无该 ref、旧总量仍 720；取消注入后原文件一次消费，累计 1440，证据在 evidence/before-prepared。不是 Swift 输入，也不是 OS 自发故障。
+- 投影汇总显式用同一 envelope 的 data.today/data.timeZone 归日，不依赖工作区再次读取的时区；避免后台读取期间 rules 变化后混入另一时区的合计。原有日期测试增加同一餐在洛杉矶/上海两个 envelope 下的归日校验，仍只有两条测试。最新定向日志为 nutrition-envelope-focused.log。

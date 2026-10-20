@@ -38,6 +38,11 @@ it("确认餐按快照日期和时区汇总最新修订，删除和改日期保�
     protein_g: 38,
     accounted_refs: [basename(first)],
   });
+  const overview = await readOverviewPage(ws, now);
+  expect(
+    buildPhoneToday({ ...overview, today: "2026-10-19", timeZone: "Asia/Shanghai" }, now.toISOString(), ws)
+      .nutrition,
+  ).toMatchObject({ kcal: 720, protein_g: 38 });
   const id = String(readRecords(ws, "meal")[0]?.id);
   updateRecord(ws, "meal", id, { kcal: 500, protein_g: 30 });
   await writePhoneSnapshots(ws, now, { force: true });

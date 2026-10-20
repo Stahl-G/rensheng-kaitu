@@ -25,7 +25,10 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
   const ledger = phoneRecordLedger(ws);
   const ready = Object.values(ledger).every((plan) => plan.consumed);
   const hasMeals = listRecordTypes(ws).some((ref) => ref.type === "meal");
-  const meals = ready && hasMeals ? readRecords(ws, "meal", { from: data.today, to: data.today }) : [];
+  const meals =
+    ready && hasMeals
+      ? readRecords(ws, "meal").filter((meal) => localDate(parseTs(meal.ts), data.timeZone) === data.today)
+      : [];
   const nutrition =
     ready && hasMeals
       ? {
