@@ -7,7 +7,7 @@
       "tiles": ["kaitu-paper://dark/{z}/{x}/{y}"],
       "tileSize": 256,
       "minzoom": 0,
-      "maxzoom": 5,
+      "maxzoom": 3,
       "attribution": "<a href=\"https://www.naturalearthdata.com/\">Natural Earth</a>"
     }
   },

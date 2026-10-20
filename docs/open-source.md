@@ -26,7 +26,9 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [FullCalendar React](https://github.com/fullcalendar/fullcalendar-react) | 将日历嵌入 React 页面 | MIT |
 | [react-easy-crop](https://github.com/ValentinH/react-easy-crop) | 选择头像后的图片裁剪 | MIT |
 | [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) | 人生足迹地图的浏览器渲染和交互 | BSD-3-Clause |
-| [OpenFreeMap](https://github.com/hyperknot/openfreemap) | 在线地图瓦片、Positron / dark 样式；详细许可见下文 | MIT；底图与样式分别署名 |
+| [OpenFreeMap](https://openfreemap.org/) | 纸本地图的区域水面与河流；按需联网，无需 Key | 软件 MIT；保留 OpenMapTiles、OpenStreetMap 等原署名 |
+| [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) | 随包全球地形晕渲，调色并重投影为纸本底图 | Public Domain，可修改及商业使用 |
+| [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | 城市层按需加载 Terrarium 地形 | 多来源许可；保留 [Tilezen/Joerd 完整署名](https://github.com/tilezen/joerd/blob/master/docs/attribution.md) |
 | [Preact](https://github.com/preactjs/preact) | packages/web 中的轻量工作台界面 | MIT |
 | [Apache ECharts](https://github.com/apache/echarts) | 轻量工作台中的趋势与统计图表 | Apache-2.0 |
 | [markdown-it](https://github.com/markdown-it/markdown-it) | 轻量工作台显示 Markdown 内容 | MIT |
@@ -102,14 +104,3 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 - 资料与导入：`packages/core/src/`；外部 Agent 接口：`packages/cli/src/`。
 - 邮件与聊天：`packages/channels/src/`；微信移植代码：`packages/channels/src/weixin/`。
 - 桌面打包：`packages/desktop/package-kaitu.mjs`；插件构建：`packages/dsh-plugin/scripts/`。
-
-
-## 足迹纸本地图（2026-10-20）
-
-- [Natural Earth terms](https://www.naturalearthdata.com/about/terms-of-use/) explicitly place the raster and vector datasets in the public domain, including commercial use and modification. We use the official [Natural Earth II 50m shaded relief](https://naciscdn.org/naturalearth/50m/raster/NE2_50M_SR_W.zip), recoloured and reprojected from geographic coordinates to Web Mercator with Pillow. The uncompressed input TIFF SHA-256 is `02ae944d9ee8a64ccacbd4f535220aac10b5c95e874118b6db8d6f07cea48e71`. The two local JPEG tile pyramids (zoom 0–5, 2,730 tiles) occupy 11,087,538 bytes as their bundled JSON (under 15 MB). The raster fades from opacity 1 at zoom 5 to 0 at zoom 7. Natural Earth credit remains accessible through the map attribution control, collapsed by default.
-- [OpenFreeMap](https://openfreemap.org/) permits commercial use. Its MIT software licence is separate from the ODbL map data and the licences of its styles. We preserve the vector source attribution (OpenMapTiles and OpenStreetMap) supplied by its TileJSON. Only water surfaces (zoom 5–12) and major rivers (zoom 6–12) are used; roads, administrative borders and labels remain off. The style is requested only on reaching regional zoom 5, without keys or account information. No bulk tile download or satellite imagery is added.
-- [AWS Terrain Tiles registry](https://registry.opendata.aws/terrain-tiles/) points to [Tilezen/Joerd attribution](https://github.com/tilezen/joerd/blob/master/docs/attribution.md), which contains multiple provider licences, not one public-domain licence. The map links to the complete provider credits. Terrain data providers include ArcticDEM (NSF awards 1043681, 1559691, 1542736), Commonwealth of Australia / Geoscience Australia (2017), offene Daten Österreichs, Canada (Open Government Licence), Copernicus / European Union EU-DEM, NOAA ETOPO1, INEGI (Continental relief 2016), LINZ and the New Zealand Government (Crown copyright 2011), Kartverket, Environment Agency (copyright/database right 2015), and USGS (3DEP, GMTED2010, SRTM). Provider-specific conditions remain in the linked upstream attribution. The Terrarium source is fetched only for visible terrain at zoom 6–12.
-- Great-circle geometry is implemented with spherical interpolation in the repository; no new runtime geometry dependency is introduced. Antipodal and coincident positions do not get an arbitrary arc. The marker options are original repository SVGs derived from the existing Kaitu folded-map logo.
-- Local tiles use the `kaitu-paper` protocol, so they work in both desktop hosts without a hosted file path. JPEG decoding is limited to visible tiles. The current single-file client build includes the encoded tile dictionary in its bundle; byte-level chunking and first-render performance still require browser measurement.
-
-The application and website source privacy notices describe the local global view and the requested city areas sent to OpenFreeMap / AWS. Website publication is outside this task; these source changes do not deploy kaitu.si.

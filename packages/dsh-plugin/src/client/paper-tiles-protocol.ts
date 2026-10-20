@@ -1,7 +1,7 @@
 import { addProtocol } from "maplibre-gl";
 
 let registered = false;
-/** Packaged bytes are available offline in both DSH and standalone hosts.
+/** Global zoom 0–3 bytes are available offline in both DSH and standalone hosts.
  * MapLibre asks only for visible tiles; JPEG decoding/upload stays viewport-limited.
  */
 export function registerPaperTiles() {

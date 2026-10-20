@@ -1,11 +1,11 @@
-"""Reproduce offline Natural Earth paper relief and marker comparison. Pillow only.
+"""Reproduce offline Natural Earth paper relief for global zooms 0–3. Pillow only.
 
 Input: official NE2_50M_SR_W.tif from naciscdn.org/naturalearth/50m/raster/NE2_50M_SR_W.zip.
 The source is equirectangular; rows are resampled into Web Mercator, never AI imagery.
 """
 from PIL import Image
 from pathlib import Path
-import base64, io, json, math, sys, hashlib
+import base64, io, json, math, sys
 
 root = Path(__file__).resolve().parents[1]
 source = Path(sys.argv[1])
@@ -26,16 +26,15 @@ for theme, (land, water) in themes.items():
         latitude = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + .5) / 4096))))
         row = max(0, min(2047, round((90 - latitude) / 180 * 2048)))
         merc.paste(paper.crop((0, row, 4096, row + 1)), (0, y))
-    merc.save(root / f'docs/design/footprint-marker-options/earth-{theme}.jpg', quality=85)
-    for z in range(6):
+    for z in range(4):
         n = 2**z
         level = merc.resize((n * 256, n * 256), Image.Resampling.LANCZOS)
         for x in range(n):
             for y in range(n):
                 tile = level.crop((x * 256, y * 256, (x + 1) * 256, (y + 1) * 256))
-                buf = io.BytesIO(); tile.save(buf, 'JPEG', quality=69, optimize=True)
+                buf = io.BytesIO(); tile.save(buf, 'JPEG', quality=40, optimize=True)
                 output[f'{theme}/{z}/{x}/{y}'] = base64.b64encode(buf.getvalue()).decode()
 asset = root / 'packages/dsh-plugin/src/client/map-assets/paper-tiles.json' 
 asset.write_text(json.dumps(output, separators=(',', ':')))
-assert asset.stat().st_size < 15_000_000
-print(json.dumps({'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest(), 'bundle_bytes': asset.stat().st_size}))
+assert asset.stat().st_size < 1_000_000
+print(f'Generated {asset}')
