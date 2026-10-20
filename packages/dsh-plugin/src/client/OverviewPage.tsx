@@ -536,7 +536,7 @@ function Overview({
         </div>
       </header>
       <main
-        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" && explore === "footprints" ? css.footprintContent : ""}`}
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""}`}
       >
         {props.desktopUpdate && view !== "settings" && (
           <FeatureUpdates request={props.desktopUpdate} compact />
@@ -914,28 +914,55 @@ function Overview({
         )}
         {view === "explore" && (
           <>
-            <div className={css.sec}>
-              <div className={css.head}>
-                <h1>{t("开图", "Explore")}</h1>
-              </div>
-              <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
+            <section className={css.sec} aria-label={t("开图", "Explore")}>
+              <h1 className={css.sr}>{t("开图", "Explore")}</h1>
+              <nav className={css.exploreEntries} aria-label={t("开图里的内容", "Explore sections")}>
                 {[
-                  ["health", t("健康", "Health")],
-                  ["footprints", t("足迹", "Footprints")],
-                  ["news", t("资讯", "News")],
-                  ["directions", t("方向", "Directions")],
-                ].map(([id, title]) => (
-                  <button
-                    type="button"
-                    key={id}
-                    aria-pressed={explore === id}
-                    onClick={() => setExplore(id as string)}
-                  >
-                    {title}
+                  {
+                    id: "health",
+                    title: t("健康", "Health"),
+                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
+                    icon: "M3 12h4l3-8 4 16 3-8h4",
+                  },
+                  {
+                    id: "footprints",
+                    title: t("足迹", "Footprints"),
+                    description: t("看看来路，探索下一站", "Trace your journey, explore what is next"),
+                    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
+                  },
+                  {
+                    id: "news",
+                    title: t("资讯", "News"),
+                    description: t("阅读关心的事，保留真实来源", "Read what matters, keep its sources"),
+                    icon: "M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h4",
+                  },
+                  {
+                    id: "directions",
+                    title: t("方向", "Directions"),
+                    description: t("把想法变成可以尝试的一步", "Turn an idea into a step you can try"),
+                    icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4 6-2 6-6 2 2-6 6-2Z",
+                  },
+                ].map(({ id, title, description, icon }) => (
+                  <button type="button" key={id} aria-pressed={explore === id} onClick={() => setExplore(id)}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d={icon} />
+                    </svg>
+                    <span>
+                      <strong>{title}</strong>
+                      <small>{description}</small>
+                    </span>
                   </button>
                 ))}
-              </div>
-            </div>
+              </nav>
+            </section>
             <div className={css.child}>
               {explore === "health" ? (
                 <HealthPage {...child} />

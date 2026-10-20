@@ -653,7 +653,7 @@ export function PaperMap({
         >
           −
         </button>
-        <button type="button" onClick={onShowList}>
+        <button type="button" className={css.listToggle} onClick={onShowList}>
           {t("城市与工具", "Cities and tools")}
         </button>
       </fieldset>
