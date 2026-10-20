@@ -1,0 +1,141 @@
+{
+  "base": "/tmp/kaitu-v4-withdrawal-8CtIiJ",
+  "root": "/tmp/kaitu-v4-withdrawal-8CtIiJ/workspace",
+  "names": {
+    "A": "ios-3fa9c1d2-01M5AXY9S3EXK89KMMYQB94AHJ.records.jsonl",
+    "B": "ios-3fa9c1d2-01M5AXYCDZ5DC6BK46HR0B7D4C.records.jsonl",
+    "C": "ios-3fa9c1d2-01M5AXYHHGQFWJB5PF8W9MN5DP.records.jsonl"
+  },
+  "counts": [
+    {
+      "stage": "A-added",
+      "count": 1,
+      "titles": [
+        "V4 withdrawal A"
+      ]
+    },
+    {
+      "stage": "B-withdraws-A",
+      "count": 0,
+      "titles": []
+    },
+    {
+      "stage": "A-late-replay",
+      "count": 1,
+      "titles": [
+        "V4 withdrawal A"
+      ]
+    },
+    {
+      "stage": "C-new-content-replaces-B",
+      "count": 2,
+      "titles": [
+        "V4 withdrawal A",
+        "V4 new operation C"
+      ]
+    },
+    {
+      "stage": "B-late-replay",
+      "count": 1,
+      "titles": [
+        "V4 new operation C"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "label": "init",
+      "args": [
+        "init",
+        "/tmp/kaitu-v4-withdrawal-8CtIiJ/workspace"
+      ],
+      "ms": 2388.452063,
+      "exit": 0
+    },
+    {
+      "label": "A-added",
+      "args": [
+        "phone",
+        "run"
+      ],
+      "ms": 2587.108549,
+      "exit": 0
+    },
+    {
+      "label": "B-withdraws-A",
+      "args": [
+        "phone",
+        "run"
+      ],
+      "ms": 2622.4384389999996,
+      "exit": 0
+    },
+    {
+      "label": "A-late-replay",
+      "args": [
+        "phone",
+        "run"
+      ],
+      "ms": 2563.246510000001,
+      "exit": 0
+    },
+    {
+      "label": "C-new-content-replaces-B",
+      "args": [
+        "phone",
+        "run"
+      ],
+      "ms": 2574.448842,
+      "exit": 0
+    },
+    {
+      "label": "B-late-replay",
+      "args": [
+        "phone",
+        "run"
+      ],
+      "ms": 2643.3954209999993,
+      "exit": 0
+    }
+  ],
+  "receipts": {
+    "format": "kaitu.phone.receipts",
+    "version": 1,
+    "generated_at": "2026-10-19T20:34:23.426Z",
+    "items": [
+      {
+        "ref": "ios-3fa9c1d2-01M5AXY9S3EXK89KMMYQB94AHJ.records.jsonl",
+        "kind": "file",
+        "status": "applied",
+        "at": "2026-10-19T20:34:18.208Z"
+      },
+      {
+        "ref": "ios-3fa9c1d2-01M5AXYCDZ5DC6BK46HR0B7D4C.records.jsonl",
+        "kind": "file",
+        "status": "applied",
+        "at": "2026-10-19T20:34:23.426Z"
+      },
+      {
+        "ref": "ios-3fa9c1d2-01M5AXYHHGQFWJB5PF8W9MN5DP.records.jsonl",
+        "kind": "file",
+        "status": "applied",
+        "at": "2026-10-19T20:34:20.790Z"
+      }
+    ]
+  },
+  "ledger": {
+    "ios-3fa9c1d2-01M5AXYHHGQFWJB5PF8W9MN5DP.records.jsonl": {
+      "agent": "iPhone",
+      "records": [
+        {
+          "type": "task",
+          "id": "01M5AXYKV46K9ZZXFX6AYY8CXH"
+        }
+      ]
+    },
+    "ios-3fa9c1d2-01M5AXYCDZ5DC6BK46HR0B7D4C.records.jsonl": {
+      "agent": "iPhone",
+      "records": []
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "format": "kaitu.phone.week",
+  "version": 1,
+  "generated_at": "2026-10-19T20:25:25.313Z",
+  "generator": {
+    "kind": "agent",
+    "name": "V4-cloud",
+    "spec": 1
+  },
+  "from": "2026-10-13",
+  "to": "2026-10-19",
+  "projects": [],
+  "health": {
+    "workouts": null,
+    "workout_days": 0,
+    "sleep_avg_hours": null,
+    "protein_avg_g": null,
+    "weight": null
+  },
+  "notes": {
+    "captured": 0
+  },
+  "changes": []
+}

@@ -1,0 +1,6 @@
+{
+  "format": "kaitu.phone.receipts",
+  "version": 1,
+  "generated_at": "2026-10-19T20:25:25.313Z",
+  "items": []
+}

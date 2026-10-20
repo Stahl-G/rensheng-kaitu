@@ -1,0 +1,13 @@
+{
+  "projectionMs": 3.2183020000002216,
+  "todayBytes": 19796,
+  "weekBytes": 302060,
+  "mapBytes": 64143,
+  "unchangedWrites": 0,
+  "actions100Ms": 99.77259799999956,
+  "appliedActions": 100,
+  "duplicateRevisions": 0,
+  "debounceObservedMs": 3701.660275000001,
+  "listInvestmentsMs": 58.39913499999966,
+  "completionRateMsPerCall": 0.005288386000000173
+}
