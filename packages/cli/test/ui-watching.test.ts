@@ -1,4 +1,4 @@
-import fs, { mkdtempSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import fs, { mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -91,19 +91,20 @@ it("首次异步盘点期间收到的收件箱文件仍会自动处理", async (
   const scanStarted = new Promise<void>((resolve) => {
     signalScan = resolve;
   });
-  const actualOpendir = fs.promises.opendir.bind(fs.promises);
-  let held = false;
-  const opening = vi.spyOn(fs.promises, "opendir").mockImplementation(async (path, options) => {
-    if (!held && String(path) === realpathSync(root)) {
-      held = true;
-      signalScan();
-      await scanHeld;
-    }
-    return actualOpendir(path, options);
-  });
+  let opening: { mockRestore: () => void } | undefined;
   try {
     const ws = await initWorkspace(root);
     ws.writeText("inbox/agents/before.note.md", "合成初始原文");
+    const actualOpendir = fs.promises.opendir.bind(fs.promises);
+    let held = false;
+    opening = vi.spyOn(fs.promises, "opendir").mockImplementation(async (path, options) => {
+      if (!held && String(path).toLowerCase().includes("kaitu-ui-inbox-baseline-")) {
+        held = true;
+        signalScan();
+        await scanHeld;
+      }
+      return actualOpendir(path, options);
+    });
     ui = await startUi(ws, { port: 0, open: false, refreshDelayMs: 30, inboxStableMs: 0 });
     await scanStarted;
     await expect.poll(() => ws.exists("inbox/agents/before.note.md")).toBe(false);
@@ -113,7 +114,7 @@ it("首次异步盘点期间收到的收件箱文件仍会自动处理", async (
     expect(inboxNotes(ws).some((note) => note.content.includes("合成盘点期间原文"))).toBe(true);
   } finally {
     releaseScan();
-    opening.mockRestore();
+    opening?.mockRestore();
     await ui?.close();
     rmSync(root, { recursive: true, force: true });
   }
