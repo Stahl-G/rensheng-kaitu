@@ -514,6 +514,14 @@ output.progress,
   background: var(--kt-primary);
   color: var(--kt-on-primary);
 }
+.approvalActions {
+  padding: 0 12px 12px;
+  margin-top: 0;
+}
+.approvalStatus {
+  display: block;
+  padding: 0 12px 12px;
+}
 .mobileNew {
   display: none;
 }

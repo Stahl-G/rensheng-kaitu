@@ -76,7 +76,7 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
     body: JSON.stringify(args),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.error ?? "操作未完成，请重试");
+  if (!response.ok) throw Object.assign(new Error(value.error ?? "操作未完成，请重试"), { code: value.code });
   return value;
 }
 function text(content: unknown): string {
@@ -151,6 +151,84 @@ function Tool({
       <pre>
         {name} {String(event.data.arguments ?? "")} {message && `\n${text(message.content)}`}
       </pre>
+    </details>
+  );
+}
+
+function NativeApproval({
+  event,
+  resolution,
+  session,
+}: { event: ChatEvent; resolution?: ChatEvent; session: string }) {
+  const t = useT();
+  const [responding, setResponding] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+  const data = event.data as {
+    requestId: string;
+    reason: string;
+    detail: string;
+    options: { optionId: string; kind: string; name: string }[];
+  };
+  const allow = data.options.find(
+    (option) => option.kind === "allow_once" || (option.kind === "allow" && option.optionId === "allow_once"),
+  );
+  const status = resolution?.data.status as string | undefined;
+  const labels: Record<string, string> = {
+    approved: t("已批准这一次", "Approved once"),
+    rejected: t("已拒绝这一次", "Rejected"),
+    expired: t("请求已过期，未批准", "Request expired without approval"),
+    cancelled: t("请求已取消，未批准", "Request cancelled without approval"),
+  };
+  const answer = async (optionId: string | null) => {
+    if (responding || submitted || status) return;
+    setResponding(true);
+    setError("");
+    try {
+      await call("askPermission", session, data.requestId, optionId);
+      setSubmitted(true);
+    } catch (err) {
+      if (err && typeof err === "object" && "code" in err && err.code === "CONFLICT") setSubmitted(true);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setResponding(false);
+    }
+  };
+  return (
+    <details open className={css.tool}>
+      <summary>{data.reason || t("本机 Agent 请求批准这一步", "The local Agent requests approval")}</summary>
+      <pre>{data.detail}</pre>
+      {status ? (
+        <output className={css.approvalStatus}>{labels[status]}</output>
+      ) : (
+        <>
+          {error && (
+            <p role="alert" className={css.approvalStatus}>
+              {error}
+            </p>
+          )}
+          {submitted && !error && (
+            <output className={css.approvalStatus}>
+              {t("已回复，等待 Agent 继续…", "Response sent. Waiting for the Agent…")}
+            </output>
+          )}
+          <div className={`${css.actions} ${css.approvalActions}`}>
+            <button type="button" disabled={responding || submitted} onClick={() => void answer(null)}>
+              {t("拒绝这一次", "Reject")}
+            </button>
+            {allow && (
+              <button
+                type="button"
+                disabled={responding || submitted}
+                title={allow.name}
+                onClick={() => void answer(allow.optionId)}
+              >
+                {responding ? t("正在回复…", "Responding…") : t("批准这一次", "Approve once")}
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </details>
   );
 }
@@ -890,6 +968,17 @@ export function AskPage({
               if (call)
                 return <Tool key={event.id} event={call} session={selected ?? ""} result={event} finished />;
             }
+            if (event.type === "approval/asked" && typeof data.requestId === "string")
+              return (
+                <NativeApproval
+                  key={`${selected}:${event.id}`}
+                  session={selected ?? ""}
+                  event={event}
+                  resolution={events.find(
+                    (item) => item.type === "approval/resolved" && item.data.requestId === data.requestId,
+                  )}
+                />
+              );
             if (event.type === "approval/asked")
               return (
                 <details key={event.id} className={css.tool}>
