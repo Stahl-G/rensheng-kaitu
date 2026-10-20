@@ -8,11 +8,12 @@ it("降权与资料搬迁期间旧完整 Agent 不能再接收请求，关闭失
   const temp = mkdtempSync(join(tmpdir(), "kaitu-ask-gate-"));
   let release: (() => void) | undefined;
   let fail = false;
+  let fullOnly = false;
   const calls: string[] = [];
   const ask = createAskService({
     state: temp,
     workspace: join(temp, "workspace"),
-    settings: async () => ({ configured: true, provider: "synthetic", model: "synthetic" }),
+    settings: async () => ({ configured: true, provider: "synthetic", model: "synthetic", fullOnly }),
     configure: async () => ({}),
     runtime: async (mode): Promise<AskRuntime> => {
       let notify: Parameters<AskRuntime["onNotification"]>[0] = () => {};
@@ -35,10 +36,12 @@ it("降权与资料搬迁期间旧完整 Agent 不能再接收请求，关闭失
     },
   });
   try {
-    const row = ask.create();
+    const row = await ask.create();
     await expect(ask.setMode(row.id, "full", false)).rejects.toThrow();
-    await ask.setMode(row.id, "full", true);
+    fullOnly = true;
+    await ask.setMode(row.id, "full", false);
     await ask.send(row.id, "synthetic first");
+    fullOnly = false;
     const switching = ask.setMode(row.id, "scoped", false);
     await Promise.resolve();
     await expect(ask.send(row.id, "during switch")).rejects.toThrow();
@@ -55,9 +58,11 @@ it("降权与资料搬迁期间旧完整 Agent 不能再接收请求，关闭失
     await moving;
     await expect(ask.send(row.id, "during copy")).rejects.toThrow();
     ask.relocate(join(temp, "workspace"));
-    await ask.setMode(row.id, "full", true);
+    fullOnly = true;
+    await ask.setMode(row.id, "full", false);
     await ask.send(row.id, "full again");
     fail = true;
+    fullOnly = false;
     await expect(ask.setMode(row.id, "scoped", false)).rejects.toThrow();
     await expect(ask.send(row.id, "must not reuse full")).rejects.toThrow();
     expect(calls).toEqual(["full", "scoped", "full"]);

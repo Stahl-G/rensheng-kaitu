@@ -15,7 +15,7 @@ export async function suggestProjectGoal(
   const project = readProjectPage(ws, slug);
   if (!ask || !(await ask.settings()).configured)
     throw new KaituError("请先到「AI 与连接」连接 AI，也可以手动填写目标", "AI_NOT_CONFIGURED");
-  const thread = ask.create();
+  const thread = await ask.create();
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

@@ -6,7 +6,7 @@ export function phoneAnswer(ask?: AskService) {
     if (!ask || !(await ask.settings()).configured) return "请先在电脑上的开图里连接 AI";
     signal.throwIfAborted();
     const service = ask.background("phone-ask");
-    const thread = service.create();
+    const thread = await service.create();
     return new Promise<string>((resolve, reject) => {
       let answer = "";
       const finish = (error?: Error) => {

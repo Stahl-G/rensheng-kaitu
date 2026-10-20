@@ -64,7 +64,7 @@ it("独立研究保存建议，用户采纳和拒绝后换批保留决定与来�
     },
   });
   try {
-    const chat = ask.create();
+    const chat = await ask.create();
     const first = await directionGeneration(ws, true, ask);
     expect(first?.status).toBe("running");
     await vi.waitFor(() => expect(first?.status).toBe("done"), { timeout: 10000 });

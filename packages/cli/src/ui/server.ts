@@ -776,7 +776,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       const status =
         code === "CONFLICT" ? 409 : code === "TOO_LARGE" ? 413 : code === "NOT_FOUND" ? 404 : 400;
       json(res, status, {
-        ...(req.url?.startsWith("/api/product/ask") ? { code } : {}),
+        ...(req.url?.startsWith("/api/product/ask") || req.url === "/api/product/onboardingMatterOrganize"
+          ? { code }
+          : {}),
         error: known
           ? known.message
           : req.url?.startsWith("/api/product/ask")
