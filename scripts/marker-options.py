@@ -10,7 +10,7 @@ paths = {
  'C': ('三折坐标', '沿用真实 logo 的三折地图，立起的折页下端落在城市坐标。', '<path d="M-16-22L-5-26 5-22 16-26V-5L5-1-5-5-16-1Z" fill="currentColor" opacity=".75"/><path d="M-5-26V-5M5-22V-1" stroke="var(--paper,#fff)" fill="none" stroke-width="1.5"/><path d="M0-3V3" stroke="currentColor" stroke-width="2"/><circle cy="4" r="3" fill="currentColor"/>')
 }
 for key,(name,desc,shape) in paths.items():
-    (dest/f'marker-{key}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-36 -24 64 52" role="img" aria-label="{name}" style="color:#2B4C7E;--paper:#f2eadf">{shape}</svg>')
+    (dest/f'marker-{key}.svg').write_text(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-36 -32 72 64" role="img" aria-label="{name}" style="color:#2B4C7E;--paper:#f2eadf">{shape}</svg>')
     body=''
     for index,theme in enumerate(['light','dark']):
         y=170+index*385
