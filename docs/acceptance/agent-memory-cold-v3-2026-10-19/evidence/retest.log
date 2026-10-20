@@ -1,0 +1,23 @@
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid add handoffs/20261019T2030-cold-agent.md
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid commit -m Include first synthetic handoff
+[main 3cceec4] Include first synthetic handoff
+ 1 file changed, 10 insertions(+)
+ create mode 100644 handoffs/20261019T2030-cold-agent.md
+
+exit=0
+$ git -c user.name=Cold Read Synthetic -c user.email=cold-read@example.invalid push
+To /tmp/kaitu-cold-v3/memory.git
+   8a61a54..3cceec4  main -> main
+
+exit=0
+$ git clone /tmp/kaitu-cold-v3/memory.git /tmp/kaitu-cold-v3/fixed-second
+Cloning into '/tmp/kaitu-cold-v3/fixed-second'...
+done.
+
+exit=0
+$ git rev-parse HEAD
+3cceec478332301a6f09b4073359b00b090d483f
+
+exit=0

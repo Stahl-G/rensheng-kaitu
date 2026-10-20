@@ -1,0 +1,36 @@
+以下为独立 Agent 在原始接入结束后报告的实际读取来源；这是事后审计报告，不冒充完整原始工具转录。
+
+指南：/tmp/kaitu-cold-v3/repo/docs/guides/agent-memory/ADD_DEVICE.md
+上级说明：/tmp/kaitu-cold-v3/repo/AGENTS.md
+临时克隆：/tmp/kaitu-memory-device-uhcL1Y/memory
+来源 bare：/tmp/kaitu-cold-v3/second-agent.git，基线 e96ebf5d002df4d750ec4c904e92c72f0ef76b21
+项目远端：git ls-remote /tmp/kaitu-cold-v3/project.git refs/heads/main → 0384784245e087c875b83e3546ee315849e80779
+
+实际读取（相对临时克隆）：
+AGENT-README.md
+AGENTS.md
+me/profile.md
+me/rules.md
+memory/MEMORY.md
+OVERVIEW.md
+me/goals.json
+me/ongoing.json
+NOW.md
+projects/paperboat/STATUS.md
+projects/paperboat/log.md
+handoffs/20261019T2030-cold-agent.md
+kaitu-backup.json
+calendar/STATUS.md
+explore/STATUS.md
+feed/STATUS.md
+finance/STATUS.md
+health/STATUS.md
+me/STATUS.md
+
+rg 匹配行：projects/module.json、me/module.json（未完整读取）。未读取 INSTALL，最终回答中 INSTALL 第 5 步引用来自 ADD_DEVICE。
+
+Agent 报告实际命令包括：cat 指南；for p 检查上级 AGENTS；command -v kaitu || true；ls -ld 源 bare；mktemp -d；真实 git clone；rg --files；多次 cat；git log / remote -v / status；rg 来源检索；git ls-remote 项目；find handoffs；git pull --ff-only；date -u；apply_patch 新交接；git add 指定新交接；git -c user.name='Synthetic Independent Agent' -c user.email='independent-agent@example.invalid' commit；git status / log。
+
+所有命令工具记录退出 0；无 kaitu 路径输出，因此只证明 PATH 中无可执行命令，未进行安装检测。一次批量 cat 约 11145 tokens 的返回被截断，后续对关键档案/项目/交接再次单独读取且未截断。原始 stdout/stderr 在 Agent 会话工具记录中合并为 output，未另存到文件；此次审计未重跑命令补证。
+
+主测试者事后只读复核：真实本地提交 34153a2 仅新增 handoffs/20261019T2034-independent-agent.md，23 行；git status 干净；源 bare 保持 e96ebf5d002df4d750ec4c904e92c72f0ef76b21。复核差异保存 agent-commit.txt。

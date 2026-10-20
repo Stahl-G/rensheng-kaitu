@@ -1,0 +1,6 @@
+远端独立克隆逐字节核对通过：
+me/profile.md
+projects/paperboat/STATUS.md
+projects/paperboat/log.md
+handoffs/20261019T2030-cold-agent.md
+HEAD=3cceec478332301a6f09b4073359b00b090d483f
