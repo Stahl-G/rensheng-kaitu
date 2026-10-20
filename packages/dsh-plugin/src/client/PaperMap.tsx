@@ -559,14 +559,14 @@ export function PaperMap({
         {mode === "now" && data.me && (
           <p>
             {t(cityNames[String(data.me.geonameid)] ?? data.me.name, data.me.name)} ·{" "}
-            {t("最近的居住记录，不代表实时位置", "Latest residence record, not live location")}
+            {t("最近的居住记录", "Latest residence record")}
           </p>
         )}
         {mode === "history" && data.undated > 0 && (
           <p>
             {t(
-              `另有 ${data.undated} 段居住时间不明，不连线`,
-              `${data.undated} undated residences are not connected`,
+              `另有 ${data.undated} 段居住记录未注明时间`,
+              `${data.undated} residences with unspecified dates`,
             )}
           </p>
         )}
@@ -659,7 +659,7 @@ export function PaperMap({
       </fieldset>
       <span className={css.routeKey}>
         {mode === "now"
-          ? t("城市级位置 · 现居记录，不是实时定位", "City-level record · Not live location")
+          ? t("城市级位置 · 现居记录", "City-level record · Current residence")
           : mode === "possible"
             ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
             : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines show experience order")}

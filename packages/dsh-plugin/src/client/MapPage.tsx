@@ -867,13 +867,13 @@ export function MapPage({
               {showRoutes ? "隐藏经历连线" : "显示经历连线"}
             </button>
           </div>
-          <p className={css.mapFootnote}>城市级位置 · 连线只表示经历顺序，不代表实际交通路线</p>
+          <p className={css.mapFootnote}>城市级位置 · 连线表示经历顺序</p>
           <details className={css.review}>
             <summary>{t("地图资料去向", "Map data and connections")}</summary>
             <p>
               {t(
-                "全球底图保存在本机。拉近城市时，按视野向 OpenFreeMap 和 AWS Terrain Tiles 下载瓦片；服务器会知道请求的地图区域与常规网络信息，不会收到经历文字或档案。不开启实时定位。",
-                "The global map is local. Zooming into cities downloads visible tiles from OpenFreeMap and AWS Terrain Tiles. Providers receive the requested map area and ordinary network metadata, without experience text or profile content. No live location tracking is used.",
+                "全球底图保存在本机。拉近城市时，按视野向 OpenFreeMap 和 AWS Terrain Tiles 下载瓦片；请求包含地图区域与常规网络信息。",
+                "The global map is local. Zooming into cities downloads visible tiles from OpenFreeMap and AWS Terrain Tiles. Requests include the map area and ordinary network metadata.",
               )}
             </p>
           </details>
