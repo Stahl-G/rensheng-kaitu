@@ -597,7 +597,11 @@ export function disconnectWorkspaceBackup(ws: Workspace) {
 export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "local" | "remote") {
   const s = state(ws);
   const conflict = s.conflicts.find((c) => c.path === path);
-  if (!conflict) throw new Error(pick("找不到待处理的冲突", "Conflict not found"));
+  if (!conflict)
+    throw new KaituError(
+      pick("找不到待处理的冲突，请刷新", "Conflict not found; refresh the list"),
+      "CONFLICT",
+    );
   // 清单按连接范围生成，本机没有这个文件：不读写磁盘，用户范围保持不变。
   if (path === manifest) {
     s.conflicts = s.conflicts.filter((c) => c.path !== path);
@@ -608,11 +612,12 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   if (current !== conflict.local) {
     conflict.local = current;
     store(ws, s);
-    throw new Error(
+    throw new KaituError(
       pick(
         "本机文件又有修改，已更新对照内容，请重新选择",
         "The local file changed; review the updated comparison and choose again",
       ),
+      "CONFLICT",
     );
   }
   // 两份原文保留在本机历史文件，作者选择后也能回看。
