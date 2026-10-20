@@ -17,6 +17,8 @@ import {
   type LearningCheckinInput,
   type LearningTopic,
   type LibraryData,
+  type MemoryExpectation,
+  type MemoryInput,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoiceResult,
@@ -45,6 +47,7 @@ import {
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  archiveMemory,
   bindGithub,
   calendarPushEntries,
   calendarPushStore,
@@ -104,12 +107,12 @@ import {
   readSettings,
   recoverExperienceImports,
   removeAvatar,
+  replaceMemory,
   resolveExperience,
   resolvePlace,
   resolvePreferences,
   restore,
   saveAvatar,
-  saveCurrentCity,
   saveHometown,
   saveLearningCheckin,
   saveNewsKeywords,
@@ -533,6 +536,16 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.write(() => captureNote(this.workspace, text));
   }
 
+  @Remote("archiveMemory")
+  async archiveMemory(file: string, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => archiveMemory(this.workspace, file, { by: "user", expected }));
+  }
+
+  @Remote("replaceMemory")
+  async replaceMemory(file: string, candidate: MemoryInput, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => replaceMemory(this.workspace, file, candidate, { by: "user", expected }));
+  }
+
   @Remote("news")
   async news(): Promise<NewsData> {
     return readNews(this.workspace);
@@ -593,11 +606,6 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("saveHometown")
   async saveHometown(name: string, geonameid: number): Promise<Hometown> {
     return this.write(() => saveHometown(this.workspace, name, geonameid));
-  }
-
-  @Remote("saveCurrentCity")
-  async saveCurrentCity(name: string, geonameid: number): Promise<void> {
-    return this.write(() => saveCurrentCity(this.workspace, name, geonameid));
   }
 
   @Remote("lifeMap")

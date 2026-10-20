@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kaitu.local/schemas/memory.schema.json",
-  "title": "memory/<type>_<slug>.md frontmatter",
+  "title": "memory/<稳定文件名>.md frontmatter",
   "type": "object",
   "required": ["type", "name", "text", "created", "updated"],
   "properties": {
@@ -11,6 +11,12 @@
     "source": { "type": "string" },
     "created": { "type": "string", "format": "date" },
     "updated": { "type": "string", "format": "date" },
-    "sensitive": { "type": "boolean" }
+    "sensitive": { "type": "boolean" },
+    "ended": { "type": "string", "format": "date", "description": "用户确认这条记忆不再成立的日期" },
+    "replaced_by": {
+      "type": "string",
+      "pattern": "^[^./\\\\][^/\\\\]*\\.md$",
+      "description": "替换它的新记忆文件名；记忆改标题或类型也不改文件名"
+    }
   }
 }
