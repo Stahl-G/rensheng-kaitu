@@ -1,0 +1,84 @@
+{
+  "baseline": "e2d9cd83a176bf2fc6b35bc1dabe7f92f32bc9d6",
+  "candidate": "b3494204a2904209b99d59128d5fb2abd1bae938",
+  "scope": "Local integration QA only; do not merge this aggregate branch without original PR review",
+  "prs": [
+    {
+      "number": 66,
+      "title": "修复照片经历批量确认与整批撤销闭环",
+      "source": "f732b7dd6355a18c93323bafbb9b3802779a48b6",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/66"
+    },
+    {
+      "number": 65,
+      "title": "足迹第1步：纸本地图三态与标记候选",
+      "source": "f1303ca51cbb5bdc08488eec115ab9f74d520bdc",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/65"
+    },
+    {
+      "number": 64,
+      "title": "feat: add optional phone nutrition snapshot with durable coverage",
+      "source": "00bea3075112902a863fde936cd97d1f516d38a9",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/64"
+    },
+    {
+      "number": 63,
+      "title": "fix: V5 失败恢复保留具体原因与真实 HTTP 验收",
+      "source": "832fcf0f04f76a3e89dae8831455cd8f4a1977dc",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/63"
+    },
+    {
+      "number": 62,
+      "title": "fix: 手机记录重投去重与 V4 官方模板 CLI 往返验收",
+      "source": "a092270ff37f20200ddf5a7e8446684d54b46fc3",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/62"
+    },
+    {
+      "number": 61,
+      "title": "docs: V3 冷读受阻记录、首次交接上传与状态格式说明",
+      "source": "e751c688d2d3801cf86368383f5fb8b871a8db9b",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/61"
+    },
+    {
+      "number": 60,
+      "title": "perf: V2 基线与健康投影、监听和版本保存修复",
+      "source": "e1c05315e96fde3de20eebbeb61ad4302cc6a96b",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/60"
+    },
+    {
+      "number": 59,
+      "title": "Keep full indexing, export, restore and polling responsive",
+      "source": "8d2f2c380109a144d5c17c5504dea00b33b09331",
+      "base": "codex/desktop-demand-io",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/59"
+    },
+    {
+      "number": 58,
+      "title": "桌面 IO 审计：按需加载资料、分页原文并移除重复全量读取",
+      "source": "46b91c2aa73272c49df7f88f62e556f5f784d4a1",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/58"
+    },
+    {
+      "number": 57,
+      "title": "学习主题：接入提问教学、OpenMAIC 卡片与保存接续",
+      "source": "4ce68d4afb2fcb16a1fb522eef75202ba51a5ee3",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/57"
+    },
+    {
+      "number": 54,
+      "title": "fix: Windows 问问短路径与飞书 CLI，清理逐文件摘要和重复回归",
+      "source": "4cc51db6c912ab6b4f5ed0ff819c84065109c7d6",
+      "base": "main",
+      "url": "https://github.com/Stahl-G/rensheng-kaitu/pull/54"
+    }
+  ]
+}
