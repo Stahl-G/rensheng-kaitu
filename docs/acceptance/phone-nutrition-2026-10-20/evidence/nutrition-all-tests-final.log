@@ -1,0 +1,10 @@
+$ vitest run
+
+ RUN  v4.1.11 /workspace/rensheng-kaitu
+
+
+ Test Files  94 passed | 1 skipped (95)
+      Tests  279 passed | 2 skipped (281)
+   Start at  23:58:03
+   Duration  141.34s (transform 5.07s, setup 1.05s, import 43.66s, tests 224.44s, environment 11ms)
+

@@ -1,0 +1,25 @@
+{
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl": {
+    "agent": "iPhone",
+    "records": [],
+    "superseded": true
+  },
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MQ.records.jsonl": {
+    "agent": "iPhone",
+    "records": [],
+    "superseded": true
+  },
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MR.records.jsonl": {
+    "agent": "iPhone",
+    "records": []
+  },
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MS.records.jsonl": {
+    "agent": "iPhone",
+    "records": [
+      {
+        "type": "meal",
+        "id": "01M5B9PZ8V5FN6BJT5S71ZSDYT"
+      }
+    ]
+  }
+}

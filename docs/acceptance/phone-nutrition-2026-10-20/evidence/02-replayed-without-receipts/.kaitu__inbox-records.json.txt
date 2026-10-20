@@ -1,0 +1,11 @@
+{
+  "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl": {
+    "agent": "iPhone",
+    "records": [
+      {
+        "type": "meal",
+        "id": "01M5B9PHRWZ6H8TE9AFSJX6J8M"
+      }
+    ]
+  }
+}

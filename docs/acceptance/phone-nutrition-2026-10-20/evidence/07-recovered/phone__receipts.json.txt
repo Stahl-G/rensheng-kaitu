@@ -1,0 +1,31 @@
+{
+  "format": "kaitu.phone.receipts",
+  "version": 1,
+  "generated_at": "2026-10-19T23:59:55.850Z",
+  "items": [
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl",
+      "kind": "file",
+      "status": "duplicate",
+      "at": "2026-10-19T23:59:50.646Z"
+    },
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MQ.records.jsonl",
+      "kind": "file",
+      "status": "applied",
+      "at": "2026-10-19T23:59:45.320Z"
+    },
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MR.records.jsonl",
+      "kind": "file",
+      "status": "applied",
+      "at": "2026-10-19T23:59:48.128Z"
+    },
+    {
+      "ref": "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MS.records.jsonl",
+      "kind": "file",
+      "status": "duplicate",
+      "at": "2026-10-19T23:59:55.850Z"
+    }
+  ]
+}

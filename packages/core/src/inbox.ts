@@ -262,8 +262,11 @@ async function prepare(ws: Workspace, file: string, text: string) {
           const records: Receipt["records"] = [];
           for (const [key, rows] of groups) {
             const [type, by] = key.split("|") as [string, "user" | "agent"];
-            // experience 有自己的来源/批次事务；不改变它的协议。
-            if (type === "experience") throw new KaituError("手机经历请通过原文提交", "BAD_INBOX");
+            // 经历沿用既有幂等导入，在准备 meal 事务前完成，不改变来源/批次协议。
+            if (type === "experience") {
+              await addExperiences(ws, rows as unknown as ExperienceInput[], by);
+              continue;
+            }
             for (const result of addRecords(ws, type, rows, { by, dryRun: true })) {
               entries.push({ type, record: result.record });
               records.push({ type, id: result.record.id });

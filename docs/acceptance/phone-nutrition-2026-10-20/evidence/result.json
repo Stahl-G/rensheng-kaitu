@@ -1,0 +1,14 @@
+{
+  "code": "/tmp/kaitu-nutrition-integration",
+  "root": "/tmp/kaitu-nutrition-cli-dD2UHC",
+  "output": "/tmp/nutrition-cli-evidence",
+  "day": "2026-10-20",
+  "refs": [
+    "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl",
+    "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MQ.records.jsonl",
+    "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MR.records.jsonl",
+    "ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MS.records.jsonl"
+  ],
+  "preparedId": "01M5B9PZ8V5FN6BJT5S71ZSDYT",
+  "result": "passed"
+}
