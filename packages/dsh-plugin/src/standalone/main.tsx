@@ -55,9 +55,10 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections) => (
+  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, active) => (
     <AskPage
       workspace={workspace}
+      active={active}
       initialPrompt={prompt}
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}

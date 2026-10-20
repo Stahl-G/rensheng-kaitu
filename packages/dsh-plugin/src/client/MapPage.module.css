@@ -713,7 +713,7 @@ body[data-ds-dark-theme] .page,
   order: -1;
 }
 .mapPane {
-  height: max(520px, calc(100dvh - 180px));
+  height: var(--footprint-map-height, max(520px, calc(100dvh - 180px)));
   border-radius: 12px;
 }
 .layout .listPane {
@@ -856,4 +856,12 @@ body[data-ds-dark-theme] .page,
 .mapPane [class~="maplibregl-ctrl-attrib-inner"]:hover,
 .mapPane [class~="maplibregl-ctrl-attrib-inner"]:focus-within {
   max-height: 180px;
+}
+
+.listPane > .listHeading:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--kt-card);
+  padding-bottom: 12px;
 }

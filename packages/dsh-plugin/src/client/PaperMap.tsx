@@ -31,6 +31,7 @@ export function PaperMap({
   showAllPlaces = false,
   asOf,
   current,
+  currentFromProfile = !!current,
   onAdd,
 }: {
   cities: City[];
@@ -40,13 +41,14 @@ export function PaperMap({
   showRoutes: boolean;
   showAllPlaces?: boolean;
   asOf: string;
-  current?: Place;
+  current?: Place | null;
+  currentFromProfile?: boolean;
   onAdd: (state: FootprintState) => void;
 }) {
   const t = useT();
   const [mode, setMode] = useState<FootprintState>("now");
   const [ready, setReady] = useState(false);
-  const [detailUnavailable, setDetailUnavailable] = useState(false);
+  const [detailStatus, setDetailStatus] = useState<"offline" | "unavailable" | null>(null);
   const [cityZoom, setCityZoom] = useState(false);
   const [failure, setFailure] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -156,7 +158,7 @@ export function PaperMap({
     const details = async () => {
       if (!m || m.getZoom() < 6 || remoteLoaded || remoteLoading || !m.isStyleLoaded()) return;
       if (!navigator.onLine) {
-        setDetailUnavailable(true);
+        setDetailStatus(navigator.onLine ? "unavailable" : "offline");
         return;
       }
       remoteLoading = true;
@@ -239,9 +241,9 @@ export function PaperMap({
             "footprint-history",
           );
         remoteLoaded = true;
-        setDetailUnavailable(false);
+        setDetailStatus(null);
       } catch {
-        if (!disposed) setDetailUnavailable(true);
+        if (!disposed) setDetailStatus(navigator.onLine ? "unavailable" : "offline");
       } finally {
         remoteLoading = false;
         if (!disposed && generation !== styleGeneration) void details();
@@ -322,7 +324,6 @@ export function PaperMap({
         }
         update(instance);
         setReady(true);
-        camera();
         void details();
       });
       m.on("idle", () => {
@@ -335,7 +336,7 @@ export function PaperMap({
       });
       m.on("error", (e) => {
         if ("sourceId" in e && e.sourceId === "paper-earth") setFailure(true);
-        else setDetailUnavailable(true);
+        else setDetailStatus(navigator.onLine ? "unavailable" : "offline");
       });
       m.on("click", (e) => {
         const features = instance.queryRenderedFeatures(e.point, { layers: ["footprint-cities"] });
@@ -354,7 +355,7 @@ export function PaperMap({
       observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     const resize = new ResizeObserver(() => m?.resize());
     resize.observe(el);
-    const offline = () => setDetailUnavailable(true);
+    const offline = () => setDetailStatus("offline");
     const online = () => {
       remoteLoaded = false;
       void details();
@@ -374,10 +375,23 @@ export function PaperMap({
       m?.remove();
       URL.revokeObjectURL(worker);
     };
-  }, [camera, update]);
+  }, [update]);
+  const cameraKey = JSON.stringify(
+    mode === "now"
+      ? [mode, data.me?.lng, data.me?.lat]
+      : mode === "history"
+        ? [
+            mode,
+            data.history.map((p) => [p.lng, p.lat]),
+            data.routes.features
+              .filter((f) => f.properties.kind === "history")
+              .map((f) => [f.geometry.coordinates[0], f.geometry.coordinates.at(-1)]),
+          ]
+        : [mode],
+  );
   useEffect(() => {
-    if (map.current && ready) camera({ mode, data });
-  }, [mode, data, ready, camera]);
+    if (map.current && ready && cameraKey) camera();
+  }, [cameraKey, ready, camera]);
   useEffect(() => {
     if (map.current && ready) update(map.current, { mode, data, selected, showRoutes, showAllPlaces });
   }, [mode, data, selected, showRoutes, showAllPlaces, ready, update]);
@@ -405,8 +419,10 @@ export function PaperMap({
           <p>
             {data.me.name} ·{" "}
             {t(
-              current ? "来自档案现居城市" : "最近的居住记录，不代表实时位置",
-              current ? "Current city from your profile" : "Latest residence record, not live location",
+              currentFromProfile ? "来自档案现居城市" : "最近的居住记录，不代表实时位置",
+              currentFromProfile
+                ? "Current city from your profile"
+                : "Latest residence record, not live location",
             )}
           </p>
         )}
@@ -448,12 +464,17 @@ export function PaperMap({
           </button>
         </div>
       )}
-      {cityZoom && detailUnavailable && (
+      {cityZoom && detailStatus && (
         <output className={css.mapNotice}>
-          {t(
-            "需要联网才能看城市细节 · 全球底图仍可浏览",
-            "Connect to view city details · The global map remains available",
-          )}
+          {detailStatus === "offline"
+            ? t(
+                "需要联网才能看城市细节 · 全球底图仍可浏览",
+                "Connect to view city details · The global map remains available",
+              )
+            : t(
+                "城市细节暂不可用 · 全球底图仍可浏览",
+                "City details are temporarily unavailable · The global map remains available",
+              )}
         </output>
       )}
       {!ready && !failure && (

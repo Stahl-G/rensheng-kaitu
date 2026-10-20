@@ -4,7 +4,7 @@ import { cityKey } from "./life-map-visuals.js";
 
 export type FootprintState = "now" | "history" | "possible";
 export type Place = Experience["place"];
-export const coordinate = (p?: Place): p is Place & { lng: number; lat: number } =>
+export const coordinate = (p?: Place | null): p is Place & { lng: number; lat: number } =>
   p?.precision === "city" && Number.isFinite(p.lng) && Number.isFinite(p.lat);
 const real = (e: Experience, asOf: string) =>
   !e.review &&
@@ -54,7 +54,7 @@ export function greatCircle(from: Place, to: Place) {
   });
 }
 
-export function footprintData(items: Experience[], asOf: string, current?: Place) {
+function residenceData(items: Experience[], asOf: string) {
   const actual = items.filter((e) => real(e, asOf) && coordinate(e.place));
   const lived = actual.filter((e) => e.event_type === "lived");
   const timed = lived
@@ -73,6 +73,10 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
       return start && interval ? [{ e, interval, start }] : [];
     })
     .sort((a, b) => a.start.from.localeCompare(b.start.from));
+  return { actual, lived, timed };
+}
+
+function residenceAnchor({ lived, timed }: ReturnType<typeof residenceData>, asOf: string) {
   // A tied/overlapping latest residence cannot establish a current city.
   const latest = timed.at(-1);
   const latestConflict =
@@ -84,13 +88,19 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
         v.start.from <= latest.start.to &&
         cityKey(v.e.place) !== cityKey(latest.e.place),
     );
-  const me = coordinate(current)
-    ? current
-    : latest && !latestConflict
-      ? latest.e.place
-      : lived.length === 1
-        ? lived[0]?.place
-        : undefined;
+  return latest && !latestConflict ? latest.e.place : lived.length === 1 ? lived[0]?.place : undefined;
+}
+
+/** Resolve the current anchor from the COMPLETE factual dataset before display filters. */
+export function footprintAnchor(items: Experience[], asOf: string, profileCity?: Place) {
+  return coordinate(profileCity) ? profileCity : residenceAnchor(residenceData(items, asOf), asOf);
+}
+
+/** null is an explicitly unresolved full-data anchor; never infer one from a filtered subset. */
+export function footprintData(items: Experience[], asOf: string, current?: Place | null) {
+  const residences = residenceData(items, asOf);
+  const { actual, lived, timed } = residences;
+  const me = current === null ? undefined : coordinate(current) ? current : residenceAnchor(residences, asOf);
   const points = (rows: Experience[]) => [...new Map(rows.map((e) => [cityKey(e.place), e.place])).values()];
   const possible = items.filter(
     (e) => !e.review && coordinate(e.place) && ["planned", "suggested"].includes(e.fact_status),

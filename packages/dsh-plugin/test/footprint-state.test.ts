@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { footprintData, greatCircle } from "../src/client/footprint-state.js";
+import { footprintAnchor, footprintData, greatCircle } from "../src/client/footprint-state.js";
 import type { Experience } from "../src/types.js";
 
 const city = (id: number, lng: number, lat = 35): Experience["place"] => ({
@@ -71,4 +71,24 @@ it("大圆经过跨日界线短边且所有坐标有限；对跖点不编造方�
   expect(arc?.every((p) => p.every(Number.isFinite))).toBe(true);
   expect((arc?.at(-1)?.[0] ?? 0) - (arc?.[0]?.[0] ?? 0)).toBeCloseTo(11);
   expect(greatCircle(city(1, 0, 0), city(2, 180, 0))).toBeNull();
+});
+
+it("年份和图层过滤不能把当前锚点改成旧居或清空计划出发点", () => {
+  const old = item(1, "2010-01-01", "2012-12-31");
+  const recent = item(2, "2020-01-01", undefined);
+  const plan = item(3, "2030-01-01", undefined, { fact_status: "planned" });
+  const anchor = footprintAnchor([old, recent, plan], "2026-10-20");
+  expect(anchor).toEqual(recent.place);
+  expect(footprintData([old], "2026-10-20", anchor ?? null).me).toEqual(recent.place);
+  const plannedOnly = footprintData([plan], "2026-10-20", anchor ?? null);
+  expect(plannedOnly.me).toEqual(recent.place);
+  expect(plannedOnly.routes.features).toHaveLength(1);
+  expect(plannedOnly.routes.features[0]?.geometry.coordinates[0]?.[0]).toBeCloseTo(
+    recent.place.lng as number,
+  );
+  // A full-data conflict stays unresolved even if a filter happens to leave one city.
+  const conflict = { ...recent, id: "conflict", place: city(4, 140) };
+  const unknown = footprintAnchor([recent, conflict], "2026-10-20");
+  expect(unknown).toBeUndefined();
+  expect(footprintData([recent], "2026-10-20", unknown ?? null).me).toBeUndefined();
 });

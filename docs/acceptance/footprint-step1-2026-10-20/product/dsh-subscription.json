@@ -1,0 +1,647 @@
+{
+  "host": "isolated DSH 0.2.1-rc.2",
+  "visibility": "visible",
+  "before": {
+    "x": 858,
+    "y": 608
+  },
+  "panned": {
+    "x": 1023,
+    "y": 649
+  },
+  "samples": [
+    {
+      "x": 1023,
+      "y": 649,
+      "trafficCount": 70
+    },
+    {
+      "x": 1023,
+      "y": 649,
+      "trafficCount": 79
+    },
+    {
+      "x": 1023,
+      "y": 649,
+      "trafficCount": 89
+    }
+  ],
+  "trafficBefore": 54,
+  "traffic": [
+    {
+      "kind": "http",
+      "path": "/",
+      "method": "GET",
+      "time": 123897.662034,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/",
+      "method": "GET",
+      "time": 123897.667112,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/plugins/",
+      "method": "GET",
+      "time": 123897.689559,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/plugins/",
+      "method": "GET",
+      "time": 123897.689682,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/plugins/",
+      "method": "GET",
+      "time": 123897.689705,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/assets/index-CN7NIWNw.js",
+      "method": "GET",
+      "time": 123897.689736,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/assets/vendor-DcuzkuQH.js",
+      "method": "GET",
+      "time": 123897.689759,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/assets/vendor-DV2921Zo.css",
+      "method": "GET",
+      "time": 123897.689785,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/assets/index-BxpfOGf3.css",
+      "method": "GET",
+      "time": 123897.689827,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/manifest.webmanifest",
+      "method": "GET",
+      "time": 123897.700724,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/settings/describe",
+      "method": "POST",
+      "time": 123897.986083,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "POST",
+      "time": 123897.993677,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/plugins/events",
+      "method": "GET",
+      "time": 123898.010503,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/dynamicCordisRunner/inventory",
+      "method": "POST",
+      "time": 123898.162596,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.172207,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123898.216002,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/brand",
+      "method": "POST",
+      "time": 123898.216579,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/session/modelCatalog",
+      "method": "POST",
+      "time": 123898.252355,
+      "mapCall": false
+    },
+    {
+      "kind": "ws",
+      "bytes": 120,
+      "time": 123898.307042
+    },
+    {
+      "kind": "ws",
+      "bytes": 117,
+      "time": 123898.307083
+    },
+    {
+      "kind": "ws",
+      "bytes": 108,
+      "time": 123898.307096
+    },
+    {
+      "kind": "http",
+      "path": "/api/session/list",
+      "method": "POST",
+      "time": 123898.341561,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/permissionPresets/catalog",
+      "method": "POST",
+      "time": 123898.342125,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/dynamicCordisRunner/inventory",
+      "method": "POST",
+      "time": 123898.342433,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/session/modelCatalog",
+      "method": "POST",
+      "time": 123898.34296,
+      "mapCall": false
+    },
+    {
+      "kind": "ws",
+      "bytes": 116,
+      "time": 123898.34461
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.353646,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.354017,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.354234,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/settings/describe",
+      "method": "POST",
+      "time": 123898.354594,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/dynamicCordisRunner/syncInspectManifest",
+      "method": "POST",
+      "time": 123898.355068,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/dshVersion",
+      "method": "POST",
+      "time": 123898.362646,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/favicon.svg",
+      "method": "GET",
+      "time": 123898.366641,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.381579,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.38199,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/credentials/describe",
+      "method": "POST",
+      "time": 123898.382218,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/session/projections",
+      "method": "POST",
+      "time": 123898.385481,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/session/create",
+      "method": "POST",
+      "time": 123898.392959,
+      "mapCall": false
+    },
+    {
+      "kind": "ws",
+      "bytes": 300,
+      "time": 123898.423341
+    },
+    {
+      "kind": "http",
+      "path": "/api/commands/list",
+      "method": "POST",
+      "time": 123898.431342,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/skills/list",
+      "method": "POST",
+      "time": 123898.431711,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123902.001803,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/preferences",
+      "method": "POST",
+      "time": 123903.710644,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/overview",
+      "method": "POST",
+      "time": 123903.714674,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendar",
+      "method": "POST",
+      "time": 123903.714954,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/library",
+      "method": "POST",
+      "time": 123903.715138,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/me",
+      "method": "POST",
+      "time": 123903.715308,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/onboarding",
+      "method": "POST",
+      "time": 123903.715476,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendarPush",
+      "method": "POST",
+      "time": 123903.715654,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123904.216588,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/health",
+      "method": "POST",
+      "time": 123905.517681,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/lifeMap",
+      "method": "POST",
+      "time": 123905.924943,
+      "mapCall": true
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/exploration",
+      "method": "POST",
+      "time": 123905.925427,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123907.217016,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/overview",
+      "method": "POST",
+      "time": 123908.718009,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendar",
+      "method": "POST",
+      "time": 123908.718317,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/library",
+      "method": "POST",
+      "time": 123908.718476,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/me",
+      "method": "POST",
+      "time": 123908.718625,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/onboarding",
+      "method": "POST",
+      "time": 123908.718766,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendarPush",
+      "method": "POST",
+      "time": 123908.718901,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123910.217427,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/lifeMap",
+      "method": "POST",
+      "time": 123910.927151,
+      "mapCall": true
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/exploration",
+      "method": "POST",
+      "time": 123910.927543,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123913.216736,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/overview",
+      "method": "POST",
+      "time": 123913.717782,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendar",
+      "method": "POST",
+      "time": 123913.718126,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/library",
+      "method": "POST",
+      "time": 123913.718319,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/me",
+      "method": "POST",
+      "time": 123913.718589,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/onboarding",
+      "method": "POST",
+      "time": 123913.718803,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendarPush",
+      "method": "POST",
+      "time": 123913.718967,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/lifeMap",
+      "method": "POST",
+      "time": 123915.927019,
+      "mapCall": true
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/exploration",
+      "method": "POST",
+      "time": 123915.927623,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123916.217215,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/overview",
+      "method": "POST",
+      "time": 123918.717199,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendar",
+      "method": "POST",
+      "time": 123918.717504,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/library",
+      "method": "POST",
+      "time": 123918.717668,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/me",
+      "method": "POST",
+      "time": 123918.717821,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/onboarding",
+      "method": "POST",
+      "time": 123918.717966,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendarPush",
+      "method": "POST",
+      "time": 123918.718121,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123919.21728,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/lifeMap",
+      "method": "POST",
+      "time": 123920.92671,
+      "mapCall": true
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/exploration",
+      "method": "POST",
+      "time": 123920.927351,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/aiDraft",
+      "method": "POST",
+      "time": 123922.217698,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/overview",
+      "method": "POST",
+      "time": 123923.717757,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendar",
+      "method": "POST",
+      "time": 123923.718057,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/library",
+      "method": "POST",
+      "time": 123923.718228,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/me",
+      "method": "POST",
+      "time": 123923.718396,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/onboarding",
+      "method": "POST",
+      "time": 123923.71855,
+      "mapCall": false
+    },
+    {
+      "kind": "http",
+      "path": "/api/kaitu/calendarPush",
+      "method": "POST",
+      "time": 123923.718689,
+      "mapCall": false
+    }
+  ],
+  "remoteCalls": [],
+  "errors": []
+}

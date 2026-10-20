@@ -172,12 +172,14 @@ function Tool({ event, result, finished }: { event: ChatEvent; result?: ChatEven
 
 export function AskPage({
   workspace,
+  active = true,
   initialPrompt = "",
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
 }: {
   workspace: string;
+  active?: boolean;
   initialPrompt?: string;
   configureRequest?: number;
   configureBuiltin?: boolean;
@@ -483,9 +485,9 @@ export function AskPage({
     return () => window.removeEventListener("kaitu-ai-changed", refresh);
   }, []);
   useEffect(() => {
-    if (step) dialog.current?.showModal();
+    if (step && active) dialog.current?.showModal();
     else dialog.current?.close();
-  }, [step]);
+  }, [step, active]);
   useEffect(() => {
     activeSession.current = selected;
     setEvents([]);

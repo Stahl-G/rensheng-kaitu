@@ -7,13 +7,7 @@
     "webgl": true
   },
   "onlineCity": {
-    "sources": [
-      "paper-earth",
-      "footprint-routes",
-      "footprint-cities",
-      "openmaptiles",
-      "paper-terrain"
-    ],
+    "sources": ["paper-earth", "footprint-routes", "footprint-cities", "openmaptiles", "paper-terrain"],
     "notice": "合成验收 · 不读取个人资料\n浅 / 深\n300城市 / 2000经历\n切换无数据\n未选城市\nNatural Earth | OpenFreeMap © OpenMapTiles Data from OpenStreetMap | Terrain data: Mapzen; ArcticDEM: DigitalGlobe imagery, funded by NSF awards 1043681, 1559691 and 1542736; Australia © Commonwealth of Australia (Geoscience Australia) 2017; Austria © offene Daten Österreichs – Digitales Geländemodell (DGM) Österreich; Canada: contains information licensed under the Open Government Licence – Canada; Europe: produced using Copernicus data and information funded by the European Union, EU-DEM; Global ETOPO1: DOC/NOAA/NESDIS/NCEI, U.S. Department of Commerce (U.S. Government material, not subject to copyright within the United States); Mexico: INEGI, Continental relief, 2016; New Zealand: Copyright 2011 Crown copyright © Land Information New Zealand and the New Zealand Government (all rights reserved); Norway © Kartverket; UK © Environment Agency copyright/database right 2015 (all rights reserved); US 3DEP and global GMTED2010/SRTM courtesy of the U.S. Geological Survey. Provider licences and full credits\n我在这里。\n\n住过 6 个城市 · 去过 20 个\n\n上海 · 来自档案现居城市\n\n此刻\n来路\n可能\n+\n−\n城市与工具\n城市级位置 · 连线表示经历顺序",
     "layers": [
       "paper-water",

@@ -12,6 +12,7 @@ import { HometownEditor } from "./HometownEditor.js";
 import css from "./MapPage.module.css";
 import { PaperMap } from "./PaperMap.js";
 import { SourceEvidence } from "./SourceEvidence.js";
+import { footprintAnchor } from "./footprint-state.js";
 import { useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 
@@ -289,6 +290,10 @@ export function MapPage({
       group.layers.sort((a, b) => layers.findIndex((l) => l.id === a) - layers.findIndex((l) => l.id === b));
     return [...groups.values()].sort((a, b) => Number(!!b.home) - Number(!!a.home));
   }, [data, enabled, year, from, to]);
+  const anchor = useMemo(
+    () => (data ? footprintAnchor(data.experiences, data.asOf, data.currentPlace) : undefined),
+    [data],
+  );
   const home = data?.hometown?.status === "ready" ? data.hometown.place : undefined;
   const homeId = home ? cityId(home) : null;
   const timeline = cities
@@ -698,7 +703,8 @@ export function MapPage({
               onShowList={showMapList}
               showRoutes={showRoutes}
               showAllPlaces={showAllPlaces}
-              current={data.currentPlace}
+              current={anchor ?? null}
+              currentFromProfile={!!data.currentPlace}
               asOf={data.asOf}
               onAdd={(mode) =>
                 mode === "now"
@@ -710,7 +716,30 @@ export function MapPage({
                     )
               }
             />
-            <section className={css.listPane} aria-label="城市列表">
+            <section
+              className={css.listPane}
+              aria-label="城市列表"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setView("map");
+                  setSelected(null);
+                }
+              }}
+            >
+              <div className={css.listHeading}>
+                <strong>{t("城市与工具", "Cities and tools")}</strong>
+                <button
+                  type="button"
+                  className={css.control}
+                  onClick={() => {
+                    setView("map");
+                    setSelected(null);
+                  }}
+                  aria-label={t("关闭城市列表", "Close city list")}
+                >
+                  {t("关闭", "Close")}
+                </button>
+              </div>
               {!!data.review.length && (
                 <details className={css.review}>
                   <summary>
