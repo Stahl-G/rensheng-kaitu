@@ -460,6 +460,7 @@ export function MapPage({
           subscribe={subscribe}
           onChanged={refresh}
           pending={data?.importsPending ?? 0}
+          reviewPending={data?.review.length ?? 0}
         />
         <button type="button" className={css.control} onClick={() => setEditingCurrent(true)}>
           {t("设置现居城市", "Set current city")}
