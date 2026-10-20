@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { KaituError, type Workspace, captureNote } from "@kaitu/core";
+import { cliCommand } from "./local-agents/agents.js";
 
 const run = promisify(execFile);
 // 飞书文档和修改时间的对应只记在本机，原文仍是普通的待整理笔记。
@@ -17,8 +18,10 @@ interface FeishuFile {
 async function lark<T>(cli: string, args: string[]): Promise<T> {
   let stdout: string;
   try {
-    ({ stdout } = await run(cli, [...args, "--as", "user", "--format", "json"], {
+    const [command, ...prefix] = cliCommand(cli, process.env);
+    ({ stdout } = await run(command, [...prefix, ...args, "--as", "user", "--format", "json"], {
       maxBuffer: 64 * 1024 * 1024,
+      windowsHide: true,
     }));
   } catch (error) {
     const { code, stderr } = error as { code?: string; stderr?: string };

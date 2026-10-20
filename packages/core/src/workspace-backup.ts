@@ -457,6 +457,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
   const run = async () => {
     const c = s.connection as BackupConnection;
     try {
+      refreshOverview(ws);
       const local = await localFiles(ws, c);
       const other = await remote.read(c.repo, c.branch);
       if (!other.head && Object.keys(s.base).length) throw new Error("Remote branch unavailable");
@@ -624,6 +625,7 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   else s.base[path] = conflict.remote;
   s.conflicts = s.conflicts.filter((c) => c.path !== path);
   store(ws, s);
+  if (choice === "remote") refreshOverview(ws);
   return workspaceBackupStatus(ws);
 }
 export async function restoreWorkspaceBackup(
@@ -682,6 +684,7 @@ export async function restoreWorkspaceBackup(
     conflicts: [],
     lastSync: new Date().toISOString(),
   });
+  refreshOverview(ws);
   return { root: ws.root };
 }
 export function startWorkspaceBackup(ws: Workspace, notify: () => void = () => {}, intervalMs = 60000) {

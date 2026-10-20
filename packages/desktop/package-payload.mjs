@@ -96,6 +96,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     platform: "node",
     format: "esm",
     target: "node22",
+    banner: { js: nodeBanner },
   });
   await build({
     entryPoints: [join(root, "packages/core/dist/health-import-worker.js")],
