@@ -146,8 +146,19 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
           geometry: { type: "LineString", coordinates: arc },
         });
     }
+  const firstRoutePoint = historyRoutes[0]?.geometry.coordinates[0];
+  const origin = firstRoutePoint
+    ? timed.find(
+        ({ e }) =>
+          Math.abs((e.place.lng ?? 0) - (firstRoutePoint[0] ?? 0)) < 1e-6 &&
+          Math.abs((e.place.lat ?? 0) - (firstRoutePoint[1] ?? 0)) < 1e-6,
+      )?.e.place
+    : timed.length === 1
+      ? timed[0]?.e.place
+      : undefined;
   return {
     me,
+    origin,
     all: points([...actual, ...possible]),
     lived: points(lived),
     history: points(timed.map((v) => v.e)),

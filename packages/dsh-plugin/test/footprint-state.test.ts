@@ -43,6 +43,7 @@ it("来路只连接已发生且有时间的居住，不把家乡、旅行、推�
     "2026-10-20",
   );
   expect(data.history.map((p) => p.geonameid)).toEqual([1, 2]);
+  expect(data.origin).toEqual(first.place);
   expect(data.routes.features).toHaveLength(1);
   expect(data.routes.features[0]?.geometry.coordinates[0]?.[0]).toBeCloseTo(80);
   expect(data.routes.features[0]?.geometry.coordinates[0]?.[1]).toBeCloseTo(35);
@@ -63,6 +64,7 @@ it("重叠居住、同年未知先后不连线，计划建议保持各自线型�
   expect(data.routes.features.map((f) => f.properties.kind)).toEqual(["planned", "suggested"]);
   for (const f of data.routes.features) expect(f.geometry.coordinates[0]?.[0]).toBeCloseTo(121.47);
   expect(footprintData([a, b], "2026-10-20").me).toBeUndefined();
+  expect(footprintData([a, b], "2026-10-20").origin).toBeUndefined();
 });
 
 it("大圆经过跨日界线短边且所有坐标有限；对跖点不编造方向", () => {

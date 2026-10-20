@@ -154,7 +154,7 @@ export function PaperMap({
       const meLabel = meMarker.current?.getElement().querySelector("span");
       if (meLabel) meLabel.textContent = data.me ? `我 · ${data.me.name}` : "";
       originLabel.current?.remove();
-      const origin = data.history[0];
+      const origin = data.origin;
       if (mode === "history" && coordinate(origin) && cityKey(origin) !== (data.me && cityKey(data.me))) {
         const label = document.createElement("span");
         label.className = css.cityLabel ?? "";
