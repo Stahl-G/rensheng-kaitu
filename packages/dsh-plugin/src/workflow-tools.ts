@@ -60,7 +60,7 @@ import {
   restore,
   saveLearningCheckin,
   saveOnboardingChoices,
-  searchChats,
+  searchChatsAsync,
   searchMemories,
   setProject,
   snapshot,
@@ -124,7 +124,8 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     name: string,
     description: string,
     schema: T,
-    run: (input: z.infer<T>) => unknown | Promise<unknown>,
+    run: (input: z.infer<T>, options: { signal: AbortSignal }) => unknown | Promise<unknown>,
+    readOnly = false,
   ) {
     ctx.tools.register({
       name,
@@ -134,16 +135,18 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         schema: { type: "object", additionalProperties: true },
         render: (_args, value) => [{ type: "text", text: JSON.stringify(value) }],
       },
-      execute: (args, exec) =>
-        queue(async () => {
+      execute: (args, exec) => {
+        const execute = async () => {
           try {
             exec.signal.throwIfAborted();
             recordOnboardingAiConnection(ws, "DSH");
-            return { ok: true, result: await run(schema.parse(args)) };
+            return { ok: true, result: await run(schema.parse(args), { signal: exec.signal }) };
           } catch (error) {
             return { ok: false, error: (error as Error).message };
           }
-        }),
+        };
+        return readOnly ? execute() : queue(execute);
+      },
     });
   }
   register(
@@ -290,7 +293,8 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     "kaitu_search_chats",
     "检索已导入的历史对话，返回来源路径。",
     z.object({ query: text, limit: z.number().int().min(1).max(100).optional() }).strict(),
-    ({ query, limit }) => searchChats(ws, query, { limit }),
+    ({ query, limit }, options) => searchChatsAsync(ws, query, { limit, ...options }),
+    true,
   );
   register(
     "kaitu_workspace",

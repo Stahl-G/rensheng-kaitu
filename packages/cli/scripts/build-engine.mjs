@@ -9,6 +9,7 @@ const output = join(root, "packages/cli/dist/engine");
 const desktop = join(root, "packages/desktop");
 mkdirSync(output, { recursive: true });
 for (const [name, entry] of Object.entries({
+  "data-worker": join(root, "packages/core/src/data-worker-entry.ts"),
   service: join(root, "packages/cli/runtime/service.mjs"),
   "mcp-stdio": join(root, "packages/cli/dist/local-agents/mcp-stdio.js"),
   "sdk-plugin": join(root, "packages/dsh-plugin/src/index.ts"),

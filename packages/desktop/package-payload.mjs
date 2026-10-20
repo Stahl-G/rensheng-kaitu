@@ -22,6 +22,16 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }),
   );
   await build({
+    entryPoints: [join(root, "packages/core/src/data-worker-entry.ts")],
+    outfile: join(payload, "dist/data-worker.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["@deepseek-ai/*", "better-sqlite3"],
+  });
+  await build({
     entryPoints: [join(directory, "plugin.mjs")],
     outfile: join(payload, "dist/index.js"),
     bundle: true,

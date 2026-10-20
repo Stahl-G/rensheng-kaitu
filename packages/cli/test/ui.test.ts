@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,9 +11,9 @@ import {
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { appleHealthZip } from "../../core/test/helpers.js";
-import { startUi } from "../src/ui/server.js";
+import { type UiOptions, startUi } from "../src/ui/server.js";
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -221,5 +221,64 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
     expect(disabled.status).toBe(200);
     expect((await disabled.json()).mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
+  }
+});
+
+it("监听失效的完整元数据扫描等待 IO 时仍能浏览，完成前不发布半份盘点，关闭会取消后续扫描", async () => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "kaitu-polling-ui-")));
+  const ws = await initWorkspace(root);
+  mkdirSync(join(root, "poll"));
+  for (let i = 0; i < 40; i++) writeFileSync(join(root, "poll", `${i}.txt`), "synthetic");
+  const held = realpathSync.native(join(root, "poll/0.txt"));
+  let release!: () => void;
+  let entered!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let block = true;
+  const original = fs.promises.lstat.bind(fs.promises);
+  const io = vi.spyOn(fs.promises, "lstat").mockImplementation(async (...args) => {
+    if (String(args[0]) === held && block) {
+      entered();
+      await gate;
+    }
+    return original(...args);
+  });
+  let ui: Awaited<ReturnType<typeof startUi>> | undefined;
+  try {
+    ui = await startUi(ws, {
+      port: 0,
+      open: false,
+      refreshDelayMs: 20,
+      watch: (() => {
+        throw Object.assign(new Error("Synthetic unavailable file events"), { code: "EMFILE" });
+      }) as UiOptions["watch"],
+    });
+    await waiting;
+    const call = async (method: string, ...args: unknown[]) => {
+      const response = await fetch(`${ui?.url}/api/product/${method}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Kaitu": "1", Origin: ui?.url as string },
+        body: JSON.stringify(args),
+      });
+      expect(response.status).toBe(200);
+      return response.json();
+    };
+    expect((await call("fileWatchStatus")).running).toBe(true);
+    expect((await call("library", { section: "summary" })).sections).toHaveLength(6);
+    block = false;
+    release();
+    await vi.waitFor(async () => expect((await call("fileWatchStatus")).scanned).toBeGreaterThanOrEqual(40));
+    await ui.close();
+    ui = undefined;
+  } finally {
+    block = false;
+    release();
+    if (ui) await ui.close();
+    io.mockRestore();
+    rmSync(root, { recursive: true, force: true });
   }
 });

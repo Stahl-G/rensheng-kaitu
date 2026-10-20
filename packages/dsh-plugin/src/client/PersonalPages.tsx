@@ -12,6 +12,7 @@ import { type PluginRequest, Plugins } from "./Plugins.js";
 import css from "./Prototype.module.css";
 import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
 import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.js";
+import { WorkspaceExport } from "./WorkspaceExport.js";
 import { aiHandover } from "./connections.js";
 import { type Locale, useT } from "./i18n.js";
 
@@ -27,7 +28,9 @@ export interface PersonalServices extends CalendarPushServices {
     tasks: Partial<Record<AutomationKey, boolean>>,
     times?: Partial<Record<AutomationKey, string>>,
   ) => Promise<AutomationSettings>;
-  exportWorkspace: () => Promise<{ name: string; base64: string }>;
+  exportWorkspaceRequest: (
+    action: "start" | "status" | "cancel" | "result",
+  ) => Promise<import("@kaitu/core").WorkspaceExportState>;
   restoreVersion: (oid: string) => Promise<unknown>;
   moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
   pickStorageFolder: () => Promise<string | null>;
@@ -566,33 +569,7 @@ export function PersonalPages(
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("资料", "Data")}</h2>
               <div className={`${css.card} ${css["list-card"]}`}>
-                <div className={css["switch-row"]}>
-                  <span>
-                    <b>{t("导出全部资料", "Export everything")}</b>
-                  </span>
-                  <button
-                    type="button"
-                    className={`${css.btn} ${css["btn-quiet"]}`}
-                    disabled={busy}
-                    onClick={() =>
-                      void run(
-                        async () => {
-                          const file = await props.exportWorkspace();
-                          const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
-                          const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
-                          const anchor = document.createElement("a");
-                          anchor.href = url;
-                          anchor.download = file.name;
-                          anchor.click();
-                          setTimeout(() => URL.revokeObjectURL(url), 10000);
-                        },
-                        t("导出文件已生成", "Export ready"),
-                      )
-                    }
-                  >
-                    {t("导出", "Export")}
-                  </button>
-                </div>
+                <WorkspaceExport request={props.exportWorkspaceRequest} />
                 <div className={css["switch-row"]}>
                   <span>
                     <b>{t("版本历史", "Version history")}</b>

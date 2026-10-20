@@ -31,7 +31,7 @@ import {
   recordReferences,
   removeMemory,
   resolvePlace,
-  searchChats,
+  searchChatsAsync,
   searchMemories,
   snapshot,
   syncProject,
@@ -83,7 +83,10 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     name: string,
     description: string,
     inputSchema: T,
-    operation: (input: z.infer<z.ZodObject<T>>) => unknown | Promise<unknown>,
+    operation: (
+      input: z.infer<z.ZodObject<T>>,
+      options: import("@kaitu/core").DataRunOptions,
+    ) => unknown | Promise<unknown>,
     mutates = false,
   ) => {
     const shape: z.ZodRawShape = inputSchema;
@@ -94,12 +97,30 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
         inputSchema: shape,
         annotations: { readOnlyHint: !mutates },
       },
-      (input) =>
-        wrap(() =>
-          mutates
-            ? write(() => Promise.resolve(operation(input as z.infer<z.ZodObject<T>>)))
-            : operation(input as z.infer<z.ZodObject<T>>),
-        ),
+      (input, extra) => {
+        const progressToken = extra._meta?.progressToken;
+        const options: import("@kaitu/core").DataRunOptions = {
+          signal: extra.signal,
+          progress:
+            progressToken === undefined
+              ? undefined
+              : (value) => {
+                  void extra
+                    .sendNotification({
+                      method: "notifications/progress",
+                      params: {
+                        progressToken,
+                        progress: value.completed,
+                        ...(value.total === undefined ? {} : { total: value.total }),
+                        message: value.phase,
+                      },
+                    })
+                    .catch(() => {});
+                },
+        };
+        const perform = () => operation(input as z.infer<z.ZodObject<T>>, options);
+        return wrap(() => (mutates ? write(() => Promise.resolve(perform())) : perform()));
+      },
     );
   };
   const text = z.string().min(1);
@@ -228,7 +249,7 @@ export function createMcpServer(ws: Workspace, tools: ToolSet = "all", write = w
     "search_chats",
     "检索历史对话，无需确认；结果包含来源路径。",
     { query: text, limit: z.number().int().min(1).max(100).optional() },
-    ({ query, limit }) => searchChats(ws, query, { limit }),
+    ({ query, limit }, options) => searchChatsAsync(ws, query, { limit, ...options }),
   );
   register(
     "read_file",

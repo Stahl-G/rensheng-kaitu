@@ -18,7 +18,7 @@ import { join, resolve } from "node:path";
 import {
   Workspace,
   enableDrive,
-  exportWorkspace,
+  exportWorkspaceAsync,
   historyDirectory,
   initWorkspace,
   localStateRoot,
@@ -149,10 +149,9 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
     process.env.KAITU_APP_HOME = join(root, "program");
     ws.writeText("program/credential.txt", secret);
     try {
-      const entries = unzipSync(Buffer.from(exportWorkspace(ws).base64, "base64")) as Record<
-        string,
-        Uint8Array
-      >;
+      const archive = await exportWorkspaceAsync(ws);
+      const entries = unzipSync(readFileSync(archive.path)) as Record<string, Uint8Array>;
+      await archive.dispose();
       const contents = Object.values(entries)
         .map((bytes) => Buffer.from(bytes).toString("utf8"))
         .join("\n");

@@ -8,6 +8,7 @@ import { setStateBinding } from "../src/state-binding.js";
 import {
   type BackupFiles,
   type BackupRemote,
+  cancelWorkspaceBackup,
   connectWorkspaceBackup,
   resolveWorkspaceBackup,
   restoreWorkspaceBackup,
@@ -94,11 +95,69 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   await syncWorkspaceBackup(a, m.remote);
   expect(b.readText("me/profile.md")).toBe("# From A\n");
   expect(a.readText("me/rules.md")).toContain("From B");
+  const incoming = await m.remote.read("synthetic/backup", "main");
+  for (let i = 0; i < 5; i++)
+    incoming.files[`inbox/notes/2026-10-19/remote-${i}.md`] = `Synthetic remote note ${i}`;
+  await m.remote.push("synthetic/backup", "main", incoming.head, incoming.files);
+  const overviewReads = vi.spyOn(a, "scanText");
+  await syncWorkspaceBackup(a, m.remote);
+  expect(overviewReads.mock.calls.filter(([file]) => file === ".kaitu/config.json")).toHaveLength(1);
+  overviewReads.mockRestore();
+  for (let i = 0; i < 5; i++)
+    expect(a.readText(`inbox/notes/2026-10-19/remote-${i}.md`)).toBe(`Synthetic remote note ${i}`);
+  // 新原文数量改变派生 OVERVIEW；按现有语义下一轮将它收敛到远端，再测真正 no-op。
+  await syncWorkspaceBackup(a, m.remote);
   const count = m.pushes();
   const checks = m.inspect.calls;
   await syncWorkspaceBackup(a, m.remote);
   expect(m.pushes()).toBe(count);
   expect(m.inspect.calls).toBe(checks);
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const stalled: BackupRemote = {
+    ...m.remote,
+    async read(_repo, _branch, options) {
+      options?.progress?.({ phase: "download", completed: 2, total: 20 });
+      entered();
+      await new Promise<void>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      });
+      throw new Error("cancelled");
+    },
+  };
+  const syncing = syncWorkspaceBackup(a, stalled);
+  await reading;
+  expect(workspaceBackupStatus(a).progress).toEqual({ phase: "download", completed: 2, total: 20 });
+  cancelWorkspaceBackup(a);
+  await syncing;
+  expect(workspaceBackupStatus(a).running).toBe(false);
+  expect(workspaceBackupStatus(a).error).toBeTruthy();
+  expect(m.pushes()).toBe(count);
+  expect(a.readText("me/profile.md")).toBe("# From A\n");
+  await syncWorkspaceBackup(a, m.remote);
+  expect(workspaceBackupStatus(a).error).toBeNull();
+  const partial = join(tmp(), "cancelled-restore");
+  const restoreAbort = new AbortController();
+  let restoredFiles = 0;
+  await expect(
+    restoreWorkspaceBackup(partial, a, { repo: "synthetic/backup" }, m.remote, {
+      signal: restoreAbort.signal,
+      progress: (value) => {
+        if (value.phase === "restore") {
+          restoredFiles = value.completed;
+          if (value.completed === 1) restoreAbort.abort();
+        }
+      },
+    }),
+  ).rejects.toMatchObject({ name: "AbortError" });
+  expect(restoredFiles).toBe(1);
+  expect(fs.existsSync(partial)).toBe(true);
+  expect(a.readText("me/profile.md")).toBe("# From A\n");
+  await expect(
+    restoreWorkspaceBackup(partial, a, { repo: "synthetic/backup" }, m.remote),
+  ).rejects.toMatchObject({ code: "TARGET_EXISTS" });
   const switching = new Workspace(a.root);
   await workspaceBackupRequest(switching, "activate", { root: target });
   expect(switching.root).toBe(target);

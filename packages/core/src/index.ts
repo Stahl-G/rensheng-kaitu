@@ -107,3 +107,4 @@ export * from "./organizer.js";
 
 export * from "./learning.js";
 export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
+export type { DataProgress, DataRunOptions } from "./data-worker.js";

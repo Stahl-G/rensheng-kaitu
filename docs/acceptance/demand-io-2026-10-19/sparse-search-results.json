@@ -1,0 +1,21 @@
+{
+  "files": 11000,
+  "sparse": {
+    "matches": [
+      {
+        "path": "00100.txt",
+        "lineNumber": 1,
+        "line": "needle"
+      }
+    ],
+    "scannedFiles": 10000,
+    "truncated": true,
+    "reason": "仅搜索前 10000 个候选文件，请缩小目录继续搜索 / Partial results: candidate limit reached; narrow the directory"
+  },
+  "empty": {
+    "matches": [],
+    "scannedFiles": 10000,
+    "truncated": true,
+    "reason": "仅搜索前 10000 个候选文件，请缩小目录继续搜索 / Partial results: candidate limit reached; narrow the directory"
+  }
+}

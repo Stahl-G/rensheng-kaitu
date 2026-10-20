@@ -46,6 +46,7 @@ import {
   removePhoto,
   renderTeachingFrame,
   restore,
+  serveWorkspaceExport,
   snapshotNow,
   stageUpload,
   startWorkspaceBackup,
@@ -53,7 +54,8 @@ import {
   syncProject,
   syncProjects,
   syncStatus,
-  workspaceFileStamps,
+  workspaceExportRequest,
+  workspaceFileStampsAsync,
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
@@ -67,6 +69,7 @@ export interface UiOptions {
   snapshotDelayMs?: number;
   versionDelayMs?: number;
   refreshDelayMs?: number;
+  watch?: typeof watch;
   inboxStableMs?: number;
   webRoot?: string;
   collectorStateRoot?: string;
@@ -202,6 +205,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
   let stamps = new Map<string, string>();
+  let pollingAbort: AbortController | undefined;
+  let pollingGeneration = 0;
+  let watchStatus = { mode: "native", running: false, scanned: 0 };
   const versionDelay = options.versionDelayMs ?? 2000;
   const snapshotDelay = options.snapshotDelayMs ?? 30000;
   holdOverview(ws);
@@ -301,37 +307,58 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     notify();
   };
   watchFile(backupState, { persistent: false, interval: 2000 }, backupChanged);
+  const stopPolling = () => {
+    pollingGeneration++;
+    pollingAbort?.abort();
+    pollingAbort = undefined;
+    clearTimeout(polling);
+    polling = undefined;
+    watchStatus.running = false;
+  };
   const startPolling = () => {
     watcher?.close();
-    if (polling) return;
-    // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
-    stamps = workspaceFileStamps(ws);
-    // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
-    changedFile("工作区");
-    scheduleInbox();
+    if (pollingAbort) return;
+    const controller = new AbortController();
+    pollingAbort = controller;
+    const generation = ++pollingGeneration;
+    let baseline = true;
     const delay = Math.max(50, options.refreshDelayMs ?? 1000);
-    function poll() {
+    const poll = async () => {
       const started = performance.now();
+      watchStatus = { mode: "polling", running: true, scanned: 0 };
       try {
-        const next = workspaceFileStamps(ws);
-        for (const file of new Set([...stamps.keys(), ...next.keys()])) {
-          if (stamps.get(file) !== next.get(file)) changedFile(file);
+        const next = await workspaceFileStampsAsync(ws, {
+          signal: controller.signal,
+          progress: (value) => {
+            watchStatus.scanned = value.completed;
+          },
+        });
+        if (closed || generation !== pollingGeneration) return;
+        if (baseline) {
+          baseline = false;
+          changedFile("工作区");
+          scheduleInbox();
+        } else {
+          for (const [file, stamp] of next) if (stamps.get(file) !== stamp) changedFile(file);
+          for (const file of stamps.keys()) if (!next.has(file)) changedFile(file);
         }
         stamps = next;
       } catch {
-        reportError();
+        if (!controller.signal.aborted) reportError();
+      } finally {
+        if (generation === pollingGeneration) watchStatus.running = false;
+        if (!closed && !controller.signal.aborted && generation === pollingGeneration)
+          polling = setTimeout(() => void poll(), Math.max(delay, performance.now() - started));
       }
-      // 慢扫描后至少留出同等空档，让后台文件 I/O 运行，避免轮询占满事件循环。
-      polling = setTimeout(poll, Math.max(delay, performance.now() - started));
-    }
-    polling = setTimeout(poll, delay);
+    };
+    void poll();
   };
   function startWatching() {
     watcher?.close();
-    clearTimeout(polling);
-    polling = undefined;
+    stopPolling();
+    watchStatus = { mode: "native", running: false, scanned: 0 };
     try {
-      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
+      watcher = (options.watch ?? watch)(ws.root, { recursive: true }, (_event, filename) => {
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
       });
       watcher.on("error", startPolling);
@@ -411,6 +438,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           ).toString(),
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
+        if (method === "fileWatchStatus") return json(res, 200, watchStatus);
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
         if (method === "desktopUpdate")
           return json(
@@ -519,6 +547,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           return res.end(html);
         }
+        if (url.pathname.startsWith("/api/export/"))
+          return await serveWorkspaceExport(ws, url.pathname.slice("/api/export/".length), res);
         if (url.pathname === "/api/ask/events" && options.ask) {
           const id = url.searchParams.get("session") ?? "";
           const history = options.ask.events(id);
@@ -751,6 +781,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
     }
     closed = true;
+    stopPolling();
+    await workspaceExportRequest(ws, "cancel");
     cancelGithubCliLogin();
     watcher?.close();
     unwatchFile(backupState, backupChanged);
@@ -781,6 +813,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       server.listen(requestedPort, "127.0.0.1", resolve);
     });
   } catch (error) {
+    stopPolling();
     watcher?.close();
     unwatchFile(backupState, backupChanged);
     stopBackup();

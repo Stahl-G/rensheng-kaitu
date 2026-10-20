@@ -64,6 +64,12 @@ export function WorkspaceBackup({
   );
   useEffect(() => refresh(), [refresh]);
   useEffect(() => subscribe?.(refresh), [subscribe, refresh]);
+  // 进度只刷新本面板；不为每个文件广播工作区变更、触发所有页面重新读取。
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [status?.running, refresh]);
   useEffect(() => {
     if (!loginPending) void checkGh();
   }, [checkGh, loginPending]);
@@ -86,8 +92,7 @@ export function WorkspaceBackup({
     try {
       const r = await request(action, input);
       setToken("");
-      if (action === "restore") setRestored((r as { root: string }).root);
-      else setStatus(r as Status);
+      setStatus(r as Status);
       if (action === "activate") {
         setRestored("");
         await onActivated();
@@ -98,6 +103,9 @@ export function WorkspaceBackup({
       setBusy(false);
     }
   };
+  useEffect(() => {
+    if (status?.restore?.status === "completed" && status.restore.root) setRestored(status.restore.root);
+  }, [status?.restore]);
   const c = status?.connection;
   return (
     <section id="workspace-backup" className={css.sec}>
@@ -131,12 +139,40 @@ export function WorkspaceBackup({
               : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
           </output>
         )}
+        {status?.running && (
+          <div>
+            <output aria-live="polite">
+              {
+                {
+                  scan: t("正在读取本机资料", "Reading local files"),
+                  download: t("正在读取远端资料", "Reading remote files"),
+                  merge: t("正在核对改动", "Checking changes"),
+                  upload: t("正在上传改动", "Uploading changes"),
+                  restore: t("正在写入新目录", "Writing the new folder"),
+                }[status.progress?.phase ?? "scan"]
+              }
+              {status.progress
+                ? ` · ${status.progress.completed}${status.progress.total === undefined ? "" : ` / ${status.progress.total}`}`
+                : ""}
+            </output>
+            <button type="button" className={css.link} disabled={busy} onClick={() => void run("cancel")}>
+              {status.restore?.status === "running"
+                ? t("取消恢复", "Cancel restore")
+                : t("取消本次同步", "Cancel this sync")}
+            </button>
+          </div>
+        )}
         {c && (
           <p className={css.small}>
             {t(
               `已保存同步范围：文字 ${c.text ? "启用" : "关闭"}；结构化资料 ${c.records ? "启用" : "关闭"}`,
               `Saved sync scope: text ${c.text ? "on" : "off"}; structured data ${c.records ? "on" : "off"}`,
             )}
+          </p>
+        )}
+        {status?.restore?.error && (
+          <p className={css.error} role="alert">
+            {status.restore.error}
           </p>
         )}
         {status?.error && (

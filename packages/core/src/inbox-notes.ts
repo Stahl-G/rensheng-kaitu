@@ -4,6 +4,7 @@ import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
+import { placeholderOriginal } from "./sync-files.js";
 import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
@@ -48,40 +49,52 @@ export function noteMetadata(text: string): Record<string, unknown> {
   }
 }
 
-export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
-  if (!ws.exists(directory)) return [];
-  return readdirSync(ws.resolve(directory), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name))
-    .flatMap((entry) => {
-      const dir = `${directory}/${entry.name}`;
-      return readdirSync(ws.resolve(dir), { withFileTypes: true })
-        .filter((file) => file.isFile() && file.name.endsWith(".md"))
-        .flatMap((file) => {
-          const path = `${dir}/${file.name}`;
-          // 原文没变时不重新读取和解析。
-          const note = ws.scanParsed(path, "note", (content) => ({
-            content,
-            data: noteMetadata(content),
-            firstLine:
-              frontmatterBody(content)
-                .split("\n")
-                .find((line) => line.trim())
-                ?.trim() ?? "（空）",
-          }));
-          return note
-            ? [
-                {
-                  path,
-                  agent: noteAgent(note.data.agent),
-                  date: note.data.date ?? entry.name,
-                  kind: note.data.kind,
-                  investment: note.data.investment,
-                  content: note.content,
-                  firstLine: note.firstLine,
-                },
-              ]
-            : [];
-        });
+function* noteFiles(ws: Workspace, directory: string, options: { from?: string } = {}) {
+  if (!ws.exists(directory)) return;
+  for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+    if (
+      !entry.isDirectory() ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(entry.name) ||
+      (options.from && entry.name < options.from)
+    )
+      continue;
+    const dir = `${directory}/${entry.name}`;
+    for (const file of readdirSync(ws.resolve(dir), { withFileTypes: true }))
+      if (file.isFile() && file.name.endsWith(".md")) yield { path: `${dir}/${file.name}`, date: entry.name };
+  }
+}
+/** 现状仅需要可用原文数量，不读取正文、解析 frontmatter 或排序。 */
+export function countInboxNotes(ws: Workspace, directory = "inbox/notes") {
+  let count = 0;
+  for (const { path } of noteFiles(ws, directory))
+    if (!ws.conflictCopy(path) && !placeholderOriginal(path) && !ws.isUnavailable(path)) count++;
+  return count;
+}
+export function inboxNotes(ws: Workspace, directory = "inbox/notes", options: { from?: string } = {}) {
+  return [...noteFiles(ws, directory, options)]
+    .flatMap(({ path, date }) => {
+      const note = ws.scanParsed(path, "note", (content) => ({
+        content,
+        data: noteMetadata(content),
+        firstLine:
+          frontmatterBody(content)
+            .split("\n")
+            .find((line) => line.trim())
+            ?.trim() ?? "（空）",
+      }));
+      return note
+        ? [
+            {
+              path,
+              agent: noteAgent(note.data.agent),
+              date: note.data.date ?? date,
+              kind: note.data.kind,
+              investment: note.data.investment,
+              content: note.content,
+              firstLine: note.firstLine,
+            },
+          ]
+        : [];
     })
     .sort((a, b) => b.path.localeCompare(a.path));
 }

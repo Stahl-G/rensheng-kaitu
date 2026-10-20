@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { CollectorService } from "@kaitu/channels/collectors";
@@ -66,7 +68,6 @@ import {
   dshFiles,
   editCalendarBlock,
   editExperience,
-  exportWorkspace,
   handoverPack,
   hideExperience,
   keepOnboardingMatter,
@@ -117,14 +118,18 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  serveWorkspaceExport,
   setExperienceSource,
   setNewsFeedback,
   snapshot,
   startLearning,
+  startWorkspaceExportDownloads,
   syncProject,
   tryNews,
   unhideExperience,
   workspaceBackupRequest,
+  workspaceBackupStatus,
+  workspaceExportRequest,
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
@@ -140,12 +145,14 @@ import type {
   ExplorationCommand,
   ExplorationData,
   HealthData,
+  LibraryQuery,
   LifeMapData,
   MeData,
   NewsAction,
   NewsData,
   OverviewData,
   ProjectDetailData,
+  WorkspaceExportState,
 } from "./types.js";
 
 declare module "@deepseek-ai/cordis" {
@@ -155,8 +162,19 @@ declare module "@deepseek-ai/cordis" {
 }
 
 /** 工作区页面数据、资讯与地点核对、本机头像。 */
+interface ExportWebServer {
+  register(route: {
+    kind: "prefix";
+    path: string;
+    handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+  }): () => void;
+}
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
+  private readonly exportContext: Context;
+  private exportRoute?: () => void;
+  private exportBase?: string;
+  private exportDownloads?: Promise<Awaited<ReturnType<typeof startWorkspaceExportDownloads>>>;
   private readonly files: ReturnType<typeof dshFiles>;
   private readonly scheduleLearningVersion: (message: string) => void;
 
@@ -168,9 +186,15 @@ export class KaituOverviewService extends TypertRemoteService {
     private readonly collectors?: CollectorService,
   ) {
     super(ctx, "kaitu");
+    this.exportContext = ctx;
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => this.files.dispose());
+    ctx.effect(() => async () => {
+      this.files.dispose();
+      this.exportRoute?.();
+      await workspaceExportRequest(this.workspace, "cancel");
+      if (this.exportDownloads) await (await this.exportDownloads).close();
+    });
     this.scheduleLearningVersion = (message) => {
       setImmediate(() => {
         void this.write(() => snapshot(this.workspace, message)).catch((error) =>
@@ -358,8 +382,8 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("library")
-  async library(): Promise<LibraryData> {
-    return readLibrary(this.workspace);
+  async library(query?: LibraryQuery): Promise<LibraryData> {
+    return readLibrary(this.workspace, query);
   }
 
   @Remote("libraryDocument")
@@ -423,9 +447,40 @@ export class KaituOverviewService extends TypertRemoteService {
     return markOrganizerSeen(this.workspace);
   }
 
-  @Remote("exportWorkspace")
-  async exportWorkspace(): Promise<{ name: string; base64: string }> {
-    return exportWorkspace(this.workspace);
+  @Remote("exportWorkspaceRequest")
+  async exportWorkspaceRequest(
+    action: "start" | "status" | "cancel" | "result",
+  ): Promise<WorkspaceExportState> {
+    if (action !== "result") return workspaceExportRequest(this.workspace, action);
+    if (!this.exportBase) {
+      // dsh-host-webserver 0.2.1-rc.2 的已安装公开 register 接口；Electron IPC 没有该服务。
+      const web = (this.exportContext as unknown as { get(name: string): ExportWebServer | undefined }).get(
+        "webServer",
+      );
+      if (web) {
+        const path = `/kaitu-export-${randomUUID()}`;
+        this.exportRoute = web.register({
+          kind: "prefix",
+          path,
+          handler: async (req, res) => {
+            const token = new URL(req.url ?? "/", "http://localhost").pathname.slice(path.length + 1);
+            if (req.method !== "GET" || !/^[a-f0-9-]+$/.test(token)) {
+              res.writeHead(404);
+              res.end();
+              return;
+            }
+            await serveWorkspaceExport(this.workspace, token, res);
+          },
+        });
+        this.exportBase = `${path}/`;
+      }
+    }
+    if (this.exportBase) return workspaceExportRequest(this.workspace, action, this.exportBase);
+    this.exportDownloads ??= startWorkspaceExportDownloads(this.workspace).catch((error) => {
+      this.exportDownloads = undefined;
+      throw error;
+    });
+    return workspaceExportRequest(this.workspace, action, (await this.exportDownloads).base);
   }
 
   @Remote("restoreVersion")
@@ -435,7 +490,11 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("moveStorage")
   async moveStorage(path: string, drive: boolean, provider?: SyncProvider): Promise<SettingsData["storage"]> {
-    return this.write(() => moveWorkspace(this.workspace, path, drive, provider));
+    return this.write(() => {
+      if (workspaceBackupStatus(this.workspace).running)
+        throw new KaituError("备份或恢复进行中，请先取消或等候完成", "CONFLICT");
+      return moveWorkspace(this.workspace, path, drive, provider);
+    });
   }
 
   @Remote("automation")

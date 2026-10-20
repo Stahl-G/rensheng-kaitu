@@ -1,0 +1,82 @@
+{
+  "node": "v26.11.1",
+  "platform": "darwin/arm64",
+  "scope": {
+    "syntheticChats": 600,
+    "chatBytes": 64923395
+  },
+  "firstIndex": {
+    "sync": {
+      "elapsedMs": 9165.88,
+      "callReturnedMs": 9165.66,
+      "timerTicks": 0,
+      "maxObservedMainThreadGapMs": 9165.87
+    },
+    "worker": {
+      "elapsedMs": 9556.56,
+      "callReturnedMs": 0.39,
+      "timerTicks": 798,
+      "maxObservedMainThreadGapMs": 140.93
+    },
+    "foundLastFile": true,
+    "progress": {
+      "phase": "index",
+      "completed": 600,
+      "total": 600
+    }
+  },
+  "zip": {
+    "sync": {
+      "elapsedMs": 965.8,
+      "callReturnedMs": 965.26,
+      "timerTicks": 1,
+      "maxObservedMainThreadGapMs": 965.35
+    },
+    "worker": {
+      "elapsedMs": 1184.96,
+      "callReturnedMs": 0.92,
+      "timerTicks": 100,
+      "maxObservedMainThreadGapMs": 25.86
+    },
+    "sameFiles": true,
+    "base64Bytes": 480896,
+    "progress": {
+      "phase": "compress",
+      "completed": 628,
+      "total": 628
+    }
+  },
+  "fallbackMetadataScan": {
+    "sync": {
+      "elapsedMs": 16.35,
+      "callReturnedMs": 16.15,
+      "timerTicks": 1,
+      "maxObservedMainThreadGapMs": 16.19
+    },
+    "async": {
+      "elapsedMs": 38.5,
+      "callReturnedMs": 0.09,
+      "timerTicks": 3,
+      "maxObservedMainThreadGapMs": 10.01
+    },
+    "syncFiles": 671,
+    "asyncFiles": 671,
+    "progress": {
+      "phase": "scan",
+      "completed": 671
+    }
+  },
+  "restore": {
+    "elapsedMs": 870.42,
+    "callReturnedMs": 2.03,
+    "timerTicks": 64,
+    "maxObservedMainThreadGapMs": 108.34,
+    "restoredFiles": 600,
+    "progress": {
+      "phase": "restore",
+      "completed": 600,
+      "total": 600
+    }
+  },
+  "limitations": "Single local run, real wall time; no timing pass/fail thresholds. Export still buffers full archive. Restore has one final synchronous derived overview refresh."
+}

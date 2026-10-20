@@ -129,7 +129,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   // 让 macOS 先把窗口放上屏幕，再开始可能卡住的读写。
   await new Promise((resolve) => setTimeout(resolve, 0));
   step("window");
-  let ws = new Workspace(workspace);
+  let ws = new Workspace(workspace, { deferOverview: true });
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   // 有文件还在云盘没下载时先不升级，下次启动再做；不能让启动停在这里。
