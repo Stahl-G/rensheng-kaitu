@@ -3,6 +3,34 @@ import type { ExperienceBatchPreview, ExperienceImportsData } from "../types.js"
 import css from "./MapPage.module.css";
 import { useT } from "./i18n.js";
 
+export function ExperienceBatchItemPreview({ item }: { item: ExperienceBatchPreview["affected"][number] }) {
+  const t = useT();
+  const eventTypes = {
+    lived: t("住过", "Lived"),
+    worked: t("工作", "Worked"),
+    studied: t("求学", "Studied"),
+    travel: t("旅行", "Travel"),
+    visit: t("到访", "Visited"),
+    other: t("其他", "Other"),
+  };
+  return (
+    <p className={css.source}>
+      <strong>
+        {item.city}
+        {item.country ? ` (${item.country})` : ""}
+      </strong>
+      {" · "}
+      {eventTypes[item.event_type]}
+      {" · "}
+      {item.start || t("开始日期未知", "Unknown start")}
+      {item.end && item.end !== item.start ? ` – ${item.end}` : ""}
+      {item.title !== item.city ? ` · ${item.title}` : ""}
+      {" · "}
+      {item.source === "apple-photos" ? t("照片", "Photos") : item.source}
+    </p>
+  );
+}
+
 export interface ExperienceImportControlProps {
   loadExperienceImports: () => Promise<ExperienceImportsData>;
   previewExperienceBatch: (
@@ -43,6 +71,7 @@ export function ExperienceImportControls(
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [limit, setLimit] = useState(10);
+  const [previewLimit, setPreviewLimit] = useState(20);
   const [sourceLimit, setSourceLimit] = useState(10);
   const confirmation = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -90,6 +119,7 @@ export function ExperienceImportControls(
   const loadPreview = (id: string, operation: "confirm" | "undo" | "restore") => {
     setSource(null);
     setNotice(null);
+    setPreviewLimit(20);
     setBusy(true);
     setError(null);
     void props
@@ -191,13 +221,16 @@ export function ExperienceImportControls(
                       </>
                     )}
                   </p>
-                  {preview.affected.slice(0, 20).map((item) => (
-                    <p key={item.id} className={css.source}>
-                      {item.title} · {sourceName(item.source)}
-                    </p>
+                  {preview.affected.slice(0, previewLimit).map((item) => (
+                    <ExperienceBatchItemPreview key={item.id} item={item} />
                   ))}
-                  {preview.affected.length > 20 && (
-                    <p className={css.secondary}>另有 {preview.affected.length - 20} 段同批经历</p>
+                  {preview.affected.length > previewLimit && (
+                    <button type="button" className={css.link} onClick={() => setPreviewLimit((n) => n + 20)}>
+                      {t(
+                        `展开更多（剩余 ${preview.affected.length - previewLimit} 段）`,
+                        `Show more (${preview.affected.length - previewLimit} remaining)`,
+                      )}
+                    </button>
                   )}
                   {preview.preserved.slice(0, 20).map((item) => (
                     <p key={item.id} className={css.source}>

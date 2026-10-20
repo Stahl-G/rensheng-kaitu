@@ -42,3 +42,17 @@ Node 26.11.1 / pnpm 11.22.0，合成 3,003 条经历的大工作区实测（真�
 - 环境浏览器清单为空（iab unavailable），无法完成真实浏览器/原生窗口点击与截图。已完成可信 HTTP 路径和前后端构建/类型检查；UI 视觉、焦点和实际点击仍待有浏览器时走查。
 - 未访问真实相册、iPhone、iCloud、Drive 或用户个人工作区；照片读取和手机队列真机验证由 iOS 线程完成。
 - 不合并、不发布；远端 CI 的 SHA、运行链接与结果见草稿 PR。
+
+## 无 title 原始输入的预览补验
+
+iOS PR11 最终 `fca411f7b2c65cb0689384b8eb0fb79ad8625696` 的原文件固定为 `packages/core/test/fixtures/ios-photos.records.jsonl`（241 bytes，SHA256 `123d419c52f83ef06455d3dd56e12674eba6dc52c4fe0553035d84fa74c82e0d`），没有 title。此前预览回退到来源名，不能让用户核对城市、日期和类别。
+
+现从现有记录派生本机预览的 city/country/start/end/event_type，UI 每条显示城市、国家、经历类别、起止日期与来源；无需给 producer 补 title，不修改外部 schema。真实组件通过 React server renderer 输出：
+
+```html
+<p class="MapPage_source"><strong>Kyoto (JP)</strong> · 旅行 · 2025-05-02 · 照片</p>
+```
+
+确认预览首屏显示 20 条，「展开更多」每次从已加载的 affected 中再显示 20 条，无重新查询或新分页协议。临时验收工作台 `http://127.0.0.1:4898` 同时提供上述原文件的一条批次和另外一份 41 条合成批次；数据与应用状态均在 `/tmp/kaitu-photos-preview-ui-*`。该地址仅在验收进程存活时有效。
+
+新增一条最小回归：从该原文件实际收件，断言记录无 title，而确认预览含 Kyoto / JP / 2025-05-02 / travel。定向 6 项通过；本轮 lint/build/typecheck 与完整 test 94 文件 / 283 项通过（133.24 秒）。浏览器仍不可用，HTML 内容已实际渲染核对；按钮点击、20→40→41 展开和最终视觉由单独 GUI 验收补充，不能把 server render 当作浏览器走查。

@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import {
   type ExperienceInput,
@@ -308,6 +308,33 @@ it("确认中途存储中断不显示半批路线，重启补完成员和批次�
     expect(lifeMap(reopened).experiences).toHaveLength(0);
   } finally {
     vi.restoreAllMocks();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("真实 Swift 无 title 文件的确认预览包含可核对城市、日期和经历类别", async () => {
+  const ws = await freshWorkspace();
+  try {
+    // iOS PR11 fca411f7 的原始 241 bytes，不给 producer 补造 title。
+    const wire = readFileSync(new URL("./fixtures/ios-photos.records.jsonl", import.meta.url), "utf8");
+    ws.writeText("inbox/agents/ios-1234abcd-01M5BH21V7CVZA5M7JQR9HZ8E0.records.jsonl", wire);
+    expect((await processInbox(ws, { stableMs: 0 })).notes).toEqual([]);
+    const [batch] = readExperienceImports(ws).batches;
+    if (!batch) throw new Error("缺少照片批次");
+    expect(lifeMap(ws).experiences[0]?.title).toBeUndefined();
+    const preview = previewExperienceBatch(ws, batch.id, "confirm");
+    expect(preview.affected).toHaveLength(1);
+    expect(preview.affected[0]).toMatchObject({
+      city: "Kyoto",
+      country: "JP",
+      start: "2025-05-02",
+      end: "2025-05-02",
+      event_type: "travel",
+      source: "apple-photos",
+      revision: 1,
+    });
+    expect(preview.affected[0]?.title).toBe("Kyoto");
+  } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

@@ -192,20 +192,45 @@ export function previewExperienceBatch(ws: Workspace, id: string, operation: Exp
   if (!["confirm", "undo", "restore"].includes(operation)) throw new KaituError("未知的导入操作", "BAD_ARGS");
   const batch = batches(ws).find((b) => b.id === id);
   if (!batch) throw new KaituError("找不到这次导入", "NOT_FOUND");
-  const { original: originals, latest } = latestExperiences(ws);
+  const { original: originals, latest, revisions } = latestExperiences(ws);
   const targets = operation === "restore" ? batch.withdrawn : batch.items;
-  const affected: { id: string; title: string; source: string; revision: number }[] = [];
+  const affected: {
+    id: string;
+    title: string;
+    source: string;
+    revision: number;
+    city: string;
+    country?: string;
+    start?: string;
+    end?: string;
+    event_type: Experience["event_type"];
+  }[] = [];
   const preserved: { id: string; title: string; reason: string }[] = [];
   for (const item of targets) {
     const row = latest.get(item.id);
     const original = originals.get(item.id);
-    const title = String((row && !row.deleted ? row.title : original?.title) || original?.source || item.id);
+    const detail = (row && !row.deleted
+      ? row
+      : (revisions.get(
+          `${item.id}:${batch.withdrawn.find((entry) => entry.id === item.id)?.restore_revision}`,
+        ) ?? original)) as unknown as Experience | undefined;
+    const title = detail?.title || detail?.place.name || String(original?.source || item.id);
     const eligible =
       operation === "confirm"
         ? batch.state === "committed" && canConfirm(row, item)
         : row && (row.rev ?? 1) === item.revision && (operation === "undo" ? !row.deleted : row.deleted);
-    if (eligible)
-      affected.push({ id: item.id, title, source: String(original?.source ?? ""), revision: item.revision });
+    if (eligible && detail)
+      affected.push({
+        id: item.id,
+        title,
+        source: String(original?.source ?? ""),
+        revision: item.revision,
+        city: detail.place.name,
+        country: detail.place.country,
+        start: detail.start,
+        end: detail.end,
+        event_type: detail.event_type,
+      });
     else
       preserved.push({
         id: item.id,
