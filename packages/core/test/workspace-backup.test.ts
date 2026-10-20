@@ -95,6 +95,26 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   await syncWorkspaceBackup(a, m.remote);
   expect(b.readText("me/profile.md")).toBe("# From A\n");
   expect(a.readText("me/rules.md")).toContain("From B");
+  const incoming = await m.remote.read("synthetic/backup", "main");
+  for (let i = 0; i < 5; i++)
+    incoming.files[`inbox/notes/2026-10-19/remote-${i}.md`] = `Synthetic remote note ${i}`;
+  await m.remote.push("synthetic/backup", "main", incoming.head, incoming.files);
+  const overviewReads = vi.spyOn(a, "scanText");
+  const remoteReads = vi.spyOn(m.remote, "read");
+  await syncWorkspaceBackup(a, m.remote);
+  const overviewOrder = overviewReads.mock.calls.flatMap(([file], index) =>
+    file === ".kaitu/config.json" ? [overviewReads.mock.invocationCallOrder[index]] : [],
+  );
+  expect(remoteReads).toHaveBeenCalledTimes(1);
+  expect(overviewOrder).toHaveLength(2);
+  expect(overviewOrder[0]).toBeLessThan(remoteReads.mock.invocationCallOrder[0]);
+  expect(overviewOrder[1]).toBeGreaterThan(remoteReads.mock.invocationCallOrder[0]);
+  remoteReads.mockRestore();
+  overviewReads.mockRestore();
+  for (let i = 0; i < 5; i++)
+    expect(a.readText(`inbox/notes/2026-10-19/remote-${i}.md`)).toBe(`Synthetic remote note ${i}`);
+  // The generated overview is included in the next sync, then the backup reaches a no-op.
+  await syncWorkspaceBackup(a, m.remote);
   const count = m.pushes();
   const checks = m.inspect.calls;
   await syncWorkspaceBackup(a, m.remote);

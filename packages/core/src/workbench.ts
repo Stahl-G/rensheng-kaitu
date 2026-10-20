@@ -1,11 +1,12 @@
-import { readdirSync, statSync } from "node:fs";
+import { promises as fs, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
-import { inboxNotes } from "./inbox-notes.js";
+import { countInboxNotes } from "./inbox-notes.js";
 import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listMemories } from "./memory.js";
 import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
@@ -118,7 +119,7 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   return { ...parsed, data };
 }
 
-export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
+export function readWorkbench(ws: Workspace, now = new Date(), remote = false, summary = false) {
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
   if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
@@ -149,7 +150,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
   return {
     root: ws.root,
     today,
-    inboxNotes: inboxNotes(ws).length,
+    inboxNotes: countInboxNotes(ws),
     timeZone: ws.timeZone(),
     now: read("今天的计划", () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }), {
       data: { date: null, blocks: [] } as TodayPlan,
@@ -162,7 +163,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
     modules,
     records,
     tasks: read("待办", () => tasksForToday(records.task ?? [], ws.timeZone(), now), []),
-    profile: ws.exists("me/profile.md") ? (ws.scanText("me/profile.md") ?? "") : "",
+    profile: !summary && ws.exists("me/profile.md") ? (ws.scanText("me/profile.md") ?? "") : "",
     rules: read("作息规则", () => document<Rules>(ws, "me/rules.md", { timezone: ws.timeZone() }), {
       data: { timezone: ws.timeZone() } as Rules,
       body: "",
@@ -172,13 +173,18 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
       feeds: [],
       keywords: [],
     }),
-    digests: read("动态简报", () => docs("feed/digests"), []),
-    reports: read("现状报告", () => docs("me/reports"), []),
-    daily: ws.exists(`reviews/daily/${today}.md`) ? (ws.scanText(`reviews/daily/${today}.md`) ?? "") : "",
-    labs: files(ws, "health/data/labs", ".json").flatMap((file) =>
-      read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
-    ),
-    memories: read("记忆", () => listMemories(ws), []),
+    digests: summary ? [] : read("动态简报", () => docs("feed/digests"), []),
+    reports: summary ? [] : read("现状报告", () => docs("me/reports"), []),
+    daily:
+      !summary && ws.exists(`reviews/daily/${today}.md`)
+        ? (ws.scanText(`reviews/daily/${today}.md`) ?? "")
+        : "",
+    labs: summary
+      ? []
+      : files(ws, "health/data/labs", ".json").flatMap((file) =>
+          read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
+        ),
+    memories: summary ? [] : read("记忆", () => listMemories(ws), []),
     warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从云盘下载：${file}`)],
   };
 }
@@ -344,5 +350,38 @@ export function workspaceFileStamps(ws: Workspace): Map<string, string> {
     }
   }
   walk("");
+  return stamps;
+}
+
+/** Async metadata scan used only when native file watching is unavailable. */
+export async function workspaceFileStampsAsync(
+  ws: Workspace,
+  options: { signal?: AbortSignal; progress?: (completed: number) => void } = {},
+): Promise<Map<string, string>> {
+  const root = await fs.realpath(ws.root);
+  const stamps = new Map<string, string>();
+  let completed = 0;
+  async function walk(dir: string): Promise<void> {
+    options.signal?.throwIfAborted();
+    for await (const entry of await fs.opendir(join(root, dir))) {
+      options.signal?.throwIfAborted();
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink() || ignoredWorkspaceChange(file)) continue;
+      if (entry.isDirectory()) {
+        await walk(file);
+      } else {
+        try {
+          const stat = await fs.lstat(join(root, file));
+          if (stat.isSymbolicLink()) continue;
+          stamps.set(file, `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`);
+          options.progress?.(++completed);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      }
+    }
+  }
+  await walk("");
+  options.signal?.throwIfAborted();
   return stamps;
 }
