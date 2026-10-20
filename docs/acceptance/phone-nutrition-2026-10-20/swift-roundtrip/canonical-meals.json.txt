@@ -1,0 +1,24 @@
+[
+  {
+    "id": "01M5BAAGEFTY2FZPKX9GMW597K",
+    "ts": "2026-10-20T04:30:00Z",
+    "by": "agent",
+    "items": [
+      {
+        "grams": 100,
+        "name": "合成米饭"
+      },
+      {
+        "grams": 80,
+        "name": "合成豆腐"
+      }
+    ],
+    "uncertainty": 50,
+    "source": "ai_estimate",
+    "kcal": 333.25,
+    "meal": "午",
+    "protein_g": 21.5,
+    "carbs_g": 45,
+    "fat_g": 9
+  }
+]

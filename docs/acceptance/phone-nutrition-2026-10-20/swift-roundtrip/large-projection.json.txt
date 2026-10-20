@@ -1,0 +1,15 @@
+{
+  "root": "/tmp/kaitu-nutrition-large-kkSMgN",
+  "mealCount": 20000,
+  "overviewMs": 638.3130139999998,
+  "projectionMs": 154.57066399999985,
+  "warmOverviewMs": 637.4398590000001,
+  "warmProjectionMs": 153.3041430000003,
+  "total": {
+    "version": 1,
+    "kcal": 20000,
+    "protein_g": 20000,
+    "accounted_refs": []
+  },
+  "scope": "core background projection only; no UI/CLI latency claim"
+}

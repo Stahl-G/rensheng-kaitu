@@ -1,0 +1,40 @@
+{
+  "format": "kaitu.phone.today",
+  "version": 1,
+  "generated_at": "2026-10-20T00:10:33.463Z",
+  "generator": {
+    "kind": "computer"
+  },
+  "today": "2026-10-20",
+  "timezone": "Asia/Shanghai",
+  "nutrition": {
+    "version": 1,
+    "kcal": 333.25,
+    "protein_g": 21.5,
+    "accounted_refs": [
+      "ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl"
+    ]
+  },
+  "mobile": {
+    "version": 1,
+    "actions": [
+      "create_task",
+      "update_task",
+      "complete_task",
+      "cancel_task",
+      "complete_next"
+    ],
+    "tasks": []
+  },
+  "next": [],
+  "proposals": [],
+  "blocks": [],
+  "goals": [],
+  "question": null,
+  "sync": {
+    "received": 0,
+    "needs_review": 0,
+    "organizer": false,
+    "updated_at": "2026-10-20T08:10:33+08:00"
+  }
+}

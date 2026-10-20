@@ -1,0 +1,18 @@
+{
+  "inbox": {
+    "processed": [
+      "inbox/agents/ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl"
+    ],
+    "notes": [],
+    "pending": []
+  },
+  "snapshots": 4,
+  "receipts": [
+    {
+      "ref": "ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl",
+      "kind": "file",
+      "status": "applied",
+      "at": "2026-10-20T00:10:33.462Z"
+    }
+  ]
+}

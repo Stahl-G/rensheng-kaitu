@@ -1,0 +1,52 @@
+{
+  "provenance": "Stahl-G/kaitu-ios@ce7d43cb818bf2ec83fb5bf0e293b1ffca74a4ef:docs/acceptance/onboarding-ui-1020/nutrition-first-stage/inbox/agents/ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl",
+  "inputSHA256": "f8f33d8ede2eaad7f79a9170eb355299c7109e3ffc3443313f39fc7cd6264a10",
+  "basename": "ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl",
+  "root": "/tmp/kaitu-swift-meal-gsI9EQ",
+  "timezone": "Asia/Shanghai",
+  "today": "2026-10-20",
+  "nutrition": {
+    "version": 1,
+    "kcal": 333.25,
+    "protein_g": 21.5,
+    "accounted_refs": [
+      "ios-1234abcd-01M5BA4CESXS26JTZ22VC4NRYD.records.jsonl"
+    ]
+  },
+  "commands": [
+    [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/tmp/kaitu-nutrition-integration/packages/cli/dist/main.js",
+      "init",
+      "/tmp/kaitu-swift-meal-gsI9EQ/data",
+      "--timezone",
+      "Asia/Shanghai"
+    ],
+    [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/tmp/kaitu-nutrition-integration/packages/cli/dist/main.js",
+      "phone",
+      "run",
+      "--dir",
+      "/tmp/kaitu-swift-meal-gsI9EQ/data"
+    ],
+    [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+      "/tmp/kaitu-nutrition-integration/packages/cli/dist/main.js",
+      "record",
+      "list",
+      "meal",
+      "--json-out",
+      "--dir",
+      "/tmp/kaitu-swift-meal-gsI9EQ/data"
+    ]
+  ],
+  "codeHash": {
+    "inbox.ts": "05cc452e5941aed3b7aed07e052391bbd20ff91d68f8299b7424309824c06663",
+    "phone-records.ts": "3cfaa8234c7564c2198a26cd956ffe8cef04b86c1b84dca84419e19aa560c80f",
+    "phone-projections.ts": "76380b7e661ed070afba7c62d334cecf57a1e8b47b03f7d052e58d14488577a1",
+    "phone-snapshots.ts": "b446dca8d8f00105aae5cbe3f06a0e0f7b371954022a0be2ebadf84e7655c947"
+  },
+  "consumer": "b21fee8 implementation plus PR62 a092270 integration; final doc-only441d839",
+  "result": "official-consumer-passed; awaiting same Swift decode"
+}
