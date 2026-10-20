@@ -129,7 +129,7 @@ test("conversations can be pinned, renamed, archived and deleted", async () => {
       },
     };
     const ask = createAskService(options);
-    const row = ask.create();
+    const row = await ask.create();
     ask.organize(row.id, { pinned: true, title: "  计划  " });
     ask.organize(row.id, { archived: true });
     expect(createAskService(options).list()[0]).toMatchObject({
@@ -159,7 +159,7 @@ test("first message of a new conversation is not lost to list()", async () => {
         close: async () => {},
       }),
     });
-    const row = ask.create();
+    const row = await ask.create();
     ask.list();
     await expect(ask.send(row.id, "hi")).resolves.toBeDefined();
   } finally {

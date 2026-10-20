@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { KaituError, workspaceAgentGuide, workspaceTaskSkill } from "@kaitu/core";
@@ -29,7 +29,7 @@ export async function agentModels(agent: LocalAgent, bin: string, state: string,
   mkdirSync(cwd, { recursive: true, mode: 0o700 });
   const child = launchAgent(agent, bin, cwd, agentEnvironment(agent, env));
   child.stderr.resume();
-  const rpc = connectAcp(child, { full: false, update() {}, timeout: 30000 });
+  const rpc = connectAcp(child, { update() {}, timeout: 30000 });
   try {
     await rpc.request("initialize", initialize);
     return sessionModels(await rpc.request("session/new", { cwd, mcpServers: [] })).models;
@@ -93,6 +93,18 @@ export async function createAgentRuntime(options: {
     notify("session.event", { sessionId: id, event: { type, data, seq: ++seq } });
   const idle = (id: string, error?: string) =>
     notify("session.status", { sessionId: id, status: "idle", error });
+  const permissions = new Map<
+    string,
+    {
+      sessionId: string;
+      options: { optionId: string; kind: string; name: string }[];
+      finish: (optionId: string | null, status: string) => void;
+    }
+  >();
+  const cancelPermissions = (id: string) => {
+    for (const permission of permissions.values())
+      if (permission.sessionId === id) permission.finish(null, "cancelled");
+  };
   const open = async (id: string) => {
     const child = launchAgent(agent, bin, options.workspace, env);
     // Never surface CLI diagnostic output: it can contain account details.
@@ -110,7 +122,37 @@ export async function createAgentRuntime(options: {
     };
     running.set(id, state);
     state.rpc = connectAcp(child, {
-      full: true,
+      permission(params) {
+        if (state.cancelled || closed) return Promise.resolve(null);
+        const choices = Array.isArray(params.options)
+          ? params.options.filter(
+              (item): item is { optionId: string; kind: string; name: string } =>
+                !!item &&
+                typeof item === "object" &&
+                typeof item.optionId === "string" &&
+                (["allow_once", "reject_once"].includes(item.kind) ||
+                  (item.kind === "allow" && item.optionId === "allow_once")),
+            )
+          : [];
+        const requestId = `native-${randomUUID()}`;
+        return new Promise<string | null>((resolve) => {
+          const timer = setTimeout(() => permissions.get(requestId)?.finish(null, "expired"), 60000);
+          const finish = (optionId: string | null, status: string) => {
+            if (!permissions.delete(requestId)) return;
+            clearTimeout(timer);
+            event(id, "approval/resolved", { requestId, optionId, status });
+            resolve(optionId);
+          };
+          permissions.set(requestId, { sessionId: id, options: choices, finish });
+          const tool = params.toolCall as { title?: string; rawInput?: unknown } | undefined;
+          event(id, "approval/asked", {
+            requestId,
+            reason: typeof tool?.title === "string" ? tool.title : `${agent.name} 请求单次操作权限`,
+            detail: JSON.stringify(tool?.rawInput ?? {}),
+            options: choices.map((choice) => ({ ...choice, name: choice.name ?? choice.optionId })),
+          });
+        });
+      },
       update(params) {
         if (state.cancelled || !state.busy || closed) return;
         const u = params.update as {
@@ -203,6 +245,7 @@ export async function createAgentRuntime(options: {
       persistSessions();
       return state;
     } catch {
+      cancelPermissions(id);
       state.rpc.close();
       await terminateAgent(child);
       running.delete(id);
@@ -222,6 +265,7 @@ export async function createAgentRuntime(options: {
     const state = running.get(id);
     if (!state) return;
     state.cancelled = true;
+    cancelPermissions(id);
     state.rpc.notify("session/cancel", { sessionId: state.upstream });
     await terminateAgent(state.child);
     state.rpc.close();
@@ -234,6 +278,21 @@ export async function createAgentRuntime(options: {
     },
     async request(method, params) {
       const id = String(params.sessionId ?? "");
+      if (method === "session/permission") {
+        const requestId = String(params.requestId ?? "");
+        const permission = permissions.get(requestId);
+        if (closed || !permission || permission.sessionId !== id)
+          throw new KaituError("操作审批已处理或过期", "CONFLICT");
+        const optionId = params.optionId;
+        const choice = permission.options.find((item) => item.optionId === optionId);
+        if (optionId !== null && !choice)
+          throw new KaituError("请选择本次操作提供的单次审批选项", "BAD_ARGS");
+        permission.finish(
+          optionId === null ? null : String(optionId),
+          choice && ["allow", "allow_once"].includes(choice.kind) ? "approved" : "rejected",
+        );
+        return {};
+      }
       if (method === "session/cancel") {
         await cancel(id);
         return {};
@@ -293,6 +352,7 @@ export async function createAgentRuntime(options: {
         }
         return {};
       } finally {
+        cancelPermissions(id);
         if (state) {
           if (state.output)
             event(id, "assistant/message", {

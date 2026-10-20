@@ -1,11 +1,13 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, test } from "vitest";
+import { initWorkspace, readOnboardingMatter, saveOnboardingMatter } from "@kaitu/core";
+import { afterEach, expect, test, vi } from "vitest";
 import { agentEnvironment, cliCommand, localAgent } from "../src/local-agents/agents.js";
 import { createAgentConnection } from "../src/local-agents/connection.js";
 import { createAgentRuntime } from "../src/local-agents/runtime.js";
 import { createAskService } from "../src/ui/ask.js";
+import { organizeOnboardingMatter } from "../src/ui/onboarding-ai.js";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -45,7 +47,7 @@ let permitted;
 createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line), p=m.params||{};
  appendFileSync('trace.jsonl',JSON.stringify(m)+'\\n');
- if(m.id===9001 && m.result){if(m.result.outcome?.optionId!=='allow_once')process.exit(3);send({method:'session/update',params:{sessionId:'upstream-'+tag,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:'approved once'}}}});send({id:permitted,result:{stopReason:'end_turn'}});return;}
+ if(m.id===9001 && m.result){const granted=m.result.outcome?.optionId==='allow_once';send({method:'session/update',params:{sessionId:'upstream-'+tag,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text:granted?'approved once':'denied once'}}}});send({id:permitted,result:{stopReason:'end_turn'}});return;}
  if(m.method==='initialize')send({id:m.id,result:{agentCapabilities:{loadSession:true}}});
  else if(m.method==='session/new'||m.method==='session/load'){
    if(m.method==='session/new'&&existsSync('fail-new-once')){unlinkSync('fail-new-once');send({id:m.id,error:{message:'boom'}});return;}
@@ -55,7 +57,7 @@ createInterface({input:process.stdin}).on('line',line=>{
  else if(m.method==='session/prompt') {
    const text=p.prompt[0].text;
    if(text.endsWith('hang'))return;
-   if(text.endsWith('permit')){permitted=m.id;send({id:9001,method:'session/request_permission',params:{options:[{kind:'allow',optionId:'allow_once',name:'Allow once'}]}});return;}
+   if(text.endsWith('permit')||text.includes('native-permission-probe')){permitted=m.id;send({id:9001,method:'session/request_permission',params:{options:[{kind:'allow',optionId:'allow_once',name:'Allow once'},{kind:'allow_always',optionId:'always',name:'Always'}]}});return;}
    if(text.endsWith('fail')){send({id:m.id,error:{message:'private upstream detail'}});return;}
    if(text.endsWith('missing-note')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'read-note',title:'read_file',rawInput:{path:'learning/new/notes.md'}}}});send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'read-note',status:'failed',content:[{type:'content',content:{type:'text',text:'notes.md does not exist yet'}}]}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(text.endsWith('tool')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t1',title:'task_add'}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
@@ -101,9 +103,8 @@ test("real stdio adapter streams, persists once, resumes after restart and keeps
   const { ask, options, switchBackend } = setup(f);
   let service = ask;
   try {
-    const row = ask.create();
-    await expect(ask.send(row.id, "test")).rejects.toThrow(/完整权限/);
-    await ask.setMode(row.id, "full", true);
+    const row = await ask.create();
+    expect(row.mode).toBe("full");
     const chunks: string[] = [];
     ask.subscribe(row.id, (event) => {
       if (event.type === "assistant/delta") chunks.push(String(event.data.text));
@@ -153,10 +154,11 @@ test("real stdio adapter streams, persists once, resumes after restart and keeps
 });
 test("cancel terminates the owned prompt and failures are actionable without upstream private details", async () => {
   const f = fixture();
+  const ws = await initWorkspace(f.workspace);
   const { ask } = setup(f);
   try {
-    const row = ask.create();
-    await ask.setMode(row.id, "full", true);
+    const row = await ask.create();
+    expect(row.mode).toBe("full");
     const entered = new Promise<void>((resolve) =>
       ask.subscribe(row.id, (event) => {
         if (event.type === "user/message") resolve();
@@ -179,7 +181,25 @@ test("cancel terminates the owned prompt and failures are actionable without ups
     });
     // 只调了工具、没回文字也算完成。
     await ask.send(row.id, "tool");
-    await ask.send(row.id, "permit");
+    const approval = () =>
+      new Promise<{ requestId: string }>((resolve) => {
+        const stop = ask.subscribe(row.id, (event) => {
+          if (event.type === "approval/asked") {
+            stop();
+            resolve(event.data as { requestId: string });
+          }
+        });
+      });
+    const asked = approval();
+    const permitting = ask.send(row.id, "permit");
+    const permission = await asked;
+    expect(readFileSync(join(f.workspace, "trace.jsonl"), "utf8")).not.toContain('"id":9001,"result"');
+    await expect(ask.permission(row.id, permission.requestId, "always")).rejects.toThrow();
+    const other = await ask.create();
+    await expect(ask.permission(other.id, permission.requestId, "allow_once")).rejects.toThrow();
+    await ask.permission(row.id, permission.requestId, "allow_once");
+    await expect(ask.permission(row.id, permission.requestId, "allow_once")).rejects.toThrow();
+    await permitting;
     expect(
       JSON.stringify(
         ask
@@ -188,6 +208,46 @@ test("cancel terminates the owned prompt and failures are actionable without ups
           .at(-1),
       ),
     ).toContain("approved once");
+    const rejected = approval();
+    const denying = ask.send(row.id, "permit");
+    await ask.permission(row.id, (await rejected).requestId, null);
+    await denying;
+    expect(
+      ask
+        .events(row.id)
+        .some((event) => event.type === "approval/resolved" && event.data.status === "rejected"),
+    ).toBe(true);
+    const realTimeout = globalThis.setTimeout;
+    const timeout = vi
+      .spyOn(globalThis, "setTimeout")
+      .mockImplementation((callback, ms, ...args) => realTimeout(callback, ms === 60000 ? 10 : ms, ...args));
+    try {
+      await ask.send(row.id, "permit");
+    } finally {
+      timeout.mockRestore();
+    }
+    expect(
+      ask
+        .events(row.id)
+        .some((event) => event.type === "approval/resolved" && event.data.status === "expired"),
+    ).toBe(true);
+    const cancelling = approval();
+    const cancelled = ask.send(row.id, "permit");
+    await cancelling;
+    await ask.cancel(row.id);
+    await cancelled;
+    expect(
+      ask
+        .events(row.id)
+        .some((event) => event.type === "approval/resolved" && event.data.status === "cancelled"),
+    ).toBe(true);
+    const matter = await saveOnboardingMatter(ws, "native-permission-probe 合成原文");
+    const threads = ask.list().map((thread) => thread.id);
+    await expect(organizeOnboardingMatter(ws, matter.source, ask)).rejects.toMatchObject({
+      code: "AI_APPROVAL_REQUIRED",
+    });
+    expect(ask.list().map((thread) => thread.id)).toEqual(threads);
+    expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe("native-permission-probe 合成原文");
   } finally {
     await ask.close();
   }
@@ -263,8 +323,8 @@ test("switching AI keeps transcript after a failed first connect", async () => {
   const f = fixture();
   const { ask, switchBackend } = setup(f);
   try {
-    const row = ask.create();
-    await ask.setMode(row.id, "full", true);
+    const row = await ask.create();
+    expect(row.mode).toBe("full");
     await ask.send(row.id, "before");
     expect(ask.list().find((item) => item.id === row.id)?.backend).toBe("codebuddy:test");
     switchBackend();

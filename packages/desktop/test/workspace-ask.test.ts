@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { initWorkspace, moveWorkspace, workspaceBackupRequest } from "@kaitu/core";
@@ -11,6 +11,11 @@ test("独立工作区会话隔离，切换回来与重新启动都保留各自�
   const ws = await initWorkspace(join(temp, "A"), { timeZone: "Asia/Shanghai" });
   const other = await initWorkspace(join(temp, "B 中文 空格"), { timeZone: "Asia/Shanghai" });
   const original = ws.root;
+  mkdirSync(join(temp, "app"), { recursive: true });
+  writeFileSync(
+    join(temp, "app", "local-agent.json"),
+    JSON.stringify({ choice: "local", agent: "codebuddy", path: process.execPath }),
+  );
   const make = () =>
     createLocalAsk({
       state: join(temp, "app"),
@@ -21,16 +26,16 @@ test("独立工作区会话隔离，切换回来与重新启动都保留各自�
     });
   let ask = make();
   try {
-    const a = ask.create();
+    const a = await ask.create();
     ask.organize(a.id, { title: "synthetic A" });
-    await ask.setMode(a.id, "full", true);
+    expect(a.mode).toBe("full");
     await ask.prepareRelocation(other.root);
     await workspaceBackupRequest(ws, "activate", { root: other.root });
     ask.relocate(ws.root);
     expect(ask.list()).toEqual([]);
-    const b = ask.create();
+    const b = await ask.create();
     ask.organize(b.id, { title: "synthetic B" });
-    expect(b.mode).toBe("scoped");
+    expect(b.mode).toBe("full");
     await ask.close();
     ask = make();
     expect(ask.list().map((row: { id: string }) => row.id)).toEqual([b.id]);
@@ -50,6 +55,11 @@ test("独立工作区会话隔离，切换回来与重新启动都保留各自�
 test("迁移同一工作区继续使用原会话身份，重新启动后仍可查看旧对话", async () => {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-moved-ask-"));
   const ws = await initWorkspace(join(temp, "original"), { timeZone: "Asia/Shanghai" });
+  mkdirSync(join(temp, "app"), { recursive: true });
+  writeFileSync(
+    join(temp, "app", "local-agent.json"),
+    JSON.stringify({ choice: "local", agent: "codebuddy", path: process.execPath }),
+  );
   const make = () =>
     createLocalAsk({
       state: join(temp, "app"),
@@ -60,7 +70,7 @@ test("迁移同一工作区继续使用原会话身份，重新启动后仍可�
     });
   let ask = make();
   try {
-    const row = ask.create();
+    const row = await ask.create();
     await ask.prepareRelocation();
     await moveWorkspace(ws, join(temp, "moved"), false);
     ask.relocate(ws.root);

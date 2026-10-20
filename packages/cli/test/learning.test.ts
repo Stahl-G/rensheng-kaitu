@@ -92,7 +92,7 @@ it("教学帧只读取已保存的工具结果，独立 CSP 允许交互且不�
   });
   const ui = await startUi(ws, { port: 0, open: false, ask });
   try {
-    const thread = ask.create();
+    const thread = await ask.create();
     await ask.send(thread.id, "synthetic");
     const response = await fetch(`${ui.url}/api/ask/teaching-frame?session=${thread.id}&call=synthetic-card`);
     expect(response.status).toBe(200);
