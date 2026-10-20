@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { KaituError } from "@kaitu/core";
+import { KaituError, workspaceAgentGuide } from "@kaitu/core";
 import type { AskRuntime } from "../ui/ask.js";
 import { connectAcp, sessionModels } from "./acp.js";
 import { type LocalAgent, agentEnvironment, launchAgent, terminateAgent } from "./agents.js";
@@ -73,7 +73,7 @@ export async function createAgentRuntime(options: {
     child: ReturnType<typeof launchAgent>;
     rpc: ReturnType<typeof connectAcp>;
     upstream: string;
-    /** 新会话的第一条消息前带上隐私提醒；续接的会话里已经有了。 */
+    /** 新会话首条消息带同源任务指引与隐私提醒；续接不重复。 */
     fresh: boolean;
     cancelled: boolean;
     busy: boolean;
@@ -258,7 +258,12 @@ export async function createAgentRuntime(options: {
           "session/prompt",
           {
             sessionId: state.upstream,
-            prompt: [{ type: "text", text: (state.fresh ? localAgentPrivacy : "") + text }],
+            prompt: [
+              {
+                type: "text",
+                text: (state.fresh ? `${workspaceAgentGuide()}\n\n${localAgentPrivacy}` : "") + text,
+              },
+            ],
           },
           30 * 60 * 1000,
         );

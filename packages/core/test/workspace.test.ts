@@ -72,7 +72,6 @@ describe("init / doctor / validate", () => {
     const { addRecord } = await import("../src/index.js");
     expect(addRecord(ws, "book", { title: "置身事内" }).file).toBe("books/data/2026-10.jsonl");
     expect(() => addRecord(ws, "book", { author: "x" })).toThrow(/title/);
-    expect(renderAgentsMd(ws)).toContain("`books/`");
   });
 
   it.skipIf(process.platform === "win32")("密钥文件权限不对时 doctor 报错", async () => {

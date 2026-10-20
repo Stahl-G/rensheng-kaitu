@@ -64,7 +64,7 @@ export function assertAgentWrite(root: string, file: string, confirmed = false, 
   const path = agentRelativePath(root, file);
   if (
     (path === "NOW.md" && !managedPlan) ||
-    ["AGENTS.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
+    ["AGENTS.md", "SKILL.md", "AGENT-README.md", "ORGANIZER.md", "OVERVIEW.md"].includes(path) ||
     path === "phone" ||
     path.startsWith("phone/") ||
     path.startsWith("memory/") ||

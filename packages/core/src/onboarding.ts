@@ -962,6 +962,7 @@ function hasUserFiles(ws: Workspace): boolean {
     ".agents",
     ".claude",
     "AGENTS.md",
+    "SKILL.md",
     "AGENT-README.md",
     "OVERVIEW.md",
     "ORGANIZER.md",
@@ -973,6 +974,7 @@ function hasUserFiles(ws: Workspace): boolean {
     return readdirSync(ws.resolve(dir), { withFileTypes: true }).some((entry) => {
       if (ignored.has(entry.name) || entry.isSymbolicLink() || entry.name.endsWith(".tmp")) return false;
       const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (["skills/record-format", "skills/log-meal"].includes(file)) return false;
       if (entry.isDirectory()) return walk(file);
       const template = join(templateDir(), file);
       if (!existsSync(template)) return statSync(ws.resolve(file)).size > 0;

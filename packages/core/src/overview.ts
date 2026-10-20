@@ -1,10 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { INBOX_FORMATS } from "./inbox-formats.js";
-import { renderRecordReference } from "./record-reference.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
@@ -13,66 +12,31 @@ import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
 export function renderAgentReadme(ws: Workspace, now = new Date()): string {
-  return `# 开图云端 Agent 入口
+  return `# 开图云端 Agent：任务入口
 
 ${timeZoneNotice(ws.timeZone(), now)}
 
-## 接手顺序
+按根目录 \`SKILL.md\` 选择当前任务，只读相关摘要、技能和必要格式；外部 Agent 可从文件发现它，是否自动识别取决于运行时。接续任务才读相关交接，整理员按 \`ORGANIZER.md\` 执行。
 
-1. AGENT-README.md。
-2. handoffs/daily/ 里最新的每日整理；没有就读 OVERVIEW.md。
-3. handoffs/ 根目录下比它新的交接记录，按时间排序。
-4. inbox/agents/ 里比它新的文件。
-5. 需要细节时再读 NOW.md、<模块>/STATUS.md、me/、memory/。
+## 投递与结果
 
-## 两个角色与文件
+在 \`inbox/agents/<agent>-<唯一时间>.records.jsonl\` 新建文件，每行一个带 type 的对象，以换行结束。类型从相关模块的 module.json.records 查，字段与示例按类型读 \`skills/record-format/<类型>.md\`；其他收件箱格式见 \`skills/record-format/SKILL.md\`。
+原始文字用唯一的 \`*.note.md\`：它保存原文，后续如何记由用户决定。放进收件箱只能说「已投递」；原文保存与餐食入账分别核对，只有处理结果和记录回读才能确认餐食已保存。不要重复投递同一餐来试探是否入账。
+本机工作台或 \`kaitu inbox process\` 处理文件，成功原件归档到 \`inbox/processed/YYYY-MM-DD/\`，错误部分附原因保存在 \`inbox/notes/YYYY-MM-DD/\`。
 
-- 任何 Agent 都能交：在 inbox/agents/* 和 handoffs/<YYYYMMDDTHHMM>-<agent>.md 新建唯一文件，不建子目录。
-- 做了某个项目的事，就更新这个项目的 projects/<项目>/STATUS.md 正文和 next，在 log.md 记一条并写明对应哪份交接；只改自己做过的项目。档案、偏好、目标、规则不直接改，建议交到 inbox/agents/，用户明确让改的照做。
-- 用户指定的整理员负责整理和更新手机：按 ORGANIZER.md 白天处理手机文件、更新手机，夜里写每日整理、更新下一步并归档交接。
-- ORGANIZER.md、AGENT-README.md、OVERVIEW.md、AGENTS.md 由本机 kaitu 维护，云端只读；整理员可改的资料范围见 ORGANIZER.md。
+## 写入边界
 
-## 交接记录
+- 交新文件，不建收件箱子目录、不覆盖已有文件。只更新自己做过的项目 STATUS.md 与 log.md；项目链接目录只读。
+- 档案、偏好、目标、规则保留原内容，建议交到收件箱；用户明确授权的修改按确认范围执行。收件箱不接受删除、恢复、规则或目标修改。
+- 日程建议等待用户确认；敏感记忆须用户明确要求。记忆替换只交 replaces 候选，用户确认前保留旧条。
+- \`.kaitu/\`、版本库、密钥由程序管理。SKILL.md、ORGANIZER.md、AGENT-README.md、AGENTS.md、OVERVIEW.md 与 skills/ 下的格式参考由本机维护；手机文件只按 ORGANIZER.md 的授权范围更新。
+- 密钥保留在本机，不写入投递文件或日志。健康只做记录、趋势与提醒。
 
-只要做过任何事，结束前新建 handoffs/<YYYYMMDDTHHMM>-<agent>.md，例如：
+${AI_NETWORK_RULES}
 
-\`\`\`markdown
----
-agent: grok-bot
-at: 2026-10-16T09:12:00+08:00
-follows: handoffs/20261016T0830-dot.md
----
-## 做了什么
-- 记录午饭：inbox/agents/grok-bot-20261016T0912.records.jsonl
-## 当前下一步
-- health：周四练背 40 分钟（已完成）
-- health：周六有氧 30 分钟
-## 未决 / 需要用户
-- 无
-\`\`\`
+## 完成后交接
 
-follows 可选，指向接续的上一份交接或每日整理。「当前下一步」写完整清单，不只写改动。
-两份交接接续同一份时，把两份都读，在自己的交接里合并「当前下一步」。
-记录交到 inbox/agents/；格式不确定时写 *.note.md。
-本机 kaitu ui 或 kaitu inbox process 处理，成功原件归档到 inbox/processed/YYYY-MM-DD/，错误部分转到 inbox/notes/YYYY-MM-DD/ 待整理。
-
-## 收件箱格式
-
-${INBOX_FORMATS}
-
-不接受删除、恢复、规则或目标修改。日程建议须用户在工作台确认；敏感记忆须用户明确要求。
-
-## 资讯投递
-
-采集规则在 [feed/COLLECT.md](feed/COLLECT.md)，关注方向在 feed/feeds.json，采集前先读这两个文件。
-新闻只有 title、url 是硬要求，summary、details、comment、published_at、relevance 尽量交全；X 仅由能读取 X 的 Agent 采集。
-可交 *.news.jsonl 或 *.records.jsonl；采集结束前留交接记录，没有新结果也写一句。
-
-## 记录格式
-
-${renderRecordReference(ws)}
-
-project_metric 的 project 填已存在的项目 slug。photo 只记录已有文件引用，上传原件用本机 kaitu photo add。
+新建 \`handoffs/<YYYYMMDDTHHMM>-<agent>.md\`，frontmatter 写 agent、带时区的 at；接续已有交接时可写 follows 路径。正文写「做了什么」「当前下一步」「未决 / 需要用户」，列实际投递路径和已核对结果；下一步保留该任务的完整清单。接续同一任务的多份交接保留各方未完成项，不把无关项目加入读取清单。
 `;
 }
 

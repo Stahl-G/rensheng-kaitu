@@ -1,11 +1,9 @@
 # Agent 入口
 
-## 接手顺序
+## 按当前任务读取
 
-1. 本文件、`me/profile.md`、`me/rules.md`、`memory/MEMORY.md`。
-2. `handoffs/daily/` 最新一份；没有就读 `OVERVIEW.md`。
-3. `handoffs/` 根目录里比它新的交接，按时间读；`inbox/agents/` 里是还没采纳的候选。
-4. 用到时再读 `me/goals.json`、`me/ongoing.json` 和相关项目的 `STATUS.md`、`log.md`。
+先读根目录 SKILL.md，按当前任务只读相关摘要与技能；是否自动识别根 Skill 取决于 Agent 运行时。
+尚未由开图初始化、缺少格式技能时，报告缺口；项目任务仍可只读目标项目的 STATUS.md 与相关日志，了解现状才读 OVERVIEW.md。
 
 ## 写入
 
@@ -26,7 +24,7 @@ follows: handoffs/20261019T0900-previous-agent.md
 ## 未决 / 需要用户
 ```
 
-`follows` 有前一份交接时才写。拿不准格式就写 `inbox/agents/<agent>-<时间>.note.md`。
+`follows` 有前一份相关交接时才写。原话用唯一的 `inbox/agents/<agent>-<时间>.note.md` 保存；保存原文不等于记入餐食。结构化餐食交 `*.records.jsonl`，只能确认投递时说「已投递」，处理结果与 meal 回读核对后才说「餐食已记录」。拿不准字段时先查该类型格式，不猜后续会自动转成记录。
 
 ## Git
 

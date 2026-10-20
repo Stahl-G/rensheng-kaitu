@@ -17,7 +17,7 @@
 6. 按 [DATA_LOCATIONS.md](DATA_LOCATIONS.md) 放内容。写入和上传前，把仓库名、目录和要写的内容给用户确认一次。
 7. 建库并上传：
    - 有 kaitu：没有工作区时先 `kaitu init <目录>`；项目用 `kaitu project new --title <名称> --slug <英文短名> --kind work --dir <目录>`；然后 `kaitu backup connect <账号>/kaitu-ai-memory --create --via gh --text --records --dir <目录>`。之后只用 `kaitu backup sync --dir <目录>` 上传，不要在工作区里直接 `git push`（工作区自己的 .gitignore 会漏掉手机和收件箱文件）。
-   - 没有 kaitu：`git clone --depth 1 https://github.com/Stahl-G/rensheng-kaitu` 到临时目录，把其中 `docs/guides/agent-memory/template/` 的全部内容（含隐藏文件）复制到新目录，填内容，`gh repo create <账号>/kaitu-ai-memory --private`，`git init`、提交、推送。时区写进 `me/rules.md`。仓库根目录必须保留 `kaitu-backup.json`，开图 App 靠它接上这个仓库。
+   - 没有 kaitu：`git clone --depth 1 https://github.com/Stahl-G/rensheng-kaitu` 到临时目录，把其中 `docs/guides/agent-memory/template/` 的全部内容（含隐藏文件）复制到新目录，再把 `templates/kaitu/SKILL.md` 复制到新目录根；这是与开图内置 Agent 同源的短任务指引。填内容，`gh repo create <账号>/kaitu-ai-memory --private`，`git init`、提交、推送。时区写进 `me/rules.md`。仓库根目录必须保留 `kaitu-backup.json`，开图 App 靠它接上这个仓库。
 8. 生成手机要读的内容，开图 iPhone 连上这个仓库就能看到：
    - 走「有 kaitu」：`kaitu phone run --as <你的名字> --dir <目录>`，再 `kaitu backup sync --dir <目录>`。
    - 走「没有 kaitu」：跳过这步。用户在装了开图的电脑上从这个仓库恢复后，开图会自动生成并同步上去。

@@ -27,7 +27,7 @@ export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径�
 - drive status/enable/disable → kaitu_drive。迁移后工具和技能自动切换到新工作区。
 - 每日整理按 ORGANIZER.md 执行，归档交接用 kaitu_workspace archive-handoffs。
 - kaitu ui → dsh 侧栏「开图」；不要求用户另开程序。批量导入、规则与目标修改仍须用户确认。
-首次了解用户时先读 AGENTS.md，再按其读取顺序读取档案、规则、NOW.md 和模块状态。`;
+任务读取路径与超时处理沿用根 SKILL.md 的指引，只加载匹配任务的技能。`;
 
 function boolean(data: Record<string, unknown>, key: string): boolean | undefined {
   if (!Object.hasOwn(data, key)) return undefined;
