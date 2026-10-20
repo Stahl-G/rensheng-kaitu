@@ -17,13 +17,24 @@ const requiredFiles = [
 ];
 
 async function download(url, limit) {
-  const parsed = new URL(url);
-  if (
-    parsed.protocol !== "https:" &&
-    !(parsed.protocol === "http:" && ["127.0.0.1", "localhost"].includes(parsed.hostname))
-  )
-    throw new Error("更新地址必须使用 HTTPS");
-  const response = await fetch(parsed, { signal: AbortSignal.timeout(120000), redirect: "error" });
+  let parsed = new URL(url);
+  const secure = parsed.protocol === "https:";
+  const signal = AbortSignal.timeout(120000);
+  let response;
+  for (let redirects = 0; ; redirects++) {
+    if (
+      parsed.username ||
+      parsed.password ||
+      (parsed.protocol !== "https:" &&
+        !(parsed.protocol === "http:" && !secure && ["127.0.0.1", "localhost"].includes(parsed.hostname)))
+    )
+      throw new Error("更新地址必须使用 HTTPS");
+    response = await fetch(parsed, { signal, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) break;
+    await response.body?.cancel();
+    if (redirects >= 5 || !response.headers.get("location")) throw new Error("更新下载重定向无效");
+    parsed = new URL(response.headers.get("location"), parsed);
+  }
   if (!response.ok) throw new Error(`下载失败（${response.status}）`);
   const chunks = [];
   let size = 0;
@@ -125,10 +136,13 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
   const configFile = join(resources, "kaitu-update.json");
   const config = existsSync(configFile) ? JSON.parse(readFileSync(configFile, "utf8")) : {};
   const current = JSON.parse(readFileSync(join(payload, "payload.json"), "utf8"));
+  const preferencesFile = join(state, "updates", "preferences.json");
+  const preferences = existsSync(preferencesFile) ? JSON.parse(readFileSync(preferencesFile, "utf8")) : {};
   let status = {
     version: current.version,
     dshVersion: DSH_VERSION,
     configured: Boolean(config.feedUrl && config.publicKey),
+    automatic: preferences.automatic !== false,
     phase: "idle",
     availableVersion: null,
     notes: "",
@@ -147,9 +161,22 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
         operation = undefined;
       });
   };
-  return {
+  const updater = {
+    async checkAutomatically() {
+      if (!status.automatic || !status.configured || operation || status.phase === "ready") return;
+      await updater.request("check");
+      await operation;
+    },
     async request(action = "status") {
       if (action === "status") return { ...status };
+      if (action === "automatic:on" || action === "automatic:off") {
+        const automatic = action === "automatic:on";
+        await mkdir(dirname(preferencesFile), { recursive: true, mode: 0o700 });
+        await writeFile(`${preferencesFile}.tmp`, JSON.stringify({ automatic }), { mode: 0o600 });
+        await rename(`${preferencesFile}.tmp`, preferencesFile);
+        status = { ...status, automatic };
+        return { ...status };
+      }
       if (operation) return { ...status };
       if (action === "restart") {
         if (status.phase !== "ready") throw new Error("没有等待重启的更新");
@@ -182,4 +209,5 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
       return { ...status };
     },
   };
+  return updater;
 }

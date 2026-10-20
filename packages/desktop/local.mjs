@@ -295,11 +295,16 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   updateMenu();
   await window.loadURL(server.url);
   step("loaded");
+  // Network checks never gate the first screen; downloading and restarting stay explicit.
+  const firstUpdateCheck = setTimeout(() => void updater.checkAutomatically(), 15000);
+  const updateChecks = setInterval(() => void updater.checkAutomatically(), 24 * 60 * 60 * 1000);
   let closing = false;
   app.on("before-quit", (event) => {
     if (closing) return;
     event.preventDefault();
     closing = true;
+    clearTimeout(firstUpdateCheck);
+    clearInterval(updateChecks);
     void Promise.allSettled([server.close(), ai.close()]).finally(() => app.quit());
   });
   await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));
