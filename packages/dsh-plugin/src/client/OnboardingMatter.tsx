@@ -147,6 +147,7 @@ export function OnboardingMatter(
   }, []);
   const apply = (result: Matter) => {
     setMatter(result);
+    setError("");
     if (!result.draft) return;
     applied.current = JSON.stringify(result.draft);
     setDraft(editable(result.draft));
@@ -243,7 +244,7 @@ export function OnboardingMatter(
           ? props.content.question
           : hasDraft
             ? t(`开图从${subject}里看到的`, `What Kaitu found in ${subject}`)
-            : t("写下你的目标和一个下一步", "Write down your goal and one next step")}
+            : t("原文已保存，接下来由你选择", "Your text is saved. Choose what comes next")}
       </h1>
       {error && (
         <p role="alert" className={v2.error}>
@@ -320,13 +321,18 @@ export function OnboardingMatter(
             </output>
           )}
           {manual && (
-            <ClipboardOrganize
-              source={matter.source}
-              promptOnboardingMatter={props.promptOnboardingMatter}
-              pasteOnboardingMatter={props.pasteOnboardingMatter}
-              onDraft={apply}
-            />
+            <p className={v2.small}>
+              {t(
+                "可以自己写目标和下一步，也可以只保留原文后结束。",
+                "Write a goal and next step yourself, or finish with just your original text saved.",
+              )}
+            </p>
           )}
+          <div className={css.footerActions}>
+            <button type="button" className={quiet} disabled={busy} onClick={() => void run(keep)}>
+              {t("保留原文并结束", "Keep the text and finish")}
+            </button>
+          </div>
           <div className={css.draftFields}>
             {field("goal", t("当前目标", "Current goal"))}
             {field("current", t("已知现状", "What's known now"))}
@@ -371,6 +377,17 @@ export function OnboardingMatter(
               : t(`依据 · 查看${subject}`, `Source · view ${subject}`)}
           </button>
           {raw && <pre className={css.original}>{matter.text}</pre>}
+          {manual && (
+            <details>
+              <summary>{t("用其他 AI 整理（可选）", "Organize with another AI (optional)")}</summary>
+              <ClipboardOrganize
+                source={matter.source}
+                promptOnboardingMatter={props.promptOnboardingMatter}
+                pasteOnboardingMatter={props.pasteOnboardingMatter}
+                onDraft={apply}
+              />
+            </details>
+          )}
           <div className={css.footerActions}>
             {props.builtin ? (
               !noAi && (
@@ -383,9 +400,6 @@ export function OnboardingMatter(
                 {t("请当前 AI 整理", "Ask the current AI")}
               </button>
             )}
-            <button type="button" className={quiet} disabled={busy} onClick={() => void run(keep)}>
-              {t("只保存原文", "Just save the text")}
-            </button>
             <button
               type="button"
               className={primary}
@@ -397,7 +411,9 @@ export function OnboardingMatter(
                 })
               }
             >
-              {t("采纳这个下一步", "Adopt this next step")}
+              {manual
+                ? t("保存目标和下一步", "Save the goal and next step")
+                : t("采纳这个下一步", "Adopt this next step")}
             </button>
           </div>
         </>
