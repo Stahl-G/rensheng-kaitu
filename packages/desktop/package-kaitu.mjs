@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
 import { writePayload as buildPayload } from "./package-payload.mjs";
+import { readUpdateConfig } from "./update-config.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
@@ -33,6 +34,7 @@ const { values, positionals } = parseArgs({
     output: { type: "string" },
     "dsh-root": { type: "string", default: join(homedir(), "Developer/deepseek-harness-rc2") },
     "update-config": { type: "string" },
+    "update-public-key": { type: "string" },
     "payload-only": { type: "string" },
     "payload-version": { type: "string" },
   },
@@ -61,6 +63,15 @@ if (values.dmg && existsSync(dmg)) throw new Error(`输出已存在，请另选�
 const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
 const version = kaituVersion;
 const payloadVersion = values["payload-version"] || version;
+const updateConfig = values["payload-only"]
+  ? null
+  : readUpdateConfig({
+      version,
+      configFile: values["update-config"],
+      publicKeyFile:
+        values["update-public-key"] ??
+        (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
+    });
 const plan = [
   `COPY ${source} → ${output}；校验 DSH 0.2.1-rc.2 / arm64 / 主入口`,
   `Info.plist: 人生开图 / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
@@ -203,8 +214,7 @@ async function packageApplication() {
     const payload = join(resources, "kaitu");
     await writePayload(payload);
     cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
-    if (values["update-config"])
-      cpSync(resolve(values["update-config"]), join(resources, "kaitu-update.json"));
+    if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
     await writeIcon(resources);
     await rewriteArchive(join(temporary, "app.asar"));
     cpSync(join(temporary, "app.asar"), join(resources, "app.asar"));

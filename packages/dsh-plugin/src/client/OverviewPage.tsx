@@ -6,6 +6,7 @@ import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js"
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
+import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import type { LearningSource } from "./LearningPage.js";
@@ -537,6 +538,9 @@ function Overview({
       <main
         className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" && explore === "footprints" ? css.footprintContent : ""}`}
       >
+        {props.desktopUpdate && view !== "settings" && (
+          <FeatureUpdates request={props.desktopUpdate} compact />
+        )}
         {error && (
           <p className={css.error} role="alert">
             {error}
