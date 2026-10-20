@@ -36,10 +36,13 @@ import {
   importUpload,
   invalidateHistoryFile,
   invalidateWorkspaceBackup,
+  normalizeLocale,
   onboardingStatus,
+  pick,
   processInbox,
   pullCalendarSubscriptions,
   readPhoto,
+  readPreferences,
   readWorkbench,
   refreshOverview,
   removeMemory,
@@ -105,6 +108,22 @@ async function body(req: IncomingMessage, limit: number): Promise<Buffer> {
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
+}
+async function requestJson(req: IncomingMessage, limit: number): Promise<unknown> {
+  const text = (await body(req, limit)).toString();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        "请求内容不是合法 JSON，请修正格式后重试。",
+        "The request body is not valid JSON; correct its format and retry.",
+      ),
+      "BAD_ARGS",
+    );
+  }
 }
 function json(res: ServerResponse, status: number, data: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -428,7 +447,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     try {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
       if (url.pathname.startsWith("/api/channels/") && req.method === "POST") {
-        const input = JSON.parse((await body(req, MAX_JSON)).toString());
+        const input = await requestJson(req, MAX_JSON);
         if (!input || typeof input !== "object" || Array.isArray(input))
           throw new KaituError("参数必须是对象", "BAD_ARGS");
         try {
@@ -436,7 +455,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           return json(
             res,
             200,
-            await (operation.startsWith("phone-") ? phones : collectors).request(operation, input),
+            await (operation.startsWith("phone-") ? phones : collectors).request(
+              operation,
+              input as Record<string, unknown>,
+            ),
           );
         } catch (error) {
           if (error instanceof KaituError) throw error;
@@ -445,15 +467,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
       if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
         const method = url.pathname.slice("/api/product/".length);
-        const args = JSON.parse(
-          (
-            await body(
-              req,
-              ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
-                ? 49 * 1024 * 1024
-                : 3 * 1024 * 1024,
-            )
-          ).toString(),
+        const args = await requestJson(
+          req,
+          ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
+            ? 49 * 1024 * 1024
+            : 3 * 1024 * 1024,
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
         if (method === "fileWatchStatus") return json(res, 200, watchStatus);
@@ -655,7 +673,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         });
         return json(res, 200, result);
       }
-      const data = JSON.parse((await body(req, MAX_JSON)).toString()) as Record<string, unknown>;
+      const data = (await requestJson(req, MAX_JSON)) as Record<string, unknown>;
       const result = await exclusive(async () => {
         if (url.pathname === "/api/import/cancel") {
           const token = field(data, "token");
