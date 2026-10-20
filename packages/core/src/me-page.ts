@@ -1,7 +1,7 @@
 import { readAvatar } from "./avatar.js";
 import { committedExperiences } from "./experience-imports.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { listMemories } from "./memory.js";
+import { type MemoryReplacement, listMemories, pendingMemoryReplacements } from "./memory.js";
 import type { Workspace } from "./workspace.js";
 export interface MeGoal {
   id: string;
@@ -30,11 +30,16 @@ export interface MeData {
   rules: MeRules;
   memories: {
     file: string;
+    name: string;
     type: "preference" | "fact" | "context" | "person" | "decision";
     text: string;
     source: string | null;
     sensitive: boolean;
+    ended?: string;
+    replaced_by?: string;
   }[];
+  archivedMemories: MeData["memories"];
+  memoryReplacements: MemoryReplacement[];
   /** 读书和工作经历，按开始时间从近到远；简历就是这份列表。 */
   career: {
     id: string;
@@ -48,6 +53,18 @@ export interface MeData {
 }
 
 export function readMe(ws: Workspace): MeData {
+  const memories = listMemories(ws, { includeArchived: true }).map(
+    ({ file, name, type, text, source, sensitive, ended, replaced_by }) => ({
+      file,
+      name,
+      type,
+      text,
+      source: source ?? null,
+      sensitive: sensitive ?? false,
+      ...(ended ? { ended } : {}),
+      ...(replaced_by ? { replaced_by } : {}),
+    }),
+  );
   const profile = parseFrontmatter<{ name?: string; bio?: string }>(
     ws.exists("me/profile.md") ? ws.readText("me/profile.md") : "",
   );
@@ -59,13 +76,9 @@ export function readMe(ws: Workspace): MeData {
     bio: profile.data.bio?.trim() || bio?.trim().replace(/\s*\n\s*/g, " ") || null,
     goals: ws.exists("me/goals.json") ? ws.readJson<MeGoal[]>("me/goals.json") : [],
     rules: ws.exists("me/rules.md") ? parseFrontmatter<MeRules>(ws.readText("me/rules.md")).data : {},
-    memories: listMemories(ws).map(({ file, type, text, source, sensitive }) => ({
-      file,
-      type,
-      text,
-      source: source ?? null,
-      sensitive: sensitive ?? false,
-    })),
+    memories: memories.filter((memory) => !memory.ended),
+    archivedMemories: memories.filter((memory) => memory.ended),
+    memoryReplacements: pendingMemoryReplacements(ws),
     avatar: readAvatar(ws),
     career: committedExperiences(ws)
       .filter(

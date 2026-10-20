@@ -32,6 +32,27 @@ it("手机操作样例逐行符合 schema，缺参数的操作不通过", () => 
   ).toBe(false);
 });
 
+it("记忆决定只接受独立文件名和候选内容，不接受 AI 夹带归档字段", () => {
+  const validate = schemas().builtin("phone-action.schema.json");
+  const action = {
+    client_id: "01JAZ1B2C3D4E5F6G7H8J9K0MP",
+    at: "2026-10-18T07:20:00+08:00",
+    device: "3fa9c1d2",
+    op: "replace_memory",
+  };
+  const candidate = { type: "fact", name: "city", text: "合成城市" };
+  const expected = { ...candidate, source: null, sensitive: false };
+  expect(validate({ ...action, args: { file: "fact_city.md", candidate, expected } })).toBe(true);
+  expect(validate({ ...action, args: { file: "fact_city.md", expected, candidate: null } })).toBe(true);
+  expect(validate({ ...action, args: { file: "../me/profile.md", expected, candidate } })).toBe(false);
+  expect(
+    validate({
+      ...action,
+      args: { file: "fact_city.md", expected, candidate: { ...candidate, ended: "2026-10-20" } },
+    }),
+  ).toBe(false);
+});
+
 it("generator 可选：没有时照常通过，Agent 必须写名字和规则版本", () => {
   const validate = schemas().builtin("phone-today.schema.json");
   const { generator: _generator, ...plain } = JSON.parse(fixture("today.json"));

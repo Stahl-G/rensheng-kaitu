@@ -2,11 +2,20 @@ import { basename } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import {
+  type MemoryExpectation,
+  type MemoryInput,
+  archiveMemory,
+  memoryExpectation,
+  normalizedMemory,
+  replaceMemory,
+} from "./memory.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
 import { schemas } from "./schema.js";
 import { cancelTask, completeTask, listTasks } from "./tasks.js";
+import { localDate } from "./time.js";
 import { completeNext, decidePhoneProposal, statusFiles } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -25,11 +34,16 @@ interface Action {
     title?: string;
     due?: string | null;
     notes?: string;
+    candidate?: MemoryInput | null;
+    expected?: MemoryExpectation;
   };
 }
 
 // 待办先记进操作账本再追加；中途失败时重投复用同一条记录，不会重复追加。
-type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & { task?: StoredRecord };
+type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & {
+  task?: StoredRecord;
+  memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
+};
 function prepareTask(ws: Workspace, action: Action): StoredRecord {
   const { id, expected_rev, title, due, notes } = action.args;
   const current = readRecords(ws, "task").find((row) => row.id === id);
@@ -126,6 +140,43 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
           case "decide_proposal":
             await decidePhoneProposal(ws, id, decision);
             break;
+          case "replace_memory": {
+            const plan = first?.memory ?? {
+              file: target,
+              candidate: action.args.candidate ?? null,
+              expected: action.args.expected as MemoryExpectation,
+              at: action.at,
+            };
+            if (!first?.memory) {
+              const current = normalizedMemory(ws, plan.file);
+              if (!current || current.ended || !isDeepStrictEqual(memoryExpectation(current), plan.expected))
+                throw new KaituError("这条记忆已更新或归档，请核对后再确认", "CONFLICT");
+              seen[action.client_id] = { memory: plan };
+              ws.writeJson(ledgerFile, seen, { internal: true });
+            }
+            if (plan.candidate) {
+              await replaceMemory(ws, plan.file, plan.candidate, {
+                by: "user",
+                now: new Date(plan.at),
+                expected: plan.expected,
+                replacementFile: `context_${action.client_id.toLowerCase()}.md`,
+              });
+            } else {
+              const current = normalizedMemory(ws, plan.file);
+              // 写完归档、还没记成功回执时中断：只认本操作的原内容，不能覆盖后来改过的记忆。
+              const recovered =
+                current?.ended === localDate(new Date(plan.at), ws.timeZone()) &&
+                !current.replaced_by &&
+                isDeepStrictEqual(memoryExpectation(current), plan.expected);
+              if (!recovered)
+                await archiveMemory(ws, plan.file, {
+                  by: "user",
+                  now: new Date(plan.at),
+                  expected: plan.expected,
+                });
+            }
+            break;
+          }
           case "create_task":
           case "update_task":
           case "complete_task":

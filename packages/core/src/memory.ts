@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
@@ -23,6 +24,8 @@ export type MemoryPatch = Partial<Pick<MemoryInput, "name" | "text" | "type" | "
 export interface Memory extends MemoryInput {
   created: string;
   updated: string;
+  ended?: string;
+  replaced_by?: string;
 }
 
 export interface MemoryEntry extends Memory {
@@ -33,6 +36,57 @@ export interface MemoryOptions {
   by?: By;
   now?: Date;
   actor?: string;
+}
+
+export interface MemoryReplacement {
+  file: string;
+  candidate: MemoryInput;
+}
+
+export interface MemoryExpectation {
+  type: MemoryType;
+  name: string;
+  text: string;
+  source: string | null;
+  sensitive: boolean;
+}
+
+export function memoryExpectation(memory: MemoryInput): MemoryExpectation {
+  return {
+    type: memory.type,
+    name: memory.name,
+    text: memory.text,
+    source: memory.source ?? null,
+    sensitive: memory.sensitive ?? false,
+  };
+}
+
+function assertExpected(memory: Memory, expected: MemoryExpectation): void {
+  if (!isDeepStrictEqual(memoryExpectation(memory), expected))
+    throw new KaituError("这条记忆已更新，请核对后再确认", "CONFLICT");
+}
+
+/** 候选仍留在已有的收件箱文件里；确认前不写入 memory/，也不新增持久格式。 */
+export function pendingMemoryReplacements(ws: Workspace): MemoryReplacement[] {
+  if (!ws.exists("inbox/agents")) return [];
+  const result: MemoryReplacement[] = [];
+  for (const file of readdirSync(ws.resolve("inbox/agents"))) {
+    if (!file.endsWith(".memory.json") || file.startsWith(".") || ws.conflictCopy(`inbox/agents/${file}`))
+      continue;
+    try {
+      const raw: unknown = ws.scanParsed(`inbox/agents/${file}`, "memory-replacements", JSON.parse);
+      const rows = Array.isArray(raw) ? raw : ((raw as { memories?: unknown[] })?.memories ?? [raw]);
+      for (const row of rows) {
+        if (!row || typeof row !== "object" || typeof row.replaces !== "string") continue;
+        const old = normalizedMemory(ws, row.replaces);
+        if (!old || old.ended) continue;
+        result.push({ file: row.replaces, candidate: memoryInput(row) });
+      }
+    } catch {
+      // 不完整或无效的文件仍由收件箱按原流程给出原因。
+    }
+  }
+  return result;
 }
 
 const TYPES: Record<MemoryType, string> = {
@@ -138,7 +192,7 @@ function looseMemory(file: string, raw: string, fallbackDate: string): Memory | 
   } as Memory;
 }
 
-function availableFile(ws: Workspace, type: MemoryType, name: string, current?: string): string {
+function availableFile(ws: Workspace, type: MemoryType, name: string): string {
   const slug =
     name
       .toLowerCase()
@@ -147,7 +201,7 @@ function availableFile(ws: Workspace, type: MemoryType, name: string, current?: 
   const base = `${type}_${slug}`;
   let file = `${base}.md`;
   let suffix = 2;
-  while (file !== current && ws.exists(memoryPath(file))) file = `${base}-${suffix++}.md`;
+  while (ws.exists(memoryPath(file))) file = `${base}-${suffix++}.md`;
   return file;
 }
 
@@ -172,7 +226,7 @@ function readMemory(ws: Workspace, file: string): { data: Memory; body: string }
   return { data, body };
 }
 
-export function listMemories(ws: Workspace): MemoryEntry[] {
+export function listMemories(ws: Workspace, options: { includeArchived?: boolean } = {}): MemoryEntry[] {
   if (!ws.exists("memory")) return [];
   const order = Object.keys(TYPES);
   return readdirSync(ws.resolve("memory"))
@@ -185,7 +239,7 @@ export function listMemories(ws: Workspace): MemoryEntry[] {
       const data = ws.scanParsed(path, "memory", (text) =>
         looseMemory(file, text, localDate(statSync(ws.resolve(path)).mtime, ws.timeZone())),
       );
-      return data ? [{ ...data, file }] : [];
+      return data && (options.includeArchived || !data.ended) ? [{ ...data, file }] : [];
     })
     .sort(
       (a, b) =>
@@ -239,15 +293,89 @@ export async function updateMemory(
   ws.assertDownloaded("memory");
   const now = opts.now ?? new Date();
   // 只改交来的字段：没写的（undefined）保留原值，不把类型等必填项清空。
-  const changes = Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined));
+  const changes = Object.fromEntries(
+    (["name", "text", "type", "sensitive"] as const)
+      .filter((key) => patch[key] !== undefined)
+      .map((key) => [key, patch[key]]),
+  );
   const data: Memory = { ...current.data, ...changes, updated: isoInZone(now, ws.timeZone()).slice(0, 10) };
   validateMemory(data);
-  const renamed = data.name !== current.data.name || data.type !== current.data.type;
-  const nextFile = renamed ? availableFile(ws, data.type, data.name, file) : file;
-  ws.writeText(memoryPath(nextFile), stringifyFrontmatter(data, current.body));
-  if (nextFile !== file) rmSync(ws.resolve(memoryPath(file)));
+  ws.writeText(memoryPath(file), stringifyFrontmatter(data, current.body));
   rewriteIndex(ws);
   await snapshot(ws, `${opts.actor ?? who(opts.by)}更新了一条记忆：${data.name}`, now);
+  return { ...data, file };
+}
+
+/** 归档和替换是用户的决定，Agent 的普通更新不能写 ended/replaced_by。 */
+export async function archiveMemory(
+  ws: Workspace,
+  file: string,
+  opts: MemoryOptions & { expected: MemoryExpectation },
+): Promise<MemoryEntry> {
+  if (opts.by !== "user") throw new KaituError("请由用户确认记忆归档", "USER_DECISION");
+  ws.assertDownloaded("memory");
+  const current = readMemory(ws, file);
+  assertExpected(current.data, opts.expected);
+  if (current.data.ended) throw new KaituError("这条记忆已归档，请重新核对", "CONFLICT");
+  const date = localDate(opts.now ?? new Date(), ws.timeZone());
+  const data = { ...current.data, ended: date, updated: date };
+  validateMemory(data);
+  ws.writeText(memoryPath(file), stringifyFrontmatter(data, current.body));
+  rewriteIndex(ws);
+  await snapshot(ws, `你归档了一条记忆：${data.name}`, opts.now);
+  return { ...data, file };
+}
+
+export async function replaceMemory(
+  ws: Workspace,
+  file: string,
+  input: MemoryInput,
+  opts: MemoryOptions & { expected: MemoryExpectation; replacementFile?: string },
+): Promise<MemoryEntry> {
+  if (opts.by !== "user") throw new KaituError("请由用户确认记忆替换", "USER_DECISION");
+  ws.assertDownloaded("memory");
+  const current = readMemory(ws, file);
+  const date = localDate(opts.now ?? new Date(), ws.timeZone());
+  // 和普通 Agent 写入一样，只接受候选内容，不能夹带归档字段。
+  const candidate = memoryInput(input as unknown as Record<string, unknown>);
+  const data: Memory = {
+    ...candidate,
+    sensitive: candidate.sensitive ?? false,
+    created: date,
+    updated: date,
+  };
+  validateMemory(data);
+  const nextFile = opts.replacementFile ?? availableFile(ws, data.type, data.name);
+  const path = memoryPath(nextFile);
+  if (nextFile === file) throw new KaituError("替换需要保留旧记忆文件", "INVALID_MEMORY");
+  // 手机先把确定的文件名记入操作账本；写到一半重投时复用它，不再新建一条。
+  if (ws.exists(path)) {
+    const existing = readMemory(ws, nextFile).data;
+    if (
+      existing.type !== data.type ||
+      existing.name !== data.name ||
+      existing.text !== data.text ||
+      existing.source !== data.source ||
+      !!existing.sensitive !== data.sensitive ||
+      existing.ended
+    )
+      throw new KaituError("替换目标已有不同内容，未覆盖", "CONFLICT");
+    if (current.data.ended && current.data.replaced_by === nextFile) return { ...existing, file: nextFile };
+  }
+  if (current.data.ended) throw new KaituError("这条记忆已归档，请重新核对", "CONFLICT");
+  assertExpected(current.data, opts.expected);
+  const archived = { ...current.data, ended: date, updated: date, replaced_by: nextFile };
+  validateMemory(archived);
+  const existed = ws.exists(path);
+  try {
+    if (!existed) ws.writeText(path, stringifyFrontmatter(data));
+    ws.writeText(memoryPath(file), stringifyFrontmatter(archived, current.body));
+  } catch (error) {
+    if (!existed && ws.exists(path)) rmSync(ws.resolve(path));
+    throw error;
+  }
+  rewriteIndex(ws);
+  await snapshot(ws, `你替换了一条记忆：${current.data.name}`, opts.now);
   return { ...data, file: nextFile };
 }
 

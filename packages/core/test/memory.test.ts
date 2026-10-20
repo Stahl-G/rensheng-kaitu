@@ -1,14 +1,125 @@
 import { copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readAgentFile } from "../src/agent-tools.js";
+import { stringifyFrontmatter } from "../src/frontmatter.js";
 import { handoverPack } from "../src/handover.js";
 import { history, restore } from "../src/history.js";
+import { processInbox } from "../src/inbox.js";
 import { readMe } from "../src/me-page.js";
-import { addMemory, importMemories, listMemories, removeMemory, updateMemory } from "../src/memory.js";
+import {
+  addMemory,
+  archiveMemory,
+  importMemories,
+  listMemories,
+  memoryExpectation,
+  normalizedMemory,
+  pendingMemoryReplacements,
+  removeMemory,
+  replaceMemory,
+  updateMemory,
+} from "../src/memory.js";
+import { readOverviewPage } from "../src/overview-page.js";
+import { buildPhoneLibrary } from "../src/phone-projections.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace } from "./helpers.js";
 
 describe("记忆", () => {
+  it.each([
+    { type: "context" },
+    { name: "changed" },
+    { text: "合成变更正文" },
+    { source: "changed" },
+    { sensitive: true },
+  ])("用户确认前旧条变动时，归档和替换均拒绝且保留当前内容：%j", async (patch) => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, { type: "fact", name: "old", text: "合成原文", source: "synthetic" });
+    const { file, ...data } = old;
+    const current = { ...data, ...patch };
+    ws.writeText(`memory/${file}`, stringifyFrontmatter(current));
+    const expected = memoryExpectation(old);
+    await expect(archiveMemory(ws, file, { by: "user", expected })).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    await expect(
+      replaceMemory(ws, file, { type: "fact", name: "new", text: "合成替换" }, { by: "user", expected }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(listMemories(ws)).toEqual([{ ...current, file }]);
+    expect(normalizedMemory(ws, file)?.ended).toBeUndefined();
+  });
+  it("改标题和类型保留文件编号、正文和来源，普通更新不能夹带归档决定", async () => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, {
+      type: "fact",
+      name: "original",
+      text: "合成旧说法",
+      source: "synthetic",
+    });
+    ws.writeText(`memory/${old.file}`, `${ws.readText(`memory/${old.file}`)}\n# 原始说明\n保留的正文。\n`);
+    const next = await updateMemory(ws, old.file, {
+      name: "new title",
+      type: "context",
+      ended: "2026-10-20",
+    } as Parameters<typeof updateMemory>[2]);
+    expect(next.file).toBe(old.file);
+    expect(next.ended).toBeUndefined();
+    expect(next.source).toBe("synthetic");
+    expect(ws.readText(`memory/${old.file}`)).toContain("保留的正文。");
+    expect(ws.readText("memory/MEMORY.md")).toContain(`new title —— 合成旧说法（${old.file}）`);
+    expect(validateWorkspace(ws)).toEqual([]);
+  });
+
+  it("用户替换和归档保留旧文件，当前索引、Agent、手机目录只列新的", async () => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, { type: "fact", name: "city", text: "合成旧城市" });
+    const candidate = { type: "context" as const, name: "city now", text: "合成新城市" };
+    await expect(
+      replaceMemory(ws, old.file, candidate, { by: "agent", expected: memoryExpectation(old) }),
+    ).rejects.toMatchObject({
+      code: "USER_DECISION",
+    });
+    const next = await replaceMemory(ws, old.file, candidate, {
+      by: "user",
+      expected: memoryExpectation(old),
+      now: new Date("2026-10-19T18:00:00Z"),
+    });
+    expect(normalizedMemory(ws, old.file)).toMatchObject({
+      ended: "2026-10-20",
+      replaced_by: next.file,
+      text: "合成旧城市",
+    });
+    expect(listMemories(ws).map((m) => m.file)).toEqual([next.file]);
+    expect(listMemories(ws, { includeArchived: true })).toHaveLength(2);
+    expect(readAgentFile(ws, `memory/${old.file}`, true)).toContain("合成旧城市");
+    expect(ws.readText("memory/MEMORY.md")).not.toContain(old.file);
+    expect(handoverPack(ws, "zh-CN").text).not.toContain("合成旧城市");
+    const now = new Date();
+    const library = buildPhoneLibrary(ws, await readOverviewPage(ws, now), now.toISOString());
+    expect(library.items.map((item) => item.path)).toContain(`memory/${next.file}`);
+    expect(library.items.map((item) => item.path)).not.toContain(`memory/${old.file}`);
+    expect(readMe(ws).archivedMemories[0]).toMatchObject({ file: old.file, replaced_by: next.file });
+    await archiveMemory(ws, next.file, { by: "user", expected: memoryExpectation(next) });
+    expect(listMemories(ws)).toEqual([]);
+    expect(validateWorkspace(ws)).toEqual([]);
+  });
+
+  it("Agent 的 replaces 候选重复整理仍等待用户，确认后才替换且不重复导入", async () => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, { type: "preference", name: "training", text: "合成早上练" });
+    const file = "inbox/agents/synthetic.memory.json";
+    const candidate = { type: "preference" as const, name: "training", text: "合成晚上练" };
+    const text = JSON.stringify([{ ...candidate, replaces: old.file, agent: "synthetic" }]);
+    ws.writeText(file, text);
+    for (let i = 0; i < 2; i++) expect((await processInbox(ws, { stableMs: 0 })).pending).toContain(file);
+    expect(ws.readText(file)).toBe(text);
+    expect(listMemories(ws).map((m) => m.text)).toEqual(["合成早上练"]);
+    expect(normalizedMemory(ws, old.file)?.ended).toBeUndefined();
+    expect(pendingMemoryReplacements(ws)).toEqual([{ file: old.file, candidate }]);
+    await replaceMemory(ws, old.file, candidate, { by: "user", expected: memoryExpectation(old) });
+    expect((await processInbox(ws, { stableMs: 0 })).processed).toContain(file);
+    expect(pendingMemoryReplacements(ws)).toEqual([]);
+    expect(listMemories(ws).map((m) => m.text)).toEqual(["合成晚上练"]);
+  });
   it("自己放进 memory/ 的普通 Markdown 也当记忆读：名字取标题", async () => {
     const ws = await freshWorkspace();
     ws.writeText(

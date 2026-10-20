@@ -14,8 +14,28 @@ const GOAL_SOURCES: Record<string, [string, string]> = {
   conversation: ["来自一段对话", "From a conversation"],
 };
 
+export type MemoryExpectation = Pick<
+  MeData["memories"][number],
+  "type" | "name" | "text" | "source" | "sensitive"
+>;
+function expectedMemory(memory: MeData["memories"][number]): MemoryExpectation {
+  return {
+    type: memory.type,
+    name: memory.name,
+    text: memory.text,
+    source: memory.source,
+    sensitive: memory.sensitive,
+  };
+}
+
 export interface MePageProps {
   loadMe: () => Promise<MeData>;
+  archiveMemory: (file: string, expected: MemoryExpectation) => Promise<unknown>;
+  replaceMemory: (
+    file: string,
+    candidate: MeData["memoryReplacements"][number]["candidate"],
+    expected: MemoryExpectation,
+  ) => Promise<unknown>;
   setAvatar: (base64: string) => Promise<string | null>;
   removeAvatar: () => Promise<void>;
   onPrompt: (text: string) => void;
@@ -105,12 +125,35 @@ function downloadResume(data: MeData, t: Translate) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt, onImportMemory }: MePageProps) {
+export function MePage({
+  loadMe,
+  archiveMemory,
+  replaceMemory,
+  setAvatar,
+  removeAvatar,
+  onPrompt,
+  onImportMemory,
+}: MePageProps) {
   const t = useT();
   const [data, setData] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [replacement, setReplacement] = useState<MeData["memories"][number] | null>(null);
+  const [replacementText, setReplacementText] = useState("");
+  const mutateMemory = async (operation: () => Promise<unknown>) => {
+    setBusy(true);
+    setError("");
+    try {
+      await operation();
+      setData(await loadMe());
+      setReplacement(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     let active = true;
@@ -136,19 +179,50 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt, onImportMemo
           .filter(Boolean)
           .join(" · ")}
       </span>
-      <span className={css["fact-acts"]}>
-        <button
-          type="button"
-          className={`${css.btn} ${css["btn-quiet"]}`}
-          onClick={() =>
-            onPrompt(
-              `请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type] ?? "记忆"}，保留出处。`,
-            )
-          }
-        >
-          {t("修改", "Edit")}
-        </button>
-      </span>
+      {memory.ended && (
+        <span className={css.src}>
+          {memory.replaced_by
+            ? t(
+                `于 ${memory.ended} 替换为：${[...(data?.memories ?? []), ...(data?.archivedMemories ?? [])].find((item) => item.file === memory.replaced_by)?.name ?? memory.replaced_by}`,
+                `Replaced on ${memory.ended}: ${[...(data?.memories ?? []), ...(data?.archivedMemories ?? [])].find((item) => item.file === memory.replaced_by)?.name ?? memory.replaced_by}`,
+              )
+            : t(`于 ${memory.ended} 归档`, `Archived on ${memory.ended}`)}
+        </span>
+      )}
+      {!memory.ended && (
+        <span className={css["fact-acts"]}>
+          <button
+            type="button"
+            className={`${css.btn} ${css["btn-quiet"]}`}
+            onClick={() =>
+              onPrompt(
+                `请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type] ?? "记忆"}，保留出处。`,
+              )
+            }
+          >
+            {t("修改", "Edit")}
+          </button>
+          <button
+            type="button"
+            className={`${css.btn} ${css["btn-quiet"]}`}
+            disabled={busy}
+            onClick={() => {
+              setReplacement(memory);
+              setReplacementText(memory.text);
+            }}
+          >
+            {t("用新说法替换", "Replace with new wording")}
+          </button>
+          <button
+            type="button"
+            className={`${css.btn} ${css["btn-quiet"]}`}
+            disabled={busy}
+            onClick={() => void mutateMemory(() => archiveMemory(memory.file, expectedMemory(memory)))}
+          >
+            {t("这条不再成立", "This no longer applies")}
+          </button>
+        </span>
+      )}
     </div>
   );
   const facts = data?.memories.filter((memory) => memory.type === "fact") ?? [];
@@ -334,6 +408,83 @@ export function MePage({ loadMe, setAvatar, removeAvatar, onPrompt, onImportMemo
               </summary>
               {other.map(fact)}
             </details>
+          )}
+          {!!data.archivedMemories?.length && (
+            <details>
+              <summary className={css.link}>
+                {t(
+                  `已归档 · ${data.archivedMemories.length} 条`,
+                  `Archived · ${data.archivedMemories.length}`,
+                )}
+              </summary>
+              {data.archivedMemories.map(fact)}
+            </details>
+          )}
+          {!!data.memoryReplacements?.length && (
+            <section className={css.sec}>
+              <h2 className={css.eyebrow}>
+                {t("待你确认的记忆替换", "Memory replacements for your review")}
+              </h2>
+              {data.memoryReplacements.map(({ file, candidate }) => (
+                <div
+                  className={css.card}
+                  key={`${file}:${candidate.type}:${candidate.name}:${candidate.text}`}
+                >
+                  <p>{data.memories.find((item) => item.file === file)?.text}</p>
+                  <p>
+                    {t("建议改为：", "Suggested wording: ")}
+                    {candidate.text}
+                  </p>
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={busy}
+                    onClick={() => {
+                      const old = data.memories.find((item) => item.file === file);
+                      if (old) void mutateMemory(() => replaceMemory(file, candidate, expectedMemory(old)));
+                    }}
+                  >
+                    {t("确认替换", "Confirm replacement")}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
+          {replacement && (
+            <form
+              className={css.card}
+              onSubmit={(event) => {
+                event.preventDefault();
+                void mutateMemory(() =>
+                  replaceMemory(
+                    replacement.file,
+                    {
+                      type: replacement.type,
+                      name: replacement.name,
+                      text: replacementText,
+                      ...(replacement.source ? { source: replacement.source } : {}),
+                      sensitive: replacement.sensitive,
+                    },
+                    expectedMemory(replacement),
+                  ),
+                );
+              }}
+            >
+              <label>
+                {t("新的说法（旧记忆会保留在已归档中）", "New wording (the old memory stays in the archive)")}
+                <textarea
+                  required
+                  value={replacementText}
+                  onChange={(event) => setReplacementText(event.target.value)}
+                />
+              </label>
+              <button type="submit" className={css.btn} disabled={busy || !replacementText.trim()}>
+                {t("确认替换", "Confirm replacement")}
+              </button>
+              <button type="button" className={css.link} disabled={busy} onClick={() => setReplacement(null)}>
+                {t("取消", "Cancel")}
+              </button>
+            </form>
           )}
           <button
             type="button"

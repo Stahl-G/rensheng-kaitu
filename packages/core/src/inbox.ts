@@ -23,7 +23,7 @@ import { batchSnapshot } from "./history.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
-import { type MemoryInput, importMemories, memoryInput, memoryType } from "./memory.js";
+import { type MemoryInput, importMemories, memoryInput, memoryType, normalizedMemory } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
@@ -253,12 +253,34 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const inputs: MemoryInput[] = [];
     const agents: string[] = [];
     const errors: string[] = [];
+    let pending = false;
     for (const [index, value] of raw.entries()) {
       try {
         const row = object(value);
         agents.push(sourceAgent(row.agent));
         const input = memoryInput(row);
         await importMemories(ws, [input], { dryRun: true });
+        if (row.replaces !== undefined) {
+          if (typeof row.replaces !== "string")
+            throw new KaituError("replaces 必须是记忆文件名", "BAD_INBOX");
+          const old = normalizedMemory(ws, row.replaces);
+          if (!old) throw new KaituError("找不到要替换的记忆", "NOT_FOUND");
+          if (old.ended) {
+            const next = old.replaced_by ? normalizedMemory(ws, old.replaced_by) : undefined;
+            if (
+              next &&
+              next.type === input.type &&
+              next.name === input.name &&
+              next.text === input.text &&
+              next.source === input.source &&
+              !!next.sensitive === !!input.sensitive
+            )
+              continue;
+            throw new KaituError("这条记忆已归档，请重新核对", "CONFLICT");
+          }
+          pending = true;
+          continue;
+        }
         inputs.push(input);
       } catch (error) {
         errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${INBOX_FORMATS}`);
@@ -268,6 +290,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const actor = `Agent（Drive 收件箱：${agent}）`;
     return {
       errors,
+      pending,
       agent,
       message: `${actor}导入了 ${inputs.length} 条记忆`,
       apply: () => importMemories(ws, inputs, { actor }),
@@ -546,6 +569,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         }
       }
       if (stamp(ws, file) !== before) {
+        result.pending.push(file);
+        continue;
+      }
+      if (prepared && "pending" in prepared && prepared.pending) {
         result.pending.push(file);
         continue;
       }

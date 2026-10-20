@@ -12,7 +12,7 @@ agent: example-bot
 ---
 今天的动态简报。
 \`\`\`
-- <唯一名>.memory.json：数组。每项写 type（preference / fact / context / person / decision）和 text；name 不写时取正文开头；可选 source、sensitive、agent。
+- <唯一名>.memory.json：数组。每项写 type（preference / fact / context / person / decision）和 text；name 不写时取正文开头；可选 source、sensitive、agent。要替换旧记忆时加 replaces（旧记忆文件名），只是候选，留在收件箱等待用户确认，确认前不改旧记忆、不写新记忆。
   示例：\`[{"type":"preference","name":"训练时间","text":"喜欢晚间训练","agent":"example-bot"}]\`
 - <唯一名>.proposal.json：对象，写 title、start、end（HH:MM，如 18:00，结束须晚于开始）；可选 module、agent。用于今天的待确认建议。
   示例：\`{"title":"散步","start":"18:00","end":"18:30","module":"health","agent":"example-bot"}\`
