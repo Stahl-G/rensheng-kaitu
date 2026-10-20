@@ -1,0 +1,599 @@
+{
+  "variant": "after",
+  "errors": [],
+  "views": [
+    {
+      "theme": "light",
+      "state": "history",
+      "marker": {
+        "x": 1249,
+        "y": 659
+      }
+    },
+    {
+      "theme": "light",
+      "state": "possible",
+      "marker": {
+        "x": 1115,
+        "y": 552
+      }
+    },
+    {
+      "theme": "dark",
+      "state": "history",
+      "marker": {
+        "x": 1249,
+        "y": 659
+      }
+    },
+    {
+      "theme": "dark",
+      "state": "possible",
+      "marker": {
+        "x": 1115,
+        "y": 552
+      }
+    }
+  ],
+  "records": 31,
+  "experiences": [
+    {
+      "id": "01M5BBDGQPHZ9CJF8132JH1EJY",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1815286,
+        "name": "天府",
+        "country": "CN",
+        "lat": 30.6667,
+        "lng": 104.0667,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2000-01-01",
+      "end": "2003-12-31"
+    },
+    {
+      "id": "01M5BBDGQQHX1GJW088JZQAATV",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1816670,
+        "name": "北京",
+        "country": "CN",
+        "lat": 39.9075,
+        "lng": 116.3972,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2004-01-01",
+      "end": "2007-12-31"
+    },
+    {
+      "id": "01M5BBDGQQHX1GJW088JZQAATW",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2950159,
+        "name": "柏林",
+        "country": "DE",
+        "lat": 52.5244,
+        "lng": 13.4105,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2008-01-01",
+      "end": "2011-12-31"
+    },
+    {
+      "id": "01M5BBDGQQHX1GJW088JZQAATX",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1880252,
+        "name": "新加坡",
+        "country": "SG",
+        "lat": 1.2897,
+        "lng": 103.8501,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2012-01-01",
+      "end": "2015-12-31"
+    },
+    {
+      "id": "01M5BBDGQQHX1GJW088JZQAATY",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1808926,
+        "name": "杭州",
+        "country": "CN",
+        "lat": 30.2936,
+        "lng": 120.1614,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2016-01-01",
+      "end": "2019-12-31"
+    },
+    {
+      "id": "01M5BBDGQQHX1GJW088JZQAATZ",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1796236,
+        "name": "上海",
+        "country": "CN",
+        "lat": 31.2222,
+        "lng": 121.4581,
+        "precision": "city"
+      },
+      "event_type": "lived",
+      "start": "2020-01-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKH6",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2988507,
+        "name": "巴黎",
+        "country": "FR",
+        "lat": 48.8534,
+        "lng": 2.3488,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-01-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHJ",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1835848,
+        "name": "ソウル特別市",
+        "country": "KR",
+        "lat": 37.566,
+        "lng": 126.9784,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-01-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKH7",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 3117735,
+        "name": "マドリード市",
+        "country": "ES",
+        "lat": 40.4165,
+        "lng": -3.7026,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-02-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHK",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1850147,
+        "name": "东京",
+        "country": "JP",
+        "lat": 35.6895,
+        "lng": 139.6917,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-02-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKH8",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2267057,
+        "name": "里斯本",
+        "country": "PT",
+        "lat": 38.7251,
+        "lng": -9.1498,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-03-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWS",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1853909,
+        "name": "大阪",
+        "country": "JP",
+        "lat": 34.6938,
+        "lng": 135.5011,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-03-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKH9",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 3169070,
+        "name": "罗马市",
+        "country": "IT",
+        "lat": 41.8919,
+        "lng": 12.5113,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-04-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWT",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2147714,
+        "name": "悉尼",
+        "country": "AU",
+        "lat": -33.8678,
+        "lng": 151.2073,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-04-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHA",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 264371,
+        "name": "雅典",
+        "country": "GR",
+        "lat": 37.9838,
+        "lng": 23.7278,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-05-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWV",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2158177,
+        "name": "墨尔本",
+        "country": "AU",
+        "lat": -37.814,
+        "lng": 144.9633,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-05-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHB",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 745044,
+        "name": "伊斯坦堡",
+        "country": "TR",
+        "lat": 41.0138,
+        "lng": 28.9497,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-06-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWW",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 5128581,
+        "name": "紐約",
+        "country": "US",
+        "lat": 40.7143,
+        "lng": -74.006,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-06-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHC",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 292223,
+        "name": "杜拜",
+        "country": "AE",
+        "lat": 25.0772,
+        "lng": 55.3093,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-07-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWX",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 6167865,
+        "name": "多伦多",
+        "country": "CA",
+        "lat": 43.7064,
+        "lng": -79.3986,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-07-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHD",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2761369,
+        "name": "維也納",
+        "country": "AT",
+        "lat": 48.2085,
+        "lng": 16.3721,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-08-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWY",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 6173331,
+        "name": "バンクーバー市",
+        "country": "CA",
+        "lat": 49.2497,
+        "lng": -123.1193,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-08-02"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHE",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1609350,
+        "name": "曼谷",
+        "country": "TH",
+        "lat": 13.754,
+        "lng": 100.5014,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-09-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHF",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1581130,
+        "name": "河內",
+        "country": "VN",
+        "lat": 21.0245,
+        "lng": 105.8412,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-10-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHG",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1819729,
+        "name": "香港",
+        "country": "HK",
+        "lat": 22.2783,
+        "lng": 114.1747,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-11-01"
+    },
+    {
+      "id": "01M5BBDGQRJ3B2M73NYE4FTKHH",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "user_reported",
+      "time_precision": "day",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 1668341,
+        "name": "台北",
+        "country": "TW",
+        "lat": 25.0531,
+        "lng": 121.5264,
+        "precision": "city"
+      },
+      "event_type": "travel",
+      "start": "2023-12-01"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TWZ",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "planned",
+      "time_precision": "unknown",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2643743,
+        "name": "伦敦",
+        "country": "GB",
+        "lat": 51.5085,
+        "lng": -0.1257,
+        "precision": "city"
+      },
+      "event_type": "travel"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TX0",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "planned",
+      "time_precision": "unknown",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 3413829,
+        "name": "雷克亞維克",
+        "country": "IS",
+        "lat": 64.1355,
+        "lng": -21.8954,
+        "precision": "city"
+      },
+      "event_type": "travel"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TX1",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "planned",
+      "time_precision": "unknown",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 2193733,
+        "name": "奧克蘭都會區",
+        "country": "NZ",
+        "lat": -36.8485,
+        "lng": 174.7635,
+        "precision": "city"
+      },
+      "event_type": "travel"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TX2",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "suggested",
+      "time_precision": "unknown",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 3871336,
+        "name": "圣地亚哥",
+        "country": "CL",
+        "lat": -33.4569,
+        "lng": -70.6483,
+        "precision": "city"
+      },
+      "event_type": "travel"
+    },
+    {
+      "id": "01M5BBDGQS0DEN9GMAASS37TX3",
+      "ts": "2026-10-20T00:00:00Z",
+      "by": "user",
+      "fact_status": "suggested",
+      "time_precision": "unknown",
+      "source": "memory/footprint-seed.md",
+      "place": {
+        "geonameid": 3369157,
+        "name": "好望角鎮",
+        "country": "ZA",
+        "lat": -33.9258,
+        "lng": 18.4232,
+        "precision": "city"
+      },
+      "event_type": "travel"
+    }
+  ]
+}

@@ -213,7 +213,7 @@ export function PaperMap({
                   .trim() || color,
             },
           };
-          if (!m.getLayer(next.id)) m.addLayer(next as typeof layer, "footprint-history");
+          if (!m.getLayer(next.id)) m.addLayer(next as typeof layer, "footprint-history-contrast");
         }
         if (!m.getSource("paper-terrain"))
           m.addSource("paper-terrain", {
@@ -238,7 +238,7 @@ export function PaperMap({
                 "hillshade-exaggeration": 0.3,
               },
             },
-            "footprint-history",
+            "footprint-history-contrast",
           );
         remoteLoaded = true;
         setDetailStatus(null);
@@ -276,6 +276,21 @@ export function PaperMap({
           ["planned", [6, 4]],
           ["suggested", [1, 5]],
         ] as const) {
+          // Keep white ink, with a narrow casing on pale paper. Scale the dash
+          // units with line width so planned/suggested gaps stay aligned.
+          instance.addLayer({
+            id: `footprint-${kind}-contrast`,
+            type: "line",
+            source: "footprint-routes",
+            filter: ["==", ["get", "kind"], kind],
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: {
+              "line-color": "#344b56",
+              "line-width": 3,
+              "line-opacity": isDark() ? 0 : ["*", ["get", "opacity"], 0.75],
+              ...(dash ? { "line-dasharray": dash.map((n) => n / 2) } : {}),
+            },
+          });
           instance.addLayer({
             id: `footprint-${kind}`,
             type: "line",
@@ -291,6 +306,18 @@ export function PaperMap({
           });
         }
         instance.addSource("footprint-cities", { type: "geojson", data: empty });
+        instance.addLayer({
+          id: "footprint-cities-contrast",
+          type: "circle",
+          source: "footprint-cities",
+          paint: {
+            "circle-radius": ["case", ["get", "lived"], 4.25, 2.75],
+            "circle-color": "rgba(255,255,255,0)",
+            "circle-stroke-color": "#344b56",
+            "circle-stroke-width": 3,
+            "circle-stroke-opacity": isDark() ? 0 : 0.75,
+          },
+        });
         instance.addLayer({
           id: "footprint-cities",
           type: "circle",
