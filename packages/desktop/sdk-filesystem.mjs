@@ -1,8 +1,10 @@
 import { realpathSync, statSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
-import { proposeAgentDocument } from "../core/dist/agent-tools.js";
+import { assertAgentWrite } from "../core/dist/agent-file-policy.js";
+import { proposeAgentDocument, readAgentFile } from "../core/dist/agent-tools.js";
+import { agentCanRead } from "../core/dist/exposure.js";
+import { Workspace } from "../core/dist/workspace.js";
 
 export function confinedFileSystem(
   LocalFileSystem,
@@ -10,12 +12,14 @@ export function confinedFileSystem(
   root,
   attachments = new Set(),
   attachmentRoot = undefined,
+  connection = "local-ask",
 ) {
+  const ws = new Workspace(root, { maintain: false });
+  const memoryIndex = (target) => target.targetKey === join(realpathSync(root), "memory", "MEMORY.md");
   const contains = (path) => {
     if (attachments.has(path)) return true;
     try {
-      assertAgentPath(root, path);
-      return true;
+      return agentCanRead(ws, path, connection);
     } catch {
       return false;
     }
@@ -71,17 +75,34 @@ export function confinedFileSystem(
     async stat(target, ...args) {
       return super.stat(await this.checked(target), ...args);
     }
-    async readText(target, ...args) {
-      return super.readText(await this.checked(target), ...args);
+    async readText(target, signal) {
+      const fresh = await this.checked(target);
+      signal?.throwIfAborted();
+      return memoryIndex(fresh)
+        ? readAgentFile(ws, "memory/MEMORY.md", connection)
+        : super.readText(fresh, signal);
     }
-    async streamText(target, ...args) {
-      return super.streamText(await this.checked(target), ...args);
+    async streamText(target, signal) {
+      const fresh = await this.checked(target);
+      if (!memoryIndex(fresh)) return super.streamText(fresh, signal);
+      const text = await this.readText(fresh, signal);
+      return (async function* () {
+        signal?.throwIfAborted();
+        yield text;
+      })();
     }
-    async readBytes(target, ...args) {
-      return super.readBytes(await this.checked(target), ...args);
+    async readBytes(target, signal, maxBytes) {
+      const fresh = await this.checked(target);
+      if (!memoryIndex(fresh)) return super.readBytes(fresh, signal, maxBytes);
+      const bytes = Buffer.from(await this.readText(fresh, signal));
+      if (bytes.length > maxBytes) throw new FsError("资料超过读取上限", "FS_TOO_LARGE");
+      return bytes;
     }
-    async readByteRange(target, ...args) {
-      return super.readByteRange(await this.checked(target), ...args);
+    async readByteRange(target, range, signal) {
+      const fresh = await this.checked(target);
+      return memoryIndex(fresh)
+        ? Buffer.from(await this.readText(fresh, signal)).subarray(range.offset, range.offset + range.length)
+        : super.readByteRange(fresh, range, signal);
     }
     async watch(target, ...args) {
       return super.watch(await this.checked(target), ...args);

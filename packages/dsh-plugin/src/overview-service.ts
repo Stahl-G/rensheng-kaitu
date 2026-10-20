@@ -3,6 +3,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { CollectorService } from "@kaitu/channels/collectors";
 import {
+  type AgentConnectionId,
   type AutomationKey,
   type AutomationSettings,
   type CalendarData,
@@ -10,6 +11,7 @@ import {
   type CalendarPushResult,
   type CalendarPushSettings,
   type City,
+  type FinanceAccess,
   type HandoverPack,
   type Hometown,
   type ImportSource,
@@ -122,6 +124,7 @@ import {
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
+  setFinanceAccess,
   setNewsFeedback,
   snapshot,
   startLearning,
@@ -243,8 +246,8 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.write(() => addGoalNext(this.workspace, goalId, title));
   }
   @Remote("handoverPack")
-  async handoverPack(locale?: string): Promise<HandoverPack> {
-    return handoverPack(this.workspace, normalizeLocale(locale));
+  async handoverPack(locale?: string, includeFinance?: boolean): Promise<HandoverPack> {
+    return handoverPack(this.workspace, normalizeLocale(locale), undefined, includeFinance === true);
   }
   @Remote("directionsPrompt")
   async directionsPrompt(locale?: string): Promise<string> {
@@ -421,6 +424,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("settings")
   async settings(): Promise<SettingsData> {
     return readSettings(this.workspace);
+  }
+
+  @Remote("setFinanceAccess")
+  async setFinanceAccess(id: AgentConnectionId, allowed: boolean): Promise<FinanceAccess> {
+    return this.write(() => Promise.resolve(setFinanceAccess(this.workspace, id, allowed)));
   }
 
   @Remote("organizerSeen")

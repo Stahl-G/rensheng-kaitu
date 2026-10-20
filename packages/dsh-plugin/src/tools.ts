@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 import {
   AI_NETWORK_RULES,
+  type AgentConnectionId,
   type ExperienceInput,
   Workspace,
   addExperiences,
@@ -24,6 +25,7 @@ export const name = "kaitu";
 export const inject = ["tools", "systemPrompt"];
 
 export interface Config {
+  connection?: AgentConnectionId;
   workspace?: string;
   enableAutomation?: boolean;
   /** false：后台工作交给开图 App（同一工作区不跑两遍），插件只提供页面和工具。 */
@@ -69,7 +71,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     pending = result.catch(() => {});
     return result;
   };
-  registerWorkflowTools(ctx, ws, queue);
+  registerWorkflowTools(ctx, ws, queue, config.connection ?? "local-ask");
   registerLearningAids(ctx);
   function register(
     toolName: string,
@@ -117,7 +119,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
         ok: true,
         workspace: ws.root,
         timeZone: ws.timeZone(),
-        summary: readStatus(ws),
+        summary: readStatus(ws, new Date(), config.connection ?? "local-ask"),
         recordTypes: listRecordTypes(ws).map(({ type }) => type),
         ...(typeof args.type === "string" ? { reference: recordReference(ws, args.type) } : {}),
       };

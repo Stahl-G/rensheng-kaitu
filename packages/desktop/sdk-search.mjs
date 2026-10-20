@@ -3,9 +3,20 @@ import { lstat, readdir } from "node:fs/promises";
 import { join, matchesGlob, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { assertAgentPath } from "../core/dist/agent-file-policy.js";
+import { agentCanRead } from "../core/dist/exposure.js";
+import { Workspace } from "../core/dist/workspace.js";
 
 const run = promisify(execFile);
-export async function agentSearch(root, name, args, signal, executable, execute = run) {
+export async function agentSearch(
+  root,
+  name,
+  args,
+  signal,
+  executable,
+  execute = run,
+  connection = "local-ask",
+) {
+  const ws = new Workspace(root, { maintain: false });
   const base = assertAgentPath(root, resolve(root, args.path ?? "."));
   const files = [];
   let visited = 0;
@@ -16,7 +27,7 @@ export async function agentSearch(root, name, args, signal, executable, execute 
     const info = await lstat(path);
     if (info.isSymbolicLink()) return;
     try {
-      assertAgentPath(root, path);
+      if (!agentCanRead(ws, path, connection)) return;
     } catch {
       return;
     }
@@ -69,6 +80,10 @@ export async function agentSearch(root, name, args, signal, executable, execute 
   for await (const path of walk(base)) {
     if (name === "glob") files.push(path);
     else {
+      if (relative(root, path).replaceAll("\\", "/") === "memory/MEMORY.md") {
+        // Its entries are already searched in the individual allowed memory files.
+        continue;
+      }
       batch.push(path);
       if (batch.length === 128) {
         await searchBatch(batch);

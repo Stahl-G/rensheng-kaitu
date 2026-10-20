@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { KaituError, type NetworkSearchSettings } from "@kaitu/core";
+import { type AgentConnectionId, KaituError, type NetworkSearchSettings } from "@kaitu/core";
 
 export type AskEventType =
   | "user/message"
@@ -50,7 +50,7 @@ export interface AskImage {
 export type AskAttachment = AskImage | { kind: "file"; data: string; mimeType: string; name: string };
 export interface AskService {
   support?(method: string, input: Record<string, unknown>): Promise<unknown>;
-  background(): AskService;
+  background(connection?: AgentConnectionId): AskService;
   list(): AskThread[];
   create(): AskThread;
   organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
@@ -110,7 +110,8 @@ export function createAskService(options: {
   workspace: string;
   workspaceKey?: string;
   workspaceKeyFor?: (workspace: string) => string;
-  runtime: (mode: AskMode) => Promise<AskRuntime>;
+  connection?: AgentConnectionId;
+  runtime: (mode: AskMode, connection: AgentConnectionId) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
   models: AskService["models"];
@@ -216,7 +217,7 @@ export function createAskService(options: {
     runtimeMode = mode;
     const epoch = generation;
     starting ??= options
-      .runtime(mode)
+      .runtime(mode, options.connection ?? "local-ask")
       .then(async (value) => {
         clients.add(value);
         if (epoch !== generation || closed) {
@@ -293,9 +294,9 @@ export function createAskService(options: {
       append(row.id, "session.status", { status: "idle", error: "上次对话已中断，可以继续发送" });
   }
   return {
-    background() {
+    background(connection = options.connection) {
       ready();
-      const service = createAskService({ ...options, workspaceKey, transient: true });
+      const service = createAskService({ ...options, workspaceKey, connection, transient: true });
       backgrounds.add(service);
       const close = service.close.bind(service);
       service.close = async () => {

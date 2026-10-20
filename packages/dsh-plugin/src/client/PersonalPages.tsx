@@ -1,4 +1,10 @@
-import type { CalendarPushSettings, HandoverPack, OrganizerStatus, SyncProvider } from "@kaitu/core";
+import type {
+  AgentConnectionId,
+  CalendarPushSettings,
+  HandoverPack,
+  OrganizerStatus,
+  SyncProvider,
+} from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
@@ -31,7 +37,8 @@ export interface PersonalServices extends CalendarPushServices {
   restoreVersion: (oid: string) => Promise<unknown>;
   moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
   pickStorageFolder: () => Promise<string | null>;
-  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
+  loadHandover: (locale?: Locale, includeFinance?: boolean) => Promise<HandoverPack>;
+  configureFinanceAccess: (id: AgentConnectionId, allowed: boolean) => Promise<unknown>;
 }
 export type PersonalView = "profile" | "connections" | "settings";
 export function PersonalPages(
@@ -280,6 +287,37 @@ export function PersonalPages(
           <>
             <section className={css.sec}>
               <HandoverPanel loadHandover={props.loadHandover} onAnswer={props.onHandoverAnswer} />
+            </section>
+            <section className={css.sec}>
+              <h2 className={css.eyebrow}>{t("Agent 读取财务", "Agent finance access")}</h2>
+              <div className={`${css.card} ${css["list-card"]}`}>
+                {(
+                  [
+                    ["local-mcp", t("本机 MCP", "Local MCP")],
+                    ["local-ask", t("本机问问", "Local Ask")],
+                    ["phone-ask", t("手机问问", "Phone Ask")],
+                    ["remote-mcp", t("远程 MCP", "Remote MCP")],
+                  ] as const
+                ).map(([id, label]) => (
+                  <label key={id} className={css["switch-row"]}>
+                    <span>{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={data.financeAccess[id]}
+                      disabled={busy}
+                      onChange={(event) =>
+                        void run(() => props.configureFinanceAccess(id, event.target.checked))
+                      }
+                    />
+                  </label>
+                ))}
+                <p className={css.small}>
+                  {t(
+                    "开图工具按这些开关读取财务。完整 Agent 可直接访问磁盘；你配的整理员能读 GitHub 备份仓库里的全部内容。",
+                    "These switches control finance access through Kaitu tools. Full Agent can access files directly; your organizer can read everything in the GitHub backup repository.",
+                  )}
+                </p>
+              </div>
             </section>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>

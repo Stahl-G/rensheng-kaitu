@@ -17,12 +17,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   Workspace,
+  addMemory,
   enableDrive,
   exportWorkspace,
   historyDirectory,
   initWorkspace,
   localStateRoot,
   readAgentFile,
+  setFinanceAccess,
   snapshot,
   stateDirectory,
 } from "@kaitu/core";
@@ -166,6 +168,31 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
       else process.env.KAITU_APP_HOME = appHome;
     }
     expect(() => desktopPaths({ KAITU_DIR: root, KAITU_APP_HOME: join(root, "program") })).toThrow();
+    const memory = await addMemory(ws, {
+      type: "fact",
+      name: "Private",
+      text: "Synthetic private memory",
+      sensitive: true,
+    });
+    for (const allowed of [false, true]) {
+      setFinanceAccess(ws, "local-ask", allowed);
+      const names = await agentSearch(root, "glob", { pattern: "**/*" });
+      expect(names.paths.includes(`memory/${memory.file}`)).toBe(false);
+      expect(names.paths.includes("finance/STATUS.md")).toBe(allowed);
+      await agentSearch(
+        root,
+        "grep",
+        { pattern: "Synthetic" },
+        undefined,
+        "synthetic-rg",
+        async (_executable: string, args: string[]) => {
+          expect(args.join(" ")).not.toContain(memory.file);
+          expect(args.join(" ")).not.toContain("memory/MEMORY.md");
+          if (!allowed) expect(args.some((arg) => /[/\\]finance[/\\]/.test(arg))).toBe(false);
+          return { stdout: "" };
+        },
+      );
+    }
     ws.writeText(
       ".agents/skills/normal/SKILL.md",
       "---\nname: normal\ndescription: synthetic\n---\nSynthetic skill",

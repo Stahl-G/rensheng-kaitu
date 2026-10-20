@@ -4,6 +4,7 @@ import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
+import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { countInboxNotes } from "./inbox-notes.js";
@@ -119,7 +120,13 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   return { ...parsed, data };
 }
 
-export function readWorkbench(ws: Workspace, now = new Date(), remote = false, summary = false) {
+export function readWorkbench(
+  ws: Workspace,
+  now = new Date(),
+  remote: boolean | AgentConnection = false,
+  summary = false,
+) {
+  const connection = remote === true ? "remote-mcp" : remote || undefined;
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
   if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
@@ -139,7 +146,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false, s
         type,
         () => {
           const rows = readRecords(ws, type);
-          return remote ? publicRecords(ws, type, rows) : rows;
+          return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 
         [],
@@ -157,9 +164,11 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false, s
       body: "",
     }),
     projects: read("项目", () => listProjects(ws, { now }), []),
-    statuses: statusFiles(ws).flatMap(({ file, module }) =>
-      read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
-    ),
+    statuses: statusFiles(ws)
+      .filter(({ file }) => !connection || agentCanRead(ws, file, connection))
+      .flatMap(({ file, module }) =>
+        read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
+      ),
     modules,
     records,
     tasks: read("待办", () => tasksForToday(records.task ?? [], ws.timeZone(), now), []),
@@ -184,7 +193,16 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false, s
       : files(ws, "health/data/labs", ".json").flatMap((file) =>
           read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
         ),
-    memories: summary ? [] : read("记忆", () => listMemories(ws), []),
+    memories: summary
+      ? []
+      : read(
+          "记忆",
+          () =>
+            listMemories(ws).filter(
+              (memory) => !connection || agentCanRead(ws, `memory/${memory.file}`, connection),
+            ),
+          [],
+        ),
     warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从云盘下载：${file}`)],
   };
 }

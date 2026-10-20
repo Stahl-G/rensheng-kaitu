@@ -21,7 +21,7 @@ import {
   webRuntimePatch,
 } from "./sdk-search-settings.mjs";
 
-export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
+export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection = "local-ask" }) {
   const web = [
     ...webRuntimePatch(hostPlugin),
     {
@@ -40,7 +40,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
       {
         insert: [
           { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-          { id: "kaitu", name: plugin, config: { workspace } },
+          { id: "kaitu", name: plugin, config: { workspace, connection } },
         ],
       },
     ];
@@ -85,7 +85,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode }) {
       insert: [
         { id: "kaitu-sdk-host", name: hostPlugin },
         { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-        { id: "kaitu", name: plugin, config: { workspace } },
+        { id: "kaitu", name: plugin, config: { workspace, connection } },
       ],
     },
   ];
@@ -297,7 +297,7 @@ export function createSdkRuntime({
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return api.settings();
     },
-    async runtime(mode = "scoped", capabilities = false) {
+    async runtime(mode = "scoped", capabilities = false, connection = "local-ask") {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
@@ -314,11 +314,18 @@ export function createSdkRuntime({
         )
           await saveProvider(settings);
       }
-      const profile = join(home, `kaitu-sdk-${capabilities ? "capabilities" : mode}.patch.json`);
+      const profile = join(
+        home,
+        `kaitu-sdk-${capabilities ? "capabilities" : `${mode}-${connection}`}.patch.json`,
+      );
       mkdirSync(home, { recursive: true, mode: 0o700 });
-      writeFileSync(profile, JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode })), {
-        mode: 0o600,
-      });
+      writeFileSync(
+        profile,
+        JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection })),
+        {
+          mode: 0o600,
+        },
+      );
       const { JsonRpcLineTransport } = await import(
         pathToFileURL(createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-sdk-protocol"))
           .href
@@ -329,6 +336,7 @@ export function createSdkRuntime({
           ...env,
           DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
           KAITU_AGENT_MODE: mode,
+          KAITU_AGENT_CONNECTION: connection,
           KAITU_DIR: workspace,
         },
         detached: process.platform !== "win32",

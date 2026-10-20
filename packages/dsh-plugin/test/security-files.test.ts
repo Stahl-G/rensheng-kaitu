@@ -2,11 +2,14 @@ import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  addMemory,
+  addRecord,
   createProject,
   initWorkspace,
   parseFrontmatter,
   readRecords,
   saveOnboardingMatter,
+  setFinanceAccess,
   stringifyFrontmatter,
 } from "@kaitu/core";
 import { expect, it } from "vitest";
@@ -54,6 +57,34 @@ it("等价路径与文件别名受同一保护，重复规范路径整批拒绝�
     expect(ws.readText("me/rules.md")).toBe(before);
     await writeFiles(ws, [{ path: "./me/rules.md", content: changed }], true);
     expect(ws.readText("me/rules.md")).toBe(changed);
+    await addMemory(ws, { type: "fact", name: "Secret", text: "Synthetic private memory", sensitive: true });
+    addRecord(ws, "finance_account", {
+      name: "Synthetic wallet",
+      kind: "wallet",
+      source: "manual",
+      currency: "CNY",
+    });
+    for (const connection of ["local-ask", "phone-ask"] as const) {
+      registerWorkflowTools(
+        { tools: { register: (tool: { name: string }) => tools.set(tool.name, tool as never) } } as never,
+        ws,
+        async (run) => run(),
+        connection,
+      );
+      const call = (name: string, args: unknown) =>
+        tools.get(name)?.execute(args, { signal: new AbortController().signal });
+      expect(JSON.stringify(await call("kaitu_memory", { operation: "list" }))).not.toContain(
+        "Synthetic private memory",
+      );
+      for (const allowed of [false, true]) {
+        setFinanceAccess(ws, connection, allowed);
+        const rows = await call("kaitu_records", { operation: "list", type: "finance_account" });
+        expect(JSON.stringify(rows).includes("Synthetic wallet")).toBe(allowed);
+        expect(await call("kaitu_workspace", { operation: "read", path: "finance/STATUS.md" })).toMatchObject(
+          { ok: allowed },
+        );
+      }
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
