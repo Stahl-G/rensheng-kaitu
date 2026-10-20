@@ -104,7 +104,6 @@
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
       const tgz = r.assets.find((a) => /^rensheng-kaitu-.*\.tgz$/i.test(a.name));
-      const exe = r.assets.filter((a) => /^Kaitu-Setup-.*-x64\.exe$/i.test(a.name)).sort((a, b) => b.id - a.id)[0];
       const set = (name, fn) => rel.querySelectorAll(`[data-rel="${name}"]`).forEach(fn);
       const version = r.tag.replace(/^v/, "");
       const date = new Date(r.published);
@@ -115,12 +114,6 @@
       set("size", (el) => { el.textContent = `${mb} MB`; });
       set("dmg", (el) => { el.href = dmg.url; });
       set("dmg-name", (el) => { el.textContent = dmg.name; });
-      if (exe) {
-        set("exe", (el) => { el.href = exe.url; });
-        set("exe-name", (el) => { el.textContent = exe.name; });
-        set("exe-size", (el) => { el.textContent = `${Math.round(exe.size / 1048576)} MB`; });
-        set("exe-sha", (el) => { el.textContent = exe.digest ? exe.digest.replace(/^sha256:/, "") : "—"; });
-      }
       set("sha", (el) => { el.textContent = dmg.digest ? dmg.digest.replace(/^sha256:/, "") : "—"; });
       set("page", (el) => { el.href = r.page; });
       set("pre", (el) => { el.hidden = !r.prerelease; });
@@ -160,7 +153,7 @@
   }
 })();
 
-/* Windows 访客直达 EXE；Linux 继续使用 DSH 插件。 */
+/* Windows 和 Linux 访客进入 DSH 插件指引；Mac 保留原下载入口。 */
 (() => {
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const agent = navigator.userAgent || "";
@@ -173,10 +166,10 @@
   const en = location.pathname.startsWith("/en/");
   for (const el of document.querySelectorAll("[data-dl]")) {
     el.href = `${en ? "/en" : ""}/download/#${os === "Windows" ? "windows" : "plugin"}`;
-    el.textContent = os === "Windows" ? (en ? "Download for Windows" : "下载 Windows 版") : (en ? "Install on Linux" : "Linux 版安装指引");
+    el.textContent = os === "Windows" ? (en ? "Install DSH plugin on Windows" : "Windows 插件安装指引") : (en ? "Install on Linux" : "Linux 版安装指引");
   }
   for (const el of document.querySelectorAll("[data-dl-meta]"))
-    el.textContent = os === "Windows" ? (en ? "Windows 10 / 11 · x64" : "Windows 10 / 11 · x64") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");
+    el.textContent = os === "Windows" ? (en ? "Windows · DeepSeek Harness plugin" : "Windows · DeepSeek Harness 插件") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");
   if (/\/download\/?$/.test(location.pathname) && !location.hash) {
     const target = document.getElementById(os === "Windows" ? "windows" : "plugin");
     if (target) requestAnimationFrame(() => target.scrollIntoView());

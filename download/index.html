@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>下载 · 人生开图</title>
-<meta name="description" content="下载 Windows EXE 或 macOS 应用，安装后添加 API Key 即可使用。也提供命令行和 DSH 插件。">
+<meta name="description" content="Mac 下载 Kaitu.app，Windows 按指引安装 DeepSeek Harness 开图插件。">
 <link rel="canonical" href="https://kaitu.si/download/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/download/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/download/">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="人生开图">
 <meta property="og:title" content="下载 · 人生开图">
-<meta property="og:description" content="下载 Windows EXE 或 macOS 应用，安装后添加 API Key 即可使用。也提供命令行和 DSH 插件。">
+<meta property="og:description" content="Mac 下载 Kaitu.app，Windows 按指引安装 DeepSeek Harness 开图插件。">
 <meta property="og:url" content="https://kaitu.si/download/">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="/tokens.css?v=da5dfb17">
 <link rel="stylesheet" href="/style.css?v=1b1ea670">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=e3d60415" defer></script>
+<script src="/app.js?v=04009e06" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -40,7 +40,7 @@
 <div class="wrap narrow" data-release>
   <header class="page-head">
     <h1>下载开图</h1>
-    <p class="lead">下载后安装，打开「问问」添加一个 API Key 就能开始。支持 <a href="#windows">Windows 10 / 11</a> 和 Mac（Apple 芯片）。</p>
+    <p class="lead">Apple 芯片的 Mac 下载 Kaitu.app；Windows 请按<a href="#windows">DSH 插件安装指引</a>使用开图。</p>
   </header>
 
   <section class="dl-card" aria-labelledby="dl-title">
@@ -63,15 +63,20 @@
   </section>
 
   <section class="dl-card" id="windows" aria-labelledby="windows-title" style="margin-top:24px">
-    <div class="dl-top"><h2 id="windows-title">Windows <span data-rel="version">0.1.0-rc.4</span></h2><span class="chip chip-pre" data-rel="pre">预览版</span></div>
-    <dl class="dl-facts">
-      <dt>文件</dt><dd><span data-rel="exe-name">Kaitu-Setup-0.1.0-rc.4-windows.2-x64.exe</span> · <span data-rel="exe-size">284 MB</span></dd>
-      <dt>系统</dt><dd>Windows 10 / 11，64 位（x64）</dd>
-      <dt>SHA-256</dt><dd><code data-rel="exe-sha">41c8977b09ffa67f2191fc9dabaab360a80621adaa3ac9a20f90918fe0030734</code></dd>
-    </dl>
-    <div class="dl-actions"><a class="btn btn-big btn-primary" data-rel="exe" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.0-rc.4/Kaitu-Setup-0.1.0-rc.4-windows.2-x64.exe">下载 Windows 安装包</a><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4">发布说明 ↗</a></div>
-    <p class="small" style="margin-top:14px">双击 EXE 安装，完成后打开人生开图。已内置 Node 与 DSH，无需另装开发工具。Windows 预览包尚未数字签名，系统可能显示发布者验证提示。</p>
-    <p class="small">第一次打开选资料存放位置，再到「问问 → 连接 AI → 用开图里的 AI」填写 API Key、获取并选择模型。DeepSeek 默认推荐，也支持其他 AI 服务。</p>
+    <h2 id="windows-title">Windows：DeepSeek Harness 插件</h2>
+    <h3 id="plugin">安装开图插件</h3>
+    <p>在 Windows、Linux 或 Intel Mac 上，开图以 DeepSeek Harness（DSH）插件的形式使用，目前是试用支持。装好后 DSH 侧栏多出「开图」，有今天、开图、资料三个入口；对话用 DSH 自己的会话。</p>
+    <ol>
+      <li>装好 DeepSeek Harness 桌面版，版本 0.2.1-rc.2 或更新（见 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness 的 GitHub</a>）。打开一次，在「设置 → 模型」配好模型。</li>
+      <li>打开侧栏「插件」，安装 <code>kaitu-dsh</code>。</li>
+      <li>装好后重开 DSH，侧栏点「开图」。第一次打开先选资料放哪。</li>
+    </ol>
+    <p>也可以从插件市场装：在「插件」点「实验性插件」旁的「更多」，打开「自定义插件市场」；在「发现」里点「添加索引源」，填 <code>https://kaitu.si/plugins/index.json</code>，再安装「人生开图」。</p>
+    <p>习惯命令行的话（需要 Node.js 22.19+ 或 24+）：</p>
+<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
+kaitu dsh --install</code></pre><button type="button" class="copy">复制</button></div>
+    <p>运行后重开 DSH。同一个资料文件夹也在 Mac 上的 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。写入系统日历只在 Mac 的 Kaitu.app 里可用，其他环境会生成日历文件让你导入。</p>
+
   </section>
 
   <div class="doc" style="margin-top:40px">
@@ -87,22 +92,9 @@
 
     <h2 id="needs">需要什么</h2>
     <ul>
-      <li>Windows 使用上方的 EXE 安装包；Kaitu.app 需要 Apple 芯片（arm64）的 Mac。Intel Mac 和 Linux 可用 <a href="#plugin">DeepSeek Harness 插件</a>。</li>
+      <li>Kaitu.app 需要 Apple 芯片（arm64）的 Mac。Windows、Intel Mac 和 Linux 使用 <a href="#plugin">DeepSeek Harness 插件</a>。</li>
       <li>看资料、记原文、看地图和财务都不需要 API Key。想用内置问问，再添加一个 AI 服务：DeepSeek 默认推荐，也可以用 OpenAI、Claude、Gemini、Kimi、智谱等。</li>
     </ul>
-
-    <h2 id="plugin">其他方式：装进 DeepSeek Harness</h2>
-    <p>也可以把开图作为插件装进 DeepSeek Harness：在 Windows、Linux 或 Intel Mac 上，开图以 DeepSeek Harness（DSH）插件的形式使用，目前是试用支持。装好后 DSH 侧栏多出「开图」，有今天、开图、资料三个入口；对话用 DSH 自己的会话。</p>
-    <ol>
-      <li>装好 DeepSeek Harness 桌面版，版本 0.2.1-rc.2 或更新（见 <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness 的 GitHub</a>）。打开一次，在「设置 → 模型」配好模型。</li>
-      <li>打开侧栏「插件」，安装 <code>kaitu-dsh</code>。</li>
-      <li>装好后重开 DSH，侧栏点「开图」。第一次打开先选资料放哪。</li>
-    </ol>
-    <p>也可以从插件市场装：在「插件」点「实验性插件」旁的「更多」，打开「自定义插件市场」；在「发现」里点「添加索引源」，填 <code>https://kaitu.si/plugins/index.json</code>，再安装「人生开图」。</p>
-    <p>习惯命令行的话（需要 Node.js 22.19+ 或 24+）：</p>
-<div class="codeblock"><pre><code>npm install -g rensheng-kaitu@next --allow-scripts=@deepseek-ai/dsh-subprocess-local,koffi,node-pty
-kaitu dsh --install</code></pre><button type="button" class="copy">复制</button></div>
-    <p>运行后重开 DSH。同一个资料文件夹也在 Mac 上的 Kaitu.app 里用时，加 <code>--no-automation</code>，后台任务只在 Kaitu.app 里跑。写入系统日历只在 Mac 的 Kaitu.app 里可用，其他环境会生成日历文件让你导入。</p>
 
     <h2 id="other">其他方式</h2>
     <h3 id="cli">命令行与网页版</h3>

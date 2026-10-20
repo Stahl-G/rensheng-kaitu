@@ -32,11 +32,9 @@ python3 -m http.server 4894 --bind 127.0.0.1
 
 ## 发新版时
 
-每个页面打开时读取 GitHub Releases 里最新带 `.dmg` 的版本，自动更新版本号、下载链接、大小和 SHA-256；同一版本的 `Kaitu-Setup-*-x64.exe` 用于 Windows，`rensheng-kaitu-*.tgz` 用于命令行。同一 Release 有多个 Windows 安装器修订时，按 asset ID 选择最新上传的文件。正式版会去掉「预览版」字样。发布时把两种桌面安装包上传到同一个 Release。
-读不到（断网、被限流）时显示页面里写死的版本。想让写死的也跟上，搜 `0.1.0-rc.4` 全部替换，并改中英文下载页里的大小和 SHA-256。
-常见问题「这是正式版吗？」和文档开头的版本说明也跟着自动变。
+每个页面打开时读取 GitHub Releases 里最新带 `.dmg` 的版本，自动更新 Mac 版本号、下载链接、大小和 SHA-256；同一版本的 `rensheng-kaitu-*.tgz` 用于命令行。读不到时保留页面里的静态版本。Windows 使用 DSH 插件，官网不展示或自动填充 EXE 下载链接。
 
-系统：Windows 访客看到「下载 Windows 版」，直达 EXE 下载卡片；Linux 访客看到 DSH 插件安装指引；Mac 和没开 JS 的访客看到 macOS 版。下载页始终提供两个桌面安装包。
+系统：Windows 访客看到「Windows 插件安装指引」，进入下载页的 DSH 安装步骤；Linux 访客同样进入插件指引；Mac 和没开 JS 的访客保留 macOS 下载入口。`#windows` 与 `#plugin` 均保留，旧链接可继续访问指引。中英文首页、下载页和 FAQ 保持一致。
 
 语言：浏览器语言里没有中文的访客，第一次打开中文页会自动跳到对应的英文页；点过顶栏的语言切换后，就按选择的来。
 
