@@ -582,6 +582,7 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
           prepared = await prepare(ws, file, text);
           errors = prepared?.errors ?? [];
         } catch (error) {
+          if (phoneInboxName.test(basename(file)) && !(error instanceof KaituError)) throw error;
           errors = [`${(error as Error).message}\n\n${INBOX_FORMATS}`];
         }
       }
