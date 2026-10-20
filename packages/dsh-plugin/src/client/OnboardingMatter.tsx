@@ -112,6 +112,7 @@ function ClipboardOrganize({
 export function OnboardingMatter(
   props: OnboardingServices & {
     initial: Matter | null;
+    initialText?: string;
     content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
@@ -121,7 +122,7 @@ export function OnboardingMatter(
 ) {
   const t = useT();
   const locale = useLocale();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(props.initialText ?? "");
   const [matter, setMatter] = useState<Matter | null>(props.initial);
   const [draft, setDraft] = useState<OnboardingMatterDraft>(
     props.initial?.draft ? editable(props.initial.draft) : { goal: "", current: "", next: "" },
@@ -406,7 +407,12 @@ export function OnboardingMatter(
 }
 
 export function OnboardingNextCard(
-  props: OnboardingServices & { next: OnboardingNext; refresh: () => Promise<void>; onSchedule?: () => void },
+  props: OnboardingServices & {
+    next: OnboardingNext;
+    refresh: () => Promise<void>;
+    onSchedule?: () => void;
+    onPrompt?: () => void;
+  },
 ) {
   const t = useT();
   const { next } = props;
@@ -440,9 +446,7 @@ export function OnboardingNextCard(
       aria-label={t("刚采纳的下一步", "The next step you adopted")}
     >
       <span className={v2.eyebrow}>
-        {next.status === "done"
-          ? t("这一步已完成", "This step is done")
-          : t("现在最该做的一件事", "The one thing to do now")}
+        {next.status === "done" ? t("这一步已完成", "This step is done") : t("现在这件事", "One thing now")}
       </span>
       <h2>{next.next}</h2>
       <p className={v2.small}>
@@ -496,6 +500,11 @@ export function OnboardingNextCard(
               >
                 {t("完成并记一句结果", "Done, log one line")}
               </button>
+              {props.onPrompt && (
+                <button type="button" className={quiet} onClick={props.onPrompt}>
+                  {t("交给 AI", "Ask AI")}
+                </button>
+              )}
               <button
                 type="button"
                 className={quiet}
