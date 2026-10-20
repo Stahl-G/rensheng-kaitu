@@ -51,6 +51,7 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
     const outside = join(temp, "outside.txt");
     writeFileSync(outside, "synthetic private data");
     writeFileSync(join(root, "NOW.md"), "synthetic Kaitu data");
+    writeFileSync(join(root, "RECORDS.md"), "synthetic managed instructions");
     symlinkSync(outside, join(root, "link"));
     const files = new (confinedFileSystem(HostFiles, FsError, root))();
     expect(await files.readText(await files.resolve("NOW.md"))).toBe("synthetic Kaitu data");
@@ -59,7 +60,7 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
     await expect(files.resolve("link")).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
     mkdirSync(join(root, "me"));
     writeFileSync(join(root, "me/goals.json"), "[]");
-    for (const path of ["NOW.md", "me/goals.json"]) {
+    for (const path of ["NOW.md", "RECORDS.md", "me/goals.json"]) {
       const managed = await files.resolve(path);
       await expect(files.writeText(managed, "AI 决定")).rejects.toThrow();
       await expect(files.editText(managed, "AI 决定")).rejects.toThrow();

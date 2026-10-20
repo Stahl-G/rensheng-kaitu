@@ -25,6 +25,12 @@ it("合法训练写入并存版本，非法记录返回原始校验错误且不�
     const tool = tools.get("kaitu_add_record");
     if (!tool) throw new Error("未注册记录工具");
     const exec = { signal: new AbortController().signal };
+    const format = (await tools.get("kaitu_status")?.execute({ type: "workout" }, exec)) as {
+      reference: { type: string };
+      summary?: unknown;
+    };
+    expect(format.reference.type).toBe("workout");
+    expect(format.summary).toBeUndefined();
     const before = await history(ws);
     const result = (await tool.execute(
       { type: "workout", fields: { exercise: "深蹲", sets: 3, reps: 12, weight_kg: 60, session_id: "s1" } },

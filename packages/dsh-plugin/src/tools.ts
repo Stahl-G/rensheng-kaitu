@@ -15,6 +15,7 @@ import {
   recordReference,
   snapshot,
   validateWorkspace,
+  workspaceAgentGuide,
 } from "@kaitu/core";
 import type { Context, MutationQueue } from "./dsh.js";
 import { registerLearningAids } from "./learning-tools.js";
@@ -35,7 +36,7 @@ export interface Config {
 }
 
 const instructions = [
-  "这是用户的开图工作区。记录前先调用 kaitu_status，传 type 可查该类型的字段规范。",
+  "这是用户的开图工作区。需要字段时调用 kaitu_status 并传 type，只取该类型的规范。",
   "能合理估算的（饮食份量、热量、营养）按常见份量直接估算写入，误差写进 uncertainty，记录后一句话说明假设，不追问；时间缺省为现在。只有无法估算且会让记录失去意义时才问一次。session_id 这类编号自己生成。只用开图工具写记录，回复要短。",
   "日常记录直接写；外部日历、批量导入、规则与目标变更须确认。地点经历可批量提交。",
   "地点经历用 kaitu_add_experience，只给城市名和国家代码，不给坐标；计划中的行程用 planned。",
@@ -60,7 +61,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
   ctx.systemPrompt?.section({
     name: "kaitu:workspace",
     order: 3000,
-    text: `${instructions}\n${skillToolGuide}\n${AI_NETWORK_RULES}`,
+    text: `${workspaceAgentGuide()}\n${instructions}\n${skillToolGuide}\n${AI_NETWORK_RULES}`,
     interpolate: false,
   });
 
@@ -115,13 +116,20 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
       if (args.type !== undefined && (typeof args.type !== "string" || !args.type.trim())) {
         throw new Error("type 必须是非空字符串");
       }
+      if (typeof args.type === "string")
+        return {
+          ok: true,
+          workspace: ws.root,
+          timeZone: ws.timeZone(),
+          recordTypes: [args.type],
+          reference: recordReference(ws, args.type),
+        };
       return {
         ok: true,
         workspace: ws.root,
         timeZone: ws.timeZone(),
         summary: readStatus(ws, new Date(), config.connection ?? "local-ask"),
         recordTypes: listRecordTypes(ws).map(({ type }) => type),
-        ...(typeof args.type === "string" ? { reference: recordReference(ws, args.type) } : {}),
       };
     },
   );
