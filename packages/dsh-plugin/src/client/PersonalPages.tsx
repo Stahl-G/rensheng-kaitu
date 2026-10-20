@@ -62,6 +62,8 @@ export function PersonalPages(
   const [history, setHistory] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [workspacePath, setWorkspacePath] = useState("");
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -177,12 +179,80 @@ export function PersonalPages(
                 <button
                   type="button"
                   className={`${css.btn} ${css["btn-quiet"]}`}
-                  onClick={() => setMoving(!moving)}
+                  onClick={() => {
+                    setOpening(false);
+                    setMoving(!moving);
+                  }}
                 >
-                  {t("更换本地文件夹", "Change local folder")}
+                  {t("迁移当前资料…", "Move current notes…")}
                 </button>
               </div>
+              {props.workspaceBackup && (
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setMoving(false);
+                    setOpening(!opening);
+                  }}
+                >
+                  {t("打开已有工作区…", "Open an existing workspace…")}
+                </button>
+              )}
             </div>
+            {opening && props.workspaceBackup && (
+              <form
+                className={`${css.card} ${css["sub-form"]}`}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void run(
+                    async () => {
+                      await props.workspaceBackup?.("activate", { root: workspacePath.trim() });
+                      await props.refreshWorkspace();
+                      setOpening(false);
+                    },
+                    t("已打开已有工作区", "Existing workspace opened"),
+                  );
+                }}
+              >
+                <p className={css.small}>
+                  {t(
+                    "选择已有的开图资料文件夹，直接沿用其中的资料。当前资料保留在原位置，不搬迁、不合并。",
+                    "Open the folder containing your existing Kaitu notes. Current notes stay in their original folder; nothing is moved or merged.",
+                  )}
+                </p>
+                <label>
+                  {t("已有工作区路径", "Existing workspace path")}
+                  <input
+                    required
+                    value={workspacePath}
+                    disabled={busy}
+                    onChange={(event) => setWorkspacePath(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const folder = await props.pickStorageFolder();
+                      if (folder) setWorkspacePath(folder);
+                    }, "")
+                  }
+                >
+                  {t("选择已有文件夹…", "Choose an existing folder…")}
+                </button>
+                <button
+                  type="submit"
+                  className={`${css.btn} ${css["btn-primary"]}`}
+                  disabled={busy || !workspacePath.trim()}
+                >
+                  {busy ? t("正在打开…", "Opening…") : t("打开此工作区", "Open this workspace")}
+                </button>
+              </form>
+            )}
             {moving && (
               <StorageChoice
                 storage={{ ...data.storage, github: !!data.backup.connection }}
