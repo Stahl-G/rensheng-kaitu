@@ -694,7 +694,7 @@ function Overview({
                 {todayDetails && (
                   <div>
                     {plansCard}
-                    {focus || onboarding?.next?.status === "done" ? adoptedCard : null}
+                    {onboarding?.next?.status === "done" ? adoptedCard : null}
                     {onboarding && (
                       <OnboardingChecklist
                         status={onboarding}
