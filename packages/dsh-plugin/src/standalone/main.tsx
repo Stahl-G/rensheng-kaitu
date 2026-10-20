@@ -112,6 +112,7 @@ const props: OverviewPageProps = {
   loadLifeMap: () => call("lifeMap"),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
+  saveCurrentCity: (name, id) => call("saveCurrentCity", name, id),
   loadExperienceImports: () => call("experienceImports"),
   previewExperienceBatch: (id, operation) => call("experienceBatchPreview", id, operation),
   setExperienceSource: (locator, excluded, revision) =>

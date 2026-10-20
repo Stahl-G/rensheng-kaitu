@@ -104,6 +104,7 @@ import {
   resolvePreferences,
   restore,
   saveAvatar,
+  saveCurrentCity,
   saveHometown,
   saveNewsKeywords,
   saveOnboardingChoices,
@@ -549,6 +550,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("saveHometown")
   async saveHometown(name: string, geonameid: number): Promise<Hometown> {
     return this.write(() => saveHometown(this.workspace, name, geonameid));
+  }
+
+  @Remote("saveCurrentCity")
+  async saveCurrentCity(name: string, geonameid: number): Promise<void> {
+    return this.write(() => saveCurrentCity(this.workspace, name, geonameid));
   }
 
   @Remote("lifeMap")

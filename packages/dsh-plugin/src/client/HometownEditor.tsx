@@ -5,11 +5,13 @@ import { useT } from "./i18n.js";
 
 export function HometownEditor({
   initial,
+  current = false,
   search,
   save,
   cancel,
 }: {
   initial: string;
+  current?: boolean;
   search: (name: string) => Promise<City[]>;
   save: (name: string, id: number) => Promise<void>;
   cancel?: () => void;
@@ -47,14 +49,14 @@ export function HometownEditor({
   return (
     <form
       className={css.editor}
-      aria-label={t("设置家乡", "Set hometown")}
+      aria-label={current ? t("设置现居城市", "Set current city") : t("设置家乡", "Set hometown")}
       onSubmit={(event) => {
         event.preventDefault();
         void choose();
       }}
     >
       <label>
-        {t("家乡", "Hometown")}
+        {current ? t("现居城市", "Current city") : t("家乡", "Hometown")}
         <input
           aria-invalid={!!error}
           aria-describedby={error ? errorId : undefined}

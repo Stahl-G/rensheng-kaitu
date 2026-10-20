@@ -95,6 +95,7 @@ import {
   resolvePreferences,
   restore,
   saveAvatar,
+  saveCurrentCity,
   saveHometown,
   saveNewsKeywords,
   saveOnboardingChoices,
@@ -160,6 +161,7 @@ export const productMutations = new Set([
   "decideProposal",
   "resolveExperience",
   "saveHometown",
+  "saveCurrentCity",
   "editExperience",
   "hideExperience",
   "unhideExperience",
@@ -413,6 +415,8 @@ export async function productRequest(
       return readExperienceSource(ws, text(0));
     case "hometownCities":
       return resolvePlace(text(0));
+    case "saveCurrentCity":
+      return saveCurrentCity(ws, text(0), revision(1));
     case "saveHometown":
       return saveHometown(ws, text(0), revision(1));
     case "lifeMap":

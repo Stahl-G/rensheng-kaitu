@@ -26,7 +26,7 @@ Kaitu describes three places your notes can go: kept on this computer, synced to
 
 ## Other connections
 
-- Map tiles come from OpenFreeMap.
+- The global footprint map (Natural Earth) is bundled locally. Browsing the global view sends no requests to map providers. Zooming into a city downloads visible city tiles from OpenFreeMap and terrain tiles from AWS Terrain Tiles. The servers receive the requested map area, your IP address, and ordinary network metadata. Requests do not include your experience text, profile, or account. City-level experience locations are not live location tracking. Offline, the global map remains available and city details show a connection notice.
 - Reference prices come from Yahoo; only ticker symbols are sent, not your holdings.
 - GitHub progress uses the token you add to read the repositories you linked.
 - Calendar subscriptions are read from the addresses you add; confirmed blocks can be written to this computer's calendar.
