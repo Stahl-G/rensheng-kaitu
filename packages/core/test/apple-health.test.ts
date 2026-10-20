@@ -301,3 +301,224 @@ it("并列列表里一行读不出只跳过那一行，其余照常导入", asyn
   expect(result.ignored).toMatchObject({ invalid: 1 });
   expect(readRecords(ws, "activity").map((row) => row.steps)).toEqual([8000, 9000]);
 });
+
+it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏、身高与血糖照常入指标", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "extended.health.json");
+  const raw = {
+    format: "kaitu.health.v1",
+    samples: [
+      {
+        type: "walking_heart_rate",
+        start: "2026-10-01T09:00:00+08:00",
+        end: "2026-10-01T09:00:00+08:00",
+        value: 88,
+        unit: "bpm",
+        source: "Watch",
+      },
+      {
+        type: "vo2max",
+        start: "2026-10-01T18:00:00+08:00",
+        end: "2026-10-01T18:00:00+08:00",
+        value: 42.5,
+        unit: "ml/kg·min",
+        source: "Watch",
+      },
+      {
+        type: "respiratory_rate",
+        start: "2026-10-02T07:00:00+08:00",
+        end: "2026-10-02T07:00:00+08:00",
+        value: 14,
+        unit: "count/min",
+        source: "Watch",
+      },
+      {
+        type: "body_temperature",
+        start: "2026-10-02T08:00:00+08:00",
+        end: "2026-10-02T08:00:00+08:00",
+        value: 98.6,
+        unit: "°F",
+        source: "Watch",
+      },
+      {
+        type: "height",
+        start: "2026-10-01T08:00:00+08:00",
+        end: "2026-10-01T08:00:00+08:00",
+        value: 175,
+        unit: "cm",
+        source: "iPhone",
+      },
+      {
+        type: "glucose",
+        start: "2026-10-03T07:30:00+08:00",
+        end: "2026-10-03T07:30:00+08:00",
+        value: 5.6,
+        unit: "mmol/L",
+        source: "Meter",
+      },
+    ],
+  };
+  writeFileSync(file, JSON.stringify(raw));
+  const result = await importHealthShortcut(ws, file);
+  expect(result.added).toBe(6);
+  const metrics = readRecords(ws, "metric").map(({ kind, value, unit }) => ({ kind, value, unit }));
+  expect(metrics).toEqual(
+    expect.arrayContaining([
+      { kind: "walking_hr", value: 88, unit: "bpm" },
+      { kind: "vo2max", value: 42.5, unit: "ml/kg·min" },
+      { kind: "respiratory_rate", value: 14, unit: "count/min" },
+      { kind: "body_temperature", unit: "°C", value: 37 },
+      { kind: "height", value: 175, unit: "cm" },
+      { kind: "glucose", value: 5.6, unit: "mmol/L" },
+    ]),
+  );
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("复合值：血压 120/80、心率与血氧日聚合 最小/均值/最大 字符串原样入指标", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "compound.health.json");
+  const raw = {
+    format: "kaitu.health.v1",
+    samples: [
+      {
+        type: "blood_pressure",
+        start: "2026-10-01T08:00:00+08:00",
+        end: "2026-10-01T08:00:00+08:00",
+        value: "120/80",
+        unit: "mmHg",
+        source: "Cuff",
+      },
+      {
+        type: "heart_rate_daily",
+        start: "2026-10-01T00:00:00+08:00",
+        end: "2026-10-01T00:00:00+08:00",
+        value: "52/68/98",
+        unit: "bpm",
+        source: "Watch",
+      },
+      {
+        type: "blood_oxygen",
+        start: "2026-10-01T00:00:00+08:00",
+        end: "2026-10-01T00:00:00+08:00",
+        value: "95/97/100",
+        unit: "%",
+        source: "Watch",
+      },
+    ],
+  };
+  writeFileSync(file, JSON.stringify(raw));
+  const result = await importHealthShortcut(ws, file);
+  expect(result.added).toBe(3);
+  const metrics = readRecords(ws, "metric").map(({ kind, value, unit }) => ({ kind, value, unit }));
+  expect(metrics).toEqual(
+    expect.arrayContaining([
+      { kind: "bp", value: "120/80", unit: "mmHg" },
+      { kind: "heart_rate_daily", value: "52/68/98", unit: "bpm" },
+      { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
+    ]),
+  );
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("活动扩展：锻炼分钟、爬楼、步行跑步距离按天入 activity 记录", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "activity-ext.health.json");
+  const raw = {
+    format: "kaitu.health.v1",
+    samples: [
+      {
+        type: "exercise_minutes",
+        start: "2026-10-01T00:00:00+08:00",
+        end: "2026-10-02T00:00:00+08:00",
+        value: 62,
+        unit: "min",
+        source: "Watch",
+      },
+      {
+        type: "flights_climbed",
+        start: "2026-10-01T00:00:00+08:00",
+        end: "2026-10-02T00:00:00+08:00",
+        value: 11,
+        unit: "count",
+        source: "Watch",
+      },
+      {
+        type: "distance_walking_running",
+        start: "2026-10-01T00:00:00+08:00",
+        end: "2026-10-02T00:00:00+08:00",
+        value: 6.25,
+        unit: "km",
+        source: "Watch",
+      },
+    ],
+  };
+  writeFileSync(file, JSON.stringify(raw));
+  const result = await importHealthShortcut(ws, file);
+  expect(result.added).toBe(1);
+  expect(readRecords(ws, "activity")).toMatchObject([
+    { date: "2026-10-01", exercise_min: 62, flights_climbed: 11, distance_km: 6.25 },
+  ]);
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("训练扩展：新运动名与爬升、METs、配速、最大心率原样落记录", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "workout-ext.health.json");
+  const raw = {
+    format: "kaitu.health.v1",
+    samples: [
+      {
+        type: "workout",
+        start: "2026-10-01T07:00:00+08:00",
+        end: "2026-10-01T08:00:00+08:00",
+        value: 60,
+        unit: "min",
+        source: "Watch",
+        workout: {
+          activity: "pickleball",
+          duration_min: 60,
+          distance_km: 8.2,
+          kcal: 540,
+          avg_hr: 142,
+          max_hr: 168,
+          elevation_up_m: 320,
+          elevation_down_m: 310,
+          mets: 7.6,
+          avg_pace_s_per_km: 439,
+          avg_cadence: 170,
+        },
+      },
+      {
+        type: "workout",
+        start: "2026-10-02T19:00:00+08:00",
+        end: "2026-10-02T19:45:00+08:00",
+        value: 45,
+        unit: "min",
+        source: "Watch",
+        workout: { activity: "hiit", duration_min: 45, max_hr: 172 },
+      },
+    ],
+  };
+  writeFileSync(file, JSON.stringify(raw));
+  const result = await importHealthShortcut(ws, file);
+  expect(result.added).toBe(2);
+  expect(readRecords(ws, "workout")).toMatchObject([
+    {
+      modality: "cardio",
+      exercise: "匹克球",
+      duration_min: 60,
+      distance_km: 8.2,
+      kcal: 540,
+      avg_hr: 142,
+      max_hr: 168,
+      elevation_up_m: 320,
+      elevation_down_m: 310,
+      mets: 7.6,
+      avg_pace_s_per_km: 439,
+      avg_cadence: 170,
+    },
+    { modality: "cardio", exercise: "高强度间歇训练", duration_min: 45, max_hr: 172 },
+  ]);
+  expect(validateWorkspace(ws)).toEqual([]);
+});
