@@ -22,8 +22,8 @@ const ciStates = {
   success: "通过",
   failure: "失败",
   running: "运行中",
-  none: t("暂无记录", "No records yet"),
-  no_access: t("暂无记录", "No records yet"),
+  none: "暂无记录",
+  no_access: "暂无记录",
 };
 const number = (value: number) => value.toLocaleString("zh-CN");
 
@@ -333,7 +333,7 @@ export function DoingPage({
                   </p>
                   <p className={css.log}>
                     {project.recentLog
-                      ? `${dateLabel(project.recentLog.date, today, locale)}：${project.recentLog.text}`
+                      ? `${dateLabel(project.recentLog.date, today, locale)}${t("：", ": ")}${project.recentLog.text}`
                       : t("最近日志：暂无记录", "No recent progress logged")}
                   </p>
                   {project.completion !== null && (
