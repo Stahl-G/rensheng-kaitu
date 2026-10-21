@@ -32,7 +32,7 @@ import {
 } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
+import { type Locale, LocaleContext, browserLocale, dateFormat, versionText } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
@@ -792,7 +792,7 @@ function Overview({
                           <span className={css.ini}>
                             {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
                           </span>
-                          <p>{version.text}</p>
+                          <p>{versionText(version.text, locale ?? "zh-CN")}</p>
                           <time className={css.small}>{stamp(version.time)}</time>
                         </div>
                       ))}

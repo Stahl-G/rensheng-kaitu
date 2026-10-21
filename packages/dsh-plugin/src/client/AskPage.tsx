@@ -9,7 +9,7 @@ import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { requestLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
 
@@ -72,7 +72,7 @@ interface Automation {
 async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   const response = await fetch(`/api/product/${method}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
+    headers: { "Content-Type": "application/json", "X-Kaitu": "1", "X-Kaitu-Locale": requestLocale() },
     body: JSON.stringify(args),
   });
   const value = await response.json();

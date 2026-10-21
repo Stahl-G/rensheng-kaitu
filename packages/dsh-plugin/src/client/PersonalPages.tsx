@@ -19,7 +19,7 @@ import css from "./Prototype.module.css";
 import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
 import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.js";
 import { aiHandover } from "./connections.js";
-import { type Locale, useT } from "./i18n.js";
+import { type Locale, useT, versionText } from "./i18n.js";
 
 export interface PersonalServices extends CalendarPushServices {
   desktopUpdate?: FeatureUpdateRequest;
@@ -743,7 +743,7 @@ export function PersonalPages(
                 <h2 className={css.eyebrow}>{t("版本历史", "Version history")}</h2>
                 {data.versions.map((version) => (
                   <div className={`${css.card} ${css.sum}`} key={version.oid}>
-                    <b>{version.message}</b>
+                    <b>{versionText(version.message, props.locale)}</b>
                     <time className={css.small}>{version.time}</time>
                     <button type="button" className={css.link} onClick={() => setRestore(version.oid)}>
                       {t("恢复这个版本", "Restore this version")}
