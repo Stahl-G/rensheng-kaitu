@@ -920,7 +920,7 @@ export function MapPage({
                         className={css.shape}
                         data-layer={id}
                         role="img"
-                        aria-label={layers.find((l) => l.id === id)?.name}
+                        aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
                       />
                     ))}
                     <span aria-hidden="true">›</span>
