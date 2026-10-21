@@ -1,7 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -99,29 +99,48 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 18px;
+}
+.trainingDetails {
+  display: grid;
+  grid-template-columns: minmax(0, 274px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.trainingDetails > :first-child {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 274px;
 }
 .stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  gap: 12px 24px;
+  margin: 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--kt-control);
 }
 .stat {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 16px;
-  border-radius: 14px;
-  background: var(--kt-subtle);
+  min-width: 0;
 }
-.stat > span {
+.stat dt,
+.stat small {
   color: var(--kt-muted);
   font-size: 13px;
   line-height: 18px;
 }
+.stat dd {
+  margin: 0;
+}
+.stat small {
+  display: block;
+}
 .stat strong {
-  font-size: 24px;
-  line-height: 32px;
+  font-size: 18px;
+  line-height: 26px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -161,8 +180,8 @@
 .heatmap {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-  max-width: 420px;
+  gap: 4px;
+  max-width: 238px;
 }
 .weekday {
   color: var(--kt-muted);
@@ -422,6 +441,9 @@
   corner-shape: round;
 }
 @container (max-width: 760px) {
+  .trainingDetails {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -431,13 +453,6 @@
   }
 }
 @container (max-width: 420px) {
-  .stat {
-    padding: 12px;
-  }
-  .stat strong {
-    font-size: 21px;
-    line-height: 28px;
-  }
   .card {
     padding: 14px;
   }
