@@ -21,19 +21,31 @@ export async function organizeOnboardingMatter(
   const matter = readOnboardingMatter(ws, source);
   if (!ask || !(await ask.settings()).configured) return matter;
   recordOnboardingAiConnection(ws, "问问");
-  const thread = ask.create();
+  const service = ask.background();
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    const thread = await service.create();
     const response = new Promise<string>((resolve, reject) => {
       timer = setTimeout(
         () => reject(new KaituError("AI 整理超时，原文已保存，可以手工填写或重试", "AI_TIMEOUT")),
         90000,
       );
-      stop = ask.subscribe(thread.id, (event) => {
+      stop = service.subscribe(thread.id, (event) => {
+        if (event.type === "approval/asked")
+          return reject(
+            new KaituError(
+              pick(
+                locale,
+                "本机 Agent 需要你批准一次操作，原文已保存，请在问问继续整理",
+                "Your local Agent needs approval for an operation. Your text is saved; continue organizing in Ask",
+              ),
+              "AI_APPROVAL_REQUIRED",
+            ),
+          );
         if (event.type !== "session.status" || event.data.status !== "idle") return;
-        if (event.data.error) return reject(new Error(String(event.data.error)));
-        const messages = ask.events(thread.id).filter((item) => item.type === "assistant/message");
+        if (event.data.error) return reject(new KaituError(String(event.data.error), "AI_CONNECTION"));
+        const messages = service.events(thread.id).filter((item) => item.type === "assistant/message");
         const message = messages.at(-1)?.data.message as
           | { content?: { type: string; text?: string }[] }
           | undefined;
@@ -45,7 +57,7 @@ export async function organizeOnboardingMatter(
         else reject(new Error("AI 未返回整理草稿，原文已保存，可以手工填写"));
       });
     });
-    const sending = ask.send(thread.id, matterPrompt(matter.text, locale, "json"));
+    const sending = service.send(thread.id, matterPrompt(matter.text, locale, "json"));
     void sending.catch(() => {});
     const text = await Promise.race([response, sending.then(() => response)]);
     let input: ReturnType<typeof parseMatterAnswer>;
@@ -64,5 +76,6 @@ export async function organizeOnboardingMatter(
   } finally {
     stop();
     clearTimeout(timer);
+    await service.close();
   }
 }

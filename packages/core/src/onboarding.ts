@@ -1149,6 +1149,7 @@ export function resolvePreferences(
   const saved = readPreferences();
   if (saved.locale) return { ...saved, followSystem: false };
   return {
+    ...saved,
     locale: typeof hint === "string" && /^zh(?:[-_]|$)/i.test(hint.trim()) ? "zh-CN" : "en",
     followSystem: true,
   };
@@ -1435,10 +1436,11 @@ export async function draftOnboardingMatter(
 }
 export async function keepOnboardingMatter(ws: Workspace, source: string): Promise<OnboardingMatter> {
   const matter = readOnboardingMatter(ws, source);
-  if (!matter.draft) return matter;
-  const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
-  doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
-  ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  if (matter.draft) {
+    const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
+    doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
+    ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
+  }
   // 核对过、只留原文：归档后不再算待整理，每日整理也不会再为它起草。
   const file = findInboxNote(ws, basename(source));
   if (file && !file.startsWith("inbox/notes/done/")) archiveInboxNote(ws, file);

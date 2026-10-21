@@ -9,7 +9,7 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
     body: JSON.stringify(args),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.error ?? "操作失败，请重试");
+  if (!response.ok) throw Object.assign(new Error(value.error ?? "操作失败，请重试"), { code: value.code });
   return value;
 }
 let workspace = "";

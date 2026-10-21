@@ -93,6 +93,11 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
 只设此变量时签名后结束；`KAITU_NOTARY_PROFILE` 必须与签名变量一起设置。
 正式签名需要访问 Apple 时间戳服务，公证也需要联网。
 
+Apple 的应用与 Helper 版本字段只写数字：例如 `0.1.1-rc.1` 的
+`CFBundleShortVersionString` 为 `0.1.1`，关于面板和功能更新仍显示完整的 `0.1.1-rc.1`。
+`CFBundleVersion` 默认同为 `0.1.1`；对同一版本分发后续构建时，设置递增的
+`KAITU_BUNDLE_BUILD`（一至三段数字，例如 `101`、`102`）。
+
 设置公证变量后，脚本压缩应用、提交 `notarytool --wait`，确认 `Accepted`，再 staple 并校验应用。
 带 `--dmg` 时，镜像内含应用和 Applications 链接，随后也会签名、公证并 staple 镜像。
 

@@ -21,6 +21,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
+import { createDmg } from "./package-dmg.mjs";
 import { writePayload as buildPayload } from "./package-payload.mjs";
 import { readUpdateConfig } from "./update-config.mjs";
 
@@ -62,6 +63,12 @@ const dmg = join(dirname(output), "Kaitu.dmg");
 if (values.dmg && existsSync(dmg)) throw new Error(`输出已存在，请另选目录：${dmg}`);
 const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
 const version = kaituVersion;
+// Apple bundle fields use numeric versions; About and feature updates keep the full semver.
+const bundleVersion = version.split(/[-+]/, 1)[0];
+const bundleBuild = process.env.KAITU_BUNDLE_BUILD?.trim() || bundleVersion;
+if (!/^\d+\.\d+\.\d+$/.test(bundleVersion)) throw new Error(`无效的应用版本：${version}`);
+if (!/^\d+(?:\.\d+){0,2}$/.test(bundleBuild))
+  throw new Error("KAITU_BUNDLE_BUILD 须为一至三段非负整数，以句点分隔");
 const payloadVersion = values["payload-version"] || version;
 const updateConfig = values["payload-only"]
   ? null
@@ -74,7 +81,7 @@ const updateConfig = values["payload-only"]
     });
 const plan = [
   `COPY ${source} → ${output}；校验 DSH 0.2.1-rc.2 / arm64 / 主入口`,
-  `Info.plist: 人生开图 / ai.kaitu.app / ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
+  `Info.plist: 人生开图 / ai.kaitu.app / ${bundleVersion} (build ${bundleBuild})；显示版本 ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
   "Frameworks: 按实际 helper 应用重命名 人生开图 Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
   "Resources: 移除 app-update.yml；从 SVG 生成 PNG / ICNS；内置插件、初始化器、schemas、templates、data 与 DSH 协议转接包",
@@ -93,7 +100,7 @@ const plan = [
     : []),
   ...(values.dmg
     ? [
-        `DMG hdiutil makehybrid + convert：Kaitu.app + Applications 链接 → ${dmg}`,
+        `DMG hdiutil create + 挂载验签：Kaitu.app + Applications 链接 → ${dmg}`,
         ...(identity
           ? ["SIGN codesign --sign Developer-ID --timestamp Kaitu.dmg；codesign --verify Kaitu.dmg"]
           : []),
@@ -230,8 +237,8 @@ async function packageApplication() {
     };
     for (const key of ["CFBundleName", "CFBundleDisplayName"]) set(key, "人生开图");
     set("CFBundleIdentifier", "ai.kaitu.app");
-    set("CFBundleShortVersionString", version);
-    set("CFBundleVersion", version);
+    set("CFBundleShortVersionString", bundleVersion);
+    set("CFBundleVersion", bundleBuild);
     set("CFBundleExecutable", "Kaitu");
     set("CFBundleIconFile", "Kaitu.icns");
     set("NSAppleEventsUsageDescription", "开图将你确认的时间段加入日历，并同步改期和取消。");
@@ -290,7 +297,8 @@ async function packageApplication() {
       execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", output, zip]);
       notarize(zip, output);
     }
-    if (values.dmg) createDmg(temporary);
+    if (values.dmg)
+      createDmg({ app: output, dmg, temporary, identity, notarize: notaryProfile ? notarize : undefined });
     console.log(`完成：${output}`);
   } catch (error) {
     // 输出目录由本次调用创建；失败不留下一个貌似可用的应用。
@@ -325,6 +333,8 @@ function renameHelpers() {
       CFBundleDisplayName: name,
       CFBundleExecutable: name,
       CFBundleIdentifier: identifier,
+      CFBundleShortVersionString: bundleVersion,
+      CFBundleVersion: bundleBuild,
     })) {
       execFileSync("/usr/bin/plutil", ["-replace", key, "-string", value, plist]);
     }
@@ -406,31 +416,6 @@ function notarize(artifact, target) {
   for (const action of ["staple", "validate"]) {
     execFileSync("/usr/bin/xcrun", ["stapler", action, target], { stdio: "inherit" });
   }
-}
-
-function createDmg(temporary) {
-  const staging = join(temporary, "dmg");
-  mkdirSync(staging);
-  execFileSync("/usr/bin/ditto", [output, join(staging, "Kaitu.app")]);
-  symlinkSync("/Applications", join(staging, "Applications"));
-  const hybrid = join(temporary, "Kaitu-hybrid.dmg");
-  const image = join(temporary, "Kaitu.dmg");
-  // 不挂载临时磁盘设备，也能生成保留应用与符号链接的 HFS+ 映像。
-  execFileSync(
-    "/usr/bin/hdiutil",
-    ["makehybrid", "-hfs", "-hfs-volume-name", "Kaitu", "-o", hybrid, staging],
-    { stdio: "inherit" },
-  );
-  execFileSync("/usr/bin/hdiutil", ["convert", hybrid, "-format", "UDZO", "-o", image], { stdio: "inherit" });
-  if (identity) {
-    execFileSync("/usr/bin/codesign", ["--force", "--sign", identity, "--timestamp", image], {
-      stdio: "inherit",
-    });
-    execFileSync("/usr/bin/codesign", ["--verify", "--strict", image], { stdio: "inherit" });
-  }
-  if (notaryProfile) notarize(image, image);
-  renameSync(image, dmg);
-  console.log(`完成：${dmg}`);
 }
 
 function markBody() {

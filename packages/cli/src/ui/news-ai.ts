@@ -23,7 +23,7 @@ export async function suggestNewsKeywords(ws: Workspace, ask?: AskService): Prom
       .filter((row) => feedback[row.id])
       .map(({ id, title, source, relevance }) => ({ title, source, relevance, feedback: feedback[id] })),
   };
-  const thread = ask.create();
+  const thread = await ask.create();
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {

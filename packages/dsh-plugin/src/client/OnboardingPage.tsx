@@ -12,6 +12,7 @@ import { OnboardingFileImport, OnboardingSetup } from "./OnboardingSources.js";
 import type { PersonalServices } from "./PersonalPages.js";
 import v2 from "./Prototype.module.css";
 import { StorageChoice, type StorageInfo } from "./StorageChoice.js";
+import { TodayStart } from "./TodayPage.js";
 import { useLocale, useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -24,6 +25,7 @@ interface Props
   step: number;
   builtin: boolean;
   initialSource?: string;
+  initialText?: string;
   setStep: (step: number) => void;
   onStatus: (status: OnboardingStatus) => void;
   refresh: () => Promise<void>;
@@ -42,6 +44,8 @@ export function OnboardingPage(props: Props) {
   const locale = useLocale();
   const { status, step } = props;
   const { content, choices } = status;
+  const [matterText, setMatterText] = useState(props.initialText ?? "");
+  const [matterDestination, setMatterDestination] = useState<Destination | null>(null);
   const [entry, setEntry] = useState<"matter" | "memory">("matter");
   const memoryMode = step === 5 || (step === 1 && entry === "memory");
   const firstAi = content.ais.find((ai) => ai.id === choices?.memoryAi) ?? content.ais[0];
@@ -135,6 +139,7 @@ export function OnboardingPage(props: Props) {
     }
   };
   const move = (nextStep: number) => {
+    if (nextStep === 0) setMatterDestination(null);
     if (alive.current) props.setStep(nextStep);
   };
   const finish = (destination: Destination) => {
@@ -171,7 +176,7 @@ export function OnboardingPage(props: Props) {
           confirming.current = false;
         }
         await save({ memoryAi: ai as OnboardingAi, skipped: skip(["memory"], false) });
-        finish("today");
+        finish(matterDestination ?? "today");
         await props.refresh();
       }
     } else if (step === 2) {
@@ -201,7 +206,7 @@ export function OnboardingPage(props: Props) {
         : {}),
       ...(step === 4 ? { aiChoice: "none", skipped: skip(["ai"], true) } : {}),
     });
-    finish("today");
+    finish(memoryMode ? (matterDestination ?? "today") : "today");
   };
   const back = async () => {
     setError("");
@@ -255,6 +260,11 @@ export function OnboardingPage(props: Props) {
               const firstRun = status.checklist.completed === 0;
               await save({ storage: true });
               if (moved) await props.refresh();
+              if (matterDestination !== null) {
+                setMatterDestination(github ? "connections" : "today");
+                move(1);
+                return;
+              }
               // GitHub 同步在「AI 与连接」里建库或连接已有仓库。
               if (github) finish("connections");
               else if (firstRun) move(1);
@@ -278,33 +288,29 @@ export function OnboardingPage(props: Props) {
     );
   if (step === 0)
     return (
-      <section
-        className={`${v2.welcome} ${css.welcome}`}
-        aria-label={t("欢迎来到人生开图", "Welcome to Kaitu")}
-        aria-busy={busy}
-      >
-        <span className={v2.eyebrow}>{t("欢迎来到人生开图", "Welcome to Kaitu")}</span>
-        <h1 key={`${step}-${!!preview}`} ref={focusHeading} tabIndex={-1}>
-          {content.welcome.title}
-        </h1>
-        <div className={css.how}>
-          <div>
-            <b>1 · {content.welcome.first}</b>
-          </div>
-          <div>
-            <b>{t("2 · 核对，选一个下一步", "2 · Review and pick one next step")}</b>
-          </div>
-          <div>
-            <b>{t("3 · 记下结果，换个 AI 也能接着", "3 · Log the result; any AI can pick it up")}</b>
-          </div>
-        </div>
+      <>
+        <TodayStart
+          busy={busy}
+          start={(text) => {
+            setMatterText(text);
+            setMatterDestination("today");
+            setEntry("matter");
+            void run(next);
+          }}
+          memory={() => {
+            setEntry("memory");
+            move(5);
+          }}
+        />
         {error && (
           <p role="alert" className={v2.error}>
             {error}
           </p>
         )}
-        {footer(t("开始", "Start"), t("先随便看看", "Look around first"))}
-      </section>
+        <button type="button" className={v2.link} disabled={busy} onClick={() => void run(skipStep)}>
+          {t("先随便看看", "Look around first")}
+        </button>
+      </>
     );
   return (
     <section className={`${css.flow} ${v2.card}`} aria-label={t("开始使用", "Get started")} aria-busy={busy}>
@@ -340,12 +346,13 @@ export function OnboardingPage(props: Props) {
           <OnboardingMatter
             {...props}
             onBusy={setBusy}
-            initial={status.draft}
+            initial={matterDestination === null ? status.draft : null}
+            initialText={matterText}
             content={content.matter}
             onDone={async () => {
               await save({ seen: true });
               await props.refresh();
-              finish("today");
+              finish(matterDestination ?? "today");
             }}
           />
           <div className={css.footer}>
@@ -353,7 +360,9 @@ export function OnboardingPage(props: Props) {
               {t("上一步", "Back")}
             </button>
             <button type="button" className={v2.link} disabled={busy} onClick={() => void run(skipStep)}>
-              {t("先随便看看", "Look around first")}
+              {matterDestination === "connections"
+                ? t("先随便看看，GitHub 稍后设置", "Look around first; set up GitHub later")
+                : t("先随便看看", "Look around first")}
             </button>
           </div>
         </>
@@ -504,7 +513,9 @@ export function OnboardingPage(props: Props) {
                   ? t(`记下这 ${selected.length} 条`, `Save these ${selected.length}`)
                   : t("完成", "Done")
                 : t("看看认出了什么", "See what it found"),
-              t("我没有常用的 AI，跳过", "I don't use an AI regularly, skip"),
+              matterDestination === "connections"
+                ? t("跳过记忆搬入，继续设置 GitHub", "Skip memories and set up GitHub")
+                : t("我没有常用的 AI，跳过", "I don't use an AI regularly, skip"),
               !preview && !text.trim(),
             )}
         </>

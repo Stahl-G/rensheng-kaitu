@@ -52,7 +52,7 @@ export function PaperMap({
   const t = useT();
   const [mode, setMode] = useState<FootprintState>("now");
   const [ready, setReady] = useState(false);
-  const [detailStatus, setDetailStatus] = useState<"offline" | "unavailable" | null>(null);
+  const [detailStatus, setDetailStatus] = useState<"loading" | "offline" | "unavailable" | null>(null);
   const [cityZoom, setCityZoom] = useState(false);
   const [failure, setFailure] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -237,6 +237,7 @@ export function PaperMap({
     let styleGeneration = 0;
     let remoteLoading = false;
     let remoteLoaded = false;
+    let detailSource: string | undefined;
     let attributionInitialized = false;
     let m: LibreMap | undefined;
     let remoteStyle: StyleSpecification | undefined;
@@ -248,6 +249,7 @@ export function PaperMap({
         return;
       }
       remoteLoading = true;
+      setDetailStatus("loading");
       const generation = styleGeneration;
       try {
         if (!remoteStyle) {
@@ -261,6 +263,7 @@ export function PaperMap({
         const vector = Object.entries(remoteStyle.sources).find(([, source]) => source.type === "vector");
         if (!vector || vector[1].type !== "vector") throw new Error("Vector map unavailable");
         const [id, source] = vector;
+        detailSource = id;
         if (!m.getSource(id)) m.addSource(id, { ...source, minzoom: 5 });
         const water = isDark() ? "#1c293c" : "#27495e";
         if (!m.getLayer("detail-water"))
@@ -323,7 +326,6 @@ export function PaperMap({
             "detail-water",
           );
         remoteLoaded = true;
-        setDetailStatus(null);
       } catch {
         if (!disposed) setDetailStatus(navigator.onLine ? "unavailable" : "offline");
       } finally {
@@ -337,6 +339,7 @@ export function PaperMap({
       if (disposed) return;
       const style = structuredClone(isDark() ? dark : light) as StyleSpecification;
       remoteLoaded = false;
+      detailSource = undefined;
       m?.setStyle(style, { diff: false });
     };
     try {
@@ -424,7 +427,12 @@ export function PaperMap({
           );
         if (marker) marker.dataset.mapBearing = String(instance.getBearing());
       });
+      const finishDetails = () => {
+        if (remoteLoaded && detailSource && instance.isSourceLoaded(detailSource))
+          setDetailStatus((status) => (status === "loading" ? null : status));
+      };
       m.on("idle", () => {
+        finishDetails();
         if (!attributionInitialized) {
           const attribution = el.querySelector(
             ".maplibregl-ctrl-attrib.maplibregl-compact:not(.maplibregl-attrib-empty)",
@@ -602,15 +610,17 @@ export function PaperMap({
       )}
       {cityZoom && detailStatus && (
         <output className={css.mapNotice}>
-          {detailStatus === "offline"
-            ? t(
-                "需要联网才能看城市细节 · 全球底图仍可浏览",
-                "Connect to view city details · The global map remains available",
-              )
-            : t(
-                "城市细节暂不可用 · 全球底图仍可浏览",
-                "City details are temporarily unavailable · The global map remains available",
-              )}
+          {detailStatus === "loading"
+            ? t("正在加载城市细节…", "Loading city details…")
+            : detailStatus === "offline"
+              ? t(
+                  "需要联网才能看城市细节 · 全球底图仍可浏览",
+                  "Connect to view city details · The global map remains available",
+                )
+              : t(
+                  "城市细节暂不可用 · 全球底图仍可浏览",
+                  "City details are temporarily unavailable · The global map remains available",
+                )}
         </output>
       )}
       {!ready && !failure && (

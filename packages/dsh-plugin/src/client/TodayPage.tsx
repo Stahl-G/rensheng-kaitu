@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type {
   FinanceCashflowData,
   FinanceInvestmentsData,
   FinanceOverviewData,
   OverviewData,
+  OverviewNext,
 } from "../types.js";
 import type { FinancePageProps } from "./FinancePage.js";
 import css from "./Prototype.module.css";
+import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 
 const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
@@ -237,3 +239,201 @@ export function DataSummaries({ data, open }: { data: OverviewData; open: (id: s
 }
 
 export { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
+
+/** 主题只预填现有原文表单；保存与采纳仍走原流程。 */
+export function TodayStart({
+  start,
+  memory,
+  busy = false,
+}: {
+  start: (text: string) => void;
+  memory: () => void;
+  busy?: boolean;
+}) {
+  const t = useT();
+  const [memoryShown, setMemoryShown] = useState(true);
+  const topics = [
+    ["工作", "Work", "在做的事", "What you're working on", "#c89f78"],
+    ["身体", "Body", "吃睡与精力", "Food, rest and energy", "#88a68b"],
+    ["学习", "Learning", "想学的新东西", "Something to learn", "#a29bc7"],
+    ["关系", "Relationships", "重要的人", "People who matter", "#c69498"],
+    ["生活", "Life", "住处与日常", "Home and everyday life", "#8fa7ba"],
+    ["还说不清", "Not sure yet", "先说一句", "Start with a thought", "#c6bb88"],
+  ] as const;
+  return (
+    <section className={todayCss.start} aria-label={t("从一件事开始", "Start with one thing")}>
+      <h1>{t("最近有什么事，\n你想理一理？", "What's on your mind lately?")}</h1>
+      <div className={todayCss.topics}>
+        {topics.map(([zh, en, hint, hintEn, color]) => (
+          <button
+            type="button"
+            key={en}
+            disabled={busy}
+            onClick={() =>
+              start(
+                zh === "还说不清"
+                  ? ""
+                  : t(`我想理一理${zh}：`, `I'd like to think about ${en.toLowerCase()}: `),
+              )
+            }
+          >
+            <b>
+              <i style={{ background: color }} />
+              {t(zh, en)}
+            </b>
+            <span>{t(hint, hintEn)}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className={todayCss.direct} disabled={busy} onClick={() => start("")}>
+        <b>{t("我想直接说一句", "Say it in my own words")}</b>
+        <span aria-hidden="true">→</span>
+      </button>
+      {memoryShown && (
+        <div className={todayCss.memory}>
+          <div>
+            <b>{t("已经在用 ChatGPT、豆包？", "Already using an AI?")}</b>
+            <p>{t("把它记得的关于你的事搬过来。", "Bring over what it remembers about you.")}</p>
+          </div>
+          <button type="button" className={css.btn} disabled={busy} onClick={memory}>
+            {t("搬过来", "Bring it over")}
+          </button>
+          <button
+            type="button"
+            className={css.link}
+            aria-label={t("关闭记忆搬入提示", "Dismiss memory import tip")}
+            onClick={() => setMemoryShown(false)}
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function TodayTasks({
+  data,
+  busy,
+  complete,
+  ask,
+  schedule,
+  review,
+  focusCard,
+}: {
+  data: OverviewData;
+  busy: boolean;
+  complete: (item: OverviewNext) => void;
+  ask: (item: OverviewNext) => void;
+  schedule: (item: OverviewNext) => void;
+  review: () => void;
+  focusCard?: ReactNode;
+}) {
+  const t = useT();
+  const focus = data.next[0];
+  const upcoming = focusCard ? data.allNext : data.allNext.slice(1);
+  const [remainingOpen, setRemainingOpen] = useState(false);
+  const extra = (item: OverviewNext, inRow = true) => (
+    <details className={todayCss.more}>
+      <summary aria-label={t(`更多操作：${item.title}`, `More actions: ${item.title}`)}>···</summary>
+      {!item.proposed && (
+        <button type="button" className={css.link} onClick={() => schedule(item)}>
+          {t("安排时间段", "Schedule a time")}
+        </button>
+      )}
+      {inRow && item.proposed && item.id.startsWith("onboarding-matter-") && (
+        <button type="button" className={css.link} onClick={review}>
+          {t("去核对", "Review")}
+        </button>
+      )}
+      {inRow && (
+        <button type="button" className={css.link} onClick={() => ask(item)}>
+          {t("交给 AI", "Ask AI")}
+        </button>
+      )}
+    </details>
+  );
+  const row = (item: OverviewNext) => (
+    <div className={todayCss.nextRow} key={`${item.file}:${item.id}`}>
+      <button
+        type="button"
+        className={css.check}
+        disabled={busy || item.proposed}
+        aria-label={t(`完成：${item.title}`, `Done: ${item.title}`)}
+        onClick={() => complete(item)}
+      >
+        ✓
+      </button>
+      <span className={todayCss.nextTitle}>
+        {item.title}
+        {item.proposed && <small>{t(" · 建议", " · Suggested")}</small>}
+      </span>
+      <span className={css.small}>{item.module}</span>
+      {extra(item)}
+    </div>
+  );
+  return (
+    <>
+      {(focus || focusCard) && (
+        <section className={css.sec}>
+          {focusCard ??
+            (focus && (
+              <>
+                <h2 className={css.eyebrow}>{t("现在这件事", "One thing now")}</h2>
+                <div className={`${todayCss.focus} ${css.card}`}>
+                  <h2>{focus.title}</h2>
+                  <p className={css.small}>
+                    {t(`来自 ${focus.module}`, `From ${focus.module}`)}
+                    {focus.proposed ? t(" · 建议，待核对", " · Suggested, to review") : ""}
+                  </p>
+                  <div className={todayCss.actions}>
+                    {!focus.proposed && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-strong"]}`}
+                        disabled={busy}
+                        onClick={() => complete(focus)}
+                      >
+                        {t("完成", "Done")}
+                      </button>
+                    )}
+                    {focus.proposed && focus.id.startsWith("onboarding-matter-") && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-strong"]}`}
+                        disabled={busy}
+                        onClick={review}
+                      >
+                        {t("去核对", "Review")}
+                      </button>
+                    )}
+                    <button type="button" className={css.btn} onClick={() => ask(focus)}>
+                      {t("交给 AI", "Ask AI")}
+                    </button>
+                    {!focus.proposed && extra(focus, false)}
+                  </div>
+                </div>
+              </>
+            ))}
+        </section>
+      )}
+      {upcoming.length > 0 && (
+        <section className={css.sec}>
+          <h2 className={css.eyebrow}>{t("接下来", "Up next")}</h2>
+          <div className={css.card}>{upcoming.slice(0, 2).map(row)}</div>
+          {upcoming.length > 2 && (
+            <details
+              className={todayCss.remaining}
+              onToggle={(event) => setRemainingOpen(event.currentTarget.open)}
+            >
+              <summary className={css.link}>
+                {t(`还有 ${upcoming.length - 2} 件`, `${upcoming.length - 2} more`)}
+              </summary>
+              {remainingOpen && <div className={css.card}>{upcoming.slice(2).map(row)}</div>}
+            </details>
+          )}
+        </section>
+      )}
+    </>
+  );
+}

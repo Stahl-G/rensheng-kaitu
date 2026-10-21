@@ -242,6 +242,10 @@ export async function productRequest(
         return ask.configure({ search: args[0] });
       case "askCancel":
         return ask.cancel(text(0));
+      case "askPermission":
+        if (args[2] !== null && typeof args[2] !== "string")
+          throw new KaituError("缺少单次审批选项", "BAD_ARGS");
+        return ask.permission(text(0), text(1), args[2] as string | null);
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {

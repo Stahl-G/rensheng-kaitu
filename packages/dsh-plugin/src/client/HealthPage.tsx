@@ -384,7 +384,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
           <div id="health-panel" role="tabpanel" aria-labelledby={`health-tab-${tab}`} className={css.panel}>
             {tab === "训练" && (
               <>
-                <div className={css.stats}>
+                <dl className={css.stats}>
                   {[
                     [
                       "本周训练",
@@ -413,68 +413,74 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                         : "需要不同日期的力量记录",
                     ],
                   ].map(([label, value, hint]) => (
-                    <article className={css.stat} key={label}>
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                      <span>{hint}</span>
-                    </article>
+                    <div className={css.stat} key={label}>
+                      <dt>{label}</dt>
+                      <dd>
+                        <strong>{value}</strong>
+                        <small>{hint}</small>
+                      </dd>
+                    </div>
                   ))}
+                </dl>
+                <div className={css.trainingDetails}>
+                  <Section title="近 5 周" note="颜色越深，那天练得越多">
+                    <div className={css.heatmap}>
+                      {[..."一二三四五六日"].map((d) => (
+                        <span className={css.weekday} key={d}>
+                          {d}
+                        </span>
+                      ))}
+                      {training.heatmap.map((d) => {
+                        const volume = d.repetitions
+                          ? d.repetitions / maxReps
+                          : (d.minutes ?? 0) / maxMinutes;
+                        const text = `${d.date}：${d.future ? "尚未到来" : d.sessions === null ? "暂无记录" : `${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`}`;
+                        return (
+                          <span
+                            className={css.heat}
+                            key={d.date}
+                            title={text}
+                            aria-label={text}
+                            data-future={d.future}
+                            data-level={d.sessions === null ? 0 : volume > 0.66 ? 3 : volume > 0.33 ? 2 : 1}
+                          />
+                        );
+                      })}
+                    </div>
+                    {!training.heatmap.some((d) => d.sessions !== null) && (
+                      <Empty>记一次训练，就会在这里留下足迹。</Empty>
+                    )}
+                  </Section>
+                  <Section title="最近的训练" note="近 30 天">
+                    {!training.recent.length ? (
+                      <Empty>点击「记一次训练」，记下动作、组数和重量。</Empty>
+                    ) : (
+                      training.recent.map((session) => (
+                        <article className={css.workout} key={session.id}>
+                          <time dateTime={session.ts}>{stamp(session.ts)}</time>
+                          {session.parts.length > 0 && (
+                            <span className={css.tag}>{session.parts.join("、")}</span>
+                          )}
+                          <div className={css.exercises}>
+                            {session.exercises.map((exercise) => (
+                              <div key={exercise.id}>
+                                <span>
+                                  {exercise.estimated && "约 "}
+                                  {exercise.name}
+                                  {exercise.cardio
+                                    ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? ` · ${number(exercise.duration)} 分钟` : ""}`
+                                    : ` ${exercise.sets ?? "—"}×${exercise.reps ?? "—"} · ${amount(exercise.weight, "kg")}`}
+                                </span>
+                                <small>记录者：{exercise.recorder}</small>
+                              </div>
+                            ))}
+                          </div>
+                          <span className={css.duration}>时长：{amount(session.duration, "分钟")}</span>
+                        </article>
+                      ))
+                    )}
+                  </Section>
                 </div>
-                <Section title="近 5 周" note="颜色越深，那天练得越多">
-                  <div className={css.heatmap}>
-                    {[..."一二三四五六日"].map((d) => (
-                      <span className={css.weekday} key={d}>
-                        {d}
-                      </span>
-                    ))}
-                    {training.heatmap.map((d) => {
-                      const volume = d.repetitions ? d.repetitions / maxReps : (d.minutes ?? 0) / maxMinutes;
-                      const text = `${d.date}：${d.future ? "尚未到来" : d.sessions === null ? "暂无记录" : `${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`}`;
-                      return (
-                        <span
-                          className={css.heat}
-                          key={d.date}
-                          title={text}
-                          aria-label={text}
-                          data-future={d.future}
-                          data-level={d.sessions === null ? 0 : volume > 0.66 ? 3 : volume > 0.33 ? 2 : 1}
-                        />
-                      );
-                    })}
-                  </div>
-                  {!training.heatmap.some((d) => d.sessions !== null) && (
-                    <Empty>记一次训练，就会在这里留下足迹。</Empty>
-                  )}
-                </Section>
-                <Section title="最近的训练" note="近 30 天">
-                  {!training.recent.length ? (
-                    <Empty>点击「记一次训练」，记下动作、组数和重量。</Empty>
-                  ) : (
-                    training.recent.map((session) => (
-                      <article className={css.workout} key={session.id}>
-                        <time dateTime={session.ts}>{stamp(session.ts)}</time>
-                        {session.parts.length > 0 && (
-                          <span className={css.tag}>{session.parts.join("、")}</span>
-                        )}
-                        <div className={css.exercises}>
-                          {session.exercises.map((exercise) => (
-                            <div key={exercise.id}>
-                              <span>
-                                {exercise.estimated && "约 "}
-                                {exercise.name}
-                                {exercise.cardio
-                                  ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? ` · ${number(exercise.duration)} 分钟` : ""}`
-                                  : ` ${exercise.sets ?? "—"}×${exercise.reps ?? "—"} · ${amount(exercise.weight, "kg")}`}
-                              </span>
-                              <small>记录者：{exercise.recorder}</small>
-                            </div>
-                          ))}
-                        </div>
-                        <span className={css.duration}>时长：{amount(session.duration, "分钟")}</span>
-                      </article>
-                    ))
-                  )}
-                </Section>
               </>
             )}
             {tab === "饮食" && (

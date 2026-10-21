@@ -6,6 +6,7 @@ import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js"
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
+import { ExploreNavigation } from "./ExploreNavigation.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -21,7 +22,16 @@ import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
-import { CalendarPushResult, CalendarSlotForm, DataSummaries, TodayFinance } from "./TodayPage.js";
+import {
+  CalendarPushResult,
+  CalendarSlotForm,
+  DataSummaries,
+  TodayFinance,
+  TodayStart,
+  TodayTasks,
+} from "./TodayPage.js";
+import todayCss from "./TodayPage.module.css";
+import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -66,6 +76,7 @@ const modules = [
 export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
+  const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
@@ -75,8 +86,13 @@ export function OverviewPage(props: OverviewPageProps) {
         if (!active) return;
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
+        setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
       })
-      .catch(() => active && setLocale("zh-CN"));
+      .catch(() => {
+        if (!active) return;
+        setLocale("zh-CN");
+        setExploreEntries([...defaultExploreEntries]);
+      });
     return () => {
       active = false;
     };
@@ -89,6 +105,8 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale={setLocale}
         followSystem={followSystem}
         setFollowSystem={setFollowSystem}
+        exploreEntries={exploreEntries}
+        setExploreEntries={setExploreEntries}
       />
     </LocaleContext.Provider>
   );
@@ -99,26 +117,35 @@ function Overview({
   setLocale,
   followSystem,
   setFollowSystem,
+  exploreEntries,
+  setExploreEntries,
   ...props
 }: OverviewPageProps & {
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
   setFollowSystem: (value: boolean) => void;
+  exploreEntries: string[] | null;
+  setExploreEntries: (value: string[]) => void;
 }) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();
   const [guideKey, setGuideKey] = useState(0);
   const [guideSource, setGuideSource] = useState<string>();
+  const [guideText, setGuideText] = useState("");
+  const [todayDetails, setTodayDetails] = useState(false);
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
-  // 开图默认先看健康，然后是足迹、资讯、方向（2026-10-17 用户决定）。
-  const [explore, setExplore] = useState("health");
+  const [explore, setExplore] = useState("footprints");
+  const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
+  useEffect(() => {
+    if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
+  }, [exploreEntries, firstExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
@@ -269,9 +296,6 @@ function Overview({
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
-  // 原文整理出的待核对草稿（每日整理或 AI 起草），在首次使用的核对页采纳。
-  const isDraft = (item: { id: string; proposed: boolean }) =>
-    item.proposed && item.id.startsWith("onboarding-matter-");
   const askNext = (item: { title: string; module: string }) =>
     prompt(
       t(
@@ -288,7 +312,7 @@ function Overview({
           : id === "directions"
             ? "directions"
             : id === "explore"
-              ? "footprints"
+              ? firstExplore
               : "health",
       );
       setView("explore");
@@ -394,10 +418,7 @@ function Overview({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder={t(
-            "随手记一句，比如「今晚跑了 5 公里，有点累」",
-            'A quick note, like "Ran 5 km tonight, a bit tired"',
-          )}
+          placeholder={t("随手记一句", "A quick note")}
           disabled={busy}
         />
         <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !draft.trim()}>
@@ -415,7 +436,21 @@ function Overview({
     </div>
   );
   const focus = data?.next[0];
-  // 规划放在「现在最该做的」之后：先看今天，再看各个目标。
+  const startMatter = (text: string) => {
+    setGuideText(text);
+    startGuide(1);
+  };
+  const adoptedCard = onboarding?.next && (
+    <OnboardingNextCard
+      {...props}
+      key={`${onboarding.next.id}-${onboarding.next.rev}`}
+      next={onboarding.next}
+      onPrompt={() => askNext({ title: onboarding.next?.next ?? "", module: onboarding.next?.goal ?? "" })}
+      onSchedule={() => setSlot({ file: "task", id: onboarding.next?.id ?? "" })}
+      refresh={refresh}
+    />
+  );
+  // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
   const plansCard = data?.plans && (
     <PlansCard
       plans={data.plans}
@@ -426,6 +461,43 @@ function Overview({
     />
   );
   const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
+  const selectedExplore = exploreModules.find((entry) => entry.id === explore);
+  const explorePages: Record<ExploreModule["id"], ReactNode> = {
+    health: <HealthPage {...child} />,
+    footprints: (
+      <>
+        <MapPage {...child} />
+        <ProgressMap
+          plans={data?.plans}
+          projects={data?.projects ?? []}
+          loadExploration={props.loadExploration}
+          subscribe={props.subscribe}
+          open={(section) => {
+            if (section === "directions") setExplore("directions");
+            else if (section === "plans") setView("overview");
+            else openSection("projects");
+          }}
+        />
+      </>
+    ),
+    news: (
+      <NewsPage
+        {...child}
+        onLearn={(item) => {
+          setLearningSource({
+            title: item.title,
+            ...(item.url ? { url: item.url } : {}),
+            ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
+          });
+          openRecord("notes");
+        }}
+      />
+    ),
+    directions: (
+      <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+    ),
+  };
+
   return (
     <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
       <header className={css.top}>
@@ -449,7 +521,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore("health");
+                if (id === "explore") setExplore(firstExplore);
                 setRecord("");
                 setMenu(false);
               }}
@@ -536,7 +608,7 @@ function Overview({
         </div>
       </header>
       <main
-        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""}`}
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? todayCss.page : ""}`}
       >
         {props.desktopUpdate && view !== "settings" && (
           <FeatureUpdates request={props.desktopUpdate} compact />
@@ -583,6 +655,7 @@ function Overview({
               step={guide ?? 0}
               builtin={!!props.renderAsk}
               initialSource={guideSource}
+              initialText={guideText}
               setStep={setGuide}
               onStatus={setOnboarding}
               refresh={refresh}
@@ -596,20 +669,6 @@ function Overview({
               }}
             />
           </div>
-        )}
-        {view === "overview" && !guideVisible && guide !== undefined && onboarding && (
-          <>
-            {onboarding.next && (
-              <OnboardingNextCard
-                {...props}
-                key={`${onboarding.next.id}-${onboarding.next.rev}`}
-                next={onboarding.next}
-                onSchedule={() => setSlot({ file: "task", id: onboarding.next?.id ?? "" })}
-                refresh={refresh}
-              />
-            )}
-            <OnboardingChecklist status={onboarding} restart={() => startGuide()} go={checklistAction} />
-          </>
         )}
         {view === "overview" && slot && (
           <CalendarSlotForm
@@ -626,13 +685,7 @@ function Overview({
           guide !== undefined &&
           data &&
           (data.empty ? (
-            <>
-              <div className={css.head}>
-                <h1>{t("今天", "Today")}</h1>
-              </div>
-              {capture}
-              {plansCard}
-            </>
+            <TodayStart start={startMatter} memory={() => startGuide(5)} />
           ) : (
             <>
               <div className={css.sec}>
@@ -648,117 +701,20 @@ function Overview({
                 </div>
                 {capture}
               </div>
-              {(!onboarding?.next || focus) && (
-                <section className={css.sec}>
-                  <h2 className={css.eyebrow}>{t("现在最该做的", "Most important now")}</h2>
-                  <div className={`${css.focus} ${css.card}`}>
-                    <div className={css["focus-body"]}>
-                      <h2 className={css["focus-title"]}>
-                        {focus?.title ??
-                          t("今天，留一点空间给下一步", "Leave some room today for a next step")}
-                      </h2>
-                      <p className={css.small}>
-                        {focus
-                          ? t(
-                              `来自 ${focus.module}${focus.proposed ? " · 建议，待确认" : ""}`,
-                              `From ${focus.module}${focus.proposed ? " · suggestion, needs confirming" : ""}`,
-                            )
-                          : null}
-                      </p>
-                    </div>
-                    {focus && (
-                      <>
-                        {!focus.proposed && (
-                          <button
-                            type="button"
-                            className={`${css.btn} ${css["btn-strong"]} ${css["btn-big"]}`}
-                            disabled={busy}
-                            onClick={() => void run(() => props.completeNext(focus.file, focus.id))}
-                          >
-                            {t("完成", "Done")}
-                          </button>
-                        )}
-                        {!focus.proposed && (
-                          <button
-                            type="button"
-                            className={css.link}
-                            onClick={() => setSlot({ file: focus.file, id: focus.id })}
-                          >
-                            {t("安排时间段", "Schedule a time")}
-                          </button>
-                        )}
-                        {isDraft(focus) && (
-                          <button
-                            type="button"
-                            className={`${css.btn} ${css["btn-strong"]}`}
-                            onClick={() => startGuide(1)}
-                          >
-                            {t("去核对", "Review")}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className={`${css.btn} ${css["btn-strong"]}`}
-                          onClick={() => askNext(focus)}
-                        >
-                          {t("让问问帮我", "Ask for help")}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {data.next.slice(1, 3).map((item) => (
-                    <div className={`${css.row} ${css.card}`} key={item.id}>
-                      <button
-                        type="button"
-                        className={css.check}
-                        aria-label={t(`完成：${item.title}`, `Done: ${item.title}`)}
-                        disabled={busy || item.proposed}
-                        onClick={() => void run(() => props.completeNext(item.file, item.id))}
-                      >
-                        ✓
-                      </button>
-                      <span className={css["row-title"]}>{item.title}</span>
-                      <span className={css.chip}>
-                        {item.module}
-                        {item.proposed ? t(" · 待确认", " · to confirm") : ""}
-                      </span>
-                      {!item.proposed && (
-                        <button
-                          type="button"
-                          className={css.link}
-                          onClick={() => setSlot({ file: item.file, id: item.id })}
-                        >
-                          {t("安排时间段", "Schedule a time")}
-                        </button>
-                      )}
-                      {isDraft(item) && (
-                        <button type="button" className={css.link} onClick={() => startGuide(1)}>
-                          {t("去核对", "Review")}
-                        </button>
-                      )}
-                      <button type="button" className={css.link} onClick={() => askNext(item)}>
-                        {t("让问问帮我", "Ask for help")}
-                      </button>
-                    </div>
-                  ))}
-                  {data.allNext.length > 3 && (
-                    <details>
-                      <summary className={css.link}>
-                        {t(`全部 ${data.allNext.length} 条下一步`, `All ${data.allNext.length} next steps`)}
-                      </summary>
-                      {data.allNext.map((item) => (
-                        <div className={css.row} key={item.id}>
-                          <span className={css["row-title"]}>{item.title}</span>
-                          <button type="button" className={css.link} onClick={() => askNext(item)}>
-                            {t("让问问帮我", "Ask for help")}
-                          </button>
-                        </div>
-                      ))}
-                    </details>
-                  )}
-                </section>
+              <TodayTasks
+                data={data}
+                busy={busy}
+                complete={(item) => void run(() => props.completeNext(item.file, item.id))}
+                ask={askNext}
+                schedule={(item) => setSlot({ file: item.file, id: item.id })}
+                review={() => startGuide(1)}
+                focusCard={onboarding?.next?.status !== "done" ? adoptedCard : undefined}
+              />
+              {!focus && !adoptedCard && (
+                <button type="button" className={css.link} onClick={() => startMatter("")}>
+                  {t("整理一件事", "Think through one thing")}
+                </button>
               )}
-              {plansCard}
               <Agenda
                 data={calendar}
                 open={() => openRecord("calendar")}
@@ -784,9 +740,57 @@ function Overview({
                       />
                     </div>
                   ))}
+              <details
+                className={todayCss.secondary}
+                onToggle={(event) => setTodayDetails(event.currentTarget.open)}
+              >
+                <summary>{t("目标、资料与近期变化", "Goals, notes and recent changes")}</summary>
+                {todayDetails && (
+                  <div>
+                    {plansCard}
+                    {onboarding?.next?.status === "done" ? adoptedCard : null}
+                    {onboarding && (
+                      <OnboardingChecklist
+                        status={onboarding}
+                        restart={() => startGuide()}
+                        go={checklistAction}
+                      />
+                    )}
+                    <DataSummaries data={data} open={openSection} />
+                    {data.sections.some((section) => section.id === "finance") && (
+                      <TodayFinance {...props} today={data.today} open={() => openRecord("finance")} />
+                    )}
+                    <section className={css.sec}>
+                      <div className={css["sec-head"]}>
+                        <h2 className={css.eyebrow}>{t("最近的变化", "Recent changes")}</h2>
+                        {data.daily && (
+                          <details>
+                            <summary className={css.link}>
+                              {t("近期回顾", "Recent review")} · {data.daily.date}
+                            </summary>
+                            <div className={css.detailBody}>{data.daily.body}</div>
+                          </details>
+                        )}
+                      </div>
+                      {data.versions.slice(0, 3).map((version) => (
+                        <div className={css["feed-row"]} key={version.oid}>
+                          <span className={css.ini}>
+                            {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
+                          </span>
+                          <p>{version.text}</p>
+                          <time className={css.small}>{stamp(version.time)}</time>
+                        </div>
+                      ))}
+                      {!data.versions.length && (
+                        <p className={css.small}>{t("还没有新的变化", "No changes yet")}</p>
+                      )}
+                    </section>
+                  </div>
+                )}
+              </details>
               {data.sync.needsReview > 0 && (
-                <div className={css.reviewLinks}>
-                  <span className={css.small}>{t("要你核对：", "To review:")}</span>
+                <div className={todayCss.review}>
+                  <span className={css.small}>{t("待核对资料", "Notes to review")}</span>
                   {data.sync.directionSuggestions > 0 && (
                     <button type="button" className={css.link} onClick={() => openSection("directions")}>
                       {t(
@@ -814,35 +818,6 @@ function Overview({
                   )}
                 </div>
               )}
-              <DataSummaries data={data} open={openSection} />
-              {data.sections.some((section) => section.id === "finance") && (
-                <TodayFinance {...props} today={data.today} open={() => openRecord("finance")} />
-              )}
-              <section className={css.sec}>
-                <div className={css["sec-head"]}>
-                  <h2 className={css.eyebrow}>{t("最近的变化", "Recent changes")}</h2>
-                  {data.daily && (
-                    <details>
-                      <summary className={css.link}>
-                        {t("近期回顾", "Recent review")} · {data.daily.date}
-                      </summary>
-                      <div className={css.detailBody}>{data.daily.body}</div>
-                    </details>
-                  )}
-                </div>
-                {data.versions.slice(0, 3).map((version) => (
-                  <div className={css["feed-row"]} key={version.oid}>
-                    <span className={css.ini}>
-                      {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
-                    </span>
-                    <p>{version.text}</p>
-                    <time className={css.small}>{stamp(version.time)}</time>
-                  </div>
-                ))}
-                {!data.versions.length && (
-                  <p className={css.small}>{t("还没有新的变化", "No changes yet")}</p>
-                )}
-              </section>
             </>
           ))}
         {view === "records" && (
@@ -916,85 +891,24 @@ function Overview({
           <>
             <section className={css.sec} aria-label={t("开图", "Explore")}>
               <h1 className={css.sr}>{t("开图", "Explore")}</h1>
-              <nav className={css.exploreEntries} aria-label={t("开图里的内容", "Explore sections")}>
-                {[
-                  {
-                    id: "health",
-                    title: t("健康", "Health"),
-                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
-                    icon: "M3 12h4l3-8 4 16 3-8h4",
-                  },
-                  {
-                    id: "footprints",
-                    title: t("足迹", "Footprints"),
-                    description: t("看看来路，探索下一站", "Trace your journey, explore what is next"),
-                    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
-                  },
-                  {
-                    id: "news",
-                    title: t("资讯", "News"),
-                    description: t("阅读关心的事，保留真实来源", "Read what matters, keep its sources"),
-                    icon: "M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h4",
-                  },
-                  {
-                    id: "directions",
-                    title: t("方向", "Directions"),
-                    description: t("把想法变成可以尝试的一步", "Turn an idea into a step you can try"),
-                    icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4 6-2 6-6 2 2-6 6-2Z",
-                  },
-                ].map(({ id, title, description, icon }) => (
-                  <button type="button" key={id} aria-pressed={explore === id} onClick={() => setExplore(id)}>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d={icon} />
-                    </svg>
-                    <span>
-                      <strong>{title}</strong>
-                      <small>{description}</small>
-                    </span>
-                  </button>
-                ))}
-              </nav>
+              <ExploreNavigation
+                entries={exploreEntries}
+                current={explore}
+                open={setExplore}
+                save={async (entries) => {
+                  const saved = await props.savePreferences({
+                    locale: followSystem ? null : locale,
+                    exploreEntries: entries,
+                  });
+                  setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
+                }}
+              />
             </section>
             <div className={css.child}>
-              {explore === "health" ? (
-                <HealthPage {...child} />
-              ) : explore === "footprints" ? (
-                <>
-                  <MapPage {...child} />
-                  <ProgressMap
-                    plans={data?.plans}
-                    projects={data?.projects ?? []}
-                    loadExploration={props.loadExploration}
-                    subscribe={props.subscribe}
-                    open={(section) => {
-                      if (section === "directions") setExplore("directions");
-                      else if (section === "plans") setView("overview");
-                      else openSection("projects");
-                    }}
-                  />
-                </>
-              ) : explore === "news" ? (
-                <NewsPage
-                  {...child}
-                  onLearn={(item) => {
-                    setLearningSource({
-                      title: item.title,
-                      ...(item.url ? { url: item.url } : {}),
-                      ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
-                    });
-                    openRecord("notes");
-                  }}
-                />
+              {selectedExplore ? (
+                explorePages[selectedExplore.id]
               ) : (
-                <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+                <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
               )}
             </div>
           </>

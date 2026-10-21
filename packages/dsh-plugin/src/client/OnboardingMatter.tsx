@@ -112,6 +112,7 @@ function ClipboardOrganize({
 export function OnboardingMatter(
   props: OnboardingServices & {
     initial: Matter | null;
+    initialText?: string;
     content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
@@ -121,7 +122,7 @@ export function OnboardingMatter(
 ) {
   const t = useT();
   const locale = useLocale();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(props.initialText ?? "");
   const [matter, setMatter] = useState<Matter | null>(props.initial);
   const [draft, setDraft] = useState<OnboardingMatterDraft>(
     props.initial?.draft ? editable(props.initial.draft) : { goal: "", current: "", next: "" },
@@ -133,6 +134,7 @@ export function OnboardingMatter(
   const [organizing, setOrganizing] = useState(false);
   const [error, setError] = useState("");
   const [raw, setRaw] = useState(false);
+  const [approvalRequired, setApprovalRequired] = useState(false);
   const [externalRequested, setExternalRequested] = useState(false);
   const [noAi, setNoAi] = useState(false);
   const [manual, setManual] = useState(!props.initial?.draft);
@@ -146,6 +148,8 @@ export function OnboardingMatter(
   }, []);
   const apply = (result: Matter) => {
     setMatter(result);
+    setError("");
+    setApprovalRequired(false);
     if (!result.draft) return;
     applied.current = JSON.stringify(result.draft);
     setDraft(editable(result.draft));
@@ -161,16 +165,24 @@ export function OnboardingMatter(
       setPaths(props.initial.draft.paths ?? []);
       setPath(-1);
       setManual(false);
+      setError("");
+      setApprovalRequired(false);
     }
   }, [props.initial, matter?.source]);
   const run = async (operation: () => Promise<void>) => {
     setBusy(true);
     props.onBusy(true);
     setError("");
+    setApprovalRequired(false);
     try {
       await operation();
     } catch (err) {
-      if (alive.current) setError(err instanceof Error ? err.message : String(err));
+      if (alive.current) {
+        setError(err instanceof Error ? err.message : String(err));
+        setApprovalRequired(
+          !!err && typeof err === "object" && "code" in err && err.code === "AI_APPROVAL_REQUIRED",
+        );
+      }
     } finally {
       if (alive.current) {
         setBusy(false);
@@ -242,12 +254,25 @@ export function OnboardingMatter(
           ? props.content.question
           : hasDraft
             ? t(`开图从${subject}里看到的`, `What Kaitu found in ${subject}`)
-            : t("写下你的目标和一个下一步", "Write down your goal and one next step")}
+            : t("原文已保存，接下来由你选择", "Your text is saved. Choose what comes next")}
       </h1>
       {error && (
         <p role="alert" className={v2.error}>
           {error}
         </p>
+      )}
+      {approvalRequired && matter && (
+        <div>
+          <p className={v2.small}>
+            {t(
+              "原文已保留。问问会显示 Agent 请求的具体操作，由你批准或拒绝；消息会先放入输入框。",
+              "Your text is saved. Ask will show the Agent's requested action for you to approve or reject; the message will first be placed in the composer.",
+            )}
+          </p>
+          <button type="button" className={primary} disabled={busy} onClick={() => external(matter)}>
+            {t("在问问继续", "Continue in Ask")}
+          </button>
+        </div>
       )}
       {!matter ? (
         <>
@@ -319,13 +344,18 @@ export function OnboardingMatter(
             </output>
           )}
           {manual && (
-            <ClipboardOrganize
-              source={matter.source}
-              promptOnboardingMatter={props.promptOnboardingMatter}
-              pasteOnboardingMatter={props.pasteOnboardingMatter}
-              onDraft={apply}
-            />
+            <p className={v2.small}>
+              {t(
+                "可以自己写目标和下一步，也可以只保留原文后结束。",
+                "Write a goal and next step yourself, or finish with just your original text saved.",
+              )}
+            </p>
           )}
+          <div className={css.footerActions}>
+            <button type="button" className={quiet} disabled={busy} onClick={() => void run(keep)}>
+              {t("保留原文并结束", "Keep the text and finish")}
+            </button>
+          </div>
           <div className={css.draftFields}>
             {field("goal", t("当前目标", "Current goal"))}
             {field("current", t("已知现状", "What's known now"))}
@@ -370,11 +400,22 @@ export function OnboardingMatter(
               : t(`依据 · 查看${subject}`, `Source · view ${subject}`)}
           </button>
           {raw && <pre className={css.original}>{matter.text}</pre>}
+          {manual && (
+            <details>
+              <summary>{t("用其他 AI 整理（可选）", "Organize with another AI (optional)")}</summary>
+              <ClipboardOrganize
+                source={matter.source}
+                promptOnboardingMatter={props.promptOnboardingMatter}
+                pasteOnboardingMatter={props.pasteOnboardingMatter}
+                onDraft={apply}
+              />
+            </details>
+          )}
           <div className={css.footerActions}>
             {props.builtin ? (
               !noAi && (
                 <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                  {t("请开图里的 AI 整理", "Ask Kaitu's AI")}
+                  {t("用当前 AI 整理", "Organize with the current AI")}
                 </button>
               )
             ) : (
@@ -382,9 +423,6 @@ export function OnboardingMatter(
                 {t("请当前 AI 整理", "Ask the current AI")}
               </button>
             )}
-            <button type="button" className={quiet} disabled={busy} onClick={() => void run(keep)}>
-              {t("只保存原文", "Just save the text")}
-            </button>
             <button
               type="button"
               className={primary}
@@ -396,7 +434,9 @@ export function OnboardingMatter(
                 })
               }
             >
-              {t("采纳这个下一步", "Adopt this next step")}
+              {manual
+                ? t("保存目标和下一步", "Save the goal and next step")
+                : t("采纳这个下一步", "Adopt this next step")}
             </button>
           </div>
         </>
@@ -406,7 +446,12 @@ export function OnboardingMatter(
 }
 
 export function OnboardingNextCard(
-  props: OnboardingServices & { next: OnboardingNext; refresh: () => Promise<void>; onSchedule?: () => void },
+  props: OnboardingServices & {
+    next: OnboardingNext;
+    refresh: () => Promise<void>;
+    onSchedule?: () => void;
+    onPrompt?: () => void;
+  },
 ) {
   const t = useT();
   const { next } = props;
@@ -440,9 +485,7 @@ export function OnboardingNextCard(
       aria-label={t("刚采纳的下一步", "The next step you adopted")}
     >
       <span className={v2.eyebrow}>
-        {next.status === "done"
-          ? t("这一步已完成", "This step is done")
-          : t("现在最该做的一件事", "The one thing to do now")}
+        {next.status === "done" ? t("这一步已完成", "This step is done") : t("现在这件事", "One thing now")}
       </span>
       <h2>{next.next}</h2>
       <p className={v2.small}>
@@ -496,6 +539,11 @@ export function OnboardingNextCard(
               >
                 {t("完成并记一句结果", "Done, log one line")}
               </button>
+              {props.onPrompt && (
+                <button type="button" className={quiet} onClick={props.onPrompt}>
+                  {t("交给 AI", "Ask AI")}
+                </button>
+              )}
               <button
                 type="button"
                 className={quiet}

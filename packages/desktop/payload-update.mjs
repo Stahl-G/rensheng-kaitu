@@ -16,6 +16,13 @@ const requiredFiles = [
   "web/index.html",
 ];
 
+class UpdateHttpError extends Error {
+  constructor(status) {
+    super(`HTTP ${status}`);
+    this.status = status;
+  }
+}
+
 async function download(url, limit) {
   let parsed = new URL(url);
   const secure = parsed.protocol === "https:";
@@ -35,7 +42,10 @@ async function download(url, limit) {
     if (redirects >= 5 || !response.headers.get("location")) throw new Error("更新下载重定向无效");
     parsed = new URL(response.headers.get("location"), parsed);
   }
-  if (!response.ok) throw new Error(`下载失败（${response.status}）`);
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new UpdateHttpError(response.status);
+  }
   const chunks = [];
   let size = 0;
   for await (const chunk of response.body) {
@@ -152,10 +162,21 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
   let candidate;
   let operation;
   const run = (phase, work) => {
-    status = { ...status, phase, error: "" };
+    status = {
+      ...status,
+      phase,
+      error: "",
+      ...(phase === "checking" ? { availableVersion: null, notes: "" } : {}),
+    };
     operation = work()
       .catch((error) => {
-        status = { ...status, phase: "error", error: error.message };
+        const unavailable = phase === "checking" && error instanceof UpdateHttpError && error.status === 404;
+        const label = phase === "checking" ? "检查更新失败" : "下载或安装更新失败";
+        status = {
+          ...status,
+          phase: unavailable ? "unavailable" : "error",
+          error: unavailable ? "" : `${label}：${error.message}`,
+        };
       })
       .finally(() => {
         operation = undefined;
@@ -187,6 +208,7 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
       } else if (action === "check") {
         if (status.phase === "ready") return { ...status };
         if (!status.configured) throw new Error("此测试版本尚未配置更新发布源");
+        candidate = undefined;
         run("checking", async () => {
           const envelope = JSON.parse((await download(config.feedUrl, 1024 * 1024)).toString());
           candidate = verifyRelease(envelope, config.publicKey);
