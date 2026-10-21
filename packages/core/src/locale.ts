@@ -29,7 +29,7 @@ function file() {
 function entryList(value: unknown): value is string[] {
   return (
     Array.isArray(value) &&
-    value.every((id) => typeof id === "string" && id.length > 0 && id.trim() === id) &&
+    value.every((id) => typeof id === "string") &&
     new Set(value).size === value.length
   );
 }

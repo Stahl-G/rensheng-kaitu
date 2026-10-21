@@ -88,7 +88,11 @@ export function OverviewPage(props: OverviewPageProps) {
         setFollowSystem(value.followSystem ?? false);
         setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
       })
-      .catch(() => active && setLocale("zh-CN"));
+      .catch(() => {
+        if (!active) return;
+        setLocale("zh-CN");
+        setExploreEntries([...defaultExploreEntries]);
+      });
     return () => {
       active = false;
     };

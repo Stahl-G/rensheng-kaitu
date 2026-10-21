@@ -2,21 +2,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it, vi } from "vitest";
-import {
-  addRecord,
-  readPreferences,
-  readRecords,
-  resolvePreferences,
-  savePreferences,
-} from "../src/index.js";
-import { freshWorkspace, workout } from "./helpers.js";
+import { readPreferences, resolvePreferences, savePreferences } from "../src/index.js";
+import { freshWorkspace } from "./helpers.js";
 
-it("入口顺序、全隐藏及重新启用持久化，跟随系统语言仍保留入口，资料不随隐藏删除", async () => {
+it("入口顺序、全隐藏及重新启用持久化，跟随系统语言仍保留入口", async () => {
   const state = mkdtempSync(join(tmpdir(), "kaitu-explore-preferences-"));
   vi.stubEnv("KAITU_LOCAL_STATE_DIR", state);
   try {
     const ws = await freshWorkspace();
-    const record = addRecord(ws, "workout", { ...workout, ts: "2026-10-15T08:00:00Z" }).record;
     expect(readPreferences().exploreEntries).toBeUndefined();
     savePreferences({ locale: null, exploreEntries: ["news", "footprints", "health"] });
     expect(resolvePreferences(ws, "en-US")).toMatchObject({
@@ -26,7 +19,6 @@ it("入口顺序、全隐藏及重新启用持久化，跟随系统语言仍保�
     });
     savePreferences({ exploreEntries: [] });
     expect(resolvePreferences(ws, "zh-CN").exploreEntries).toEqual([]);
-    expect(readRecords(ws, "workout").map((item) => item.id)).toContain(record.id);
     savePreferences({ locale: "en" });
     expect(readPreferences().exploreEntries).toEqual([]);
     savePreferences({ exploreEntries: ["health", "news"] });

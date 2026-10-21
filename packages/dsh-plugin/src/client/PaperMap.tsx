@@ -431,7 +431,6 @@ export function PaperMap({
         if (remoteLoaded && detailSource && instance.isSourceLoaded(detailSource))
           setDetailStatus((status) => (status === "loading" ? null : status));
       };
-      m.on("sourcedata", finishDetails);
       m.on("idle", () => {
         finishDetails();
         if (!attributionInitialized) {
