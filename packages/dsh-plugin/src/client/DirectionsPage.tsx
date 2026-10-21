@@ -61,6 +61,63 @@ const conclusions = {
 };
 const stances = { unclear: "还不能判断", supports: "支持依据", refutes: "反面证据" };
 const kinds = { evidence: "依据与资料", reflection: "新的认识", decision: "我的决定" };
+const DIRECTION_EN: Record<string, string> = {
+  计划中: "Planned",
+  进行中: "In progress",
+  行动已完成: "Action completed",
+  已完成行动: "Action completed",
+  已取消: "Cancelled",
+  暂未判断假设: "Hypothesis not assessed",
+  支持假设: "Supports hypothesis",
+  反驳假设: "Refutes hypothesis",
+  证据还不足: "Inconclusive",
+  还不能判断: "Not assessed yet",
+  支持依据: "Supporting evidence",
+  反面证据: "Contrary evidence",
+  依据与资料: "Evidence and sources",
+  新的认识: "Reflection",
+  我的决定: "My decision",
+  "项目：": "Project: ",
+  "决策：": "Decision: ",
+  "原文：": "Source: ",
+  关联项目: "Linked project",
+  决策记录: "Decision",
+  外部参考资料: "External source",
+  个人资料: "Personal files",
+  查看关联资料: "View linked source",
+  已保存: "Saved",
+  修正资料: "Correct source",
+  重新读取: "Reload",
+  "← 全部方向": "← All directions",
+  取消收藏: "Unsave",
+  收藏: "Save",
+  方向详情: "Direction details",
+  概览: "Overview",
+  资料: "Sources",
+  尝试: "Experiments",
+  变化: "Changes",
+  为什么在意: "Why it matters",
+  目前的假设: "Current hypothesis",
+  仍然未知: "Still unknown",
+  需要认真看待的反面证据: "Contrary evidence to consider",
+  最近的尝试: "Recent experiments",
+  安排一个小尝试: "Plan a small experiment",
+  补充依据或认识: "Add evidence or reflection",
+  方向管理: "Manage direction",
+  采纳这个方向: "Adopt this direction",
+  不感兴趣: "Not interested",
+  暂停方向: "Pause direction",
+  继续探索: "Resume",
+  归档方向: "Archive direction",
+  调整问题与假设: "Edit question and hypothesis",
+  还没有资料: "No sources yet",
+  还没有尝试: "No experiments yet",
+  查看结果来源: "View result source",
+  更新尝试与结果: "Update experiment and result",
+  "和 AI 一起梳理": "Explore with AI",
+  你: "You",
+  历史尝试: "Past experiment",
+};
 function ReferenceList({
   data,
   load,
@@ -74,21 +131,27 @@ function ReferenceList({
   data: ExplorationData | null;
   load: DirectionsPageProps["loadExplorationSource"];
 }) {
+  const t = useT();
+  const label = (value: string) => t(value, DIRECTION_EN[value] ?? value);
   return (
     <>
       {items?.map((item, index) => (
         <div key={`${item.kind}:${item.ref}`} className={css.reference}>
           <p>
-            {item.kind === "project" ? "项目：" : item.kind === "decision" ? "决策：" : "原文："}
             {item.kind === "project"
-              ? (data?.references.projects.find((p) => p.id === item.ref)?.title ?? "关联项目")
+              ? label("项目：")
               : item.kind === "decision"
-                ? (data?.references.decisions.find((d) => d.path === item.ref)?.title ?? "决策记录")
+                ? label("决策：")
+                : label("原文：")}
+            {item.kind === "project"
+              ? (data?.references.projects.find((p) => p.id === item.ref)?.title ?? label("关联项目"))
+              : item.kind === "decision"
+                ? (data?.references.decisions.find((d) => d.path === item.ref)?.title ?? label("决策记录"))
                 : /^https?:\/\//i.test(item.ref)
-                  ? "外部参考资料"
-                  : "个人资料"}
+                  ? label("外部参考资料")
+                  : label("个人资料")}
           </p>
-          <SourceEvidence id={id} label="查看关联资料" load={() => load(owner, id, index)} />
+          <SourceEvidence id={id} label={label("查看关联资料")} load={() => load(owner, id, index)} />
         </div>
       ))}
     </>
@@ -197,6 +260,7 @@ function ClipboardDirections({
 
 export function DirectionsPage(props: DirectionsPageProps) {
   const t = useT();
+  const label = (value: string) => t(value, DIRECTION_EN[value] ?? value);
   const locale = useLocale();
   const stateLabel = (status: Direction["status"]) => (locale === "en" ? statesEn[status] : states[status]);
   const [clipboard, setClipboard] = useState(false);
@@ -255,7 +319,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
   }, [props.generateDirections, generation?.status, refresh]);
   const generate = async () => {
     setError(null);
-    setGeneration({ status: "running", stage: "读资料" });
+    setGeneration({ status: "running", stage: t("读资料", "Reading sources") });
     try {
       if (!props.generateDirections) {
         setGeneration(undefined);
@@ -302,7 +366,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
       setTab("overview");
     }
     closeForm();
-    setReceipt("已保存");
+    setReceipt(label("已保存"));
     await refresh();
   };
   const update = async (patch: Partial<Pick<Direction, "status" | "favorite">>) => {
@@ -335,18 +399,22 @@ export function DirectionsPage(props: DirectionsPageProps) {
     items.map((note) => (
       <article key={`${note.id}:${note.rev ?? 1}`} className={css.item}>
         <div className={css.itemHeader}>
-          <strong>{kinds[note.kind]}</strong>
+          <strong>{label(kinds[note.kind])}</strong>
           <span className={base.muted}>
-            {stances[note.stance]} · {note.by === "user" ? "你" : "AI"}
+            {label(stances[note.stance])} · {note.by === "user" ? label("你") : "AI"}
           </span>
         </div>
         {note.question !== (direction?.hypothesis || direction?.title) && (
-          <p className={base.muted}>记录时针对的问题：{note.question}</p>
+          <p className={base.muted}>
+            {t("记录时针对的问题：", "Question when recorded: ")}
+            {note.question}
+          </p>
         )}
         <p className={css.prose}>{note.text}</p>
         {note.experiment_id && (
           <p className={base.muted}>
-            来自尝试：{experiments.find((e) => e.id === note.experiment_id)?.action ?? "历史尝试"}
+            {t("来自尝试：", "From experiment: ")}
+            {experiments.find((e) => e.id === note.experiment_id)?.action ?? label("历史尝试")}
           </p>
         )}
         {note.source && (
@@ -360,7 +428,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
           items={note.references}
         />
         <button type="button" className={base.link} onClick={() => openForm("note", note)}>
-          修正资料
+          {label("修正资料")}
         </button>
       </article>
     ));
@@ -371,7 +439,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
           <p role="alert">
             {error}
             <button type="button" className={base.link} onClick={() => void refresh()}>
-              重新读取
+              {label("重新读取")}
             </button>
           </p>
         ) : (
@@ -436,9 +504,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
                 setReceipt(null);
               }}
             >
-              ← 全部方向
+              {label("← 全部方向")}
             </button>
-            <span className={base.muted}>{states[direction.status]}</span>
+            <span className={base.muted}>{stateLabel(direction.status)}</span>
           </header>
           <div className={css.heading}>
             <h2>{directionText(direction.title, 120)}</h2>
@@ -448,16 +516,16 @@ export function DirectionsPage(props: DirectionsPageProps) {
               disabled={busy}
               onClick={() => void update({ favorite: !direction.favorite })}
             >
-              {direction.favorite ? "取消收藏" : "收藏"}
+              {direction.favorite ? label("取消收藏") : label("收藏")}
             </button>
           </div>
-          <nav className={base.secondaryNav} aria-label="方向详情">
+          <nav className={base.secondaryNav} aria-label={label("方向详情")}>
             {(
               [
-                ["overview", "概览"],
-                ["sources", "资料"],
-                ["experiments", "尝试"],
-                ["changes", "变化"],
+                ["overview", label("概览")],
+                ["sources", label("资料")],
+                ["experiments", label("尝试")],
+                ["changes", label("变化")],
               ] as const
             ).map(([id, title]) => (
               <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
@@ -468,13 +536,13 @@ export function DirectionsPage(props: DirectionsPageProps) {
           {tab === "overview" && (
             <>
               <div className={css.statement}>
-                <h3>为什么在意</h3>
+                <h3>{label("为什么在意")}</h3>
                 <p>{directionText(direction.motivation, 600) || "—"}</p>
-                <h3>目前的假设</h3>
+                <h3>{label("目前的假设")}</h3>
                 <p>{directionText(direction.hypothesis, 400) || "—"}</p>
                 {direction.unknowns && (
                   <>
-                    <h3>仍然未知</h3>
+                    <h3>{label("仍然未知")}</h3>
                     <p>{directionText(direction.unknowns, 240)}</p>
                   </>
                 )}
@@ -482,21 +550,24 @@ export function DirectionsPage(props: DirectionsPageProps) {
 
               {notes.some((n) => n.stance === "refutes") && (
                 <section>
-                  <h3>需要认真看待的反面证据</h3>
+                  <h3>{label("需要认真看待的反面证据")}</h3>
                   {noteItems(notes.filter((n) => n.stance === "refutes").slice(-2))}
                 </section>
               )}
               {experiments.length > 0 && (
                 <section>
-                  <h3>最近的尝试</h3>
+                  <h3>{label("最近的尝试")}</h3>
                   {experiments.slice(-2).map((e) => (
                     <article key={e.id} className={css.item}>
                       <strong>{e.action}</strong>
                       <p className={base.muted}>
-                        {actionStates[e.status]} · {conclusions[e.conclusion]}
+                        {label(actionStates[e.status])} · {label(conclusions[e.conclusion])}
                       </p>
                       {e.question !== (direction.hypothesis || direction.title) && (
-                        <p className={base.muted}>这次验证的问题：{e.question}</p>
+                        <p className={base.muted}>
+                          {t("这次验证的问题：", "Question tested: ")}
+                          {e.question}
+                        </p>
                       )}
                       {e.result && <p className={css.prose}>{e.result}</p>}
                     </article>
@@ -506,15 +577,15 @@ export function DirectionsPage(props: DirectionsPageProps) {
               <div className={css.actions}>
                 {direction.status === "active" && (
                   <button type="button" className={base.button} onClick={() => openForm("experiment")}>
-                    安排一个小尝试
+                    {label("安排一个小尝试")}
                   </button>
                 )}
                 <button type="button" className={base.link} onClick={() => openForm("note")}>
-                  补充依据或认识
+                  {label("补充依据或认识")}
                 </button>
               </div>
               <details>
-                <summary>方向管理</summary>
+                <summary>{label("方向管理")}</summary>
                 <div className={css.actions}>
                   {direction.status === "suggested" ? (
                     <>
@@ -524,7 +595,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         className={base.button}
                         onClick={() => void update({ status: "active" })}
                       >
-                        采纳这个方向
+                        {label("采纳这个方向")}
                       </button>
                       <button
                         type="button"
@@ -532,7 +603,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         className={base.link}
                         onClick={() => void update({ status: "dismissed" })}
                       >
-                        不感兴趣
+                        {label("不感兴趣")}
                       </button>
                     </>
                   ) : (
@@ -545,7 +616,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           void update({ status: direction.status === "active" ? "paused" : "active" })
                         }
                       >
-                        {direction.status === "active" ? "暂停方向" : "继续探索"}
+                        {direction.status === "active" ? label("暂停方向") : label("继续探索")}
                       </button>
                       {direction.status !== "archived" && (
                         <button
@@ -554,7 +625,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                           className={base.link}
                           onClick={() => void update({ status: "archived" })}
                         >
-                          归档方向
+                          {label("归档方向")}
                         </button>
                       )}
                     </>
@@ -564,7 +635,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                     className={base.link}
                     onClick={() => openForm("direction", direction)}
                   >
-                    调整问题与假设
+                    {label("调整问题与假设")}
                   </button>
                 </div>
               </details>
@@ -581,45 +652,55 @@ export function DirectionsPage(props: DirectionsPageProps) {
               />
               <div className={css.actions}>
                 <button type="button" className={base.button} onClick={() => openForm("note")}>
-                  补充依据或认识
+                  {label("补充依据或认识")}
                 </button>
               </div>
-              {notes.length ? noteItems(notes) : <p className={base.muted}>还没有资料</p>}
+              {notes.length ? noteItems(notes) : <p className={base.muted}>{label("还没有资料")}</p>}
             </>
           )}
           {tab === "experiments" && (
             <>
               {direction.status === "active" && (
                 <button type="button" className={base.button} onClick={() => openForm("experiment")}>
-                  安排一个小尝试
+                  {label("安排一个小尝试")}
                 </button>
               )}
-              {!experiments.length && <p className={base.muted}>还没有尝试</p>}
+              {!experiments.length && <p className={base.muted}>{label("还没有尝试")}</p>}
               {experiments.map((e) => (
                 <article key={`${e.id}:${e.rev ?? 1}`} className={css.item}>
                   <div className={css.itemHeader}>
                     <h3>{e.action}</h3>
-                    <span className={base.muted}>{actionStates[e.status]}</span>
+                    <span className={base.muted}>{label(actionStates[e.status])}</span>
                   </div>
                   <p>{e.question}</p>
                   <p className={base.muted}>
-                    投入上限：{e.budget} · 期限：{e.deadline}
+                    {t("投入上限：", "Budget: ")}
+                    {e.budget} · {t("期限：", "Due: ")}
+                    {e.deadline}
                   </p>
-                  <p className={css.prose}>观察标准：{e.criteria}</p>
-                  {e.result && <p className={css.prose}>实际结果：{e.result}</p>}
+                  <p className={css.prose}>
+                    {t("观察标准：", "Observation criteria: ")}
+                    {e.criteria}
+                  </p>
+                  {e.result && (
+                    <p className={css.prose}>
+                      {t("实际结果：", "Observed result: ")}
+                      {e.result}
+                    </p>
+                  )}
                   <p>
-                    {conclusions[e.conclusion]}
-                    {e.by === "agent" ? " · AI 记录" : ""}
+                    {label(conclusions[e.conclusion])}
+                    {e.by === "agent" ? t(" · AI 记录", " · Recorded by AI") : ""}
                   </p>
                   {e.source && (
                     <SourceEvidence
                       id={e.id}
-                      label="查看结果来源"
+                      label={label("查看结果来源")}
                       load={() => props.loadExplorationSource("exploration_experiment", e.id)}
                     />
                   )}
                   <button type="button" className={base.link} onClick={() => openForm("experiment", e)}>
-                    更新尝试与结果
+                    {label("更新尝试与结果")}
                   </button>
                 </article>
               ))}
@@ -630,10 +711,20 @@ export function DirectionsPage(props: DirectionsPageProps) {
               {timeline.map((entry) => (
                 <article key={entry.id}>
                   <time>{entry.at.replace("T", " ").slice(0, 16)}</time>
-                  <span className={base.muted}>{entry.by === "user" ? "你" : "AI"}</span>
+                  <span className={base.muted}>{entry.by === "user" ? label("你") : "AI"}</span>
                   <p className={css.prose}>{entry.text}</p>
-                  {entry.before && <p className={base.muted}>此前假设：{entry.before}</p>}
-                  {entry.after && <p>当前假设：{entry.after}</p>}
+                  {entry.before && (
+                    <p className={base.muted}>
+                      {t("此前假设：", "Previous hypothesis: ")}
+                      {entry.before}
+                    </p>
+                  )}
+                  {entry.after && (
+                    <p>
+                      {t("当前假设：", "Current hypothesis: ")}
+                      {entry.after}
+                    </p>
+                  )}
                 </article>
               ))}
             </div>
@@ -643,11 +734,14 @@ export function DirectionsPage(props: DirectionsPageProps) {
             className={base.link}
             onClick={() =>
               props.onPrompt(
-                `一起研究「${direction.title}」，先通过 exploration_read 读取方向、正反依据和尝试结果，再提出下一步。`,
+                t(
+                  `一起研究「${direction.title}」，先通过 exploration_read 读取方向、正反依据和尝试结果，再提出下一步。`,
+                  `Explore “${direction.title}” with me. Use exploration_read to read the direction, supporting and contrary evidence and experiment results before suggesting a next step.`,
+                ),
               )
             }
           >
-            和 AI 一起梳理
+            {label("和 AI 一起梳理")}
           </button>
         </>
       ) : (
