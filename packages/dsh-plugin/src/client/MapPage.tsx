@@ -98,7 +98,7 @@ const MAP_EN: Record<string, string> = {
   "经历读取失败，请重试。": "Couldn’t load places. Try again.",
   "正在读取经历…": "Loading places…",
   "地图工具 · 图层与时间": "Map tools · Layers and dates",
-  经历连线: "Experience routes",
+  经历连线: "Place routes",
   地图图层: "Map layers",
   显示方式: "View",
   地图: "Map",
