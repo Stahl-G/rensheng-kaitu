@@ -156,6 +156,14 @@ export async function importBatch(
         }
       }
     }
+    if (type === "workout") {
+      const starts = new Set<string>();
+      for (const item of group.values()) {
+        const at = new Date(String(item.data.ts)).toISOString();
+        if (starts.has(at)) generic.delete(at);
+        starts.add(at);
+      }
+    }
     const added: Record<string, unknown>[] = [];
     const updated: { id: string; patch: Record<string, unknown> }[] = [];
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };

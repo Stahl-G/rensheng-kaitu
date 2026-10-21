@@ -112,6 +112,30 @@ it("Apple训练泛名升级保留id且重放幂等，人工修订和删除保持
   expect((await importHealthShortcut(ws, file)).version).toBeNull();
   expect(readRecords(ws, "workout").find((row) => row.id === old[0]?.id)?.exercise).toBe("高强度间歇训练");
   expect(readRecords(ws, "workout").find((row) => row.id === alongside.id)?.exercise).toBe("跑步");
+  const ambiguous = addRecord(
+    ws,
+    "workout",
+    { ts: "2026-10-14T13:00:00+08:00", modality: "cardio", exercise: "其他训练", duration_min: 30 },
+    { by: "import:apple-health" },
+  ).record;
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      samples: ["running", "pickleball"].map((activity) => ({
+        ...samples[0],
+        start: ambiguous.ts,
+        end: "2026-10-14T13:30:00+08:00",
+        workout: { activity, duration_min: 30 },
+      })),
+    }),
+  );
+  expect(await importHealthShortcut(ws, file)).toMatchObject({ added: 2, updated: 0 });
+  expect(readRecords(ws, "workout").find((row) => row.id === ambiguous.id)).toMatchObject({
+    exercise: "其他训练",
+    duration_min: 30,
+  });
+  expect((await importHealthShortcut(ws, file)).version).toBeNull();
   expect(validateWorkspace(ws)).toEqual([]);
 });
 
