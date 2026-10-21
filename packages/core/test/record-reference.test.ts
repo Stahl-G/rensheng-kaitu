@@ -36,7 +36,11 @@ it("所有内置与自定义记录的生成示例均通过实际写入校验", a
       expect(published).toHaveLength(examples.length);
       for (const example of published) {
         const { type: _type, ...input } = example;
-        const [result] = addRecords(ws, type, [input], { dryRun: true });
+        // 日程示例描述已确认的记录；Agent 必须另外走 propose_block。
+        const [result] = addRecords(ws, type, [input], {
+          dryRun: true,
+          by: type === "event" ? "user" : "agent",
+        });
         expect(result?.record).toMatchObject(input);
       }
     }
