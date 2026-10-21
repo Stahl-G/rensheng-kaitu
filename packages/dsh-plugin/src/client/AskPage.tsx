@@ -9,7 +9,7 @@ import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
 
@@ -86,12 +86,16 @@ function text(content: unknown): string {
     .map((block) => block.text)
     .join("\n");
 }
-function day(value: string) {
+function day(value: string, locale: Locale) {
   const date = new Date(value);
   const today = new Date();
-  if (date.toDateString() === today.toDateString()) return "今天";
+  if (date.toDateString() === today.toDateString()) return locale === "en" ? "Today" : "今天";
   today.setDate(today.getDate() - 1);
-  return date.toDateString() === today.toDateString() ? "昨天" : date.toLocaleDateString("zh-CN");
+  return date.toDateString() === today.toDateString()
+    ? locale === "en"
+      ? "Yesterday"
+      : "昨天"
+    : date.toLocaleDateString(locale);
 }
 function teachingResult(event: ChatEvent | undefined) {
   return (
@@ -106,6 +110,7 @@ function Tool({
   finished,
   session,
 }: { event: ChatEvent; result?: ChatEvent; finished: boolean; session: string }) {
+  const t = useT();
   let args: Record<string, unknown> = {};
   try {
     args = JSON.parse(String(event.data.arguments ?? "{}"));
@@ -127,13 +132,15 @@ function Tool({
     );
   }
   const labels: Record<string, string> = {
-    kaitu_status: "你的开图资料",
-    kaitu_records: "相关记录",
-    kaitu_search_chats: "历史对话",
-    kaitu_life_map: "足迹",
-    kaitu_exploration_read: "方向与尝试",
+    kaitu_status: t("你的开图资料", "Your Kaitu files"),
+    kaitu_records: t("相关记录", "Related records"),
+    kaitu_search_chats: t("历史对话", "Past conversations"),
+    kaitu_life_map: t("足迹", "Footprints"),
+    kaitu_exploration_read: t("方向与尝试", "Directions and experiments"),
   };
-  const target = String(args.path ?? args.file_path ?? args.file ?? labels[name] ?? "开图资料");
+  const target = String(
+    args.path ?? args.file_path ?? args.file ?? labels[name] ?? t("开图资料", "Kaitu files"),
+  );
   const reading = name in labels || /read|list|search|status|overview|get/.test(name);
   const running = !result && !finished;
   return (
@@ -141,12 +148,12 @@ function Tool({
       <summary>
         <span className={`${css.dot} ${running ? css.pulse : ""}`} />
         {running
-          ? `正在${reading ? "读" : "处理"} ${target}`
+          ? t(`正在${reading ? "读" : "处理"} ${target}`, `${reading ? "Reading" : "Working on"} ${target}`)
           : message?.isError
-            ? `未完成 ${target}`
+            ? t(`未完成 ${target}`, `Couldn’t complete ${target}`)
             : result
-              ? `${reading ? "读了" : "完成了"} ${target}`
-              : `已中断 ${target}`}
+              ? t(`${reading ? "读了" : "完成了"} ${target}`, `${reading ? "Read" : "Completed"} ${target}`)
+              : t(`已中断 ${target}`, `Stopped ${target}`)}
       </summary>
       <pre>
         {name} {String(event.data.arguments ?? "")} {message && `\n${text(message.content)}`}
@@ -251,6 +258,7 @@ export function AskPage({
   onConnections?: () => void;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [cliPath, setCliPath] = useState("");
   const [agentId, setAgentId] = useState("codebuddy");
   const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
@@ -343,9 +351,9 @@ export function AskPage({
   const [showArchived, setShowArchived] = useState(false);
   const groups = new Map<string, Thread[]>();
   for (const thread of threads.filter((row) => row.pinned && !row.archived))
-    groups.set("置顶", [...(groups.get("置顶") ?? []), thread]);
+    groups.set(t("置顶", "Pinned"), [...(groups.get(t("置顶", "Pinned")) ?? []), thread]);
   for (const thread of threads.filter((row) => !row.pinned && !row.archived)) {
-    const label = day(thread.updated);
+    const label = day(thread.updated, locale);
     groups.set(label, [...(groups.get(label) ?? []), thread]);
   }
   const archived = threads.filter((row) => row.archived);
@@ -359,16 +367,26 @@ export function AskPage({
     void call<OverviewData>("overview")
       .then((data) => {
         if (!active) return;
-        const prompts = data.projects.slice(0, 2).map((project) => `「${project.title}」下一步先做什么？`);
-        if (data.allNext.length) prompts.push(`帮我梳理「${data.allNext[0]?.title}」怎么推进`);
-        if (data.notes.length) prompts.push("帮我回顾最近保存的记录");
+        const prompts = data.projects
+          .slice(0, 2)
+          .map((project) =>
+            t(`「${project.title}」下一步先做什么？`, `What should I do next for “${project.title}”?`),
+          );
+        if (data.allNext.length)
+          prompts.push(
+            t(
+              `帮我梳理「${data.allNext[0]?.title}」怎么推进`,
+              `Help me work through “${data.allNext[0]?.title}”`,
+            ),
+          );
+        if (data.notes.length) prompts.push(t("帮我回顾最近保存的记录", "Help me review my recent records"));
         setQuestions(prompts.slice(0, 3));
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
   const refreshThreads = useCallback(
     () =>
       call<Thread[]>("askList").then((list) => {
@@ -571,17 +589,21 @@ export function AskPage({
         void refreshThreads().catch((err) => setError(err.message));
       }
     };
-    stream.onerror = () => setError("对话连接中断，正在重连…");
+    stream.onerror = () => setError(t("对话连接中断，正在重连…", "Connection lost. Reconnecting…"));
     stream.onopen = () => setError("");
     return () => stream.close();
-  }, [selected, refreshThreads]);
+  }, [selected, refreshThreads, t]);
   useLayoutEffect(() => {
     if (nearBottom.current && scroll.current) scroll.current.scrollTop = scroll.current.scrollHeight;
   });
   const send = async () => {
     const value =
       draft.trim() ||
-      (attachments.length ? "请看看这些附件" : sessionReferences.length ? "参考这些对话帮我继续" : "");
+      (attachments.length
+        ? t("请看看这些附件", "Please review these attachments")
+        : sessionReferences.length
+          ? t("参考这些对话帮我继续", "Help me continue using these conversations")
+          : "");
     if (!value || busy || readingFiles || !settings?.configured) return;
     // askSend 要等整轮回复；输入框一点发送就清掉，失败再还原（若用户已另写则不覆盖）。
     const pendingText = value;
@@ -621,7 +643,9 @@ export function AskPage({
     if (!files.length || busy || readingFiles) return;
     setError("");
     if (attachments.length + files.length > 10 || files.some((file) => file.size > 25 * 1024 * 1024)) {
-      setError("每次最多添加 10 个附件，单个附件不超过 25MB");
+      setError(
+        t("每次最多添加 10 个附件，单个附件不超过 25MB", "Add up to 10 attachments, each up to 25 MB"),
+      );
       return;
     }
     if (
@@ -629,7 +653,7 @@ export function AskPage({
       settings?.configured &&
       !settings.supportsImages
     ) {
-      setError("当前模型不支持图片");
+      setError(t("当前模型不支持图片", "This model does not support images"));
       return;
     }
     setReadingFiles(true);
@@ -646,7 +670,10 @@ export function AskPage({
                   mimeType: file.type,
                   name: file.name,
                 });
-              reader.onerror = () => reject(new Error("附件读取失败，请重新选择"));
+              reader.onerror = () =>
+                reject(
+                  new Error(t("附件读取失败，请重新选择", "Couldn’t read the attachment. Choose it again.")),
+                );
               reader.readAsDataURL(file);
             }),
         ),
@@ -699,7 +726,11 @@ export function AskPage({
         );
         setManualModel(false);
       }
-      setModelNotice(models.length ? `${models.length} 个模型` : "服务没有返回模型");
+      setModelNotice(
+        models.length
+          ? t(`${models.length} 个模型`, `${models.length} ${models.length === 1 ? "model" : "models"}`)
+          : t("服务没有返回模型", "The provider returned no models"),
+      );
     } catch (err) {
       if (request !== modelRequest.current) return;
       setAvailableModels([]);
@@ -797,10 +828,10 @@ export function AskPage({
     return (
       <div className={css.unavailable}>
         <div className={css.welcome}>
-          <h1>问问引擎没有载入</h1>
+          <h1>{t("问问引擎没有载入", "Ask could not load")}</h1>
           {onConnections && (
             <button type="button" onClick={onConnections}>
-              打开 AI 与连接
+              {t("打开 AI 与连接", "Open AI & connections")}
             </button>
           )}
         </div>
@@ -808,7 +839,7 @@ export function AskPage({
     );
   return (
     <div className={css.chat}>
-      <nav className={css.threads} aria-label="对话">
+      <nav className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
           type="button"
           className={css.newThread}
@@ -820,7 +851,7 @@ export function AskPage({
             setError("");
           }}
         >
-          ＋ 新对话
+          {t("＋ 新对话", "+ New conversation")}
         </button>
         {[...groups].map(([label, rows]) => (
           <Fragment key={label}>
@@ -841,7 +872,7 @@ export function AskPage({
           </>
         )}
       </nav>
-      <section className={css.conversation} aria-label="问问开图">
+      <section className={css.conversation} aria-label={t("问问开图", "Ask Kaitu")}>
         <div className={css.mobileNew}>
           <button
             type="button"
@@ -852,7 +883,7 @@ export function AskPage({
               setSessionReferences([]);
             }}
           >
-            ＋ 新对话
+            {t("＋ 新对话", "+ New conversation")}
           </button>
         </div>
         <div
@@ -866,7 +897,7 @@ export function AskPage({
         >
           {!events.some((event) => event.type === "user/message") && (
             <div className={css.welcome}>
-              <h1>从你正在推进的事聊起</h1>
+              <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
               <div className={css.suggestions}>
                 {questions.map((question) => (
                   <button
@@ -895,10 +926,10 @@ export function AskPage({
                       .filter((block) => block.type === "file")
                       .map((block, i) => (
                         // biome-ignore lint/suspicious/noArrayIndexKey: attachments of one sent message never reorder.
-                        <span key={i}> · {block.attachment?.name ?? "已附文件"}</span>
+                        <span key={i}> · {block.attachment?.name ?? t("已附文件", "Attached file")}</span>
                       ))}
                   {Array.isArray(data.content) && data.content.some((block) => block.type === "image") && (
-                    <span> · 已附图片</span>
+                    <span> · {t("已附图片", "Attached image")}</span>
                   )}
                 </div>
               );
@@ -935,18 +966,20 @@ export function AskPage({
               );
               const name = String(active?.data.name ?? "");
               const activity = !active
-                ? "正在整理回答"
+                ? t("正在整理回答", "Preparing a response")
                 : /search/.test(name)
-                  ? "正在搜索"
+                  ? t("正在搜索", "Searching")
                   : /read|list|status|overview|get|fetch/.test(name)
-                    ? "正在读取资料"
-                    : "正在调用工具";
+                    ? t("正在读取资料", "Reading files")
+                    : t("正在调用工具", "Using tools");
               return (
                 <details key={event.id} className={css.progress}>
                   <summary>
                     <span className={`${css.dot} ${running ? css.pulse : ""}`} />
-                    {running ? activity : "处理步骤"}
-                    <span className={css.stepCount}>{calls.length} 步</span>
+                    {running ? activity : t("处理步骤", "Steps")}
+                    <span className={css.stepCount}>
+                      {t(`${calls.length} 步`, `${calls.length} ${calls.length === 1 ? "step" : "steps"}`)}
+                    </span>
                   </summary>
                   {calls.map((item) => (
                     <Tool
@@ -987,7 +1020,9 @@ export function AskPage({
             if (event.type === "approval/asked")
               return (
                 <details key={event.id} className={css.tool}>
-                  <summary>这一步需要更高权限，已跳过</summary>
+                  <summary>
+                    {t("这一步需要更高权限，已跳过", "This step needs additional permission and was skipped")}
+                  </summary>
                   <pre>{String(data.reason ?? data.callId ?? "")}</pre>
                 </details>
               );
@@ -1007,7 +1042,7 @@ export function AskPage({
           {waiting && !liveText && (
             <output className={css.progress}>
               <span className={`${css.dot} ${css.pulse}`} />
-              正在准备回答
+              {t("正在准备回答", "Preparing a response")}
             </output>
           )}
         </div>
@@ -1018,9 +1053,9 @@ export function AskPage({
         )}
         {loaded && !settings?.configured && (
           <div className={css.connect}>
-            <span>连接 AI，就能在这里聊。</span>
+            <span>{t("连接 AI，就能在这里聊。", "Connect AI to start chatting here.")}</span>
             <button type="button" onClick={() => setStep(1)}>
-              连接 AI
+              {t("连接 AI", "Connect AI")}
             </button>
           </div>
         )}
@@ -1050,12 +1085,12 @@ export function AskPage({
           }}
         >
           <textarea
-            aria-label="给开图发消息"
+            aria-label={t("给开图发消息", "Message Kaitu")}
             ref={input}
             rows={2}
             value={draft}
             maxLength={100000}
-            placeholder="问问开图，或者让它帮你记一件事"
+            placeholder={t("问问开图，或者让它帮你记一件事", "Ask Kaitu or tell it something to remember")}
             onChange={(event) => {
               setDraft(event.target.value);
               cursor.current = event.target.selectionStart;
@@ -1096,7 +1131,7 @@ export function AskPage({
               <button
                 type="button"
                 onClick={() => setAttachments((current) => current.filter((_, i) => i !== index))}
-                aria-label={`移除 ${file.name}`}
+                aria-label={t(`移除 ${file.name}`, `Remove ${file.name}`)}
               >
                 ×
               </button>
@@ -1104,10 +1139,12 @@ export function AskPage({
           ))}
           {sessionReferences.map((reference) => (
             <div key={reference.id} className={css.attachment}>
-              <span>引用对话 · {reference.title}</span>
+              <span>
+                {t("引用对话", "Referenced conversation")} · {reference.title}
+              </span>
               <button
                 type="button"
-                aria-label={`移除引用 ${reference.title}`}
+                aria-label={t(`移除引用 ${reference.title}`, `Remove reference ${reference.title}`)}
                 onClick={() =>
                   setSessionReferences((current) => current.filter((item) => item.id !== reference.id))
                 }
@@ -1116,7 +1153,7 @@ export function AskPage({
               </button>
             </div>
           ))}
-          {readingFiles && <output>正在读取附件…</output>}
+          {readingFiles && <output>{t("正在读取附件…", "Reading attachments…")}</output>}
           {(references || atQuery !== undefined) && (
             <div className={css.referencePanel}>
               {references && (
@@ -1129,7 +1166,7 @@ export function AskPage({
                       setAtQuery(undefined);
                     }}
                   >
-                    文件和文件夹
+                    {t("文件和文件夹", "Files and folders")}
                   </button>
                   <button
                     type="button"
@@ -1139,19 +1176,27 @@ export function AskPage({
                       setAtQuery(undefined);
                     }}
                   >
-                    其他对话
+                    {t("其他对话", "Other conversations")}
                   </button>
                 </div>
               )}
               {references && referenceKind === "sessions" && atQuery === undefined ? (
-                <section className={filesCss.picker} aria-label="引用对话">
+                <section className={filesCss.picker} aria-label={t("引用对话", "Reference a conversation")}>
                   <header className={filesCss.header}>
-                    <span>其他对话</span>
-                    <button type="button" onClick={closeReferences} aria-label="关闭对话选择">
+                    <span>{t("其他对话", "Other conversations")}</span>
+                    <button
+                      type="button"
+                      onClick={closeReferences}
+                      aria-label={t("关闭对话选择", "Close conversation picker")}
+                    >
                       ×
                     </button>
                   </header>
-                  {!referenceThreads.length && <p className={filesCss.notice}>还没有其他可引用的对话</p>}
+                  {!referenceThreads.length && (
+                    <p className={filesCss.notice}>
+                      {t("还没有其他可引用的对话", "No other conversations to reference yet")}
+                    </p>
+                  )}
                   <div className={filesCss.list}>
                     {referenceThreads.map((thread) => (
                       <button
@@ -1201,7 +1246,7 @@ export function AskPage({
             <button
               type="button"
               className={css.add}
-              aria-label="添加附件"
+              aria-label={t("添加附件", "Add attachment")}
               disabled={busy || readingFiles || settings?.supportsAttachments === false}
               onClick={() => upload.current?.click()}
             >
@@ -1219,7 +1264,7 @@ export function AskPage({
                 setModelMenu(false);
               }}
             >
-              引用资料
+              {t("引用资料", "Reference files")}
             </button>
             <span className={css.modelWrap}>
               <button
@@ -1243,7 +1288,11 @@ export function AskPage({
                 <span aria-hidden="true">⌄</span>
               </button>
               {modelMenu && (
-                <dialog open className={`${v2["mode-pop"]} ${css.modelPopover}`} aria-label="当前 AI">
+                <dialog
+                  open
+                  className={`${v2["mode-pop"]} ${css.modelPopover}`}
+                  aria-label={t("当前 AI", "Current AI")}
+                >
                   {localRuntime && (
                     <p className={v2.small}>
                       {t(
@@ -1317,7 +1366,9 @@ export function AskPage({
                       setStep(1);
                     }}
                   >
-                    {settings?.choice === "local" ? t("换一个 AI", "Switch AI") : "添加服务商"}
+                    {settings?.choice === "local"
+                      ? t("换一个 AI", "Switch AI")
+                      : t("添加服务商", "Add provider")}
                   </button>
                 </dialog>
               )}
@@ -1337,7 +1388,7 @@ export function AskPage({
               <button
                 type="submit"
                 className={css.send}
-                aria-label="发送"
+                aria-label={t("发送", "Send")}
                 disabled={
                   readingFiles ||
                   (!draft.trim() && !attachments.length && !sessionReferences.length) ||
@@ -1352,7 +1403,7 @@ export function AskPage({
         <p className={css.scope}>
           {settings?.configured
             ? `${settings.providerName} · ${runtimeLabel}`
-            : "Enter 发送 · Shift + Enter 换行"}
+            : t("Enter 发送 · Shift + Enter 换行", "Enter to send · Shift + Enter for a new line")}
         </p>
       </section>
       <dialog
@@ -1367,10 +1418,10 @@ export function AskPage({
           setKey("");
         }}
       >
-        <p className={css.step}>第 {step} 步，共 2 步</p>
+        <p className={css.step}>{t(`第 ${step} 步，共 2 步`, `Step ${step} of 2`)}</p>
         {step === 1 ? (
           <>
-            <h2 id="ask-connect-title">连接 AI</h2>
+            <h2 id="ask-connect-title">{t("连接 AI", "Connect AI")}</h2>
             <button
               type="button"
               className={css.choice}
@@ -1407,8 +1458,13 @@ export function AskPage({
                     .catch((err) => setError(err.message));
               }}
             >
-              <b>用开图里的 AI</b>
-              <span>用 API Key 连接，或使用服务商提供的账号登录。</span>
+              <b>{t("用开图里的 AI", "Use AI in Kaitu")}</b>
+              <span>
+                {t(
+                  "用 API Key 连接，或使用服务商提供的账号登录。",
+                  "Connect with an API key or sign in with a supported provider account.",
+                )}
+              </span>
             </button>
             {choice === "local" && (
               <div className={css.fields}>
@@ -1443,7 +1499,7 @@ export function AskPage({
             {choice === "builtin" ? (
               <fieldset className={css.fields} disabled={saving}>
                 <label className={css.key}>
-                  AI 服务
+                  {t("AI 服务", "AI provider")}
                   <select
                     value={provider}
                     onChange={(event) => {
@@ -1460,14 +1516,14 @@ export function AskPage({
                     {settings?.providers.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
-                        {item.recommended ? "（推荐）" : ""}
+                        {item.recommended ? t("（推荐）", " (recommended)") : ""}
                       </option>
                     ))}
                   </select>
                 </label>
                 {custom && (
                   <label className={css.key}>
-                    协议
+                    {t("协议", "Protocol")}
                     <select
                       value={api}
                       onChange={(event) => {
@@ -1503,7 +1559,7 @@ export function AskPage({
                     onAuthorized={() => {
                       setAuth("dsh");
                       setKey("");
-                      setModelNotice("账号已授权");
+                      setModelNotice(t("账号已授权", "Account authorized"));
                     }}
                   />
                 )}
@@ -1516,8 +1572,8 @@ export function AskPage({
                       value={key}
                       placeholder={
                         settings?.configured && settings.provider === provider
-                          ? "已连接，留空保留"
-                          : "粘贴这个 AI 服务的 API Key"
+                          ? t("已连接，留空保留", "Connected; leave empty to keep")
+                          : t("粘贴这个 AI 服务的 API Key", "Paste your provider’s API key")
                       }
                       onChange={(event) => {
                         dropModels();
@@ -1532,7 +1588,7 @@ export function AskPage({
                 )}
                 {availableModels.length > 0 && (
                   <label className={css.key}>
-                    模型
+                    {t("模型", "Model")}
                     <select
                       value={manualModel ? "" : model}
                       onChange={(event) => {
@@ -1545,28 +1601,36 @@ export function AskPage({
                           {item.name && item.name !== item.id ? `${item.name} · ${item.id}` : item.id}
                         </option>
                       ))}
-                      <option value="">手动填写模型 ID</option>
+                      <option value="">{t("手动填写模型 ID", "Enter model ID manually")}</option>
                     </select>
                   </label>
                 )}
                 {(!availableModels.length || manualModel) && (
                   <label className={css.key} htmlFor="ask-model">
-                    {availableModels.length ? "模型 ID" : "模型"}
+                    {availableModels.length ? t("模型 ID", "Model ID") : t("模型", "Model")}
                     <input
                       id="ask-model"
                       value={model}
-                      placeholder="从服务获取后选择，或填写模型 ID"
+                      placeholder={t(
+                        "从服务获取后选择，或填写模型 ID",
+                        "Choose a model from your provider or enter its ID",
+                      )}
                       onChange={(event) => setModel(event.target.value)}
                     />
                   </label>
                 )}
                 <button type="button" onClick={() => void loadModels()} disabled={loadingModels}>
-                  {loadingModels ? "正在获取模型…" : "从服务获取模型列表"}
+                  {loadingModels
+                    ? t("正在获取模型…", "Loading models…")
+                    : t("从服务获取模型列表", "Load provider models")}
                 </button>
                 {modelNotice && <output>{modelNotice}</output>}
                 {selectedProvider?.keyUrl ? (
                   <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
-                    去 {selectedProvider.name} 官方申请 API Key ↗
+                    {t(
+                      `去 ${selectedProvider.name} 官方申请 API Key ↗`,
+                      `Get an API key from ${selectedProvider.name} ↗`,
+                    )}
                   </a>
                 ) : null}
               </fieldset>
@@ -1574,25 +1638,25 @@ export function AskPage({
             {error && <p role="alert">{error}</p>}
             <div className={css.actions}>
               <button type="button" disabled={saving} onClick={() => setStep(0)}>
-                以后再说
+                {t("以后再说", "Later")}
               </button>
               <button
                 type="button"
                 disabled={saving || loadingModels || (choice === "builtin" && !model.trim())}
                 onClick={() => void next()}
               >
-                {saving ? "连接中…" : "下一步"}
+                {saving ? t("连接中…", "Connecting…") : t("下一步", "Next")}
               </button>
             </div>
           </>
         ) : (
           <>
-            <h2 id="ask-connect-title">每天自动整理</h2>
+            <h2 id="ask-connect-title">{t("每天自动整理", "Daily automation")}</h2>
             {(
               [
-                ["morning", "每天早上 7:30 排好今天"],
-                ["organizer", "每晚 3:00 整理一遍"],
-                ["news", "每天早上 8:00 搜索资讯"],
+                ["morning", t("每天早上 7:30 排好今天", "Plan today at 7:30 every morning")],
+                ["organizer", t("每晚 3:00 整理一遍", "Organize at 3:00 every night")],
+                ["news", t("每天早上 8:00 搜索资讯", "Find news at 8:00 every morning")],
               ] as const
             ).map(([id, label]) => (
               <label className={css.toggle} key={id}>
@@ -1607,10 +1671,10 @@ export function AskPage({
             {error && <p role="alert">{error}</p>}
             <div className={css.actions}>
               <button type="button" disabled={saving} onClick={() => void finish(true)}>
-                都不要
+                {t("都不要", "Skip all")}
               </button>
               <button type="button" disabled={saving} onClick={() => void finish()}>
-                {saving ? "保存中…" : "开始用"}
+                {saving ? t("保存中…", "Saving…") : t("开始用", "Start")}
               </button>
             </div>
           </>

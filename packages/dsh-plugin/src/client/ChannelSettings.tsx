@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { useLocale, useT } from "./i18n.js";
 
 export type ChannelRequest = (operation: string, input?: Record<string, unknown>) => Promise<unknown>;
 export interface ChannelAccount {
@@ -80,12 +80,95 @@ const providers: Record<string, { name: string; host: string; steps: string[]; u
     url: "",
   },
 };
+const CHANNEL_EN: Record<string, string> = {
+  其他邮箱: "Other email",
+  飞书: "Feishu",
+  "QQ 邮箱": "QQ Mail",
+  "163 邮箱": "163 Mail",
+  "Gmail（应用专用密码）": "Gmail (app password)",
+  "自定义 IMAP": "Custom IMAP",
+  "登录 Apple 账户，打开「登录和安全」": "Sign in to your Apple Account and open Sign-In and Security",
+  "选择「App 专用密码」，生成一个密码后填在下面":
+    "Choose App-Specific Passwords, generate a password and enter it below",
+  "打开网页版邮箱 → 设置 → 账号与安全": "Open webmail → Settings → Account and security",
+  "开启 IMAP，按提示生成授权码": "Enable IMAP and follow the instructions to generate an authorization code",
+  "打开网页版邮箱 → 设置 → POP3/SMTP/IMAP": "Open webmail → Settings → POP3/SMTP/IMAP",
+  "开启 IMAP，按提示获取授权码": "Enable IMAP and follow the instructions to obtain an authorization code",
+  "Outlook 需要 Microsoft OAuth 登录，这一版暂不支持":
+    "Outlook requires Microsoft OAuth, which this version does not support",
+  "可以先连接其他邮箱，或由熟悉配置的人展开高级设置":
+    "Connect another mailbox or use Advanced if you already have the required settings",
+  "Google 账户 → 安全 → 开启两步验证": "Google Account → Security → Turn on 2-Step Verification",
+  "生成应用专用密码，将它填在下面": "Generate an app password and enter it below",
+  "在邮箱服务商处开启 IMAP，取得授权码或应用专用密码":
+    "Enable IMAP with your email provider and obtain an authorization code or app password",
+  "展开高级设置，填写服务商提供的服务器地址": "Open Advanced and enter the server address from your provider",
+  "无法读取连接状态，请稍后重试": "Couldn’t load connection status. Try again later.",
+  "连接未完成，请重试": "Couldn’t connect. Try again.",
+  "已打开系统浏览器，请完成 Google 登录": "Complete Google sign-in in the browser",
+  "已断开，本机凭据已删除": "Disconnected; local credentials deleted",
+  连接测试通过: "Connection test passed",
+  已保存连接设置: "Connection settings saved",
+  "连接未完成，请检查网络后重试": "Couldn’t connect. Check your network and try again.",
+  邮件与聊天: "Email and chat",
+  "只读接收摘录 · 凭据存在这台电脑": "Read-only excerpts · Credentials stay on this computer",
+  "正在读取状态…": "Loading status…",
+  "未连接 · 上次拉取：尚无": "Not connected · No fetch yet",
+  尚无: "None yet",
+  测试: "Test",
+  断开: "Disconnect",
+  选择要收的频道: "Choose channels to receive",
+  "这个版本还没开通 Google 登录，可以先用应用专用密码":
+    "Google sign-in is unavailable in this version. Use an app password instead.",
+  连接其他账号: "Connect another account",
+  连接: "Connect",
+  "摘录进入开图资料，随资料设置同步到你的云盘；整理时会发送给你选择的 AI。":
+    "Excerpts enter your Kaitu workspace and follow its cloud sync settings. Organizing sends them to the AI you choose.",
+  关闭: "Close",
+  "用 Google 账号登录": "Sign in with Google",
+  "等待浏览器完成授权…连接结果会自动更新":
+    "Finish authorization in the browser. Connection status updates automatically.",
+  "从 Slack 会话详情底部复制频道 ID，或从浏览器地址复制私信 ID。只接收所选频道的新消息。":
+    "Copy the channel ID from Slack conversation details or the DM ID from its browser URL. Only new messages from selected conversations are collected.",
+  "新增频道 ID（多个用空格分开）": "Add channel IDs (separate with spaces)",
+  保存采集范围: "Save collection scope",
+  使用应用专用密码: "Use an app password",
+  填写连接信息: "Enter connection details",
+  邮箱服务商: "Email provider",
+  "查看官方说明 ↗": "Official instructions ↗",
+  邮箱: "Email",
+  "授权码 / 应用专用密码": "Authorization code / app password",
+  高级: "Advanced",
+  "IMAP 服务器": "IMAP server",
+  端口: "Port",
+  文件夹: "Folder",
+  "IMAP OAuth access token（需自行取得）": "IMAP OAuth access token (bring your own)",
+  "在 Slack 点击一键导入，选择工作区，核对只读权限后创建并安装应用。":
+    "Import the Slack app, choose a workspace, review the read-only permissions, then create and install it.",
+  "在 OAuth & Permissions 复制 User OAuth Token。": "Copy the User OAuth Token from OAuth & Permissions.",
+  "连接后选择要收的频道。": "After connecting, choose the conversations to receive.",
+  "一键导入 Slack 应用 ↗": "Import Slack app ↗",
+  "查看 manifest ↗": "View manifest ↗",
+  账号名称: "Account name",
+  "创建企业自建应用，启用机器人。": "Create an internal app and enable its bot.",
+  "开启只读消息权限，使用长连接订阅 im.message.receive_v1，发布应用版本。":
+    "Enable read-only message permissions, subscribe to im.message.receive_v1 over a persistent connection, and publish the app version.",
+  "填入凭据，把机器人加入要接收的群，或直接私聊机器人。":
+    "Enter its credentials, then add the bot to a group or message it directly.",
+  "打开飞书开放平台 ↗": "Open Feishu developer platform ↗",
+  "只能接收机器人所在群与发给机器人的私信；群聊只有 @权限时，需要 @机器人。":
+    "Receives messages from groups containing the bot and direct messages to it. If group access is mention-only, mention the bot.",
+  "账号名称（可选）": "Account name (optional)",
+  "正在连接…": "Connecting…",
+};
 export function ChannelSettings({
   request,
   focus = false,
   onFocused,
 }: { request: ChannelRequest; focus?: boolean; onFocused?: () => void }) {
   const t = useT();
+  const locale = useLocale();
+  const caption = (value: string) => t(value, CHANNEL_EN[value] ?? value);
   const [settings, setSettings] = useState<ChannelState>();
   const [dialog, setDialog] = useState<string | null>(null);
   const [selection, setSelection] = useState<ChannelAccount>();
@@ -107,10 +190,12 @@ export function ChannelSettings({
     if (next.accounts.some((a) => a.kind === "gmail")) setWaiting(false);
   }, [request]);
   useEffect(() => {
-    void refresh().catch(() => setError("无法读取连接状态，请稍后重试"));
+    void refresh().catch(() =>
+      setError(t("无法读取连接状态，请稍后重试", "Couldn’t load connection status. Try again later.")),
+    );
     const timer = setInterval(() => void refresh().catch(() => {}), 3000);
     return () => clearInterval(timer);
-  }, [refresh]);
+  }, [refresh, t]);
   useEffect(() => {
     if (focus) {
       section.current?.scrollIntoView({ block: "start" });
@@ -128,21 +213,21 @@ export function ChannelSettings({
       const result = (await request(operation, input)) as { ok?: boolean; error?: string };
       await refresh();
       if (result.ok === false) {
-        setError(result.error ?? "连接未完成，请重试");
+        setError(result.error ?? caption("连接未完成，请重试"));
         return false;
       }
       setReceipt(
         operation === "gmail-login"
-          ? "已打开系统浏览器，请完成 Google 登录"
+          ? caption("已打开系统浏览器，请完成 Google 登录")
           : operation === "disconnect"
-            ? "已断开，本机凭据已删除"
+            ? caption("已断开，本机凭据已删除")
             : operation === "test"
-              ? "连接测试通过"
-              : "已保存连接设置",
+              ? caption("连接测试通过")
+              : caption("已保存连接设置"),
       );
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "连接未完成，请检查网络后重试");
+      setError(err instanceof Error ? err.message : caption("连接未完成，请检查网络后重试"));
       return false;
     } finally {
       setBusy(false);
@@ -158,7 +243,7 @@ export function ChannelSettings({
   };
   const field = (label: string, name: string, secret = false, required = true, placeholder = "") => (
     <label>
-      {label}
+      {caption(label)}
       <input
         name={name}
         type={secret ? "password" : "text"}
@@ -173,9 +258,9 @@ export function ChannelSettings({
     <section ref={section} className={css.sec} aria-labelledby="channel-heading">
       <div className={css["sec-head"]}>
         <h2 id="channel-heading" className={css.eyebrow}>
-          邮件与聊天
+          {caption("邮件与聊天")}
         </h2>
-        <span className={css.small}>只读接收摘录 · 凭据存在这台电脑</span>
+        <span className={css.small}>{caption("只读接收摘录 · 凭据存在这台电脑")}</span>
       </div>
       <div className={css.channelGrid}>
         {channels.map(([kind, name, logo]) => {
@@ -188,25 +273,30 @@ export function ChannelSettings({
           return (
             <article className={`${css.card} ${css.sum}`} key={kind}>
               <div className={css.channelTitle}>
-                <span className={css.channelLogo}>{logo}</span>
-                <b>{name}</b>
+                <span className={css.channelLogo}>
+                  {t(logo ?? "", kind === "imap" ? "@" : kind === "feishu" ? "F" : (logo ?? ""))}
+                </span>
+                <b>{caption(name ?? "")}</b>
               </div>
               {!settings ? (
-                <p className={css.small}>正在读取状态…</p>
+                <p className={css.small}>{caption("正在读取状态…")}</p>
               ) : !accounts.length ? (
-                <p className={css.small}>未连接 · 上次拉取：尚无</p>
+                <p className={css.small}>{caption("未连接 · 上次拉取：尚无")}</p>
               ) : (
                 accounts.map((account) => (
                   <div className={css.channelAccount} key={account.id}>
                     <p className={account.error ? css.channelError : css.small}>
                       {account.error
-                        ? `出错 · ${account.error}`
+                        ? t(`出错 · ${account.error}`, `Error · ${account.error}`)
                         : account.connected
-                          ? `已连接 · ${account.label}`
-                          : `未连接 · ${account.label}`}
+                          ? t(`已连接 · ${account.label}`, `Connected · ${account.label}`)
+                          : t(`未连接 · ${account.label}`, `Not connected · ${account.label}`)}
                     </p>
                     <p className={css.small}>
-                      上次拉取：{account.lastFetch ? new Date(account.lastFetch).toLocaleString() : "尚无"}
+                      {t("上次拉取：", "Last fetch: ")}
+                      {account.lastFetch
+                        ? new Date(account.lastFetch).toLocaleString(locale)
+                        : caption("尚无")}
                     </p>
                     <div className={css.channelActions}>
                       <button
@@ -215,7 +305,7 @@ export function ChannelSettings({
                         disabled={busy}
                         onClick={() => void run("test", { id: account.id })}
                       >
-                        测试
+                        {caption("测试")}
                       </button>
                       <button
                         className={css.link}
@@ -223,7 +313,7 @@ export function ChannelSettings({
                         disabled={busy}
                         onClick={() => void run("disconnect", { id: account.id })}
                       >
-                        断开
+                        {caption("断开")}
                       </button>
                       {kind === "slack" && (
                         <button
@@ -234,7 +324,7 @@ export function ChannelSettings({
                             setDialog("select");
                           }}
                         >
-                          选择要收的频道
+                          {caption("选择要收的频道")}
                         </button>
                       )}
                     </div>
@@ -242,7 +332,7 @@ export function ChannelSettings({
                 ))
               )}
               {kind === "gmail" && settings && !settings.gmailConfigured && (
-                <p className={css.small}>这个版本还没开通 Google 登录，可以先用应用专用密码</p>
+                <p className={css.small}>{caption("这个版本还没开通 Google 登录，可以先用应用专用密码")}</p>
               )}
               <button
                 className={`${css.btn} ${css["btn-quiet"]}`}
@@ -250,13 +340,15 @@ export function ChannelSettings({
                 disabled={busy || !settings}
                 onClick={() => connect(kind ?? "")}
               >
-                {accounts.length ? "连接其他账号" : "连接"}
+                {accounts.length ? caption("连接其他账号") : caption("连接")}
               </button>
             </article>
           );
         })}
       </div>
-      <p className={css.note}>摘录进入开图资料，随资料设置同步到你的云盘；整理时会发送给你选择的 AI。</p>
+      <p className={css.note}>
+        {caption("摘录进入开图资料，随资料设置同步到你的云盘；整理时会发送给你选择的 AI。")}
+      </p>
       {receipt && (
         <output className={css.small} aria-live="polite">
           {receipt}
@@ -278,11 +370,14 @@ export function ChannelSettings({
           <div className={css["sec-head"]}>
             <h2 id="channel-dialog-title">
               {dialog === "select"
-                ? "选择要收的频道"
-                : `连接${channels.find(([kind]) => kind === dialog)?.[1] ?? ""}`}
+                ? caption("选择要收的频道")
+                : t(
+                    `连接${channels.find(([kind]) => kind === dialog)?.[1] ?? ""}`,
+                    `Connect ${caption(channels.find(([kind]) => kind === dialog)?.[1] ?? "")}`,
+                  )}
             </h2>
             <button className={css.link} type="button" onClick={() => modal.current?.close()}>
-              关闭
+              {caption("关闭")}
             </button>
           </div>
           {dialog === "gmail" && (
@@ -295,22 +390,24 @@ export function ChannelSettings({
                   if (await run("gmail-login")) setWaiting(true);
                 }}
               >
-                用 Google 账号登录
+                {caption("用 Google 账号登录")}
               </button>
               <p className={css.small}>
                 {t("只读收取邮件，保留已读状态。", "Read-only email collection, preserving read status.")}
               </p>
-              {waiting && <output className={css.small}>等待浏览器完成授权…连接结果会自动更新</output>}
+              {waiting && (
+                <output className={css.small}>{caption("等待浏览器完成授权…连接结果会自动更新")}</output>
+              )}
               {settings?.accounts
                 .filter((a) => a.kind === "gmail")
                 .map((a) => (
                   <p className={css.small} key={a.id}>
-                    已接入 {a.label}
+                    {t("已接入", "Connected")} {a.label}
                     {a.error ? ` · ${a.error}` : ""}
                   </p>
                 ))}
               {!settings?.gmailConfigured && (
-                <p className={css.small}>这个版本还没开通 Google 登录，可以先用应用专用密码</p>
+                <p className={css.small}>{caption("这个版本还没开通 Google 登录，可以先用应用专用密码")}</p>
               )}
             </>
           )}
@@ -328,7 +425,9 @@ export function ChannelSettings({
               }}
             >
               <p className={css.small}>
-                从 Slack 会话详情底部复制频道 ID，或从浏览器地址复制私信 ID。只接收所选频道的新消息。
+                {caption(
+                  "从 Slack 会话详情底部复制频道 ID，或从浏览器地址复制私信 ID。只接收所选频道的新消息。",
+                )}
               </p>
               {selection?.selected.map((id) => (
                 <label className={css.channelCheck} key={id}>
@@ -338,13 +437,13 @@ export function ChannelSettings({
               ))}
               {field("新增频道 ID（多个用空格分开）", "extra", false, false, "C… / G… / D…")}
               <button className={`${css.btn} ${css["btn-primary"]}`} disabled={busy} type="submit">
-                保存采集范围
+                {caption("保存采集范围")}
               </button>
             </form>
           ) : (
             <details open={dialog !== "gmail"} className={css.channelFallback}>
               <summary className={css.link}>
-                {dialog === "gmail" ? "使用应用专用密码" : "填写连接信息"}
+                {dialog === "gmail" ? caption("使用应用专用密码") : caption("填写连接信息")}
               </summary>
               <form
                 className={css.channelForm}
@@ -363,7 +462,7 @@ export function ChannelSettings({
                       ...data,
                       kind,
                       preset,
-                      label: data.user || data.label || data.appId || "飞书",
+                      label: data.user || data.label || data.appId || caption("飞书"),
                     })
                   )
                     modal.current?.close();
@@ -373,7 +472,7 @@ export function ChannelSettings({
                   <>
                     {dialog === "imap" && (
                       <label>
-                        邮箱服务商
+                        {caption("邮箱服务商")}
                         <select
                           value={preset}
                           onChange={(event) => {
@@ -385,7 +484,7 @@ export function ChannelSettings({
                             .filter(([id]) => id !== "gmail")
                             .map(([id, item]) => (
                               <option value={id} key={id}>
-                                {item.name}
+                                {caption(item.name)}
                               </option>
                             ))}
                         </select>
@@ -393,22 +492,22 @@ export function ChannelSettings({
                     )}
                     <ol className={css.channelSteps}>
                       {selectedProvider?.steps.map((step) => (
-                        <li key={step}>{step}</li>
+                        <li key={step}>{caption(step)}</li>
                       ))}
                     </ol>
                     {selectedProvider?.url && (
                       <a className={css.link} href={selectedProvider.url} target="_blank" rel="noreferrer">
-                        查看官方说明 ↗
+                        {caption("查看官方说明 ↗")}
                       </a>
                     )}
                     {field("邮箱", "user", false, true, "you@example.com")}
                     {preset !== "outlook" && field("授权码 / 应用专用密码", "password", true)}
                     <details key={preset} onToggle={(event) => setAdvanced(event.currentTarget.open)}>
-                      <summary className={css.link}>高级</summary>
+                      <summary className={css.link}>{caption("高级")}</summary>
                       <div className={css.channelForm}>
                         {field("IMAP 服务器", "host", false, preset === "custom", selectedProvider?.host)}
                         <label>
-                          端口
+                          {caption("端口")}
                           <input type="number" name="port" min={1} max={65535} placeholder="993" />
                         </label>
                         {field("文件夹", "mailbox", false, false, "INBOX")}
@@ -426,13 +525,13 @@ export function ChannelSettings({
                 ) : dialog === "slack" ? (
                   <>
                     <ol className={css.channelSteps}>
-                      <li>在 Slack 点击一键导入，选择工作区，核对只读权限后创建并安装应用。</li>
-                      <li>在 OAuth &amp; Permissions 复制 User OAuth Token。</li>
-                      <li>连接后选择要收的频道。</li>
+                      <li>{caption("在 Slack 点击一键导入，选择工作区，核对只读权限后创建并安装应用。")}</li>
+                      <li>{caption("在 OAuth & Permissions 复制 User OAuth Token。")}</li>
+                      <li>{caption("连接后选择要收的频道。")}</li>
                     </ol>
                     <div className={css.channelActions}>
                       <a className={css.link} href={slackManifestUrl} target="_blank" rel="noreferrer">
-                        一键导入 Slack 应用 ↗
+                        {caption("一键导入 Slack 应用 ↗")}
                       </a>
                       <a
                         className={css.link}
@@ -440,7 +539,7 @@ export function ChannelSettings({
                         target="_blank"
                         rel="noreferrer"
                       >
-                        查看 manifest ↗
+                        {caption("查看 manifest ↗")}
                       </a>
                     </div>
                     {field("账号名称", "label")}
@@ -449,9 +548,11 @@ export function ChannelSettings({
                 ) : (
                   <>
                     <ol className={css.channelSteps}>
-                      <li>创建企业自建应用，启用机器人。</li>
-                      <li>开启只读消息权限，使用长连接订阅 im.message.receive_v1，发布应用版本。</li>
-                      <li>填入凭据，把机器人加入要接收的群，或直接私聊机器人。</li>
+                      <li>{caption("创建企业自建应用，启用机器人。")}</li>
+                      <li>
+                        {caption("开启只读消息权限，使用长连接订阅 im.message.receive_v1，发布应用版本。")}
+                      </li>
+                      <li>{caption("填入凭据，把机器人加入要接收的群，或直接私聊机器人。")}</li>
                     </ol>
                     <a
                       className={css.link}
@@ -459,10 +560,10 @@ export function ChannelSettings({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      打开飞书开放平台 ↗
+                      {caption("打开飞书开放平台 ↗")}
                     </a>
                     <p className={css.small}>
-                      只能接收机器人所在群与发给机器人的私信；群聊只有 @权限时，需要 @机器人。
+                      {caption("只能接收机器人所在群与发给机器人的私信；群聊只有 @权限时，需要 @机器人。")}
                     </p>
                     {field("账号名称（可选）", "label", false, false)}
                     {field("App ID", "appId", false, true, "cli_…")}
@@ -474,7 +575,7 @@ export function ChannelSettings({
                   disabled={busy || (preset === "outlook" && !advanced)}
                   type="submit"
                 >
-                  {busy ? "正在连接…" : "连接"}
+                  {busy ? caption("正在连接…") : caption("连接")}
                 </button>
               </form>
             </details>
