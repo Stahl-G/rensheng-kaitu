@@ -62,6 +62,12 @@ export interface HealthSample {
     distance_km?: number;
     kcal?: number;
     avg_hr?: number;
+    elevation_up_m?: number;
+    elevation_down_m?: number;
+    mets?: number;
+    avg_pace_s_per_km?: number;
+    max_hr?: number;
+    avg_cadence?: number;
   };
 }
 
@@ -79,6 +85,7 @@ const ACTIVITIES: Record<string, string> = {
   rowing: "划船",
   stair_climbing: "爬楼",
   high_intensity_interval_training: "高强度间歇训练",
+  hiit: "高强度间歇训练",
   core_training: "核心训练",
   mixed_cardio: "混合有氧",
   dance: "舞蹈",
@@ -90,6 +97,52 @@ const ACTIVITIES: Record<string, string> = {
   cooldown: "放松",
   flexibility: "柔韧训练",
   other: "其他训练",
+  american_football: "美式橄榄球",
+  archery: "射箭",
+  australian_football: "澳式橄榄球",
+  baseball: "棒球",
+  bowling: "保龄球",
+  boxing: "拳击",
+  climbing: "攀岩",
+  cricket: "板球",
+  cross_training: "交叉训练",
+  curling: "冰壶",
+  dance_inspired_training: "舞蹈健身",
+  disc_sports: "飞盘",
+  equestrian_sports: "马术",
+  fencing: "击剑",
+  fishing: "钓鱼",
+  fitness_gaming: "体感游戏",
+  golf: "高尔夫",
+  gymnastics: "体操",
+  handball: "手球",
+  hand_cycling: "手摇车",
+  hockey: "曲棍球",
+  hunting: "狩猎",
+  lacrosse: "长曲棍球",
+  martial_arts: "武术",
+  mind_and_body: "身心训练",
+  mixed_metabolic_cardio_training: "混合代谢有氧",
+  paddle_sports: "桨类运动",
+  pickleball: "匹克球",
+  play: "游玩",
+  preparation_and_recovery: "热身与放松",
+  racquetball: "短式壁球",
+  rugby: "英式橄榄球",
+  sailing: "帆船",
+  skating: "滑冰",
+  snow_sports: "雪上运动",
+  softball: "垒球",
+  squash: "壁球",
+  surfing: "冲浪",
+  table_tennis: "乒乓球",
+  volleyball: "排球",
+  water_fitness: "水中健身",
+  water_polo: "水球",
+  water_sports: "水上运动",
+  wrestling: "摔跤",
+  barre: "芭杆训练",
+  tai_chi: "太极",
 };
 
 function activityName(value: string): string {
@@ -105,6 +158,21 @@ function healthEventType(type: string) {
   if (type === "state_of_mind") return "mood" as const;
   if (type === "heart_notification") return "heart_notification" as const;
 }
+
+/** 手机端预合并的复合值指标：内部类型 → metric kind。 */
+const COMPOUND_METRICS: Record<string, { kind: string; parts: number; unit: string }> = {
+  BloodPressureRecord: { kind: "bp", parts: 2, unit: "mmHg" },
+  HeartRateDaily: { kind: "heart_rate_daily", parts: 3, unit: "bpm" },
+  BloodOxygenDaily: { kind: "blood_oxygen", parts: 3, unit: "%" },
+};
+
+/** 按天聚合的活动量的单位换算表；能量类沿用默认 kcal 换算。 */
+const DAILY_UNITS: Record<string, Record<string, number>> = {
+  StepCount: { count: 1 },
+  AppleExerciseTime: { min: 1, s: 1 / 60, h: 60 },
+  FlightsClimbed: { count: 1 },
+  DistanceWalkingRunning: { km: 1, m: 0.001, mi: 1.609344 },
+};
 
 export function healthCandidates(zone: string) {
   const candidates: Candidate[] = [];
@@ -155,6 +223,27 @@ export function healthCandidates(zone: string) {
       emit(candidate(eventType, data));
       return;
     }
+    // 手机端已合并的复合值：血压 120/80、心率/血氧日聚合 最小/均值/最大。
+    const compound = COMPOUND_METRICS[type];
+    if (compound) {
+      const text = typeof sample.value === "string" ? sample.value.trim() : "";
+      const parts = text.split("/");
+      if (parts.length !== compound.parts || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part)))
+        throw new Error("复合健康值格式不对");
+      const unit = sample.unit?.trim() || compound.unit;
+      if (unit !== compound.unit && !(compound.kind === "heart_rate_daily" && unit === "count/min"))
+        throw new Error("Unsupported unit");
+      emit(
+        candidate("metric", {
+          ts: isoInZone(parseTs(sample.start), zone),
+          kind: compound.kind,
+          value: text,
+          unit: compound.unit,
+          source: "apple-health",
+        }),
+      );
+      return;
+    }
     if (
       ![
         "BodyMass",
@@ -164,10 +253,17 @@ export function healthCandidates(zone: string) {
         "BloodPressureDiastolic",
         "BloodGlucose",
         "RestingHeartRate",
+        "WalkingHeartRateAverage",
         "HeartRateVariabilitySDNN",
+        "VO2Max",
+        "RespiratoryRate",
+        "BodyTemperature",
         "StepCount",
         "ActiveEnergyBurned",
         "BasalEnergyBurned",
+        "AppleExerciseTime",
+        "FlightsClimbed",
+        "DistanceWalkingRunning",
         "HKCategoryTypeIdentifierSleepAnalysis",
       ].includes(type)
     ) {
@@ -217,6 +313,25 @@ export function healthCandidates(zone: string) {
       case "RestingHeartRate":
         metric("resting_hr", convert({ bpm: 1, "count/min": 1 }), "bpm");
         break;
+      case "WalkingHeartRateAverage":
+        metric("walking_hr", convert({ bpm: 1, "count/min": 1 }), "bpm");
+        break;
+      case "VO2Max":
+        // Apple 官方 XML 导出用 mL/min·kg 拼写，手机端用 ml/kg·min，两种都认。
+        metric("vo2max", convert({ "ml/kg·min": 1, "mL/min·kg": 1 }), "ml/kg·min");
+        break;
+      case "RespiratoryRate":
+        metric("respiratory_rate", convert({ "count/min": 1 }), "count/min");
+        break;
+      case "BodyTemperature": {
+        // 华氏度是仿射换算，不能走倍率表；XML 用 degF/degC 拼写，其余单位拒绝而非当摄氏度。
+        const warm = unit === "°F" || unit === "F" || unit === "degF";
+        const cold = unit === "°C" || unit === "C" || unit === "degC";
+        if (!warm && !cold) throw new Error("Unsupported unit");
+        const celsius = warm ? (value - 32) * (5 / 9) : value;
+        metric("body_temperature", celsius, "°C");
+        break;
+      }
       case "HeartRateVariabilitySDNN":
         metric("hrv_sdnn", convert({ ms: 1, s: 1000 }), "ms");
         break;
@@ -229,8 +344,7 @@ export function healthCandidates(zone: string) {
         break;
       }
       default: {
-        const amount =
-          type === "StepCount" ? convert({ count: 1 }) : convert({ kcal: 1, kJ: 1 / 4.184, cal: 0.001 });
+        const amount = convert(DAILY_UNITS[type] ?? { kcal: 1, kJ: 1 / 4.184, cal: 0.001 });
         const end = parseTs(sample.end);
         if (+end < +start) throw new Error("Invalid activity interval");
         let cursor = +start;
@@ -272,6 +386,9 @@ export function healthCandidates(zone: string) {
       const steps = max("StepCount");
       const active = max("ActiveEnergyBurned");
       const basal = max("BasalEnergyBurned");
+      const exercise = max("AppleExerciseTime");
+      const flights = max("FlightsClimbed");
+      const distance = max("DistanceWalkingRunning");
       emit({
         ...candidate("activity", {
           ts: isoInZone(localTimeToInstant(`${date}T00:00:00`, zone), zone),
@@ -281,6 +398,9 @@ export function healthCandidates(zone: string) {
           ...(active === undefined && basal === undefined
             ? {}
             : { total_kcal: (active ?? 0) + (basal ?? 0) }),
+          ...(exercise === undefined ? {} : { exercise_min: Math.round(exercise) }),
+          ...(flights === undefined ? {} : { flights_climbed: Math.round(flights) }),
+          ...(distance === undefined ? {} : { distance_km: Math.round(distance * 100) / 100 }),
           source: "apple-health",
         }),
         activityTotals: { basalKcal: basal },
@@ -457,11 +577,23 @@ const SHORTCUT_TYPES: Record<string, { type: string; unit: string }> = {
   step_count: { type: "StepCount", unit: "count" },
   body_mass: { type: "BodyMass", unit: "kg" },
   body_fat_percentage: { type: "BodyFatPercentage", unit: "fraction" },
+  height: { type: "Height", unit: "cm" },
+  glucose: { type: "BloodGlucose", unit: "mmol/L" },
   resting_heart_rate: { type: "RestingHeartRate", unit: "bpm" },
+  walking_heart_rate: { type: "WalkingHeartRateAverage", unit: "bpm" },
   hrv_sdnn: { type: "HeartRateVariabilitySDNN", unit: "ms" },
+  vo2max: { type: "VO2Max", unit: "ml/kg·min" },
+  respiratory_rate: { type: "RespiratoryRate", unit: "count/min" },
+  body_temperature: { type: "BodyTemperature", unit: "°C" },
+  blood_pressure: { type: "BloodPressureRecord", unit: "mmHg" },
+  heart_rate_daily: { type: "HeartRateDaily", unit: "bpm" },
+  blood_oxygen: { type: "BloodOxygenDaily", unit: "%" },
   sleep_analysis: { type: "HKCategoryTypeIdentifierSleepAnalysis", unit: "" },
   active_energy: { type: "ActiveEnergyBurned", unit: "kcal" },
   basal_energy: { type: "BasalEnergyBurned", unit: "kcal" },
+  exercise_minutes: { type: "AppleExerciseTime", unit: "min" },
+  flights_climbed: { type: "FlightsClimbed", unit: "count" },
+  distance_walking_running: { type: "DistanceWalkingRunning", unit: "km" },
   workout: { type: "workout", unit: "min" },
 };
 const SLEEP_VALUES: Record<string, string> = {
@@ -519,7 +651,14 @@ function parallelSamples(raw: Record<string, unknown>) {
     } catch {
       return { invalid: "的时间读不出" };
     }
-    const daily = ["step_count", "active_energy", "basal_energy"].includes(type);
+    const daily = [
+      "step_count",
+      "active_energy",
+      "basal_energy",
+      "exercise_minutes",
+      "flights_climbed",
+      "distance_walking_running",
+    ].includes(type);
     return {
       type,
       start,
@@ -562,6 +701,27 @@ const SHORTCUT_TYPE_NAMES: Record<string, string> = {
   静息能量: "basal_energy",
   基础能量: "basal_energy",
   体能训练: "workout",
+  身高: "height",
+  // 注意：oxygensaturation / 血氧 不做别名——原始 SpO2 样本会撞上预聚合的
+  // blood_oxygen 复合值校验而整份转待整理；原始逐样本血氧暂不支持。
+  bloodpressure: "blood_pressure",
+  血压: "blood_pressure",
+  walkingheartrateaverage: "walking_heart_rate",
+  步行心率: "walking_heart_rate",
+  最大摄氧量: "vo2max",
+  respiratoryrate: "respiratory_rate",
+  呼吸频率: "respiratory_rate",
+  bodytemperature: "body_temperature",
+  体温: "body_temperature",
+  appleexercisetime: "exercise_minutes",
+  锻炼分钟: "exercise_minutes",
+  运动分钟: "exercise_minutes",
+  flightsclimbed: "flights_climbed",
+  爬楼: "flights_climbed",
+  distancewalkingrunning: "distance_walking_running",
+  步行加跑步距离: "distance_walking_running",
+  bloodglucose: "glucose",
+  血糖: "glucose",
 };
 const SHORTCUT_UNITS: Record<string, string> = {
   步: "count",
@@ -586,7 +746,7 @@ function shortcutType(value: unknown): string {
     .replace(/^HK(?:Quantity|Category)TypeIdentifier/, "")
     .toLowerCase()
     .replace(/[\s_-]/g, "");
-  return SHORTCUT_TYPE_NAMES[key] ?? SHORTCUT_TYPE_NAMES[text] ?? text;
+  return SHORTCUT_TYPE_NAMES[key] ?? SHORTCUT_TYPE_NAMES[text] ?? (SHORTCUT_TYPES[key] ? key : text);
 }
 
 function shortcutTime(value: unknown, zone: string): string {
@@ -607,7 +767,9 @@ function shortcutSample(input: unknown, device: string, zone: string): HealthSam
   const end = shortcutTime(raw.end ?? raw.endDate, zone) || start;
   let value = raw.value as number | string | undefined;
   let unit = typeof raw.unit === "string" ? raw.unit.trim() : undefined;
-  const quantity = definition && !["sleep_analysis", "workout"].includes(type);
+  const quantity =
+    definition &&
+    !["sleep_analysis", "workout", "blood_pressure", "heart_rate_daily", "blood_oxygen"].includes(type);
   if (quantity && typeof value === "string") {
     const match = /^\s*(-?[\d,]+(?:\.\d+)?)\s*(.*)$/.exec(value);
     if (match) {
@@ -631,7 +793,17 @@ function shortcutSample(input: unknown, device: string, zone: string): HealthSam
       activity: typeof data.activity === "string" ? data.activity : "other",
       duration_min: duration,
     };
-    for (const key of ["distance_km", "kcal", "avg_hr"] as const) {
+    for (const key of [
+      "distance_km",
+      "kcal",
+      "avg_hr",
+      "elevation_up_m",
+      "elevation_down_m",
+      "mets",
+      "avg_pace_s_per_km",
+      "max_hr",
+      "avg_cadence",
+    ] as const) {
       if (data[key] === undefined || data[key] === null || data[key] === "") continue;
       // 写了却读不出的数量（"five"）让这条样本算作读不出并计数，不悄悄丢掉。
       const amount = Number(data[key]);

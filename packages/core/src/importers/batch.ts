@@ -71,6 +71,8 @@ export function candidate(type: ImportType, data: Record<string, unknown>): Cand
   return { type, data, key: naturalKey(type, data) };
 }
 
+const genericWorkouts = new Set(["其他训练", "体能训练"]);
+
 function content(record: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(record).filter(
@@ -143,17 +145,46 @@ export async function importBatch(
       (record) => !record.deleted && record.by === by && (!opts.scope || opts.scope(record)),
     );
     const existing = new Map<string, StoredRecord>();
+    // 运动名扩展前以通用名导入的训练，按开始时间找回；同一时刻有两条则不猜。
+    const generic = new Map<string, string>();
     for (const record of revisions) {
-      if (!record.deleted && record.by === by && (!opts.scope || opts.scope(record)))
+      if (!record.deleted && record.by === by && (!opts.scope || opts.scope(record))) {
         existing.set(naturalKey(type, record), latest.get(record.id) as StoredRecord);
+        if (type === "workout" && genericWorkouts.has(String(record.exercise))) {
+          const at = new Date(record.ts).toISOString();
+          generic.set(at, generic.has(at) && generic.get(at) !== record.id ? "" : record.id);
+        }
+      }
+    }
+    if (type === "workout") {
+      const starts = new Set<string>();
+      for (const item of group.values()) {
+        const at = new Date(String(item.data.ts)).toISOString();
+        if (starts.has(at)) generic.delete(at);
+        starts.add(at);
+      }
     }
     const added: Record<string, unknown>[] = [];
     const updated: { id: string; patch: Record<string, unknown> }[] = [];
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
     for (const item of group.values()) {
-      const known = existing.get(item.key);
+      let known = existing.get(item.key);
+      if (!known && type === "workout") {
+        const at = new Date(String(item.data.ts)).toISOString();
+        known = latest.get(generic.get(at) ?? "");
+        generic.delete(at);
+      }
       // 依据导入时的身份找到人工修订或删除的记录，旧来源不能覆盖或重新创建它。
       if (known && known.by !== by) {
+        counts.skipped++;
+        continue;
+      }
+      // 旧版手机仍发通用名时，不覆盖已经升级的具体运动名。
+      if (
+        known &&
+        genericWorkouts.has(String(item.data.exercise)) &&
+        !genericWorkouts.has(String(known.exercise))
+      ) {
         counts.skipped++;
         continue;
       }
