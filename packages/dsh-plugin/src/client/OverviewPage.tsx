@@ -1,4 +1,4 @@
-import type { CalendarPushSettings, OnboardingStatus } from "@kaitu/core";
+import type { CalendarPushSettings, OnboardingStatus, Preferences } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
@@ -77,6 +77,15 @@ export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
+  const [preferencesFailed, setPreferencesFailed] = useState(false);
+  const [preferencesAttempt, setPreferencesAttempt] = useState(0);
+  const applyPreferences = useCallback((value: Preferences) => {
+    setLocale(value.locale === "en" ? "en" : "zh-CN");
+    setFollowSystem(value.followSystem ?? false);
+    setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
+    setPreferencesFailed(false);
+  }, []);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: An explicit retry starts a fresh read and cancels the previous effect.
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
@@ -84,23 +93,29 @@ export function OverviewPage(props: OverviewPageProps) {
       .loadPreferences(browserLocale())
       .then((value) => {
         if (!active) return;
-        setLocale(value.locale === "en" ? "en" : "zh-CN");
-        setFollowSystem(value.followSystem ?? false);
-        setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
+        applyPreferences(value);
       })
-      .catch(() => active && setLocale("zh-CN"));
+      .catch(() => {
+        if (!active) return;
+        setLocale("zh-CN");
+        setPreferencesFailed(true);
+      });
     return () => {
       active = false;
     };
-  }, [props.loadPreferences]);
+  }, [props.loadPreferences, preferencesAttempt, applyPreferences]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
       <Overview
         {...props}
         locale={locale}
-        setLocale={setLocale}
         followSystem={followSystem}
-        setFollowSystem={setFollowSystem}
+        applyPreferences={applyPreferences}
+        preferencesFailed={preferencesFailed}
+        retryPreferences={() => {
+          setPreferencesFailed(false);
+          setPreferencesAttempt((attempt) => attempt + 1);
+        }}
         exploreEntries={exploreEntries}
         setExploreEntries={setExploreEntries}
       />
@@ -110,17 +125,19 @@ export function OverviewPage(props: OverviewPageProps) {
 
 function Overview({
   locale,
-  setLocale,
   followSystem,
-  setFollowSystem,
+  applyPreferences,
+  preferencesFailed,
+  retryPreferences,
   exploreEntries,
   setExploreEntries,
   ...props
 }: OverviewPageProps & {
   locale: Locale | null;
-  setLocale: (locale: Locale) => void;
   followSystem: boolean;
-  setFollowSystem: (value: boolean) => void;
+  applyPreferences: (value: Preferences) => void;
+  preferencesFailed: boolean;
+  retryPreferences: () => void;
   exploreEntries: string[] | null;
   setExploreEntries: (value: string[]) => void;
 }) {
@@ -364,8 +381,7 @@ function Overview({
   const changeLocale = async (next: Locale | null) => {
     await props.savePreferences({ locale: next });
     const resolved = await props.loadPreferences(browserLocale());
-    setLocale(resolved.locale === "en" ? "en" : "zh-CN");
-    setFollowSystem(resolved.followSystem ?? false);
+    applyPreferences(resolved);
   };
   const child = {
     ...props,
@@ -887,6 +903,14 @@ function Overview({
           <>
             <section className={css.sec} aria-label={t("开图", "Explore")}>
               <h1 className={css.sr}>{t("开图", "Explore")}</h1>
+              {preferencesFailed && (
+                <div className={css.exploreManage} role="alert">
+                  <span>{t("入口布局读取失败。", "Could not load your entry layout.")}</span>
+                  <button type="button" onClick={retryPreferences}>
+                    {t("重试读取", "Retry loading")}
+                  </button>
+                </div>
+              )}
               <ExploreNavigation
                 entries={exploreEntries}
                 current={explore}
