@@ -22,7 +22,7 @@ function Empty({ children }: { children: ReactNode }) {
   const t = useT();
   return (
     <p className={css.empty}>
-      {t("暂无记录。", "No records yet.")}
+      {t("暂无记录。", "No records yet. ")}
       {children}
     </p>
   );
