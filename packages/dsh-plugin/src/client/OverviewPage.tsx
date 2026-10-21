@@ -955,6 +955,11 @@ function Overview({
             navigate={setView}
             onImportMemory={() => startGuide(5)}
             refreshWorkspace={refresh}
+            onWorkspaceCreated={async () => {
+              await props.chooseOnboarding({ storage: true });
+              await refresh();
+              startGuide();
+            }}
             channelSettings={props.channelSettings}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
