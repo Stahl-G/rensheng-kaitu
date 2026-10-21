@@ -234,7 +234,8 @@ export function OnboardingMatter(
   const field = (key: keyof OnboardingMatterDraft, title: string) => (
     <label key={key}>
       <b>{title}</b>
-      <input
+      <textarea
+        rows={2}
         value={draft[key]}
         disabled={busy || (key === "next" && paths.length > 0 && path < 0)}
         maxLength={key === "current" ? 4000 : 2000}
@@ -243,7 +244,9 @@ export function OnboardingMatter(
             ? t("先选一条可能路径，再修改小实验", "Pick a possible path first, then adjust its experiment")
             : undefined
         }
-        onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+        onChange={(event) =>
+          setDraft((current) => ({ ...current, [key]: event.target.value.replace(/[\r\n]+/g, " ") }))
+        }
       />
     </label>
   );
@@ -336,13 +339,7 @@ export function OnboardingMatter(
               {hasDraft ? t("需要你核对", "Needs your review") : t("等你整理", "Ready to organize")}
             </span>
           </div>
-          {busy && (
-            <output className={v2.small}>
-              {organizing
-                ? t("正在请 AI 整理，原文已保存…", "Asking the AI to organize. Your text is saved…")
-                : t("正在保存…", "Saving…")}
-            </output>
-          )}
+          {busy && !organizing && <output className={v2.small}>{t("正在保存…", "Saving…")}</output>}
           {manual && (
             <p className={v2.small}>
               {t(
@@ -411,33 +408,38 @@ export function OnboardingMatter(
               />
             </details>
           )}
-          <div className={css.footerActions}>
-            {props.builtin ? (
-              !noAi && (
-                <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                  {t("用当前 AI 整理", "Organize with the current AI")}
-                </button>
-              )
-            ) : (
-              <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
-                {t("请当前 AI 整理", "Ask the current AI")}
-              </button>
+          <div className={css.matterActions}>
+            {organizing && (
+              <output className={v2.small}>
+                {t("AI 正在整理，原文已经保存", "AI is organizing. Your original text is saved.")}
+              </output>
             )}
-            <button
-              type="button"
-              className={primary}
-              disabled={busy || !draft.goal.trim() || !draft.next.trim() || (paths.length > 0 && path < 0)}
-              onClick={() =>
-                void run(async () => {
-                  await props.adoptOnboardingMatter(matter.source, draft, paths[path] ?? null);
-                  await props.onDone();
-                })
-              }
-            >
-              {manual
-                ? t("保存目标和下一步", "Save the goal and next step")
-                : t("采纳这个下一步", "Adopt this next step")}
-            </button>
+            <div className={css.footerActions}>
+              {props.builtin ? (
+                !noAi && (
+                  <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
+                    {t("用当前 AI 整理", "Organize with the current AI")}
+                  </button>
+                )
+              ) : (
+                <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
+                  {t("请当前 AI 整理", "Ask the current AI")}
+                </button>
+              )}
+              <button
+                type="button"
+                className={primary}
+                disabled={busy || !draft.goal.trim() || !draft.next.trim() || (paths.length > 0 && path < 0)}
+                onClick={() =>
+                  void run(async () => {
+                    await props.adoptOnboardingMatter(matter.source, draft, paths[path] ?? null);
+                    await props.onDone();
+                  })
+                }
+              >
+                {t("采纳这个下一步", "Adopt this next step")}
+              </button>
+            </div>
           </div>
         </>
       )}

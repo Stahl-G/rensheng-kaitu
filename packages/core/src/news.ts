@@ -203,7 +203,11 @@ function findNews(ws: Workspace, id: string): NewsItem {
   return item;
 }
 
-export async function tryNews(ws: Workspace, id: string) {
+export async function tryNews(
+  ws: Workspace,
+  id: string,
+  options: { by?: "user" | "agent"; actor?: string } = {},
+) {
   const item = findNews(ws, id);
   const moduleId = item.relevance?.module ?? "me";
   const module = listModules(ws).find((entry) => entry.def.id === moduleId || entry.dir === moduleId);
@@ -225,17 +229,21 @@ export async function tryNews(ws: Workspace, id: string) {
   const result =
     item.status === "tried"
       ? { record: item }
-      : updateRecord(ws, "news_item", id, { status: "tried" }, { by: "user" });
-  const version = await snapshot(ws, `你把资讯加到下一步，等待确认：${item.title}`);
+      : updateRecord(ws, "news_item", id, { status: "tried" }, { by: options.by ?? "user" });
+  const version = await snapshot(ws, `${options.actor ?? "你"}把资讯加到下一步，等待确认：${item.title}`);
   return { ...result, version };
 }
 
-export async function dismissNews(ws: Workspace, id: string) {
+export async function dismissNews(
+  ws: Workspace,
+  id: string,
+  options: { by?: "user" | "agent"; actor?: string } = {},
+) {
   const item = findNews(ws, id);
   const result =
     item.status === "dismissed"
       ? { record: item }
-      : updateRecord(ws, "news_item", id, { status: "dismissed" }, { by: "user" });
-  const version = await snapshot(ws, `你标记了不相关：${item.title}`);
+      : updateRecord(ws, "news_item", id, { status: "dismissed" }, { by: options.by ?? "user" });
+  const version = await snapshot(ws, `${options.actor ?? "你"}标记了不相关：${item.title}`);
   return { ...result, version };
 }

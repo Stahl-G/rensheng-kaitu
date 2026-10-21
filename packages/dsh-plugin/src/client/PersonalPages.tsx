@@ -51,6 +51,7 @@ export function PersonalPages(
       navigate: (view: PersonalView) => void;
       manageAi: () => void;
       refreshWorkspace: () => Promise<void>;
+      onWorkspaceCreated: () => Promise<void>;
       subscribe?: (refresh: () => void) => () => void;
       onHandoverAnswer: (answer: string) => Promise<void>;
       locale: Locale;
@@ -233,7 +234,8 @@ export function PersonalPages(
                       const root = workspacePath.trim();
                       if (opening === "initialize") await props.workspaceBackup?.("initialize", { root });
                       await props.workspaceBackup?.("activate", { root });
-                      await props.refreshWorkspace();
+                      if (opening === "initialize") await props.onWorkspaceCreated();
+                      else await props.refreshWorkspace();
                       setOpening(null);
                     },
                     opening === "initialize"

@@ -148,7 +148,7 @@ export function OnboardingPage(props: Props) {
   const next = async () => {
     if (step === 0) {
       await save({ seen: true });
-      move(STORAGE_STEP);
+      move(choices?.storage ? 1 : STORAGE_STEP);
     } else if (memoryMode) {
       if (!preview) {
         const result = await props.previewOnboardingMemory(text, ai as OnboardingAi, locale);

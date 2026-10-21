@@ -183,10 +183,11 @@ async function prepare(ws: Workspace, file: string, text: string) {
         const record = fields.includes("date") ? data : withoutDate;
         if (["experience_source", "experience_batch"].includes(type))
           throw new KaituError("收件箱只提交经历，来源与批次由开图管理", "BAD_INBOX");
+        const by = phoneInboxName.test(basename(file)) && origin === "user" ? "user" : "agent";
         if (type === "experience")
           await addExperiences(ws, [record as unknown as ExperienceInput], "agent", { dryRun: true });
-        else addRecords(ws, type, [record], { dryRun: true });
-        const key = `${type}|${phoneInboxName.test(basename(file)) && origin === "user" ? "user" : "agent"}`;
+        else addRecords(ws, type, [record], { dryRun: true, by });
+        const key = `${type}|${by}`;
         const group = groups.get(key) ?? [];
         group.push(record);
         groups.set(key, group);
