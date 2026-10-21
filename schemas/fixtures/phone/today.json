@@ -2,6 +2,7 @@
   "format": "kaitu.phone.today",
   "version": 1,
   "generated_at": "2026-10-18T07:30:12+08:00",
+  "generator": { "kind": "computer" },
   "today": "2026-10-18",
   "timezone": "Asia/Shanghai",
   "next": [
@@ -88,5 +89,11 @@
     "needs_review": 1,
     "organizer": true,
     "updated_at": "2026-10-18T07:30:00+08:00"
+  },
+  "nutrition": {
+    "version": 1,
+    "kcal": 720,
+    "protein_g": 38,
+    "accounted_refs": ["ios-3fa9c1d2-01JAZ1B2C3D4E5F6G7H8J9K0MP.records.jsonl"]
   }
 }

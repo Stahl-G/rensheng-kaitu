@@ -1,7 +1,10 @@
 import { realpathSync, statSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { assertAgentPath, assertAgentWrite } from "../core/dist/agent-file-policy.js";
+import { assertAgentWrite } from "../core/dist/agent-file-policy.js";
+import { proposeAgentDocument, readAgentFile } from "../core/dist/agent-tools.js";
+import { agentCanRead } from "../core/dist/exposure.js";
+import { Workspace } from "../core/dist/workspace.js";
 
 export function confinedFileSystem(
   LocalFileSystem,
@@ -9,12 +12,14 @@ export function confinedFileSystem(
   root,
   attachments = new Set(),
   attachmentRoot = undefined,
+  connection = "local-ask",
 ) {
+  const ws = new Workspace(root, { maintain: false });
+  const memoryIndex = (target) => target.targetKey === join(realpathSync.native(root), "memory", "MEMORY.md");
   const contains = (path) => {
     if (attachments.has(path)) return true;
     try {
-      assertAgentPath(root, path);
-      return true;
+      return agentCanRead(ws, path, connection);
     } catch {
       return false;
     }
@@ -70,30 +75,70 @@ export function confinedFileSystem(
     async stat(target, ...args) {
       return super.stat(await this.checked(target), ...args);
     }
-    async readText(target, ...args) {
-      return super.readText(await this.checked(target), ...args);
+    async readText(target, signal) {
+      const fresh = await this.checked(target);
+      signal?.throwIfAborted();
+      return memoryIndex(fresh)
+        ? readAgentFile(ws, "memory/MEMORY.md", connection)
+        : super.readText(fresh, signal);
     }
-    async streamText(target, ...args) {
-      return super.streamText(await this.checked(target), ...args);
+    async streamText(target, signal) {
+      const fresh = await this.checked(target);
+      if (!memoryIndex(fresh)) return super.streamText(fresh, signal);
+      const text = await this.readText(fresh, signal);
+      return (async function* () {
+        signal?.throwIfAborted();
+        yield text;
+      })();
     }
-    async readBytes(target, ...args) {
-      return super.readBytes(await this.checked(target), ...args);
+    async readBytes(target, signal, maxBytes) {
+      const fresh = await this.checked(target);
+      if (!memoryIndex(fresh)) return super.readBytes(fresh, signal, maxBytes);
+      const bytes = Buffer.from(await this.readText(fresh, signal));
+      if (bytes.length > maxBytes) throw new FsError("资料超过读取上限", "FS_TOO_LARGE");
+      return bytes;
     }
-    async readByteRange(target, ...args) {
-      return super.readByteRange(await this.checked(target), ...args);
+    async readByteRange(target, range, signal) {
+      const fresh = await this.checked(target);
+      return memoryIndex(fresh)
+        ? Buffer.from(await this.readText(fresh, signal)).subarray(range.offset, range.offset + range.length)
+        : super.readByteRange(fresh, range, signal);
     }
     async watch(target, ...args) {
       return super.watch(await this.checked(target), ...args);
     }
-    async writeText(target, ...args) {
+    async writeText(target, content, expected, signal) {
       const checked = await this.checked(target);
-      assertAgentWrite(root, checked.targetKey);
-      return super.writeText(checked, ...args);
+      const file = assertAgentWrite(root, checked.targetKey);
+      if (!file.endsWith("/STATUS.md")) return super.writeText(checked, content, expected, signal);
+      const info = await super.stat(checked, signal);
+      const previous = info ? await super.readText(checked, signal) : "";
+      return super.writeText(
+        checked,
+        proposeAgentDocument(file, content, previous),
+        expected ?? (info ? { kind: "replaceIfVersion", version: info.version } : { kind: "createIfAbsent" }),
+        signal,
+      );
     }
-    async editText(target, ...args) {
+    async editText(target, edit, expected, signal) {
       const checked = await this.checked(target);
-      assertAgentWrite(root, checked.targetKey);
-      return super.editText(checked, ...args);
+      const file = assertAgentWrite(root, checked.targetKey);
+      if (!file.endsWith("/STATUS.md")) return super.editText(checked, edit, expected, signal);
+      const info = await super.stat(checked, signal);
+      if (!info || (expected && expected.version !== info.version))
+        throw new FsError("资料已变化，请重新读取", "FS_STALE_VERSION");
+      const previous = (await super.readText(checked, signal)).replaceAll("\r\n", "\n");
+      const old = edit.oldString.replaceAll("\r\n", "\n");
+      const matches = old ? previous.split(old).length - 1 : 0;
+      if (!matches) throw new FsError("没有找到要修改的内容", "FS_EDIT_NOT_FOUND");
+      if (matches > 1 && !edit.replaceAll) throw new FsError("修改内容不唯一", "FS_AMBIGUOUS_EDIT");
+      const content = previous.split(old).join(edit.newString.replaceAll("\r\n", "\n"));
+      return super.editText(
+        checked,
+        { oldString: previous, newString: proposeAgentDocument(file, content, previous) },
+        { version: info.version },
+        signal,
+      );
     }
   };
 }

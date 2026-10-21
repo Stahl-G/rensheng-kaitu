@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { basename, dirname, relative } from "node:path";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
 import { isoInZone, localDate } from "./time.js";
@@ -9,8 +9,8 @@ import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
 
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
-export async function captureNote(ws: Workspace, text: string, investment?: string) {
-  if (typeof text !== "string" || !text.trim() || text.length > 100000)
+export async function captureNote(ws: Workspace, text: string, investment?: string, limit = 100000) {
+  if (typeof text !== "string" || !text.trim() || text.length > limit)
     throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
   const now = new Date();
   const date = localDate(now, ws.timeZone());
@@ -48,10 +48,31 @@ export function noteMetadata(text: string): Record<string, unknown> {
   }
 }
 
-export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
+/** Count usable notes for summary views without reading their bodies. */
+export function countInboxNotes(ws: Workspace, directory = "inbox/notes") {
+  if (!ws.exists(directory)) return 0;
+  let count = 0;
+  for (const date of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+    if (!date.isDirectory() || !/^\d{4}-\d{2}-\d{2}$/.test(date.name)) continue;
+    const dir = `${directory}/${date.name}`;
+    for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+      const path = `${dir}/${entry.name}`;
+      if (!ws.conflictCopy(path) && !ws.isUnavailable(path)) count++;
+    }
+  }
+  return count;
+}
+
+export function inboxNotes(ws: Workspace, directory = "inbox/notes", options: { from?: string } = {}) {
   if (!ws.exists(directory)) return [];
   return readdirSync(ws.resolve(directory), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name))
+    .filter(
+      (entry) =>
+        entry.isDirectory() &&
+        /^\d{4}-\d{2}-\d{2}$/.test(entry.name) &&
+        (!options.from || entry.name >= options.from),
+    )
     .flatMap((entry) => {
       const dir = `${directory}/${entry.name}`;
       return readdirSync(ws.resolve(dir), { withFileTypes: true })
@@ -59,7 +80,15 @@ export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
         .flatMap((file) => {
           const path = `${dir}/${file.name}`;
           // 原文没变时不重新读取和解析。
-          const note = ws.scanParsed(path, "note", (content) => ({ content, data: noteMetadata(content) }));
+          const note = ws.scanParsed(path, "note", (content) => ({
+            content,
+            data: noteMetadata(content),
+            firstLine:
+              frontmatterBody(content)
+                .split("\n")
+                .find((line) => line.trim())
+                ?.trim() ?? "（空）",
+          }));
           return note
             ? [
                 {
@@ -69,6 +98,7 @@ export function inboxNotes(ws: Workspace, directory = "inbox/notes") {
                   kind: note.data.kind,
                   investment: note.data.investment,
                   content: note.content,
+                  firstLine: note.firstLine,
                 },
               ]
             : [];

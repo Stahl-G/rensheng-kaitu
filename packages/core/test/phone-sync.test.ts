@@ -7,6 +7,7 @@ import {
   Workspace,
   addMemory,
   addRecord,
+  buildPhoneLibrary,
   buildPhoneMap,
   buildPhoneToday,
   buildPhoneWeek,
@@ -14,7 +15,10 @@ import {
   editCalendarBlock,
   inboxNoteDone,
   lifeMap,
+  listMemories,
   listModules,
+  memoryExpectation,
+  normalizedMemory,
   pendingWorkspaceFiles,
   phoneReceipts,
   processInbox,
@@ -23,8 +27,10 @@ import {
   readRecords,
   schemas,
   snapshot,
+  updateMemory,
   writePhoneSnapshots,
 } from "../src/index.js";
+import { applyPhoneActions } from "../src/phone-actions.js";
 import { ulid } from "../src/ulid.js";
 import {
   type BackupFiles,
@@ -35,6 +41,242 @@ import {
 import { freshWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
+it("未完成的记忆操作绑定首次 client_id，改投其他 op 不覆盖计划且原操作仍可恢复", async () => {
+  const ws = await freshWorkspace();
+  const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
+  const action = {
+    client_id: ulid(),
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "replace_memory",
+    args: {
+      file: old.file,
+      candidate: { type: "fact", name: "new", text: "合成新说法" },
+      expected: memoryExpectation(old),
+    },
+  };
+  const plan = {
+    file: old.file,
+    candidate: action.args.candidate,
+    expected: action.args.expected,
+    at: action.at,
+  };
+  ws.writeJson(".kaitu/phone-actions.json", { [action.client_id]: { memory: plan } }, { internal: true });
+  const file = phoneFile("actions.jsonl");
+  await applyPhoneActions(
+    ws,
+    file,
+    JSON.stringify({
+      ...action,
+      op: "decide_proposal",
+      args: { id: ulid(), decision: "confirmed" },
+    }),
+  );
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "conflict" }),
+  );
+  expect(
+    ws.readJson<Record<string, { memory: typeof plan }>>(".kaitu/phone-actions.json")[action.client_id]
+      ?.memory,
+  ).toEqual(plan);
+  expect(normalizedMemory(ws, old.file)?.ended).toBeUndefined();
+  await applyPhoneActions(ws, file, JSON.stringify(action));
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "applied" }),
+  );
+  expect(listMemories(ws).map((memory) => memory.text)).toEqual(["合成新说法"]);
+});
+
+it.each([null, { type: "context", name: "new", text: "合成新记忆" }])(
+  "手机记忆决定写完文件但回执前中断，重开可恢复：%j",
+  async (candidate) => {
+    const ws = await freshWorkspace();
+    const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧记忆" });
+    const action = {
+      client_id: ulid(),
+      at: new Date().toISOString(),
+      device: "3fa9c1d2",
+      op: "replace_memory",
+      args: { file: old.file, candidate, expected: memoryExpectation(old) },
+    };
+    const file = phoneFile("actions.jsonl");
+    ws.writeText(file, JSON.stringify(action));
+    const write = ws.writeJson.bind(ws);
+    ws.writeJson = (path, value, options) => {
+      if (
+        path === ".kaitu/phone-actions.json" &&
+        (value as Record<string, { status?: string }>)[action.client_id]?.status === "applied"
+      )
+        throw new Error("合成回执中断");
+      write(path, value, options);
+    };
+    await expect(processInbox(ws, { stableMs: 0 })).rejects.toThrow("合成回执中断");
+    expect(normalizedMemory(ws, old.file)?.ended).toBeTruthy();
+    const reopened = new Workspace(ws.root);
+    reopened.writeText(
+      file,
+      JSON.stringify({
+        ...action,
+        args: { ...action.args, candidate: { type: "fact", name: "other", text: "不应采用的重投内容" } },
+      }),
+    );
+    await processInbox(reopened, { stableMs: 0 });
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: action.client_id, status: "applied" }),
+    );
+    expect(listMemories(reopened)).toHaveLength(candidate ? 1 : 0);
+    if (candidate) expect(listMemories(reopened)[0]?.text).toBe(candidate.text);
+    expect(listMemories(reopened, { includeArchived: true })).toHaveLength(candidate ? 2 : 1);
+  },
+);
+
+it("手机核对后旧条仍活跃但正文变了，确认返回 conflict 且不覆盖新内容", async () => {
+  const ws = await freshWorkspace();
+  const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
+  const action = {
+    client_id: ulid(),
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "replace_memory",
+    args: {
+      file: old.file,
+      expected: memoryExpectation(old),
+      candidate: { type: "context", name: "new", text: "合成候选" },
+    },
+  };
+  await updateMemory(ws, old.file, { text: "另一端先改好的合成内容" });
+  ws.writeText(phoneFile("actions.jsonl"), JSON.stringify(action));
+  await processInbox(ws, { stableMs: 0 });
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "conflict" }),
+  );
+  expect(listMemories(ws).map((memory) => memory.text)).toEqual(["另一端先改好的合成内容"]);
+  expect(normalizedMemory(ws, old.file)?.ended).toBeUndefined();
+});
+
+it("手机确认替换记忆后保留归档，重开重投不重复，陈旧的新操作返回冲突", async () => {
+  const ws = await freshWorkspace();
+  const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
+  const action = {
+    client_id: ulid(),
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "replace_memory",
+    args: {
+      file: old.file,
+      expected: memoryExpectation(old),
+      candidate: { type: "context", name: "new", text: "合成新说法" },
+    },
+  };
+  const file = phoneFile("actions.jsonl");
+  ws.writeText(file, JSON.stringify(action));
+  await processInbox(ws, { stableMs: 0 });
+  const next = listMemories(ws);
+  expect(next).toHaveLength(1);
+  expect(next[0]?.text).toBe("合成新说法");
+  expect(normalizedMemory(ws, old.file)?.replaced_by).toBe(next[0]?.file);
+  expect(phoneReceipts(ws)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "applied" }),
+  );
+  ws.writeJson("phone/receipts.json", { items: [] });
+  const reopened = new Workspace(ws.root);
+  reopened.writeText(file, JSON.stringify(action));
+  await processInbox(reopened, { stableMs: 0 });
+  expect(listMemories(reopened)).toEqual(next);
+  expect(phoneReceipts(reopened)).toContainEqual(
+    expect.objectContaining({ ref: action.client_id, status: "duplicate" }),
+  );
+  const stale = { ...action, client_id: ulid() };
+  reopened.writeText(phoneFile("actions.jsonl"), JSON.stringify(stale));
+  await processInbox(reopened, { stableMs: 0 });
+  expect(phoneReceipts(reopened)).toContainEqual(
+    expect.objectContaining({ ref: stale.client_id, status: "conflict" }),
+  );
+  expect(listMemories(reopened, { includeArchived: true })).toHaveLength(2);
+});
+
+it("手机记录同名重投跨重开及回执清理仍只入账一次，新文件仍能记相同内容", async () => {
+  const ws = await freshWorkspace();
+  const file = phoneFile("records.jsonl");
+  const text = JSON.stringify({ type: "task", title: "合成重复投递", status: "open", origin: "user" });
+  ws.writeText(file, text);
+  await processInbox(ws, { stableMs: 0 });
+  const first = readRecords(ws, "task");
+  expect(first).toHaveLength(1);
+  ws.writeJson("phone/receipts.json", {
+    format: "kaitu.phone.receipts",
+    version: 1,
+    generated_at: new Date().toISOString(),
+    items: [],
+  });
+  const reopened = new Workspace(ws.root);
+  reopened.writeText(file, text);
+  await processInbox(reopened, { stableMs: 0 });
+  expect(readRecords(reopened, "task")).toEqual(first);
+  expect(phoneReceipts(reopened)).toContainEqual(
+    expect.objectContaining({ ref: basename(file), status: "duplicate" }),
+  );
+  reopened.writeText(phoneFile("records.jsonl"), text);
+  await processInbox(reopened, { stableMs: 0 });
+  expect(readRecords(reopened, "task")).toHaveLength(2);
+});
+
+it("手机记录撤回及替换后，旧文件去重、陈旧替换拒绝，当前来源可继续替换", async () => {
+  for (const withdrawOnly of [true, false]) {
+    const ws = await freshWorkspace();
+    const row = (title: string) => ({ type: "task", agent: "iPhone", title, status: "open" });
+    const original = phoneFile("records.jsonl");
+    const text = JSON.stringify(row("合成原任务"));
+    ws.writeText(original, text);
+    await processInbox(ws, { stableMs: 0 });
+    expect(readRecords(ws, "task")).toHaveLength(1);
+    const replacement = phoneFile("records.jsonl");
+    const replace =
+      JSON.stringify({ replaces: basename(original), agent: "iPhone" }) +
+      (withdrawOnly ? "" : `\n${JSON.stringify(row("合成替换内容"))}`);
+    ws.writeText(replacement, replace);
+    await processInbox(ws, { stableMs: 0 });
+    const current = readRecords(ws, "task");
+    expect(current).toHaveLength(withdrawOnly ? 0 : 1);
+    const reopened = new Workspace(ws.root);
+    reopened.writeText(original, text);
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(current);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(original), status: "duplicate" }),
+    );
+    const stale = phoneFile("records.jsonl");
+    reopened.writeText(
+      stale,
+      `${JSON.stringify({ replaces: basename(original), agent: "iPhone" })}\n${JSON.stringify(row("陈旧分支内容"))}`,
+    );
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(current);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(stale), status: "rejected" }),
+    );
+    const successor = phoneFile("records.jsonl");
+    reopened.writeText(
+      successor,
+      `${JSON.stringify({ replaces: basename(replacement), agent: "iPhone" })}\n${JSON.stringify(row("合成后继内容"))}`,
+    );
+    await processInbox(reopened, { stableMs: 0 });
+    const next = readRecords(reopened, "task");
+    expect(next).toHaveLength(1);
+    expect(next[0]?.title).toBe("合成后继内容");
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(successor), status: "applied" }),
+    );
+    reopened.writeText(replacement, replace);
+    await processInbox(reopened, { stableMs: 0 });
+    expect(readRecords(reopened, "task")).toEqual(next);
+    expect(phoneReceipts(reopened)).toContainEqual(
+      expect.objectContaining({ ref: basename(replacement), status: "duplicate" }),
+    );
+  }
+});
+
 function remoteMock() {
   let files: BackupFiles = {};
   const remote: BackupRemote = {
@@ -58,6 +300,46 @@ function remoteMock() {
   };
 }
 
+it("today 的饮食合计只算当天，已入账的手机文件撤回后仍记在 accounted_refs", async () => {
+  const ws = await freshWorkspace();
+  const items = [{ name: "米饭", grams: 200 }];
+  const meal = (kcal: number) =>
+    JSON.stringify({ type: "meal", origin: "user", meal: "午", items, kcal, protein_g: 20, source: "user" });
+  const first = phoneFile("records.jsonl");
+  ws.writeText(first, meal(500));
+  await processInbox(ws, { stableMs: 0 });
+  addRecord(ws, "meal", { meal: "晚", items, kcal: 300, protein_g: 10, source: "user" });
+  addRecord(ws, "meal", {
+    ts: "2020-01-01T12:00:00+08:00",
+    meal: "午",
+    items,
+    kcal: 900,
+    protein_g: 50,
+    source: "user",
+  });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  const today = () =>
+    ws.readJson<{ nutrition: { kcal: number; protein_g: number; accounted_refs: string[] } }>(
+      "phone/today.json",
+    );
+  expect(today().nutrition).toEqual({
+    version: 1,
+    kcal: 800,
+    protein_g: 30,
+    accounted_refs: [basename(first)],
+  });
+  const validate = schemas().builtin("phone-today.schema.json");
+  expect(validate(today()), JSON.stringify(validate.errors)).toBe(true);
+  const withdraw = phoneFile("records.jsonl");
+  ws.writeText(withdraw, JSON.stringify({ replaces: basename(first) }));
+  await processInbox(ws, { stableMs: 0 });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  expect(today().nutrition).toMatchObject({
+    kcal: 300,
+    accounted_refs: [basename(first), basename(withdraw)].sort(),
+  });
+});
+
 it("快照投影符合手机契约且不带原文、凭据、链接路径或财务明细；生成目录不可被 Agent 改写或进历史", async () => {
   const ws = await freshWorkspace();
   const now = new Date("2026-10-18T12:00:00Z");
@@ -76,12 +358,32 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     ),
   );
   addRecord(ws, "workout", { ...workout, ts: now.toISOString() });
+  addRecord(ws, "finance_transaction", {
+    ts: now.toISOString(),
+    account: "synthetic-card",
+    amount: "-32.00",
+    currency: "CNY",
+    category: "expense",
+    counterparty: null,
+    description: "PRIVATE_FINANCE_DESCRIPTION",
+    source: "manual",
+    source_transaction_id: null,
+    related_ids: [],
+    reconciliation: "ok",
+  });
   await addMemory(ws, {
     type: "fact",
-    name: "PRIVATE_MEMORY_NAME",
+    name: "合成敏感记忆",
     text: "PRIVATE_MEMORY_BODY",
     sensitive: true,
   });
+  await addMemory(ws, { type: "preference", name: "合成偏好", text: "合成正文", sensitive: false });
+  ws.writeText(
+    "inbox/notes/2026-10-18/synthetic.md",
+    "---\nkind: capture\n---\n\n合成原文第一行\nPRIVATE_NOTE_SECOND_LINE\n",
+  );
+  // 写坏的 frontmatter 只影响这一条，不让整份快照停更。
+  ws.writeText("inbox/notes/2026-10-17/broken.md", "---\nkind: [capture\n---\n\n写坏的 frontmatter\n");
   const data = await readOverviewPage(ws, now);
   const map = lifeMap(ws, now);
   const from = { name: "合成甲", lat: 10, lng: 170, precision: "city" as const };
@@ -99,9 +401,10 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
     },
   ];
   const snapshots = {
-    today: buildPhoneToday(data, now.toISOString()),
+    today: buildPhoneToday(data, now.toISOString(), ws),
     week: buildPhoneWeek(data, now.toISOString()),
     map: buildPhoneMap(data, map, readExploration(ws), now.toISOString()),
+    library: buildPhoneLibrary(ws, data, now.toISOString()),
   };
   for (const [name, value] of Object.entries(snapshots)) {
     const validate = schemas().builtin(`phone-${name}.schema.json`);
@@ -111,6 +414,16 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
   expect(snapshots.week.projects[0]?.kind).toBe("work");
   expect(snapshots.week.health.workouts).toBe(1);
   expect(snapshots.map.rows[0]?.ahead).toBe("planned");
+  expect(snapshots.today.generator).toEqual({ kind: "computer" });
+  const items = snapshots.library.items;
+  expect(items.find((i) => i.kind === "note")).toMatchObject({ title: "合成原文第一行", date: "2026-10-18" });
+  expect(items.find((i) => i.kind === "health")?.path).toBe("health/data/workouts/2026-10.jsonl");
+  expect(items.find((i) => i.kind === "project")?.path).toBe("projects/synthetic/STATUS.md");
+  expect(items.some((i) => i.title === "合成偏好")).toBe(true);
+  // 手机是用户自己的设备：财务和标为敏感的记忆也列出，正文仍要点开才读。
+  expect(items.find((i) => i.title === "合成敏感记忆")?.subtitle).toBe("标为敏感");
+  expect(items.find((i) => i.kind === "finance")?.path).toBe("finance/data/transaction/2026-10.jsonl");
+  expect(items.some((i) => i.title === "写坏的 frontmatter")).toBe(true);
   expect(JSON.stringify(snapshots)).not.toContain(ws.root);
   expect(JSON.stringify(snapshots)).not.toContain("PRIVATE_");
   expect(await writePhoneSnapshots(ws, now)).toBe(0);
@@ -292,4 +605,106 @@ it("手机记录有一条不合格整份不写，重投不重复；冲突操作�
     await processInbox(reopened, { stableMs: 0 });
     expect(phoneReceipts(reopened).find((r) => r.kind === "action")?.status).toBe("conflict");
   }
+});
+
+it("云端整理员写的回执并进本机，手机重投不再执行；待整理原文随 GitHub 双向同步", async () => {
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
+  await writePhoneSnapshots(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  const clientId = ulid();
+  const remote = JSON.parse(m.files()["phone/receipts.json"] as string);
+  remote.items.push({ ref: clientId, kind: "action", status: "applied", at: new Date().toISOString() });
+  m.deliver("phone/receipts.json", JSON.stringify(remote));
+  const agentNote = `inbox/notes/2026-10-18/ios-3fa9c1d2-${ulid()}.note.md`;
+  m.deliver(agentNote, stringifyFrontmatter({ agent: "你（iPhone）", kind: "capture" }, "整理员移来的原文"));
+  ws.writeText("inbox/notes/2026-10-18/local.md", "电脑上的待整理原文");
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(phoneReceipts(ws).some((r) => r.ref === clientId)).toBe(true);
+  expect(m.files()["phone/receipts.json"]).toBe(ws.readText("phone/receipts.json"));
+  expect(ws.exists(agentNote)).toBe(true);
+  expect(m.files()["inbox/notes/2026-10-18/local.md"]).toBe("电脑上的待整理原文");
+
+  // 待办不存在：没有回执去重时会回 conflict。
+  const action = {
+    client_id: clientId,
+    at: new Date().toISOString(),
+    device: "3fa9c1d2",
+    op: "complete_task",
+  };
+  ws.writeText(phoneFile("actions.jsonl"), JSON.stringify({ ...action, args: { id: ulid() } }));
+  await processInbox(ws, { stableMs: 0 });
+  expect(phoneReceipts(ws).find((r) => r.ref === clientId)?.status).toBe("duplicate");
+});
+
+it("同目录 Agent 快照覆盖前保存来源与离线回执，已读记录在重开后保留", async () => {
+  const { markOrganizerSeen, organizerStatus, writePhoneReceipts } = await import("../src/index.js");
+  const ws = await freshWorkspace();
+  const now = new Date();
+  await writePhoneSnapshots(ws, now, { force: true });
+  const today = ws.readJson<Record<string, unknown>>("phone/today.json");
+  const generatedAt = new Date(now.getTime() + 2000).toISOString();
+  ws.writeJson("phone/today.json", {
+    ...today,
+    generated_at: generatedAt,
+    generator: { kind: "agent", name: "Dot", spec: 1 },
+  });
+  const at = new Date(now.getTime() + 1000).toISOString();
+  writePhoneReceipts(
+    ws,
+    [
+      { ref: "computer-action", kind: "action", status: "applied", at },
+      { ref: "remote-action", kind: "action", status: "applied", at },
+      { ref: "remote-review", kind: "action", status: "conflict", at },
+    ],
+    now,
+  );
+  ws.writeJson(".kaitu/phone-actions.json", { "computer-action": { status: "applied" } }, { internal: true });
+  await writePhoneSnapshots(ws, new Date(now.getTime() + 3000), { force: true });
+  expect(ws.readJson<{ generator: unknown }>("phone/today.json").generator).toEqual({ kind: "computer" });
+  expect(organizerStatus(ws)).toMatchObject({
+    agent: { name: "Dot", generatedAt },
+    unread: true,
+    away: { actions: 2, needsReview: 1 },
+  });
+  markOrganizerSeen(ws);
+  const reopened = new Workspace(ws.root);
+  expect(organizerStatus(reopened)).toMatchObject({
+    agent: { name: "Dot" },
+    unread: false,
+    away: { actions: 2 },
+  });
+  expect(await writePhoneSnapshots(reopened, new Date(now.getTime() + 4000), { force: true })).toBe(0);
+  expect(organizerStatus(reopened).unread).toBe(false);
+  await snapshot(ws, "合成整理员状态");
+  const versions = await import("../src/history.js");
+  expect(await versions.isTracked(ws, ".kaitu/organizer.json")).toBe(false);
+});
+
+it("GitHub 在回写电脑快照之前记住远端整理员和新回执，重复同步不重复计数", async () => {
+  const { markOrganizerSeen, organizerStatus } = await import("../src/index.js");
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  await connectWorkspaceBackup(ws, { repo: "synthetic/organizer", text: true, records: false }, m.remote);
+  await writePhoneSnapshots(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  const today = JSON.parse(m.files()["phone/today.json"] as string);
+  m.deliver(
+    "phone/today.json",
+    JSON.stringify({ ...today, generator: { kind: "agent", name: "Dot", spec: 1 } }),
+  );
+  const receipts = JSON.parse(m.files()["phone/receipts.json"] as string);
+  receipts.items.push({ ref: ulid(), kind: "action", status: "rejected", at: new Date().toISOString() });
+  m.deliver("phone/receipts.json", JSON.stringify(receipts));
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(JSON.parse(m.files()["phone/today.json"] as string).generator).toEqual({ kind: "computer" });
+  expect(organizerStatus(ws)).toMatchObject({
+    agent: { name: "Dot" },
+    unread: true,
+    away: { actions: 1, needsReview: 1 },
+  });
+  markOrganizerSeen(ws);
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(organizerStatus(ws)).toMatchObject({ unread: false, away: { actions: 1, needsReview: 1 } });
 });

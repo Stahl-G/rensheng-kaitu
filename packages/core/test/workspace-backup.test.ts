@@ -8,6 +8,7 @@ import { setStateBinding } from "../src/state-binding.js";
 import {
   type BackupFiles,
   type BackupRemote,
+  cancelWorkspaceBackup,
   connectWorkspaceBackup,
   resolveWorkspaceBackup,
   restoreWorkspaceBackup,
@@ -80,7 +81,7 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   a.writeJson("secrets.json", { value: "synthetic-only" });
   a.writeJson("credentials.json", { value: "synthetic-only" });
   const m = remoteMock();
-  await connectWorkspaceBackup(a, { repo: "synthetic/backup" }, m.remote);
+  await connectWorkspaceBackup(a, { repo: "synthetic/backup", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(a, m.remote);
   expect(Object.keys(m.files()).some((p) => /\.kaitu|\.git|\.mp4|secrets|credentials/.test(p))).toBe(false);
   const target = join(tmp(), "restored");
@@ -94,11 +95,57 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   await syncWorkspaceBackup(a, m.remote);
   expect(b.readText("me/profile.md")).toBe("# From A\n");
   expect(a.readText("me/rules.md")).toContain("From B");
+  const incoming = await m.remote.read("synthetic/backup", "main");
+  for (let i = 0; i < 5; i++)
+    incoming.files[`inbox/notes/2026-10-19/remote-${i}.md`] = `Synthetic remote note ${i}`;
+  await m.remote.push("synthetic/backup", "main", incoming.head, incoming.files);
+  const overviewReads = vi.spyOn(a, "scanText");
+  const remoteReads = vi.spyOn(m.remote, "read");
+  await syncWorkspaceBackup(a, m.remote);
+  const overviewOrder = overviewReads.mock.calls.flatMap(([file], index) =>
+    file === ".kaitu/config.json" ? [overviewReads.mock.invocationCallOrder[index]] : [],
+  );
+  expect(remoteReads).toHaveBeenCalledTimes(1);
+  expect(overviewOrder).toHaveLength(2);
+  expect(overviewOrder[0]).toBeLessThan(remoteReads.mock.invocationCallOrder[0]);
+  expect(overviewOrder[1]).toBeGreaterThan(remoteReads.mock.invocationCallOrder[0]);
+  remoteReads.mockRestore();
+  overviewReads.mockRestore();
+  for (let i = 0; i < 5; i++)
+    expect(a.readText(`inbox/notes/2026-10-19/remote-${i}.md`)).toBe(`Synthetic remote note ${i}`);
+  // The generated overview is included in the next sync, then the backup reaches a no-op.
+  await syncWorkspaceBackup(a, m.remote);
   const count = m.pushes();
   const checks = m.inspect.calls;
   await syncWorkspaceBackup(a, m.remote);
   expect(m.pushes()).toBe(count);
   expect(m.inspect.calls).toBe(checks);
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const stalled: BackupRemote = {
+    ...m.remote,
+    async read(_repo, _branch, options) {
+      options?.progress?.({ phase: "download", completed: 2, total: 20 });
+      entered();
+      await new Promise<void>((_resolve, reject) => {
+        options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true });
+      });
+      throw new Error("cancelled");
+    },
+  };
+  const syncing = syncWorkspaceBackup(a, stalled);
+  await reading;
+  expect(workspaceBackupStatus(a).progress).toEqual({ phase: "download", completed: 2, total: 20 });
+  cancelWorkspaceBackup(a);
+  await syncing;
+  expect(workspaceBackupStatus(a).running).toBe(false);
+  expect(workspaceBackupStatus(a).error).toBeTruthy();
+  expect(m.pushes()).toBe(count);
+  expect(a.readText("me/profile.md")).toBe("# From A\n");
+  await syncWorkspaceBackup(a, m.remote);
+  expect(workspaceBackupStatus(a).error).toBeNull();
   const switching = new Workspace(a.root);
   await workspaceBackupRequest(switching, "activate", { root: target });
   expect(switching.root).toBe(target);
@@ -108,7 +155,7 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
   const a = await freshWorkspace();
   const first = addRecord(a, "workout", workout);
   const m = remoteMock();
-  await connectWorkspaceBackup(a, { repo: "synthetic/records" }, m.remote);
+  await connectWorkspaceBackup(a, { repo: "synthetic/records", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(a, m.remote);
   const root = join(tmp(), "b");
   await restoreWorkspaceBackup(root, a, { repo: "synthetic/records" }, m.remote);
@@ -145,15 +192,66 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
   expect(fs.readdirSync(b.resolve(".kaitu/backup-conflicts", { internal: true })).length).toBeGreaterThan(0);
 });
 
+it("本机只开手机与待整理、远端全开且没有共同基线：清单不算冲突，解决真冲突后同步，远端其余文件和范围都留着", async () => {
+  const ws = await freshWorkspace();
+  const m = remoteMock();
+  const remoteNote = "inbox/agents/synthetic-handoff.md";
+  await m.remote.push("synthetic/memory", "main", null, {
+    "kaitu-backup.json": JSON.stringify({ format: "kaitu-workspace", version: 1, text: true, records: true }),
+    "projects/synthetic/STATUS.md": "远端的项目状态",
+    "health/synthetic.jsonl": '{"id":"r1"}\n',
+    [remoteNote]: "远端写的交接",
+    "phone/receipts.json": JSON.stringify({
+      format: "kaitu.phone.receipts",
+      version: 1,
+      generated_at: new Date().toISOString(),
+      items: [
+        {
+          ref: "01JAZ1B2C3D4E5F6G7H8J9K0MP",
+          kind: "action",
+          status: "applied",
+          at: new Date().toISOString(),
+        },
+      ],
+    }),
+  });
+  ws.writeText(remoteNote, "本机写的交接");
+  await connectWorkspaceBackup(ws, { repo: "synthetic/memory", text: false, records: false }, m.remote);
+
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(workspaceBackupStatus(ws).conflicts.map((c) => c.path)).toEqual([remoteNote]);
+  expect(ws.readText(remoteNote)).toBe("本机写的交接");
+  // 冲突没解决前，云端回执不提前写进本机。
+  expect(ws.exists("phone/receipts.json")).toBe(false);
+
+  resolveWorkspaceBackup(ws, remoteNote, "local");
+  await syncWorkspaceBackup(ws, m.remote);
+  const status = workspaceBackupStatus(ws);
+  expect(status).toMatchObject({ conflicts: [], error: null, connection: { text: false, records: false } });
+  expect(m.files()).toMatchObject({
+    "projects/synthetic/STATUS.md": "远端的项目状态",
+    "health/synthetic.jsonl": '{"id":"r1"}\n',
+    [remoteNote]: "本机写的交接",
+  });
+  expect(JSON.parse(m.files()["kaitu-backup.json"] as string)).toMatchObject({ text: true, records: true });
+  expect(ws.exists("kaitu-backup.json")).toBe(false);
+  expect(ws.readText("phone/receipts.json")).toContain("01JAZ1B2C3D4E5F6G7H8J9K0MP");
+  expect(ws.exists("projects/synthetic/STATUS.md")).toBe(false);
+
+  const pushes = m.pushes();
+  await syncWorkspaceBackup(ws, m.remote);
+  expect(m.pushes()).toBe(pushes);
+});
+
 it("公开仓库默认不上传；后台等待与授权失败不挡住本地写入", async () => {
   const ws = await freshWorkspace();
   const pub = remoteMock(false);
-  await connectWorkspaceBackup(ws, { repo: "synthetic/public" }, pub.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/public", text: true, records: true }, pub.remote);
   await syncWorkspaceBackup(ws, pub.remote);
   expect(workspaceBackupStatus(ws).connection?.enabled).toBe(false);
   expect(pub.pushes()).toBe(0);
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/private" }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/private", text: true, records: true }, m.remote);
   let reject: (e: Error) => void = () => {};
   let reached: () => void = () => {};
   const reading = new Promise<void>((resolve) => {
@@ -243,7 +341,7 @@ it("GitHub API 接通空仓库初始化、缓存回读和非强推提交，可�
     return Response.json(value);
   });
   try {
-    await connectWorkspaceBackup(ws, { repo: "synthetic/api" });
+    await connectWorkspaceBackup(ws, { repo: "synthetic/api", text: true, records: true });
     await syncWorkspaceBackup(ws);
     expect(workspaceBackupStatus(ws).error).toBeNull();
     const first = head;
@@ -266,7 +364,7 @@ it("iCloud 占位不作为本地删除上传，下载后可继续，真实删除
   setStateBinding(original.root, directory, "icloud");
   const ws = new Workspace(original.root);
   const m = remoteMock();
-  await connectWorkspaceBackup(ws, { repo: "synthetic/icloud" }, m.remote);
+  await connectWorkspaceBackup(ws, { repo: "synthetic/icloud", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(ws, m.remote);
   const before = m.files()["me/profile.md"];
   const count = m.pushes();

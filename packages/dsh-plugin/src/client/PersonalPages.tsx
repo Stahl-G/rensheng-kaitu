@@ -1,8 +1,15 @@
-import type { CalendarPushSettings, HandoverPack, SyncProvider } from "@kaitu/core";
+import type {
+  AgentConnectionId,
+  CalendarPushSettings,
+  HandoverPack,
+  OrganizerStatus,
+  SyncProvider,
+} from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
+import { CloudOrganizer } from "./CloudOrganizer.js";
 import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
@@ -20,6 +27,7 @@ export interface PersonalServices extends CalendarPushServices {
   plugins?: PluginRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
     tasks: Partial<Record<AutomationKey, boolean>>,
@@ -29,7 +37,8 @@ export interface PersonalServices extends CalendarPushServices {
   restoreVersion: (oid: string) => Promise<unknown>;
   moveStorage: (path: string, drive: boolean, provider?: SyncProvider) => Promise<unknown>;
   pickStorageFolder: () => Promise<string | null>;
-  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
+  loadHandover: (locale?: Locale, includeFinance?: boolean) => Promise<HandoverPack>;
+  configureFinanceAccess: (id: AgentConnectionId, allowed: boolean) => Promise<unknown>;
 }
 export type PersonalView = "profile" | "connections" | "settings";
 export function PersonalPages(
@@ -60,6 +69,8 @@ export function PersonalPages(
   const [history, setHistory] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [workspacePath, setWorkspacePath] = useState("");
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -74,6 +85,10 @@ export function PersonalPages(
     void refresh();
   }, [refresh]);
   useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(() => {
+    if (props.view === "connections" && data?.organizer.unread)
+      document.getElementById("cloud-organizer")?.scrollIntoView({ block: "center" });
+  }, [props.view, data?.organizer.unread]);
   const run = async (operation: () => Promise<unknown>, message = t("已保存", "Saved")) => {
     setBusy(true);
     setError("");
@@ -158,6 +173,112 @@ export function PersonalPages(
           </p>
         )}
         {receipt && <output className={css.small}>{receipt}</output>}
+        {data && props.view === "settings" && (
+          <section className={css.sec}>
+            <h2 className={css.eyebrow}>{t("资料位置", "Workspace location")}</h2>
+            <div className={`${css.card} ${css["list-card"]}`}>
+              <div className={css["switch-row"]}>
+                <span>
+                  <b>{storageName(data.storage.provider)}</b>
+                  <br />
+                  <span className={css.small}>{data.storage.root}</span>
+                </span>
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  onClick={() => {
+                    setOpening(false);
+                    setMoving(!moving);
+                  }}
+                >
+                  {t("迁移当前资料…", "Move current notes…")}
+                </button>
+              </div>
+              {props.workspaceBackup && (
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setMoving(false);
+                    setOpening(!opening);
+                  }}
+                >
+                  {t("打开已有工作区…", "Open an existing workspace…")}
+                </button>
+              )}
+            </div>
+            {opening && props.workspaceBackup && (
+              <form
+                className={`${css.card} ${css["sub-form"]}`}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void run(
+                    async () => {
+                      await props.workspaceBackup?.("activate", { root: workspacePath.trim() });
+                      await props.refreshWorkspace();
+                      setOpening(false);
+                    },
+                    t("已打开已有工作区", "Existing workspace opened"),
+                  );
+                }}
+              >
+                <label>
+                  {t("已有工作区路径", "Existing workspace path")}
+                  <input
+                    required
+                    value={workspacePath}
+                    disabled={busy}
+                    onChange={(event) => setWorkspacePath(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const folder = await props.pickStorageFolder();
+                      if (folder) setWorkspacePath(folder);
+                    }, "")
+                  }
+                >
+                  {t("选择已有文件夹…", "Choose an existing folder…")}
+                </button>
+                <button
+                  type="submit"
+                  className={`${css.btn} ${css["btn-primary"]}`}
+                  disabled={busy || !workspacePath.trim()}
+                >
+                  {busy ? t("正在打开…", "Opening…") : t("打开此工作区", "Open this workspace")}
+                </button>
+              </form>
+            )}
+            {moving && (
+              <StorageChoice
+                storage={{ ...data.storage, github: !!data.backup.connection }}
+                moveStorage={props.moveStorage}
+                pickStorageFolder={props.pickStorageFolder}
+                submitLabel={t("迁移到这里", "Move here")}
+                onDone={async (moved) => {
+                  setMoving(false);
+                  if (moved) {
+                    await props.refreshWorkspace();
+                    setReceipt(t("资料已迁移", "Notes moved"));
+                  }
+                }}
+              />
+            )}
+          </section>
+        )}
+        {data && props.view !== "profile" && props.workspaceBackup && (
+          <WorkspaceBackup
+            request={props.workspaceBackup}
+            subscribe={props.subscribe}
+            pickFolder={props.pickStorageFolder}
+            onActivated={props.refreshWorkspace}
+          />
+        )}
         {props.view === "profile" ? (
           <MePage {...props} />
         ) : !data ? (
@@ -166,6 +287,31 @@ export function PersonalPages(
           <>
             <section className={css.sec}>
               <HandoverPanel loadHandover={props.loadHandover} onAnswer={props.onHandoverAnswer} />
+            </section>
+            <section className={css.sec}>
+              <h2 className={css.eyebrow}>{t("Agent 读取财务", "Agent finance access")}</h2>
+              <div className={`${css.card} ${css["list-card"]}`}>
+                {(
+                  [
+                    ["local-mcp", t("本机 MCP", "Local MCP")],
+                    ["local-ask", t("本机问问", "Local Ask")],
+                    ["phone-ask", t("手机问问", "Phone Ask")],
+                    ["remote-mcp", t("远程 MCP", "Remote MCP")],
+                  ] as const
+                ).map(([id, label]) => (
+                  <label key={id} className={css["switch-row"]}>
+                    <span>{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={data.financeAccess[id]}
+                      disabled={busy}
+                      onChange={(event) =>
+                        void run(() => props.configureFinanceAccess(id, event.target.checked))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
             </section>
             <section className={css.sec}>
               <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
@@ -307,8 +453,28 @@ export function PersonalPages(
             </section>
             <section className={css.sec}>
               <div className={css["sec-head"]}>
-                <h2 className={css.eyebrow}>{t("云端的 AI（进阶）", "Cloud AI (advanced)")}</h2>
+                <h2 className={css.eyebrow}>{t("云端整理员", "Cloud organizer")}</h2>
               </div>
+              <CloudOrganizer
+                data={data}
+                copy={(text) =>
+                  run(() => navigator.clipboard.writeText(text), t("说明已复制", "Instructions copied"))
+                }
+                seen={() =>
+                  run(async () => {
+                    const organizer = await props.organizerSeen?.();
+                    if (organizer) setData((current) => (current ? { ...current, organizer } : current));
+                  })
+                }
+                setup={() => {
+                  if (props.workspaceBackup)
+                    document.getElementById("workspace-backup")?.scrollIntoView({ block: "center" });
+                  else {
+                    props.navigate("settings");
+                    setMoving(true);
+                  }
+                }}
+              />
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
                   <span>
@@ -336,14 +502,6 @@ export function PersonalPages(
                 </div>
               </div>
             </section>
-            {props.workspaceBackup && (
-              <WorkspaceBackup
-                request={props.workspaceBackup}
-                subscribe={props.subscribe}
-                pickFolder={props.pickStorageFolder}
-                onActivated={props.refreshWorkspace}
-              />
-            )}
             {props.phoneChannels && props.channelSettings && (
               <PhoneChannels request={props.channelSettings} />
             )}
@@ -543,22 +701,6 @@ export function PersonalPages(
                     {t("打开", "Open")}
                   </button>
                 </div>
-                <div className={css["switch-row"]}>
-                  <span>
-                    <b>{t("换一个存放位置", "Change where notes live")}</b>
-                    <br />
-                    <span className={css.small}>
-                      {storageName(data.storage.provider)} · {data.storage.root}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className={`${css.btn} ${css["btn-quiet"]}`}
-                    onClick={() => setMoving(!moving)}
-                  >
-                    {t("更换", "Change")}
-                  </button>
-                </div>
               </div>
             </section>
             {history && (
@@ -599,21 +741,6 @@ export function PersonalPages(
                   {t("取消", "Cancel")}
                 </button>
               </section>
-            )}
-            {moving && (
-              <StorageChoice
-                storage={data.storage}
-                moveStorage={props.moveStorage}
-                pickStorageFolder={props.pickStorageFolder}
-                submitLabel={t("迁移到这里", "Move here")}
-                onDone={async (moved) => {
-                  setMoving(false);
-                  if (moved) {
-                    await props.refreshWorkspace();
-                    setReceipt(t("资料已迁移", "Notes moved"));
-                  }
-                }}
-              />
             )}
             {props.plugins && <Plugins request={props.plugins} />}
             <section className={css.sec}>

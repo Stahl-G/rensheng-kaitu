@@ -12,6 +12,7 @@ import {
   configureAutomation,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
+  createProject,
   draftOnboardingMatter,
   history,
   inboxNoteDone,
@@ -34,6 +35,7 @@ import {
   restore,
   saveOnboardingChoices,
   saveOnboardingMatter,
+  splitImportedBlobs,
   stringifyFrontmatter,
   validateWorkspace,
 } from "../src/index.js";
@@ -53,6 +55,7 @@ it("粘贴解析保留未知与不合格式行，处理列表、时间及已有�
         "格式没对上，别丢",
         "- 喜欢散步",
         "1. 喜欢散步",
+        "[目标] 投稿散文 (2026-10) [在考虑] 老虎杯 (2026-10) [偏好] 不爱被说教",
         "",
         "[偏好]",
       ].join("\n"),
@@ -64,6 +67,9 @@ it("粘贴解析保留未知与不合格式行，处理列表、时间及已有�
       ["context", "[没见过的类] 原样内容 (时间不详)"],
       ["context", "格式没对上，别丢"],
       ["context", "- 喜欢散步"],
+      ["context", "投稿散文 (2026-10)"],
+      ["context", "老虎杯 (2026-10)"],
+      ["preference", "不爱被说教"],
       ["context", "[偏好]"],
     ]);
     expect(candidates[0]?.when).toBe("2026-09");
@@ -150,7 +156,9 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
     expect(ws.readText(".kaitu/config.json")).toBe(config);
     const initial = onboardingStatus(ws, options);
     expect(initial.sources.map((source) => source.id)).toEqual(["calendar", "health", "projects", "news"]);
-    expect(initial.checklist.completed).toBe(1);
+    // 跳过了一个数据源，「接上数据」就算完成，不要求每个都接上。
+    expect(initial.checklist.items.find((item) => item.id === "sources")?.done).toBe(true);
+    expect(initial.checklist.completed).toBe(2);
     expect(initial.sources.find((item) => item.id === "health")).toMatchObject({
       done: false,
       skipped: true,
@@ -190,10 +198,10 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
       options,
     );
     const newsPreview = previewOnboardingSetup(ws, { source: "news", keywords: ["合成方向"] }, options);
-    expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
+    expect(onboardingStatus(ws, options).checklist.completed).toBe(5);
     await confirmOnboardingSetup(ws, projectPreview.token, options);
     await confirmOnboardingSetup(ws, newsPreview.token, options);
-    expect(onboardingStatus(ws, options).checklist.completed).toBe(4);
+    expect(onboardingStatus(ws, options).checklist.completed).toBe(5);
     expect(onboardingStatus(ws, { stateRoot: join(root, "another-computer") }).showGuide).toBe(false);
     await restore(ws, before[0]?.oid as string);
     const restored = onboardingStatus(ws, options);
@@ -471,6 +479,50 @@ it("搬入时括号里的条件和记下的时间都留着；已有记忆也能�
     );
     expect(added).toMatchObject({ projects: 1 });
     expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("旧版搬记忆挤成一条的目标和项目，启动时拆开；拆过就不再动", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-split-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    ws.writeJson("me/goals.json", [
+      {
+        id: "doubao-20261019-aaaaaa",
+        title:
+          "投稿散文 (2026-10) [在考虑] 要不要参加老虎杯 (2026-10) [偏好] 不爱被说教 [目标] 攒够一年生活费",
+        status: "active",
+      },
+    ]);
+    const next = await addGoalNext(ws, "doubao-20261019-aaaaaa", "这周写完初稿");
+    const { slug } = await createProject(ws, {
+      title: "写小说《三角梅》 [项目] 《火星安徒生》…",
+      kind: "personal",
+    });
+    const notes = `projects/${slug}/notes.md`;
+    ws.writeText(
+      notes,
+      `${ws.readText(notes).trimEnd()}\n\n来源：从 豆包 搬来（2026-10-19）\n\n写小说《三角梅》 [项目] 《火星安徒生》参加征文\n`,
+    );
+
+    expect(await splitImportedBlobs(ws)).toEqual({ goals: 1, projects: 1 });
+    const goals = ws.readJson<{ id: string; title: string }[]>("me/goals.json");
+    expect(goals.map((goal) => goal.title)).toEqual(["投稿散文", "攒够一年生活费"]);
+    expect(goals[1]?.id).toMatch(/^doubao-/);
+    expect(onboardingStatus(ws, options).next).toMatchObject({ id: next.id, goal: "投稿散文" });
+    expect(readExploration(ws).directions.map((item) => item.title)).toContain("要不要参加老虎杯");
+    expect(listMemories(ws).map((memory) => memory.text)).toContain("不爱被说教");
+    expect(
+      listProjects(ws)
+        .map((project) => project.title)
+        .sort(),
+    ).toEqual(["《火星安徒生》参加征文", "写小说《三角梅》"]);
+    expect(ws.readText(notes)).not.toContain("[项目]");
+    expect(validateWorkspace(ws)).toEqual([]);
+    expect(await splitImportedBlobs(ws)).toEqual({ goals: 0, projects: 0 });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

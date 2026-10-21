@@ -1,12 +1,12 @@
 .page {
-  --atlas-water: #cfdee3;
-  --atlas-land: #f4f5ef;
-  --atlas-border: #aebebb;
+  --atlas-water: #27495e;
+  --atlas-land: #e6dcc5;
+  --atlas-border: #aaa58e;
   --atlas-muted: #647b7e;
-  --atlas-green: #e4ebe0;
+  --atlas-green: #e6dcc5;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -576,11 +576,11 @@
 /* 与开图探索页共用青绿、字体和卡片；海陆使用独立对比层级。 */
 body[data-ds-dark-theme] .page,
 [data-theme="dark"] .page {
-  --atlas-water: #203e49;
-  --atlas-land: #303c39;
-  --atlas-border: #56736f;
+  --atlas-water: #1c293c;
+  --atlas-land: #554d43;
+  --atlas-border: #728185;
   --atlas-muted: #a3bfba;
-  --atlas-green: #344a3e;
+  --atlas-green: #554d43;
 }
 .tools {
   display: flex;
@@ -704,4 +704,252 @@ body[data-ds-dark-theme] .page,
 .mapFooter {
   display: flex;
   justify-content: flex-end;
+}
+
+/* One full map, with the existing records available in a secondary panel. */
+.layout {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  order: -1;
+}
+.mapPane {
+  height: var(--footprint-map-height, max(520px, calc(100dvh - 180px)));
+  border-radius: 12px;
+}
+.layout .listPane {
+  display: block;
+  position: static;
+  max-height: none;
+  padding: 16px;
+  overflow: visible;
+  background: var(--kt-card);
+  border: 1px solid var(--kt-control);
+  border-radius: 12px;
+  scrollbar-gutter: auto;
+}
+.layout[data-view="list"] .listPane,
+.layout[data-selected="true"] .listPane {
+  position: static;
+}
+.layout[data-view="list"] .mapPane {
+  display: block;
+}
+.listControls,
+.mapControls .listToggle {
+  display: none;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@container (max-width: 1000px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 12px;
+  }
+}
+@container (max-width: 740px) {
+  .layout {
+    display: block;
+  }
+  .layout .listPane {
+    margin-top: 12px;
+  }
+  .layout[data-view="map"]:not([data-selected="true"]) .listPane {
+    display: none;
+  }
+  .listControls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .mapControls .listToggle {
+    display: block;
+    min-height: 44px;
+  }
+}
+.stateCaption {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  max-width: calc(100% - 150px);
+  pointer-events: none;
+  color: #263f64;
+  background: #f4eddfeb;
+  padding: 14px 18px;
+  border-radius: 10px;
+  text-shadow: none;
+}
+.stateCaption h1 {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.stateCaption p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+.stateEmpty {
+  position: absolute;
+  left: 24px;
+  top: 150px;
+  max-width: min(360px, calc(100% - 48px));
+  background: var(--kt-card);
+  color: var(--kt-text);
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: var(--kt-shadow);
+}
+.stateEmpty p {
+  margin: 0 0 12px;
+}
+.page .stateTabs {
+  display: flex;
+  position: absolute;
+  z-index: 2;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 4px;
+  padding: 5px;
+  background: var(--kt-card);
+  border-radius: 24px;
+  box-shadow: var(--kt-shadow);
+}
+.stateTabs button {
+  min-height: 42px;
+  min-width: 76px;
+  border: 0;
+  border-radius: 20px;
+  color: var(--kt-secondary);
+  background: transparent;
+  font: inherit;
+}
+.stateTabs button[aria-pressed="true"] {
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+}
+.routeKey {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  color: #263f64;
+  background: #f4eddfeb;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+}
+.meMarker {
+  width: 0;
+  height: 0;
+  color: #2b4c7e;
+}
+.meIcon {
+  position: absolute;
+  left: -32px;
+  top: -32px;
+  width: 64px;
+  height: 64px;
+  transform-origin: center;
+}
+.meMarker:not([data-mode="now"]) .meIcon {
+  transform: scale(0.85);
+}
+.meGlow {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.15;
+  filter: blur(2px);
+}
+.meMarker[data-breathe="true"] .meGlow {
+  animation: footprint-breathe 2.4s ease-in-out infinite;
+}
+@keyframes footprint-breathe {
+  50% {
+    transform: scale(1.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meMarker[data-breathe="true"] .meGlow {
+    animation: none;
+  }
+}
+[data-theme="dark"] .meMarker,
+body[data-ds-dark-theme] .meMarker {
+  color: #f4eddf;
+}
+.page {
+  position: relative;
+}
+.mapPane [class~="maplibregl-ctrl-attrib-inner"] {
+  max-width: 420px;
+  max-height: 42px;
+  overflow: auto;
+}
+
+.page .mapControls {
+  top: 24px;
+  bottom: auto;
+}
+.mapNotice {
+  bottom: 110px;
+}
+
+.mapPane [class~="maplibregl-ctrl-attrib-inner"]:hover,
+.mapPane [class~="maplibregl-ctrl-attrib-inner"]:focus-within {
+  max-height: 180px;
+}
+
+.listPane > .listHeading:first-child {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--kt-card);
+  padding-bottom: 12px;
+}
+
+.cityLabel {
+  white-space: nowrap;
+  color: #263f64;
+  background: #f4eddfed;
+  padding: 3px 7px;
+  border-radius: 5px;
+  font: 12px / 1.4 system-ui;
+  pointer-events: none;
+}
+.meMarker .cityLabel {
+  position: absolute;
+  left: 14px;
+  top: -11px;
+}
+.cityPopup {
+  color: #263f64;
+  font: 13px / 1.5 system-ui;
+}
+[data-theme="dark"] .stateCaption,
+body[data-ds-dark-theme] .stateCaption {
+  color: #f6efdf;
+  background: #241f1bd9;
+}
+[data-theme="dark"] .cityLabel,
+body[data-ds-dark-theme] .cityLabel {
+  color: #f6efdf;
+  background: #241f1bed;
+}
+
+[data-theme="dark"] .routeKey,
+body[data-ds-dark-theme] .routeKey {
+  color: #f4eddf;
+  background: #241f1bed;
 }

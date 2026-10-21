@@ -66,6 +66,13 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const month = data.today.slice(0, 7);
   const previousMonth = offset(`${month}-01`, -1).slice(0, 7);
   const monday = offset(data.today, -(new Date(`${data.today}T12:00:00Z`).getUTCDay() + 6) % 7);
+  // 训练页只投影上月、本月、近 30 天及热力图。先折叠完整记录修订，再筛掉这些视图用不到的历史训练，
+  // 避免为多年前的每一组训练换算时区、分组并构造 exercises。UTC 粗筛留足所有时区的偏移。
+  const trainingFrom = [from, `${previousMonth}-01`, offset(monday, -28)].sort()[0] as string;
+  const trainingEarliest = Date.parse(`${trainingFrom}T00:00:00Z`) - 14 * 3600000;
+  const workouts = records("workout").filter(
+    (row) => Date.parse(row.ts) >= trainingEarliest && day(row.ts) >= trainingFrom,
+  );
   const cloud = cloudWorkouts(ws);
   const recorder = (row: StoredRecord) => {
     if (row.by === "user") return "你";
@@ -79,7 +86,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     if (row.by === "agent") return "本机 Agent";
     return row.by === "import:apple-health" ? "Apple 健康导入" : "导入记录";
   };
-  const sessions = workoutSessions(records("workout"), data.timeZone).map((rows) => {
+  const sessions = workoutSessions(workouts, data.timeZone).map((rows) => {
     const first = rows[0] as StoredRecord;
     const durations = rows.flatMap((r) => (typeof r.duration_min === "number" ? [r.duration_min] : []));
     const reps = rows
@@ -233,4 +240,3 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     ),
   };
 }
-export type HealthPageData = ReturnType<typeof readHealthPage>;

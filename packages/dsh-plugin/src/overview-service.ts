@@ -3,6 +3,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { CollectorService } from "@kaitu/channels/collectors";
 import {
+  type AgentConnectionId,
   type AutomationKey,
   type AutomationSettings,
   type CalendarData,
@@ -10,11 +11,16 @@ import {
   type CalendarPushResult,
   type CalendarPushSettings,
   type City,
+  type FinanceAccess,
   type HandoverPack,
   type Hometown,
   type ImportSource,
   KaituError,
+  type LearningCheckinInput,
+  type LearningTopic,
   type LibraryData,
+  type MemoryExpectation,
+  type MemoryInput,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoiceResult,
@@ -33,14 +39,17 @@ import {
   type OnboardingSetupResult,
   type OnboardingStatus,
   type OnboardingTarget,
+  type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
   type SettingsData,
+  type StartLearningInput,
   type SyncProvider,
   Workspace,
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  archiveMemory,
   bindGithub,
   calendarPushEntries,
   calendarPushStore,
@@ -67,6 +76,8 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  listLearning,
+  markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
   normalizeLocale,
@@ -86,6 +97,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLearning,
   readLibrary,
   readLibraryDocument,
   readNews,
@@ -97,12 +109,14 @@ import {
   readSettings,
   recoverExperienceImports,
   removeAvatar,
+  replaceMemory,
   resolveExperience,
   resolvePlace,
   resolvePreferences,
   restore,
   saveAvatar,
   saveHometown,
+  saveLearningCheckin,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -110,7 +124,10 @@ import {
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
+  setFinanceAccess,
   setNewsFeedback,
+  snapshot,
+  startLearning,
   syncProject,
   tryNews,
   unhideExperience,
@@ -130,6 +147,7 @@ import type {
   ExplorationCommand,
   ExplorationData,
   HealthData,
+  LibraryQuery,
   LifeMapData,
   MeData,
   NewsAction,
@@ -148,6 +166,7 @@ declare module "@deepseek-ai/cordis" {
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
+  private readonly scheduleLearningVersion: (message: string) => void;
 
   constructor(
     ctx: Context,
@@ -160,6 +179,13 @@ export class KaituOverviewService extends TypertRemoteService {
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
     ctx.effect(() => () => this.files.dispose());
+    this.scheduleLearningVersion = (message) => {
+      setImmediate(() => {
+        void this.write(() => snapshot(this.workspace, message)).catch((error) =>
+          ctx.logger.warn(`学习资料已保存，后台版本记录未完成：${String(error)}`),
+        );
+      });
+    };
     const performWrite = this.write;
     this.write = async (operation) => {
       try {
@@ -199,11 +225,11 @@ export class KaituOverviewService extends TypertRemoteService {
   }
   @Remote("onboardingMatterRead")
   async onboardingMatterRead(source: string): Promise<OnboardingMatter> {
-    return this.write(async () => readOnboardingMatter(this.workspace, source));
+    return readOnboardingMatter(this.workspace, source);
   }
   @Remote("onboardingMatterOrganize")
   async onboardingMatterOrganize(source: string): Promise<OnboardingMatter> {
-    return this.write(async () => readOnboardingMatter(this.workspace, source));
+    return readOnboardingMatter(this.workspace, source);
   }
   @Remote("onboardingMatterPrompt")
   async onboardingMatterPrompt(source: string, locale?: string): Promise<string> {
@@ -220,8 +246,8 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.write(() => addGoalNext(this.workspace, goalId, title));
   }
   @Remote("handoverPack")
-  async handoverPack(locale?: string): Promise<HandoverPack> {
-    return handoverPack(this.workspace, normalizeLocale(locale));
+  async handoverPack(locale?: string, includeFinance?: boolean): Promise<HandoverPack> {
+    return handoverPack(this.workspace, normalizeLocale(locale), undefined, includeFinance === true);
   }
   @Remote("directionsPrompt")
   async directionsPrompt(locale?: string): Promise<string> {
@@ -233,7 +259,7 @@ export class KaituOverviewService extends TypertRemoteService {
   }
   @Remote("preferences")
   async preferences(hint?: string): Promise<Preferences> {
-    return this.write(async () => resolvePreferences(this.workspace, hint));
+    return resolvePreferences(this.workspace, hint);
   }
   @Remote("savePreferences")
   async savePreferences(input: Preferences): Promise<Preferences> {
@@ -263,7 +289,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("onboarding")
   async onboarding(locale?: string): Promise<OnboardingStatus> {
-    return this.write(async () => onboardingStatus(this.workspace, { locale: normalizeLocale(locale) }));
+    return onboardingStatus(this.workspace, { locale: normalizeLocale(locale) });
   }
 
   @Remote("onboardingMemoryPreview")
@@ -340,13 +366,39 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("library")
-  async library(): Promise<LibraryData> {
-    return readLibrary(this.workspace);
+  async library(query?: LibraryQuery): Promise<LibraryData> {
+    return readLibrary(this.workspace, query);
   }
 
   @Remote("libraryDocument")
   async libraryDocument(file: string): Promise<string> {
     return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("learningList")
+  async learningList(): Promise<{ topic: string; title: string; next: string | null }[]> {
+    return listLearning(this.workspace);
+  }
+
+  @Remote("learningRead")
+  async learningRead(topic: string): Promise<LearningTopic> {
+    return readLearning(this.workspace, topic);
+  }
+
+  @Remote("learningStart")
+  async learningStart(
+    input: StartLearningInput,
+  ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
+    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleLearningVersion));
+  }
+
+  @Remote("learningSave")
+  async learningSave(
+    input: LearningCheckinInput,
+  ): Promise<LearningTopic & { version: string | null; versionError?: string; replayed?: boolean }> {
+    return this.write(() =>
+      saveLearningCheckin(this.workspace, input, new Date(), this.scheduleLearningVersion),
+    );
   }
 
   @Remote("calendar")
@@ -356,7 +408,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("addCalendarSubscription")
   async addCalendarSubscription(url: string, name: string): Promise<CalendarData> {
-    return this.write(() => addCalendarSubscription(this.workspace, url, name));
+    return addCalendarSubscription(this.workspace, url, name, this.write);
   }
 
   @Remote("completeNext")
@@ -372,6 +424,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("settings")
   async settings(): Promise<SettingsData> {
     return readSettings(this.workspace);
+  }
+
+  @Remote("setFinanceAccess")
+  async setFinanceAccess(id: AgentConnectionId, allowed: boolean): Promise<FinanceAccess> {
+    return this.write(() => Promise.resolve(setFinanceAccess(this.workspace, id, allowed)));
+  }
+
+  @Remote("organizerSeen")
+  async organizerSeen(): Promise<OrganizerStatus> {
+    return markOrganizerSeen(this.workspace);
   }
 
   @Remote("exportWorkspace")
@@ -409,16 +471,14 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("aiDraft")
   async aiDraft(id?: string): Promise<{ id: string; text: string } | null> {
-    return this.write(async () => {
-      const file = ".kaitu/cache/ai-draft.json";
-      if (!this.workspace.exists(file)) return null;
-      const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
-      if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
-      const value = draft.text;
-      if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
-        throw new KaituError("会话草稿不合法", "BAD_ARGS");
-      return { id: draft.id, text: value };
-    });
+    const file = ".kaitu/cache/ai-draft.json";
+    if (!this.workspace.exists(file)) return null;
+    const draft = this.workspace.readJson<{ id?: string; text?: unknown }>(file);
+    if (id ? draft.id !== id : !process.env.DSH_CLIENT_VERSION) return null;
+    const value = draft.text;
+    if (typeof draft.id !== "string" || typeof value !== "string" || value.length > 100000)
+      throw new KaituError("会话草稿不合法", "BAD_ARGS");
+    return { id: draft.id, text: value };
   }
 
   @Remote("ackAiDraft")
@@ -482,6 +542,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("capture")
   async capture(text: string): Promise<{ path: string; version: string | null }> {
     return this.write(() => captureNote(this.workspace, text));
+  }
+
+  @Remote("archiveMemory")
+  async archiveMemory(file: string, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => archiveMemory(this.workspace, file, { by: "user", expected }));
+  }
+
+  @Remote("replaceMemory")
+  async replaceMemory(file: string, candidate: MemoryInput, expected: MemoryExpectation): Promise<void> {
+    await this.write(() => replaceMemory(this.workspace, file, candidate, { by: "user", expected }));
   }
 
   @Remote("news")
@@ -556,7 +626,10 @@ export class KaituOverviewService extends TypertRemoteService {
     return readExperienceImports(this.workspace);
   }
   @Remote("experienceBatchPreview")
-  async experienceBatchPreview(id: string, operation: "undo" | "restore"): Promise<ExperienceBatchPreview> {
+  async experienceBatchPreview(
+    id: string,
+    operation: "confirm" | "undo" | "restore",
+  ): Promise<ExperienceBatchPreview> {
     return previewExperienceBatch(this.workspace, id, operation);
   }
   @Remote("setExperienceSource")
@@ -566,7 +639,7 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("changeExperienceBatch")
   async changeExperienceBatch(
     id: string,
-    operation: "undo" | "restore",
+    operation: "confirm" | "undo" | "restore",
     revision: number,
   ): Promise<{ affected: number; preserved: number; version: string | null }> {
     return this.write(() => changeExperienceBatch(this.workspace, id, operation, revision));

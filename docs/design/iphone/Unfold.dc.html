@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图 · 展开过渡</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+.mv{position:absolute;transition-property:left,top,width,height,border-radius,opacity,font-size,transform;transition-timing-function:cubic-bezier(.2,.8,.2,1)}
+</style>
+</helmet>
+<div style="position: relative; width: 1260px; height: 980px; overflow: hidden; background: #FCFCFB; color: #1F1E1D; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
+  <div style="position: absolute; left: 40px; top: 28px; right: 40px; display: flex; align-items: center; gap: 12px;">
+    <button type="button" onClick="{{toggle}}" style="height: 40px; padding: 0 20px; border-radius: 20px; border: 0; background: #1F1E1D; color: #FFFFFF; font-size: 15px; font-weight: 600;">{{toggleLabel}}</button>
+    <button type="button" onClick="{{toggleSlow}}" aria-pressed="{{slowPressed}}" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: {{slowBg}}; color: {{slowFg}}; font-size: 15px;">慢速 ×3</button>
+    <span style="font-size: 13px; color: #6B6A66;">外屏整页就是展开后的右栏：整列平移，地图从卡片放大到左边；不淡出、不重建</span>
+  </div>
+
+  <div class="mv" style="left: {{devLeft}}px; top: 100px; width: {{devW}}px; height: 820px; border-radius: {{devR}}px; overflow: hidden; background: #F5F5F3; box-shadow: 0 0 0 10px #1F1E1D, 0 24px 60px rgba(31,30,29,0.25); transition-duration: {{dur}}ms;">
+
+    <div class="mv" style="left: {{mapL}}px; top: {{mapT}}px; width: {{mapW}}px; height: {{mapH}}px; border-radius: {{mapR}}px; overflow: hidden; background: #EEF1EC; box-shadow: 0 0 0 1px #E6E4DD; transition-duration: {{dur}}ms;">
+      <svg width="100%" height="100%" viewBox="0 0 1180 820" preserveAspectRatio="xMinYMid slice" aria-label="同一张地图">
+        <rect width="1180" height="820" fill="#EEF1EC"></rect>
+        <path d="M0 120H1180M0 240H1180M0 360H1180M0 480H1180M0 600H1180M0 720H1180M150 0V820M300 0V820M450 0V820M600 0V820M750 0V820M900 0V820M1050 0V820" stroke="#DDE2DA"></path>
+        <path d="M1000 0 C980 140 970 250 1050 340 C1090 390 1080 470 1050 540 C1000 610 900 690 830 760 L830 820 L1180 820 L1180 0 Z" fill="#F4F6F7"></path>
+        <path d="M300 330 Q470 230 600 250 Q760 270 880 430" fill="none" stroke="#B8CBE4" stroke-width="22" stroke-opacity=".55" stroke-linecap="round"></path>
+        <path d="M300 330 Q470 230 600 250 Q760 270 880 430" fill="none" stroke="#1B3254" stroke-width="7" stroke-linecap="round"></path>
+        <path d="M880 430 Q840 560 720 640" fill="none" stroke="#2B4C7E" stroke-width="6" stroke-dasharray="16 14" stroke-linecap="round"></path>
+        <circle cx="300" cy="330" r="10" fill="#1B3254" stroke="#FFF" stroke-width="3"></circle>
+        <circle cx="600" cy="250" r="10" fill="#1B3254" stroke="#FFF" stroke-width="3"></circle>
+        <circle cx="880" cy="430" r="13" fill="#1B3254" stroke="#FFF" stroke-width="3"></circle>
+        <circle cx="720" cy="640" r="10" fill="#FFF" stroke="#2B4C7E" stroke-width="3"></circle>
+        <g font-size="22" font-weight="600" fill="#1F1E1D" stroke="#EEF1EC" stroke-width="6" paint-order="stroke">
+          <text x="300" y="372" text-anchor="middle">合肥</text><text x="600" y="228" text-anchor="middle">南京</text>
+          <text x="860" y="482" text-anchor="end" font-size="34" font-weight="800" fill="#1B3254">上海</text><text x="700" y="686" text-anchor="end">杭州</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="mv" style="left: 20px; top: 52px; opacity: {{narrowOnly}}; transition-duration: {{dur}}ms;">
+      <div style="font-size: 15px; color: #6B6A66;">10月18日 · 周日</div>
+      <div style="font-size: 34px; line-height: 41px; font-weight: 700;">开图</div>
+    </div>
+
+    <div class="mv" style="left: {{navL}}px; top: 20px; height: 44px; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 22px; background: rgba(255,255,255,0.52); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7), 0 8px 28px rgba(31,30,29,0.12); opacity: {{wideOnly}}; transition-duration: {{dur}}ms;">
+      <span style="padding: 0 14px; font-size: 15px; color: #4D4C48;">今天</span><span style="padding: 6px 14px; border-radius: 18px; background: #1F1E1D; color: #FFF; font-size: 15px; font-weight: 600;">开图</span><span style="padding: 0 14px; font-size: 15px; color: #4D4C48;">资料</span><span style="padding: 0 14px; font-size: 15px; color: #4D4C48;">问问</span>
+    </div>
+
+    <div class="mv" style="left: {{chipL}}px; top: {{chipT}}px; width: 358px; display: flex; flex-wrap: wrap; gap: 8px; transition-duration: {{dur}}ms;">
+      <span style="height: 32px; display: flex; align-items: center; padding: 0 12px; border-radius: 16px; background: #FFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px;">合肥 · 家乡</span>
+      <span style="height: 32px; display: flex; align-items: center; padding: 0 12px; border-radius: 16px; background: #FFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px;">南京 · 2014–2018</span>
+      <span style="height: 32px; display: flex; align-items: center; padding: 0 12px; border-radius: 16px; background: #EEF2F7; box-shadow: 0 0 0 1px #D3DEEC; font-size: 13px; font-weight: 600; color: #1B3254;">上海 · 2018 至今</span>
+      <span style="height: 32px; display: flex; align-items: center; padding: 0 12px; border-radius: 16px; background: #FFF; box-shadow: 0 0 0 1px #E6E4DD; font-size: 13px;">杭州 · 计划中</span>
+    </div>
+
+    <div class="mv" style="left: {{panL}}px; top: {{panT}}px; width: {{panW}}px; display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 20px; background: rgba(255,255,255,0.55); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.7), 0 8px 24px rgba(31,30,29,{{panShadow}}); transition-duration: {{dur}}ms;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #6B6A66;">接下来往哪走</span>
+      <div><div style="font-size: 17px; font-weight: 600;">年底出一本摄影集</div><svg width="100%" height="10" aria-hidden="true"><path d="M2 5H110" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><path d="M120 5H260" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg></div>
+      <div><div style="font-size: 17px; font-weight: 600;">开图 App</div><svg width="100%" height="10" aria-hidden="true"><path d="M2 5H160" stroke="#2B4C7E" stroke-width="3" stroke-linecap="round"></path><path d="M170 5H260" stroke="#2B4C7E" stroke-width="3" stroke-dasharray="7 5"></path></svg></div>
+      <div style="height: 1px; background: #E6E4DD;"></div>
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: .06em; color: #1B3254;">今天最重要的一件事</span>
+      <span style="font-size: 17px; line-height: 23px;">把摄影集初选从 80 张挑到 30 张</span>
+    </div>
+
+    <div class="mv" style="left: {{capL}}px; top: {{capT}}px; width: {{capW}}px; height: {{capH}}px; display: flex; align-items: center; justify-content: {{capJustify}}; gap: 8px; padding: 0 18px; border-radius: 26px; background: {{capBg}}; color: {{capFg}}; font-size: {{capFont}}px; box-shadow: 0 8px 24px rgba(31,30,29,.14), 0 0 0 1px #E6E4DD; transition-duration: {{dur}}ms;">＋ 记一下{{capDots}}</div>
+
+    <div class="mv" style="left: 0; top: {{tabT}}px; width: 390px; height: 83px; display: grid; grid-template-columns: repeat(4, 1fr); align-items: center; background: #FCFCFB; border-top: 1px solid #E6E4DD; font-size: 11px; color: #6B6A66; text-align: center; opacity: {{narrowOnly}}; transition-duration: {{dur}}ms;">
+      <span>今天</span><span style="color: #1B3254; font-weight: 600;">开图</span><span>资料</span><span>问问</span>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 40px; bottom: 24px; display: flex; gap: 28px; font-size: 13px; color: #4D4C48;">
+    <span><b style="color: #1B3254;">地图</b> 卡片 → 铺满</span>
+    <span><b style="color: #1B3254;">城市一排 + 接下来往哪走 + 最重要的一件事</b> 整列平移到右边，宽度不变</span>
+    <span><b style="color: #1B3254;">记一下</b> 底部长条 → 右上按钮</span>
+    <span><b style="color: #1B3254;">标签栏</b> ↔ 顶部胶囊</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1260,"height":980}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { wide: false, slow: false }; }
+  renderVals() {
+    const w = this.state.wide;
+    const W = w ? 1180 : 390;
+    return {
+      toggle: () => this.setState({ wide: !this.state.wide }),
+      toggleLabel: w ? '合上' : '展开',
+      toggleSlow: () => this.setState({ slow: !this.state.slow }),
+      slowPressed: this.state.slow ? 'true' : 'false',
+      slowBg: this.state.slow ? '#1B3254' : '#F0EFEC',
+      slowFg: this.state.slow ? '#FFFFFF' : '#1F1E1D',
+      dur: this.state.slow ? 1800 : 600,
+      devLeft: (1260 - W) / 2, devW: W, devR: w ? 32 : 44,
+      mapL: w ? 0 : 16, mapT: w ? 0 : 116, mapW: w ? 1180 : 358, mapH: w ? 820 : 300, mapR: w ? 0 : 24,
+      narrowOnly: w ? 0 : 1, wideOnly: w ? 1 : 0,
+      navL: w ? 20 : -320,
+      chipL: w ? 806 : 16, chipT: w ? 88 : 428,
+      panL: w ? 806 : 16, panT: w ? 176 : 516, panW: 358, panShadow: w ? 0.12 : 0,
+      capL: w ? 1040 : 16, capT: w ? 20 : 652, capW: w ? 120 : 358, capH: w ? 44 : 52,
+      capBg: w ? '#1F1E1D' : '#FFFFFF', capFg: w ? '#FFFFFF' : '#6B6A66', capFont: w ? 15 : 17,
+      capJustify: w ? 'center' : 'flex-start', capDots: w ? '' : '…',
+      tabT: w ? 820 : 737,
+    };
+  }
+}
+</script>
+</body>
+</html>

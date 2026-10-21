@@ -17,12 +17,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   Workspace,
+  addMemory,
+  addRecord,
+  agentConnections,
   enableDrive,
   exportWorkspace,
   historyDirectory,
   initWorkspace,
   localStateRoot,
+  publicRecords,
   readAgentFile,
+  readRecords,
+  setFinanceAccess,
   snapshot,
   stateDirectory,
 } from "@kaitu/core";
@@ -34,6 +40,46 @@ import { desktopPaths } from "../../desktop/environment.mjs";
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { agentSearch } from "../../desktop/sdk-search.mjs";
+
+it("财务模块改目录后，文件、别名、搜索和记录投影仍遵循各连接开关", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-renamed-finance-")));
+  try {
+    const ws = await initWorkspace(root);
+    addRecord(ws, "finance_account", {
+      name: "Synthetic wallet",
+      kind: "wallet",
+      source: "manual",
+      currency: "CNY",
+    });
+    const rows = readRecords(ws, "finance_account");
+    renameSync(ws.resolve("finance"), ws.resolve("ledger"));
+    symlinkSync(ws.resolve("ledger/STATUS.md"), join(root, "ledger-alias.md"));
+    expect(() => readAgentFile(ws, "ledger/STATUS.md", "remote-mcp")).toThrow();
+    expect(publicRecords(ws, "finance_account", rows)).toEqual([]);
+    for (const connection of agentConnections) {
+      for (const allowed of [false, true]) {
+        setFinanceAccess(ws, connection, allowed);
+        for (const path of ["ledger/STATUS.md", "ledger-alias.md"]) {
+          if (allowed) expect(readAgentFile(ws, path, connection)).toBe(ws.readText("ledger/STATUS.md"));
+          else expect(() => readAgentFile(ws, path, connection)).toThrow();
+        }
+        expect(publicRecords(ws, "finance_account", rows, connection)).toEqual(allowed ? rows : []);
+        const names = await agentSearch(
+          root,
+          "glob",
+          { pattern: "**/*" },
+          undefined,
+          undefined,
+          undefined,
+          connection,
+        );
+        expect(names.paths.includes("ledger/STATUS.md")).toBe(allowed);
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，工作区配置不能重定向状态", async () => {
   const temp = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-state-security-")));
@@ -166,6 +212,31 @@ it("scoped 文件入口拒绝程序状态及其别名，搜索不返回密钥，
       else process.env.KAITU_APP_HOME = appHome;
     }
     expect(() => desktopPaths({ KAITU_DIR: root, KAITU_APP_HOME: join(root, "program") })).toThrow();
+    const memory = await addMemory(ws, {
+      type: "fact",
+      name: "Private",
+      text: "Synthetic private memory",
+      sensitive: true,
+    });
+    for (const allowed of [false, true]) {
+      setFinanceAccess(ws, "local-ask", allowed);
+      const names = await agentSearch(root, "glob", { pattern: "**/*" });
+      expect(names.paths.includes(`memory/${memory.file}`)).toBe(false);
+      expect(names.paths.includes("finance/STATUS.md")).toBe(allowed);
+      await agentSearch(
+        root,
+        "grep",
+        { pattern: "Synthetic" },
+        undefined,
+        "synthetic-rg",
+        async (_executable: string, args: string[]) => {
+          expect(args.join(" ")).not.toContain(memory.file);
+          expect(args.join(" ")).not.toContain("memory/MEMORY.md");
+          if (!allowed) expect(args.some((arg) => /[/\\]finance[/\\]/.test(arg))).toBe(false);
+          return { stdout: "" };
+        },
+      );
+    }
     ws.writeText(
       ".agents/skills/normal/SKILL.md",
       "---\nname: normal\ndescription: synthetic\n---\nSynthetic skill",

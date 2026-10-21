@@ -23,7 +23,7 @@ import { batchSnapshot } from "./history.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
-import { type MemoryInput, importMemories, memoryInput, memoryType } from "./memory.js";
+import { type MemoryInput, importMemories, memoryInput, memoryType, normalizedMemory } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
@@ -106,7 +106,7 @@ function inboxContent(file: string, text: string): InboxContent {
 
 /** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
 const RECEIPTS = ".kaitu/inbox-records.json";
-type Receipt = { agent: string; records: { type: string; id: string }[] };
+type Receipt = { agent: string; records: { type: string; id: string }[]; superseded?: true };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
   ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
 
@@ -201,7 +201,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const previous = replaces ? receipts[basename(replaces)] : undefined;
     const refused = !replaces
       ? null
-      : !previous
+      : !previous || previous.superseded
         ? `找不到要替换的 ${replaces}：只能替换开图已经记下的收件箱记录文件，写文件名即可`
         : previous.agent !== agents
           ? `${replaces} 是 ${previous.agent} 交来的，只能由它自己修改或撤回`
@@ -235,7 +235,14 @@ async function prepare(ws: Workspace, file: string, text: string) {
               records.push({ type, id: result.record.id });
         }
         const next = { ...receipts, [basename(file)]: { agent: agents, records } };
-        if (replaces) delete next[basename(replaces)];
+        if (replaces) {
+          const replaced = basename(replaces);
+          // 旧手机提交只留本机去重凭据，不能再作为 replaces 目标。
+          // 单独标记，避免把合法的空撤回回执也误判为已被替换。
+          if (phoneInboxName.test(replaced))
+            next[replaced] = { agent: agents, records: [], superseded: true };
+          else delete next[replaced];
+        }
         ws.writeJson(RECEIPTS, next, { internal: true });
       },
     };
@@ -246,12 +253,34 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const inputs: MemoryInput[] = [];
     const agents: string[] = [];
     const errors: string[] = [];
+    let pending = false;
     for (const [index, value] of raw.entries()) {
       try {
         const row = object(value);
         agents.push(sourceAgent(row.agent));
         const input = memoryInput(row);
         await importMemories(ws, [input], { dryRun: true });
+        if (row.replaces !== undefined) {
+          if (typeof row.replaces !== "string")
+            throw new KaituError("replaces 必须是记忆文件名", "BAD_INBOX");
+          const old = normalizedMemory(ws, row.replaces);
+          if (!old) throw new KaituError("找不到要替换的记忆", "NOT_FOUND");
+          if (old.ended) {
+            const next = old.replaced_by ? normalizedMemory(ws, old.replaced_by) : undefined;
+            if (
+              next &&
+              next.type === input.type &&
+              next.name === input.name &&
+              next.text === input.text &&
+              next.source === input.source &&
+              !!next.sensitive === !!input.sensitive
+            )
+              continue;
+            throw new KaituError("这条记忆已归档，请重新核对", "CONFLICT");
+          }
+          pending = true;
+          continue;
+        }
         inputs.push(input);
       } catch (error) {
         errors.push(`第 ${index + 1} 条：${(error as Error).message}\n\n${INBOX_FORMATS}`);
@@ -261,6 +290,7 @@ async function prepare(ws: Workspace, file: string, text: string) {
     const actor = `Agent（Drive 收件箱：${agent}）`;
     return {
       errors,
+      pending,
       agent,
       message: `${actor}导入了 ${inputs.length} 条记忆`,
       apply: () => importMemories(ws, inputs, { actor }),
@@ -431,7 +461,8 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
     for (const dir of ["inbox/agents", "inbox/health"]) {
       if (!ws.exists(dir)) continue;
       for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
-        if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name === ".DS_Store") continue;
+        // 隐藏文件（.DS_Store、占位用的 .gitkeep）不是交来的资料。
+        if (!entry.isFile() || entry.name.endsWith(".tmp") || entry.name.startsWith(".")) continue;
         const file = `${dir}/${entry.name}`;
         if (ws.conflictCopy(file) || placeholderOriginal(file)) continue;
         if (unavailable.some((path) => file === path || file.startsWith(`${path}/`))) {
@@ -513,6 +544,20 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         });
         continue;
       }
+      // 手机每次提交都新建文件；同步盘重送同名文件时复用已有入账结果。
+      // 用持久账本而非十四天的展示回执，重启及回执过期后仍不能重复入账。
+      if (
+        phoneInboxName.test(basename(file)) &&
+        file.endsWith(".records.jsonl") &&
+        readReceipts(ws)[basename(file)]
+      ) {
+        moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
+        result.processed.push(file);
+        writePhoneReceipts(ws, [
+          { ref: basename(file), kind: "file", status: "duplicate", at: new Date().toISOString() },
+        ]);
+        continue;
+      }
       let prepared: Awaited<ReturnType<typeof prepare>> | undefined;
       let errors: string[] = [];
       if (!file.endsWith(".md") || file.endsWith(".digest.md")) {
@@ -524,6 +569,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         }
       }
       if (stamp(ws, file) !== before) {
+        result.pending.push(file);
+        continue;
+      }
+      if (prepared && "pending" in prepared && prepared.pending) {
         result.pending.push(file);
         continue;
       }

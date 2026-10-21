@@ -2,11 +2,13 @@ import { readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import {
+  type AgentConnectionId,
   ONBOARDING,
   type Workspace,
   addMemory,
   addPhoto,
   addTask,
+  agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
   completeTask,
@@ -25,9 +27,11 @@ import {
   importNutAi,
   inboxNoteDone,
   inboxNotes,
+  learningCheckinSchema,
   lifeMap,
   linkProject,
   listInvestments,
+  listLearning,
   listMemories,
   listProjects,
   listTasks,
@@ -37,13 +41,17 @@ import {
   onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
+  parseFrontmatter,
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
   projectDirectory,
+  proposeAgentDocument,
+  publicRecords,
   readAgentFile,
   readExperienceImports,
   readExploration,
+  readLearning,
   readOnboardingMatter,
   readPhases,
   readProject,
@@ -53,11 +61,15 @@ import {
   removePhoto,
   resolvePlace,
   restore,
+  saveLearningCheckin,
   saveOnboardingChoices,
   searchChats,
   searchMemories,
   setProject,
   snapshot,
+  startLearning,
+  startLearningSchema,
+  stringifyFrontmatter,
   syncProject,
   syncProjects,
   updateMemory,
@@ -110,7 +122,14 @@ const next = z
   })
   .passthrough();
 
-export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: MutationQueue) {
+export function registerWorkflowTools(
+  ctx: Context,
+  ws: Workspace,
+  queue: MutationQueue,
+  connection: AgentConnectionId = "local-ask",
+) {
+  const visibleMemories = (rows: ReturnType<typeof listMemories>) =>
+    rows.filter((row) => agentCanRead(ws, `memory/${row.file}`, connection));
   function register<T extends z.ZodType>(
     name: string,
     description: string,
@@ -137,6 +156,28 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
         }),
     });
   }
+  register(
+    "kaitu_learning",
+    '学习主题：list/read 读已存资料，start 保存主题与来源，save 追加用户实际表达的理解、疑问与下一步。读取参数 {"action":"read","topic":"主题ID"}。保存参数 {"action":"save","input":{"topic":"主题ID","understanding":"理解","questions":"疑问","next":"下一步","operationId":"唯一请求ID"}}；这五个字段全部放在 input 内，理解、疑问、下一步均为字符串，无内容用空字符串。不能把 AI 的讲解写成用户已学会。不要自动完成下一步；completedNextId 仅在用户明确完成时传，并传入读取时的 completedNextTitle；任务已变化先重新读取。每次 save 用一个 operationId；结果不确定时重试沿用该 ID，另一次学习用新 ID。',
+    z.discriminatedUnion("action", [
+      z.object({ action: z.literal("list") }).strict(),
+      z.object({ action: z.literal("read"), topic: text }).strict(),
+      z.object({ action: z.literal("start"), input: startLearningSchema }).strict(),
+      z.object({ action: z.literal("save"), input: learningCheckinSchema }).strict(),
+    ]),
+    (input) => {
+      switch (input.action) {
+        case "list":
+          return listLearning(ws);
+        case "read":
+          return readLearning(ws, input.topic);
+        case "start":
+          return startLearning(ws, input.input);
+        case "save":
+          return saveLearningCheckin(ws, input.input);
+      }
+    },
+  );
   register(
     "kaitu_onboarding",
     "首次使用：保存原文后的整理草稿、内容与清单、选择和记忆预览。草稿只进待核对，用户采纳才生成待办。",
@@ -235,7 +276,7 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     ]),
     (input) =>
       input.operation === "list"
-        ? readRecords(ws, input.type, input)
+        ? publicRecords(ws, input.type, readRecords(ws, input.type, input), connection)
         : writeAgentRecord(
             ws,
             input.operation,
@@ -280,9 +321,12 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     async (input) => {
       switch (input.operation) {
         case "read":
-          return { path: input.path, content: readAgentFile(ws, input.path) };
+          return { path: input.path, content: readAgentFile(ws, input.path, connection) };
         case "list":
-          return listFiles(ws, input.path);
+          if (!agentCanRead(ws, input.path, connection)) throw new Error("这个连接不能读取该目录");
+          return listFiles(ws, input.path).filter((entry) =>
+            agentCanRead(ws, `${input.path}/${entry.name}`.replace(/^\//, ""), connection),
+          );
         case "write":
           return writeFiles(ws, input.files, false);
         case "snapshot":
@@ -322,9 +366,9 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
     (input) => {
       switch (input.operation) {
         case "list":
-          return listMemories(ws);
+          return visibleMemories(listMemories(ws));
         case "search":
-          return searchMemories(ws, input.query);
+          return visibleMemories(searchMemories(ws, input.query));
         case "add":
           return addMemory(ws, memoryInput(input.entry), { by: "agent", actor: "DeepSeek" });
         case "update": {
@@ -509,8 +553,15 @@ export function registerWorkflowTools(ctx: Context, ws: Workspace, queue: Mutati
           return input.slug ? syncProject(ws, input.slug) : syncProjects(ws);
         case "link":
           return linkProject(ws, input.slug, input.link);
-        case "set":
-          return setProject(ws, input.slug, input.patch);
+        case "set": {
+          const project = readProject(ws, input.slug);
+          const content = proposeAgentDocument(
+            `${project.dir}/STATUS.md`,
+            stringifyFrontmatter({ ...project.data, ...input.patch }, project.body),
+            stringifyFrontmatter(project.data, project.body),
+          );
+          return setProject(ws, input.slug, parseFrontmatter(content).data);
+        }
         case "log":
           return logProject(ws, input.slug, input.text, { date: input.date, by: "agent" });
         case "project-read": {

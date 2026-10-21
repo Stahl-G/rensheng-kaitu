@@ -11,6 +11,8 @@ import { type Workspace, stateDirectory } from "./workspace.js";
 
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [
+  ".kaitu/organizer.json",
+  ".kaitu/feishu.json",
   "phone/",
   ".kaitu/phone-actions.json",
   ".kaitu/secrets.json",
@@ -34,7 +36,9 @@ export const NEVER_TRACK = [
   "inbox/rejected/",
 ];
 
-export const GITIGNORE = `phone/
+export const GITIGNORE = `.kaitu/organizer.json
+.kaitu/feishu.json
+phone/
 .kaitu/phone-actions.json
 # 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
@@ -88,7 +92,22 @@ export async function ensureHistory(ws: Workspace): Promise<void> {
   maintainHistoryIgnore(ws);
 }
 
+/** 纯 Git 建的记忆仓库（根目录有 kaitu-backup.json）：根目录 .gitignore 属于用户推到 GitHub 的仓库。 */
+export function userOwnsGitignore(ws: Workspace): boolean {
+  return ws.exists("kaitu-backup.json");
+}
+
+export function historyExcludeFile(ws: Workspace): string {
+  return join(historyDirectory(ws), "info", "exclude");
+}
+
 export function maintainHistoryIgnore(ws: Workspace): void {
+  if (userOwnsGitignore(ws)) {
+    // 手机快照和收件箱要随仓库推上去，开图版本历史的排除规则只写进版本库自己的 info/exclude。
+    fs.mkdirSync(join(historyDirectory(ws), "info"), { recursive: true });
+    fs.writeFileSync(historyExcludeFile(ws), GITIGNORE);
+    return;
+  }
   const ignore = ws.exists(".gitignore") ? ws.scanText(".gitignore") : "";
   if (ignore === undefined) return;
   const missing = GITIGNORE.split("\n").filter(
@@ -106,8 +125,25 @@ async function headOid(ws: Workspace): Promise<string | null> {
   }
 }
 
-function historyFs(ws: Workspace) {
-  if (!ws.isICloud) return fs;
+const invalidated = new WeakMap<Workspace, Map<string, symbol>>();
+
+/** 文件事件比 Git 索引的整秒 stat 更精确；只让这些路径重新读取内容。 */
+export function invalidateHistoryFile(ws: Workspace, file: string): void {
+  const files = invalidated.get(ws) ?? new Map<string, symbol>();
+  files.set(file, Symbol());
+  invalidated.set(ws, files);
+}
+
+function clearInvalidated(ws: Workspace, checked: ReadonlyMap<string, symbol>): void {
+  const files = invalidated.get(ws);
+  for (const [file, token] of checked) {
+    if (files?.get(file) === token) files.delete(file);
+  }
+}
+
+function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map()) {
+  if (!ws.isICloud && !changed.size) return fs;
+  const gitdir = historyDirectory(ws);
   const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
     if (typeof path === "string") {
       const rel = relative(ws.root, path);
@@ -119,30 +155,59 @@ function historyFs(ws: Workspace) {
     }
     return fs.promises.readFile(path, options);
   }) as typeof fs.promises.readFile;
-  return { ...fs, promises: { ...fs.promises, readFile } };
+  const lstat = (async (...args: Parameters<typeof fs.promises.lstat>) => {
+    const stat = await fs.promises.lstat(...args);
+    const path = String(args[0]);
+    // 用户目录事件不能使 Git 自己的索引失效，否则每个工作区条目都会重读整份 index。
+    if (path === gitdir || path.startsWith(`${gitdir}${sep}`)) return stat;
+    const file = relative(ws.root, String(args[0])).split(sep).join("/");
+    let affected = changed.has(file);
+    for (
+      let slash = file.lastIndexOf("/");
+      !affected && slash >= 0;
+      slash = file.lastIndexOf("/", slash - 1)
+    ) {
+      affected = changed.has(file.slice(0, slash));
+    }
+    if (stat.isFile() && affected) {
+      // statusMatrix 没有按路径禁用 stat 缓存的接口。仅在只读盘点里令时间戳失配，
+      // refresh:false 防止占位时间写入索引；git.add 仍使用真实文件状态。
+      stat.mtimeMs = Number.NaN;
+    }
+    return stat;
+  }) as typeof fs.promises.lstat;
+  return { ...fs, promises: { ...fs.promises, ...(ws.isICloud ? { readFile } : {}), lstat } };
 }
 
 function snapshotFile(ws: Workspace, file: string): boolean {
   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
-export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
-  await ensureHistory(ws);
-  const matrix = await git.statusMatrix({
-    fs: historyFs(ws),
-    dir: ws.root,
-    gitdir: historyDirectory(ws),
-    filter: (file) => snapshotFile(ws, file),
-  });
+function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, includeInbox = false): string[] {
   return matrix
     .filter(
       ([file, head, workdir, stage]) =>
         file !== "OVERVIEW.md" &&
-        !file.startsWith("inbox/") &&
+        (includeInbox || !file.startsWith("inbox/")) &&
         !neverTrack(file) &&
         !(head === 1 && workdir === 1 && stage === 1),
     )
     .map(([file]) => file);
+}
+
+export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
+  await ensureHistory(ws);
+  const changedFiles = new Map(invalidated.get(ws));
+  const matrix = await git.statusMatrix({
+    fs: historyFs(ws, changedFiles),
+    refresh: !changedFiles.size,
+    dir: ws.root,
+    gitdir: historyDirectory(ws),
+    filter: (file) => snapshotFile(ws, file),
+  });
+  const files = pendingFiles(matrix);
+  if (!files.length) clearInvalidated(ws, changedFiles);
+  return files;
 }
 
 const deferred = new WeakMap<Workspace, (message: string) => void>();
@@ -179,53 +244,91 @@ export async function snapshot(ws: Workspace, message: string, now = new Date())
   return null;
 }
 
-/** 立刻存版本，不经过后台。 */
-export async function snapshotNow(ws: Workspace, message: string, now = new Date()): Promise<string | null> {
+type SnapshotMessage = string | ((files: readonly string[], hasPendingFiles: boolean) => string | null);
+
+function unavailableHistoryWrite(error: unknown): boolean {
+  if (error instanceof git.Errors.MultipleGitError)
+    return error.errors.length > 0 && error.errors.every(unavailableHistoryWrite);
+  return ["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(
+    (error as NodeJS.ErrnoException | undefined)?.code ?? "",
+  );
+}
+
+/** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */
+export async function snapshotNow(
+  ws: Workspace,
+  message: SnapshotMessage,
+  now = new Date(),
+): Promise<string | null> {
   refreshOverview(ws, now);
   try {
     return await saveSnapshot(ws, message, now);
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
-    if (!["EPERM", "EACCES", "EROFS", "ENOSPC"].includes(code ?? "")) throw error;
+    if (!unavailableHistoryWrite(error)) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");
     return null;
   }
 }
 
-async function saveSnapshot(ws: Workspace, message: string, now: Date): Promise<string | null> {
+async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date): Promise<string | null> {
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
+  // 只在这次完整保存里共享 Git 对象与索引解析，不跨版本缓存工作区状态。
+  const cache = {};
+  const changedFiles = new Map(invalidated.get(ws));
   const matrix = await git.statusMatrix({
-    fs: io,
+    cache,
+    fs: historyFs(ws, changedFiles),
+    refresh: !changedFiles.size,
     dir,
     gitdir: historyDirectory(ws),
     filter: (file) => snapshotFile(ws, file),
   });
-  let changed = 0;
+  let description: string;
+  if (typeof message === "function") {
+    const files = pendingFiles(matrix);
+    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。
+    const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);
+    if (result === null) {
+      if (!files.length) clearInvalidated(ws, changedFiles);
+      return null;
+    }
+    description = result;
+  } else description = message;
+  const additions: string[] = [];
+  const removals: string[] = [];
   for (const [filepath, head, workdir, stage] of matrix) {
     if (neverTrack(filepath)) {
       if (head !== 0 || stage !== 0) {
-        await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-        changed++;
+        removals.push(filepath);
       }
       continue;
     }
     if (head === 1 && workdir === 1 && stage === 1) continue;
-    if (workdir === 0) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath });
-    else await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath });
-    changed++;
+    if (workdir === 0) removals.push(filepath);
+    else additions.push(filepath);
   }
-  if (changed === 0) return null;
+  if (!additions.length && !removals.length) {
+    clearInvalidated(ws, changedFiles);
+    return null;
+  }
+  if (removals.length) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath: removals, cache });
+  // git.add 支持多路径，但会并行打开该数组里的文件；小批限制文件句柄，同时避免逐文件重写全索引。
+  for (let i = 0; i < additions.length; i += 32)
+    await git.add({ fs: io, dir, gitdir: historyDirectory(ws), filepath: additions.slice(i, i + 32), cache });
   const timestamp = Math.floor(now.getTime() / 1000);
-  return git.commit({
+  const oid = await git.commit({
+    cache,
     fs,
     dir,
     gitdir: historyDirectory(ws),
-    message,
+    message: description,
     author: { ...AUTHOR, timestamp, timezoneOffset: now.getTimezoneOffset() },
   });
+  clearInvalidated(ws, changedFiles);
+  return oid;
 }
 
 export interface Version {
@@ -327,7 +430,7 @@ export async function restore(
       ws.isUnavailable(file),
   );
   if (unavailable.length)
-    throw new KaituError(`还没从 iCloud 下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
+    throw new KaituError(`还没从云盘下载：${unavailable.join("、")}`, "CLOUD_UNAVAILABLE");
   await saveSnapshot(ws, "恢复前自动保存", opts.now ?? new Date());
   if (await headOid(ws))
     currentFiles = (await git.listFiles({ fs, dir, gitdir: historyDirectory(ws), ref: "HEAD" })).filter(

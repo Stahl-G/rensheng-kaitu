@@ -1,5 +1,12 @@
-import { existsSync, statSync } from "node:fs";
-import { NEVER_TRACK, hasHistory, historyDirectory, isTracked } from "./history.js";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  NEVER_TRACK,
+  hasHistory,
+  historyDirectory,
+  historyExcludeFile,
+  isTracked,
+  userOwnsGitignore,
+} from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { CONFIG_VERSION } from "./init.js";
 import { investmentOf, listInvestments } from "./investments.js";
@@ -57,7 +64,7 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   add(
     "iCloud 文件已下载",
     !unavailable.length,
-    unavailable.length ? `还没从 iCloud 下载：${unavailable.join("、")}` : undefined,
+    unavailable.length ? `还没从云盘下载：${unavailable.join("、")}` : undefined,
     unavailable,
   );
   if (ws.scanText(".kaitu/config.json") === undefined) return checks;
@@ -111,12 +118,16 @@ export async function doctor(ws: Workspace): Promise<Check[]> {
   if (!hasHistory(ws)) add("版本历史已启用", false, "缺少版本库");
   else {
     add("版本历史已启用", true, historyDirectory(ws));
-    const ignore = ws.exists(".gitignore") ? (ws.scanText(".gitignore") ?? "") : "";
+    const own = userOwnsGitignore(ws);
+    const ignoreFile = own ? historyExcludeFile(ws) : ws.resolve(".gitignore");
+    const ignore = existsSync(ignoreFile) ? readFileSync(ignoreFile, "utf8") : "";
     const notIgnored = NEVER_TRACK.filter((p) => !ignore.split("\n").includes(p));
     add(
       "密钥与索引不进版本历史",
       notIgnored.length === 0,
-      notIgnored.length ? `.gitignore 缺少：${notIgnored.join("、")}` : undefined,
+      notIgnored.length
+        ? `${own ? "版本库排除规则" : ".gitignore"} 缺少：${notIgnored.join("、")}`
+        : undefined,
     );
     const leaked = [];
     for (const p of [".kaitu/secrets.json", ".kaitu/index.sqlite"])

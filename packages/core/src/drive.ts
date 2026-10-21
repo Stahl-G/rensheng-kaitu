@@ -150,6 +150,7 @@ function suggestedFolders() {
     icloud: process.platform === "darwin" && existsSync(icloud) ? icloud : null,
     drive,
     nutstore: nutstoreDirectory(),
+    home: process.env.HOME || homedir(),
   };
 }
 
@@ -250,7 +251,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   const unavailable = ws.unavailableFiles();
   if (unavailable.length)
     throw new KaituError(
-      `还没从 iCloud 下载：${unavailable.join("、")}，下载完成后再搬回本机`,
+      `还没从云盘下载：${unavailable.join("、")}，下载完成后再搬回本机`,
       "CLOUD_UNAVAILABLE",
     );
   const old = ws.root;

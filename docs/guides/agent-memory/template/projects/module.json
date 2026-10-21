@@ -1,0 +1,22 @@
+{
+  "id": "projects",
+  "name": "项目",
+  "version": 1,
+  "visibility": "agent",
+  "description": "个人项目与工作",
+  "records": {
+    "project_metric": {
+      "path": "data/metrics/{YYYY-MM}.jsonl",
+      "schema": "schemas/project-metric.schema.json",
+      "label": "项目进度"
+    },
+    "github_snapshot": {
+      "path": "data/github/{YYYY-MM}.jsonl",
+      "schema": "schemas/github-snapshot.schema.json",
+      "label": "GitHub 快照"
+    }
+  },
+  "agent": {
+    "instructions": "每个项目一个子目录，含 STATUS.md、notes.md、log.md。用 kaitu project 管理与同步；项目内容在链接的文件夹里，只读。next 会出现在今天。"
+  }
+}

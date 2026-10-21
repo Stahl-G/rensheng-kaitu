@@ -27,6 +27,7 @@ export * from "./workbench.js";
 export * from "./ui-imports.js";
 export * from "./sample.js";
 export * from "./agent-tools.js";
+export * from "./exposure.js";
 export * from "./secrets.js";
 
 export * from "./drive.js";
@@ -92,6 +93,9 @@ export { saveHometown } from "./hometown.js";
 export { dshFiles } from "./dsh-files.js";
 
 export * from "./workspace-backup.js";
+export * from "./github-cli.js";
+export * from "./project-memory.js";
+export * from "./system-proxy.js";
 
 export * from "./investments.js";
 export * from "./phases.js";
@@ -99,3 +103,8 @@ export * from "./completion-rate.js";
 export * from "./phone-projections.js";
 export * from "./phone-snapshots.js";
 export * from "./phone-receipts.js";
+export * from "./phone-run.js";
+export * from "./organizer.js";
+
+export * from "./learning.js";
+export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";

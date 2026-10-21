@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图 · 更新来源</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #F5F5F3; color: #1F1E1D; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
+  <div style="display: flex; align-items: center; padding: 50px 8px 0;">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 8px 0 4px; font-size: 17px; color: #2B4C7E;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      设置
+    </a>
+  </div>
+  <h1 style="margin: 0; padding: 2px 20px 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.01em;">更新来源</h1>
+
+  <div style="display: flex; flex-direction: column; gap: 26px; padding: 18px 16px 32px;">
+    <section aria-label="谁在更新" style="display: flex; flex-direction: column; gap: 8px;">
+      <div style="border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; overflow: hidden;">
+        <div style="display: flex; gap: 12px; align-items: center; padding: 12px 16px;">
+          <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 18px; background: #1B3254; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700;">D</span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 17px; line-height: 22px;">Dot</span>
+            <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">今天 07:30 更新</span>
+          </div>
+          <span style="flex: none; padding: 3px 10px; border-radius: 12px; background: #EEF2F7; color: #1B3254; font-size: 13px; font-weight: 600;">当前</span>
+        </div>
+        <div style="height: 1px; background: #E6E4DD; margin-left: 64px;"></div>
+        <div style="display: flex; gap: 12px; align-items: center; padding: 12px 16px;">
+          <span aria-hidden="true" style="width: 36px; height: 36px; flex: none; border-radius: 18px; background: #F0EFEC; color: #4D4C48; display: flex; align-items: center; justify-content: center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"></rect><path d="M2 19h20"></path></svg>
+          </span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 17px; line-height: 22px;">电脑上的开图</span>
+            <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">10月16日 22:10 更新</span>
+          </div>
+        </div>
+      </div>
+      <p style="margin: 0; padding: 0 16px; font-size: 13px; line-height: 18px; color: #6B6A66;">电脑开着时由电脑更新，其余时间由 Agent 更新。</p>
+    </section>
+
+    <section aria-labelledby="brief-title" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="brief-title" style="margin: 0; padding: 0 16px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">交给 Agent 的说明</h2>
+      <div style="display: flex; flex-direction: column; gap: 14px; padding: 14px; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px 14px 16px; border-radius: 12px; background: #F5F5F3; font-size: 15px; line-height: 22px; color: #1F1E1D;">
+          <span>你是我的「开图整理员」。</span>
+          <span>资料位置：GitHub 私有仓库 <span style="font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 14px; color: #1B3254;">xiaolin/kaitu</span>（只用这个仓库）。</span>
+          <span>每天 06:30、12:30、18:30、22:30 和凌晨 3:00（北京时间）各运行一次；我说「更新开图」时也运行一次。</span>
+          <span>每次运行先读仓库根目录的 ORGANIZER.md，照做，不做它没写的事。</span>
+        </div>
+        <button type="button" onClick="{{copy}}" aria-live="polite" style="height: 48px; border-radius: 24px; border: 0; background: {{copyBg}}; color: #FFFFFF; font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 160ms ease;">
+          <sc-if value="{{copied}}" hint-placeholder-val="{{false}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg>
+          </sc-if>
+          <sc-if value="{{notCopied}}" hint-placeholder-val="{{true}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>
+          </sc-if>
+          {{copyLabel}}
+        </button>
+      </div>
+      <p style="margin: 0; padding: 0 16px; font-size: 13px; line-height: 18px; color: #6B6A66;">Agent 会读写这个仓库，读到的内容由它所在的服务处理。</p>
+    </section>
+
+    <a href="StatusAgent.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; color: #1F1E1D;">
+      <span style="flex: 1; font-size: 17px;">最近一次</span>
+      <span style="font-size: 15px; color: #6B6A66; font-variant-numeric: tabular-nums;">处理 2 个文件 · 1 条核对</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6A66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+    </a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { copied: false };
+  }
+  renderVals() {
+    const copied = this.state.copied;
+    return {
+      copied: copied,
+      notCopied: !copied,
+      copyLabel: copied ? '已拷贝' : '拷贝说明',
+      copyBg: copied ? '#2B4C7E' : '#1F1E1D',
+      copy: () => this.setState({ copied: !this.state.copied }),
+    };
+  }
+}
+</script>
+</body>
+</html>

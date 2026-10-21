@@ -71,6 +71,8 @@ export function candidate(type: ImportType, data: Record<string, unknown>): Cand
   return { type, data, key: naturalKey(type, data) };
 }
 
+const genericWorkouts = new Set(["其他训练", "体能训练"]);
+
 function content(record: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(record).filter(
@@ -143,17 +145,53 @@ export async function importBatch(
       (record) => !record.deleted && record.by === by && (!opts.scope || opts.scope(record)),
     );
     const existing = new Map<string, StoredRecord>();
+    const legacyWorkouts = new Map<string, Set<string>>();
+    const workoutCounts = new Map<string, number>();
+    if (source === "apple-health" && type === "workout")
+      for (const item of group.values()) {
+        const at = new Date(String(item.data.ts)).toISOString();
+        workoutCounts.set(at, (workoutCounts.get(at) ?? 0) + 1);
+      }
     for (const record of revisions) {
-      if (!record.deleted && record.by === by && (!opts.scope || opts.scope(record)))
+      if (!record.deleted && record.by === by && (!opts.scope || opts.scope(record))) {
         existing.set(naturalKey(type, record), latest.get(record.id) as StoredRecord);
+        if (source === "apple-health" && type === "workout" && genericWorkouts.has(String(record.exercise))) {
+          const at = new Date(record.ts).toISOString();
+          const ids = legacyWorkouts.get(at) ?? new Set<string>();
+          const current = latest.get(record.id) as StoredRecord;
+          if (current.by !== by || genericWorkouts.has(String(current.exercise))) ids.add(record.id);
+          legacyWorkouts.set(at, ids);
+        }
+      }
     }
     const added: Record<string, unknown>[] = [];
     const updated: { id: string; patch: Record<string, unknown> }[] = [];
     const counts: Counts = { added: 0, updated: 0, deleted: 0, skipped: 0 };
     for (const item of group.values()) {
-      const known = existing.get(item.key);
+      let known = existing.get(item.key);
+      if (
+        !known &&
+        source === "apple-health" &&
+        type === "workout" &&
+        !genericWorkouts.has(String(item.data.exercise))
+      ) {
+        const at = new Date(String(item.data.ts)).toISOString();
+        const ids = legacyWorkouts.get(at);
+        // Only an unambiguous old generic name can be upgraded; simultaneous distinct workouts keep their identities.
+        if (workoutCounts.get(at) === 1 && ids?.size === 1) known = latest.get([...ids][0] as string);
+      }
       // 依据导入时的身份找到人工修订或删除的记录，旧来源不能覆盖或重新创建它。
       if (known && known.by !== by) {
+        counts.skipped++;
+        continue;
+      }
+      if (
+        known &&
+        source === "apple-health" &&
+        type === "workout" &&
+        genericWorkouts.has(String(item.data.exercise)) &&
+        !genericWorkouts.has(String(known.exercise))
+      ) {
         counts.skipped++;
         continue;
       }

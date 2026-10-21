@@ -26,7 +26,9 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [FullCalendar React](https://github.com/fullcalendar/fullcalendar-react) | 将日历嵌入 React 页面 | MIT |
 | [react-easy-crop](https://github.com/ValentinH/react-easy-crop) | 选择头像后的图片裁剪 | MIT |
 | [MapLibre GL JS](https://github.com/maplibre/maplibre-gl-js) | 人生足迹地图的浏览器渲染和交互 | BSD-3-Clause |
-| [OpenFreeMap](https://github.com/hyperknot/openfreemap) | 在线地图瓦片、Positron / dark 样式；详细许可见下文 | MIT；底图与样式分别署名 |
+| [OpenFreeMap](https://openfreemap.org/) | 纸本地图的区域水面与河流；按需联网，无需 Key | 软件 MIT；保留 OpenMapTiles、OpenStreetMap 等原署名 |
+| [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) | 随包全球地形晕渲，调色并重投影为纸本底图 | Public Domain，可修改及商业使用 |
+| [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | 城市层按需加载 Terrarium 地形 | 多来源许可；保留 [Tilezen/Joerd 完整署名](https://github.com/tilezen/joerd/blob/master/docs/attribution.md) |
 | [Preact](https://github.com/preactjs/preact) | packages/web 中的轻量工作台界面 | MIT |
 | [Apache ECharts](https://github.com/apache/echarts) | 轻量工作台中的趋势与统计图表 | Apache-2.0 |
 | [markdown-it](https://github.com/markdown-it/markdown-it) | 轻量工作台显示 Markdown 内容 | MIT |

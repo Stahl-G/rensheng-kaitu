@@ -45,7 +45,15 @@ const save = (ws: Workspace, rows: CalendarSubscription[]) => {
   writeFileSync(file(ws), `${JSON.stringify(rows, null, 2)}\n`, { mode: 0o600 });
 };
 
-export async function addCalendarSubscription(ws: Workspace, address: string, name: string) {
+type CalendarWrite = <T>(operation: () => Promise<T>) => Promise<T>;
+const directWrite: CalendarWrite = (operation) => operation();
+
+export async function addCalendarSubscription(
+  ws: Workspace,
+  address: string,
+  name: string,
+  write: CalendarWrite = directWrite,
+) {
   let url: URL;
   try {
     url = new URL(address.replace(/^webcal:/i, "https:"));
@@ -53,40 +61,56 @@ export async function addCalendarSubscription(ws: Workspace, address: string, na
   } catch {
     throw new KaituError("请输入有效的 ICS 订阅地址", "BAD_ARGS");
   }
-  const rows = subscriptions(ws);
-  if (rows.some((row) => row.url === url.href)) throw new KaituError("这个日历已经添加", "CONFLICT");
-  rows.push({
-    id: randomUUID(),
-    name: name.trim().slice(0, 100) || "订阅日历",
-    url: url.href,
-    attemptedAt: null,
-    syncedAt: null,
-    error: null,
+  await write(async () => {
+    const rows = subscriptions(ws);
+    if (rows.some((row) => row.url === url.href)) throw new KaituError("这个日历已经添加", "CONFLICT");
+    rows.push({
+      id: randomUUID(),
+      name: name.trim().slice(0, 100) || "订阅日历",
+      url: url.href,
+      attemptedAt: null,
+      syncedAt: null,
+      error: null,
+    });
+    save(ws, rows);
   });
-  save(ws, rows);
-  await pullCalendarSubscriptions(ws);
+  await pullCalendarSubscriptions(ws, new Date(), write);
   return readCalendar(ws);
 }
 
-export async function pullCalendarSubscriptions(ws: Workspace, now = new Date()) {
-  const rows = subscriptions(ws);
-  for (const row of rows) {
+export async function pullCalendarSubscriptions(
+  ws: Workspace,
+  now = new Date(),
+  write: CalendarWrite = directWrite,
+) {
+  for (const row of subscriptions(ws)) {
     if (row.attemptedAt && +now - Date.parse(row.attemptedAt) < interval) continue;
-    row.attemptedAt = now.toISOString();
-    const directory = mkdtempSync(join(tmpdir(), "kaitu-calendar-"));
+    // 网络等待不占用工作区写队列；应用时重新读取列表，保留等待期间新增的订阅。
+    let bytes: Uint8Array | undefined;
     try {
-      const bytes = await fetchCalendar(row.url);
-      const input = join(directory, "calendar.ics");
-      writeFileSync(input, bytes, { mode: 0o600 });
-      await importIcs(ws, input, { calendar: `subscription:${row.id}`, now });
-      row.syncedAt = now.toISOString();
-      row.error = null;
-    } catch {
-      row.error = "日历拉取失败，稍后重试";
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-      save(ws, rows);
-    }
+      bytes = await fetchCalendar(row.url);
+    } catch {}
+    await write(async () => {
+      const rows = subscriptions(ws);
+      const current = rows.find((entry) => entry.id === row.id);
+      // 同一订阅若已被另一轮完成，不用较早的结果覆盖它。
+      if (!current || current.attemptedAt !== row.attemptedAt) return;
+      current.attemptedAt = now.toISOString();
+      const directory = mkdtempSync(join(tmpdir(), "kaitu-calendar-"));
+      try {
+        if (!bytes) throw new Error("Calendar fetch failed");
+        const input = join(directory, "calendar.ics");
+        writeFileSync(input, bytes, { mode: 0o600 });
+        await importIcs(ws, input, { calendar: `subscription:${row.id}`, now });
+        current.syncedAt = now.toISOString();
+        current.error = null;
+      } catch {
+        current.error = "日历拉取失败，稍后重试";
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+        save(ws, rows);
+      }
+    });
   }
 }
 
@@ -104,9 +128,11 @@ export function readCalendar(ws: Workspace, now = new Date()): CalendarData {
     pending: false,
   }));
   let planDate: string | null = null;
-  if (ws.exists("NOW.md")) {
+  // 云盘里还没下载的 NOW.md 当作没有计划，不让整页读取失败。
+  const nowText = ws.exists("NOW.md") ? ws.scanText("NOW.md") : undefined;
+  if (nowText !== undefined) {
     // 和今天页读同一份补齐 id 后的计划。
-    const data = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as unknown as TodayPlan;
+    const data = normalizeNow(parseFrontmatter(nowText).data) as unknown as TodayPlan;
     const date = data.date;
     planDate = data.blocks?.length ? date : null;
     for (const block of data.blocks ?? []) {

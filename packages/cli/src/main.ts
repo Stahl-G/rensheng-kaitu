@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
   type By,
@@ -33,6 +33,7 @@ import {
   draftOnboardingMatter,
   enableSync,
   findRecordType,
+  githubCliStatus,
   history,
   importAppleHealth,
   importChatgptConversations,
@@ -42,6 +43,7 @@ import {
   inboxNoteDone,
   inboxNotes,
   initWorkspace,
+  installProjectMemory,
   linkProject,
   listInvestments,
   listMemories,
@@ -53,6 +55,7 @@ import {
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
+  projectMemoryContext,
   readOnboardingMatter,
   readProject,
   readRecords,
@@ -66,6 +69,8 @@ import {
   renderRecordReference,
   resetOnboarding,
   restore,
+  restoreWorkspaceBackup,
+  runPhone,
   saveOnboardingChoices,
   searchChats,
   searchMemories,
@@ -75,16 +80,20 @@ import {
   syncProject,
   syncProjects,
   syncStatus,
+  syncWorkspaceBackup,
   updateMemory,
   updateRecord,
   upgradeWorkspace,
   validateWorkspace,
+  workspaceBackupRequest,
+  workspaceBackupStatus,
   writeAgentsMd,
 } from "@kaitu/core";
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { channelsCommand, installShutdown } from "./channels.js";
 import { dshCommand, installDsh } from "./dsh.js";
+import { importFeishuFolder } from "./feishu.js";
 import { startMcpHttp } from "./mcp/http.js";
 import { createMcpServer } from "./mcp/server.js";
 import { startUi } from "./ui/server.js";
@@ -100,6 +109,8 @@ const HELP = `开图 kaitu
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
   kaitu inbox process                               处理 Agent 与健康数据收件箱
+  kaitu phone run [--as <名字>]                     处理手机收件箱并重写手机快照
+  kaitu feishu import --folder <文件夹 token> [--cli <lark-cli 路径>]  把飞书文件夹里的云文档存成原文
   kaitu ui [--port 4870] [--no-open] [--channels]   打开工作台，可同时启动手机通道
   kaitu dsh [--install] [--no-automation]         把开图装进 DeepSeek Harness 桌面应用（不加则打印网页版启动命令；开图 App 已在用同一工作区时加 --no-automation）
   kaitu channels setup <telegram|feishu|qq|weixin>  配置手机通道
@@ -123,8 +134,12 @@ const HELP = `开图 kaitu
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
   kaitu investments [--json]
-  kaitu project new --title <标题> --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
+  kaitu project new --title <标题> [--slug <英文短名>] --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
+  kaitu project memory [--from <代码目录>] [--project <slug>] [--install]
+  kaitu backup status | auth-status | sync
+  kaitu backup connect <owner/repo> [--create] [--via gh|token] [--text|--no-text] [--records|--no-records]
+  kaitu backup restore <owner/repo> --to <新目录> [--via gh|token]
   kaitu project link <slug> <路径> [--role manuscript|repo|folder] [--include <glob>]...
   kaitu project github <slug> <url>
   kaitu project github-token [--clear]  从 stdin 读取 token，仅保存在本机
@@ -165,11 +180,18 @@ const HELP = `开图 kaitu
 `;
 
 const options = {
+  via: { type: "string" },
+  create: { type: "boolean" },
+  "backup-text": { type: "boolean" },
+  "no-text": { type: "boolean" },
+  records: { type: "boolean" },
+  "no-records": { type: "boolean" },
   channels: { type: "boolean" },
   install: { type: "boolean" },
   "no-automation": { type: "boolean" },
   only: { type: "string" },
   title: { type: "string" },
+  slug: { type: "string" },
   due: { type: "string" },
   "remind-at": { type: "string" },
   project: { type: "string" },
@@ -212,6 +234,9 @@ const options = {
   "no-sensitive": { type: "boolean" },
   "dry-run": { type: "boolean" },
   calendar: { type: "string" },
+  as: { type: "string" },
+  folder: { type: "string" },
+  cli: { type: "string" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -251,8 +276,8 @@ function out(values: Values, data: unknown, text: string): void {
   console.log(values["json-out"] ? JSON.stringify(data, null, 2) : text);
 }
 
-function workspace(values: Values, maintain = true): Workspace {
-  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain });
+function workspace(values: Values, maintain = true, deferOverview = false): Workspace {
+  const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot(), { maintain, deferOverview });
   if (!ws.exists(".kaitu/config.json"))
     throw new KaituError(`${ws.root} 还不是开图工作区，先运行 kaitu init`, "NOT_INITIALIZED");
   return ws;
@@ -260,7 +285,11 @@ function workspace(values: Values, maintain = true): Workspace {
 
 async function run(argv: string[]): Promise<number> {
   const inputArgs =
-    argv[0] === "investments" ? argv.map((arg) => (arg === "--json" ? "--json-out" : arg)) : argv;
+    argv[0] === "backup"
+      ? argv.map((arg) => (arg === "--text" ? "--backup-text" : arg))
+      : argv[0] === "investments"
+        ? argv.map((arg) => (arg === "--json" ? "--json-out" : arg))
+        : argv;
   const { values, positionals } = parseArgs({ args: inputArgs, options, allowPositionals: true });
   const [cmd, ...args] = positionals;
   if (!cmd || values.help) {
@@ -269,6 +298,50 @@ async function run(argv: string[]): Promise<number> {
   }
 
   switch (cmd) {
+    case "backup": {
+      const action = args[0];
+      const via = values.via ?? "gh";
+      if (!["gh", "token"].includes(via)) throw new KaituError("--via 只能是 gh 或 token", "BAD_ARGS");
+      // gh 查询与恢复不构造原工作区，也不创建默认绑定。
+      const ws =
+        action === "auth-status" || (action === "restore" && via === "gh") ? undefined : workspace(values);
+      let result: unknown;
+      if (action === "auth-status") result = await githubCliStatus();
+      else if (action === "restore") {
+        result = await restoreWorkspaceBackup(resolve(need(values.to, "--to")), ws, {
+          repo: need(args[1], "owner/repo"),
+          via,
+        });
+      } else if (!ws) throw new KaituError("需要开图工作区", "NOT_INITIALIZED");
+      else if (action === "status") result = workspaceBackupStatus(ws);
+      else if (action === "connect") {
+        if (values.create && via !== "gh")
+          throw new KaituError("建库使用已登录的 gh；token 方式请连接已有仓库", "BAD_ARGS");
+        if ((values["backup-text"] && values["no-text"]) || (values.records && values["no-records"]))
+          throw new KaituError("同一范围不能同时启用和关闭", "BAD_ARGS");
+        result = await workspaceBackupRequest(ws, values.create ? "create" : "connect", {
+          repo: need(args[1], "owner/repo"),
+          via,
+          text: values["no-text"] ? false : values["backup-text"],
+          records: values["no-records"] ? false : values.records,
+        });
+        await syncWorkspaceBackup(ws);
+        result = workspaceBackupStatus(ws);
+      } else if (action === "sync") {
+        await syncWorkspaceBackup(ws);
+        result = workspaceBackupStatus(ws);
+      } else
+        throw new KaituError(
+          "使用 backup status / connect <owner/repo> [--create] [--via gh|token] / sync",
+          "BAD_ARGS",
+        );
+      if (result && typeof result === "object") {
+        const { ghLogin: _login, ...safe } = result as Record<string, unknown>;
+        if (typeof safe.error === "string" && safe.error) throw new KaituError(safe.error, "BACKUP_SYNC");
+        console.log(JSON.stringify(safe, null, 2));
+      }
+      return 0;
+    }
     case "dsh": {
       let ws = new Workspace(values.dir ?? defaultRoot());
       if (!values.install && !ws.exists(".kaitu/config.json")) {
@@ -306,7 +379,14 @@ async function run(argv: string[]): Promise<number> {
           title: need(values.title, "--title"),
           kind: need(values.kind, "--kind") as ProjectStatus["kind"],
           links,
+          slug: values.slug,
         });
+      } else if (action === "memory") {
+        result = await (values.install ? installProjectMemory : projectMemoryContext)(
+          ws,
+          values.from ?? process.cwd(),
+          values.project,
+        );
       } else if (action === "list") result = listProjects(ws);
       else if (action === "show") result = readProject(ws, need(slug, "slug"));
       else if (action === "log")
@@ -339,7 +419,7 @@ async function run(argv: string[]): Promise<number> {
         });
       else
         throw new KaituError(
-          "使用 project new / list / show / log / link / github / github-token / sync / set",
+          "使用 project new / list / show / log / memory / link / github / github-token / sync / set",
           "BAD_ARGS",
         );
       out(values, result, JSON.stringify(result, null, 2));
@@ -373,6 +453,30 @@ async function run(argv: string[]): Promise<number> {
       );
       return 0;
     }
+    case "phone": {
+      if (args[0] !== "run") throw new KaituError("使用 phone run", "BAD_ARGS");
+      if (values["dry-run"]) throw new KaituError("phone run 已不支持 --dry-run，本次未执行", "BAD_ARGS");
+      const name = values.as;
+      if (name !== undefined && (!name.trim() || [...name].length > 32))
+        throw new KaituError("--as 需要 1–32 个字的整理员名字", "BAD_ARGS");
+      const result = await runPhone(
+        workspace(values),
+        name === undefined ? { kind: "computer" } : { kind: "agent", name, spec: 1 },
+      );
+      out(values, result, JSON.stringify(result, null, 2));
+      return 0;
+    }
+    case "feishu": {
+      if (args[0] !== "import" || !values.folder)
+        throw new KaituError("使用 feishu import --folder <文件夹 token>", "BAD_ARGS");
+      const result = await importFeishuFolder(workspace(values), values.folder, values.cli);
+      out(
+        values,
+        result,
+        `${result.documents} 篇云文档：新存 ${result.imported.length} 条原文，${result.unchanged} 篇没变。`,
+      );
+      return 0;
+    }
     case "inbox": {
       const ws = workspace(values);
       if (args[0] === "notes") {
@@ -401,16 +505,19 @@ async function run(argv: string[]): Promise<number> {
     }
     case "init": {
       const root = resolve(args[0] ?? values.dir ?? defaultRoot());
+      const adopted = existsSync(join(root, "kaitu-backup.json"));
       const ws = await initWorkspace(root, { timeZone: values.timezone, sample: values.sample });
       out(
         values,
-        { root: ws.root },
-        `已创建开图工作区：${ws.root}\n下一步：在这个文件夹里打开 Codex，说「开始使用开图」。`,
+        { root: ws.root, adopted },
+        adopted
+          ? `已接管这个记忆仓库：${ws.root}\n只补了缺的文件，已有资料没动；AGENTS.md、OVERVIEW.md 换成开图维护的版本。运行 kaitu phone run 生成手机内容。`
+          : `已创建开图工作区：${ws.root}\n下一步：在这个文件夹里打开 Codex，说「开始使用开图」。`,
       );
       return 0;
     }
     case "ui": {
-      const ws = workspace(values);
+      const ws = workspace(values, true, true);
       const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
         open: !values["no-open"],

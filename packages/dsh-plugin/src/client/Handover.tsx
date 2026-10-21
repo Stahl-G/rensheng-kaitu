@@ -28,7 +28,7 @@ export function HandoverPanel({
   loadHandover,
   onAnswer,
 }: {
-  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
+  loadHandover: (locale?: Locale, includeFinance?: boolean) => Promise<HandoverPack>;
   onAnswer: (answer: string) => Promise<void>;
 }) {
   const t = useT();
@@ -42,9 +42,11 @@ export function HandoverPanel({
   const [error, setError] = useState("");
   const [area, setArea] = useState<HTMLTextAreaElement | null>(null);
   const [pending, setPending] = useState<{ id: string; on: boolean } | null>(null);
+  const [includeFinance, setIncludeFinance] = useState<boolean | null>(null);
   useEffect(() => {
+    if (includeFinance === null) return;
     let active = true;
-    void loadHandover(locale)
+    void loadHandover(locale, includeFinance)
       .then((value) => {
         if (!active) return;
         const ids = value.sections.filter((section) => section.defaultOn).map((section) => section.id);
@@ -56,7 +58,7 @@ export function HandoverPanel({
     return () => {
       active = false;
     };
-  }, [loadHandover, locale]);
+  }, [loadHandover, locale, includeFinance]);
   // 用户删改过文字后，换勾选不能悄悄按原始资料重写：删掉的私人内容会回来。
   const edited = !!pack && text !== compose(pack, include);
   const apply = (id: string, on: boolean) => {
@@ -82,7 +84,29 @@ export function HandoverPanel({
         </p>
       )}
       {!pack ? (
-        !error && <p className={css.small}>{t("正在整理资料包…", "Putting the pack together…")}</p>
+        includeFinance === null ? (
+          <div className={css["sub-form"]}>
+            <p>{t("这份资料包要带上财务近况吗？", "Include your finance summary in this pack?")}</p>
+            <div className={css["dialog-foot"]}>
+              <button
+                type="button"
+                className={`${css.btn} ${css["btn-quiet"]}`}
+                onClick={() => setIncludeFinance(false)}
+              >
+                {t("不带财务", "Leave finance out")}
+              </button>
+              <button
+                type="button"
+                className={`${css.btn} ${css["btn-primary"]}`}
+                onClick={() => setIncludeFinance(true)}
+              >
+                {t("带上财务近况", "Include finance")}
+              </button>
+            </div>
+          </div>
+        ) : (
+          !error && <p className={css.small}>{t("正在整理资料包…", "Putting the pack together…")}</p>
+        )
       ) : (
         <>
           <b>{t("1 · 选要带上的内容", "1 · Choose what to bring")}</b>

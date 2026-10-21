@@ -5,11 +5,115 @@ import { strToU8, zipSync } from "fflate";
 import { expect, it } from "vitest";
 import { history, restore } from "../src/history.js";
 import { importAppleHealth, importHealthShortcut } from "../src/importers/apple-health.js";
-import { readRecords } from "../src/records.js";
+import { addRecord, deleteRecord, readRecords, updateRecord } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
 const fixture = fileURLToPath(new URL("../../../examples/apple-health/export.xml", import.meta.url));
+
+it("完整日补导替换日总量且重放不累加，整夜片段补导保持同一睡眠记录", async () => {
+  const ws = await freshWorkspace();
+  const file = join(tmp(), "whole-day.health.json");
+  const steps = (value: number, start: string, end: string) => ({
+    type: "step_count",
+    value,
+    unit: "count",
+    source: "Watch",
+    start,
+    end,
+  });
+  const first = steps(3000, "2026-10-14T09:00:00+08:00", "2026-10-14T10:00:00+08:00");
+  const later = steps(2500, "2026-10-14T10:00:00+08:00", "2026-10-14T12:00:00+08:00");
+  const sleep = (start: string, end: string) => ({
+    type: "sleep_analysis",
+    value: "asleep",
+    unit: "",
+    source: "Watch",
+    start,
+    end,
+  });
+  const earlySleep = sleep("2026-10-13T23:00:00+08:00", "2026-10-14T03:00:00+08:00");
+  const lateSleep = sleep("2026-10-14T03:10:00+08:00", "2026-10-14T07:00:00+08:00");
+  const deliver = async (samples: unknown[]) => {
+    writeFileSync(
+      file,
+      JSON.stringify({ format: "kaitu.health.v1", exported_at: "2026-10-14T12:00:00+08:00", samples }),
+    );
+    return importHealthShortcut(ws, file);
+  };
+  await deliver([first, earlySleep]);
+  const activityID = readRecords(ws, "activity")[0]?.id;
+  const sleepID = readRecords(ws, "sleep")[0]?.id;
+  await deliver([first, later, earlySleep, lateSleep]);
+  expect(readRecords(ws, "activity")).toMatchObject([{ id: activityID, steps: 5500 }]);
+  expect(readRecords(ws, "sleep")).toMatchObject([
+    { id: sleepID, duration_min: 470, end: "2026-10-14T07:00:00+08:00" },
+  ]);
+  expect((await deliver([first, later, earlySleep, lateSleep])).version).toBeNull();
+  expect(readRecords(ws, "activity")).toHaveLength(1);
+  expect(readRecords(ws, "sleep")).toHaveLength(1);
+});
+
+it("Apple训练泛名升级保留id且重放幂等，人工修订和删除保持优先", async () => {
+  const ws = await freshWorkspace();
+  const file = join(tmp(), "workout-rename.health.json");
+  const starts = [
+    "2026-10-14T09:00:00+08:00",
+    "2026-10-14T10:00:00+08:00",
+    "2026-10-14T11:00:00+08:00",
+    "2026-10-14T12:00:00+08:00",
+  ];
+  const old = starts.map(
+    (ts, index) =>
+      addRecord(
+        ws,
+        "workout",
+        { ts, modality: "cardio", exercise: index === 3 ? "其他训练" : "体能训练", duration_min: 30 },
+        { by: "import:apple-health" },
+      ).record,
+  );
+  updateRecord(ws, "workout", old[1]?.id as string, { exercise: "我核对的训练" }, { by: "user" });
+  deleteRecord(ws, "workout", old[2]?.id as string, { by: "user" });
+  const samples = starts.map((start, index) => ({
+    type: "workout",
+    start,
+    end: start.replace(":00:00", ":30:00"),
+    source: "Watch",
+    value: 30,
+    unit: "min",
+    workout: { activity: index === 3 ? "pilates" : "hiit", duration_min: 30 },
+  }));
+  writeFileSync(
+    file,
+    JSON.stringify({ format: "kaitu.health.v1", exported_at: "2026-10-14T12:00:00+08:00", samples }),
+  );
+  const result = await importHealthShortcut(ws, file);
+  expect(result).toMatchObject({ added: 0, updated: 2, skipped: 2 });
+  expect(readRecords(ws, "workout")).toMatchObject([
+    { id: old[0]?.id, exercise: "高强度间歇训练", rev: 2 },
+    { id: old[1]?.id, exercise: "我核对的训练", by: "user" },
+    { id: old[3]?.id, exercise: "普拉提", rev: 2 },
+  ]);
+  expect((await importHealthShortcut(ws, file)).version).toBeNull();
+  const alongside = addRecord(
+    ws,
+    "workout",
+    { ts: starts[0], modality: "cardio", exercise: "跑步", duration_min: 20 },
+    { by: "import:apple-health" },
+  ).record;
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      exported_at: "2026-10-14T12:00:00+08:00",
+      samples: [{ ...samples[0], workout: { activity: "unknown_sport", duration_min: 30 } }],
+    }),
+  );
+  expect((await importHealthShortcut(ws, file)).version).toBeNull();
+  expect(readRecords(ws, "workout").find((row) => row.id === old[0]?.id)?.exercise).toBe("高强度间歇训练");
+  expect(readRecords(ws, "workout").find((row) => row.id === alongside.id)?.exercise).toBe("跑步");
+  expect(validateWorkspace(ws)).toEqual([]);
+});
 
 it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等且整次可恢复", async () => {
   const ws = await freshWorkspace();
@@ -436,6 +540,48 @@ it("复合值：血压 120/80、心率与血氧日聚合 最小/均值/最大 �
       { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
     ]),
   );
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("复合指标按类型补非空单位并逐条拒绝错误的分量数", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "compound-boundaries.health.json");
+  const valid = [
+    ["BloodPressureRecord", "120/80"],
+    ["HeartRateDaily", "52/68/98"],
+    ["BloodOxygenDaily", "95/97/100"],
+  ];
+  const samples = valid.flatMap(([type, value]) => [
+    { type, value, unit: "   " },
+    { type, value },
+  ]);
+  const invalid = [
+    { type: "blood_pressure", value: "120/80/70" },
+    { type: "heart_rate_daily", value: "52/68" },
+    { type: "blood_oxygen", value: "95/97" },
+  ];
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      samples: [...samples, ...invalid].map((sample, index) => ({
+        ...sample,
+        start: `2026-10-01T0${index}:00:00+08:00`,
+        source: "Synthetic",
+      })),
+    }),
+  );
+  const result = await importHealthShortcut(ws, file);
+  expect(result).toMatchObject({ added: 6, ignored: { invalid: 3 } });
+  const metrics = readRecords(ws, "metric");
+  expect(metrics.map(({ kind, value, unit }) => ({ kind, value, unit }))).toEqual([
+    { kind: "bp", value: "120/80", unit: "mmHg" },
+    { kind: "bp", value: "120/80", unit: "mmHg" },
+    { kind: "heart_rate_daily", value: "52/68/98", unit: "bpm" },
+    { kind: "heart_rate_daily", value: "52/68/98", unit: "bpm" },
+    { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
+    { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
+  ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });
 

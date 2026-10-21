@@ -413,9 +413,10 @@ account_last4（本方银行卡尾四位，四位数字或 null）；原交易�
 ### 6.8 手机快照与收件箱（2026-10-18）
 
 `phone/` 是电脑生成、Agent 只读的目录，不作为模块、不进本机版本历史。
-`today.json`、`week.json`、`map.json`、`receipts.json` 的契约见 `schemas/phone-*.schema.json`，样例见 `schemas/fixtures/phone/`。
+`today.json`、`week.json`、`map.json`、`library.json`（资料目录，2026-10-18 用户确认）、`receipts.json` 的契约见 `schemas/phone-*.schema.json`，样例见 `schemas/fixtures/phone/`。
 只有手机可读的同步存放位置或启用 GitHub 备份时，后台防抖生成读快照；内容不变不写。
 手机新建 `inbox/agents/ios-<8位设备号>-<ULID>.note.md / .records.jsonl / .actions.jsonl`。
+快照可选 `generator`（`computer` 或 `agent` 加名字和规则版本，2026-10-18 用户确认），kind=agent 必须有 name 和 spec，kind=computer 只写 kind 即可；没有 generator 时当作电脑生成。
 原文保留 capture 与作者，手机记录 origin 映射署名 by，权限按 Agent 校验；操作按 client_id 去重并先核对当前状态，结果写十四天回执。
 支持完成下一步、完成或取消待办、确认或拒绝日程建议；手机确认的日程由手机写进 Apple 日历（`calendar: phone`），电脑不替它新建；Mac 在日历里找到那条后可以在电脑上改时间。阶段确认、方向启用只在电脑上由用户确认。其他操作预留。GitHub 手机路径独立于备份内容开关。
 详细读写、隐私边界与失败语义见 [手机契约](guides/phone-contract.md)。本次不支持照片。
@@ -440,8 +441,14 @@ source: chats/2026/10/01J....jsonl
 created: 2026-10-15
 updated: 2026-10-15
 sensitive: false
+ended: 2026-10-20         # 可选；用户确认不再成立的日期
+replaced_by: context_new.md  # 可选；替换它的新记忆文件名
 ---
 ```
+
+文件名是稳定编号；改标题或类型不改名。`created` 是保存日期，不代表事情开始。没有 `ended` 的是当前记忆；有 `ended` 的保留在已归档中，仍能按文件名读取。`MEMORY.md`、Agent 默认记忆列表和手机资料目录只列当前记忆。
+
+用户确认归档或替换后才写 `ended` / `replaced_by`。AI 只能交带 `replaces: <旧文件名>` 的收件箱记忆候选；确认前不写新记忆，也不改旧记忆。手机确认用 `replace_memory`（`args.file` 是不含目录的旧文件名，`args.candidate` 是新候选；为 `null` 时只归档）。`args.expected` 必填 type、name、text、source、sensitive 五项，source 缺省读成 null、sensitive 缺省读成 false；当前旧条必须逐项相等且没有 ended，否则 conflict。created/updated 不充当版本。ended 按操作 at 换算为工作区时区后的日期；client_id 首计划先落账本，重投复用它或首结果，回执沿用 action 格式且不写 target。
 
 `MEMORY.md` 每条一行：`- [类型] 名称 —— 一句话（文件名）`，总量上限约 3k tokens，超出时在晚间复盘中合并。
 
@@ -483,7 +490,7 @@ sensitive: false
 ### 7.3 版本历史
 
 - 内置 isomorphic-git（纯 JS，不要求用户安装 git）。每次写入自动提交，提交说明用人能读懂的话：「Agent 更新了健康模块：记录训练 1 次」。
-- 单一线性历史，无分支。外部 Agent 直接改文件时，监听文件变化并合并为一次提交（防抖 30 秒）。
+- 单一线性历史，无分支。外部 Agent 直接改文件时，监听文件变化，从第一处改动起 30 秒内合并为一次提交；连续编辑不会一直推迟。
 - 界面不出现 git 字样：每个模块、每条记忆旁有「历史」，可查看改动、恢复到某个版本；导入确认页提供「撤销导入」。
 - `.kaitu/secrets.json`、`.kaitu/index.sqlite`、`.kaitu/cache/` 不进版本历史。
 - 设置中提供「备份到我自己的 Git 远程仓库」，默认关闭。

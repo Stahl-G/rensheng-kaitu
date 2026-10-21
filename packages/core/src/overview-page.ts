@@ -6,6 +6,7 @@ import { type TimedExperience, experienceLayer } from "./experience-time.js";
 import { history } from "./history.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { findRecordType, recordFileFor } from "./modules.js";
+import { organizerStatus } from "./organizer.js";
 import { latestDaily } from "./overview.js";
 import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
@@ -63,7 +64,16 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const data = readWorkbench(ws, now);
   const status = summarizeStatus(data);
   const cutoff = now.toISOString();
-  const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
+  const localDays = new Map<string, string>();
+  const day = (ts: unknown) => {
+    const key = String(ts);
+    let date = localDays.get(key);
+    if (date === undefined) {
+      date = localDate(parseTs(key), data.timeZone);
+      localDays.set(key, date);
+    }
+    return date;
+  };
   // 先按时间粗筛（任何时区的当地零点都不早于 UTC 零点前 14 小时），只给近几天的记录换算当地日期。
   const earliest = Date.parse(`${status.recent7.from}T00:00:00Z`) - 14 * 3600000;
   const rows = (type: string, field = "ts") =>
@@ -356,6 +366,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
     plans: readPlans(data),
     capturedWeek,
     sync: {
+      cloudOrganizer: organizerStatus(ws),
       received: pendingFiles + notes.filter((note) => note.status === "received").length,
       // 只有开了每日整理才说「等待整理」；没开时原文就是已保存，不暗示后台在处理。
       organizer: organizerOn(ws),

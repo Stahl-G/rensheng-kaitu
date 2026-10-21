@@ -2,7 +2,6 @@
 
 - 状态：设计已定（2026-10-15，第二版）。第一版的租约锁实测下来太重：步骤多、需要等待，ChatGPT 还看不到 `LOCK.json`，所以改为本方案。
 - 目标：电脑关机时，任何云端 Agent（Dot、Grok、ChatGPT……）都能通过 Google Drive 接手，不用用户重讲，也不会互相覆盖。
-- 验收：[acceptance/cloud-relay.md](acceptance/cloud-relay.md)。
 
 ## 1. 两个角色
 

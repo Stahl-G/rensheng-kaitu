@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { KaituError } from "@kaitu/core";
+import { KaituError, workspaceAgentGuide, workspaceTaskSkill } from "@kaitu/core";
 import type { AskRuntime } from "../ui/ask.js";
 import { connectAcp, sessionModels } from "./acp.js";
 import { type LocalAgent, agentEnvironment, launchAgent, terminateAgent } from "./agents.js";
@@ -73,10 +73,11 @@ export async function createAgentRuntime(options: {
     child: ReturnType<typeof launchAgent>;
     rpc: ReturnType<typeof connectAcp>;
     upstream: string;
-    /** 新会话的第一条消息前带上隐私提醒；续接的会话里已经有了。 */
+    /** 新会话首条消息带同源任务指引与隐私提醒；续接不重复。 */
     fresh: boolean;
     cancelled: boolean;
     busy: boolean;
+    skills: Set<string>;
     output: string;
     messageId: string;
   };
@@ -103,6 +104,7 @@ export async function createAgentRuntime(options: {
       fresh: false,
       cancelled: false,
       busy: false,
+      skills: new Set<string>(),
       output: "",
       messageId: "",
     };
@@ -143,7 +145,12 @@ export async function createAgentRuntime(options: {
               toolCallId: u.toolCallId,
               isError: u.status === "failed",
               content: Array.isArray(u.content)
-                ? u.content
+                ? u.content.map((block) => {
+                    // ACP wraps ContentBlock in { type: "content", content }.
+                    // Ask renders the same flat text blocks as the native SDK.
+                    const value = block as { type?: string; content?: { type?: string } };
+                    return value?.type === "content" && value.content?.type ? value.content : block;
+                  })
                 : [
                     {
                       type: "text",
@@ -249,15 +256,24 @@ export async function createAgentRuntime(options: {
         state.messageId = `${agent.id}-${++seq}`;
         event(id, "user/message", { content, source: { kind: "user" } });
         const text = content.map((item) => item.text ?? "").join("\n");
+        const skill = workspaceTaskSkill(text);
+        const skillText = skill && !state.skills.has(skill.name) ? `\n\n${skill.text}\n\n` : "";
         const done = await state.rpc.request(
           "session/prompt",
           {
             sessionId: state.upstream,
-            prompt: [{ type: "text", text: (state.fresh ? localAgentPrivacy : "") + text }],
+            prompt: [
+              {
+                type: "text",
+                text:
+                  (state.fresh ? `${workspaceAgentGuide()}\n\n${localAgentPrivacy}` : "") + skillText + text,
+              },
+            ],
           },
           30 * 60 * 1000,
         );
         state.fresh = false;
+        if (skill) state.skills.add(skill.name);
         if (done.stopReason === "refusal")
           throw new KaituError(
             `${agent.name} 拒绝了这次请求，可能是所选模型不可用，换个模型再试`,

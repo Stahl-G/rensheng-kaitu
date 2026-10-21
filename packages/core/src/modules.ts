@@ -32,6 +32,21 @@ const NOT_MODULES = new Set([".kaitu", ".git", "memory", "chats", "inbox", "node
 
 const loaded = new WeakMap<Workspace, { key: string; modules: LoadedModule[] }>();
 
+/** 按实际目录解析模块身份，与模块清单使用同一份定义和校验。 */
+export function moduleAtDirectory(ws: Workspace, dir: string): LoadedModule | undefined {
+  if (!dir || NOT_MODULES.has(dir) || dir.startsWith(".") || /[/\\]/.test(dir)) return;
+  const full = ws.resolve(dir);
+  if (!existsSync(full) || !lstatSync(full).isDirectory() || !ws.exists(`${dir}/module.json`)) return;
+  const def = ws.scanParsed<ModuleDef>(`${dir}/module.json`, "module-definition", (text) => {
+    const value = JSON.parse(text) as ModuleDef;
+    if (!schemas().builtin("module.schema.json")(value))
+      throw new KaituError(`模块定义不合法：${dir}`, "INVALID_CONFIG");
+    return value;
+  });
+  if (!def) throw new KaituError(`模块资料暂不可读：${dir}`, "CLOUD_UNAVAILABLE");
+  return { dir, def };
+}
+
 /** 工作区顶层含 module.json 的目录即模块；module.json 没变就用上次读到的结果。 */
 export function listModules(ws: Workspace): LoadedModule[] {
   const names = readdirSync(ws.root).sort();
@@ -49,14 +64,9 @@ export function listModules(ws: Workspace): LoadedModule[] {
   const out: LoadedModule[] = [];
   for (const name of names) {
     if (ws.conflictCopy(name)) continue;
-    if (NOT_MODULES.has(name) || name.startsWith(".")) continue;
-    const full = join(ws.root, name);
-    if (!lstatSync(full).isDirectory()) continue;
     try {
-      if (!ws.exists(`${name}/module.json`)) continue;
-      const def = ws.readJson<ModuleDef>(`${name}/module.json`);
-      if (!schemas().builtin("module.schema.json")(def)) continue;
-      out.push({ dir: name, def });
+      const module = moduleAtDirectory(ws, name);
+      if (module) out.push(module);
     } catch {
       // 损坏的 module.json 由 validate 报告，这里跳过
     }

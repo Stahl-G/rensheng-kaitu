@@ -384,3 +384,33 @@ it("Agent 放一份 replaces 之前文件的新文件就能修改或撤回，只
   await drop("grok-3.records.jsonl", [{ replaces: "grok-2.records.jsonl", agent: "grok-bot" }]);
   expect(readRecords(ws, "meal")).toEqual([]);
 });
+
+it("Agent 收件箱不能冒充用户或直接写目标，日程仍待确认并保留拒绝原因", async () => {
+  const ws = await freshWorkspace();
+  try {
+    ws.writeText(
+      "inbox/agents/spoof.records.jsonl",
+      JSON.stringify({ type: "task", title: "AI 待办", status: "open", by: "user", agent: "synthetic" }),
+    );
+    ws.writeText(
+      "inbox/agents/goal.records.jsonl",
+      JSON.stringify({ type: "goal", title: "AI 目标", status: "active", by: "user" }),
+    );
+    ws.writeText(
+      "inbox/agents/decision.proposal.json",
+      JSON.stringify({ title: "AI 日程", start: "10:00", end: "11:00", status: "confirmed", by: "user" }),
+    );
+    const result = await processInbox(ws, { stableMs: 0 });
+    expect(readRecords(ws, "task")).toEqual([expect.objectContaining({ title: "AI 待办", by: "agent" })]);
+    expect(ws.readJson("me/goals.json")).toEqual([]);
+    expect(parseFrontmatter<{ blocks: { status: string }[] }>(ws.readText("NOW.md")).data.blocks).toEqual([
+      expect.objectContaining({ kind: "proposal", status: "pending" }),
+    ]);
+    expect(result.notes).toHaveLength(1);
+    expect(ws.readText(result.notes[0] as string)).toContain("goal");
+    expect((await processInbox(ws, { stableMs: 0 })).processed).toEqual([]);
+    expect(readRecords(ws, "task")).toHaveLength(1);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});

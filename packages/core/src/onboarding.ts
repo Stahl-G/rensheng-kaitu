@@ -29,7 +29,13 @@ import { type Memory, type MemoryInput, type MemoryType, importMemories, listMem
 import { listRecordTypes } from "./modules.js";
 import { ONBOARDING_EN } from "./onboarding-en.js";
 import { type GoalOrigin, noteLine, upsertGoal } from "./plans.js";
-import { type ProjectInput, createProject, listProjects } from "./projects.js";
+import {
+  type ProjectInput,
+  type ProjectStatus,
+  createProject,
+  listProjects,
+  projectDirectory,
+} from "./projects.js";
 import { readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
@@ -38,6 +44,7 @@ import { isoInZone, localDate } from "./time.js";
 import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
 import { ulid } from "./ulid.js";
 import { type Goal, type ModuleStatus, readWorkbench } from "./workbench.js";
+import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
 /** 搬来记忆时的类别：中英文标签都认；目标、项目、在考虑的事默认进对应模块，其余进记忆。 */
@@ -117,7 +124,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     { id: "claude", name: "Claude", hint: "开了记忆的话，把「设置」里的记忆内容也一起复制过来。" },
     { id: "gemini", name: "Gemini", hint: "把「保存的信息」页面里的内容也一起复制过来。" },
     { id: "doubao", name: "豆包", hint: "开了记忆的话，把设置里的记忆列表也一起复制过来。" },
-    { id: "other", name: "其他", hint: "任何 AI 都可以，回答格式对不上也没关系，对不上的行会原样留着。" },
+    { id: "other", name: "其他", hint: "粘贴常用 AI 的回答；未识别的行会保留原文。" },
   ],
   prompt: `请把你记住的关于我的所有信息完整列出来，尽量保持原文，不要总结或省略。包括：
 1. 你保存的记忆条目
@@ -245,7 +252,7 @@ ChatGPT：那可以先选另外两个，排班项目等补到数据再加。`,
     {
       id: "mine",
       title: "在原来的 AI 里继续",
-      description: "复制一份简短的资料包给你常用的 AI，再把它的回答贴回来，不用 API Key",
+      description: "把资料包复制给常用的 AI，再贴回回答继续整理",
       target: "connections",
     },
     { id: "none", title: "先不用 AI", description: "随手记和导入都能用，等你连上再整理", target: "today" },
@@ -425,6 +432,11 @@ const WHEN = new RegExp(
   "i",
 );
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
+// 有的 AI 复制出来的回答没有换行，多条挤在一行里；在每个已知类别标签前断开。
+const INLINE_TAG = new RegExp(
+  `\\s+(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
+  "gi",
+);
 
 export function parseMemoryPaste(
   text: string,
@@ -435,45 +447,51 @@ export function parseMemoryPaste(
   // 已有记忆只和要记成记忆的条目去重：同样的话也可以设为目标、项目或方向。
   const known = new Set(existing.map((entry) => withoutPrefix(entry.text.trim())));
   const seen = new Set<string>();
-  return text.split(/\r?\n/).flatMap((line, index) => {
-    const original = line.trim();
-    if (!original) return [];
-    const match = /^[[【]([^\]】]+)[\]】]\s*[:：]?\s*(.+)$/.exec(withoutPrefix(original));
-    const category = match?.[1]?.trim().toLowerCase();
-    let group = category
-      ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
-      : undefined;
-    let body = group ? (match?.[2]?.trim() ?? original) : original;
-    let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
-    if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
-    let content = time ? body.slice(0, time.index).trim() : body;
-    if (!content) {
-      group = undefined;
-      body = original;
-      content = original;
-      time = null;
-    }
-    const raw = !group;
-    const target: OnboardingTarget = group && "target" in group ? group.target : "memory";
-    const key = withoutPrefix(body);
-    if (target === "memory" && known.has(key)) return [];
-    if (seen.has(`${target}\0${key}`)) return [];
-    seen.add(`${target}\0${key}`);
-    return [
-      {
-        id: `line-${index + 1}`,
-        type: (group?.type ?? "context") as MemoryType,
-        name: content.slice(0, 60),
-        text: body,
-        content,
-        when: time?.[1] ?? null,
-        category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
-        raw,
-        original,
-        target,
-      },
-    ];
-  });
+  return text
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      const prefix = /^\s*(?:[-*+]\s+|\d+[.)、]\s*)?/.exec(line)?.[0] ?? "";
+      return (prefix + line.slice(prefix.length).replace(INLINE_TAG, "\n")).split("\n");
+    })
+    .flatMap((line, index) => {
+      const original = line.trim();
+      if (!original) return [];
+      const match = /^[[【]([^\]】]+)[\]】]\s*[:：]?\s*(.+)$/.exec(withoutPrefix(original));
+      const category = match?.[1]?.trim().toLowerCase();
+      let group = category
+        ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
+        : undefined;
+      let body = group ? (match?.[2]?.trim() ?? original) : original;
+      let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
+      if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
+      let content = time ? body.slice(0, time.index).trim() : body;
+      if (!content) {
+        group = undefined;
+        body = original;
+        content = original;
+        time = null;
+      }
+      const raw = !group;
+      const target: OnboardingTarget = group && "target" in group ? group.target : "memory";
+      const key = withoutPrefix(body);
+      if (target === "memory" && known.has(key)) return [];
+      if (seen.has(`${target}\0${key}`)) return [];
+      seen.add(`${target}\0${key}`);
+      return [
+        {
+          id: `line-${index + 1}`,
+          type: (group?.type ?? "context") as MemoryType,
+          name: content.slice(0, 60),
+          text: body,
+          content,
+          when: time?.[1] ?? null,
+          category: group ? pick(locale, group.zh, group.en) : pick(locale, "其他", "Other"),
+          raw,
+          original,
+          target,
+        },
+      ];
+    });
 }
 
 interface MemoryPreview {
@@ -698,23 +716,11 @@ export async function confirmOnboardingMemory(
   )
     throw new KaituError("确认范围不在预览内", "BAD_ARGS");
   const locale = normalizeLocale(preview.locale);
-  const name = aiInfo(preview.ai).name;
   const chosen = preview.candidates.filter((entry) => selected.includes(entry.id));
-  const route = (entry: MemoryCandidate) => targets[entry.id] ?? entry.target ?? "memory";
-  const existing = new Set(listMemories(ws).map((entry) => withoutPrefix(entry.text.trim())));
-  const inputs = chosen
-    .filter((entry) => route(entry) === "memory" && !existing.has(withoutPrefix(entry.text)))
-    .map(({ type, name: title, text }) => ({
-      type,
-      name: title,
-      text,
-      source: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
-    }));
-  const date = localDate(new Date(), ws.timeZone());
-  const routed = chosen.filter((entry) => route(entry) !== "memory");
+  const routed = chosen.map((entry) => ({ ...entry, target: targets[entry.id] ?? entry.target ?? "memory" }));
   const hasDirections = listRecordTypes(ws).some((ref) => ref.type === "direction");
   // 先确认能写到方向，再动手写，免得一半写进去一半报错。
-  if (routed.some((entry) => route(entry) === "direction") && !hasDirections)
+  if (routed.some((entry) => entry.target === "direction") && !hasDirections)
     throw new KaituError(
       pick(
         locale,
@@ -725,104 +731,177 @@ export async function confirmOnboardingMemory(
     );
   const goalsBefore = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json").length : 0;
   const before = (await history(ws, { limit: 1 }))[0]?.oid ?? null;
-  let result: { entries: Memory[]; version: string | null } = { entries: [], version: null };
-  let projects = 0;
-  let directions = 0;
+  let written = { entries: [] as Memory[], skipped: 0, projects: 0, directions: 0 };
   await batchSnapshot(
     ws,
-    () => pick(locale, `从 ${name} 搬来资料`, `Imported from ${name}`),
+    () => pick(locale, `从 ${aiInfo(preview.ai).name} 搬来资料`, `Imported from ${aiInfo(preview.ai).name}`),
     async () => {
-      result = await importMemories(ws, inputs, { by: `import:${preview.ai}`, actor: `从 ${name} 搬来：` });
-      // 搬进目标、项目、方向的原文整段留档：括号里的条件和记下的时间都能查回。
-      if (routed.length)
-        ws.writeText(
-          `inbox/notes/done/${date}/${ulid().toLowerCase()}.md`,
-          stringifyFrontmatter(
-            {
-              agent: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
-              date,
-              created: isoInZone(new Date(), ws.timeZone()),
-              kind: "import",
-            },
-            routed.map((entry) => entry.original).join("\n"),
-          ),
-        );
-      for (const entry of chosen.filter((item) => route(item) === "goal"))
-        upsertGoal(ws, entry.content, preview.ai as GoalOrigin, date);
-      // 项目按完整内容判断是否重复；标题可以截短，但截短后撞名就加序号，不吞掉另一项。
-      const known = listProjects(ws);
-      const titles = new Set(known.map((project) => project.title));
-      const imported = new Set<string>();
-      const notesOf = (slug: string) =>
-        ws.exists(`projects/${slug}/notes.md`) ? ws.readText(`projects/${slug}/notes.md`) : "";
-      for (const entry of chosen.filter((item) => route(item) === "project")) {
-        const full = entry.content;
-        if (imported.has(full)) continue;
-        imported.add(full);
-        const short = full.length > 80 ? `${full.slice(0, 79)}…` : full;
-        // 同名即同一项；截短过的标题（含加了序号的）要再看备注里的完整原文。
-        if (
-          known.some(
-            (project) =>
-              project.title === full ||
-              (short !== full &&
-                project.title.startsWith(short) &&
-                notesOf(project.slug)
-                  .split("\n")
-                  .some((line) => line.trim() === entry.text.trim())),
-          )
-        )
-          continue;
-        let title = short;
-        for (let n = 2; titles.has(title); n++) title = `${short}（${n}）`;
-        titles.add(title);
-        const { slug } = await createProject(ws, { title, kind: "personal" });
-        const notes = `projects/${slug}/notes.md`;
-        ws.writeText(
-          notes,
-          `${ws.readText(notes).trimEnd()}\n\n${pick(locale, `来源：从 ${name} 搬来（${date}）`, `Source: imported from ${name} (${date})`)}\n\n${entry.text}\n`,
-        );
-        projects++;
-      }
-      const directionTitles = new Set(
-        hasDirections ? readRecords(ws, "direction").map((row) => String(row.title).trim()) : [],
-      );
-      for (const entry of chosen.filter((item) => route(item) === "direction")) {
-        if (directionTitles.has(entry.content)) continue;
-        directionTitles.add(entry.content);
-        await writeExploration(
-          ws,
-          {
-            operation: "create_direction",
-            data: {
-              title: entry.content,
-              motivation: pick(
-                locale,
-                `从 ${name} 搬来：${entry.text}`,
-                `Imported from ${name}: ${entry.text}`,
-              ),
-              hypothesis: "",
-            },
-          },
-          // 用户已在搬入预览里确认这是自己在考虑的事，来源写在动机里。
-          "user",
-        );
-        directions++;
-      }
+      written = await writeImported(ws, routed, preview.ai, locale);
     },
   );
   const goals = (ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json").length : 0) - goalsBefore;
   const latest = (await history(ws, { limit: 1 }))[0]?.oid ?? null;
   cancelOnboardingPreview(ws, token, options);
   return {
-    ...result,
+    entries: written.entries,
     version: latest !== before ? latest : null,
     before,
-    skipped: chosen.filter((item) => route(item) === "memory").length - inputs.length,
+    skipped: written.skipped,
     goals,
+    projects: written.projects,
+    directions: written.directions,
+  };
+}
+/** 把搬来的条目按去向写进记忆、目标、项目和方向；调用方负责快照。 */
+async function writeImported(ws: Workspace, chosen: MemoryCandidate[], ai: OnboardingAi, locale: Locale) {
+  const name = aiInfo(ai).name;
+  const existing = new Set(listMemories(ws).map((entry) => withoutPrefix(entry.text.trim())));
+  const inputs = chosen
+    .filter((entry) => entry.target === "memory" && !existing.has(withoutPrefix(entry.text)))
+    .map(({ type, name: title, text }) => ({
+      type,
+      name: title,
+      text,
+      source: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
+    }));
+  const date = localDate(new Date(), ws.timeZone());
+  const routed = chosen.filter((entry) => entry.target !== "memory");
+  const result = await importMemories(ws, inputs, { by: `import:${ai}`, actor: `从 ${name} 搬来：` });
+  // 搬进目标、项目、方向的原文整段留档：括号里的条件和记下的时间都能查回。
+  if (routed.length)
+    ws.writeText(
+      `inbox/notes/done/${date}/${ulid().toLowerCase()}.md`,
+      stringifyFrontmatter(
+        {
+          agent: pick(locale, `从 ${name} 搬来`, `Imported from ${name}`),
+          date,
+          created: isoInZone(new Date(), ws.timeZone()),
+          kind: "import",
+        },
+        routed.map((entry) => entry.original).join("\n"),
+      ),
+    );
+  for (const entry of chosen.filter((item) => item.target === "goal"))
+    upsertGoal(ws, entry.content, ai as GoalOrigin, date);
+  // 项目按完整内容判断是否重复；标题可以截短，但截短后撞名就加序号，不吞掉另一项。
+  const known = listProjects(ws);
+  const titles = new Set(known.map((project) => project.title));
+  const imported = new Set<string>();
+  const notesOf = (slug: string) =>
+    ws.exists(`projects/${slug}/notes.md`) ? ws.readText(`projects/${slug}/notes.md`) : "";
+  let projects = 0;
+  for (const entry of chosen.filter((item) => item.target === "project")) {
+    const full = entry.content;
+    if (imported.has(full)) continue;
+    imported.add(full);
+    const short = full.length > 80 ? `${full.slice(0, 79)}…` : full;
+    // 同名即同一项；截短过的标题（含加了序号的）要再看备注里的完整原文。
+    if (
+      known.some(
+        (project) =>
+          project.title === full ||
+          (short !== full &&
+            project.title.startsWith(short) &&
+            notesOf(project.slug)
+              .split("\n")
+              .some((line) => line.trim() === entry.text.trim())),
+      )
+    )
+      continue;
+    let title = short;
+    for (let n = 2; titles.has(title); n++) title = `${short}（${n}）`;
+    titles.add(title);
+    const { slug } = await createProject(ws, { title, kind: "personal" });
+    const notes = `projects/${slug}/notes.md`;
+    ws.writeText(
+      notes,
+      `${ws.readText(notes).trimEnd()}\n\n${pick(locale, `来源：从 ${name} 搬来（${date}）`, `Source: imported from ${name} (${date})`)}\n\n${entry.text}\n`,
+    );
+    projects++;
+  }
+  const hasDirections = listRecordTypes(ws).some((ref) => ref.type === "direction");
+  const directionTitles = new Set(
+    hasDirections ? readRecords(ws, "direction").map((row) => String(row.title).trim()) : [],
+  );
+  let directions = 0;
+  for (const entry of chosen.filter((item) => item.target === "direction")) {
+    if (directionTitles.has(entry.content)) continue;
+    directionTitles.add(entry.content);
+    await writeExploration(
+      ws,
+      {
+        operation: "create_direction",
+        data: {
+          title: entry.content,
+          motivation: pick(locale, `从 ${name} 搬来：${entry.text}`, `Imported from ${name}: ${entry.text}`),
+          hypothesis: "",
+        },
+      },
+      // 用户已在搬入预览里确认这是自己在考虑的事，来源写在动机里。
+      "user",
+    );
+    directions++;
+  }
+  return {
+    entries: result.entries,
+    skipped: chosen.filter((item) => item.target === "memory").length - inputs.length,
     projects,
     directions,
   };
+}
+/**
+ * 旧版搬记忆遇到多条挤在一行时，整行成了一个目标或项目。
+ * 按类别标签拆开：原条目只留第一条，其余照常搬进记忆、目标、项目和方向。没有这种条目时不写任何东西。
+ */
+export async function splitImportedBlobs(ws: Workspace) {
+  const ais = ONBOARDING.ais.map((ai) => ai.id) as OnboardingAi[];
+  const hasDirections = listRecordTypes(ws).some((ref) => ref.type === "direction");
+  const split = (tag: string, text: string) => {
+    if (text.search(INLINE_TAG) <= 0) return null;
+    const parts = parseMemoryPaste(`[${tag}] ${text}`).map((entry) =>
+      entry.target === "direction" && !hasDirections ? { ...entry, target: "memory" as const } : entry,
+    );
+    return parts.length > 1 ? parts : null;
+  };
+  const goals = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [];
+  const goalFixes = goals.flatMap((goal) => {
+    const parts = split("目标", goal.title);
+    return parts ? [{ goal, parts }] : [];
+  });
+  const projectFixes = listProjects(ws).flatMap((project) => {
+    const file = `projects/${project.slug}/notes.md`;
+    const notes = ws.exists(file) ? (ws.scanText(file) ?? "") : "";
+    const line = notes.split("\n").find((row) => split("项目", row));
+    const parts = line && split("项目", line);
+    const ai = ais.find((id) => notes.includes(`从 ${aiInfo(id).name} 搬来`)) ?? "other";
+    return parts && line ? [{ slug: project.slug, file, notes, line, parts, ai }] : [];
+  });
+  if (!goalFixes.length && !projectFixes.length) return { goals: 0, projects: 0 };
+  await batchSnapshot(ws, "把搬记忆时挤在一起的条目拆开", async () => {
+    for (const { goal, parts } of goalFixes) {
+      const [first, ...rest] = parts as [MemoryCandidate, ...MemoryCandidate[]];
+      const all = ws.readJson<Goal[]>("me/goals.json");
+      ws.writeJson(
+        "me/goals.json",
+        all.map((item) => (item.id === goal.id ? { ...item, title: first.content } : item)),
+      );
+      const ai = ais.find((id) => goal.id.startsWith(`${id}-`)) ?? "other";
+      await writeImported(ws, rest, ai, "zh-CN");
+    }
+    for (const { slug, file, notes, line, parts, ai } of projectFixes) {
+      const [first, ...rest] = parts as [MemoryCandidate, ...MemoryCandidate[]];
+      const status = `${projectDirectory(ws, slug)}/STATUS.md`;
+      const doc = parseFrontmatter<ProjectStatus>(ws.readText(status));
+      const title = first.content.length > 80 ? `${first.content.slice(0, 79)}…` : first.content;
+      ws.writeText(
+        status,
+        stringifyFrontmatter({ ...doc.data, title }, doc.body.replace(`# ${doc.data.title}`, `# ${title}`)),
+      );
+      ws.writeText(file, notes.replace(line, first.text));
+      await writeImported(ws, rest, ai, "zh-CN");
+    }
+  });
+  return { goals: goalFixes.length, projects: projectFixes.length };
 }
 export function cancelOnboardingPreview(ws: Workspace, token: string, options: OnboardingOptions = {}) {
   const file = previewFile(token);
@@ -883,6 +962,7 @@ function hasUserFiles(ws: Workspace): boolean {
     ".agents",
     ".claude",
     "AGENTS.md",
+    "RECORDS.md",
     "AGENT-README.md",
     "OVERVIEW.md",
     "ORGANIZER.md",
@@ -1001,7 +1081,12 @@ export function onboardingStatus(ws: Workspace, options: OnboardingOptions = {})
     {
       id: "sources",
       title: content.checklist.sources,
-      done: !!choices?.starts?.length && sources.every((source) => source.done),
+      // 接上一个就算：GitHub 同步、任一数据源，或用户跳过；不要求每个都连上。
+      done:
+        !!choices?.starts?.length &&
+        (workspaceBackupEnabled(ws) ||
+          sources.length === 0 ||
+          sources.some((source) => source.done || source.skipped)),
       // 还没选要管的事时先去选，选完接着接数据，不让这一项变成点不动的灰按钮。
       action: choices?.starts?.length
         ? { kind: "source", target: "sources" }
@@ -1248,19 +1333,24 @@ function isOnboardingTask(task: Task): boolean {
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
+const goals = (ws: Workspace) => (ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : []);
 function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
   let kind: OnboardingNext["kind"] = goalSource.test(task.source ?? "") ? "goal" : "note";
   if (kind !== "goal")
     try {
       kind = readOnboardingMatter(ws, task.source ?? "").kind;
     } catch {}
+  const goalId = noteLine(task.notes ?? "", "目标编号") || goalSource.exec(task.source ?? "")?.[1] || null;
   return {
     kind,
     id: task.id,
     source: task.source ?? "",
-    goalId: noteLine(task.notes ?? "", "目标编号") || goalSource.exec(task.source ?? "")?.[1] || null,
+    goalId,
     next: task.title,
-    goal: noteLine(task.notes ?? "", "当前目标"),
+    // 目标改过名（比如拆开了挤在一起的条目）时以目标列表为准，备注里是采纳时的原文。
+    goal:
+      (goalId && goals(ws).find((goal) => goal.id === goalId)?.title) ||
+      noteLine(task.notes ?? "", "当前目标"),
     current: noteLine(task.notes ?? "", "已知现状"),
     result: noteLine(task.notes ?? "", "完成结果"),
     status: task.status,

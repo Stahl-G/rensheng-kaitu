@@ -136,3 +136,38 @@ it("总览 Remote 按天区分缺失与零值，汇总训练、睡眠、营养�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("写队列悬挂时 onboarding 及其他只读 Remote 立即返回", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-read-queue-"));
+  const ctx = new Context();
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const write = vi.fn(async <T>(run: () => Promise<T>) => {
+    await blocked;
+    return run();
+  });
+  try {
+    const ws = await initWorkspace(root);
+    const service = new KaituOverviewService(ctx, {}, ws, write);
+    const saving = service.onboardingMatterSave("合成目标：写一本书");
+    const reads = Promise.all([service.onboarding(), service.preferences("zh-CN"), service.aiDraft()]);
+    const result = await Promise.race([
+      reads,
+      new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 100)),
+    ]);
+    expect(result).not.toBe("blocked");
+    expect(write).toHaveBeenCalledTimes(1);
+    release();
+    const matter = await saving;
+    // 两个名称都是只读的，不能再失效文件索引或等待写队列。
+    expect(await service.onboardingMatterRead(matter.source)).toEqual(matter);
+    expect(await service.onboardingMatterOrganize(matter.source)).toEqual(matter);
+    expect(write).toHaveBeenCalledTimes(1);
+  } finally {
+    release();
+    await ctx.fiber.dispose();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

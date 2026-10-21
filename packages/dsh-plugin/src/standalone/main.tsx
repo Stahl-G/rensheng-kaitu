@@ -28,7 +28,8 @@ const props: OverviewPageProps = {
   promptOnboardingMatter: (source, locale) => call("onboardingMatterPrompt", source, locale),
   pasteOnboardingMatter: (source, answer, locale) => call("onboardingMatterPaste", source, answer, locale),
   addGoalNext: (goalId, title) => call("goalNextAdd", goalId, title),
-  loadHandover: (locale) => call("handoverPack", locale),
+  loadHandover: (locale, includeFinance) => call("handoverPack", locale, includeFinance),
+  configureFinanceAccess: (id, allowed) => call("setFinanceAccess", id, allowed),
   loadPreferences: (hint) => call("preferences", hint),
   savePreferences: (input) => call("savePreferences", input),
   directionsPrompt: (locale) => call("directionsPrompt", locale),
@@ -55,10 +56,12 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections) => (
+  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, promptRequest, active) => (
     <AskPage
       workspace={workspace}
+      active={active}
       initialPrompt={prompt}
+      initialPromptRequest={promptRequest}
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}
@@ -75,6 +78,7 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
   plugins: (action, input) => call("plugins", action, input),
@@ -85,12 +89,17 @@ const props: OverviewPageProps = {
   pickStorageFolder: () => call("pickStorageFolder"),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
-  loadLibrary: () => call("library"),
+  loadLibrary: (query) => call("library", query),
+  loadLearning: (topic) => call("learningRead", topic),
+  startLearning: (input) => call("learningStart", input),
+  saveLearning: (input) => call("learningSave", input),
   loadLibraryDocument: (file) => call("libraryDocument", file),
   completeNext: (file, id) => call("completeNext", file, id),
   decideProposal: (id, decision) => call("decideProposal", id, decision),
   capture: (text) => call("capture", text),
   loadMe: () => call("me"),
+  archiveMemory: (file, expected) => call("archiveMemory", file, expected),
+  replaceMemory: (file, candidate, expected) => call("replaceMemory", file, candidate, expected),
   setAvatar: (data) => call("setAvatar", data),
   removeAvatar: () => call("removeAvatar"),
   loadHealth: () => call("health"),

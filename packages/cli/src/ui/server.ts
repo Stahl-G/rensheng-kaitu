@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { type FSWatcher, existsSync, readFileSync, watch } from "node:fs";
+import { type FSWatcher, existsSync, readFileSync, unwatchFile, watch, watchFile } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
   CalendarPush,
+  FRAME_CSP,
   type ImportSource,
   KaituError,
   MAX_PHOTO_BYTES,
@@ -19,6 +20,7 @@ import {
   assetsRoot,
   calendarPushEntries,
   calendarPushStore,
+  cancelGithubCliLogin,
   completeNext,
   completeTask,
   decideProposal,
@@ -32,23 +34,29 @@ import {
   holdOverview,
   ignoredWorkspaceChange,
   importUpload,
+  invalidateHistoryFile,
+  invalidateWorkspaceBackup,
+  normalizeLocale,
   onboardingStatus,
-  pendingWorkspaceFiles,
+  pick,
   processInbox,
   pullCalendarSubscriptions,
   readPhoto,
+  readPreferences,
   readWorkbench,
   refreshOverview,
   removeMemory,
   removePhoto,
+  renderTeachingFrame,
   restore,
   snapshotNow,
   stageUpload,
   startWorkspaceBackup,
+  subscribeOrganizer,
   syncProject,
   syncProjects,
   syncStatus,
-  workspaceFileStamps,
+  workspaceFileStampsAsync,
 } from "@kaitu/core";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
@@ -97,6 +105,22 @@ async function body(req: IncomingMessage, limit: number): Promise<Buffer> {
     chunks.push(chunk);
   }
   return Buffer.concat(chunks);
+}
+async function requestJson(req: IncomingMessage, limit: number): Promise<unknown> {
+  const text = (await body(req, limit)).toString();
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        "请求内容不是合法 JSON，请修正格式后重试。",
+        "The request body is not valid JSON; correct its format and retry.",
+      ),
+      "BAD_ARGS",
+    );
+  }
 }
 function json(res: ServerResponse, status: number, data: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -191,18 +215,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let inboxTimer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let saveAt = Number.POSITIVE_INFINITY;
+  let saveQueued = false;
   let closed = false;
   let watchError = "";
-  let polling: ReturnType<typeof setInterval> | undefined;
-  let stamps = workspaceFileStamps(ws);
+  let polling: ReturnType<typeof setTimeout> | undefined;
+  let stamps = new Map<string, string>();
+  let pollingAbort: AbortController | undefined;
+  const versionDelay = options.versionDelayMs ?? 2000;
+  const snapshotDelay = options.snapshotDelayMs ?? 30000;
   holdOverview(ws);
   deferSnapshots(ws, (message) => {
     messages.push(message);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(
-      () => void exclusive(saveExternal).catch(reportError),
-      options.versionDelayMs ?? 2000,
-    );
+    scheduleSave(versionDelay);
   });
   const syncCalendar = () => {
     if (!options.calendarExecutor) return;
@@ -216,6 +241,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
+  const stopOrganizer = subscribeOrganizer(ws, notify);
   const stopPhone = startPhoneSnapshots(ws, () => reportError());
   void pullCalendars().catch(() => {});
   const reportError = () => {
@@ -223,32 +249,48 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     notify();
   };
   let messages: string[] = [];
-  async function saveExternal() {
+  function scheduleSave(delay: number) {
+    if (closed || saveQueued) return;
+    const due = performance.now() + delay;
+    // 第一条未保存改动确定本轮最晚开始时间，连续编辑只能提前、不能延后。
+    if (saveTimer && saveAt <= due) return;
     clearTimeout(saveTimer);
-    refreshOverview(ws);
-    const files = await pendingWorkspaceFiles(ws);
+    saveAt = due;
+    saveTimer = setTimeout(() => {
+      saveTimer = undefined;
+      saveAt = Number.POSITIVE_INFINITY;
+      saveQueued = true;
+      void exclusive(async () => {
+        saveQueued = false;
+        await saveExternal();
+      }).catch(reportError);
+    }, delay);
+  }
+  async function saveExternal() {
     const own = [...new Set(messages)];
     messages = [];
-    if (!files.length) {
-      watchError = "";
-      return;
+    let pending = true;
+    let version: string | null;
+    try {
+      version = await snapshotNow(ws, (files, hasPendingFiles) => {
+        // 显式原文要补存，但已经在版本里的原文不应无限重试。
+        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);
+        if (!pending) return null;
+        return own.length
+          ? own.join("；")
+          : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+              .slice(0, 3)
+              .map((file) => file.split("/").at(-1))
+              .join("、")}等 ${files.length} 个文件`;
+      });
+    } catch (error) {
+      messages.unshift(...own);
+      throw error;
     }
-    const version = await snapshotNow(
-      ws,
-      own.length
-        ? own.join("；")
-        : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
-            .slice(0, 3)
-            .map((file) => file.split("/").at(-1))
-            .join("、")}等 ${files.length} 个文件`,
-    );
-    if (!version && (await pendingWorkspaceFiles(ws)).length) {
+    if (!version && pending) {
+      messages.unshift(...own);
       reportError();
-      if (!closed)
-        saveTimer = setTimeout(
-          () => void exclusive(saveExternal).catch(reportError),
-          options.snapshotDelayMs ?? 30000,
-        );
+      scheduleSave(snapshotDelay);
     } else watchError = "";
   }
   function scheduleInbox() {
@@ -265,6 +307,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   function changedFile(file: string) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
+    invalidateHistoryFile(ws, file);
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
@@ -275,39 +318,63 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         notify();
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(
-      () => void exclusive(saveExternal).catch(reportError),
-      messages.length ? (options.versionDelayMs ?? 2000) : (options.snapshotDelayMs ?? 30000),
-    );
+    scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
-  for (const file of await pendingWorkspaceFiles(ws)) changedFile(file);
   let watcher: FSWatcher | undefined;
   let externalWatchers: FSWatcher[] = [];
+  // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。
+  const backupState = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
+  const backupChanged = () => {
+    invalidateWorkspaceBackup(ws);
+    notify();
+  };
+  watchFile(backupState, { persistent: false, interval: 2000 }, backupChanged);
+  const stopPolling = () => {
+    pollingAbort?.abort();
+    pollingAbort = undefined;
+    clearTimeout(polling);
+    polling = undefined;
+  };
   const startPolling = () => {
     watcher?.close();
-    if (polling) return;
+    if (pollingAbort) return;
     // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
-    polling = setInterval(
-      () => {
-        try {
-          const next = workspaceFileStamps(ws);
+    const controller = new AbortController();
+    pollingAbort = controller;
+    // 监听失效到建立轮询基线之间也可能有改动，后台补查版本和收件箱。
+    changedFile("工作区");
+    scheduleInbox();
+    const delay = Math.max(50, options.refreshDelayMs ?? 1000);
+    let baseline = true;
+    async function poll() {
+      const started = performance.now();
+      try {
+        const next = await workspaceFileStampsAsync(ws, { signal: controller.signal });
+        if (closed || controller.signal.aborted) return;
+        if (baseline) {
+          baseline = false;
+          // Files may arrive during the first scan after the initial catch-up was queued.
+          changedFile("工作区");
+          scheduleInbox();
+        } else {
           for (const file of new Set([...stamps.keys(), ...next.keys()])) {
             if (stamps.get(file) !== next.get(file)) changedFile(file);
           }
-          stamps = next;
-        } catch {
-          reportError();
         }
-      },
-      Math.max(50, options.refreshDelayMs ?? 1000),
-    );
+        stamps = next;
+      } catch {
+        if (!controller.signal.aborted) reportError();
+      } finally {
+        // One scan at a time; a stopped watcher cannot schedule another scan.
+        if (!closed && !controller.signal.aborted)
+          polling = setTimeout(() => void poll(), Math.max(delay, performance.now() - started));
+      }
+    }
+    void poll();
   };
   function startWatching() {
     watcher?.close();
-    clearInterval(polling);
-    polling = undefined;
-    stamps = workspaceFileStamps(ws);
+    stopPolling();
     try {
       watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
@@ -346,7 +413,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://s3.amazonaws.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!hosts.includes(req.headers.host ?? "")) return json(res, 403, { error: "拒绝非本机 Host" });
@@ -361,7 +428,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     try {
       const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
       if (url.pathname.startsWith("/api/channels/") && req.method === "POST") {
-        const input = JSON.parse((await body(req, MAX_JSON)).toString());
+        const input = await requestJson(req, MAX_JSON);
         if (!input || typeof input !== "object" || Array.isArray(input))
           throw new KaituError("参数必须是对象", "BAD_ARGS");
         try {
@@ -369,7 +436,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           return json(
             res,
             200,
-            await (operation.startsWith("phone-") ? phones : collectors).request(operation, input),
+            await (operation.startsWith("phone-") ? phones : collectors).request(
+              operation,
+              input as Record<string, unknown>,
+            ),
           );
         } catch (error) {
           if (error instanceof KaituError) throw error;
@@ -378,15 +448,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
       if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
         const method = url.pathname.slice("/api/product/".length);
-        const args = JSON.parse(
-          (
-            await body(
-              req,
-              ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
-                ? 49 * 1024 * 1024
-                : 3 * 1024 * 1024,
-            )
-          ).toString(),
+        const args = await requestJson(
+          req,
+          ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
+            ? 49 * 1024 * 1024
+            : 3 * 1024 * 1024,
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
@@ -440,7 +506,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               : relocate || method === "restoreVersion"
                 ? await exclusive(async () => {
                     await saveExternal();
-                    await options.ask?.prepareRelocation();
+                    const opening = method === "workspaceBackup" && args[0] === "activate";
+                    const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
+                    await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
                     await phones.stop();
                     const oldRoot = ws.root;
                     try {
@@ -460,7 +528,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
-        if (productMutations.has(method)) notify();
+        const backupRead =
+          method === "workspaceBackup" && ["status", "prompts", "gh-status"].includes(String(args[0]));
+        if (productMutations.has(method) && !backupRead) notify();
         if (
           method === "openAi" &&
           draftId &&
@@ -473,6 +543,28 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         return json(res, 200, result ?? null);
       }
       if (req.method === "GET") {
+        if (url.pathname === "/api/ask/teaching-frame" && options.ask) {
+          const session = url.searchParams.get("session") ?? "";
+          const call = url.searchParams.get("call") ?? "";
+          const event = options.ask
+            .events(session)
+            .findLast(
+              (event) =>
+                event.type === "tool/result" &&
+                (event.data.message as { toolCallId?: string; isError?: boolean })?.toolCallId === call &&
+                !(event.data.message as { isError?: boolean })?.isError,
+            );
+          const html = event ? renderTeachingFrame(event.data.meta, call) : undefined;
+          if (!html) return json(res, 404, { error: "找不到教学卡片" });
+          // A separate HTTP document does not inherit the main page's script restriction.
+          // Both response policy and iframe sandbox keep it away from workspace APIs/cookies.
+          res.setHeader(
+            "Content-Security-Policy",
+            `${FRAME_CSP}; sandbox allow-scripts; frame-ancestors 'self'`,
+          );
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(html);
+        }
         if (url.pathname === "/api/ask/events" && options.ask) {
           const id = url.searchParams.get("session") ?? "";
           const history = options.ask.events(id);
@@ -561,7 +653,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         });
         return json(res, 200, result);
       }
-      const data = JSON.parse((await body(req, MAX_JSON)).toString()) as Record<string, unknown>;
+      const data = (await requestJson(req, MAX_JSON)) as Record<string, unknown>;
       const result = await exclusive(async () => {
         if (url.pathname === "/api/import/cancel") {
           const token = field(data, "token");
@@ -705,17 +797,20 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
     }
     closed = true;
+    cancelGithubCliLogin();
     watcher?.close();
+    unwatchFile(backupState, backupChanged);
     for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
-    clearInterval(polling);
+    stopPolling();
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
@@ -733,12 +828,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     });
   } catch (error) {
     watcher?.close();
+    unwatchFile(backupState, backupChanged);
     stopBackup();
+    stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
-    clearInterval(polling);
+    stopPolling();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
@@ -749,6 +846,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("无法取得监听端口");
   port = address.port;
+  // 启动前已有的改动也走后台保存；与提交共用一次盘点，不另做全量查找。
+  setImmediate(() => {
+    if (closed) return;
+    changedFile("工作区");
+    scheduleInbox();
+  });
   const url = `http://127.0.0.1:${port}`;
   if (options.open !== false) {
     const command =

@@ -1,4 +1,5 @@
-import { readdirSync } from "node:fs";
+import { lstatSync, readdirSync } from "node:fs";
+import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
@@ -12,7 +13,7 @@ import type { Workspace } from "./workspace.js";
 export interface LibraryItem {
   id: string;
   title: string;
-  count: number;
+  count: number | null;
   sources: string[];
   latest: string | null;
 }
@@ -24,53 +25,73 @@ export interface InboxEntry {
   status: "organized" | "review" | "raw";
   destination: string | null;
 }
+export interface LibraryQuery {
+  section?: "summary" | "inbox" | "notes" | "health";
+  before?: string;
+  source?: string;
+}
 export interface LibraryData {
+  next?: string | null;
   sections: LibraryItem[];
   inbox: InboxEntry[];
   notes: { file: string; title: string; kind: "笔记" | "决定"; status: string | null }[];
 }
-export function readLibrary(ws: Workspace): LibraryData {
-  const calendar = readCalendar(ws);
-  const doing = readDoing(ws);
-  const entry = (file: string, organized: boolean): InboxEntry => {
-    const { data, body } = parseFrontmatter(ws.readText(file));
+export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryData {
+  const section = query.section;
+  if (section && !["summary", "inbox", "notes", "health"].includes(section))
+    throw new KaituError("未知资料分类", "BAD_ARGS");
+  const calendar = !section ? readCalendar(ws) : null;
+  const doing = !section || section === "notes" ? readDoing(ws) : { learning: [], decisions: [] };
+  // 还没从云盘下载的笔记先不列，下载后自然出现。
+  const entry = (file: string, organized: boolean): InboxEntry[] => {
+    const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
+    if (!parsed) return [];
+    const { data, body } = parsed;
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
         : undefined;
-    return {
-      file,
-      text: body.trim(),
-      source:
-        data.kind === "capture"
-          ? "me"
-          : channelSource === "gmail" || channelSource === "imap"
-            ? "mail"
-            : (channelSource ?? "other"),
-      date:
-        typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
-      status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
-      destination: null,
-    };
+    return [
+      {
+        file,
+        text: body.trim(),
+        source:
+          data.kind === "capture"
+            ? "me"
+            : channelSource === "gmail" || channelSource === "imap"
+              ? "mail"
+              : (channelSource ?? "other"),
+        date:
+          typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
+        status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
+        destination: null,
+      },
+    ];
   };
-  const inbox = inboxNotes(ws).map((note) => entry(note.path, false));
+  const page = section === "inbox" ? inboxPage(ws, query, entry) : null;
+  const inbox = page?.inbox ?? (!section ? inboxNotes(ws).flatMap((note) => entry(note.path, false)) : []);
   const done = "inbox/notes/done";
-  if (ws.exists(done))
+  if (!section && ws.exists(done))
     for (const day of readdirSync(ws.resolve(done), { withFileTypes: true })) {
       if (!day.isDirectory() || !/^\d{4}-\d{2}-\d{2}$/.test(day.name)) continue;
       for (const file of readdirSync(ws.resolve(`${done}/${day.name}`), { withFileTypes: true })) {
         if (file.isFile() && file.name.endsWith(".md"))
-          inbox.push(entry(`${done}/${day.name}/${file.name}`, true));
+          inbox.push(...entry(`${done}/${day.name}/${file.name}`, true));
       }
     }
-  inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  if (!page) inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const records = (types: string[]) => types.flatMap((type) => readRecords(ws, type));
-  const health = records(
-    listRecordTypes(ws)
-      .filter((r) => r.module.def.id === "health")
-      .map((r) => r.type),
-  );
-  const finance = records(["finance_account", "finance_transaction", "finance_holding_snapshot"]);
+  const health =
+    !section || section === "health"
+      ? records(
+          listRecordTypes(ws)
+            .filter((r) => r.module.def.id === "health")
+            .map((r) => r.type),
+        )
+      : [];
+  const finance = !section
+    ? records(["finance_account", "finance_transaction", "finance_holding_snapshot"])
+    : [];
   const fromRecords = (rows: ReturnType<typeof records>) => ({
     sources: [
       ...new Set(
@@ -102,16 +123,17 @@ export function readLibrary(ws: Workspace): LibraryData {
     ...doing.decisions.map((row) => ({ ...row, kind: "决定" as const })),
   ];
   return {
+    ...(page ? { next: page.next } : {}),
     inbox,
     notes,
     sections: [
       {
         id: "calendar",
         title: "日程",
-        count: calendar.events.length,
-        sources: [...new Set(calendar.events.map((row) => row.source))],
+        count: calendar?.events.length ?? null,
+        sources: [...new Set((calendar?.events ?? []).map((row) => row.source))],
         latest:
-          calendar.subscriptions
+          calendar?.subscriptions
             .map((row) => row.syncedAt)
             .filter((date): date is string => !!date)
             .sort()
@@ -120,23 +142,28 @@ export function readLibrary(ws: Workspace): LibraryData {
       {
         id: "projects",
         title: "在做的事",
-        count: listProjects(ws).length,
+        count: !section ? listProjects(ws).length : null,
         sources: ["本机项目档案"],
         latest: null,
       },
-      { id: "health", title: "健康", count: health.length, ...fromRecords(health) },
-      { id: "finance", title: "财务", count: finance.length, ...fromRecords(finance) },
+      {
+        id: "health",
+        title: "健康",
+        count: !section || section === "health" ? health.length : null,
+        ...fromRecords(health),
+      },
+      { id: "finance", title: "财务", count: !section ? finance.length : null, ...fromRecords(finance) },
       {
         id: "notes",
         title: "笔记与决策",
-        count: notes.length,
+        count: !section || section === "notes" ? notes.length : null,
         sources: ["学习笔记", "决策记录"],
         latest: null,
       },
       {
         id: "inbox",
         title: "收件箱",
-        count: inbox.length,
+        count: !section ? inbox.length : null,
         sources: [...new Set(inbox.map((row) => (row.source === "me" ? "随手记" : "其他原文")))],
         latest: inbox[0]?.date ?? null,
       },
@@ -144,7 +171,62 @@ export function readLibrary(ws: Workspace): LibraryData {
   };
 }
 export function readLibraryDocument(ws: Workspace, file: string) {
-  if (!readLibrary(ws).notes.some((note) => note.file === file))
+  // 资料详情只接受目录页所列的主题状态文档；不为验证一个路径读取其他资料。
+  if (!/^(learning|decisions)\/[^./][^/]*\/STATUS\.md$/.test(file) || file.includes("\\"))
+    throw new KaituError("找不到这份资料", "NOT_FOUND");
+  assertAgentPath(ws.root, file);
+  if (
+    !ws.exists(file) ||
+    !lstatSync(ws.resolve(file.slice(0, file.lastIndexOf("/")))).isDirectory() ||
+    ws.conflictCopy(file)
+  )
     throw new KaituError("找不到这份资料", "NOT_FOUND");
   return ws.readText(file);
+}
+
+/** 按日期目录、文件名倒序续读；正文只在这一页或来源筛选命中之前读取。 */
+function inboxPage(
+  ws: Workspace,
+  query: LibraryQuery,
+  read: (file: string, organized: boolean) => InboxEntry[],
+) {
+  const limit = 40;
+  const directories: { date: string; path: string; organized: boolean }[] = [];
+  for (const base of ["inbox/notes", "inbox/notes/done"]) {
+    if (!ws.exists(base)) continue;
+    for (const dir of readdirSync(ws.resolve(base), { withFileTypes: true })) {
+      if (dir.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(dir.name))
+        directories.push({ date: dir.name, path: `${base}/${dir.name}`, organized: base.endsWith("/done") });
+    }
+  }
+  const dates = [...new Set(directories.map((dir) => dir.date))].sort().reverse();
+  const entries: { key: string; value: InboxEntry }[] = [];
+  for (const date of dates) {
+    if (query.before && date > query.before.slice(0, 10)) continue;
+    const files = directories
+      .filter((dir) => dir.date === date)
+      .flatMap((dir) =>
+        readdirSync(ws.resolve(dir.path), { withFileTypes: true })
+          .filter((file) => file.isFile() && file.name.endsWith(".md"))
+          .map((file) => ({
+            ...dir,
+            file: `${dir.path}/${file.name}`,
+            key: `${date}/${file.name}/${dir.organized ? 1 : 0}`,
+          })),
+      )
+      .sort((a, b) => b.key.localeCompare(a.key));
+    for (const file of files) {
+      if (query.before && file.key.localeCompare(query.before) >= 0) continue;
+      for (const value of read(file.file, file.organized)) {
+        if (query.source && query.source !== "all" && value.source !== query.source) continue;
+        entries.push({ key: file.key, value });
+        if (entries.length > limit)
+          return {
+            inbox: entries.slice(0, limit).map((row) => row.value),
+            next: entries[limit - 1]?.key ?? null,
+          };
+      }
+    }
+  }
+  return { inbox: entries.map((row) => row.value), next: null };
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { rewriteArchive } from "./package-archive.mjs";
 import { writePayload } from "./package-payload.mjs";
+import { readUpdateConfig } from "./update-config.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
@@ -16,6 +17,8 @@ const { values, positionals } = parseArgs({
     tools: { type: "string" },
     dir: { type: "boolean" },
     revision: { type: "string" },
+    "update-config": { type: "string" },
+    "update-public-key": { type: "string" },
   },
 });
 if (process.platform !== "win32" || process.arch !== "x64") throw new Error("请在 Windows x64 上打包");
@@ -36,6 +39,13 @@ const asar = requireTools(asarPath);
 const archive = join(source, "resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const version = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
+const updateConfig = readUpdateConfig({
+  version,
+  configFile: values["update-config"],
+  publicKeyFile:
+    values["update-public-key"] ??
+    (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
+});
 const dshVersion = "0.2.1-rc.2";
 if (manifest.version !== dshVersion || manifest.main !== "lib/main.js")
   throw new Error(`输入必须是 DSH ${dshVersion} 官方 Windows 桌面包`);
@@ -45,6 +55,7 @@ const resources = join(appDir, "resources");
 const payload = join(resources, "kaitu");
 await writePayload({ payload, archive, asar, payloadVersion: version, dshVersion });
 cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
+if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
 rmSync(join(resources, "app-update.yml"), { force: true });
 
 const changes = new Map();

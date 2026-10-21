@@ -173,27 +173,73 @@ function latestExperiences(ws: Workspace, committed = false) {
   }
   return { all, latest, original, revisions };
 }
-export function previewExperienceBatch(ws: Workspace, id: string, operation: "undo" | "restore") {
-  if (!["undo", "restore"].includes(operation)) throw new KaituError("未知的导入操作", "BAD_ARGS");
+export type ExperienceBatchOperation = "confirm" | "undo" | "restore";
+function canConfirm(row: StoredRecord | undefined, item: Item) {
+  const experience = row as unknown as Experience | undefined;
+  return !!(
+    row &&
+    !row.deleted &&
+    (row.rev ?? 1) === item.revision &&
+    experience?.fact_status === "inferred" &&
+    !experience.review &&
+    experience.place.precision === "city" &&
+    experience.place.geonameid !== undefined &&
+    experience.place.lat !== undefined &&
+    experience.place.lng !== undefined
+  );
+}
+export function previewExperienceBatch(ws: Workspace, id: string, operation: ExperienceBatchOperation) {
+  if (!["confirm", "undo", "restore"].includes(operation)) throw new KaituError("未知的导入操作", "BAD_ARGS");
   const batch = batches(ws).find((b) => b.id === id);
   if (!batch) throw new KaituError("找不到这次导入", "NOT_FOUND");
-  const { original: originals, latest } = latestExperiences(ws);
-  const targets = operation === "undo" ? batch.items : batch.withdrawn;
-  const affected: { id: string; title: string; source: string; revision: number }[] = [];
+  const { original: originals, latest, revisions } = latestExperiences(ws);
+  const targets = operation === "restore" ? batch.withdrawn : batch.items;
+  const affected: {
+    id: string;
+    title: string;
+    source: string;
+    revision: number;
+    city: string;
+    country?: string;
+    start?: string;
+    end?: string;
+    event_type: Experience["event_type"];
+  }[] = [];
   const preserved: { id: string; title: string; reason: string }[] = [];
   for (const item of targets) {
     const row = latest.get(item.id);
     const original = originals.get(item.id);
-    const title = String((row && !row.deleted ? row.title : original?.title) || original?.source || item.id);
+    const detail = (row && !row.deleted
+      ? row
+      : (revisions.get(
+          `${item.id}:${batch.withdrawn.find((entry) => entry.id === item.id)?.restore_revision}`,
+        ) ?? original)) as unknown as Experience | undefined;
+    const title = detail?.title || detail?.place.name || String(original?.source || item.id);
     const eligible =
-      row && (row.rev ?? 1) === item.revision && (operation === "undo" ? !row.deleted : row.deleted);
-    if (eligible)
-      affected.push({ id: item.id, title, source: String(original?.source ?? ""), revision: item.revision });
+      operation === "confirm"
+        ? batch.state === "committed" && canConfirm(row, item)
+        : row && (row.rev ?? 1) === item.revision && (operation === "undo" ? !row.deleted : row.deleted);
+    if (eligible && detail)
+      affected.push({
+        id: item.id,
+        title,
+        source: String(original?.source ?? ""),
+        revision: item.revision,
+        city: detail.place.name,
+        country: detail.place.country,
+        start: detail.start,
+        end: detail.end,
+        event_type: detail.event_type,
+      });
     else
       preserved.push({
         id: item.id,
         title,
-        reason: row?.deleted ? "已经隐藏，保留当前状态" : "后续已有修改，保留当前资料",
+        reason: row?.deleted
+          ? "已经隐藏，保留当前状态"
+          : operation === "confirm" && row && (row.rev ?? 1) === item.revision
+            ? "无需确认或城市尚未解析，保留当前状态"
+            : "后续已有修改，保留当前资料",
       });
   }
   return { id: batch.id, revision: batch.rev ?? 1, state: batch.state, operation, affected, preserved };
@@ -201,26 +247,39 @@ export function previewExperienceBatch(ws: Workspace, id: string, operation: "un
 export async function changeExperienceBatch(
   ws: Workspace,
   id: string,
-  operation: "undo" | "restore",
+  operation: ExperienceBatchOperation,
   expectedRevision: number,
 ) {
-  if (!["undo", "restore"].includes(operation)) throw new KaituError("未知的导入操作", "BAD_ARGS");
+  if (!["confirm", "undo", "restore"].includes(operation)) throw new KaituError("未知的导入操作", "BAD_ARGS");
   await recoverExperienceImports(ws);
   const batch = batches(ws).find((b) => b.id === id);
   if (!batch) throw new KaituError("找不到这次导入", "NOT_FOUND");
   const target = operation === "undo" ? "undone" : "committed";
-  if (batch.state === target) return { affected: 0, preserved: 0, version: null };
   if ((batch.rev ?? 1) !== expectedRevision)
     throw new KaituError("导入状态已更新，请重新查看影响范围", "CONFLICT");
+  if (operation === "confirm" ? batch.state !== "committed" : batch.state === target)
+    return { affected: 0, preserved: 0, version: null };
   const preview = previewExperienceBatch(ws, id, operation);
-  const { revisions } = latestExperiences(ws);
+  if (operation === "confirm" && !preview.affected.length)
+    return { affected: 0, preserved: preview.preserved.length, version: null };
+  const { revisions, latest } = latestExperiences(ws);
   const restorePoints = new Map(batch.withdrawn.map((item) => [item.id, item.restore_revision]));
   const now = isoInZone(new Date(), ws.timeZone());
   const withdrawn: Withdrawn[] = [];
   const items = batch.items.map((item) => ({ ...item }));
   const entries = preview.affected.map((item) => {
     let record: StoredRecord;
-    if (operation === "undo") {
+    if (operation === "confirm") {
+      // 确认修订和批次指针必须一起提交；逐条 editExperience 会令整批撤销失去目标。
+      record = {
+        ...(latest.get(item.id) as StoredRecord),
+        fact_status: "observed",
+        by: "user",
+        rev: item.revision + 1,
+      };
+      const active = items.find((entry) => entry.id === item.id);
+      if (active) active.revision = record.rev as number;
+    } else if (operation === "undo") {
       record = { id: item.id, ts: now, by: "user", rev: item.revision + 1, deleted: true };
       withdrawn.push({ id: item.id, revision: record.rev as number, restore_revision: item.revision });
     } else {
@@ -248,7 +307,11 @@ export async function changeExperienceBatch(
   const result = await commitRecordTransaction(
     ws,
     entries,
-    operation === "undo" ? "你撤销了一次足迹导入" : "你恢复了一次足迹导入",
+    operation === "confirm"
+      ? "你确认了一批地点经历"
+      : operation === "undo"
+        ? "你撤销了一次足迹导入"
+        : "你恢复了一次足迹导入",
   );
   return { affected: preview.affected.length, preserved: preview.preserved.length, version: result.version };
 }
@@ -295,6 +358,10 @@ export function readExperienceImports(ws: Workspace) {
         revision: batch.rev ?? 1,
         state: batch.state,
         added: batch.items.length,
+        confirmable:
+          batch.state === "committed"
+            ? batch.items.filter((item) => canConfirm(latest.get(item.id), item)).length
+            : 0,
         duplicates: batch.duplicate_count,
         excluded: batch.excluded_count,
         sources: [

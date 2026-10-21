@@ -8,15 +8,16 @@
 - `today.json`：前三项下一步、待确认与已确认日程、进行中的目标、同步摘要。`question` 在 v1 为 null。
 - `week.json`：最近七天的进行中项目、健康摘要、保存原文数和最近三项变化。
 - `map.json`：共用电脑进度行与路线算法，输出城市和经纬度路线。未知或待核对的地点不生成路线。
+- `library.json`：资料目录，手机资料页的列表和搜索用。每项是分类（项目、健康、财务、原文、我的）、标题、一行说明、日期和相对路径，不含正文；手机点开哪一项才读那个文件。原文只取第一行作标题（最多 40 字），只列最近 30 天；健康和财务按记录类型各一项，路径是最近一个月的记录文件；记忆全部列出，标为敏感的 subtitle 写「标为敏感」。手机是用户自己的设备，资料目录不替用户藏东西（2026-10-19 用户决定）。
 - `receipts.json`：最近十四天的处理结果，`ref` 是操作的 client_id 或收件箱文件名。
 
-每份快照含 format、version、generated_at。字段只增不改，手机忽略未知字段，遇到不支持的主版本提示升级。
+每份快照含 format、version、generated_at。today、week、map、library 另有可选的 `generator`：电脑写 `{kind: "computer"}`，云端整理员必须写 `{kind: "agent", name, spec}`（name 不超过 32 字，spec 是 ORGANIZER.md 规则版本）；没有这个字段当作电脑生成。字段只增不改，手机忽略未知字段，遇到不支持的主版本提示升级。
 资料变化在后台防抖两秒刷新，监听不可用时每分钟补看；内容不变不写，generated_at 也不变。
-只有工作区位于 iCloud / 已配置同步文件夹，或启用 GitHub 备份时才生成三个读快照。
+只有工作区位于 iCloud / 已配置同步文件夹，或启用 GitHub 备份时才生成四个读快照。
 回执由收件箱处理器写入。`phone/` 不作为模块、不进入本机版本历史，Agent 只能读。
 
-投影只取页面需要的字段，不复制原文、项目本机链接、财务明细、记忆或凭据。
-最近变化排除财务和记忆类版本说明。file 是工作区内相对路径。
+投影只取页面需要的字段，不复制正文、项目本机链接或凭据；正文在手机点开时读原文件。
+最近变化列最近三个版本，不再按版本说明的文字过滤。file 是工作区内相对路径。
 
 ## 手机提交
 
@@ -26,7 +27,7 @@
 - `.records.jsonl`：沿用记录入箱格式。手机文件的 `origin: user` 署名为 `by: user`，assistant 写为 agent。
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
-  执行 complete_next、complete_task、cancel_task、decide_proposal。预留操作返回 rejected。
+  执行 complete_next、complete_task、cancel_task、decide_proposal；声明mobile能力的消费者还支持create_task/update_task。其余预留操作返回 rejected。
   decide_proposal 只改今天的状态：确认的日程标 `calendar: phone`，由手机自己写进 Apple 日历，电脑从不替它新建日历事件。
 - 健康仍使用 `inbox/health/*.health.json`。照片不在本次实现范围内。
 
@@ -52,15 +53,40 @@
 - 不生效：只能由用户本人做的决定。确认阶段、写阶段回顾、启用方向按 Agent 权限校验，整份拒绝，在电脑上确认。
 - 未交付：手机可信确认通道。需要设备配对和签名之类的来源证明，本期不做，也不新增凭据或授权。
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
-操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重。
+操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重；`phone/receipts.json` 里已有的 client_id（例如云端整理员处理过的）也算处理过。
 同一个 client_id 再投递不重复执行：第一次成功的返回 duplicate，第一次 conflict 或 rejected 的照原结果再返回。
 conflict 说明这一项已经在电脑上变了，不需要再到电脑上处理，所以不计入电脑今天页的「需要核对」；回执供手机撤回乐观显示并呈现原因。
 成功文件移到 processed，原文进入 notes；不合格记录附原因进入待整理笔记。
 
 ## GitHub 与同步文件夹
 
-GitHub 连接启用后，phone 四个 JSON 始终只上传，agents 文本与 health JSON 收件箱始终双向同步，
-不受文字 / 结构化资料开关影响。电脑拉下新文件后，下一轮上传回执和快照；处理完的远端收件箱文件删除。
+GitHub 连接启用后，phone 四个 JSON 始终以本机为准上传，只有远端回执里本机没有的条目先并进本机；
+agents 文本、health JSON 收件箱和 `inbox/notes/` 下的待整理原文始终双向同步，不受文字 / 结构化资料开关影响。电脑拉下新文件后，下一轮上传回执和快照；处理完的远端收件箱文件删除。
 网络期间本机文件有变化时保留本机内容，下轮重试。原有同记录冲突规则、Host / Origin 和 Agent / MCP 写入策略保留。
 
 iCloud 和其他同步文件夹直接交换同样的路径，无需额外协议。真实手机、真实同步盘和真实 GitHub 的联调另行验收。
+
+## 本机基础事项与修订同步（2026-10-19）
+
+手机即使未连接或没有today也能在本机创建、查看、编辑、完成/取消待办及保存/回读笔记，先原子持久化，再显示结果。
+本机完成与跨端应用分开。笔记从inbox消失不能作为成功证据；file applied只说明已收下，不代表整理完成。
+
+新版today可选mobile={version:1,actions:[...],tasks:[{id,rev,title,status,ts,due?}]}，tasks包括完成/取消项。
+缺少能力声明时，新任务与修订保留手机上，不投递给旧消费者；已有四动作的旧格式继续兼容。
+新建create_task的args含稳定ULID id、title、expected_rev:0，可有due/notes；正式记录rev1，id不再重生。
+update_task只允许title/due/notes与expected_rev；complete/cancel携带expected_rev。保留字段by/rev/deleted不能由客户端指定。
+回执可带target:{id,rev}。当前rev不匹配则conflict，保留两端内容，不静默覆盖。
+同target前序未取得真实成功回执前不投后续动作，本机继续编辑不受阻；不用文件名字典序假定跨文件到达顺序。
+
+next可选source_precondition是所见目标条目原对象，complete_next.args.expected_next原样带回；
+消费者比较该条目精确内容后才完成，不给所有STATUS额外增加修订框架。
+
+消费者在已有phone-actions账本先保存受控任务的准备记录，再通过现有record-transaction追加。
+中断后重投同client_id复用准备记录，已有相同rev/内容不再追加；终态账本成功后才发布回执。
+不同内容的同rev或陈旧目标返回冲突；持久化故障保留作业可重试，不落永久conflict。
+手机仍只新建inbox，不能伪写phone快照或desktop receipt。实际跨语言文件旅程另行验证，真机/同步盘验收不由合成测试代替。
+
+## 饮食合计（2026-10-20）
+
+开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
+手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。

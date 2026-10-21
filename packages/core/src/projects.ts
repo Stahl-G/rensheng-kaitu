@@ -34,7 +34,8 @@ export interface ProjectStatus extends ModuleStatus {
   github?: { repo: string };
   blocked?: unknown[];
 }
-export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> & Partial<Pick<ProjectStatus, "links">>;
+export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
+  Partial<Pick<ProjectStatus, "links">> & { slug?: string };
 
 function slugCheck(slug: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ["data", "projects"].includes(slug)) {
@@ -109,7 +110,12 @@ export function readProject(ws: Workspace, slug: string) {
   const parsed = { ...raw, data: projectStatus(raw.data, slug) };
   parsed.data.links ??= [];
   checkStatus(parsed.data);
-  return { slug, dir, ...parsed, log: ws.exists(`${dir}/log.md`) ? ws.readText(`${dir}/log.md`) : "" };
+  return {
+    slug,
+    dir,
+    ...parsed,
+    log: ws.exists(`${dir}/log.md`) ? (ws.scanText(`${dir}/log.md`) ?? "") : "",
+  };
 }
 /** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
 function projectSnapshot(ws: Workspace, slug: string) {
@@ -264,8 +270,9 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
     ws.writeJson(".kaitu/config.json", config, { internal: true });
     writeAgentsMd(ws);
   }
+  const { slug: wanted, ...fields } = input;
   const data: ProjectStatus = {
-    ...input,
+    ...fields,
     title: typeof input.title === "string" ? input.title.trim() : "",
     stage: "active",
     links: input.links ?? [],
@@ -273,12 +280,16 @@ export async function createProject(ws: Workspace, input: ProjectInput) {
     next: [],
   };
   checkStatus(data);
+  if (wanted) slugCheck(wanted);
+  // 中文标题生成不了可读目录名，Agent 可指定一个英文短名。
   const base =
+    wanted ||
     data.title
       .toLowerCase()
       .replace(/[^a-z0-9-]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .replace(/-+/g, "-") || ulid().slice(-8).toLowerCase();
+      .replace(/-+/g, "-") ||
+    ulid().slice(-8).toLowerCase();
   let slug = ["data", "projects"].includes(base) ? `${base}-project` : base;
   while (slugs(ws).includes(slug)) slug = `${base}-${ulid().slice(-8).toLowerCase()}`;
   const dir = `projects/${slug}`;
@@ -529,29 +540,39 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
       try {
         const dir = linkedPath(link);
         if (!fs.lstatSync(join(dir, ".git")).isDirectory()) throw new Error("只支持普通 .git 目录");
-        const refs: string[] = [];
+        const shallowFile = join(dir, ".git/shallow");
+        const shallow = new Set(
+          fs.existsSync(shallowFile) ? fs.readFileSync(shallowFile, "utf8").trim().split(/\s+/) : [],
+        );
+        const expanded = new Set<string>();
+        const pending: string[] = [];
         for (const namespace of ["refs/heads", "refs/remotes"]) {
           for (const ref of await git.listRefs({ fs, dir, filepath: namespace })) {
-            refs.push(`${namespace}/${ref}`);
+            pending.push(await git.resolveRef({ fs, dir, ref: `${namespace}/${ref}` }));
           }
         }
-        // 只读取所有分支的对象与引用，不执行 status、checkout 或任何写命令。
-        for (const ref of refs) {
-          for (const { oid, commit } of await git.log({ fs, dir, ref })) {
-            if (seenCommits.has(oid)) continue;
-            seenCommits.add(oid);
-            const timestamp = commit.author.timestamp;
-            const day = localDate(new Date(timestamp * 1000), tz);
-            if (day < from || day >= today) continue;
-            const item = counts.get(day) ?? { count: 0, titles: [] };
-            item.count++;
-            item.titles.push({
-              timestamp,
-              oid,
-              title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
-            });
-            counts.set(day, item);
-          }
+        // 所有分支共用一次提交图遍历；合并和本地/远端引用不会重复读取祖先。
+        // 作者日期不保证随父提交递减，仍须检查完整可达图，不能按日期提前截断。
+        while (pending.length) {
+          const oid = pending.pop() as string;
+          if (expanded.has(oid)) continue;
+          const { commit } = await git.readCommit({ fs, dir, oid });
+          expanded.add(oid);
+          if (!shallow.has(oid)) pending.push(...commit.parent);
+          // 跨库只去重计数；浅库见过的 oid 不能截断完整库中的父链。
+          if (seenCommits.has(oid)) continue;
+          seenCommits.add(oid);
+          const timestamp = commit.author.timestamp;
+          const day = localDate(new Date(timestamp * 1000), tz);
+          if (day < from || day >= today) continue;
+          const item = counts.get(day) ?? { count: 0, titles: [] };
+          item.count++;
+          item.titles.push({
+            timestamp,
+            oid,
+            title: [...(commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
+          });
+          counts.set(day, item);
         }
       } catch (error) {
         reposOk = false;

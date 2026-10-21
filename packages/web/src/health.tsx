@@ -329,7 +329,7 @@ export function Health({
           </Panel>
         </>
       )}
-      <footer class="health-footer">只做记录与趋势，不构成医疗建议</footer>
+      <footer class="health-footer">健康记录与趋势</footer>
     </>
   );
 }

@@ -1,0 +1,68 @@
+.page {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.toolbar h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.form {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+.form h3,
+.form p {
+  margin: 0;
+}
+.form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.form input,
+.form textarea,
+.form select {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 8px;
+  padding: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.form textarea {
+  resize: vertical;
+}
+.form button {
+  justify-self: start;
+}
+.topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.topics button[aria-pressed="true"] {
+  outline: 2px solid var(--accent, #515b91);
+  outline-offset: 2px;
+}
+.document {
+  display: grid;
+  gap: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.7;
+  margin-top: 12px;
+  max-height: 360px;
+  overflow: auto;
+}

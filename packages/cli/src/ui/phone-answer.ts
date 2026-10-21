@@ -5,7 +5,8 @@ export function phoneAnswer(ask?: AskService) {
   return async (prompt: string, signal: AbortSignal): Promise<string> => {
     if (!ask || !(await ask.settings()).configured) return "请先在电脑上的开图里连接 AI";
     signal.throwIfAborted();
-    const thread = ask.create();
+    const service = ask.background("phone-ask");
+    const thread = service.create();
     return new Promise<string>((resolve, reject) => {
       let answer = "";
       const finish = (error?: Error) => {
@@ -30,13 +31,13 @@ export function phoneAnswer(ask?: AskService) {
         if (event.type === "session.status" && event.data.status === "idle")
           finish(event.data.error ? new KaituError(String(event.data.error), "AI_CONNECTION") : undefined);
       };
-      const unsubscribe = ask.subscribe(thread.id, receive);
+      const unsubscribe = service.subscribe(thread.id, receive);
       const timer = setTimeout(
         () => finish(new KaituError("AI 回复超时，请稍后重试", "AI_CONNECTION")),
         180000,
       );
       signal.addEventListener("abort", abort, { once: true });
-      void ask.send(thread.id, prompt).catch((error) => finish(error));
-    });
+      void service.send(thread.id, prompt).catch((error) => finish(error));
+    }).finally(() => service.close());
   };
 }

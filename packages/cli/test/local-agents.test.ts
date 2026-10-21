@@ -11,20 +11,36 @@ const dirs: string[] = [];
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+function writeAgent(dir: string, name: string, source: string): string {
+  const windows = process.platform === "win32";
+  const script = join(dir, windows ? `${name}.mjs` : name);
+  writeFileSync(script, source, { mode: 0o755 });
+  chmodSync(script, 0o755);
+  if (!windows) return script;
+  // Exercise the same npm-shim resolution as installed Windows ACP CLIs.
+  writeFileSync(join(dir, name), `exec node "$basedir/${name}.mjs" "$@"`);
+  const path = join(dir, `${name}.cmd`);
+  writeFileSync(path, `@node "%~dp0${name}.mjs" %*\r\n`);
+  return path;
+}
+function copyAgent(path: string, dir: string, name: string): string {
+  const script = process.platform === "win32" ? path.replace(/\.cmd$/, ".mjs") : path;
+  return writeAgent(dir, name, readFileSync(script, "utf8"));
+}
 function fixture() {
   const dir = mkdtempSync(join(tmpdir(), "kaitu-codebuddy-"));
   dirs.push(dir);
   const workspace = join(dir, "workspace");
   mkdirSync(workspace);
-  const path = join(dir, "codebuddy");
-  writeFileSync(
-    path,
+  const path = writeAgent(
+    dir,
+    "codebuddy",
     `#!/usr/bin/env node
 import {createInterface} from 'node:readline';
 import {appendFileSync,existsSync,unlinkSync} from 'node:fs';
 import {basename} from 'node:path';
 const send = x => process.stdout.write(JSON.stringify(x)+'\\n');
-const tag = basename(process.argv[1] || 'synthetic');
+const tag = basename(process.argv[1] || 'synthetic').replace(/\\.mjs$/, '');
 let permitted;
 createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line), p=m.params||{};
@@ -41,6 +57,7 @@ createInterface({input:process.stdin}).on('line',line=>{
    if(text.endsWith('hang'))return;
    if(text.endsWith('permit')){permitted=m.id;send({id:9001,method:'session/request_permission',params:{options:[{kind:'allow',optionId:'allow_once',name:'Allow once'}]}});return;}
    if(text.endsWith('fail')){send({id:m.id,error:{message:'private upstream detail'}});return;}
+   if(text.endsWith('missing-note')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'read-note',title:'read_file',rawInput:{path:'learning/new/notes.md'}}}});send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call_update',toolCallId:'read-note',status:'failed',content:[{type:'content',content:{type:'text',text:'notes.md does not exist yet'}}]}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    if(text.endsWith('tool')){send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'tool_call',toolCallId:'t1',title:'task_add'}}});send({id:m.id,result:{stopReason:'end_turn'}});return;}
    for(const text of ['synthetic ','reply'])send({method:'session/update',params:{sessionId:p.sessionId,update:{sessionUpdate:'agent_message_chunk',content:{type:'text',text}}}});
    send({id:m.id,result:{stopReason:'end_turn'}});
@@ -48,7 +65,6 @@ createInterface({input:process.stdin}).on('line',line=>{
 });
 `,
   );
-  chmodSync(path, 0o755);
   return {
     state: join(dir, "state"),
     workspace,
@@ -154,6 +170,13 @@ test("cancel terminates the owned prompt and failures are actionable without ups
     await expect(ask.send(row.id, "fail")).rejects.toThrow(/CodeBuddy/);
     expect(JSON.stringify(ask.events(row.id))).not.toContain("private upstream detail");
     await ask.send(row.id, "recover");
+    // A real ACP tool error must retain its text in Ask's tool details.
+    await ask.send(row.id, "missing-note");
+    expect(ask.events(row.id).find((e) => e.type === "tool/result")?.data.message).toEqual({
+      toolCallId: "read-note",
+      isError: true,
+      content: [{ type: "text", text: "notes.md does not exist yet" }],
+    });
     // 只调了工具、没回文字也算完成。
     await ask.send(row.id, "tool");
     await ask.send(row.id, "permit");
@@ -200,8 +223,7 @@ test("local agent: model choice, CLI identity, and switching back to the SDK pro
   await runtime.close();
   expect(readFileSync(join(f.workspace, "trace.jsonl"), "utf8")).toContain('"configId":"model","value":"m2"');
   // 换成另一个 CLI 就是另一个连接：旧对话不会拿去续接。
-  const other = join(f.state, "codebuddy-other");
-  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
+  const other = copyAgent(f.path, f.state, "codebuddy-other");
   await connection.configure({ choice: "local", agent: "codebuddy", path: other });
   expect((await connection.settings()).backend).not.toBe(first.backend);
   await connection.configure({ choice: "builtin", provider: "deepseek-official" });
@@ -293,9 +315,7 @@ test("legacy agent sessions file is used when path-scoped file is missing", asyn
 });
 test("same agent at two CLI paths keeps separate upstream sessions", async () => {
   const f = fixture();
-  const other = join(f.workspace, "codebuddy-other");
-  writeFileSync(other, readFileSync(f.path), { mode: 0o755 });
-  chmodSync(other, 0o755);
+  const other = copyAgent(f.path, f.workspace, "codebuddy-other");
   const agent = localAgent("codebuddy");
   const a = await createAgentRuntime({ ...f, agent, path: f.path });
   try {

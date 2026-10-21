@@ -1,3 +1,0 @@
-Local fixture explicitly declares image capability in memory; no shipped provider metadata changed.
-requests [{"model":"local-first","image":true},{"model":"local-second","image":false},{"model":"local-second","image":true}]
-new conversation mode scoped

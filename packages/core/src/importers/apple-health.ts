@@ -160,10 +160,10 @@ function healthEventType(type: string) {
 }
 
 /** 手机端预合并的复合值指标：内部类型 → metric kind。 */
-const COMPOUND_KINDS: Record<string, string> = {
-  BloodPressureRecord: "bp",
-  HeartRateDaily: "heart_rate_daily",
-  BloodOxygenDaily: "blood_oxygen",
+const COMPOUND_METRICS: Record<string, { kind: string; parts: number; unit: string }> = {
+  BloodPressureRecord: { kind: "bp", parts: 2, unit: "mmHg" },
+  HeartRateDaily: { kind: "heart_rate_daily", parts: 3, unit: "bpm" },
+  BloodOxygenDaily: { kind: "blood_oxygen", parts: 3, unit: "%" },
 };
 
 /** 按天聚合的活动量的单位换算表；能量类沿用默认 kcal 换算。 */
@@ -224,17 +224,18 @@ export function healthCandidates(zone: string) {
       return;
     }
     // 手机端已合并的复合值：血压 120/80、心率/血氧日聚合 最小/均值/最大。
-    const compoundKind = COMPOUND_KINDS[type];
-    if (compoundKind) {
+    const compound = COMPOUND_METRICS[type];
+    if (compound) {
       const text = typeof sample.value === "string" ? sample.value.trim() : "";
-      if (!/^\d+(?:\.\d+)?\/\d+(?:\.\d+)?(?:\/\d+(?:\.\d+)?)?$/.test(text))
+      const parts = text.split("/");
+      if (parts.length !== compound.parts || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part)))
         throw new Error("复合健康值格式不对");
       emit(
         candidate("metric", {
           ts: isoInZone(parseTs(sample.start), zone),
-          kind: compoundKind,
+          kind: compound.kind,
           value: text,
-          unit: sample.unit || "",
+          unit: sample.unit?.trim() || compound.unit,
           source: "apple-health",
         }),
       );
@@ -697,7 +698,6 @@ const SHORTCUT_TYPE_NAMES: Record<string, string> = {
   静息能量: "basal_energy",
   基础能量: "basal_energy",
   体能训练: "workout",
-  height: "height",
   身高: "height",
   // 注意：oxygensaturation / 血氧 不做别名——原始 SpO2 样本会撞上预聚合的
   // blood_oxygen 复合值校验而整份转待整理；原始逐样本血氧暂不支持。
@@ -705,7 +705,6 @@ const SHORTCUT_TYPE_NAMES: Record<string, string> = {
   血压: "blood_pressure",
   walkingheartrateaverage: "walking_heart_rate",
   步行心率: "walking_heart_rate",
-  vo2max: "vo2max",
   最大摄氧量: "vo2max",
   respiratoryrate: "respiratory_rate",
   呼吸频率: "respiratory_rate",
@@ -744,7 +743,7 @@ function shortcutType(value: unknown): string {
     .replace(/^HK(?:Quantity|Category)TypeIdentifier/, "")
     .toLowerCase()
     .replace(/[\s_-]/g, "");
-  return SHORTCUT_TYPE_NAMES[key] ?? SHORTCUT_TYPE_NAMES[text] ?? text;
+  return SHORTCUT_TYPE_NAMES[key] ?? SHORTCUT_TYPE_NAMES[text] ?? (SHORTCUT_TYPES[key] ? key : text);
 }
 
 function shortcutTime(value: unknown, zone: string): string {

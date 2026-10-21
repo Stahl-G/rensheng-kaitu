@@ -1,0 +1,65 @@
+{
+  "format": "kaitu.phone.library",
+  "version": 1,
+  "generated_at": "2026-10-18T07:30:12+08:00",
+  "generator": {
+    "kind": "computer"
+  },
+  "items": [
+    {
+      "kind": "note",
+      "title": "下午外景光线太硬，下次改到 5 点以后拍。",
+      "date": "2026-10-18",
+      "path": "inbox/notes/2026-10-18/01jaz1b2c3d4e5f6g7h8j9k0mn.md"
+    },
+    {
+      "kind": "health",
+      "title": "训练",
+      "subtitle": "12 条",
+      "date": "2026-10-17",
+      "path": "health/data/workouts/2026-10.jsonl"
+    },
+    {
+      "kind": "health",
+      "title": "睡眠",
+      "subtitle": "31 条",
+      "date": "2026-10-17",
+      "path": "health/data/sleep/2026-10.jsonl"
+    },
+    {
+      "kind": "finance",
+      "title": "流水",
+      "subtitle": "86 条",
+      "date": "2026-10-16",
+      "path": "finance/data/transaction/2026-10.jsonl"
+    },
+    {
+      "kind": "me",
+      "title": "每周最多安排三次外景",
+      "date": "2026-10-12",
+      "path": "memory/preference_photo-schedule.md"
+    },
+    {
+      "kind": "project",
+      "title": "摄影集",
+      "subtitle": "下一步：把摄影集初选从 80 张挑到 30 张",
+      "date": null,
+      "path": "projects/photo-book/STATUS.md"
+    },
+    {
+      "kind": "project",
+      "title": "开图 App",
+      "subtitle": "下一步：发 TestFlight 0.6.0",
+      "date": null,
+      "path": "projects/kaitu-app/STATUS.md"
+    },
+    {
+      "kind": "me",
+      "title": "年底出一本摄影集",
+      "subtitle": "记过 3 次结果",
+      "date": null,
+      "path": "me/goals.json",
+      "id": "chat-20261012-a1b2c3"
+    }
+  ]
+}

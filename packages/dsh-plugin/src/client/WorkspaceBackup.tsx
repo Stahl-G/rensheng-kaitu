@@ -1,5 +1,5 @@
-import type { workspaceBackupStatus } from "@kaitu/core";
-import { useCallback, useEffect, useState } from "react";
+import type { githubCliStatus, workspaceBackupPrompts, workspaceBackupStatus } from "@kaitu/core";
+import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 type Status = ReturnType<typeof workspaceBackupStatus>;
@@ -19,18 +19,73 @@ export function WorkspaceBackup({
   const [status, setStatus] = useState<Status>();
   const [repo, setRepo] = useState("");
   const [token, setToken] = useState("");
-  const [text, setText] = useState(true);
-  const [records, setRecords] = useState(true);
+  const [text, setText] = useState(false);
+  const [records, setRecords] = useState(false);
+  const scopeInitialized = useRef(false);
+  const scopeEdited = useRef(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [restored, setRestored] = useState("");
+  const [gh, setGh] = useState<Awaited<ReturnType<typeof githubCliStatus>>>();
+  const [via, setVia] = useState<"gh" | "token">("gh");
+  const [copied, setCopied] = useState("");
+  const loginPending = status?.ghLogin?.pending ?? false;
   const refresh = useCallback(() => {
     void request("status")
-      .then((s) => setStatus(s as Status))
-      .catch((e) => setMessage((e as Error).message));
+      .then((s) => {
+        const current = s as Status;
+        setStatus(current);
+        setStatusError("");
+        if (!scopeInitialized.current) {
+          scopeInitialized.current = true;
+          if (!scopeEdited.current) {
+            setText(current.connection?.text ?? false);
+            setRecords(current.connection?.records ?? false);
+          }
+          if (current.connection) {
+            setRepo(current.connection.repo);
+            setVia(current.connection.via ?? "token");
+          }
+        }
+      })
+      .catch((e) => setStatusError((e as Error).message));
   }, [request]);
+  const checkGh = useCallback(
+    () =>
+      request("gh-status")
+        .then((value) => {
+          const current = value as Awaited<ReturnType<typeof githubCliStatus>>;
+          setGh(current);
+          if (current.login) setRepo((old) => old || `${current.login}/kaitu-ai-memory`);
+        })
+        .catch((error) => setMessage((error as Error).message)),
+    [request],
+  );
   useEffect(() => refresh(), [refresh]);
   useEffect(() => subscribe?.(refresh), [subscribe, refresh]);
+  // 进度只刷新本面板；不为每个文件广播工作区变更、触发所有页面重新读取。
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [status?.running, refresh]);
+  useEffect(() => {
+    if (!loginPending) void checkGh();
+  }, [checkGh, loginPending]);
+  const copyPrompt = async (kind: "create" | "connect") => {
+    try {
+      const prompts = (await request("prompts", {
+        repo: kind === "connect" ? (status?.connection?.repo ?? repo) : repo,
+        text,
+        records,
+      })) as ReturnType<typeof workspaceBackupPrompts>;
+      await navigator.clipboard.writeText(prompts[kind]);
+      setCopied(t("提示词已复制", "Prompt copied"));
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  };
   const run = async (action: string, input: Record<string, unknown> = {}) => {
     setBusy(true);
     setMessage("");
@@ -51,19 +106,63 @@ export function WorkspaceBackup({
   };
   const c = status?.connection;
   return (
-    <section className={css.sec}>
-      <h2 className={css.eyebrow}>{t("GitHub 备份", "GitHub backup")}</h2>
+    <section id="workspace-backup" className={css.sec}>
+      <h2 className={css.eyebrow}>{t("GitHub 同步", "GitHub sync")}</h2>
       <div className={`${css.card} ${css["sub-form"]}`}>
+        {!c && (
+          <output>
+            {status
+              ? t(
+                  "尚未连接 GitHub 仓库，本机资料照常保存",
+                  "No GitHub repository connected; local files still save",
+                )
+              : t("正在读取同步状态…", "Loading sync status…")}
+          </output>
+        )}
         {c && (
-          <p>
+          <output>
             {c.repo} · {c.private ? t("私有仓库", "Private repository") : t("公开仓库", "Public repository")}{" "}
             ·{" "}
             {status.running
               ? t("正在同步…", "Syncing…")
               : c.enabled
-                ? t("已连接", "Connected")
-                : t("上传未开启", "Upload disabled")}
-            {status.lastSync && ` · ${new Date(status.lastSync).toLocaleString()}`}
+                ? status.conflicts.length
+                  ? t("有冲突，等待你选择保留版本", "Conflicts need your choice")
+                  : status.error
+                    ? t("同步失败", "Sync failed")
+                    : t("已连接", "Connected")
+                : t("同步未开启", "Sync disabled")}
+            {status.lastSync
+              ? ` · ${t("上次同步", "Last synced")} ${new Date(status.lastSync).toLocaleString()}`
+              : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
+          </output>
+        )}
+        {status?.running && (
+          <div>
+            <output aria-live="polite">
+              {
+                {
+                  scan: t("正在读取本机资料", "Reading local files"),
+                  download: t("正在读取远端资料", "Reading remote files"),
+                  merge: t("正在核对改动", "Checking changes"),
+                  upload: t("正在上传改动", "Uploading changes"),
+                }[status.progress?.phase ?? "scan"]
+              }
+              {status.progress
+                ? ` · ${status.progress.completed}${status.progress.total === undefined ? "" : ` / ${status.progress.total}`}`
+                : ""}
+            </output>
+            <button type="button" className={css.link} disabled={busy} onClick={() => void run("cancel")}>
+              {t("取消本次同步", "Cancel this sync")}
+            </button>
+          </div>
+        )}
+        {c && (
+          <p className={css.small}>
+            {t(
+              `已保存同步范围：文字 ${c.text ? "启用" : "关闭"}；结构化资料 ${c.records ? "启用" : "关闭"}`,
+              `Saved sync scope: text ${c.text ? "on" : "off"}; structured data ${c.records ? "on" : "off"}`,
+            )}
           </p>
         )}
         {status?.error && (
@@ -77,46 +176,135 @@ export function WorkspaceBackup({
         <details open={!c}>
           <summary>
             {c
-              ? t("更换仓库 / 从备份恢复", "Change repository / restore backup")
-              : t("连接仓库 / 从备份恢复", "Connect / restore")}
+              ? t("更换仓库 / 从仓库恢复", "Change repository / restore")
+              : t("连接已有仓库 / 从仓库恢复", "Connect an existing repository / restore")}
           </summary>
           <label>
             {t("仓库（owner/repo）", "Repository (owner/repo)")}
             <input
-              aria-label={t("备份仓库", "Backup repository")}
+              aria-label={t("同步仓库", "Sync repository")}
               value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              placeholder="owner/kaitu-backup"
+              onChange={(e) => {
+                setRepo(e.target.value);
+                setCopied("");
+              }}
+              placeholder="owner/kaitu-ai-memory"
             />
           </label>
           <label>
-            GitHub token
+            {t("连接方式", "Connection method")}
+            <select
+              aria-label={t("连接方式", "Connection method")}
+              value={via}
+              onChange={(event) => setVia(event.target.value as "gh" | "token")}
+            >
+              <option value="gh">{t("已登录的 GitHub CLI（gh）", "Existing GitHub CLI login (gh)")}</option>
+              <option value="token">{t("单仓库 token", "Repository-specific token")}</option>
+            </select>
+          </label>
+          {via === "gh" ? (
+            <>
+              {gh?.authenticated ? (
+                <p>{t(`已登录：${gh.login}`, `Signed in: ${gh.login}`)}</p>
+              ) : gh?.installed ? (
+                <>
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy || loginPending}
+                    onClick={() => void run("gh-login")}
+                  >
+                    {t("用 GitHub 登录", "Sign in with GitHub")}
+                  </button>
+                  <button type="button" className={css.link} disabled={busy} onClick={() => void checkGh()}>
+                    {t("重新检查登录", "Check login again")}
+                  </button>
+                </>
+              ) : (
+                gh && (
+                  <a href="https://cli.github.com/" target="_blank" rel="noreferrer">
+                    {t(
+                      "安装 GitHub CLI，也可改用单仓库 token",
+                      "Install GitHub CLI or use a repository token",
+                    )}
+                  </a>
+                )
+              )}
+            </>
+          ) : (
+            <>
+              <label>
+                GitHub token
+                <input
+                  aria-label="GitHub token"
+                  type="password"
+                  autoComplete="new-password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                />
+              </label>
+              <p className={css.small}>
+                <a
+                  href="https://github.com/settings/personal-access-tokens/new"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("在 GitHub 创建 token", "Create a token on GitHub")}
+                </a>
+              </p>
+            </>
+          )}
+          <label>
             <input
-              type="password"
-              autoComplete="new-password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+              type="checkbox"
+              checked={text}
+              onChange={(e) => {
+                scopeEdited.current = true;
+                setText(e.target.checked);
+                setCopied("");
+              }}
             />
-          </label>
-          <p className={css.small}>
-            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
-              {t("在 GitHub 创建 token", "Create a token on GitHub")}
-            </a>
-          </p>
-          <label>
-            <input type="checkbox" checked={text} onChange={(e) => setText(e.target.checked)} />
             {t("文字（Markdown / TXT）", "Text (Markdown / TXT)")}
           </label>{" "}
           <label>
-            <input type="checkbox" checked={records} onChange={(e) => setRecords(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={records}
+              onChange={(e) => {
+                scopeEdited.current = true;
+                setRecords(e.target.checked);
+                setCopied("");
+              }}
+            />
             {t("结构化资料（JSON / JSONL 等）", "Structured data (JSON / JSONL, etc.)")}
           </label>
           <p>
+            {!c && (
+              <button
+                className={`${css.btn} ${css["btn-primary"]}`}
+                type="button"
+                disabled={busy || status?.running || !repo.trim() || !gh?.authenticated}
+                onClick={() =>
+                  void run("create", {
+                    repo,
+                    via: "gh",
+                    text,
+                    records,
+                  })
+                }
+              >
+                {busy
+                  ? t("正在创建并连接…", "Creating and connecting…")
+                  : t("建一个私有记忆仓库", "Create a private memory repository")}
+              </button>
+            )}{" "}
             <button
               className={`${css.btn} ${css["btn-quiet"]}`}
               type="button"
               disabled={busy || status?.running || !repo.trim()}
-              onClick={() => void run("connect", { repo, token, text, records })}
+              onClick={() =>
+                void run("connect", { repo, via, ...(via === "token" ? { token } : {}), text, records })
+              }
             >
               {busy ? t("正在处理…", "Working…") : t("检查并连接", "Check and connect")}
             </button>{" "}
@@ -126,8 +314,18 @@ export function WorkspaceBackup({
               disabled={busy || status?.running || !repo.trim()}
               onClick={() =>
                 void (async () => {
-                  const folder = await pickFolder();
-                  if (folder) await run("restore", { repo, token, root: folder });
+                  try {
+                    const folder = await pickFolder();
+                    if (folder)
+                      await run("restore", {
+                        repo,
+                        via,
+                        ...(via === "token" ? { token } : {}),
+                        root: folder,
+                      });
+                  } catch (error) {
+                    setMessage((error as Error).message);
+                  }
                 })()
               }
             >
@@ -135,13 +333,51 @@ export function WorkspaceBackup({
             </button>
           </p>
         </details>
+        {loginPending && (
+          <div>
+            <p>
+              {t("请在 GitHub 官方页面完成登录与授权。", "Complete sign-in and authorization on GitHub.")}
+            </p>
+            {status?.ghLogin.code && <output>{status.ghLogin.code}</output>}{" "}
+            <a href="https://github.com/login/device" target="_blank" rel="noreferrer">
+              GitHub
+            </a>{" "}
+            <button type="button" className={css.link} onClick={() => void run("gh-login-cancel")}>
+              {t("取消登录", "Cancel sign-in")}
+            </button>
+          </div>
+        )}
+        {status?.ghLogin?.error && <p role="alert">{status.ghLogin.error}</p>}
+        <p>
+          <button
+            type="button"
+            className={css.link}
+            disabled={!repo.trim() && !c}
+            onClick={() => void copyPrompt("create")}
+          >
+            {t(
+              "复制新建 / 接入前核对提示词（当前选中范围）",
+              "Copy pre-connection review prompt (selected scope)",
+            )}
+          </button>{" "}
+          <button type="button" className={css.link} disabled={!c} onClick={() => void copyPrompt("connect")}>
+            {t("复制第二设备接入提示词", "Copy setup prompt for another device")}
+          </button>
+        </p>
+        {copied && <output>{copied}</output>}
         {c && !c.enabled && !c.private && (
           <button
             className={`${css.btn} ${css["btn-quiet"]}`}
             type="button"
             disabled={busy}
             onClick={() =>
-              void run("connect", { repo: c.repo, text: c.text, records: c.records, allowPublic: true })
+              void run("connect", {
+                repo: c.repo,
+                via: c.via,
+                text: c.text,
+                records: c.records,
+                allowPublic: true,
+              })
             }
           >
             {t("我允许内容公开，启用同步", "Allow public contents and enable sync")}
@@ -154,7 +390,7 @@ export function WorkspaceBackup({
             disabled={busy || status?.running || !!status?.conflicts.length}
             onClick={() => void run("sync")}
           >
-            {t("立即同步", "Sync now")}
+            {status?.error ? t("重试同步", "Retry sync") : t("立即同步", "Sync now")}
           </button>
         )}{" "}
         {c && (
@@ -164,7 +400,7 @@ export function WorkspaceBackup({
             disabled={busy || status?.running}
             onClick={() => void run("disconnect")}
           >
-            {t("断开备份连接", "Disconnect backup")}
+            {t("断开同步连接", "Disconnect sync")}
           </button>
         )}
         {status?.conflicts.map((conflict) => (
@@ -215,9 +451,9 @@ export function WorkspaceBackup({
             </button>
           </output>
         )}
-        {message && (
+        {(message || statusError) && (
           <p className={css.error} role="alert">
-            {message}
+            {message || statusError}
           </p>
         )}
       </div>

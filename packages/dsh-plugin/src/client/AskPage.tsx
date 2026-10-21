@@ -1,14 +1,19 @@
 import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
+import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
+import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
 import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import css from "./AskPage.module.css";
+import { DocumentBody } from "./DocumentBody.js";
 import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
+import { type AskMode, modeChangeForSend } from "./ask-mode.js";
 import { useT } from "./i18n.js";
+import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
+import { WidgetCard } from "./openmaic/WidgetCard.js";
 
-type AskMode = "scoped" | "full";
 interface Thread {
   mode?: AskMode;
   id: string;
@@ -89,50 +94,19 @@ function day(value: string) {
   today.setDate(today.getDate() - 1);
   return date.toDateString() === today.toDateString() ? "昨天" : date.toLocaleDateString("zh-CN");
 }
-function inline(text: string) {
-  return text
-    .split(/(\*\*[^*]+\*\*)/g)
-    .map((piece) => (piece.startsWith("**") ? <strong key={piece}>{piece.slice(2, -2)}</strong> : piece));
-}
-function Body({ content }: { content: string }) {
-  // 按空行分段；标题只吃自己那一行，避免「## 标题\n- 列表」整段变成巨大的 h3。
+function teachingResult(event: ChatEvent | undefined) {
   return (
-    <>
-      {content.split(/\n\n+/).map((part, index) => {
-        const lines = part.split("\n");
-        const heading = /^(#{1,3}) (.+)$/.exec(lines[0] ?? "");
-        if (heading) {
-          const rest = lines.slice(1);
-          return (
-            <Fragment key={`${index}:${part}`}>
-              <h3>{inline(heading[2] ?? "")}</h3>
-              {rest.length > 0 &&
-                (rest.every((line) => /^[-*] /.test(line)) ? (
-                  <ul>
-                    {rest.map((line, i) => (
-                      <li key={`${i}:${line}`}>{inline(line.slice(2))}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>{inline(rest.join("\n"))}</p>
-                ))}
-            </Fragment>
-          );
-        }
-        if (lines.every((line) => /^[-*] /.test(line)))
-          return (
-            <ul key={`${index}:${part}`}>
-              {lines.map((line, i) => (
-                <li key={`${i}:${line}`}>{inline(line.slice(2))}</li>
-              ))}
-            </ul>
-          );
-        return <p key={`${index}:${part}`}>{inline(part)}</p>;
-      })}
-    </>
+    event &&
+    !(event.data.message as { isError?: boolean } | undefined)?.isError &&
+    (openmaicMetaFrom(event.data.meta) || widgetMetaFrom(event.data.meta))
   );
 }
-function Tool({ event, result, finished }: { event: ChatEvent; result?: ChatEvent; finished: boolean }) {
+function Tool({
+  event,
+  result,
+  finished,
+  session,
+}: { event: ChatEvent; result?: ChatEvent; finished: boolean; session: string }) {
   let args: Record<string, unknown> = {};
   try {
     args = JSON.parse(String(event.data.arguments ?? "{}"));
@@ -141,6 +115,18 @@ function Tool({ event, result, finished }: { event: ChatEvent; result?: ChatEven
   }
   const message = result?.data.message as { content?: unknown; isError?: boolean } | undefined;
   const name = String(event.data.name);
+  const meta = result?.data.meta;
+  const card = openmaicMetaFrom(meta) ? OpenmaicCard : widgetMetaFrom(meta) ? WidgetCard : undefined;
+  if (card && !message?.isError) {
+    const Card = card;
+    return (
+      <Card
+        callId={String(event.data.callId)}
+        frameUrl={`/api/ask/teaching-frame?session=${encodeURIComponent(session)}&call=${encodeURIComponent(String(event.data.callId))}`}
+        block={{ kind: "tool-result", content: [], meta }}
+      />
+    );
+  }
   const labels: Record<string, string> = {
     kaitu_status: "你的开图资料",
     kaitu_records: "相关记录",
@@ -172,13 +158,17 @@ function Tool({ event, result, finished }: { event: ChatEvent; result?: ChatEven
 
 export function AskPage({
   workspace,
+  active = true,
   initialPrompt = "",
+  initialPromptRequest = 0,
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
 }: {
   workspace: string;
+  active?: boolean;
   initialPrompt?: string;
+  initialPromptRequest?: number;
   configureRequest?: number;
   configureBuiltin?: boolean;
   onConnections?: () => void;
@@ -194,8 +184,8 @@ export function AskPage({
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [draft, setDraft] = useState(initialPrompt);
   useEffect(() => {
-    if (initialPrompt) setDraft(initialPrompt);
-  }, [initialPrompt]);
+    if (initialPrompt || initialPromptRequest) setDraft(initialPrompt);
+  }, [initialPrompt, initialPromptRequest]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const configurationRequested = useRef(false);
@@ -212,6 +202,7 @@ export function AskPage({
   const [modeSaving, setModeSaving] = useState(false);
   const selectThread = (id: string | null) => {
     setSelected(id);
+    setPendingMode(null);
     setModeMenu(false);
     setModelMenu(false);
   };
@@ -482,9 +473,9 @@ export function AskPage({
     return () => window.removeEventListener("kaitu-ai-changed", refresh);
   }, []);
   useEffect(() => {
-    if (step) dialog.current?.showModal();
+    if (step && active) dialog.current?.showModal();
     else dialog.current?.close();
-  }, [step]);
+  }, [step, active]);
   useEffect(() => {
     activeSession.current = selected;
     setEvents([]);
@@ -531,8 +522,6 @@ export function AskPage({
     const pendingReferences = sessionReferences;
     const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
     // 本机 Agent 只有完整模式：发送时直接开，不再弹确认。
-    let modeForThread = pendingMode;
-    if (settings.fullOnly && mode !== "full") modeForThread = "full";
     setDraft("");
     setAttachments([]);
     setSessionReferences([]);
@@ -540,13 +529,21 @@ export function AskPage({
     setSending(true);
     try {
       let id = selected;
+      let actualMode = threads.find((thread) => thread.id === id)?.mode;
       if (!id) {
         const thread = await call<Thread>("askCreate");
         id = thread.id;
+        actualMode = thread.mode;
         activeSession.current = id;
         selectThread(id);
       }
-      if (modeForThread && modeForThread !== mode) {
+      const modeForThread = modeChangeForSend(
+        actualMode ?? "scoped",
+        pendingMode,
+        !!selected,
+        !!settings.fullOnly,
+      );
+      if (modeForThread) {
         await call("askSetMode", id, modeForThread, modeForThread === "full");
       }
       await call("askSend", id, payload, pendingAttachments);
@@ -874,7 +871,7 @@ export function AskPage({
             if (event.type === "assistant/message" && text(message?.content))
               return (
                 <article key={event.id} className={css.assistant}>
-                  <Body content={text(message?.content)} />
+                  <DocumentBody content={text(message?.content)} />
                 </article>
               );
             if (event.type === "tool/call") {
@@ -882,7 +879,17 @@ export function AskPage({
               if (events.slice(start + 1, index).some((item) => item.type === "tool/call")) return null;
               const next = events.findIndex((item, i) => i > index && item.type === "user/message");
               const turn = events.slice(start + 1, next < 0 ? undefined : next);
-              const calls = turn.filter((item) => item.type === "tool/call");
+              const calls = turn.filter(
+                (item) =>
+                  item.type === "tool/call" &&
+                  !turn.some(
+                    (result) =>
+                      result.type === "tool/result" &&
+                      (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId &&
+                      teachingResult(result),
+                  ),
+              );
+              if (!calls.length) return null;
               const running = busy && next < 0;
               const active = calls.findLast(
                 (item) =>
@@ -911,6 +918,7 @@ export function AskPage({
                     <Tool
                       key={item.id}
                       event={item}
+                      session={selected ?? ""}
                       finished={!running}
                       result={turn.find(
                         (result) =>
@@ -921,6 +929,15 @@ export function AskPage({
                   ))}
                 </details>
               );
+            }
+            if (event.type === "tool/result" && teachingResult(event)) {
+              const call = events.find(
+                (item) =>
+                  item.type === "tool/call" &&
+                  item.data.callId === (event.data.message as { toolCallId?: string })?.toolCallId,
+              );
+              if (call)
+                return <Tool key={event.id} event={call} session={selected ?? ""} result={event} finished />;
             }
             if (event.type === "approval/asked")
               return (
@@ -939,7 +956,7 @@ export function AskPage({
           })}
           {liveText && (
             <article className={css.assistant} aria-live="polite">
-              <Body content={liveText} />
+              <DocumentBody content={liveText} />
             </article>
           )}
           {waiting && !liveText && (
@@ -1361,8 +1378,8 @@ export function AskPage({
               <b>{t("用本机 Agent", "Use a local agent")}</b>
               <span>
                 {t(
-                  "不填 Key，用 CodeBuddy、Claude Code、Kimi 等 CLI 自己的登录和额度。",
-                  "No API key; uses the login and allowance of CodeBuddy, Claude Code, Kimi and others.",
+                  "使用 CodeBuddy、Claude Code、Kimi 等 CLI 的账号登录和额度。",
+                  "Uses the account login and allowance of CodeBuddy, Claude Code, Kimi and other CLIs.",
                 )}
               </span>
             </button>

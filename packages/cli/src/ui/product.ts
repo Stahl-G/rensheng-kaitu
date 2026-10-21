@@ -1,4 +1,5 @@
 import {
+  type AgentConnectionId,
   type AutomationKey,
   type BankMail,
   CalendarPush,
@@ -8,7 +9,10 @@ import {
   type FinanceViewOptions,
   type ImportSource,
   KaituError,
+  type LearningCheckinInput,
   type Locale,
+  type MemoryExpectation,
+  type MemoryInput,
   type NewsFeedback,
   type OnboardingAi,
   type OnboardingChoices,
@@ -19,11 +23,13 @@ import {
   type OnboardingTarget,
   type ProjectGoal,
   type SettingsData,
+  type StartLearningInput,
   type SyncProvider,
   type Workspace,
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  archiveMemory,
   bankNotificationCandidates,
   bindGithub,
   calendarPushEntries,
@@ -54,7 +60,9 @@ import {
   hideExperience,
   keepOnboardingMatter,
   lifeMap,
+  listLearning,
   loadFinanceInvestments,
+  markOrganizerSeen,
   matterPrompt,
   moveWorkspace,
   normalizeLocale,
@@ -75,6 +83,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readLearning,
   readLibrary,
   readLibraryDocument,
   readMe,
@@ -89,12 +98,14 @@ import {
   recordOnboardingAiConnection,
   recoverExperienceImports,
   removeAvatar,
+  replaceMemory,
   resolveExperience,
   resolvePlace,
   resolvePreferences,
   restore,
   saveAvatar,
   saveHometown,
+  saveLearningCheckin,
   saveNewsKeywords,
   saveOnboardingChoices,
   saveOnboardingMatter,
@@ -102,8 +113,10 @@ import {
   saveProjectGoal,
   scheduleNext,
   setExperienceSource,
+  setFinanceAccess,
   setNewsFeedback,
   stageFinanceUpload,
+  startLearning,
   syncProject,
   tryNews,
   unhideExperience,
@@ -121,6 +134,11 @@ import type { AskMode, AskService } from "./ask.js";
 export const planMutations = new Set(["decideProposal", "scheduleNext", "editCalendarBlock"]);
 
 export const productMutations = new Set([
+  "archiveMemory",
+  "replaceMemory",
+  "learningStart",
+  "learningSave",
+  "organizerSeen",
   "workspaceBackup",
   "askModels",
   "projectCreate",
@@ -187,6 +205,14 @@ export async function productRequest(
     return args[i] as number;
   };
   const locale = (i: number): Locale => normalizeLocale(args[i]);
+  if (method === "archiveMemory")
+    return archiveMemory(ws, text(0), { by: "user", expected: args[1] as MemoryExpectation });
+  if (method === "replaceMemory")
+    return replaceMemory(ws, text(0), args[1] as MemoryInput, {
+      by: "user",
+      expected: args[2] as MemoryExpectation,
+    });
+  if (method === "organizerSeen") return markOrganizerSeen(ws);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
     if (!ask) {
@@ -244,9 +270,17 @@ export async function productRequest(
   }
   switch (method) {
     case "library":
-      return readLibrary(ws);
+      return readLibrary(ws, args[0] as Parameters<typeof readLibrary>[1]);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
+    case "learningList":
+      return listLearning(ws);
+    case "learningRead":
+      return readLearning(ws, text(0));
+    case "learningStart":
+      return startLearning(ws, args[0] as StartLearningInput);
+    case "learningSave":
+      return saveLearningCheckin(ws, args[0] as LearningCheckinInput);
     case "calendarPush":
       return calendarPush.settings();
     case "configureCalendarPush":
@@ -277,6 +311,8 @@ export async function productRequest(
       data.ai = ask ? await ask.settings() : null;
       return data;
     }
+    case "setFinanceAccess":
+      return setFinanceAccess(ws, text(0) as AgentConnectionId, args[1] as boolean);
     case "exportWorkspace":
       return exportWorkspace(ws);
     case "restoreVersion":
@@ -319,7 +355,7 @@ export async function productRequest(
     case "goalNextAdd":
       return addGoalNext(ws, text(0), text(1));
     case "handoverPack":
-      return handoverPack(ws, locale(0));
+      return handoverPack(ws, locale(0), undefined, args[1] === true);
     case "directionsPrompt":
       return directionsPrompt(ws, locale(0));
     case "directionsPaste":
@@ -358,12 +394,12 @@ export async function productRequest(
     case "experienceImports":
       return readExperienceImports(ws);
     case "experienceBatchPreview":
-      return previewExperienceBatch(ws, text(0), text(1) as "undo" | "restore");
+      return previewExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore");
     case "setExperienceSource":
       if (typeof args[1] !== "boolean") throw new KaituError("缺少来源开关", "BAD_ARGS");
       return setExperienceSource(ws, text(0), args[1], revision(2));
     case "changeExperienceBatch":
-      return changeExperienceBatch(ws, text(0), text(1) as "undo" | "restore", revision(2));
+      return changeExperienceBatch(ws, text(0), text(1) as "confirm" | "undo" | "restore", revision(2));
     case "recoverExperienceImports":
       return { recovered: (await recoverExperienceImports(ws)).length };
     case "exploration":

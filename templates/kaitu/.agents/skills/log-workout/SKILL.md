@@ -7,7 +7,7 @@ description: 用户描述力量或有氧训练时，记录实际训练并对比�
 
 ## 步骤
 
-1. 读取 health/module.json，用 `kaitu record schema workout` 确认字段。
+1. 直接使用下方本类型示例；字段不确定才用 `kaitu record schema workout`，模块特有规则需要时才读 health/module.json。
 2. 运行 `kaitu record list workout --json-out`，查同项目、同训练方式的上次记录。
 3. 「深蹲 3×12，60kg」按力量记录，modality 可省略；必填 exercise、sets、reps、weight_kg、session_id。
    同次力量训练共用 session_id，延续当前训练时复用已知标识，新训练用新标识。
@@ -25,7 +25,7 @@ kaitu record add workout --json '{"modality":"cardio","exercise":"跑步","durat
 7. 力量训练对比上次同动作的目标组次和完成情况：达到计划且动作质量无问题时，下次建议增加 2.5kg；未达标则保持重量。
 8. 有氧不给加重建议。有距离时按 duration_min / distance_km 对比上次同项目配速，并说明距离与环境差异；没有距离时对比时长。
 9. 首次记录先建立基线。建议只是下次安排，不当成已经完成的记录。
-10. 运行 `kaitu record list workout --from YYYY-MM-DD --to YYYY-MM-DD` 核对写入，日期按用户时区。
+10. 回执有 id 即确认保存；结果不确定或用户要求核对时才读回，日期按用户时区。
 11. 需要时引导 `kaitu ui` 看力量重量趋势与近 30 天有氧距离、时长。
 
 ## 确认点

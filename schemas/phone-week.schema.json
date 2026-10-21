@@ -9,6 +9,23 @@
     "format": { "const": "kaitu.phone.week" },
     "version": { "const": 1 },
     "generated_at": { "type": "string", "format": "date-time" },
+    "generator": {
+      "type": "object",
+      "required": ["kind"],
+      "if": { "properties": { "kind": { "const": "agent" } } },
+      "then": { "required": ["name", "spec"] },
+      "description": "谁生成的这份快照；Agent 必须写 name 和 spec，没有这个字段当作电脑生成",
+      "properties": {
+        "kind": { "enum": ["computer", "agent"] },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "description": "显示给用户的名字，Agent 才写"
+        },
+        "spec": { "type": "integer", "minimum": 1, "description": "Agent 照做的 ORGANIZER.md 规则版本" }
+      }
+    },
     "from": { "type": "string", "format": "date" },
     "to": { "type": "string", "format": "date" },
     "projects": {

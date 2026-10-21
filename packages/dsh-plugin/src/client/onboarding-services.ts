@@ -35,7 +35,7 @@ export interface OnboardingServices {
   ) => Promise<OnboardingNext>;
   changeOnboardingNext: (id: string, rev: number, action: string, value: string) => Promise<OnboardingNext>;
   addGoalNext: (goalId: string, title: string) => Promise<OnboardingNext>;
-  loadHandover: (locale?: Locale) => Promise<HandoverPack>;
+  loadHandover: (locale?: Locale, includeFinance?: boolean) => Promise<HandoverPack>;
   loadOnboarding: (locale?: Locale) => Promise<OnboardingStatus>;
   loadPreferences: (hint?: string) => Promise<Preferences>;
   savePreferences: (input: Preferences) => Promise<Preferences>;

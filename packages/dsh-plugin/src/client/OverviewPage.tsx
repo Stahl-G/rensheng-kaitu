@@ -6,8 +6,10 @@ import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js"
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
+import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import type { LearningSource } from "./LearningPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
@@ -24,10 +26,10 @@ import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
-  extends MePageProps,
+  extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
     OnboardingServices,
-    Omit<NewsPageProps, "onPrompt">,
+    Omit<NewsPageProps, "onPrompt" | "onLearn">,
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals" | "onConnect">,
     Omit<MapPageProps, "onPrompt">,
@@ -47,6 +49,8 @@ export interface OverviewPageProps
     configureRequest: number,
     configureBuiltin: boolean,
     onConnections: () => void,
+    promptRequest: number,
+    active: boolean,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -120,11 +124,14 @@ function Overview({
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
+  const [learningTopic, setLearningTopic] = useState("");
+  const [learningSource, setLearningSource] = useState<LearningSource>();
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState("");
+  const [promptRequest, setPromptRequest] = useState(0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -134,46 +141,71 @@ function Overview({
   const [theme, setTheme] = useState("light");
   const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
+  const writing = useRef(false);
+  const refreshPending = useRef(false);
   const refresh = useCallback(async () => {
     if (!locale) return;
     const seq = ++sequence.current;
     try {
-      const [overview, agenda, files, me, introduction, calendarPush] = await Promise.all([
-        props.load(),
-        props.loadCalendar(),
-        props.loadLibrary(),
-        props.loadMe(),
-        props.loadOnboarding(locale),
-        props.loadCalendarPush(),
-      ]);
-      if (seq !== sequence.current) return;
-      setData(overview);
-      setPush(calendarPush);
-      setCalendar(agenda);
-      setLibrary(files);
-      setPersonal(me);
-      setOnboarding(introduction);
-      setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
       setError("");
+      const update = <T,>(load: () => Promise<T>, apply: (value: T) => void) =>
+        load().then((value) => {
+          if (seq === sequence.current) apply(value);
+        });
+      await Promise.all([
+        update(props.load, setData),
+        update(props.loadCalendar, setCalendar),
+        update(props.loadMe, setPersonal),
+        update(
+          () => props.loadOnboarding(locale),
+          (introduction) => {
+            setOnboarding(introduction);
+            setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
+          },
+        ),
+        update(props.loadCalendarPush, setPush),
+      ]);
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [
-    locale,
-    props.load,
-    props.loadCalendar,
-    props.loadLibrary,
-    props.loadMe,
-    props.loadOnboarding,
-    props.loadCalendarPush,
-  ]);
+  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding, props.loadCalendarPush]);
   useEffect(() => {
     void refresh();
     return () => {
       sequence.current++;
     };
   }, [refresh]);
-  useEffect(() => props.subscribe?.(() => void refresh()), [props.subscribe, refresh]);
+  useEffect(
+    () =>
+      props.subscribe?.(() => {
+        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。
+        if (writing.current) refreshPending.current = true;
+        else void refresh();
+      }),
+    [props.subscribe, refresh],
+  );
+  // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
+  useEffect(() => {
+    if (view !== "records") return;
+    let sequence = 0;
+    const load = async () => {
+      const seq = ++sequence;
+      try {
+        const value = await props.loadLibrary({
+          section: record === "notes" || record === "health" ? record : "summary",
+        });
+        if (seq === sequence) setLibrary(value);
+      } catch (err) {
+        if (seq === sequence) setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void load();
+    const off = props.subscribe?.(() => void load());
+    return () => {
+      sequence++;
+      off?.();
+    };
+  }, [view, record, props.loadLibrary, props.subscribe]);
   useEffect(() => {
     if (view === "ask") setAskVisited(true);
   }, [view]);
@@ -206,15 +238,23 @@ function Overview({
     };
   }, [menu]);
   const run = async (operation: () => Promise<unknown>) => {
+    writing.current = true;
     setBusy(true);
     setError("");
     try {
       await operation();
+      // 到这里之前的通知已被本次读取覆盖；读取期间的新变化仍要补读，不能丢外部编辑。
+      refreshPending.current = false;
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      writing.current = false;
       setBusy(false);
+      if (refreshPending.current) {
+        refreshPending.current = false;
+        void refresh();
+      }
     }
   };
   const openRecord = (id: string) => {
@@ -225,6 +265,7 @@ function Overview({
   };
   const prompt = (text: string) => {
     setPromptDraft(text);
+    setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
@@ -421,25 +462,36 @@ function Overview({
           <button
             type="button"
             className={`${css.link} ${css.sync}`}
-            onClick={() => (savedOnly ? openRecord("inbox") : void refresh())}
+            onClick={() =>
+              data?.sync.cloudOrganizer?.unread
+                ? setView("connections")
+                : savedOnly
+                  ? openRecord("inbox")
+                  : void refresh()
+            }
           >
             <i className={css.dot} style={{ background: error ? "var(--news)" : "var(--health)" }} />
             {error
               ? t("读取失败", "Couldn't load")
               : !data
                 ? t("正在读取…", "Loading…")
-                : data.sync.needsReview
-                  ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
-                  : data.sync.received
-                    ? data.sync.organizer
-                      ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
-                      : t(
-                          `已保存 ${data.sync.received} 条原文`,
-                          `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
-                        )
-                    : data.sync.updatedAt
-                      ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
-                      : t("本机资料", "On this computer")}
+                : data.sync.cloudOrganizer?.unread && data.sync.cloudOrganizer.away
+                  ? t(
+                      `电脑不在时 ${data.sync.cloudOrganizer.away.agent.name} 处理了 ${data.sync.cloudOrganizer.away.actions} 条`,
+                      `${data.sync.cloudOrganizer.away.agent.name} handled ${data.sync.cloudOrganizer.away.actions} while away`,
+                    )
+                  : data.sync.needsReview
+                    ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
+                    : data.sync.received
+                      ? data.sync.organizer
+                        ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
+                        : t(
+                            `已保存 ${data.sync.received} 条原文`,
+                            `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
+                          )
+                      : data.sync.updatedAt
+                        ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
+                        : t("本机资料", "On this computer")}
           </button>
           <div className={css.account} ref={account}>
             <button
@@ -483,7 +535,12 @@ function Overview({
           </div>
         </div>
       </header>
-      <main className={`${css.content} ${view === "ask" ? css.askContent : ""}`}>
+      <main
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""}`}
+      >
+        {props.desktopUpdate && view !== "settings" && (
+          <FeatureUpdates request={props.desktopUpdate} compact />
+        )}
         {error && (
           <p className={css.error} role="alert">
             {error}
@@ -825,7 +882,8 @@ function Overview({
               />
             ) : record === "inbox" ? (
               <InboxPage
-                data={library}
+                loadLibrary={props.loadLibrary}
+                subscribe={props.subscribe}
                 channelSettings={props.channelSettings}
                 connect={() => {
                   setView("connections");
@@ -833,34 +891,78 @@ function Overview({
                 }}
               />
             ) : (
-              <NotesPage data={library} loadLibraryDocument={props.loadLibraryDocument} />
+              <NotesPage
+                data={library}
+                loadLibraryDocument={props.loadLibraryDocument}
+                loadLearning={props.loadLearning}
+                startLearning={props.startLearning}
+                saveLearning={props.saveLearning}
+                topic={learningTopic}
+                onTopic={setLearningTopic}
+                source={learningSource}
+                onSourceConsumed={() => setLearningSource(undefined)}
+                onPrompt={prompt}
+                onSaved={() => {
+                  void props
+                    .loadLibrary()
+                    .then(setLibrary)
+                    .catch((err) => setError(String(err)));
+                }}
+              />
             )}
           </>
         )}
         {view === "explore" && (
           <>
-            <div className={css.sec}>
-              <div className={css.head}>
-                <h1>{t("开图", "Explore")}</h1>
-              </div>
-              <div className={css.subtabs} role="toolbar" aria-label={t("开图里的内容", "Explore sections")}>
+            <section className={css.sec} aria-label={t("开图", "Explore")}>
+              <h1 className={css.sr}>{t("开图", "Explore")}</h1>
+              <nav className={css.exploreEntries} aria-label={t("开图里的内容", "Explore sections")}>
                 {[
-                  ["health", t("健康", "Health")],
-                  ["footprints", t("足迹", "Footprints")],
-                  ["news", t("资讯", "News")],
-                  ["directions", t("方向", "Directions")],
-                ].map(([id, title]) => (
-                  <button
-                    type="button"
-                    key={id}
-                    aria-pressed={explore === id}
-                    onClick={() => setExplore(id as string)}
-                  >
-                    {title}
+                  {
+                    id: "health",
+                    title: t("健康", "Health"),
+                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
+                    icon: "M3 12h4l3-8 4 16 3-8h4",
+                  },
+                  {
+                    id: "footprints",
+                    title: t("足迹", "Footprints"),
+                    description: t("看看来路，探索下一站", "Trace your journey, explore what is next"),
+                    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
+                  },
+                  {
+                    id: "news",
+                    title: t("资讯", "News"),
+                    description: t("阅读关心的事，保留真实来源", "Read what matters, keep its sources"),
+                    icon: "M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h4",
+                  },
+                  {
+                    id: "directions",
+                    title: t("方向", "Directions"),
+                    description: t("把想法变成可以尝试的一步", "Turn an idea into a step you can try"),
+                    icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4 6-2 6-6 2 2-6 6-2Z",
+                  },
+                ].map(({ id, title, description, icon }) => (
+                  <button type="button" key={id} aria-pressed={explore === id} onClick={() => setExplore(id)}>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d={icon} />
+                    </svg>
+                    <span>
+                      <strong>{title}</strong>
+                      <small>{description}</small>
+                    </span>
                   </button>
                 ))}
-              </div>
-            </div>
+              </nav>
+            </section>
             <div className={css.child}>
               {explore === "health" ? (
                 <HealthPage {...child} />
@@ -880,7 +982,17 @@ function Overview({
                   />
                 </>
               ) : explore === "news" ? (
-                <NewsPage {...child} />
+                <NewsPage
+                  {...child}
+                  onLearn={(item) => {
+                    setLearningSource({
+                      title: item.title,
+                      ...(item.url ? { url: item.url } : {}),
+                      ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
+                    });
+                    openRecord("notes");
+                  }}
+                />
               ) : (
                 <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
               )}
@@ -889,7 +1001,14 @@ function Overview({
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div className={css.askPanel} hidden={view !== "ask"}>
-            {props.renderAsk(promptDraft, configureRequest, configureBuiltin, () => setView("connections"))}
+            {props.renderAsk(
+              promptDraft,
+              configureRequest,
+              configureBuiltin,
+              () => setView("connections"),
+              promptRequest,
+              view === "ask",
+            )}
           </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (
@@ -897,6 +1016,7 @@ function Overview({
             {...child}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
+            onImportMemory={() => startGuide(5)}
             refreshWorkspace={refresh}
             channelSettings={props.channelSettings}
             channelFocus={channelFocus}

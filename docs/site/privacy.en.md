@@ -19,14 +19,14 @@ Kaitu describes three places your notes can go: kept on this computer, synced to
 - Full agent: only for a conversation where you turn it on. It can run commands and read or write any file on this computer, and what it reads may go to the AI service.
 - Morning plan, daily organizer and news search: when on, they run on schedule with Ask's AI, read the notes they need and send them to the same AI service.
 - Web search: queries go to Ask's current AI service by default, or to Perplexity, Exa or Tavily if you switch.
-- Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; ones connected over the internet can't read finance details or memories marked sensitive, and none can read keys, credentials or version history. What they read goes to the AI service behind them.
+- Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; none can read memories marked sensitive, keys, credentials or version history. Finance access follows each connection's switch in AI & connections: local MCP, local Ask and phone Ask can read finance by default, remote MCP cannot. These switches cover Kaitu tools only; a full agent can read the disk directly, and the GitHub backup organizer can read everything in the backup repository. What they read goes to the AI service behind them.
 - Cloud relay: a cloud AI that works through your drive (such as Grok over Google Drive) can read every note file on the drive, finance details included.
 - Phone channels: messages you send on WeChat, Telegram, Feishu or QQ, and the replies, pass through those platforms; Ask's AI answers them.
-- Context pack and clipboard: only the text you copy and paste leaves Kaitu. Packs leave out health records, finance details and memories marked sensitive, and recognizable keys and local paths are removed.
+- Context pack and clipboard: only the text you copy and paste leaves Kaitu. Packs leave out raw health records and memories marked sensitive; you choose each time whether to include a finance summary; recognizable keys and local paths are removed.
 
 ## Other connections
 
-- Map tiles come from OpenFreeMap.
+- The global footprint map (Natural Earth) is bundled locally. Below zoom 5, no requests are sent to map providers. Zooming into regional detail downloads visible water and major-river tiles from OpenFreeMap (from zoom 5) and terrain tiles from AWS Terrain Tiles (from zoom 6). The servers receive the requested map area, your IP address, and ordinary network metadata. Requests do not include your experience text, profile, or account. City-level experience locations are not live location tracking. Offline, the global map remains available and city details show a connection notice.
 - Reference prices come from Yahoo; only ticker symbols are sent, not your holdings.
 - GitHub progress uses the token you add to read the repositories you linked.
 - Calendar subscriptions are read from the addresses you add; confirmed blocks can be written to this computer's calendar.

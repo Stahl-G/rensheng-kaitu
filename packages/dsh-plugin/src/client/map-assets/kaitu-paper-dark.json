@@ -1,0 +1,40 @@
+{
+  "version": 8,
+  "name": "\u5f00\u56fe\u7eb8\u672c \u00b7 \u591c",
+  "sources": {
+    "paper-earth": {
+      "type": "raster",
+      "tiles": ["kaitu-paper://dark/{z}/{x}/{y}"],
+      "tileSize": 256,
+      "minzoom": 0,
+      "maxzoom": 3,
+      "attribution": "<a href=\"https://www.naturalearthdata.com/\">Natural Earth</a>"
+    }
+  },
+  "layers": [
+    {
+      "id": "paper-water",
+      "type": "background",
+      "paint": {
+        "background-color": "#1c293c"
+      }
+    },
+    {
+      "id": "paper-regional-land",
+      "type": "background",
+      "minzoom": 5,
+      "paint": {
+        "background-color": "#554d43"
+      }
+    },
+    {
+      "id": "paper-relief",
+      "type": "raster",
+      "source": "paper-earth",
+      "paint": {
+        "raster-fade-duration": 0,
+        "raster-opacity": ["interpolate", ["linear"], ["zoom"], 5, 1, 7, 0]
+      }
+    }
+  ]
+}

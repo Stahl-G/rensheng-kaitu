@@ -1,14 +1,16 @@
 import { realpathSync } from "node:fs";
 import { extname, relative, sep } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { assertAgentPath } from "./agent-file-policy.js";
-import { normalizeNow } from "./doc-input.js";
+import { normalizeNow, normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { isExperienceControlType } from "./experience-imports.js";
 import { isExplorationType } from "./exploration.js";
+import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
-import { listMemories, normalizedMemory } from "./memory.js";
-import { findRecordType, listModules, recordFilePattern, resolveRecordPath } from "./modules.js";
+import { listMemories } from "./memory.js";
+import { findRecordType, recordFilePattern, resolveRecordPath } from "./modules.js";
 import { refreshOverview } from "./overview.js";
 import { removePhoto } from "./photos.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
@@ -20,7 +22,12 @@ import { ulid } from "./ulid.js";
 import type { TodayPlan } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-export function readAgentFile(ws: Workspace, file: string, remote = false): string {
+export function readAgentFile(
+  ws: Workspace,
+  file: string,
+  connection: AgentConnection | boolean = "local-mcp",
+): string {
+  const reader = typeof connection === "boolean" ? (connection ? "remote-mcp" : "local-mcp") : connection;
   assertAgentPath(ws.root, file);
   const abs = ws.resolve(file);
   // 同时检查请求路径和真实路径，不能借工作区内链接读取程序状态。
@@ -36,45 +43,18 @@ export function readAgentFile(ws: Workspace, file: string, remote = false): stri
       throw new KaituError("只允许读取工作区内的 .md / .json，不读 .kaitu/ 或版本库目录", "OUT_OF_SCOPE");
     }
   }
-  if (remote) {
-    const financialModules = [
-      "finance",
-      ...listModules(ws)
-        .filter((m) => m.def.id === "finance" || m.dir === "finance")
-        .map((m) => m.dir),
-    ];
-    for (const path of paths) {
-      if (financialModules.some((dir) => path === dir || path.startsWith(`${dir}/`)))
-        throw new KaituError("财务明细只允许在本机读取", "OUT_OF_SCOPE");
-    }
-  }
-  if (remote && paths.includes("OVERVIEW.md")) refreshOverview(ws);
-  if (!remote || !paths.some((path) => path.split("/")[0]?.toLowerCase() === "memory"))
-    return ws.readText(file);
-  // 公网连接读不到标为敏感的记忆：单条文件拒绝，索引去掉提到它们的行。
-  const sensitive = listMemories(ws)
-    .filter((memory) => memory.sensitive)
-    .map((memory) => memory.file);
-  let index = false;
-  for (const path of paths) {
-    const [dir, ...rest] = path.split("/");
-    if (dir?.toLowerCase() !== "memory") continue;
-    const name = rest.join("/");
-    if (name.toLowerCase() === "memory.md") {
-      index = true;
-      continue;
-    }
-    let open = false;
-    try {
-      open = rest.length === 1 && normalizedMemory(ws, name)?.sensitive === false;
-    } catch {}
-    if (!open) throw new KaituError("标为敏感的记忆只允许在本机读取", "OUT_OF_SCOPE");
-  }
+  if (paths.some((path) => !agentCanRead(ws, path, reader)))
+    throw new KaituError("这个连接不能读取该文件", "OUT_OF_SCOPE");
+  if (reader === "remote-mcp" && paths.includes("OVERVIEW.md")) refreshOverview(ws);
   const text = ws.readText(file);
-  return index
+  if (!paths.includes("memory/MEMORY.md")) return text;
+  const hidden = listMemories(ws, { includeArchived: true })
+    .filter((memory) => !agentCanRead(ws, `memory/${memory.file}`, reader))
+    .map((memory) => memory.file);
+  return hidden.length
     ? text
         .split("\n")
-        .filter((line) => !sensitive.some((name) => line.includes(name)))
+        .filter((line) => !hidden.some((name) => line.includes(name)))
         .join("\n")
     : text;
 }
@@ -167,6 +147,28 @@ export async function writeDigest(
   return { file, version: await snapshot(ws, `${actor}写入了 ${date} 的动态简报`) };
 }
 
+/** Agent 文档入口只把新增或改动的安排写成建议，原有用户决定原样保留。 */
+export function proposeAgentDocument(file: string, content: string, previous = ""): string {
+  const plan = file === "NOW.md";
+  if (!plan && !file.endsWith("/STATUS.md")) return content;
+  const normalize = plan ? normalizeNow : normalizeStatus;
+  const next = parseFrontmatter(content);
+  const before = normalize(parseFrontmatter(previous).data);
+  const data = normalize(next.data);
+  const key = plan ? "blocks" : "next";
+  const old = plan && before.date !== data.date ? [] : ((before[key] as Record<string, unknown>[]) ?? []);
+  data[key] = ((data[key] as Record<string, unknown>[]) ?? []).map((item) => {
+    if (old.some((entry) => isDeepStrictEqual(entry, item))) return item;
+    return {
+      ...item,
+      ...(plan ? { kind: "proposal" } : {}),
+      status: plan ? "pending" : "proposed",
+      ...("by" in item ? { by: "agent" } : {}),
+    };
+  });
+  return stringifyFrontmatter(data, next.body);
+}
+
 export interface ProposedBlock {
   title: string;
   start: string;
@@ -199,14 +201,12 @@ export function publicRecords<T extends Record<string, unknown>>(
   ws: Workspace,
   type: string,
   rows: T[],
+  connection: AgentConnection = "remote-mcp",
 ): T[] {
   const ref = findRecordType(ws, type);
   resolveRecordPath(ws, ref, recordFilePattern(ref).dir);
   const path = relative(realpathSync(ws.root), realpathSync(ws.resolve(ref.module.dir)))
     .split(sep)
     .join("/");
-  if (ref.module.def.id === "finance" || ref.module.dir === "finance" || path.startsWith("finance/"))
-    return [];
-  if (path.split("/").some((part) => part === ".kaitu" || part === ".git")) return [];
-  return rows;
+  return agentCanRead(ws, path, connection) ? rows : [];
 }

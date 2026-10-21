@@ -69,7 +69,7 @@ export function OnboardingPage(props: Props) {
     if (step !== STORAGE_STEP) return;
     void props
       .loadSettings()
-      .then((settings) => setStorage(settings.storage))
+      .then((settings) => setStorage({ ...settings.storage, github: !!settings.backup.connection }))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, [step, props.loadSettings]);
   const [error, setError] = useState("");
@@ -251,17 +251,24 @@ export function OnboardingPage(props: Props) {
             moveStorage={props.moveStorage}
             pickStorageFolder={props.pickStorageFolder}
             submitLabel={t("下一步", "Next")}
-            onDone={async (moved) => {
+            onDone={async (moved, github) => {
               const firstRun = status.checklist.completed === 0;
               await save({ storage: true });
               if (moved) await props.refresh();
-              if (firstRun) move(1);
+              // GitHub 同步在「AI 与连接」里建库或连接已有仓库。
+              if (github) finish("connections");
+              else if (firstRun) move(1);
               else finish("today");
             }}
           />
         ) : (
           !error && <p className={v2.small}>{t("正在读取…", "Loading…")}</p>
         )}
+        <p className={v2.small}>
+          <button type="button" className={v2.link} onClick={() => finish("connections")}>
+            {t("从 GitHub 仓库恢复", "Restore from GitHub")}
+          </button>
+        </p>
         <div className={css.footer}>
           <button type="button" className={quiet} onClick={() => move(0)}>
             {t("上一步", "Back")}
@@ -540,7 +547,7 @@ export function OnboardingPage(props: Props) {
             {t("把数据接进来", "Connect your data")}
           </h1>
           <div className={css.sources}>
-            {!status.sources.length && <p className={v2.small}>{t("不需要接数据", "No data needed")}</p>}
+            {!status.sources.length && <p className={v2.small}>{t("可直接继续", "Ready to continue")}</p>}
             {status.sources.map((source) => {
               const item = source;
               return (

@@ -14,11 +14,14 @@
         "complete_next",
         "decide_proposal",
         "complete_task",
+        "create_task",
+        "update_task",
         "cancel_task",
         "keep_draft",
         "adopt_draft",
         "answer_question",
-        "trial_checkin"
+        "trial_checkin",
+        "replace_memory"
       ]
     },
     "args": { "type": "object" }
@@ -118,6 +121,141 @@
               "done": { "type": "boolean" },
               "date": { "type": "string", "format": "date" },
               "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "create_task" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["id", "expected_rev", "title"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "expected_rev": { "const": 0 },
+              "title": { "type": "string", "minLength": 1 },
+              "due": {
+                "type": ["string", "null"],
+                "anyOf": [{ "format": "date" }, { "format": "date-time" }, { "type": "null" }]
+              },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "update_task" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["id", "expected_rev"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$" },
+              "expected_rev": { "type": "integer", "minimum": 1 },
+              "title": { "type": "string", "minLength": 1 },
+              "due": {
+                "type": ["string", "null"],
+                "anyOf": [{ "format": "date" }, { "format": "date-time" }, { "type": "null" }]
+              },
+              "notes": { "type": "string" }
+            },
+            "anyOf": [{ "required": ["title"] }, { "required": ["due"] }, { "required": ["notes"] }]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "enum": ["complete_task", "cancel_task"] } } },
+      "then": {
+        "properties": { "args": { "properties": { "expected_rev": { "type": "integer", "minimum": 1 } } } }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "complete_next" } } },
+      "then": { "properties": { "args": { "properties": { "expected_next": { "type": "object" } } } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "replace_memory"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["file", "candidate", "expected"],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "pattern": "^[^./\\\\][^/\\\\]*\\.md$"
+              },
+              "candidate": {
+                "oneOf": [
+                  {
+                    "type": "null",
+                    "description": "用户确认这条不再成立，仅归档，不替换"
+                  },
+                  {
+                    "type": "object",
+                    "required": ["type", "name", "text"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "type": {
+                        "enum": ["preference", "fact", "context", "person", "decision"]
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "sensitive": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                ]
+              },
+              "expected": {
+                "type": "object",
+                "required": ["type", "name", "text", "source", "sensitive"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "enum": ["preference", "fact", "context", "person", "decision"]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "type": ["string", "null"]
+                  },
+                  "sensitive": {
+                    "type": "boolean"
+                  }
+                }
+              }
             }
           }
         }

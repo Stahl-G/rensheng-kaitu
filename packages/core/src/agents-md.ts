@@ -3,220 +3,127 @@ import { join } from "node:path";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { listModules } from "./modules.js";
-import { ONBOARDING } from "./onboarding.js";
+import { INBOX_FORMATS } from "./inbox-formats.js";
 import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
+const routes = [
+  {
+    request: "记一顿饭",
+    use: "log-meal",
+    read: "无需先读资料；字段不确定才查 meal",
+    done: "写入回执有 id；云盘投递仍待处理",
+    skill: "log-meal",
+    match: /log-meal|早餐|午餐|晚餐|加餐|吃了|记.*(?:饭|餐|饮食)|breakfast|lunch|dinner|log.*meal/i,
+  },
+  {
+    request: "记训练",
+    use: "log-workout",
+    read: "上次同动作一条",
+    done: "回执有 id，并给有依据的下次建议",
+    skill: "log-workout",
+    match: /log-workout|训练|深蹲|卧推|硬拉|跑步|骑行|游泳|workout|log.*exercise/i,
+  },
+  {
+    request: "加个待办",
+    use: "kaitu task add --title 事项",
+    read: "无需先读资料",
+    done: "回执有 id",
+    skill: undefined,
+    match: /待办|todo|to-do|task add/i,
+  },
+  {
+    request: "项目推进了",
+    use: "project",
+    read: "该项目 STATUS.md，必要时读 log.md",
+    done: "STATUS/日志已更新，回执有版本",
+    skill: "project",
+    match: /项目|project/i,
+  },
+  {
+    request: "记住一件事",
+    use: "kaitu memory add --type preference --name 名称 --text 内容",
+    read: "无需先读资料",
+    done: "回执有 file 后说「已记住」",
+    skill: undefined,
+    match: /记住|偏好|remember|preference/i,
+  },
+  {
+    request: "设目标或改规则",
+    use: "先提具体改动，确认后写入",
+    read: "goals.json 或 rules.md，必要时读相关状态",
+    done: "用户确认、保存回执与读回一致",
+    skill: undefined,
+    match: /目标|规则|goal|rule/i,
+  },
+];
 
 function skills() {
   const dir = join(templateDir(), ".agents/skills");
   return readdirSync(dir)
     .sort()
-    .map((name) => {
-      const text = readFileSync(join(dir, name, "SKILL.md"), "utf8");
-      const { data } = parseFrontmatter<{ name: string; description: string }>(text);
-      return { name, text, description: data.description };
-    });
+    .map((name) => ({ name, text: readFileSync(join(dir, name, "SKILL.md"), "utf8") }));
+}
+
+/** 文件入口与内置 Agent 注入共用；不附带用户档案或全量格式。 */
+export function workspaceAgentGuide(): string {
+  return `# 开图资料工作区
+
+这里是用户的个人资料。时区在 me/rules.md 的 timezone；时间用带偏移的 ISO 8601，日期按用户时区切分。
+
+## 按当前任务做
+
+| 用户说 | 用 | 最多读什么 | 做完的标志 |
+|---|---|---|---|
+${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${route.done} |`).join("\n")}
+
+只加载这次任务的一个相关 Skill：正本在 .agents/skills/<技能>/SKILL.md，.claude/skills/ 是副本。缺口只问一个会改变下一步的问题，已知信息直接用。了解现状才读 OVERVIEW.md 的相关摘要，需要背景时再读档案与相关记忆；整理员按 ORGANIZER.md 执行。
+字段不确定时用 kaitu record schema <类型>（DSH 用 kaitu_status 带 type；MCP 用 record_types）。类型从相关 module.json.records 或 kaitu record types 查。只能读写云盘、没有命令时，格式不确定才读 RECORDS.md 的相关类型，投递边界见 AGENT-README.md；不安装 CLI 来绕路。
+
+## 边界
+
+1. 只写工作区内；程序状态、版本库和密钥由程序管理。记录用专用工具写入，保留 ID 和追加修订，不直接改数据 JSONL；项目链接目录只读。
+2. 改目标/规则/长期投入、外部日历、批量导入、删除模块或超过 10 条记录、自动任务、记忆归档/替换先确认。AI 提议保持 suggested/pending，用户采纳才生效。批量导入先预览；项目可见性变更须用户明确选择，云端旧副本由用户清理。
+3. 日常记录可直接保存、可撤销；自动记忆保存后告知，用户要求暂停时停止。敏感记忆须用户明确要求并标 sensitive；归档/替换只提候选，确认前保留旧条，文件名稳定，保留原正文与来源。健康只做记录、趋势和提醒。
+4. 普通文档修改后校验相关路径并保存版本；对用户说版本、历史、恢复。回执有 id/file 才确认数据已保存，有版本才确认版本已保存；只有结果不确定或用户要求核对时才读回。云盘新建文件只说「已投递」，note 只保存原文，不能当餐食入账。
+5. 摘要可能不完整。CLOUD_UNAVAILABLE 表示未下载或暂不可读，不是文件不存在；说明缺口后停止读取。其他错误只用原工具重试一次，第二次失败就报告缺口，不换工具/别名/整目录扫描循环读取。写入结果未知时核对原回执或复用原幂等标识，不另建记录重试。
+6. ${AI_NETWORK_RULES}
+
+工作区不在默认位置时加 --dir <绝对路径> 或设置 KAITU_DIR。工具与文件的实际权限继续生效；凭据留在本机，不写进资料或日志。
+`;
+}
+
+/** 只为明确匹配的一个常用任务补齐现有技能，歧义交给运行时的技能发现。 */
+export function workspaceTaskSkill(request: string): { name: string; text: string } | undefined {
+  const matches = routes.filter((route) => route.match.test(request));
+  if (matches.length !== 1 || !matches[0]?.skill) return;
+  const name = matches[0].skill;
+  return {
+    name,
+    text: parseFrontmatter(
+      readFileSync(join(templateDir(), ".agents/skills", name, "SKILL.md"), "utf8"),
+    ).body.trim(),
+  };
 }
 
 /** 分隔线以下是用户追加的内容，重新生成时原样保留。 */
 export function renderAgentsMd(ws: Workspace): string {
-  const modules = listModules(ws);
-  const moduleRows = modules
-    .map((m) => {
-      const types = Object.entries(m.def.records ?? {})
-        .map(([t, d]) => `\`${t}\`${d.label ? `（${d.label}）` : ""}`)
-        .join("、");
-      const vis = m.def.visibility === "nav" ? "导航页面" : "Agent 管理";
-      return `| \`${m.dir}/\` | ${m.def.name} | ${m.def.description ?? ""} | ${types || "—"} | ${vis} |`;
-    })
-    .join("\n");
-  const instructions = modules
-    .filter((m) => m.def.agent?.instructions)
-    .map((m) => `- **${m.def.name}**：${m.def.agent?.instructions}`)
-    .join("\n");
-
-  let userPart = "";
-  if (ws.exists("AGENTS.md")) {
-    const old = ws.readText("AGENTS.md");
-    const i = old.indexOf(USER_SECTION);
-    if (i >= 0) userPart = old.slice(i + USER_SECTION.length).replace(/^\n+/, "");
-  }
-
-  return `# 开图工作区（给 Agent 的入口说明）
-
-这个文件夹是用户的个人生活数据。读完本文件，你就知道用户是谁、在做什么、下一步该做什么。
-
-本文件由 \`kaitu agents-md\` 生成；要补充说明，写在文末分隔线以下。
-
-## 1. 用户是谁
-
-- 档案：\`me/profile.md\`
-- 记忆索引：\`memory/MEMORY.md\`（每条一行，详情在同目录的单独文件里）
-
-## 2. 进入后的读取顺序
-
-1. \`me/profile.md\`
-2. \`me/rules.md\`（作息与排程约束，frontmatter 是机器可读的规则）
-3. \`NOW.md\`（今天的计划）
-4. 各模块的 \`STATUS.md\`（进度与下一步）
-5. 需要细节时再读各模块的 \`data/\`
-
-## 3. 模块
-
-| 路径 | 名称 | 用途 | 记录类型 | 显示 |
-|---|---|---|---|---|
-${moduleRows}
-
-${instructions}
-
-## 4. 写入规则
-
-- 只写本文件夹之内；不要改 \`.kaitu/\`（程序状态与密钥）。
-- 记录类数据（训练、饮食、睡眠、指标、日程……）**只通过命令写入**，不要直接编辑 JSONL：
-  - 新增：\`kaitu record add <类型> --json '{...}'\`（自动生成 id、ts、by 并校验）
-  - 修改：\`kaitu record update <类型> <id> --json '{...}'\`
-  - 删除：\`kaitu record rm <类型> <id>\`
-  - 查询：\`kaitu record list <类型> [--from YYYY-MM-DD] [--to YYYY-MM-DD]\`
-- 记录与原文 frontmatter 可用 investment 标所属投入：project:<slug>、learning:<主题目录名>、ongoing:<id>；先用 kaitu investments 查询。待办旧 project 字段视为 project:<slug>。
-- 尝试可挂 direction_id 或 investment，也可独立保存；create_checkin 记录是否按计划做到。
-- 财务流水可选保留 source_status、source_direction、account_last4；退款关联原交易号。银行通知只进入本机待核对候选，不直接记入流水。
-- 健康症状写 \`symptom\`（普通症状填 severity，食欲变化只填 appetite_change）；心理状态写 \`mood\`（七级 valence）；设备心率通知写 \`heart_notification\`，不写日历 event。
-- 地点经历用 MCP \`experience_add\` 或 dsh \`kaitu_add_experience\`，只给城市名和国家代码；计划用 planned，坐标由城市表提供。
-- 方向与实验通过 MCP \`exploration_read\` / \`exploration_write\`（dsh 加 kaitu_ 前缀），修改带预期版本；AI 提议先标 suggested，用户采纳后才是 active。行动完成不自动支持假设。
-- 待办用 \`kaitu task add --title "事项" [--due 日期或时间] [--remind-at 时间] [--investment 引用]\`，新建为 open。
-- \`kaitu task list [--all]\` 查询，\`kaitu task done <id>\` 完成，\`kaitu task cancel <id>\` 取消；状态变化追加修订并保存版本。
-- 时间一律 ISO 8601 并带时区偏移；日期按用户时区（\`me/rules.md\` 的 \`timezone\`）切分。
-- 项目改回公开会搬回关联记录的全部修订与删除标记；只在用户明确选择后操作。迁移可在重新打开时继续，既有云端副本须由用户清理。
-- 项目内容在链接的文件夹里，只读；用 \`kaitu project\` 管理档案与同步进度。
-
-## 自定义项目视图
-
-可直接写 \`projects/<slug>/view.json\`，或用 MCP \`project_view_write\`（slug、view）；顶层 \`{title?, blocks:[...]}\` 或 \`{title?, html}\`。
-积木公共字段 \`id,type,title?\`；progress 用 \`source:"progress"\`（现有目标），curve 用 \`source:"metrics",kind:"words"|"commits"\`（仅本项目指标）。
-checklist 用 \`items:[{text,checked,source?}]\`；milestones 用 \`items:[{title,date?,done,source?}]\`；links 用 \`items:[{title,url}]\`（HTTP/HTTPS）。
-note 用 \`text,source?\`（纯文本）；table 用 \`columns:[{key,title}],rows:[{字段:字符串或数值}],source?\`。
-可选 source 指向本项目内已有相对文件，可用 \`STATUS.md#progress\` 引用字段；不写表达式或越界路径。HTML 在隔离 iframe 内显示。
-例：\`{"title":"写作进度","blocks":[{"id":"goal","type":"progress","source":"progress"},{"id":"next","type":"note","text":"本周写完下一节"}]}\`。
-
-- 体态照片用 \`kaitu photo add <图片> --pose front|side|back|other\`；原件在 \`health/files/photos/\`。
-- 照片查询用 \`kaitu photo list\`，删除用 \`kaitu photo rm <id>\`（含原件，可恢复）。
-- 直接编辑 Markdown / JSON 文件后，运行 \`kaitu validate\`，再用 \`kaitu snapshot -m "<人能读懂的说明>"\` 保存一个版本。
-
-### 记录格式参考
-
-${renderRecordReference(ws)}
-
-本机 \`kaitu record add <类型> --json\` 只传示例中 type 以外的字段；date 简写与 source 自动补齐仅用于收件箱。
-用 \`kaitu record types\` 列出类型，\`kaitu record schema <类型>\` 查看单个类型。
-
-## 5. 确认规则
-
-| 操作 | 是否需要用户确认 |
-|---|---|
-| 日常记录（训练、饮食、指标、待办） | 否，直接写，可撤销 |
-| 自动记忆 | 否，直接写，告诉用户「已记住：……」 |
-| 写入外部日历 | 是 |
-| 批量导入 | 是（一屏列出，默认全选） |
-| 删除模块、删除超过 10 条记录 | 是 |
-| 修改 \`me/rules.md\`、\`me/goals.json\`、\`me/ongoing.json\` | 是：先提出修改建议，用户确认后再改 |
-
-## 6. 撤销与历史
-
-- 每次写入都会生成一个版本。\`kaitu history [路径]\` 查看，\`kaitu restore <版本> [路径]\` 恢复。
-- 对用户说「版本」「历史」「恢复」，不要说 git。
-
-## 7. 记忆规则
-
-- 用户说「记住……」时，用 \`kaitu memory add --type <类型> --name "<名称>" --text "<内容>"\` 保存。
-- 自动提取默认开启：保存值得记住的内容，告诉用户「已记住：……」，可用版本历史撤销；用户要求暂停时停止提取。
-- 有对应模块的内容写进模块，不进记忆。健康诊断等敏感信息仅在用户明确要求时保存，并加 \`--sensitive\`。
-- 晚间复盘合并重复、处理矛盾并刷新档案摘要。用 \`kaitu chats search <词>\` 检索历史对话。
-
-### 首次使用
-
-- 首次入口「${ONBOARDING.matter.entry}」：直接写或粘贴对话，保存原文后核对目标、现状和一个下一步。也可搬来记忆。
-- 已连 AI 且不知道做什么时，给 2–3 条可能路径及理由、未知、小实验，不预选。用户选中并核对后才采纳成待办。
-- 起步选项：${ONBOARDING.starts.map((item) => item.title).join("、")}。
-- 先运行 \`kaitu onboarding status\`，或 MCP \`onboarding_status\`；DSH 使用 \`kaitu_onboarding\` 的 status。
-- AI 列表、记忆位置提示、提示词与所需数据源取返回值 content，按 onboarding 技能先得到一个下一步，其余设置从今天清单按需完成。
-- 原文用 onboarding matter-read 读取，matter-draft 仅保存待核对草稿，不自动建待办。记忆先 preview 展示候选，确认后传 token 与 selected；数据源先预览再确认，来源、版本与撤销点以工具回执为准。
-- 选择用 onboarding choose 保存，完成情况实时计算；reset 只重置本机选择，不删除资料。不要手改配置或打勾完成状态。
-
-## 8. 日常节奏
-
-- 早间（morning-plan）：读规则、目标、日程、下一步、今天到期与提醒的待办和昨晚睡眠，按训练频率排今天，建议保留 pending。
-- 晚间（evening-review）：把笔记待办整理为 task、提醒过期项、核对完成情况、更新模块状态、写日报、整理记忆，最后保存版本。
-- 周复盘（weekly-review）：汇总本周进展和障碍，更新下周下一步。
-- 月复盘（monthly-review）：汇总整月，满两个月后做有数据支持的现状分析；规则和目标变更仍须确认。
-- 自动任务由用户在问问或设置中确认启用；首次使用选择不自动创建定时任务。
-
-## 9. 技能与常用命令
-
-正本在 \`.agents/skills/\`，同步副本在 \`.claude/skills/\`；\`kaitu agents-md\` 同时更新两处。
-
-| 技能 | 何时使用 |
-|---|---|
-${skills()
-  .map((s) => `| ${s.name} | ${s.description} |`)
-  .join("\n")}
-
-- \`kaitu status [--json-out]\`：今天的块和待确认数量、模块进度与 next、近 7 天训练和营养睡眠数据，以及项目进度和今天到期 / 过期 / 提醒的待办。
-- \`kaitu memory import --file <候选.json> [--dry-run]\`：确认后的记忆数组一次导入、一个版本。
-- \`kaitu import apple-health|nut-ai|ics <文件> --dry-run\`：先预览，用户确认后移除 --dry-run。
-- \`kaitu upgrade [--dry-run]\`：升级内置模块与技能，保留自定义配置。
-- \`kaitu doctor\` 检查工作区，\`kaitu validate [路径]\` 校验格式。
-
-## 10. 工作台
-
-独立 Kaitu.app 有总览、开图、记录、问问四个入口；DSH 插件保留三个资料入口与原生会话。运行 \`kaitu ui\` 可直接浏览资料与保存原文，无需模型；详情、连接与高级设置按需进入。
-工作区不在默认位置时，命令加 \`--dir <绝对路径>\` 或设置 \`KAITU_DIR\`。
-
-## 11. 存放位置与云端接力
-
-- 本机、iCloud、Google Drive 三选一；用 \`kaitu sync enable icloud|drive [--dir <同步目录>]\` 开启，换云盘前先 disable。
-- 个人数据存到 Drive，版本历史与密钥留在本机状态目录；\`kaitu drive disable [--to <目录>]\` 搬回本机。
-- 云端 Agent 白天只追加（规则见 \`AGENT-README.md\`）；整理员每天整理一次（规则见 \`ORGANIZER.md\`）。
-- 接受 digest.md（date frontmatter）、records.jsonl（每行 type）、memory.json（候选数组）、proposal.json（title/start/end）。
-- 格式不确定时直接写 \`*.note.md\`，用自然语言即可，不会被拒；结构化文件写对会立即生效，写错的部分会转为待整理笔记。
-- 可带 agent 来源；收件箱不接受删除、恢复、规则与目标修改。\`kaitu inbox process\` 手动处理，工作台运行时自动处理。
-- Apple 健康 export.zip / export.xml 与快捷指令 *.health.json 放进 \`inbox/health/\`，稳定后自动导入；健康原件归档但不进版本。
-- 每份成功文件一个版本，原件归档到 \`inbox/processed/YYYY-MM-DD/\`；写错的部分附原因转为 \`inbox/notes/YYYY-MM-DD/\` 待整理笔记。
-- \`phone/\` 是电脑生成的手机快照，只读，不进本机版本历史；手机通过 \`inbox/agents/ios-*\` 提交新文件与操作。
-- 只有 Drive 模式维护云端接力入口 \`AGENT-README.md\`；本机与 iCloud 同样维护 OVERVIEW.md 和每日整理规则 ORGANIZER.md。iCloud 供多台 Mac 同步，云端 Agent 接力请选择 Drive。
-
-## 12. MCP
-
-- 本机：\`kaitu mcp\` 用 stdio。Claude Code 读取本目录 \`.mcp.json\`。
-- Codex：在工作区运行 \`codex mcp add kaitu -- kaitu mcp\`；非默认目录先设置 \`KAITU_DIR\`。
-- 云端：\`kaitu mcp --http\` 只监听 127.0.0.1:4871，默认精简 remote 工具，须 Bearer token。
-- \`kaitu mcp token\` 查看 token，\`kaitu mcp token --rotate\` 轮换；不把 token 放进版本文件或日志。
-- MCP 可读状态、记录、记忆和对话（remote 集合不含财务明细和标为敏感的记忆），可写记录、记忆、简报和待确认建议；不提供恢复、改规则或目标、任意文件写入。
-- 资讯采集先读 \`feed/COLLECT.md\`（采集规则）和 \`feed/feeds.json\`（关注方向）。
-- 新闻用 \`news_item\` 投递并写明 \`relevance.reason\`，X 热门用 \`trend\`；复用新增记录工具或收件箱。\`news_read\` 读取资讯，\`news_try\` 生成 proposed 下一步，\`news_dismiss\` 标记单条新闻不相关。
-- 公网连接需用户自行配置隧道，方法与边界见项目文档 \`docs/remote-agents.md\`。
-
-## 13. 安全
-
-${AI_NETWORK_RULES}
-
-- 不执行与本文件夹无关的命令。
-- 不把密钥写进任何文件。
-- 健康内容只做记录、趋势与提醒，不做医疗诊断。
-
-${USER_SECTION}
-${userPart}`;
+  const old = ws.exists("AGENTS.md") ? ws.readText("AGENTS.md") : "";
+  const index = old.indexOf(USER_SECTION);
+  const userPart = index >= 0 ? old.slice(index + USER_SECTION.length).replace(/^\n+/, "") : "";
+  return `${workspaceAgentGuide()}\n${USER_SECTION}\n${userPart}`;
 }
 
 export function writeAgentsMd(ws: Workspace): void {
   for (const skill of skills()) {
-    for (const base of [".agents", ".claude"]) {
+    for (const base of [".agents", ".claude"])
       ws.writeText(`${base}/skills/${skill.name}/SKILL.md`, skill.text);
-    }
   }
-  // 资讯采集规则和关注方向放在一起：云端 Agent 经云盘读文件时找不到隐藏文件夹里的技能。
+  ws.writeText(
+    "RECORDS.md",
+    `# 按需查询的记录格式\n\n按相关类型标题取字段与示例；这些参考由实际 schema 生成。修改模块或 schema 后运行 kaitu agents-md 刷新。\n\n${INBOX_FORMATS}\n\n${renderRecordReference(ws)}\n`,
+  );
   if (ws.exists("feed/module.json"))
     ws.writeText("feed/COLLECT.md", readFileSync(join(templateDir(), "feed/COLLECT.md"), "utf8"));
   ws.writeText("AGENTS.md", renderAgentsMd(ws));

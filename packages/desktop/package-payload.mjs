@@ -80,12 +80,23 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     external: ["better-sqlite3"],
   });
   await build({
+    entryPoints: [join(root, "packages/cli/dist/main.js")],
+    outfile: join(payload, "dist/cli.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["@deepseek-ai/*", "better-sqlite3"],
+  });
+  await build({
     entryPoints: [join(directory, "sdk-host.mjs")],
     outfile: join(payload, "dist/sdk-host.mjs"),
     bundle: true,
     platform: "node",
     format: "esm",
     target: "node22",
+    banner: { js: nodeBanner },
   });
   await build({
     entryPoints: [join(root, "packages/core/dist/health-import-worker.js")],
@@ -136,7 +147,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   cpSync(join(root, "packages/core/data"), join(payload, "data"), { recursive: true });
   // 插件里用到的每个 DSH 入口都转接到宿主自带的同一份模块；从构建结果里找，内核新增子路径时不会漏。
   const bridges = new Map();
-  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs"])
+  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs", "dist/cli.mjs"])
     for (const [, name, subpath] of readFileSync(join(payload, file), "utf8").matchAll(
       /from ?"(@deepseek-ai\/[\w-]+)(\/[\w-]+)?"/g,
     ))

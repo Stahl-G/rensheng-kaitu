@@ -9,6 +9,7 @@ import {
   configureAutomation,
   initWorkspace,
   readAutomation,
+  splitImportedBlobs,
   upgradeWorkspace,
 } from "../core/dist/index.js";
 import { createAiProcess } from "./ai-process.mjs";
@@ -18,7 +19,14 @@ import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 
-export function createLocalAsk({ state, resources, executable, getWorkspace, conversationState = state }) {
+export function createLocalAsk({
+  state,
+  resources,
+  executable,
+  getWorkspace,
+  workspace: ws,
+  conversationState = state,
+}) {
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
   const makeSdk = () =>
     createSdkRuntime({
@@ -30,7 +38,6 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
       hostPlugin: join(resources, "dist/sdk-host.mjs"),
       helper: join(resources, "dist/sdk-credentials.mjs"),
     });
-  const ws = new Workspace(getWorkspace());
   let sdkRoot = ws.root;
   let sdk = makeSdk();
   const currentSdk = () => {
@@ -42,8 +49,13 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
     return sdk;
   };
   const keyFile = ".kaitu/ask-workspace.json";
-  const workspaceKey = ws.exists(keyFile) ? ws.readJson(keyFile).key : ws.root;
-  if (!ws.exists(keyFile)) ws.writeJson(keyFile, { key: workspaceKey }, { internal: true });
+  const workspaceKeyFor = (root) => {
+    const target = root === ws.root ? ws : new Workspace(root, { maintain: false });
+    if (!target.exists(".kaitu/config.json")) throw new Error("不是开图工作区");
+    const key = target.exists(keyFile) ? target.readJson(keyFile).key : root;
+    if (!target.exists(keyFile)) target.writeJson(keyFile, { key }, { internal: true });
+    return key;
+  };
   const connection = createAgentConnection({
     state,
     workspace: getWorkspace,
@@ -59,8 +71,9 @@ export function createLocalAsk({ state, resources, executable, getWorkspace, con
   return createAskService({
     state: conversationState,
     workspace: ws.root,
-    workspaceKey,
-    runtime: (mode) => connection.runtime(mode),
+    workspaceKey: workspaceKeyFor(ws.root),
+    workspaceKeyFor,
+    runtime: (mode, reader) => connection.runtime(mode, reader),
     settings: () => connection.settings(),
     // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
     models: (input) => connection.models(input),
@@ -122,10 +135,16 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   // 让 macOS 先把窗口放上屏幕，再开始可能卡住的读写。
   await new Promise((resolve) => setTimeout(resolve, 0));
   step("window");
-  let ws = new Workspace(workspace);
+  let ws = new Workspace(workspace, { deferOverview: true });
   if (!ws.exists(".kaitu/config.json"))
     ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-  else await upgradeWorkspace(ws);
+  // 有文件还在云盘没下载时先不升级，下次启动再做；不能让启动停在这里。
+  else
+    await upgradeWorkspace(ws)
+      .then(() => splitImportedBlobs(ws))
+      .catch((error) => {
+        if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
+      });
   step("workspace");
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
@@ -163,6 +182,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     resources,
     executable: app.getPath("exe"),
     getWorkspace: () => ws.root,
+    workspace: ws,
   });
   const startAutomation = async () => {
     const settings = readAutomation(ws);
@@ -275,11 +295,16 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   updateMenu();
   await window.loadURL(server.url);
   step("loaded");
+  // Network checks never gate the first screen; downloading and restarting stay explicit.
+  const firstUpdateCheck = setTimeout(() => void updater.checkAutomatically(), 15000);
+  const updateChecks = setInterval(() => void updater.checkAutomatically(), 24 * 60 * 60 * 1000);
   let closing = false;
   app.on("before-quit", (event) => {
     if (closing) return;
     event.preventDefault();
     closing = true;
+    clearTimeout(firstUpdateCheck);
+    clearInterval(updateChecks);
     void Promise.allSettled([server.close(), ai.close()]).finally(() => app.quit());
   });
   await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));

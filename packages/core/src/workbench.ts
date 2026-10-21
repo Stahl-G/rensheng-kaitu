@@ -1,12 +1,16 @@
-import { readdirSync, statSync } from "node:fs";
+import { promises as fs, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
+import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
-import { inboxNotes } from "./inbox-notes.js";
+import { countInboxNotes } from "./inbox-notes.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listMemories } from "./memory.js";
-import { listModules, listRecordTypes } from "./modules.js";
+import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
@@ -81,13 +85,16 @@ function files(ws: Workspace, dir: string, suffix: string): string[] {
 
 export function statusFiles(ws: Workspace): { file: string; module: string }[] {
   const out: { file: string; module: string }[] = [];
+  const recordDirectories = new Set(listRecordTypes(ws).map((ref) => recordFilePattern(ref).dir));
   function walk(dir: string, module: string): void {
     for (const entry of readdirSync(ws.resolve(dir), { withFileTypes: true })) {
       if (entry.isSymbolicLink() || entry.name.startsWith(".") || entry.name === "node_modules") continue;
       const file = `${dir}/${entry.name}`;
       if (ws.conflictCopy(file)) continue;
-      if (entry.isDirectory()) walk(file, module);
-      else if (entry.name === "STATUS.md") out.push({ file, module });
+      // 只排除已知健康附件与声明的记录目录；files 也可以是合法主题名。
+      if (entry.isDirectory()) {
+        if (file !== "health/files" && !recordDirectories.has(file)) walk(file, module);
+      } else if (entry.name === "STATUS.md") out.push({ file, module });
     }
   }
   for (const module of listModules(ws)) {
@@ -113,7 +120,13 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   return { ...parsed, data };
 }
 
-export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
+export function readWorkbench(
+  ws: Workspace,
+  now = new Date(),
+  remote: boolean | AgentConnection = false,
+  summary = false,
+) {
+  const connection = remote === true ? "remote-mcp" : remote || undefined;
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
   if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
@@ -133,7 +146,7 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
         type,
         () => {
           const rows = readRecords(ws, type);
-          return remote ? publicRecords(ws, type, rows) : rows;
+          return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 
         [],
@@ -144,20 +157,22 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
   return {
     root: ws.root,
     today,
-    inboxNotes: inboxNotes(ws).length,
+    inboxNotes: countInboxNotes(ws),
     timeZone: ws.timeZone(),
     now: read("今天的计划", () => document<TodayPlan>(ws, "NOW.md", { date: null, blocks: [] }), {
       data: { date: null, blocks: [] } as TodayPlan,
       body: "",
     }),
     projects: read("项目", () => listProjects(ws, { now }), []),
-    statuses: statusFiles(ws).flatMap(({ file, module }) =>
-      read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
-    ),
+    statuses: statusFiles(ws)
+      .filter(({ file }) => !connection || agentCanRead(ws, file, connection))
+      .flatMap(({ file, module }) =>
+        read(file, () => [{ file, module, ...document<ModuleStatus>(ws, file, { updated: null }) }], []),
+      ),
     modules,
     records,
     tasks: read("待办", () => tasksForToday(records.task ?? [], ws.timeZone(), now), []),
-    profile: ws.exists("me/profile.md") ? (ws.scanText("me/profile.md") ?? "") : "",
+    profile: !summary && ws.exists("me/profile.md") ? (ws.scanText("me/profile.md") ?? "") : "",
     rules: read("作息规则", () => document<Rules>(ws, "me/rules.md", { timezone: ws.timeZone() }), {
       data: { timezone: ws.timeZone() } as Rules,
       body: "",
@@ -167,20 +182,47 @@ export function readWorkbench(ws: Workspace, now = new Date(), remote = false) {
       feeds: [],
       keywords: [],
     }),
-    digests: read("动态简报", () => docs("feed/digests"), []),
-    reports: read("现状报告", () => docs("me/reports"), []),
-    daily: ws.exists(`reviews/daily/${today}.md`) ? (ws.scanText(`reviews/daily/${today}.md`) ?? "") : "",
-    labs: files(ws, "health/data/labs", ".json").flatMap((file) =>
-      read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
-    ),
-    memories: read("记忆", () => listMemories(ws), []),
-    warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从 iCloud 下载：${file}`)],
+    digests: summary ? [] : read("动态简报", () => docs("feed/digests"), []),
+    reports: summary ? [] : read("现状报告", () => docs("me/reports"), []),
+    daily:
+      !summary && ws.exists(`reviews/daily/${today}.md`)
+        ? (ws.scanText(`reviews/daily/${today}.md`) ?? "")
+        : "",
+    labs: summary
+      ? []
+      : files(ws, "health/data/labs", ".json").flatMap((file) =>
+          read(file, () => [{ file, ...ws.readJson<Lab>(file) }], []),
+        ),
+    memories: summary
+      ? []
+      : read(
+          "记忆",
+          () =>
+            listMemories(ws).filter(
+              (memory) => !connection || agentCanRead(ws, `memory/${memory.file}`, connection),
+            ),
+          [],
+        ),
+    warnings: [...warnings, ...ws.pendingDownloads().map((file) => `还没从云盘下载：${file}`)],
   };
 }
 export type WorkbenchData = ReturnType<typeof readWorkbench>;
 
 async function editFrontmatter<T>(ws: Workspace, file: string, schema: string, edit: (data: T) => string) {
-  const raw = parseFrontmatter<T>(ws.readText(file));
+  let raw: Frontmatter<T>;
+  try {
+    raw = parseFrontmatter<T>(ws.readText(file));
+  } catch (error) {
+    if (!(error instanceof YAMLParseError)) throw error;
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `${file} 的 frontmatter 无法读取（YAML ${error.code}）。文件已保留，请修正格式后重试。`,
+        `Cannot read frontmatter in ${file} (YAML ${error.code}). The file is kept; correct its format and retry.`,
+      ),
+      "INVALID_DOCUMENT",
+    );
+  }
   const parsed = { ...raw, data: normalizeDocument(schema, raw.data) as T };
   const message = edit(parsed.data);
   const validate = schemas().builtin(schema);
@@ -296,6 +338,8 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file === "phone" ||
     file.startsWith("phone/") ||
     file === ".kaitu/inbox-state.json" ||
+    file === ".kaitu/organizer.json" ||
+    file === ".kaitu/feishu.json" ||
     file === ".kaitu/channels" ||
     file.startsWith(".kaitu/channels/") ||
     file.startsWith("inbox/processed/") ||
@@ -324,5 +368,38 @@ export function workspaceFileStamps(ws: Workspace): Map<string, string> {
     }
   }
   walk("");
+  return stamps;
+}
+
+/** Async metadata scan used only when native file watching is unavailable. */
+export async function workspaceFileStampsAsync(
+  ws: Workspace,
+  options: { signal?: AbortSignal; progress?: (completed: number) => void } = {},
+): Promise<Map<string, string>> {
+  const root = await fs.realpath(ws.root);
+  const stamps = new Map<string, string>();
+  let completed = 0;
+  async function walk(dir: string): Promise<void> {
+    options.signal?.throwIfAborted();
+    for await (const entry of await fs.opendir(join(root, dir))) {
+      options.signal?.throwIfAborted();
+      const file = dir ? `${dir}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink() || ignoredWorkspaceChange(file)) continue;
+      if (entry.isDirectory()) {
+        await walk(file);
+      } else {
+        try {
+          const stat = await fs.lstat(join(root, file));
+          if (stat.isSymbolicLink()) continue;
+          stamps.set(file, `${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`);
+          options.progress?.(++completed);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      }
+    }
+  }
+  await walk("");
+  options.signal?.throwIfAborted();
   return stamps;
 }

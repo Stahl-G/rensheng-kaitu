@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>开图 · 今天</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit;margin:0;cursor:pointer}
+a{color:#2B4C7E;text-decoration:none}a:hover{color:#1B3254}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 1240px; overflow: hidden; background: #F5F5F3; color: #1F1E1D; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif; -webkit-font-smoothing: antialiased;">
+  <div style="display: flex; flex-direction: column; gap: 22px; padding: 56px 16px 200px;">
+
+    <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 0 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 15px; font-weight: 500; color: #6B6A66;">10月18日 · 周日</span>
+        <h1 style="margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.01em;">今天</h1>
+      </div>
+      <button type="button" aria-label="设置" style="width: 44px; height: 44px; border-radius: 22px; border: 0; background: #E6E4DD; display: flex; align-items: center; justify-content: center; color: #4D4C48;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+    </div>
+
+    <sc-if value="{{syncNormal}}" hint-placeholder-val="{{true}}">
+      <a href="Status.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; color: #4D4C48; font-size: 14px;">
+        <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #3E8A5A; flex: none;"></span>
+        <span style="flex: 1; font-variant-numeric: tabular-nums;">{{sourceName}} 07:30 更新 · {{moving}} 条在路上</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6A66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </sc-if>
+    <sc-if value="{{syncOffline}}" hint-placeholder-val="{{false}}">
+      <a href="Status.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; color: #4D4C48; font-size: 14px;">
+        <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px solid #6B6A66; flex: none;"></span>
+        <span style="flex: 1; font-variant-numeric: tabular-nums;">离线 · {{moving}} 条待交出</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6A66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </sc-if>
+    <sc-if value="{{syncReview}}" hint-placeholder-val="{{false}}">
+      <a href="Status.dc.html" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: 14px; background: #EEF2F7; box-shadow: 0 0 0 1px #D3DEEC; color: #1B3254; font-size: 14px;">
+        <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 4px; background: #1B3254; flex: none;"></span>
+        <span style="flex: 1; font-variant-numeric: tabular-nums;">1 条需要核对 · {{sourceName}} 07:30 更新</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1B3254" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>
+    </sc-if>
+
+    <section aria-label="最重要的一件事" style="display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 20px; border-radius: 24px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(31,30,29,0.06), 0 0 0 1px #E6E4DD;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #1B3254;">最重要的一件事</span>
+        <span style="font-size: 13px; color: #6B6A66;">明天截止</span>
+      </div>
+      <div style="display: flex; gap: 12px; align-items: flex-start;">
+        <button type="button" onClick="{{toggleHero}}" aria-pressed="{{heroPressed}}" aria-label="完成：把摄影集初选从 80 张挑到 30 张" style="flex: none; width: 44px; height: 44px; margin: -2px 0 0 -4px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0;">
+          <span style="width: 32px; height: 32px; border-radius: 16px; border: 2px solid #1B3254; background: {{heroFill}}; display: flex; align-items: center; justify-content: center;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{heroCheck}}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg>
+          </span>
+        </button>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px;">
+          <p style="margin: 0; font-size: 22px; line-height: 29px; font-weight: 600; color: {{heroInk}}; text-decoration: {{heroLine}};">把摄影集初选从 80 张挑到 30 张</p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <span style="font-size: 13px; line-height: 18px; padding: 3px 10px; border-radius: 999px; background: #F6E7ED; color: #8A3A5A;">摄影集</span>
+            <sc-if value="{{heroDone}}" hint-placeholder-val="{{false}}">
+              <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; line-height: 18px; color: #6B6A66;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"></path><path d="M12 15.5v-4.5M10 12.5l2-2 2 2"></path></svg>
+                在路上
+              </span>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="next-title" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="next-title" style="margin: 0; padding: 0 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">接下来</h2>
+      <div style="border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; overflow: hidden;">
+        <div style="display: flex; gap: 6px; align-items: center; padding: 8px 16px 8px 6px; min-height: 64px;">
+          <span aria-hidden="true" style="flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+            <span style="width: 24px; height: 24px; border-radius: 12px; border: 1.5px dashed #85837E;"></span>
+          </span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;">
+            <span style="font-size: 17px; line-height: 22px;">每周留一个晚上练吉他</span>
+            <span style="font-size: 13px; line-height: 18px; color: #6B6A66;">草稿 · 去电脑核对</span>
+          </div>
+        </div>
+        <div style="height: 1px; background: #E6E4DD; margin-left: 56px;"></div>
+        <div style="display: flex; gap: 6px; align-items: center; padding: 8px 16px 8px 6px; min-height: 64px;">
+          <button type="button" onClick="{{toggleCardio}}" aria-pressed="{{cardioPressed}}" aria-label="完成：周六有氧 30 分钟" style="flex: none; width: 44px; height: 44px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; padding: 0;">
+            <span style="width: 24px; height: 24px; border-radius: 12px; border: 2px solid {{cardioRing}}; background: {{cardioFill}}; display: flex; align-items: center; justify-content: center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="{{cardioCheck}}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"></path></svg>
+            </span>
+          </button>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 17px; line-height: 22px; color: {{cardioInk}}; text-decoration: {{cardioLine}};">周六有氧 30 分钟</span>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <span style="font-size: 12px; line-height: 16px; padding: 2px 8px; border-radius: 999px; background: #E5F1E9; color: #2A6A41;">健康</span>
+              <sc-if value="{{cardioDone}}" hint-placeholder-val="{{false}}">
+                <span style="font-size: 13px; line-height: 18px; color: #6B6A66;">在路上</span>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="plan-title" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="plan-title" style="margin: 0; padding: 0 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">今天的安排</h2>
+      <div style="display: flex; flex-direction: column; padding: 14px 16px 10px; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD;">
+        <div style="display: flex; gap: 12px;">
+          <div style="width: 44px; flex: none; display: flex; flex-direction: column; font-variant-numeric: tabular-nums;">
+            <span style="font-size: 15px; font-weight: 600;">10:00</span>
+            <span style="font-size: 12px; color: #6B6A66;">11:00</span>
+          </div>
+          <div aria-hidden="true" style="width: 12px; flex: none; display: flex; flex-direction: column; align-items: center;">
+            <span style="width: 9px; height: 9px; border-radius: 5px; background: #85837E; margin-top: 6px;"></span>
+            <span style="flex: 1; width: 2px; background: #E6E4DD; margin-top: 4px;"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-bottom: 18px;">
+            <span style="font-size: 17px; line-height: 22px;">周会</span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <div style="width: 44px; flex: none; display: flex; flex-direction: column; font-variant-numeric: tabular-nums;">
+            <span style="font-size: 15px; font-weight: 600;">15:00</span>
+            <span style="font-size: 12px; color: #6B6A66;">16:30</span>
+          </div>
+          <div aria-hidden="true" style="width: 12px; flex: none; display: flex; flex-direction: column; align-items: center;">
+            <span style="width: 9px; height: 9px; border-radius: 5px; background: #1B3254; margin-top: 6px;"></span>
+            <span style="flex: 1; width: 2px; background: #E6E4DD; margin-top: 4px;"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding-bottom: 18px;">
+            <span style="font-size: 17px; line-height: 22px;">外景拍摄</span>
+            <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #6B6A66;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+              iPhone 日历
+            </span>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px;">
+          <div style="width: 44px; flex: none; display: flex; flex-direction: column; font-variant-numeric: tabular-nums;">
+            <span style="font-size: 15px; font-weight: 600; color: #1B3254;">20:00</span>
+            <span style="font-size: 12px; color: #6B6A66;">21:00</span>
+          </div>
+          <div aria-hidden="true" style="width: 12px; flex: none; display: flex; flex-direction: column; align-items: center;">
+            <span style="width: 9px; height: 9px; border-radius: 5px; border: 1.5px dashed #1B3254; margin-top: 6px;"></span>
+          </div>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px 12px 12px; margin-bottom: 4px; border-radius: 14px; background: #EEF2F7; border: 1px dashed #D3DEEC;">
+            <span style="font-size: 17px; line-height: 22px; color: {{planInk}}; text-decoration: {{planLine}};">整理摄影集</span>
+            <sc-if value="{{planPending}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; gap: 8px;">
+                <button type="button" onClick="{{confirmPlan}}" style="height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: #1F1E1D; color: #FFFFFF; font-size: 15px; font-weight: 600;">加进日历</button>
+                <button type="button" onClick="{{rejectPlan}}" style="height: 36px; padding: 0 14px; border-radius: 18px; border: 0; background: #F0EFEC; color: #1F1E1D; font-size: 15px;">不要</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{planConfirmed}}" hint-placeholder-val="{{false}}">
+              <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #4D4C48;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></svg>
+                已加进日历
+              </span>
+            </sc-if>
+            <sc-if value="{{planRejected}}" hint-placeholder-val="{{false}}">
+              <span style="font-size: 13px; color: #6B6A66;">不要了</span>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="goal-title" style="display: flex; flex-direction: column; gap: 8px;">
+      <h2 id="goal-title" style="margin: 0; padding: 0 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">你带来的规划</h2>
+      <div style="border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; overflow: hidden;">
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;">
+          <span style="font-size: 17px; line-height: 22px; font-weight: 600;">年底出一本摄影集</span>
+          <span style="font-size: 15px; line-height: 20px; color: #4D4C48;">下一步：把初选从 80 张挑到 30 张</span>
+          <span style="font-size: 13px; line-height: 18px; color: #6B6A66;">记过 3 次结果 · 上次：完成第一轮选片</span>
+        </div>
+        <div style="height: 1px; background: #E6E4DD; margin-left: 16px;"></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 14px 16px;">
+          <span style="font-size: 17px; line-height: 22px; font-weight: 600;">能弹完一首完整的曲子</span>
+          <span style="font-size: 13px; line-height: 18px; color: #6B6A66;">还没有下一步</span>
+        </div>
+      </div>
+    </section>
+
+    <a href="Map.dc.html" aria-label="这一周，看近况" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: #FFFFFF; box-shadow: 0 0 0 1px #E6E4DD; color: #1F1E1D;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: #6B6A66;">这一周</span>
+        <span style="font-size: 15px; color: #2B4C7E;">看近况</span>
+      </div>
+      <p style="margin: 0; font-size: 17px; line-height: 25px;">训练 3 次，平均睡眠 6.8 小时，记下 5 条原文。</p>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="flex: 1; min-width: 0; font-size: 15px; color: #4D4C48;">开图 App · 23 次提交</span>
+        <div aria-hidden="true" style="display: flex; gap: 5px;">
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #E6E4DD;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #E6E4DD;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #E6E4DD;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #E6E4DD;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #8FAED6;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #1B3254;"></span>
+          <span style="width: 10px; height: 10px; border-radius: 5px; background: #FFFFFF; box-shadow: inset 0 0 0 1.5px #1B3254;"></span>
+        </div>
+      </div>
+      <sc-if value="{{fromAgent}}" hint-placeholder-val="{{false}}">
+        <span style="font-size: 13px; color: #6B6A66; font-variant-numeric: tabular-nums;">电脑 10-16 的数据</span>
+      </sc-if>
+    </a>
+  </div>
+
+  <div style="position: absolute; left: 16px; right: 16px; bottom: 99px; display: flex; gap: 10px; align-items: center;">
+    <a href="Capture.dc.html" style="flex: 1; display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 18px; border-radius: 26px; background: #FFFFFF; color: #6B6A66; font-size: 17px; box-shadow: 0 8px 24px rgba(31,30,29,0.12), 0 0 0 1px #E6E4DD;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F1E1D" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      记一下…
+    </a>
+    <a href="Capture.dc.html" aria-label="按住说一句" style="width: 52px; height: 52px; flex: none; border-radius: 26px; background: #1F1E1D; color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(31,30,29,0.22);">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+    </a>
+  </div>
+
+  <nav aria-label="页面" style="position: absolute; left: 0; right: 0; bottom: 0; height: 83px; padding-top: 8px; background: #FCFCFB; border-top: 1px solid #E6E4DD; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));">
+    <a href="Main.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 3px; color: #1B3254; font-size: 11px; font-weight: 600;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"></path></svg>
+      今天
+    </a>
+    <a href="Map.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 3px; color: #6B6A66; font-size: 11px; font-weight: 500;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"></path><path d="M9 4v14M15 6v14"></path></svg>
+      开图
+    </a>
+    <a href="Library.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 3px; color: #6B6A66; font-size: 11px; font-weight: 500;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"></path><path d="M8 13h8M8 16.5h5"></path></svg>
+      资料
+    </a>
+    <a href="Ask.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 3px; color: #6B6A66; font-size: 11px; font-weight: 500;">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.7 7.1L4 20l1-4A8 8 0 1 1 20 12z"></path><path d="M9 11h.01M12 11h.01M15 11h.01"></path></svg>
+      问问
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"sync":{"editor":"enum","options":["正常","离线","需要核对"],"default":"正常"},"source":{"editor":"enum","options":["电脑","Dot"],"default":"电脑"},"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { hero: false, cardio: false, plan: 'pending' };
+  }
+  renderVals() {
+    const s = this.state;
+    const sync = this.props.sync ?? '正常';
+    const source = this.props.source ?? '电脑';
+    const moving = 2 + (s.hero ? 1 : 0) + (s.cardio ? 1 : 0) + (s.plan !== 'pending' ? 1 : 0);
+    return {
+      moving: moving,
+      sourceName: source,
+      fromAgent: source !== '电脑',
+      syncNormal: sync === '正常',
+      syncOffline: sync === '离线',
+      syncReview: sync === '需要核对',
+      heroDone: s.hero,
+      heroPressed: s.hero ? 'true' : 'false',
+      heroFill: s.hero ? '#1B3254' : '#FFFFFF',
+      heroCheck: s.hero ? '#FFFFFF' : 'transparent',
+      heroInk: s.hero ? '#6B6A66' : '#1F1E1D',
+      heroLine: s.hero ? 'line-through' : 'none',
+      toggleHero: () => this.setState({ hero: !this.state.hero }),
+      cardioDone: s.cardio,
+      cardioPressed: s.cardio ? 'true' : 'false',
+      cardioRing: s.cardio ? '#1B3254' : '#85837E',
+      cardioFill: s.cardio ? '#1B3254' : '#FFFFFF',
+      cardioCheck: s.cardio ? '#FFFFFF' : 'transparent',
+      cardioInk: s.cardio ? '#6B6A66' : '#1F1E1D',
+      cardioLine: s.cardio ? 'line-through' : 'none',
+      toggleCardio: () => this.setState({ cardio: !this.state.cardio }),
+      planPending: s.plan === 'pending',
+      planConfirmed: s.plan === 'confirmed',
+      planRejected: s.plan === 'rejected',
+      planInk: s.plan === 'rejected' ? '#6B6A66' : '#1F1E1D',
+      planLine: s.plan === 'rejected' ? 'line-through' : 'none',
+      confirmPlan: () => this.setState({ plan: 'confirmed' }),
+      rejectPlan: () => this.setState({ plan: 'rejected' })
+    };
+  }
+}
+</script>
+</body>
+</html>
