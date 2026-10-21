@@ -1,4 +1,5 @@
 import { lstatSync, readdirSync } from "node:fs";
+import { basename } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
@@ -6,8 +7,11 @@ import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { listRecordTypes } from "./modules.js";
+import { taskGoal } from "./plans.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
+import { listTasks } from "./tasks.js";
+import type { Goal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export interface LibraryItem {
@@ -24,6 +28,8 @@ export interface InboxEntry {
   date: string | null;
   status: "organized" | "review" | "raw";
   destination: string | null;
+  destinationId?: string;
+  destinationGoalId?: string;
 }
 export interface LibraryQuery {
   section?: "summary" | "inbox" | "notes" | "health";
@@ -42,11 +48,18 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
     throw new KaituError("未知资料分类", "BAD_ARGS");
   const calendar = !section ? readCalendar(ws) : null;
   const doing = !section || section === "notes" ? readDoing(ws) : { learning: [], decisions: [] };
+  const tasks = !section || section === "inbox" ? listTasks(ws, { status: "all" }) : [];
+  const goals = tasks.length && ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [];
+  const bySource = new Map(
+    tasks.filter((task) => task.source).map((task) => [basename(task.source ?? ""), task]),
+  );
   // 还没从云盘下载的笔记先不列，下载后自然出现。
   const entry = (file: string, organized: boolean): InboxEntry[] => {
     const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
     if (!parsed) return [];
     const { data, body } = parsed;
+    const task = bySource.get(basename(file));
+    const goal = task && taskGoal(task, goals);
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
@@ -64,7 +77,8 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
         date:
           typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
         status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
-        destination: null,
+        destination: task ? `变成下一步：${task.title}${goal ? `（目标：${goal.title}）` : ""}` : null,
+        ...(task ? { destinationId: task.id, destinationGoalId: goal?.id } : {}),
       },
     ];
   };

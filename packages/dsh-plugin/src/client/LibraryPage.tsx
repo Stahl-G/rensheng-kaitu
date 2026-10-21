@@ -18,7 +18,11 @@ export interface LibraryProps extends LearningServices {
   loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
-export function LibraryPage({ data, open }: { data: LibraryData | null; open: (id: string) => void }) {
+export function LibraryPage({
+  data,
+  open,
+  inboxCount,
+}: { data: LibraryData | null; open: (id: string) => void; inboxCount?: number }) {
   const t = useT();
   const colors: Record<string, string> = {
     calendar: "news",
@@ -30,49 +34,53 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
   };
   return (
     <section className={css.mods} aria-label={t("各类资料", "Library sections")}>
-      {data?.sections.map((section) => (
-        <button
-          type="button"
-          className={`${css.mod} ${css.card} ${css.summaryButton}`}
-          key={section.id}
-          onClick={() => open(section.id)}
-        >
-          <span className={css["sum-h"]}>
-            <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
-            {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-            <span>›</span>
-          </span>
-          {section.count === null ? (
-            <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
-          ) : section.count ? (
-            <span className={`${css.big} ${css.num}`}>
-              {t(
-                `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
-              )}
+      {data?.sections.map((item) => {
+        const section =
+          item.id === "inbox" && inboxCount !== undefined ? { ...item, count: inboxCount } : item;
+        return (
+          <button
+            type="button"
+            className={`${css.mod} ${css.card} ${css.summaryButton}`}
+            key={section.id}
+            onClick={() => open(section.id)}
+          >
+            <span className={css["sum-h"]}>
+              <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
+              {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+              <span>›</span>
             </span>
-          ) : (
-            <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
-          )}
-          <span className={css.small}>
-            {section.sources.map((source, index) => (
-              <Fragment key={source}>
-                {index ? t("、", ", ") : ""}
-                <span className={css.nowrap}>{source}</span>
-              </Fragment>
-            ))}
-            {section.latest && (
-              <span className={css.nowrap}>
-                {section.sources.length ? " · " : ""}
+            {section.count === null ? (
+              <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
+            ) : section.count ? (
+              <span className={`${css.big} ${css.num}`}>
                 {t(
-                  `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
-                  `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                  `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
+                  `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
                 )}
               </span>
+            ) : (
+              <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
             )}
-          </span>
-        </button>
-      )) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
+            <span className={css.small}>
+              {section.sources.map((source, index) => (
+                <Fragment key={source}>
+                  {index ? t("、", ", ") : ""}
+                  <span className={css.nowrap}>{source}</span>
+                </Fragment>
+              ))}
+              {section.latest && (
+                <span className={css.nowrap}>
+                  {section.sources.length ? " · " : ""}
+                  {t(
+                    `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
+                    `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                  )}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      }) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
     </section>
   );
 }
@@ -81,10 +89,12 @@ export function InboxPage({
   subscribe,
   channelSettings,
   connect,
+  openNext,
 }: Pick<LibraryProps, "loadLibrary"> & {
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
   connect: () => void;
+  openNext: (id: string, goalId?: string) => void;
 }) {
   const t = useT();
   const [channels, setChannels] = useState<ChannelState>();
@@ -212,11 +222,21 @@ export function InboxPage({
               <span className={css.chip}>
                 {row.status === "organized" ? "已整理" : row.status === "review" ? "要你核对" : "只存了原文"}
               </span>
-              {row.status === "organized"
-                ? (row.destination ?? "整理去向未记录")
-                : row.status === "review"
-                  ? "请核对原文与相关资料"
-                  : "还没整理"}
+              {row.destination && row.destinationId ? (
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => openNext(row.destinationId ?? "", row.destinationGoalId)}
+                >
+                  {row.destination}
+                </button>
+              ) : row.status === "organized" ? (
+                t("只保留了原文", "Original text kept")
+              ) : row.status === "review" ? (
+                "请核对原文与相关资料"
+              ) : (
+                "还没整理"
+              )}
             </span>
           </div>
         ))

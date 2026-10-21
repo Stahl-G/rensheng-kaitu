@@ -19,6 +19,7 @@ import {
   pasteOnboardingMatter,
   previewOnboardingMemory,
   readExploration,
+  readLibrary,
   readOverviewPage,
   saveOnboardingMatter,
   validateWorkspace,
@@ -93,6 +94,15 @@ it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核
     expect(onboardingStatus(ws, options).checklist.items.find((item) => item.id === "ai")?.done).toBe(false);
     const next = await adoptOnboardingMatter(ws, matter.source, draft.draft as never);
     expect(next.goal).toBe("每周稳定练三次");
+    expect(
+      readLibrary(ws, { section: "inbox" }).inbox.find((entry) =>
+        entry.file.endsWith(matter.source.split("/").at(-1) ?? ""),
+      ),
+    ).toMatchObject({
+      status: "organized",
+      destination: "变成下一步：周二晚上先练 20 分钟（目标：每周稳定练三次）",
+      destinationId: next.id,
+    });
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
