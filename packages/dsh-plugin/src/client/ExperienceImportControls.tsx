@@ -201,7 +201,7 @@ export function ExperienceImportControls(
                         )
                       : t(
                           `停止从这份资料新增足迹，包括其他原文定位行。已有 ${source.active} 段经历保留。`,
-                          `Stop adding places from all locations in this source. Keep ${source.active} existing places.`,
+                          `Stop adding places from all locations in this source. Keep ${count(source.active, "existing place", "existing places")}.`,
                         )}
                   </p>
                   <div className={css.actions}>
@@ -251,13 +251,13 @@ export function ExperienceImportControls(
                     {preview.operation === "confirm" ? (
                       t(
                         `将确认 ${preview.affected.length} 段经历，保留 ${preview.preserved.length} 段已修改、隐藏、无需确认或城市未解析的资料。`,
-                        `Confirm ${count(preview.affected.length, "place", "places")}; preserve ${preview.preserved.length} edited, hidden, unresolved or other places.`,
+                        `Confirm ${count(preview.affected.length, "place", "places")}; preserve ${preview.preserved.length} edited, hidden, unresolved or other ${preview.preserved.length === 1 ? "place" : "places"}.`,
                       )
                     ) : (
                       <>
                         {t(
                           `${preview.operation === "undo" ? "将隐藏" : "将恢复"} ${preview.affected.length} 段经历，保留 ${preview.preserved.length} 段后续已修改的资料或隐藏状态。`,
-                          `${preview.operation === "undo" ? "Hide" : "Restore"} ${count(preview.affected.length, "place", "places")}; preserve ${preview.preserved.length} later edits or hidden states.`,
+                          `${preview.operation === "undo" ? "Hide" : "Restore"} ${count(preview.affected.length, "place", "places")}; preserve ${count(preview.preserved.length, "later edit or hidden state", "later edits or hidden states")}.`,
                         )}
                       </>
                     )}
@@ -305,11 +305,11 @@ export function ExperienceImportControls(
                           return preview.operation === "confirm"
                             ? t(
                                 `已确认 ${result.affected} 段经历，保留 ${result.preserved} 段其他资料`,
-                                `Confirmed ${count(result.affected, "place", "places")}; preserved ${result.preserved} others`,
+                                `Confirmed ${count(result.affected, "place", "places")}; preserved ${count(result.preserved, "other place", "other places")}`,
                               )
                             : t(
                                 `已${preview.operation === "undo" ? "撤销" : "恢复"} ${result.affected} 段经历，保留 ${result.preserved} 段后续资料`,
-                                `${preview.operation === "undo" ? "Undid" : "Restored"} ${count(result.affected, "place", "places")}; preserved ${result.preserved} later records`,
+                                `${preview.operation === "undo" ? "Undid" : "Restored"} ${count(result.affected, "place", "places")}; preserved ${count(result.preserved, "later record", "later records")}`,
                               );
                         })
                       }
