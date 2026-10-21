@@ -54,8 +54,12 @@ export function LibraryPage({
             ) : section.count ? (
               <span className={`${css.big} ${css.num}`}>
                 {t(
-                  `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                  `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
+                  section.id === "inbox" && inboxCount !== undefined
+                    ? `${section.count} 条未整理`
+                    : `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
+                  section.id === "inbox" && inboxCount !== undefined
+                    ? `${section.count} to sort`
+                    : `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
                 )}
               </span>
             ) : (
@@ -221,9 +225,7 @@ export function InboxPage({
             <span className={css.st}>
               <span className={css.chip}>
                 {row.status === "organized"
-                  ? row.destination
-                    ? t("已整理", "Organized")
-                    : t("原文已保留", "Original kept")
+                  ? t("已整理", "Organized")
                   : row.status === "review"
                     ? t("要你核对", "Needs review")
                     : t("只存了原文", "Text saved")}

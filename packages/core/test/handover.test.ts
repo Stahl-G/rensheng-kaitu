@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import {
   addGoalNext,
   addMemory,
@@ -22,6 +22,7 @@ import {
   readLibrary,
   readOverviewPage,
   saveOnboardingMatter,
+  updateRecord,
   validateWorkspace,
 } from "../src/index.js";
 
@@ -103,6 +104,15 @@ it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核
       destination: "变成下一步：周二晚上先练 20 分钟（目标：每周稳定练三次）",
       destinationId: next.id,
     });
+    const reads = vi.spyOn(ws, "readBytes");
+    readLibrary(ws, { section: "inbox" });
+    expect(reads.mock.calls.every(([file]) => file.startsWith("inbox/notes/"))).toBe(true);
+    reads.mockRestore();
+    updateRecord(ws, "task", next.id, { title: "周二先练 25 分钟" }, { by: "user" });
+    expect(
+      readLibrary(ws, { section: "inbox" }).inbox.find((entry) => entry.destinationId === next.id)
+        ?.destination,
+    ).toContain("周二先练 25 分钟");
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });

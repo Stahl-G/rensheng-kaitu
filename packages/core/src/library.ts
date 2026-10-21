@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync } from "node:fs";
+import { lstatSync, readdirSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
@@ -6,11 +6,11 @@ import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
-import { listRecordTypes } from "./modules.js";
+import { findRecordType, listRecordTypes, recordFilePattern, resolveRecordPath } from "./modules.js";
 import { taskGoal } from "./plans.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
-import { listTasks } from "./tasks.js";
+import { type Task, listTasks } from "./tasks.js";
 import type { Goal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -42,24 +42,61 @@ export interface LibraryData {
   inbox: InboxEntry[];
   notes: { file: string; title: string; kind: "笔记" | "决定"; status: string | null }[];
 }
+const destinations = new WeakMap<Workspace, { key: string; tasks: Map<string, Task>; goals: Goal[] }>();
+
+function taskDestinations(ws: Workspace) {
+  const ref = findRecordType(ws, "task");
+  const { dir, match } = recordFilePattern(ref);
+  const absolute = resolveRecordPath(ws, ref, dir);
+  const files = [
+    "me/goals.json",
+    "me/rules.md",
+    `${ref.module.dir}/module.json`,
+    ...(ws.exists(dir)
+      ? readdirSync(absolute)
+          .filter((name) => match.test(name))
+          .sort()
+          .map((name) => `${dir}/${name}`)
+      : []),
+  ];
+  const key = [
+    ws.root,
+    dir,
+    ...files.map((file) => {
+      try {
+        const stat = statSync(ws.resolve(file));
+        return `${file}:${stat.ino}:${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}`;
+      } catch {
+        return `${file}:missing`;
+      }
+    }),
+  ].join("|");
+  const cached = destinations.get(ws);
+  if (cached?.key === key) return cached;
+  const value = {
+    key,
+    tasks: new Map(
+      listTasks(ws, { status: "all" })
+        .filter((task) => task.source)
+        .map((task) => [basename(task.source ?? ""), task]),
+    ),
+    goals: ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [],
+  };
+  destinations.set(ws, value);
+  return value;
+}
+
 export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryData {
   const section = query.section;
   if (section && !["summary", "inbox", "notes", "health"].includes(section))
     throw new KaituError("未知资料分类", "BAD_ARGS");
   const calendar = !section ? readCalendar(ws) : null;
   const doing = !section || section === "notes" ? readDoing(ws) : { learning: [], decisions: [] };
-  const tasks = !section || section === "inbox" ? listTasks(ws, { status: "all" }) : [];
-  const goals = tasks.length && ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [];
-  const bySource = new Map(
-    tasks.filter((task) => task.source).map((task) => [basename(task.source ?? ""), task]),
-  );
   // 还没从云盘下载的笔记先不列，下载后自然出现。
   const entry = (file: string, organized: boolean): InboxEntry[] => {
     const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
     if (!parsed) return [];
     const { data, body } = parsed;
-    const task = bySource.get(basename(file));
-    const goal = task && taskGoal(task, goals);
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
@@ -77,8 +114,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
         date:
           typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
         status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
-        destination: task ? `变成下一步：${task.title}${goal ? `（目标：${goal.title}）` : ""}` : null,
-        ...(task ? { destinationId: task.id, destinationGoalId: goal?.id } : {}),
+        destination: null,
       },
     ];
   };
@@ -94,6 +130,18 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       }
     }
   if (!page) inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  if (inbox.some((entry) => entry.status === "organized")) {
+    const { tasks, goals } = taskDestinations(ws);
+    for (const entry of inbox) {
+      if (entry.status !== "organized") continue;
+      const task = tasks.get(basename(entry.file));
+      if (!task) continue;
+      const goal = taskGoal(task, goals);
+      entry.destination = `变成下一步：${task.title}${goal ? `（目标：${goal.title}）` : ""}`;
+      entry.destinationId = task.id;
+      entry.destinationGoalId = goal?.id;
+    }
+  }
   const records = (types: string[]) => types.flatMap((type) => readRecords(ws, type));
   const health =
     !section || section === "health"
