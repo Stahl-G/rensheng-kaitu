@@ -749,3 +749,33 @@ it("训练扩展：新运动名与爬升、METs、配速、最大心率原样落
   ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });
+
+it("手机采集窗口按另一时区的零点开始时，只写盖满的整天，不把已有整天步数改成半天", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  addRecord(
+    ws,
+    "activity",
+    { ts: "2026-10-14T00:00:00+08:00", date: "2026-10-14", steps: 9000, source: "apple-health" },
+    { by: "import:apple-health" },
+  );
+  const file = join(tmp(), "window.health.json");
+  const step = (start: string, value: number) => ({
+    type: "step_count",
+    start,
+    end: start,
+    value,
+    unit: "count",
+  });
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      // 手机在 +07:00，窗口从手机的 10-14 零点开始，即上海 10-14 01:00。
+      window: { start: "2026-10-14T00:00:00+07:00" },
+      samples: [step("2026-10-14T08:00:00+07:00", 1200), step("2026-10-15T08:00:00+07:00", 3000)],
+    }),
+  );
+  await importHealthShortcut(ws, file);
+  const days = Object.fromEntries(readRecords(ws, "activity").map((row) => [row.date, row.steps]));
+  expect(days).toEqual({ "2026-10-14": 9000, "2026-10-15": 3000 });
+});
