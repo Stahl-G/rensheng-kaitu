@@ -127,8 +127,7 @@ function Overview({
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
-  // 开图默认先看健康，然后是足迹、资讯、方向（2026-10-17 用户决定）。
-  const [explore, setExplore] = useState("health");
+  const [explore, setExplore] = useState("footprints");
   const [data, setData] = useState<OverviewData | null>(null);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
@@ -467,7 +466,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore("health");
+                if (id === "explore") setExplore("footprints");
                 setRecord("");
                 setMenu(false);
               }}
@@ -840,16 +839,16 @@ function Overview({
               <nav className={css.exploreEntries} aria-label={t("开图里的内容", "Explore sections")}>
                 {[
                   {
-                    id: "health",
-                    title: t("健康", "Health"),
-                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
-                    icon: "M3 12h4l3-8 4 16 3-8h4",
-                  },
-                  {
                     id: "footprints",
                     title: t("足迹", "Footprints"),
                     description: t("看看来路，探索下一站", "Trace your journey, explore what is next"),
                     icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
+                  },
+                  {
+                    id: "health",
+                    title: t("健康", "Health"),
+                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
+                    icon: "M3 12h4l3-8 4 16 3-8h4",
                   },
                   {
                     id: "news",
