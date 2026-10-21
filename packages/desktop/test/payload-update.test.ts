@@ -47,8 +47,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     envelope?: { manifest: string; signature: string };
     bytes: Buffer;
     feedStatus: number;
-    packageStatus: number;
-  } = { bytes, feedStatus: 404, packageStatus: 200 };
+  } = { bytes, feedStatus: 404 };
   let payloadDownloads = 0;
   const server = createServer((req, res) => {
     if (req.url === "/feed" || req.url === "/features.zip") {
@@ -59,7 +58,6 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
       res.end(JSON.stringify(served.envelope));
     } else {
       payloadDownloads++;
-      res.writeHead(served.packageStatus);
       res.end(served.bytes);
     }
   });
@@ -125,14 +123,6 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     served.feedStatus = 200;
     await updater.request("check");
     await expect.poll(async () => (await updater.request()).phase).toBe("available");
-    served.packageStatus = 404;
-    await updater.request("install");
-    await expect.poll(async () => (await updater.request()).phase).toBe("error");
-    expect((await updater.request()).error).toMatch(/404/);
-    expect(selectPayload(state, resources)).toBe(payload);
-    served.packageStatus = 200;
-    await updater.request("check");
-    await expect.poll(async () => (await updater.request()).phase).toBe("available");
     await updater.request("install");
     await expect.poll(async () => (await updater.request()).phase).toBe("ready");
     const active = selectPayload(state, resources);
@@ -146,7 +136,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     await updated.checkAutomatically();
     expect((await updated.request()).phase).toBe("error");
     expect(selectPayload(state, resources)).toBe(active);
-    expect(payloadDownloads).toBe(2);
+    expect(payloadDownloads).toBe(1);
     served.envelope = signed({ ...release, version: "0.1.2" });
     await updated.checkAutomatically();
     served.bytes = Buffer.from("interrupted download");

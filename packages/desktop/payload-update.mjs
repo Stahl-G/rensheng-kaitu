@@ -171,12 +171,7 @@ export function createPayloadUpdater({ state, resources, payload, restart }) {
     operation = work()
       .catch((error) => {
         const unavailable = phase === "checking" && error instanceof UpdateHttpError && error.status === 404;
-        const label =
-          phase === "checking"
-            ? "检查更新清单失败"
-            : error instanceof UpdateHttpError
-              ? "更新包下载失败"
-              : "下载或安装更新失败";
+        const label = phase === "checking" ? "检查更新失败" : "下载或安装更新失败";
         status = {
           ...status,
           phase: unavailable ? "unavailable" : "error",
