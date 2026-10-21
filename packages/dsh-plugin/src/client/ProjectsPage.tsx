@@ -6,6 +6,16 @@ import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
 import { useLocale, useT } from "./i18n.js";
 
+const PROJECT_UNITS_EN: Record<string, string> = {
+  字: "words",
+  次提交: "commits",
+  次: "times",
+  版: "versions",
+};
+function unitName(unit: string | undefined, t: ReturnType<typeof useT>) {
+  return t(unit ?? "", PROJECT_UNITS_EN[unit ?? ""] ?? unit ?? "");
+}
+
 function Progress({ project }: { project: DoingProject & { progress?: ProjectGoal | null } }) {
   const t = useT();
   const locale = useLocale();
@@ -17,7 +27,7 @@ function Progress({ project }: { project: DoingProject & { progress?: ProjectGoa
           (completion.basis === "tasks" ? t("待办完成", "Tasks completed") : t("进度", "Progress"))}
         {t("：", ": ")}
         {completion.done.toLocaleString(locale)} / {completion.total.toLocaleString(locale)}{" "}
-        {project.progress?.unit}
+        {unitName(project.progress?.unit, t)}
       </p>
       <progress className={css.progress} value={Math.max(0, completion.done)} max={completion.total} />
     </div>
@@ -241,7 +251,7 @@ function CustomView({ project }: { project: ProjectDetailData }) {
               {project.progress.label}
               {t("：", ": ")}
               {project.progress.current.toLocaleString(locale)} /{" "}
-              {project.progress.target.toLocaleString(locale)} {project.progress.unit}
+              {project.progress.target.toLocaleString(locale)} {unitName(project.progress.unit, t)}
             </p>
             <progress
               className={css.progress}
