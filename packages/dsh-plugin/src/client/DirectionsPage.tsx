@@ -169,7 +169,6 @@ function ClipboardDirections({
   done: (message: string) => Promise<void>;
 }) {
   const t = useT();
-  const label = (value: string) => t(value, DIRECTION_EN[value] ?? value);
   const locale = useLocale();
   const [prompt, setPrompt] = useState("");
   const [answer, setAnswer] = useState("");
@@ -261,6 +260,7 @@ function ClipboardDirections({
 
 export function DirectionsPage(props: DirectionsPageProps) {
   const t = useT();
+  const label = (value: string) => t(value, DIRECTION_EN[value] ?? value);
   const locale = useLocale();
   const stateLabel = (status: Direction["status"]) => (locale === "en" ? statesEn[status] : states[status]);
   const [clipboard, setClipboard] = useState(false);
