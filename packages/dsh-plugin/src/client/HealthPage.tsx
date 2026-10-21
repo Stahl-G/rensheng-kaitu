@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { HealthData, MeGoal } from "../types.js";
 import css from "./HealthPage.module.css";
+import { useLocale, useT } from "./i18n.js";
 
 export interface HealthPageProps {
   loadHealth: () => Promise<HealthData>;
@@ -8,22 +9,23 @@ export interface HealthPageProps {
   onPrompt: (text: string) => void;
 }
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
-const metricNames: Record<string, string> = {
-  weight: "体重",
-  body_fat: "体脂",
-  height: "身高",
-  bp: "血压",
-  glucose: "血糖",
-  waist: "腰围",
-  bmi: "身体质量指数",
-  muscle_mass: "肌肉量",
-};
-const poses = { front: "正面", side: "侧面", back: "背面", other: "其他" };
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
-const amount = (value: number | null, unit: string, estimated = false) =>
-  value === null ? "暂无记录" : `${estimated ? "约 " : ""}${number(value)} ${unit}`;
+const sessions = (n: number) => `${n} ${n === 1 ? "session" : "sessions"}`;
+const reps = (n: number) => `${n} ${n === 1 ? "rep" : "reps"}`;
+const makeAmount =
+  (t: ReturnType<typeof useT>) =>
+  (value: number | null, unit: string, estimated = false) =>
+    value === null
+      ? t("暂无记录", "No records yet")
+      : `${estimated ? t("约 ", "about ") : ""}${number(value)} ${unit}`;
 function Empty({ children }: { children: ReactNode }) {
-  return <p className={css.empty}>暂无记录。{children}</p>;
+  const t = useT();
+  return (
+    <p className={css.empty}>
+      {t("暂无记录。", "No records yet. ")}
+      {children}
+    </p>
+  );
 }
 function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
@@ -50,17 +52,28 @@ function Trend({
   target?: number[] | null;
   line?: boolean;
 }) {
+  const t = useT();
+  const amount = makeAmount(t);
   const values = points.flatMap((p) => (p.value === null ? [] : [p.value]));
   const max = Math.max(...values, ...(target ?? []), 1);
   const min =
     line && values.length ? Math.min(...values) - Math.max((max - Math.min(...values)) * 0.2, 1) : 0;
   const y = (value: number) => 112 - ((value - min) / (max - min || 1)) * 96;
   const x = (i: number) => 18 + (i * 564) / Math.max(points.length - 1, 1);
-  const summary = points.map((p) => `${p.date}：${amount(p.value, unit, p.estimated)}`).join("，");
+  const summary = points
+    .map((p) => `${p.date}${t("：", ": ")}${amount(p.value, unit, p.estimated)}`)
+    .join(t("，", ", "));
   return (
-    <Section title={title} note={target?.length ? `每日目标 ${target.join("–")} ${unit}` : unit}>
+    <Section
+      title={title}
+      note={
+        target?.length
+          ? t(`每日目标 ${target.join("–")} ${unit}`, `Daily goal ${target.join("–")} ${unit}`)
+          : unit
+      }
+    >
       {!values.length ? (
-        <Empty>导入或记下数据后，就能看到趋势。</Empty>
+        <Empty>{t("导入或记下数据后，就能看到趋势。", "Import or log data to see the trend.")}</Empty>
       ) : (
         <>
           <div className={css.scale}>
@@ -77,7 +90,9 @@ function Trend({
                 p.value === null ? null : (
                   <g key={`${p.date}-${i}`}>
                     <title>
-                      {p.date}：{amount(p.value, unit, p.estimated)}
+                      {p.date}
+                      {t("：", ": ")}
+                      {amount(p.value, unit, p.estimated)}
                     </title>
                     {i > 0 && points[i - 1]?.value !== null && (
                       <line x1={x(i - 1)} y1={y(points[i - 1]?.value ?? 0)} x2={x(i)} y2={y(p.value)} />
@@ -96,7 +111,7 @@ function Trend({
                 <div
                   className={css.barSlot}
                   key={p.date}
-                  title={`${p.date}：${amount(p.value, unit, p.estimated)}`}
+                  title={`${p.date}${t("：", ": ")}${amount(p.value, unit, p.estimated)}`}
                 >
                   {p.value === null ? (
                     <span className={css.missing} />
@@ -121,7 +136,7 @@ function Trend({
             ))}
           </div>
           <details className={css.details}>
-            <summary>查看每日数值</summary>
+            <summary>{t("查看每日数值", "View daily values")}</summary>
             <dl>
               {points.map((p, i) => (
                 <div key={`${p.date}-${i}`}>
@@ -140,6 +155,13 @@ function Photo({
   photo,
   load,
 }: { photo: HealthData["photos"][number]; load: HealthPageProps["loadHealthPhoto"] }) {
+  const t = useT();
+  const poses = {
+    front: t("正面", "Front"),
+    side: t("侧面", "Side"),
+    back: t("背面", "Back"),
+    other: t("其他", "Other"),
+  };
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -163,13 +185,19 @@ function Photo({
   return (
     <figure className={css.photo}>
       {url ? (
-        <img src={url} alt={`${photo.date} ${poses[photo.pose]}体态照片`} />
+        <img
+          src={url}
+          alt={t(
+            `${photo.date} ${poses[photo.pose]}体态照片`,
+            `${photo.date} ${poses[photo.pose]} progress photo`,
+          )}
+        />
       ) : error ? (
         <button type="button" onClick={() => setRetry((n) => n + 1)}>
-          照片读取失败，点此重试
+          {t("照片读取失败，点此重试", "Couldn't load photo. Click to retry")}
         </button>
       ) : (
-        <p>正在读取照片…</p>
+        <p>{t("正在读取照片…", "Loading photo…")}</p>
       )}
       <figcaption>
         {poses[photo.pose]}
@@ -187,29 +215,49 @@ function Photos({
   load: HealthPageProps["loadHealthPhoto"];
   onPrompt: HealthPageProps["onPrompt"];
 }) {
+  const t = useT();
+  const poses = {
+    front: t("正面", "Front"),
+    side: t("侧面", "Side"),
+    back: t("背面", "Back"),
+    other: t("其他", "Other"),
+  };
   const dates = [...new Set(photos.map((p) => p.date))];
   const [left, setLeft] = useState(dates.at(-1) ?? "");
   const [right, setRight] = useState(dates.length > 1 ? (dates[0] ?? "") : "");
   return (
-    <Section title="体态照片" note="只读取本机照片">
-      <button type="button" className={css.link} onClick={() => onPrompt("帮我记录今天的体态照片")}>
-        记一次体态照片
+    <Section
+      title={t("体态照片", "Progress photos")}
+      note={t("只读取本机照片", "Only photos stored on this computer")}
+    >
+      <button
+        type="button"
+        className={css.link}
+        onClick={() => onPrompt(t("帮我记录今天的体态照片", "Help me log today’s progress photos"))}
+      >
+        {t("记一次体态照片", "Log a progress photo")}
       </button>
       {!dates.length ? (
-        <Empty>把体态照片交给开图，之后可以按日期对比。</Empty>
+        <Empty>
+          {t("把体态照片交给开图，之后可以按日期对比。", "Add progress photos to compare them by date.")}
+        </Empty>
       ) : (
         <>
-          {dates.length < 2 && <p className={css.empty}>再记录一个日期，就可以并排对比。</p>}
+          {dates.length < 2 && (
+            <p className={css.empty}>
+              {t("再记录一个日期，就可以并排对比。", "Add another date to compare side by side.")}
+            </p>
+          )}
           <div className={css.comparison}>
             {[
-              { value: left, set: setLeft, other: right, label: "左侧日期" },
-              { value: right, set: setRight, other: left, label: "右侧日期" },
+              { value: left, set: setLeft, other: right, label: t("左侧日期", "Left date") },
+              { value: right, set: setRight, other: left, label: t("右侧日期", "Right date") },
             ].map((side) => (
               <div key={side.label}>
                 <label className={css.photoDate}>
                   {side.label}
                   <select value={side.value} onChange={(e) => side.set(e.target.value)}>
-                    <option value="">选择日期</option>
+                    <option value="">{t("选择日期", "Choose a date")}</option>
                     {dates
                       .filter((d) => d !== side.other)
                       .map((d) => (
@@ -233,7 +281,7 @@ function Photos({
                   {photos
                     .filter((p) => p.date === date)
                     .map((p) => poses[p.pose])
-                    .join("、")}
+                    .join(t("、", ", "))}
                 </span>
                 <button
                   type="button"
@@ -241,7 +289,7 @@ function Photos({
                   disabled={date === right}
                   onClick={() => setLeft(date)}
                 >
-                  放左侧
+                  {t("放左侧", "Show on left")}
                 </button>
                 <button
                   type="button"
@@ -249,7 +297,7 @@ function Photos({
                   disabled={date === left}
                   onClick={() => setRight(date)}
                 >
-                  放右侧
+                  {t("放右侧", "Show on right")}
                 </button>
               </div>
             ))}
@@ -260,6 +308,37 @@ function Photos({
   );
 }
 export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPageProps) {
+  const t = useT();
+  const locale = useLocale();
+  const amount = makeAmount(t);
+  const labels: Record<string, string> = {
+    早: "Breakfast",
+    午: "Lunch",
+    晚: "Dinner",
+    加餐: "Snack",
+    腿部: "Legs",
+    胸部: "Chest",
+    背部: "Back",
+    肩部: "Shoulders",
+    手臂: "Arms",
+    核心: "Core",
+    你: "you",
+    "本机 Agent": "Local agent",
+    "Apple 健康导入": "Apple Health import",
+    导入记录: "Imported",
+  };
+  const label = (value: string) =>
+    t(value, labels[value] ?? value.replace(/^云端 Agent · /, "Cloud agent · "));
+  const metricNames: Record<string, string> = {
+    weight: t("体重", "Weight"),
+    body_fat: t("体脂", "Body fat"),
+    height: t("身高", "Height"),
+    bp: t("血压", "Blood pressure"),
+    glucose: t("血糖", "Blood glucose"),
+    waist: t("腰围", "Waist"),
+    bmi: t("身体质量指数", "BMI"),
+    muscle_mass: t("肌肉量", "Muscle mass"),
+  };
   const [data, setData] = useState<HealthData | null>(null);
   const [tab, setTab] = useState("训练");
   const [error, setError] = useState<string | null>(null);
@@ -288,7 +367,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
     }
   };
   const stamp = (ts: string) =>
-    new Intl.DateTimeFormat("zh-CN", {
+    new Intl.DateTimeFormat(locale, {
       timeZone: data?.timeZone,
       month: "2-digit",
       day: "2-digit",
@@ -302,14 +381,14 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
     pattern === "alternate-days" ? [3, 4] : pattern === "daily" ? [7] : pattern === "weekdays" ? [5] : null;
   const ruleText =
     pattern === "alternate-days"
-      ? "隔天一次 · 每周约 3–4 次"
+      ? t("隔天一次 · 每周约 3–4 次", "Every other day · about 3–4 times a week")
       : pattern === "daily"
-        ? "每天一次"
+        ? t("每天一次", "Daily")
         : pattern === "weekdays"
-          ? "工作日训练"
+          ? t("工作日训练", "Weekdays")
           : pattern === "custom"
-            ? "自定安排"
-            : "暂无训练目标";
+            ? t("自定安排", "Custom schedule")
+            : t("暂无训练目标", "No training goal yet");
   const maxReps = Math.max(...(training?.heatmap.map((d) => d.repetitions ?? 0) ?? []), 1);
   const maxMinutes = Math.max(...(training?.heatmap.map((d) => d.minutes ?? 0) ?? []), 1);
   return (
@@ -318,20 +397,24 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
         <div>
           <h1>
             <span aria-hidden="true" />
-            健康
+            {t("健康", "Health")}
           </h1>
-          <p>近 30 天的记录与趋势</p>
+          <p>{t("近 30 天的记录与趋势", "Records and trends over the last 30 days")}</p>
         </div>
         <div className={css.actions}>
-          <button type="button" className={css.button} onClick={() => ask("帮我导入 Apple 健康数据")}>
-            导入 Apple 健康
+          <button
+            type="button"
+            className={css.button}
+            onClick={() => ask(t("帮我导入 Apple 健康数据", "Help me import Apple Health data"))}
+          >
+            {t("导入 Apple 健康", "Import Apple Health")}
           </button>
           <button
             type="button"
             className={`${css.button} ${css.primary}`}
-            onClick={() => ask("记录今天的训练：")}
+            onClick={() => ask(t("记录今天的训练：", "Log today’s workout:"))}
           >
-            记一次训练
+            {t("记一次训练", "Log a workout")}
           </button>
         </div>
       </header>
@@ -339,11 +422,11 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
         <p className={css.notice} role="alert">
           {error}{" "}
           <button type="button" className={css.link} onClick={() => void refresh()}>
-            重新读取
+            {t("重新读取", "Reload")}
           </button>
         </p>
       )}
-      <div className={css.tabs} role="tablist" aria-label="健康分类">
+      <div className={css.tabs} role="tablist" aria-label={t("健康分类", "Health categories")}>
         {tabs.map((name) => (
           <button
             type="button"
@@ -373,12 +456,21 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
             }}
             tabIndex={tab === name ? 0 : -1}
           >
-            {name}
+            {t(
+              name,
+              ["Training", "Meals", "Sleep and activity", "Body measurements", "Progress photos"][
+                tabs.indexOf(name)
+              ] ?? name,
+            )}
           </button>
         ))}
       </div>
       {!data || !training ? (
-        <p className={css.empty}>{error ? "健康数据读取失败，请重试。" : "正在读取健康数据…"}</p>
+        <p className={css.empty}>
+          {error
+            ? t("健康数据读取失败，请重试。", "Couldn't load health data. Try again.")
+            : t("正在读取健康数据…", "Loading health data…")}
+        </p>
       ) : (
         <>
           <div id="health-panel" role="tabpanel" aria-labelledby={`health-tab-${tab}`} className={css.panel}>
@@ -387,30 +479,44 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                 <dl className={css.stats}>
                   {[
                     [
-                      "本周训练",
-                      amount(training.week, "次"),
-                      `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? "已达到本周目标" : `距目标还差 ${(target[0] ?? 0) - training.week} 次`}` : ""}`,
+                      t("本周训练", "Workouts this week"),
+                      amount(training.week, t("次", training.week === 1 ? "session" : "sessions")),
+                      `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? t("已达到本周目标", "Weekly goal reached") : t(`距目标还差 ${(target[0] ?? 0) - training.week} 次`, `${sessions((target[0] ?? 0) - training.week)} to goal`)}` : ""}`,
                     ],
                     [
-                      "本月训练",
-                      amount(training.month, "次"),
+                      t("本月训练", "Workouts this month"),
+                      amount(training.month, t("次", training.month === 1 ? "session" : "sessions")),
                       training.month !== null && training.previousMonth !== null
-                        ? `上月 ${training.previousMonth} 次 · ${training.month === training.previousMonth ? "与上月持平" : `比上月${training.month > training.previousMonth ? "多" : "少"} ${Math.abs(training.month - training.previousMonth)} 次`}`
-                        : "上月或本月暂无记录",
+                        ? t(
+                            `上月 ${training.previousMonth} 次 · ${training.month === training.previousMonth ? "与上月持平" : `比上月${training.month > training.previousMonth ? "多" : "少"} ${Math.abs(training.month - training.previousMonth)} 次`}`,
+                            `Last month: ${training.previousMonth} · ${training.month === training.previousMonth ? "Same as last month" : `${Math.abs(training.month - training.previousMonth)} ${training.month > training.previousMonth ? "more" : "fewer"} ${Math.abs(training.month - training.previousMonth) === 1 ? "session" : "sessions"}`}`,
+                          )
+                        : t("上月或本月暂无记录", "No records for last month or this month"),
                     ],
                     [
-                      "练得最多",
-                      training.topPart?.name ?? "暂无记录",
+                      t("练得最多", "Most trained"),
+                      training.topPart ? label(training.topPart.name) : t("暂无记录", "No records yet"),
                       training.topPart
-                        ? `本月 ${training.topPart.count} 次 · 按动作归类`
-                        : "记录动作后可汇总部位",
+                        ? t(
+                            `本月 ${training.topPart.count} 次 · 按动作归类`,
+                            `${sessions(training.topPart.count)} this month · grouped by exercise`,
+                          )
+                        : t("记录动作后可汇总部位", "Log exercises to see the muscle groups"),
                     ],
                     [
-                      training.lift ? `最大${training.lift.name}` : "最大重量变化",
+                      training.lift
+                        ? t(`最大${training.lift.name}`, `Heaviest ${training.lift.name}`)
+                        : t("最大重量变化", "Change in heaviest lift"),
                       amount(training.lift?.max ?? null, "kg"),
                       training.lift?.change !== null && training.lift?.change !== undefined
-                        ? `比本月首个记录日 ${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg`
-                        : "需要不同日期的力量记录",
+                        ? t(
+                            `比本月首个记录日 ${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg`,
+                            `${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg since the first record this month`,
+                          )
+                        : t(
+                            "需要不同日期的力量记录",
+                            "Log strength sets on two different days to see the change",
+                          ),
                     ],
                   ].map(([label, value, hint]) => (
                     <div className={css.stat} key={label}>
@@ -423,9 +529,15 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                   ))}
                 </dl>
                 <div className={css.trainingDetails}>
-                  <Section title="近 5 周" note="颜色越深，那天练得越多">
+                  <Section
+                    title={t("近 5 周", "Last 5 weeks")}
+                    note={t("颜色越深，那天练得越多", "Darker squares mean more training")}
+                  >
                     <div className={css.heatmap}>
-                      {[..."一二三四五六日"].map((d) => (
+                      {(locale === "en"
+                        ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+                        : [..."一二三四五六日"]
+                      ).map((d) => (
                         <span className={css.weekday} key={d}>
                           {d}
                         </span>
@@ -434,7 +546,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                         const volume = d.repetitions
                           ? d.repetitions / maxReps
                           : (d.minutes ?? 0) / maxMinutes;
-                        const text = `${d.date}：${d.future ? "尚未到来" : d.sessions === null ? "暂无记录" : `${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`}`;
+                        const text = `${d.date}${t("：", ": ")}${d.future ? t("尚未到来", "Upcoming") : d.sessions === null ? t("暂无记录", "No records yet") : t(`${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`, `${sessions(d.sessions)}${d.repetitions ? ` · ${reps(d.repetitions)}` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} min` : ""}`)}`;
                         return (
                           <span
                             className={css.heat}
@@ -448,34 +560,45 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                       })}
                     </div>
                     {!training.heatmap.some((d) => d.sessions !== null) && (
-                      <Empty>记一次训练，就会在这里留下足迹。</Empty>
+                      <Empty>{t("记一次训练，就会在这里留下足迹。", "Log a workout to see it here.")}</Empty>
                     )}
                   </Section>
-                  <Section title="最近的训练" note="近 30 天">
+                  <Section title={t("最近的训练", "Recent workouts")} note={t("近 30 天", "Last 30 days")}>
                     {!training.recent.length ? (
-                      <Empty>点击「记一次训练」，记下动作、组数和重量。</Empty>
+                      <Empty>
+                        {t(
+                          "点击「记一次训练」，记下动作、组数和重量。",
+                          "Choose “Log a workout” to record exercises, sets and weights.",
+                        )}
+                      </Empty>
                     ) : (
                       training.recent.map((session) => (
                         <article className={css.workout} key={session.id}>
                           <time dateTime={session.ts}>{stamp(session.ts)}</time>
                           {session.parts.length > 0 && (
-                            <span className={css.tag}>{session.parts.join("、")}</span>
+                            <span className={css.tag}>{session.parts.map(label).join(t("、", ", "))}</span>
                           )}
                           <div className={css.exercises}>
                             {session.exercises.map((exercise) => (
                               <div key={exercise.id}>
                                 <span>
-                                  {exercise.estimated && "约 "}
+                                  {exercise.estimated && t("约 ", "about ")}
                                   {exercise.name}
                                   {exercise.cardio
-                                    ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? ` · ${number(exercise.duration)} 分钟` : ""}`
+                                    ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? t(` · ${number(exercise.duration)} 分钟`, ` · ${number(exercise.duration)} min`) : ""}`
                                     : ` ${exercise.sets ?? "—"}×${exercise.reps ?? "—"} · ${amount(exercise.weight, "kg")}`}
                                 </span>
-                                <small>记录者：{exercise.recorder}</small>
+                                <small>
+                                  {t("记录者：", "Recorded by: ")}
+                                  {label(exercise.recorder)}
+                                </small>
                               </div>
                             ))}
                           </div>
-                          <span className={css.duration}>时长：{amount(session.duration, "分钟")}</span>
+                          <span className={css.duration}>
+                            {t("时长：", "Duration: ")}
+                            {amount(session.duration, t("分钟", "min"))}
+                          </span>
                         </article>
                       ))
                     )}
@@ -486,32 +609,50 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
             {tab === "饮食" && (
               <>
                 <div className={css.trends}>
-                  <Trend title="近 7 天热量" points={data.nutrition.calories} unit="kcal" />
                   <Trend
-                    title="近 7 天蛋白质"
+                    title={t("近 7 天热量", "Calories over 7 days")}
+                    points={data.nutrition.calories}
+                    unit="kcal"
+                  />
+                  <Trend
+                    title={t("近 7 天蛋白质", "Protein over 7 days")}
                     points={data.nutrition.protein}
                     unit="g"
                     target={data.nutrition.target}
                   />
                 </div>
                 {!data.nutrition.target?.length && (
-                  <p className={css.empty}>暂无蛋白质目标，可在对话中设置每天的目标。</p>
+                  <p className={css.empty}>
+                    {t(
+                      "暂无蛋白质目标，可在对话中设置每天的目标。",
+                      "No protein goal yet. Set a daily goal in Ask.",
+                    )}
+                  </p>
                 )}
-                <Section title="最近餐食" note="近 30 天">
-                  <button type="button" className={css.link} onClick={() => ask("记录今天的饮食：")}>
-                    记一餐
+                <Section title={t("最近餐食", "Recent meals")} note={t("近 30 天", "Last 30 days")}>
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => ask(t("记录今天的饮食：", "Log today’s meals:"))}
+                  >
+                    {t("记一餐", "Log a meal")}
                   </button>
                   {!data.nutrition.meals.length ? (
-                    <Empty>记下吃了什么，开图会帮你整理营养记录。</Empty>
+                    <Empty>
+                      {t(
+                        "记下吃了什么，开图会帮你整理营养记录。",
+                        "Log what you ate to organize your nutrition records.",
+                      )}
+                    </Empty>
                   ) : (
                     data.nutrition.meals.map((meal) => (
                       <article className={css.row} key={meal.id}>
                         <time dateTime={meal.ts}>
-                          {stamp(meal.ts)} · {meal.meal}
+                          {stamp(meal.ts)} · {label(meal.meal)}
                         </time>
                         <span className={css.grow}>{meal.items}</span>
                         <span>
-                          {amount(meal.kcal, "kcal", meal.estimated)} · 蛋白质{" "}
+                          {amount(meal.kcal, "kcal", meal.estimated)} · {t("蛋白质", "Protein")}{" "}
                           {amount(meal.protein, "g", meal.estimated)}
                         </span>
                       </article>
@@ -522,24 +663,44 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
             )}
             {tab === "睡眠与活动" && (
               <div className={css.trends}>
-                <Trend title="近 14 天睡眠" points={data.sleep} unit="小时" />
-                <Trend title="近 14 天步数" points={data.steps} unit="步" />
+                <Trend
+                  title={t("近 14 天睡眠", "Sleep over 14 days")}
+                  points={data.sleep}
+                  unit={t("小时", "hours")}
+                />
+                <Trend
+                  title={t("近 14 天步数", "Steps over 14 days")}
+                  points={data.steps}
+                  unit={t("步", "steps")}
+                />
               </div>
             )}
             {tab === "身体数据" && (
               <>
-                <button type="button" className={css.link} onClick={() => ask("记录今天的身体数据：")}>
-                  记一次测量
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => ask(t("记录今天的身体数据：", "Log today’s measurements:"))}
+                >
+                  {t("记一次测量", "Log a measurement")}
                 </button>
                 {!data.metrics.length ? (
-                  <Empty>记下体重、体脂等测量结果，每项数据会单独展示趋势。</Empty>
+                  <Empty>
+                    {t(
+                      "记下体重、体脂等测量结果，每项数据会单独展示趋势。",
+                      "Log weight, body fat or other measurements to see each trend.",
+                    )}
+                  </Empty>
                 ) : (
                   <div className={css.trends}>
                     {data.metrics.map((metric) => (
                       <div key={metric.key}>
                         {metric.points.some((p) => typeof p.value === "number") ? (
                           <Trend
-                            title={`${metricNames[metric.kind] ?? metric.kind}趋势`}
+                            title={t(
+                              `${metricNames[metric.kind] ?? metric.kind}趋势`,
+                              `${metricNames[metric.kind] ?? metric.kind} trend`,
+                            )}
                             unit={metric.unit}
                             line
                             points={metric.points.map((p) => ({
@@ -549,7 +710,12 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                           />
                         ) : (
                           <div className={css.heading}>
-                            <h2>{metricNames[metric.kind] ?? metric.kind}记录</h2>
+                            <h2>
+                              {t(
+                                `${metricNames[metric.kind] ?? metric.kind}记录`,
+                                `${metricNames[metric.kind] ?? metric.kind} records`,
+                              )}
+                            </h2>
                             <span>{metric.unit}</span>
                           </div>
                         )}
@@ -558,7 +724,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                             <p key={p.id}>
                               <time dateTime={p.ts}>{p.date}</time>
                               <strong>
-                                {p.estimated && "约 "}
+                                {p.estimated && t("约 ", "about ")}
                                 {typeof p.value === "number" ? number(p.value) : p.value} {metric.unit}
                               </strong>
                             </p>
@@ -573,37 +739,45 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
             {tab === "体态照片" && <Photos photos={data.photos} load={loadHealthPhoto} onPrompt={ask} />}
           </div>
           <footer className={css.footer}>
-            <section aria-label="健康目标">
+            <section aria-label={t("健康目标", "Health goals")}>
               <div className={css.heading}>
-                <h2>健康目标</h2>
-                <button type="button" className={css.link} onClick={() => ask("帮我设一个健康目标")}>
-                  新建目标
+                <h2>{t("健康目标", "Health goals")}</h2>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => ask(t("帮我设一个健康目标", "Help me set a health goal"))}
+                >
+                  {t("新建目标", "New goal")}
                 </button>
               </div>
               {!data.goals.length ? (
-                <Empty>和开图聊聊你想达到的健康目标。</Empty>
+                <Empty>
+                  {t("和开图聊聊你想达到的健康目标。", "Tell Kaitu about a health goal you want to reach.")}
+                </Empty>
               ) : (
                 data.goals.map((goal: MeGoal) => (
                   <article className={`${css.card} ${css.goal}`} key={goal.id}>
-                    <h3>目标 · {goal.title}</h3>
+                    <h3>
+                      {t("目标", "Goal")} · {goal.title}
+                    </h3>
                     {(goal.metric || goal.target) && (
                       <p>{[goal.metric, goal.target].filter(Boolean).join(" · ")}</p>
                     )}
                     {goal.approach && (
                       <p>
-                        <span>现在的做法</span>
+                        <span>{t("现在的做法", "Current approach")}</span>
                         {goal.approach}
                       </p>
                     )}
                     {goal.actual && (
                       <p>
-                        <span>实际发生</span>
+                        <span>{t("实际发生", "What happened")}</span>
                         {goal.actual}
                       </p>
                     )}
                     {goal.due && (
                       <p>
-                        <span>下次回看</span>
+                        <span>{t("下次回看", "Next review")}</span>
                         {goal.due}
                       </p>
                     )}
@@ -611,16 +785,21 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                 ))
               )}
             </section>
-            <Section title="健康的下一步">
+            <Section title={t("健康的下一步", "Health next steps")}>
               {!data.next.length ? (
-                <Empty>让开图根据最近的记录帮你安排下一步。</Empty>
+                <Empty>
+                  {t(
+                    "让开图根据最近的记录帮你安排下一步。",
+                    "Ask Kaitu for a next step based on your recent records.",
+                  )}
+                </Empty>
               ) : (
                 data.next.map((item) => (
                   <div className={css.next} key={item.id}>
                     <span aria-hidden="true" />
                     <span>
                       {item.title}
-                      {item.status === "proposed" && <small> · 建议</small>}
+                      {item.status === "proposed" && <small>{t(" · 建议", " · Suggested")}</small>}
                       {item.due && <small> · {item.due}</small>}
                     </span>
                   </div>
