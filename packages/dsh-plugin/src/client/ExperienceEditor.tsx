@@ -20,7 +20,7 @@ export function ExperienceEditor({
   return (
     <form
       className={css.editor}
-      aria-label={t("修正经历", "Correct experience")}
+      aria-label={t("修正经历", "Correct place")}
       aria-busy={busy}
       onSubmit={async (event) => {
         event.preventDefault();
@@ -80,7 +80,7 @@ export function ExperienceEditor({
             {t("事实状态", "Fact status")}
             <select name="fact_status" defaultValue={item.fact_status}>
               <option value="user_reported">{t("我提供的经历", "Shared by me")}</option>
-              <option value="observed">{t("已记录的经历", "Recorded experience")}</option>
+              <option value="observed">{t("已记录的经历", "Recorded place")}</option>
               <option value="inferred">{t("AI 推测", "AI inference")}</option>
               <option value="planned">{t("计划", "Planned")}</option>
               <option value="suggested">{t("建议", "Suggested")}</option>

@@ -96,9 +96,9 @@ export function SourceEvidence({
                 (
                   {
                     "来源链接不完整，请核对来源": "The source link is incomplete. Review its location.",
-                    这条经历尚未附可打开的原文路径: "This experience has no source location to open yet.",
+                    这条经历尚未附可打开的原文路径: "This place has no source location to open yet.",
                     "原文已移动或不在当前工作区，经历仍保留":
-                      "The source moved or is outside this workspace. The experience is kept.",
+                      "The source moved or is outside this workspace. The place is kept.",
                   } as Record<string, string>
                 )[source.reason] ??
                   (/^当前原文没有第 \d+ 行，请核对来源定位$/.test(source.reason)

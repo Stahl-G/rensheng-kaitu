@@ -3,6 +3,8 @@ import type { ExperienceBatchPreview, ExperienceImportsData } from "../types.js"
 import css from "./MapPage.module.css";
 import { useT } from "./i18n.js";
 
+const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
 export function ExperienceBatchItemPreview({ item }: { item: ExperienceBatchPreview["affected"][number] }) {
   const t = useT();
   const eventTypes = {
@@ -151,13 +153,13 @@ export function ExperienceImportControls(
                   <strong>
                     {t(
                       `${data.pending.length} 次导入操作尚未完成`,
-                      `${data.pending.length} imports to finish`,
+                      `${count(data.pending.length, "import", "imports")} to finish`,
                     )}
                   </strong>
                   <p className={css.secondary}>
                     {t(
                       "从上次进度继续，保留已保存的经历。",
-                      "Continue from the last saved step, keeping saved experiences.",
+                      "Continue from the last saved step, keeping saved places.",
                     )}
                   </p>
                   <button
@@ -169,7 +171,7 @@ export function ExperienceImportControls(
                         const result = await props.recoverExperienceImports();
                         return t(
                           `已完成 ${result.recovered} 次导入操作`,
-                          `Completed ${result.recovered} imports`,
+                          `Completed ${count(result.recovered, "import", "imports")}`,
                         );
                       })
                     }
@@ -195,11 +197,11 @@ export function ExperienceImportControls(
                     {source.excluded
                       ? t(
                           "允许从这份资料新增足迹。已隐藏或已撤销的经历仍保留当前状态。",
-                          "Allow new experiences from this source. Hidden or undone experiences keep their current state.",
+                          "Allow new places from this source. Hidden or undone places keep their current state.",
                         )
                       : t(
                           `停止从这份资料新增足迹，包括其他原文定位行。已有 ${source.active} 段经历保留。`,
-                          `Stop adding experiences from all locations in this source. Keep ${source.active} existing experiences.`,
+                          `Stop adding places from all locations in this source. Keep ${source.active} existing places.`,
                         )}
                   </p>
                   <div className={css.actions}>
@@ -212,7 +214,7 @@ export function ExperienceImportControls(
                           await props.setExperienceSource(source.locator, !source.excluded, source.revision);
                           return source.excluded
                             ? t("来源已重新启用", "Source re-enabled")
-                            : t("来源已排除，已有经历保留", "Source excluded; existing experiences kept");
+                            : t("来源已排除，已有经历保留", "Source excluded; existing places kept");
                         })
                       }
                     >
@@ -249,13 +251,13 @@ export function ExperienceImportControls(
                     {preview.operation === "confirm" ? (
                       t(
                         `将确认 ${preview.affected.length} 段经历，保留 ${preview.preserved.length} 段已修改、隐藏、无需确认或城市未解析的资料。`,
-                        `Confirm ${preview.affected.length} experiences; preserve ${preview.preserved.length} edited, hidden, unresolved or other experiences.`,
+                        `Confirm ${count(preview.affected.length, "place", "places")}; preserve ${preview.preserved.length} edited, hidden, unresolved or other places.`,
                       )
                     ) : (
                       <>
                         {t(
                           `${preview.operation === "undo" ? "将隐藏" : "将恢复"} ${preview.affected.length} 段经历，保留 ${preview.preserved.length} 段后续已修改的资料或隐藏状态。`,
-                          `${preview.operation === "undo" ? "Hide" : "Restore"} ${preview.affected.length} experiences; preserve ${preview.preserved.length} later edits or hidden states.`,
+                          `${preview.operation === "undo" ? "Hide" : "Restore"} ${count(preview.affected.length, "place", "places")}; preserve ${preview.preserved.length} later edits or hidden states.`,
                         )}
                       </>
                     )}
@@ -303,17 +305,17 @@ export function ExperienceImportControls(
                           return preview.operation === "confirm"
                             ? t(
                                 `已确认 ${result.affected} 段经历，保留 ${result.preserved} 段其他资料`,
-                                `Confirmed ${result.affected} experiences; preserved ${result.preserved} others`,
+                                `Confirmed ${count(result.affected, "place", "places")}; preserved ${result.preserved} others`,
                               )
                             : t(
                                 `已${preview.operation === "undo" ? "撤销" : "恢复"} ${result.affected} 段经历，保留 ${result.preserved} 段后续资料`,
-                                `${preview.operation === "undo" ? "Undid" : "Restored"} ${result.affected} experiences; preserved ${result.preserved} later records`,
+                                `${preview.operation === "undo" ? "Undid" : "Restored"} ${count(result.affected, "place", "places")}; preserved ${result.preserved} later records`,
                               );
                         })
                       }
                     >
                       {preview.operation === "confirm"
-                        ? t("确认这批经历", "Confirm experiences")
+                        ? t("确认这批经历", "Confirm places")
                         : preview.operation === "undo"
                           ? t("确认撤销导入", "Confirm undo")
                           : t("确认恢复导入", "Confirm restore")}
@@ -344,7 +346,7 @@ export function ExperienceImportControls(
                         <p className={css.secondary}>
                           {t(
                             `${batch.confirmable} 段经历待确认`,
-                            `${batch.confirmable} experiences to confirm`,
+                            `${count(batch.confirmable, "place", "places")} to confirm`,
                           )}
                         </p>
                         <button
@@ -408,7 +410,7 @@ export function ExperienceImportControls(
                 <p className={css.secondary}>
                   {t(
                     "还没有可撤销的导入批次。已有经历可单独修正或隐藏。",
-                    "No import batches to undo yet. Correct or hide individual experiences as needed.",
+                    "No import batches to undo yet. Correct or hide individual places as needed.",
                   )}
                 </p>
               )}
@@ -420,13 +422,13 @@ export function ExperienceImportControls(
                 >
                   <strong>
                     {batch.ts.slice(0, 16).replace("T", " ")} ·{" "}
-                    {t(`${batch.added} 段经历`, `${batch.added} experiences`)}
+                    {t(`${batch.added} 段经历`, `${count(batch.added, "place", "places")}`)}
                   </strong>
                   <p className={css.secondary}>
                     {batch.state === "undone" ? t("已撤销", "Undone") : t("已导入", "Imported")} ·{" "}
                     {t(
                       `${batch.duplicates} 段重复 · ${batch.excluded} 段来源已排除`,
-                      `${batch.duplicates} duplicates · ${batch.excluded} from excluded sources`,
+                      `${count(batch.duplicates, "duplicate", "duplicates")} · ${batch.excluded} from excluded sources`,
                     )}
                   </p>
                   <p className={css.source}>{batch.sources.map(sourceName).join(t("、", ", "))}</p>

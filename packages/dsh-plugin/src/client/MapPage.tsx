@@ -77,10 +77,10 @@ const MAP_EN: Record<string, string> = {
   计划: "Planned",
   建议: "Suggested",
   暂无记录: "No records yet",
-  修正经历: "Correct experience",
+  修正经历: "Correct place",
   隐藏: "Hide",
   "隐藏这段经历？之后可撤销，旧来源同步不会重新添加。":
-    "Hide this experience? You can undo this later. Syncing the original source will keep it hidden.",
+    "Hide this place? You can undo this later. Syncing the original source will keep it hidden.",
   "隐藏中…": "Hiding…",
   确认隐藏: "Confirm hide",
   保留: "Keep",
@@ -94,9 +94,9 @@ const MAP_EN: Record<string, string> = {
   从记忆生成: "Build from memories",
   重新读取: "Reload",
   撤销隐藏: "Undo hide",
-  恢复这段经历: "Restore experience",
-  "经历读取失败，请重试。": "Couldn’t load experiences. Try again.",
-  "正在读取经历…": "Loading experiences…",
+  恢复这段经历: "Restore place",
+  "经历读取失败，请重试。": "Couldn’t load places. Try again.",
+  "正在读取经历…": "Loading places…",
   "地图工具 · 图层与时间": "Map tools · Layers and dates",
   经历连线: "Experience routes",
   地图图层: "Map layers",
@@ -129,9 +129,9 @@ const MAP_EN: Record<string, string> = {
   生活的章节: "Chapters of life",
   人生起点: "Starting point",
   查看家乡依据: "View hometown source",
-  隐藏经历连线: "Hide experience routes",
-  显示经历连线: "Show experience routes",
-  "城市级位置 · 连线表示经历顺序": "City-level locations · Lines show experience order",
+  隐藏经历连线: "Hide place routes",
+  显示经历连线: "Show place routes",
+  "城市级位置 · 连线表示经历顺序": "City-level locations · Lines follow the order of places",
 };
 const cityId = cityKey;
 function dateLabel(value: string | undefined, precision: Experience["time_precision"], locale: Locale) {
@@ -255,7 +255,7 @@ function ExperienceDetails({
           onPrompt(
             t(
               `帮我核对并修改「${item.place.name}」的这段经历（${item.id}），先和我确认地点、时间和分类`,
-              `Help me review this experience in ${item.place.name} (${item.id}). Confirm its place, dates and category with me before editing.`,
+              `Help me review this place in ${item.place.name} (${item.id}). Confirm its place, dates and category with me before editing.`,
             ),
           )
         }
@@ -489,7 +489,7 @@ export function MapPage({
                 ? label("家乡 · 人生地图的起点")
                 : t(
                     `${city.place.country || "暂无记录"} · ${city.experiences.length} 段经历`,
-                    `${city.place.country || "Unknown country"} · ${city.experiences.length} ${city.experiences.length === 1 ? "experience" : "experiences"}`,
+                    `${city.place.country || "Unknown country"} · ${city.experiences.length} ${city.experiences.length === 1 ? "place" : "places"}`,
                   )}
             </p>
           </div>
@@ -529,7 +529,7 @@ export function MapPage({
           <button type="button" className={css.link} onClick={() => setDetailLimit((value) => value + 30)}>
             {t(
               `更多经历（${city.experiences.length - detailLimit}）`,
-              `More experiences (${city.experiences.length - detailLimit})`,
+              `More places (${city.experiences.length - detailLimit})`,
             )}
           </button>
         )}
@@ -598,7 +598,7 @@ export function MapPage({
       {!!data?.hidden.length && (
         <details className={css.review}>
           <summary>
-            {t(`已隐藏 ${data.hidden.length} 段经历`, `Hidden experiences · ${data.hidden.length}`)}
+            {t(`已隐藏 ${data.hidden.length} 段经历`, `Hidden places · ${data.hidden.length}`)}
           </summary>
           {data.hidden.map(({ item, revision }) => (
             <div key={item.id} className={css.reviewItem}>
@@ -833,7 +833,10 @@ export function MapPage({
               {!!data.review.length && (
                 <details className={css.review}>
                   <summary>
-                    {t(`${data.review.length} 段经历待核对`, `${data.review.length} experiences to review`)}{" "}
+                    {t(
+                      `${data.review.length} 段经历待核对`,
+                      `${data.review.length} ${data.review.length === 1 ? "place" : "places"} to review`,
+                    )}{" "}
                     <span aria-hidden="true">⌄</span>
                   </summary>
                   {data.review.map((item) => (
@@ -906,7 +909,7 @@ export function MapPage({
                         ? label("⌂ 家乡 · 起点")
                         : t(
                             `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
-                            `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "experience" : "experiences"}`,
+                            `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
                           )}
                     </span>
                   </span>
