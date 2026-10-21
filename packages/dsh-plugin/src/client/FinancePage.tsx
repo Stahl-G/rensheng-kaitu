@@ -11,7 +11,7 @@ import type {
   FinanceRemoteViewOptions,
 } from "../types.js";
 import css from "./FinancePage.module.css";
-import { useT } from "./i18n.js";
+import { useLocale, useT } from "./i18n.js";
 
 export interface FinancePageProps {
   loadFinanceOverview: (options?: FinanceRemoteViewOptions) => Promise<FinanceOverviewData>;
@@ -123,24 +123,184 @@ const reasons: Record<string, string> = {
   transfer_counterpart_missing_or_ambiguous: "转账另一方缺失或有多个匹配",
   refund_original_missing_or_ambiguous: "退款原交易缺失、有多个匹配或累计退款超出原额",
 };
-function decimal(value: string | null | undefined) {
-  if (value == null) return "暂无记录";
-  const [integer = "", fraction] = value.split(".");
-  return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction === undefined ? "" : `.${fraction}`);
-}
-function money(value: string | null | undefined, currency?: string | null) {
-  return value == null
-    ? "暂无记录"
-    : `${decimal(value)} ${currency && currency !== "unknown" ? currency : "（币种未知）"}`;
-}
-function reason(value: string | null, fallback: string) {
-  if (!value) return fallback;
-  return value
-    .split(",")
-    .map(
-      (r) => reasons[r] ?? (r.startsWith("unreconciled:") ? "存在待核对交易" : /[_:]/.test(r) ? fallback : r),
-    )
-    .join("、");
+const FINANCE_EN: Record<string, string> = {
+  总览: "Overview",
+  收支: "Cash flow",
+  投资: "Investments",
+  账户: "Accounts",
+  现金: "Cash",
+  投资资产: "Invested assets",
+  负债: "Liabilities",
+  总资产: "Total assets",
+  净资产: "Net assets",
+  银行: "Bank",
+  电子钱包: "Wallet",
+  证券: "Securities",
+  信用: "Credit",
+  借贷: "Loans",
+  收入: "Income",
+  日常消费: "Everyday spending",
+  消费: "Spending",
+  结余: "Surplus",
+  利息: "Interest",
+  转账: "Transfer",
+  证券买入: "Security purchase",
+  证券卖出本金: "Sale principal",
+  投资本金: "Investment principal",
+  已实现收益: "Realized gains",
+  未实现收益: "Unrealized gains",
+  分红: "Dividends",
+  税费: "Taxes",
+  手续费: "Fees",
+  退款冲减: "Refund offset",
+  借入本金: "Borrowed principal",
+  偿还本金: "Loan principal repayment",
+  支付宝: "Alipay",
+  持仓表: "Holdings table",
+  微信: "WeChat",
+  招商银行: "China Merchants Bank",
+  工商银行: "ICBC",
+  建设银行: "CCB",
+  中国银行: "Bank of China",
+  京东: "JD",
+  美团: "Meituan",
+  华西证券: "Huaxi Securities",
+  "海通证券 / 同花顺成交": "Haitong Securities / Tonghuashun trades",
+  银行卡尾号: "Last four card digits",
+  支付方式: "Payment method",
+  日期: "Date",
+  收支方向: "Direction",
+  金额: "Amount",
+  交易状态: "Transaction status",
+  币种: "Currency",
+  类别: "Category",
+  对手方: "Counterparty",
+  说明: "Description",
+  交易单号: "Transaction ID",
+  原交易单号: "Original transaction ID",
+  证券代码: "Security code",
+  证券名称: "Security name",
+  数量: "Quantity",
+  单位成本: "Unit cost",
+  市价: "Price",
+  市值: "Market value",
+  交易分类: "Classification",
+  "银行动账通知，等待账单核对": "Bank notification awaiting statement review",
+  缺少汇率: "Exchange rate missing",
+  币种缺失: "Currency missing",
+  缺少余额基准: "Balance baseline missing",
+  缺少持仓估值: "Holding valuation missing",
+  缺少成本或数量: "Cost or quantity missing",
+  缺少卖出证券的成本: "Cost of sold securities missing",
+  退款尚未关联原消费: "Refund not linked to its purchase",
+  暂无已实现收益记录: "No realized gains yet",
+  暂无分红记录: "No dividends yet",
+  暂无手续费记录: "No fees yet",
+  暂无税费记录: "No taxes yet",
+  疑似重复记录: "Possible duplicate",
+  转账另一方缺失或有多个匹配: "Transfer counterpart missing or ambiguous",
+  "退款原交易缺失、有多个匹配或累计退款超出原额": "Refund purchase missing, ambiguous or exceeded",
+  存在待核对交易: "Transactions need review",
+  暂无记录: "No records yet",
+  "（币种未知）": "(currency unknown)",
+  币种未知: "Currency unknown",
+  资料不完整: "Incomplete data",
+  查看组成记录: "View contributing records",
+  " · 查看记录": " · View records",
+  导入一份账单开始: "Start by importing a statement",
+  导入账单: "Import statement",
+  "先预览，再确认写入": "Preview before confirming import",
+  "请选择不超过 36MB 的 CSV、XML、XLS 或 XLSX 文件。": "Choose a CSV, XML, XLS or XLSX file up to 36 MB.",
+  导入到账户: "Import into account",
+  新建账户: "New account",
+  账户名: "Account name",
+  更新预览: "Update preview",
+  表格选项: "Table options",
+  "银行卡尾号（账单未提供时）": "Last four card digits (if absent from the statement)",
+  "成交日（成交表缺少日期时填写）": "Trade date (if absent from the trade table)",
+  "工作表名称（多张账单时填写）": "Sheet name (for workbooks with multiple sheets)",
+  选择账单或持仓文件: "Choose a statement or holdings file",
+  查看列映射: "View column mapping",
+  其他字段: "Other field",
+  忽略: "Ignore",
+  新增: "New",
+  已存在: "Already imported",
+  疑似重复: "Possible duplicate",
+  待核对: "Needs review",
+  行号: "Row",
+  "对手方 / 证券": "Counterparty / security",
+  "原币金额 / 持仓": "Original amount / holding",
+  暂无成本: "Cost missing",
+  "问题行 · 请修正文件后重新选择": "Rows to fix · Correct the file and choose it again",
+  重新选文件: "Choose another file",
+  确认导入: "Confirm import",
+  放弃: "Cancel",
+  "刷新中…": "Refreshing…",
+  刷新: "Refresh",
+  重新读取: "Reload",
+  财务视图: "Finance views",
+  "财务读取失败，请重新读取。": "Couldn’t load finance records. Try again.",
+  "正在读取财务记录…": "Loading finance records…",
+  回到对话核对: "Review in Ask",
+  折算为: "Convert to",
+  收支期间: "Cash flow period",
+  本月: "This month",
+  上月: "Last month",
+  "近 3 个月": "Last 3 months",
+  "正在读取所选期间…": "Loading this period…",
+  "所选期间读取失败，请重新读取。": "Couldn’t load this period. Try again.",
+  按类别的消费: "Spending by category",
+  其他消费: "Other spending",
+  暂无消费记录: "No spending yet",
+  不计入收支: "Excluded from cash flow",
+  其他: "Other",
+  "暂无转账、卖出本金、借款本金或退款冲减记录":
+    "No transfers, sale principal, loan principal or refund offsets yet",
+  持仓: "Holdings",
+  暂无持仓记录: "No holdings yet",
+  "代码 / 名称": "Code / name",
+  成本: "Cost",
+  浮动收益: "Unrealized gain",
+  暂无代码: "Code missing",
+  暂无名称: "Name missing",
+  没有行情: "No quote",
+  "刷新失败，保留上次参考价": "Refresh failed; showing the last reference price",
+  查看余额记录: "View balance records",
+  " · 查看交易": " · View transactions",
+  余额未知: "Balance unknown",
+  已导入: "Imported",
+  尚未导入: "Not imported yet",
+  需要核对交易: "Transaction needs review",
+};
+function useFinanceText() {
+  const t = useT();
+  const label = (value: string) => t(value, FINANCE_EN[value] ?? value);
+  function decimal(value: string | null | undefined) {
+    if (value == null) return label("暂无记录");
+    const [integer = "", fraction] = value.split(".");
+    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (fraction === undefined ? "" : `.${fraction}`);
+  }
+  function money(value: string | null | undefined, currency?: string | null) {
+    return value == null
+      ? label("暂无记录")
+      : `${decimal(value)} ${currency && currency !== "unknown" ? currency : label("（币种未知）")}`;
+  }
+  function reason(value: string | null, fallback: string) {
+    if (!value) return label(fallback);
+    return value
+      .split(",")
+      .map((r) =>
+        reasons[r]
+          ? label(reasons[r] ?? "")
+          : r.startsWith("unreconciled:")
+            ? label("存在待核对交易")
+            : /[_:]/.test(r)
+              ? label(fallback)
+              : r,
+      )
+      .join(t("、", ", "));
+  }
+  return { t, label, decimal, money, reason };
 }
 function dateRange(today: string, period: string) {
   const [year = 0, month = 1] = today.split("-").map(Number);
@@ -155,6 +315,7 @@ function Records({
   records,
   stamp,
 }: { ids: string[]; records: Ledger; stamp: (value: string) => string }) {
+  const { label, money } = useFinanceText();
   const selected = new Set(ids);
   const rows = records.filter((r) => selected.has(r.id));
   return rows.length ? (
@@ -168,7 +329,7 @@ function Records({
       ))}
     </ul>
   ) : (
-    <p className={css.empty}>暂无记录</p>
+    <p className={css.empty}>{label("暂无记录")}</p>
   );
 }
 function NumberDetail({
@@ -186,14 +347,15 @@ function NumberDetail({
   stamp: (value: string) => string;
   note?: string;
 }) {
+  const { t, label: text, money, reason } = useFinanceText();
   return (
     <details className={css.metric}>
-      <summary aria-label={`${label}，展开记录`}>
+      <summary aria-label={t(`${label}，展开记录`, `${label}, show records`)}>
         <span className={css.muted}>{label}</span>
         <strong>{money(metric.record_ids.length ? metric.amount : null, currency)}</strong>
         {note && <small>{note}</small>}
         {!!metric.missing.length && <small>{reason(metric.missing.join(","), "资料不完整")}</small>}
-        <span className={css.link}>查看组成记录</span>
+        <span className={css.link}>{text("查看组成记录")}</span>
       </summary>
       <Records ids={metric.record_ids} records={records} stamp={stamp} />
     </details>
@@ -204,13 +366,17 @@ function Converted({
   records,
   stamp,
 }: { value: Conversion; records: Ledger; stamp: (value: string) => string }) {
+  const { t, label, money, decimal, reason } = useFinanceText();
   return (
     <div className={css.conversion}>
       <details>
         <summary>
-          折算合计{!value.complete && "（部分）"}：
+          {t(
+            `折算合计${!value.complete ? "（部分）" : ""}：`,
+            `Converted total${!value.complete ? " (partial)" : ""}: `,
+          )}
           <strong>{money(value.record_ids.length ? value.amount : null, value.currency)}</strong>
-          <span className={css.link}> · 查看记录</span>
+          <span className={css.link}>{label(" · 查看记录")}</span>
         </summary>
         <Records ids={value.record_ids} records={records} stamp={stamp} />
       </details>
@@ -222,7 +388,9 @@ function Converted({
       ))}
       {!!value.excluded.length && (
         <details className={css.excluded}>
-          <summary>未计入合计 · {value.excluded.length} 项</summary>
+          <summary>
+            {t(`未计入合计 · ${value.excluded.length} 项`, `Excluded · ${value.excluded.length}`)}
+          </summary>
           {value.excluded.map((r, i) => (
             <div key={`${r.currency}-${i}`}>
               <p>
@@ -248,11 +416,12 @@ function Section({ title, children, note }: { title: string; children: ReactNode
   );
 }
 function Empty({ onImport }: { onImport: () => void }) {
+  const { label } = useFinanceText();
   return (
     <div className={css.empty}>
-      <p>导入一份账单开始</p>
+      <p>{label("导入一份账单开始")}</p>
       <button type="button" className={css.button} onClick={onImport}>
-        导入账单
+        {label("导入账单")}
       </button>
     </div>
   );
@@ -274,6 +443,7 @@ function ImportPanel({
   onImported: (result: FinanceImportCommitData) => void;
   stamp: (value: string) => string;
 }) {
+  const { t, label, money, decimal } = useFinanceText();
   const [account, setAccount] = useState("");
   const [accountName, setAccountName] = useState("");
   const selectedFile = useRef<File>();
@@ -296,7 +466,7 @@ function ImportPanel({
   const upload = async (file?: File, target?: string, name?: string) => {
     if (!file) return;
     if (file.size > 36 * 1024 * 1024 || !/\.(csv|xml|xls|xlsx)$/i.test(file.name)) {
-      setError("请选择不超过 36MB 的 CSV、XML、XLS 或 XLSX 文件。");
+      setError(label("请选择不超过 36MB 的 CSV、XML、XLS 或 XLSX 文件。"));
       return;
     }
     setBusy(true);
@@ -376,7 +546,7 @@ function ImportPanel({
   };
   const p = preview?.preview;
   return (
-    <Section title="导入账单" note="先预览，再确认写入">
+    <Section title={label("导入账单")} note={label("先预览，再确认写入")}>
       {error && (
         <p role="alert" className={css.notice}>
           {error}
@@ -386,7 +556,7 @@ function ImportPanel({
         <div className={css.importFields}>
           {preview && (
             <label>
-              导入到账户
+              {label("导入到账户")}
               <select
                 value={account}
                 disabled={busy}
@@ -397,7 +567,7 @@ function ImportPanel({
                   else setAccountName("");
                 }}
               >
-                <option value="">新建账户</option>
+                <option value="">{label("新建账户")}</option>
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.name} · {a.currency}
@@ -408,7 +578,7 @@ function ImportPanel({
           )}
           {preview && !account && (
             <label>
-              账户名
+              {label("账户名")}
               <input value={accountName} disabled={busy} onChange={(e) => setAccountName(e.target.value)} />
               {accountName.trim() && accountName.trim() !== preview.preview.suggestedAccount.name && (
                 <button
@@ -417,7 +587,7 @@ function ImportPanel({
                   disabled={busy}
                   onClick={() => void upload(selectedFile.current, "", accountName)}
                 >
-                  更新预览
+                  {label("更新预览")}
                 </button>
               )}
             </label>
@@ -425,9 +595,9 @@ function ImportPanel({
           {!preview && (
             <>
               <details>
-                <summary>表格选项</summary>
+                <summary>{label("表格选项")}</summary>
                 <label>
-                  银行卡尾号（账单未提供时）
+                  {label("银行卡尾号（账单未提供时）")}
                   <input
                     inputMode="numeric"
                     maxLength={4}
@@ -437,7 +607,7 @@ function ImportPanel({
                   />
                 </label>
                 <label>
-                  成交日（成交表缺少日期时填写）
+                  {label("成交日（成交表缺少日期时填写）")}
                   <input
                     type="date"
                     value={tradeDate}
@@ -446,7 +616,7 @@ function ImportPanel({
                   />
                 </label>
                 <label>
-                  工作表名称（多张账单时填写）
+                  {label("工作表名称（多张账单时填写）")}
                   <input
                     value={sheet}
                     disabled={busy || !!preview}
@@ -455,7 +625,7 @@ function ImportPanel({
                 </label>
               </details>
               <label>
-                选择账单或持仓文件
+                {label("选择账单或持仓文件")}
                 <input
                   type="file"
                   accept=".csv,.xml,.xls,.xlsx"
@@ -470,24 +640,31 @@ function ImportPanel({
           )}
         </div>
 
-        {busy && <output className={css.muted}>{preview ? "正在处理…" : "正在读取文件并生成预览…"}</output>}
+        {busy && (
+          <output className={css.muted}>
+            {preview
+              ? t("正在处理…", "Processing…")
+              : t("正在读取文件并生成预览…", "Reading the file and preparing a preview…")}
+          </output>
+        )}
         {p && (
           <div className={css.preview}>
             <p>
-              {importSourceNames[p.format] ?? p.format} · {p.encoding.toUpperCase()}
+              {label(importSourceNames[p.format] ?? p.format)} · {p.encoding.toUpperCase()}
             </p>
             <p className={css.muted}>
-              期间：{p.period.from ? stamp(p.period.from) : "暂无记录"} –{" "}
-              {p.period.to ? stamp(p.period.to) : "暂无记录"} · 币种：
-              {p.currencies.map((c) => c ?? "未知").join("、") || "暂无记录"}
+              {t("期间：", "Period: ")}
+              {p.period.from ? stamp(p.period.from) : label("暂无记录")} –{" "}
+              {p.period.to ? stamp(p.period.to) : label("暂无记录")} · {t("币种：", "Currencies: ")}
+              {p.currencies.map((c) => c ?? t("未知", "Unknown")).join(t("、", ", ")) || label("暂无记录")}
             </p>
             <details>
-              <summary className={css.link}>查看列映射</summary>
+              <summary className={css.link}>{label("查看列映射")}</summary>
               <dl className={css.mapping}>
                 {Object.entries(p.mapping).map(([field, column]) => (
                   <div key={field}>
-                    <dt>{fields[field] ?? "其他字段"}</dt>
-                    <dd>{column ?? "忽略"}</dd>
+                    <dt>{label(fields[field] ?? "其他字段")}</dt>
+                    <dd>{column ?? label("忽略")}</dd>
                   </div>
                 ))}
               </dl>
@@ -498,45 +675,62 @@ function ImportPanel({
                 ["已存在", p.skipped],
                 ["疑似重复", p.candidate_duplicate],
                 ["待核对", p.pending_review],
-              ].map(([label, count]) => (
-                <span key={label}>
-                  <strong>{count}</strong> {label}
+              ].map(([title, count]) => (
+                <span key={title}>
+                  <strong>{count}</strong> {label(String(title))}
                 </span>
               ))}
             </div>
-            {!!p.ignored && <p className={css.muted}>另跳过 {p.ignored} 行关闭交易或说明。</p>}
-            <h3>前 {p.rows.length} 行</h3>
+            {!!p.ignored && (
+              <p className={css.muted}>
+                {t(
+                  `另跳过 ${p.ignored} 行关闭交易或说明。`,
+                  `Skipped ${p.ignored} closed transaction or description rows.`,
+                )}
+              </p>
+            )}
+            <h3>{t(`前 ${p.rows.length} 行`, `First ${p.rows.length} rows`)}</h3>
             <table className={css.table}>
               <thead>
                 <tr>
-                  {["行号", "日期", "对手方 / 证券", "原币金额 / 持仓", "说明"].map((label) => (
-                    <th key={label}>{label}</th>
+                  {["行号", "日期", "对手方 / 证券", "原币金额 / 持仓", "说明"].map((title) => (
+                    <th key={title}>{label(title ?? "")}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {p.rows.map((r) => (
                   <tr key={r.line}>
-                    <td data-label="行号">{r.line}</td>
-                    <td data-label="日期">{stamp(r.ts)}</td>
-                    <td data-label="对手方 / 证券">
-                      {[r.counterparty, r.security_code, r.name].filter(Boolean).join(" · ") || "暂无记录"}
+                    <td data-label={label("行号")}>{r.line}</td>
+                    <td data-label={label("日期")}>{stamp(r.ts)}</td>
+                    <td data-label={label("对手方 / 证券")}>
+                      {[r.counterparty, r.security_code, r.name].filter(Boolean).join(" · ") ||
+                        label("暂无记录")}
                     </td>
-                    <td data-label="原币金额 / 持仓">
+                    <td data-label={label("原币金额 / 持仓")}>
                       {r.amount !== null ? (
                         money(r.amount, r.currency)
                       ) : (
                         <>
-                          <span>数量 {decimal(r.quantity)}</span>
+                          <span>
+                            {label("数量")} {decimal(r.quantity)}
+                          </span>
                           <br />
-                          <span>单位成本 {r.cost === null ? "暂无成本" : money(r.cost, r.currency)}</span>
+                          <span>
+                            {label("单位成本")}{" "}
+                            {r.cost === null ? label("暂无成本") : money(r.cost, r.currency)}
+                          </span>
                           <br />
-                          <span>市值 {money(r.market_value, r.currency)}</span>
+                          <span>
+                            {label("市值")} {money(r.market_value, r.currency)}
+                          </span>
                         </>
                       )}
                     </td>
-                    <td data-label="说明">
-                      {r.description ?? (r.category ? categories[r.category] : null) ?? "暂无记录"}
+                    <td data-label={label("说明")}>
+                      {r.description ??
+                        (r.category ? label(categories[r.category] ?? r.category) : null) ??
+                        label("暂无记录")}
                     </td>
                   </tr>
                 ))}
@@ -544,11 +738,12 @@ function ImportPanel({
             </table>
             {!!p.errors.length && (
               <div role="alert" className={css.notice}>
-                <h3>问题行 · 请修正文件后重新选择</h3>
+                <h3>{label("问题行 · 请修正文件后重新选择")}</h3>
                 <ul>
                   {p.errors.map((r, i) => (
                     <li key={`${r.line}-${i}`}>
-                      第 {r.line} 行：{r.reason}
+                      {t(`第 ${r.line} 行：`, `Row ${r.line}: `)}
+                      {r.reason}
                     </li>
                   ))}
                 </ul>
@@ -560,7 +755,7 @@ function ImportPanel({
       <div className={css.actions}>
         {preview && (
           <button type="button" className={css.button} disabled={busy} onClick={() => void discard(false)}>
-            重新选文件
+            {label("重新选文件")}
           </button>
         )}
         {preview && (
@@ -576,11 +771,11 @@ function ImportPanel({
             }
             onClick={() => void commit()}
           >
-            确认导入
+            {label("确认导入")}
           </button>
         )}
         <button type="button" className={css.button} disabled={busy} onClick={() => void discard()}>
-          放弃
+          {label("放弃")}
         </button>
       </div>
     </Section>
@@ -588,7 +783,8 @@ function ImportPanel({
 }
 
 export function FinancePage(props: FinancePageProps & { initialImport?: boolean }) {
-  const t = useT();
+  const { t, label, money, decimal, reason } = useFinanceText();
+  const locale = useLocale();
   const {
     loadFinanceOverview,
     loadFinanceCashflow,
@@ -652,7 +848,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   }, [refresh]);
   const stamp = (value: string) => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-    return new Intl.DateTimeFormat("zh-CN", {
+    return new Intl.DateTimeFormat(locale, {
       timeZone,
       year: "numeric",
       month: "2-digit",
@@ -692,7 +888,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
         </p>
         <div className={css.actions}>
           <button type="button" className={css.button} disabled={loading} onClick={() => void refresh()}>
-            {loading ? "刷新中…" : "刷新"}
+            {loading ? label("刷新中…") : label("刷新")}
           </button>
           <button
             type="button"
@@ -700,7 +896,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
             onClick={openImport}
             disabled={importing || !data}
           >
-            导入账单
+            {label("导入账单")}
           </button>
         </div>
       </header>
@@ -708,7 +904,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
         <p className={css.notice} role="alert">
           {error}{" "}
           <button type="button" className={css.link} onClick={() => void refresh()}>
-            重新读取
+            {label("重新读取")}
           </button>
         </p>
       )}
@@ -721,26 +917,38 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
           onClose={() => setImporting(false)}
           onImported={(result) => {
             setImporting(false);
-            setMessage(`已导入 ${result.added} 条，已存在 ${result.skipped} 条。`);
+            setMessage(
+              t(
+                `已导入 ${result.added} 条，已存在 ${result.skipped} 条。`,
+                `Imported ${result.added}; already present ${result.skipped}.`,
+              ),
+            );
             void refresh();
           }}
         />
       )}
-      <nav className={css.tabs} aria-label="财务视图">
-        {tabs.map((label, i) => (
-          <button type="button" key={label} aria-pressed={tab === i} onClick={() => setTab(i)}>
-            {label}
+      <nav className={css.tabs} aria-label={label("财务视图")}>
+        {tabs.map((title, i) => (
+          <button type="button" key={title} aria-pressed={tab === i} onClick={() => setTab(i)}>
+            {label(title ?? "")}
           </button>
         ))}
       </nav>
       {!data ? (
-        <p className={css.empty}>{error ? "财务读取失败，请重新读取。" : "正在读取财务记录…"}</p>
+        <p className={css.empty}>
+          {error ? label("财务读取失败，请重新读取。") : label("正在读取财务记录…")}
+        </p>
       ) : (
         <>
           {tab === 0 && (
             <>
               {!!data.overview.pending.length && (
-                <Section title={`${data.overview.pending.length} 条待你核对`}>
+                <Section
+                  title={t(
+                    `${data.overview.pending.length} 条待你核对`,
+                    `${data.overview.pending.length} to review`,
+                  )}
+                >
                   <ul className={css.records}>
                     {data.overview.pending.map((r) => (
                       <li key={r.id}>
@@ -756,8 +964,12 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                       </li>
                     ))}
                   </ul>
-                  <button type="button" className={css.button} onClick={() => ask("帮我核对这些财务记录")}>
-                    回到对话核对
+                  <button
+                    type="button"
+                    className={css.button}
+                    onClick={() => ask(t("帮我核对这些财务记录", "Help me review these finance records"))}
+                  >
+                    {label("回到对话核对")}
                   </button>
                 </Section>
               )}
@@ -766,7 +978,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
               ) : (
                 <>
                   <label className={css.currency}>
-                    折算为
+                    {label("折算为")}
                     <select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                       {currencies.map((c) => (
                         <option key={c}>{c}</option>
@@ -774,17 +986,20 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                     </select>
                   </label>
                   <div className={css.overview}>
-                    {overviewMetrics.map(([key, label]) => (
-                      <Section key={key} title={label}>
+                    {overviewMetrics.map(([key, title]) => (
+                      <Section key={key} title={label(title ?? "")}>
                         {data.overview.currencies.map((g) => (
                           <NumberDetail
                             key={g.currency}
-                            label={g.currency === "unknown" ? "币种未知" : g.currency}
+                            label={g.currency === "unknown" ? label("币种未知") : g.currency}
                             metric={g[key]}
                             currency={g.currency}
                             records={records}
                             stamp={stamp}
-                            note={`统计截止 ${stamp(data.overview.period.as_of)}`}
+                            note={t(
+                              `统计截止 ${stamp(data.overview.period.as_of)}`,
+                              `As of ${stamp(data.overview.period.as_of)}`,
+                            )}
                           />
                         ))}
                         {data.overview.converted && (
@@ -800,30 +1015,32 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
           {tab === 1 && (
             <>
               <div className={css.heading}>
-                <div className={css.periods} aria-label="收支期间">
+                <div className={css.periods} aria-label={label("收支期间")}>
                   {[
                     ["month", "本月"],
                     ["previous", "上月"],
                     ["quarter", "近 3 个月"],
-                  ].map(([value, label]) => (
+                  ].map(([value, title]) => (
                     <button
                       type="button"
                       key={value}
                       aria-pressed={period === value}
                       onClick={() => setPeriod(value ?? "month")}
                     >
-                      {label}
+                      {label(title ?? "")}
                     </button>
                   ))}
                 </div>
                 <span className={css.muted}>
                   {loading
-                    ? "正在读取所选期间…"
+                    ? label("正在读取所选期间…")
                     : `${data.cashflow.period.from} – ${data.cashflow.period.to}`}
                 </span>
               </div>
               {data.cashflow.period.from !== from || data.cashflow.period.to !== to ? (
-                <p className={css.empty}>{error ? "所选期间读取失败，请重新读取。" : "正在读取所选期间…"}</p>
+                <p className={css.empty}>
+                  {error ? label("所选期间读取失败，请重新读取。") : label("正在读取所选期间…")}
+                </p>
               ) : !data.cashflow.currencies.length ? (
                 <Empty onImport={openImport} />
               ) : (
@@ -837,10 +1054,10 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                             ["consumption", "消费"],
                             ["surplus", "结余"],
                           ] as const
-                        ).map(([key, label]) => (
+                        ).map(([key, title]) => (
                           <NumberDetail
                             key={key}
-                            label={label}
+                            label={label(title ?? "")}
                             metric={g[key]}
                             currency={g.currency}
                             records={records}
@@ -850,12 +1067,12 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                       </div>
                     </Section>
                   ))}
-                  <Section title="按类别的消费">
+                  <Section title={label("按类别的消费")}>
                     {data.cashflow.consumption_categories.length ? (
                       data.cashflow.consumption_categories.map((g) => (
                         <NumberDetail
                           key={`${g.category}-${g.currency}`}
-                          label={categories[g.category] ?? "其他消费"}
+                          label={label(categories[g.category] ?? "其他消费")}
                           metric={g.total}
                           currency={g.currency}
                           records={records}
@@ -863,15 +1080,15 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                         />
                       ))
                     ) : (
-                      <p className={css.empty}>暂无消费记录</p>
+                      <p className={css.empty}>{label("暂无消费记录")}</p>
                     )}
                   </Section>
-                  <Section title="不计入收支">
+                  <Section title={label("不计入收支")}>
                     {data.cashflow.excluded.length ? (
                       data.cashflow.excluded.map((g) => (
                         <NumberDetail
                           key={`${g.category}-${g.currency}`}
-                          label={categories[g.category] ?? "其他"}
+                          label={label(categories[g.category] ?? "其他")}
                           metric={g.total}
                           currency={g.currency}
                           records={records}
@@ -879,7 +1096,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                         />
                       ))
                     ) : (
-                      <p className={css.empty}>暂无转账、卖出本金、借款本金或退款冲减记录</p>
+                      <p className={css.empty}>{label("暂无转账、卖出本金、借款本金或退款冲减记录")}</p>
                     )}
                   </Section>
                 </>
@@ -891,56 +1108,71 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
               <Empty onImport={openImport} />
             ) : (
               <>
-                <Section title="持仓" note={`统计截止 ${stamp(data.investments.period.as_of)}`}>
+                <Section
+                  title={label("持仓")}
+                  note={t(
+                    `统计截止 ${stamp(data.investments.period.as_of)}`,
+                    `As of ${stamp(data.investments.period.as_of)}`,
+                  )}
+                >
                   {!data.investments.holdings.length ? (
-                    <p className={css.empty}>暂无持仓记录</p>
+                    <p className={css.empty}>{label("暂无持仓记录")}</p>
                   ) : (
                     <table className={css.table}>
                       <thead>
                         <tr>
-                          {["代码 / 名称", "数量", "成本", "市值", "浮动收益"].map((label) => (
-                            <th key={label}>{label}</th>
+                          {["代码 / 名称", "数量", "成本", "市值", "浮动收益"].map((title) => (
+                            <th key={title}>{label(title ?? "")}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {data.investments.holdings.map((h) => (
                           <tr key={h.record_ids.join("-")}>
-                            <td data-label="代码 / 名称">
-                              <strong>{h.security_code ?? "暂无代码"}</strong>
+                            <td data-label={label("代码 / 名称")}>
+                              <strong>{h.security_code ?? label("暂无代码")}</strong>
                               <br />
-                              {h.name ?? "暂无名称"}
+                              {h.name ?? label("暂无名称")}
                               <small>
-                                {data.accounts.accounts.find((a) => a.id === h.account)?.name ?? "账户"} ·{" "}
-                                {stamp(h.as_of)}
+                                {data.accounts.accounts.find((a) => a.id === h.account)?.name ??
+                                  label("账户")}{" "}
+                                · {stamp(h.as_of)}
                               </small>
                             </td>
-                            <td data-label="数量">{decimal(h.quantity.amount)}</td>
-                            <td data-label="成本">
-                              {h.cost.amount === null ? "暂无成本" : money(h.cost.amount, h.currency)}
+                            <td data-label={label("数量")}>{decimal(h.quantity.amount)}</td>
+                            <td data-label={label("成本")}>
+                              {h.cost.amount === null ? label("暂无成本") : money(h.cost.amount, h.currency)}
                             </td>
-                            <td data-label="市值">
+                            <td data-label={label("市值")}>
                               {money(h.valuation.amount, h.currency)}
                               <small>
                                 {h.reference.price === null ? (
-                                  "没有行情"
+                                  label("没有行情")
                                 ) : (
                                   <>
-                                    参考价 {money(h.reference.price, h.reference.currency)} ·{" "}
-                                    {h.reference.at ? stamp(h.reference.at) : ""} · 来源 Yahoo
+                                    {t("参考价", "Reference price")}{" "}
+                                    {money(h.reference.price, h.reference.currency)} ·{" "}
+                                    {h.reference.at ? stamp(h.reference.at) : ""} ·{" "}
+                                    {t("来源 Yahoo", "Source: Yahoo")}
                                   </>
                                 )}
                               </small>
                               {h.reference.value !== null && (
-                                <small>参考市值 {money(h.reference.value, h.reference.currency)}</small>
+                                <small>
+                                  {t("参考市值", "Reference value")}{" "}
+                                  {money(h.reference.value, h.reference.currency)}
+                                </small>
                               )}
-                              {h.reference.status === "stale" && <small>刷新失败，保留上次参考价</small>}
+                              {h.reference.status === "stale" && (
+                                <small>{label("刷新失败，保留上次参考价")}</small>
+                              )}
                             </td>
-                            <td data-label="浮动收益">
+                            <td data-label={label("浮动收益")}>
                               {money(h.unrealized_gain.amount, h.currency)}
                               {h.snapshot_return.amount !== null && (
                                 <small>
-                                  收益率（小数）：{decimal(h.snapshot_return.amount)}
+                                  {t("收益率（小数）：", "Return (decimal): ")}
+                                  {decimal(h.snapshot_return.amount)}
                                   <br />
                                   {h.snapshot_return_algorithm}
                                 </small>
@@ -958,18 +1190,18 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                 {data.investments.currencies.map((g) => (
                   <Section
                     key={g.currency}
-                    title={`${g.currency === "unknown" ? "币种未知" : g.currency} · 收益`}
+                    title={`${g.currency === "unknown" ? label("币种未知") : g.currency} · ${t("收益", "Returns")}`}
                   >
                     <div className={css.two}>
                       <NumberDetail
-                        label="已实现收益"
+                        label={label("已实现收益")}
                         metric={g.realized_gain}
                         currency={g.currency}
                         records={records}
                         stamp={stamp}
                       />
                       <NumberDetail
-                        label="未实现收益"
+                        label={label("未实现收益")}
                         metric={g.unrealized_gain}
                         currency={g.currency}
                         records={records}
@@ -983,10 +1215,10 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                           ["fees", "手续费"],
                           ["taxes", "税费"],
                         ] as const
-                      ).map(([key, label]) => (
+                      ).map(([key, title]) => (
                         <NumberDetail
                           key={key}
-                          label={label}
+                          label={label(title ?? "")}
                           metric={g[key]}
                           currency={g.currency}
                           records={records}
@@ -1004,29 +1236,33 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
             ) : (
               <div className={css.overview}>
                 {data.accounts.accounts.map((a) => (
-                  <Section key={a.id} title={a.name} note={`${accountKinds[a.kind]} · ${a.currency}`}>
+                  <Section key={a.id} title={a.name} note={`${label(accountKinds[a.kind])} · ${a.currency}`}>
                     <details className={css.metric}>
                       <summary>
                         <strong>
-                          {a.balance.amount === null ? "余额未知" : money(a.balance.amount, a.currency)}
+                          {a.balance.amount === null
+                            ? label("余额未知")
+                            : money(a.balance.amount, a.currency)}
                         </strong>
-                        <span className={css.link}>查看余额记录</span>
+                        <span className={css.link}>{label("查看余额记录")}</span>
                       </summary>
                       <Records ids={a.balance.record_ids} records={records} stamp={stamp} />
                     </details>
                     <details className={css.metric}>
                       <summary>
-                        交易数：{a.transaction_count.value}
-                        <span className={css.link}> · 查看交易</span>
+                        {t("交易数：", "Transactions: ")}
+                        {a.transaction_count.value}
+                        <span className={css.link}>{label(" · 查看交易")}</span>
                       </summary>
                       <Records ids={a.transaction_count.record_ids} records={records} stamp={stamp} />
                     </details>
                     <p className={css.muted}>
-                      最近导入：{a.latest_import.at ? stamp(a.latest_import.at) : "暂无记录"}
+                      {t("最近导入：", "Last import: ")}
+                      {a.latest_import.at ? stamp(a.latest_import.at) : label("暂无记录")}
                     </p>
                     <p className={css.muted}>
-                      {a.sync_status === "imported" ? "已导入" : "尚未导入"} · 统计截止{" "}
-                      {stamp(data.accounts.period.as_of)}
+                      {a.sync_status === "imported" ? label("已导入") : label("尚未导入")} ·{" "}
+                      {t("统计截止", "As of")} {stamp(data.accounts.period.as_of)}
                     </p>
                   </Section>
                 ))}
