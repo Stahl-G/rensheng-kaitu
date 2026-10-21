@@ -189,6 +189,15 @@ export async function importBatch(
         continue;
       }
       const previous = known?.deleted ? undefined : known;
+      if (
+        type === "activity" &&
+        previous?.source_exported_at &&
+        item.data.source_exported_at &&
+        Date.parse(String(item.data.source_exported_at)) < Date.parse(String(previous.source_exported_at))
+      ) {
+        counts.skipped++;
+        continue;
+      }
       let data = item.data;
       if (previous && item.activityTotals) {
         data = { ...content(previous), ...data };

@@ -174,7 +174,14 @@ const DAILY_UNITS: Record<string, Record<string, number>> = {
   DistanceWalkingRunning: { km: 1, m: 0.001, mi: 1.609344 },
 };
 
-export function healthCandidates(zone: string) {
+/** 手机交来的采集起止时间；end 省略表示采到导出时为止。 */
+export interface HealthWindow {
+  start: Date;
+  end?: Date;
+  exportedAt: Date;
+}
+
+export function healthCandidates(zone: string, window?: HealthWindow) {
   const candidates: Candidate[] = [];
   let samples = 0;
   function emit(...items: Candidate[]) {
@@ -378,7 +385,18 @@ export function healthCandidates(zone: string) {
         }),
       );
     }
+    const today = window ? localDate(new Date(), zone) : undefined;
     for (const [date, types] of daily) {
+      // 今天允许累计到导出截止；历史日必须盖满，延迟的半日文件不能覆盖整天。
+      if (
+        window &&
+        (+localTimeToInstant(`${date}T00:00:00`, zone) < +window.start ||
+          (+localTimeToInstant(`${nextDay(date)}T00:00:00`, zone) > +(window.end ?? window.exportedAt) &&
+            (window.end !== undefined || date !== today || localDate(window.exportedAt, zone) !== date)))
+      ) {
+        ignored.partial_day = (ignored.partial_day ?? 0) + 1;
+        continue;
+      }
       const max = (type: string) => {
         const sources = types.get(type);
         return sources ? Math.max(...sources.values()) : undefined;
@@ -402,6 +420,7 @@ export function healthCandidates(zone: string) {
           ...(flights === undefined ? {} : { flights_climbed: Math.round(flights) }),
           ...(distance === undefined ? {} : { distance_km: Math.round(distance * 100) / 100 }),
           source: "apple-health",
+          ...(window ? { source_exported_at: window.exportedAt.toISOString() } : {}),
         }),
         activityTotals: { basalKcal: basal },
       });
@@ -836,7 +855,15 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     const samples: unknown[] = parallel ? parallelSamples(raw) : raw.samples;
     if (!Array.isArray(samples)) throw new Error("缺少 samples 样本数组");
     if (samples.length > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
-    const collector = healthCandidates(zone);
+    const window =
+      raw.window === undefined
+        ? undefined
+        : {
+            start: parseTs(raw.window.start),
+            exportedAt: parseTs(raw.exported_at),
+            ...(raw.window.end === undefined ? {} : { end: parseTs(raw.window.end) }),
+          };
+    const collector = healthCandidates(zone, window);
     // 单条样本有问题只跳过这一条，其余照常导入；全部读不出时才整份转待整理。
     const skipped: string[] = [];
     for (const [index, input] of samples.entries()) {
@@ -854,7 +881,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     }
     const result = collector.finish();
     // 有样本却一条都没导入（读不出、类型都不支持）时转待整理，不能当成功归档。
-    if (samples.length && !result.candidates.length) {
+    if (samples.length && !result.candidates.length && !result.ignored.partial_day) {
       const reasons = skipped.slice(0, 3);
       if (skipped.length > 3) reasons.push(`另有 ${skipped.length - 3} 条读不出`);
       if (result.ignored.unsupported) reasons.push(`${result.ignored.unsupported} 条类型暂不支持`);

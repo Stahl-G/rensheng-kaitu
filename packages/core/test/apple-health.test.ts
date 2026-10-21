@@ -749,3 +749,98 @@ it("训练扩展：新运动名与爬升、METs、配速、最大心率原样落
   ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });
+
+it("手机采集窗口按另一时区的零点开始时，只写盖满的整天，不把已有整天步数改成半天", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  addRecord(
+    ws,
+    "activity",
+    { ts: "2026-10-14T00:00:00+08:00", date: "2026-10-14", steps: 9000, source: "apple-health" },
+    { by: "import:apple-health" },
+  );
+  const file = join(tmp(), "window.health.json");
+  const step = (start: string, value: number) => ({
+    type: "step_count",
+    start,
+    end: start,
+    value,
+    unit: "count",
+  });
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      // 手机在 +07:00，窗口从手机的 10-14 零点开始，即上海 10-14 01:00。
+      exported_at: "2026-10-16T00:00:00+08:00",
+      window: { start: "2026-10-14T00:00:00+07:00", end: "2026-10-16T00:00:00+08:00" },
+      samples: [step("2026-10-14T08:00:00+07:00", 1200), step("2026-10-15T08:00:00+07:00", 3000)],
+    }),
+  );
+  await importHealthShortcut(ws, file);
+  const days = Object.fromEntries(readRecords(ws, "activity").map((row) => [row.date, row.steps]));
+  expect(days).toEqual({ "2026-10-14": 9000, "2026-10-15": 3000 });
+});
+
+it("当天累计保留导出顺序，旧文件和重放不覆盖，较新删除纠正允许下降", async () => {
+  const ws = await freshWorkspace("UTC");
+  const file = join(tmp(), "ordered.health.json");
+  const now = new Date();
+  const day = now.toISOString().slice(0, 10);
+  const start = `${day}T00:00:00Z`;
+  const elapsed = +now - Date.parse(start);
+  const early = new Date(Date.parse(start) + Math.floor(elapsed / 3)).toISOString();
+  const middle = new Date(Date.parse(start) + Math.floor((elapsed * 2) / 3)).toISOString();
+  const deliver = async (value: number, exported_at: string) => {
+    writeFileSync(
+      file,
+      JSON.stringify({
+        format: "kaitu.health.v1",
+        exported_at,
+        window: { start },
+        samples: [{ type: "step_count", start, end: start, value, unit: "count" }],
+      }),
+    );
+    return importHealthShortcut(ws, file);
+  };
+  await deliver(3000, early);
+  const id = readRecords(ws, "activity")[0].id;
+  await deliver(9000, middle);
+  expect((await deliver(3000, early)).version).toBeNull();
+  expect(readRecords(ws, "activity")).toMatchObject([{ id, steps: 9000 }]);
+  // 数值未变也记住较新的截止，避免随后到达的中间快照回退它。
+  await deliver(9000, now.toISOString());
+  expect((await deliver(5000, middle)).version).toBeNull();
+  const corrected = new Date().toISOString();
+  await deliver(2000, corrected);
+  expect(readRecords(ws, "activity")).toMatchObject([{ id, steps: 2000, source_exported_at: corrected }]);
+  expect((await deliver(2000, corrected)).version).toBeNull();
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("延迟到达的历史未完整尾日跳过，完整日仍能以较新导出纠正", async () => {
+  const ws = await freshWorkspace("UTC");
+  const file = join(tmp(), "delayed.health.json");
+  const end = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
+  const start = new Date(Date.parse(end) - 86400000).toISOString();
+  const partial = new Date(Date.parse(start) + 3600000).toISOString();
+  const deliver = async (value: number, exported_at: string, window: { start: string; end?: string }) => {
+    writeFileSync(
+      file,
+      JSON.stringify({
+        format: "kaitu.health.v1",
+        exported_at,
+        window,
+        samples: [{ type: "step_count", start, end: start, value, unit: "count" }],
+      }),
+    );
+    return importHealthShortcut(ws, file);
+  };
+  await deliver(9000, end, { start, end });
+  const stale = await deliver(3000, partial, { start });
+  expect(stale.ignored.partial_day).toBe(1);
+  expect(stale.version).toBeNull();
+  expect(readRecords(ws, "activity")[0].steps).toBe(9000);
+  await deliver(2500, new Date().toISOString(), { start, end });
+  expect(readRecords(ws, "activity")[0].steps).toBe(2500);
+  expect(validateWorkspace(ws)).toEqual([]);
+});
