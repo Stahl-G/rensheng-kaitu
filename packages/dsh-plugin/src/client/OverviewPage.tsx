@@ -760,6 +760,7 @@ function Overview({
                   ))}
               <details
                 className={todayCss.secondary}
+                open={todayDetails}
                 onToggle={(event) => setTodayDetails(event.currentTarget.open)}
               >
                 <summary>{t("目标、资料与近期变化", "Goals, notes and recent changes")}</summary>
