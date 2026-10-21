@@ -66,6 +66,13 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
     });
     expect(news.isError).not.toBe(true);
     expect(readRecords(ws, "news_item")[0]).toMatchObject({ source: "example.com", via: "grok" });
+    const newsId = readRecords(ws, "news_item")[0]?.id;
+    expect((await client.callTool({ name: "news_try", arguments: { id: newsId } })).isError).not.toBe(true);
+    expect(readRecords(ws, "news_item")[0]).toMatchObject({ by: "agent", status: "tried" });
+    expect((await client.callTool({ name: "news_dismiss", arguments: { id: newsId } })).isError).not.toBe(
+      true,
+    );
+    expect(readRecords(ws, "news_item")[0]).toMatchObject({ by: "agent", status: "dismissed" });
     const deleted = await client.callTool({
       name: "record_delete",
       arguments: { type: "workout", id: readRecords(ws, "workout")[0]?.id },
@@ -227,6 +234,22 @@ it("MCP 日程回执仍待确认，模型不能伪造用户署名或经记录接
     });
     expect(goal.isError).toBe(true);
     expect(server.readJson("me/goals.json")).toEqual([]);
+    const event = await client.callTool({
+      name: "record_add",
+      arguments: {
+        type: "event",
+        data: {
+          title: "绕过确认的日程",
+          start: "2026-10-22T10:00:00Z",
+          end: "2026-10-22T11:00:00Z",
+          calendar: "work",
+          source: "synthetic",
+          by: "user",
+        },
+      },
+    });
+    expect(event.isError).toBe(true);
+    expect(readRecords(server, "event")).toEqual([]);
   } finally {
     await client.close();
     rmSync(root, { recursive: true, force: true });

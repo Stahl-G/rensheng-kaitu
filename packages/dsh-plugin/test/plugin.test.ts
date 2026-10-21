@@ -66,6 +66,23 @@ it("合法训练写入并存版本，非法记录返回原始校验错误且不�
     expect(ws.readText(result.file)).toBe(content);
     expect(readRecords(ws, "workout")).toHaveLength(1);
     expect(await history(ws)).toEqual(versions);
+    expect(
+      await tool.execute(
+        {
+          type: "event",
+          fields: {
+            title: "AI 日程",
+            start: "2026-10-22T10:00:00Z",
+            end: "2026-10-22T11:00:00Z",
+            calendar: "work",
+            source: "synthetic",
+            by: "user",
+          },
+        },
+        exec,
+      ),
+    ).toMatchObject({ ok: false });
+    expect(readRecords(ws, "event")).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

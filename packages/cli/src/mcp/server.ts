@@ -132,14 +132,14 @@ export function createMcpServer(
     "news_try",
     "将新闻加入对应模块的建议下一步，保存版本。",
     { id: text },
-    ({ id }) => tryNews(ws, id),
+    ({ id }) => tryNews(ws, id, { by: "agent", actor: actor() }),
     true,
   );
   register(
     "news_dismiss",
     "标记单条新闻不相关，保存版本。",
     { id: text },
-    ({ id }) => dismissNews(ws, id),
+    ({ id }) => dismissNews(ws, id, { by: "agent", actor: actor() }),
     true,
   );
   register("record_types", "列出全部记录类型、字段约束和合法示例，只读。", {}, () => recordReferences(ws));
