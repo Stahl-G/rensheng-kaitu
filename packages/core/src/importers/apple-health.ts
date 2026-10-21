@@ -178,6 +178,7 @@ const DAILY_UNITS: Record<string, Record<string, number>> = {
 export interface HealthWindow {
   start: Date;
   end?: Date;
+  exportedAt: Date;
 }
 
 export function healthCandidates(zone: string, window?: HealthWindow) {
@@ -384,12 +385,14 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
         }),
       );
     }
+    const today = window ? localDate(new Date(), zone) : undefined;
     for (const [date, types] of daily) {
-      // 采集窗口没盖满的日子只有半天样本，写进去会把整天的累计改小。
+      // 今天允许累计到导出截止；历史日必须盖满，延迟的半日文件不能覆盖整天。
       if (
         window &&
         (+localTimeToInstant(`${date}T00:00:00`, zone) < +window.start ||
-          (window.end && +localTimeToInstant(`${nextDay(date)}T00:00:00`, zone) > +window.end))
+          (+localTimeToInstant(`${nextDay(date)}T00:00:00`, zone) > +(window.end ?? window.exportedAt) &&
+            (window.end !== undefined || date !== today || localDate(window.exportedAt, zone) !== date)))
       ) {
         ignored.partial_day = (ignored.partial_day ?? 0) + 1;
         continue;
@@ -417,6 +420,7 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
           ...(flights === undefined ? {} : { flights_climbed: Math.round(flights) }),
           ...(distance === undefined ? {} : { distance_km: Math.round(distance * 100) / 100 }),
           source: "apple-health",
+          ...(window ? { source_exported_at: window.exportedAt.toISOString() } : {}),
         }),
         activityTotals: { basalKcal: basal },
       });
@@ -856,6 +860,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
         ? undefined
         : {
             start: parseTs(raw.window.start),
+            exportedAt: parseTs(raw.exported_at),
             ...(raw.window.end === undefined ? {} : { end: parseTs(raw.window.end) }),
           };
     const collector = healthCandidates(zone, window);

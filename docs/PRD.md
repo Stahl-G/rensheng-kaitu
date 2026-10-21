@@ -338,7 +338,7 @@ goal_priority: [g1]
 | meal | `meal`（早/午/晚/加餐）、`items[]`（`name`、`grams?`）、`kcal`、`protein_g`、`carbs_g?`、`fat_g?`、`uncertainty?`、`photo?`、`source` |
 | supplement | `name`、`amount`、`unit` |
 | sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source` |
-| activity | `date`、`steps?`、`active_kcal?`、`total_kcal?`、`source` |
+| activity | `date`、`steps?`、`active_kcal?`、`total_kcal?`、`source`；可选 `source_exported_at` 为健康来源导出时间，旧快照不覆盖新快照，较新纠正允许下降 |
 | metric | `kind`（weight / body_fat / height / bp / glucose / hrv_sdnn …）、`value`、`unit`、`source` |
 | symptom | `kind`、`source`；普通症状填 `severity: unspecified / mild / moderate / severe`，食欲变化只填 `appetite_change: unspecified / decreased / increased` |
 | mood | `valence`（very_unpleasant / unpleasant / slightly_unpleasant / neutral / slightly_pleasant / pleasant / very_pleasant）、`source` |

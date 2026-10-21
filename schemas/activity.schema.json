@@ -12,6 +12,11 @@
     "exercise_min": { "type": "integer", "minimum": 0, "description": "Apple 锻炼分钟数" },
     "flights_climbed": { "type": "integer", "minimum": 0, "description": "爬楼层数" },
     "distance_km": { "type": "number", "minimum": 0, "description": "步行加跑步距离" },
+    "source_exported_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "来源快照导出时间；较旧快照不覆盖较新累计"
+    },
     "source": { "type": "string", "minLength": 1 }
   }
 }
