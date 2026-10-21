@@ -400,14 +400,28 @@ it("Agent 收件箱不能冒充用户或直接写目标，日程仍待确认并�
       "inbox/agents/decision.proposal.json",
       JSON.stringify({ title: "AI 日程", start: "10:00", end: "11:00", status: "confirmed", by: "user" }),
     );
+    ws.writeText(
+      "inbox/agents/event.records.jsonl",
+      JSON.stringify({
+        type: "event",
+        title: "未经确认的日程",
+        start: "2026-10-22T10:00:00Z",
+        end: "2026-10-22T11:00:00Z",
+        calendar: "work",
+        source: "synthetic",
+        by: "user",
+      }),
+    );
     const result = await processInbox(ws, { stableMs: 0 });
     expect(readRecords(ws, "task")).toEqual([expect.objectContaining({ title: "AI 待办", by: "agent" })]);
     expect(ws.readJson("me/goals.json")).toEqual([]);
     expect(parseFrontmatter<{ blocks: { status: string }[] }>(ws.readText("NOW.md")).data.blocks).toEqual([
       expect.objectContaining({ kind: "proposal", status: "pending" }),
     ]);
-    expect(result.notes).toHaveLength(1);
-    expect(ws.readText(result.notes[0] as string)).toContain("goal");
+    expect(result.notes).toHaveLength(2);
+    expect(result.notes.map((file) => ws.readText(file)).join("\n")).toContain("goal");
+    expect(result.notes.map((file) => ws.readText(file)).join("\n")).toContain("未经确认的日程");
+    expect(readRecords(ws, "event")).toEqual([]);
     expect((await processInbox(ws, { stableMs: 0 })).processed).toEqual([]);
     expect(readRecords(ws, "task")).toHaveLength(1);
   } finally {
