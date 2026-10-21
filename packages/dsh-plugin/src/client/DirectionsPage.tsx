@@ -506,7 +506,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
             >
               {label("← 全部方向")}
             </button>
-            <span className={base.muted}>{states[direction.status]}</span>
+            <span className={base.muted}>{stateLabel(direction.status)}</span>
           </header>
           <div className={css.heading}>
             <h2>{directionText(direction.title, 120)}</h2>
