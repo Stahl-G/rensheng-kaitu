@@ -9,6 +9,9 @@
     "steps": { "type": "integer", "minimum": 0 },
     "active_kcal": { "type": "number", "minimum": 0 },
     "total_kcal": { "type": "number", "minimum": 0 },
+    "exercise_min": { "type": "integer", "minimum": 0, "description": "Apple 锻炼分钟数" },
+    "flights_climbed": { "type": "integer", "minimum": 0, "description": "爬楼层数" },
+    "distance_km": { "type": "number", "minimum": 0, "description": "步行加跑步距离" },
     "source": { "type": "string", "minLength": 1 }
   }
 }
