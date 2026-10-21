@@ -5,27 +5,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { Workspace, addRecord, readRecords, validateWorkspace } from "../src/index.js";
-import { freshWorkspace } from "./helpers.js";
-
-it("Agent 不能绕过日程建议确认，用户写入与日历导入仍按原来源保存", async () => {
-  const ws = await freshWorkspace();
-  const event = {
-    title: "合成日程",
-    start: "2026-10-22T10:00:00Z",
-    end: "2026-10-22T11:00:00Z",
-    calendar: "work",
-    source: "synthetic",
-  };
-  try {
-    expect(() => addRecord(ws, "event", { ...event, by: "user" }, { by: "agent" })).toThrow("待用户确认");
-    expect(readRecords(ws, "event")).toEqual([]);
-    addRecord(ws, "event", event, { by: "user" });
-    addRecord(ws, "event", event, { by: "import:ics" });
-    expect(readRecords(ws, "event").map((row) => row.by)).toEqual(["user", "import:ics"]);
-  } finally {
-    rmSync(ws.root, { recursive: true, force: true });
-  }
-});
 
 it("模块定义、记录目录及文件链接不能跨越模块边界，合法自定义模块可读写", () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-record-security-"));

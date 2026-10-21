@@ -66,6 +66,13 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
     });
     expect(news.isError).not.toBe(true);
     expect(readRecords(ws, "news_item")[0]).toMatchObject({ source: "example.com", via: "grok" });
+    const newsId = readRecords(ws, "news_item")[0]?.id;
+    expect((await client.callTool({ name: "news_try", arguments: { id: newsId } })).isError).not.toBe(true);
+    expect(readRecords(ws, "news_item")[0]).toMatchObject({ by: "agent", status: "tried" });
+    expect((await client.callTool({ name: "news_dismiss", arguments: { id: newsId } })).isError).not.toBe(
+      true,
+    );
+    expect(readRecords(ws, "news_item")[0]).toMatchObject({ by: "agent", status: "dismissed" });
     const deleted = await client.callTool({
       name: "record_delete",
       arguments: { type: "workout", id: readRecords(ws, "workout")[0]?.id },

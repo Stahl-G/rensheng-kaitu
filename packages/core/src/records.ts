@@ -50,7 +50,7 @@ function validateRecord(
   expectedRevision?: number,
 ): void {
   if (ref.type === "event" && record.by === "agent")
-    throw new KaituError("日程建议请用 propose_block 提交，等待用户确认", "USER_DECISION");
+    throw new KaituError("日程只能作为建议提交，等待用户在今天页确认", "USER_DECISION");
   if (ref.type === "phase") {
     if ((previous || (record.rev ?? 1) > 1) && (!previous || expectedRevision !== (previous.rev ?? 1)))
       throw new KaituError("阶段已经更新，请携带当前预期修订号", "CONFLICT");
