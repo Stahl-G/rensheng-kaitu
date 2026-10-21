@@ -1,6 +1,7 @@
 import type { CalendarPushSettings } from "@kaitu/core";
 import { useState } from "react";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
 export interface CalendarPushServices {
   loadCalendarPush: () => Promise<CalendarPushSettings>;
@@ -20,30 +21,42 @@ export function CalendarPushResult({
   state: CalendarPushSettings | null;
   retry: (id: string) => Promise<unknown>;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const receipt = state?.entries[id];
-  if (!receipt) return state && !state.enabled ? <span className={css.small}>系统日历已关闭</span> : null;
+  if (!receipt)
+    return state && !state.enabled ? (
+      <span className={css.small}>{t("系统日历已关闭", "System calendar is off")}</span>
+    ) : null;
   const labels = {
-    added: "已加入『开图』日历",
-    file: "已生成日历文件",
-    deleted: "已从日历删除",
-    removed: "已移除日历安排",
-    error: "日历操作失败",
+    added: t("已加入『开图』日历", "Added to the Kaitu calendar"),
+    file: t("已生成日历文件", "Calendar file ready"),
+    deleted: t("已从日历删除", "Deleted from calendar"),
+    removed: t("已移除日历安排", "Event removed"),
+    error: t("日历操作失败", "Calendar action failed"),
   };
   return (
     <output className={css.stack}>
       <span>
-        {receipt.status === "removed" && receipt.ics ? "已生成取消日历文件" : labels[receipt.status]}
+        {receipt.status === "removed" && receipt.ics
+          ? t("已生成取消日历文件", "Cancellation file ready")
+          : labels[receipt.status]}
       </span>
-      {receipt.reason && <span className={css.small}>{receipt.reason}</span>}
+      {receipt.reason && (
+        <span className={css.small}>
+          {receipt.reason === "请导入取消文件以移除之前导入的事件"
+            ? t(receipt.reason, "Import the cancellation file to remove the event you added earlier.")
+            : receipt.reason}
+        </span>
+      )}
       {receipt.ics && (
         <a
           className={css.link}
           download={`kaitu-block-${encodeURIComponent(id)}.ics`}
           href={`data:text/calendar;charset=utf-8,${encodeURIComponent(receipt.ics)}`}
         >
-          下载日历文件
+          {t("下载日历文件", "Download calendar file")}
         </a>
       )}
       {["file", "error"].includes(receipt.status) && (
@@ -63,7 +76,7 @@ export function CalendarPushResult({
             }
           }}
         >
-          重试日历操作
+          {t("重试日历操作", "Retry calendar action")}
         </button>
       )}
       {error && <span role="alert">{error}</span>}
@@ -84,6 +97,7 @@ export function CalendarSlotForm({
   save: (start: string, end: string) => Promise<unknown>;
   close: () => void;
 }) {
+  const t = useT();
   const [from, setFrom] = useState(start);
   const [to, setTo] = useState(end);
   const [busy, setBusy] = useState(false);
@@ -105,23 +119,25 @@ export function CalendarSlotForm({
         }
       }}
     >
-      <b>安排时间段 · {date}</b>
+      <b>
+        {t("安排时间段", "Schedule a time")} · {date}
+      </b>
       <div className={css.fields}>
         <label>
-          开始时间
+          {t("开始时间", "Start time")}
           <input type="time" required value={from} onChange={(event) => setFrom(event.target.value)} />
         </label>
         <label>
-          结束时间
+          {t("结束时间", "End time")}
           <input type="time" required value={to} onChange={(event) => setTo(event.target.value)} />
         </label>
       </div>
       {error && <p role="alert">{error}</p>}
       <button type="submit" className={`${css.btn} ${css["btn-primary"]}`} disabled={busy}>
-        确认时间段
+        {t("确认时间段", "Confirm time")}
       </button>
       <button type="button" className={css.link} disabled={busy} onClick={close}>
-        取消
+        {t("取消", "Cancel")}
       </button>
     </form>
   );
