@@ -465,7 +465,7 @@ export function PaperMap({
         }
         const content = document.createElement("div");
         content.className = css.cityPopup ?? "";
-        content.textContent = `${feature.properties?.name} · ${feature.properties?.years || "时间未知"}`;
+        content.textContent = `${feature.properties?.name} · ${feature.properties?.years || latest.current.t("时间未知", "Undated")}`;
         popup.setLngLat(e.lngLat).setDOMContent(content).addTo(instance);
       };
       m.on("mousemove", showCity);
@@ -554,7 +554,7 @@ export function PaperMap({
           {mode === "now"
             ? t("我在这里。", "I am here.")
             : mode === "history"
-              ? t("这些经历组成了我。", "These experiences shaped me.")
+              ? t("这些经历组成了我。", "These places shaped me.")
               : t("还有许多生活等待探索。", "There is more life to explore.")}
         </h1>
         <p>
@@ -672,7 +672,7 @@ export function PaperMap({
           ? t("城市级位置 · 现居记录", "City-level record · Current residence")
           : mode === "possible"
             ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
-            : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines show experience order")}
+            : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines follow the order of places")}
       </span>
     </section>
   );

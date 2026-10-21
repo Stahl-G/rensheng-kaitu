@@ -13,7 +13,7 @@ import css from "./MapPage.module.css";
 import { PaperMap } from "./PaperMap.js";
 import { SourceEvidence } from "./SourceEvidence.js";
 import { footprintAnchor, footprintData } from "./footprint-state.js";
-import { useT } from "./i18n.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
@@ -59,11 +59,92 @@ const statuses = {
 const homePrompt =
   "请用 build-life-map 技能，从我的档案、记忆和对话识别家乡，列出原文依据，必要时向我核对。确认后在 me/profile.md 基本情况中维护一条家乡：城市名，保留其他内容。没有依据不要猜，不把籍贯、出生地或当前居住地直接当家乡。";
 const prompt = `${homePrompt}然后整理去过和住过的城市；间接推断和计划保持待核对，不补造日期。`;
+const promptEn =
+  "Use the build-life-map skill to identify my hometown from my profile, memories and conversations. Show source evidence and ask me when needed. After confirmation, update only the hometown entry in me/profile.md. Do not assume birthplace, ancestry or current residence is my hometown. Then organize cities I have visited or lived in; keep inference and plans pending review and do not invent dates.";
+const MAP_EN: Record<string, string> = {
+  走过的地方: "Past places",
+  现在的生活: "Life now",
+  计划与机会: "Plans and possibilities",
+  住过: "Lived",
+  工作: "Worked",
+  读书: "Studied",
+  旅行: "Travel",
+  到访: "Visited",
+  其他: "Other",
+  已记录: "Recorded",
+  你说的: "Shared by you",
+  "AI 推测": "AI inference",
+  计划: "Planned",
+  建议: "Suggested",
+  暂无记录: "No records yet",
+  修正经历: "Correct place",
+  隐藏: "Hide",
+  "隐藏这段经历？之后可撤销，旧来源同步不会重新添加。":
+    "Hide this place? You can undo this later. Syncing the original source will keep it hidden.",
+  "隐藏中…": "Hiding…",
+  确认隐藏: "Confirm hide",
+  保留: "Keep",
+  请开图协助核对: "Review with Kaitu",
+  修正已保存: "Correction saved",
+  经历已隐藏: "Place hidden",
+  隐藏已撤销: "Place restored",
+  "家乡 · 人生地图的起点": "Hometown · Your starting point",
+  关闭: "Close",
+  "⌂ 从这里出发": "⌂ Started here",
+  从记忆生成: "Build from memories",
+  重新读取: "Reload",
+  撤销隐藏: "Undo hide",
+  恢复这段经历: "Restore place",
+  "经历读取失败，请重试。": "Couldn’t load places. Try again.",
+  "正在读取经历…": "Loading places…",
+  "地图工具 · 图层与时间": "Map tools · Layers and dates",
+  经历连线: "Place routes",
+  地图图层: "Map layers",
+  显示方式: "View",
+  地图: "Map",
+  列表: "List",
+  按年份筛选: "Filter by year",
+  全部: "All",
+  按日期区间筛选: "Filter by date range",
+  从: "From",
+  至: "To",
+  清除时间筛选: "Clear date filter",
+  开始日期不能晚于结束日期: "Start date must be on or before end date",
+  时间不详: "Undated",
+  不限: "Any",
+  全部时间: "All dates",
+  未选择图层: "No layers selected",
+  重置筛选: "Reset filters",
+  城市列表: "City list",
+  地点待核对: "Place needs review",
+  事实或时间待核对: "Fact or date needs review",
+  人口暂无记录: "Population not recorded",
+  "没有候选城市，可修正地名。": "No candidate cities. Correct the place name.",
+  "这条记录是推测或日期仍在未来，核对后才计入已到访。":
+    "Review this inferred or future-dated record before counting it as a visited place.",
+  我的城市: "My cities",
+  "这个筛选下暂无记录。": "No records match these filters.",
+  "⌂ 家乡 · 起点": "⌂ Hometown · Start",
+  经历时间轴: "Place timeline",
+  生活的章节: "Chapters of life",
+  人生起点: "Starting point",
+  查看家乡依据: "View hometown source",
+  隐藏经历连线: "Hide place routes",
+  显示经历连线: "Show place routes",
+  "城市级位置 · 连线表示经历顺序": "City-level locations · Lines follow the order of places",
+};
 const cityId = cityKey;
-function dateLabel(value: string | undefined, precision: Experience["time_precision"]) {
-  if (!value || precision === "unknown") return "暂无记录";
+function dateLabel(value: string | undefined, precision: Experience["time_precision"], locale: Locale) {
+  if (!value || precision === "unknown") return locale === "en" ? "No records yet" : "暂无记录";
   const [year, month, day] = value.split("-");
   if (precision === "year" || !month) return year;
+  if (locale === "en")
+    return new Intl.DateTimeFormat("en", {
+      timeZone: "UTC",
+      year: "numeric",
+      month: "short",
+      ...(precision === "day" && day ? { day: "numeric" as const } : {}),
+    }).format(new Date(`${year}-${month}-${day || "01"}T12:00:00Z`));
   return `${year} 年 ${Number(month)} 月${precision === "day" && day ? ` ${Number(day)} 日` : ""}`;
 }
 function ExperienceDetails({
@@ -81,6 +162,9 @@ function ExperienceDetails({
   save: (item: Experience, changes: ExperienceChanges) => Promise<void>;
   hide: (item: Experience) => Promise<void>;
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const label = (value: string) => t(value, MAP_EN[value] ?? value);
   const [editing, setEditing] = useState(false);
   const [confirmHide, setConfirmHide] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,21 +172,24 @@ function ExperienceDetails({
   return (
     <article className={css.experience}>
       <div className={css.experienceHeading}>
-        <strong>{item.title || eventTypes[item.event_type]}</strong>
+        <strong>{item.title || label(eventTypes[item.event_type])}</strong>
         <span className={css.status} data-status={item.fact_status}>
-          {statuses[item.fact_status]}
+          {label(statuses[item.fact_status])}
         </span>
       </div>
       <p className={css.secondary}>
-        {eventTypes[item.event_type]} · {dateLabel(item.start, item.time_precision)}
+        {label(eventTypes[item.event_type])} · {dateLabel(item.start, item.time_precision, locale)}
         {item.end
-          ? ` – ${dateLabel(item.end, item.time_precision)}`
+          ? ` – ${dateLabel(item.end, item.time_precision, locale)}`
           : experienceLayer(item, asOf) === "now"
-            ? " – 至今"
+            ? t(" – 至今", " – Present")
             : ""}
       </p>
       {item.notes && <p className={css.notes}>{item.notes}</p>}
-      <p className={css.source}>来源：{item.source || "暂无记录"}</p>
+      <p className={css.source}>
+        {t("来源：", "Source: ")}
+        {item.source || label("暂无记录")}
+      </p>
       <SourceEvidence id={item.id} load={loadSource} />
       {editing ? (
         <ExperienceEditor
@@ -116,16 +203,16 @@ function ExperienceDetails({
       ) : (
         <div className={css.actions}>
           <button type="button" className={css.link} onClick={() => setEditing(true)}>
-            修正经历
+            {label("修正经历")}
           </button>
           <button type="button" className={css.link} onClick={() => setConfirmHide(true)}>
-            隐藏
+            {label("隐藏")}
           </button>
         </div>
       )}
       {confirmHide && (
         <div className={css.notice}>
-          <p>隐藏这段经历？之后可撤销，旧来源同步不会重新添加。</p>
+          <p>{label("隐藏这段经历？之后可撤销，旧来源同步不会重新添加。")}</p>
           <div className={css.actions}>
             <button
               type="button"
@@ -143,7 +230,7 @@ function ExperienceDetails({
                 }
               }}
             >
-              {busy ? "隐藏中…" : "确认隐藏"}
+              {busy ? label("隐藏中…") : label("确认隐藏")}
             </button>
             <button
               type="button"
@@ -151,7 +238,7 @@ function ExperienceDetails({
               disabled={busy}
               onClick={() => setConfirmHide(false)}
             >
-              保留
+              {label("保留")}
             </button>
           </div>
         </div>
@@ -165,10 +252,15 @@ function ExperienceDetails({
         type="button"
         className={css.link}
         onClick={() =>
-          onPrompt(`帮我核对并修改「${item.place.name}」的这段经历（${item.id}），先和我确认地点、时间和分类`)
+          onPrompt(
+            t(
+              `帮我核对并修改「${item.place.name}」的这段经历（${item.id}），先和我确认地点、时间和分类`,
+              `Help me review this place in ${item.place.name} (${item.id}). Confirm its place, dates and category with me before editing.`,
+            ),
+          )
         }
       >
-        请开图协助核对
+        {label("请开图协助核对")}
       </button>
     </article>
   );
@@ -188,6 +280,8 @@ export function MapPage({
   ...importControls
 }: MapPageProps) {
   const t = useT();
+  const locale = useLocale();
+  const label = (value: string) => t(value, MAP_EN[value] ?? value);
   const [editingHome, setEditingHome] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; revision: number } | null>(null);
@@ -325,13 +419,13 @@ export function MapPage({
   const dismiss = () => setSelected(null);
   const save = async (item: Experience, changes: ExperienceChanges) => {
     await editExperience(item.id, changes, item.rev ?? 1);
-    setNotice("修正已保存");
+    setNotice(label("修正已保存"));
     await refresh();
   };
   const hide = async (item: Experience) => {
     const revision = await hideExperience(item.id, item.rev ?? 1);
     setUndo({ id: item.id, revision });
-    setNotice("经历已隐藏");
+    setNotice(label("经历已隐藏"));
     await refresh();
   };
   const unhide = async (id: string, revision: number) => {
@@ -339,7 +433,7 @@ export function MapPage({
     try {
       await unhideExperience(id, revision);
       setUndo(null);
-      setNotice("隐藏已撤销");
+      setNotice(label("隐藏已撤销"));
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -392,17 +486,20 @@ export function MapPage({
             <h2 id="city-title">{city.place.name}</h2>
             <p className={css.secondary}>
               {city.home
-                ? "家乡 · 人生地图的起点"
-                : `${city.place.country || "暂无记录"} · ${city.experiences.length} 段经历`}
+                ? label("家乡 · 人生地图的起点")
+                : t(
+                    `${city.place.country || "暂无记录"} · ${city.experiences.length} 段经历`,
+                    `${city.place.country || "Unknown country"} · ${city.experiences.length} ${city.experiences.length === 1 ? "place" : "places"}`,
+                  )}
             </p>
           </div>
           <button ref={close} type="button" className={css.control} onClick={dismiss}>
-            关闭
+            {label("关闭")}
           </button>
         </div>
         {city.home && (
           <section className={css.homeStory}>
-            <span className={css.homeBadge}>⌂ 从这里出发</span>
+            <span className={css.homeBadge}>{label("⌂ 从这里出发")}</span>
             <p>{home?.name}</p>
             <p className={css.source}>{t("来自个人档案", "From your profile")}</p>
             <button
@@ -430,7 +527,10 @@ export function MapPage({
         ))}
         {city.experiences.length > detailLimit && (
           <button type="button" className={css.link} onClick={() => setDetailLimit((value) => value + 30)}>
-            更多经历（{city.experiences.length - detailLimit}）
+            {t(
+              `更多经历（${city.experiences.length - detailLimit}）`,
+              `More places (${city.experiences.length - detailLimit})`,
+            )}
           </button>
         )}
       </div>
@@ -442,8 +542,8 @@ export function MapPage({
         <h2 className={css.sr}>{t("足迹工具", "Footprint tools")}</h2>
         {/* 还没有经历时，下方空白处已有同一个入口。 */}
         {!(data && !data.experiences.length && !home) && (
-          <button type="button" className={css.primary} onClick={() => ask(prompt)}>
-            从记忆生成
+          <button type="button" className={css.primary} onClick={() => ask(t(prompt, promptEn))}>
+            {label("从记忆生成")}
           </button>
         )}
       </header>
@@ -456,7 +556,7 @@ export function MapPage({
           reviewPending={data?.review.length ?? 0}
         />
         <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
-          {home ? `⌂ ${t("家乡", "Hometown")}：${home.name}` : t("设置家乡", "Set hometown")}
+          {home ? `⌂ ${t("家乡", "Hometown")}${t("：", ": ")}${home.name}` : t("设置家乡", "Set hometown")}
         </button>
       </div>
       {data && editingHome && (
@@ -476,7 +576,7 @@ export function MapPage({
         <p className={css.notice} role="alert">
           {error}{" "}
           <button type="button" className={css.link} onClick={() => void refresh()}>
-            重新读取
+            {label("重新读取")}
           </button>
         </p>
       )}
@@ -490,19 +590,23 @@ export function MapPage({
               disabled={busy}
               onClick={() => void unhide(undo.id, undo.revision)}
             >
-              撤销隐藏
+              {label("撤销隐藏")}
             </button>
           )}
         </output>
       )}
       {!!data?.hidden.length && (
         <details className={css.review}>
-          <summary>已隐藏 {data.hidden.length} 段经历</summary>
+          <summary>
+            {t(`已隐藏 ${data.hidden.length} 段经历`, `Hidden places · ${data.hidden.length}`)}
+          </summary>
           {data.hidden.map(({ item, revision }) => (
             <div key={item.id} className={css.reviewItem}>
               <strong>{item.title || item.place.name}</strong>
               <p className={css.source}>
-                {item.place.name} · {dateLabel(item.start, item.time_precision)} · 来源：{item.source}
+                {item.place.name} · {dateLabel(item.start, item.time_precision, locale)} ·{" "}
+                {t("来源：", "Source: ")}
+                {item.source}
               </p>
               <button
                 type="button"
@@ -510,18 +614,20 @@ export function MapPage({
                 disabled={busy}
                 onClick={() => void unhide(item.id, revision)}
               >
-                恢复这段经历
+                {label("恢复这段经历")}
               </button>
             </div>
           ))}
         </details>
       )}
       {!data ? (
-        <output className={css.empty}>{error ? "经历读取失败，请重试。" : "正在读取经历…"}</output>
+        <output className={css.empty}>
+          {error ? label("经历读取失败，请重试。") : label("正在读取经历…")}
+        </output>
       ) : (
         <>
           <details className={css.review}>
-            <summary>地图工具 · 图层与时间</summary>
+            <summary>{label("地图工具 · 图层与时间")}</summary>
             <div className={css.toolbar}>
               <label className={css.routeToggle}>
                 <input
@@ -537,9 +643,9 @@ export function MapPage({
                   checked={showRoutes}
                   onChange={(event) => setShowRoutes(event.target.checked)}
                 />
-                经历连线
+                {label("经历连线")}
               </label>
-              <fieldset className={css.legend} aria-label="地图图层">
+              <fieldset className={css.legend} aria-label={label("地图图层")}>
                 {layers.map((layer) => (
                   <button
                     type="button"
@@ -555,11 +661,11 @@ export function MapPage({
                     }}
                   >
                     <span className={css.shape} data-layer={layer.id} aria-hidden="true" />
-                    {layer.name}
+                    {label(layer.name)}
                   </button>
                 ))}
               </fieldset>
-              <fieldset className={css.switch} aria-label="显示方式">
+              <fieldset className={css.switch} aria-label={label("显示方式")}>
                 {(
                   [
                     ["map", "地图"],
@@ -567,16 +673,16 @@ export function MapPage({
                   ] as const
                 ).map(([id, name]) => (
                   <button type="button" key={id} aria-pressed={view === id} onClick={() => setView(id)}>
-                    {name}
+                    {label(name)}
                   </button>
                 ))}
               </fieldset>
             </div>
-            <fieldset className={css.years} aria-label="按年份筛选">
+            <fieldset className={css.years} aria-label={label("按年份筛选")}>
               {[
-                { id: "all", name: "全部" },
+                { id: "all", name: label("全部") },
                 ...years.map((id) => ({ id, name: id })),
-                { id: "undated", name: `时间不详 ${data.undated}` },
+                { id: "undated", name: t(`时间不详 ${data.undated}`, `Undated ${data.undated}`) },
               ].map((item) => (
                 <button
                   type="button"
@@ -589,13 +695,13 @@ export function MapPage({
                     setSelected(null);
                   }}
                 >
-                  {item.name}
+                  {label(item.name)}
                 </button>
               ))}
             </fieldset>
-            <fieldset className={css.range} aria-label="按日期区间筛选">
+            <fieldset className={css.range} aria-label={label("按日期区间筛选")}>
               <label>
-                从
+                {label("从")}
                 <input
                   type="date"
                   value={from}
@@ -607,7 +713,7 @@ export function MapPage({
                 />
               </label>
               <label>
-                至
+                {label("至")}
                 <input
                   type="date"
                   value={to}
@@ -628,12 +734,12 @@ export function MapPage({
                   setSelected(null);
                 }}
               >
-                清除时间筛选
+                {label("清除时间筛选")}
               </button>
             </fieldset>
             {invalidRange && (
               <p role="alert" className={css.formError}>
-                开始日期不能晚于结束日期
+                {label("开始日期不能晚于结束日期")}
               </p>
             )}
           </details>
@@ -641,18 +747,18 @@ export function MapPage({
             <div className={css.filterStatus}>
               <span>
                 {year === "undated"
-                  ? "时间不详"
+                  ? label("时间不详")
                   : year === "range"
-                    ? `${from || "不限"} — ${to || "不限"}`
+                    ? `${from || label("不限")} — ${to || label("不限")}`
                     : year === "all"
-                      ? "全部时间"
-                      : `${year} 年`}
+                      ? label("全部时间")
+                      : t(`${year} 年`, year)}
                 {enabled.length !== layers.length
                   ? ` · ${
                       layers
                         .filter((l) => enabled.includes(l.id))
-                        .map((l) => l.name)
-                        .join("、") || "未选择图层"
+                        .map((l) => label(l.name))
+                        .join(t("、", ", ")) || label("未选择图层")
                     }`
                   : ""}
               </span>
@@ -667,7 +773,7 @@ export function MapPage({
                   setSelected(null);
                 }}
               >
-                重置筛选
+                {label("重置筛选")}
               </button>
             </div>
           )}
@@ -686,18 +792,24 @@ export function MapPage({
               onAdd={(mode) =>
                 mode === "now"
                   ? ask(
-                      "请帮我核对目前居住的城市，并确认对应经历的时间和事实状态。不要把计划或推测写成已发生。",
+                      t(
+                        "请帮我核对目前居住的城市，并确认对应经历的时间和事实状态。不要把计划或推测写成已发生。",
+                        "Help me review my current city of residence and confirm the dates and fact status. Keep plans and inference separate from past events.",
+                      ),
                     )
                   : ask(
                       mode === "history"
-                        ? prompt
-                        : "我想记一个计划去的城市，请先问我要去哪里，区分计划与 AI 建议，不写成已经去过。",
+                        ? t(prompt, promptEn)
+                        : t(
+                            "我想记一个计划去的城市，请先问我要去哪里，区分计划与 AI 建议，不写成已经去过。",
+                            "I want to add a city I plan to visit. Ask me which city, distinguish my plan from AI suggestions, and do not mark it as already visited.",
+                          ),
                     )
               }
             />
             <section
               className={css.listPane}
-              aria-label="城市列表"
+              aria-label={label("城市列表")}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   setView("map");
@@ -721,12 +833,16 @@ export function MapPage({
               {!!data.review.length && (
                 <details className={css.review}>
                   <summary>
-                    {data.review.length} 段经历待核对 <span aria-hidden="true">⌄</span>
+                    {t(
+                      `${data.review.length} 段经历待核对`,
+                      `${data.review.length} ${data.review.length === 1 ? "place" : "places"} to review`,
+                    )}{" "}
+                    <span aria-hidden="true">⌄</span>
                   </summary>
                   {data.review.map((item) => (
                     <div key={item.id} className={css.reviewItem}>
                       <h3>
-                        {item.place.name} · {item.review ? "地点待核对" : "事实或时间待核对"}
+                        {item.place.name} · {item.review ? label("地点待核对") : label("事实或时间待核对")}
                       </h3>
                       <ExperienceDetails
                         key={`${item.id}:${item.rev ?? 1}`}
@@ -748,23 +864,23 @@ export function MapPage({
                           >
                             <strong>{candidate.zh[0] || candidate.name}</strong>
                             <span>
-                              {candidate.name} · {candidate.admin1 || "暂无记录"} · {candidate.country}
+                              {candidate.name} · {candidate.admin1 || label("暂无记录")} · {candidate.country}
                             </span>
                             <span>
                               {candidate.population > 0
-                                ? `人口约 ${new Intl.NumberFormat("zh-CN", {
+                                ? `${t("人口约", "Population about")} ${new Intl.NumberFormat(locale, {
                                     notation: "compact",
                                     maximumFractionDigits: 1,
                                   }).format(candidate.population)}`
-                                : "人口暂无记录"}
+                                : label("人口暂无记录")}
                             </span>
                           </button>
                         ))
                       ) : (
                         <p className={css.secondary}>
                           {item.review
-                            ? "没有候选城市，可修正地名。"
-                            : "这条记录是推测或日期仍在未来，核对后才计入已到访。"}
+                            ? label("没有候选城市，可修正地名。")
+                            : label("这条记录是推测或日期仍在未来，核对后才计入已到访。")}
                         </p>
                       )}
                     </div>
@@ -772,11 +888,11 @@ export function MapPage({
                 </details>
               )}
               <div className={css.listHeading}>
-                <h2>我的城市</h2>
-                <span>{cities.length} 个</span>
+                <h2>{label("我的城市")}</h2>
+                <span>{cities.length}</span>
               </div>
               {!compact && details}
-              {!cities.length && <p className={css.empty}>这个筛选下暂无记录。</p>}
+              {!cities.length && <p className={css.empty}>{label("这个筛选下暂无记录。")}</p>}
               {cities.map((item) => (
                 <button
                   type="button"
@@ -790,8 +906,11 @@ export function MapPage({
                     <strong>{item.place.name}</strong>
                     <span className={css.secondary}>
                       {item.home
-                        ? "⌂ 家乡 · 起点"
-                        : `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`}
+                        ? label("⌂ 家乡 · 起点")
+                        : t(
+                            `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
+                            `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
+                          )}
                     </span>
                   </span>
                   <span className={css.cityShapes}>
@@ -801,7 +920,7 @@ export function MapPage({
                         className={css.shape}
                         data-layer={id}
                         role="img"
-                        aria-label={layers.find((l) => l.id === id)?.name}
+                        aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
                       />
                     ))}
                     <span aria-hidden="true">›</span>
@@ -812,8 +931,8 @@ export function MapPage({
           </div>
 
           {(timeline.length > 0 || home) && (
-            <section className={css.timeline} aria-label="经历时间轴">
-              <h2>生活的章节</h2>
+            <section className={css.timeline} aria-label={label("经历时间轴")}>
+              <h2>{label("生活的章节")}</h2>
               <div className={css.timelineCards}>
                 {home && (
                   <button
@@ -822,9 +941,11 @@ export function MapPage({
                     aria-pressed={selected === homeId}
                     onClick={() => setSelected(homeId)}
                   >
-                    <span>人生起点</span>
-                    <strong>⌂ {home.name} · 家乡</strong>
-                    <small>查看家乡依据</small>
+                    <span>{label("人生起点")}</span>
+                    <strong>
+                      ⌂ {home.name} · {t("家乡", "Hometown")}
+                    </strong>
+                    <small>{label("查看家乡依据")}</small>
                   </button>
                 )}
                 {timeline.slice(0, chapterLimit).map(({ city, item }) => (
@@ -835,11 +956,11 @@ export function MapPage({
                     aria-pressed={selected === city.id}
                     onClick={() => setSelected(city.id)}
                   >
-                    <span>{dateLabel(item.start, item.time_precision)}</span>
+                    <span>{dateLabel(item.start, item.time_precision, locale)}</span>
                     <strong>
-                      {city.place.name} · {item.title || eventTypes[item.event_type]}
+                      {city.place.name} · {item.title || label(eventTypes[item.event_type])}
                     </strong>
-                    <small>{statuses[item.fact_status]}</small>
+                    <small>{label(statuses[item.fact_status])}</small>
                   </button>
                 ))}
               </div>
@@ -847,7 +968,10 @@ export function MapPage({
           )}
           {timeline.length > chapterLimit && (
             <button type="button" className={css.link} onClick={() => setChapterLimit((value) => value + 30)}>
-              更多时间轴经历（{timeline.length - chapterLimit}）
+              {t(
+                `更多时间轴经历（${timeline.length - chapterLimit}）`,
+                `More timeline entries (${timeline.length - chapterLimit})`,
+              )}
             </button>
           )}
           <div className={css.mapFooter}>
@@ -857,10 +981,10 @@ export function MapPage({
               aria-pressed={showRoutes}
               onClick={() => setShowRoutes((value) => !value)}
             >
-              {showRoutes ? "隐藏经历连线" : "显示经历连线"}
+              {showRoutes ? label("隐藏经历连线") : label("显示经历连线")}
             </button>
           </div>
-          <p className={css.mapFootnote}>城市级位置 · 连线表示经历顺序</p>
+          <p className={css.mapFootnote}>{label("城市级位置 · 连线表示经历顺序")}</p>
           <details className={css.review}>
             <summary>{t("地图资料去向", "Map data and connections")}</summary>
             <p>

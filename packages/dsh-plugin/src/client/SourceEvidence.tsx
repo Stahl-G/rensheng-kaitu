@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { ExperienceSource } from "../types.js";
 import css from "./MapPage.module.css";
+import { useT } from "./i18n.js";
 
 export function SourceEvidence({
   id,
   load,
-  label = "查看原文",
+  label,
 }: { id: string; label?: string; load: (id: string) => Promise<ExperienceSource> }) {
+  const t = useT();
   const focus = useRef<HTMLElement>(null);
   const [source, setSource] = useState<ExperienceSource | null>(null);
   const [open, setOpen] = useState(false);
@@ -42,16 +44,22 @@ export function SourceEvidence({
           }
         }}
       >
-        {busy ? "正在读取原文…" : open ? "收起原文" : label}
+        {busy
+          ? t("正在读取原文…", "Loading source…")
+          : open
+            ? t("收起原文", "Hide source")
+            : (label ?? t("查看原文", "View source"))}
       </button>
       {open && (
-        <div aria-label="来源原文">
+        <div aria-label={t("来源原文", "Source text")}>
           {error && <p role="alert">{error}</p>}
           {source?.kind === "local" && (
             <>
               <p className={css.source}>
-                {source.file} · 从第 {source.firstLine} 行显示
-                {source.focusLine ? ` · 定位第 ${source.focusLine} 行` : ""}
+                {source.file} · {t(`从第 ${source.firstLine} 行显示`, `From line ${source.firstLine}`)}
+                {source.focusLine
+                  ? t(` · 定位第 ${source.focusLine} 行`, ` · Highlighting line ${source.focusLine}`)
+                  : ""}
               </p>
               <pre className={css.sourceText}>
                 {lines ? (
@@ -66,15 +74,39 @@ export function SourceEvidence({
                   source.text
                 )}
               </pre>
-              {source.truncated && <p className={css.secondary}>显示原文片段，完整资料保留在工作区。</p>}
+              {source.truncated && (
+                <p className={css.secondary}>
+                  {t(
+                    "显示原文片段，完整资料保留在工作区。",
+                    "Showing an excerpt. The full source stays in your workspace.",
+                  )}
+                </p>
+              )}
             </>
           )}
           {source?.kind === "external" && (
             <a href={source.url} target="_blank" rel="noreferrer">
-              打开来源网页 ↗
+              {t("打开来源网页 ↗", "Open source page ↗")}
             </a>
           )}
-          {source?.kind === "unavailable" && <p className={css.secondary}>{source.reason}</p>}
+          {source?.kind === "unavailable" && (
+            <p className={css.secondary}>
+              {t(
+                source.reason,
+                (
+                  {
+                    "来源链接不完整，请核对来源": "The source link is incomplete. Review its location.",
+                    这条经历尚未附可打开的原文路径: "This place has no source location to open yet.",
+                    "原文已移动或不在当前工作区，经历仍保留":
+                      "The source moved or is outside this workspace. The place is kept.",
+                  } as Record<string, string>
+                )[source.reason] ??
+                  (/^当前原文没有第 \d+ 行，请核对来源定位$/.test(source.reason)
+                    ? "This line is missing from the source. Review its location."
+                    : source.reason),
+              )}
+            </p>
+          )}
         </div>
       )}
     </div>
