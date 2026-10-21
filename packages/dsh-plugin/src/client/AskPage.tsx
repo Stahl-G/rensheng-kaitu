@@ -197,14 +197,11 @@ function NativeApproval({
   return (
     <details open={!status} className={css.tool}>
       <summary>
-        {status
-          ? labels[status]
-          : data.reason || t("本机 Agent 请求批准这一步", "The local Agent requests approval")}
+        {data.reason || t("本机 Agent 请求批准这一步", "The local Agent requests approval")}
+        {status ? ` · ${labels[status]}` : ""}
       </summary>
       <pre>{data.detail}</pre>
-      {status ? (
-        <output className={css.approvalStatus}>{labels[status]}</output>
-      ) : (
+      {!status && (
         <>
           {error && (
             <p role="alert" className={css.approvalStatus}>
