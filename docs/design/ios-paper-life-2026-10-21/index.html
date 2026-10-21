@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>开图 · 纸上生活</title>
+  <link rel="stylesheet" href="assets/leaflet.css" />
+  <link rel="stylesheet" href="assets/app.css" />
+</head>
+<body data-viewport="phone" data-theme="light" data-text="normal" data-motion="normal">
+  <div class="demo-shell">
+    <aside class="demo-panel" id="demoPanel" aria-label="演示目录与覆盖清单">
+      <div class="demo-head">
+        <div>
+          <strong>开图</strong>
+          <span>完整 UI · 纸上一版</span>
+        </div>
+        <button type="button" class="demo-close" data-demo="close-panel" aria-label="收起演示目录">×</button>
+      </div>
+      <p class="demo-note">全部人物、城市、健康、财务与对话内容均为合成示例，不代表真实用户。语音、AI、同步与连接不真实发生。</p>
+
+      <section class="demo-group">
+        <h2>视口</h2>
+        <div class="demo-seg">
+          <button type="button" class="is-active" data-viewport-set="phone">393</button>
+          <button type="button" data-viewport-set="phone-320">320</button>
+          <button type="button" data-viewport-set="desktop">桌面</button>
+        </div>
+      </section>
+
+      <section class="demo-group">
+        <h2>外观</h2>
+        <div class="demo-seg two">
+          <button type="button" class="is-active" data-theme-set="light">浅色</button>
+          <button type="button" data-theme-set="dark">深色</button>
+        </div>
+        <div class="demo-seg two">
+          <button type="button" class="is-active" data-text-set="normal">标准字</button>
+          <button type="button" data-text-set="large">放大字</button>
+        </div>
+        <div class="demo-seg two">
+          <button type="button" class="is-active" data-motion-set="normal">完整动效</button>
+          <button type="button" data-motion-set="reduced">减弱动效</button>
+        </div>
+      </section>
+
+      <section class="demo-group">
+        <h2>共用状态</h2>
+        <div class="demo-seg two">
+          <button type="button" data-demo-state="empty">空资料</button>
+          <button type="button" data-demo-state="sync">同步失败</button>
+          <button type="button" data-demo-state="mapfail">地图失败</button>
+          <button type="button" data-demo-state="askfail">生成失败</button>
+          <button type="button" data-demo-state="longname">长名字</button>
+          <button type="button" data-demo-state="keyboard">键盘</button>
+        </div>
+      </section>
+
+      <section class="demo-group demo-pages">
+        <h2>页面 / 状态覆盖</h2>
+        <nav id="demoNav" aria-label="逐页目录"></nav>
+      </section>
+      <p class="demo-foot">桌面与 393 / 320 手机共用一套页面。地图为真实几何；街道瓦片联网加载，失败时保留本地世界底图。</p>
+    </aside>
+
+    <main class="stage">
+      <button type="button" class="demo-open" data-demo="open-panel" aria-label="打开演示目录">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        <span class="demo-open-label">演示目录</span>
+      </button>
+      <div class="device" id="device">
+        <div class="app" id="app" data-page="today" data-sub="" data-layout="desktop"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root" aria-live="polite"></div>
+
+  <script src="assets/leaflet.js"></script>
+  <script src="assets/cities.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

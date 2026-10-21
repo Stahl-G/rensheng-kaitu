@@ -294,3 +294,7 @@ yahoo-finance2 4.0.3（MIT）：https://github.com/gadicc/yahoo-finance2 。仅�
 - 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.2/packages/web
 - 复用发布包的提供方实现，Key 在开图适配层通过本机凭据服务读取，不写入提供方配置。
 - 完整许可证随 npm 依赖及桌面载荷的 `licenses/` 目录保留。
+
+## iOS「纸上生活」设计原型（2026-10-21）
+
+`docs/design/ios-paper-life-2026-10-21/` 独立保存 Open Design 原型，使用 Leaflet 1.9.4（BSD-2-Clause）、Natural Earth 世界几何（公共领域）和 GeoNames 地点坐标（CC BY 4.0），联网底图为 OpenStreetMap 数据。完整来源、许可和占位照片说明见该目录的 [THIRD-PARTY-NOTICES.md](docs/design/ios-paper-life-2026-10-21/THIRD-PARTY-NOTICES.md)。
