@@ -69,7 +69,7 @@ export function PersonalPages(
   const [history, setHistory] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
-  const [opening, setOpening] = useState(false);
+  const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
   const [workspacePath, setWorkspacePath] = useState("");
   const refresh = useCallback(async () => {
     try {
@@ -187,7 +187,7 @@ export function PersonalPages(
                   type="button"
                   className={`${css.btn} ${css["btn-quiet"]}`}
                   onClick={() => {
-                    setOpening(false);
+                    setOpening(null);
                     setMoving(!moving);
                   }}
                 >
@@ -201,7 +201,22 @@ export function PersonalPages(
                   disabled={busy}
                   onClick={() => {
                     setMoving(false);
-                    setOpening(!opening);
+                    setWorkspacePath("");
+                    setOpening(opening === "initialize" ? null : "initialize");
+                  }}
+                >
+                  {t("新建空白工作区…", "Create a blank workspace…")}
+                </button>
+              )}
+              {props.workspaceBackup && (
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setMoving(false);
+                    setWorkspacePath("");
+                    setOpening(opening === "activate" ? null : "activate");
                   }}
                 >
                   {t("打开已有工作区…", "Open an existing workspace…")}
@@ -215,16 +230,30 @@ export function PersonalPages(
                   event.preventDefault();
                   void run(
                     async () => {
-                      await props.workspaceBackup?.("activate", { root: workspacePath.trim() });
+                      const root = workspacePath.trim();
+                      if (opening === "initialize") await props.workspaceBackup?.("initialize", { root });
+                      await props.workspaceBackup?.("activate", { root });
                       await props.refreshWorkspace();
-                      setOpening(false);
+                      setOpening(null);
                     },
-                    t("已打开已有工作区", "Existing workspace opened"),
+                    opening === "initialize"
+                      ? t("已创建空白工作区", "Blank workspace created")
+                      : t("已打开已有工作区", "Existing workspace opened"),
                   );
                 }}
               >
+                {opening === "initialize" && (
+                  <p className={css.small}>
+                    {t(
+                      "选择一个空文件夹，生成独立的空白资料；当前资料会保留在原位置。",
+                      "Choose an empty folder for separate blank notes. Your current notes stay in their original location.",
+                    )}
+                  </p>
+                )}
                 <label>
-                  {t("已有工作区路径", "Existing workspace path")}
+                  {opening === "initialize"
+                    ? t("空文件夹路径", "Empty folder path")
+                    : t("已有工作区路径", "Existing workspace path")}
                   <input
                     required
                     value={workspacePath}
@@ -243,14 +272,20 @@ export function PersonalPages(
                     }, "")
                   }
                 >
-                  {t("选择已有文件夹…", "Choose an existing folder…")}
+                  {opening === "initialize"
+                    ? t("选择空文件夹…", "Choose an empty folder…")
+                    : t("选择已有文件夹…", "Choose an existing folder…")}
                 </button>
                 <button
                   type="submit"
                   className={`${css.btn} ${css["btn-primary"]}`}
                   disabled={busy || !workspacePath.trim()}
                 >
-                  {busy ? t("正在打开…", "Opening…") : t("打开此工作区", "Open this workspace")}
+                  {busy
+                    ? t("正在打开…", "Opening…")
+                    : opening === "initialize"
+                      ? t("新建并打开", "Create and open")
+                      : t("打开此工作区", "Open this workspace")}
                 </button>
               </form>
             )}

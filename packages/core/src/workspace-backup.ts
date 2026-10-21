@@ -835,13 +835,42 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
         throw new Error(pick("请选择冲突文件和保留版本", "Choose a file and version"));
       return resolveWorkspaceBackup(ws, args.path, args.choice);
     }
+    case "initialize":
     case "activate": {
-      if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
+      if (active.has(ws))
+        throw new KaituError(
+          pick("请等待本次同步完成", "Wait for the current sync to finish"),
+          "BACKUP_BUSY",
+        );
       if (!args.root || !isAbsolute(args.root))
-        throw new Error(pick("请选择恢复后的工作区", "Select a restored workspace"));
+        throw new KaituError(
+          pick("请选择资料文件夹的完整路径", "Choose an absolute workspace folder path"),
+          "BAD_ARGS",
+        );
+      if (operation === "initialize") {
+        if (
+          existsSync(args.root) &&
+          (!(await fs.stat(args.root)).isDirectory() ||
+            (await fs.readdir(args.root)).some((name) => name !== ".DS_Store"))
+        )
+          throw new KaituError(
+            pick("请选择空文件夹来新建空白工作区", "Choose an empty folder to create a blank workspace"),
+            "NOT_EMPTY",
+          );
+        const initialized = await initWorkspace(args.root, {
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        });
+        return { root: initialized.root };
+      }
       const opened = new Workspace(args.root);
       if (!opened.exists(".kaitu/config.json"))
-        throw new Error(pick("不是开图工作区", "Not a Kaitu workspace"));
+        throw new KaituError(
+          pick(
+            "这个文件夹还没有开图资料。请使用「新建空白工作区」。",
+            "This folder has no Kaitu workspace. Use Create a blank workspace.",
+          ),
+          "NOT_INITIALIZED",
+        );
       // 先读取目标状态；损坏的备份或凭据文件不能把当前工作区切走。
       const status = workspaceBackupStatus(opened);
       const previous = ws.root;
