@@ -176,7 +176,7 @@ export function OnboardingPage(props: Props) {
           confirming.current = false;
         }
         await save({ memoryAi: ai as OnboardingAi, skipped: skip(["memory"], false) });
-        finish("today");
+        finish(matterDestination ?? "today");
         await props.refresh();
       }
     } else if (step === 2) {
@@ -206,7 +206,7 @@ export function OnboardingPage(props: Props) {
         : {}),
       ...(step === 4 ? { aiChoice: "none", skipped: skip(["ai"], true) } : {}),
     });
-    finish("today");
+    finish(memoryMode ? (matterDestination ?? "today") : "today");
   };
   const back = async () => {
     setError("");
@@ -360,7 +360,9 @@ export function OnboardingPage(props: Props) {
               {t("上一步", "Back")}
             </button>
             <button type="button" className={v2.link} disabled={busy} onClick={() => void run(skipStep)}>
-              {t("先随便看看", "Look around first")}
+              {matterDestination === "connections"
+                ? t("先随便看看，GitHub 稍后设置", "Look around first; set up GitHub later")
+                : t("先随便看看", "Look around first")}
             </button>
           </div>
         </>
@@ -511,7 +513,9 @@ export function OnboardingPage(props: Props) {
                   ? t(`记下这 ${selected.length} 条`, `Save these ${selected.length}`)
                   : t("完成", "Done")
                 : t("看看认出了什么", "See what it found"),
-              t("我没有常用的 AI，跳过", "I don't use an AI regularly, skip"),
+              matterDestination === "connections"
+                ? t("跳过记忆搬入，继续设置 GitHub", "Skip memories and set up GitHub")
+                : t("我没有常用的 AI，跳过", "I don't use an AI regularly, skip"),
               !preview && !text.trim(),
             )}
         </>
