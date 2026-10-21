@@ -77,6 +77,9 @@ export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
+  const [preferencesFailed, setPreferencesFailed] = useState(false);
+  const [preferencesAttempt, setPreferencesAttempt] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry starts a fresh read and cancels the previous effect.
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
@@ -87,16 +90,17 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
         setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
+        setPreferencesFailed(false);
       })
       .catch(() => {
         if (!active) return;
         setLocale("zh-CN");
-        setExploreEntries([...defaultExploreEntries]);
+        setPreferencesFailed(true);
       });
     return () => {
       active = false;
     };
-  }, [props.loadPreferences]);
+  }, [props.loadPreferences, preferencesAttempt]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
       <Overview
@@ -107,6 +111,14 @@ export function OverviewPage(props: OverviewPageProps) {
         setFollowSystem={setFollowSystem}
         exploreEntries={exploreEntries}
         setExploreEntries={setExploreEntries}
+        retryPreferences={
+          preferencesFailed && exploreEntries === null
+            ? () => {
+                setPreferencesFailed(false);
+                setPreferencesAttempt((attempt) => attempt + 1);
+              }
+            : undefined
+        }
       />
     </LocaleContext.Provider>
   );
@@ -119,6 +131,7 @@ function Overview({
   setFollowSystem,
   exploreEntries,
   setExploreEntries,
+  retryPreferences,
   ...props
 }: OverviewPageProps & {
   locale: Locale | null;
@@ -127,6 +140,7 @@ function Overview({
   setFollowSystem: (value: boolean) => void;
   exploreEntries: string[] | null;
   setExploreEntries: (value: string[]) => void;
+  retryPreferences?: () => void;
 }) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
@@ -370,6 +384,7 @@ function Overview({
     const resolved = await props.loadPreferences(browserLocale());
     setLocale(resolved.locale === "en" ? "en" : "zh-CN");
     setFollowSystem(resolved.followSystem ?? false);
+    setExploreEntries(resolved.exploreEntries ?? [...defaultExploreEntries]);
   };
   const child = {
     ...props,
@@ -891,6 +906,14 @@ function Overview({
           <>
             <section className={css.sec} aria-label={t("开图", "Explore")}>
               <h1 className={css.sr}>{t("开图", "Explore")}</h1>
+              {retryPreferences && (
+                <div className={css.exploreManage} role="alert">
+                  <span>{t("入口布局读取失败。", "Could not load your entry layout.")}</span>
+                  <button type="button" onClick={retryPreferences}>
+                    {t("重试读取", "Retry loading")}
+                  </button>
+                </div>
+              )}
               <ExploreNavigation
                 entries={exploreEntries}
                 current={explore}
