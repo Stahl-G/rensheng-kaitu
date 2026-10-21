@@ -220,7 +220,13 @@ export function InboxPage({
             <blockquote>{row.text}</blockquote>
             <span className={css.st}>
               <span className={css.chip}>
-                {row.status === "organized" ? "已整理" : row.status === "review" ? "要你核对" : "只存了原文"}
+                {row.status === "organized"
+                  ? row.destination
+                    ? t("已整理", "Organized")
+                    : t("原文已保留", "Original kept")
+                  : row.status === "review"
+                    ? t("要你核对", "Needs review")
+                    : t("只存了原文", "Text saved")}
               </span>
               {row.destination && row.destinationId ? (
                 <button
