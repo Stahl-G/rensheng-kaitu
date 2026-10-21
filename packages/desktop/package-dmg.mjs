@@ -20,6 +20,7 @@ export function createDmg({ app, dmg, temporary, identity, notarize }) {
     { stdio: "inherit" },
   );
   const mount = join(temporary, "verify-mount");
+  mkdirSync(mount);
   execFileSync("/usr/bin/hdiutil", ["attach", image, "-readonly", "-nobrowse", "-mountpoint", mount], {
     stdio: "inherit",
   });
