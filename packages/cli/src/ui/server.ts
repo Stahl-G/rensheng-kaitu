@@ -466,8 +466,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           if (error instanceof KaituError) throw error;
           return json(res, 400, {
             error: pick(
-              resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"] ?? "zh-CN")
-                .locale,
+              resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ??
+                "zh-CN",
               "采集设置未完成，请检查参数或稍后重试",
               "Couldn't save these data settings. Check them and try again.",
             ),
@@ -793,10 +793,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       notify();
       json(res, 200, result);
     } catch (error) {
-      const locale = resolvePreferences(
-        ws,
-        options.systemLocale ?? req.headers["accept-language"] ?? "zh-CN",
-      ).locale;
+      const locale =
+        resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ?? "zh-CN";
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
       if (req.url === "/api/product/moveStorage" && (error as NodeJS.ErrnoException).code === "EBUSY")
         return json(res, 400, {
