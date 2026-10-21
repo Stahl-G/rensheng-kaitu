@@ -67,7 +67,7 @@ export function PlansCard({
     return t(`从 ${name} 搬来 · ${date}`, `From ${name} · ${date}`);
   };
   const row = (goal: PlansData["goals"][number]) => (
-    <div key={goal.id}>
+    <div key={goal.id} id={`plan-${goal.id}`}>
       <div className={css.row}>
         <span className={`${css["row-title"]} ${css.stack}`}>
           <b>{goal.title}</b>

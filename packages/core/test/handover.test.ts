@@ -20,9 +20,11 @@ import {
   pasteOnboardingMatter,
   previewOnboardingMemory,
   readExploration,
+  readLibrary,
   readOverviewPage,
   readRecords,
   saveOnboardingMatter,
+  updateRecord,
   validateWorkspace,
 } from "../src/index.js";
 
@@ -100,6 +102,21 @@ it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核
     expect(onboardingStatus(ws, options).checklist.items.find((item) => item.id === "ai")?.done).toBe(false);
     const next = await adoptOnboardingMatter(ws, matter.source, draft.draft as never);
     expect(next.goal).toBe("每周稳定练三次");
+    expect(
+      readLibrary(ws, { section: "inbox" }).inbox.find((entry) =>
+        entry.file.endsWith(matter.source.split("/").at(-1) ?? ""),
+      ),
+    ).toMatchObject({
+      status: "organized",
+    });
+    const source = matter.source.split("/").at(-1) as string;
+    expect((await readOverviewPage(ws)).plans.sources[source]).toMatchObject({
+      taskId: next.id,
+      title: "周二晚上先练 20 分钟",
+      goalTitle: "每周稳定练三次",
+    });
+    updateRecord(ws, "task", next.id, { title: "周二先练 25 分钟" }, { by: "user" });
+    expect((await readOverviewPage(ws)).plans.sources[source]?.title).toBe("周二先练 25 分钟");
     expect(readRecords(ws, "task")).toContainEqual(expect.objectContaining({ by: "user", status: "open" }));
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
