@@ -879,6 +879,7 @@ function Overview({
               />
             ) : record === "inbox" ? (
               <InboxPage
+                sources={data?.plans.sources}
                 openNext={(id, goalId) => {
                   setGuide(null);
                   setView("overview");

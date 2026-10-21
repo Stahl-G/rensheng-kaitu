@@ -1,4 +1,4 @@
-import type { LibraryQuery } from "@kaitu/core";
+import type { LibraryQuery, PlansData } from "@kaitu/core";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
@@ -94,11 +94,13 @@ export function InboxPage({
   channelSettings,
   connect,
   openNext,
+  sources,
 }: Pick<LibraryProps, "loadLibrary"> & {
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
   connect: () => void;
   openNext: (id: string, goalId?: string) => void;
+  sources: PlansData["sources"] | undefined;
 }) {
   const t = useT();
   const [channels, setChannels] = useState<ChannelState>();
@@ -204,50 +206,56 @@ export function InboxPage({
             : "这里还没有原文记录"}
         </p>
       ) : (
-        entries.map((row) => (
-          <div className={css.raw} key={row.file}>
-            <time>
-              {row.date?.slice(0, 16).replace("T", " ") ?? "时间未记录"}
-              <br />
-              <span className={css.small}>
-                {row.source === "me"
-                  ? "随手记"
-                  : row.source === "mail"
-                    ? "邮件"
-                    : row.source === "slack"
-                      ? "Slack"
-                      : row.source === "feishu"
-                        ? "飞书"
-                        : "其他原文"}
+        entries.map((row) => {
+          const destination = sources?.[row.file.split("/").at(-1) ?? ""];
+          return (
+            <div className={css.raw} key={row.file}>
+              <time>
+                {row.date?.slice(0, 16).replace("T", " ") ?? "时间未记录"}
+                <br />
+                <span className={css.small}>
+                  {row.source === "me"
+                    ? "随手记"
+                    : row.source === "mail"
+                      ? "邮件"
+                      : row.source === "slack"
+                        ? "Slack"
+                        : row.source === "feishu"
+                          ? "飞书"
+                          : "其他原文"}
+                </span>
+              </time>
+              <blockquote>{row.text}</blockquote>
+              <span className={css.st}>
+                <span className={css.chip}>
+                  {row.status === "organized"
+                    ? t("已整理", "Organized")
+                    : row.status === "review"
+                      ? t("要你核对", "Needs review")
+                      : t("只存了原文", "Text saved")}
+                </span>
+                {row.status === "organized" && destination ? (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => openNext(destination.taskId, destination.goalId)}
+                  >
+                    {t(
+                      `变成下一步：${destination.title}${destination.goalTitle ? `（目标：${destination.goalTitle}）` : ""}`,
+                      `Next step: ${destination.title}${destination.goalTitle ? ` (Goal: ${destination.goalTitle})` : ""}`,
+                    )}
+                  </button>
+                ) : row.status === "organized" ? (
+                  t("只保留了原文", "Original text kept")
+                ) : row.status === "review" ? (
+                  "请核对原文与相关资料"
+                ) : (
+                  "还没整理"
+                )}
               </span>
-            </time>
-            <blockquote>{row.text}</blockquote>
-            <span className={css.st}>
-              <span className={css.chip}>
-                {row.status === "organized"
-                  ? t("已整理", "Organized")
-                  : row.status === "review"
-                    ? t("要你核对", "Needs review")
-                    : t("只存了原文", "Text saved")}
-              </span>
-              {row.destination && row.destinationId ? (
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() => openNext(row.destinationId ?? "", row.destinationGoalId)}
-                >
-                  {row.destination}
-                </button>
-              ) : row.status === "organized" ? (
-                t("只保留了原文", "Original text kept")
-              ) : row.status === "review" ? (
-                "请核对原文与相关资料"
-              ) : (
-                "还没整理"
-              )}
-            </span>
-          </div>
-        ))
+            </div>
+          );
+        })
       )}
       {next && (
         <button type="button" className={css.link} disabled={loading} onClick={() => void more()}>
