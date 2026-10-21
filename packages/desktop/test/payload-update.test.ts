@@ -43,15 +43,23 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   );
   const bytes = Buffer.from(zipSync(entries));
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
-  const served: { envelope?: { manifest: string; signature: string }; bytes: Buffer } = { bytes };
+  const served: {
+    envelope?: { manifest: string; signature: string };
+    bytes: Buffer;
+    feedStatus: number;
+    packageStatus: number;
+  } = { bytes, feedStatus: 404, packageStatus: 200 };
   let payloadDownloads = 0;
   const server = createServer((req, res) => {
     if (req.url === "/feed" || req.url === "/features.zip") {
       res.writeHead(302, { Location: req.url === "/feed" ? "/latest.json" : "/payload.zip" });
       res.end();
-    } else if (req.url === "/latest.json") res.end(JSON.stringify(served.envelope));
-    else {
+    } else if (req.url === "/latest.json") {
+      res.writeHead(served.feedStatus);
+      res.end(JSON.stringify(served.envelope));
+    } else {
       payloadDownloads++;
+      res.writeHead(served.packageStatus);
       res.end(served.bytes);
     }
   });
@@ -92,9 +100,37 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     expect((await reopened.request()).phase).toBe("idle");
     await reopened.request("automatic:on");
     await reopened.checkAutomatically();
-    expect((await reopened.request()).phase).toBe("available");
+    expect(await reopened.request()).toMatchObject({
+      phase: "unavailable",
+      automatic: true,
+      configured: true,
+      availableVersion: null,
+    });
+    expect(JSON.parse(readFileSync(join(state, "updates/preferences.json"), "utf8"))).toEqual({
+      automatic: true,
+    });
     expect(payloadDownloads).toBe(0);
     expect(selectPayload(state, resources)).toBe(payload);
+    served.feedStatus = 200;
+    await reopened.request("check");
+    await expect.poll(async () => (await reopened.request()).phase).toBe("available");
+    expect(payloadDownloads).toBe(0);
+    expect(selectPayload(state, resources)).toBe(payload);
+    await updater.request("check");
+    await expect.poll(async () => (await updater.request()).phase).toBe("available");
+    served.feedStatus = 404;
+    await updater.request("check");
+    await expect.poll(async () => (await updater.request()).phase).toBe("unavailable");
+    expect(await updater.request()).toMatchObject({ availableVersion: null, notes: "", automatic: false });
+    served.feedStatus = 200;
+    await updater.request("check");
+    await expect.poll(async () => (await updater.request()).phase).toBe("available");
+    served.packageStatus = 404;
+    await updater.request("install");
+    await expect.poll(async () => (await updater.request()).phase).toBe("error");
+    expect((await updater.request()).error).toMatch(/404/);
+    expect(selectPayload(state, resources)).toBe(payload);
+    served.packageStatus = 200;
     await updater.request("check");
     await expect.poll(async () => (await updater.request()).phase).toBe("available");
     await updater.request("install");
@@ -110,7 +146,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     await updated.checkAutomatically();
     expect((await updated.request()).phase).toBe("error");
     expect(selectPayload(state, resources)).toBe(active);
-    expect(payloadDownloads).toBe(1);
+    expect(payloadDownloads).toBe(2);
     served.envelope = signed({ ...release, version: "0.1.2" });
     await updated.checkAutomatically();
     served.bytes = Buffer.from("interrupted download");

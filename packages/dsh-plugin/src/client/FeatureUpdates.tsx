@@ -69,7 +69,10 @@ export function FeatureUpdates({
     compact &&
     (!state.configured ||
       notice === dismissed ||
-      !(["available", "downloading", "ready"].includes(state.phase) || (acted && (error || state.error))))
+      !(
+        ["available", "downloading", "ready"].includes(state.phase) ||
+        (acted && (error || state.error || state.phase === "unavailable"))
+      ))
   )
     return null;
   return (
@@ -94,6 +97,14 @@ export function FeatureUpdates({
       )}
       {!state.configured && <p className={css.small}>{t("未配置更新源", "No update source configured")}</p>}
       {state.phase === "current" && <p>{t("已是最新功能版本", "Features are up to date")}</p>}
+      {state.phase === "unavailable" && (
+        <p>
+          {t(
+            "更新清单暂不可用（404），请稍后重试。",
+            "The update manifest is unavailable (404). Try again later.",
+          )}
+        </p>
+      )}
       {state.phase === "checking" && <output>{t("正在检查更新…", "Checking for updates…")}</output>}
       {state.phase === "downloading" && (
         <output>{t("正在下载并验证更新…", "Downloading and verifying…")}</output>
