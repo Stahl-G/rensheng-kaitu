@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import type { CalendarData, CalendarEntry } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices, CalendarSlotForm } from "./CalendarPush.js";
 import css from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 
 export interface CalendarPageProps extends CalendarPushServices {
   loadCalendar: () => Promise<CalendarData>;
@@ -20,8 +20,8 @@ export function calendarDay(value: string, zone: string) {
     ? value.slice(0, 10)
     : new Intl.DateTimeFormat("sv-SE", { timeZone: zone }).format(new Date(value));
 }
-export function calendarTime(value: string, zone: string) {
-  if (value.length === 10) return "全天";
+export function calendarTime(value: string, zone: string, locale: Locale = "zh-CN") {
+  if (value.length === 10) return locale === "en" ? "All day" : "全天";
   return !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)
     ? value.slice(11, 16)
     : new Intl.DateTimeFormat("zh-CN", {
@@ -45,6 +45,7 @@ export function Agenda({
   busy: boolean;
 }) {
   const t = useT();
+  const locale = useLocale();
   const today =
     data?.events.filter(
       (event) =>
@@ -83,7 +84,9 @@ export function Agenda({
             .sort((a, b) => a.start.localeCompare(b.start))
             .map((event) => (
               <div className={css["agenda-row"]} key={event.id}>
-                <time>{event.start ? calendarTime(event.start, data.timeZone) : t("待定", "TBD")}</time>
+                <time>
+                  {event.start ? calendarTime(event.start, data.timeZone, locale) : t("待定", "TBD")}
+                </time>
                 <span>{event.title}</span>
                 {event.pending ? (
                   <div className={css.confirmationActions}>
@@ -105,7 +108,9 @@ export function Agenda({
                     </button>
                   </div>
                 ) : (
-                  <span className={css.small}>{event.source}</span>
+                  <span className={css.small}>
+                    {event.source === "开图" ? t("开图", "Kaitu") : event.source}
+                  </span>
                 )}
               </div>
             ))
@@ -115,6 +120,8 @@ export function Agenda({
   );
 }
 export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolean }) {
+  const t = useT();
+  const locale = useLocale();
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [editing, setEditing] = useState(false);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -163,9 +170,11 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
   return (
     <div className={css.sec}>
       <div className={css["sec-head"]}>
-        <p className={css.small}>日历订阅每 15 分钟刷新</p>
+        <p className={css.small}>
+          {t("日历订阅每 15 分钟刷新", "Calendar subscriptions refresh every 15 minutes")}
+        </p>
         <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} onClick={() => setAdding(!adding)}>
-          ＋ 添加日历
+          {t("＋ 添加日历", "+ Add calendar")}
         </button>
       </div>
       {error && (
@@ -192,24 +201,28 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
             }
           }}
         >
-          <b>添加日历订阅</b>
+          <b>{t("添加日历订阅", "Add a calendar subscription")}</b>
           <div className={css.fields}>
             <label>
-              ICS 订阅地址
+              {t("ICS 订阅地址", "ICS subscription URL")}
               <input
                 required
                 value={url}
-                placeholder="https://…/basic.ics 或 webcal://…"
+                placeholder={t("https://…/basic.ics 或 webcal://…", "https://…/basic.ics or webcal://…")}
                 onChange={(e) => setUrl(e.target.value)}
               />
             </label>
             <label>
-              叫它什么
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="比如：家庭" />
+              {t("叫它什么", "Name")}
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t("比如：家庭", "For example: Family")}
+              />
             </label>
           </div>
           <button type="submit" className={`${css.btn} ${css["btn-primary"]}`} disabled={busy}>
-            添加订阅
+            {t("添加订阅", "Add subscription")}
           </button>
         </form>
       )}
@@ -217,7 +230,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
         {data && (
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
-            locale={zh}
+            locale={locale === "en" ? "en" : zh}
             initialView="timeGridWeek"
             initialDate={data.today}
             headerToolbar={{
@@ -229,11 +242,11 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
             buttonText={{
               prev: "‹",
               next: "›",
-              today: "今天",
-              day: "日",
-              week: "周",
-              month: "月",
-              list: "列表",
+              today: t("今天", "Today"),
+              day: t("日", "Day"),
+              week: t("周", "Week"),
+              month: t("月", "Month"),
+              list: t("列表", "List"),
             }}
             height="auto"
             editable={false}
@@ -272,10 +285,10 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
         {sources.map((source) => (
           <span key={source}>
             <i className={css.dot} style={{ background: `var(--${colorFor(source)})` }} />
-            {source}
+            {source === "开图" ? t("开图", "Kaitu") : source}
           </span>
         ))}
-        <span>┄ 开图建议</span>
+        <span>{t("┄ 开图建议", "┄ Kaitu suggestion")}</span>
       </div>
       {selected && (
         <div className={`${css.card} ${css["cal-detail"]}`}>
@@ -300,7 +313,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
                 disabled={busy}
                 onClick={() => void decide("confirmed")}
               >
-                确认
+                {t("确认", "Confirm")}
               </button>
               <button
                 type="button"
@@ -308,14 +321,14 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
                 disabled={busy}
                 onClick={() => void decide("rejected")}
               >
-                不用
+                {t("不用", "No thanks")}
               </button>
             </>
           )}
           {!selected.pending && selected.source === "开图" && !!push?.entries[selected.id] && (
             <>
               <button type="button" className={css.link} disabled={busy} onClick={() => setEditing(!editing)}>
-                调整时间
+                {t("调整时间", "Change time")}
               </button>
               <button
                 type="button"
@@ -323,7 +336,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
                 disabled={busy}
                 onClick={() => void decide("rejected")}
               >
-                取消日程
+                {t("取消日程", "Cancel event")}
               </button>
             </>
           )}
@@ -365,7 +378,12 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
         <div key={sub.id} className={css.small}>
           {sub.name} ·{" "}
           {sub.error ??
-            (sub.syncedAt ? `最近同步 ${new Date(sub.syncedAt).toLocaleString("zh-CN")}` : "还没同步")}
+            (sub.syncedAt
+              ? t(
+                  `最近同步 ${new Date(sub.syncedAt).toLocaleString(locale)}`,
+                  `Last synced ${new Date(sub.syncedAt).toLocaleString(locale)}`,
+                )
+              : t("还没同步", "Not synced yet"))}
         </div>
       ))}
     </div>
