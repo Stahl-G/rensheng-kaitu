@@ -48,6 +48,7 @@ import {
   removeMemory,
   removePhoto,
   renderTeachingFrame,
+  resolvePreferences,
   restore,
   snapshotNow,
   stageUpload,
@@ -125,6 +126,26 @@ async function requestJson(req: IncomingMessage, limit: number): Promise<unknown
 function json(res: ServerResponse, status: number, data: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(data));
+}
+
+function englishError(error: KaituError): string {
+  if (!/[\u3400-\u9fff]/.test(error.message)) return error.message;
+  const messages: Record<string, string> = {
+    NOT_EMPTY: "Choose an empty folder to create a blank workspace.",
+    NOT_INITIALIZED: "This folder has no Kaitu workspace. Use Create a blank workspace.",
+    CONFLICT: "This item has changed. Refresh, review it and try again.",
+    TOO_LARGE: "The file or request is too large.",
+    NOT_FOUND: "This item could not be found. Refresh and try again.",
+    USER_DECISION: "This change needs your confirmation in Kaitu.",
+    BACKUP_BUSY: "Wait for the current sync to finish, then try again.",
+    CLOUD_UNAVAILABLE: "Download the workspace files in your sync app, then try again.",
+    READ_ONLY: "This workspace is read-only. Check its folder permissions.",
+    INVALID_RECORD: "Check the record's required fields and values, then try again.",
+    INVALID_CONFIG: "Check the settings and try again.",
+    BAD_ARGS: "Check the input and try again.",
+    AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
+  };
+  return messages[error.code] ?? "This action could not be completed. Check the input and try again.";
 }
 function field(data: Record<string, unknown>, key: string): string {
   if (typeof data[key] !== "string" || !data[key]) throw new KaituError(`缺少${key}`, "BAD_ARGS");
@@ -443,7 +464,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         } catch (error) {
           if (error instanceof KaituError) throw error;
-          return json(res, 400, { error: "采集设置未完成，请检查参数或稍后重试" });
+          return json(res, 400, {
+            error: pick(
+              resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ??
+                "zh-CN",
+              "采集设置未完成，请检查参数或稍后重试",
+              "Couldn't save these data settings. Check them and try again.",
+            ),
+          });
         }
       }
       if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
@@ -765,9 +793,17 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       notify();
       json(res, 200, result);
     } catch (error) {
+      const locale =
+        resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ?? "zh-CN";
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
       if (req.url === "/api/product/moveStorage" && (error as NodeJS.ErrnoException).code === "EBUSY")
-        return json(res, 400, { error: "资料文件夹正在被其他程序占用，请关闭占用它的窗口后重试" });
+        return json(res, 400, {
+          error: pick(
+            locale,
+            "资料文件夹正在被其他程序占用，请关闭占用它的窗口后重试",
+            "The Kaitu folder is open in another app. Close it there and try again.",
+          ),
+        });
       const known =
         error instanceof KaituError || (error instanceof Error && error.name === "KaituError")
           ? (error as KaituError)
@@ -780,10 +816,20 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           ? { code }
           : {}),
         error: known
-          ? known.message
+          ? locale === "en"
+            ? englishError(known)
+            : known.message
           : req.url?.startsWith("/api/product/ask")
-            ? "AI 连接未完成，请检查连接设置后重试"
-            : "请求未完成，请检查文件格式后重试",
+            ? pick(
+                locale,
+                "AI 连接未完成，请检查连接设置后重试",
+                "The AI connection could not complete. Check connection settings and retry.",
+              )
+            : pick(
+                locale,
+                "请求未完成，请检查文件格式后重试",
+                "The request could not be completed. Check the input and retry.",
+              ),
       });
     }
   });
