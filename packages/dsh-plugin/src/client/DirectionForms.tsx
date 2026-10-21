@@ -10,6 +10,7 @@ import type {
 import css from "./DirectionsPage.module.css";
 import { FilePicker } from "./DshFiles.js";
 import base from "./OverviewPage.module.css";
+import { useT } from "./i18n.js";
 
 function FormShell({
   title,
@@ -17,6 +18,7 @@ function FormShell({
   save,
   cancel,
 }: { title: string; children: ReactNode; save: (form: FormData) => Promise<void>; cancel: () => void }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
@@ -47,10 +49,10 @@ function FormShell({
       )}
       <div className={css.actions}>
         <button className={`${base.button} ${base.primary}`} type="submit" disabled={busy}>
-          {busy ? "保存中…" : "保存"}
+          {busy ? t("保存中…", "Saving…") : t("保存", "Save")}
         </button>
         <button type="button" className={base.link} onClick={cancel} disabled={busy}>
-          取消
+          {t("取消", "Cancel")}
         </button>
       </div>
     </form>
@@ -64,6 +66,7 @@ function Field({
   multiline = false,
   type = "text",
 }: { name: string; label: string; value?: string; optional?: boolean; multiline?: boolean; type?: string }) {
+  const t = useT();
   const id = useId();
   const [text, setText] = useState(value ?? "");
   const [picking, setPicking] = useState(false);
@@ -97,7 +100,7 @@ function Field({
       </label>
       {["source", "sources"].includes(name) && (
         <button type="button" className={base.link} onClick={() => setPicking(true)}>
-          选择开图资料…
+          {t("选择开图资料…", "Choose Kaitu files…")}
         </button>
       )}
       {picking && (
@@ -114,6 +117,7 @@ function Field({
   );
 }
 function References({ data, selected = [] }: { data: ExplorationData; selected?: ExplorationReference[] }) {
+  const t = useT();
   const missing = selected.filter(
     (ref) =>
       (ref.kind === "project" && !data.references.projects.some((project) => project.id === ref.ref)) ||
@@ -121,12 +125,17 @@ function References({ data, selected = [] }: { data: ExplorationData; selected?:
   );
   return (
     <details>
-      <summary>关联资料（可选）</summary>
+      <summary>{t("关联资料（可选）", "Linked sources (optional)")}</summary>
       <div className={css.referenceFields}>
         {missing.length > 0 && (
           <fieldset>
-            <legend>暂时找不到的关联资料</legend>
-            <p>保留原有关联。若资料已移除，请取消勾选后保存。</p>
+            <legend>{t("暂时找不到的关联资料", "Unavailable linked sources")}</legend>
+            <p>
+              {t(
+                "保留原有关联。若资料已移除，请取消勾选后保存。",
+                "Existing links are kept. Uncheck a removed source before saving.",
+              )}
+            </p>
             {missing.map((ref) => (
               <label key={`${ref.kind}:${ref.ref}`} className={css.check}>
                 <input type="checkbox" name={ref.kind} value={ref.ref} defaultChecked />
@@ -137,7 +146,7 @@ function References({ data, selected = [] }: { data: ExplorationData; selected?:
         )}
         {!!data.references.projects.length && (
           <fieldset>
-            <legend>项目</legend>
+            <legend>{t("项目", "Projects")}</legend>
             {data.references.projects.map((p) => (
               <label key={p.id} className={css.check}>
                 <input
@@ -153,7 +162,7 @@ function References({ data, selected = [] }: { data: ExplorationData; selected?:
         )}
         {!!data.references.decisions.length && (
           <fieldset>
-            <legend>决策</legend>
+            <legend>{t("决策", "Decisions")}</legend>
             {data.references.decisions.map((d) => (
               <label key={d.path} className={css.check}>
                 <input
@@ -169,7 +178,7 @@ function References({ data, selected = [] }: { data: ExplorationData; selected?:
         )}
         <Field
           name="sources"
-          label="原文链接或资料位置（每行一个）"
+          label={t("原文链接或资料位置（每行一个）", "Source links or file locations (one per line)")}
           optional
           multiline
           value={selected
@@ -206,9 +215,10 @@ export function DirectionForm({
   save: (command: ExplorationCommand) => Promise<void>;
   cancel: () => void;
 }) {
+  const t = useT();
   return (
     <FormShell
-      title={initial ? "调整方向" : "记下一个方向"}
+      title={initial ? t("调整方向", "Edit direction") : t("记下一个方向", "Add a direction")}
       cancel={cancel}
       save={async (form) => {
         const fields = {
@@ -230,16 +240,32 @@ export function DirectionForm({
         );
       }}
     >
-      <Field name="title" label="我想探索什么" value={initial?.title ?? seed?.title} />
-      <Field name="motivation" label="为什么在意（可选）" optional value={initial?.motivation} multiline />
+      <Field
+        name="title"
+        label={t("我想探索什么", "What I want to explore")}
+        value={initial?.title ?? seed?.title}
+      />
+      <Field
+        name="motivation"
+        label={t("为什么在意（可选）", "Why it matters (optional)")}
+        optional
+        value={initial?.motivation}
+        multiline
+      />
       <Field
         name="hypothesis"
-        label="我目前的假设（可选）"
+        label={t("我目前的假设（可选）", "My current hypothesis (optional)")}
         optional
         value={initial?.hypothesis ?? seed?.hypothesis}
         multiline
       />
-      <Field name="unknowns" label="还不知道什么（可选）" value={initial?.unknowns} multiline optional />
+      <Field
+        name="unknowns"
+        label={t("还不知道什么（可选）", "What I don’t know yet (optional)")}
+        value={initial?.unknowns}
+        multiline
+        optional
+      />
       <References data={data} selected={initial?.references} />
     </FormShell>
   );
@@ -255,9 +281,14 @@ export function ExperimentForm({
   save: (command: ExplorationCommand) => Promise<void>;
   cancel: () => void;
 }) {
+  const t = useT();
   return (
     <FormShell
-      title={initial ? "更新尝试与结果" : "安排一个小尝试"}
+      title={
+        initial
+          ? t("更新尝试与结果", "Update experiment and result")
+          : t("安排一个小尝试", "Plan a small experiment")
+      }
       cancel={cancel}
       save={async (form) => {
         const fields = {
@@ -287,38 +318,58 @@ export function ExperimentForm({
     >
       <Field
         name="question"
-        label="这次想弄清的问题"
+        label={t("这次想弄清的问题", "Question to explore")}
         value={initial?.question ?? (direction.hypothesis || direction.title)}
         multiline
       />
-      <Field name="action" label="具体做什么" value={initial?.action} multiline />
+      <Field name="action" label={t("具体做什么", "What to do")} value={initial?.action} multiline />
       <div className={css.fieldsRow}>
-        <Field name="budget" label="投入上限" value={initial?.budget} />
-        <Field name="deadline" label="期限" value={initial?.deadline} type="date" />
+        <Field name="budget" label={t("投入上限", "Budget limit")} value={initial?.budget} />
+        <Field name="deadline" label={t("期限", "Due date")} value={initial?.deadline} type="date" />
       </div>
-      <Field name="criteria" label="怎样观察结果" value={initial?.criteria} multiline />
+      <Field
+        name="criteria"
+        label={t("怎样观察结果", "How to observe results")}
+        value={initial?.criteria}
+        multiline
+      />
       {initial && (
         <>
           <label>
-            行动状态
-            <select name="status" aria-label="行动状态" defaultValue={initial.status}>
-              <option value="planned">计划中</option>
-              <option value="active">进行中</option>
-              <option value="completed">已完成行动</option>
-              <option value="cancelled">已取消</option>
+            {t("行动状态", "Action status")}
+            <select name="status" aria-label={t("行动状态", "Action status")} defaultValue={initial.status}>
+              <option value="planned">{t("计划中", "Planned")}</option>
+              <option value="active">{t("进行中", "In progress")}</option>
+              <option value="completed">{t("已完成行动", "Action completed")}</option>
+              <option value="cancelled">{t("已取消", "Cancelled")}</option>
             </select>
           </label>
-          <Field name="result" label="实际观察到什么" value={initial.result} multiline optional />
+          <Field
+            name="result"
+            label={t("实际观察到什么", "What happened")}
+            value={initial.result}
+            multiline
+            optional
+          />
           <label>
-            这些结果对假设意味着什么
-            <select name="conclusion" aria-label="假设结论" defaultValue={initial.conclusion}>
-              <option value="unassessed">暂不判断</option>
-              <option value="supports">支持假设</option>
-              <option value="refutes">反驳假设</option>
-              <option value="inconclusive">证据还不足</option>
+            {t("这些结果对假设意味着什么", "What the results mean for the hypothesis")}
+            <select
+              name="conclusion"
+              aria-label={t("假设结论", "Hypothesis conclusion")}
+              defaultValue={initial.conclusion}
+            >
+              <option value="unassessed">{t("暂不判断", "Not assessed")}</option>
+              <option value="supports">{t("支持假设", "Supports hypothesis")}</option>
+              <option value="refutes">{t("反驳假设", "Refutes hypothesis")}</option>
+              <option value="inconclusive">{t("证据还不足", "Inconclusive")}</option>
             </select>
           </label>
-          <Field name="source" label="结果来源（可选）" value={initial.source} optional />
+          <Field
+            name="source"
+            label={t("结果来源（可选）", "Result source (optional)")}
+            value={initial.source}
+            optional
+          />
         </>
       )}
     </FormShell>
@@ -339,9 +390,10 @@ export function NoteForm({
   save: (command: ExplorationCommand) => Promise<void>;
   cancel: () => void;
 }) {
+  const t = useT();
   return (
     <FormShell
-      title={initial ? "修正资料" : "补充依据或认识"}
+      title={initial ? t("修正资料", "Correct source") : t("补充依据或认识", "Add evidence or reflection")}
       cancel={cancel}
       save={async (form) => {
         const fields = {
@@ -365,30 +417,48 @@ export function NoteForm({
         );
       }}
     >
-      {initial && <p className={base.muted}>这条资料针对的问题：{initial.question}</p>}
+      {initial && (
+        <p className={base.muted}>
+          {t("这条资料针对的问题：", "Question for this source: ")}
+          {initial.question}
+        </p>
+      )}
       <label>
-        内容类型
-        <select name="kind" aria-label="内容类型" defaultValue={initial?.kind ?? "evidence"}>
-          <option value="evidence">依据与资料</option>
-          <option value="reflection">新的认识</option>
-          <option value="decision">我的决定</option>
+        {t("内容类型", "Content type")}
+        <select
+          name="kind"
+          aria-label={t("内容类型", "Content type")}
+          defaultValue={initial?.kind ?? "evidence"}
+        >
+          <option value="evidence">{t("依据与资料", "Evidence and sources")}</option>
+          <option value="reflection">{t("新的认识", "Reflection")}</option>
+          <option value="decision">{t("我的决定", "My decision")}</option>
         </select>
       </label>
-      <Field name="text" label="内容" value={initial?.text} multiline />
+      <Field name="text" label={t("内容", "Content")} value={initial?.text} multiline />
       <label>
-        与当前假设的关系
-        <select name="stance" aria-label="与假设的关系" defaultValue={initial?.stance ?? "unclear"}>
-          <option value="unclear">还不能判断</option>
-          <option value="supports">提供支持</option>
-          <option value="refutes">提供反面证据</option>
+        {t("与当前假设的关系", "How it relates to the hypothesis")}
+        <select
+          name="stance"
+          aria-label={t("与假设的关系", "Relation to hypothesis")}
+          defaultValue={initial?.stance ?? "unclear"}
+        >
+          <option value="unclear">{t("还不能判断", "Not assessed yet")}</option>
+          <option value="supports">{t("提供支持", "Supports it")}</option>
+          <option value="refutes">{t("提供反面证据", "Contrary evidence")}</option>
         </select>
       </label>
-      <Field name="source" label="来源链接或资料位置（可选）" value={initial?.source} optional />
+      <Field
+        name="source"
+        label={t("来源链接或资料位置（可选）", "Source link or file location (optional)")}
+        value={initial?.source}
+        optional
+      />
       {!initial && experiments.length > 0 && (
         <label>
-          关联尝试（可选）
-          <select name="experiment" aria-label="关联尝试" defaultValue="">
-            <option value="">不关联</option>
+          {t("关联尝试（可选）", "Linked experiment (optional)")}
+          <select name="experiment" aria-label={t("关联尝试", "Linked experiment")} defaultValue="">
+            <option value="">{t("不关联", "None")}</option>
             {experiments.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.action}
