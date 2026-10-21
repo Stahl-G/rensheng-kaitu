@@ -51,7 +51,7 @@ export function LibraryPage({
             </span>
             {section.count === null ? (
               <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
-            ) : section.count ? (
+            ) : section.count || (section.id === "inbox" && inboxCount !== undefined) ? (
               <span className={`${css.big} ${css.num}`}>
                 {t(
                   section.id === "inbox" && inboxCount !== undefined
