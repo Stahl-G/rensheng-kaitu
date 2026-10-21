@@ -1,12 +1,11 @@
 import { createRoot } from "react-dom/client";
 import { AskPage } from "../client/AskPage.js";
 import { OverviewPage, type OverviewPageProps } from "../client/OverviewPage.js";
-import { requestLocale } from "../client/i18n.js";
 
 async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   const response = await fetch(`/api/product/${method}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Kaitu": "1", "X-Kaitu-Locale": requestLocale() },
+    headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
     body: JSON.stringify(args),
   });
   const value = await response.json();

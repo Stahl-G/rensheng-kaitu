@@ -24,10 +24,10 @@ async function setup(options: UiOptions = {}) {
   const ws = await initWorkspace(root);
   const ui = await startUi(ws, { port: 0, open: false, ...options });
   cleanup.push(ui.close);
-  const post = async (method: string, args: unknown[], raw = JSON.stringify(args), locale?: string) => {
+  const post = async (method: string, args: unknown[], raw = JSON.stringify(args)) => {
     const response = await fetch(`${ui.url}/api/product/${method}`, {
       method: "POST",
-      headers: { Origin: ui.url, "X-Kaitu": "1", ...(locale ? { "X-Kaitu-Locale": locale } : {}) },
+      headers: { Origin: ui.url, "X-Kaitu": "1" },
       body: raw,
     });
     return { status: response.status, body: await response.json() };
@@ -54,9 +54,6 @@ it("空目录可独立新建再切回，拒绝覆盖已有资料，打开入口�
   const opened = await post("workspaceBackup", ["activate", { root: target }]);
   expect(opened.status).toBe(400);
   expect(opened.body.error).toContain("新建空白工作区");
-  const english = await post("workspaceBackup", ["activate", { root: target }], undefined, "en");
-  expect(english.status).toBe(400);
-  expect(english.body.error).toContain("Create a blank workspace");
   expect(ws.root).toBe(previous);
   expect(currentWorkspace()).toBe(previous);
   expect(readdirSync(target)).toEqual([]);

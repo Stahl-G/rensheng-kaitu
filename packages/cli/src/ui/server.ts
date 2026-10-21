@@ -48,6 +48,7 @@ import {
   removeMemory,
   removePhoto,
   renderTeachingFrame,
+  resolvePreferences,
   restore,
   snapshotNow,
   stageUpload,
@@ -129,7 +130,6 @@ function json(res: ServerResponse, status: number, data: unknown): void {
 
 function englishError(error: KaituError): string {
   if (!/[\u3400-\u9fff]/.test(error.message)) return error.message;
-  if (/JSON/.test(error.message)) return "The request body is not valid JSON. Correct its format and retry.";
   const messages: Record<string, string> = {
     NOT_EMPTY: "Choose an empty folder to create a blank workspace.",
     NOT_INITIALIZED: "This folder has no Kaitu workspace. Use Create a blank workspace.",
@@ -145,7 +145,7 @@ function englishError(error: KaituError): string {
     BAD_ARGS: "Check the input and try again.",
     AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
   };
-  return messages[error.code] ?? "This change could not be saved. Check the input and try again.";
+  return messages[error.code] ?? "This action could not be completed. Check the input and try again.";
 }
 function field(data: Record<string, unknown>, key: string): string {
   if (typeof data[key] !== "string" || !data[key]) throw new KaituError(`缺少${key}`, "BAD_ARGS");
@@ -464,7 +464,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         } catch (error) {
           if (error instanceof KaituError) throw error;
-          return json(res, 400, { error: "采集设置未完成，请检查参数或稍后重试" });
+          return json(res, 400, {
+            error: pick(
+              resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale,
+              "采集设置未完成，请检查参数或稍后重试",
+              "Couldn't save these data settings. Check them and try again.",
+            ),
+          });
         }
       }
       if (url.pathname.startsWith("/api/product/") && req.method === "POST") {
@@ -786,14 +792,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       notify();
       json(res, 200, result);
     } catch (error) {
-      const locale = normalizeLocale(req.headers["x-kaitu-locale"]);
+      const locale = resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale;
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
       if (req.url === "/api/product/moveStorage" && (error as NodeJS.ErrnoException).code === "EBUSY")
         return json(res, 400, {
           error: pick(
             locale,
             "资料文件夹正在被其他程序占用，请关闭占用它的窗口后重试",
-            "The notes folder is in use. Close the window using it, then retry.",
+            "The Kaitu folder is open in another app. Close it there and try again.",
           ),
         });
       const known =
