@@ -465,7 +465,7 @@ export function PaperMap({
         }
         const content = document.createElement("div");
         content.className = css.cityPopup ?? "";
-        content.textContent = `${feature.properties?.name} · ${feature.properties?.years || "时间未知"}`;
+        content.textContent = `${feature.properties?.name} · ${feature.properties?.years || latest.current.t("时间未知", "Undated")}`;
         popup.setLngLat(e.lngLat).setDOMContent(content).addTo(instance);
       };
       m.on("mousemove", showCity);
