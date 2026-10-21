@@ -22,7 +22,7 @@ async function setup(options: UiOptions = {}) {
   const root = join(directory, "current");
   cleanup.push(async () => rmSync(directory, { recursive: true, force: true }));
   const ws = await initWorkspace(root);
-  const ui = await startUi(ws, { port: 0, open: false, ...options });
+  const ui = await startUi(ws, { port: 0, open: false, systemLocale: "zh-CN", ...options });
   cleanup.push(ui.close);
   const post = async (method: string, args: unknown[], raw = JSON.stringify(args)) => {
     const response = await fetch(`${ui.url}/api/product/${method}`, {
