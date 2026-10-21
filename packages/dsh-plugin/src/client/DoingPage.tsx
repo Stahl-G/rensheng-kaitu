@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DoingData, DoingProject, ProjectDetailData } from "../types.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 
 export interface DoingPageProps {
   loadProjects: () => Promise<DoingProject[]>;
@@ -26,50 +27,65 @@ const ciStates = {
 };
 const number = (value: number) => value.toLocaleString("zh-CN");
 
-function dateLabel(date: string, today: string) {
-  if (date === today) return "今天";
+function dateLabel(date: string, today: string, locale: Locale) {
+  if (date === today) return locale === "en" ? "Today" : "今天";
   const yesterday = new Date(`${today}T12:00:00Z`);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  return date === yesterday.toISOString().slice(0, 10) ? "昨天" : date.slice(5).replace("-", "/");
+  return date === yesterday.toISOString().slice(0, 10)
+    ? locale === "en"
+      ? "Yesterday"
+      : "昨天"
+    : date.slice(5).replace("-", "/");
 }
 
 export function Output({ project }: { project: DoingProject }) {
+  const t = useT();
   const kind = project.recent7.words !== null ? "words" : "commits";
   const value = project.recent7[kind];
-  const unit = kind === "words" ? "字" : "次提交";
+  const unit = kind === "words" ? t("字", "words") : t("次提交", "commits");
   const daily = project.recent7.daily;
   const max = Math.max(1, ...daily.map((day) => Math.abs(day[kind] ?? 0)));
   const label = (value: number | null) =>
     value === null
-      ? "暂无记录"
-      : `${kind === "words" ? `约 ${value >= 0 ? "+" : ""}` : ""}${number(value)} ${unit}`;
+      ? t("暂无记录", "No records yet")
+      : `${kind === "words" ? `${t("约 ", "about ")}${value >= 0 ? "+" : ""}` : ""}${number(value)} ${unit}`;
   return (
     <div className={css.output}>
       <div className={css.paths}>
-        <span>近 7 天 {label(value)}</span>
+        <span>
+          {t("近 7 天", "Last 7 days")} {label(value)}
+        </span>
         {project.links.length ? (
           project.links.map((link) => (
             <span key={`${link.role}:${link.path}`}>
-              <span className={css.role}>{roles[link.role]}：</span>
+              <span className={css.role}>
+                {t(
+                  roles[link.role],
+                  { manuscript: "Manuscript", repo: "Repository", folder: "Folder" }[link.role],
+                )}
+                {t("：", ": ")}
+              </span>
               <OpenPath path={link.path} />
             </span>
           ))
         ) : (
-          <span>链接：暂无记录</span>
+          <span>{t("链接：暂无记录", "No linked sources yet")}</span>
         )}
       </div>
       {daily.some((day) => day[kind] !== null) && (
         <span
           className={css.chart}
           role="img"
-          aria-label={daily.map((day) => `${day.date}：${label(day[kind])}`).join("，")}
+          aria-label={daily
+            .map((day) => `${day.date}${t("：", ": ")}${label(day[kind])}`)
+            .join(t("，", ", "))}
         >
           {daily.map((day) => (
             <span
               key={day.date}
               className={css.slot}
               data-missing={day[kind] === null}
-              title={`${day.date}：${label(day[kind])}`}
+              title={`${day.date}${t("：", ": ")}${label(day[kind])}`}
             >
               {day[kind] !== null && (
                 <span
@@ -94,9 +110,11 @@ export function Repository({
   today: string;
   timeZone?: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const latest = github.latest;
   const stamp = github.ok_at ?? latest?.ts;
-  let updated = "暂无记录";
+  let updated = t("暂无记录", "No records yet");
   if (stamp && Number.isFinite(Date.parse(stamp))) {
     const date = new Intl.DateTimeFormat("sv-SE", { timeZone }).format(new Date(stamp));
     const time = new Intl.DateTimeFormat("zh-CN", {
@@ -105,7 +123,7 @@ export function Repository({
       minute: "2-digit",
       hour12: false,
     }).format(new Date(stamp));
-    updated = `${dateLabel(date, today)} ${time}`;
+    updated = `${dateLabel(date, today, locale)} ${time}`;
   }
   return (
     <div className={css.repository}>
@@ -113,13 +131,32 @@ export function Repository({
         {github.repo}
       </a>
       <div className={css.repoStats}>
-        <span>Star {latest ? number(latest.stars) : "暂无记录"}</span>
-        <span>Fork {latest ? number(latest.forks) : "暂无记录"}</span>
-        <span>开放 Issue {latest ? number(latest.open_issues) : "暂无记录"}</span>
-        <span>开放 PR {latest ? number(latest.open_prs) : "暂无记录"}</span>
-        <span>CI {latest ? ciStates[latest.ci.state] : "暂无记录"}</span>
+        <span>Star {latest ? number(latest.stars) : t("暂无记录", "No records yet")}</span>
+        <span>Fork {latest ? number(latest.forks) : t("暂无记录", "No records yet")}</span>
         <span>
-          最新发布{" "}
+          {t("开放 Issue", "Open issues")}{" "}
+          {latest ? number(latest.open_issues) : t("暂无记录", "No records yet")}
+        </span>
+        <span>
+          {t("开放 PR", "Open PRs")} {latest ? number(latest.open_prs) : t("暂无记录", "No records yet")}
+        </span>
+        <span>
+          CI{" "}
+          {latest
+            ? t(
+                ciStates[latest.ci.state],
+                {
+                  success: "Passed",
+                  failure: "Failed",
+                  running: "Running",
+                  none: "No records yet",
+                  no_access: "No records yet",
+                }[latest.ci.state],
+              )
+            : t("暂无记录", "No records yet")}
+        </span>
+        <span>
+          {t("最新发布", "Latest release")}{" "}
           {latest?.latest_release ? (
             <a href={latest.latest_release.url} target="_blank" rel="noreferrer">
               {latest.latest_release.name || latest.latest_release.tag}
@@ -130,11 +167,24 @@ export function Repository({
         </span>
       </div>
       <p>
-        最近推送{" "}
-        {latest?.pushed_at ? new Date(latest.pushed_at).toLocaleString("zh-CN", { timeZone }) : "暂无记录"}
+        {t("最近推送", "Last push")}{" "}
+        {latest?.pushed_at
+          ? new Date(latest.pushed_at).toLocaleString(locale, { timeZone })
+          : t("暂无记录", "No records yet")}
       </p>
-      {github.problem && <p className={css.stale}>GitHub 更新失败，请检查仓库地址或稍后重试。</p>}
-      {github.stale && <p className={css.stale}>数据过期 · 上次更新 {updated}</p>}
+      {github.problem && (
+        <p className={css.stale}>
+          {t(
+            "GitHub 更新失败，请检查仓库地址或稍后重试。",
+            "Couldn’t refresh GitHub. Check the repository or try again later.",
+          )}
+        </p>
+      )}
+      {github.stale && (
+        <p className={css.stale}>
+          {t("数据过期 · 上次更新", "Out of date · Last updated")} {updated}
+        </p>
+      )}
     </div>
   );
 }
@@ -145,6 +195,8 @@ export function DoingPage({
   onPrompt,
   timeZone,
 }: DoingPageProps & { timeZone?: string }) {
+  const t = useT();
+  const locale = useLocale();
   const [projects, setProjects] = useState<DoingProject[] | null>(null);
   const [doing, setDoing] = useState<DoingData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,36 +237,51 @@ export function DoingPage({
         <div>
           <h1>
             <span className={css.dot} aria-hidden="true" />
-            在做的事
+            {t("在做的事", "In progress")}
           </h1>
-          <p className={css.subtitle}>项目、学习和正在做的决定</p>
+          <p className={css.subtitle}>{t("项目、学习和正在做的决定", "Projects, learning and decisions")}</p>
         </div>
-        <button type="button" className={css.primary} onClick={() => ask("帮我新建一个项目：")}>
-          新建项目
+        <button
+          type="button"
+          className={css.primary}
+          onClick={() => ask(t("帮我新建一个项目：", "Help me create a project:"))}
+        >
+          {t("新建项目", "New project")}
         </button>
       </header>
       {error && (
         <p className={css.notice} role="alert">
           {error}{" "}
           <button type="button" className={css.link} onClick={() => void refresh()}>
-            重新读取
+            {t("重新读取", "Reload")}
           </button>
         </p>
       )}
-      {!error && (projects === null || doing === null) && <p className={css.muted}>正在读取在做的事…</p>}
+      {!error && (projects === null || doing === null) && (
+        <p className={css.muted}>{t("正在读取在做的事…", "Loading…")}</p>
+      )}
       {empty && (
         <div className={css.empty}>
-          <h2>还没有在做的事</h2>
-          <p>和开图聊聊你想推进的事，从一个项目开始。</p>
-          <button type="button" className={css.primary} onClick={() => ask("帮我新建一个项目：")}>
-            新建项目
+          <h2>{t("还没有在做的事", "Nothing in progress yet")}</h2>
+          <p>
+            {t(
+              "和开图聊聊你想推进的事，从一个项目开始。",
+              "Tell Kaitu what you want to move forward. Start with a project.",
+            )}
+          </p>
+          <button
+            type="button"
+            className={css.primary}
+            onClick={() => ask(t("帮我新建一个项目：", "Help me create a project:"))}
+          >
+            {t("新建项目", "New project")}
           </button>
         </div>
       )}
       {!!projects?.length && (
-        <section aria-label="项目">
+        <section aria-label={t("项目", "Projects")}>
           <div className={css.heading}>
-            <h2>项目</h2>
+            <h2>{t("项目", "Projects")}</h2>
             {hidden && (
               <button
                 type="button"
@@ -222,11 +289,20 @@ export function DoingPage({
                 aria-expanded={expanded}
                 onClick={() => setExpanded(!expanded)}
               >
-                {expanded ? "收起" : `全部 ${projects.length} 个`}
+                {expanded
+                  ? t("收起", "Show less")
+                  : t(`全部 ${projects.length} 个`, `All projects · ${projects.length}`)}
               </button>
             )}
           </div>
-          {!visible.length && <p className={css.muted}>暂无进行中的项目，展开全部看看，或新建一个项目。</p>}
+          {!visible.length && (
+            <p className={css.muted}>
+              {t(
+                "暂无进行中的项目，展开全部看看，或新建一个项目。",
+                "No active projects. Show all projects or create one.",
+              )}
+            </p>
+          )}
           <div className={css.projects}>
             {visible.map((project) => {
               const next = project.next.find((item) => item.status === "todo" || item.status === "proposed");
@@ -237,23 +313,33 @@ export function DoingPage({
                     <div className={css.tags}>
                       <span className={css.kind}>
                         <span className={css.kindDot} aria-hidden="true" />
-                        {project.kind === "work" ? "工作" : project.kind === "learning" ? "学习" : "个人"}
+                        {project.kind === "work"
+                          ? t("工作", "Work")
+                          : project.kind === "learning"
+                            ? t("学习", "Learning")
+                            : t("个人", "Personal")}
                       </span>
-                      <span className={css.stage}>{stages[project.stage]}</span>
+                      <span className={css.stage}>
+                        {t(
+                          stages[project.stage],
+                          { active: "Active", paused: "Paused", idea: "Idea", done: "Done" }[project.stage],
+                        )}
+                      </span>
                     </div>
                   </div>
                   <p>
-                    <span className={css.muted}>下一步　</span>
-                    {next?.title ?? "暂无记录"}
+                    <span className={css.muted}>{t("下一步\u3000", "Next step ")}</span>
+                    {next?.title ?? t("暂无记录", "No records yet")}
                   </p>
                   <p className={css.log}>
                     {project.recentLog
-                      ? `${dateLabel(project.recentLog.date, today)}：${project.recentLog.text}`
-                      : "最近日志：暂无记录"}
+                      ? `${dateLabel(project.recentLog.date, today, locale)}${t("：", ": ")}${project.recentLog.text}`
+                      : t("最近日志：暂无记录", "No recent progress logged")}
                   </p>
                   {project.completion !== null && (
                     <span className={css.muted}>
-                      完成度 {number(project.completion.done)} / {number(project.completion.total)}
+                      {t("完成度", "Completed")} {number(project.completion.done)} /{" "}
+                      {number(project.completion.total)}
                     </span>
                   )}
                   {project.github && <Repository github={project.github} today={today} timeZone={timeZone} />}
@@ -261,9 +347,16 @@ export function DoingPage({
                   <button
                     type="button"
                     className={`${css.link} ${css.record}`}
-                    onClick={() => ask(`帮我给项目「${project.title}」记一次进展：`)}
+                    onClick={() =>
+                      ask(
+                        t(
+                          `帮我给项目「${project.title}」记一次进展：`,
+                          `Help me log progress for “${project.title}”:`,
+                        ),
+                      )
+                    }
                   >
-                    记一次
+                    {t("记一次", "Log progress")}
                   </button>
                 </article>
               );
@@ -274,23 +367,27 @@ export function DoingPage({
       {(!!doing?.decisions.length || !!doing?.learning.length) && (
         <div className={css.lower}>
           {!!doing?.decisions.length && (
-            <section className={css.decisions} aria-label="在做的决定">
+            <section className={css.decisions} aria-label={t("在做的决定", "Decisions in progress")}>
               <div className={css.heading}>
-                <h2>在做的决定</h2>
+                <h2>{t("在做的决定", "Decisions in progress")}</h2>
               </div>
               {doing.decisions.map((decision) => (
                 <div className={css.decision} key={decision.file}>
                   <strong>{decision.title}</strong>
-                  <span className={css.status}>{decision.status ?? "暂无记录"}</span>
-                  <span className={css.due}>{decision.due ? `${decision.due} 截止` : "截止：暂无记录"}</span>
+                  <span className={css.status}>{decision.status ?? t("暂无记录", "No records yet")}</span>
+                  <span className={css.due}>
+                    {decision.due
+                      ? t(`${decision.due} 截止`, `Due ${decision.due}`)
+                      : t("截止：暂无记录", "No due date")}
+                  </span>
                 </div>
               ))}
             </section>
           )}
           {!!doing?.learning.length && (
-            <section aria-label="在学">
+            <section aria-label={t("在学", "Learning")}>
               <div className={css.heading}>
-                <h2>在学</h2>
+                <h2>{t("在学", "Learning")}</h2>
               </div>
               <div className={css.learning}>
                 {doing.learning.map((topic) => (
@@ -298,14 +395,18 @@ export function DoingPage({
                     <h3>{topic.title}</h3>
                     <p className={css.status}>
                       {topic.progress
-                        ? `第 ${number(topic.progress.current)} / ${number(topic.progress.target)} 章`
-                        : "进度：暂无记录"}{" "}
-                      · 下一步：{topic.next ?? "暂无记录"}
+                        ? t(
+                            `第 ${number(topic.progress.current)} / ${number(topic.progress.target)} 章`,
+                            `${number(topic.progress.current)} / ${number(topic.progress.target)} chapters`,
+                          )
+                        : t("进度：暂无记录", "No progress recorded")}{" "}
+                      · {t("下一步：", "Next step: ")}
+                      {topic.next ?? t("暂无记录", "No records yet")}
                     </p>
                     {topic.progress && topic.progress.target > 0 && (
                       <progress
                         className={css.progress}
-                        aria-label={`${topic.title}学习进度`}
+                        aria-label={t(`${topic.title}学习进度`, `${topic.title} learning progress`)}
                         value={Math.max(0, topic.progress.current)}
                         max={topic.progress.target}
                       />
