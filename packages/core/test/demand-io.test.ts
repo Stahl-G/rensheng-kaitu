@@ -42,8 +42,14 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
     expect(reads).not.toHaveBeenCalled();
     const first = readLibrary(ws, { section: "inbox" });
     expect(first.inbox).toHaveLength(40);
-    expect(reads.mock.calls).toHaveLength(41);
-    expect(reads.mock.calls.every(([file]) => file.startsWith("inbox/notes/"))).toBe(true);
+    expect(reads.mock.calls.filter(([file]) => file.startsWith("inbox/notes/"))).toHaveLength(41);
+    // 关联整理去向需要任务注册信息；正文仍只读当前页，不读无关健康记录或附件。
+    expect(
+      reads.mock.calls.every(
+        ([file]) =>
+          file.startsWith("inbox/notes/") || file.endsWith("/module.json") || file === "me/rules.md",
+      ),
+    ).toBe(true);
     const seen = first.inbox.map((row) => row.file);
     let before = first.next;
     while (before) {
