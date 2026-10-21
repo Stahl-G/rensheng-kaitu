@@ -69,7 +69,7 @@ export function versionText(text: string, locale: Locale): string {
       if (labels[label]) return labels[label];
       if (/^添加了一张体态照片（.*）$/.test(label)) return "Added a progress photo";
       for (const [zh, en] of prefixes) {
-        if (!label.startsWith(zh)) continue;
+        if (!label.startsWith(zh) || !/^[：:]|^「/.test(label.slice(zh.length))) continue;
         const title = label
           .slice(zh.length)
           .replace(/^[：:]\s*/, "")
