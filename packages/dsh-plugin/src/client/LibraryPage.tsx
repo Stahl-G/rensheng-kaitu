@@ -7,6 +7,7 @@ import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 
 const SOURCE_EN: Record<string, string> = {
+  开图: "Kaitu",
   你记录的: "Recorded by you",
   "本机 AI": "Local AI",
   "Apple 健康": "Apple Health",
@@ -16,7 +17,7 @@ const SOURCE_EN: Record<string, string> = {
   学习笔记: "Learning notes",
   决策记录: "Decisions",
   随手记: "Quick notes",
-  其他原文: "Other originals",
+  其他原文: "Other",
 };
 const LIBRARY_EN: Record<string, string> = {
   calendar: "Schedule",
@@ -60,7 +61,7 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
             <span className={`${css.big} ${css.num}`}>
               {t(
                 `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                `${section.count} ${section.id === "projects" ? "projects" : "items"}`,
+                `${section.count} ${section.id === "projects" ? (section.count === 1 ? "project" : "projects") : section.count === 1 ? "item" : "items"}`,
               )}
             </span>
           ) : (
@@ -159,7 +160,7 @@ export function InboxPage({
     ["mail", t("邮件", "Email")],
     ["slack", "Slack"],
     ["feishu", t("飞书", "Feishu")],
-    ["other", t("其他原文", "Other originals")],
+    ["other", t("其他原文", "Other")],
   ];
   return (
     <div className={css.sec}>
@@ -198,8 +199,8 @@ export function InboxPage({
       ) : !entries?.length ? (
         <p className={css.emptyState}>
           {["mail", "slack", "feishu", "ding"].includes(source)
-            ? t("这个来源还没有原文记录", "No originals from this source yet")
-            : t("这里还没有原文记录", "No originals yet")}
+            ? t("这个来源还没有原文记录", "Nothing from this source yet")
+            : t("这里还没有原文记录", "Nothing here yet")}
         </p>
       ) : (
         entries.map((row) => (
@@ -216,7 +217,7 @@ export function InboxPage({
                       ? "Slack"
                       : row.source === "feishu"
                         ? t("飞书", "Feishu")
-                        : t("其他原文", "Other original")}
+                        : t("其他原文", "Other")}
               </span>
             </time>
             <blockquote>{row.text}</blockquote>
@@ -226,7 +227,7 @@ export function InboxPage({
                   ? t("已整理", "Organized")
                   : row.status === "review"
                     ? t("要你核对", "Needs review")
-                    : t("只存了原文", "Text saved")}
+                    : t("只存了原文", "Saved as is")}
               </span>
               {row.status === "organized"
                 ? (row.destination ?? t("整理去向未记录", "Destination not recorded"))

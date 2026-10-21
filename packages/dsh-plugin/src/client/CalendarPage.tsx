@@ -15,6 +15,9 @@ export interface CalendarPageProps extends CalendarPushServices {
   addCalendar: (url: string, name: string) => Promise<CalendarData>;
   decideProposal: (id: string, decision: "confirmed" | "rejected") => Promise<unknown>;
 }
+const sourceName = (source: string, t: ReturnType<typeof useT>) =>
+  source === "开图" ? t("开图", "Kaitu") : source;
+
 export function calendarDay(value: string, zone: string) {
   return value.length === 10 || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)
     ? value.slice(0, 10)
@@ -108,9 +111,7 @@ export function Agenda({
                     </button>
                   </div>
                 ) : (
-                  <span className={css.small}>
-                    {event.source === "开图" ? t("开图", "Kaitu") : event.source}
-                  </span>
+                  <span className={css.small}>{sourceName(event.source, t)}</span>
                 )}
               </div>
             ))
@@ -285,7 +286,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
         {sources.map((source) => (
           <span key={source}>
             <i className={css.dot} style={{ background: `var(--${colorFor(source)})` }} />
-            {source === "开图" ? t("开图", "Kaitu") : source}
+            {sourceName(source, t)}
           </span>
         ))}
         <span>{t("┄ 开图建议", "┄ Kaitu suggestion")}</span>
@@ -295,7 +296,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
           <span className={css.stack}>
             <b>{selected.title}</b>
             <span className={css.small}>
-              {selected.start} · {selected.source}
+              {selected.start} · {sourceName(selected.source, t)}
             </span>
           </span>
           <CalendarPushResult
@@ -377,13 +378,14 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
       {data?.subscriptions.map((sub) => (
         <div key={sub.id} className={css.small}>
           {sub.name} ·{" "}
-          {sub.error ??
-            (sub.syncedAt
+          {sub.error
+            ? t("日历拉取失败，稍后重试", "Couldn't refresh this calendar. Try again later.")
+            : sub.syncedAt
               ? t(
                   `最近同步 ${new Date(sub.syncedAt).toLocaleString(locale)}`,
                   `Last synced ${new Date(sub.syncedAt).toLocaleString(locale)}`,
                 )
-              : t("还没同步", "Not synced yet"))}
+              : t("还没同步", "Not synced yet")}
         </div>
       ))}
     </div>

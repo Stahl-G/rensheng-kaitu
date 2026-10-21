@@ -33,7 +33,7 @@ export function CalendarPushResult({
     added: t("已加入『开图』日历", "Added to the Kaitu calendar"),
     file: t("已生成日历文件", "Calendar file ready"),
     deleted: t("已从日历删除", "Deleted from calendar"),
-    removed: t("已移除日历安排", "Schedule removed"),
+    removed: t("已移除日历安排", "Event removed"),
     error: t("日历操作失败", "Calendar action failed"),
   };
   return (
@@ -43,7 +43,13 @@ export function CalendarPushResult({
           ? t("已生成取消日历文件", "Cancellation file ready")
           : labels[receipt.status]}
       </span>
-      {receipt.reason && <span className={css.small}>{receipt.reason}</span>}
+      {receipt.reason && (
+        <span className={css.small}>
+          {receipt.reason === "请导入取消文件以移除之前导入的事件"
+            ? t(receipt.reason, "Import the cancellation file to remove the event you added earlier.")
+            : receipt.reason}
+        </span>
+      )}
       {receipt.ics && (
         <a
           className={css.link}
