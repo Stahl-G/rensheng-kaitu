@@ -3,7 +3,7 @@ import type { NewsAction, NewsData, NewsFeedback, NewsItem, NewsVia } from "../t
 import { NewsExtra, NewsImage, TrendDetails } from "./NewsContent.js";
 import css from "./NewsPage.module.css";
 import { NewsRules } from "./NewsRules.js";
-import { useT } from "./i18n.js";
+import { useLocale, useT } from "./i18n.js";
 
 export interface NewsPageProps {
   loadNews: () => Promise<NewsData>;
@@ -41,19 +41,22 @@ function dayOf(item: NewsItem) {
 }
 
 function Source({ item }: { item: NewsItem }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <span className={css.source}>
       <span className={css.initial} data-via={item.via} aria-hidden="true">
         {Array.from(item.source)[0]?.toUpperCase() ?? "?"}
       </span>
-      {item.source} · {viaNames[item.via]}
-      {item.published_at ? ` · ${new Date(item.published_at).toLocaleDateString("zh-CN")}` : ""}
+      {item.source} · {item.via === "user" ? t("你", "You") : viaNames[item.via]}
+      {item.published_at ? ` · ${new Date(item.published_at).toLocaleDateString(locale)}` : ""}
     </span>
   );
 }
 
 export function NewsPage(props: NewsPageProps) {
   const t = useT();
+  const locale = useLocale();
   const [data, setData] = useState<NewsData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -114,7 +117,12 @@ export function NewsPage(props: NewsPageProps) {
           {item.summary && <p className={css.reason}>{item.summary}</p>}
           {item.comment && <p className={css.reason}>{item.comment}</p>}
           <div className={css.cardFooter}>
-            {related && <span className={css.meta}>和你有关：{related}</span>}
+            {related && (
+              <span className={css.meta}>
+                {t("和你有关：", "Relevant to you: ")}
+                {related}
+              </span>
+            )}
             <span className={css.actions}>
               {props.onLearn && (
                 <button type="button" className={css.button} onClick={() => props.onLearn?.(item)}>
@@ -127,7 +135,9 @@ export function NewsPage(props: NewsPageProps) {
                 disabled={busy !== null || added.includes(item.id)}
                 onClick={() => void tryItem(item.id)}
               >
-                {added.includes(item.id) ? "已加到下一步" : "加到下一步"}
+                {added.includes(item.id)
+                  ? t("已加到下一步", "Added to next steps")
+                  : t("加到下一步", "Add to next steps")}
               </button>
               {vote ? (
                 <button
@@ -136,7 +146,7 @@ export function NewsPage(props: NewsPageProps) {
                   disabled={busy !== null}
                   onClick={() => void feedback(item.id, null)}
                 >
-                  撤销{vote === "useful" ? "有用" : "不相关"}
+                  {vote === "useful" ? t("撤销有用", "Undo useful") : t("撤销不相关", "Undo not relevant")}
                 </button>
               ) : (
                 <>
@@ -146,7 +156,7 @@ export function NewsPage(props: NewsPageProps) {
                     disabled={busy !== null}
                     onClick={() => void feedback(item.id, "useful")}
                   >
-                    有用
+                    {t("有用", "Useful")}
                   </button>
                   <button
                     type="button"
@@ -154,7 +164,7 @@ export function NewsPage(props: NewsPageProps) {
                     disabled={busy !== null}
                     onClick={() => void feedback(item.id, "irrelevant")}
                   >
-                    不相关
+                    {t("不相关", "Not relevant")}
                   </button>
                 </>
               )}
@@ -202,23 +212,23 @@ export function NewsPage(props: NewsPageProps) {
   const todayOthers = todayItems.filter((item) => !data?.picked.some((row) => row.id === item.id));
 
   return (
-    <div className={css.page} aria-label="资讯">
+    <div className={css.page} aria-label={t("资讯", "News")}>
       <header className={css.header}>
         <div>
           <h1>
             <span className={css.dot} aria-hidden="true" />
-            资讯
+            {t("资讯", "News")}
           </h1>
           <p className={css.subtitle}>
             {data
-              ? `${new Intl.DateTimeFormat("zh-CN", {
+              ? `${new Intl.DateTimeFormat(locale, {
                   month: "long",
                   day: "numeric",
                   timeZone: "UTC",
                 }).format(
                   new Date(`${data.date}T12:00:00Z`),
-                )} · 今日 ${todayItems.length + data.trends.length} 条${earlierItems.length ? ` · 更早 ${earlierItems.length} 条已收起` : ""}`
-              : "正在读取资讯…"}
+                )} · ${t(`今日 ${todayItems.length + data.trends.length} 条`, `${todayItems.length + data.trends.length} today`)}${earlierItems.length ? t(` · 更早 ${earlierItems.length} 条已收起`, ` · ${earlierItems.length} earlier, collapsed`) : ""}`
+              : t("正在读取资讯…", "Loading news…")}
           </p>
         </div>
         <button
@@ -227,7 +237,7 @@ export function NewsPage(props: NewsPageProps) {
           aria-expanded={rules}
           onClick={() => setRules((open) => !open)}
         >
-          采集规则
+          {t("采集规则", "Collection rules")}
         </button>
       </header>
       {rules && data && (
@@ -243,31 +253,44 @@ export function NewsPage(props: NewsPageProps) {
         <p className={css.notice} role="alert">
           {error}
           <button type="button" className={css.link} onClick={() => void refresh()}>
-            重新读取
+            {t("重新读取", "Reload")}
           </button>
         </p>
       )}
-      {added.length > 0 && <output className={css.saved}>已加到下一步，等你确认</output>}
+      {added.length > 0 && (
+        <output className={css.saved}>
+          {t("已加到下一步，等你确认", "Added to next steps for your review")}
+        </output>
+      )}
       {!data ? (
-        <p className={css.empty}>正在整理资讯…</p>
+        <p className={css.empty}>{t("正在整理资讯…", "Loading news…")}</p>
       ) : !data.picked.length && !data.others.length && !data.trends.length ? (
-        <p className={css.empty}>还没有采集到资讯。可在设置中开启资讯搜索，或让你连接的 AI 帮你找。</p>
+        <p className={css.empty}>
+          {t(
+            "还没有采集到资讯。可在设置中开启资讯搜索，或让你连接的 AI 帮你找。",
+            "No news yet. Enable news search in Settings or ask your connected AI to find some.",
+          )}
+        </p>
       ) : (
         <div className={css.columns}>
           <div className={css.main}>
             {!!todayPicked.length && (
-              <section aria-label="和你有关">
+              <section aria-label={t("和你有关", "Relevant to you")}>
                 <div className={css.heading}>
-                  <h2>和你有关的 {todayPicked.length} 条</h2>
+                  <h2>
+                    {t(`和你有关的 ${todayPicked.length} 条`, `Relevant to you · ${todayPicked.length}`)}
+                  </h2>
                 </div>
                 <div className={css.picked}>{todayPicked.map(pickedCard)}</div>
               </section>
             )}
             {!!data.trends.length && (
-              <section aria-label="讨论与热门">
+              <section aria-label={t("讨论与热门", "Discussions and trends")}>
                 <div className={css.heading}>
-                  <h2>讨论与热门</h2>
-                  <span className={css.meta}>原帖与讨论点开再看</span>
+                  <h2>{t("讨论与热门", "Discussions and trends")}</h2>
+                  <span className={css.meta}>
+                    {t("原帖与讨论点开再看", "Open an item to see posts and discussions")}
+                  </span>
                 </div>
                 <div className={css.trends}>
                   {data.trends.map((trend) => (
@@ -279,26 +302,28 @@ export function NewsPage(props: NewsPageProps) {
               </section>
             )}
             {!!todayOthers.length && (
-              <section aria-label="今日其他">
+              <section aria-label={t("今日其他", "More today")}>
                 <div className={css.heading}>
-                  <h2>今日其他</h2>
+                  <h2>{t("今日其他", "More today")}</h2>
                 </div>
                 {todayOthers.map(row)}
               </section>
             )}
             {!!earlierItems.length && (
               <details>
-                <summary className={css.link}>昨日及更早 · {earlierItems.length}</summary>
+                <summary className={css.link}>
+                  {t("昨日及更早", "Yesterday and earlier")} · {earlierItems.length}
+                </summary>
                 {earlierItems.map(row)}
               </details>
             )}
           </div>
           <aside className={css.aside}>
-            <section className={css.sideCard} aria-label="你关注的">
+            <section className={css.sideCard} aria-label={t("你关注的", "Your interests")}>
               <div className={css.heading}>
-                <h2>你关注的</h2>
+                <h2>{t("你关注的", "Your interests")}</h2>
                 <button type="button" className={css.link} onClick={() => setRules(true)}>
-                  编辑
+                  {t("编辑", "Edit")}
                 </button>
               </div>
               <div className={css.tags}>
@@ -308,21 +333,23 @@ export function NewsPage(props: NewsPageProps) {
                   </span>
                 ))}
               </div>
-              {!data.keywords?.length && <p className={css.empty}>还没有关注方向。</p>}
+              {!data.keywords?.length && (
+                <p className={css.empty}>{t("还没有关注方向。", "No interests yet.")}</p>
+              )}
             </section>
-            <section className={css.sideCard} aria-label="新闻从哪来">
+            <section className={css.sideCard} aria-label={t("新闻从哪来", "News sources")}>
               <div className={css.heading}>
-                <h2>新闻从哪来</h2>
+                <h2>{t("新闻从哪来", "News sources")}</h2>
               </div>
               <dl className={css.sources}>
                 <div>
-                  <dt>订阅源</dt>
-                  <dd>{data.feedCount === null ? "—" : `${data.feedCount} 个`}</dd>
+                  <dt>{t("订阅源", "Subscriptions")}</dt>
+                  <dd>{data.feedCount === null ? "—" : t(`${data.feedCount} 个`, String(data.feedCount))}</dd>
                 </div>
                 {sources.map(([via, count]) => (
                   <div key={via}>
-                    <dt>{viaNames[via]}</dt>
-                    <dd>{count} 条</dd>
+                    <dt>{via === "user" ? t("你", "You") : viaNames[via]}</dt>
+                    <dd>{t(`${count} 条`, String(count))}</dd>
                   </div>
                 ))}
               </dl>

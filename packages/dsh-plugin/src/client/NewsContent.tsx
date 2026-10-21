@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { NewsDiscussion, NewsItem, NewsPost, NewsTrend } from "../types.js";
 import css from "./NewsPage.module.css";
+import { useLocale, useT } from "./i18n.js";
 function webUrl(value?: string): string | undefined {
   if (!value) return undefined;
   try {
@@ -15,6 +16,7 @@ export function NewsImage({
   className,
   source = "X",
 }: { src?: string; className?: string; source?: string }) {
+  const t = useT();
   const [failed, setFailed] = useState<string | null>(null);
   const url = webUrl(src);
   return url && url !== failed ? (
@@ -27,7 +29,11 @@ export function NewsImage({
       onError={() => setFailed(url)}
     />
   ) : (
-    <span className={`${className ?? ""} ${css.placeholder}`} role="img" aria-label={`${source} · 暂无图片`}>
+    <span
+      className={`${className ?? ""} ${css.placeholder}`}
+      role="img"
+      aria-label={t(`${source} · 暂无图片`, `${source} · No image`)}
+    >
       {Array.from(source)[0]?.toUpperCase() ?? "?"}
     </span>
   );
@@ -44,9 +50,11 @@ function NewsLink({ url, children }: { url?: string; children: string }) {
 }
 
 function PostCard({ post }: { post: NewsPost }) {
+  const t = useT();
+  const locale = useLocale();
   const author = post.author || post.handle || "X";
   return (
-    <article className={css.post} aria-label="X 原帖">
+    <article className={css.post} aria-label={t("X 原帖", "Original X post")}>
       <header className={css.postHeader}>
         <span className={css.avatar} aria-hidden="true">
           {Array.from(author)[0]}
@@ -66,30 +74,46 @@ function PostCard({ post }: { post: NewsPost }) {
       )}
       <footer className={css.postFooter}>
         <span className={css.meta}>
-          {post.likes !== undefined && <span>点赞 {post.likes.toLocaleString("zh-CN")} </span>}
-          {post.reposts !== undefined && <span>转发 {post.reposts.toLocaleString("zh-CN")} </span>}
-          {post.replies !== undefined && <span>回复 {post.replies.toLocaleString("zh-CN")} </span>}
+          {post.likes !== undefined && (
+            <span>
+              {t("点赞", "Likes")} {post.likes.toLocaleString(locale)}{" "}
+            </span>
+          )}
+          {post.reposts !== undefined && (
+            <span>
+              {t("转发", "Reposts")} {post.reposts.toLocaleString(locale)}{" "}
+            </span>
+          )}
+          {post.replies !== undefined && (
+            <span>
+              {t("回复", "Replies")} {post.replies.toLocaleString(locale)}{" "}
+            </span>
+          )}
         </span>
         {post.posted_at && (
           <time className={css.meta} dateTime={post.posted_at}>
-            {new Date(post.posted_at).toLocaleString("zh-CN")}
+            {new Date(post.posted_at).toLocaleString(locale)}
           </time>
         )}
-        <NewsLink url={post.url}>查看原帖 ↗</NewsLink>
+        <NewsLink url={post.url}>{t("查看原帖 ↗", "View post ↗")}</NewsLink>
       </footer>
     </article>
   );
 }
 function Discussion({ rows }: { rows?: NewsDiscussion[] }) {
+  const t = useT();
   if (!rows?.length) return null;
   return (
-    <section className={css.discussion} aria-label="讨论">
-      <h4>讨论</h4>
+    <section className={css.discussion} aria-label={t("讨论", "Discussion")}>
+      <h4>{t("讨论", "Discussion")}</h4>
       {rows.slice(0, 3).map((row) => (
         <div key={`${row.who}-${row.quote}`}>
           <p>{row.stance}</p>
           <blockquote>
-            「{row.quote}」<cite> — {row.who}</cite>
+            {t("「", "“")}
+            {row.quote}
+            {t("」", "”")}
+            <cite> — {row.who}</cite>
           </blockquote>
         </div>
       ))}
@@ -98,9 +122,10 @@ function Discussion({ rows }: { rows?: NewsDiscussion[] }) {
 }
 
 export function NewsExtra({ item }: { item: NewsItem }) {
+  const t = useT();
   const metadata = [
     item.author,
-    item.authors?.join("、"),
+    item.authors?.join(t("、", ", ")),
     item.venue,
     item.version,
     item.channel,
@@ -108,7 +133,7 @@ export function NewsExtra({ item }: { item: NewsItem }) {
   ].filter(Boolean);
   return (
     <details className={css.rich}>
-      <summary className={css.expandHint}>来源与详情</summary>
+      <summary className={css.expandHint}>{t("来源与详情", "Sources and details")}</summary>
       <div className={css.expanded}>
         {item.details?.map((detail) => (
           <p key={detail}>{detail}</p>
@@ -128,8 +153,8 @@ export function NewsExtra({ item }: { item: NewsItem }) {
           </p>
         ))}
         <div className={css.sourceLinks}>
-          <NewsLink url={item.url}>阅读原文 ↗</NewsLink>
-          {item.repo && <NewsLink url={item.repo}>代码仓库 ↗</NewsLink>}
+          <NewsLink url={item.url}>{t("阅读原文 ↗", "Read source ↗")}</NewsLink>
+          {item.repo && <NewsLink url={item.repo}>{t("代码仓库 ↗", "Repository ↗")}</NewsLink>}
           {item.sources?.map((source) => (
             <NewsLink key={source.url} url={source.url}>
               {source.name}
@@ -141,6 +166,8 @@ export function NewsExtra({ item }: { item: NewsItem }) {
   );
 }
 export function TrendDetails({ trend }: { trend: NewsTrend }) {
+  const t = useT();
+  const locale = useLocale();
   return (
     <details className={css.rich}>
       <summary className={css.trendLead}>
@@ -148,16 +175,21 @@ export function TrendDetails({ trend }: { trend: NewsTrend }) {
         <strong className={css.title}>{trend.topic}</strong>
         {trend.summary && <span className={css.summary}>{trend.summary}</span>}
         <span className={css.meta}>
-          {trend.posts === undefined ? "X 热门" : `${trend.posts.toLocaleString("zh-CN")} 条讨论`}
+          {trend.posts === undefined
+            ? t("X 热门", "Trending on X")
+            : t(
+                `${trend.posts.toLocaleString(locale)} 条讨论`,
+                `${trend.posts.toLocaleString(locale)} ${trend.posts === 1 ? "post" : "posts"}`,
+              )}
         </span>
-        <span className={css.expandHint}>展开原帖与讨论</span>
+        <span className={css.expandHint}>{t("展开原帖与讨论", "Open posts and discussion")}</span>
       </summary>
       <div className={css.expanded}>
         {trend.samples?.map((post) => (
           <PostCard key={post.url} post={post} />
         ))}
         <Discussion rows={trend.discussion} />
-        {trend.url && <NewsLink url={trend.url}>查看话题 ↗</NewsLink>}
+        {trend.url && <NewsLink url={trend.url}>{t("查看话题 ↗", "View topic ↗")}</NewsLink>}
       </div>
     </details>
   );
