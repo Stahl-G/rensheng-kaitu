@@ -230,12 +230,15 @@ export function healthCandidates(zone: string) {
       const parts = text.split("/");
       if (parts.length !== compound.parts || parts.some((part) => !/^\d+(?:\.\d+)?$/.test(part)))
         throw new Error("复合健康值格式不对");
+      const unit = sample.unit?.trim() || compound.unit;
+      if (unit !== compound.unit && !(compound.kind === "heart_rate_daily" && unit === "count/min"))
+        throw new Error("Unsupported unit");
       emit(
         candidate("metric", {
           ts: isoInZone(parseTs(sample.start), zone),
           kind: compound.kind,
           value: text,
-          unit: sample.unit?.trim() || compound.unit,
+          unit: compound.unit,
           source: "apple-health",
         }),
       );

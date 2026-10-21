@@ -543,7 +543,7 @@ it("复合值：血压 120/80、心率与血氧日聚合 最小/均值/最大 �
   expect(validateWorkspace(ws)).toEqual([]);
 });
 
-it("复合指标按类型补非空单位并逐条拒绝错误的分量数", async () => {
+it("复合指标按类型补非空单位并拒绝错误分量和不兼容单位", async () => {
   const ws = await freshWorkspace("Asia/Shanghai");
   const file = join(tmp(), "compound-boundaries.health.json");
   const valid = [
@@ -559,20 +559,25 @@ it("复合指标按类型补非空单位并逐条拒绝错误的分量数", asyn
     { type: "blood_pressure", value: "120/80/70" },
     { type: "heart_rate_daily", value: "52/68" },
     { type: "blood_oxygen", value: "95/97" },
+    { type: "blood_pressure", value: "120/80", unit: "bpm" },
+    { type: "heart_rate_daily", value: "52/68/98", unit: "mmHg" },
+    { type: "blood_oxygen", value: "95/97/100", unit: "bpm" },
   ];
   writeFileSync(
     file,
     JSON.stringify({
       format: "kaitu.health.v1",
-      samples: [...samples, ...invalid].map((sample, index) => ({
-        ...sample,
-        start: `2026-10-01T0${index}:00:00+08:00`,
-        source: "Synthetic",
-      })),
+      samples: [...samples, { type: "HeartRateDaily", value: "50/60/90", unit: "count/min" }, ...invalid].map(
+        (sample, index) => ({
+          ...sample,
+          start: `2026-10-01T08:${String(index).padStart(2, "0")}:00+08:00`,
+          source: "Synthetic",
+        }),
+      ),
     }),
   );
   const result = await importHealthShortcut(ws, file);
-  expect(result).toMatchObject({ added: 6, ignored: { invalid: 3 } });
+  expect(result).toMatchObject({ added: 7, ignored: { invalid: 6 } });
   const metrics = readRecords(ws, "metric");
   expect(metrics.map(({ kind, value, unit }) => ({ kind, value, unit }))).toEqual([
     { kind: "bp", value: "120/80", unit: "mmHg" },
@@ -581,6 +586,40 @@ it("复合指标按类型补非空单位并逐条拒绝错误的分量数", asyn
     { kind: "heart_rate_daily", value: "52/68/98", unit: "bpm" },
     { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
     { kind: "blood_oxygen", value: "95/97/100", unit: "%" },
+    { kind: "heart_rate_daily", value: "50/60/90", unit: "bpm" },
+  ]);
+  expect(validateWorkspace(ws)).toEqual([]);
+});
+
+it("累计爬升下降允许零和正值，负值训练逐条跳过", async () => {
+  const ws = await freshWorkspace("Asia/Shanghai");
+  const file = join(tmp(), "workout-elevation-boundary.health.json");
+  const amounts = [
+    [0, 0],
+    [12, 5],
+    [-1, 0],
+    [0, -1],
+  ];
+  writeFileSync(
+    file,
+    JSON.stringify({
+      format: "kaitu.health.v1",
+      samples: amounts.map(([elevation_up_m, elevation_down_m], index) => ({
+        type: "workout",
+        start: `2026-10-01T0${index}:00:00+08:00`,
+        end: `2026-10-01T0${index}:15:00+08:00`,
+        unit: "min",
+        value: 15,
+        source: "Synthetic",
+        workout: { activity: "hiking", duration_min: 15, elevation_up_m, elevation_down_m },
+      })),
+    }),
+  );
+  const result = await importHealthShortcut(ws, file);
+  expect(result).toMatchObject({ added: 2, ignored: { invalid: 2 } });
+  expect(readRecords(ws, "workout")).toMatchObject([
+    { elevation_up_m: 0, elevation_down_m: 0 },
+    { elevation_up_m: 12, elevation_down_m: 5 },
   ]);
   expect(validateWorkspace(ws)).toEqual([]);
 });
