@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import { KaituError } from "./errors.js";
 import { schemas } from "./schema.js";
 import type { Task } from "./tasks.js";
@@ -96,6 +97,7 @@ export interface PlansData {
   goals: PlanGoal[];
   projects: number;
   directions: number;
+  sources: Record<string, { taskId: string; title: string; goalId?: string; goalTitle?: string }>;
 }
 
 /** 今天页「你带来的规划」：进行中的目标、各自的下一步和已记下的结果。只读已加载的数据。 */
@@ -103,13 +105,14 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
   // 只列正在推进的目标；暂停的不算「进行中」。
   const goals = data.goals.filter((goal) => !goal.status || goal.status === "active");
   const tasks = (data.records.task ?? []) as Task[];
-  const byId = new Map(goals.map((goal) => [goal.id, goal]));
+  const byId = new Map(data.goals.map((goal) => [goal.id, goal]));
   const byTitle = new Map<string, Goal>();
-  for (const goal of goals) {
+  for (const goal of [...goals, ...data.goals]) {
     const key = goal.title.trim().toLowerCase();
     if (!byTitle.has(key)) byTitle.set(key, goal);
   }
   const linked = new Map<string, Task[]>();
+  const sources: PlansData["sources"] = {};
   for (const task of tasks) {
     const ref = goalRef(task);
     const goal = !ref
@@ -117,12 +120,19 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
       : "id" in ref
         ? byId.get(ref.id)
         : byTitle.get(ref.title.trim().toLowerCase());
-    if (!goal) continue;
+    if (task.source)
+      sources[basename(task.source)] = {
+        taskId: task.id,
+        title: task.title,
+        ...(goal ? { goalId: goal.id, goalTitle: goal.title } : {}),
+      };
+    if (!goal || (goal.status && goal.status !== "active")) continue;
     const own = linked.get(goal.id);
     if (own) own.push(task);
     else linked.set(goal.id, [task]);
   }
   return {
+    sources,
     goals: goals.map((goal) => {
       const own = linked.get(goal.id) ?? [];
       const open = own.filter((task) => task.status === "open").at(-1);

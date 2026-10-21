@@ -577,7 +577,10 @@ function Overview({
                             `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
                           )
                       : data.sync.updatedAt
-                        ? t(`已更新 ${stamp(data.sync.updatedAt)}`, `Updated ${stamp(data.sync.updatedAt)}`)
+                        ? t(
+                            `已存版本 ${stamp(data.sync.updatedAt)}`,
+                            `Version saved ${stamp(data.sync.updatedAt)}`,
+                          )
                         : t("本机资料", "On this computer")}
           </button>
           <div className={css.account} ref={account}>
@@ -723,7 +726,7 @@ function Overview({
                 ask={askNext}
                 schedule={(item) => setSlot({ file: item.file, id: item.id })}
                 review={() => startGuide(1)}
-                focusCard={onboarding?.next?.status !== "done" ? adoptedCard : undefined}
+                focusCard={adoptedCard}
               />
               {!focus && !adoptedCard && (
                 <button type="button" className={css.link} onClick={() => startMatter("")}>
@@ -757,13 +760,13 @@ function Overview({
                   ))}
               <details
                 className={todayCss.secondary}
+                open={todayDetails}
                 onToggle={(event) => setTodayDetails(event.currentTarget.open)}
               >
                 <summary>{t("目标、资料与近期变化", "Goals, notes and recent changes")}</summary>
                 {todayDetails && (
                   <div>
                     {plansCard}
-                    {onboarding?.next?.status === "done" ? adoptedCard : null}
                     {onboarding && (
                       <OnboardingChecklist
                         status={onboarding}
@@ -853,7 +856,11 @@ function Overview({
               </div>
             </div>
             {!record ? (
-              <LibraryPage data={library} open={openRecord} />
+              <LibraryPage
+                data={library}
+                open={openRecord}
+                inboxCount={data ? data.sync.received + data.inboxNotes : undefined}
+              />
             ) : record === "calendar" ? (
               <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
@@ -872,6 +879,19 @@ function Overview({
               />
             ) : record === "inbox" ? (
               <InboxPage
+                sources={data?.plans.sources}
+                openNext={(id, goalId) => {
+                  setGuide(null);
+                  setView("overview");
+                  setTodayDetails(true);
+                  setTimeout(
+                    () =>
+                      (
+                        document.getElementById(`next-${id}`) ?? document.getElementById(`plan-${goalId}`)
+                      )?.scrollIntoView({ block: "center" }),
+                    0,
+                  );
+                }}
                 loadLibrary={props.loadLibrary}
                 subscribe={props.subscribe}
                 channelSettings={props.channelSettings}
@@ -955,6 +975,11 @@ function Overview({
             navigate={setView}
             onImportMemory={() => startGuide(5)}
             refreshWorkspace={refresh}
+            onWorkspaceCreated={async () => {
+              await props.chooseOnboarding({ storage: true });
+              await refresh();
+              startGuide();
+            }}
             channelSettings={props.channelSettings}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}

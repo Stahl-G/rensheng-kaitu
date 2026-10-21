@@ -1,4 +1,4 @@
-import type { LibraryQuery } from "@kaitu/core";
+import type { LibraryQuery, PlansData } from "@kaitu/core";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
@@ -31,7 +31,11 @@ export interface LibraryProps extends LearningServices {
   loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
-export function LibraryPage({ data, open }: { data: LibraryData | null; open: (id: string) => void }) {
+export function LibraryPage({
+  data,
+  open,
+  inboxCount,
+}: { data: LibraryData | null; open: (id: string) => void; inboxCount?: number }) {
   const t = useT();
   const colors: Record<string, string> = {
     calendar: "news",
@@ -43,49 +47,57 @@ export function LibraryPage({ data, open }: { data: LibraryData | null; open: (i
   };
   return (
     <section className={css.mods} aria-label={t("各类资料", "Library sections")}>
-      {data?.sections.map((section) => (
-        <button
-          type="button"
-          className={`${css.mod} ${css.card} ${css.summaryButton}`}
-          key={section.id}
-          onClick={() => open(section.id)}
-        >
-          <span className={css["sum-h"]}>
-            <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
-            {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-            <span>›</span>
-          </span>
-          {section.count === null ? (
-            <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
-          ) : section.count ? (
-            <span className={`${css.big} ${css.num}`}>
-              {t(
-                `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                `${section.count} ${section.id === "projects" ? (section.count === 1 ? "project" : "projects") : section.count === 1 ? "item" : "items"}`,
-              )}
+      {data?.sections.map((item) => {
+        const section =
+          item.id === "inbox" && inboxCount !== undefined ? { ...item, count: inboxCount } : item;
+        return (
+          <button
+            type="button"
+            className={`${css.mod} ${css.card} ${css.summaryButton}`}
+            key={section.id}
+            onClick={() => open(section.id)}
+          >
+            <span className={css["sum-h"]}>
+              <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
+              {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+              <span>›</span>
             </span>
-          ) : (
-            <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
-          )}
-          <span className={css.small}>
-            {section.sources.map((source, index) => (
-              <Fragment key={source}>
-                {index ? t("、", ", ") : ""}
-                <span className={css.nowrap}>{t(source, SOURCE_EN[source] ?? source)}</span>
-              </Fragment>
-            ))}
-            {section.latest && (
-              <span className={css.nowrap}>
-                {section.sources.length ? " · " : ""}
+            {section.count === null ? (
+              <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
+            ) : section.count || (section.id === "inbox" && inboxCount !== undefined) ? (
+              <span className={`${css.big} ${css.num}`}>
                 {t(
-                  `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
-                  `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                  section.id === "inbox" && inboxCount !== undefined
+                    ? `${section.count} 条未整理`
+                    : `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
+                  section.id === "inbox" && inboxCount !== undefined
+                    ? `${section.count} to sort`
+                    : `${section.count} ${section.id === "projects" ? (section.count === 1 ? "project" : "projects") : section.count === 1 ? "item" : "items"}`,
                 )}
               </span>
+            ) : (
+              <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
             )}
-          </span>
-        </button>
-      )) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
+            <span className={css.small}>
+              {section.sources.map((source, index) => (
+                <Fragment key={source}>
+                  {index ? t("、", ", ") : ""}
+                  <span className={css.nowrap}>{t(source, SOURCE_EN[source] ?? source)}</span>
+                </Fragment>
+              ))}
+              {section.latest && (
+                <span className={css.nowrap}>
+                  {section.sources.length ? " · " : ""}
+                  {t(
+                    `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
+                    `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
+                  )}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      }) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
     </section>
   );
 }
@@ -94,10 +106,14 @@ export function InboxPage({
   subscribe,
   channelSettings,
   connect,
+  openNext,
+  sources,
 }: Pick<LibraryProps, "loadLibrary"> & {
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
   connect: () => void;
+  openNext: (id: string, goalId?: string) => void;
+  sources: PlansData["sources"] | undefined;
 }) {
   const t = useT();
   const [channels, setChannels] = useState<ChannelState>();
@@ -203,40 +219,56 @@ export function InboxPage({
             : t("这里还没有原文记录", "Nothing here yet")}
         </p>
       ) : (
-        entries.map((row) => (
-          <div className={css.raw} key={row.file}>
-            <time>
-              {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
-              <br />
-              <span className={css.small}>
-                {row.source === "me"
-                  ? t("随手记", "Quick note")
-                  : row.source === "mail"
-                    ? t("邮件", "Email")
-                    : row.source === "slack"
-                      ? "Slack"
-                      : row.source === "feishu"
-                        ? t("飞书", "Feishu")
-                        : t("其他原文", "Other")}
+        entries.map((row) => {
+          const destination = sources?.[row.file.split("/").at(-1) ?? ""];
+          return (
+            <div className={css.raw} key={row.file}>
+              <time>
+                {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
+                <br />
+                <span className={css.small}>
+                  {row.source === "me"
+                    ? t("随手记", "Quick note")
+                    : row.source === "mail"
+                      ? t("邮件", "Email")
+                      : row.source === "slack"
+                        ? "Slack"
+                        : row.source === "feishu"
+                          ? t("飞书", "Feishu")
+                          : t("其他原文", "Other")}
+                </span>
+              </time>
+              <blockquote>{row.text}</blockquote>
+              <span className={css.st}>
+                <span className={css.chip}>
+                  {row.status === "organized"
+                    ? t("已整理", "Organized")
+                    : row.status === "review"
+                      ? t("要你核对", "Needs review")
+                      : t("只存了原文", "Saved as is")}
+                </span>
+                {row.status === "organized" && destination ? (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => openNext(destination.taskId, destination.goalId)}
+                  >
+                    {t(
+                      `变成下一步：${destination.title}${destination.goalTitle ? `（目标：${destination.goalTitle}）` : ""}`,
+                      `Next step: ${destination.title}${destination.goalTitle ? ` (Goal: ${destination.goalTitle})` : ""}`,
+                    )}
+                  </button>
+                ) : row.status === "organized" ? (
+                  t("只保留了原文", "Saved as is")
+                ) : row.status === "review" ? (
+                  t("请核对原文与相关资料", "Review the original and related items")
+                ) : (
+                  t("还没整理", "Not organized yet")
+                )}
               </span>
-            </time>
-            <blockquote>{row.text}</blockquote>
-            <span className={css.st}>
-              <span className={css.chip}>
-                {row.status === "organized"
-                  ? t("已整理", "Organized")
-                  : row.status === "review"
-                    ? t("要你核对", "Needs review")
-                    : t("只存了原文", "Saved as is")}
-              </span>
-              {row.status === "organized"
-                ? (row.destination ?? t("整理去向未记录", "Destination not recorded"))
-                : row.status === "review"
-                  ? t("请核对原文与相关资料", "Review the original and related items")
-                  : t("还没整理", "Not organized yet")}
-            </span>
-          </div>
-        ))
+            </div>
+          );
+        })
       )}
       {next && (
         <button type="button" className={css.link} disabled={loading} onClick={() => void more()}>

@@ -234,7 +234,8 @@ export function OnboardingMatter(
   const field = (key: keyof OnboardingMatterDraft, title: string) => (
     <label key={key}>
       <b>{title}</b>
-      <input
+      <textarea
+        rows={2}
         value={draft[key]}
         disabled={busy || (key === "next" && paths.length > 0 && path < 0)}
         maxLength={key === "current" ? 4000 : 2000}
@@ -243,7 +244,9 @@ export function OnboardingMatter(
             ? t("先选一条可能路径，再修改小实验", "Pick a possible path first, then adjust its experiment")
             : undefined
         }
-        onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+        onChange={(event) =>
+          setDraft((current) => ({ ...current, [key]: event.target.value.replace(/[\r\n]+/g, " ") }))
+        }
       />
     </label>
   );
@@ -336,13 +339,7 @@ export function OnboardingMatter(
               {hasDraft ? t("需要你核对", "Needs your review") : t("等你整理", "Ready to organize")}
             </span>
           </div>
-          {busy && (
-            <output className={v2.small}>
-              {organizing
-                ? t("正在请 AI 整理，原文已保存…", "Asking the AI to organize. Your text is saved…")
-                : t("正在保存…", "Saving…")}
-            </output>
-          )}
+          {busy && !organizing && <output className={v2.small}>{t("正在保存…", "Saving…")}</output>}
           {manual && (
             <p className={v2.small}>
               {t(
@@ -411,33 +408,38 @@ export function OnboardingMatter(
               />
             </details>
           )}
-          <div className={css.footerActions}>
-            {props.builtin ? (
-              !noAi && (
-                <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                  {t("用当前 AI 整理", "Organize with the current AI")}
-                </button>
-              )
-            ) : (
-              <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
-                {t("请当前 AI 整理", "Ask the current AI")}
-              </button>
+          <div className={css.matterActions}>
+            {organizing && (
+              <output className={v2.small}>
+                {t("AI 正在整理，原文已经保存", "AI is organizing. Your original text is saved.")}
+              </output>
             )}
-            <button
-              type="button"
-              className={primary}
-              disabled={busy || !draft.goal.trim() || !draft.next.trim() || (paths.length > 0 && path < 0)}
-              onClick={() =>
-                void run(async () => {
-                  await props.adoptOnboardingMatter(matter.source, draft, paths[path] ?? null);
-                  await props.onDone();
-                })
-              }
-            >
-              {manual
-                ? t("保存目标和下一步", "Save the goal and next step")
-                : t("采纳这个下一步", "Adopt this next step")}
-            </button>
+            <div className={css.footerActions}>
+              {props.builtin ? (
+                !noAi && (
+                  <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
+                    {t("用当前 AI 整理", "Organize with the current AI")}
+                  </button>
+                )
+              ) : (
+                <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
+                  {t("请当前 AI 整理", "Ask the current AI")}
+                </button>
+              )}
+              <button
+                type="button"
+                className={primary}
+                disabled={busy || !draft.goal.trim() || !draft.next.trim() || (paths.length > 0 && path < 0)}
+                onClick={() =>
+                  void run(async () => {
+                    await props.adoptOnboardingMatter(matter.source, draft, paths[path] ?? null);
+                    await props.onDone();
+                  })
+                }
+              >
+                {t("采纳这个下一步", "Adopt this next step")}
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -455,7 +457,7 @@ export function OnboardingNextCard(
 ) {
   const t = useT();
   const { next } = props;
-  const [action, setAction] = useState<"complete" | "defer" | null>(null);
+  const [action, setAction] = useState<"complete" | "defer" | "next" | null>(null);
   const [value, setValue] = useState("");
   const [original, setOriginal] = useState<Matter | null>(null);
   const [goalShown, setGoalShown] = useState(false);
@@ -481,6 +483,7 @@ export function OnboardingNextCard(
   const shown = next.kind === "goal" ? goalShown : !!original;
   return (
     <section
+      id={`next-${next.id}`}
       className={`${v2.card} ${css.nextCard}`}
       aria-label={t("刚采纳的下一步", "The next step you adopted")}
     >
@@ -515,82 +518,98 @@ export function OnboardingNextCard(
         </p>
       )}
       {original && <pre className={css.original}>{original.text}</pre>}
-      {next.status === "done" ? (
-        <p>
-          {t("结果：", "Result: ")}
-          {next.result}
-        </p>
-      ) : (
+      {next.status === "done" && (
         <>
-          {!action ? (
-            <div className={css.footerActions}>
-              {props.onSchedule && (
-                <button type="button" className={quiet} onClick={props.onSchedule}>
-                  {t("安排时间段", "Schedule a time")}
-                </button>
-              )}
-              <button
-                type="button"
-                className={primary}
-                onClick={() => {
-                  setAction("complete");
-                  setValue("");
-                }}
-              >
-                {t("完成并记一句结果", "Done, log one line")}
-              </button>
-              {props.onPrompt && (
-                <button type="button" className={quiet} onClick={props.onPrompt}>
-                  {t("交给 AI", "Ask AI")}
-                </button>
-              )}
-              <button
-                type="button"
-                className={quiet}
-                onClick={() => {
-                  setAction("defer");
-                  setValue(next.due ?? "");
-                }}
-              >
-                {t("改到以后", "Move to later")}
-              </button>
-            </div>
-          ) : (
-            <form
-              className={css.resultForm}
-              onSubmit={(event) => {
-                event.preventDefault();
-                void run(async () => {
-                  await props.changeOnboardingNext(next.id, next.rev, action, value);
-                  await props.refresh();
-                });
+          <output className={v2.small}>{t("已记好", "Saved")}</output>
+          <p>
+            {t("结果：", "Result: ")}
+            {next.result}
+          </p>
+          {next.goalId && !action && (
+            <button
+              type="button"
+              className={primary}
+              onClick={() => {
+                setAction("next");
+                setValue("");
               }}
             >
-              <label>
-                {action === "complete"
-                  ? t("记一句结果", "One line about how it went")
-                  : t("安排到哪一天", "Which day")}
-                <input
-                  type={action === "defer" ? "date" : "text"}
-                  value={value}
-                  maxLength={2000}
-                  disabled={busy}
-                  required
-                  onChange={(event) => setValue(event.target.value)}
-                />
-              </label>
-              <div className={css.footerActions}>
-                <button type="button" className={quiet} disabled={busy} onClick={() => setAction(null)}>
-                  {t("取消", "Cancel")}
-                </button>
-                <button type="submit" className={primary} disabled={busy || !value.trim()}>
-                  {busy ? t("保存中…", "Saving…") : t("保存", "Save")}
-                </button>
-              </div>
-            </form>
+              {t("定下一步", "Set the next step")}
+            </button>
           )}
         </>
       )}
+      {(next.status !== "done" || action === "next") &&
+        (!action ? (
+          <div className={css.footerActions}>
+            {props.onSchedule && (
+              <button type="button" className={quiet} onClick={props.onSchedule}>
+                {t("安排时间段", "Schedule a time")}
+              </button>
+            )}
+            <button
+              type="button"
+              className={primary}
+              onClick={() => {
+                setAction("complete");
+                setValue("");
+              }}
+            >
+              {t("完成并记一句结果", "Done, log one line")}
+            </button>
+            {props.onPrompt && (
+              <button type="button" className={quiet} onClick={props.onPrompt}>
+                {t("交给 AI", "Ask AI")}
+              </button>
+            )}
+            <button
+              type="button"
+              className={quiet}
+              onClick={() => {
+                setAction("defer");
+                setValue(next.due ?? "");
+              }}
+            >
+              {t("改到以后", "Move to later")}
+            </button>
+          </div>
+        ) : (
+          <form
+            className={css.resultForm}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run(async () => {
+                if (action === "next" && next.goalId) await props.addGoalNext(next.goalId, value);
+                else await props.changeOnboardingNext(next.id, next.rev, action, value);
+                await props.refresh();
+              });
+            }}
+          >
+            <label>
+              {action === "next"
+                ? t("下一个小步骤", "The next small step")
+                : action === "complete"
+                  ? t("记一句结果", "One line about how it went")
+                  : t("安排到哪一天", "Which day")}
+              <input
+                type={action === "defer" ? "date" : "text"}
+                value={value}
+                maxLength={2000}
+                disabled={busy}
+                required
+                onChange={(event) => setValue(event.target.value)}
+              />
+            </label>
+            <div className={css.footerActions}>
+              <button type="button" className={quiet} disabled={busy} onClick={() => setAction(null)}>
+                {t("取消", "Cancel")}
+              </button>
+              <button type="submit" className={primary} disabled={busy || !value.trim()}>
+                {busy ? t("保存中…", "Saving…") : t("保存", "Save")}
+              </button>
+            </div>
+          </form>
+        ))}
       {error && (
         <p role="alert" className={v2.error}>
           {error}
