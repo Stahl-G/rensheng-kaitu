@@ -195,8 +195,12 @@ function NativeApproval({
     }
   };
   return (
-    <details open className={css.tool}>
-      <summary>{data.reason || t("本机 Agent 请求批准这一步", "The local Agent requests approval")}</summary>
+    <details open={!status} className={css.tool}>
+      <summary>
+        {status
+          ? labels[status]
+          : data.reason || t("本机 Agent 请求批准这一步", "The local Agent requests approval")}
+      </summary>
       <pre>{data.detail}</pre>
       {status ? (
         <output className={css.approvalStatus}>{labels[status]}</output>
@@ -275,7 +279,9 @@ export function AskPage({
   }, [configureRequest, configureBuiltin]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
-  const selectThread = (id: string | null) => {
+  const selectThread = (id: string | null, follow = false) => {
+    nearBottom.current = !id || follow;
+    if (!nearBottom.current && scroll.current) scroll.current.scrollTop = 0;
     setSelected(id);
     setModelMenu(false);
   };
@@ -547,7 +553,6 @@ export function AskPage({
     activeSession.current = selected;
     setEvents([]);
     setLiveText("");
-    nearBottom.current = true;
     if (!selected) return;
     const stream = new EventSource(`/api/ask/events?session=${encodeURIComponent(selected)}`);
     stream.onmessage = (message) => {
@@ -583,6 +588,7 @@ export function AskPage({
       draft.trim() ||
       (attachments.length ? "请看看这些附件" : sessionReferences.length ? "参考这些对话帮我继续" : "");
     if (!value || busy || readingFiles || !settings?.configured) return;
+    nearBottom.current = true;
     // askSend 要等整轮回复；输入框一点发送就清掉，失败再还原（若用户已另写则不覆盖）。
     const pendingText = value;
     const pendingAttachments = attachments;
@@ -599,7 +605,7 @@ export function AskPage({
         const thread = await call<Thread>("askCreate");
         id = thread.id;
         activeSession.current = id;
-        selectThread(id);
+        selectThread(id, true);
       }
       await call("askSend", id, payload, pendingAttachments);
       await refreshThreads();
