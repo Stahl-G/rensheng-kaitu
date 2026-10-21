@@ -7,6 +7,8 @@ export const locales = ["zh-CN", "en"] as const;
 export type Locale = (typeof locales)[number];
 export interface Preferences {
   locale: Locale | null;
+  /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
+  exploreEntries?: string[];
   /** Resolved UI state only; an automatic choice is never persisted as a manual choice. */
   followSystem?: boolean;
 }
@@ -24,12 +26,22 @@ export function pick(locale: Locale, zh: string, en: string): string {
 function file() {
   return join(localStateRoot(), "preferences.json");
 }
+function entryList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((id) => typeof id === "string" && id.length > 0 && id.trim() === id) &&
+    new Set(value).size === value.length
+  );
+}
 
 /** 界面偏好只存在本机状态目录：不进工作区、不同步、不进版本历史。 */
 export function readPreferences(): Preferences {
   try {
     const value = JSON.parse(readFileSync(file(), "utf8")) as Partial<Preferences>;
-    return { locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null };
+    return {
+      locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
+      ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
+    };
   } catch {
     return { locale: null };
   }
@@ -40,7 +52,8 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     !input ||
     typeof input !== "object" ||
     Array.isArray(input) ||
-    Object.keys(input).some((key) => key !== "locale") ||
+    Object.keys(input).some((key) => key !== "locale" && key !== "exploreEntries") ||
+    (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
     (input.locale !== null && input.locale !== undefined && !locales.includes(input.locale))
   )
     throw new KaituError("界面偏好不合法", "BAD_ARGS");

@@ -22,6 +22,7 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | 项目 | 开图用于哪里 | 许可证 |
 |---|---|---|
 | [React / React DOM](https://github.com/react/react) | 当前开图 App、DSH 插件和独立 React 界面 | MIT |
+| [dnd-kit](https://github.com/clauderic/dnd-kit) | 开图入口的独立拖拽手柄与键盘排序；使用同代 core / sortable / utilities | MIT |
 | [FullCalendar](https://github.com/fullcalendar/fullcalendar) | 日、周、月、列表日历视图，使用 standard 模块 | MIT |
 | [FullCalendar React](https://github.com/fullcalendar/fullcalendar-react) | 将日历嵌入 React 页面 | MIT |
 | [react-easy-crop](https://github.com/ValentinH/react-easy-crop) | 选择头像后的图片裁剪 | MIT |

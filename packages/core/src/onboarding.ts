@@ -1149,6 +1149,7 @@ export function resolvePreferences(
   const saved = readPreferences();
   if (saved.locale) return { ...saved, followSystem: false };
   return {
+    ...saved,
     locale: typeof hint === "string" && /^zh(?:[-_]|$)/i.test(hint.trim()) ? "zh-CN" : "en",
     followSystem: true,
   };

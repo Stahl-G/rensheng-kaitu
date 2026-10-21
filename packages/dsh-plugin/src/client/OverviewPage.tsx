@@ -6,6 +6,7 @@ import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js"
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
+import { ExploreNavigation } from "./ExploreNavigation.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -30,6 +31,7 @@ import {
   TodayTasks,
 } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
+import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -74,6 +76,7 @@ const modules = [
 export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
+  const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
@@ -83,6 +86,7 @@ export function OverviewPage(props: OverviewPageProps) {
         if (!active) return;
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
+        setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
       })
       .catch(() => active && setLocale("zh-CN"));
     return () => {
@@ -97,6 +101,8 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale={setLocale}
         followSystem={followSystem}
         setFollowSystem={setFollowSystem}
+        exploreEntries={exploreEntries}
+        setExploreEntries={setExploreEntries}
       />
     </LocaleContext.Provider>
   );
@@ -107,12 +113,16 @@ function Overview({
   setLocale,
   followSystem,
   setFollowSystem,
+  exploreEntries,
+  setExploreEntries,
   ...props
 }: OverviewPageProps & {
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
   setFollowSystem: (value: boolean) => void;
+  exploreEntries: string[] | null;
+  setExploreEntries: (value: string[]) => void;
 }) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
@@ -128,6 +138,10 @@ function Overview({
   const [view, setView] = useState<View>("overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
+  const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
+  useEffect(() => {
+    if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
+  }, [exploreEntries, firstExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
@@ -294,7 +308,7 @@ function Overview({
           : id === "directions"
             ? "directions"
             : id === "explore"
-              ? "footprints"
+              ? firstExplore
               : "health",
       );
       setView("explore");
@@ -443,6 +457,43 @@ function Overview({
     />
   );
   const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
+  const selectedExplore = exploreModules.find((entry) => entry.id === explore);
+  const explorePages: Record<ExploreModule["id"], ReactNode> = {
+    health: <HealthPage {...child} />,
+    footprints: (
+      <>
+        <MapPage {...child} />
+        <ProgressMap
+          plans={data?.plans}
+          projects={data?.projects ?? []}
+          loadExploration={props.loadExploration}
+          subscribe={props.subscribe}
+          open={(section) => {
+            if (section === "directions") setExplore("directions");
+            else if (section === "plans") setView("overview");
+            else openSection("projects");
+          }}
+        />
+      </>
+    ),
+    news: (
+      <NewsPage
+        {...child}
+        onLearn={(item) => {
+          setLearningSource({
+            title: item.title,
+            ...(item.url ? { url: item.url } : {}),
+            ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
+          });
+          openRecord("notes");
+        }}
+      />
+    ),
+    directions: (
+      <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+    ),
+  };
+
   return (
     <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
       <header className={css.top}>
@@ -466,7 +517,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore("footprints");
+                if (id === "explore") setExplore(firstExplore);
                 setRecord("");
                 setMenu(false);
               }}
@@ -836,85 +887,25 @@ function Overview({
           <>
             <section className={css.sec} aria-label={t("开图", "Explore")}>
               <h1 className={css.sr}>{t("开图", "Explore")}</h1>
-              <nav className={css.exploreEntries} aria-label={t("开图里的内容", "Explore sections")}>
-                {[
-                  {
-                    id: "footprints",
-                    title: t("足迹", "Footprints"),
-                    description: t("看看来路，探索下一站", "Trace your journey, explore what is next"),
-                    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
-                  },
-                  {
-                    id: "health",
-                    title: t("健康", "Health"),
-                    description: t("照顾身体，记录每天的变化", "Care for your body, notice daily changes"),
-                    icon: "M3 12h4l3-8 4 16 3-8h4",
-                  },
-                  {
-                    id: "news",
-                    title: t("资讯", "News"),
-                    description: t("阅读关心的事，保留真实来源", "Read what matters, keep its sources"),
-                    icon: "M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h4",
-                  },
-                  {
-                    id: "directions",
-                    title: t("方向", "Directions"),
-                    description: t("把想法变成可以尝试的一步", "Turn an idea into a step you can try"),
-                    icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4 6-2 6-6 2 2-6 6-2Z",
-                  },
-                ].map(({ id, title, description, icon }) => (
-                  <button type="button" key={id} aria-pressed={explore === id} onClick={() => setExplore(id)}>
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d={icon} />
-                    </svg>
-                    <span>
-                      <strong>{title}</strong>
-                      <small>{description}</small>
-                    </span>
-                  </button>
-                ))}
-              </nav>
+              <ExploreNavigation
+                entries={exploreEntries}
+                current={explore}
+                sections={data?.sections ?? []}
+                open={setExplore}
+                save={async (entries) => {
+                  const saved = await props.savePreferences({
+                    locale: followSystem ? null : locale,
+                    exploreEntries: entries,
+                  });
+                  setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
+                }}
+              />
             </section>
             <div className={css.child}>
-              {explore === "health" ? (
-                <HealthPage {...child} />
-              ) : explore === "footprints" ? (
-                <>
-                  <MapPage {...child} />
-                  <ProgressMap
-                    plans={data?.plans}
-                    projects={data?.projects ?? []}
-                    loadExploration={props.loadExploration}
-                    subscribe={props.subscribe}
-                    open={(section) => {
-                      if (section === "directions") setExplore("directions");
-                      else if (section === "plans") setView("overview");
-                      else openSection("projects");
-                    }}
-                  />
-                </>
-              ) : explore === "news" ? (
-                <NewsPage
-                  {...child}
-                  onLearn={(item) => {
-                    setLearningSource({
-                      title: item.title,
-                      ...(item.url ? { url: item.url } : {}),
-                      ...(item.summary ? { text: `已有资讯摘要（非原文）：\n${item.summary}` } : {}),
-                    });
-                    openRecord("notes");
-                  }}
-                />
+              {selectedExplore ? (
+                explorePages[selectedExplore.id]
               ) : (
-                <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+                <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
               )}
             </div>
           </>
