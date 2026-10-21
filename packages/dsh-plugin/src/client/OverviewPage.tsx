@@ -914,7 +914,6 @@ function Overview({
               <ExploreNavigation
                 entries={exploreEntries}
                 current={explore}
-                sections={data?.sections ?? []}
                 open={setExplore}
                 save={async (entries) => {
                   const saved = await props.savePreferences({

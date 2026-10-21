@@ -15,7 +15,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
-import type { OverviewData } from "../types.js";
 import css from "./Prototype.module.css";
 import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
 import { useT } from "./i18n.js";
@@ -90,13 +89,11 @@ function Entry({
 export function ExploreNavigation({
   entries,
   current,
-  sections,
   open,
   save,
 }: {
   entries: string[] | null;
   current: string;
-  sections: OverviewData["sections"];
   open: (id: string) => void;
   save: (entries: string[]) => Promise<unknown>;
 }) {
@@ -111,9 +108,6 @@ export function ExploreNavigation({
   const available = new Map(exploreModules.map((entry) => [entry.id as string, entry]));
   const visible = (entries ?? []).flatMap((id) => available.get(id) ?? []);
   const hidden = exploreModules.filter((entry) => !entries?.includes(entry.id));
-  const withoutPage = sections.filter(
-    (section) => !exploreModules.some((entry) => entry.module === section.id),
-  );
   const change = async (next: string[]) => {
     setBusy(true);
     setError("");
@@ -190,16 +184,6 @@ export function ExploreNavigation({
             </button>
           ))}
           {!hidden.length && <p>{t("所有可用入口都已显示。", "All available entries are shown.")}</p>}
-          {withoutPage.length > 0 && (
-            <details>
-              <summary>{t("已有资料模块", "Existing data modules")}</summary>
-              {withoutPage.map((section) => (
-                <p key={section.id}>
-                  {section.label} · {t("尚无开图页面", "No Explore page available")}
-                </p>
-              ))}
-            </details>
-          )}
         </section>
       )}
       {error && <p role="alert">{error}</p>}
