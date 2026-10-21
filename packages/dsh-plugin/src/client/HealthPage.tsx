@@ -10,6 +10,8 @@ export interface HealthPageProps {
 }
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
+const sessions = (n: number) => `${n} ${n === 1 ? "session" : "sessions"}`;
+const reps = (n: number) => `${n} ${n === 1 ? "rep" : "reps"}`;
 const makeAmount =
   (t: ReturnType<typeof useT>) =>
   (value: number | null, unit: string, estimated = false) =>
@@ -58,7 +60,9 @@ function Trend({
     line && values.length ? Math.min(...values) - Math.max((max - Math.min(...values)) * 0.2, 1) : 0;
   const y = (value: number) => 112 - ((value - min) / (max - min || 1)) * 96;
   const x = (i: number) => 18 + (i * 564) / Math.max(points.length - 1, 1);
-  const summary = points.map((p) => `${p.date}：${amount(p.value, unit, p.estimated)}`).join("，");
+  const summary = points
+    .map((p) => `${p.date}${t("：", ": ")}${amount(p.value, unit, p.estimated)}`)
+    .join(t("，", ", "));
   return (
     <Section
       title={title}
@@ -86,7 +90,9 @@ function Trend({
                 p.value === null ? null : (
                   <g key={`${p.date}-${i}`}>
                     <title>
-                      {p.date}：{amount(p.value, unit, p.estimated)}
+                      {p.date}
+                      {t("：", ": ")}
+                      {amount(p.value, unit, p.estimated)}
                     </title>
                     {i > 0 && points[i - 1]?.value !== null && (
                       <line x1={x(i - 1)} y1={y(points[i - 1]?.value ?? 0)} x2={x(i)} y2={y(p.value)} />
@@ -105,7 +111,7 @@ function Trend({
                 <div
                   className={css.barSlot}
                   key={p.date}
-                  title={`${p.date}：${amount(p.value, unit, p.estimated)}`}
+                  title={`${p.date}${t("：", ": ")}${amount(p.value, unit, p.estimated)}`}
                 >
                   {p.value === null ? (
                     <span className={css.missing} />
@@ -179,10 +185,16 @@ function Photo({
   return (
     <figure className={css.photo}>
       {url ? (
-        <img src={url} alt={`${photo.date} ${poses[photo.pose]} ${t("体态照片", "progress photo")}`} />
+        <img
+          src={url}
+          alt={t(
+            `${photo.date} ${poses[photo.pose]}体态照片`,
+            `${photo.date} ${poses[photo.pose]} progress photo`,
+          )}
+        />
       ) : error ? (
         <button type="button" onClick={() => setRetry((n) => n + 1)}>
-          {t("照片读取失败，点此重试", "Photo could not load. Retry")}
+          {t("照片读取失败，点此重试", "Couldn't load photo. Click to retry")}
         </button>
       ) : (
         <p>{t("正在读取照片…", "Loading photo…")}</p>
@@ -214,7 +226,10 @@ function Photos({
   const [left, setLeft] = useState(dates.at(-1) ?? "");
   const [right, setRight] = useState(dates.length > 1 ? (dates[0] ?? "") : "");
   return (
-    <Section title={t("体态照片", "Progress photos")} note={t("只读取本机照片", "Loads local photos only")}>
+    <Section
+      title={t("体态照片", "Progress photos")}
+      note={t("只读取本机照片", "Only photos stored on this computer")}
+    >
       <button
         type="button"
         className={css.link}
@@ -246,7 +261,7 @@ function Photos({
                     {dates
                       .filter((d) => d !== side.other)
                       .map((d) => (
-                        <option key={index}>{d}</option>
+                        <option key={d}>{d}</option>
                       ))}
                   </select>
                 </label>
@@ -266,7 +281,7 @@ function Photos({
                   {photos
                     .filter((p) => p.date === date)
                     .map((p) => poses[p.pose])
-                    .join("、")}
+                    .join(t("、", ", "))}
                 </span>
                 <button
                   type="button"
@@ -296,6 +311,24 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
   const t = useT();
   const locale = useLocale();
   const amount = makeAmount(t);
+  const labels: Record<string, string> = {
+    早: "Breakfast",
+    午: "Lunch",
+    晚: "Dinner",
+    加餐: "Snack",
+    腿部: "Legs",
+    胸部: "Chest",
+    背部: "Back",
+    肩部: "Shoulders",
+    手臂: "Arms",
+    核心: "Core",
+    你: "you",
+    "本机 Agent": "Local agent",
+    "Apple 健康导入": "Apple Health import",
+    导入记录: "Imported",
+  };
+  const label = (value: string) =>
+    t(value, labels[value] ?? value.replace(/^云端 Agent · /, "Cloud agent · "));
   const metricNames: Record<string, string> = {
     weight: t("体重", "Weight"),
     body_fat: t("体脂", "Body fat"),
@@ -352,7 +385,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
       : pattern === "daily"
         ? t("每天一次", "Daily")
         : pattern === "weekdays"
-          ? t("工作日训练", "Weekday training")
+          ? t("工作日训练", "Weekdays")
           : pattern === "custom"
             ? t("自定安排", "Custom schedule")
             : t("暂无训练目标", "No training goal yet");
@@ -435,7 +468,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
       {!data || !training ? (
         <p className={css.empty}>
           {error
-            ? t("健康数据读取失败，请重试。", "Could not load health data. Retry.")
+            ? t("健康数据读取失败，请重试。", "Couldn't load health data. Try again.")
             : t("正在读取健康数据…", "Loading health data…")}
         </p>
       ) : (
@@ -447,26 +480,26 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                   {[
                     [
                       t("本周训练", "Workouts this week"),
-                      amount(training.week, t("次", "sessions")),
-                      `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? t("已达到本周目标", "Weekly goal reached") : t(`距目标还差 ${(target[0] ?? 0) - training.week} 次`, `${(target[0] ?? 0) - training.week} sessions to goal`)}` : ""}`,
+                      amount(training.week, t("次", training.week === 1 ? "session" : "sessions")),
+                      `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? t("已达到本周目标", "Weekly goal reached") : t(`距目标还差 ${(target[0] ?? 0) - training.week} 次`, `${sessions((target[0] ?? 0) - training.week)} to goal`)}` : ""}`,
                     ],
                     [
                       t("本月训练", "Workouts this month"),
-                      amount(training.month, t("次", "sessions")),
+                      amount(training.month, t("次", training.month === 1 ? "session" : "sessions")),
                       training.month !== null && training.previousMonth !== null
                         ? t(
                             `上月 ${training.previousMonth} 次 · ${training.month === training.previousMonth ? "与上月持平" : `比上月${training.month > training.previousMonth ? "多" : "少"} ${Math.abs(training.month - training.previousMonth)} 次`}`,
-                            `Last month: ${training.previousMonth} · ${training.month === training.previousMonth ? "Same as last month" : `${Math.abs(training.month - training.previousMonth)} ${training.month > training.previousMonth ? "more" : "fewer"} sessions`}`,
+                            `Last month: ${training.previousMonth} · ${training.month === training.previousMonth ? "Same as last month" : `${Math.abs(training.month - training.previousMonth)} ${training.month > training.previousMonth ? "more" : "fewer"} ${Math.abs(training.month - training.previousMonth) === 1 ? "session" : "sessions"}`}`,
                           )
                         : t("上月或本月暂无记录", "No records for last month or this month"),
                     ],
                     [
                       t("练得最多", "Most trained"),
-                      training.topPart?.name ?? t("暂无记录", "No records yet"),
+                      training.topPart ? label(training.topPart.name) : t("暂无记录", "No records yet"),
                       training.topPart
                         ? t(
                             `本月 ${training.topPart.count} 次 · 按动作归类`,
-                            `${training.topPart.count} this month · by exercise`,
+                            `${sessions(training.topPart.count)} this month · grouped by exercise`,
                           )
                         : t("记录动作后可汇总部位", "Log exercises to see the muscle groups"),
                     ],
@@ -480,7 +513,10 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                             `比本月首个记录日 ${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg`,
                             `${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg since the first record this month`,
                           )
-                        : t("需要不同日期的力量记录", "Needs strength records from different dates"),
+                        : t(
+                            "需要不同日期的力量记录",
+                            "Log strength sets on two different days to see the change",
+                          ),
                     ],
                   ].map(([label, value, hint]) => (
                     <div className={css.stat} key={label}>
@@ -495,7 +531,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                 <div className={css.trainingDetails}>
                   <Section
                     title={t("近 5 周", "Last 5 weeks")}
-                    note={t("颜色越深，那天练得越多", "Darker days have more training")}
+                    note={t("颜色越深，那天练得越多", "Darker squares mean more training")}
                   >
                     <div className={css.heatmap}>
                       {(locale === "en"
@@ -510,7 +546,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                         const volume = d.repetitions
                           ? d.repetitions / maxReps
                           : (d.minutes ?? 0) / maxMinutes;
-                        const text = `${d.date}：${d.future ? t("尚未到来", "Upcoming") : d.sessions === null ? t("暂无记录", "No records yet") : t(`${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`, `${d.sessions} sessions${d.repetitions ? ` · ${d.repetitions} reps` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} min` : ""}`)}`;
+                        const text = `${d.date}${t("：", ": ")}${d.future ? t("尚未到来", "Upcoming") : d.sessions === null ? t("暂无记录", "No records yet") : t(`${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`, `${sessions(d.sessions)}${d.repetitions ? ` · ${reps(d.repetitions)}` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} min` : ""}`)}`;
                         return (
                           <span
                             className={css.heat}
@@ -532,7 +568,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                       <Empty>
                         {t(
                           "点击「记一次训练」，记下动作、组数和重量。",
-                          "Choose Log a workout to record exercises, sets and weight.",
+                          "Choose “Log a workout” to record exercises, sets and weights.",
                         )}
                       </Empty>
                     ) : (
@@ -540,7 +576,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                         <article className={css.workout} key={session.id}>
                           <time dateTime={session.ts}>{stamp(session.ts)}</time>
                           {session.parts.length > 0 && (
-                            <span className={css.tag}>{session.parts.join("、")}</span>
+                            <span className={css.tag}>{session.parts.map(label).join(t("、", ", "))}</span>
                           )}
                           <div className={css.exercises}>
                             {session.exercises.map((exercise) => (
@@ -554,7 +590,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                                 </span>
                                 <small>
                                   {t("记录者：", "Recorded by: ")}
-                                  {exercise.recorder === "你" ? t("你", "you") : exercise.recorder}
+                                  {label(exercise.recorder)}
                                 </small>
                               </div>
                             ))}
@@ -612,7 +648,7 @@ export function HealthPage({ loadHealth, loadHealthPhoto, onPrompt }: HealthPage
                     data.nutrition.meals.map((meal) => (
                       <article className={css.row} key={meal.id}>
                         <time dateTime={meal.ts}>
-                          {stamp(meal.ts)} · {meal.meal}
+                          {stamp(meal.ts)} · {label(meal.meal)}
                         </time>
                         <span className={css.grow}>{meal.items}</span>
                         <span>
