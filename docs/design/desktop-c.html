@@ -2174,7 +2174,7 @@ pre code { background: none; padding: 0; }
 
 <section class="d-sec" id="prs">
   <h2>分几步做</h2>
-  <p>每一步单独一个 PR，按顺序合。每个 PR 的描述里放浅色、深色，以及 1440、1100、900、420 四个宽度的截图和实测时间（按 AGENTS.md 第 6 条，只放在 PR 描述里）。不为这一轮加截图测试；只给真实行为加测试（比如“开图打开到哪一页”的判断）。</p>
+  <p>这一轮做成 <strong>0.1.2</strong>，不出 rc，六步都合并、用户真机看过后直接发正式版。每一步单独一个 PR，按顺序合。每个 PR 的描述里放浅色、深色，以及 1440、1100、900、420 四个宽度的截图和实测时间（按 AGENTS.md 第 6 条，只放在 PR 描述里）。不为这一轮加截图测试；只给真实行为加测试（比如“开图打开到哪一页”的判断）。</p>
   <ol>
     <li><strong>基础</strong>：颜色变量和深色、字号、按钮/卡片/行/标签、标志、顶栏（新图标、品牌名、设置按钮、头像、资料徽标、⌘ , 和菜单栏）。验收：现有每一页换了颜色不坏；深色跟随系统；DSH 插件里只有 3 个入口。</li>
     <li><strong>今天</strong>：两栏和窄窗口顺序、现在这件事、AI 建议、接下来、随手记、日程里的 AI 建议、要你核对；新用户今天页；天气先只做“问城市”和显示缓存的界面。<code>PlansCard</code> 在第 4 步有了落点后再从今天页拿掉。</li>
@@ -2184,7 +2184,7 @@ pre code { background: none; padding: 0; }
     <li><strong>天气数据</strong>：等用户定了数据源和位置方案再做：后台取数、缓存、时段、收起规则。</li>
   </ol>
   <div class="d-callout">
-    <p><strong>和 #146 的关系：</strong>#146（外部贡献的纸上生活配色和两栏今天页）是这一轮的起点，这份稿子取代了它的具体做法：配色换成纸与墨蓝、按钮不再用黑色、今天页的排法和顶栏都不同。怎么处理 #146 由用户定，见下一节。</p>
+    <p><strong>和 #146 的关系：</strong>#146（外部贡献的纸上生活配色和两栏今天页）是这一轮的起点，这份稿子取代了它的具体做法：配色换成纸与墨蓝、按钮不再用黑色、今天页的排法和顶栏都不同。用户已定：#146 感谢后关闭，由 Codex 按稿子从第 1 步做。</p>
     <p><strong>不在这一轮：</strong>工作与求职模块的页面、插件页读取开图主题（插件仓库的事）、iOS。</p>
   </div>
 </section>
@@ -2195,7 +2195,6 @@ pre code { background: none; padding: 0; }
     <li><span class="d-tag d-tag--open">待定</span> <strong>天气数据源和位置。</strong>候选是 Open-Meteo（免费、不要 Key、只发城市坐标），还没核实，按约定记在 HANDOFF §6，确认前不依赖。另一个问题：要不要在设置里加“用这台电脑的位置”开关（默认关）。</li>
     <li><span class="d-tag d-tag--open">待定</span> <strong>开图里要不要单独的外观开关</strong>（浅色 / 深色 / 跟随系统）。不加的话就是跟随系统和 DSH。</li>
     <li><span class="d-tag d-tag--open">待定</span> <strong>设置里的存放位置要不要只显示文件夹名</strong>、不显示完整路径。</li>
-    <li><span class="d-tag d-tag--open">待定</span> <strong>#146 怎么处理：</strong>请作者按这份稿子的第 1、2 步改，或者关掉、由 Codex 按稿子从第 1 步做。</li>
     <li><span class="d-tag d-tag--open">待定</span> <strong>工作与求职</strong>什么时候做页面。做好之前，它只在“更多模块”的说明和“还可以添加”的规划中一行出现。</li>
     <li><span class="d-tag">已按 C 版</span> <strong>品牌名用“开图”。</strong>想保留“人生开图”的话只改顶栏一处文案和菜单栏。</li>
     <li><span class="d-tag">已按 C 版</span> <strong>健康的异常提示阈值</strong>先按“体重一天变化超过 3 kg”，用了再调。</li>
