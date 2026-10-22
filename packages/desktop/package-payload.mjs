@@ -2,6 +2,7 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HOST_API } from "./payload-loader.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
 const nodeBanner = [
@@ -19,7 +20,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   mkdirSync(join(payload, "dist"), { recursive: true });
   writeFileSync(
     join(payload, "payload.json"),
-    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }),
+    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: HOST_API }),
   );
   await build({
     entryPoints: [join(directory, "plugin.mjs")],

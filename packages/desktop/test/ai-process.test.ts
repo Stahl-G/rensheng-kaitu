@@ -21,7 +21,7 @@ process.on('message', message => {
     process.exit(0);
   }
 });
-process.send({ type: "kaitu:web", url: "http://127.0.0.1:12345/?token=synthetic-process-access" });
+process.stdout.write(JSON.stringify({ type: "kaitu:web", url: "http://127.0.0.1:12345/?token=synthetic-process-access" })+"\\n");
 setInterval(() => {}, 1000);
 `,
       { mode: 0o700 },

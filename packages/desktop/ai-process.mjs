@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 
 /** A single owned Electron child, with IPC focus and bounded process-group shutdown. */
 export function createAiProcess(executable, env) {
@@ -17,15 +18,22 @@ export function createAiProcess(executable, env) {
         child = spawn(executable, [], {
           env: { ...env, KAITU_AI_BACKGROUND: background ? "1" : "0" },
           detached: process.platform !== "win32",
-          stdio: ["ignore", "ignore", "ignore", "ipc"],
+          stdio: ["ignore", "pipe", "ignore", "ipc"],
         });
         const launched = child;
         ready = new Promise((resolve, reject) => {
-          launched.on("message", (message) => {
-            if (message?.type !== "kaitu:web") return;
-            const url = URL.parse(message.url);
-            if (url?.protocol === "http:" && url.hostname === "127.0.0.1") resolve(url.href);
+          const lines = createInterface({ input: launched.stdout });
+          lines.on("line", (line) => {
+            try {
+              const message = JSON.parse(line);
+              if (message?.type !== "kaitu:web") return;
+              const url = URL.parse(message.url);
+              if (url?.protocol === "http:" && url.hostname === "127.0.0.1") resolve(url.href);
+            } catch {
+              // CLI diagnostics are not routed to the workbench or its logs.
+            }
           });
+          launched.once("exit", () => lines.close());
           launched.once("exit", () => reject(new Error("插件页面服务已退出")));
           launched.once("error", reject);
         });
