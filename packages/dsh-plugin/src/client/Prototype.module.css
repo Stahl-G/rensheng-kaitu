@@ -201,7 +201,7 @@
   cursor: pointer;
 }
 .app :focus-visible {
-  outline: 3px solid var(--link-line);
+  outline: 3px solid var(--link-line) !important;
   outline-offset: 2px;
 }
 :where(.app) :where(h1, h2, h3, p) {
@@ -424,6 +424,7 @@
   transition: background-color .14s, border-color .14s, color .14s;
 }
 .btn-primary {
+  border-color: transparent;
   background: var(--primary);
   color: var(--on-primary);
 }
@@ -435,6 +436,7 @@
   transform: translateY(1px);
 }
 .btn-strong {
+  border-color: transparent;
   background: var(--strong);
   color: var(--on-strong);
 }
@@ -2045,7 +2047,7 @@
   transform: translateX(18px);
 }
 .switch input:focus-visible + i {
-  outline: 3px solid var(--link-line);
+  outline: 3px solid var(--link-line) !important;
   outline-offset: 2px;
 }
 @media (max-width: 760px) {
@@ -2489,7 +2491,7 @@
   background: var(--surface);
 }
 .app :focus-visible {
-  outline: 3px solid var(--link-line);
+  outline: 3px solid var(--link-line) !important;
   outline-offset: 2px;
 }
 .content {
