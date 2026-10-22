@@ -76,12 +76,20 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       : [];
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
-    async page(id, back, open) {
+    async page(id, workbenchOrigin, open) {
       const entry = this.explore().find((item) => item.id === id);
       if (!entry) throw new KaituError("这个模块已卸载", "PLUGIN");
       const { url } = await open();
       const target = new URL(url);
-      target.hash = new URLSearchParams({ "kaitu-page": entry.page, "kaitu-return": back }).toString();
+      if (
+        target.protocol !== "http:" ||
+        target.hostname !== "127.0.0.1" ||
+        target.username ||
+        target.password ||
+        target.origin === new URL(workbenchOrigin).origin
+      )
+        throw new KaituError("插件页面服务地址无效", "PLUGIN");
+      target.hash = new URLSearchParams({ "kaitu-page": entry.page, "kaitu-embed": "1" }).toString();
       return target.href;
     },
     explore() {

@@ -17,7 +17,7 @@ it("discovers installed package metadata locally, preserves origins, and reflect
   };
   writeFileSync(
     join(profile, "node_modules/synthetic-plugin/package.json"),
-    JSON.stringify({ kaitu: { explore: definition } }),
+    JSON.stringify({ kaitu: { explore: { ...definition, url: "https://untrusted.example/plugin" } } }),
   );
   writeFileSync(manifest, JSON.stringify({ dependencies: { "synthetic-plugin": "file:synthetic" } }));
   const make = () =>
@@ -46,7 +46,13 @@ it("discovers installed package metadata locally, preserves origins, and reflect
       })),
     );
     expect(route.searchParams.get("token")).toBe("synthetic-access");
+    expect(route.origin).toBe("http://127.0.0.1:34567");
     expect(new URLSearchParams(route.hash.slice(1)).get("kaitu-page")).toBe("synthetic-page");
+    expect(new URLSearchParams(route.hash.slice(1)).get("kaitu-embed")).toBe("1");
+    for (const url of ["https://untrusted.example/", "http://localhost:34567/", "http://127.0.0.1:23456/"])
+      await expect(
+        make().page("plugin:synthetic-plugin", "http://127.0.0.1:23456", async () => ({ url })),
+      ).rejects.toThrow("插件页面服务地址无效");
     expect(readFileSync(manifest, "utf8")).toBe(before);
     writeFileSync(manifest, JSON.stringify({ dependencies: {} }));
     expect(make().explore()).toEqual([]);

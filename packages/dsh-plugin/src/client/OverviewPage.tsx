@@ -7,6 +7,7 @@ import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { ExploreNavigation } from "./ExploreNavigation.js";
+import { ExplorePluginFrame } from "./ExplorePluginFrame.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -179,11 +180,19 @@ function Overview({
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
+  const pluginRemoved = useCallback(() => setExplore("footprints"), []);
   const availableModules = [...exploreModules, ...pluginModules];
   const firstExplore = exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "";
   useEffect(() => {
-    if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
-  }, [exploreEntries, firstExplore]);
+    if (exploreEntries)
+      setExplore((current) =>
+        current.startsWith("plugin:") && !pluginModules.some((entry) => entry.id === current)
+          ? "footprints"
+          : exploreEntries.includes(current)
+            ? current
+            : firstExplore,
+      );
+  }, [exploreEntries, firstExplore, pluginModules]);
   const [data, setData] = useState<OverviewData | null>(null);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
@@ -962,16 +971,7 @@ function Overview({
                 modules={availableModules}
                 entries={exploreEntries}
                 current={explore}
-                open={(id) => {
-                  setExplore(id);
-                  if (pluginModules.some((entry) => entry.id === id))
-                    void props
-                      .plugins?.("page", id)
-                      .then((url) => {
-                        if (typeof url === "string") window.location.assign(url);
-                      })
-                      .catch((err) => setError(String(err)));
-                }}
+                open={setExplore}
                 save={async (entries) => {
                   const saved = await props.savePreferences({
                     locale: followSystem ? null : locale,
@@ -983,7 +983,15 @@ function Overview({
             </section>
             <div className={css.child}>
               {selectedExplore ? (
-                (explorePages[selectedExplore.id] ?? <p>{t("正在打开模块…", "Opening module…")}</p>)
+                (explorePages[selectedExplore.id] ?? (
+                  <ExplorePluginFrame
+                    key={selectedExplore.id}
+                    id={selectedExplore.id}
+                    title={t(selectedExplore.title[0] ?? "", selectedExplore.title[1] ?? "")}
+                    plugins={props.plugins}
+                    onRemoved={pluginRemoved}
+                  />
+                ))
               ) : (
                 <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
               )}

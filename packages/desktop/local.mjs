@@ -201,11 +201,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
       ai = makeBackgroundAi();
       ask.relocate(ws.root);
       await startAutomation();
-      if (!window.isDestroyed() && new URL(window.webContents.getURL()).origin === pluginOrigin)
-        await window.loadURL(`${server.url}/#kaitu-view=explore`);
     },
   });
-  let pluginOrigin;
   const server = await startUi(ws, {
     port: 0,
     open: false,
@@ -215,13 +212,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     desktopUpdate: (action) => updater.request(action),
     plugins: async (action, input) => {
       if (action === "explore") return plugins.explore();
-      if (action === "page") {
-        const target = new URL(
-          await plugins.page(input, server.url, () => ai.open({ background: true, waitForUrl: true })),
-        );
-        pluginOrigin = target.origin;
-        return target.href;
-      }
+      if (action === "page")
+        return plugins.page(input, server.url, () => ai.open({ background: true, waitForUrl: true }));
       return action === "install"
         ? plugins.install(input)
         : action === "remove"
@@ -262,7 +254,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     return { action: "deny" };
   });
   window.webContents.on("will-navigate", (event, url) => {
-    if (![server.url, pluginOrigin].includes(new URL(url).origin)) event.preventDefault();
+    if (new URL(url).origin !== server.url) event.preventDefault();
   });
   const updateMenu = () =>
     Menu.setApplicationMenu(

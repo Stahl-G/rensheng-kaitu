@@ -2907,3 +2907,10 @@
     display: none;
   }
 }
+
+.pluginFrame {
+  display: block;
+  width: 100%;
+  height: max(420px, calc(100dvh - 240px));
+  border: 0;
+}

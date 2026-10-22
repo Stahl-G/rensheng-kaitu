@@ -138,7 +138,8 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     join(payload, "dist/client.js"),
     client.replace(
       navigation,
-      (_match, indent, call) => `${indent}ctx2.layout.selectPanel(panel);${indent}${call}`,
+      (_match, indent, call) =>
+        `${indent}if (new URLSearchParams(window.location.hash.slice(1)).get("kaitu-embed") !== "1") ctx2.layout.selectPanel(panel);${indent}${call}`,
     ),
   );
   const pluginManifest = JSON.parse(readFileSync(join(root, "packages/dsh-plugin/package.json"), "utf8"));
