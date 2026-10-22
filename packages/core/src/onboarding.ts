@@ -440,8 +440,9 @@ const WHEN = new RegExp(
 );
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
 // 有的 AI 复制出来的回答没有换行，多条挤在一行里；在每个已知类别标签前断开。
+// 标签也可能紧贴正文；不要求空格，不丢弃正文里的标点。
 const INLINE_TAG = new RegExp(
-  `\\s+(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
+  `(?<=.)\\s*(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
   "gi",
 );
 

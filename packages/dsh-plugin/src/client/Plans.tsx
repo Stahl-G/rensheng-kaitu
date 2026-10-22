@@ -1,5 +1,6 @@
 import type { PlansData } from "@kaitu/core";
 import { useState } from "react";
+import { ClampedText } from "./ClampedText.js";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
 
@@ -70,7 +71,7 @@ export function PlansCard({
     <div key={goal.id} id={`plan-${goal.id}`}>
       <div className={css.row}>
         <span className={`${css["row-title"]} ${css.stack}`}>
-          <b>{goal.title}</b>
+          <ClampedText text={goal.title} className={css.clampStrong} />
           <span className={css.small}>
             {origin(goal)}
             {goal.results

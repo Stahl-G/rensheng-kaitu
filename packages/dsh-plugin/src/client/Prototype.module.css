@@ -2665,6 +2665,41 @@
   justify-content: flex-end;
   gap: 4px 12px;
 }
+/* 长文本先截成两行，点一下展开全文；展开后按 [标签] 换行。 */
+.clamp {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  min-width: 0;
+}
+.clampBody {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.clampOpen {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.clampHint {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+.clampStrong {
+  font-weight: 600;
+}
 .handover h2 {
   margin: 0;
   font-size: 19px;

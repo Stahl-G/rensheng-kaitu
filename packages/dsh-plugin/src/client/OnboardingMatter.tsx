@@ -7,6 +7,7 @@ import type {
   OnboardingPath,
 } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
+import { ClampedText } from "./ClampedText.js";
 import css from "./Onboarding.module.css";
 import v2 from "./Prototype.module.css";
 import { useLocale, useT } from "./i18n.js";
@@ -491,11 +492,13 @@ export function OnboardingNextCard(
         {next.status === "done" ? t("这一步已完成", "This step is done") : t("现在这件事", "One thing now")}
       </span>
       <h2>{next.next}</h2>
-      <p className={v2.small}>
-        {t("为了：", "For: ")}
-        {next.goal}
-        {next.due ? t(` · 安排到 ${next.due}`, ` · planned for ${next.due}`) : ""}
-      </p>
+      <div className={v2.small}>
+        <span>
+          {t("为了：", "For: ")}
+          {next.due ? t(` · 安排到 ${next.due}`, ` · planned for ${next.due}`) : ""}
+        </span>
+        <ClampedText text={next.goal} />
+      </div>
       <button
         type="button"
         className={v2.link}

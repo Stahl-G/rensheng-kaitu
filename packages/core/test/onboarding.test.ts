@@ -81,6 +81,53 @@ it("粘贴解析保留未知与不合格式行，处理列表、时间及已有�
   }
 });
 
+it("挤在一行的条目按标签拆开，只有 [目标] 进目标标题，重复搬入不建第二个目标", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-inline-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-26T12:00:00+08:00"));
+    // 标签紧贴正文（无空格）与隔着逗号两种情况都要拆开。
+    const text = "[目标] 完成纸桥模型[偏好] 喜欢先画草图，[事实] 已有一盒彩纸";
+    const preview = previewOnboardingMemory(ws, text, "claude", options);
+    expect(preview.candidates.map((item) => item.target)).toEqual(["goal", "memory", "memory"]);
+    expect(preview.candidates.map((item) => item.content)).toEqual([
+      "完成纸桥模型",
+      "喜欢先画草图，",
+      "已有一盒彩纸",
+    ]);
+    await confirmOnboardingMemory(
+      ws,
+      preview.token,
+      preview.candidates.map((item) => item.id),
+      options,
+    );
+    expect(ws.readJson<{ title: string }[]>("me/goals.json").map((goal) => goal.title)).toEqual([
+      "完成纸桥模型",
+    ]);
+    expect(
+      listMemories(ws)
+        .map((memory) => memory.text)
+        .sort(),
+    ).toEqual(["喜欢先画草图，", "已有一盒彩纸"].sort());
+    // 隔天再搬同一段：目标按标题去重，不受导入日期影响。
+    vi.setSystemTime(new Date("2026-10-28T12:00:00+08:00"));
+    const again = previewOnboardingMemory(ws, text, "claude", options);
+    await confirmOnboardingMemory(
+      ws,
+      again.token,
+      again.candidates.map((item) => item.id),
+      options,
+    );
+    expect(ws.readJson<{ title: string }[]>("me/goals.json")).toHaveLength(1);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("本地接口只确认预览中所选的记忆，整批一个版本并能撤销", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   const previousState = process.env.KAITU_LOCAL_STATE_DIR;
