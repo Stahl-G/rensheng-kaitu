@@ -239,6 +239,15 @@
   <li><strong>坚果云</strong>：默认用找到的坚果云同步文件夹。提示没找到时，先在坚果云客户端里设好一个同步文件夹，再把路径填成它里面的一个新文件夹。</li>
   <li><strong>Google Drive</strong>：云端 AI 接力用它（见<a href="#relay">云端的 AI</a>）。</li>
 </ul>
+<h3 id="drive-offline">Google Drive：把资料下载到这台电脑</h3>
+<ol>
+  <li>连接网络，打开桌面版 Google Drive，确认同步没有暂停。</li>
+  <li>在访达（Finder）的 Google Drive 中找到你在开图里选择的资料文件夹；例如 <code>kaitu-ai-memory</code>，已有文件夹按实际名称选择。</li>
+  <li>右键点文件夹，选择「设为可离线访问」（Available offline；部分版本在「离线访问」子菜单里）。整个文件夹及其内容会下载到本机，请预留足够磁盘空间。</li>
+  <li>等待 Google Drive 下载完成、显示可离线使用的勾选标记，再回到开图重试刚才的打开或读取。仍在下载时，先保持联网并查看 Drive 的同步进度。</li>
+</ol>
+<p>「移除下载」（Remove Download）是释放本机下载副本，让文件按需重新下载；它不是「设为可离线访问」。准备离线使用资料时，请保留本机下载。若使用镜像模式，文件本来就会下载到本机。</p>
+<p>操作依据：<a href="https://support.google.com/drive/answer/2375012?hl=zh-Hans">Google：离线使用云端硬盘文件</a>、<a href="https://support.google.com/drive/answer/12178485?hl=zh-Hans">在 macOS 上使用桌面版云端硬盘</a>。</p>
 <p>命令行：<code>kaitu sync enable icloud|drive|nutstore [--dir &lt;父目录&gt;]</code>、<code>kaitu sync disable [--to &lt;目录&gt;]</code>、<code>kaitu sync status</code>。同步后哪些文件进云盘、哪些 AI 能读到，见<a href="/privacy/">资料去向</a>。</p>
 
 <h2 id="phone">手机通道<a class="anchor" href="#phone" aria-label="#">#</a></h2>
