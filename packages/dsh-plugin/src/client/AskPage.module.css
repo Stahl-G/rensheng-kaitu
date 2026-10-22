@@ -257,10 +257,10 @@
   padding: 12px 12px 10px 16px;
   border-radius: 20px;
   background: var(--kt-card);
-  box-shadow: var(--kt-shadow), 0 0 0 1px var(--kt-control);
+  box-shadow: 0 0 0 1px var(--kt-control);
 }
 .composer:focus-within {
-  box-shadow: var(--kt-shadow), 0 0 0 1.5px var(--kt-accent);
+  box-shadow: 0 0 0 1.5px var(--kt-accent);
 }
 .chat .composer textarea,
 .chat .composer textarea:focus-visible {

@@ -2469,7 +2469,7 @@
   --kt-project-slot: var(--doing-tint);
   --kt-target: var(--health);
   --kt-estimate: var(--health);
-  --kt-shadow: 0 0 0 1px var(--line);
+  --kt-shadow: none;
   height: 100%;
   display: flex;
   flex-direction: column;
