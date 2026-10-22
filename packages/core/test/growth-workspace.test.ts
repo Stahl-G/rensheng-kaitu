@@ -26,11 +26,21 @@ it("从当前工作区新建一个孩子的成长模板，打开/切回仍可识
     expect(listModules(child).some((m) => m.def.id === "growth")).toBe(true);
     expect(validateWorkspace(child)).toEqual([]);
     expect(child.readText("me/profile.md")).not.toBe(before);
-    expect(child.readJson<Record<string, unknown>>(".kaitu/config.json")).not.toHaveProperty("mode");
+    const childConfig = child.readJson<Record<string, unknown>>(".kaitu/config.json");
+    expect(Object.keys(childConfig).sort()).toEqual(
+      Object.keys(current.readJson<Record<string, unknown>>(".kaitu/config.json")).sort(),
+    );
     await workspaceBackupRequest(current, "activate", { root: target });
     expect((await readSettings(current)).workspaceMode).toBe("growth");
+    const profile = current.readText("me/profile.md");
+    current.writeJson(
+      ".kaitu/config.json",
+      { ...childConfig, template_version: "synthetic-old" },
+      { internal: true },
+    );
     await upgradeWorkspace(current);
     expect((await readSettings(current)).workspaceMode).toBe("growth");
+    expect(current.readText("me/profile.md")).toBe(profile);
     await workspaceBackupRequest(current, "activate", { root: original });
     expect((await readSettings(current)).workspaceMode).toBe("standard");
     expect(current.readText("me/profile.md")).toBe(before);
