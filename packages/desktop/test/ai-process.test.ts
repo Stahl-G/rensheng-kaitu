@@ -15,7 +15,9 @@ it.skipIf(process.platform === "win32")(
       worker,
       `#!${process.execPath}
 import { writeFileSync } from 'node:fs';
+let focuses = 0;
 process.on('message', message => {
+  if (message.type === 'kaitu:focus' && ++focuses === 3) process.stdout.write(JSON.stringify({ type: 'kaitu:web', url: 'http://127.0.0.1:12346/?token=synthetic-restarted-host' })+"\\n");
   if (message.type === 'kaitu:quit') {
     writeFileSync(process.env.KAITU_TEST_RECEIPT, 'saved');
     process.exit(0);
@@ -36,6 +38,13 @@ setInterval(() => {}, 1000);
         pid,
         url: "http://127.0.0.1:12345/?token=synthetic-process-access",
       });
+      await ai.open();
+      await expect
+        .poll(() => ai.open({ background: true, waitForUrl: true }))
+        .toEqual({
+          pid,
+          url: "http://127.0.0.1:12346/?token=synthetic-restarted-host",
+        });
       expect(process.kill(pid, 0)).toBe(true);
       await ai.close();
       expect(readFileSync(receipt, "utf8")).toBe("saved");

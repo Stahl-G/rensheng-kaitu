@@ -8,6 +8,7 @@ export function createAiProcess(executable, env) {
   let stopping;
   let closed = false;
   let ready;
+  let latestUrl;
   const send = (type) => {
     if (child?.connected) child.send({ type }, () => {});
   };
@@ -21,6 +22,7 @@ export function createAiProcess(executable, env) {
           stdio: ["ignore", "pipe", "ignore", "ipc"],
         });
         const launched = child;
+        latestUrl = undefined;
         ready = new Promise((resolve, reject) => {
           const lines = createInterface({ input: launched.stdout });
           lines.on("line", (line) => {
@@ -28,7 +30,14 @@ export function createAiProcess(executable, env) {
               const message = JSON.parse(line);
               if (message?.type !== "kaitu:web") return;
               const url = URL.parse(message.url);
-              if (url?.protocol === "http:" && url.hostname === "127.0.0.1") resolve(url.href);
+              if (
+                url?.protocol === "http:" &&
+                url.hostname === "127.0.0.1" &&
+                url.searchParams.has("token")
+              ) {
+                latestUrl = url.href;
+                resolve();
+              }
             } catch {
               // CLI diagnostics are not routed to the workbench or its logs.
             }
@@ -54,13 +63,13 @@ export function createAiProcess(executable, env) {
       if (!waitForUrl) return { pid: child?.pid };
       let timeout;
       try {
-        const url = await Promise.race([
+        await Promise.race([
           ready,
           new Promise((_, reject) => {
             timeout = setTimeout(() => reject(new Error("插件页面仍未就绪，请重试")), 20000);
           }),
         ]);
-        return { pid: child?.pid, url };
+        return { pid: child?.pid, url: latestUrl };
       } finally {
         clearTimeout(timeout);
       }
