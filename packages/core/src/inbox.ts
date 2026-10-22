@@ -1,4 +1,5 @@
 import { isUtf8 } from "node:buffer";
+import { createHash } from "node:crypto";
 import {
   type Dirent,
   closeSync,
@@ -104,11 +105,15 @@ function inboxContent(file: string, text: string): InboxContent {
   return { kind: "note" };
 }
 
-/** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
+/** 记录文件的替换回执，以及 seen/ 命名空间下的原文重送回执。 */
 const RECEIPTS = ".kaitu/inbox-records.json";
 type Receipt = { agent: string; records: { type: string; id: string }[]; superseded?: true };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
   ws.exists(RECEIPTS) ? ws.readJson(RECEIPTS) : {};
+const inboxHash = (file: string, text: string) =>
+  createHash("sha256")
+    .update(`${basename(file)}\0${text}`)
+    .digest("hex");
 
 async function prepare(ws: Workspace, file: string, text: string) {
   if (file.endsWith(".digest.md")) {
@@ -299,10 +304,11 @@ async function prepare(ws: Workspace, file: string, text: string) {
   }
   if (content.kind === "proposal") {
     const raw = content.row;
-    const row = only(raw, ["title", "start", "end", "module", "agent"]);
+    const row = only(raw, ["title", "start", "end", "module", "agent", "ref"]);
     if (
       !["title", "start", "end"].every((key) => typeof row[key] === "string") ||
-      (row.module !== undefined && typeof row.module !== "string")
+      (row.module !== undefined && typeof row.module !== "string") ||
+      (row.ref !== undefined && typeof row.ref !== "string")
     )
       throw new KaituError("日程建议需要 title、start、end（如 18:00）", "BAD_INBOX");
     const { agent, ...input } = row;
@@ -310,7 +316,14 @@ async function prepare(ws: Workspace, file: string, text: string) {
     // proposeBlock 在写入前校验完整 NOW 文档。
     return {
       message: `${actor}提出了日程建议：${row.title}`,
-      apply: () => proposeBlock(ws, input as unknown as Parameters<typeof proposeBlock>[1], actor),
+      apply: () =>
+        proposeBlock(
+          ws,
+          input as unknown as Parameters<typeof proposeBlock>[1],
+          actor,
+          new Date(),
+          `inbox-${inboxHash(file, text)}`,
+        ),
     };
   }
   // 其余文字（.md、.txt、读不出结构的 JSON）当待整理笔记收下，不算出错。
@@ -537,7 +550,8 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
         continue;
       }
       const text = ws.readText(file);
-      if (phoneInboxName.test(basename(file)) && file.endsWith(".actions.jsonl")) {
+      const phone = phoneInboxName.test(basename(file));
+      if (phone && file.endsWith(".actions.jsonl")) {
         await batchSnapshot(ws, "你在 iPhone 上处理了待办", async () => {
           await applyPhoneActions(ws, file, text);
           moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
@@ -547,10 +561,10 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       }
       // 手机每次提交都新建文件；同步盘重送同名文件时复用已有入账结果。
       // 用持久账本而非十四天的展示回执，重启及回执过期后仍不能重复入账。
+      const seen = phone ? undefined : `seen/${inboxHash(file, text)}`;
       if (
-        phoneInboxName.test(basename(file)) &&
-        file.endsWith(".records.jsonl") &&
-        readReceipts(ws)[basename(file)]
+        (phone && file.endsWith(".records.jsonl") && readReceipts(ws)[basename(file)]) ||
+        (seen && readReceipts(ws)[seen])
       ) {
         moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
         result.processed.push(file);
@@ -590,15 +604,23 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
             ? `Agent（Drive 收件箱：${sourceAgent(agent)}）留了一条待整理笔记`
             : prepared.message,
         async () => {
+          let applied = !prepared;
           if (prepared) {
             try {
               await prepared.apply();
+              applied = true;
             } catch (error) {
               errors.push(`${(error as Error).message}\n\n${INBOX_FORMATS}`);
             }
           }
-          if (errors.length || !prepared) result.notes.push(saveNote(ws, file, errors, sourceAgent(agent)));
-          else {
+          const note = errors.length || !prepared;
+          if (note) result.notes.push(saveNote(ws, file, errors, sourceAgent(agent)));
+          if (seen && applied) {
+            const receipts = readReceipts(ws);
+            receipts[seen] = { agent: sourceAgent(agent), records: [] };
+            ws.writeJson(RECEIPTS, receipts, { internal: true });
+          }
+          if (!note) {
             moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
             result.processed.push(file);
           }
