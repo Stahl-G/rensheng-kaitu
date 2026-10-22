@@ -1,4 +1,5 @@
 import { isUtf8 } from "node:buffer";
+import { createHash } from "node:crypto";
 import {
   type Dirent,
   closeSync,
@@ -104,7 +105,7 @@ function inboxContent(file: string, text: string): InboxContent {
   return { kind: "note" };
 }
 
-/** 每份收件箱记录文件记下了哪些记录，供之后的文件用 replaces 修改或撤回。 */
+/** 记录文件的替换回执，以及 proposal/ 命名空间下的原文重送回执。 */
 const RECEIPTS = ".kaitu/inbox-records.json";
 type Receipt = { agent: string; records: { type: string; id: string }[]; superseded?: true };
 const readReceipts = (ws: Workspace): Record<string, Receipt> =>
@@ -299,18 +300,35 @@ async function prepare(ws: Workspace, file: string, text: string) {
   }
   if (content.kind === "proposal") {
     const raw = content.row;
-    const row = only(raw, ["title", "start", "end", "module", "agent"]);
+    const row = only(raw, ["title", "start", "end", "module", "agent", "ref"]);
     if (
       !["title", "start", "end"].every((key) => typeof row[key] === "string") ||
-      (row.module !== undefined && typeof row.module !== "string")
+      (row.module !== undefined && typeof row.module !== "string") ||
+      (row.ref !== undefined && typeof row.ref !== "string")
     )
       throw new KaituError("日程建议需要 title、start、end（如 18:00）", "BAD_INBOX");
     const { agent, ...input } = row;
     const actor = `Agent（Drive 收件箱：${sourceAgent(agent)}）`;
+    const key = createHash("sha256")
+      .update(`${basename(file)}\0${text}`)
+      .digest("hex");
     // proposeBlock 在写入前校验完整 NOW 文档。
     return {
       message: `${actor}提出了日程建议：${row.title}`,
-      apply: () => proposeBlock(ws, input as unknown as Parameters<typeof proposeBlock>[1], actor),
+      apply: async () => {
+        const receipts = readReceipts(ws);
+        if (receipts[`proposal/${key}`]) return;
+        await proposeBlock(
+          ws,
+          input as unknown as Parameters<typeof proposeBlock>[1],
+          actor,
+          new Date(),
+          `inbox-${key}`,
+        );
+        // 先写建议再记回执；稳定 ID 同时覆盖 NOW 已落盘、回执尚未写下的重试。
+        receipts[`proposal/${key}`] = { agent: sourceAgent(agent), records: [] };
+        ws.writeJson(RECEIPTS, receipts, { internal: true });
+      },
     };
   }
   // 其余文字（.md、.txt、读不出结构的 JSON）当待整理笔记收下，不算出错。
