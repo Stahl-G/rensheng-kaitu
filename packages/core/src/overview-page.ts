@@ -163,6 +163,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
   const allNext = next.map((item) => ({
     id: item.id,
     title: item.title,
+    ref: item.ref,
+    ...("source" in item && typeof item.source === "string" ? { source: item.source } : {}),
+    ...("by" in item && typeof item.by === "string" ? { by: item.by } : {}),
     proposed: item.status === "proposed",
     module: item.module,
     file: item.file,
