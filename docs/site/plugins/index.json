@@ -118,6 +118,42 @@
           }
         }
       ]
+    },
+    {
+      "name": "kaitu-fortune",
+      "title": {
+        "zh": "命理与星象",
+        "en": "Fortune"
+      },
+      "description": {
+        "zh": "八字、紫微、星盘与塔罗，本机排盘、AI 解读和结合近况",
+        "en": "Local Bazi, Ziwei, astrology and Tarot charts with AI readings and selected Kaitu context"
+      },
+      "author": "Stahl-G",
+      "homepage": "https://github.com/Stahl-G/dsh-kaitu-fortune",
+      "repository": {
+        "url": "https://github.com/Stahl-G/dsh-kaitu-fortune"
+      },
+      "metadata": {
+        "category": "life",
+        "keywords": ["命理", "星象", "塔罗", "fortune"],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1792657883,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-kaitu-fortune.git",
+            "commit": "3cd9d96650fcd3c7939581057555da86f0401031"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.2"
+          }
+        }
+      ]
     }
   ]
 }
