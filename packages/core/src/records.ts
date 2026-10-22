@@ -55,7 +55,7 @@ function validateRecord(
     !record.deleted &&
     ((!previous && record.status !== "proposed") ||
       (previous?.status === "proposed" && record.status !== "proposed") ||
-      (previous && record.status === "open" && previous.status !== "open"))
+      (previous && record.status === "open"))
   )
     throw new KaituError("待办建议只能由用户采纳", "USER_DECISION");
   if (ref.type === "event" && record.by === "agent")

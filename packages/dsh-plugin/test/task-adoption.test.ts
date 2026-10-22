@@ -86,11 +86,28 @@ it("Agent 工具只能提出待办，桌面用户采纳才进入今天，重复�
       current: "合成现状",
       next: "用户仍可核对",
     });
+    expect(
+      await call("kaitu_records", {
+        operation: "update",
+        type: "task",
+        id,
+        fields: { title: "修订建议文字" },
+      }),
+    ).toMatchObject({ ok: true });
     const before = await history(ws);
     await service.adoptTask(plugin.id);
     const adopted = readRecords(ws, "task").find((task) => task.id === plugin.id);
     if (!adopted) throw new Error("Missing adopted task");
     expect(adopted).toMatchObject({ status: "open", by: "user", rev: 2 });
+    expect(
+      await call("kaitu_records", {
+        operation: "update",
+        type: "task",
+        id: plugin.id,
+        fields: { title: "借旧 open 塞入的新建议", status: "open", source: "manual", by: "user" },
+      }),
+    ).toMatchObject({ ok: false });
+    expect(readRecords(ws, "task").find((task) => task.id === plugin.id)).toEqual(adopted);
     await productRequest(ws, "adoptTask", [plugin.id]);
     expect(readRecords(ws, "task").find((task) => task.id === plugin.id)).toEqual(adopted);
     expect(await history(ws)).toHaveLength(before.length + 1);
