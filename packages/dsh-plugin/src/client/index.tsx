@@ -411,6 +411,16 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              adoptTask: async (id: string) => {
+                const result = await ctx.remote.kaitu.adoptTask(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              cancelTask: async (id: string) => {
+                const result = await ctx.remote.kaitu.cancelTask(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               completeNext: async (file: string, id: string) => {
                 const r = await ctx.remote.kaitu.completeNext(file, id);
                 if (!r.ok) throw new Error(r.error.message);

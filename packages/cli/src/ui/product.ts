@@ -25,16 +25,19 @@ import {
   type SettingsData,
   type StartLearningInput,
   type SyncProvider,
+  type TaskInput,
   type Workspace,
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  adoptTask,
   archiveMemory,
   bankNotificationCandidates,
   bindGithub,
   calendarPushEntries,
   calendarPushStore,
   cancelOnboardingPreview,
+  cancelTask,
   captureNote,
   changeExperienceBatch,
   changeOnboardingNext,
@@ -74,6 +77,7 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  proposeTask,
   readAutomation,
   readAvatar,
   readCalendar,
@@ -155,6 +159,9 @@ export const productMutations = new Set([
   "moveStorage",
   "addCalendarSubscription",
   "completeNext",
+  "adoptTask",
+  "cancelTask",
+  "proposeTask",
   "onboardingChoose",
   "onboardingMatterSave",
   "onboardingMatterKeep",
@@ -306,6 +313,12 @@ export async function productRequest(
       return readCalendar(ws);
     case "addCalendarSubscription":
       return addCalendarSubscription(ws, text(0), text(1));
+    case "cancelTask":
+      return cancelTask(ws, text(0), { by: "user" });
+    case "adoptTask":
+      return adoptTask(ws, text(0));
+    case "proposeTask":
+      return { id: (await proposeTask(ws, args[0] as TaskInput)).record.id };
     case "completeNext":
       return completeNext(ws, text(0), text(1));
     case "workspaceBackup":

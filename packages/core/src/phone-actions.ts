@@ -14,7 +14,7 @@ import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-re
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
 import { schemas } from "./schema.js";
-import { cancelTask, completeTask, listTasks } from "./tasks.js";
+import { adoptTask, cancelTask, completeTask, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
 import { completeNext, decidePhoneProposal, statusFiles } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -180,6 +180,12 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
                   expected: plan.expected,
                 });
             }
+            break;
+          }
+          case "adopt_task": {
+            const result = await adoptTask(ws, id);
+            receipt.target = { id: result.record.id, rev: result.record.rev ?? 1 };
+            openTasks = undefined;
             break;
           }
           case "create_task":

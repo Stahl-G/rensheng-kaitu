@@ -134,6 +134,7 @@ export interface OverviewData {
   cutoff: string;
   drive: boolean;
   empty: boolean;
+  proposedTasks: { id: string; title: string }[];
   blocks: OverviewBlock[];
   next: OverviewNext[];
   allNext: OverviewNext[];

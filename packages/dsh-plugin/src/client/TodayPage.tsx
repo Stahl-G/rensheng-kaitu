@@ -321,6 +321,7 @@ export function TodayTasks({
   schedule,
   review,
   focusCard,
+  focusTaskId,
 }: {
   data: OverviewData;
   busy: boolean;
@@ -329,12 +330,15 @@ export function TodayTasks({
   schedule: (item: OverviewNext) => void;
   review: () => void;
   focusCard?: ReactNode;
+  focusTaskId?: string;
 }) {
   const t = useT();
   const locale = useLocale();
   const focus = data.next[0];
   const focusText = focus && nextPresentation(focus, locale);
-  const upcoming = focusCard ? data.allNext : data.allNext.slice(1);
+  const upcoming = (focusCard ? data.allNext : data.allNext.slice(1)).filter(
+    (item) => item.id !== focusTaskId,
+  );
   const [remainingOpen, setRemainingOpen] = useState(false);
   const extra = (item: OverviewNext, inRow = true) => (
     <details className={todayCss.more}>
