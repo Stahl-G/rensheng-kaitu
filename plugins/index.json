@@ -44,7 +44,11 @@
 			},
 			"metadata": {
 				"category": "life",
-				"keywords": ["开图", "kaitu", "人生"],
+				"keywords": [
+					"开图",
+					"kaitu",
+					"人生"
+				],
 				"labels": [],
 				"sortKeys": {}
 			},
@@ -88,7 +92,11 @@
 			},
 			"metadata": {
 				"category": "writing",
-				"keywords": ["小说", "写作", "novel"],
+				"keywords": [
+					"小说",
+					"写作",
+					"novel"
+				],
 				"labels": [],
 				"sortKeys": {}
 			},
@@ -115,6 +123,47 @@
 					},
 					"engines": {
 						"dsh": "0.2.0-rc.2"
+					}
+				}
+			]
+		},
+		{
+			"name": "kaitu-fortune",
+			"title": {
+				"zh": "命理与星象",
+				"en": "Fortune"
+			},
+			"description": {
+				"zh": "八字、紫微、星盘与塔罗，本机排盘、AI 盲评后开新对话继续聊",
+				"en": "Local charts and AI blind readings, then continue in a new Kaitu conversation"
+			},
+			"author": "Stahl-G",
+			"homepage": "https://github.com/Stahl-G/dsh-kaitu-fortune",
+			"repository": {
+				"url": "https://github.com/Stahl-G/dsh-kaitu-fortune"
+			},
+			"metadata": {
+				"category": "life",
+				"keywords": [
+					"命理",
+					"星象",
+					"塔罗",
+					"fortune"
+				],
+				"labels": [],
+				"sortKeys": {}
+			},
+			"versions": [
+				{
+					"version": "0.1.1",
+					"publishTimestamp": 1792662702,
+					"source": {
+						"type": "git",
+						"url": "https://github.com/Stahl-G/dsh-kaitu-fortune.git",
+						"commit": "ee4884e02e02f8c9662948f63de6fa67c1488a00"
+					},
+					"engines": {
+						"dsh": "0.2.1-rc.2"
 					}
 				}
 			]
