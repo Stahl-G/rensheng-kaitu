@@ -441,6 +441,11 @@ export async function apply(ctx: Context) {
                 return JSON.parse(result.value);
               },
               onAdvanced: () => ctx.layout.selectPanel("plugins" as MainPanelId),
+              loadJobs: async () => {
+                const result = await ctx.remote.kaitu.jobs();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadNews: async () => {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);

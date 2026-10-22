@@ -1,0 +1,36 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-wrap: anywhere;
+}
+.page header p,
+.job summary span,
+.job dt {
+  color: var(--kt-muted);
+}
+.job {
+  padding: 18px;
+  background: var(--kt-card);
+  border-radius: 16px;
+  box-shadow: var(--kt-shadow);
+}
+.job summary {
+  cursor: pointer;
+}
+.job summary span {
+  display: block;
+  margin-top: 8px;
+}
+.job dl > div {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) minmax(0, 3fr);
+  gap: 12px;
+  margin: 8px 0;
+}
+.job dd {
+  margin: 0;
+}
+.note {
+  white-space: pre-wrap;
+}

@@ -87,6 +87,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readJobs,
   readLearning,
   readLibrary,
   readLibraryDocument,
@@ -475,6 +476,8 @@ export async function productRequest(
       return (await hideExperience(ws, text(0), revision(1))).record.rev;
     case "unhideExperience":
       return unhideExperience(ws, text(0), revision(1));
+    case "jobs":
+      return readJobs(ws);
     case "news":
       return readNews(ws);
     case "suggestNewsKeywords":
