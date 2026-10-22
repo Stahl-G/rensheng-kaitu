@@ -11,7 +11,6 @@ import {
   cancelOnboardingPreview,
   cancelTask,
   completeTask,
-  confirmOnboardingMemory,
   confirmOnboardingSetup,
   createProject,
   disableDrive,
@@ -20,6 +19,7 @@ import {
   enableDrive,
   explorationCommandSchema,
   fileImportSources,
+  history,
   importMemories,
   importSources,
   inboxNoteDone,
@@ -58,7 +58,6 @@ import {
   removeMemory,
   removePhoto,
   resolvePlace,
-  restore,
   saveLearningCheckin,
   saveOnboardingChoices,
   searchChats,
@@ -133,6 +132,7 @@ export function registerWorkflowTools(
     description: string,
     schema: T,
     run: (input: z.infer<T>) => unknown | Promise<unknown>,
+    readOnly: boolean | ((input: z.infer<T>) => boolean) = false,
   ) {
     ctx.tools.register({
       name,
@@ -146,8 +146,10 @@ export function registerWorkflowTools(
         queue(async () => {
           try {
             exec.signal.throwIfAborted();
-            recordOnboardingAiConnection(ws, "DSH");
-            return { ok: true, result: await run(schema.parse(args)) };
+            const input = schema.parse(args);
+            if (!(typeof readOnly === "function" ? readOnly(input) : readOnly))
+              recordOnboardingAiConnection(ws, "DSH");
+            return { ok: true, result: await run(input) };
           } catch (error) {
             return { ok: false, error: (error as Error).message };
           }
@@ -206,7 +208,6 @@ export function registerWorkflowTools(
       z
         .object({ action: z.literal("preview"), text, ai: z.enum(ONBOARDING.ais.map((item) => item.id)) })
         .strict(),
-      z.object({ action: z.literal("confirm"), token: text, selected: z.array(text) }).strict(),
       z.object({ action: z.literal("cancel"), token: text }).strict(),
       z.object({ action: z.literal("setup-preview"), input: onboardingSetupSchema }).strict(),
       z.object({ action: z.literal("setup-confirm"), token: text }).strict(),
@@ -227,13 +228,12 @@ export function registerWorkflowTools(
           return saveOnboardingChoices(ws, input.choices);
         case "preview":
           return previewOnboardingMemory(ws, input.text, input.ai);
-        case "confirm":
-          return confirmOnboardingMemory(ws, input.token, input.selected);
         case "cancel":
           cancelOnboardingPreview(ws, input.token);
           return { ok: true };
       }
     },
+    (input) => input.action === "preview" || input.action === "cancel",
   );
   register("kaitu_investment_list", "列出项目、学习主题与长期投入。", z.object({}).strict(), () =>
     listInvestments(ws),
@@ -287,12 +287,22 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_restore",
-    "用户选择历史版本并确认后恢复工作区或指定路径，恢复前自动保存当前改动。",
-    z.object({ version: text, path: text.optional(), confirmed: z.boolean().default(false) }).strict(),
-    ({ version, path, confirmed }) => {
-      if (!confirmed) throw new Error("恢复版本须先获得用户确认");
-      return restore(ws, version, { path });
+    "提出恢复建议，不执行恢复。用户须在设置的版本历史里选择版本并点击确认恢复。",
+    z.object({ version: text, path: text.optional() }).strict(),
+    async ({ version, path }) => {
+      const versions = (await history(ws)).filter((item) => item.oid.startsWith(version));
+      if (versions.length !== 1) throw new Error("请从版本历史中选择唯一的版本");
+      return {
+        status: "requires_user_confirmation",
+        version: versions[0],
+        path: path ?? null,
+        next: {
+          zh: "请在设置 → 版本历史选择该版本，核对后点击确认恢复。界面恢复整个工作区。",
+          en: "Select this version in Settings → Version history, review it and click Restore. This restores the whole workspace.",
+        },
+      };
     },
+    true,
   );
   register(
     "kaitu_search_chats",
@@ -339,7 +349,7 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_memory",
-    "记忆增删查与批量导入。import 先 dryRun，用户确认后再执行；敏感内容须用户明确要求。",
+    "记忆增删查与批量导入预览。import 只预览；用户在搬记忆界面粘贴、核对后确认保存。敏感内容须用户明确要求。",
     z.discriminatedUnion("operation", [
       z.object({ operation: z.literal("list") }).strict(),
       z.object({ operation: z.literal("search"), query: text }).strict(),
@@ -356,8 +366,7 @@ export function registerWorkflowTools(
         .object({
           operation: z.literal("import"),
           entries: z.array(memory),
-          dryRun: z.boolean().default(true),
-          confirmed: z.boolean().default(false),
+          dryRun: z.literal(true).default(true),
         })
         .strict(),
     ]),
@@ -378,14 +387,10 @@ export function registerWorkflowTools(
         case "delete":
           return removeMemory(ws, input.file, { actor: "DeepSeek" });
         case "import":
-          if (!input.dryRun && !input.confirmed) throw new Error("批量导入须先预览并获得用户确认");
-          return importMemories(ws, input.entries.map(memoryInput), {
-            dryRun: input.dryRun,
-            by: "agent",
-            actor: "DeepSeek",
-          });
+          return importMemories(ws, input.entries.map(memoryInput), { dryRun: true });
       }
     },
+    (input) => input.operation === "import",
   );
   register(
     "kaitu_tasks",
@@ -426,23 +431,20 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_import",
-    `导入用户指定的本机文件（${fileImportSources.map((id) => importSources[id].name).join("、")}），path 可为绝对路径。先 dryRun 预览数量，用户确认后相同参数执行。`,
+    `导入用户指定的本机文件（${fileImportSources.map((id) => importSources[id].name).join("、")}），path 可为绝对路径。只预览数量，不执行导入。用户须在已有导入界面重新选择文件、核对并点击确认导入。`,
     z
       .object({
         source: z.enum(fileImportSources),
         path: text,
-        dryRun: z.boolean().default(true),
-        confirmed: z.boolean().default(false),
+        dryRun: z.literal(true).default(true),
         calendar: text.optional(),
         from: date.optional(),
         to: date.optional(),
       })
       .strict(),
-    (input) => {
-      if (!input.dryRun && !input.confirmed) throw new Error("导入须先预览并获得用户确认");
-      const { source, path, confirmed: _confirmed, ...options } = input;
-      return importSources[source].run(ws, inputPath(ws, path), options);
-    },
+    ({ source, path, ...options }) =>
+      importSources[source].run(ws, inputPath(ws, path), { ...options, dryRun: true }),
+    true,
   );
   register(
     "kaitu_photos",
