@@ -9,7 +9,13 @@ import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
 
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
-export async function captureNote(ws: Workspace, text: string, investment?: string, limit = 100000) {
+export async function captureNote(
+  ws: Workspace,
+  text: string,
+  investment?: string,
+  limit = 100000,
+  scheduleVersion?: (message: string) => void,
+) {
   if (typeof text !== "string" || !text.trim() || text.length > limit)
     throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
   const now = new Date();
@@ -28,7 +34,12 @@ export async function captureNote(ws: Workspace, text: string, investment?: stri
       text.trim(),
     ),
   );
-  return { path, version: await snapshot(ws, "你保存了一条原文记录") };
+  const message = "你保存了一条原文记录";
+  if (scheduleVersion) {
+    scheduleVersion(message);
+    return { path, version: null };
+  }
+  return { path, version: await snapshot(ws, message) };
 }
 
 export function noteAgent(value: unknown): string {

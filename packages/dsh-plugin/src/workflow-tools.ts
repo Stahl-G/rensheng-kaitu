@@ -129,6 +129,11 @@ export function registerWorkflowTools(
 ) {
   const visibleMemories = (rows: ReturnType<typeof listMemories>) =>
     rows.filter((row) => agentCanRead(ws, `memory/${row.file}`, connection));
+  const scheduleNoteVersion = (message: string) => {
+    setImmediate(() => {
+      void queue(() => snapshot(ws, message)).catch(() => console.warn("原文已保存，后台版本记录未完成"));
+    });
+  };
   function register<T extends z.ZodType>(
     name: string,
     description: string,
@@ -421,7 +426,7 @@ export function registerWorkflowTools(
     ]),
     (input) =>
       input.operation === "capture"
-        ? captureNote(ws, input.text)
+        ? captureNote(ws, input.text, undefined, undefined, scheduleNoteVersion)
         : input.operation === "notes"
           ? inboxNotes(ws)
           : input.operation === "done"

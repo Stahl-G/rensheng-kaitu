@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { exportWorkspace, initWorkspace, readLibrary, validateWorkspace } from "@kaitu/core";
+import { exportWorkspace, history, initWorkspace, readLibrary, validateWorkspace } from "@kaitu/core";
 import { strFromU8, unzipSync } from "fflate";
 import { expect, it } from "vitest";
 import type { ToolDefinition } from "../../dsh-plugin/src/dsh.js";
@@ -14,6 +14,8 @@ it("原文工具只写绑定工作区，资料与导出保留原话；拒绝越�
     const a = await initWorkspace(join(root, "synthetic-child-a"));
     const b = await initWorkspace(join(root, "synthetic-child-b"));
     const tools = new Map<string, ToolDefinition>();
+    const pending: Promise<unknown>[] = [];
+    const beforeVersions = await history(a);
     registerWorkflowTools(
       {
         tools: {
@@ -24,7 +26,11 @@ it("原文工具只写绑定工作区，资料与导出保留原话；拒绝越�
         },
       },
       a,
-      (run) => run(),
+      (run) => {
+        const result = run();
+        pending.push(result);
+        return result;
+      },
     );
     const inbox = tools.get("kaitu_inbox");
     if (!inbox) throw new Error("inbox tool missing");
@@ -36,7 +42,10 @@ it("原文工具只写绑定工作区，资料与导出保留原话；拒绝越�
       result: { path: string; version: string | null };
     };
     expect(saved.ok).toBe(true);
-    expect(saved.result.version).toBeTruthy();
+    expect(saved.result.version).toBeNull();
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await Promise.all(pending);
+    expect(await history(a)).toHaveLength(beforeVersions.length + 1);
     expect(readLibrary(a).inbox).toContainEqual(
       expect.objectContaining({ file: saved.result.path, text, status: "raw" }),
     );
