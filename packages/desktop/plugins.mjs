@@ -76,6 +76,17 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       : [];
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
+    explore() {
+      const require = createRequire(join(profileDir("desktop"), "package.json"));
+      return installed().flatMap((name) => {
+        const pkg = JSON.parse(readFileSync(require.resolve(`${name}/package.json`), "utf8"));
+        const entry = pkg.kaitu?.explore;
+        if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
+        const pair = (value) =>
+          typeof value === "string" ? [value, value] : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
+        return [{ id: `plugin:${name}`, name, page: entry.page, title: pair(entry.title), description: pair(entry.description), icon: typeof entry.icon === "string" ? entry.icon : "◇" }];
+      });
+    },
     async list() {
       const { parseMarketIndex, marketInstallTarget } = await import(
         pathToFileURL(
