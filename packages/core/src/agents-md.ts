@@ -10,6 +10,14 @@ import type { Workspace } from "./workspace.js";
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
 const routes = [
   {
+    request: "记一条成长原文",
+    use: "log-growth",
+    read: "已明确的孩子工作区；不读取其他工作区",
+    done: "原文保存回执有 path；不等于已整理",
+    skill: "log-growth",
+    match: /log-growth|(?:记|保存|记录).{0,8}成长|成长.{0,8}(?:记录|日记)|growth (?:record|journal)/i,
+  },
+  {
     request: "记一顿饭",
     use: "log-meal",
     read: "无需先读资料；字段不确定才查 meal",

@@ -11,6 +11,7 @@ import {
   agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
+  captureNote,
   completeTask,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
@@ -412,17 +413,20 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_inbox",
-    "读取待整理笔记、完成后归档，或立即处理稳定的收件箱文件。",
+    "保存用户原文、读取待整理笔记、完成后归档，或立即处理稳定的收件箱文件。capture 只保存原文，不代表已整理或写入结构化记录。",
     z.discriminatedUnion("operation", [
+      z.object({ operation: z.literal("capture"), text: text.max(100000) }).strict(),
       z.object({ operation: z.enum(["notes", "process"]) }).strict(),
       z.object({ operation: z.literal("done"), path: text }).strict(),
     ]),
     (input) =>
-      input.operation === "notes"
-        ? inboxNotes(ws)
-        : input.operation === "done"
-          ? inboxNoteDone(ws, input.path, "DeepSeek")
-          : processInbox(ws),
+      input.operation === "capture"
+        ? captureNote(ws, input.text)
+        : input.operation === "notes"
+          ? inboxNotes(ws)
+          : input.operation === "done"
+            ? inboxNoteDone(ws, input.path, "DeepSeek")
+            : processInbox(ws),
   );
   register(
     "kaitu_import",
