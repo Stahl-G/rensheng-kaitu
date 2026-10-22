@@ -43,7 +43,7 @@
   background: var(--kt-control);
   color: var(--kt-text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
   white-space: nowrap;
 }
@@ -105,7 +105,7 @@
 .metric small,
 .table small {
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
 }
 .overview,
@@ -138,7 +138,7 @@
   padding: 0;
   background: transparent;
   color: var(--kt-link);
-  font-size: 13px;
+  font-size: 14px;
 }
 summary:hover .link,
 .page button.link:hover {
@@ -165,7 +165,7 @@ summary:hover .link,
   border-top: 1px solid var(--kt-control);
   margin-top: 12px;
   padding-top: 12px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
 }
 .conversion p,
@@ -182,7 +182,7 @@ summary:hover .link,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 .currency {
   flex-direction: row;
@@ -283,7 +283,7 @@ summary:hover .link,
   margin-top: 12px;
 }
 .page h3 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 @container (min-width: 600px) {
@@ -317,7 +317,7 @@ summary:hover .link,
   }
   .table th {
     color: var(--kt-muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
   }
   .table td::before {

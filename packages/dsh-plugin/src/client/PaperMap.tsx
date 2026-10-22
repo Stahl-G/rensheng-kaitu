@@ -235,6 +235,7 @@ export function PaperMap({
     const worker = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
     setWorkerUrl(worker);
     const themeRoot = el.closest("[data-theme]") ?? document.body;
+    const color = (token: string) => getComputedStyle(el).getPropertyValue(token).trim();
     const isDark = () =>
       themeRoot.getAttribute("data-theme") === "dark" ||
       (!themeRoot.getAttribute("data-theme") && document.body.hasAttribute("data-ds-dark-theme"));
@@ -270,7 +271,7 @@ export function PaperMap({
         const [id, source] = vector;
         detailSource = id;
         if (!m.getSource(id)) m.addSource(id, { ...source, minzoom: 5 });
-        const water = isDark() ? "#1c293c" : "#27495e";
+        const water = color("--map-sea");
         if (!m.getLayer("detail-water"))
           m.addLayer(
             {
@@ -323,8 +324,8 @@ export function PaperMap({
               source: "paper-terrain",
               minzoom: 6,
               paint: {
-                "hillshade-shadow-color": isDark() ? "#121c22" : "#817761",
-                "hillshade-highlight-color": isDark() ? "#a9aaa0" : "#fff8e8",
+                "hillshade-shadow-color": color("--map-line"),
+                "hillshade-highlight-color": color("--map-land"),
                 "hillshade-exaggeration": isDark() ? 0.12 : 0.18,
               },
             },
@@ -377,7 +378,7 @@ export function PaperMap({
             filter: ["==", ["get", "kind"], kind],
             layout: { "line-cap": "round", "line-join": "round" },
             paint: {
-              "line-color": isDark() ? "#ffffff" : "#263f64",
+              "line-color": color("--explore-ink"),
               "line-width": 1.5,
               "line-opacity": ["get", "opacity"],
               ...(dash ? { "line-dasharray": [...dash] } : {}),
@@ -391,8 +392,9 @@ export function PaperMap({
           source: "footprint-cities",
           paint: {
             "circle-radius": ["case", ["get", "lived"], 2.5, 1.5],
-            "circle-color": "rgba(255,255,255,0)",
-            "circle-stroke-color": isDark() ? "#fff" : "#263f64",
+            "circle-color": color("--surface"),
+            "circle-opacity": 0,
+            "circle-stroke-color": color("--explore-ink"),
             "circle-stroke-width": 1.5,
           },
         });
@@ -403,8 +405,9 @@ export function PaperMap({
           filter: ["==", ["get", "id"], latest.current.selected ?? ""],
           paint: {
             "circle-radius": 12,
-            "circle-color": "rgba(255,255,255,.15)",
-            "circle-stroke-color": isDark() ? "#fff" : "#263f64",
+            "circle-color": color("--surface"),
+            "circle-opacity": 0.15,
+            "circle-stroke-color": color("--explore-ink"),
             "circle-stroke-width": 1,
           },
         });

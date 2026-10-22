@@ -50,6 +50,7 @@ export function PersonalPages(
       view: PersonalView;
       navigate: (view: PersonalView) => void;
       manageAi: () => void;
+      restartGuide: () => void;
       refreshWorkspace: () => Promise<void>;
       onWorkspaceCreated: () => Promise<void>;
       subscribe?: (refresh: () => void) => () => void;
@@ -167,6 +168,11 @@ export function PersonalPages(
       <div className={css["me-body"]}>
         <div className={css.head}>
           <h1>{title}</h1>
+          {props.view === "settings" && (
+            <button type="button" className={css.link} onClick={props.restartGuide}>
+              {t("重新看一遍开始使用", "See Get started again")}
+            </button>
+          )}
         </div>
         {error && (
           <p className={css.error} role="alert">

@@ -47,7 +47,7 @@
 .topics span,
 .memory p {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.6;
 }
 .direct {
@@ -142,7 +142,7 @@
 .secondary > summary {
   cursor: pointer;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .secondary[open] > summary {
   margin-bottom: 20px;
@@ -160,7 +160,7 @@
   gap: 10px 16px;
   align-items: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 @media (max-width: 600px) {
   .start {
