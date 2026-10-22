@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>开图 iPhone 隐私政策 · 人生开图</title>
-<meta name="description" content="开图 iPhone 不收集你的数据：资料只在你的 iPhone 和你自己选的存放位置。">
+<meta name="description" content="开图 iPhone 的本机资料、AI 请求、云盘授权、系统权限和删除方式。">
 <link rel="canonical" href="https://kaitu.si/privacy/iphone/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/iphone/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/iphone/">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="人生开图">
 <meta property="og:title" content="开图 iPhone 隐私政策 · 人生开图">
-<meta property="og:description" content="开图 iPhone 不收集你的数据：资料只在你的 iPhone 和你自己选的存放位置。">
+<meta property="og:description" content="开图 iPhone 的本机资料、AI 请求、云盘授权、系统权限和删除方式。">
 <meta property="og:url" content="https://kaitu.si/privacy/iphone/">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
@@ -38,54 +38,49 @@
 </header>
 <main id="main" tabindex="-1">
 <div class="wrap narrow">
-  <header class="page-head"><h1>开图 iPhone 隐私政策</h1><p class="lead">适用于 App Store 上的「人生开图」iPhone App。</p></header>
+  <header class="page-head"><h1>开图 iPhone 隐私政策</h1><p class="lead">适用于「人生开图」iPhone App，包括 TestFlight 测试版。</p></header>
   <div class="doc">
-<p>更新：2026 年 10 月 18 日。适用于 App Store 上的「人生开图」iPhone App（不含问问功能的版本）。</p>
-<p><strong>一句话：开图不收集你的数据。</strong> 开发者没有服务器，看不到你的资料、健康数据和日程。你的资料只在两个地方：这台 iPhone，和你自己选的存放位置。</p>
-<h2>资料存在哪</h2>
+<p>更新：2026 年 10 月 22 日。适用于「人生开图」iPhone App 0.7.2，包括 TestFlight 中的问问功能。</p>
+<p>开发者不提供接收个人资料的开图云端服务器。你可以只在手机上使用；连接云盘、使用 AI、语音识别或联网地图时，相关服务会按你的操作接收必要的数据。</p>
+<h2>资料与凭据存在哪</h2>
 <ul>
-<li><strong>这台 iPhone：</strong> 最近一次读到的「今天」「开图」等内容的缓存、还没交出去的记录、App 设置。删除 App 时一起删除。</li>
-<li><strong>你选的存放位置：</strong> 在设置里选的 iCloud 云盘文件夹、你自己的私有 GitHub 仓库，或其他云盘文件夹。记下的原文、确认和健康数据会写进这里，由对应的服务（Apple、GitHub 等）按它们的条款存放，开图不经手。</li>
-<li><strong>GitHub token：</strong> 你填的 token 只存在这台 iPhone 的钥匙串里，只用来读写你指定的那个仓库，不会发给开发者或其他任何人。</li>
+<li><strong>手机：</strong> 本机档案、笔记、待办、未发送文字草稿、对话历史，以及已连接资料位置的缓存和待交出记录，保存在 App 的本机存储中。</li>
+<li><strong>你选的资料位置：</strong> 连接文件夹、iCloud、私有 GitHub 仓库或 Google Drive 后，相关资料由对应服务存放。保存到手机、交出文件和收到处理回执是不同状态。</li>
+<li><strong>凭据：</strong> AI Key 和 GitHub 凭据保存在本机钥匙串，Google 登录由 Google Sign-In SDK 管理。凭据用于你选择的服务，不发送给开图开发者。</li>
 </ul>
-<h2>健康数据</h2>
+<h2>问问和给 AI 的资料</h2>
+<p>问问是可选功能，需要你配置所选服务商的 Key，调用费用与额度由该服务商账户承担。当前提供 DeepSeek、Kimi、智谱和 OpenAI 选项。</p>
+<p>你发起问答时，问题、工作区规则、上下文摘要、读取到的资料片段和最近对话会发送给所选 AI 服务。明确选择并发送的图片会发送给支持图片的模型。服务商按自己的隐私政策处理这些请求。</p>
+<p>「给 AI 的我」先由你审阅和确认，再复制或导出。默认分享不包含敏感项；改变选择后需要重新确认。模型提出的建议不是已保存事实，只有你明确采纳才会写入资料。</p>
+<h2>照片、相机与语音</h2>
 <ul>
-<li>经你在系统里授权后，开图读取：步数、活动能量、静息能量、体能训练、睡眠、心率、静息心率、心率变异性、体重、体脂率。你可以在「设置 → 健康 → 数据访问与设备」里逐项关闭。</li>
-<li>开图只读，不写入健康 App。</li>
-<li>读到的数据转换成开图的格式，写进你选的存放位置（或你自己填写的接收地址，例如你自己的 Google Apps Script），供你电脑上的开图生成趋势和提醒。</li>
-<li>健康数据不用于广告，不出售，不提供给任何第三方，也不做医疗诊断。</li>
+<li><strong>照片足迹：</strong> 经系统授权后，扫描允许访问照片的拍摄时间和位置元数据，不扫描照片像素。保存城市中心和推断经历，不保存原始精确 GPS 或照片资产标识；推断经历仍需本人核对。</li>
+<li><strong>相机与图片附件：</strong> 只有你明确使用拍摄或选图入口才读取相应图片。添加附件不等于发送给模型，发送给模型是另一次明确操作。</li>
+<li><strong>语音：</strong> 由 Apple 系统语音识别转写，支持时优先在设备上处理，否则可能由 Apple 的识别服务处理。转写可以编辑，明确保存后才进入资料。App 不保存录音。</li>
 </ul>
-<h2>其他权限</h2>
+<h2>健康与日历</h2>
+<p>健康权限由你在系统中选择，App 只读 Apple 健康，不向其中写入数据。授权范围取决于你使用的新手引导或健康同步入口。</p>
+<p>新手引导的健康原始输入另存手机，不包含在默认背景分享中。另行启用健康同步时，获准数据会以原始样本格式交到你选择的资料位置或接收地址，例如你自己的 Google Apps Script。开发者不接收这些样本，也不用于广告或出售。</p>
+<p>开图中的日程记录与 Apple 日历是两个存放位置。只有你使用日历联动并授予相应系统权限时，App 才会写入「开图」日历。本机保存不代表已经同步到系统或电脑。</p>
+<h2>GitHub 与 Google Drive</h2>
+<p>GitHub 官方登录或 Token 只用于获准的资料仓库。Google Drive 请求完整 Drive 权限：Google 层面的授权可读写整个 Drive，App 自身将资料操作限定在你选择的开图目录。</p>
+<p>Google Drive 在首轮公开测试中为受限功能。如果 Google 项目仍处于 Testing 状态，只有登记的测试账号可以授权；TestFlight 邀请不会自动赋予 Google 授权资格。</p>
+<p>断开本机连接不会删除远端资料，也不等于撤销远端授权。你可以在 <a href="https://myaccount.google.com/connections">Google 账号连接设置</a>或 <a href="https://github.com/settings/apps/authorizations">GitHub 已授权 App</a>中管理或撤销授权。</p>
+<h2>地图、诊断与反馈</h2>
+<p>地图使用 MapLibre，并可能向 OpenFreeMap / OpenStreetMap 相关图块服务和 Terrain 地形数据服务请求样式或图块。这些服务会接收到正常网络请求信息，例如 IP 地址和所请求的地图区域。足迹位置来自资料中的城市，不使用相册原始精确 GPS 绘图。</p>
+<p>App 没有广告，也未接入第三方行为分析或广告追踪 SDK。TestFlight 反馈和 Apple 提供的崩溃诊断适用 Apple 的相关说明。你主动发邮件或提交 Issue 时，开发者会收到你提交的内容；请不要在公开反馈中放入 Key、私人对话或健康原文。</p>
+<h2>你的选择与删除</h2>
 <ul>
-<li><strong>日历：</strong> 你在手机上确认一条日程时，开图把它写进名为「开图」的日历，并按开图的记录找到同一条日程。不读取其他日历的内容。</li>
-<li><strong>麦克风和语音识别：</strong> 只在你按住说话时使用，用系统的语音识别把声音转成文字，能在设备上识别时优先在设备上识别；不在设备上时由 Apple 处理，适用 Apple 的隐私政策。录音不保存。</li>
-<li><strong>地图：</strong> 开图页的地图由 Apple 地图提供，显示时会向 Apple 请求地图图块；地点来自你自己的资料，精确到城市。</li>
+<li>本机建档和记录不要求注册开图账号；AI、云盘和系统权限均按所用功能选择。</li>
+<li>在系统设置中关闭照片、健康、相机、麦克风、语音或日历权限，停止相应访问。</li>
+<li>在 App 中删除 AI Key、退出第三方登录或断开资料位置；需要远端撤权时使用该服务的账号设置。</li>
+<li>卸载 App 会移除 App 的本机文件，但不等于删除云端副本、系统备份或撤销第三方授权。云端文件由你在所选服务中管理。</li>
 </ul>
-<p>所有权限都可以在系统设置里随时关闭，关闭后对应功能停用，其他功能照常。</p>
-<h2>开图不做的事</h2>
-<ul>
-<li>没有账号，不需要注册或登录。</li>
-<li>没有广告，没有第三方统计或追踪代码。</li>
-<li>不把你的资料发给 AI 服务。本版本没有 AI 功能；以后加入时，会先更新本页，并在 App 里征得你的同意后才发送。</li>
-<li>崩溃报告：只有你在系统里选择了「与 App 开发者共享」时，Apple 才会把匿名的崩溃信息提供给开发者。</li>
-</ul>
-<h2>儿童</h2>
-<p>开图不面向 13 岁以下的儿童，也不会有意收集他们的信息。</p>
-<h2>你可以</h2>
-<ul>
-<li>在系统设置里关闭任何权限。</li>
-<li>在 App 设置里断开存放位置；资料仍在你自己的 iCloud 或 GitHub 里，由你管理或删除。</li>
-<li>删除 App，清掉这台 iPhone 上的全部缓存和设置。</li>
-</ul>
-<h2>本页变更</h2>
-<p>隐私做法改变时更新本页，并改上面的日期；涉及新的数据去向（例如 AI 功能）时，会在 App 里先告诉你。</p>
+<h2>儿童与政策更新</h2>
+<p>开图不面向 13 岁以下儿童。数据处理方式改变时会更新本页和日期；新增数据去向会在相应功能中说明。</p>
 <h2>联系</h2>
-<ul>
-<li>开发者：Stahl G</li>
-<li>邮箱：<a href="mailto:stahlguo@gmail.com">stahlguo@gmail.com</a></li>
-<li>问题反馈：<a href="https://github.com/Stahl-G/rensheng-kaitu/issues">https://github.com/Stahl-G/rensheng-kaitu/issues</a></li>
-</ul>
-<p>电脑版开图的资料去向见<a href="/privacy/">资料去向</a>。</p>
+<p>开发者：Stahl G。邮箱：<a href="mailto:stahlguo@gmail.com">stahlguo@gmail.com</a>。问题反馈：<a href="https://github.com/Stahl-G/rensheng-kaitu/issues">GitHub Issues</a>。</p>
+<p>电脑版资料去向见<a href="/privacy/">资料去向</a>，使用问题见<a href="/support/">支持</a>。</p>
   </div>
 </div>
 </main>
