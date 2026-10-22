@@ -7,7 +7,6 @@ import {
   type Workspace,
   addMemory,
   addPhoto,
-  addTask,
   agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
@@ -45,6 +44,7 @@ import {
   processInbox,
   projectDirectory,
   proposeAgentDocument,
+  proposeTask,
   publicRecords,
   readAgentFile,
   readExperienceImports,
@@ -389,12 +389,12 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_tasks",
-    "新建、查询、完成或取消待办。",
+    "提议、查询、完成或取消待办；新建建议等待用户在今天页采纳。",
     z.discriminatedUnion("operation", [
       z
         .object({
           operation: z.literal("list"),
-          status: z.enum(["open", "done", "cancelled", "all"]).optional(),
+          status: z.enum(["proposed", "open", "done", "cancelled", "all"]).optional(),
           dueBefore: text.optional(),
         })
         .strict(),
@@ -405,7 +405,7 @@ export function registerWorkflowTools(
       input.operation === "list"
         ? listTasks(ws, input)
         : input.operation === "add"
-          ? addTask(ws, input.task, { by: "agent", actor: "DeepSeek" })
+          ? proposeTask(ws, input.task, "DeepSeek")
           : input.operation === "done"
             ? completeTask(ws, input.id, { by: "agent", actor: "DeepSeek" })
             : cancelTask(ws, input.id, { by: "agent", actor: "DeepSeek" }),

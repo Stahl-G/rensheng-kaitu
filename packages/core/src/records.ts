@@ -49,6 +49,15 @@ function validateRecord(
   previous?: StoredRecord,
   expectedRevision?: number,
 ): void {
+  if (
+    ref.type === "task" &&
+    record.by !== "user" &&
+    !record.deleted &&
+    ((!previous && record.status !== "proposed") ||
+      (previous?.status === "proposed" && record.status !== "proposed") ||
+      (previous && record.status === "open" && previous.status !== "open"))
+  )
+    throw new KaituError("待办建议只能由用户采纳", "USER_DECISION");
   if (ref.type === "event" && record.by === "agent")
     throw new KaituError("日程只能作为建议提交，等待用户在今天页确认", "USER_DECISION");
   if (ref.type === "phase") {
@@ -164,6 +173,7 @@ export function addRecords(
       ts,
       by: opts.by ?? "agent",
       ...rest,
+      ...(type === "task" && opts.by !== "user" ? { status: "proposed" } : {}),
       ...(news && rest.via === undefined ? { via: "agent" } : {}),
       ...(type === "news_item"
         ? { kind: rest.kind ?? "article", status: "new", source: rest.source ?? publisher(rest.url) }
@@ -348,13 +358,21 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
 function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+  const tasks = entries.some((entry) => entry.type === "task")
+    ? new Map(readRecords(ws, "task").map((record) => [record.id, record]))
+    : undefined;
   const phases = entries.some((entry) => entry.type === "phase")
     ? new Map(readRecords(ws, "phase").map((record) => [record.id, record]))
     : undefined;
   return entries.map(({ type, record }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
-    validateRecord(ws, ref, record, type === "phase" ? phases?.get(record.id) : undefined);
+    validateRecord(
+      ws,
+      ref,
+      record,
+      type === "phase" ? phases?.get(record.id) : type === "task" ? tasks?.get(record.id) : undefined,
+    );
     const file = recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
     resolveRecordPath(ws, ref, file);
     return { file, record, ref };

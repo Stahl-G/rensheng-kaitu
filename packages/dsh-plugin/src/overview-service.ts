@@ -45,10 +45,12 @@ import {
   type SettingsData,
   type StartLearningInput,
   type SyncProvider,
+  type TaskInput,
   Workspace,
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
+  adoptTask,
   archiveMemory,
   bindGithub,
   calendarPushEntries,
@@ -88,6 +90,7 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  proposeTask,
   readAutomation,
   readAvatar,
   readCalendar,
@@ -409,6 +412,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("addCalendarSubscription")
   async addCalendarSubscription(url: string, name: string): Promise<CalendarData> {
     return addCalendarSubscription(this.workspace, url, name, this.write);
+  }
+
+  @Remote("proposeTask")
+  async proposeTask(input: TaskInput): Promise<{ id: string }> {
+    return this.write(async () => ({ id: (await proposeTask(this.workspace, input)).record.id }));
+  }
+
+  @Remote("adoptTask")
+  async adoptTask(id: string): Promise<{ version: string | null }> {
+    return this.write(() => adoptTask(this.workspace, id));
   }
 
   @Remote("completeNext")

@@ -462,8 +462,8 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
       .map((origin) => JSON.stringify({ type: "workout", agent: "iPhone", origin, ...workout }))
       .join("\n"),
   );
-  const task = addRecord(ws, "task", { title: "合成待办", status: "open" }).record;
-  const cancelled = addRecord(ws, "task", { title: "合成取消", status: "open" }).record;
+  const task = addRecord(ws, "task", { title: "合成待办", status: "open" }, { by: "user" }).record;
+  const cancelled = addRecord(ws, "task", { title: "合成取消", status: "open" }, { by: "user" }).record;
   ws.writeText(
     "me/STATUS.md",
     stringifyFrontmatter(
