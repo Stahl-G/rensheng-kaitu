@@ -83,6 +83,7 @@ export interface LifeMapData {
 
 let cities: City[] | undefined;
 let citiesById: Map<number, City> | undefined;
+let citiesByAlias: Map<string, City[]> | undefined;
 function cityTable(): City[] {
   if (!cities) {
     const data = JSON.parse(readFileSync(new URL("../data/cities.json", import.meta.url), "utf8")) as {
@@ -141,6 +142,36 @@ function cityPlace(city: City): Experience["place"] {
     lng: city.lng,
     precision: "city",
   };
+}
+
+/** 只补齐读取视图；同名城市和明确待核对的记录保持原样。 */
+function displayPlace(place: Experience["place"]): Experience["place"] {
+  if ((place.lat !== undefined && place.lng !== undefined) || !["city", "unknown"].includes(place.precision))
+    return place;
+  let city: City | undefined;
+  if (place.geonameid !== undefined) {
+    citiesById ??= new Map(cityTable().map((row) => [row.geonameid, row]));
+    city = citiesById.get(place.geonameid);
+  } else {
+    if (!citiesByAlias) {
+      citiesByAlias = new Map();
+      for (const row of cityTable())
+        for (const alias of new Set(
+          [row.name, row.ascii, ...row.zh].map((s) => s.normalize("NFC").toLowerCase()),
+        )) {
+          const matches = citiesByAlias.get(alias) ?? [];
+          matches.push(row);
+          citiesByAlias.set(alias, matches);
+        }
+    }
+    const candidates = (citiesByAlias.get(place.name.trim().normalize("NFC").toLowerCase()) ?? []).filter(
+      (row) => !place.country || row.country === place.country,
+    );
+    if (candidates.length === 1) city = candidates[0];
+  }
+  return city && (!place.country || city.country === place.country)
+    ? { ...place, geonameid: city.geonameid, lat: city.lat, lng: city.lng, precision: "city" }
+    : place;
 }
 
 function experiences(ws: Workspace): Experience[] {
@@ -325,10 +356,15 @@ export async function resolveExperience(ws: Workspace, id: string, geonameid: nu
 
 export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   const asOf = localDate(now, ws.timeZone());
-  const rows = experiences(ws).sort(
-    (a, b) =>
-      (a.start ?? a.end ?? "9999").localeCompare(b.start ?? b.end ?? "9999") || a.id.localeCompare(b.id),
-  );
+  const rows = experiences(ws)
+    .map((item) => {
+      const place = item.review ? item.place : displayPlace(item.place);
+      return place === item.place ? item : { ...item, place };
+    })
+    .sort(
+      (a, b) =>
+        (a.start ?? a.end ?? "9999").localeCompare(b.start ?? b.end ?? "9999") || a.id.localeCompare(b.id),
+    );
   const groups = new Map<string, LifeMapFeature>();
   const hidden = new Map<string, { item?: Experience; revision: number; deleted: boolean }>();
   if (listRecordTypes(ws).some((ref) => ref.type === "experience")) {

@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import {
   type ExperienceInput,
   addExperiences,
+  addRecords,
   editExperience,
   hideExperience,
   history,
@@ -14,6 +15,63 @@ import {
   unhideExperience,
 } from "../src/index.js";
 import { freshWorkspace } from "./helpers.js";
+
+it("只读地图用确定城市补坐标，保留重名、待核对和原显示名，不改记录", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const places = [
+      { name: "Berlin", country: "DE" },
+      { name: "北京", country: "CN" },
+      { name: "胡志明市", country: "VN" },
+      { name: "Paris", country: "FR" },
+      { name: "Sa\u0303o Paulo", country: "BR" },
+      { name: "我的城市名", geonameid: 2950159 },
+      { name: "Springfield" },
+      { name: "Paris" },
+    ];
+    addRecords(
+      ws,
+      "experience",
+      places.map((place) => ({
+        place: { ...place, precision: "city" },
+        event_type: "lived",
+        fact_status: "user_reported",
+        start: "2020",
+        time_precision: "year",
+        source: "synthetic/cities.md",
+      })),
+    );
+    addRecords(ws, "experience", [
+      {
+        place: { name: "Berlin", precision: "unknown" },
+        event_type: "lived",
+        fact_status: "inferred",
+        time_precision: "unknown",
+        source: "synthetic/review.md",
+        review: { reason: "待核对", candidates: [] },
+      },
+    ]);
+    const before = readRecords(ws, "experience");
+    const map = lifeMap(ws);
+    expect(map.features).toHaveLength(5);
+    const resolved = map.experiences.filter((e) => e.place.country || e.place.geonameid);
+    expect(resolved).toHaveLength(6);
+    expect(resolved.every((e) => Number.isFinite(e.place.lat) && Number.isFinite(e.place.lng))).toBe(true);
+    expect(map.experiences.find((e) => e.place.name === "我的城市名")?.place).toMatchObject({
+      geonameid: 2950159,
+      name: "我的城市名",
+    });
+    for (const name of ["Springfield", "Paris"])
+      expect(
+        map.experiences.find((e) => e.place.name === name && !e.place.country)?.place.lat,
+      ).toBeUndefined();
+    expect(map.review[0]).toMatchObject({ fact_status: "inferred", place: { precision: "unknown" } });
+    expect(map.review[0]?.place.lat).toBeUndefined();
+    expect(readRecords(ws, "experience")).toEqual(before);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 it("人工纠正日期或城市后重导旧来源不新增，删除后的经历不复活，同城新访问仍可导入", async () => {
   const ws = await freshWorkspace();

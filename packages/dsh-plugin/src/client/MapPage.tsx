@@ -788,6 +788,7 @@ export function MapPage({
               showRoutes={showRoutes}
               showAllPlaces={showAllPlaces}
               current={anchor ?? null}
+              hometown={home}
               asOf={data.asOf}
               onAdd={(mode) =>
                 mode === "now"
