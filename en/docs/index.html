@@ -240,6 +240,15 @@
   <li><strong>Nutstore</strong>: uses the Nutstore sync folder it finds. If none is found, set up a sync folder in the Nutstore client, then enter a new folder inside it.</li>
   <li><strong>Google Drive</strong>: used for cloud AI relay (see <a href="#relay">Cloud AIs</a>).</li>
 </ul>
+<h3 id="drive-offline">Google Drive: download your notes to this computer</h3>
+<ol>
+  <li>Connect to the internet, open Google Drive for desktop, and make sure syncing is not paused.</li>
+  <li>In Finder, open Google Drive and find the notes folder selected in Kaitu, for example <code>kaitu-ai-memory</code>. Use the actual name of your existing folder.</li>
+  <li>Right-click the folder and choose Available offline (under Offline access in some versions). This downloads the folder and its contents, so allow enough disk space.</li>
+  <li>Wait for Drive to finish downloading and show its offline check mark, then return to Kaitu and retry opening or reading your notes. While downloading, stay online and check Drive's sync progress.</li>
+</ol>
+<p>Remove Download frees the downloaded copy on this computer so files can download again on demand; it is not Available offline. Keep the download when preparing to work offline. In mirror mode, your files are already downloaded.</p>
+<p>Instructions: <a href="https://support.google.com/drive/answer/2375012?hl=en">Google: use Drive files offline</a> and <a href="https://support.google.com/drive/answer/12178485?hl=en">use Drive for desktop on macOS</a>.</p>
 <p>Command line: <code>kaitu sync enable icloud|drive|nutstore [--dir &lt;parent&gt;]</code>, <code>kaitu sync disable [--to &lt;folder&gt;]</code>, <code>kaitu sync status</code>. For which files reach the cloud and which AIs can read them, see <a href="/en/privacy/">Where your data goes</a>.</p>
 
 <h2 id="phone">Phone channels<a class="anchor" href="#phone" aria-label="#">#</a></h2>
