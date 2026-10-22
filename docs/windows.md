@@ -4,9 +4,11 @@ Windows 与 Mac 使用同一份 React 界面、core、资料服务、DSH 插件�
 
 ## 使用
 
-从 [官网下载页](https://kaitu.si/download/#windows) 下载 Windows 安装包，双击安装，完成后打开「人生开图」。当前为 `Kaitu-Setup-0.1.0-rc.4-windows.2-x64.exe`。支持 Windows 10 / 11 x64，安装包内置 Node 和 DSH，不需要终端或另装运行时。
+Windows 用户从 [官网下载页](https://kaitu.si/download/#windows) 查看 DSH 插件安装指引；仓库内的操作步骤见 [dsh.md](dsh.md)。未签名的独立 EXE 暂不作为推荐下载入口。
 
-第一次打开选择资料位置。需要内置 AI 时，打开「问问 → 连接 AI → 用开图里的 AI」，填写服务商 API Key，获取并选择模型，再继续。默认推荐 DeepSeek；查看资料和保存原文不要求 Key。
+0.1.1 的 Windows 独立安装包尚未完成验收，只用于本机测试。Mac 的签名、公证和验收结果不能代表 Windows 已通过验收。
+
+独立测试包第一次打开选择资料位置。需要内置 AI 时，打开「问问 → 连接 AI → 用开图里的 AI」，填写服务商 API Key，获取并选择模型，再继续。默认推荐 DeepSeek；查看资料和保存原文不要求 Key。
 
 当前 Windows 预览包没有数字签名，系统可能显示发布者验证提示。Mac 的签名与公证不代表 Windows 包已签名。
 
