@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaitu for iPhone Privacy Policy · Kaitu</title>
-<meta name="description" content="Kaitu for iPhone does not collect your data: it stays on your iPhone and in the storage you choose.">
+<meta name="description" content="How Kaitu for iPhone handles local files, AI requests, cloud authorization, permissions and deletion.">
 <link rel="canonical" href="https://kaitu.si/en/privacy/iphone/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/iphone/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/iphone/">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Kaitu">
 <meta property="og:title" content="Kaitu for iPhone Privacy Policy · Kaitu">
-<meta property="og:description" content="Kaitu for iPhone does not collect your data: it stays on your iPhone and in the storage you choose.">
+<meta property="og:description" content="How Kaitu for iPhone handles local files, AI requests, cloud authorization, permissions and deletion.">
 <meta property="og:url" content="https://kaitu.si/en/privacy/iphone/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
@@ -37,54 +37,49 @@
 </header>
 <main id="main" tabindex="-1">
 <div class="wrap narrow">
-  <header class="page-head"><h1>Kaitu for iPhone Privacy Policy</h1><p class="lead">For the Kaitu (人生开图) iPhone app on the App Store.</p></header>
+  <header class="page-head"><h1>Kaitu for iPhone Privacy Policy</h1><p class="lead">For Kaitu on iPhone, including TestFlight beta builds.</p></header>
   <div class="doc">
-<p>Updated October 18, 2026. Applies to the Kaitu (人生开图) iPhone app on the App Store, in the version without the Ask feature.</p>
-<p><strong>In short: Kaitu does not collect your data.</strong> The developer runs no servers and cannot see your notes, health data or schedule. Your data lives in two places only: this iPhone, and the storage location you choose.</p>
-<h2>Where your data is stored</h2>
+<p>Updated October 22, 2026. Applies to Kaitu for iPhone 0.7.2, including Ask in TestFlight builds.</p>
+<p>The developer does not run a Kaitu cloud server that receives your personal workspace. You can use the app on your phone alone. Cloud storage, AI, speech recognition and online maps send necessary data to the services you choose or use.</p>
+<h2>Files and credentials</h2>
 <ul>
-<li><strong>This iPhone:</strong> a cache of the latest Today and Explore content, entries not yet sent, and app settings. Deleted together with the app.</li>
-<li><strong>The storage location you choose:</strong> an iCloud Drive folder, your own private GitHub repository, or another cloud folder you pick in Settings. Notes, confirmations and health data are written there and stored by that service (Apple, GitHub and so on) under its own terms. Kaitu does not handle them.</li>
-<li><strong>GitHub token:</strong> the token you enter is kept only in this iPhone's Keychain and is used only to read and write the repository you specify. It is never sent to the developer or anyone else.</li>
+<li><strong>On your phone:</strong> Local profiles, notes, tasks, unsent text drafts, conversation history, workspace caches and items waiting to be delivered are stored in the app.</li>
+<li><strong>Your chosen location:</strong> Connected folders, iCloud, private GitHub repositories and Google Drive store the relevant files under their own services. Saving locally, delivering a file and receiving a processing receipt are separate states.</li>
+<li><strong>Credentials:</strong> AI keys and GitHub credentials are stored in the device Keychain. Google Sign-In manages Google login. Credentials are used for your chosen services and are not sent to the Kaitu developer.</li>
 </ul>
-<h2>Health data</h2>
+<h2>Ask and context shared with AI</h2>
+<p>Ask is optional and requires your own provider key. Charges and quotas belong to that provider account. Current options are DeepSeek, Kimi, Zhipu and OpenAI.</p>
+<p>When you send a question, your question, workspace rules, context summaries, retrieved file excerpts and recent conversation are sent to the selected AI service. Images that you explicitly select and send go to models that support images. The provider processes requests under its own privacy policy.</p>
+<p>You review and confirm “About me for AI” before copying or exporting it. Sensitive items are excluded by default, and changed selections require confirmation again. Model suggestions become saved information only after you explicitly accept them.</p>
+<h2>Photos, camera and speech</h2>
 <ul>
-<li>With your permission, Kaitu reads: steps, active energy, resting energy, workouts, sleep, heart rate, resting heart rate, heart rate variability, body mass and body fat percentage. You can turn off each type in Settings → Health → Data Access &amp; Devices.</li>
-<li>Kaitu only reads; it never writes to the Health app.</li>
-<li>The data is converted to Kaitu's format and written to your chosen storage location (or to an address you enter yourself, such as your own Google Apps Script), so Kaitu on your computer can show trends and reminders.</li>
-<li>Health data is not used for advertising, not sold, not shared with any third party, and not used for medical diagnosis.</li>
+<li><strong>Photo footprints:</strong> With system permission, the scan reads the capture dates and location metadata of accessible photos, not their pixels. It saves city centers and inferred experiences, not original precise GPS or photo asset identifiers. Inferred experiences still need your review.</li>
+<li><strong>Camera and image attachments:</strong> Images are accessed only when you explicitly capture or select them. Attaching a file is separate from sending an image to a model.</li>
+<li><strong>Speech:</strong> Apple system speech recognition transcribes your speech, on device when supported; otherwise Apple’s recognition service may process it. You can edit the transcript before explicitly saving it. The app does not retain audio recordings.</li>
 </ul>
-<h2>Other permissions</h2>
+<h2>Health and calendar</h2>
+<p>You choose Health permissions in the system prompt. Kaitu reads but does not write Apple Health data. The requested types depend on whether you use onboarding or the health-sync feature.</p>
+<p>Raw health inputs collected during onboarding are stored separately on the phone and excluded from default context sharing. If you separately enable health sync, permitted raw samples are delivered to your selected location or receiver, such as your own Google Apps Script. The developer does not receive these samples, use them for advertising or sell them.</p>
+<p>Kaitu event records and Apple Calendar are separate destinations. Writing to the “Kaitu” calendar requires the calendar integration and system permission. A local save does not mean the event has synced to the system or a computer.</p>
+<h2>GitHub and Google Drive</h2>
+<p>GitHub login or a token accesses only an authorized workspace repository. Google Drive requests the full Drive scope: Google grants read/write access across Drive, while the app restricts workspace operations to your selected Kaitu folder.</p>
+<p>Google Drive is a restricted feature in the initial public beta. If the Google project is still in Testing, only registered test accounts can authorize it. A TestFlight invitation does not grant Google authorization eligibility.</p>
+<p>Disconnecting locally does not delete remote files or revoke a remote grant. Manage grants in <a href="https://myaccount.google.com/connections">Google account connections</a> or <a href="https://github.com/settings/apps/authorizations">GitHub authorized apps</a>.</p>
+<h2>Maps, diagnostics and feedback</h2>
+<p>Maps use MapLibre and may request styles or tiles from OpenFreeMap / OpenStreetMap-related services and Terrain elevation services. These services receive ordinary request information, including your IP address and the requested map area. Footprints use cities from your workspace, not original precise photo GPS.</p>
+<p>The app has no advertising and does not integrate third-party behavioral analytics or advertising-tracking SDKs. TestFlight feedback and Apple-provided crash diagnostics are subject to Apple’s terms. If you email us or submit an issue, the developer receives what you send. Do not include keys, private conversations or raw health data in public feedback.</p>
+<h2>Your controls and deletion</h2>
 <ul>
-<li><strong>Calendar:</strong> when you confirm a plan on your phone, Kaitu adds it to a calendar named "开图" (Kaitu) and finds the same event later by Kaitu's own note. It does not read your other calendars' contents.</li>
-<li><strong>Microphone and speech recognition:</strong> used only while you hold to speak. The system's speech recognition turns speech into text, on device when possible; otherwise Apple processes it under Apple's privacy policy. Recordings are not kept.</li>
-<li><strong>Maps:</strong> the map on the Explore page is provided by Apple Maps, which requests map tiles from Apple. Places come from your own data at city level.</li>
+<li>Local profiles and notes do not require a Kaitu account. AI, cloud services and system permissions are optional for their respective features.</li>
+<li>Disable Photos, Health, camera, microphone, speech or calendar permissions in system settings to stop the corresponding access.</li>
+<li>Delete AI keys, sign out of third-party services or disconnect the workspace in the app. Revoke remote grants in the service’s account settings when needed.</li>
+<li>Uninstalling removes app files but does not delete cloud copies, system backups or revoke third-party grants. Manage cloud files in your chosen service.</li>
 </ul>
-<p>You can turn off any permission in Settings at any time. The related feature stops; everything else keeps working.</p>
-<h2>What Kaitu does not do</h2>
-<ul>
-<li>No accounts; nothing to sign up for or log into.</li>
-<li>No ads, no third-party analytics or tracking code.</li>
-<li>Does not send your data to AI services. This version has no AI features; if they are added, this page will be updated first and the app will ask for your consent before sending anything.</li>
-<li>Crash reports: Apple shares anonymous crash information with the developer only if you chose "Share with App Developers" in system settings.</li>
-</ul>
-<h2>Children</h2>
-<p>Kaitu is not directed at children under 13 and does not knowingly collect their information.</p>
-<h2>Your choices</h2>
-<ul>
-<li>Turn off any permission in system settings.</li>
-<li>Disconnect the storage location in the app's settings; your data stays in your own iCloud or GitHub, for you to keep or delete.</li>
-<li>Delete the app to remove all cache and settings from this iPhone.</li>
-</ul>
-<h2>Changes</h2>
-<p>This page is updated, with a new date above, when our practices change. New destinations for your data (such as AI features) will be explained in the app first.</p>
+<h2>Children and updates</h2>
+<p>Kaitu is not directed at children under 13. We update this page and its date when data practices change, and describe new destinations in the relevant feature.</p>
 <h2>Contact</h2>
-<ul>
-<li>Developer: Stahl G</li>
-<li>Email: <a href="mailto:stahlguo@gmail.com">stahlguo@gmail.com</a></li>
-<li>Issues: <a href="https://github.com/Stahl-G/rensheng-kaitu/issues">https://github.com/Stahl-G/rensheng-kaitu/issues</a></li>
-</ul>
-<p>For Kaitu on the computer, see <a href="/en/privacy/">Where your data goes</a>.</p>
+<p>Developer: Stahl G. Email: <a href="mailto:stahlguo@gmail.com">stahlguo@gmail.com</a>. Feedback: <a href="https://github.com/Stahl-G/rensheng-kaitu/issues">GitHub Issues</a>.</p>
+<p>See <a href="/en/privacy/">where desktop data goes</a> and <a href="/en/support/">support</a>.</p>
   </div>
 </div>
 </main>
