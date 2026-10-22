@@ -58,6 +58,11 @@ export function KaituMark({ size, className }: { size: number; className?: strin
   );
 }
 
+/** Standalone hero row only; DSH retains its workspace picker and composer. */
+export function HiddenHeroMark() {
+  return <span className={css.hiddenHeroMark} />;
+}
+
 export function KaituName() {
   return <span>Kaitu</span>;
 }
