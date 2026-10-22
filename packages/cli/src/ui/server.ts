@@ -144,6 +144,7 @@ function englishError(error: KaituError): string {
     INVALID_CONFIG: "Check the settings and try again.",
     BAD_ARGS: "Check the input and try again.",
     AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
+    PLUGIN_NETWORK: "The plugin catalog could not connect. Check the network and try again.",
   };
   return messages[error.code] ?? "This action could not be completed. Check the input and try again.";
 }
