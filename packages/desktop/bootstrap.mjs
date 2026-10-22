@@ -27,6 +27,12 @@ if (embedded) {
   let visible = process.env.KAITU_AI_BACKGROUND !== "1";
   void app.whenReady().then(() => app.dock?.hide());
   app.on("browser-window-created", (_event, window) => {
+    window.webContents.on("did-start-navigation", (_event, target, _sameDocument, mainFrame) => {
+      if (!mainFrame) return;
+      const url = URL.parse(target);
+      if (url?.protocol === "http:" && url.hostname === "127.0.0.1")
+        process.send?.({ type: "kaitu:web", url: url.href });
+    });
     window.on("show", () => {
       if (!visible) window.hide();
     });

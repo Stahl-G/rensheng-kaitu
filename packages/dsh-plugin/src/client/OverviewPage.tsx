@@ -77,16 +77,30 @@ export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
+  const [pluginModules, setPluginModules] = useState<ExploreModule[]>([]);
   const [preferencesFailed, setPreferencesFailed] = useState(false);
   const [preferencesAttempt, setPreferencesAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry starts a fresh read and cancels the previous effect.
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
-    void props
-      .loadPreferences(browserLocale())
+    const load = async () => {
+      const modules = props.plugins ? ((await props.plugins("explore")) as ExploreModule[]) : [];
+      if (!active) return null;
+      setPluginModules(modules);
+      const value = await props.loadPreferences(browserLocale());
+      const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
+      if (!fresh.length || !active) return value;
+      const saved = await props.savePreferences({
+        locale: value.followSystem ? null : value.locale,
+        exploreEntries: [...(value.exploreEntries ?? defaultExploreEntries), ...fresh],
+        explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
+      });
+      return { ...saved, followSystem: value.followSystem };
+    };
+    void load()
       .then((value) => {
-        if (!active) return;
+        if (!active || !value) return;
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
         setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
@@ -97,14 +111,20 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale("zh-CN");
         setPreferencesFailed(true);
       });
+    function retry() {
+      setPreferencesAttempt((attempt) => attempt + 1);
+    }
+    window.addEventListener("kaitu:plugins-changed", retry);
     return () => {
       active = false;
+      window.removeEventListener("kaitu:plugins-changed", retry);
     };
-  }, [props.loadPreferences, preferencesAttempt]);
+  }, [props.loadPreferences, props.plugins, preferencesAttempt]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
       <Overview
         {...props}
+        pluginModules={pluginModules}
         locale={locale}
         setLocale={setLocale}
         followSystem={followSystem}
@@ -125,6 +145,7 @@ export function OverviewPage(props: OverviewPageProps) {
 }
 
 function Overview({
+  pluginModules,
   locale,
   setLocale,
   followSystem,
@@ -134,6 +155,7 @@ function Overview({
   retryPreferences,
   ...props
 }: OverviewPageProps & {
+  pluginModules: ExploreModule[];
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
@@ -153,10 +175,16 @@ function Overview({
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
   const guideVisible = guide !== undefined && guide !== null;
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>(() => {
+    const requested = new URLSearchParams(window.location.hash.slice(1)).get("kaitu-view");
+    return ["overview", "explore", "records", "ask"].includes(requested ?? "")
+      ? (requested as View)
+      : "overview";
+  });
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
-  const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
+  const availableModules = [...exploreModules, ...pluginModules];
+  const firstExplore = exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "";
   useEffect(() => {
     if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
   }, [exploreEntries, firstExplore]);
@@ -476,7 +504,7 @@ function Overview({
     />
   );
   const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
-  const selectedExplore = exploreModules.find((entry) => entry.id === explore);
+  const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
     footprints: (
@@ -935,9 +963,19 @@ function Overview({
                 </div>
               )}
               <ExploreNavigation
+                modules={availableModules}
                 entries={exploreEntries}
                 current={explore}
-                open={setExplore}
+                open={(id) => {
+                  setExplore(id);
+                  if (pluginModules.some((entry) => entry.id === id))
+                    void props
+                      .plugins?.("page", id)
+                      .then((url) => {
+                        if (typeof url === "string") window.location.assign(url);
+                      })
+                      .catch((err) => setError(String(err)));
+                }}
                 save={async (entries) => {
                   const saved = await props.savePreferences({
                     locale: followSystem ? null : locale,
@@ -949,7 +987,7 @@ function Overview({
             </section>
             <div className={css.child}>
               {selectedExplore ? (
-                explorePages[selectedExplore.id]
+                (explorePages[selectedExplore.id] ?? <p>{t("正在打开模块…", "Opening module…")}</p>)
               ) : (
                 <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
               )}

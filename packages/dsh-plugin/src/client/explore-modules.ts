@@ -28,4 +28,10 @@ export const exploreModules = [
   },
 ] as const;
 export const defaultExploreEntries = exploreModules.map(({ id }) => id);
-export type ExploreModule = (typeof exploreModules)[number];
+export interface ExploreModule {
+  id: string;
+  title: readonly [string, string];
+  description: readonly [string, string];
+  icon: string;
+  page?: string;
+}

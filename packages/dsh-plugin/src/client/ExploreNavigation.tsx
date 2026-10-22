@@ -16,7 +16,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
 import css from "./Prototype.module.css";
-import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
+import type { ExploreModule } from "./explore-modules.js";
 import { useT } from "./i18n.js";
 
 function Entry({
@@ -45,17 +45,21 @@ function Entry({
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <button type="button" className={css.exploreOpen} aria-pressed={current === entry.id} onClick={open}>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d={entry.icon} />
-        </svg>
+        {entry.page ? (
+          <span aria-hidden="true">{entry.icon}</span>
+        ) : (
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d={entry.icon} />
+          </svg>
+        )}
         <span>
           <strong>{title}</strong>
           <small>{t(entry.description[0], entry.description[1])}</small>
@@ -87,11 +91,13 @@ function Entry({
 }
 
 export function ExploreNavigation({
+  modules,
   entries,
   current,
   open,
   save,
 }: {
+  modules: readonly ExploreModule[];
   entries: string[] | null;
   current: string;
   open: (id: string) => void;
@@ -105,9 +111,9 @@ export function ExploreNavigation({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const available = new Map(exploreModules.map((entry) => [entry.id as string, entry]));
+  const available = new Map(modules.map((entry) => [entry.id as string, entry]));
   const visible = (entries ?? []).flatMap((id) => available.get(id) ?? []);
-  const hidden = exploreModules.filter((entry) => !entries?.includes(entry.id));
+  const hidden = modules.filter((entry) => !entries?.includes(entry.id));
   const change = async (next: string[]) => {
     setBusy(true);
     setError("");
@@ -166,7 +172,7 @@ export function ExploreNavigation({
         <button
           type="button"
           disabled={entries === null || busy}
-          onClick={() => void change([...defaultExploreEntries])}
+          onClick={() => void change(modules.map(({ id }) => id))}
         >
           {t("恢复默认布局", "Restore default layout")}
         </button>

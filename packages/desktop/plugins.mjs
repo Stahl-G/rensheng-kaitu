@@ -76,16 +76,37 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       : [];
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
+    async page(id, back, open) {
+      const entry = this.explore().find((item) => item.id === id);
+      if (!entry) throw new KaituError("这个模块已卸载", "PLUGIN");
+      const { url } = await open();
+      const target = new URL(url);
+      target.hash = new URLSearchParams({ "kaitu-page": entry.page, "kaitu-return": back }).toString();
+      return target.href;
+    },
     explore() {
-      const require = createRequire(join(profileDir("desktop"), "package.json"));
-      return installed().flatMap((name) => {
-        const pkg = JSON.parse(readFileSync(require.resolve(`${name}/package.json`), "utf8"));
+      const entries = installed().flatMap((name) => {
+        const pkg = JSON.parse(
+          readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
+        );
         const entry = pkg.kaitu?.explore;
         if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
         const pair = (value) =>
-          typeof value === "string" ? [value, value] : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
-        return [{ id: `plugin:${name}`, name, page: entry.page, title: pair(entry.title), description: pair(entry.description), icon: typeof entry.icon === "string" ? entry.icon : "◇" }];
+          typeof value === "string"
+            ? [value, value]
+            : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
+        return [
+          {
+            id: `plugin:${name}`,
+            name,
+            page: entry.page,
+            title: pair(entry.title),
+            description: pair(entry.description),
+            icon: typeof entry.icon === "string" ? entry.icon : "◇",
+          },
+        ];
       });
+      return entries;
     },
     async list() {
       const { parseMarketIndex, marketInstallTarget } = await import(

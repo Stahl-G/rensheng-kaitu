@@ -21,6 +21,7 @@ process.on('message', message => {
     process.exit(0);
   }
 });
+process.send({ type: "kaitu:web", url: "http://127.0.0.1:12345/?token=synthetic-process-access" });
 setInterval(() => {}, 1000);
 `,
       { mode: 0o700 },
@@ -31,6 +32,10 @@ setInterval(() => {}, 1000);
       const pid = opened[0].pid;
       expect(opened.every((result) => result.pid === pid)).toBe(true);
       expect(pid).toBeGreaterThan(0);
+      expect(await ai.open({ background: true, waitForUrl: true })).toEqual({
+        pid,
+        url: "http://127.0.0.1:12345/?token=synthetic-process-access",
+      });
       expect(process.kill(pid, 0)).toBe(true);
       await ai.close();
       expect(readFileSync(receipt, "utf8")).toBe("saved");

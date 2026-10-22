@@ -6,11 +6,12 @@ export function createAiProcess(executable, env) {
   let starting;
   let stopping;
   let closed = false;
+  let ready;
   const send = (type) => {
     if (child?.connected) child.send({ type }, () => {});
   };
   return {
-    async open({ background = false } = {}) {
+    async open({ background = false, waitForUrl = false } = {}) {
       if (closed) throw new Error("开图正在退出");
       if (!child) {
         child = spawn(executable, [], {
@@ -19,6 +20,16 @@ export function createAiProcess(executable, env) {
           stdio: ["ignore", "ignore", "ignore", "ipc"],
         });
         const launched = child;
+        ready = new Promise((resolve, reject) => {
+          launched.on("message", (message) => {
+            if (message?.type !== "kaitu:web") return;
+            const url = URL.parse(message.url);
+            if (url?.protocol === "http:" && url.hostname === "127.0.0.1") resolve(url.href);
+          });
+          launched.once("exit", () => reject(new Error("插件页面服务已退出")));
+          launched.once("error", reject);
+        });
+        void ready.catch(() => {});
         starting = new Promise((resolve, reject) => {
           launched.once("spawn", resolve);
           launched.once("error", reject);
@@ -32,7 +43,19 @@ export function createAiProcess(executable, env) {
       }
       await starting;
       if (!background) send("kaitu:focus");
-      return { pid: child?.pid };
+      if (!waitForUrl) return { pid: child?.pid };
+      let timeout;
+      try {
+        const url = await Promise.race([
+          ready,
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => reject(new Error("插件页面仍未就绪，请重试")), 20000);
+          }),
+        ]);
+        return { pid: child?.pid, url };
+      } finally {
+        clearTimeout(timeout);
+      }
     },
     close() {
       if (stopping) return stopping;

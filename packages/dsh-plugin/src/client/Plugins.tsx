@@ -11,7 +11,7 @@ export interface PluginItem {
   installed: boolean;
 }
 export type PluginRequest = (
-  action: "list" | "install" | "remove" | "open",
+  action: "list" | "install" | "remove" | "open" | "explore" | "page",
   input?: string,
 ) => Promise<unknown>;
 
@@ -37,7 +37,10 @@ export function Plugins({ request }: { request: PluginRequest }) {
     setError("");
     try {
       await request(action, input);
-      if (action !== "open") await load();
+      if (action !== "open") {
+        window.dispatchEvent(new Event("kaitu:plugins-changed"));
+        await load();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
