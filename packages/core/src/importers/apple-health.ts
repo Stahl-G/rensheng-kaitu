@@ -856,8 +856,7 @@ export function parseHealthShortcut(inputFile: string, zone: string) {
     if (!Array.isArray(samples)) throw new Error("缺少 samples 样本数组");
     if (samples.length > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
     const window =
-      // 窗口表示整份快照；并列列表一份只有一种类型，不按导出顺序比较。
-      parallel || raw.window === undefined
+      raw.window === undefined
         ? undefined
         : {
             start: parseTs(raw.window.start),
