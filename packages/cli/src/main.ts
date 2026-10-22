@@ -101,9 +101,9 @@ const HELP = `开图 kaitu
 
 用法：
   kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
-  kaitu sync enable icloud|drive|nutstore [--dir <路径>] [--name kaitu]  选择同步文件夹（nutstore 为坚果云）
+  kaitu sync enable icloud|drive|nutstore [--dir <路径>] [--name kaitu-ai-memory]  选择同步文件夹（nutstore 为坚果云）
   kaitu sync disable [--to <目录>] | status          搬回本机 / 查看存放位置
-  kaitu drive enable [--drive-dir <路径>] [--name kaitu]  开启 Google Drive 同步
+  kaitu drive enable [--drive-dir <路径>] [--name kaitu-ai-memory]  开启 Google Drive 同步
   kaitu drive disable [--to <目录>]                  搬回本机
   kaitu drive status                                查看同步状态
   kaitu inbox notes | done <路径>                    列出待整理笔记 / 整理后归档
