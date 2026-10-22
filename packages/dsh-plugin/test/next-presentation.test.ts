@@ -15,10 +15,22 @@ it("shows concise provenance, hides technical annotations, and preserves actual 
   });
   const original = JSON.stringify(item);
   expect(nextPresentation(item)).toEqual({
-    title: "吃三餐（豆类 + 鸡/蛋），先试 7 天",
+    title: "吃三餐（豆类 + 鸡/蛋），先试 7 天（方案见 资料，用户加入）",
     source: "Grokbot 提供",
   });
   expect(JSON.stringify(item)).toBe(original);
+  const mixed = Object.freeze({
+    title:
+      "提交申请（先让 Alice 审阅，参考 docs/checklist.md）；核对 /Users/me/results/scan.pdf、projects/book/draft.docx 和 meals/lunch.jpg（20 分钟）",
+    source: "grok-bot",
+    ref: file,
+  });
+  const mixedRaw = JSON.stringify(mixed);
+  expect(nextPresentation(mixed)).toEqual({
+    title: "提交申请（先让 Alice 审阅，参考 资料）；核对 资料、资料 和 资料（20 分钟）",
+    source: "Grokbot 提供",
+  });
+  expect(JSON.stringify(mixed)).toBe(mixedRaw);
   expect(
     nextPresentation({ title: `本机处理 ${file} 中 3 条和 ${file} 中 2 条只有日期的待核实资讯` }),
   ).toEqual({ title: "Grokbot 提供", source: "Grokbot 提供" });
