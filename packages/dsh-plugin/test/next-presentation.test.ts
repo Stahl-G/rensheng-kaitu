@@ -63,7 +63,7 @@ it("keeps raw title and provenance available through the real overview without r
     const item = data.allNext.find((value) => value.id === next.id);
     if (!item) throw new Error("Synthetic next item missing from overview");
     expect(item).toMatchObject({ title: next.title, ref: file, source: "grok-bot", by: "agent" });
-    expect(nextPresentation(item)).toEqual({ title: "浏览资讯", source: "Grokbot 提供" });
+    expect(nextPresentation(item)).toEqual({ title: "浏览资讯（资料）", source: "Grokbot 提供" });
     expect(ws.readText("feed/STATUS.md")).toBe(before);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -38,7 +38,7 @@ export function nextPresentation(
         .replace(recordID, "")
         .replace(paths, locale === "en" ? "notes" : "资料")
         .replace(/^[\s,，;；]+|[\s,，;；]+$/g, "");
-      if (!content || /^(?:资料|参考资料|方案见资料|见资料|notes|see notes)$/i.test(content)) return "";
+      if (!content) return "";
       return `${note[0]}${content}${note.at(-1)}`;
     })
     .replace(paths, locale === "en" ? "notes" : "资料")
