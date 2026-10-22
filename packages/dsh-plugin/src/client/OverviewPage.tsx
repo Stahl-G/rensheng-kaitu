@@ -410,7 +410,8 @@ function Overview({
       hour12: false,
     }).format(new Date(value));
   const capture = (
-    <div className={css.sec}>
+    <section className={`${css.sec} ${todayCss.captureCard}`}>
+      <h2 className={css.eyebrow}>{t("随手记", "Quick note")}</h2>
       <form
         className={css.capture}
         onSubmit={(e) => {
@@ -429,12 +430,13 @@ function Overview({
         <label className={css.sr} htmlFor="capture-text">
           {t("随手记一句", "Quick note")}
         </label>
-        <input
+        <textarea
           id="capture-text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder={t("随手记一句", "A quick note")}
+          rows={5}
+          placeholder={t("写下此刻的一点，不必完整。", "Write what's on your mind. A few words are enough.")}
           disabled={busy}
         />
         <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !draft.trim()}>
@@ -449,7 +451,7 @@ function Overview({
           </button>
         </output>
       )}
-    </div>
+    </section>
   );
   const focus = data?.next[0];
   const startMatter = (text: string) => {
@@ -709,56 +711,67 @@ function Overview({
             <>
               <div className={css.sec}>
                 <div className={css.head}>
-                  <h1>
-                    {dateFormat(locale ?? "zh-CN", {
-                      timeZone: "UTC",
-                      month: "long",
-                      day: "numeric",
-                      weekday: "long",
-                    }).format(new Date(`${data.today}T12:00:00Z`))}
-                  </h1>
+                  <div>
+                    <p className={css.sub}>
+                      {dateFormat(locale ?? "zh-CN", {
+                        timeZone: "UTC",
+                        month: "long",
+                        day: "numeric",
+                        weekday: "long",
+                      }).format(new Date(`${data.today}T12:00:00Z`))}
+                    </p>
+                    <h1>{t("今天", "Today")}</h1>
+                  </div>
                 </div>
-                {capture}
               </div>
-              <TodayTasks
-                data={data}
-                busy={busy}
-                complete={(item) => void run(() => props.completeNext(item.file, item.id))}
-                ask={askNext}
-                schedule={(item) => setSlot({ file: item.file, id: item.id })}
-                review={() => startGuide(1)}
-                focusCard={adoptedCard}
-              />
-              {!focus && !adoptedCard && (
-                <button type="button" className={css.link} onClick={() => startMatter("")}>
-                  {t("整理一件事", "Think through one thing")}
-                </button>
-              )}
-              <Agenda
-                data={calendar}
-                open={() => openRecord("calendar")}
-                proposals={pendingProposals}
-                busy={busy}
-                decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
-              />
-              {push &&
-                data.blocks
-                  // 加入日历成功不再列一遍；只有失败或需要手动导入的才显示。
-                  .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
-                  .map((block) => (
-                    <div className={css.row} key={block.id}>
-                      <span>{block.title}</span>
-                      <CalendarPushResult
-                        id={block.id}
-                        state={push}
-                        retry={async (id) => {
-                          setPush(
-                            await (push?.enabled ? props.retryCalendarPush(id) : props.removeCalendarPush()),
-                          );
-                        }}
-                      />
-                    </div>
-                  ))}
+              <div className={todayCss.dashboard}>
+                <div className={todayCss.main}>
+                  <TodayTasks
+                    data={data}
+                    busy={busy}
+                    complete={(item) => void run(() => props.completeNext(item.file, item.id))}
+                    ask={askNext}
+                    schedule={(item) => setSlot({ file: item.file, id: item.id })}
+                    review={() => startGuide(1)}
+                    focusCard={adoptedCard}
+                  />
+                  {!focus && !adoptedCard && (
+                    <button type="button" className={css.link} onClick={() => startMatter("")}>
+                      {t("整理一件事", "Think through one thing")}
+                    </button>
+                  )}
+                </div>
+                <aside className={todayCss.sidebar} aria-label={t("随手记与日程", "Quick note and schedule")}>
+                  {capture}
+                  <Agenda
+                    data={calendar}
+                    open={() => openRecord("calendar")}
+                    proposals={pendingProposals}
+                    busy={busy}
+                    decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
+                  />
+                  {push &&
+                    data.blocks
+                      // 加入日历成功不再列一遍；只有失败或需要手动导入的才显示。
+                      .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
+                      .map((block) => (
+                        <div className={css.row} key={block.id}>
+                          <span>{block.title}</span>
+                          <CalendarPushResult
+                            id={block.id}
+                            state={push}
+                            retry={async (id) => {
+                              setPush(
+                                await (push?.enabled
+                                  ? props.retryCalendarPush(id)
+                                  : props.removeCalendarPush()),
+                              );
+                            }}
+                          />
+                        </div>
+                      ))}
+                </aside>
+              </div>
               <details
                 className={todayCss.secondary}
                 open={todayDetails}

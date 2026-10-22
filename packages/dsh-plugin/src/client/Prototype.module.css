@@ -1,80 +1,80 @@
 .app {
-  --bg: #fcfcfb;
-  --surface: #ffffff;
-  --sunken: #f5f5f3;
-  --control: #f0efec;
-  --line: #e6e4dd;
-  --ink: #1f1e1d;
-  --ink2: #4d4c48;
-  --muted: #6b6a66;
+  --bg: #f7f5f0;
+  --surface: #fffdf8;
+  --sunken: #f1eee6;
+  --control: #f1eee6;
+  --line: #e6e1d6;
+  --ink: #20221f;
+  --ink2: #595e56;
+  --muted: #656b60;
   --link: #2b4c7e;
-  --primary: #1f1e1d;
-  --on-primary: #ffffff;
-  --strong: #1f1e1d;
-  --on-strong: #ffffff;
-  --ask: #f7f6f3;
-  --ask-line: #e6e4dd;
+  --primary: #20221f;
+  --on-primary: #fffdf8;
+  --strong: #20221f;
+  --on-strong: #fffdf8;
+  --ask: #f1eee6;
+  --ask-line: #e6e1d6;
   --scrim: rgba(31, 30, 29, 0.42);
   --health: #3e8a5a;
-  --health-tint: #e5f1e9;
+  --health-tint: #e8ede4;
   --health-ink: #2a6a41;
   --doing: #4a6a8f;
-  --doing-tint: #e7edf4;
+  --doing-tint: #edf1f7;
   --doing-ink: #344e6e;
   --explore: #1b3254;
-  --explore-tint: #eef2f7;
+  --explore-tint: #edf1f7;
   --explore-ink: #1b3254;
   --news: #b5711a;
-  --news-tint: #f7ecdc;
+  --news-tint: #f1ebdd;
   --news-ink: #84520f;
   --finance: #5f6f2a;
   --finance-tint: #eef1e2;
   --finance-ink: #4a5720;
   --me: #b5577a;
-  --empty: #f0efec;
-  --map-land: #eef1ec;
-  --map-grid: #dde2da;
-  --map-sea: #f4f6f7;
+  --empty: #f1eee6;
+  --map-land: #f1eee4;
+  --map-grid: #d5d9ce;
+  --map-sea: #e4eae3;
   --map-dot: #d3dad4;
-  --me-tint: #f6e7ed;
+  --me-tint: #f1eee6;
   --me-ink: #8a3a5a;
   --on-health: #020d05;
   --on-news: #191005;
-  --on-me: #ffffff;
-  --on-explore: #ffffff;
+  --on-me: #fffdf8;
+  --on-explore: #fffdf8;
   --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC",
     sans-serif;
-  --radius: 14px;
+  --radius: 12px;
 }
 @media (prefers-color-scheme: dark) {
   .app:not([data-theme="light"]) {
-    --bg: #171716;
-    --surface: #201f1e;
-    --sunken: #1b1b1a;
-    --control: #2a2927;
-    --line: #2f2e2c;
-    --ink: #ecebe8;
-    --ink2: #c9c7c2;
-    --muted: #a09e98;
-    --link: #b8cbe4;
-    --primary: #ecebe8;
-    --on-primary: #171716;
-    --strong: #ecebe8;
-    --on-strong: #171716;
-    --ask: #252422;
-    --ask-line: #393735;
+    --bg: #171a18;
+    --surface: #1e2220;
+    --sunken: #1a1e1b;
+    --control: #242925;
+    --line: #383e36;
+    --ink: #f1eee6;
+    --ink2: #c4c7bf;
+    --muted: #a2a79f;
+    --link: #9db8e6;
+    --primary: #f1eee6;
+    --on-primary: #171a18;
+    --strong: #f1eee6;
+    --on-strong: #171a18;
+    --ask: #242925;
+    --ask-line: #383e36;
     --scrim: rgba(0, 0, 0, 0.6);
     --health-tint: #203a2b;
     --health-ink: #a2d9b6;
     --doing-tint: #263243;
     --doing-ink: #bfd0e4;
     --explore-tint: #242e3e;
-    --explore-ink: #b8cbe4;
+    --explore-ink: #9db8e6;
     --news-tint: #43331e;
     --news-ink: #f0ca8f;
     --finance-tint: #2f3420;
     --finance-ink: #cbd69a;
-    --empty: #2a2927;
+    --empty: #242925;
     --map-land: #1f2620;
     --map-grid: #2d352e;
     --map-sea: #1a1c1d;
@@ -95,33 +95,33 @@
   }
 }
 .app[data-theme="dark"] {
-  --bg: #171716;
-  --surface: #201f1e;
-  --sunken: #1b1b1a;
-  --control: #2a2927;
-  --line: #2f2e2c;
-  --ink: #ecebe8;
-  --ink2: #c9c7c2;
-  --muted: #a09e98;
-  --link: #b8cbe4;
-  --primary: #ecebe8;
-  --on-primary: #171716;
-  --strong: #ecebe8;
-  --on-strong: #171716;
-  --ask: #252422;
-  --ask-line: #393735;
+  --bg: #171a18;
+  --surface: #1e2220;
+  --sunken: #1a1e1b;
+  --control: #242925;
+  --line: #383e36;
+  --ink: #f1eee6;
+  --ink2: #c4c7bf;
+  --muted: #a2a79f;
+  --link: #9db8e6;
+  --primary: #f1eee6;
+  --on-primary: #171a18;
+  --strong: #f1eee6;
+  --on-strong: #171a18;
+  --ask: #242925;
+  --ask-line: #383e36;
   --scrim: rgba(0, 0, 0, 0.6);
   --health-tint: #203a2b;
   --health-ink: #a2d9b6;
   --doing-tint: #263243;
   --doing-ink: #bfd0e4;
   --explore-tint: #242e3e;
-  --explore-ink: #b8cbe4;
+  --explore-ink: #9db8e6;
   --news-tint: #43331e;
   --news-ink: #f0ca8f;
   --finance-tint: #2f3420;
   --finance-ink: #cbd69a;
-  --empty: #2a2927;
+  --empty: #242925;
   --map-land: #1f2620;
   --map-grid: #2d352e;
   --map-sea: #1a1c1d;
@@ -231,10 +231,10 @@
   top: env(safe-area-inset-top, 0px);
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: auto auto minmax(0, 1fr);
   flex: none;
   align-items: center;
-  gap: 12px 20px;
+  gap: 12px 32px;
   padding-block: 12px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -253,13 +253,12 @@
   flex: 0 1 auto;
   display: flex;
   gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--control);
+  padding: 0;
+  background: transparent;
 }
 .tabs button {
   height: 40px;
-  padding: 0 22px;
+  padding: 0 18px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -268,10 +267,9 @@
   font-weight: 500;
 }
 .tabs button[aria-current="page"] {
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--explore-tint);
+  color: var(--link);
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(31, 30, 29, 0.12);
 }
 .tools {
   min-width: 0;
@@ -299,7 +297,7 @@
   display: inline-block;
 }
 .btn {
-  height: 40px;
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -340,14 +338,14 @@
   height: 40px;
   border-radius: 50%;
   border: 0;
-  background: var(--me);
-  color: var(--on-me);
+  background: var(--ink);
+  color: var(--bg);
   font-weight: 600;
 }
 
 .content {
   flex: none;
-  max-width: 1040px;
+  max-width: 1280px;
   margin: 0 auto;
   padding-block: 28px 72px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
@@ -364,8 +362,8 @@
   gap: 6px 16px;
 }
 .head h1 {
-  font-size: 28px;
-  line-height: 36px;
+  font-size: 36px;
+  line-height: 1.25;
   font-weight: 600;
 }
 .sub {
@@ -1355,6 +1353,7 @@
 .agenda {
   display: flex;
   flex-direction: column;
+  container-type: inline-size;
 }
 .agenda-row {
   display: grid;
@@ -1371,6 +1370,15 @@
   font-size: 14px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+@container (max-width: 400px) {
+  .agenda-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    padding-inline: 0;
+  }
+  .agenda-row > :last-child {
+    grid-column: 2;
+  }
 }
 @media (max-width: 760px) {
   .sub-form .fields {
@@ -2780,11 +2788,11 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
-  min-height: 64px;
+  min-height: 44px;
   padding: 10px 14px;
   flex: 1;
   border: 0;
-  border-radius: 14px;
+  border-radius: 9px;
   background: transparent;
   color: inherit;
   text-align: start;
@@ -2793,17 +2801,17 @@
   display: flex;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--ask);
+  border-radius: 9px;
+  background: transparent;
   color: var(--ink);
 }
 .exploreEntry:hover {
   border-color: var(--link);
 }
 .exploreEntry[data-current="true"] {
-  background: #1b3254;
-  border-color: #1b3254;
-  color: #fff;
+  background: var(--explore-tint);
+  border-color: var(--link);
+  color: var(--link);
 }
 .exploreEntry[data-dragging="true"] {
   z-index: 1;
@@ -2905,5 +2913,47 @@
   }
   .exploreEntries small {
     display: none;
+  }
+}
+
+/* 纸上生活：共用页面沿用产品数据与操作，只统一纸色和交互反馈。 */
+.app {
+  -webkit-font-smoothing: antialiased;
+}
+.top {
+  padding-inline: max(28px, var(--dsh-frame-leading-clearance, 0px));
+}
+.content {
+  padding-inline: 32px;
+}
+.tabs button:hover:not([aria-current="page"]) {
+  background: var(--sunken);
+}
+.btn:not(.btn-primary):not(.btn-strong):not(.btn-quiet) {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.app button,
+.app summary {
+  touch-action: manipulation;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app button {
+    transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
+  }
+  .app button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+@media (max-width: 760px) {
+  .top {
+    gap: 12px;
+    padding-inline: max(16px, env(safe-area-inset-left, 0px));
+  }
+  .content {
+    padding-inline: 20px;
+  }
+  .head h1 {
+    font-size: 28px;
   }
 }
