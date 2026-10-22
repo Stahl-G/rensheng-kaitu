@@ -151,7 +151,9 @@ describe("时区与日期切分", () => {
 
   it("只有交来的 Agent 认前缀写法，其他取值写错仍拒绝", async () => {
     const ws = await freshWorkspace("Asia/Shanghai");
-    expect(() => addRecord(ws, "task", { title: "整理照片", status: "open-ended" })).toThrow(/只能是/);
+    expect(() => addRecord(ws, "task", { title: "整理照片", status: "open-ended" }, { by: "user" })).toThrow(
+      /只能是/,
+    );
   });
 
   it("餐次没写时按时间推断，写了却认不出的不改成别的餐次", async () => {

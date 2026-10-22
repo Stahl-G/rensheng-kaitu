@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { templateDir } from "./assets.js";
+import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { type ModuleDef, listRecordTypes } from "./modules.js";
 import { type StoredRecord, type WriteOptions, addRecord, readRecords, updateRecord } from "./records.js";
 import { localDate, parseTs } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
-export type TaskStatus = "open" | "done" | "cancelled";
+export type TaskStatus = "proposed" | "open" | "done" | "cancelled";
 export interface Task extends StoredRecord {
   title: string;
   status: TaskStatus;
@@ -72,8 +73,24 @@ export async function addTask(ws: Workspace, input: TaskInput, options: TaskWrit
     { ...input, status: "open" },
     { ...options, by: options.by ?? "user" },
   );
-  const version = await snapshot(ws, `${options.actor ?? "你"}记下了待办：${result.record.title}`);
+  const action = result.record.status === "proposed" ? "提出了待办建议" : "记下了待办";
+  const version = await snapshot(ws, `${options.actor ?? "你"}${action}：${result.record.title}`);
   return { ...result, version };
+}
+
+/** 插件与 Agent 共用的建议入口；调用方不能自行指定用户身份。 */
+export function proposeTask(ws: Workspace, input: TaskInput, actor = "Agent") {
+  return addTask(ws, input, { by: "agent", actor });
+}
+
+/** 只由用户界面或已接收的手机采纳操作调用；重复点击不追加修订。 */
+export async function adoptTask(ws: Workspace, id: string) {
+  const task = listTasks(ws, { status: "all" }).find((task) => task.id === id);
+  if (!task) throw new KaituError("待办建议不存在", "NOT_FOUND");
+  if (task.status === "open") return { record: task, version: null };
+  if (task.status !== "proposed") throw new KaituError("待办已处理，请刷新", "CONFLICT");
+  const result = updateRecord(ws, "task", id, { status: "open" }, { by: "user" });
+  return { ...result, version: await snapshot(ws, `你采纳了待办：${task.title}`) };
 }
 
 async function setTaskStatus(ws: Workspace, id: string, status: TaskStatus, options: TaskWriteOptions) {

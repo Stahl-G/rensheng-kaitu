@@ -226,8 +226,19 @@ it("MCP 日程回执仍待确认，模型不能伪造用户署名或经记录接
     });
     expect(spoof.isError).not.toBe(true);
     expect(readRecords(server, "task")).toEqual([
-      expect.objectContaining({ title: "伪造决定", by: "agent" }),
+      expect.objectContaining({ title: "伪造决定", by: "agent", status: "proposed" }),
     ]);
+    const task = readRecords(server, "task")[0];
+    const promote = await client.callTool({
+      name: "record_update",
+      arguments: {
+        type: "task",
+        id: task?.id,
+        data: { status: "open", by: "user", source: "manual", confirmed: true },
+      },
+    });
+    expect(promote.isError).toBe(true);
+    expect(readRecords(server, "task")).toEqual([task]);
     const goal = await client.callTool({
       name: "record_add",
       arguments: { type: "goal", data: { title: "未经确认的目标", status: "active" } },

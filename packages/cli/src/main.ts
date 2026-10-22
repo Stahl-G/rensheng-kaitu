@@ -728,7 +728,7 @@ async function run(argv: string[]): Promise<number> {
         );
         return 0;
       }
-      const by = values.by ? parseBy(values.by) : "user";
+      const by = parseBy(values.by);
       const options = { by, actor: who(by) };
       const result =
         action === "add"

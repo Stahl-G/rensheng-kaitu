@@ -150,6 +150,18 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
         .filter((item) => item.status === "todo" || item.status === "proposed")
         .map((item) => ({ ...item, module: module.module, file: module.file })),
     )
+    .concat(
+      (data.records.task ?? [])
+        .filter((task) => task.status === "open")
+        .map((task) => ({
+          id: task.id,
+          title: String(task.title),
+          status: "todo" as const,
+          due: typeof task.due === "string" ? task.due : undefined,
+          module: "me",
+          file: "task",
+        })),
+    )
     .sort((a, b) => {
       const overdue = (item: typeof a) => (item.due && item.due < data.today ? 0 : 1);
       const priority = (item: typeof a) => (item.priority === "high" ? 0 : item.priority === "low" ? 2 : 1);
@@ -362,6 +374,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date()) {
       !data.memories.length &&
       !daily &&
       !data.inboxNotes,
+    proposedTasks: (data.records.task ?? [])
+      .filter((task) => task.status === "proposed")
+      .map(({ id, title }) => ({ id, title: String(title) })),
     blocks: status.now.blocks,
     next: allNext.slice(0, 3),
     allNext,

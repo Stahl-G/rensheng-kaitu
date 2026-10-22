@@ -76,6 +76,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 |---|---|---|---|
 | `complete_next` | `file`、`id` | `completeNext` | v0.6 |
 | `decide_proposal` | `id`、`decision`（confirmed / rejected） | `decidePhoneProposal`：只改状态；确认的标 `calendar: phone`，日历由手机写入；Mac 在日历里找到那条后才跟着更新、允许改时间，从不新建 | v0.6 |
+| `adopt_task` | `id` | `adoptTask`：proposed → open，重复采纳不重复追加；沿用手机操作回执 | rc.5 共用协议；iOS N1b 待实现 |
 | `complete_task` / `cancel_task` | `id` | `completeTask` / `cancelTask` | v0.6 |
 | `keep_draft` / `adopt_draft` | `source`（加核对后的草稿） | `keepOnboardingMatter` / `adoptOnboardingMatter` | v0.6.1 |
 | `answer_question` | `question_id`、`value` | 待定 | 预留 |
@@ -179,3 +180,9 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 
 每个模块单独写一份任务说明（目标、涉及文件、格式、验收、不要做的事），放在 `docs/mobile/tasks/`，由本地的 agent 分给 Codex。
 要让我审 iOS 代码，需要把 `kaitu-ios` 推到 GitHub，并加进这个会话可访问的仓库。
+
+### rc.5 N1 兼容边界
+
+Agent 的 task 写入一律先为 proposed，不信任 records 中的 source、confirmed、by 或 origin=user；手机 UI 直接新增继续走 create_task。桌面今天页显示待办建议，由用户采纳后进入活动列表；旧 open/done/cancelled 原样读取，不迁移。插件可调用 kaitu.proposeTask(input)，只能提出建议；adoptTask 仅供用户界面调用，不注册为模型工具。
+
+旧 iOS 尚无建议采纳界面，当前 mobile.tasks 暂不投影 proposed，仍投影既有状态；现有 iOS 的 actions 与任务 status 均按字符串解码，可读取新增能力名。共用 adopt_task 操作已可导入，N1b 另仓接入建议展示时再扩展手机投影。操作文件仍沿用既有信任边界：没有配对签名验证，拥有同步目录任意写权限的 Agent 仍可能伪造用户操作；N2 单独处理，本次不新增凭据或改签名。完整 Agent 或可任意写文件/执行 CLI 的进程不受模型工具边界隔离。
