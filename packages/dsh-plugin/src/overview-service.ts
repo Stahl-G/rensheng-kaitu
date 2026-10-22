@@ -56,6 +56,7 @@ import {
   calendarPushEntries,
   calendarPushStore,
   cancelOnboardingPreview,
+  cancelTask,
   captureNote,
   changeExperienceBatch,
   changeOnboardingNext,
@@ -422,6 +423,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("adoptTask")
   async adoptTask(id: string): Promise<{ version: string | null }> {
     return this.write(() => adoptTask(this.workspace, id));
+  }
+
+  @Remote("cancelTask")
+  async cancelTask(id: string): Promise<{ version: string | null }> {
+    return this.write(() => cancelTask(this.workspace, id, { by: "user" }));
   }
 
   @Remote("completeNext")

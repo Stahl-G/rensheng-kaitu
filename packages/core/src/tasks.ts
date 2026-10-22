@@ -94,8 +94,6 @@ export async function adoptTask(ws: Workspace, id: string) {
 }
 
 async function setTaskStatus(ws: Workspace, id: string, status: TaskStatus, options: TaskWriteOptions) {
-  if (status === "done" && listTasks(ws, { status: "proposed" }).some((task) => task.id === id))
-    throw new KaituError("请先采纳待办建议，再完成", "USER_DECISION");
   const result = updateRecord(ws, "task", id, { status }, { ...options, by: options.by ?? "user" });
   const action = status === "done" ? "完成" : "取消";
   const version = await snapshot(ws, `${options.actor ?? "你"}${action}了待办：${result.record.title}`);

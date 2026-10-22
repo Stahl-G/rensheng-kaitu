@@ -52,6 +52,7 @@ export interface OverviewPageProps
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
   adoptTask: (id: string) => Promise<unknown>;
+  cancelTask: (id: string) => Promise<unknown>;
   completeNext: (file: string, id: string) => Promise<unknown>;
   onAgent: () => void;
   onAdvanced?: () => void;
@@ -750,6 +751,14 @@ function Overview({
                           onClick={() => void run(() => props.adoptTask(task.id))}
                         >
                           {t("采纳", "Adopt")}
+                        </button>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={busy}
+                          onClick={() => void run(() => props.cancelTask(task.id))}
+                        >
+                          {t("不用了", "Not needed")}
                         </button>
                       </div>
                     ))}

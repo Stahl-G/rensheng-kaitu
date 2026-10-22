@@ -99,21 +99,22 @@ it("Agent 工具只能提出待办，桌面用户采纳才进入今天，重复�
     const adopted = readRecords(ws, "task").find((task) => task.id === plugin.id);
     if (!adopted) throw new Error("Missing adopted task");
     expect(adopted).toMatchObject({ status: "open", by: "user", rev: 2 });
-    expect(
-      await call("kaitu_records", {
-        operation: "update",
-        type: "task",
-        id: plugin.id,
-        fields: { title: "借旧 open 塞入的新建议", status: "open", source: "manual", by: "user" },
-      }),
-    ).toMatchObject({ ok: false });
-    expect(readRecords(ws, "task").find((task) => task.id === plugin.id)).toEqual(adopted);
     await productRequest(ws, "adoptTask", [plugin.id]);
     expect(readRecords(ws, "task").find((task) => task.id === plugin.id)).toEqual(adopted);
     expect(await history(ws)).toHaveLength(before.length + 1);
     today = await service.overview();
     expect(today.allNext.filter((task) => task.id === plugin.id)).toHaveLength(1);
     expect(today.proposedTasks.map((task) => task.id)).not.toContain(plugin.id);
+    expect(
+      await call("kaitu_records", {
+        operation: "update",
+        type: "task",
+        id: plugin.id,
+        fields: { title: "交报告", due: "2026-10-30", source: "manual", by: "user", confirmed: true },
+      }),
+    ).toMatchObject({ ok: true });
+    const edited = readRecords(ws, "task").find((task) => task.id === plugin.id);
+    expect(edited).toMatchObject({ due: "2026-10-30", status: "open", by: "agent", rev: 3 });
     await completeNext(ws, "task", plugin.id);
     expect(listTasks(ws, { status: "done" }).map((task) => task.id)).toContain(plugin.id);
     // 原有用户 UI 的引导采纳直接创建 open；core 用户路径仍保持可用。
@@ -128,6 +129,11 @@ it("Agent 工具只能提出待办，桌面用户采纳才进入今天，重复�
     });
     const user = await addTask(ws, { title: "已有用户事项", due: "2020-01-01" });
     expect(readStatus(ws).tasks.map((task) => task.id)).toContain(user.record.id);
+    await service.cancelTask(id);
+    expect(listTasks(ws, { status: "cancelled" }).map((task) => task.id)).toContain(id);
+    today = await service.overview();
+    expect(today.proposedTasks.some((task) => task.id === id)).toBe(false);
+    expect(today.allNext.some((task) => task.id === id)).toBe(false);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
     await ctx.fiber.dispose();

@@ -101,6 +101,7 @@ const props: OverviewPageProps = {
   saveLearning: (input) => call("learningSave", input),
   loadLibraryDocument: (file) => call("libraryDocument", file),
   adoptTask: (id) => call("adoptTask", id),
+  cancelTask: (id) => call("cancelTask", id),
   completeNext: (file, id) => call("completeNext", file, id),
   decideProposal: (id, decision) => call("decideProposal", id, decision),
   capture: (text) => call("capture", text),

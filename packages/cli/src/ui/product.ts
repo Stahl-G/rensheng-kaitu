@@ -37,6 +37,7 @@ import {
   calendarPushEntries,
   calendarPushStore,
   cancelOnboardingPreview,
+  cancelTask,
   captureNote,
   changeExperienceBatch,
   changeOnboardingNext,
@@ -159,6 +160,7 @@ export const productMutations = new Set([
   "addCalendarSubscription",
   "completeNext",
   "adoptTask",
+  "cancelTask",
   "proposeTask",
   "onboardingChoose",
   "onboardingMatterSave",
@@ -311,6 +313,8 @@ export async function productRequest(
       return readCalendar(ws);
     case "addCalendarSubscription":
       return addCalendarSubscription(ws, text(0), text(1));
+    case "cancelTask":
+      return cancelTask(ws, text(0), { by: "user" });
     case "adoptTask":
       return adoptTask(ws, text(0));
     case "proposeTask":
