@@ -9,6 +9,8 @@ export interface PluginItem {
   version: string;
   spec: string;
   installed: boolean;
+  installedVersion?: string;
+  updateAvailable?: boolean;
 }
 export type PluginRequest = (
   action: "list" | "install" | "remove" | "open",
@@ -20,6 +22,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
   const t = useT();
   const [items, setItems] = useState<PluginItem[] | null>(null);
   const [working, setWorking] = useState("");
+  const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
@@ -34,6 +37,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
   }, [load]);
   const run = async (name: string, action: "install" | "remove" | "open", input?: string) => {
     setWorking(name);
+    setOperation(action);
     setError("");
     try {
       await request(action, input);
@@ -67,40 +71,62 @@ export function Plugins({ request }: { request: PluginRequest }) {
       {!items ? (
         !error && <p className={css.small}>{t("正在读取插件目录…", "Loading plugins…")}</p>
       ) : (
-        <div className={`${css.card} ${css["list-card"]}`}>
-          {items.map((item) => (
-            <div className={css["switch-row"]} key={item.name}>
-              <span>
-                <b>{item.title}</b>
-                {item.version && <span className={css.small}> · {item.version}</span>}
-                {item.description && (
-                  <>
-                    <br />
-                    <span className={css.small}>{item.description}</span>
-                  </>
-                )}
-              </span>
-              <button
-                type="button"
-                className={`${css.btn} ${item.installed ? css["btn-quiet"] : css["btn-primary"]}`}
-                disabled={!!working || (!item.installed && !item.spec)}
-                onClick={() =>
-                  void (item.installed
-                    ? run(item.name, "remove", item.name)
-                    : run(item.name, "install", item.spec))
-                }
-              >
-                {working === item.name
-                  ? item.installed
-                    ? t("正在移除…", "Removing…")
-                    : t("正在安装…", "Installing…")
-                  : item.installed
-                    ? t("移除", "Remove")
-                    : t("安装", "Install")}
-              </button>
-            </div>
-          ))}
-        </div>
+        <details className={css.card} open>
+          <summary>{t("开图插件", "Kaitu plugins")}</summary>
+          <div className={css["list-card"]}>
+            {items.map((item) => (
+              <div className={css["switch-row"]} key={item.name}>
+                <span>
+                  <b>{item.title}</b>
+                  {(item.installed ? item.installedVersion : item.version) && (
+                    <span className={css.small}>
+                      {" "}
+                      · {item.installed ? item.installedVersion : item.version}
+                    </span>
+                  )}
+                  {item.description && (
+                    <>
+                      <br />
+                      <span className={css.small}>{item.description}</span>
+                    </>
+                  )}
+                </span>
+                <div className={css["plugin-actions"]}>
+                  {item.installed && item.updateAvailable && item.spec && (
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css["btn-primary"]}`}
+                      disabled={!!working}
+                      onClick={() => void run(item.name, "install", item.spec)}
+                    >
+                      {working === item.name && operation === "install"
+                        ? t("正在更新…", "Updating…")
+                        : t(`更新至 ${item.version}`, `Update to ${item.version}`)}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={`${css.btn} ${item.installed ? css["btn-quiet"] : css["btn-primary"]}`}
+                    disabled={!!working || (!item.installed && !item.spec)}
+                    onClick={() =>
+                      void (item.installed
+                        ? run(item.name, "remove", item.name)
+                        : run(item.name, "install", item.spec))
+                    }
+                  >
+                    {working === item.name && operation === (item.installed ? "remove" : "install")
+                      ? item.installed
+                        ? t("正在移除…", "Removing…")
+                        : t("正在安装…", "Installing…")
+                      : item.installed
+                        ? t("移除", "Remove")
+                        : t("安装", "Install")}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </section>
   );

@@ -83,6 +83,12 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         ).href
       );
       const names = installed();
+      const versions = new Map(
+        names.map((name) => {
+          const file = join(profileDir("desktop"), "node_modules", name, "package.json");
+          return [name, existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).version : ""];
+        }),
+      );
       const response = await fetch(KAITU_PLUGIN_INDEX, { signal: AbortSignal.timeout(15000) });
       if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
       const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
@@ -98,11 +104,23 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
             version: latest?.version ?? "",
             spec: latest ? marketInstallTarget(plugin.name, latest).spec : "",
             installed: names.includes(plugin.name),
+            installedVersion: versions.get(plugin.name),
+            updateAvailable:
+              plugin.versions.findIndex((item) => item.version === versions.get(plugin.name)) > 0,
           };
         });
       const extra = names
         .filter((name) => !catalog.some((plugin) => plugin.name === name))
-        .map((name) => ({ name, title: name, description: "", version: "", spec: "", installed: true }));
+        .map((name) => ({
+          name,
+          title: name,
+          description: "",
+          version: "",
+          spec: "",
+          installed: true,
+          installedVersion: versions.get(name),
+          updateAvailable: false,
+        }));
       return [...catalog, ...extra];
     },
     async install(spec) {
