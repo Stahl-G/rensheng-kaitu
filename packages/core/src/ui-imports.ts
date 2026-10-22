@@ -8,14 +8,55 @@ import { importIcs } from "./importers/ics.js";
 import { importNutAi } from "./importers/nut-ai.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
-export type ImportSource = "chatgpt-conversations" | "apple-health" | "ics" | "nut-ai" | "finance";
+export interface ImportOptions {
+  dryRun?: boolean;
+  calendar?: string;
+  from?: string;
+  to?: string;
+  /** 用户上传时的原文件名，日历没写名字时用它。 */
+  name?: string;
+}
+/** 开图能导入的文件：名称、后缀和导入函数只写在这里，命令行、DSH 工具和界面都从这里读。 */
+export const importSources = {
+  "chatgpt-conversations": {
+    name: "ChatGPT 对话",
+    extensions: [".json", ".zip"],
+    onboarding: true,
+    run: (ws: Workspace, path: string, o: ImportOptions) => importChatgptConversations(ws, path, o),
+  },
+  "apple-health": {
+    name: "Apple 健康",
+    extensions: [".zip", ".xml"],
+    onboarding: true,
+    run: (ws: Workspace, path: string, o: ImportOptions) => importAppleHealth(ws, path, o),
+  },
+  ics: {
+    name: "日历 .ics",
+    extensions: [".ics"],
+    onboarding: true,
+    run: (ws: Workspace, path: string, { name, ...o }: ImportOptions) =>
+      importIcs(ws, path, { ...o, fallbackCalendarName: name ? basename(name, extname(name)) : undefined }),
+  },
+  "nut-ai": {
+    name: "Nut AI",
+    extensions: [".json"],
+    onboarding: false,
+    run: (ws: Workspace, path: string, o: ImportOptions) => importNutAi(ws, path, o),
+  },
+};
+export type FileImportSource = keyof typeof importSources;
+export const fileImportSources = Object.keys(importSources) as [FileImportSource, ...FileImportSource[]];
+export type ImportSource = FileImportSource | "finance";
 const EXTENSIONS: Record<ImportSource, string[]> = {
-  "chatgpt-conversations": [".json", ".zip"],
-  "apple-health": [".zip", ".xml"],
-  ics: [".ics"],
-  "nut-ai": [".json"],
+  ...(Object.fromEntries(fileImportSources.map((id) => [id, importSources[id].extensions])) as Record<
+    FileImportSource,
+    string[]
+  >),
   finance: [".csv", ".xml", ".xls", ".xlsx"],
 };
+const UPLOAD = new RegExp(
+  `^\\.kaitu/cache/uploads/[a-f0-9-]+\\.(${[...new Set(Object.values(EXTENSIONS).flat())].map((ext) => ext.slice(1)).join("|")})$`,
+);
 export function stageUpload(ws: Workspace, source: ImportSource, name: string, bytes: Uint8Array): string {
   const ext = extname(name).toLowerCase();
   if (!Object.hasOwn(EXTENSIONS, source) || !EXTENSIONS[source].includes(ext)) {
@@ -48,9 +89,7 @@ export function resolveUpload(ws: Workspace, file: string): string {
   return target;
 }
 function assertUpload(file: string): void {
-  if (!/^\.kaitu\/cache\/uploads\/[a-f0-9-]+\.(json|zip|xml|ics|csv|xls|xlsx)$/.test(file)) {
-    throw new KaituError("无效的上传文件", "BAD_ARGS");
-  }
+  if (!UPLOAD.test(file)) throw new KaituError("无效的上传文件", "BAD_ARGS");
 }
 export function importUpload(
   ws: Workspace,
@@ -60,20 +99,9 @@ export function importUpload(
   originalName?: string,
 ) {
   assertUpload(file);
-  const path = resolveUpload(ws, file);
-  switch (source) {
-    case "chatgpt-conversations":
-      return importChatgptConversations(ws, path, { dryRun });
-    case "apple-health":
-      return importAppleHealth(ws, path, { dryRun });
-    case "ics":
-      return importIcs(ws, path, {
-        dryRun,
-        fallbackCalendarName: originalName ? basename(originalName, extname(originalName)) : undefined,
-      });
-    case "nut-ai":
-      return importNutAi(ws, path, { dryRun });
-    default:
-      throw new KaituError("未知导入来源", "BAD_ARGS");
-  }
+  if (!Object.hasOwn(importSources, source)) throw new KaituError("未知导入来源", "BAD_ARGS");
+  return importSources[source as FileImportSource].run(ws, resolveUpload(ws, file), {
+    dryRun,
+    name: originalName,
+  });
 }

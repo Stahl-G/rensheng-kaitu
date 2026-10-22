@@ -41,7 +41,14 @@ import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
 import { type Task, addTask, listTasks } from "./tasks.js";
 import { isoInZone, localDate } from "./time.js";
-import { type ImportSource, discardUpload, importUpload, stageUpload } from "./ui-imports.js";
+import {
+  type FileImportSource,
+  type ImportSource,
+  discardUpload,
+  importSources,
+  importUpload,
+  stageUpload,
+} from "./ui-imports.js";
 import { ulid } from "./ulid.js";
 import { type Goal, type ModuleStatus, readWorkbench } from "./workbench.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
@@ -916,7 +923,7 @@ export async function previewOnboardingImport(
   bytes: Uint8Array,
   options: OnboardingOptions = {},
 ): Promise<OnboardingImportPreview> {
-  if (!["ics", "apple-health", "chatgpt-conversations"].includes(source))
+  if (!Object.hasOwn(importSources, source) || !importSources[source as FileImportSource].onboarding)
     throw new KaituError("请使用对应数据源的导入预览", "BAD_ARGS");
   const digest = createHash("sha256").update(bytes).digest("hex");
   const file = stageUpload(ws, source, name, bytes);

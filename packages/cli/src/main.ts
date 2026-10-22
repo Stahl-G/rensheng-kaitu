@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import {
   type By,
+  type FileImportSource,
   KaituError,
   type MemoryInput,
   type MemoryPatch,
@@ -32,14 +33,12 @@ import {
   doctor,
   draftOnboardingMatter,
   enableSync,
+  fileImportSources,
   findRecordType,
   githubCliStatus,
   history,
-  importAppleHealth,
-  importChatgptConversations,
-  importIcs,
   importMemoryFile,
-  importNutAi,
+  importSources,
   inboxNoteDone,
   inboxNotes,
   initWorkspace,
@@ -163,10 +162,8 @@ const HELP = `开图 kaitu
   kaitu memory list                                列出记忆
   kaitu memory import --file <候选.json> [--dry-run]  批量导入记忆
   kaitu memory search <词>                          搜索记忆
-  kaitu import chatgpt-conversations <文件> [--dry-run]
-  kaitu import apple-health <export.zip|export.xml> [--dry-run]
-  kaitu import ics <文件.ics> [--calendar 名称] [--from 日期] [--to 日期] [--dry-run]
-  kaitu import nut-ai <backup.json> [--dry-run]
+  kaitu import <${fileImportSources.join("|")}> <文件> [--dry-run]
+                                                   日历另可加 [--calendar 名称] [--from 日期] [--to 日期]
   kaitu chats search <词> [--limit N]               搜索历史对话
   kaitu chats reindex                              重建对话索引
   kaitu history [路径] [--limit N]                 版本历史
@@ -876,21 +873,19 @@ async function run(argv: string[]): Promise<number> {
     }
     case "import": {
       const [source, file] = args;
-      if (source === "apple-health" || source === "ics" || source === "nut-ai") {
-        const ws = workspace(values);
-        const input = need(file, "文件");
-        const opts = { dryRun: values["dry-run"] };
-        const result =
-          source === "apple-health"
-            ? await importAppleHealth(ws, input, opts)
-            : source === "nut-ai"
-              ? await importNutAi(ws, input, opts)
-              : await importIcs(ws, input, {
-                  ...opts,
-                  calendar: values.calendar,
-                  from: values.from,
-                  to: values.to,
-                });
+      if (!source || !Object.hasOwn(importSources, source))
+        throw new KaituError(`未知导入来源：${source ?? ""}`, "BAD_ARGS");
+      const result = await importSources[source as FileImportSource].run(
+        workspace(values),
+        need(file, "文件"),
+        {
+          dryRun: values["dry-run"],
+          calendar: values.calendar,
+          from: values.from,
+          to: values.to,
+        },
+      );
+      if ("types" in result) {
         const labels: Record<string, string> = {
           metric: "指标",
           sleep: "睡眠",
@@ -922,12 +917,6 @@ async function run(argv: string[]): Promise<number> {
         );
         return 0;
       }
-      if (source !== "chatgpt-conversations") {
-        throw new KaituError(`未知导入来源：${source ?? ""}`, "BAD_ARGS");
-      }
-      const result = await importChatgptConversations(workspace(values), need(file, "文件"), {
-        dryRun: values["dry-run"],
-      });
       const actions = { added: "新增", updated: "更新", skipped: "跳过" };
       out(
         values,
