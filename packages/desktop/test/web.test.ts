@@ -2,6 +2,8 @@ import { createServer } from "node:http";
 import { fetchPublicResource } from "@kaitu/core";
 import { expect, test } from "vitest";
 // @ts-expect-error Desktop adapters are native ESM.
+import { nativeSearchInfo } from "../sdk-search-settings.mjs";
+// @ts-expect-error Desktop adapters are native ESM.
 import { createPublicFetch, createSearchRouter, searchNative } from "../sdk-web-providers.mjs";
 
 test("web reading goes through the public-address fetch", async () => {
@@ -97,17 +99,6 @@ test("search prefers the current chat service then configured specialist service
     const exa = await router.search({ query: "another public topic" });
     expect(exa.sources[0].url).toBe("https://source.example/exa");
     expect(requests.map((request) => request.url)).toEqual(["/chat/completions", "/search"]);
-    const tavily = await createSearchRouter({
-      preferred: "tavily",
-      resolve: async (ref: string) => (ref === "KAITU_SEARCH_TAVILY_API_KEY" ? key : undefined),
-      endpoints: { tavily: url },
-      current: () => settings,
-    }).search({ query: "tavily topic" });
-    expect(tavily.sources[0]).toMatchObject({
-      url: "https://source.example/exa",
-      snippet: "synthetic source",
-    });
-    expect(requests.pop()?.body).toMatchObject({ query: "tavily topic", search_depth: "basic" });
     expect(requests.every((request) => request.auth === `Bearer ${key}`)).toBe(true);
     expect(JSON.stringify({ perplexity, exa })).not.toContain(key);
     keys.set("DEEPSEEK_API_KEY", "unused-deepseek-key");
@@ -193,22 +184,10 @@ test("native search sends protocol-specific requests and returns only structured
       },
       check: (body: Record<string, unknown>) => expect(body.tools).toEqual([{ google_search: {} }]),
     },
-    {
-      api: "openai-completions",
-      path: "/chat/completions",
-      payload: {
-        choices: [
-          {
-            message: {
-              content: "https://invented.example",
-              annotations: [{ type: "url_citation", url_citation: source }],
-            },
-          },
-        ],
-      },
-      check: (body: Record<string, unknown>) => expect(body.web_search_options).toEqual({}),
-    },
   ];
+  // 只用 Chat Completions 的服务（Kimi、智谱、通义、OpenRouter）没有结构化的自带搜索，改用搜索服务。
+  for (const provider of ["moonshotai-cn", "kaitu-zhipu", "kaitu-qwen", "openrouter"])
+    expect(nativeSearchInfo({ provider }).supported).toBe(false);
   try {
     for (const item of cases) {
       response = item.payload;
@@ -242,39 +221,6 @@ test("native search sends protocol-specific requests and returns only structured
       await expect(searchNative(settings, "fake-key", { query: "public query" })).rejects.toMatchObject({
         code: "AI_SEARCH_UNSUPPORTED",
       });
-    }
-    for (const item of [
-      {
-        provider: "moonshotai-cn",
-        path: "/tools/search",
-        payload: { search_results: [source] },
-        expected: { text_query: "public query", include_content: false, limit: 8 },
-      },
-      {
-        provider: "kaitu-zhipu",
-        path: "/web_search",
-        payload: { search_result: [{ link: source.url, title: source.title }] },
-        expected: { search_engine: "search_std", search_query: "public query", count: 8 },
-      },
-      {
-        provider: "kaitu-qwen",
-        path: "/api/v1/services/aigc/text-generation/generation",
-        payload: { output: { search_info: { search_results: [source] } } },
-        expected: {
-          input: { messages: [{ role: "user", content: "Search the web for: public query" }] },
-          parameters: { enable_search: true, search_options: { forced_search: true, enable_source: true } },
-        },
-      },
-    ]) {
-      response = item.payload;
-      const result = await searchNative(
-        { provider: item.provider, model: "local-model", baseURL: root },
-        "fake-key",
-        { query: "public query" },
-      );
-      expect(result.sources).toEqual([source]);
-      expect(received.at(-1)?.url).toBe(item.path);
-      expect(received.at(-1)?.body).toMatchObject(item.expected);
     }
     response = {
       content: [

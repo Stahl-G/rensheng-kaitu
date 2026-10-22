@@ -8,19 +8,18 @@ export const searchProviders = [
     keyUrl: "https://www.perplexity.ai/settings/api",
   },
   { id: "exa", name: "Exa", ref: "KAITU_SEARCH_EXA_API_KEY", keyUrl: "https://dashboard.exa.ai/api-keys" },
-  { id: "tavily", name: "Tavily", ref: "KAITU_SEARCH_TAVILY_API_KEY", keyUrl: "https://app.tavily.com/home" },
 ];
+/** 这几种协议有服务商自带、返回结构化来源的搜索；其他服务改用上面的搜索服务。 */
+const NATIVE = ["anthropic-messages", "openai-responses", "google-generative-ai"];
 export function nativeSearchInfo(settings = {}, configured = false) {
   const entry = providers.find((item) => item.id === settings.provider);
   const api = settings.api ?? entry?.api;
   const reason =
     settings.auth === "dsh"
       ? "此账号登录通道未提供独立搜索接口，可添加搜索服务。"
-      : entry?.id === "openrouter"
-        ? "OpenRouter 搜索可能回落到其他搜索商，当前未接入。"
-        : entry?.id === "kaitu-qwen" && settings.model === "qwen-vl-plus"
-          ? "当前通义多模态模型的搜索需要流式接口，请换用 qwen-plus 或添加搜索服务。"
-          : undefined;
+      : entry && !NATIVE.includes(api)
+        ? `${entry.name} 没有可用的自带搜索，可添加搜索服务。`
+        : undefined;
   const supported = !!entry && !reason;
   return {
     provider: entry?.id ?? null,
