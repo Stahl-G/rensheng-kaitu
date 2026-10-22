@@ -100,14 +100,12 @@ export function JobsPage(props: JobsPageProps) {
       </header>
       {error && <p role="alert">{error}</p>}
       {!data && !error && <output>{t("正在读取岗位…", "Loading positions…")}</output>}
-      {data && (
-        <p>{t(`共 ${data.items.length} 个岗位`, `${data.items.length} positions`)} · jobs/jobs.json</p>
-      )}
+      {data && <p>{t(`共 ${data.items.length} 个岗位`, `${data.items.length} positions`)}</p>}
       {data && !data.available && (
         <p>
           {t(
-            "当前工作区还没有 jobs/jobs.json。把已有 jobs 文件夹放到资料目录后重新读取。",
-            "No jobs/jobs.json in this workspace. Place your existing jobs folder in the workspace and reload.",
+            "这个工作区里还没有求职资料。把整理好的求职文件夹放进资料目录后重新读取。",
+            "This workspace has no job search information yet. Place your prepared job search folder in the workspace and reload.",
           )}
         </p>
       )}

@@ -7,13 +7,12 @@
 .page header p,
 .job summary span,
 .job dt {
-  color: var(--kt-muted);
+  color: var(--muted);
 }
 .job {
   padding: 18px;
-  background: var(--kt-card);
+  background: var(--surface);
   border-radius: 16px;
-  box-shadow: var(--kt-shadow);
 }
 .job summary {
   cursor: pointer;
