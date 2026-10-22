@@ -5,6 +5,7 @@ import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { ensureHistory, snapshot } from "./history.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listModules } from "./modules.js";
 import { populateSample } from "./sample.js";
 import { templateVersion } from "./template-version.js";
@@ -44,7 +45,15 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
   }
   // 用纯 Git 模板建的记忆仓库（根目录有 kaitu-backup.json）可以直接接管：只补缺的文件，已有的一律不动。
   const adopt = existsSync(join(root, "kaitu-backup.json"));
-  if (adopt && opts.template === "growth") throw new KaituError("成长工作区需要一个空文件夹", "NOT_EMPTY");
+  if (adopt && opts.template === "growth")
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        "成长工作区需要一个空文件夹",
+        "Choose an empty folder for a growth workspace",
+      ),
+      "NOT_EMPTY",
+    );
   if (!adopt && existsSync(root) && readdirSync(root).some((n) => n !== ".DS_Store")) {
     throw new KaituError(`${root} 不是空目录，换一个位置或先清空`, "NOT_EMPTY");
   }
