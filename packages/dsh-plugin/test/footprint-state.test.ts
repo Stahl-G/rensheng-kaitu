@@ -70,6 +70,35 @@ it("重叠居住、同年未知先后不连线，计划建议保持各自线型�
   expect(footprintData([a, b], "2026-10-20", current).previous).toBeUndefined();
 });
 
+it("家乡与首居分开，保留各自经历类型，不补造家乡到首居路线", () => {
+  const home = city(90, 110, 20);
+  const first = item(1, "2010-01-01", "2011-12-31");
+  const current = item(2, "2020-01-01", undefined);
+  const rows = [
+    first,
+    current,
+    ...[3, 4, 5, 6].map((id) =>
+      item(id, "2015", undefined, {
+        event_type: id % 2 ? "worked" : "studied",
+      }),
+    ),
+    item(7, "2018", undefined, { fact_status: "inferred" }),
+    item(8, "2030", undefined, { fact_status: "planned" }),
+  ];
+  const data = footprintData(rows, "2026-10-22", current.place, home);
+  expect(data.origin).toEqual(home);
+  expect(data.me).toEqual(current.place);
+  expect(data.history.map((p) => p.geonameid)).toEqual([90, 1, 2]);
+  expect(data.all.map((p) => p.geonameid)).toEqual([90, 1, 2, 3, 4, 5, 6, 8]);
+  expect(data.lived.map((p) => p.geonameid)).toEqual([1, 2]);
+  expect(data.travelled).toHaveLength(0);
+  const route = data.routes.features.find((f) => f.properties.kind === "history");
+  expect(route?.geometry.coordinates[0]?.[0]).toBeCloseTo(first.place.lng as number);
+  expect(route?.geometry.coordinates[0]?.[1]).toBeCloseTo(first.place.lat as number);
+  expect(data.routes.features.filter((f) => f.properties.kind === "history")).toHaveLength(1);
+  expect(footprintData(rows, "2026-10-22", current.place).origin).toEqual(first.place);
+});
+
 it("大圆经过跨日界线短边且所有坐标有限；对跖点不编造方向", () => {
   const arc = greatCircle(city(1, 178), city(2, -171));
   expect(arc).not.toBeNull();

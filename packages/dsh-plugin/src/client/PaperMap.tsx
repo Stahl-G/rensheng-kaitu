@@ -35,6 +35,7 @@ export function PaperMap({
   showAllPlaces = false,
   asOf,
   current,
+  hometown,
   onAdd,
 }: {
   cities: City[];
@@ -47,6 +48,7 @@ export function PaperMap({
   showAllPlaces?: boolean;
   asOf: string;
   current?: Place | null;
+  hometown?: Place;
   onAdd: (state: FootprintState) => void;
 }) {
   const t = useT();
@@ -66,8 +68,9 @@ export function PaperMap({
         cities.flatMap((c) => c.experiences),
         asOf,
         current,
+        hometown,
       ),
-    [cities, asOf, current],
+    [cities, asOf, current, hometown],
   );
   const latest = useRef({
     mode,
@@ -205,7 +208,9 @@ export function PaperMap({
       if (mode === "history" && coordinate(origin) && cityKey(origin) !== (data.me && cityKey(data.me))) {
         const label = document.createElement("span");
         label.className = css.cityLabel ?? "";
-        label.textContent = t(`起点 · ${nameOf(origin)}`, `Start · ${nameOf(origin)}`);
+        label.textContent = data.hometown
+          ? t(`起点 · ${nameOf(origin)}`, `Start · ${nameOf(origin)}`)
+          : t(`最早居住记录 · ${nameOf(origin)}`, `Earliest residence record · ${nameOf(origin)}`);
         originLabel.current = new Marker({ element: label, anchor: "bottom-left", offset: [10, -10] })
           .setLngLat([origin.lng, origin.lat])
           .addTo(m);
@@ -672,7 +677,7 @@ export function PaperMap({
           ? t("城市级位置 · 现居记录", "City-level record · Current residence")
           : mode === "possible"
             ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
-            : t("城市级位置 · 连线表示经历顺序", "City-level locations · Lines follow the order of places")}
+            : t("居住来路 · 连线表示居住经历顺序", "Residence history · Lines follow residence records")}
       </span>
     </section>
   );

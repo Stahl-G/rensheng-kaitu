@@ -97,7 +97,7 @@ export function footprintAnchor(items: Experience[], asOf: string, profileCity?:
 }
 
 /** null is an explicitly unresolved full-data anchor; never infer one from a filtered subset. */
-export function footprintData(items: Experience[], asOf: string, current?: Place | null) {
+export function footprintData(items: Experience[], asOf: string, current?: Place | null, hometown?: Place) {
   const residences = residenceData(items, asOf);
   const { actual, lived, timed } = residences;
   const me = current === null ? undefined : coordinate(current) ? current : residenceAnchor(residences, asOf);
@@ -153,13 +153,19 @@ export function footprintData(items: Experience[], asOf: string, current?: Place
           geometry: { type: "LineString", coordinates: arc },
         });
     }
+  const all = points([...actual, ...possible]);
+  const history = points(timed.map((v) => v.e));
+  if (coordinate(hometown))
+    for (const places of [all, history])
+      if (!places.some((p) => cityKey(p) === cityKey(hometown))) places.unshift(hometown);
   return {
     me,
-    origin,
+    hometown: coordinate(hometown) ? hometown : undefined,
+    origin: coordinate(hometown) ? hometown : origin,
     previous: previousResidence,
-    all: points([...actual, ...possible]),
+    all,
     lived: points(lived),
-    history: points(timed.map((v) => v.e)),
+    history,
     possible: points(possible),
     travelled: points(actual.filter((e) => ["travel", "visit"].includes(e.event_type))),
     undated: lived.length - timed.length,
