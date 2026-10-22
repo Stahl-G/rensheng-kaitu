@@ -47,6 +47,10 @@ export function moduleAtDirectory(ws: Workspace, dir: string): LoadedModule | un
   return { dir, def };
 }
 
+export function isGrowthWorkspace(ws: Workspace): boolean {
+  return moduleAtDirectory(ws, "growth")?.def.id === "growth";
+}
+
 /** 工作区顶层含 module.json 的目录即模块；module.json 没变就用上次读到的结果。 */
 export function listModules(ws: Workspace): LoadedModule[] {
   const names = readdirSync(ws.root).sort();

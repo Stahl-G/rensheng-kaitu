@@ -61,7 +61,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
   ctx.systemPrompt?.section({
     name: "kaitu:workspace",
     order: 3000,
-    text: `${workspaceAgentGuide()}\n${instructions}\n${skillToolGuide}\n${AI_NETWORK_RULES}`,
+    text: `${workspaceAgentGuide(ws)}\n${instructions}\n${skillToolGuide}\n${AI_NETWORK_RULES}`,
     interpolate: false,
   });
 

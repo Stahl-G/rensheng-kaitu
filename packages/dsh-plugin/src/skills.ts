@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { dirname } from "node:path";
-import { type Workspace, fileImportSources, parseFrontmatter } from "@kaitu/core";
+import { type Workspace, fileImportSources, isGrowthWorkspace, parseFrontmatter } from "@kaitu/core";
 import type {
   SkillCandidate,
   SkillContext,
@@ -57,6 +57,7 @@ export class KaituSkillProvider implements SkillProvider {
   private load(file: string): SkillDefinition | undefined {
     if (!this.workspace.exists(file)) return undefined;
     const { data, body } = parseFrontmatter(this.workspace.readText(file));
+    if (data.name === "log-growth" && !isGrowthWorkspace(this.workspace)) return undefined;
     if (
       typeof data.name !== "string" ||
       !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(data.name) ||
