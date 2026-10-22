@@ -192,6 +192,18 @@ it("手机 records 不能伪装采纳；create_task 直接可用，adopt_task �
     const today = buildPhoneToday(await readOverviewPage(ws), now, ws);
     expect(today.mobile.tasks.map((task) => task.id)).toEqual(expect.arrayContaining([userId, proposed.id]));
     expect(schemas().builtin("phone-today.schema.json")(today)).toBe(true);
+    // 同一批的旧式完成操作会缓存 open 任务；采纳新建议后须立刻看到它。
+    const batch = await addTask(ws, { title: "合成同批建议" }, { by: "agent" });
+    const finish = action("complete_task", { id: batch.record.id });
+    await submit([
+      action("complete_task", { id: userId }),
+      action("adopt_task", { id: batch.record.id }),
+      finish,
+    ]);
+    expect(listTasks(ws, { status: "done" }).map((task) => task.id)).toEqual(
+      expect.arrayContaining([userId, batch.record.id]),
+    );
+    expect(phoneReceipts(ws).find((receipt) => receipt.ref === finish.client_id)?.status).toBe("applied");
     // 旧格式中即使由 Agent 写成 open/done，也按历史状态读取，不猜测迁移。
     const legacy = ["open", "done"].map((status) => ({
       id: ulid(),

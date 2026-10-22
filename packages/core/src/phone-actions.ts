@@ -185,6 +185,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
           case "adopt_task": {
             const result = await adoptTask(ws, id);
             receipt.target = { id: result.record.id, rev: result.record.rev ?? 1 };
+            openTasks = undefined;
             break;
           }
           case "create_task":
