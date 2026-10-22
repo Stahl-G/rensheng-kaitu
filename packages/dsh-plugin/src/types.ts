@@ -90,6 +90,9 @@ export interface OverviewBlock {
 export interface OverviewNext {
   id: string;
   title: string;
+  ref?: string;
+  source?: string;
+  by?: string;
   proposed: boolean;
   section: string;
   module: string;

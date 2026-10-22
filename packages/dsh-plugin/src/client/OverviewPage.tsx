@@ -47,6 +47,7 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  initialChatDraft?: string;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -175,12 +176,7 @@ function Overview({
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
   const guideVisible = guide !== undefined && guide !== null;
-  const [view, setView] = useState<View>(() => {
-    const requested = new URLSearchParams(window.location.hash.slice(1)).get("kaitu-view");
-    return ["overview", "explore", "records", "ask"].includes(requested ?? "")
-      ? (requested as View)
-      : "overview";
-  });
+  const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
   const availableModules = [...exploreModules, ...pluginModules];
@@ -199,8 +195,8 @@ function Overview({
   const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
-  const [promptDraft, setPromptDraft] = useState("");
-  const [promptRequest, setPromptRequest] = useState(0);
+  const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
+  const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);

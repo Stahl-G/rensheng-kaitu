@@ -12,8 +12,14 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   if (!response.ok) throw Object.assign(new Error(value.error ?? "操作失败，请重试"), { code: value.code });
   return value;
 }
+// 原生模块回到问问时，片段只携带待用户编辑的草稿，不发起模型调用。
+const route = new URLSearchParams(window.location.hash.slice(1));
+const initialChatDraft = route.get("kaitu-chat-draft") ?? "";
+if (initialChatDraft)
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
 let workspace = "";
 const props: OverviewPageProps = {
+  initialChatDraft,
   phoneChannels: true,
   loadCalendarPush: () => call("calendarPush"),
   retryCalendarPush: (id) => call("retryCalendarPush", id),

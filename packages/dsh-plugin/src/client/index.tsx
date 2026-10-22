@@ -25,7 +25,7 @@ import type {
   FinanceRemoteViewOptions,
   NewsFeedback,
 } from "../types.js";
-import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
+import { HiddenHeroMark, KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { registerExplorePluginRoute } from "./ExplorePluginRoute.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
@@ -131,7 +131,7 @@ export async function apply(ctx: Context) {
           }),
         );
         ctx.slots.inject("conversation.hero.brand.mark", () =>
-          ctx.slots.register({ name: "conversation.hero.brand.mark" }, KaituMark),
+          ctx.slots.register({ name: "conversation.hero.brand.mark" }, HiddenHeroMark),
         );
         ctx.slots.inject("sidebar.footer.action", () =>
           ctx.slots.register(

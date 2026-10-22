@@ -270,7 +270,14 @@ export function AskPage({
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [draft, setDraft] = useState(initialPrompt);
   useEffect(() => {
-    if (initialPrompt || initialPromptRequest) setDraft(initialPrompt);
+    if (!initialPrompt && !initialPromptRequest) return;
+    setDraft(initialPrompt);
+    const frame = requestAnimationFrame(() => {
+      const field = input.current;
+      field?.focus();
+      field?.setSelectionRange(field.value.length, field.value.length);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [initialPrompt, initialPromptRequest]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);

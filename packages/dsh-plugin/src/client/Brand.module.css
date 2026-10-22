@@ -41,3 +41,8 @@ body[data-ds-dark-theme] .fold2,
   font-size: 11px;
   overflow-wrap: anywhere;
 }
+
+/* DSH 0.2.1-rc.2 HeroShell: hide only the row owning our hero mark. */
+div:has(> span > .hiddenHeroMark) {
+  display: none;
+}

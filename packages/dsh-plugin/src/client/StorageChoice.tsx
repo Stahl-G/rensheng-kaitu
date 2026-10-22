@@ -45,6 +45,7 @@ export function StorageChoice({
   const current: Choice =
     storage.github && (storage.provider ?? "local") === "local" ? "github" : (storage.provider ?? "local");
   const suggestion = (id: Choice) => {
+    if (id === current) return storage.root;
     if (id === "github" || id === "local")
       return current === "local" || current === "github"
         ? storage.root
@@ -53,7 +54,7 @@ export function StorageChoice({
           : "";
     const key = PROVIDERS.find((entry) => entry.id === id)?.key;
     const folder = key ? storage.suggested?.[key] : null;
-    return folder ? `${folder}/kaitu` : id === current ? storage.root : "";
+    return folder ? `${folder}/kaitu-ai-memory` : "";
   };
   const [provider, setProvider] = useState<Choice>(current);
   const [path, setPath] = useState(storage.root);
@@ -134,11 +135,6 @@ export function StorageChoice({
             if (folder) {
               const separator = folder.includes("\\") ? "\\" : "/";
               const selected = folder.replace(/[\\/]+$/, "");
-              setPath(
-                selected.split(/[\\/]/).at(-1)?.toLowerCase() === "kaitu"
-                  ? selected
-                  : `${selected}${separator}kaitu`,
-              );
               const normalized = selected.replaceAll("\\", "/").toLowerCase();
               const detected = PROVIDERS.find((item) => {
                 const base = item.key
@@ -146,6 +142,14 @@ export function StorageChoice({
                   : undefined;
                 return base && (normalized === base || normalized.startsWith(`${base}/`));
               });
+              const target = detected?.id ?? provider;
+              const name = target === "local" || target === "github" ? "kaitu" : "kaitu-ai-memory";
+              const leaf = selected.split(/[\\/]/).at(-1)?.toLowerCase();
+              setPath(
+                selected === storage.root || leaf === "kaitu" || leaf === "kaitu-ai-memory"
+                  ? selected
+                  : `${selected}${separator}${name}`,
+              );
               if (detected) setProvider(detected.id);
             }
           })
