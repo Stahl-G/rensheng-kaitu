@@ -71,8 +71,8 @@ export function Plugins({ request }: { request: PluginRequest }) {
       {!items ? (
         !error && <p className={css.small}>{t("正在读取插件目录…", "Loading plugins…")}</p>
       ) : (
-        <details className={css.card} open>
-          <summary>{t("开图插件", "Kaitu plugins")}</summary>
+        <section className={css.card}>
+          <h3>{t("开图插件", "Kaitu plugins")}</h3>
           <div className={css["list-card"]}>
             {items.map((item) => (
               <div className={css["switch-row"]} key={item.name}>
@@ -126,7 +126,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
               </div>
             ))}
           </div>
-        </details>
+        </section>
       )}
     </section>
   );
