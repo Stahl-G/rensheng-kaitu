@@ -20,11 +20,9 @@ import {
   driveStatus,
   enableDrive,
   explorationCommandSchema,
-  importAppleHealth,
-  importChatgptConversations,
-  importIcs,
+  fileImportSources,
   importMemories,
-  importNutAi,
+  importSources,
   inboxNoteDone,
   inboxNotes,
   learningCheckinSchema,
@@ -428,10 +426,10 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_import",
-    "导入用户指定的本机健康、日历或 ChatGPT 文件，path 可为绝对路径。先 dryRun 预览数量，用户确认后相同参数执行。",
+    `导入用户指定的本机文件（${fileImportSources.map((id) => importSources[id].name).join("、")}），path 可为绝对路径。先 dryRun 预览数量，用户确认后相同参数执行。`,
     z
       .object({
-        source: z.enum(["apple-health", "nut-ai", "ics", "chatgpt-conversations"]),
+        source: z.enum(fileImportSources),
         path: text,
         dryRun: z.boolean().default(true),
         confirmed: z.boolean().default(false),
@@ -442,17 +440,8 @@ export function registerWorkflowTools(
       .strict(),
     (input) => {
       if (!input.dryRun && !input.confirmed) throw new Error("导入须先预览并获得用户确认");
-      const path = inputPath(ws, input.path);
-      if (input.source === "ics")
-        return importIcs(ws, path, {
-          dryRun: input.dryRun,
-          calendar: input.calendar,
-          from: input.from,
-          to: input.to,
-        });
-      if (input.source === "apple-health") return importAppleHealth(ws, path, { dryRun: input.dryRun });
-      if (input.source === "nut-ai") return importNutAi(ws, path, { dryRun: input.dryRun });
-      return importChatgptConversations(ws, path, { dryRun: input.dryRun });
+      const { source, path, confirmed: _confirmed, ...options } = input;
+      return importSources[source].run(ws, inputPath(ws, path), options);
     },
   );
   register(
