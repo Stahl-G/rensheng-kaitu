@@ -12,7 +12,7 @@ export function ExplorePluginFrame({
   id: string;
   title: string;
   plugins: PersonalServices["plugins"];
-  onRemoved: () => void;
+  onRemoved: (id: string) => void;
 }) {
   const t = useT();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -40,11 +40,11 @@ export function ExplorePluginFrame({
         event.source === frame.current?.contentWindow &&
         event.data?.type === "kaitu:explore-removed"
       )
-        onRemoved();
+        onRemoved(id);
     };
     window.addEventListener("message", removed);
     return () => window.removeEventListener("message", removed);
-  }, [url, onRemoved]);
+  }, [url, id, onRemoved]);
   return (
     <>
       {error ? <p role="alert">{error}</p> : !loaded && <output>{t("正在打开…", "Opening…")}</output>}

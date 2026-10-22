@@ -180,10 +180,22 @@ function Overview({
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
-  const pluginRemoved = useCallback(() => {
-    setExplore("footprints");
+  const [openedPlugins, setOpenedPlugins] = useState<string[]>([]);
+  const pluginRemoved = useCallback((id: string) => {
+    setExplore((current) => (current === id ? "footprints" : current));
+    setOpenedPlugins((current) => current.filter((opened) => opened !== id));
     window.dispatchEvent(new Event("kaitu:plugins-changed"));
   }, []);
+  useEffect(() => {
+    setOpenedPlugins((current) => {
+      const installed = current.filter((id) => pluginModules.some((entry) => entry.id === id));
+      return view === "explore" &&
+        pluginModules.some((entry) => entry.id === explore) &&
+        !installed.includes(explore)
+        ? [...installed, explore]
+        : installed;
+    });
+  }, [view, explore, pluginModules]);
   const availableModules = [...exploreModules, ...pluginModules];
   const firstExplore = exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "";
   useEffect(() => {
@@ -986,21 +998,25 @@ function Overview({
             </section>
             <div className={css.child}>
               {selectedExplore ? (
-                (explorePages[selectedExplore.id] ?? (
-                  <ExplorePluginFrame
-                    key={selectedExplore.id}
-                    id={selectedExplore.id}
-                    title={t(selectedExplore.title[0] ?? "", selectedExplore.title[1] ?? "")}
-                    plugins={props.plugins}
-                    onRemoved={pluginRemoved}
-                  />
-                ))
+                (explorePages[selectedExplore.id] ?? null)
               ) : (
                 <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
               )}
             </div>
           </>
         )}
+        {pluginModules
+          .filter((entry) => openedPlugins.includes(entry.id))
+          .map((entry) => (
+            <div key={entry.id} className={css.child} hidden={view !== "explore" || explore !== entry.id}>
+              <ExplorePluginFrame
+                id={entry.id}
+                title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
+                plugins={props.plugins}
+                onRemoved={pluginRemoved}
+              />
+            </div>
+          ))}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div className={css.askPanel} hidden={view !== "ask"}>
             {props.renderAsk(
