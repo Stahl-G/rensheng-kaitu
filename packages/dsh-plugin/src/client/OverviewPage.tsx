@@ -180,7 +180,10 @@ function Overview({
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
-  const pluginRemoved = useCallback(() => setExplore("footprints"), []);
+  const pluginRemoved = useCallback(() => {
+    setExplore("footprints");
+    window.dispatchEvent(new Event("kaitu:plugins-changed"));
+  }, []);
   const availableModules = [...exploreModules, ...pluginModules];
   const firstExplore = exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "";
   useEffect(() => {
