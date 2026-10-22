@@ -76,6 +76,7 @@ export async function createAgentRuntime(options: {
     /** 新会话首条消息带同源任务指引与隐私提醒；续接不重复。 */
     fresh: boolean;
     cancelled: boolean;
+    permissionExpired: boolean;
     busy: boolean;
     skills: Set<string>;
     output: string;
@@ -115,6 +116,7 @@ export async function createAgentRuntime(options: {
       upstream: "",
       fresh: false,
       cancelled: false,
+      permissionExpired: false,
       busy: false,
       skills: new Set<string>(),
       output: "",
@@ -142,6 +144,11 @@ export async function createAgentRuntime(options: {
             clearTimeout(timer);
             event(id, "approval/resolved", { requestId, optionId, status });
             resolve(optionId);
+            if (status === "expired") {
+              state.permissionExpired = true;
+              state.rpc.notify("session/cancel", { sessionId: state.upstream });
+              state.rpc.close();
+            }
           };
           permissions.set(requestId, { sessionId: id, options: choices, finish });
           const tool = params.toolCall as { title?: string; rawInput?: unknown } | undefined;
@@ -346,6 +353,11 @@ export async function createAgentRuntime(options: {
             state.rpc.close();
             running.delete(id);
           }
+          if (state?.permissionExpired)
+            throw new KaituError(
+              "批准请求已过期，已结束这轮。重新发送可再次请求批准",
+              "AI_APPROVAL_REQUIRED",
+            );
           throw error instanceof KaituError
             ? error
             : new KaituError(`${agent.name} 回复未完成，请检查登录、网络或账户额度后重试`, "AI_CONNECTION");
