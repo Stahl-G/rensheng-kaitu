@@ -10,35 +10,18 @@ export async function searchNative(settings, apiKey, request, signal) {
   const root = settings.baseURL ?? entry.baseURL;
   const headers = { "Content-Type": "application/json" };
   const prompt = `Search the web for: ${request.query}`;
-  let endpoint = `${root}/chat/completions`;
-  let body = { model: settings.model, messages: [{ role: "user", content: prompt }], max_tokens: 1024 };
-  if (settings.provider === "moonshotai-cn") {
-    endpoint = `${root}/tools/search`;
-    body = {
-      text_query: request.query,
-      limit: Math.min(request.maxResults ?? 8, 20),
-      include_content: false,
-    };
-  } else if (settings.provider === "kaitu-zhipu") {
-    endpoint = `${root}/web_search`;
-    body = { search_engine: "search_std", search_query: request.query, count: request.maxResults ?? 8 };
-  } else if (settings.provider === "kaitu-qwen") {
-    endpoint = `${new URL(root).origin}/api/v1/services/aigc/text-generation/generation`;
-    body = {
-      model: settings.model,
-      input: { messages: body.messages },
-      parameters: {
-        enable_search: true,
-        search_options: { forced_search: true, enable_source: true },
-        result_format: "message",
-        max_tokens: 1024,
-      },
-    };
-  } else if (api === "anthropic-messages") {
+  let endpoint;
+  let body;
+  if (api === "anthropic-messages") {
     endpoint = `${root}${messagesPath(root)}`;
     headers["x-api-key"] = apiKey;
     headers["anthropic-version"] = "2023-06-01";
-    body.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }];
+    body = {
+      model: settings.model,
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1024,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 1 }],
+    };
   } else if (api === "openai-responses") {
     endpoint = `${root}/responses`;
     body = {
@@ -49,12 +32,10 @@ export async function searchNative(settings, apiKey, request, signal) {
       include: ["web_search_call.action.sources"],
       max_output_tokens: 1024,
     };
-  } else if (api === "google-generative-ai") {
+  } else {
     endpoint = `${root}/models/${encodeURIComponent(settings.model)}:generateContent`;
     headers["x-goog-api-key"] = apiKey;
     body = { contents: [{ parts: [{ text: prompt }] }], tools: [{ google_search: {} }] };
-  } else {
-    body.web_search_options = {};
   }
   if (api !== "google-generative-ai") headers.Authorization = `Bearer ${apiKey}`;
   const response = await fetch(endpoint, {
@@ -72,16 +53,7 @@ export async function searchNative(settings, apiKey, request, signal) {
   let items;
   if (payload.error || payload.code)
     throw new KaituError("服务商未完成搜索，请检查账号权限和模型支持。", "AI_SEARCH");
-  if (settings.provider === "moonshotai-cn") items = payload.search_results;
-  else if (settings.provider === "kaitu-zhipu")
-    items = payload.search_result?.map((item) => ({
-      ...item,
-      url: item.link,
-      snippet: item.content,
-      publishedAt: item.publish_date,
-    }));
-  else if (settings.provider === "kaitu-qwen") items = payload.output?.search_info?.search_results;
-  else if (api === "anthropic-messages") {
+  if (api === "anthropic-messages") {
     const blocks = payload.content?.filter((item) => item.type === "web_search_tool_result");
     if (blocks?.some((block) => !Array.isArray(block.content)))
       throw new KaituError("服务商的搜索工具未完成，请稍后重试或检查搜索权限。", "AI_SEARCH");
@@ -104,21 +76,15 @@ export async function searchNative(settings, apiKey, request, signal) {
             )
           : [],
     );
-  } else if (api === "google-generative-ai") {
+  } else {
     items = payload.candidates
       ?.flatMap((item) => item.groundingMetadata?.groundingChunks ?? [])
       .filter((chunk) => chunk.web)
       .map((chunk) => ({ url: chunk.web.uri, title: chunk.web.title }));
-  } else {
-    items = payload.choices?.flatMap((choice) =>
-      (choice.message?.annotations ?? [])
-        .filter((item) => item.type === "url_citation")
-        .map((item) => item.url_citation),
-    );
   }
   if (!Array.isArray(items) || items.length === 0)
     throw new KaituError(
-      "这个服务或模型没有返回结构化搜索来源。请检查服务端搜索支持，或到「AI 与连接 → 网络搜索」配置 Perplexity / Exa / Tavily。",
+      "这个服务或模型没有返回结构化搜索来源。请检查服务端搜索支持，或到「AI 与连接 → 网络搜索」配置 Perplexity 或 Exa。",
       "AI_SEARCH_UNSUPPORTED",
     );
   const sources = [];
@@ -137,30 +103,6 @@ export async function searchNative(settings, apiKey, request, signal) {
   }
   if (!sources.length) throw new KaituError("服务商没有返回可用的搜索来源，请换一个查询词。", "AI_SEARCH");
   const limit = request.maxResults ?? 8;
-  return { sources: sources.slice(0, limit), truncated: sources.length > limit };
-}
-async function searchTavily(apiKey, request, signal, root = "https://api.tavily.com") {
-  const limit = request.maxResults ?? 8;
-  const response = await fetch(`${root}/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ query: request.query, max_results: Math.min(limit, 20), search_depth: "basic" }),
-    redirect: "error",
-    signal,
-  });
-  if (!response.ok) {
-    const failure = connectionFailure(response.status, await response.text());
-    throw new KaituError(failure.message.replace("验证", "搜索"), failure.code);
-  }
-  const sources = ((await response.json()).results ?? [])
-    .filter((item) => typeof item?.url === "string" && /^https?:\/\//i.test(item.url))
-    .map((item) => ({
-      url: item.url,
-      ...(typeof item.title === "string" ? { title: item.title } : {}),
-      ...(typeof item.content === "string" ? { snippet: item.content } : {}),
-      ...(typeof item.published_date === "string" ? { publishedAt: item.published_date } : {}),
-    }));
-  if (!sources.length) throw new KaituError("Tavily 没有返回可用的搜索来源，请换一个查询词。", "AI_SEARCH");
   return { sources: sources.slice(0, limit), truncated: sources.length > limit };
 }
 export function createSearchRouter({ resolve, preferred, current, endpoints = {} }) {
@@ -195,10 +137,9 @@ export function createSearchRouter({ resolve, preferred, current, endpoints = {}
         if (!selected && nativeError) throw nativeError;
         if (!selected)
           throw new KaituError(
-            "请先到「问问 → 连接 AI」连接支持搜索的服务，或在「AI 与连接 → 网络搜索」添加 Perplexity / Exa / Tavily 的 Key。",
+            "请先到「问问 → 连接 AI」连接支持搜索的服务，或在「AI 与连接 → 网络搜索」添加 Perplexity 或 Exa 的 Key。",
             "AI_SEARCH_KEY",
           );
-        if (selected === "tavily") return await searchTavily(keys.tavily, request, bounded, endpoints.tavily);
         const backend =
           selected === "exa"
             ? new ExaSearchProvider({
