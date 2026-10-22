@@ -15,7 +15,7 @@ const PROFILES = ["desktop", "sdk"];
  * package.json 的 dsh.profile.bundles。pnpm 和 node 用 App 自带的运行时。
  * 改 profile 前先停掉后台 AI（beforeChange），改完再重新加载（onChanged）。
  */
-export function createPluginService({ archive, runtime, home, beforeChange, onChanged }) {
+export function createPluginService({ archive, runtime, home, beforeChange, onChanged, fetchIndex = fetch }) {
   const modules = join(archive, "dsh/node_modules");
   const bin = join(home, "bin");
   const pnpm = join(bin, "pnpm");
@@ -77,6 +77,18 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
     async list() {
+      let response;
+      try {
+        response = await fetchIndex(KAITU_PLUGIN_INDEX, {
+          signal: AbortSignal.timeout(15000),
+          credentials: "omit",
+        });
+      } catch (cause) {
+        throw Object.assign(new KaituError("无法连接插件目录，请检查网络后重试", "PLUGIN_NETWORK"), {
+          cause,
+        });
+      }
+      if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
       const { parseMarketIndex, marketInstallTarget } = await import(
         pathToFileURL(
           createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-plugin-market-index"),
@@ -89,8 +101,6 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
           return [name, existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).version : ""];
         }),
       );
-      const response = await fetch(KAITU_PLUGIN_INDEX, { signal: AbortSignal.timeout(15000) });
-      if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
       const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
       // 目录里的 kaitu-dsh 是给 DSH 装开图用的，开图 App 自己就是开图，不列出来。
       const catalog = index.plugins

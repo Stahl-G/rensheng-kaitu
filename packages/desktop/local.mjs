@@ -189,6 +189,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
   };
   const plugins = createPluginService({
+    fetchIndex: (url, options) => window.webContents.session.fetch(url, options),
     archive: join(hostResources, "app.asar"),
     runtime: join(hostResources, "runtime/primary-runtime/dependencies"),
     home: aiHome,
