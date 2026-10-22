@@ -13,6 +13,7 @@
       "enum": [
         "complete_next",
         "decide_proposal",
+        "adopt_task",
         "complete_task",
         "create_task",
         "update_task",
@@ -56,7 +57,7 @@
       }
     },
     {
-      "if": { "properties": { "op": { "enum": ["complete_task", "cancel_task"] } } },
+      "if": { "properties": { "op": { "enum": ["adopt_task", "complete_task", "cancel_task"] } } },
       "then": {
         "properties": {
           "args": {

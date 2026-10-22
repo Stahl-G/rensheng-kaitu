@@ -1,9 +1,32 @@
-import { Fragment } from "react";
+import React, { Fragment } from "react";
 
 function inline(text: string) {
   return text
-    .split(/(\*\*[^*]+\*\*)/g)
-    .map((piece) => (piece.startsWith("**") ? <strong key={piece}>{piece.slice(2, -2)}</strong> : piece));
+    .split(/(\*\*[^*]+\*\*|\[(?:[^\[\]]|\[[^\]]*\])+\]\(https?:\/\/\S+\)|https?:\/\/[^\s<>]+)/g)
+    .map((piece, index) => {
+      const key = `${index}:${piece}`;
+      if (piece.startsWith("**")) return <strong key={key}>{piece.slice(2, -2)}</strong>;
+      const link = /^\[([\s\S]+)\]\((https?:\/\/\S+)\)$/.exec(piece);
+      const address = link?.[2] ?? (/^https?:\/\//.test(piece) ? piece.replace(/[.,!?;:]+$/, "") : "");
+      if (!address) return piece;
+      let href = address;
+      if (!link)
+        while (href.endsWith(")") && href.split(")").length > href.split("(").length)
+          href = href.slice(0, -1);
+      try {
+        new URL(href);
+      } catch {
+        return piece;
+      }
+      return (
+        <Fragment key={key}>
+          <a href={href} target="_blank" rel="noreferrer">
+            {link?.[1] ?? href}
+          </a>
+          {!link && piece.slice(href.length)}
+        </Fragment>
+      );
+    });
 }
 export function DocumentBody({ content }: { content: string }) {
   // 按空行分段；标题只吃自己那一行，避免「## 标题\n- 列表」整段变成巨大的 h3。

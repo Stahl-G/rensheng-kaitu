@@ -90,6 +90,9 @@ export interface OverviewBlock {
 export interface OverviewNext {
   id: string;
   title: string;
+  ref?: string;
+  source?: string;
+  by?: string;
   proposed: boolean;
   section: string;
   module: string;
@@ -131,6 +134,7 @@ export interface OverviewData {
   cutoff: string;
   drive: boolean;
   empty: boolean;
+  proposedTasks: { id: string; title: string }[];
   blocks: OverviewBlock[];
   next: OverviewNext[];
   allNext: OverviewNext[];

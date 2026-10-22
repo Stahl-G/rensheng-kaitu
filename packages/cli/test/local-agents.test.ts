@@ -222,7 +222,7 @@ test("cancel terminates the owned prompt and failures are actionable without ups
       .spyOn(globalThis, "setTimeout")
       .mockImplementation((callback, ms, ...args) => realTimeout(callback, ms === 60000 ? 10 : ms, ...args));
     try {
-      await ask.send(row.id, "permit");
+      await expect(ask.send(row.id, "permit")).rejects.toMatchObject({ code: "AI_APPROVAL_REQUIRED" });
     } finally {
       timeout.mockRestore();
     }

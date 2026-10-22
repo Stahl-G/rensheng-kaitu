@@ -14,7 +14,7 @@ import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { listProjects, projectStatusFiles } from "./projects.js";
 import { readRecords } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
-import { listTasks, tasksForToday } from "./tasks.js";
+import { completeTask, listTasks, tasksForToday } from "./tasks.js";
 import { templateOutdated } from "./template-version.js";
 import { isoInZone, localDate } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -321,6 +321,7 @@ export function scheduleNext(ws: Workspace, file: string, id: string, start: str
 }
 
 export function completeNext(ws: Workspace, file: string, id: string, now = new Date()) {
+  if (file === "task") return completeTask(ws, id, { now });
   if (!statusFiles(ws).some((item) => item.file === file))
     throw new KaituError("找不到模块状态", "NOT_FOUND");
   return editFrontmatter<ModuleStatus>(ws, file, "status.schema.json", (data) => {

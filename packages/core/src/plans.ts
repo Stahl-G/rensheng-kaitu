@@ -114,6 +114,7 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
   const linked = new Map<string, Task[]>();
   const sources: PlansData["sources"] = {};
   for (const task of tasks) {
+    if (task.status === "proposed") continue;
     const ref = goalRef(task);
     const goal = !ref
       ? undefined

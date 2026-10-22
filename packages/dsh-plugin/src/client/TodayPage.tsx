@@ -10,6 +10,7 @@ import type { FinancePageProps } from "./FinancePage.js";
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
+import { nextPresentation } from "./next-presentation.js";
 
 const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
 
@@ -320,6 +321,7 @@ export function TodayTasks({
   schedule,
   review,
   focusCard,
+  focusTaskId,
 }: {
   data: OverviewData;
   busy: boolean;
@@ -328,14 +330,26 @@ export function TodayTasks({
   schedule: (item: OverviewNext) => void;
   review: () => void;
   focusCard?: ReactNode;
+  focusTaskId?: string;
 }) {
   const t = useT();
+  const locale = useLocale();
   const focus = data.next[0];
-  const upcoming = focusCard ? data.allNext : data.allNext.slice(1);
+  const focusText = focus && nextPresentation(focus, locale);
+  const upcoming = (focusCard ? data.allNext : data.allNext.slice(1)).filter(
+    (item) => item.id !== focusTaskId,
+  );
   const [remainingOpen, setRemainingOpen] = useState(false);
   const extra = (item: OverviewNext, inRow = true) => (
     <details className={todayCss.more}>
-      <summary aria-label={t(`更多操作：${item.title}`, `More actions: ${item.title}`)}>···</summary>
+      <summary
+        aria-label={t(
+          `更多操作：${nextPresentation(item, locale).title}`,
+          `More actions: ${nextPresentation(item, locale).title}`,
+        )}
+      >
+        ···
+      </summary>
       {!item.proposed && (
         <button type="button" className={css.link} onClick={() => schedule(item)}>
           {t("安排时间段", "Schedule a time")}
@@ -353,25 +367,29 @@ export function TodayTasks({
       )}
     </details>
   );
-  const row = (item: OverviewNext) => (
-    <div className={todayCss.nextRow} key={`${item.file}:${item.id}`}>
-      <button
-        type="button"
-        className={css.check}
-        disabled={busy || item.proposed}
-        aria-label={t(`完成：${item.title}`, `Done: ${item.title}`)}
-        onClick={() => complete(item)}
-      >
-        ✓
-      </button>
-      <span className={todayCss.nextTitle}>
-        {item.title}
-        {item.proposed && <small>{t(" · 建议", " · Suggested")}</small>}
-      </span>
-      <span className={css.small}>{item.module}</span>
-      {extra(item)}
-    </div>
-  );
+  const row = (item: OverviewNext) => {
+    const display = nextPresentation(item, locale);
+    return (
+      <div className={todayCss.nextRow} key={`${item.file}:${item.id}`}>
+        <button
+          type="button"
+          className={css.check}
+          disabled={busy || item.proposed}
+          aria-label={t(`完成：${display.title}`, `Done: ${display.title}`)}
+          onClick={() => complete(item)}
+        >
+          ✓
+        </button>
+        <span className={todayCss.nextTitle}>
+          {display.title}
+          {display.source && display.source !== display.title && <small> · {display.source}</small>}
+          {item.proposed && <small>{t(" · 建议", " · Suggested")}</small>}
+        </span>
+        <span className={css.small}>{item.module}</span>
+        {extra(item)}
+      </div>
+    );
+  };
   return (
     <>
       {(focus || focusCard) && (
@@ -381,9 +399,12 @@ export function TodayTasks({
               <>
                 <h2 className={css.eyebrow}>{t("现在这件事", "One thing now")}</h2>
                 <div className={`${todayCss.focus} ${css.card}`}>
-                  <h2>{focus.title}</h2>
+                  <h2>{focusText?.title}</h2>
                   <p className={css.small}>
                     {t(`来自 ${focus.module}`, `From ${focus.module}`)}
+                    {focusText?.source && focusText.source !== focusText.title
+                      ? ` · ${focusText.source}`
+                      : ""}
                     {focus.proposed ? t(" · 建议，待核对", " · Suggested, to review") : ""}
                   </p>
                   <div className={todayCss.actions}>

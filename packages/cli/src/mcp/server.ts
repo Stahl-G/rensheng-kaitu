@@ -3,7 +3,6 @@ import {
   type Workspace,
   addExperiences,
   addMemory,
-  addTask,
   agentCanRead,
   completeTask,
   dismissNews,
@@ -21,6 +20,7 @@ import {
   onboardingStatus,
   projectGithub,
   proposeBlock,
+  proposeTask,
   publicRecords,
   readAgentFile,
   readExperienceImports,
@@ -154,7 +154,7 @@ export function createMcpServer(
   );
   register(
     "task_add",
-    "新增待办，status 为 open，保存版本。remind_at 供今天页与早间计划提醒。",
+    "新增待办，status 为 proposed，用户在今天页采纳后才为 open，保存版本。remind_at 供今天页与早间计划提醒。",
     {
       title: text,
       due: text.optional(),
@@ -165,14 +165,17 @@ export function createMcpServer(
       source: text.optional(),
     },
     (input) => {
-      return addTask(ws, input, { by: "agent", actor: actor() });
+      return proposeTask(ws, input, actor());
     },
     true,
   );
   register(
     "task_list",
     "查询待办，默认 open；dueBefore 日期含当天，时间截止按用户时区判断。",
-    { status: z.enum(["open", "done", "cancelled", "all"]).optional(), dueBefore: text.optional() },
+    {
+      status: z.enum(["proposed", "open", "done", "cancelled", "all"]).optional(),
+      dueBefore: text.optional(),
+    },
     (input) => {
       const rows = listTasks(ws, { ...input });
       return publicRecords(ws, "task", rows, connection);

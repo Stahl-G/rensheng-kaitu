@@ -189,7 +189,7 @@ export async function enableSync(
     throw new KaituError("已在同步模式，请先运行 kaitu sync disable 搬回本机", "CONFLICT");
   if (mode === "icloud" && process.platform !== "darwin")
     throw new KaituError("iCloud 同步仅支持 macOS", "UNSUPPORTED_PLATFORM");
-  const name = options.name ?? "kaitu";
+  const name = options.name ?? "kaitu-ai-memory";
   if (!name || name === "." || name === ".." || /[/\\]/.test(name))
     throw new KaituError("name 必须是单个目录名", "BAD_ARGS");
   const cloud = mode === "icloud" ? iCloudDirectory() : undefined;

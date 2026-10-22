@@ -117,7 +117,7 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
     expect(readRecords(ws, "task")).toEqual([
       expect.objectContaining({
         title: "给妈妈买生日礼物",
-        status: "open",
+        status: "proposed",
         due: "2026-07-08",
         source: "dot",
       }),

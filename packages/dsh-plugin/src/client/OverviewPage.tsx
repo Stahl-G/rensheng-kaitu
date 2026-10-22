@@ -47,9 +47,12 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  initialChatDraft?: string;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
+  adoptTask: (id: string) => Promise<unknown>;
+  cancelTask: (id: string) => Promise<unknown>;
   completeNext: (file: string, id: string) => Promise<unknown>;
   onAgent: () => void;
   onAdvanced?: () => void;
@@ -153,7 +156,7 @@ function Overview({
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
   const guideVisible = guide !== undefined && guide !== null;
-  const [view, setView] = useState<View>("overview");
+  const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
   const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
@@ -171,8 +174,8 @@ function Overview({
   const [personal, setPersonal] = useState<MeData | null>(null);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
-  const [promptDraft, setPromptDraft] = useState("");
-  const [promptRequest, setPromptRequest] = useState(0);
+  const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
+  const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -727,11 +730,40 @@ function Overview({
                 schedule={(item) => setSlot({ file: item.file, id: item.id })}
                 review={() => startGuide(1)}
                 focusCard={adoptedCard}
+                focusTaskId={onboarding?.next?.id}
               />
               {!focus && !adoptedCard && (
                 <button type="button" className={css.link} onClick={() => startMatter("")}>
                   {t("整理一件事", "Think through one thing")}
                 </button>
+              )}
+              {!!data.proposedTasks.length && (
+                <section className={css.sec}>
+                  <h2 className={css.eyebrow}>{t("待确认的待办建议", "Task suggestions to review")}</h2>
+                  <div className={css.card}>
+                    {data.proposedTasks.map((task) => (
+                      <div className={css.row} key={task.id}>
+                        <span>{task.title}</span>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={busy}
+                          onClick={() => void run(() => props.adoptTask(task.id))}
+                        >
+                          {t("采纳", "Adopt")}
+                        </button>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={busy}
+                          onClick={() => void run(() => props.cancelTask(task.id))}
+                        >
+                          {t("不用了", "Not needed")}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               )}
               <Agenda
                 data={calendar}

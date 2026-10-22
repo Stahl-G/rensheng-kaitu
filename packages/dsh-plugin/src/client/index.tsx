@@ -25,7 +25,7 @@ import type {
   FinanceRemoteViewOptions,
   NewsFeedback,
 } from "../types.js";
-import { KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
+import { HiddenHeroMark, KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
@@ -129,7 +129,7 @@ export async function apply(ctx: Context) {
           }),
         );
         ctx.slots.inject("conversation.hero.brand.mark", () =>
-          ctx.slots.register({ name: "conversation.hero.brand.mark" }, KaituMark),
+          ctx.slots.register({ name: "conversation.hero.brand.mark" }, HiddenHeroMark),
         );
         ctx.slots.inject("sidebar.footer.action", () =>
           ctx.slots.register(
@@ -410,6 +410,16 @@ export async function apply(ctx: Context) {
                 const r = await ctx.remote.kaitu.libraryDocument(file);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
+              },
+              adoptTask: async (id: string) => {
+                const result = await ctx.remote.kaitu.adoptTask(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              cancelTask: async (id: string) => {
+                const result = await ctx.remote.kaitu.cancelTask(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
               },
               completeNext: async (file: string, id: string) => {
                 const r = await ctx.remote.kaitu.completeNext(file, id);

@@ -334,7 +334,7 @@ goal_priority: [g1]
 |---|---|
 | workout（力量） | `modality?: strength`（缺省视为力量）、`exercise`、`sets`、`reps`、`weight_kg`、`session_id`；可选 `rpe`、`video`、`notes` |
 | workout（有氧） | `modality: cardio`、`exercise`、`duration_min`；可选 `distance_km`、`avg_hr`、`kcal`、`elevation_m`、`rpe`、`notes`、`session_id` |
-| task（me 模块） | `title`、`status: open / done / cancelled`（新建为 open）；可选 `due`（日期或带偏移时间）、`remind_at`（带偏移时间）、`project`（slug）、`notes`、`source` |
+| task（me 模块） | `title`、`status: proposed / open / done / cancelled`（Agent 新建为 proposed，用户在界面采纳后为 open；用户界面直接新增仍为 open）；可选 `due`（日期或带偏移时间）、`remind_at`（带偏移时间）、`project`（slug）、`notes`、`source` |
 | meal | `meal`（早/午/晚/加餐）、`items[]`（`name`、`grams?`）、`kcal`、`protein_g`、`carbs_g?`、`fat_g?`、`uncertainty?`、`photo?`、`source` |
 | supplement | `name`、`amount`、`unit` |
 | sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source` |
@@ -352,7 +352,7 @@ goal_priority: [g1]
 待办按创建时间 `ts` 分月，状态变化通过 `updateRecord` 追加同 id 的修订，保留创建时间。
 日期型 due 在用户时区当天结束后才过期，时间型 due 按具体时刻过期；今天到期和今天提醒按用户时区查询。
 `kaitu status`、OVERVIEW.md 和今天页列出今天到期、已过期、今天提醒的 open 待办；今天页可标完成。
-提醒暂由早间计划与今天页列出，推送通道留到 M5。收件箱 records 可新增 task，笔记中的待办由晚间复盘整理。
+提醒暂由早间计划与今天页列出，推送通道留到 M5。收件箱 records 可新增 proposed task；手机 adopt_task 只采纳已有建议，同一 id 重复采纳不追加修订，笔记中的待办由晚间复盘整理。
 
 #### 资讯记录（news_item / trend）
 

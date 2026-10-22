@@ -58,8 +58,11 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
     await snapshot(ws, "迁移前");
     const before = await history(ws);
     if (process.platform !== "win32") expect(findDriveDirectory()).toBe(drive);
+    const existing = join(drive, "kaitu");
+    mkdirSync(existing);
     await enableDrive(ws, { driveDir: drive });
-    expect(ws.root).toBe(join(drive, "kaitu"));
+    expect(ws.root).toBe(join(drive, "kaitu-ai-memory"));
+    expect(existsSync(existing)).toBe(true);
     expect(defaultRoot()).toBe(ws.root);
     expect(driveStatus(ws).mode).toBe("drive");
     expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);

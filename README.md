@@ -25,7 +25,7 @@
 | 平台 | 状态 |
 |---|---|
 | [macOS（Apple 芯片）](https://kaitu.si/download/) | 候选版，可日常使用 |
-| [Windows 10 / 11 x64](https://kaitu.si/download/#windows) | 候选版，已内置运行环境，见 [docs/windows.md](docs/windows.md) |
+| [Windows 10 / 11 x64](https://kaitu.si/download/#windows) | 先用 DSH 插件；0.1.1 独立 EXE 尚未完成验收，见 [docs/windows.md](docs/windows.md) |
 | iPhone | 内部 TestFlight 测试中，尚未公开 |
 | [DeepSeek Harness 插件](docs/dsh.md) | `kaitu dsh --install`，在 DSH 里用今天、开图、资料三页 |
 

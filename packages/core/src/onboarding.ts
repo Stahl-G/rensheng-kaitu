@@ -1335,6 +1335,7 @@ function matterNotes(draft: OnboardingMatterDraft) {
 const goalSource = /^me\/goals\.json#([a-z0-9-]+)$/;
 function isOnboardingTask(task: Task): boolean {
   return (
+    task.status !== "proposed" &&
     typeof task.source === "string" &&
     (/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) ||
       goalSource.test(task.source)) &&
@@ -1423,7 +1424,7 @@ export async function draftOnboardingMatter(
   const draft = parsed.data;
   const doc = parseFrontmatter<ModuleStatus>(ws.readText("me/STATUS.md"));
   const id = matterId(source);
-  if (listTasks(ws, { status: "all" }).some((task) => task.source === source))
+  if (listTasks(ws, { status: "all" }).some((task) => task.status !== "proposed" && task.source === source))
     throw new KaituError("这段原文已有采纳的下一步", "CONFLICT");
   doc.data.next = [
     ...(doc.data.next ?? []).filter((item) => item.id !== id),
@@ -1465,7 +1466,9 @@ export async function adoptOnboardingMatter(
   if (!parsed.success)
     throw new KaituError("请填写当前目标、已知现状和一个下一步，均使用单行文本", "BAD_ARGS");
   const draft = parsed.data;
-  const existing = listTasks(ws, { status: "all" }).find((task) => task.source === source);
+  const existing = listTasks(ws, { status: "all" }).find(
+    (task) => task.status !== "proposed" && task.source === source,
+  );
   if (existing) return onboardingNext(ws, existing);
   const paths = matter.draft?.paths;
   const selected = onboardingPathSchema.safeParse(path);
