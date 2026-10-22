@@ -68,7 +68,7 @@ it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可
       ["download", crafted],
       expect.objectContaining({ shell: false }),
     );
-    expect(ws.root).toBe(join(cloud, "kaitu"));
+    expect(ws.root).toBe(join(cloud, "kaitu-ai-memory"));
     expect(defaultRoot()).toBe(ws.root);
     expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
     expect(historyDirectory(ws).startsWith(ws.root)).toBe(false);
@@ -230,7 +230,11 @@ it("坚果云往返：资料进同步文件夹、状态留本机；冲突副本�
     mkdirSync(nutstore, { recursive: true });
     expect(syncStatus(ws).suggested.nutstore).toBe(nutstore);
     const result = await enableSync(ws, "drive", { provider: "nutstore" });
-    expect(result).toMatchObject({ mode: "drive", provider: "nutstore", root: join(nutstore, "kaitu") });
+    expect(result).toMatchObject({
+      mode: "drive",
+      provider: "nutstore",
+      root: join(nutstore, "kaitu-ai-memory"),
+    });
     expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
     expect(historyDirectory(ws).startsWith(nutstore)).toBe(false);
     expect(mcpToken(ws)).toBe(token);
