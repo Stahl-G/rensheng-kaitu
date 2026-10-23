@@ -14,6 +14,7 @@ import { CloudOrganizer } from "./CloudOrganizer.js";
 import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
+import { MediaLocation, type MediaServices } from "./MediaPreview.js";
 import { type FileImportServices, OnboardingFileImport } from "./OnboardingSources.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import { type PluginRequest, Plugins } from "./Plugins.js";
@@ -24,7 +25,10 @@ import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.
 import { aiHandover } from "./connections.js";
 import { type Locale, useT, versionText } from "./i18n.js";
 
-export interface PersonalServices extends CalendarPushServices, FileImportServices {
+export interface PersonalServices
+  extends CalendarPushServices,
+    FileImportServices,
+    Pick<MediaServices, "loadMediaLocation" | "selectMediaLibrary"> {
   desktopUpdate?: FeatureUpdateRequest;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
@@ -340,6 +344,11 @@ export function PersonalPages(
             )}
             {section === "storage" && (
               <section className={css.sec}>
+                <MediaLocation
+                  loadMediaLocation={props.loadMediaLocation}
+                  selectMediaLibrary={props.selectMediaLibrary}
+                  pickStorageFolder={props.pickStorageFolder}
+                />
                 <h2 className={css.eyebrow}>{t("资料位置", "Workspace location")}</h2>
                 <div className={`${css.card} ${css["list-card"]}`}>
                   <div className={css["switch-row"]}>
