@@ -8,7 +8,8 @@
   "types": "lib/types/index.d.ts",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "build:testsite": "node scripts/build-testsite.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-file-reference": "0.2.1-rc.2",
