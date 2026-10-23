@@ -1,8 +1,8 @@
 # 浏览器合成示例预览
 
-这是三个依赖草稿 PR 的组合入口。本切片仅含合成状态、浏览器状态行为测试与预览样式；打包和今天页在下一切片，资料与方向接线在最后一片。以下构建及完整体验说明适用于三个切片组合后。
+拆分草稿依赖顺序：#211 合成状态 → #212 今天页与构建 → 本片资料和方向接线。均未授权合并或部署，原 #210 保留作拆分前的完整证据索引。
 
-组合入口复用正式 App 的 TodayTasks、LibraryPage、InboxPage、DirectionsPage、品牌与配色。没有修改桌面入口、数据 schema 或官网 `gh-pages` 分支。
+这是独立草稿入口，复用正式 App 的 TodayTasks、LibraryPage、InboxPage、DirectionsPage、品牌与配色。没有修改桌面入口、数据 schema 或官网 `gh-pages` 分支。
 
 ## 构建与本地查看
 
