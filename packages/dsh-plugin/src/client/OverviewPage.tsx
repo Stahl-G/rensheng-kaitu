@@ -5,6 +5,7 @@ import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
+import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { ExploreModulesPage, ExploreNavigation } from "./ExploreNavigation.js";
@@ -51,6 +52,10 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
+  loadDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
+  generateDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
+  dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
   initialChatDraft?: string;
   hosted?: boolean;
   load: () => Promise<OverviewData>;
@@ -729,19 +734,29 @@ function Overview({
             <div ref={planning} id="direction-plans" tabIndex={-1}>
               {plansCard}
             </div>
-            <ProgressMap
-              plans={data?.plans}
-              projects={data?.projects ?? []}
-              loadExploration={props.loadExploration}
-              subscribe={props.subscribe}
-              open={(section) => {
-                if (section === "projects") openRecord("projects");
-                else if (section === "plans") {
-                  planning.current?.scrollIntoView({ block: "start" });
-                  planning.current?.focus({ preventScroll: true });
-                } else setExplore("directions");
-              }}
-            />
+            {props.loadDirectionMap && props.generateDirectionMap && props.dismissDirectionLink ? (
+              <DirectionMap
+                load={props.loadDirectionMap}
+                generate={props.generateDirectionMap}
+                dismiss={props.dismissDirectionLink}
+                onConnect={() => setView("connections")}
+                openProject={() => openRecord("projects")}
+              />
+            ) : (
+              <ProgressMap
+                plans={data?.plans}
+                projects={data?.projects ?? []}
+                loadExploration={props.loadExploration}
+                subscribe={props.subscribe}
+                open={(section) => {
+                  if (section === "projects") openRecord("projects");
+                  else if (section === "plans") {
+                    planning.current?.scrollIntoView({ block: "start" });
+                    planning.current?.focus({ preventScroll: true });
+                  } else setExplore("directions");
+                }}
+              />
+            )}
             {!data?.plans.goals.length && (
               <button type="button" className={css.btn} onClick={() => startMatter("")}>
                 {t("写下想做成的事", "Write down a goal")}

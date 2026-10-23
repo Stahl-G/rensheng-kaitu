@@ -110,3 +110,4 @@ export * from "./learning.js";
 export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
 
 export * from "./jobs.js";
+export * from "./direction-map.js";

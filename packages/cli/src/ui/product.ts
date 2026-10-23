@@ -51,6 +51,7 @@ import {
   decideProposal,
   directionsPrompt,
   discardFinanceImport,
+  dismissDirectionLink,
   dismissNews,
   draftOnboardingMatter,
   editCalendarBlock,
@@ -59,6 +60,7 @@ import {
   financeAccounts,
   financeCashflow,
   financeOverview,
+  generateDirectionMap,
   handoverPack,
   hideExperience,
   installProjectMemory,
@@ -84,6 +86,7 @@ import {
   readAutomation,
   readAvatar,
   readCalendar,
+  readDirectionMap,
   readDoing,
   readExperienceImports,
   readExperienceSource,
@@ -135,7 +138,7 @@ import {
 import { directionGeneration } from "./directions-ai.js";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
-import { suggestProjectGoal } from "./project-ai.js";
+import { askText, suggestProjectGoal } from "./project-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -455,6 +458,24 @@ export async function productRequest(
       return readProjectPage(ws, text(0));
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
+    case "directionMap":
+      return readDirectionMap(ws);
+    case "directionMapGenerate": {
+      if (!ask || !(await ask.settings()).configured)
+        throw new KaituError("先到「AI 与连接」连上 AI，开图才能帮你看", "AI_NOT_CONFIGURED");
+      const service = ask;
+      // 等 AI 是外部的事：立刻返回「正在看」，结果写进本机缓存，界面再读。
+      return generateDirectionMap(ws, (prompt) =>
+        askText(
+          service,
+          prompt,
+          { timeout: "开图看得太久了，请再试一次", empty: "AI 没有回答，请再试一次" },
+          120000,
+        ),
+      );
+    }
+    case "directionMapDismiss":
+      return dismissDirectionLink(ws, text(0), text(1));
     case "projectGoalSuggest":
       return suggestProjectGoal(ws, text(0), ask);
     case "projectGoalSave":
