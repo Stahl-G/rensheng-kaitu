@@ -1347,6 +1347,7 @@ export function AskPage({
               type="file"
               multiple
               hidden
+              disabled={!settings?.configured}
               onChange={(event) => {
                 void addFiles(Array.from(event.target.files ?? []));
                 event.target.value = "";
@@ -1356,7 +1357,9 @@ export function AskPage({
               type="button"
               className={css.add}
               aria-label={t("添加附件", "Add attachment")}
-              disabled={busy || readingFiles || settings?.supportsAttachments === false}
+              disabled={
+                busy || readingFiles || !settings?.configured || settings?.supportsAttachments === false
+              }
               onClick={() => upload.current?.click()}
             >
               ＋
