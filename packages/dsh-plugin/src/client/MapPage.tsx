@@ -395,6 +395,18 @@ export function MapPage({
       (a, b) =>
         (a.item.start ?? "9999").localeCompare(b.item.start ?? "9999") || a.item.id.localeCompare(b.item.id),
     );
+  const listedCities = showAllPlaces
+    ? cities
+    : cities.filter(
+        (item) =>
+          item.home ||
+          item.experiences.some(
+            (experience) =>
+              experience.event_type === "lived" &&
+              !experience.review &&
+              ["observed", "user_reported"].includes(experience.fact_status),
+          ),
+      );
   const city = cities.find((item) => item.id === selected);
   const selectedId = city?.id;
   useEffect(() => {
@@ -890,21 +902,32 @@ export function MapPage({
               )}
               <div className={css.listHeading}>
                 <h2>{label("我的城市")}</h2>
-                <span>{cities.length}</span>
+                <span>{listedCities.length}</span>
               </div>
               {!compact && details}
-              {!cities.length && <p className={css.empty}>{label("这个筛选下暂无记录。")}</p>}
-              {cities.map((item) => (
+              {!listedCities.length && (
+                <p className={css.empty}>
+                  {t(
+                    "还没有住过的城市。加上家乡，或在筛选中显示旅行城市。",
+                    "No residences yet. Add your hometown or show travel cities in the filters.",
+                  )}
+                </p>
+              )}
+              {listedCities.map((item) => (
                 <button
                   type="button"
                   className={css.city}
+                  data-current={anchor ? cityId(anchor) === item.id : false}
                   key={item.id}
                   aria-expanded={city?.id === item.id}
                   aria-controls={city?.id === item.id ? "city-details" : undefined}
                   onClick={() => setSelected(item.id)}
                 >
                   <span>
-                    <strong>{item.place.name}</strong>
+                    <strong>
+                      {item.place.name}
+                      {anchor && cityId(anchor) === item.id ? t(" · 现居", " · Current residence") : ""}
+                    </strong>
                     <span className={css.secondary}>
                       {item.home
                         ? label("⌂ 家乡 · 起点")
@@ -928,6 +951,20 @@ export function MapPage({
                   </span>
                 </button>
               ))}
+              <button
+                type="button"
+                className={css.control}
+                onClick={() =>
+                  ask(
+                    t(
+                      "我想加一个城市经历，请先问我城市和发生的时间，区分住过、去过与计划。",
+                      "Help me add a city experience. Ask for the city and dates, and distinguish residence, travel and plans.",
+                    ),
+                  )
+                }
+              >
+                {t("加一个城市", "Add a city")}
+              </button>
             </section>
           </div>
 

@@ -73,7 +73,7 @@
 }
 .page button:focus-visible,
 .page summary:focus-visible {
-  outline: 2px solid var(--kt-accent);
+  outline: 3px solid var(--link-line);
   outline-offset: 3px;
 }
 .page button:disabled {
@@ -129,7 +129,7 @@
 .editor input:focus-visible,
 .editor select:focus-visible,
 .editor textarea:focus-visible {
-  outline: 2px solid var(--kt-accent);
+  outline: 3px solid var(--link-line);
   outline-offset: 2px;
 }
 @media (hover: hover) {
@@ -925,4 +925,44 @@
 .cityPopup {
   color: var(--ink);
   font: 14px / 1.5 system-ui;
+}
+
+/* C: the city list stays visible beside or below the map. */
+.layout {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  order: 0;
+}
+.layout .listPane {
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+}
+.city[data-current="true"] {
+  background: var(--link-soft);
+}
+.review summary,
+.link {
+  min-height: 36px;
+}
+.primary {
+  min-height: 44px;
+  border-radius: 10px;
+}
+@container (min-width: 960px) and (max-width: 1179px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 288px;
+  }
+}
+@container (max-width: 959px) {
+  .layout {
+    display: block;
+  }
+  .layout[data-view="map"]:not([data-selected="true"]) .listPane,
+  .layout .listPane {
+    display: block;
+    margin-top: 16px;
+  }
+  .listControls {
+    display: none;
+  }
 }
