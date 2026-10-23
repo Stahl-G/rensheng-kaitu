@@ -17,6 +17,7 @@ import {
   setGithubToken,
   setProject,
   stringifyFrontmatter,
+  syncBoundProjects,
   syncGithub,
   syncProject,
 } from "../src/index.js";
@@ -239,4 +240,16 @@ it("权限、网络、部分响应失败与两种限流都保留最后有效快�
   data.failPath = "";
   expect((await syncGithub(ws, slug, { api, now: at(18) })).ok).toBe(true);
   expect(projectGithub(ws, slug, at(18))?.stale).toBe(false);
+});
+
+it("后台同步只拉绑了 GitHub 的项目，数据没变不存新版本", async () => {
+  const { ws, slug, data, requests, api } = await fixture();
+  await createProject(ws, { title: "没绑仓库", kind: "personal" });
+  await bindGithub(ws, slug, "owner/demo", { api, now: at(15) });
+  requests.length = 0;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 6) })).toBe(false);
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every((request) => request.url.startsWith("/repos/Owner/demo"))).toBe(true);
+  data.repo.stargazers_count = 121;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 7) })).toBe(true);
 });

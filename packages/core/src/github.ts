@@ -71,7 +71,7 @@ interface Runs {
     html_url: string;
   }[];
 }
-interface GithubOptions {
+export interface GithubOptions {
   now?: Date;
   api?: string;
   fetch?: typeof fetch;
