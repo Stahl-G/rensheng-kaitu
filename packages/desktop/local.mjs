@@ -17,6 +17,7 @@ import {
 import { reconnectWorkspaceState } from "../core/dist/state-binding.js";
 import { readWorkspaceConfig } from "../core/dist/sync-files.js";
 import { createAiProcess } from "./ai-process.mjs";
+import { productCopyright } from "./brand.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
@@ -256,6 +257,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   app.setAboutPanelOptions({
     applicationName: "人生开图",
     applicationVersion: featureVersion,
+    copyright: productCopyright,
     version: `Powered by DeepSeek Harness ${process.env.DSH_CLIENT_VERSION}`,
   });
   const ask = createLocalAsk({
