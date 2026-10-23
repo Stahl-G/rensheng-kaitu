@@ -5,7 +5,7 @@ import type {
   OrganizerStatus,
   SyncProvider,
 } from "@kaitu/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
@@ -29,7 +29,7 @@ export interface PersonalServices extends CalendarPushServices, FileImportServic
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
   phoneChannels?: boolean;
-  loadSettings: () => Promise<SettingsData>;
+  loadSettings: (baseOnly?: boolean) => Promise<SettingsData>;
   organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
@@ -97,16 +97,67 @@ export function PersonalPages(
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
   const [workspacePath, setWorkspacePath] = useState("");
+  const [aiError, setAiError] = useState("");
+  const [calendarError, setCalendarError] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const loadAttempt = useRef(0);
   const refresh = useCallback(async () => {
-    try {
-      const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
-      setData(settings);
-      setCalendarPush(calendar);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [props.loadSettings, props.loadCalendarPush]);
+    const attempt = ++loadAttempt.current;
+    const read = async <T,>(promise: Promise<T>): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(t("读取超时，请重试", "Loading timed out. Retry."))),
+              10000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const current = () => attempt === loadAttempt.current;
+    const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+    setError("");
+    setCalendarError("");
+    setAiError("");
+    setAiLoading(Boolean(props.desktopUpdate));
+    const base = read(props.loadSettings(true))
+      .then((settings) => {
+        if (current()) setData(settings);
+      })
+      .catch((err) => {
+        if (current()) setError(message(err));
+      });
+    await Promise.all([
+      base,
+      read(props.loadCalendarPush())
+        .then((calendar) => {
+          if (current()) setCalendarPush(calendar);
+        })
+        .catch((err) => {
+          if (current()) setCalendarError(message(err));
+        }),
+      ...(props.desktopUpdate
+        ? [
+            read(props.loadSettings())
+              .then(async (settings) => {
+                await base;
+                if (current()) setData((base) => (base ? { ...base, ai: settings.ai } : base));
+              })
+              .catch((err) => {
+                if (current()) setAiError(message(err));
+              })
+              .finally(() => {
+                if (current()) setAiLoading(false);
+              }),
+          ]
+        : []),
+    ]);
+  }, [props.loadSettings, props.loadCalendarPush, props.desktopUpdate, t]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -244,14 +295,26 @@ export function PersonalPages(
         <h1>{section === "overview" ? t("设置", "Settings") : t(item[3], item[4])}</h1>
         {error && (
           <p role="alert" className={css.error}>
-            {error}
+            {error}{" "}
+            <button type="button" onClick={() => void refresh()}>
+              {t("重试读取", "Retry loading")}
+            </button>
+          </p>
+        )}
+        {(aiError || calendarError) && (
+          <p role="alert" className={css.error}>
+            {aiError && `${t("AI 状态读取失败", "Could not read AI status")}: ${aiError}`}
+            {calendarError && `${t("日历状态读取失败", "Could not read calendar status")}: ${calendarError}`}{" "}
+            <button type="button" onClick={() => void refresh()}>
+              {t("重试读取", "Retry loading")}
+            </button>
           </p>
         )}
         {receipt && <output className={css.small}>{receipt}</output>}
         {section === "profile" ? (
           <MePage {...props} />
         ) : !data ? (
-          <p>{t("正在读取设置…", "Loading settings…")}</p>
+          !error && <p>{t("正在读取设置…", "Loading settings…")}</p>
         ) : (
           <>
             {section === "overview" && (
@@ -289,7 +352,11 @@ export function PersonalPages(
                           ? data.ai.configured
                             ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}`
                             : t("还没连接", "Not connected")
-                          : t("由 DSH 管理", "Managed by DSH"),
+                          : aiError
+                            ? t("状态读取失败", "Could not read status")
+                            : aiLoading
+                              ? t("正在读取…", "Loading…")
+                              : t("由 DSH 管理", "Managed by DSH"),
                       ],
                       [
                         "phone",
@@ -590,7 +657,7 @@ export function PersonalPages(
             )}
             {section === "ai" && (
               <>
-                {data.ai ? (
+                {data.ai || props.desktopUpdate ? (
                   <AiSettings focusKey={props.aiKeyRequest} onSaved={refresh} />
                 ) : (
                   <section className={css.sec}>

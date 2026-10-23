@@ -94,7 +94,7 @@ const props: OverviewPageProps = {
     workspace = data.root;
     return data;
   },
-  loadSettings: () => call("settings"),
+  loadSettings: (baseOnly) => call("settings", baseOnly),
   organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),

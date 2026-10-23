@@ -337,7 +337,7 @@ export async function productRequest(
       return workspaceBackupRequest(ws, text(0), args[1]);
     case "settings": {
       const data: SettingsData = await readSettings(ws);
-      data.ai = ask ? await ask.settings() : null;
+      data.ai = ask && args[0] !== true ? await ask.settings() : null;
       return data;
     }
     case "setFinanceAccess":
