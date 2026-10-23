@@ -1,13 +1,15 @@
 import { lstatSync, readdirSync } from "node:fs";
+import { basename } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { inboxNotes } from "./inbox-notes.js";
+import { inboxNotes, isCaptureSource } from "./inbox-notes.js";
 import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
+import type { ModuleStatus } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export interface LibraryItem {
@@ -21,6 +23,8 @@ export interface InboxEntry {
   file: string;
   text: string;
   source: string;
+  /** Original capture identity, independent of its current archive path and display timestamp. */
+  originalSource: string | null;
   date: string | null;
   status: "organized" | "review" | "raw";
   destination: string | null;
@@ -42,11 +46,27 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
     throw new KaituError("未知资料分类", "BAD_ARGS");
   const calendar = !section ? readCalendar(ws) : null;
   const doing = !section || section === "notes" ? readDoing(ws) : { learning: [], decisions: [] };
+  const pendingSources =
+    !section || section === "inbox"
+      ? ws.scanParsed("me/STATUS.md", "library-pending", (text) => {
+          const { data } = parseFrontmatter<ModuleStatus>(text);
+          return new Set(
+            (data.next ?? [])
+              .filter((item) => item.status === "proposed" && item.id?.startsWith("onboarding-matter-"))
+              .map((item) => item.ref),
+          );
+        })
+      : undefined;
   // 还没从云盘下载的笔记先不列，下载后自然出现。
   const entry = (file: string, organized: boolean): InboxEntry[] => {
     const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
     if (!parsed) return [];
     const { data, body } = parsed;
+    const captureSource =
+      data.kind === "capture" && typeof data.date === "string"
+        ? `inbox/notes/${data.date}/${basename(file)}`
+        : null;
+    const originalSource = isCaptureSource(captureSource) ? captureSource : null;
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]
@@ -55,6 +75,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       {
         file,
         text: body.trim(),
+        originalSource,
         source:
           data.kind === "capture"
             ? "me"
@@ -63,7 +84,14 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
               : (channelSource ?? "other"),
         date:
           typeof data.created === "string" ? data.created : typeof data.date === "string" ? data.date : null,
-        status: organized ? "organized" : data.kind === "capture" ? "raw" : "review",
+        status:
+          originalSource && pendingSources?.has(originalSource)
+            ? "review"
+            : organized
+              ? "organized"
+              : data.kind === "capture"
+                ? "raw"
+                : "review",
         destination: null,
       },
     ];

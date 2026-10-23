@@ -23,7 +23,13 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "./github.js";
 import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
-import { archiveInboxNote, captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
+import {
+  archiveInboxNote,
+  captureNote,
+  findInboxNote,
+  isCaptureSource,
+  noteMetadata,
+} from "./inbox-notes.js";
 import { type Locale, type Preferences, normalizeLocale, pick, readPreferences } from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
@@ -1337,8 +1343,7 @@ function isOnboardingTask(task: Task): boolean {
   return (
     task.status !== "proposed" &&
     typeof task.source === "string" &&
-    (/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) ||
-      goalSource.test(task.source)) &&
+    (isCaptureSource(task.source) || goalSource.test(task.source)) &&
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
@@ -1368,8 +1373,7 @@ function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
   };
 }
 export function readOnboardingMatter(ws: Workspace, source: string): OnboardingMatter {
-  if (typeof source !== "string" || !/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(source))
-    throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
+  if (!isCaptureSource(source)) throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
   const file = findInboxNote(ws, basename(source));
   const text = file ? ws.scanText(file) : undefined;
   if (!text || noteMetadata(text).kind !== "capture") throw new KaituError("原文记录不存在", "NOT_FOUND");
