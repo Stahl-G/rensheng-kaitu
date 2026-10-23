@@ -1203,6 +1203,7 @@ function Overview({
             )}
             {!record ? (
               <LibraryPage
+                searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
                 open={openRecord}
                 onOpenOriginal={(entry) => {

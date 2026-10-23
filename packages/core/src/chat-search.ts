@@ -22,7 +22,7 @@ interface IndexedFile {
   size: number;
 }
 
-function openIndex(ws: Workspace): DatabaseSync {
+export function openIndex(ws: Workspace): DatabaseSync {
   const path = ws.resolve(INDEX_FILE, { internal: true });
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
@@ -116,7 +116,7 @@ export function reindexChats(ws: Workspace): number {
   }
 }
 
-function excerpt(text: string, query: string): string {
+export function excerpt(text: string, query: string): string {
   const normalized = text.replace(/\s+/gu, " ");
   const at = normalized.toLowerCase().indexOf(query.toLowerCase());
   const start = Math.max(0, at - 35);

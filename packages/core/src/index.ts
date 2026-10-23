@@ -2,6 +2,7 @@ export * from "./agents-md.js";
 export * from "./avatar.js";
 export { assetsRoot, schemasDir, templateDir } from "./assets.js";
 export * from "./chat-search.js";
+export * from "./note-search.js";
 export * from "./chats.js";
 export * from "./doctor.js";
 export * from "./doing-page.js";

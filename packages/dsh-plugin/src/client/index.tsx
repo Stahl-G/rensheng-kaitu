@@ -415,6 +415,11 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              searchLibraryNotes: async (query: string) => {
+                const result = await ctx.remote.kaitu.searchLibraryNotes(query);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               cancelTask: async (id: string) => {
                 const result = await ctx.remote.kaitu.cancelTask(id);
                 if (!result.ok) throw new Error(result.error.message);
