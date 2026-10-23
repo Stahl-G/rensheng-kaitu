@@ -32,11 +32,11 @@
   /* 健康热力格 1、2 级的 color-mix 预算值（health 30% / 60% 混 surface） */
   --heat-1: #c5dcce; --heat-2: #8bb99c;
   /* 标志：Brand.module.css */
-  --mark-fold0: #1b3254;  /* 左折，最深，还折着 */
+  --mark-fold0: #1f3550;  /* 左折，最深，还折着 */
   --mark-fold1: #2b4c7e;  /* 中折 */
-  --mark-fold2: #b8cbe4;  /* 右折，最亮，已展开 */
+  --mark-fold2: #e8dfcc;  /* 右折，羊皮纸，已展开 */
   --mark-route-folded: #ffffff;
-  --mark-route-open: #1b3254;
+  --mark-route-open: #1f3550;
   /* 阴影：应用里只有这几档 */
   --shadow-ring: 0 0 0 1px var(--line);                                   /* 普通卡片 */
   --shadow-raised: 0 1px 3px rgba(31, 30, 29, 0.08), 0 0 0 1px var(--line); /* 重点卡、输入条、问问输入框 */
@@ -66,8 +66,8 @@
     --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
     --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
     --heat-1: #374e3e; --heat-2: #4e7c5f;
-    --mark-fold0: #365b90; --mark-fold1: #7194c4; --mark-fold2: #b8cbe4;
-    /* 路线两色在深色下不变：白 / #1b3254 */
+    --mark-fold0: #3a5a86; --mark-fold1: #5c7daa; --mark-fold2: #cfc4ad;
+    --mark-route-folded: #ece6da; --mark-route-open: #3a5a86;
   }
 }
 :root[data-theme="dark"] {
@@ -85,5 +85,6 @@
   --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
   --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
   --heat-1: #374e3e; --heat-2: #4e7c5f;
-  --mark-fold0: #365b90; --mark-fold1: #7194c4; --mark-fold2: #b8cbe4;
+  --mark-fold0: #3a5a86; --mark-fold1: #5c7daa; --mark-fold2: #cfc4ad;
+  --mark-route-folded: #ece6da; --mark-route-open: #3a5a86;
 }
