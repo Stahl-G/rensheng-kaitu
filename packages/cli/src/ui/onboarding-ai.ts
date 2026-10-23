@@ -3,6 +3,7 @@ import {
   type Locale,
   type OnboardingMatter,
   type Workspace,
+  type WorkspaceWrite,
   draftOnboardingMatter,
   matterPrompt,
   parseMatterAnswer,
@@ -17,10 +18,11 @@ export async function organizeOnboardingMatter(
   source: string,
   ask?: AskService,
   locale: Locale = "zh-CN",
+  write: WorkspaceWrite = (operation) => operation(),
 ): Promise<OnboardingMatter> {
-  const matter = readOnboardingMatter(ws, source);
+  const matter = await write(async () => readOnboardingMatter(ws, source));
   if (!ask || !(await ask.settings()).configured) return matter;
-  recordOnboardingAiConnection(ws, "问问");
+  await write(async () => recordOnboardingAiConnection(ws, "问问"));
   const service = ask.background();
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -72,7 +74,7 @@ export async function organizeOnboardingMatter(
         ),
       );
     }
-    return await draftOnboardingMatter(ws, source, input);
+    return await write(() => draftOnboardingMatter(ws, source, input));
   } finally {
     stop();
     clearTimeout(timer);

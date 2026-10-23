@@ -26,6 +26,7 @@ import {
   type SyncProvider,
   type TaskInput,
   type Workspace,
+  type WorkspaceWrite,
   addCalendarSubscription,
   addGoalNext,
   adoptOnboardingMatter,
@@ -214,6 +215,7 @@ export async function productRequest(
   args: unknown[],
   ask?: AskService,
   calendarPush = new CalendarPush(calendarPushStore(ws)),
+  write: WorkspaceWrite = (operation) => operation(),
 ): Promise<unknown> {
   const text = (i: number) => {
     if (typeof args[i] !== "string") throw new KaituError("缺少有效参数", "BAD_ARGS");
@@ -336,7 +338,7 @@ export async function productRequest(
     case "completeNext":
       return completeNext(ws, text(0), text(1));
     case "workspaceBackup":
-      return workspaceBackupRequest(ws, text(0), args[1]);
+      return workspaceBackupRequest(ws, text(0), args[1], write);
     case "settings":
       return readSettings(ws);
     case "setFinanceAccess":
@@ -356,7 +358,7 @@ export async function productRequest(
     case "onboardingMatterRead":
       return readOnboardingMatter(ws, text(0));
     case "onboardingMatterOrganize":
-      return organizeOnboardingMatter(ws, text(0), ask, locale(1));
+      return organizeOnboardingMatter(ws, text(0), ask, locale(1), write);
     case "onboardingMatterPrompt":
       return matterPrompt(readOnboardingMatter(ws, text(0)).text, locale(1));
     case "onboardingMatterPaste":
@@ -504,10 +506,10 @@ export async function productRequest(
     case "projectGoalSave":
       return saveProjectGoal(ws, text(0), args[1] as ProjectGoal);
     case "projectBindGithub":
-      await bindGithub(ws, text(0), text(1));
-      return readProjectPage(ws, text(0));
+      await bindGithub(ws, text(0), text(1), { write });
+      return write(async () => readProjectPage(ws, text(0)));
     case "projectSync":
-      return syncProject(ws, text(0));
+      return syncProject(ws, text(0), { write });
     case "projectMemoryPrompt":
       return projectMemoryPrompt(ws, text(0), args[1] === "en" ? "en" : "zh-CN");
     case "weather":

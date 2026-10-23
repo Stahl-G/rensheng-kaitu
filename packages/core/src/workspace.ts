@@ -31,6 +31,8 @@ import { isICloudPath } from "./sync-location.js";
 import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
 
+export type WorkspaceWrite = <T>(operation: () => Promise<T>) => Promise<T>;
+
 export const STATE_DIR = ".kaitu";
 
 /** 默认数据目录：--dir > KAITU_DIR > 当前工作区 > 已有的 ~/kaitu（含搬去云盘后留下的迁移说明）> ~/kaitu-ai-memory */

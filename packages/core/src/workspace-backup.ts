@@ -25,7 +25,7 @@ import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-re
 import { schemas } from "./schema.js";
 import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 const pick = (zh: string, en: string) => translate(normalizeLocale(readPreferences().locale), zh, en);
-import { Workspace, stateDirectory } from "./workspace.js";
+import { Workspace, type WorkspaceWrite, stateDirectory } from "./workspace.js";
 
 export type BackupFiles = Record<string, string>;
 export interface BackupProgress {
@@ -453,8 +453,12 @@ function backupSelection(ws: Workspace, input: { text?: boolean; records?: boole
   return { text, records };
 }
 
-export async function connectWorkspaceBackup(ws: Workspace, input: unknown, providedRemote?: BackupRemote) {
-  if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
+export async function connectWorkspaceBackup(
+  ws: Workspace,
+  input: unknown,
+  providedRemote?: BackupRemote,
+  write: WorkspaceWrite = (operation) => operation(),
+) {
   const args = z
     .object({
       repo: z.string(),
@@ -464,9 +468,14 @@ export async function connectWorkspaceBackup(ws: Workspace, input: unknown, prov
       allowPublic: z.boolean().default(false),
     })
     .parse(input);
-  const selection = backupSelection(ws, args);
   const repo = parseGithubRepo(args.repo);
-  const remote = providedRemote ?? githubBackupRemote(ws, args.via);
+  const { selection, remote } = await write(async () => {
+    if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+    return {
+      selection: backupSelection(ws, args),
+      remote: providedRemote ?? githubBackupRemote(ws, args.via),
+    };
+  });
   const info = await remote.inspect(repo);
   const connection = {
     via: args.via,
@@ -476,16 +485,19 @@ export async function connectWorkspaceBackup(ws: Workspace, input: unknown, prov
     ...selection,
     checkedAt: new Date().toISOString(),
   };
-  const previous = state(ws);
-  store(ws, {
-    ...previous,
-    connection,
-    base: previous.connection?.repo === repo ? previous.base : {},
-    conflicts: [],
-    error: undefined,
+  return write(async () => {
+    if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+    const previous = state(ws);
+    store(ws, {
+      ...previous,
+      connection,
+      base: previous.connection?.repo === repo ? previous.base : {},
+      conflicts: [],
+      error: undefined,
+    });
+    refreshOverview(ws);
+    return workspaceBackupStatus(ws);
   });
-  refreshOverview(ws);
-  return workspaceBackupStatus(ws);
 }
 function remoteReceipts(text: string): PhoneReceipt[] {
   try {
@@ -777,7 +789,12 @@ export function startWorkspaceBackup(ws: Workspace, notify: () => void = () => {
   };
 }
 
-export async function workspaceBackupRequest(ws: Workspace, operation: string, input: unknown = {}) {
+export async function workspaceBackupRequest(
+  ws: Workspace,
+  operation: string,
+  input: unknown = {},
+  write: WorkspaceWrite = (action) => action(),
+) {
   const args = z
     .object({
       repo: z.string().optional(),
@@ -808,22 +825,26 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
       return workspaceBackupStatus(ws);
     case "create": {
       if (!args.repo) throw new KaituError("请填写新仓库名称", "BAD_ARGS");
-      backupSelection(ws, args);
-      if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+      await write(async () => {
+        backupSelection(ws, args);
+        if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+      });
       await createPrivateGithubRepository(args.repo);
-      if (!ws.exists("README.md")) ws.writeText("README.md", memoryRepositoryReadme);
-      const status = await connectWorkspaceBackup(ws, { ...args, via: "gh" });
+      await write(async () => {
+        if (!ws.exists("README.md")) ws.writeText("README.md", memoryRepositoryReadme);
+      });
+      const status = await connectWorkspaceBackup(ws, { ...args, via: "gh" }, undefined, write);
       if (!status.connection?.private) throw new KaituError("仓库不是私有仓库，尚未开启同步", "GH_REQUEST");
-      requestWorkspaceBackup(ws);
-      return workspaceBackupStatus(ws);
+      return write(async () => requestWorkspaceBackup(ws));
     }
     case "status":
       return workspaceBackupStatus(ws);
     case "connect": {
-      if (args.token) setGithubToken(ws, args.token);
-      const status = await connectWorkspaceBackup(ws, args);
-      if (status.connection?.enabled) requestWorkspaceBackup(ws);
-      return workspaceBackupStatus(ws);
+      if (args.token) await write(async () => setGithubToken(ws, args.token as string));
+      const status = await connectWorkspaceBackup(ws, args, undefined, write);
+      return write(async () =>
+        status.connection?.enabled ? requestWorkspaceBackup(ws) : workspaceBackupStatus(ws),
+      );
     }
     case "sync":
       return requestWorkspaceBackup(ws);
