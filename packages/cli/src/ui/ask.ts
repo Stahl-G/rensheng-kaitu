@@ -63,7 +63,7 @@ export interface AskService {
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
   send(id: string, text: string, images?: AskAttachment[]): Promise<unknown>;
-  settings(): Promise<{
+  settings(resolveImages?: boolean): Promise<{
     configured: boolean;
     search?: NetworkSearchSettings;
     supportsImages?: boolean;
@@ -413,7 +413,9 @@ export function createAskService(options: {
       if ((row.workspace ?? workspaceKey) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");
       const epoch = generation;
-      const connection = await options.settings();
+      const connection = await options.settings(
+        Array.isArray(images) && images.some((file) => file && !("kind" in file && file.kind === "file")),
+      );
       ready();
       if (epoch !== generation) throw new KaituError("AI 连接已改变，请重新发送", "AI_CONNECTION");
       const backend = connection.backend ?? "dsh";
@@ -561,8 +563,8 @@ export function createAskService(options: {
       options.workspace = workspace;
       relocating = false;
     },
-    settings: async () => {
-      const settings = await options.settings();
+    settings: async (resolveImages = false) => {
+      const settings = await options.settings(resolveImages);
       return { ...settings, mode: effectiveAskMode(settings, options.connection) };
     },
     support: options.support,

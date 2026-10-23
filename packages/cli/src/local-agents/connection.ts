@@ -51,8 +51,9 @@ export function createAgentConnection(options: {
     const path = saved.path ?? detected().find((item) => item.id === agent.id)?.path;
     return { agent, path };
   };
-  const settings = async () => {
-    if (!local()) return { ...(await options.sdk().settings()), backend: "dsh", localAgents: detected() };
+  const settings = async (resolveImages = false) => {
+    if (!local())
+      return { ...(await options.sdk().settings(resolveImages)), backend: "dsh", localAgents: detected() };
     const { agent, path } = current();
     return {
       choice: "local" as const,

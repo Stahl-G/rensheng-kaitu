@@ -281,7 +281,7 @@ export function createSdkRuntime({
       if (result.code) throw new KaituError(result.message, result.code);
       return result.models;
     },
-    settings() {
+    async settings(resolveImages = false) {
       // 连接判定不启动 SDK，也不读取模型目录；真实发送仍在 runtime 里验证。
       connectionStatus ??= (async () => {
         const settings = readSettings();
@@ -292,16 +292,21 @@ export function createSdkRuntime({
         return {
           ...connectionInfo({
             ...settings,
-            supportsImages: settings.supportsImages ?? info.supportsImages,
             configured: settings.choice === "builtin" && info.configured,
           }),
+          supportsImages: settings.supportsImages,
           providerName: providers.find((entry) => entry.id === settings.provider)?.name ?? settings.provider,
         };
       })().catch((error) => {
         connectionStatus = undefined;
         throw error;
       });
-      return connectionStatus;
+      const current = await connectionStatus;
+      if (resolveImages && current.configured && current.supportsImages === undefined) {
+        const info = await credential("model-status", { settings: readSettings() });
+        current.supportsImages = info.supportsImages ?? false;
+      }
+      return current;
     },
     async catalogSettings(includeSaved = false) {
       // 仅 AI 设置和模型选择器显式读取完整目录；失败不能假装没有已保存服务商。
@@ -375,17 +380,10 @@ export function createSdkRuntime({
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
       if (!capabilities) {
-        const info = await credential("status", { ref: credentialRef(settings.provider), settings });
+        const info = await credential("model-status", { ref: credentialRef(settings.provider), settings });
         settings.supportsImages ??= info.supportsImages;
         if (settings.choice !== "builtin" || !info.configured)
           throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
-        // 旧版只存在 kaitu-ai.json 里的服务商，第一次用时搬进 DSH 的 profile。
-        if (
-          !(await savedProviders()).some(
-            (row) => row.provider === settings.provider && row.models.includes(settings.model),
-          )
-        )
-          await saveProvider(settings);
       }
       const profile = join(
         home,
@@ -394,7 +392,10 @@ export function createSdkRuntime({
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(
         profile,
-        JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly })),
+        JSON.stringify([
+          ...(capabilities ? [] : providerPatch(settings)),
+          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly }),
+        ]),
         {
           mode: 0o600,
         },

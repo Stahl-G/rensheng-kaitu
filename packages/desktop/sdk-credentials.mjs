@@ -109,6 +109,7 @@ try {
             )
           : undefined;
       const model =
+        process.argv[2] === "model-status" &&
         input.settings &&
         input.settings.supportsImages === undefined &&
         (await knownModels(input.settings)).find((m) => m.id === input.settings.model);

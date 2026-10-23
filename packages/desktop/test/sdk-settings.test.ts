@@ -18,7 +18,7 @@ test("连接状态不启动 SDK 或读目录，保存后失效；显式目录失
     `import {appendFileSync} from 'node:fs';
 for await (const chunk of process.stdin) {}
 appendFileSync(${JSON.stringify(calls)}, JSON.stringify(process.argv[2])+'\\n');
-process.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true}');`,
+process.stdout.write(process.argv[2] === 'catalog' ? '[]' : process.argv[2] === 'model-status' ? '{"configured":true,"supportsImages":true}' : '{"configured":true}');`,
   );
   writeFileSync(
     join(home, "kaitu-ai.json"),
@@ -26,7 +26,6 @@ process.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true}
       choice: "builtin",
       provider: "deepseek-official",
       model: "synthetic",
-      supportsImages: false,
     }),
   );
   const sdk = createSdkRuntime({
@@ -40,8 +39,11 @@ process.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true}
   });
   try {
     expect((await sdk.settings()).configured).toBe(true);
-    expect((await sdk.settings()).configured).toBe(true);
+    expect((await sdk.settings()).supportsImages).toBeUndefined();
     expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual(['"status"']);
+    expect((await sdk.settings(true)).supportsImages).toBe(true);
+    expect((await sdk.settings()).supportsImages).toBe(true);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toEqual(['"status"', '"model-status"']);
     // No SDK modules exist here: only the explicit catalogue may try to load them.
     await expect(sdk.catalogSettings(true)).rejects.toThrow();
     expect((await sdk.settings()).configured).toBe(true);

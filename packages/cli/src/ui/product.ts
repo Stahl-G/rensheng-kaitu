@@ -267,7 +267,7 @@ export async function productRequest(
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {
-        const settings = await ask.settings();
+        const settings = await ask.settings(args[0] === true);
         if (settings.configured) recordOnboardingAiConnection(ws, "问问");
         return settings;
       }
