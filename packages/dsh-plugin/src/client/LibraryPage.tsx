@@ -41,7 +41,13 @@ export function LibraryPage({
   overview,
   capture,
   onAdd,
+  onOpenOriginal,
+  onOpenNote,
+  onOpenGoal,
 }: {
+  onOpenOriginal: (entry: InboxEntry) => void;
+  onOpenNote: (file: string) => void;
+  onOpenGoal: (id: string) => void;
   data: LibraryData | null;
   open: (id: string) => void;
   overview?: OverviewData | null;
@@ -57,7 +63,10 @@ export function LibraryPage({
   const away = overview?.sync.cloudOrganizer?.away;
   const items = data?.inbox ?? [];
   const matches = (value: string) => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
-  const recent = items.filter((item) => matches(item.text));
+  const searching = !!query.trim();
+  const originals = searching ? items.filter((item) => matches(item.text)) : [];
+  const goals = searching ? (overview?.plans.goals ?? []).filter((goal) => matches(goal.title)) : [];
+  const notes = searching ? (data?.notes ?? []).filter((note) => matches(note.title)) : [];
   const hints: Record<string, [string, string]> = {
     calendar: ["添加日程或连接日历", "Add an event or connect a calendar"],
     projects: ["记下正在做的项目", "Add a project you are working on"],
@@ -79,9 +88,65 @@ export function LibraryPage({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label={t("搜索资料", "Search library")}
-          placeholder={t("搜索原文、分类、笔记", "Search originals, categories and notes")}
+          placeholder={t("搜索原文、目标、笔记标题", "Search originals, goals and note titles")}
         />
       </div>
+      {searching && (
+        <section aria-label={t("搜索结果", "Search results")} className={styles.searchResults}>
+          <h2>{t("搜索结果", "Search results")}</h2>
+          {!data || !overview ? (
+            <output>{t("正在读取资料…", "Loading…")}</output>
+          ) : (
+            <>
+              <output className={styles.meta}>
+                {t(
+                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记标题 ${notes.length}`,
+                  `Originals ${originals.length} · Goals ${goals.length} · Note titles ${notes.length}`,
+                )}
+              </output>
+              {originals.map((item) => (
+                <button
+                  type="button"
+                  className={styles.row}
+                  key={item.file}
+                  onClick={() => onOpenOriginal(item)}
+                >
+                  <span className={css.chip}>{t("原文", "Original")}</span>
+                  <span className={styles.preview}>{item.text}</span>
+                  <time className={styles.meta}>{item.date?.slice(0, 10)}</time>
+                </button>
+              ))}
+              {goals.map((goal) => (
+                <button
+                  type="button"
+                  className={styles.row}
+                  key={goal.id}
+                  onClick={() => onOpenGoal(goal.id)}
+                >
+                  <span className={css.chip}>{t("目标", "Goal")}</span>
+                  <span className={styles.preview}>{goal.title}</span>
+                </button>
+              ))}
+              {notes.map((note) => (
+                <button
+                  type="button"
+                  className={styles.row}
+                  key={note.file}
+                  onClick={() => onOpenNote(note.file)}
+                >
+                  <span className={css.chip}>{t(note.kind, note.kind === "决定" ? "Decision" : "Note")}</span>
+                  <span className={styles.preview}>{note.title}</span>
+                </button>
+              ))}
+              {!originals.length && !goals.length && !notes.length && (
+                <p className={styles.meta}>
+                  {t("没有匹配的原文、目标或笔记标题", "No matching originals, goals or note titles")}
+                </p>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <section
         className={styles.inbox}
         aria-label={t("收件箱", "Inbox")}
@@ -132,8 +197,8 @@ export function LibraryPage({
             )}
           </p>
         )}
-        {recent.slice(0, 3).map((item) => (
-          <button type="button" className={styles.row} key={item.file} onClick={() => open("inbox")}>
+        {items.slice(0, 3).map((item) => (
+          <button type="button" className={styles.row} key={item.file} onClick={() => onOpenOriginal(item)}>
             <time className={styles.meta}>{item.date?.slice(0, 10) ?? ""}</time>
             <span className={styles.preview}>{item.text}</span>
             <span className={css.chip}>
@@ -210,10 +275,7 @@ export function LibraryPage({
       <h2>{t("整理好的资料", "Organized items")}</h2>
       <section className={styles.categories} aria-label={t("各类资料", "Library sections")}>
         {data?.sections
-          .filter(
-            (section) =>
-              section.id !== "inbox" && matches(`${section.title} ${LIBRARY_EN[section.id] ?? ""}`),
-          )
+          .filter((section) => section.id !== "inbox")
           .map((section) => (
             <button
               type="button"
@@ -241,20 +303,6 @@ export function LibraryPage({
         )}
         {!data && <output>{t("正在读取资料…", "Loading…")}</output>}
       </section>
-      {query && (
-        <section aria-label={t("笔记搜索结果", "Matching notes")}>
-          {data?.notes
-            .filter((note) => matches(note.title))
-            .map((note) => (
-              <button type="button" className={styles.row} key={note.file} onClick={() => open("notes")}>
-                {note.title}
-              </button>
-            ))}
-          {recent.length === 0 && !data?.notes.some((note) => matches(note.title)) && (
-            <p className={styles.meta}>{t("没有匹配的原文或笔记", "No matching originals or notes")}</p>
-          )}
-        </section>
-      )}
       {!!overview?.versions.length && (
         <section>
           <div className={styles.heading}>
@@ -280,6 +328,7 @@ export function LibraryPage({
   );
 }
 export function InboxPage({
+  initialEntry,
   loadLibrary,
   subscribe,
   channelSettings,
@@ -290,6 +339,7 @@ export function InboxPage({
   onReview,
   review,
 }: Pick<LibraryProps, "loadLibrary"> & {
+  initialEntry?: InboxEntry;
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
   connect: () => void;
@@ -311,8 +361,8 @@ export function InboxPage({
   }, [channelSettings]);
   const [source, setSource] = useState("all");
   // null follows the default; an explicit choice survives pagination and refreshes.
-  const [status, setStatus] = useState<"review" | "all" | "saved" | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [status, setStatus] = useState<"review" | "all" | "saved" | null>(initialEntry ? "all" : null);
+  const [selected, setSelected] = useState<string | null>(initialEntry?.file ?? null);
   const [entries, setEntries] = useState<InboxEntry[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -327,7 +377,13 @@ export function InboxPage({
       try {
         const page = await loadLibrary({ section: "inbox", source });
         if (!active || seq !== generation.current) return;
-        setEntries(page.inbox);
+        setEntries(
+          initialEntry &&
+            (source === "all" || source === initialEntry.source) &&
+            !page.inbox.some((entry) => entry.file === initialEntry.file)
+            ? [initialEntry, ...page.inbox]
+            : page.inbox,
+        );
         setNext(page.next ?? null);
         setError("");
       } catch (err) {
@@ -345,7 +401,7 @@ export function InboxPage({
       generation.current++;
       off?.();
     };
-  }, [loadLibrary, source, subscribe]);
+  }, [loadLibrary, source, subscribe, initialEntry]);
   const more = async () => {
     if (!next || loading) return;
     const seq = generation.current;
@@ -353,7 +409,10 @@ export function InboxPage({
     try {
       const page = await loadLibrary({ section: "inbox", source, before: next });
       if (seq !== generation.current) return;
-      setEntries((current) => [...(current ?? []), ...page.inbox]);
+      setEntries((current) => [
+        ...(current ?? []),
+        ...page.inbox.filter((entry) => !current?.some((item) => item.file === entry.file)),
+      ]);
       setNext(page.next ?? null);
       setError("");
     } catch (err) {
@@ -698,10 +757,12 @@ function InboxReview({
   );
 }
 export function NotesPage({
+  initialFile,
   data,
   loadLibraryDocument,
   ...learning
 }: {
+  initialFile?: string;
   data: LibraryData | null;
   topic: string;
   onTopic: (topic: string) => void;
@@ -712,7 +773,7 @@ export function NotesPage({
 } & Pick<LibraryProps, "loadLibraryDocument"> &
   LearningServices) {
   const t = useT();
-  const [file, setFile] = useState<string | null>(null);
+  const [file, setFile] = useState<string | null>(initialFile ?? null);
   const [body, setBody] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
@@ -733,7 +794,7 @@ export function NotesPage({
   }, [file, loadLibraryDocument]);
   return (
     <div className={css.sec}>
-      <LearningPage {...learning} data={data} />
+      {!file && <LearningPage {...learning} data={data} />}
       {error && <p role="alert">{error}</p>}
       {file ? (
         <>

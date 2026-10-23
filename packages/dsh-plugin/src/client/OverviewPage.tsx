@@ -1,6 +1,6 @@
 import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
+import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
@@ -312,6 +312,19 @@ function Overview({
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [learningTopic, setLearningTopic] = useState("");
   const [learningSource, setLearningSource] = useState<LearningSource>();
+  const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
+  const [libraryFile, setLibraryFile] = useState<string>();
+  const [libraryGoal, setLibraryGoal] = useState<string>();
+  useEffect(() => {
+    if (view !== "records" || record !== "projects" || !libraryGoal) return;
+    const target = document.getElementById(`plan-${libraryGoal}`);
+    if (!target) return;
+    const details = target.closest("details");
+    if (details) details.open = true;
+    target.tabIndex = -1;
+    target.focus();
+    target.scrollIntoView({ block: "center" });
+  }, [view, record, libraryGoal]);
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
@@ -488,6 +501,9 @@ function Overview({
     }
   };
   const openRecord = (id: string) => {
+    setLibraryEntry(undefined);
+    setLibraryFile(undefined);
+    setLibraryGoal(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
@@ -1165,6 +1181,19 @@ function Overview({
               <LibraryPage
                 data={library}
                 open={openRecord}
+                onOpenOriginal={(entry) => {
+                  openRecord("inbox");
+                  setLibraryEntry(entry);
+                }}
+                onOpenGoal={(id) => {
+                  openRecord("projects");
+                  setLibraryGoal(id);
+                }}
+                onOpenNote={(file) => {
+                  openRecord("notes");
+                  setLearningTopic(file.startsWith("learning/") ? (file.split("/")[1] ?? "") : "");
+                  setLibraryFile(file.startsWith("learning/") ? undefined : file);
+                }}
                 overview={data}
                 capture={async (text) => {
                   await props.capture(text);
@@ -1207,6 +1236,7 @@ function Overview({
             ) : record === "inbox" ? (
               reviewMatter ? null : (
                 <InboxPage
+                  initialEntry={libraryEntry}
                   overview={data}
                   review={{
                     readOnboardingMatter: props.readOnboardingMatter,
@@ -1252,6 +1282,7 @@ function Overview({
               )
             ) : (
               <NotesPage
+                initialFile={libraryFile}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
                 loadLearning={props.loadLearning}

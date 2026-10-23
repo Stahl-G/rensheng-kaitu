@@ -151,3 +151,8 @@ button.row {
 .count.meta {
   font-size: 32px;
 }
+
+.searchResults {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
