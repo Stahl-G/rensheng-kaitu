@@ -1,5 +1,7 @@
 .page {
   display: grid;
+  /* 列宽跟页面走：一行不换行的长原文只能在预览里省略，不能把整页撑宽。 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   container-type: inline-size;
 }
@@ -39,27 +41,70 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
+/* 设计稿 C：每类一个模块色的浅渐变和图标，颜色由 --tint / --tone 传入。 */
 .category {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
-  min-height: 180px;
+  min-height: 172px;
+  box-sizing: border-box;
   text-align: left;
-  padding: 24px;
-  border: 0;
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--tint, var(--control)), var(--surface) 72%);
   color: var(--ink);
   font: inherit;
   cursor: pointer;
+  transition: box-shadow 0.18s, transform 0.18s;
 }
 .category:hover {
-  background: var(--control);
+  box-shadow: 0 10px 26px rgba(32, 34, 31, 0.07);
+  transform: translateY(-2px);
+}
+.category time {
+  margin-top: auto;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--tone, var(--link));
+}
+.add {
+  justify-content: center;
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+}
+.add .icon {
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+  color: var(--ink2);
+}
+.add:hover {
+  border-color: var(--link-line);
+  background: var(--link-soft);
+  box-shadow: none;
+  transform: none;
 }
 .count {
-  font-size: 32px;
+  margin-top: 6px;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 650;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 .meta {
