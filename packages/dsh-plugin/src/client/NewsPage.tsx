@@ -105,6 +105,7 @@ export function NewsPage(props: NewsPageProps) {
   const pickedCard = (item: NewsItem) => {
     const vote = data?.feedback[item.id];
     const related = directionText(item.relevance?.reason || item.relevance?.ref, 180);
+    const summary = item.summary?.split(/(?<=[。！？!?])\s*/)[0]?.trim();
     return (
       <article key={item.id} className={css.card}>
         <div className={css.body}>
@@ -113,7 +114,9 @@ export function NewsPage(props: NewsPageProps) {
               {item.title}
             </a>
           </h3>
-          {item.summary && <p className={css.reason}>{item.summary.split(/(?<=[。！？!?])\s*/)[0]}</p>}
+          {summary && (
+            <p className={css.reason}>{summary.length > 180 ? `${summary.slice(0, 179)}…` : summary}</p>
+          )}
           <Source item={item} />
           <div className={css.cardFooter}>
             {related && (
@@ -136,7 +139,7 @@ export function NewsPage(props: NewsPageProps) {
               >
                 {added.includes(item.id)
                   ? t("已加入 AI 建议", "Added as an AI suggestion")
-                  : t("加到下一步", "Add to next steps")}
+                  : t("加为 AI 建议", "Add as an AI suggestion")}
               </button>
               {vote ? (
                 <button
