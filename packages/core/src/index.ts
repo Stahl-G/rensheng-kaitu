@@ -75,6 +75,7 @@ export * from "./locale.js";
 export { localStateRoot } from "./local-state.js";
 export * from "./plans.js";
 export * from "./handover.js";
+export * from "./reading-pack.js";
 
 export * from "./agent-file-policy.js";
 
