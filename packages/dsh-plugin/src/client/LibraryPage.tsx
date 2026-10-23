@@ -1,5 +1,5 @@
 import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import styles from "./InboxPage.module.css";
@@ -142,33 +142,13 @@ export function InboxPage({
   const [error, setError] = useState("");
   const generation = useRef(0);
   const reload = useRef<() => Promise<void>>(async () => {});
-  const readMatter = review?.readOnboardingMatter;
-  const readPage = useCallback(
-    async (query: LibraryQuery) => {
-      const page = await loadLibrary(query);
-      if (!readMatter) return page;
-      const inbox = await Promise.all(
-        page.inbox.map(async (entry) => {
-          if (entry.source !== "me") return entry;
-          // Archive folders use the archive date; the capture date retains the original source identity.
-          const source = entry.file.startsWith("inbox/notes/done/")
-            ? `inbox/notes/${entry.date?.slice(0, 10)}/${entry.file.split("/").at(-1)}`
-            : entry.file;
-          const matter = await readMatter(source);
-          return { ...entry, file: matter.source, status: matter.draft ? ("review" as const) : entry.status };
-        }),
-      );
-      return { ...page, inbox };
-    },
-    [loadLibrary, readMatter],
-  );
   useEffect(() => {
     let active = true;
     const load = async () => {
       const seq = ++generation.current;
       setLoading(true);
       try {
-        const page = await readPage({ section: "inbox", source });
+        const page = await loadLibrary({ section: "inbox", source });
         if (!active || seq !== generation.current) return;
         setEntries(page.inbox);
         setStatus((current) =>
@@ -193,13 +173,13 @@ export function InboxPage({
       generation.current++;
       off?.();
     };
-  }, [readPage, source, subscribe]);
+  }, [loadLibrary, source, subscribe]);
   const more = async () => {
     if (!next || loading) return;
     const seq = generation.current;
     setLoading(true);
     try {
-      const page = await readPage({ section: "inbox", source, before: next });
+      const page = await loadLibrary({ section: "inbox", source, before: next });
       if (seq !== generation.current) return;
       setEntries((current) => [...(current ?? []), ...page.inbox]);
       setNext(page.next ?? null);
@@ -211,7 +191,7 @@ export function InboxPage({
     }
   };
   const filtered = entries?.filter((entry) => status === "all" || entry.status === status) ?? [];
-  const selectedEntry = filtered.find((entry) => entry.file === selected) ?? filtered[0];
+  const selectedEntry = filtered.find((entry) => entry.file === selected);
   const away = overview?.sync.cloudOrganizer?.away;
   const sourceLabel = (id: string) =>
     id === "all"
@@ -354,10 +334,10 @@ export function InboxPage({
                     <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}
-                {review && selectedEntry.source === "me" && selectedEntry.status !== "organized" && (
+                {review && selectedEntry.originalSource && selectedEntry.status !== "organized" && (
                   <InboxReview
                     key={selectedEntry.file}
-                    file={selectedEntry.file}
+                    file={selectedEntry.originalSource}
                     services={review}
                     done={() => {
                       setSelected(
@@ -371,12 +351,12 @@ export function InboxPage({
                 )}
                 {!review &&
                   onReview &&
-                  selectedEntry.source === "me" &&
+                  selectedEntry.originalSource &&
                   selectedEntry.status !== "organized" && (
                     <button
                       type="button"
                       className={`${css.btn} ${css["btn-primary"]}`}
-                      onClick={() => onReview(selectedEntry.file)}
+                      onClick={() => onReview(selectedEntry.originalSource as string)}
                     >
                       {t("核对整理结果", "Review organized results")}
                     </button>
