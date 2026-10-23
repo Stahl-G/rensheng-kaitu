@@ -531,25 +531,34 @@ export function AskPage({
   useEffect(() => {
     if (!active) return;
     let current = true;
-    void Promise.all([
-      call<Settings>("askSettings"),
-      call<Automation>("automation"),
-      call<Thread[]>("askList"),
-    ])
-      .then(([ai, auto, list]) => {
-        if (!current) return;
-        setSettings(ai);
-        setAsked(auto.asked);
-        if (auto.asked) setAutomation(auto.tasks);
-        setThreads(list);
-        setLoaded(true);
-        if (!configurationRequested.current) {
-          if (ai.configured && !auto.asked && ai.choice !== "local") setStep(2);
-        }
+    const fail = (err: Error) => {
+      if (current) setError(err.message);
+    };
+    // 本地对话列表先显示，不等待连接状态或自动整理设置。
+    void call<Thread[]>("askList")
+      .then((list) => {
+        if (current) setThreads(list);
       })
-      .catch((err) => {
-        if (current) setError(err.message);
-      });
+      .catch(fail);
+    const ai = call<Settings>("askSettings");
+    const auto = call<Automation>("automation");
+    void ai.then((value) => {
+      if (!current) return;
+      setSettings(value);
+      setLoaded(true);
+    }, fail);
+    void auto.then((value) => {
+      if (!current) return;
+      setAsked(value.asked);
+      if (value.asked) setAutomation(value.tasks);
+    }, fail);
+    void Promise.all([ai, auto]).then(
+      ([value, automation]) => {
+        if (!current || configurationRequested.current) return;
+        if (value.configured && !automation.asked && value.choice !== "local") setStep(2);
+      },
+      () => {},
+    );
     return () => {
       current = false;
     };
