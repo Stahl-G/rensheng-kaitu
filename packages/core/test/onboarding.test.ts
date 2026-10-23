@@ -27,6 +27,7 @@ import {
   previewOnboardingMemory,
   previewOnboardingSetup,
   readExploration,
+  readLibrary,
   readMe,
   readOnboardingMatter,
   readOverviewPage,
@@ -221,20 +222,40 @@ it("每日整理起草并归档的原文不再算等待整理，草稿仍能核�
   try {
     const ws = await initWorkspace(join(root, "ws"));
     const sleep = await saveOnboardingMatter(ws, "想把入睡时间调到 11 点前");
+    const original = parseFrontmatter(ws.readText(sleep.source));
+    original.data.date = "2020-01-02";
+    original.data.created = "2020-01-01T16:30:00Z";
+    const oldSource = sleep.source;
+    sleep.source = `inbox/notes/2020-01-02/${oldSource.split("/").at(-1)}`;
+    ws.writeText(sleep.source, stringifyFrontmatter(original.data, original.body));
+    rmSync(ws.resolve(oldSource));
+    const projected = (source: string) =>
+      readLibrary(ws, { section: "inbox" }).inbox.find((entry) => entry.originalSource === source);
+    expect(projected(sleep.source)?.status).toBe("raw");
     const swim = await saveOnboardingMatter(ws, "想学会游泳");
     expect((await readOverviewPage(ws)).sync.received).toBe(2);
     const draft = { goal: "11 点前入睡", current: "常拖到 1 点", next: "今晚 10:30 放下手机" };
     await draftOnboardingMatter(ws, sleep.source, draft);
-    await inboxNoteDone(ws, sleep.source);
+    const archived = await inboxNoteDone(ws, sleep.source);
+    expect(projected(sleep.source)).toMatchObject({
+      file: archived.path,
+      originalSource: sleep.source,
+      date: "2020-01-01T16:30:00Z",
+      status: "review",
+    });
+    expect(archived.path).not.toContain("2020-01-02");
+    expect(readLibrary(ws).inbox.find((entry) => entry.file === archived.path)?.status).toBe("review");
     await draftOnboardingMatter(ws, swim.source, {
       goal: "学会游泳",
       current: "不会换气",
       next: "报一节体验课",
     });
     await keepOnboardingMatter(ws, swim.source);
+    expect(projected(swim.source)?.status).toBe("organized");
     expect((await readOverviewPage(ws)).sync.received).toBe(0);
     expect(readOnboardingMatter(ws, sleep.source).draft).toEqual(draft);
     await adoptOnboardingMatter(ws, sleep.source, draft);
+    expect(projected(sleep.source)?.status).toBe("organized");
     expect(listTasks(ws).map((task) => task.source)).toEqual([sleep.source]);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
