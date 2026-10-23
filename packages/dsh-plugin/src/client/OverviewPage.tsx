@@ -1,4 +1,4 @@
-import type { CalendarPushSettings, OnboardingStatus } from "@kaitu/core";
+import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
@@ -19,8 +19,9 @@ import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
-import { OnboardingNextCard } from "./OnboardingMatter.js";
+import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
+import { OnboardingFileImport } from "./OnboardingSources.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
@@ -45,6 +46,7 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  hosted?: boolean;
   initialChatDraft?: string;
   hosted?: boolean;
   load: () => Promise<OverviewData>;
@@ -63,6 +65,8 @@ export interface OverviewPageProps
     onConnections: () => void,
     promptRequest: number,
     active: boolean,
+    onToday: () => void,
+    onSettings: (section: "ai" | "local-ai") => void,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -170,6 +174,12 @@ function Overview({
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
+  const [connectionSection, setConnectionSection] = useState<"local-ai" | "cloud-organizer">();
+  const [importSource, setImportSource] = useState<
+    "choose" | "apple-health" | "chatgpt-conversations" | null
+  >(null);
+  const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
+  const askPanel = useRef<HTMLDivElement>(null);
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
@@ -280,7 +290,7 @@ function Overview({
       const seq = ++sequence;
       try {
         const value = await props.loadLibrary({
-          section: record === "notes" || record === "health" ? record : "summary",
+          section: record === "notes" || record === "health" ? record : record ? "summary" : undefined,
         });
         if (seq === sequence) setLibrary(value);
       } catch (err) {
@@ -388,6 +398,29 @@ function Overview({
       setView("ask");
     } else setView("connections");
   };
+  const openAskSettings = (section: "ai" | "local-ai") => {
+    if (section === "local-ai") {
+      setConnectionSection(section);
+      setView("connections");
+    } else manageAi(true);
+  };
+  useEffect(() => {
+    if (!configureRequest || !configureBuiltin || view !== "ask") return;
+    const panel = askPanel.current;
+    if (!panel) return;
+    const focus = () => {
+      const input = panel.querySelector<HTMLInputElement>('dialog[open] input[type="password"]');
+      if (!input) return false;
+      input.focus();
+      return true;
+    };
+    if (focus()) return;
+    const observer = new MutationObserver(() => {
+      if (focus()) observer.disconnect();
+    });
+    observer.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
+    return () => observer.disconnect();
+  }, [configureRequest, configureBuiltin, view]);
   const openSource = (source: string) => {
     if (source === "calendar" || source === "finance") {
       openRecord(source);
@@ -953,11 +986,85 @@ function Overview({
                 </h1>
               </div>
             </div>
+            {!record && importSource && (
+              <section className={css.sec} aria-label={t("导入已有导出文件", "Import an existing export")}>
+                {importSource === "choose" ? (
+                  <>
+                    <p>{t("选择导出文件的来源", "Choose the export source")}</p>
+                    <button type="button" className={css.btn} onClick={() => setImportSource("apple-health")}>
+                      Apple Health
+                    </button>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      onClick={() => setImportSource("chatgpt-conversations")}
+                    >
+                      ChatGPT
+                    </button>
+                    <button type="button" className={css.link} onClick={() => setImportSource(null)}>
+                      {t("取消", "Cancel")}
+                    </button>
+                  </>
+                ) : (
+                  <OnboardingFileImport
+                    {...props}
+                    key={importSource}
+                    source={importSource}
+                    onDone={async () => {
+                      setImportSource(null);
+                      setLibrary(await props.loadLibrary({}));
+                      await refresh();
+                    }}
+                    onClose={() => setImportSource(null)}
+                  />
+                )}
+              </section>
+            )}
+            {record === "inbox" && reviewMatter && onboarding && (
+              <section className={css.sec} aria-label={t("核对这条原文", "Review this original")}>
+                <button
+                  type="button"
+                  className={css.link}
+                  disabled={busy}
+                  onClick={() => setReviewMatter(null)}
+                >
+                  {t("回到收件箱", "Back to inbox")}
+                </button>
+                <OnboardingMatter
+                  {...props}
+                  key={reviewMatter.source}
+                  initial={reviewMatter}
+                  content={onboarding.content.matter}
+                  builtin={!!props.renderAsk}
+                  onPrompt={prompt}
+                  onBusy={setBusy}
+                  onDone={async () => {
+                    setReviewMatter(null);
+                    await refresh();
+                  }}
+                />
+              </section>
+            )}
             {!record ? (
               <LibraryPage
                 data={library}
                 open={openRecord}
-                inboxCount={data ? data.sync.received + data.inboxNotes : undefined}
+                overview={data}
+                capture={async (text) => {
+                  await props.capture(text);
+                  const value = await props.loadLibrary({});
+                  setLibrary(value);
+                  await refresh();
+                }}
+                onAdd={(kind) => {
+                  if (kind === "file") setImportSource("choose");
+                  else if (kind === "category") setView("explore");
+                  else {
+                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : undefined);
+                    setChannelFocus(kind === "phone");
+                    setView("connections");
+                  }
+                }}
               />
             ) : record === "calendar" ? (
               <CalendarPage {...props} initialAdding={calendarAdding} />
@@ -980,27 +1087,49 @@ function Overview({
                 timeZone={data?.timeZone}
               />
             ) : record === "inbox" ? (
-              <InboxPage
-                sources={data?.plans.sources}
-                openNext={(id, goalId) => {
-                  setGuide(null);
-                  setView("overview");
-                  setTimeout(
-                    () =>
-                      (
-                        document.getElementById(`next-${id}`) ?? document.getElementById(`plan-${goalId}`)
-                      )?.scrollIntoView({ block: "center" }),
-                    0,
-                  );
-                }}
-                loadLibrary={props.loadLibrary}
-                subscribe={props.subscribe}
-                channelSettings={props.channelSettings}
-                connect={() => {
-                  setView("connections");
-                  setChannelFocus(true);
-                }}
-              />
+              reviewMatter ? null : (
+                <InboxPage
+                  overview={data}
+                  review={{
+                    readOnboardingMatter: props.readOnboardingMatter,
+                    adoptOnboardingMatter: async (...args) => {
+                      const result = await props.adoptOnboardingMatter(...args);
+                      await refresh();
+                      return result;
+                    },
+                    keepOnboardingMatter: async (file) => {
+                      const result = await props.keepOnboardingMatter(file);
+                      await refresh();
+                      return result;
+                    },
+                  }}
+                  onReview={(file) => {
+                    void props
+                      .readOnboardingMatter(file)
+                      .then(setReviewMatter)
+                      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+                  }}
+                  sources={data?.plans.sources}
+                  openNext={(id, goalId) => {
+                    setGuide(null);
+                    setView("overview");
+                    setTimeout(
+                      () =>
+                        (
+                          document.getElementById(`next-${id}`) ?? document.getElementById(`plan-${goalId}`)
+                        )?.scrollIntoView({ block: "center" }),
+                      0,
+                    );
+                  }}
+                  loadLibrary={props.loadLibrary}
+                  subscribe={props.subscribe}
+                  channelSettings={props.channelSettings}
+                  connect={() => {
+                    setView("connections");
+                    setChannelFocus(true);
+                  }}
+                />
+              )
             ) : (
               <NotesPage
                 data={library}
@@ -1015,7 +1144,7 @@ function Overview({
                 onPrompt={prompt}
                 onSaved={() => {
                   void props
-                    .loadLibrary()
+                    .loadLibrary({})
                     .then(setLibrary)
                     .catch((err) => setError(String(err)));
                 }}
@@ -1058,7 +1187,7 @@ function Overview({
           </>
         )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div className={css.askPanel} hidden={view !== "ask"}>
+          <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
             {props.renderAsk(
               promptDraft,
               configureRequest,
@@ -1066,6 +1195,11 @@ function Overview({
               () => setView("connections"),
               promptRequest,
               view === "ask",
+              () => {
+                setGuide(null);
+                setView("overview");
+              },
+              openAskSettings,
             )}
           </div>
         )}
@@ -1083,6 +1217,8 @@ function Overview({
               startGuide();
             }}
             channelSettings={props.channelSettings}
+            focusSection={connectionSection}
+            onSectionFocused={() => setConnectionSection(undefined)}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}

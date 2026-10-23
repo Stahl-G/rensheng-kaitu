@@ -3013,6 +3013,9 @@
     padding-left: 32px;
     padding-right: 32px;
   }
+  .top {
+    padding-left: max(32px, var(--dsh-frame-leading-clearance, 0px));
+  }
 }
 @container (max-width: 959px) {
   .tabs button {
@@ -3024,6 +3027,9 @@
   .content {
     padding-left: 20px;
     padding-right: 20px;
+  }
+  .top {
+    padding-left: max(20px, var(--dsh-frame-leading-clearance, 0px));
   }
   .brandName,
   .settingsLabel {

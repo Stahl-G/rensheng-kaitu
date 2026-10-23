@@ -25,6 +25,7 @@ export function SessionPage(props: Props) {
     <FileServicesContext.Provider value={props.fileServices}>
       {error && <p role="alert">{error}</p>}
       <OverviewPage
+        hosted
         {...props}
         hosted
         onPrompt={(text) => void open(text)}
