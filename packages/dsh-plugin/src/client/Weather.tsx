@@ -6,6 +6,61 @@ import { useLocale, useT } from "./i18n.js";
 
 type Tod = "morning" | "noon" | "dusk" | "night";
 
+/** Decorative only: the existing forecast and time-of-day gradient remain the source of truth. */
+function WeatherSky({ tod, code }: { tod: Tod; code: number }) {
+  return (
+    <div className={css.sky} aria-hidden="true">
+      <svg
+        className={css.atmosphere}
+        viewBox="0 0 1200 240"
+        preserveAspectRatio="xMidYMid slice"
+        focusable="false"
+        aria-hidden="true"
+      >
+        {tod === "night" && code <= 2 && (
+          <g className={css.stars}>
+            {[
+              [90, 32],
+              [210, 92],
+              [355, 22],
+              [465, 65],
+              [558, 30],
+              [620, 101],
+              [704, 48],
+              [815, 20],
+              [890, 85],
+              [1010, 42],
+              [1115, 108],
+            ].map(([x, y], index) => (
+              <circle
+                className={css.star}
+                key={`${x}-${y}`}
+                cx={x}
+                cy={y}
+                r={index % 3 === 0 ? 1.8 : 1.2}
+                style={{ animationDelay: `${-index * 0.7}s` }}
+              />
+            ))}
+          </g>
+        )}
+        {code > 0 && (
+          <g className={css.clouds}>
+            <g className={css.cloud}>
+              <path d="M355 100c-24 0-24-30-4-34 0-30 49-38 60-10 22-10 43 7 40 24 30-2 34 26 9 26H355Z" />
+            </g>
+            <g className={css.cloud}>
+              <path d="M725 57c-27 0-30-30-7-37 3-27 44-31 55-8 20-8 39 5 39 21 24-1 31 26 4 29H725Z" />
+            </g>
+            <g className={css.cloud}>
+              <path d="M940 135c-23 0-26-27-6-33 0-27 39-34 52-13 20-11 42 5 40 24 24-2 31 27 6 27H940Z" />
+            </g>
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+}
+
 // WMO 天气代码，Open-Meteo 用的就是这一套。
 function condition(code: number, t: (zh: string, en: string) => string) {
   if (code === 0) return t("晴", "Clear");
@@ -224,7 +279,7 @@ export function TodayWeather({
         data-tod={tod}
         aria-label={t("今天的天气，收起", "Today's weather, collapsed")}
       >
-        <div className={css.sky} />
+        <WeatherSky tod={tod} code={forecast.current.code} />
         <div className={css.barIn}>
           {place}
           <span className={css.barTemp}>{round(forecast.current.temperature)}</span>
@@ -242,7 +297,7 @@ export function TodayWeather({
     );
   return (
     <section className={css.wx} data-tod={tod} aria-label={t("今天的天气", "Today's weather")}>
-      <div className={css.sky} />
+      <WeatherSky tod={tod} code={forecast.current.code} />
       <div className={css.inner}>
         <div className={css.top}>
           <div>
