@@ -9,8 +9,10 @@ import {
   explorationCommandSchema,
   inboxNoteDone,
   inboxNotes,
+  learningCheckinSchema,
   lifeMap,
   listInvestments,
+  listLearning,
   listMemories,
   listProjects,
   listTasks,
@@ -25,6 +27,7 @@ import {
   readAgentFile,
   readExperienceImports,
   readExploration,
+  readLearning,
   readNews,
   readPhases,
   readRecords,
@@ -33,9 +36,12 @@ import {
   recordReferences,
   removeMemory,
   resolvePlace,
+  saveLearningCheckin,
   searchChats,
   searchMemories,
   snapshot,
+  startLearning,
+  startLearningSchema,
   syncProject,
   syncProjects,
   tryNews,
@@ -292,6 +298,24 @@ export function createMcpServer(
       annotations: { readOnlyHint: false },
     },
     ({ slug, view }) => wrap(() => writeProjectView(ws, slug, view)),
+  );
+  register("learning_list", "列出学习主题与各自的下一步。", {}, () => listLearning(ws));
+  register("learning_read", "读取一个学习主题的来源、学习记录和下一步。", { topic: text }, ({ topic }) =>
+    readLearning(ws, topic),
+  );
+  register(
+    "learning_start",
+    "存一篇材料并开一个学习主题；已有主题就沿用，不覆盖笔记。没读到原文时只存链接，不编正文。",
+    startLearningSchema.shape,
+    (input) => startLearning(ws, input),
+    true,
+  );
+  register(
+    "learning_save",
+    "追加用户自己说出的理解、没弄懂的问题和一个小的下一步；AI 的讲解不算用户理解。每次新保存用新的 operationId。",
+    learningCheckinSchema.shape,
+    (input) => saveLearningCheckin(ws, input),
+    true,
   );
   register("project_list", "列出项目进度与下一步。", {}, () => listProjects(ws));
   register("project_github", "读取项目 GitHub 快照与同步状态。", { slug: text }, ({ slug }) => {

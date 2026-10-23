@@ -71,7 +71,7 @@ interface Runs {
     html_url: string;
   }[];
 }
-interface GithubOptions {
+export interface GithubOptions {
   now?: Date;
   api?: string;
   fetch?: typeof fetch;
@@ -235,7 +235,19 @@ export async function bindGithub(ws: Workspace, slug: string, url: string, optio
     return syncGithub(ws, slug, options);
   });
 }
+// 同一个工作区的 GitHub 同步排队：手动同步和后台每小时同步都改 github-state.json 和版本库。
+const syncQueues = new Map<string, Promise<unknown>>();
+
 export async function syncGithub(ws: Workspace, slug: string, options: GithubOptions = {}) {
+  const run = (syncQueues.get(ws.root) ?? Promise.resolve()).then(() => syncGithubNow(ws, slug, options));
+  syncQueues.set(
+    ws.root,
+    run.catch(() => {}),
+  );
+  return run;
+}
+
+async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
     let repo = project.data.github?.repo;
@@ -381,6 +393,7 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
         repo,
         ok: true,
         problem,
+        statusChanged: !!previousState?.error || (previousState?.problem ?? null) !== problem,
         snapshot: record,
         version: same && !renamed ? null : await snapshot(ws, `同步了 GitHub：${project.data.title}`, now),
       };
@@ -393,7 +406,15 @@ export async function syncGithub(ws: Workspace, slug: string, options: GithubOpt
         error: error instanceof KaituError ? error.message : "GitHub 同步失败",
       };
       ws.writeJson(stateFile, state, { internal: true });
-      return { slug, repo, ok: false, problem, snapshot: null, version: null };
+      return {
+        slug,
+        repo,
+        ok: false,
+        problem,
+        statusChanged: previousState?.error !== state.repos[slug].error || previousState?.problem !== problem,
+        snapshot: null,
+        version: null,
+      };
     }
   });
 }
