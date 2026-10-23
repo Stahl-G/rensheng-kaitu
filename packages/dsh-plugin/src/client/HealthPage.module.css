@@ -93,7 +93,7 @@
 .page button:focus-visible,
 .page select:focus-visible,
 .details summary:focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 3px solid var(--link-line);
   outline-offset: 4px;
 }
 .panel {
