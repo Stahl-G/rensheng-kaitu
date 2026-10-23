@@ -72,6 +72,7 @@ import {
   defaultRoot,
   directionsPrompt,
   dismissNews,
+  disposeNoteIndex,
   draftOnboardingMatter,
   dshFiles,
   editCalendarBlock,
@@ -136,6 +137,7 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  searchLibraryNotes,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -192,7 +194,10 @@ export class KaituOverviewService extends TypertRemoteService {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => this.files.dispose());
+    ctx.effect(() => () => {
+      this.files.dispose();
+      disposeNoteIndex(this.workspace);
+    });
     this.scheduleLearningVersion = (message) => {
       setImmediate(() => {
         void this.write(() => snapshot(this.workspace, message)).catch((error) =>
@@ -387,6 +392,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("libraryDocument")
   async libraryDocument(file: string): Promise<string> {
     return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("searchLibraryNotes")
+  async searchLibraryNotes(query: string): Promise<import("@kaitu/core").NoteSearchResult[]> {
+    return searchLibraryNotes(this.workspace, query);
   }
 
   @Remote("learningList")

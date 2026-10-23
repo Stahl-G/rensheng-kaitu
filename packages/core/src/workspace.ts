@@ -16,6 +16,7 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
 import { invalidateHistoryFile, maintainHistoryIgnore } from "./history.js";
+import { invalidateNoteIndex } from "./note-search.js";
 import { holdOverview, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
@@ -279,6 +280,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
@@ -291,6 +293,7 @@ export class Workspace {
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 

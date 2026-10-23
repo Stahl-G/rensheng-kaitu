@@ -123,6 +123,7 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  searchLibraryNotes,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -292,6 +293,8 @@ export async function productRequest(
       return readLibrary(ws, args[0] as Parameters<typeof readLibrary>[1]);
     case "libraryDocument":
       return readLibraryDocument(ws, text(0));
+    case "searchLibraryNotes":
+      return searchLibraryNotes(ws, text(0));
     case "learningList":
       return listLearning(ws);
     case "learningRead":

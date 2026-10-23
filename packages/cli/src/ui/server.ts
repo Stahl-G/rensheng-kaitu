@@ -27,6 +27,7 @@ import {
   deferSnapshots,
   disableSync,
   discardUpload,
+  disposeNoteIndex,
   dshFiles,
   enableSync,
   externalHealthPaths,
@@ -872,6 +873,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
+    disposeNoteIndex(ws);
     await exclusive(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>
