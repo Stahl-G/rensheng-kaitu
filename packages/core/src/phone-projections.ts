@@ -63,17 +63,16 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
       actions: hasTasks
         ? ["adopt_task", "create_task", "update_task", "complete_task", "cancel_task", "complete_next"]
         : ["complete_next"],
-      tasks: (hasTasks
-        ? listTasks(ws, { status: "all" }).filter((task) => task.status !== "proposed")
-        : []
-      ).map(({ id, rev, title, status, ts, due }) => ({
-        id,
-        rev: rev ?? 1,
-        title,
-        status,
-        ts,
-        ...(due ? { due } : {}),
-      })),
+      tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
+        ({ id, rev, title, status, ts, due }) => ({
+          id,
+          rev: rev ?? 1,
+          title,
+          status,
+          ts,
+          ...(due ? { due } : {}),
+        }),
+      ),
     },
     next: data.next.slice(0, 3).map(({ id, title, file, module, section, proposed }) => ({
       id,
