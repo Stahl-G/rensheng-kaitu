@@ -22,7 +22,7 @@ export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径�
 - 概念卡/自判小测 → kaitu_learning_card；互动模拟 → kaitu_learning_widget。先问后展示，答案不自动回传模型。PPT 仅用户明确要求时用已安装的 openmaic_slide；不默认调用 openmaic_generate。
 - task add/list/done/cancel → kaitu_tasks；inbox notes/done/process → kaitu_inbox。
 - project list/new/show/link/set/log/sync → kaitu_projects；项目内文件用 project-read/project-write；自定义视图用 project_view_write（slug、view），格式按 project 技能。
-- import ${fileImportSources.join("/")} → kaitu_import，只预览，实际导入由用户在已有导入界面选择文件、核对并确认；文件用用户指定的本机绝对路径或工作区内相对路径。
+- import ${fileImportSources.join("/")} → kaitu_import，只预览；实际导入在设置 → 同步与备份 → 资料 → 导入文件选择对应类型、文件，核对并确认；文件用用户指定的本机绝对路径或工作区内相对路径。
 - photo add/list/rm → kaitu_photos；头像用「关于我」的上传入口。
 - drive status/enable/disable → kaitu_drive。迁移后工具和技能自动切换到新工作区。
 - 每日整理按 ORGANIZER.md 执行，归档交接用 kaitu_workspace archive-handoffs。
