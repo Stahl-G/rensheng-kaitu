@@ -48,6 +48,8 @@ export async function createAgentRuntime(options: {
   path?: string;
   mcp: McpCommand;
   env?: NodeJS.ProcessEnv;
+  /** 只收发文字：不挂开图工具，所有权限请求直接拒绝。 */
+  textOnly?: boolean;
 }): Promise<AskRuntime> {
   const { agent } = options;
   const env = agentEnvironment(agent, options.env);
@@ -125,7 +127,7 @@ export async function createAgentRuntime(options: {
     running.set(id, state);
     state.rpc = connectAcp(child, {
       permission(params) {
-        if (state.cancelled || closed) return Promise.resolve(null);
+        if (state.cancelled || closed || options.textOnly) return Promise.resolve(null);
         const choices = Array.isArray(params.options)
           ? params.options.filter(
               (item): item is { optionId: string; kind: string; name: string } =>
@@ -224,13 +226,15 @@ export async function createAgentRuntime(options: {
       if (!method) throw new Error("resume unsupported");
       const result = await state.rpc.request(method, {
         cwd: options.workspace,
-        mcpServers: [
-          {
-            name: "kaitu",
-            ...options.mcp,
-            env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
-          },
-        ],
+        mcpServers: options.textOnly
+          ? []
+          : [
+              {
+                name: "kaitu",
+                ...options.mcp,
+                env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
+              },
+            ],
         ...(resume ? { sessionId: resume } : {}),
       });
       state.upstream = result.sessionId ?? resume ?? "";

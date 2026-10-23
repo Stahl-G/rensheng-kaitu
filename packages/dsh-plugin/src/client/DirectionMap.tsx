@@ -1,7 +1,7 @@
-import type { DirectionMapState } from "@kaitu/core";
+import type { DirectionMapState, DirectionQuote } from "@kaitu/core";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import css from "./DirectionMap.module.css";
-import { useLocale, useT } from "./i18n.js";
+import { type Locale, useLocale, useT } from "./i18n.js";
 
 // 目标的颜色按顺序取模块色；颜色只用来分组，不代表含义。
 const tones = ["--doing", "--me", "--health", "--news", "--finance"] as const;
@@ -9,7 +9,7 @@ const tones = ["--doing", "--me", "--health", "--news", "--finance"] as const;
 /**
  * 方向页的「我在推进什么」：点一下让已连接的 AI 读目标、项目和日志，
  * 按固定样子画出 想达成 → 正在做 → 下一步，再附几句导师式的建议。
- * 连线是开图的看法，每条都带原文依据，用户可以点「不对」去掉。
+ * 连线是开图的看法，每条都带出处明确的原文，用户可以点「不对」去掉。
  */
 export function DirectionMap({
   load,
@@ -18,11 +18,11 @@ export function DirectionMap({
   onConnect,
   openProject,
 }: {
-  load: () => Promise<DirectionMapState>;
-  generate: () => Promise<DirectionMapState>;
+  load: (locale: Locale) => Promise<DirectionMapState>;
+  generate: (locale: Locale) => Promise<DirectionMapState>;
   dismiss: (goal: string, project: string) => Promise<DirectionMapState>;
   onConnect?: () => void;
-  openProject: () => void;
+  openProject: (slug: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -31,10 +31,10 @@ export function DirectionMap({
   const board = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<{ d: string; tone: string; dashed: boolean }[]>([]);
   const refresh = useCallback(() => {
-    void load()
+    void load(locale)
       .then(setState)
       .catch(() => {});
-  }, [load]);
+  }, [load, locale]);
   useEffect(() => refresh(), [refresh]);
   // 正在看时读本机缓存，看完就停。
   useEffect(() => {
@@ -45,16 +45,14 @@ export function DirectionMap({
   const start = async () => {
     setError("");
     try {
-      setState(await generate());
+      setState(await generate(locale));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
   const map = state?.map;
   const input = state?.input;
-  const links = (map?.links ?? []).filter(
-    (link) => !state?.dismissed.includes(`${link.goal}|${link.project}`),
-  );
+  const links = map?.links ?? [];
   const goals = input?.goals ?? [];
   const toneOf = (goal: string): string =>
     tones[
@@ -64,7 +62,7 @@ export function DirectionMap({
       ) % tones.length
     ] ?? "--doing";
   // 连线跟着卡片的实际位置画；窗口变窄时卡片上下排，线不画，理由仍写在项目卡里。
-  // biome-ignore lint/correctness/useExhaustiveDependencies: links 和颜色都由 map 与「不对」算出，只在它们变化时重画。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 连线由看法和当前资料算出，只在它们变化时重画。
   useLayoutEffect(() => {
     const root = board.current;
     if (!root || !map) return;
@@ -90,10 +88,11 @@ export function DirectionMap({
         const b = at(`project:${link.project}`, "l");
         if (a && b) next.push({ d: curve(a, b), tone: toneOf(link.goal), dashed: true });
       }
-      for (const step of map.next) {
+      // 只有用户定下的下一步画实线；建议和空缺都是虚线。
+      for (const step of state?.next ?? []) {
         const a = at(`project:${step.project}`, "r");
         const b = at(`next:${step.project}`, "l");
-        if (a && b) next.push({ d: curve(a, b), tone: "--line-strong", dashed: false });
+        if (a && b) next.push({ d: curve(a, b), tone: "--line-strong", dashed: step.kind !== "todo" });
       }
       setPaths(next);
     };
@@ -101,17 +100,18 @@ export function DirectionMap({
     const observer = new ResizeObserver(draw);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [map, state?.dismissed]);
+  }, [map, input, state?.next]);
 
   if (!state) return null;
+  const projects = input?.projects ?? [];
   const header = (
     <div className={css.lens}>
       <span>
         <b>{t("开图的看法", "Kaitu's view")}</b>
         {state.generatedAt &&
           t(
-            ` · ${new Date(state.generatedAt).toLocaleDateString(locale)} 根据 ${goals.length} 个目标、${input?.projects.length ?? 0} 个项目最近 30 天的记录整理`,
-            ` · ${new Date(state.generatedAt).toLocaleDateString(locale)}, from ${goals.length} goals and ${input?.projects.length ?? 0} projects over the last 30 days`,
+            ` · ${new Date(state.generatedAt).toLocaleDateString(locale)} 根据 ${goals.length} 个目标、${projects.length} 个项目最近 30 天的记录整理`,
+            ` · ${new Date(state.generatedAt).toLocaleDateString(locale)}, from ${goals.length} goals and ${projects.length} projects over the last 30 days`,
           )}
       </span>
       <button type="button" className={css.primary} disabled={state.running} onClick={() => void start()}>
@@ -137,7 +137,7 @@ export function DirectionMap({
         {failure && (
           <p className={css.error} role="alert">
             {failure}{" "}
-            {/AI_NOT_CONFIGURED|连上 AI/.test(failure) && onConnect && (
+            {/AI_NOT_CONFIGURED|连上 AI|Connect AI/.test(failure) && onConnect && (
               <button type="button" className={css.link} onClick={onConnect}>
                 {t("去连接 AI", "Connect AI")}
               </button>
@@ -146,12 +146,42 @@ export function DirectionMap({
         )}
       </section>
     );
-  const projects = input?.projects ?? [];
   const title = (slug: string) => projects.find((p) => p.slug === slug)?.title ?? slug;
   const last = (slug: string) => projects.find((p) => p.slug === slug)?.logs[0];
+  // 依据写明出自哪里：哪个目标、哪个项目的哪天日志或下一步。
+  const from = ({ source, quote }: DirectionQuote) => {
+    const [kind, id = "", rest = ""] = source.split(":");
+    const place =
+      kind === "g"
+        ? t(
+            `目标「${goals.find((g) => g.id === id)?.title ?? id}」`,
+            `goal “${goals.find((g) => g.id === id)?.title ?? id}”`,
+          )
+        : kind === "l"
+          ? t(`「${title(id)}」${rest.split("#")[0]} 的日志`, `“${title(id)}” log, ${rest.split("#")[0]}`)
+          : kind === "n"
+            ? t(`「${title(id)}」的下一步`, `“${title(id)}” next step`)
+            : kind === "d"
+              ? t("你在探索的方向", "a direction you're exploring")
+              : t(`项目「${title(id)}」`, `project “${title(id)}”`);
+    return (
+      <span className={css.meta}>
+        {" "}
+        {t("依据", "From")} {place}：「{quote}」
+      </span>
+    );
+  };
   return (
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
       {header}
+      {state.stale && (
+        <output className={css.stale}>
+          {t(
+            "这之后你的目标或项目有变化：卡片已按现在的资料画，对不上的看法已撤下。想更新就点「重新看一遍」。",
+            "Your goals or projects changed since then. Cards show your current notes and views that no longer match were removed. Choose “Look again” to refresh.",
+          )}
+        </output>
+      )}
       {failure && (
         <p className={css.error} role="alert">
           {failure}
@@ -184,6 +214,20 @@ export function DirectionMap({
               {goal.why && <p>{goal.why}</p>}
             </div>
           ))}
+          {!!input?.directions.length && (
+            <>
+              <h3>{t("也在探索", "Also exploring")}</h3>
+              {input.directions.map((direction) => (
+                <div key={direction.id} className={`${css.card} ${css.direction}`}>
+                  <strong>{direction.title}</strong>
+                  {direction.status === "paused" && (
+                    <span className={css.meta}> · {t("先放一放", "Paused")}</span>
+                  )}
+                  {direction.motivation && <p>{direction.motivation}</p>}
+                </div>
+              ))}
+            </>
+          )}
         </div>
         <div className={css.col}>
           <h3>{t("正在做", "Working on")}</h3>
@@ -193,7 +237,7 @@ export function DirectionMap({
             const loose = map.unlinked.find((row) => row.project === project.slug);
             return (
               <div key={project.slug} data-node={`project:${project.slug}`} className={css.card}>
-                <button type="button" className={css.title} onClick={openProject}>
+                <button type="button" className={css.title} onClick={() => openProject(project.slug)}>
                   {project.title}
                 </button>
                 {recent ? (
@@ -210,10 +254,7 @@ export function DirectionMap({
                     {t("开图觉得它在帮", "Kaitu thinks it helps")}「
                     {goals.find((g) => g.id === link.goal)?.title}」：
                     {link.reason}
-                    <span className={css.meta}>
-                      {" "}
-                      {t("依据", "From")}「{link.quote}」
-                    </span>
+                    {from(link)}
                     <button
                       type="button"
                       className={css.link}
@@ -230,22 +271,27 @@ export function DirectionMap({
         </div>
         <div className={css.col}>
           <h3>{t("下一步", "Next")}</h3>
-          {map.next.map((step) => (
+          {state.next.map((step) => (
             <div
               key={step.project}
               data-node={`next:${step.project}`}
-              className={step.text && !step.suggested ? css.card : `${css.card} ${css.suggested}`}
+              className={step.kind === "todo" ? css.card : `${css.card} ${css.suggested}`}
             >
               <strong>{step.text || t("还没有下一步", "No next step yet")}</strong>
               <p className={css.meta}>
-                {step.suggested
-                  ? step.text
-                    ? t(`开图建议 · ${title(step.project)}`, `Suggested by Kaitu · ${title(step.project)}`)
-                    : t(
-                        `给「${title(step.project)}」定一个小动作`,
-                        `Pick a small step for “${title(step.project)}”`,
+                {step.kind === "todo"
+                  ? t(`来自「${title(step.project)}」的下一步`, `From “${title(step.project)}”`)
+                  : step.kind === "proposed"
+                    ? t(
+                        `待你采纳的建议 · ${title(step.project)}`,
+                        `Suggestion waiting for you · ${title(step.project)}`,
                       )
-                  : t(`来自「${title(step.project)}」的下一步`, `From “${title(step.project)}”`)}
+                    : step.kind === "suggested"
+                      ? t(`开图建议 · ${title(step.project)}`, `Suggested by Kaitu · ${title(step.project)}`)
+                      : t(
+                          `给「${title(step.project)}」定一个小动作`,
+                          `Pick a small step for “${title(step.project)}”`,
+                        )}
               </p>
             </div>
           ))}
@@ -257,10 +303,7 @@ export function DirectionMap({
           {map.mentor.map((item) => (
             <p key={item.text}>
               {item.text}
-              <span className={css.meta}>
-                {" "}
-                {t("依据", "From")}「{item.evidence[0]}」
-              </span>
+              {item.evidence[0] && from(item.evidence[0])}
             </p>
           ))}
         </div>

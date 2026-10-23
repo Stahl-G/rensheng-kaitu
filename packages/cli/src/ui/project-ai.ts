@@ -61,8 +61,30 @@ export async function askText(
     const sending = ask.send(thread.id, prompt);
     void sending.catch(() => {});
     return await Promise.race([response, sending.then(() => response)]);
+  } catch (error) {
+    // 超时或出错时停下这次回答，不让它在后台继续跑。
+    await ask.cancel(thread.id).catch(() => {});
+    throw error;
   } finally {
     stop();
     clearTimeout(timer);
+  }
+}
+
+/**
+ * 只收发文字的一次性对话：不进问问历史，执行层拒绝任何工具调用，
+ * 成功、失败、超时都关掉这次的 AI 进程。
+ */
+export async function askTextOnly(
+  parent: AskService,
+  prompt: string,
+  messages: { timeout: string; empty: string },
+  ms = 60000,
+): Promise<string> {
+  const service = parent.background(undefined, { textOnly: true });
+  try {
+    return await askText(service, prompt, messages, ms);
+  } finally {
+    await service.close().catch(() => {});
   }
 }

@@ -75,6 +75,7 @@ import {
   onboardingStatus,
   pasteDirections,
   pasteOnboardingMatter,
+  pick,
   previewExperienceBatch,
   previewFinanceImport,
   previewOnboardingImport,
@@ -141,7 +142,7 @@ import {
 import { directionGeneration } from "./directions-ai.js";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
-import { askText, suggestProjectGoal } from "./project-ai.js";
+import { askTextOnly, suggestProjectGoal } from "./project-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -462,19 +463,29 @@ export async function productRequest(
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
     case "directionMap":
-      return readDirectionMap(ws);
+      return readDirectionMap(ws, locale(0));
     case "directionMapGenerate": {
+      const lang = locale(0);
       if (!ask || !(await ask.settings()).configured)
-        throw new KaituError("先到「AI 与连接」连上 AI，开图才能帮你看", "AI_NOT_CONFIGURED");
+        throw new KaituError(
+          pick(lang, "先到「AI 与连接」连上 AI，开图才能帮你看", "Connect AI in AI & Connections first"),
+          "AI_NOT_CONFIGURED",
+        );
       const service = ask;
       // 等 AI 是外部的事：立刻返回「正在看」，结果写进本机缓存，界面再读。
-      return generateDirectionMap(ws, (prompt) =>
-        askText(
-          service,
-          prompt,
-          { timeout: "开图看得太久了，请再试一次", empty: "AI 没有回答，请再试一次" },
-          120000,
-        ),
+      return generateDirectionMap(
+        ws,
+        (prompt) =>
+          askTextOnly(
+            service,
+            prompt,
+            {
+              timeout: pick(lang, "开图看得太久了，请再试一次", "Kaitu took too long. Try again."),
+              empty: pick(lang, "AI 没有回答，请再试一次", "The AI didn't answer. Try again."),
+            },
+            120000,
+          ),
+        lang,
       );
     }
     case "directionMapDismiss":

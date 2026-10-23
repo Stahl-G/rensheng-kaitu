@@ -54,8 +54,8 @@ export interface OverviewPageProps
     CalendarPageProps,
     LibraryProps {
   /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
-  loadDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
-  generateDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
+  loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
+  generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
   /** 今天页天气：读本机缓存、设城市；宿主没提供时不显示天气。 */
   loadWeather?: () => Promise<import("@kaitu/core").WeatherState>;
@@ -329,6 +329,7 @@ function Overview({
   const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
   const [libraryFile, setLibraryFile] = useState<string>();
   const [libraryGoal, setLibraryGoal] = useState<string>();
+  const [projectFocus, setProjectFocus] = useState<string>();
   useEffect(() => {
     if (view !== "records" || record !== "projects" || !libraryGoal) return;
     const target = document.getElementById(`plan-${libraryGoal}`);
@@ -518,6 +519,7 @@ function Overview({
     setLibraryEntry(undefined);
     setLibraryFile(undefined);
     setLibraryGoal(undefined);
+    setProjectFocus(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
@@ -765,7 +767,10 @@ function Overview({
                 generate={props.generateDirectionMap}
                 dismiss={props.dismissDirectionLink}
                 onConnect={() => setView("connections")}
-                openProject={() => openRecord("projects")}
+                openProject={(slug) => {
+                  openRecord("projects");
+                  setProjectFocus(slug);
+                }}
               />
             ) : (
               <ProgressMap
@@ -1256,7 +1261,7 @@ function Overview({
               <>
                 {plansCard}
                 {renderTasks(true)}
-                <ProjectsLibrary {...child} timeZone={data?.timeZone} />
+                <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
               </>
             ) : record === "health" ? (
               <HealthLibrary
