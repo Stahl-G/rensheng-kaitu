@@ -7,6 +7,8 @@ export const locales = ["zh-CN", "en"] as const;
 export type Locale = (typeof locales)[number];
 export interface Preferences {
   locale: Locale | null;
+  weatherCity?: string;
+  todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
   /** Resolved UI state only; an automatic choice is never persisted as a manual choice. */
@@ -34,12 +36,25 @@ function entryList(value: unknown): value is string[] {
   );
 }
 
+function adoptionList(value: unknown): value is NonNullable<Preferences["todayAdoptions"]> {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Preferences["todayAdoptions"];
+  return (
+    !!entry &&
+    typeof entry.workspace === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(entry.day) &&
+    entryList(entry.ids)
+  );
+}
+
 /** 界面偏好只存在本机状态目录：不进工作区、不同步、不进版本历史。 */
 export function readPreferences(): Preferences {
   try {
     const value = JSON.parse(readFileSync(file(), "utf8")) as Partial<Preferences>;
     return {
       locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
+      ...(adoptionList(value.todayAdoptions) ? { todayAdoptions: value.todayAdoptions } : {}),
+      ...(typeof value.weatherCity === "string" ? { weatherCity: value.weatherCity } : {}),
       ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
     };
   } catch {
@@ -52,7 +67,13 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     !input ||
     typeof input !== "object" ||
     Array.isArray(input) ||
-    Object.keys(input).some((key) => key !== "locale" && key !== "exploreEntries") ||
+    Object.keys(input).some(
+      (key) =>
+        key !== "locale" && key !== "exploreEntries" && key !== "weatherCity" && key !== "todayAdoptions",
+    ) ||
+    (input.todayAdoptions !== undefined && !adoptionList(input.todayAdoptions)) ||
+    (input.weatherCity !== undefined &&
+      (typeof input.weatherCity !== "string" || input.weatherCity.length > 100)) ||
     (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
     (input.locale !== null && input.locale !== undefined && !locales.includes(input.locale))
   )

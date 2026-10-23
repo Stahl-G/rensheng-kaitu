@@ -26,6 +26,7 @@ export function SessionPage(props: Props) {
       {error && <p role="alert">{error}</p>}
       <OverviewPage
         {...props}
+        hosted
         onPrompt={(text) => void open(text)}
         onAgent={() => void open()}
         renderAsk={(prompt, _configure, _builtin, _connections, promptRequest) => (
