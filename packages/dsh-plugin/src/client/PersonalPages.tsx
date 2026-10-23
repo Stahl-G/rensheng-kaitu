@@ -830,6 +830,42 @@ export function PersonalPages(
                 </div>
               </section>
             )}
+            {section === "phone" && (
+              <section className={css.sec}>
+                <h2 className={css.eyebrow}>{t("开图 iPhone App", "Kaitu for iPhone")}</h2>
+                <div className={`${css.card} ${css["list-card"]}`}>
+                  <div className={css["switch-row"]}>
+                    <span>
+                      <b>{t("开图 iPhone（测试中）", "Kaitu for iPhone (beta)")}</b>
+                      <br />
+                      <span className={css.small}>
+                        {data.storage.mode === "local"
+                          ? t(
+                              "手机直接打开和电脑同一个资料文件夹。资料现在只在这台电脑上，先放到 iCloud 云盘或 Google Drive。",
+                              "Your iPhone opens the same notes folder as this computer. It is only on this computer now; move it to iCloud Drive or Google Drive first.",
+                            )
+                          : t(
+                              `在 iPhone 上装开图（TestFlight 邀请测试），在「文件」里选中${storageName(data.storage.provider)}的「${data.storage.root.split(/[\\/]/).pop()}」文件夹，就能看今天、记一笔、采纳建议。`,
+                              `Install Kaitu on iPhone (TestFlight beta), then pick the “${data.storage.root.split(/[\\/]/).pop()}” folder in ${storageName(data.storage.provider)} from Files to see today, capture and adopt suggestions.`,
+                            )}
+                      </span>
+                    </span>
+                    {data.storage.mode === "local" && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-quiet"]}`}
+                        onClick={() => {
+                          select("storage");
+                          setMoving(true);
+                        }}
+                      >
+                        {t("管理存放位置", "Manage storage")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
             {section === "phone" &&
               (props.phoneChannels && props.channelSettings ? (
                 <PhoneChannels request={props.channelSettings} />
