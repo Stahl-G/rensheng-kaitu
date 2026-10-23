@@ -144,6 +144,7 @@ function englishError(error: KaituError): string {
     READ_ONLY: "This workspace is read-only. Check its folder permissions.",
     INVALID_RECORD: "Check the record's required fields and values, then try again.",
     INVALID_CONFIG: "Check the settings and try again.",
+    INVALID_IMPORT: "The import file could not be read. Check its format and export it again.",
     BAD_ARGS: "Check the input and try again.",
     AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
     PLUGIN_NETWORK: "The plugin catalog could not connect. Check the network and try again.",

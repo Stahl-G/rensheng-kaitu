@@ -87,10 +87,12 @@ export function LibraryPage({
   overview,
   capture,
   onAdd,
+  onFile,
   onOpenOriginal,
   onOpenNote,
   onOpenGoal,
 }: {
+  onFile?: (file: File) => void;
   onOpenOriginal: (entry: InboxEntry) => void;
   onOpenNote: (file: string) => void;
   onOpenGoal: (id: string) => void;
@@ -198,13 +200,18 @@ export function LibraryPage({
         aria-label={t("收件箱", "Inbox")}
         onDragOver={(event) => {
           const files = event.dataTransfer.types.includes("Files");
-          if ((files && onAdd) || (!files && capture && event.dataTransfer.types.includes("text/plain")))
+          if ((files && onFile) || (!files && capture && event.dataTransfer.types.includes("text/plain")))
             event.preventDefault();
         }}
         onDrop={(event) => {
           event.preventDefault();
           if (event.dataTransfer.files.length) {
-            onAdd?.("file");
+            if (event.dataTransfer.files.length !== 1) {
+              setError(t("请一次拖入一个文件。", "Drop one file at a time."));
+              return;
+            }
+            setError("");
+            onFile?.(event.dataTransfer.files[0] as File);
             return;
           }
           const text = event.dataTransfer.getData("text/plain");
