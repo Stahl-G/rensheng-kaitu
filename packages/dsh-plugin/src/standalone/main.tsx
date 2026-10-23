@@ -141,6 +141,9 @@ const props: OverviewPageProps = {
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
+  loadDirectionMap: (locale) => call("directionMap", locale),
+  generateDirectionMap: (locale) => call("directionMapGenerate", locale),
+  dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
     call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),

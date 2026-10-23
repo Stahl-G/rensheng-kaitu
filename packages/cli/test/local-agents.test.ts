@@ -278,6 +278,8 @@ test("local agent: model choice, CLI identity, and switching back to the SDK pro
   // 换模型仍是同一个连接，打开会话后切到所选模型。
   await connection.configure({ choice: "local", agent: "codebuddy", path: f.path, model: "m2" });
   expect(await connection.settings()).toMatchObject({ model: "m2", backend: first.backend });
+  // 本机 Agent 自带读文件和命令工具，不能当成只收发文字的对话启动。
+  await expect(connection.runtime("scoped", "local-ask", true)).rejects.toThrow(/不能用于只收发文字/);
   const runtime = await connection.runtime("full");
   await runtime.request("session/prompt", { sessionId: "k1", contentBlocks: [{ type: "text", text: "hi" }] });
   await runtime.close();

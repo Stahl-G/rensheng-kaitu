@@ -324,7 +324,12 @@ function CustomView({ project }: { project: ProjectDetailData }) {
 }
 
 export function ProjectsPage(
-  props: DoingPageProps & { timeZone?: string; subscribe?: (refresh: () => void) => () => void },
+  props: DoingPageProps & {
+    timeZone?: string;
+    subscribe?: (refresh: () => void) => () => void;
+    /** 从别处点进来时直接打开这个项目的详情。 */
+    initialProject?: string;
+  },
 ) {
   const t = useT();
   const [projects, setProjects] = useState<DoingProject[] | null>(null);
@@ -382,6 +387,11 @@ export function ProjectsPage(
     setRepo(detail.github?.repo ?? "");
     setBinding(false);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在指定的项目变化时打开一次。
+  useEffect(() => {
+    if (props.initialProject)
+      void open(props.initialProject).catch((err) => setError(String(err.message ?? err)));
+  }, [props.initialProject]);
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: props.timeZone }).format(new Date());
   const refresh = async () => {
     if (project) await open(project.slug);

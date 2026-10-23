@@ -14,6 +14,7 @@ export function createAgentConnection(options: {
       mode: AskMode,
       capabilities?: boolean,
       connection?: AgentConnectionId,
+      textOnly?: boolean,
     ): ReturnType<typeof createAgentRuntime>;
     support(method: string, input: Record<string, unknown>): Promise<unknown>;
   };
@@ -110,8 +111,8 @@ export function createAgentConnection(options: {
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },
-    runtime(mode: AskMode, connection: AgentConnectionId = "local-ask") {
-      if (!local()) return options.sdk().runtime(mode, false, connection);
+    runtime(mode: AskMode, connection: AgentConnectionId = "local-ask", textOnly = false) {
+      if (!local()) return options.sdk().runtime(mode, false, connection, textOnly);
       const { agent, path } = current();
       return createAgentRuntime({
         agent,
@@ -121,6 +122,7 @@ export function createAgentConnection(options: {
         path,
         mcp: { ...options.mcp, env: { ...options.mcp.env, KAITU_AGENT_CONNECTION: connection } },
         env: options.env,
+        textOnly,
       });
     },
   };
