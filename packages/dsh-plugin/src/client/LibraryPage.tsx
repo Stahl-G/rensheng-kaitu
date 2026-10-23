@@ -41,7 +41,6 @@ export function LibraryPage({
 }: {
   data: LibraryData | null;
   open: (id: string) => void;
-  inboxCount?: number;
   overview?: OverviewData | null;
   capture?: (text: string) => Promise<unknown>;
   onAdd?: (kind: "file" | "phone" | "organizer" | "category") => void;
@@ -84,11 +83,8 @@ export function LibraryPage({
         className={styles.inbox}
         aria-label={t("收件箱", "Inbox")}
         onDragOver={(event) => {
-          if (
-            capture &&
-            event.dataTransfer.types.includes("text/plain") &&
-            !event.dataTransfer.types.includes("Files")
-          )
+          const files = event.dataTransfer.types.includes("Files");
+          if ((files && onAdd) || (!files && capture && event.dataTransfer.types.includes("text/plain")))
             event.preventDefault();
         }}
         onDrop={(event) => {
