@@ -1,5 +1,5 @@
 import { directionText } from "@kaitu/core/direction-copy";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type {
   Direction,
   DirectionNote,
@@ -36,6 +36,8 @@ export interface DirectionsPageProps {
   ) => Promise<ExperienceSource>;
   subscribe?: (refresh: () => void) => () => void;
   goals?: MeGoal[];
+  /** Shared planning actions are supplied by Overview without duplicating their write flow. */
+  planningContent?: ReactNode;
   onPrompt: (text: string) => void;
 }
 const states = {
@@ -232,7 +234,7 @@ function ClipboardDirections({
       <div className={v2["dialog-foot"]}>
         <button
           type="button"
-          className={`${v2.btn} ${v2["btn-primary"]}`}
+          className={v2.btn}
           disabled={busy || !answer.trim()}
           onClick={() => {
             setBusy(true);
@@ -746,6 +748,13 @@ export function DirectionsPage(props: DirectionsPageProps) {
         </>
       ) : (
         <>
+          <h1>{t("方向", "Directions")}</h1>
+          {props.planningContent && (
+            <section className={css.planning} aria-label={t("想做成的事", "Things you want to get done")}>
+              <h2>{t("想做成的事", "Things you want to get done")}</h2>
+              {props.planningContent}
+            </section>
+          )}
           <header className={css.listHeader}>
             <h2 className={v2.eyebrow}>{t("你在探索的方向", "Directions you're exploring")}</h2>
             <button
@@ -777,9 +786,30 @@ export function DirectionsPage(props: DirectionsPageProps) {
               }}
             />
           )}
+          {!!data.directions.length && (
+            <nav className={base.secondaryNav} aria-label={t("方向筛选", "Direction filter")}>
+              {(
+                [
+                  ["current", t("当前", "Current")],
+                  ["favorites", t("收藏", "Saved")],
+                  ["history", t("已归档", "Archived")],
+                ] as const
+              ).map(([id, title]) => (
+                <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+                  {title}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className={css.directionList}>
             {listedDirections.map((d) => {
-              const attempt = data.experiments.filter((e) => e.direction_id === d.id).at(-1);
+              const ownAttempts = data.experiments.filter((e) => e.direction_id === d.id);
+              const attempt =
+                ownAttempts.find((e) => e.status === "active") ??
+                ownAttempts.find((e) => e.status === "planned");
+              const hypothesis = directionText(d.hypothesis, 160);
+              const budget = directionText(attempt?.budget, 100);
+              const criteria = directionText(attempt?.criteria, 160);
               const change = async (status: Direction["status"]) => {
                 setBusy(true);
                 setError(null);
@@ -817,11 +847,38 @@ export function DirectionsPage(props: DirectionsPageProps) {
                       {directionText(d.motivation, 110).split(/(?<=[。！？!?])\s*/)[0] ||
                         t("先记下这个想法，试过再判断。", "Keep the idea and learn by trying.")}
                     </p>
-                    {(attempt?.action || d.hypothesis) && (
+                    {attempt?.action && (
                       <p className={css.ideaNext}>
                         <span>{t("第一步", "First step")}</span>
-                        {directionText(attempt?.action || d.hypothesis, 100)}
+                        {directionText(attempt.action, 100)}
                       </p>
+                    )}
+                    {budget && (
+                      <p className={css.ideaNext}>
+                        <span>{t("投入上限", "Budget")}</span>
+                        {budget}
+                      </p>
+                    )}
+                    {criteria && (
+                      <p className={css.ideaNext}>
+                        <span>{t("看什么", "What to observe")}</span>
+                        {criteria}
+                      </p>
+                    )}
+                    {attempt?.deadline && (
+                      <p className={css.ideaNext}>
+                        <span>{t("期限", "Deadline")}</span>
+                        {attempt.deadline}
+                      </p>
+                    )}
+                    {!attempt && hypothesis && (
+                      <p className={css.ideaNext}>
+                        <span>{t("想验证", "What to test")}</span>
+                        {hypothesis}
+                      </p>
+                    )}
+                    {!attempt && !hypothesis && (
+                      <p className={css.ideaNext}>{t("还没有安排下一步", "No next step planned yet")}</p>
                     )}
                   </div>
                   <div className={css.ideaActions}>
@@ -829,7 +886,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                       <>
                         <button
                           type="button"
-                          className={`${v2.btn} ${v2["btn-primary"]}`}
+                          className={v2.btn}
                           disabled={busy}
                           onClick={() => void change("active")}
                         >
@@ -862,24 +919,6 @@ export function DirectionsPage(props: DirectionsPageProps) {
               );
             })}
           </div>
-          {!!data.directions.length && (
-            <details>
-              <summary className={v2.link}>{t("筛选方向", "Filter")}</summary>{" "}
-              <nav className={base.secondaryNav} aria-label={t("方向筛选", "Direction filter")}>
-                {(
-                  [
-                    ["current", t("当前", "Current")],
-                    ["favorites", t("收藏", "Saved")],
-                    ["history", t("已归档", "Archived")],
-                  ] as const
-                ).map(([id, title]) => (
-                  <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
-                    {title}
-                  </button>
-                ))}
-              </nav>
-            </details>
-          )}
           {!data.directions.length && (
             <div className={base.focus}>
               <h2>{t("一个值得探索的问题", "A question worth exploring")}</h2>

@@ -40,3 +40,29 @@ export const exploreModules = [
 ] as const;
 export const defaultExploreEntries = exploreModules.filter((entry) => entry.default).map(({ id }) => id);
 export type ExploreModule = (typeof exploreModules)[number];
+
+/** Counts come from the existing in-memory page projections, never a directory scan. */
+export interface ExploreContent {
+  hometown: boolean;
+  experiences: number;
+  healthRecords: number;
+  newsTopics: number;
+  goals: number;
+  directions: number;
+}
+export function exploreDestination(
+  entries: readonly string[],
+  content: ExploreContent,
+  available: readonly string[] = exploreModules.map(({ id }) => id),
+): string {
+  if (
+    !content.hometown &&
+    !content.experiences &&
+    !content.healthRecords &&
+    !content.newsTopics &&
+    !content.goals &&
+    !content.directions
+  )
+    return "modules";
+  return entries.find((id) => available.includes(id)) ?? "modules";
+}
