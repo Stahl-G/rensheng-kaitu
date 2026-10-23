@@ -5,10 +5,15 @@ import own from "./ArchitectureCard.module.css";
 import base from "./Prototype.module.css";
 import { useLocale, useT } from "./i18n.js";
 
-// Archify 的图自带脚本（缩放、主题、导出），只许内联脚本运行，不能联网、不能读开图页面。
-const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:">`;
+// Archify 的图自带脚本（缩放、主题、导出），只许内联脚本运行。策略不靠在导入内容里找 <head>：
+// 外层文档由开图生成，第一行就是策略，内层继承它；外层的 frame-src 'none' 挡住内层自己跳到外网。
+// 两层都只给 allow-scripts：不能提交表单、弹窗、跳转父页面，也读不到开图页面。
+const POLICY =
+  "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; form-action 'none'; base-uri 'none'";
+const META = `<meta http-equiv="Content-Security-Policy" content="${POLICY}">`;
+const attribute = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 const isolate = (html: string) =>
-  /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (head) => head + CSP) : CSP + html;
+  `<!doctype html><meta http-equiv="Content-Security-Policy" content="${POLICY}; frame-src 'none'"><style>html,body,iframe{margin:0;width:100%;height:100%;border:0;display:block}</style><iframe sandbox="allow-scripts" srcdoc="${attribute(`<!doctype html>${META}${html}`)}"></iframe>`;
 
 /** 项目页的架构图：显示 Agent 用 Archify 画好交回的图；画图和重画都交给在代码仓库里工作的 Agent。 */
 export function ArchitectureCard({

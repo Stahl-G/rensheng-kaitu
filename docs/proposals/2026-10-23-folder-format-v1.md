@@ -100,7 +100,7 @@ note: 程序生成，以正本为准。改动写 inbox/agents/，或在开图里
   - **记忆正文移出 frontmatter（最值得做）。** 现在正文写在 frontmatter 的 `text:` 里，Claude Code、Obsidian、Letta 都把正文放在 `---` 下面，frontmatter 只放元数据。Agent 读写记忆最频繁，这条最容易让它写错位置。要改 `memory.schema.json`、读写代码和生成模板，旧记忆在读取时兼容两种写法。
   - 订阅源加 OPML 导入导出，`feed/feeds.json` 不变。
   - 日程加 `.ics` 导出，财务加 beancount 导出，存储格式不变。
-  - 记录里 `by` 和 `source` 意思重叠，以后新类型只用一个；已有字段不动。
+  - 记录里 `by` 和 `source` 不是同义字段，两个都保留：`by` 是写入者，也是权限标记（`validateRecord` 靠它限定只有用户能做的改动）；`source` 是证据出处（从哪个文件或服务来）。新类型照这个分工用，文档里写清楚两者的区别。
   - 项目目录用可读短名（并入上面“可读目录名”）。
 
 ## 验收

@@ -91,6 +91,17 @@ it("新项目会话读取既有状态并写回现有项目日志；入口保留�
   expect(prompt).toContain(`project log ${project.slug}`);
   expect(prompt).toContain(ws.root);
   expect(prompt).toContain(`--from '${code}'`);
+  // Windows 上的编程 Agent 用 PowerShell：命令不能是 POSIX 的环境变量前缀写法。
+  const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+  Object.defineProperty(process, "platform", { value: "win32" });
+  try {
+    expect(projectMemoryPrompt(ws, project.slug)).toMatch(/\$env:ELECTRON_RUN_AS_NODE=1; & '/);
+  } finally {
+    Object.defineProperty(process, "platform", platform);
+  }
+  // 没绑仓库的项目不给出一定会失败的命令。
+  const unbound = await createProject(ws, { title: "Unbound synthetic project", kind: "personal" });
+  expect(() => projectMemoryPrompt(ws, unbound.slug)).toThrow("先给这个项目绑定");
   // Agent 用 Archify 画好后交回：只收 HTML，项目页据此显示架构图卡片。
   expect(projectArchitecturePrompt(ws, project.slug)).toContain(
     `project architecture ${project.slug} --file`,

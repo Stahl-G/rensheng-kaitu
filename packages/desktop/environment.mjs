@@ -10,7 +10,8 @@ export function desktopPaths(env = process.env) {
     env.KAITU_DIR ||
     (env.KAITU_APP_HOME
       ? join(state, "workspace")
-      : existsSync(join(legacy, ".kaitu/config.json"))
+      : // 有 ~/kaitu 就照旧用它，包括搬去云盘后只剩迁移说明的情况：云盘暂时没挂上时报不可用，不另建空库。
+        existsSync(legacy)
         ? legacy
         : join(homedir(), "kaitu-ai-memory"));
   if (!env.KAITU_DIR && !env.KAITU_APP_HOME) {

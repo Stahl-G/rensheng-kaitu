@@ -556,6 +556,7 @@ export function ProjectsPage(
                 project.github ||
                 project.links.some((link) => link.role === "repo")) && (
                 <ArchitectureCard
+                  key={project.slug}
                   project={project}
                   prompt={props.projectArchitecturePrompt}
                   load={props.loadProjectArchitecture}
@@ -563,6 +564,7 @@ export function ProjectsPage(
               )}
             {props.projectMemoryPrompt && props.installProjectMemory && (
               <AgentHandoff
+                key={project.slug}
                 project={project}
                 prompt={props.projectMemoryPrompt}
                 install={props.installProjectMemory}

@@ -105,8 +105,8 @@ export function AgentHandoff({
             <strong>{t("把接力提示词交给 Agent", "Give the hand-off prompt to an Agent")}</strong>
             <span>
               {t(
-                "没装技能也能用：贴给任何编程 Agent，它会先读进度，做完记回日志。",
-                "Works without the skill too: paste it into any coding Agent. It reads the progress first and logs back when done.",
+                "没装技能也能用：贴给任何编程 Agent，它会先读进度，做完记回日志。同样要先绑定仓库。",
+                "Works without the skill too: paste it into any coding Agent. It reads the progress first and logs back when done. Link the repository first.",
               )}
             </span>
           </div>
@@ -114,7 +114,7 @@ export function AgentHandoff({
             <button
               type="button"
               className={base.btn}
-              disabled={busy !== null}
+              disabled={!bound || busy !== null}
               onClick={() =>
                 void run("copy", async () => {
                   await navigator.clipboard.writeText(await load());
@@ -131,6 +131,7 @@ export function AgentHandoff({
             )}
           </div>
           <details
+            hidden={!bound}
             className={css.preview}
             onToggle={(event) => {
               if (event.currentTarget.open) void run("copy", async () => void (await load()));

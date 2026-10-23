@@ -31,14 +31,12 @@ import { assertTimeZone } from "./time.js";
 
 export const STATE_DIR = ".kaitu";
 
-/** 默认数据目录：--dir > KAITU_DIR > 当前工作区 > 已有的 ~/kaitu > ~/kaitu-ai-memory */
+/** 默认数据目录：--dir > KAITU_DIR > 当前工作区 > 已有的 ~/kaitu（含搬去云盘后留下的迁移说明）> ~/kaitu-ai-memory */
 export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
   const home = env.HOME || homedir();
   const legacy = join(home, "kaitu");
   return resolve(
-    env.KAITU_DIR ||
-      currentWorkspace(env) ||
-      (existsSync(join(legacy, STATE_DIR, "config.json")) ? legacy : join(home, "kaitu-ai-memory")),
+    env.KAITU_DIR || currentWorkspace(env) || (existsSync(legacy) ? legacy : join(home, "kaitu-ai-memory")),
   );
 }
 

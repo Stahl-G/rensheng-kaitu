@@ -633,13 +633,14 @@ export async function syncProjects(ws: Workspace) {
   });
 }
 
-/** 只拉绑了 GitHub 的项目；数据没变时 syncGithub 不写记录、不存版本。返回是否有项目更新。 */
+/** 只拉绑了 GitHub 的项目；数据没变时 syncGithub 不写记录、不存版本。返回界面是否需要刷新：数据或同步状态变了。 */
 export async function syncBoundProjects(ws: Workspace, options: GithubOptions = {}): Promise<boolean> {
   let changed = false;
   for (const slug of slugs(ws)) {
     try {
       if (!readProject(ws, slug).data.github) continue;
-      if ((await syncGithub(ws, slug, options)).version) changed = true;
+      const result = await syncGithub(ws, slug, options);
+      if (result.version || result.statusChanged) changed = true;
     } catch {
       // 单个项目读不了不挡其他项目；GitHub 的失败原因已由 syncGithub 记在项目上。
     }
@@ -655,6 +656,8 @@ export function startProjectGithubSync(ws: Workspace, notify: () => void = () =>
     running = true;
     try {
       if (await syncBoundProjects(ws)) notify();
+    } catch {
+      // 云盘暂时卸载等读不到项目目录时跳过这一轮，下个小时再试，不让后台任务把 App 带崩。
     } finally {
       running = false;
     }

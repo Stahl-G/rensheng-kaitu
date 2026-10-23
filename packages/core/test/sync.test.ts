@@ -85,7 +85,7 @@ it("iCloud 往返保持数据、历史、密钥与项目，自定义目录仍可
     expect(syncStatus(ws).mode).toBe("icloud");
     const state = stateDirectory(ws.root);
     await disableSync(ws);
-    expect(stateDirectory(ws.root)).toBe(join(home, "kaitu-ai-memory/.kaitu"));
+    expect(stateDirectory(ws.root)).toBe(join(home, "kaitu/.kaitu"));
     expect(existsSync(state)).toBe(false);
     expect(mcpToken(ws)).toBe(token);
     expect(readProject(ws, project.slug).dir).toBe(`projects/${project.slug}`);
