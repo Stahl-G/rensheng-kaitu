@@ -443,10 +443,7 @@ export function createAskService(options: {
         images.some((file) => !file || typeof file.data !== "string" || file.data.length > 40 * 1024 * 1024)
       )
         throw new KaituError("每次最多添加 10 个附件，单个附件不超过 25MB", "AI_ATTACHMENT");
-      if (
-        images.some((file) => !("kind" in file && file.kind === "file")) &&
-        !(await options.settings()).supportsImages
-      )
+      if (images.some((file) => !("kind" in file && file.kind === "file")) && !connection.supportsImages)
         throw new KaituError("当前连接未启用图片，请切换模型后重试", "AI_IMAGE");
       ready();
       const blocks = [

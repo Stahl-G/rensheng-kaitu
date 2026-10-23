@@ -528,14 +528,15 @@ export function AskPage({
     </div>
   );
   useEffect(() => {
-    let active = true;
+    if (!active) return;
+    let current = true;
     void Promise.all([
       call<Settings>("askSettings"),
       call<Automation>("automation"),
       call<Thread[]>("askList"),
     ])
       .then(([ai, auto, list]) => {
-        if (!active) return;
+        if (!current) return;
         setSettings(ai);
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
@@ -546,20 +547,21 @@ export function AskPage({
         }
       })
       .catch((err) => {
-        if (active) setError(err.message);
+        if (current) setError(err.message);
       });
     return () => {
-      active = false;
+      current = false;
     };
-  }, []);
+  }, [active]);
   useEffect(() => {
+    if (!active) return;
     const refresh = () =>
       void call<Settings>("askSettings")
         .then(setSettings)
         .catch((err) => setError(err.message));
     window.addEventListener("kaitu-ai-changed", refresh);
     return () => window.removeEventListener("kaitu-ai-changed", refresh);
-  }, []);
+  }, [active]);
   useEffect(() => {
     if (step && active) dialog.current?.showModal();
     else dialog.current?.close();
@@ -708,7 +710,15 @@ export function AskPage({
     if (!settings?.configured) return;
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
-    if (modelMenu || !agent) return;
+    if (modelMenu) return;
+    if (!agent) {
+      void call<Settings>("askSupport", "builtinSettings", { saved: true })
+        .then((catalog) =>
+          setSettings((current) => (current ? { ...current, saved: catalog.saved } : current)),
+        )
+        .catch((err) => setError(err.message));
+      return;
+    }
     setAgentModels(null);
     setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })

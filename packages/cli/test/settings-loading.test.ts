@@ -15,7 +15,7 @@ it.each(["pending", "rejected"])("基础设置不等待 %s 的 AI 状态", async
         ? new Promise<never>(() => {})
         : Promise.reject(new Error("synthetic AI unavailable")),
     );
-    const data = await productRequest(ws, "settings", [true], { settings } as unknown as AskService);
+    const data = await productRequest(ws, "settings", [], { settings } as unknown as AskService);
     expect(data).toHaveProperty("storage");
     expect(data).toHaveProperty("ai", null);
     expect(settings).not.toHaveBeenCalled();
@@ -24,7 +24,7 @@ it.each(["pending", "rejected"])("基础设置不等待 %s 的 AI 状态", async
   }
 });
 
-it("完整设置保留 AI 配置成功与失败的原始结果", async () => {
+it("显式 AI 状态保留成功与失败的原始结果", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-settings-"));
   try {
     const ws = await initWorkspace(root);
@@ -34,8 +34,8 @@ it("完整设置保留 AI 配置成功与失败的原始结果", async () => {
       .mockResolvedValueOnce(ai)
       .mockRejectedValueOnce(new Error("synthetic AI unavailable"));
     const ask = { settings } as unknown as AskService;
-    expect(await productRequest(ws, "settings", [], ask)).toHaveProperty("ai", ai);
-    await expect(productRequest(ws, "settings", [], ask)).rejects.toThrow("synthetic AI unavailable");
+    expect(await productRequest(ws, "askSettings", [], ask)).toEqual(ai);
+    await expect(productRequest(ws, "askSettings", [], ask)).rejects.toThrow("synthetic AI unavailable");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

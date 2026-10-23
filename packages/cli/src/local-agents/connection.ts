@@ -16,6 +16,7 @@ export function createAgentConnection(options: {
       connection?: AgentConnectionId,
       textOnly?: boolean,
     ): ReturnType<typeof createAgentRuntime>;
+    catalogSettings(includeSaved?: boolean): Promise<unknown>;
     support(method: string, input: Record<string, unknown>): Promise<unknown>;
   };
   env?: NodeJS.ProcessEnv;
@@ -107,7 +108,7 @@ export function createAgentConnection(options: {
       return list;
     },
     async support(method: string, input: Record<string, unknown>) {
-      if (method === "builtinSettings") return options.sdk().settings();
+      if (method === "builtinSettings") return options.sdk().catalogSettings(input.saved === true);
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },

@@ -141,22 +141,32 @@ export function createSdkRuntime({
       : { choice: undefined, provider: "deepseek-official", model: "" };
   let directory;
   const loadDirectory = async () => {
-    directory ??= credential("catalog").then((entries) => {
-      extendProviders(entries);
-      return entries;
-    });
+    directory ??= credential("catalog")
+      .then((entries) => {
+        extendProviders(entries);
+        return entries;
+      })
+      .catch((error) => {
+        directory = undefined;
+        throw error;
+      });
     return directory;
   };
   const loadSettings = async () => {
     await loadDirectory();
     const stored = readSettings();
-    if (stored.provider && !providers.some((item) => item.id === stored.provider))
-      await savedProviders().catch(() => []);
+    if (stored.provider && !providers.some((item) => item.id === stored.provider)) await savedProviders();
     return { choice: stored.choice, ...selection(stored) };
   };
   const credential = (operation, input) =>
     new Promise((resolve, reject) => {
       const child = spawn(executable, [helper, operation], { env, stdio: ["pipe", "pipe", "ignore"] });
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new KaituError("AI 凭据读取超时，请重试", "AI_CREDENTIALS"));
+      }, 20000);
+      child.once("error", () => clearTimeout(timer));
+      child.once("exit", () => clearTimeout(timer));
       let output = "";
       child.stdout.on("data", (chunk) => {
         output += chunk;
@@ -217,18 +227,39 @@ export function createSdkRuntime({
   };
   const saveProvider = (settings) => api.support("saveProvider", { patch: providerPatch(settings) });
   let capabilityRuntime;
+  let capabilityAbort;
+  let connectionStatus;
   const api = {
     async support(method, input = {}) {
-      capabilityRuntime ??= api.runtime("scoped", true).catch((error) => {
-        capabilityRuntime = undefined;
-        throw error;
-      });
-      return (await capabilityRuntime).request(`kaitu/${method}`, input);
+      if (!capabilityRuntime) {
+        const controller = new AbortController();
+        capabilityAbort = controller;
+        capabilityRuntime = api
+          .runtime("scoped", true, "local-ask", false, controller.signal)
+          .catch((error) => {
+            if (capabilityAbort === controller) {
+              capabilityAbort = undefined;
+              capabilityRuntime = undefined;
+            }
+            throw error;
+          });
+      }
+      const result = await (await capabilityRuntime).request(`kaitu/${method}`, input);
+      if (method === "saveProvider" || (method === "authPoll" && result.status !== "running"))
+        connectionStatus = undefined;
+      return result;
     },
     async closeSupport() {
       const running = capabilityRuntime;
+      capabilityAbort?.abort();
+      capabilityAbort = undefined;
       capabilityRuntime = undefined;
-      if (running) await (await running).close();
+      connectionStatus = undefined;
+      if (running)
+        await running.then(
+          (runtime) => runtime.close(),
+          () => {},
+        );
     },
     async models(input) {
       const previous = await loadSettings();
@@ -250,24 +281,40 @@ export function createSdkRuntime({
       if (result.code) throw new KaituError(result.message, result.code);
       return result.models;
     },
-    async settings() {
-      const settings = await loadSettings();
-      const info = await credential("status", {
-        ref: credentialRef(settings.provider),
-        search: true,
-        settings,
+    settings() {
+      // 连接判定不启动 SDK，也不读取模型目录；真实发送仍在 runtime 里验证。
+      connectionStatus ??= (async () => {
+        const settings = readSettings();
+        const info =
+          settings.choice === "builtin"
+            ? await credential("status", { ref: credentialRef(settings.provider), settings })
+            : { configured: false };
+        return {
+          ...connectionInfo({
+            ...settings,
+            supportsImages: settings.supportsImages ?? info.supportsImages,
+            configured: settings.choice === "builtin" && info.configured,
+          }),
+          providerName: providers.find((entry) => entry.id === settings.provider)?.name ?? settings.provider,
+        };
+      })().catch((error) => {
+        connectionStatus = undefined;
+        throw error;
       });
-      return {
-        ...connectionInfo({
-          ...settings,
-          supportsImages: settings.supportsImages ?? info.supportsImages,
-          configured: settings.choice === "builtin" && info.configured,
-        }),
-        saved: await savedProviders().catch(() => []),
-        search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
-      };
+      return connectionStatus;
+    },
+    async catalogSettings(includeSaved = false) {
+      // 仅 AI 设置和模型选择器显式读取完整目录；失败不能假装没有已保存服务商。
+      await loadDirectory();
+      const settings = await api.settings();
+      const saved =
+        includeSaved || !providers.some((entry) => entry.id === settings.provider)
+          ? await savedProviders()
+          : undefined;
+      return { ...settings, providers, ...(saved ? { saved } : {}), search: await describeSearch() };
     },
     async configure(input) {
+      connectionStatus = undefined;
       await loadDirectory();
       if (input.search !== undefined) return configureSearch(input.search);
       if (input.choice !== "builtin" && input.choice !== "external")
@@ -301,7 +348,7 @@ export function createSdkRuntime({
         // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
         const known =
           !input.apiKey &&
-          (await savedProviders().catch(() => [])).some(
+          (await savedProviders()).some(
             (row) => row.provider === settings.provider && row.models.includes(settings.model),
           );
         const result =
@@ -317,7 +364,13 @@ export function createSdkRuntime({
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return api.settings();
     },
-    async runtime(mode = "scoped", capabilities = false, connection = "local-ask", textOnly = false) {
+    async runtime(
+      mode = "scoped",
+      capabilities = false,
+      connection = "local-ask",
+      textOnly = false,
+      signal = undefined,
+    ) {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
@@ -350,6 +403,7 @@ export function createSdkRuntime({
         pathToFileURL(createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-sdk-protocol"))
           .href
       );
+      signal?.throwIfAborted();
       const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
         cwd: workspace,
         env: {
@@ -427,7 +481,7 @@ export function createSdkRuntime({
         await rpc.request(
           "initialize",
           { cwd: workspace, provider: settings.provider, model: settings.model, capabilities },
-          AbortSignal.timeout(20000),
+          signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
         );
       } catch {
         await close();

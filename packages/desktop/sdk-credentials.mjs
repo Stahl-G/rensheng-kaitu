@@ -56,7 +56,7 @@ try {
   for await (const chunk of process.stdin) raw += chunk;
   const input = raw ? JSON.parse(raw) : {};
   raw = "";
-  await providerDirectory();
+  if (["catalog", "models", "validate"].includes(process.argv[2])) await providerDirectory();
   const ref = input.ref ?? "DEEPSEEK_API_KEY";
   if (!/^(?:DEEPSEEK_API_KEY|KAITU_[A-Z0-9_]+_API_KEY)$/.test(ref)) throw new Error();
   if (process.argv[2] === "catalog") {
@@ -109,7 +109,9 @@ try {
             )
           : undefined;
       const model =
-        input.settings && (await knownModels(input.settings)).find((m) => m.id === input.settings.model);
+        input.settings &&
+        input.settings.supportsImages === undefined &&
+        (await knownModels(input.settings)).find((m) => m.id === input.settings.model);
       process.stdout.write(
         JSON.stringify({
           configured: info.configured,
