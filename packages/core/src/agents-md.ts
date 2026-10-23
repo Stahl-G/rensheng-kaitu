@@ -34,6 +34,14 @@ const routes = [
     match: /待办|todo|to-do|task add/i,
   },
   {
+    request: "整理项目今天的进展",
+    use: "project-review",
+    read: "该项目 STATUS、日志与 view.json；有 gh 时读当天 PR 和 issue",
+    done: "日志有今天的日报，view.json 的 daily- 积木已更新并通过校验",
+    skill: "project-review",
+    match: /项目日报|项目.*今天|今天.*项目|project.*(?:review|today)|daily.*project/i,
+  },
+  {
     request: "项目推进了",
     use: "project",
     read: "该项目 STATUS.md，必要时读 log.md",
