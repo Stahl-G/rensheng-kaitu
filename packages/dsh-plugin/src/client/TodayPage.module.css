@@ -197,31 +197,6 @@
   border-radius: 10px;
   padding: 12px;
 }
-.weather {
-  padding: 20px 0 28px;
-  margin-bottom: 24px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 14px;
-  border-bottom: 1px solid var(--line);
-}
-.weather form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-}
-.weather input {
-  width: 160px;
-}
-.weather small {
-  color: var(--muted);
-}
-.weather strong {
-  font-size: 34px;
-  font-weight: 400;
-}
 .goal summary {
   cursor: pointer;
   overflow: hidden;
@@ -287,12 +262,6 @@
   .nextRow {
     gap: 8px;
   }
-  .weather form {
-    align-items: start;
-  }
-  .weather label {
-    width: 100%;
-  }
 }
 .goal {
   display: flex;
@@ -319,8 +288,7 @@
   font-weight: 600;
   line-height: 1.35;
 }
-.goalForm input,
-.weather input {
+.goalForm input {
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 10px;
