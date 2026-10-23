@@ -126,6 +126,8 @@ header.writeUInt32LE(png.length, 14);
 header.writeUInt32LE(22, 18);
 const icon = join(resources, "Kaitu.ico");
 writeFileSync(icon, Buffer.concat([header, png]));
+// DSH's Windows tray and quit dialog read this separate resource at runtime.
+cpSync(icon, join(resources, "tray.ico"));
 const exe = join(appDir, "Kaitu.exe");
 renameSync(join(appDir, "DeepSeek Harness.exe"), exe);
 await requireTools("rcedit")(exe, {
