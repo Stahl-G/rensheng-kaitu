@@ -1,4 +1,5 @@
 import type {
+  FileImportSource,
   HandoverPack,
   OnboardingAi,
   OnboardingChoiceResult,
@@ -52,7 +53,7 @@ export interface OnboardingServices {
   ) => Promise<OnboardingMemoryResult>;
   cancelOnboarding: (token: string) => Promise<void>;
   previewOnboardingImport: (
-    source: "apple-health" | "chatgpt-conversations",
+    source: FileImportSource,
     name: string,
     base64: string,
   ) => Promise<OnboardingImportPreview>;
