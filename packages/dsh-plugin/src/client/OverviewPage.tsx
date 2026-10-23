@@ -26,10 +26,9 @@ import { PersonalPages, type PersonalServices, type SettingsSection } from "./Pe
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
-import { TodayStart, TodayTasks, TodayWeather } from "./TodayPage.js";
+import { TodayStart, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
-import { footprintAnchor } from "./footprint-state.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -153,23 +152,7 @@ function Overview({
   const [guideKey, setGuideKey] = useState(0);
   const [guideSource, setGuideSource] = useState<string>();
   const [guideText, setGuideText] = useState("");
-  const [residenceCity, setResidenceCity] = useState("");
-  const [weatherCity, setWeatherCity] = useState("");
   const [adoptedTasks, setAdoptedTasks] = useState<{ day: string; ids: string[] }>({ day: "", ids: [] });
-  useEffect(() => {
-    let active = true;
-    void props
-      .loadPreferences()
-      .then((value) => {
-        if (active) {
-          setWeatherCity(value.weatherCity ?? "");
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [props.loadPreferences]);
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
@@ -207,19 +190,6 @@ function Overview({
       active = false;
     };
   }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
-  useEffect(() => {
-    let active = true;
-    if (workspaceRoot)
-      void props
-        .loadLifeMap()
-        .then((map) => {
-          if (active) setResidenceCity(footprintAnchor(map.experiences, map.asOf)?.name ?? "");
-        })
-        .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [workspaceRoot, props.loadLifeMap]);
   useEffect(() => {
     let active = true;
     void props
@@ -808,17 +778,6 @@ function Overview({
         )}
         {view === "overview" && !guideVisible && guide !== undefined && data && (
           <>
-            <TodayWeather
-              city={residenceCity || weatherCity}
-              saveCity={async (city) => {
-                const preferences = await props.loadPreferences();
-                await props.savePreferences({
-                  locale: preferences.followSystem ? null : preferences.locale,
-                  weatherCity: city,
-                });
-                setWeatherCity(city);
-              }}
-            />
             <div className={todayCss.layout}>
               <div className={todayCss.left}>
                 {data.empty ? (
