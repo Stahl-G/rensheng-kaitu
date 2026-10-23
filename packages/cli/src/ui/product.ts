@@ -51,6 +51,7 @@ import {
   decideProposal,
   directionsPrompt,
   discardFinanceImport,
+  dismissDirectionLink,
   dismissNews,
   draftOnboardingMatter,
   editCalendarBlock,
@@ -59,6 +60,7 @@ import {
   financeAccounts,
   financeCashflow,
   financeOverview,
+  generateDirectionMap,
   handoverPack,
   hideExperience,
   installProjectMemory,
@@ -73,6 +75,7 @@ import {
   onboardingStatus,
   pasteDirections,
   pasteOnboardingMatter,
+  pick,
   previewExperienceBatch,
   previewFinanceImport,
   previewOnboardingImport,
@@ -84,6 +87,7 @@ import {
   readAutomation,
   readAvatar,
   readCalendar,
+  readDirectionMap,
   readDoing,
   readExperienceImports,
   readExperienceSource,
@@ -138,7 +142,7 @@ import {
 import { directionGeneration } from "./directions-ai.js";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
-import { suggestProjectGoal } from "./project-ai.js";
+import { askTextOnly, suggestProjectGoal } from "./project-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -458,6 +462,44 @@ export async function productRequest(
       return readProjectPage(ws, text(0));
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
+    case "directionMap":
+      return readDirectionMap(ws, locale(0));
+    case "directionMapGenerate": {
+      const lang = locale(0);
+      if (!ask || !(await ask.settings()).configured)
+        throw new KaituError(
+          pick(lang, "先到「AI 与连接」连上 AI，开图才能帮你看", "Connect AI in AI & Connections first"),
+          "AI_NOT_CONFIGURED",
+        );
+      // 本机 Agent 自带读文件和命令工具，开图没法保证它只收发文字；这次只用内置模型。
+      if (((await ask.settings()).backend ?? "dsh") !== "dsh")
+        throw new KaituError(
+          pick(
+            lang,
+            "方向页的看法只用内置模型生成：本机 Agent 会带自己的读文件和命令工具，开图没法保证它只收发文字。请到「AI 与连接」切到内置模型再看。",
+            "Kaitu's view uses the built-in model only: local Agents bring their own file and command tools, so Kaitu can't keep them text-only. Switch to a built-in model in AI & Connections.",
+          ),
+          "AI_NOT_CONFIGURED",
+        );
+      const service = ask;
+      // 等 AI 是外部的事：立刻返回「正在看」，结果写进本机缓存，界面再读。
+      return generateDirectionMap(
+        ws,
+        (prompt) =>
+          askTextOnly(
+            service,
+            prompt,
+            {
+              timeout: pick(lang, "开图看得太久了，请再试一次", "Kaitu took too long. Try again."),
+              empty: pick(lang, "AI 没有回答，请再试一次", "The AI didn't answer. Try again."),
+            },
+            120000,
+          ),
+        lang,
+      );
+    }
+    case "directionMapDismiss":
+      return dismissDirectionLink(ws, text(0), text(1));
     case "projectGoalSuggest":
       return suggestProjectGoal(ws, text(0), ask);
     case "projectGoalSave":
