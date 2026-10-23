@@ -1,8 +1,14 @@
-import type { OnboardingImportPreview, OnboardingSetupInput, OnboardingSetupPreview } from "@kaitu/core";
+import type {
+  FileImportSource,
+  OnboardingImportPreview,
+  OnboardingSetupInput,
+  OnboardingSetupPreview,
+} from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import { FolderButton } from "./DshFiles.js";
 import styles from "./OnboardingSources.module.css";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 type Completion = { onDone: () => void | Promise<void>; onClose: () => void };
@@ -56,16 +62,27 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 const quiet = `${css.btn} ${css["btn-quiet"]}`;
 const primary = `${css.btn} ${css["btn-primary"]}`;
 
-export function OnboardingFileImport(
-  props: OnboardingServices & Completion & { source: "apple-health" | "chatgpt-conversations" },
-) {
+export type FileImportServices = Pick<
+  OnboardingServices,
+  "previewOnboardingImport" | "confirmOnboardingImport" | "cancelOnboarding"
+>;
+
+export function OnboardingFileImport(props: FileImportServices & Completion & { source?: FileImportSource }) {
+  const t = useT();
+  const [source, setSource] = useState<FileImportSource>(props.source ?? "ics");
+  const sources = {
+    "apple-health": { name: t("Apple 健康", "Apple Health"), accept: ".zip,.xml" },
+    "chatgpt-conversations": { name: t("ChatGPT 对话", "ChatGPT conversations"), accept: ".zip,.json" },
+    ics: { name: t("日历 ICS", "Calendar ICS"), accept: ".ics" },
+    "nut-ai": { name: t("Nut AI 备份", "Nut AI backup"), accept: ".json" },
+  } satisfies Record<FileImportSource, { name: string; accept: string }>;
+  const title = t("导入 ", "Import ") + sources[source].name;
   const session = usePreview<OnboardingImportPreview>(props.cancelOnboarding);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const preview = session.preview?.preview;
-  const health = props.source === "apple-health";
   async function prepare() {
     if (!file) return;
     setBusy(true);
@@ -74,7 +91,7 @@ export function OnboardingFileImport(
       await session.clear();
       const base64 = await fileBase64(file);
       if (!session.alive.current) return;
-      await session.accept(await props.previewOnboardingImport(props.source, file.name, base64));
+      await session.accept(await props.previewOnboardingImport(source, file.name, base64));
     } catch (err) {
       setError(message(err));
     } finally {
@@ -111,16 +128,33 @@ export function OnboardingFileImport(
     }
   }
   return (
-    <section
-      className={`${css.card} ${css["sub-form"]}`}
-      aria-label={health ? "导入 Apple 健康" : "导入 ChatGPT 对话"}
-    >
-      <strong>{health ? "导入 Apple 健康" : "导入 ChatGPT 对话"}</strong>
+    <section className={`${css.card} ${css["sub-form"]}`} aria-label={title}>
+      <strong>{title}</strong>
+      {!props.source && (
+        <label>
+          {t("资料类型", "File type")}
+          <select
+            value={source}
+            disabled={busy || !!preview}
+            onChange={(event) => {
+              setSource(event.target.value as FileImportSource);
+              setFile(null);
+            }}
+          >
+            {Object.entries(sources).map(([id, item]) => (
+              <option key={id} value={id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label>
-        {health ? "选择健康导出的 ZIP 或 XML 文件" : "选择 ChatGPT 导出的 ZIP 或 conversations.json"}
+        {t("选择导出文件", "Choose an export file")}
         <input
+          key={source}
           type="file"
-          accept={health ? ".zip,.xml" : ".zip,.json"}
+          accept={sources[source].accept}
           disabled={busy || !!preview}
           onChange={(event) => setFile(event.target.files?.[0] ?? null)}
         />

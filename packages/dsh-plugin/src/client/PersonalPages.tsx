@@ -13,6 +13,7 @@ import { CloudOrganizer } from "./CloudOrganizer.js";
 import { type FeatureUpdateRequest, FeatureUpdates } from "./FeatureUpdates.js";
 import { HandoverPanel } from "./Handover.js";
 import { MePage, type MePageProps } from "./MePage.js";
+import { type FileImportServices, OnboardingFileImport } from "./OnboardingSources.js";
 import { PhoneChannels } from "./PhoneChannels.js";
 import { type PluginRequest, Plugins } from "./Plugins.js";
 import css from "./Prototype.module.css";
@@ -21,7 +22,7 @@ import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.
 import { aiHandover } from "./connections.js";
 import { type Locale, useT, versionText } from "./i18n.js";
 
-export interface PersonalServices extends CalendarPushServices {
+export interface PersonalServices extends CalendarPushServices, FileImportServices {
   desktopUpdate?: FeatureUpdateRequest;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
@@ -68,6 +69,7 @@ export function PersonalPages(
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
@@ -700,6 +702,16 @@ export function PersonalPages(
               <h2 className={css.eyebrow}>{t("资料", "Data")}</h2>
               <div className={`${css.card} ${css["list-card"]}`}>
                 <div className={css["switch-row"]}>
+                  <b>{t("导入文件", "Import a file")}</b>
+                  <button
+                    type="button"
+                    className={`${css.btn} ${css["btn-quiet"]}`}
+                    onClick={() => setImporting(!importing)}
+                  >
+                    {t("打开", "Open")}
+                  </button>
+                </div>
+                <div className={css["switch-row"]}>
                   <span>
                     <b>{t("导出全部资料", "Export everything")}</b>
                   </span>
@@ -739,6 +751,17 @@ export function PersonalPages(
                   </button>
                 </div>
               </div>
+              {importing && (
+                <OnboardingFileImport
+                  {...props}
+                  onClose={() => setImporting(false)}
+                  onDone={async () => {
+                    setImporting(false);
+                    await props.refreshWorkspace();
+                    await refresh();
+                  }}
+                />
+              )}
             </section>
             {history && (
               <section className={css.sec}>

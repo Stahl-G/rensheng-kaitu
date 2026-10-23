@@ -6,6 +6,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
 import type {
   AgentConnectionId,
+  FileImportSource,
   LearningCheckinInput,
   OnboardingAi,
   OnboardingChoices,
@@ -283,11 +284,7 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              previewOnboardingImport: async (
-                source: "apple-health" | "chatgpt-conversations",
-                name: string,
-                base64: string,
-              ) => {
+              previewOnboardingImport: async (source: FileImportSource, name: string, base64: string) => {
                 const r = await ctx.remote.kaitu.onboardingImportPreview(source, name, base64);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
