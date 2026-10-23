@@ -50,6 +50,22 @@ const routes = [
     match: /项目|project/i,
   },
   {
+    request: "存一篇文章去学 / 接着学",
+    use: "learn-topic；有命令行时 kaitu learning start / save",
+    read: "该主题 STATUS 与 notes；新主题只读用户给的材料",
+    done: "回执有 topic；记下的理解只来自用户原话",
+    skill: "learn-topic",
+    match: /学习|接着学|学一下|这篇文章|存.*文章|learn|article/i,
+  },
+  {
+    request: "帮我做个决定",
+    use: "decision",
+    read: "decisions/ 下同名档案与相关记忆",
+    done: "analysis.md 与 STATUS 已写；用户选定前保持待决定",
+    skill: "decision",
+    match: /做.*决定|决策|拿主意|decide|decision/i,
+  },
+  {
     request: "记住一件事",
     use: "kaitu memory add --type preference --name 名称 --text 内容",
     read: "无需先读资料",

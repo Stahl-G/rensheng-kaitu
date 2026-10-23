@@ -2,6 +2,7 @@ import type { ProjectGoal } from "@kaitu/core";
 import { useEffect, useState } from "react";
 import type { DoingProject, ProjectDetailData } from "../types.js";
 import { AgentHandoff } from "./AgentHandoff.js";
+import { ArchitectureCard } from "./ArchitectureCard.js";
 import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
@@ -549,6 +550,17 @@ export function ProjectsPage(
                 </details>
               )}
             </section>
+            {props.projectArchitecturePrompt &&
+              props.loadProjectArchitecture &&
+              (project.architecture ||
+                project.github ||
+                project.links.some((link) => link.role === "repo")) && (
+                <ArchitectureCard
+                  project={project}
+                  prompt={props.projectArchitecturePrompt}
+                  load={props.loadProjectArchitecture}
+                />
+              )}
             {props.projectMemoryPrompt && props.installProjectMemory && (
               <AgentHandoff
                 project={project}

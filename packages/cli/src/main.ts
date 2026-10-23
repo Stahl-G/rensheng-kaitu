@@ -45,6 +45,7 @@ import {
   installProjectMemory,
   linkProject,
   listInvestments,
+  listLearning,
   listMemories,
   listProjects,
   listTasks,
@@ -55,6 +56,7 @@ import {
   previewOnboardingSetup,
   processInbox,
   projectMemoryContext,
+  readLearning,
   readOnboardingMatter,
   readProject,
   readRecords,
@@ -70,12 +72,15 @@ import {
   restore,
   restoreWorkspaceBackup,
   runPhone,
+  saveLearningCheckin,
   saveOnboardingChoices,
+  saveProjectArchitecture,
   searchChats,
   searchMemories,
   setGithubToken,
   setProject,
   snapshot,
+  startLearning,
   syncProject,
   syncProjects,
   syncStatus,
@@ -133,9 +138,13 @@ const HELP = `开图 kaitu
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
   kaitu investments [--json]
+  kaitu learning list | read <主题>                 学习主题与下一步
+  kaitu learning start --json '{"title":"…","source":{"title":"…","url":"…","text":"…"}}'  存一篇材料、开一个主题（已有就沿用）
+  kaitu learning save --json '{"topic":"…","understanding":"…","questions":"…","next":"…","operationId":"…"}'  记下用户说出的理解
   kaitu project new --title <标题> [--slug <英文短名>] --kind work|learning|personal [--link <路径>[:manuscript|repo|folder]]...
   kaitu project list | show <slug> | log <slug> --text <内容>
   kaitu project memory [--from <代码目录>] [--project <slug>] [--install]
+  kaitu project architecture <slug> --file <Archify 生成的 HTML>  交回架构图，显示在项目页
   kaitu backup status | auth-status | sync
   kaitu backup connect <owner/repo> [--create] [--via gh|token] [--text|--no-text] [--records|--no-records]
   kaitu backup restore <owner/repo> --to <新目录> [--via gh|token]
@@ -351,6 +360,25 @@ async function run(argv: string[]): Promise<number> {
       await channelsCommand(workspace(values), args, values.only, values["json-out"]);
       return 0;
     }
+    case "learning": {
+      const ws = workspace(values);
+      const [action, topic] = args;
+      const input = () =>
+        JSON.parse(values.file ? readFileSync(values.file, "utf8") : need(values.json, "--json"));
+      const result =
+        action === "list"
+          ? listLearning(ws)
+          : action === "read"
+            ? readLearning(ws, need(topic, "主题"))
+            : action === "start"
+              ? await startLearning(ws, input())
+              : action === "save"
+                ? await saveLearningCheckin(ws, input())
+                : null;
+      if (!result) throw new KaituError("使用 learning list / read / start / save", "BAD_ARGS");
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
     case "investments": {
       const rows = listInvestments(workspace(values));
       console.log(
@@ -384,7 +412,9 @@ async function run(argv: string[]): Promise<number> {
           values.from ?? process.cwd(),
           values.project,
         );
-      } else if (action === "list") result = listProjects(ws);
+      } else if (action === "architecture")
+        result = saveProjectArchitecture(ws, need(slug, "slug"), need(values.file, "--file"));
+      else if (action === "list") result = listProjects(ws);
       else if (action === "show") result = readProject(ws, need(slug, "slug"));
       else if (action === "log")
         result = await logProject(ws, need(slug, "slug"), need(values.text, "--text"), {
@@ -416,7 +446,7 @@ async function run(argv: string[]): Promise<number> {
         });
       else
         throw new KaituError(
-          "使用 project new / list / show / log / memory / link / github / github-token / sync / set",
+          "使用 project new / list / show / log / memory / architecture / link / github / github-token / sync / set",
           "BAD_ARGS",
         );
       out(values, result, JSON.stringify(result, null, 2));

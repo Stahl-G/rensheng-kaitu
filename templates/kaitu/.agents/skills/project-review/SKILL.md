@@ -16,14 +16,14 @@ description: 每天收工或用户问「这个项目今天怎么样」时，按�
    - `gh issue list --repo <repo> --state all --search "updated:>=<今天>" --json number,title,state,labels,url`
    没有 `gh` 或没权限时只用 sync 的快照，并在日志里写明「未读 PR 明细」。
 3. 路线图：读仓库里已有的路线图或交接文档（如 ROADMAP、HANDOFF、README 的里程碑），只用文档里写明的里程碑和完成情况，不自己编阶段。
-4. 架构图：仓库里有用户指定工具生成的架构图文件时，看今天的提交是否改过它；改过就在日志里写一句改了哪里，并在视图里放它的链接。没有就跳过，不自己画。
+4. 架构图要不要重画：只判断，不画。项目有架构图时（仓库里的 `docs/architecture/architecture.json`，或开图里的 `projects/<slug>/architecture.html`），拿今天合并的 PR、CHANGELOG 和提交对照图上已有的模块、服务、存储、外部依赖和数据流向。出现图上没有的模块或服务、去掉了图上的部分、换了存储或外部服务、主要数据流向变了，才算结构变化；改界面、修 bug、改文案、补测试都不算。有结构变化就在日志「变化」段写一句哪里和图不一样，并在「明天」建议「在项目页点『用 Archify 重画』」。没有架构图、或项目刚有了第一批代码时，建议点「用 Archify 画架构图」。不自己画图，也不替用户启动重画。
 
 ## 2. 写一条日志
 
 `kaitu project log <slug> --text '…' --by agent`，一条，分四段，每条都带 PR / issue 号或提交作为出处：
 
 - 今天：合了哪些 PR、修了哪些 bug、新开了什么；
-- 变化：Star / Fork 增减、CI 由绿变红或由红变绿、架构图变化；
+- 变化：Star / Fork 增减、CI 由绿变红或由红变绿、和架构图不一样的结构变化；
 - 卡点：还开着的阻塞问题、红着的 CI；
 - 明天：建议先做什么（只是建议，不写进 STATUS 的 next）。
 
@@ -37,7 +37,7 @@ description: 每天收工或用户问「这个项目今天怎么样」时，按�
 - `daily-roadmap`（milestones）：路线图里程碑，`done` 按文档；
 - `daily-fixes`（table）：列 `number` 编号、`title` 标题、`kind` 类型（bug / 功能 / 文档）、`state` 状态，只放今天合并或关闭的；
 - `daily-open`（table）：同样的列，放还开着的 PR，草稿标「草稿」；
-- `daily-links`（links）：今天提到的 PR / issue / 架构图链接，只用 HTTP / HTTPS。
+- `daily-links`（links）：今天提到的 PR / issue 链接，只用 HTTP / HTTPS。架构图不放进视图，项目页自带架构图卡片。
 
 格式见 project 技能的「自定义项目视图」；写入后运行 `kaitu validate`，有错就改到通过。
 

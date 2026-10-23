@@ -4,7 +4,7 @@ import git from "isomorphic-git";
 import { assetsRoot, templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { parseGithubRepo } from "./github.js";
-import { projectStatusFiles, readProject } from "./projects.js";
+import { projectDirectory, projectStatusFiles, readProject } from "./projects.js";
 import type { Workspace } from "./workspace.js";
 
 export async function projectMemoryContext(ws: Workspace, directory: string, selected?: string) {
@@ -58,6 +58,44 @@ export function projectMemoryPrompt(ws: Workspace, slug: string, locale: "zh-CN"
   return locale === "en"
     ? `Please continue my Kaitu project "${project.data.title}". Before you start, read where it stands:\n${read}\nThen tell me in three sentences what is done, what is blocked and what you will do first.\nWhen you finish this stretch, log it back to Kaitu, covering changes, failed attempts, blockers and suggested next steps:\n${log}\nOnly write this project's log; do not change goals or other data.`
     : `请接着做我的开图项目「${project.data.title}」。开始前先读进度：\n${read}\n读完用三句话告诉我做到哪、卡在哪、你打算先做什么。\n做完这一段，把结果记回开图，写清改动、失败尝试、阻塞和建议下一步：\n${log}\n只写这个项目的日志，不改目标和别的资料。`;
+}
+
+/** 项目页「用 Archify 画架构图」：交给在代码仓库里工作的 Agent，画好后交回开图显示。 */
+export function projectArchitecturePrompt(
+  ws: Workspace,
+  slug: string,
+  locale: "zh-CN" | "en" = "zh-CN",
+): string {
+  const project = readProject(ws, slug);
+  const cli = cliCommand();
+  const repo = project.data.links.find((link) => link.role === "repo")?.path;
+  const at = repo ? quote(repo) : locale === "en" ? "this project's code repository" : "这个项目的代码仓库";
+  const done = `${cli} project architecture ${slug} --file docs/architecture/architecture.html --dir ${quote(ws.root)}`;
+  return locale === "en"
+    ? `Please draw an architecture diagram with Archify for my Kaitu project "${project.data.title}".\n1. Work in ${at}. If the Archify skill is not installed, ask me first; once I agree, run: npx skills add tt-a1i/archify\n2. Follow Archify's repository flow for an architecture diagram, with source evidence. Keep the JSON source at docs/architecture/architecture.json and the HTML next to it. If a previous source exists, start from it and tell me which nodes and connections changed.\n3. When Archify's finalize passes, hand the diagram to Kaitu:\n${done}\n4. Tell me in one or two sentences what level the diagram shows, what it leaves out and what changed. Do not commit or push; I will decide.`
+    : `请用 Archify 给我的开图项目「${project.data.title}」画一张架构图。\n1. 在${repo ? `代码仓库 ${at} ` : at}里工作。没装 Archify 技能时先问我，同意后运行：npx skills add tt-a1i/archify\n2. 按 Archify 给代码仓库画架构图的流程做，带源码出处。JSON 源放 docs/architecture/architecture.json，生成的 HTML 放在同一目录；已有旧的源就在它上面改，并说清哪些节点和连线变了。\n3. Archify 的 finalize 通过后，把图交给开图：\n${done}\n4. 用一两句话告诉我：这张图画到哪一层、省略了什么、和上一版比变了什么。不要提交或推送，由我决定。`;
+}
+
+const ARCHITECTURE_LIMIT = 8 * 1024 * 1024;
+
+/** 外部 Agent 交回的架构图：入口处查一次大小和类型，之后项目页按原样在隔离框里显示。 */
+export function saveProjectArchitecture(ws: Workspace, slug: string, source: string) {
+  readProject(ws, slug);
+  const path = resolve(source);
+  if (!fs.existsSync(path) || !fs.statSync(path).isFile())
+    throw new KaituError(`找不到架构图文件：${source}`, "NOT_FOUND");
+  if (fs.statSync(path).size > ARCHITECTURE_LIMIT) throw new KaituError("架构图超过 8 MB", "BAD_ARGS");
+  const html = fs.readFileSync(path, "utf8");
+  if (!/<(?:html|svg)[\s>]/i.test(html.slice(0, 4096)))
+    throw new KaituError("架构图需要是 Archify 生成的 HTML 文件", "BAD_ARGS");
+  const file = `${projectDirectory(ws, slug)}/architecture.html`;
+  ws.writeText(file, html);
+  return { file };
+}
+
+export function readProjectArchitecture(ws: Workspace, slug: string): string | null {
+  const file = `${projectDirectory(ws, slug)}/architecture.html`;
+  return ws.exists(file) ? ws.readText(file) : null;
 }
 
 export async function installProjectMemory(ws: Workspace, directory: string, selected?: string) {

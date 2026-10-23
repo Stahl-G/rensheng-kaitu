@@ -93,6 +93,7 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectArchitecturePrompt,
   projectMemoryPrompt,
   proposeTask,
   readAutomation,
@@ -112,6 +113,7 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
   readSettings,
@@ -760,6 +762,16 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("projectMemoryPrompt")
   async projectMemoryPrompt(slug: string, locale: string): Promise<string> {
     return projectMemoryPrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("projectArchitecturePrompt")
+  async projectArchitecturePrompt(slug: string, locale: string): Promise<string> {
+    return projectArchitecturePrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("projectArchitecture")
+  async projectArchitecture(slug: string): Promise<string | null> {
+    return readProjectArchitecture(this.workspace, slug);
   }
 
   @Remote("projectMemoryInstall")

@@ -10,10 +10,13 @@ import {
   initWorkspace,
   installProjectMemory,
   logProject,
+  projectArchitecturePrompt,
   projectMemoryContext,
   projectMemoryPrompt,
+  readProjectArchitecture,
   readProjectPage,
   runPhone,
+  saveProjectArchitecture,
 } from "../src/index.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
@@ -88,6 +91,19 @@ it("新项目会话读取既有状态并写回现有项目日志；入口保留�
   expect(prompt).toContain(`project log ${project.slug}`);
   expect(prompt).toContain(ws.root);
   expect(prompt).toContain(`--from '${code}'`);
+  // Agent 用 Archify 画好后交回：只收 HTML，项目页据此显示架构图卡片。
+  expect(projectArchitecturePrompt(ws, project.slug)).toContain(
+    `project architecture ${project.slug} --file`,
+  );
+  expect(readProjectPage(ws, project.slug).architecture).toBeNull();
+  const notes = join(code, "notes.txt");
+  fs.writeFileSync(notes, "not a diagram");
+  expect(() => saveProjectArchitecture(ws, project.slug, notes)).toThrow("HTML");
+  const diagram = join(code, "architecture.html");
+  fs.writeFileSync(diagram, "<!doctype html><html><head></head><body><svg></svg></body></html>");
+  saveProjectArchitecture(ws, project.slug, diagram);
+  expect(readProjectArchitecture(ws, project.slug)).toContain("<svg>");
+  expect(readProjectPage(ws, project.slug).architecture).not.toBeNull();
 });
 
 it("纯 Git 模板建的记忆仓库能直接接管：已有文件不动，接着能给手机生成内容", async () => {

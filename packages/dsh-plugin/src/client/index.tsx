@@ -640,6 +640,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              projectArchitecturePrompt: async (slug: string, locale: string) => {
+                const result = await ctx.remote.kaitu.projectArchitecturePrompt(slug, locale);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadProjectArchitecture: async (slug: string) => {
+                const result = await ctx.remote.kaitu.projectArchitecture(slug);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               installProjectMemory: async (slug: string, directory: string) => {
                 const result = await ctx.remote.kaitu.projectMemoryInstall(slug, directory);
                 if (!result.ok) throw new Error(result.error.message);
