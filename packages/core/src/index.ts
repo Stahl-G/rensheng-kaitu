@@ -32,6 +32,7 @@ export * from "./secrets.js";
 
 export * from "./drive.js";
 export * from "./overview.js";
+export * from "./user-profile.js";
 export * from "./inbox.js";
 
 export * from "./projects.js";
@@ -111,4 +112,3 @@ export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
 
 export * from "./jobs.js";
 export * from "./weather.js";
-export * from "./user-profile.js";

@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { userProfileSections } from "./handover.js";
 import { type Locale, pick } from "./locale.js";
 import { findRecordType, recordFilePattern } from "./modules.js";
-import { syncInventory } from "./sync-files.js";
+import { placeholderOriginal, syncInventory } from "./sync-files.js";
 import type { Workspace } from "./workspace.js";
 
 const setting = ".kaitu/user-profile.json";
@@ -43,8 +43,18 @@ function sourceFingerprint(ws: Workspace): string {
       throw new Error("Source unavailable");
     for (const file of inventory.files) if (accept(file)) files.add(file);
   };
-  collect("memory", (path) => path.endsWith(".md") && path !== "memory/MEMORY.md");
-  collect("projects", (path) => /\/(STATUS|log)\.md$/.test(path));
+  for (const entry of readdirSync(ws.resolve("memory"))) {
+    const path = `memory/${entry}`;
+    const original = placeholderOriginal(path) ?? path;
+    if (original.endsWith(".md") && original !== "memory/MEMORY.md") collect(original, () => true);
+  }
+  // Only project metadata is a source; do not traverse attachments or architecture exports.
+  for (const entry of readdirSync(ws.resolve("projects"), { withFileTypes: true })) {
+    const path = `projects/${entry.name}`;
+    if (placeholderOriginal(path) || ws.conflictCopy(path)) throw new Error("Source unavailable");
+    if (entry.isDirectory())
+      for (const name of ["STATUS.md", "log.md"]) collect(`${path}/${name}`, () => true);
+  }
   for (const type of ["task", "direction", "exploration_experiment", "phase", "project_metric"]) {
     const ref = findRecordType(ws, type);
     files.add(`${ref.module.dir}/module.json`);

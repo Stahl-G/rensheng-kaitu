@@ -612,6 +612,15 @@ async function run(argv: string[]): Promise<number> {
       out(values, result, lines.join("\n"));
       return problems.length || result.validation?.length ? 1 : 0;
     }
+    case "profile-publisher": {
+      const ws = workspace(values, false);
+      if (!["enable", "disable", "refresh"].includes(args[0] ?? ""))
+        throw new KaituError("使用 profile-publisher enable / disable / refresh", "BAD_ARGS");
+      const result =
+        args[0] === "refresh" ? refreshUserProfile(ws) : configureProfilePublisher(ws, args[0] === "enable");
+      out(values, result, result.status);
+      return 0;
+    }
     case "doctor": {
       const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());
       const checks = await doctor(ws);
@@ -634,15 +643,6 @@ async function run(argv: string[]): Promise<number> {
           : `${issues.map((i) => `${i.file}${i.line ? `:${i.line}` : ""}  ${i.message}`).join("\n")}\n\n共 ${issues.length} 处问题。`,
       );
       return issues.length === 0 ? 0 : 1;
-    }
-    case "profile-publisher": {
-      const ws = workspace(values, false);
-      if (!["enable", "disable", "refresh"].includes(args[0] ?? ""))
-        throw new KaituError("使用 profile-publisher enable / disable / refresh", "BAD_ARGS");
-      const result =
-        args[0] === "refresh" ? refreshUserProfile(ws) : configureProfilePublisher(ws, args[0] === "enable");
-      out(values, result, result.status);
-      return 0;
     }
     case "agents-md": {
       const ws = workspace(values);
