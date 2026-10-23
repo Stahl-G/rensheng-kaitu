@@ -163,6 +163,9 @@ export function TodayStart({
                 </button>
               ))}
           </div>
+          <button type="button" className={css.link} onClick={() => openModule("modules")}>
+            {t("更多模块 →", "More modules →")}
+          </button>
         </section>
       )}
       {storage && (

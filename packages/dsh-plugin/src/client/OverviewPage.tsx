@@ -7,7 +7,7 @@ import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
-import { ExploreNavigation } from "./ExploreNavigation.js";
+import { ExploreModulesPage, ExploreNavigation } from "./ExploreNavigation.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -28,7 +28,12 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { TodayStart, TodayTasks, TodayWeather } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
-import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
+import {
+  type ExploreModule,
+  defaultExploreEntries,
+  exploreDestination,
+  exploreModules,
+} from "./explore-modules.js";
 import { footprintAnchor } from "./footprint-state.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
@@ -183,12 +188,28 @@ function Overview({
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
-  const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
+  const firstExplore =
+    exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "modules";
   useEffect(() => {
-    if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
+    if (exploreEntries)
+      setExplore((current) =>
+        current === "modules" || current === "loading" || exploreEntries.includes(current)
+          ? current
+          : firstExplore,
+      );
   }, [exploreEntries, firstExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
+  const [exploreFacts, setExploreFacts] = useState<{
+    root: string;
+    hometown: boolean;
+    experiences: number;
+    newsTopics: number;
+    directions: number;
+  } | null>(null);
+  const [exploreError, setExploreError] = useState("");
+  const [exploreAttempt, setExploreAttempt] = useState(0);
+  const planning = useRef<HTMLDivElement>(null);
   const [hasWrittenMatter, setHasWrittenMatter] = useState(false);
   const emptyWorkspace = data?.empty;
   const hasUserData = onboarding?.hasUserData;
@@ -207,19 +228,52 @@ function Overview({
       active = false;
     };
   }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
+  // Warm the existing page projections independently of Today. Opening Explore only reads this state.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
   useEffect(() => {
-    let active = true;
-    if (workspaceRoot)
-      void props
-        .loadLifeMap()
-        .then((map) => {
-          if (active) setResidenceCity(footprintAnchor(map.experiences, map.asOf)?.name ?? "");
-        })
-        .catch(() => {});
-    return () => {
-      active = false;
+    let sequence = 0;
+    if (!workspaceRoot) return;
+    setExploreFacts(null);
+    setResidenceCity("");
+    const load = async () => {
+      const current = ++sequence;
+      try {
+        const [map, news, directions] = await Promise.all([
+          props.loadLifeMap(),
+          props.loadNews(),
+          props.loadExploration(),
+        ]);
+        if (current !== sequence) return;
+        setExploreFacts({
+          root: workspaceRoot,
+          hometown: !!map.hometown && map.hometown.status !== "missing",
+          experiences: map.experiences.length,
+          newsTopics: news.keywords?.length ?? 0,
+          directions: directions.directions.length,
+        });
+        setResidenceCity(footprintAnchor(map.experiences, map.asOf)?.name ?? "");
+        setExploreError("");
+      } catch (err) {
+        if (current === sequence) {
+          setExploreFacts(null);
+          setExploreError(err instanceof Error ? err.message : String(err));
+        }
+      }
     };
-  }, [workspaceRoot, props.loadLifeMap]);
+    void load();
+    const off = props.subscribe?.(() => void load());
+    return () => {
+      sequence++;
+      off?.();
+    };
+  }, [
+    workspaceRoot,
+    props.loadLifeMap,
+    props.loadNews,
+    props.loadExploration,
+    props.subscribe,
+    exploreAttempt,
+  ]);
   useEffect(() => {
     let active = true;
     void props
@@ -245,6 +299,28 @@ function Overview({
   const [learningSource, setLearningSource] = useState<LearningSource>();
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
+  const exploreContent =
+    data && personal && exploreFacts && exploreFacts.root === workspaceRoot
+      ? {
+          ...exploreFacts,
+          healthRecords: data.sections.find((section) => section.id === "health")?.count ?? 0,
+          goals: personal.goals.length,
+        }
+      : null;
+  const exploreEmpty =
+    !!exploreContent &&
+    !exploreContent.hometown &&
+    exploreContent.experiences +
+      exploreContent.healthRecords +
+      exploreContent.newsTopics +
+      exploreContent.goals +
+      exploreContent.directions ===
+      0;
+  const exploreStart =
+    exploreContent && exploreEntries ? exploreDestination(exploreEntries, exploreContent) : null;
+  useEffect(() => {
+    if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
+  }, [exploreStart]);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
@@ -402,7 +478,7 @@ function Overview({
           : id === "directions"
             ? "directions"
             : id === "explore"
-              ? firstExplore
+              ? (exploreStart ?? "loading")
               : "health",
       );
       setView("explore");
@@ -609,22 +685,7 @@ function Overview({
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
     jobs: <JobsPage {...child} />,
-    footprints: (
-      <>
-        <MapPage {...child} />
-        <ProgressMap
-          plans={data?.plans}
-          projects={data?.projects ?? []}
-          loadExploration={props.loadExploration}
-          subscribe={props.subscribe}
-          open={(section) => {
-            if (section === "directions") setExplore("directions");
-            else if (section === "plans") setView("overview");
-            else openSection("projects");
-          }}
-        />
-      </>
-    ),
+    footprints: <MapPage {...child} />,
     news: (
       <NewsPage
         {...child}
@@ -639,7 +700,36 @@ function Overview({
       />
     ),
     directions: (
-      <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+      <DirectionsPage
+        {...child}
+        goals={personal?.goals}
+        onConnect={() => setView("connections")}
+        planningContent={
+          <>
+            <div ref={planning} id="direction-plans" tabIndex={-1}>
+              {plansCard}
+            </div>
+            <ProgressMap
+              plans={data?.plans}
+              projects={data?.projects ?? []}
+              loadExploration={props.loadExploration}
+              subscribe={props.subscribe}
+              open={(section) => {
+                if (section === "projects") openRecord("projects");
+                else if (section === "plans") {
+                  planning.current?.scrollIntoView({ block: "start" });
+                  planning.current?.focus({ preventScroll: true });
+                } else setExplore("directions");
+              }}
+            />
+            {!data?.plans.goals.length && (
+              <button type="button" className={css.btn} onClick={() => startMatter("")}>
+                {t("写下想做成的事", "Write down a goal")}
+              </button>
+            )}
+          </>
+        }
+      />
     ),
   };
 
@@ -684,7 +774,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore(firstExplore);
+                if (id === "explore") setExplore(exploreStart ?? "loading");
                 setRecord("");
               }}
             >
@@ -982,12 +1072,6 @@ function Overview({
                 )}
               </aside>
             </div>
-            {!data.empty && (
-              <details className={todayCss.secondary}>
-                <summary>{t("你带来的规划", "Your plans")}</summary>
-                {plansCard}
-              </details>
-            )}
           </>
         )}
 
@@ -1080,8 +1164,10 @@ function Overview({
                 }}
                 onAdd={(kind) => {
                   if (kind === "file") setImportSource("choose");
-                  else if (kind === "category") setView("explore");
-                  else {
+                  else if (kind === "category") {
+                    setExplore("modules");
+                    setView("explore");
+                  } else {
                     setConnectionSection(kind === "organizer" ? "cloud-organizer" : undefined);
                     setChannelFocus(kind === "phone");
                     setView("connections");
@@ -1134,7 +1220,8 @@ function Overview({
                   sources={data?.plans.sources}
                   openNext={(id, goalId) => {
                     setGuide(null);
-                    setView("overview");
+                    if (goalId) openSection("directions");
+                    else setView("overview");
                     setTimeout(
                       () =>
                         (
@@ -1200,10 +1287,54 @@ function Overview({
               />
             </section>
             <div className={css.child}>
-              {selectedExplore ? (
+              {explore === "modules" ? (
+                <ExploreModulesPage
+                  entries={exploreEntries}
+                  current={explore}
+                  open={setExplore}
+                  empty={exploreEmpty}
+                  summaries={
+                    exploreContent
+                      ? {
+                          footprints: t(
+                            `${exploreContent.hometown ? "已有家乡 · " : ""}${exploreContent.experiences} 段经历`,
+                            `${exploreContent.hometown ? "Hometown recorded · " : ""}${exploreContent.experiences} experiences`,
+                          ),
+                          health: t(
+                            `${exploreContent.healthRecords} 条记录`,
+                            `${exploreContent.healthRecords} records`,
+                          ),
+                          news: t(
+                            `${exploreContent.newsTopics} 个关键词`,
+                            `${exploreContent.newsTopics} keywords`,
+                          ),
+                          directions: t(
+                            `${exploreContent.goals} 个目标 · ${exploreContent.directions} 个方向`,
+                            `${exploreContent.goals} goals · ${exploreContent.directions} directions`,
+                          ),
+                        }
+                      : {}
+                  }
+                  save={async (entries) => {
+                    const saved = await props.savePreferences({
+                      locale: followSystem ? null : locale,
+                      exploreEntries: entries,
+                    });
+                    setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
+                  }}
+                />
+              ) : selectedExplore ? (
                 explorePages[selectedExplore.id]
               ) : (
-                <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
+                <output>{t("正在读取模块…", "Loading modules…")}</output>
+              )}
+              {exploreError && (
+                <p role="alert">
+                  {exploreError}{" "}
+                  <button type="button" className={css.link} onClick={() => setExploreAttempt((n) => n + 1)}>
+                    {t("重试读取", "Retry loading")}
+                  </button>
+                </p>
               )}
             </div>
           </>
