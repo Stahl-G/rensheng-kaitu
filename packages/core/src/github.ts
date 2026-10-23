@@ -79,6 +79,18 @@ export interface GithubOptions {
 }
 const stateFile = ".kaitu/github-state.json";
 const secretsFile = ".kaitu/secrets.json";
+const credentialGenerations = new Map<string, number>();
+
+function credentialWriter(ws: Workspace, write: WorkspaceWrite): WorkspaceWrite {
+  const root = ws.root;
+  const generation = credentialGenerations.get(root);
+  return (operation) =>
+    write(async () => {
+      if (ws.root !== root || credentialGenerations.get(root) !== generation)
+        throw new KaituError("GitHub 凭据已变化，请重新同步", "CONFLICT");
+      return operation();
+    });
+}
 
 export function parseGithubRepo(input: string): string {
   let value = input.trim();
@@ -108,6 +120,7 @@ export function setGithubToken(ws: Workspace, token: string | null): void {
     value.github_token = token.trim();
   }
   ws.writeJson(secretsFile, value, { internal: true, mode: 0o600 });
+  credentialGenerations.set(ws.root, (credentialGenerations.get(ws.root) ?? 0) + 1);
   chmodSync(ws.resolve(secretsFile, { internal: true }), 0o600);
   // 换凭据后重新核验权限与额度。
   if (ws.exists(stateFile)) {
@@ -226,19 +239,19 @@ async function bindGithubNow(ws: Workspace, slug: string, url: string, options: 
   const write: WorkspaceWrite = options.write ?? ((operation) => operation());
   const repo = parseGithubRepo(url);
   const now = options.now ?? new Date();
-  const { state, request } = await write(async () => {
+  const { state, request, commit } = await write(async () => {
     readProject(ws, slug);
     const state = readState(ws);
-    return { state, request: requester(ws, state, options, now) };
+    return { state, request: requester(ws, state, options, now), commit: credentialWriter(ws, write) };
   });
   let canonical: string;
   try {
     const result = await request<Repo>(`/repos/${repo}`);
     canonical = parseGithubRepo(result.body.full_name);
   } finally {
-    await write(async () => ws.writeJson(stateFile, state, { internal: true }));
+    await commit(async () => ws.writeJson(stateFile, state, { internal: true }));
   }
-  await write(async () => bindRepo(ws, slug, canonical, now));
+  await commit(async () => bindRepo(ws, slug, canonical, now));
   return syncGithubNow(ws, slug, options);
 }
 // 同工作区的绑定、手动和后台同步共用队列；队列内直接调用 Now 函数，避免重入等待自身。
@@ -258,12 +271,13 @@ function queueGithub<T>(ws: Workspace, action: () => Promise<T>): Promise<T> {
 
 async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions) {
   const write: WorkspaceWrite = options.write ?? ((operation) => operation());
-  const { project, state, request } = await write(async () => {
+  const { project, state, request, commit } = await write(async () => {
     const state = readState(ws);
     return {
       project: readProject(ws, slug),
       state,
       request: requester(ws, state, options, options.now ?? new Date()),
+      commit: credentialWriter(ws, write),
     };
   });
   const boundRepo = project.data.github?.repo;
@@ -346,7 +360,7 @@ async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions
     ) {
       throw new GithubFailure("GitHub 返回的数据不合法", "network");
     }
-    return await write(() =>
+    return await commit(() =>
       batchOverview(ws, async () => {
         const existing = snapshots(ws, slug, now);
         const today = localDate(now, ws.timeZone());
@@ -420,7 +434,7 @@ async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions
     );
   } catch (error) {
     if (error instanceof KaituError && error.code === "CONFLICT") throw error;
-    return write(async () => {
+    return commit(async () => {
       problem = error instanceof GithubFailure ? error.problem : "network";
       state.repos[slug] = {
         checked_at,

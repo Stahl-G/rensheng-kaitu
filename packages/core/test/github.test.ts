@@ -118,6 +118,51 @@ async function fixture() {
   return { ws, slug, data, requests, api };
 }
 
+it.each([
+  ["sync", "success"],
+  ["sync", "failure"],
+  ["bind", "success"],
+  ["bind", "failure"],
+] as const)("凭据变更后丢弃旧 %s 的迟到 %s，不恢复缓存或写项目", async (operation, outcome) => {
+  const { ws, slug, data, api } = await fixture();
+  await bindGithub(ws, slug, "Owner/demo", { api, now: at(15) });
+  const project = readProject(ws, slug);
+  const status = ws.readText(`${project.dir}/STATUS.md`);
+  const records = ws.readText("projects/data/github/2026-10.jsonl");
+  data.repo.stargazers_count = 999;
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const options = {
+    api,
+    now: at(16),
+    fetch: (async (...args) => {
+      entered();
+      await gate;
+      if (outcome === "failure") throw new Error("synthetic network failure");
+      return fetch(...args);
+    }) as typeof fetch,
+  };
+  const pending =
+    operation === "bind" ? bindGithub(ws, slug, "Owner/new", options) : syncGithub(ws, slug, options);
+  const rejected = expect(pending).rejects.toMatchObject({ code: "CONFLICT" });
+  await started;
+  setGithubToken(new Workspace(ws.root, { maintain: false }), "synthetic-replacement");
+  const invalidated = ws.readText(".kaitu/github-state.json");
+  release();
+  await rejected;
+  expect(ws.readText(".kaitu/github-state.json")).toBe(invalidated);
+  expect(ws.readText(`${project.dir}/STATUS.md`)).toBe(status);
+  expect(ws.readText("projects/data/github/2026-10.jsonl")).toBe(records);
+  expect(readProject(ws, slug).log).toBe(project.log);
+  expect((await syncGithub(ws, slug, { api, now: at(16) })).snapshot?.stars).toBe(999);
+});
+
 it("解析、核验、分页和条件缓存，同日只修订一条，按真实日期记录净下降", async () => {
   for (const input of [
     "https://github.com/Owner/demo",
