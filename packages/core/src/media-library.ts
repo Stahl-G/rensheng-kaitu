@@ -32,7 +32,8 @@ export function selectMediaLibrary(ws: Workspace, folder: string): string {
   return root;
 }
 
-/** UI-only pixel read. A missing local library/image does not invalidate the referring text. */
+/** UI-only single-image preview; grids need a separate thumbnail path, not full originals over IPC.
+ * Missing or unsupported images return null so the UI can retain the text and show a placeholder. */
 export async function readMediaImage(ws: Workspace, reference: string) {
   if (!schemas().builtin("media-reference.schema.json")(reference))
     throw new KaituError("媒体引用路径不合法", "INVALID_MEDIA_REFERENCE");
@@ -42,11 +43,9 @@ export async function readMediaImage(ws: Workspace, reference: string) {
     ".png": "image/png",
     ".webp": "image/webp",
     ".gif": "image/gif",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
   };
   const contentType = types[extname(reference).toLowerCase()];
-  if (!contentType) throw new KaituError("此媒体暂不能显示为图片", "UNSUPPORTED_MEDIA");
+  if (!contentType) return null;
   try {
     const root = await realpath(mediaLibraryLocation(ws));
     const target = join(root, reference.slice("media:".length));

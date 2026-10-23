@@ -19,7 +19,7 @@ import { ulid } from "../src/ulid.js";
 import { freshWorkspace } from "./helpers.js";
 
 const png = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR1sAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGM0rt/EgA0wYRUdtBIAGfABdJ5cDhAAAAAASUVORK5CYII=",
   "base64",
 );
 it("设备绑定按工作区隔离，媒体原字节不进入资料目录且拒绝路径逃逸", async () => {
@@ -38,6 +38,13 @@ it("设备绑定按工作区隔离，媒体原字节不进入资料目录且拒�
     expect(second.readText("AGENTS.md")).toBe(before);
     expect(first.exists(name)).toBe(false);
     expect(readFileSync(join(root, name))).toEqual(png);
+    for (const extension of ["HEIC", "heif"]) {
+      const unsupported = `2026/10/IMG_1234.${extension}`;
+      const original = Buffer.from("synthetic unsupported original");
+      writeFileSync(join(root, unsupported), original);
+      expect(await readMediaImage(first, `media:${unsupported}`)).toBeNull();
+      expect(readFileSync(join(root, unsupported))).toEqual(original);
+    }
     await expect(readMediaImage(first, "media:2026/10/missing.png")).resolves.toBeNull();
     await expect(readMediaImage(first, "media:2026/10/../../outside.png")).rejects.toThrow();
     symlinkSync(join(first.root, "AGENTS.md"), join(root, "2026/10/escape.png"));
