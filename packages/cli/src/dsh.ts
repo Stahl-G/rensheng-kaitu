@@ -27,6 +27,8 @@ function entry(
         "desktop-product-telemetry",
         "product-analytics",
         "session-telemetry-otel",
+        "session-log-deepseek",
+        "plugin-package-inventory-deepseek",
         "ui-settings-session-log",
         "ui-open-in-app",
         "ui-subagent",

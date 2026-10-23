@@ -29,6 +29,10 @@ export function sdkRuntimePatch({
   connection = "local-ask",
   textOnly = false,
 }) {
+  // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
+  const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
+    (id) => ({ id, disabled: true }),
+  );
   // 只收发文字：不开网页和技能工具；万一还有工具被调用，宿主插件在执行前拒绝（KAITU_AGENT_TOOLS=none）。
   const web = textOnly
     ? [
@@ -46,6 +50,7 @@ export function sdkRuntimePatch({
       ];
   if (mode === "full" && !textOnly)
     return [
+      ...privacy,
       ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
       { id: "sandbox-policy", config: { mode: "danger-full-access", workspaceRoot: workspace } },
@@ -58,6 +63,7 @@ export function sdkRuntimePatch({
       },
     ];
   return [
+    ...privacy,
     ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
     { id: "sandbox", disabled: true },
