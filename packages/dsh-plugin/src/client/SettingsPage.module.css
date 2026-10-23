@@ -42,8 +42,8 @@
   cursor: pointer;
 }
 .navigation button[aria-current] {
-  background: var(--accent-tint);
-  color: var(--accent);
+  background: var(--link-soft);
+  color: var(--link);
   font-weight: 600;
 }
 .body {
