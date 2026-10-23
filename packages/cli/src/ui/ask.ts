@@ -54,7 +54,8 @@ export interface AskImage {
 export type AskAttachment = AskImage | { kind: "file"; data: string; mimeType: string; name: string };
 export interface AskService {
   support?(method: string, input: Record<string, unknown>): Promise<unknown>;
-  background(connection?: AgentConnectionId): AskService;
+  /** 后台一次性对话：不进问问历史。textOnly 时只收发文字，执行层拒绝工具调用。 */
+  background(connection?: AgentConnectionId, options?: { textOnly?: boolean }): AskService;
   list(): AskThread[];
   create(): Promise<AskThread>;
   organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
@@ -113,12 +114,13 @@ const visible = new Set<AskEventType>([
 
 export function createAskService(options: {
   transient?: boolean;
+  textOnly?: boolean;
   state: string;
   workspace: string;
   workspaceKey?: string;
   workspaceKeyFor?: (workspace: string) => string;
   connection?: AgentConnectionId;
-  runtime: (mode: AskMode, connection: AgentConnectionId) => Promise<AskRuntime>;
+  runtime: (mode: AskMode, connection: AgentConnectionId, textOnly?: boolean) => Promise<AskRuntime>;
   settings: AskService["settings"];
   configure: AskService["configure"];
   models: AskService["models"];
@@ -235,7 +237,7 @@ export function createAskService(options: {
     runtimeMode = mode;
     const epoch = generation;
     starting ??= options
-      .runtime(mode, options.connection ?? "local-ask")
+      .runtime(mode, options.connection ?? "local-ask", options.textOnly)
       .then(async (value) => {
         clients.add(value);
         if (epoch !== generation || closed) {
@@ -279,6 +281,21 @@ export function createAskService(options: {
               return;
             }
             if (!event || !visible.has(event.type)) return;
+            if (options.textOnly && (event.type === "tool/call" || event.type === "approval/asked")) {
+              // 只收发文字的对话：模型一伸手调工具就停下这次回答，审批一律拒绝。
+              if (!busy.delete(id)) return;
+              const requestId = event.data.requestId;
+              if (event.type === "approval/asked" && typeof requestId === "string")
+                void value
+                  .request("session/permission", { sessionId: id, requestId, optionId: null })
+                  .catch(() => {});
+              void value.request("session/cancel", { sessionId: id }).catch(() => {});
+              append(id, "session.status", {
+                status: "idle",
+                error: "这次只收发文字，AI 想调用工具，开图已停下",
+              });
+              return;
+            }
             if (
               event.type === "user/message" &&
               (event.data.source as { kind?: string } | undefined)?.kind !== "user"
@@ -312,9 +329,15 @@ export function createAskService(options: {
       append(row.id, "session.status", { status: "idle", error: "上次对话已中断，可以继续发送" });
   }
   return {
-    background(connection = options.connection) {
+    background(connection = options.connection, extra = {}) {
       ready();
-      const service = createAskService({ ...options, workspaceKey, connection, transient: true });
+      const service = createAskService({
+        ...options,
+        workspaceKey,
+        connection,
+        transient: true,
+        textOnly: extra.textOnly ?? false,
+      });
       backgrounds.add(service);
       const close = service.close.bind(service);
       service.close = async () => {

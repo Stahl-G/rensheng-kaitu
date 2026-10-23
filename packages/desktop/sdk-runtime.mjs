@@ -21,17 +21,30 @@ import {
   webRuntimePatch,
 } from "./sdk-search-settings.mjs";
 
-export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection = "local-ask" }) {
-  const web = [
-    ...webRuntimePatch(hostPlugin),
-    {
-      insert: [
-        { id: "kaitu-session-reference", name: "@deepseek-ai/dsh-session-reference" },
-        { id: "kaitu-file-reference", name: "@deepseek-ai/dsh-file-reference-local" },
-      ],
-    },
-  ];
-  if (mode === "full")
+export function sdkRuntimePatch({
+  workspace,
+  plugin,
+  hostPlugin,
+  mode,
+  connection = "local-ask",
+  textOnly = false,
+}) {
+  // 只收发文字：不开网页和技能工具；万一还有工具被调用，宿主插件在执行前拒绝（KAITU_AGENT_TOOLS=none）。
+  const web = textOnly
+    ? [
+        { id: "tool-web", disabled: true },
+        { id: "tool-skill", disabled: true },
+      ]
+    : [
+        ...webRuntimePatch(hostPlugin),
+        {
+          insert: [
+            { id: "kaitu-session-reference", name: "@deepseek-ai/dsh-session-reference" },
+            { id: "kaitu-file-reference", name: "@deepseek-ai/dsh-file-reference-local" },
+          ],
+        },
+      ];
+  if (mode === "full" && !textOnly)
     return [
       ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
@@ -77,10 +90,17 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connectio
       id: "agent-instructions",
       config: { maxBytes: 65536, projectRootMarkers: ["AGENTS.md"] },
     },
+    // 只收发文字时不读工作区的 AGENTS.md 和技能，模型只看到这次给的材料。
+    ...(textOnly
+      ? [
+          { id: "skill-filesystem", disabled: true },
+          { id: "agent-instructions", disabled: true },
+        ]
+      : []),
     { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
     { id: "approval", config: { policy: "never" } },
     { id: "permission", disabled: true },
-    { id: "tool-skill", disabled: false },
+    { id: "tool-skill", disabled: textOnly },
     {
       insert: [
         { id: "kaitu-sdk-host", name: hostPlugin },
@@ -297,7 +317,7 @@ export function createSdkRuntime({
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return api.settings();
     },
-    async runtime(mode = "scoped", capabilities = false, connection = "local-ask") {
+    async runtime(mode = "scoped", capabilities = false, connection = "local-ask", textOnly = false) {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
@@ -316,12 +336,12 @@ export function createSdkRuntime({
       }
       const profile = join(
         home,
-        `kaitu-sdk-${capabilities ? "capabilities" : `${mode}-${connection}`}.patch.json`,
+        `kaitu-sdk-${capabilities ? "capabilities" : `${mode}-${connection}${textOnly ? "-text" : ""}`}.patch.json`,
       );
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(
         profile,
-        JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection })),
+        JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly })),
         {
           mode: 0o600,
         },
@@ -334,9 +354,10 @@ export function createSdkRuntime({
         cwd: workspace,
         env: {
           ...env,
-          DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
-          KAITU_AGENT_MODE: mode,
+          DSH_PERMISSION_MODE: mode === "full" && !textOnly ? "danger-full-access" : "workspace-write",
+          KAITU_AGENT_MODE: textOnly ? "scoped" : mode,
           KAITU_AGENT_CONNECTION: connection,
+          KAITU_AGENT_TOOLS: textOnly ? "none" : "",
           KAITU_DIR: workspace,
         },
         detached: process.platform !== "win32",
