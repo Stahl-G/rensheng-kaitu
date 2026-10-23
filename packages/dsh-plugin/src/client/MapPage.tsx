@@ -404,7 +404,9 @@ export function MapPage({
             (experience) =>
               experience.event_type === "lived" &&
               !experience.review &&
-              ["observed", "user_reported"].includes(experience.fact_status),
+              ["observed", "user_reported"].includes(experience.fact_status) &&
+              (!experienceInterval(experience) ||
+                (experienceInterval(experience)?.from ?? "") <= (data?.asOf ?? "")),
           ),
       );
   const city = cities.find((item) => item.id === selected);
