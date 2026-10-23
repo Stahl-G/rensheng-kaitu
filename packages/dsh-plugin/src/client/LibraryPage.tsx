@@ -1,11 +1,13 @@
-import type { LibraryQuery, PlansData } from "@kaitu/core";
-import { useEffect, useRef, useState } from "react";
+import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
+import inboxStyles from "./InboxPage.module.css";
 import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
 import styles from "./LibraryPage.module.css";
 import css from "./Prototype.module.css";
 import { useLocale, useT, versionText } from "./i18n.js";
+import type { OnboardingServices } from "./onboarding-services.js";
 
 const SOURCE_EN: Record<string, string> = {
   开图: "Kaitu",
@@ -283,12 +285,21 @@ export function InboxPage({
   connect,
   openNext,
   sources,
+  overview,
+  onReview,
+  review,
 }: Pick<LibraryProps, "loadLibrary"> & {
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
   connect: () => void;
   openNext: (id: string, goalId?: string) => void;
   sources: PlansData["sources"] | undefined;
+  overview?: OverviewData | null;
+  onReview?: (file: string) => void;
+  review?: Pick<
+    OnboardingServices,
+    "readOnboardingMatter" | "adoptOnboardingMatter" | "keepOnboardingMatter"
+  >;
 }) {
   const t = useT();
   const [channels, setChannels] = useState<ChannelState>();
@@ -298,11 +309,14 @@ export function InboxPage({
       .catch(() => {});
   }, [channelSettings]);
   const [source, setSource] = useState("all");
+  const [status, setStatus] = useState<"review" | "all" | "raw">("review");
+  const [selected, setSelected] = useState<string | null>(null);
   const [entries, setEntries] = useState<InboxEntry[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const generation = useRef(0);
+  const reload = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -312,6 +326,11 @@ export function InboxPage({
         const page = await loadLibrary({ section: "inbox", source });
         if (!active || seq !== generation.current) return;
         setEntries(page.inbox);
+        setStatus((current) =>
+          current === "review" && !page.next && !page.inbox.some((row) => row.status === "review")
+            ? "all"
+            : current,
+        );
         setNext(page.next ?? null);
         setError("");
       } catch (err) {
@@ -320,6 +339,7 @@ export function InboxPage({
         if (active && seq === generation.current) setLoading(false);
       }
     };
+    reload.current = load;
     setEntries(null);
     void load();
     const off = subscribe?.(() => void load());
@@ -345,6 +365,9 @@ export function InboxPage({
       if (seq === generation.current) setLoading(false);
     }
   };
+  const filtered = entries?.filter((entry) => status === "all" || entry.status === status) ?? [];
+  const selectedEntry = filtered.find((entry) => entry.file === selected) ?? filtered[0];
+  const away = overview?.sync.cloudOrganizer?.away;
   const filters = [
     ["all", t("全部", "All")],
     ["me", t("随手记", "Quick notes")],
@@ -355,6 +378,14 @@ export function InboxPage({
   ];
   return (
     <div className={css.sec}>
+      {away && (
+        <p className={inboxStyles.meta}>
+          {t(
+            `电脑不在时，云端整理员整理了 ${away.actions} 条`,
+            `While your computer was off, the cloud organizer sorted ${away.actions} items`,
+          )}
+        </p>
+      )}
       <div className={css["conn-strip"]}>
         {[
           ["gmail", "Gmail"],
@@ -394,60 +425,261 @@ export function InboxPage({
             : t("这里还没有原文记录", "Nothing here yet")}
         </p>
       ) : (
-        entries.map((row) => {
-          const destination = sources?.[row.file.split("/").at(-1) ?? ""];
-          return (
-            <div className={css.raw} key={row.file}>
-              <time>
-                {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
-                <br />
-                <span className={css.small}>
-                  {row.source === "me"
-                    ? t("随手记", "Quick note")
-                    : row.source === "mail"
-                      ? t("邮件", "Email")
-                      : row.source === "slack"
-                        ? "Slack"
-                        : row.source === "feishu"
-                          ? t("飞书", "Feishu")
-                          : t("其他原文", "Other")}
-                </span>
-              </time>
-              <blockquote>{row.text}</blockquote>
-              <span className={css.st}>
-                <span className={css.chip}>
-                  {row.status === "organized"
-                    ? t("已整理", "Organized")
-                    : row.status === "review"
-                      ? t("要你核对", "Needs review")
-                      : t("只存了原文", "Saved as is")}
-                </span>
-                {row.status === "organized" && destination ? (
-                  <button
-                    type="button"
-                    className={css.link}
-                    onClick={() => openNext(destination.taskId, destination.goalId)}
-                  >
-                    {t(
-                      `变成下一步：${destination.title}${destination.goalTitle ? `（目标：${destination.goalTitle}）` : ""}`,
-                      `Next step: ${destination.title}${destination.goalTitle ? ` (Goal: ${destination.goalTitle})` : ""}`,
-                    )}
-                  </button>
-                ) : row.status === "organized" ? (
-                  t("只保留了原文", "Saved as is")
-                ) : row.status === "review" ? (
-                  t("请核对原文与相关资料", "Review the original and related items")
-                ) : (
-                  t("还没整理", "Not organized yet")
+        <>
+          <div className={css.subtabs} role="toolbar" aria-label={t("看哪些", "Show items")}>
+            {(["review", "all", "raw"] as const).map((value) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={status === value}
+                onClick={() => {
+                  setStatus(value);
+                  setSelected(null);
+                }}
+              >
+                {t(
+                  value === "review" ? "要你核对" : value === "all" ? "全部" : "只存了原文",
+                  value === "review" ? "To review" : value === "all" ? "All" : "Saved as is",
                 )}
-              </span>
+              </button>
+            ))}
+          </div>
+          {filtered.length === 0 && (
+            <p className={css.small}>
+              {t(
+                "这一页没有这类原文，可以切换筛选或加载更多。",
+                "No matching originals on this page. Change the filter or load more.",
+              )}
+            </p>
+          )}
+          <div className={inboxStyles.split}>
+            <div className={inboxStyles.list}>
+              {filtered.map((row) => (
+                <button
+                  type="button"
+                  className={inboxStyles.entry}
+                  key={row.file}
+                  aria-pressed={selectedEntry?.file === row.file}
+                  onClick={() => setSelected(row.file)}
+                >
+                  <strong className={inboxStyles.preview}>{row.text.split("\n")[0]}</strong>
+                  <time className={inboxStyles.meta}>
+                    {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
+                  </time>
+                  <span className={inboxStyles.meta}>
+                    {t(
+                      row.source === "me"
+                        ? "随手记"
+                        : row.source === "mail"
+                          ? "邮件"
+                          : row.source === "other"
+                            ? "其他原文"
+                            : row.source,
+                      row.source === "me"
+                        ? "Quick note"
+                        : row.source === "mail"
+                          ? "Email"
+                          : row.source === "other"
+                            ? "Other"
+                            : row.source,
+                    )}{" "}
+                    ·{" "}
+                    {t(
+                      row.status === "review"
+                        ? "要你核对"
+                        : row.status === "organized"
+                          ? "已整理"
+                          : "只存了原文",
+                      row.status === "review"
+                        ? "To review"
+                        : row.status === "organized"
+                          ? "Organized"
+                          : "Saved as is",
+                    )}
+                  </span>
+                </button>
+              ))}
             </div>
-          );
-        })
+            {selectedEntry && (
+              <article className={inboxStyles.detail} aria-label={t("这一条原文", "Selected original")}>
+                <p className={inboxStyles.meta}>
+                  {t("原文", "Original")} · {selectedEntry.date?.slice(0, 16).replace("T", " ")}
+                </p>
+                <blockquote className={inboxStyles.original}>{selectedEntry.text}</blockquote>
+                {(() => {
+                  const destination = sources?.[selectedEntry.file.split("/").at(-1) ?? ""];
+                  return destination ? (
+                    <button
+                      type="button"
+                      className={css.link}
+                      onClick={() => openNext(destination.taskId, destination.goalId)}
+                    >
+                      {t(`变成下一步：${destination.title}`, `Next step: ${destination.title}`)}
+                    </button>
+                  ) : null;
+                })()}
+                {review && selectedEntry.source === "me" && selectedEntry.status !== "organized" && (
+                  <InboxReview
+                    key={selectedEntry.file}
+                    file={selectedEntry.file}
+                    services={review}
+                    done={() => {
+                      setSelected(
+                        filtered.find((row) => row.file !== selectedEntry.file && row.status !== "organized")
+                          ?.file ?? null,
+                      );
+                      void reload.current();
+                    }}
+                    onReview={onReview}
+                  />
+                )}
+                {!review &&
+                  onReview &&
+                  selectedEntry.source === "me" &&
+                  selectedEntry.status !== "organized" && (
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css["btn-primary"]}`}
+                      onClick={() => onReview(selectedEntry.file)}
+                    >
+                      {t("核对整理结果", "Review organized results")}
+                    </button>
+                  )}
+              </article>
+            )}
+          </div>
+        </>
       )}
       {next && (
         <button type="button" className={css.link} disabled={loading} onClick={() => void more()}>
           {loading ? t("正在读取…", "Loading…") : t("加载更多", "Load more")}
+        </button>
+      )}
+    </div>
+  );
+}
+function InboxReview({
+  file,
+  services,
+  done,
+  onReview,
+}: {
+  file: string;
+  services: Pick<
+    OnboardingServices,
+    "readOnboardingMatter" | "adoptOnboardingMatter" | "keepOnboardingMatter"
+  >;
+  done: () => void;
+  onReview?: (file: string) => void;
+}) {
+  const t = useT();
+  const [matter, setMatter] = useState<OnboardingMatter | null>(null);
+  const [draft, setDraft] = useState<OnboardingMatterDraft>({ goal: "", current: "", next: "" });
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void services
+      .readOnboardingMatter(file)
+      .then((value) => {
+        if (active) {
+          setMatter(value);
+          if (value.draft)
+            setDraft({ goal: value.draft.goal, current: value.draft.current, next: value.draft.next });
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      active = false;
+    };
+  }, [file, services.readOnboardingMatter]);
+  const save = async (keep = false) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      if (keep) await services.keepOnboardingMatter(file);
+      else await services.adoptOnboardingMatter(file, draft);
+      done();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={inboxStyles.review}>
+      {error && <p role="alert">{error}</p>}
+      {matter?.draft && !matter.draft.paths?.length && (
+        <>
+          <h2>{t("开图从这里整理出", "Organized from this original")}</h2>
+          {editing ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void save();
+              }}
+            >
+              {(["goal", "current", "next"] as const).map((key) => (
+                <label key={key}>
+                  {t(
+                    key === "goal" ? "想做成的事" : key === "current" ? "已知现状" : "下一步",
+                    key === "goal" ? "Goal" : key === "current" ? "Current situation" : "Next step",
+                  )}
+                  <textarea
+                    value={draft[key]}
+                    disabled={busy}
+                    maxLength={10000}
+                    onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+                  />
+                </label>
+              ))}
+              <button
+                type="submit"
+                className={`${css.btn} ${css["btn-primary"]}`}
+                disabled={busy || !draft.next.trim()}
+              >
+                {t("对，就这样", "Looks right")}
+              </button>
+            </form>
+          ) : (
+            <>
+              <p>{draft.goal}</p>
+              <p>{draft.current}</p>
+              <p>
+                {draft.next} · {t("进接下来", "Goes to next steps")}
+              </p>
+              <button
+                type="button"
+                className={`${css.btn} ${css["btn-primary"]}`}
+                disabled={busy}
+                onClick={() => void save()}
+              >
+                {t("对，就这样", "Looks right")}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className={css.btn}
+            disabled={busy}
+            onClick={() => setEditing((value) => !value)}
+          >
+            {editing ? t("收起编辑", "Close editor") : t("改一下", "Edit")}
+          </button>
+        </>
+      )}
+      {!!matter?.draft?.paths?.length && onReview && (
+        <button type="button" className={css.btn} onClick={() => onReview(file)}>
+          {t("核对方向与尝试", "Review directions and experiments")}
+        </button>
+      )}
+      {matter && (
+        <button type="button" className={css.link} disabled={busy} onClick={() => void save(true)}>
+          {busy ? t("正在保存…", "Saving…") : t("只存原文", "Keep original only")}
         </button>
       )}
     </div>
