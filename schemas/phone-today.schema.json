@@ -55,7 +55,7 @@
               "rev": { "type": "integer", "minimum": 1 },
               "ts": { "type": "string", "format": "date-time" },
               "title": { "type": "string", "minLength": 1 },
-              "status": { "enum": ["open", "done", "cancelled"] },
+              "status": { "enum": ["proposed", "open", "done", "cancelled"] },
               "due": { "type": "string" }
             }
           }
