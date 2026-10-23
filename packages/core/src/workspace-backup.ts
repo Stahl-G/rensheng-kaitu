@@ -83,6 +83,7 @@ const memoryRepositoryReadme =
 const manifest = "kaitu-backup.json";
 const states = new WeakMap<Workspace, { root: string; value: BackupState }>();
 const active = new WeakMap<Workspace, Promise<void>>();
+const connectionGenerations = new Map<string, number>();
 const events = new WeakMap<Workspace, EventEmitter>();
 const jobs = new WeakMap<Workspace, { controller: AbortController; progress?: BackupProgress }>();
 function emitter(ws: Workspace) {
@@ -469,11 +470,17 @@ export async function connectWorkspaceBackup(
     })
     .parse(input);
   const repo = parseGithubRepo(args.repo);
-  const { selection, remote } = await write(async () => {
+  const { selection, remote, root, generation } = await write(async () => {
     if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+    const selection = backupSelection(ws, args);
+    const remote = providedRemote ?? githubBackupRemote(ws, args.via);
+    const generation = (connectionGenerations.get(ws.root) ?? 0) + 1;
+    connectionGenerations.set(ws.root, generation);
     return {
-      selection: backupSelection(ws, args),
-      remote: providedRemote ?? githubBackupRemote(ws, args.via),
+      selection,
+      remote,
+      root: ws.root,
+      generation,
     };
   });
   const info = await remote.inspect(repo);
@@ -486,6 +493,8 @@ export async function connectWorkspaceBackup(
     checkedAt: new Date().toISOString(),
   };
   return write(async () => {
+    if (ws.root !== root || connectionGenerations.get(root) !== generation)
+      throw new KaituError("备份连接已变化，请重新连接", "CONFLICT");
     if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
     const previous = state(ws);
     store(ws, {
@@ -672,6 +681,7 @@ export function workspaceBackupPrompts(
 }
 export function disconnectWorkspaceBackup(ws: Workspace) {
   if (active.has(ws)) throw new Error(pick("请等待本次同步完成", "Wait for the current sync to finish"));
+  connectionGenerations.set(ws.root, (connectionGenerations.get(ws.root) ?? 0) + 1);
   const s = state(ws);
   s.connection = undefined;
   s.error = undefined;

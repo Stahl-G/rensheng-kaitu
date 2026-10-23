@@ -10,6 +10,7 @@ import {
   type BackupRemote,
   cancelWorkspaceBackup,
   connectWorkspaceBackup,
+  disconnectWorkspaceBackup,
   resolveWorkspaceBackup,
   restoreWorkspaceBackup,
   syncWorkspaceBackup,
@@ -40,6 +41,46 @@ function remoteMock(isPrivate = true) {
   };
   return { remote, inspect, files: () => files, pushes: () => count };
 }
+
+it("断开或较新的连接生效后，迟到的连接核验不能覆盖用户选择", async () => {
+  const ws = await freshWorkspace();
+  const { remote } = remoteMock();
+  for (const change of ["disconnect", "connect"] as const) {
+    let release!: () => void;
+    let entered!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = connectWorkspaceBackup(
+      ws,
+      { repo: "synthetic/old", text: true, records: false },
+      {
+        ...remote,
+        async inspect(repo) {
+          entered();
+          await gate;
+          return remote.inspect(repo);
+        },
+      },
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ code: "CONFLICT" });
+    await started;
+    if (change === "disconnect") disconnectWorkspaceBackup(ws);
+    else await connectWorkspaceBackup(ws, { repo: "synthetic/new", text: true, records: false }, remote);
+    const selected = ws.readText(".kaitu/workspace-backup.json");
+    release();
+    await rejected;
+    expect(ws.readText(".kaitu/workspace-backup.json")).toBe(selected);
+    expect(workspaceBackupStatus(ws).connection?.repo ?? null).toBe(
+      change === "disconnect" ? null : "synthetic/new",
+    );
+  }
+  await connectWorkspaceBackup(ws, { repo: "synthetic/retry", text: true, records: false }, remote);
+  expect(workspaceBackupStatus(ws).connection?.repo).toBe("synthetic/retry");
+});
 
 it("保留用户的无 remote 仓库与 worktree 指针；有明确来源的旧历史可迁往重定向 state", async () => {
   const ws = await freshWorkspace();
