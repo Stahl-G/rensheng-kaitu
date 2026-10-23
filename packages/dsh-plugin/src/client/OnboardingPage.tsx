@@ -290,6 +290,9 @@ export function OnboardingPage(props: Props) {
     return (
       <>
         <TodayStart
+          status={status}
+          connect={() => move(4)}
+          storage={() => move(STORAGE_STEP)}
           busy={busy}
           start={(text) => {
             setMatterText(text);

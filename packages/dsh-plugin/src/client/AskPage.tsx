@@ -3,9 +3,9 @@ import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
 import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
 import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
+import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";
 import { DocumentBody } from "./DocumentBody.js";
-import { DshAuthorization } from "./DshAuthorization.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
@@ -166,7 +166,8 @@ function NativeApproval({
   event,
   resolution,
   session,
-}: { event: ChatEvent; resolution?: ChatEvent; session: string }) {
+  disabled,
+}: { event: ChatEvent; resolution?: ChatEvent; session: string; disabled: boolean }) {
   const t = useT();
   const [responding, setResponding] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -188,7 +189,7 @@ function NativeApproval({
     cancelled: t("请求已取消，未批准", "Request cancelled without approval"),
   };
   const answer = async (optionId: string | null) => {
-    if (responding || submitted || status) return;
+    if (disabled || responding || submitted || status) return;
     setResponding(true);
     setError("");
     try {
@@ -221,13 +222,17 @@ function NativeApproval({
             </output>
           )}
           <div className={`${css.actions} ${css.approvalActions}`}>
-            <button type="button" disabled={responding || submitted} onClick={() => void answer(null)}>
+            <button
+              type="button"
+              disabled={disabled || responding || submitted}
+              onClick={() => void answer(null)}
+            >
               {t("拒绝这一次", "Reject")}
             </button>
             {allow && (
               <button
                 type="button"
-                disabled={responding || submitted}
+                disabled={disabled || responding || submitted}
                 title={allow.name}
                 onClick={() => void answer(allow.optionId)}
               >
@@ -264,8 +269,6 @@ export function AskPage({
 }) {
   const t = useT();
   const locale = useLocale();
-  const [cliPath, setCliPath] = useState("");
-  const [agentId, setAgentId] = useState("codebuddy");
   const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
   const [modelQuery, setModelQuery] = useState("");
   const [liveText, setLiveText] = useState("");
@@ -286,43 +289,27 @@ export function AskPage({
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const configurationRequested = useRef(false);
+  const [connectionFocus, setConnectionFocus] = useState(0);
+  const [connectionLocalOnly, setConnectionLocalOnly] = useState(false);
   useEffect(() => {
     if (configureRequest) {
       configurationRequested.current = true;
       setStep(1);
-      if (configureBuiltin) setChoice("builtin");
+      setConnectionLocalOnly(false);
+      if (configureBuiltin) setConnectionFocus((n) => n + 1);
     }
   }, [configureRequest, configureBuiltin]);
   const [showThreads, setShowThreads] = useState(false);
-  const [checkingLocal, setCheckingLocal] = useState(false);
   const connectKey = () => {
-    if (onSettings) {
-      onSettings("ai");
-      return;
-    }
-    setChoice("builtin");
+    if (onSettings) return onSettings("ai");
+    setConnectionLocalOnly(false);
+    setConnectionFocus((n) => n + 1);
     setStep(1);
-    requestAnimationFrame(() =>
-      dialog.current?.querySelector<HTMLInputElement>('input[type="password"]')?.focus(),
-    );
   };
-  const checkLocal = async () => {
-    setCheckingLocal(true);
-    setError("");
-    try {
-      const ai = await call<Settings>("askSettings");
-      setSettings(ai);
-      setAgentId(ai.localAgent?.id ?? ai.localAgents?.[0]?.id ?? "codebuddy");
-      if (onSettings) onSettings("local-ai");
-      else {
-        setChoice("local");
-        setStep(1);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setCheckingLocal(false);
-    }
+  const checkLocal = () => {
+    if (onSettings) return onSettings("local-ai");
+    setConnectionLocalOnly(true);
+    setStep(1);
   };
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
@@ -335,19 +322,6 @@ export function AskPage({
   const localRuntime = settings?.mode ? settings.mode === "full" : !!settings?.fullOnly;
   const runtimeLabel = localRuntime ? t("本机 Agent", "Local Agent") : t("开图资料", "Kaitu files");
 
-  const [choice, setChoice] = useState<"builtin" | "local">("local");
-  const [key, setKey] = useState("");
-  const [provider, setProvider] = useState("deepseek-official");
-  const [model, setModel] = useState("");
-  const [availableModels, setAvailableModels] = useState<{ id: string; name?: string; image?: boolean }[]>(
-    [],
-  );
-  const [loadingModels, setLoadingModels] = useState(false);
-  const [manualModel, setManualModel] = useState(false);
-  const modelRequest = useRef(0);
-  const [modelNotice, setModelNotice] = useState("");
-  const [baseURL, setBaseURL] = useState("");
-  const [api, setApi] = useState("openai-completions");
   const [attachments, setAttachments] = useState<AttachmentInput[]>([]);
   const [readingFiles, setReadingFiles] = useState(false);
   const [references, setReferences] = useState(false);
@@ -356,16 +330,8 @@ export function AskPage({
     { id: string; title: string; mention: string }[]
   >([]);
   const [atQuery, setAtQuery] = useState<string | undefined>();
-  const [auth, setAuth] = useState<"dsh" | "key">("key");
   const cursor = useRef(0);
   const upload = useRef<HTMLInputElement>(null);
-  const selectedProvider = settings?.providers.find((item) => item.id === provider);
-  const custom = provider === "kaitu-custom";
-  const authMethods = selectedProvider?.authMethods ?? [];
-  const nativeLoginOnly =
-    authMethods.length > 0 &&
-    (authMethods.every((method) => method.id === "oauth") ||
-      !settings?.protocols.some((protocol) => protocol.id === selectedProvider?.api));
   const [automation, setAutomation] = useState({ morning: true, organizer: true, news: false });
   const [asked, setAsked] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -504,6 +470,7 @@ export function AskPage({
       <button
         type="button"
         className={css.threadMore}
+        disabled={!settings?.configured}
         aria-label={t("更多", "More")}
         aria-expanded={threadMenu?.id === thread.id}
         onClick={() => setThreadMenu(threadMenu?.id === thread.id ? null : { id: thread.id })}
@@ -570,14 +537,6 @@ export function AskPage({
       .then(([ai, auto, list]) => {
         if (!active) return;
         setSettings(ai);
-        setAuth(ai.auth ?? "key");
-        setProvider(ai.provider);
-        setModel(ai.model);
-        setCliPath(ai.localAgent?.path ?? "");
-        setAgentId(ai.localAgent?.id ?? ai.localAgents?.[0]?.id ?? "codebuddy");
-        setBaseURL(ai.baseURL ?? "");
-        setApi(ai.api ?? "openai-completions");
-        if (!configurationRequested.current) setChoice(ai.choice === "builtin" ? "builtin" : "local");
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
         setThreads(list);
@@ -745,82 +704,8 @@ export function AskPage({
     setAtQuery(undefined);
     input.current?.focus();
   };
-  // 服务、接口或 Key 变了，之前获取的模型和还没回来的请求都作废。
-  const dropModels = () => {
-    modelRequest.current++;
-    setLoadingModels(false);
-    setAvailableModels([]);
-    setModelNotice("");
-  };
-  const loadModels = async () => {
-    const request = ++modelRequest.current;
-    setLoadingModels(true);
-    setModelNotice("");
-    try {
-      const models = await call<typeof availableModels>("askModels", {
-        provider,
-        auth,
-        ...(custom ? { baseURL, api } : {}),
-        ...(key.trim() ? { apiKey: key.trim() } : {}),
-      });
-      if (request !== modelRequest.current) return;
-      setAvailableModels(models);
-      if (models.length) {
-        setModel((current) =>
-          models.some((item) => item.id === current) ? current : (models[0]?.id ?? current),
-        );
-        setManualModel(false);
-      }
-      setModelNotice(
-        models.length
-          ? t(`${models.length} 个模型`, `${models.length} ${models.length === 1 ? "model" : "models"}`)
-          : t("服务没有返回模型", "The provider returned no models"),
-      );
-    } catch (err) {
-      if (request !== modelRequest.current) return;
-      setAvailableModels([]);
-      setModelNotice(err instanceof Error ? err.message : String(err));
-    } finally {
-      if (request === modelRequest.current) setLoadingModels(false);
-    }
-  };
-  const next = async () => {
-    setSaving(true);
-    setError("");
-    try {
-      const ai = await call<Settings>("askConfigure", {
-        choice,
-        ...(choice === "local"
-          ? { agent: agentId, ...(cliPath.trim() ? { path: cliPath.trim() } : {}) }
-          : {}),
-        ...(choice === "builtin"
-          ? {
-              provider,
-              model,
-              auth,
-              ...(availableModels.find((item) => item.id === model)?.image === undefined
-                ? {}
-                : { supportsImages: availableModels.find((item) => item.id === model)?.image }),
-              ...(custom ? { baseURL, api } : {}),
-              ...(key ? { apiKey: key } : {}),
-            }
-          : {}),
-      });
-      setKey("");
-      setSettings(ai);
-      // 换 AI 留在当前对话；后端会把对方没看过的记录带进提示词。
-      setAuth(ai.auth ?? "key");
-      if (!ai.supportsImages) setAttachments([]);
-      setSessionReferences([]);
-      if (choice === "builtin" && !asked) setStep(2);
-      else setStep(0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSaving(false);
-    }
-  };
   const openModelMenu = () => {
+    if (!settings?.configured) return;
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
     if (modelMenu || !agent) return;
@@ -831,6 +716,7 @@ export function AskPage({
       .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
   };
   const switchModel = async (provider: string, id: string) => {
+    if (!settings?.configured) return;
     setModelMenu(false);
     setSaving(true);
     setError("");
@@ -884,7 +770,7 @@ export function AskPage({
     );
   return (
     <div
-      className={`${css.chat} ${loaded && !settings?.configured ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+      className={`${css.chat} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
     >
       <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
@@ -950,7 +836,7 @@ export function AskPage({
               nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 40;
           }}
         >
-          {loaded && !settings?.configured ? (
+          {loaded && !settings?.configured && !selected ? (
             <div className={css.noKey}>
               <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
               <p>
@@ -982,8 +868,8 @@ export function AskPage({
                       )}
                     </p>
                   </span>
-                  <button type="button" disabled={checkingLocal} onClick={() => void checkLocal()}>
-                    {checkingLocal ? t("正在检查…", "Checking…") : t("检查一下", "Check this computer")}
+                  <button type="button" onClick={checkLocal}>
+                    {t("去设置", "Open settings")}
                   </button>
                 </div>
                 <div>
@@ -1003,6 +889,7 @@ export function AskPage({
               </section>
             </div>
           ) : (
+            settings?.configured &&
             !events.some((event) => event.type === "user/message") && (
               <div className={css.welcome}>
                 <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
@@ -1120,6 +1007,7 @@ export function AskPage({
                 <NativeApproval
                   key={`${selected}:${event.id}`}
                   session={selected ?? ""}
+                  disabled={!settings?.configured}
                   event={event}
                   resolution={events.find(
                     (item) => item.type === "approval/resolved" && item.data.requestId === data.requestId,
@@ -1382,7 +1270,7 @@ export function AskPage({
               <button
                 type="button"
                 className={css.model}
-                disabled={busy}
+                disabled={busy || !settings?.configured}
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
                 title={
@@ -1475,6 +1363,7 @@ export function AskPage({
                     className={css.model}
                     onClick={() => {
                       setModelMenu(false);
+                      setConnectionLocalOnly(false);
                       setStep(1);
                     }}
                   >
@@ -1526,240 +1415,26 @@ export function AskPage({
           if (saving) event.preventDefault();
           else setStep(0);
         }}
-        onClose={() => {
-          setKey("");
-        }}
       >
         <p className={css.step}>{t(`第 ${step} 步，共 2 步`, `Step ${step} of 2`)}</p>
         {step === 1 ? (
           <>
             <h2 id="ask-connect-title">{t("连接 AI", "Connect AI")}</h2>
-            <button
-              type="button"
-              className={css.choice}
-              aria-pressed={choice === "local"}
-              disabled={saving}
-              onClick={() => setChoice("local")}
-            >
-              <b>{t("用本机 Agent", "Use a local agent")}</b>
-              <span>
-                {t(
-                  "使用 CodeBuddy、Claude Code、Kimi 等 CLI 的账号和本机能力，操作审批由 Agent 自己处理。",
-                  "Uses the accounts and local capabilities of CodeBuddy, Claude Code, Kimi and other CLIs, with the Agent's own approval flow.",
-                )}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={css.choice}
-              aria-pressed={choice === "builtin"}
-              disabled={saving}
-              onClick={() => {
-                setChoice("builtin");
-                if (settings?.choice === "local")
-                  void call<Settings>("askSupport", "builtinSettings", {})
-                    .then((ai) => {
-                      setSettings((current) =>
-                        current
-                          ? { ...current, providers: ai.providers, protocols: ai.protocols, saved: ai.saved }
-                          : ai,
-                      );
-                      setProvider(ai.provider);
-                      setModel(ai.model);
-                    })
-                    .catch((err) => setError(err.message));
+            <AiSettings
+              focusKey={connectionFocus}
+              localOnly={connectionLocalOnly}
+              onSaving={setSaving}
+              onSaved={async () => {
+                const ai = await call<Settings>("askSettings");
+                setSettings(ai);
+                if (!ai.supportsImages) setAttachments([]);
+                setSessionReferences([]);
+                setStep(ai.choice !== "local" && !asked ? 2 : 0);
               }}
-            >
-              <b>{t("用开图里的 AI", "Use AI in Kaitu")}</b>
-              <span>
-                {t(
-                  "用 API Key 连接，或使用服务商提供的账号登录。",
-                  "Connect with an API key or sign in with a supported provider account.",
-                )}
-              </span>
+            />
+            <button type="button" disabled={saving} onClick={() => setStep(0)}>
+              {t("以后再说", "Later")}
             </button>
-            {choice === "local" && (
-              <div className={css.fields}>
-                {!!settings?.localAgents?.length && (
-                  <label className={css.key}>
-                    Agent
-                    <select
-                      value={agentId}
-                      onChange={(event) => {
-                        setAgentId(event.target.value);
-                        setCliPath("");
-                      }}
-                    >
-                      {settings.localAgents.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <label className={css.key}>
-                  {t("CLI 路径（可选，留空自动检测）", "CLI path (optional; auto-detect when empty)")}
-                  <input
-                    value={cliPath}
-                    onChange={(event) => setCliPath(event.target.value)}
-                    placeholder={settings?.localAgents?.find((item) => item.id === agentId)?.path}
-                  />
-                </label>
-              </div>
-            )}
-            {choice === "builtin" ? (
-              <fieldset className={css.fields} disabled={saving}>
-                <label className={css.key}>
-                  {t("AI 服务", "AI provider")}
-                  <select
-                    value={provider}
-                    onChange={(event) => {
-                      const id = event.target.value;
-                      dropModels();
-                      setManualModel(false);
-                      setProvider(id);
-                      setAuth(settings?.provider === id ? (settings.auth ?? "key") : "key");
-                      setModel(settings?.provider === id ? settings.model : "");
-                      setKey("");
-                      setError("");
-                    }}
-                  >
-                    {settings?.providers.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                        {item.recommended ? t("（推荐）", " (recommended)") : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {custom && (
-                  <label className={css.key}>
-                    {t("协议", "Protocol")}
-                    <select
-                      value={api}
-                      onChange={(event) => {
-                        dropModels();
-                        setApi(event.target.value);
-                      }}
-                    >
-                      {settings?.protocols.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                {custom && (
-                  <label className={css.key}>
-                    Base URL
-                    <input
-                      type="url"
-                      value={baseURL}
-                      placeholder="https://api.example.com/v1"
-                      onChange={(event) => {
-                        dropModels();
-                        setBaseURL(event.target.value);
-                      }}
-                    />
-                  </label>
-                )}
-                {selectedProvider?.authKey && (
-                  <DshAuthorization
-                    provider={selectedProvider}
-                    onAuthorized={() => {
-                      setAuth("dsh");
-                      setKey("");
-                      setModelNotice(t("账号已授权", "Account authorized"));
-                    }}
-                  />
-                )}
-                {!nativeLoginOnly && (
-                  <label className={css.key}>
-                    API Key
-                    <input
-                      type="password"
-                      autoComplete="off"
-                      value={key}
-                      placeholder={
-                        settings?.configured && settings.provider === provider
-                          ? t("已连接，留空保留", "Connected; leave empty to keep")
-                          : t("粘贴这个 AI 服务的 API Key", "Paste your provider’s API key")
-                      }
-                      onChange={(event) => {
-                        dropModels();
-                        setKey(event.target.value);
-                        setAuth("key");
-                      }}
-                      onBlur={() => {
-                        if (key.trim()) void loadModels();
-                      }}
-                    />
-                  </label>
-                )}
-                {availableModels.length > 0 && (
-                  <label className={css.key}>
-                    {t("模型", "Model")}
-                    <select
-                      value={manualModel ? "" : model}
-                      onChange={(event) => {
-                        setManualModel(!event.target.value);
-                        setModel(event.target.value);
-                      }}
-                    >
-                      {availableModels.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name && item.name !== item.id ? `${item.name} · ${item.id}` : item.id}
-                        </option>
-                      ))}
-                      <option value="">{t("手动填写模型 ID", "Enter model ID manually")}</option>
-                    </select>
-                  </label>
-                )}
-                {(!availableModels.length || manualModel) && (
-                  <label className={css.key} htmlFor="ask-model">
-                    {availableModels.length ? t("模型 ID", "Model ID") : t("模型", "Model")}
-                    <input
-                      id="ask-model"
-                      value={model}
-                      placeholder={t(
-                        "从服务获取后选择，或填写模型 ID",
-                        "Choose a model from your provider or enter its ID",
-                      )}
-                      onChange={(event) => setModel(event.target.value)}
-                    />
-                  </label>
-                )}
-                <button type="button" onClick={() => void loadModels()} disabled={loadingModels}>
-                  {loadingModels
-                    ? t("正在获取模型…", "Loading models…")
-                    : t("从服务获取模型列表", "Load provider models")}
-                </button>
-                {modelNotice && <output>{modelNotice}</output>}
-                {selectedProvider?.keyUrl ? (
-                  <a href={selectedProvider.keyUrl} target="_blank" rel="noreferrer">
-                    {t(
-                      `去 ${selectedProvider.name} 官方申请 API Key ↗`,
-                      `Get an API key from ${selectedProvider.name} ↗`,
-                    )}
-                  </a>
-                ) : null}
-              </fieldset>
-            ) : null}
-            {error && <p role="alert">{error}</p>}
-            <div className={css.actions}>
-              <button type="button" disabled={saving} onClick={() => setStep(0)}>
-                {t("以后再说", "Later")}
-              </button>
-              <button
-                type="button"
-                disabled={saving || loadingModels || (choice === "builtin" && !model.trim())}
-                onClick={() => void next()}
-              >
-                {saving ? t("连接中…", "Connecting…") : t("下一步", "Next")}
-              </button>
-            </div>
           </>
         ) : (
           <>

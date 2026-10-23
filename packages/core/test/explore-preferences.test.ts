@@ -41,3 +41,25 @@ it("重复入口被入口校验拒绝，已保存的顺序和语言保持原样"
     rmSync(state, { recursive: true, force: true });
   }
 });
+
+it("当天采纳徽标只存本机，改语言和入口时不丢失", () => {
+  const state = mkdtempSync(join(tmpdir(), "kaitu-today-preferences-"));
+  vi.stubEnv("KAITU_LOCAL_STATE_DIR", state);
+  try {
+    const todayAdoptions = { workspace: "/synthetic/one", day: "2026-10-23", ids: ["task-one"] };
+    savePreferences({ todayAdoptions });
+    savePreferences({ locale: "en", exploreEntries: ["health"] });
+    expect(readPreferences()).toEqual({
+      locale: "en",
+      exploreEntries: ["health"],
+      todayAdoptions,
+    });
+    expect(() =>
+      savePreferences({ todayAdoptions: { ...todayAdoptions, ids: ["duplicate", "duplicate"] } }),
+    ).toThrow("界面偏好不合法");
+    expect(readPreferences().todayAdoptions).toEqual(todayAdoptions);
+  } finally {
+    vi.unstubAllEnvs();
+    rmSync(state, { recursive: true, force: true });
+  }
+});

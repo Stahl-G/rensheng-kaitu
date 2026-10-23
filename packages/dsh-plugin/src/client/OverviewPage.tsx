@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
+import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
@@ -19,20 +20,13 @@ import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
-import { OnboardingChecklist, OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
+import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
 import { OnboardingFileImport } from "./OnboardingSources.js";
-import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
+import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
-import {
-  CalendarPushResult,
-  CalendarSlotForm,
-  DataSummaries,
-  TodayFinance,
-  TodayStart,
-  TodayTasks,
-} from "./TodayPage.js";
+import { TodayStart, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import {
   type ExploreModule,
@@ -40,7 +34,7 @@ import {
   exploreDestination,
   exploreModules,
 } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale, dateFormat, versionText } from "./i18n.js";
+import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
@@ -56,8 +50,8 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
-  hosted?: boolean;
   initialChatDraft?: string;
+  hosted?: boolean;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -163,16 +157,17 @@ function Overview({
   const [guideKey, setGuideKey] = useState(0);
   const [guideSource, setGuideSource] = useState<string>();
   const [guideText, setGuideText] = useState("");
-  const [todayDetails, setTodayDetails] = useState(false);
+  const [adoptedTasks, setAdoptedTasks] = useState<{ day: string; ids: string[] }>({ day: "", ids: [] });
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
-  const [connectionSection, setConnectionSection] = useState<"local-ai" | "cloud-organizer">();
+  const [connectionSection, setConnectionSection] = useState<SettingsSection>("overview");
   const [importSource, setImportSource] = useState<
     "choose" | "apple-health" | "chatgpt-conversations" | null
   >(null);
   const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
   const askPanel = useRef<HTMLDivElement>(null);
+  const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
@@ -199,6 +194,24 @@ function Overview({
   const [exploreError, setExploreError] = useState("");
   const [exploreAttempt, setExploreAttempt] = useState(0);
   const planning = useRef<HTMLDivElement>(null);
+  const [hasWrittenMatter, setHasWrittenMatter] = useState(false);
+  const emptyWorkspace = data?.empty;
+  const hasUserData = onboarding?.hasUserData;
+  useEffect(() => {
+    let active = true;
+    setHasWrittenMatter(false);
+    if (workspaceRoot && emptyWorkspace && hasUserData) {
+      void props
+        .loadLibrary({ section: "inbox", source: "me" })
+        .then((value) => {
+          if (active) setHasWrittenMatter(value.inbox.length > 0);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
   // Warm the existing page projections independently of Today. Opening Explore only reads this state.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
   useEffect(() => {
@@ -243,6 +256,23 @@ function Overview({
     props.subscribe,
     exploreAttempt,
   ]);
+  useEffect(() => {
+    let active = true;
+    void props
+      .loadPreferences()
+      .then((value) => {
+        if (active)
+          setAdoptedTasks(
+            value.todayAdoptions && value.todayAdoptions.workspace === workspaceRoot
+              ? value.todayAdoptions
+              : { day: "", ids: [] },
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [workspaceRoot, props.loadPreferences]);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
@@ -303,7 +333,7 @@ function Overview({
           () => props.loadOnboarding(locale),
           (introduction) => {
             setOnboarding(introduction);
-            setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
+            setGuide((current) => (current === undefined ? null : current));
           },
         ),
         update(props.loadCalendarPush, setPush),
@@ -368,7 +398,10 @@ function Overview({
   useEffect(() => {
     // The DSH plugin leaves the host's Settings shortcut untouched.
     if (props.hosted || !props.renderAsk) return;
-    const openSettings = () => setView("settings");
+    const openSettings = () => {
+      setConnectionSection("overview");
+      setView("settings");
+    };
     const shortcut = (event: KeyboardEvent) => {
       if (event.metaKey && !event.ctrlKey && !event.altKey && event.key === ",") {
         event.preventDefault();
@@ -444,34 +477,17 @@ function Overview({
     } else setView("connections");
   };
   const openAskSettings = (section: "ai" | "local-ai") => {
-    if (section === "local-ai") {
-      setConnectionSection(section);
-      setView("connections");
-    } else manageAi(true);
+    setConnectionSection(section);
+    if (section === "ai") setAiKeyRequest((n) => n + 1);
+    setView("settings");
   };
-  useEffect(() => {
-    if (!configureRequest || !configureBuiltin || view !== "ask") return;
-    const panel = askPanel.current;
-    if (!panel) return;
-    const focus = () => {
-      const input = panel.querySelector<HTMLInputElement>('dialog[open] input[type="password"]');
-      if (!input) return false;
-      input.focus();
-      return true;
-    };
-    if (focus()) return;
-    const observer = new MutationObserver(() => {
-      if (focus()) observer.disconnect();
-    });
-    observer.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
-    return () => observer.disconnect();
-  }, [configureRequest, configureBuiltin, view]);
   const openSource = (source: string) => {
     if (source === "calendar" || source === "finance") {
       openRecord(source);
       setCalendarAdding(source === "calendar");
       setFinanceImporting(source === "finance");
     } else if (source === "mail") {
+      setConnectionSection("channels");
       setChannelFocus(true);
       setView("connections");
     }
@@ -525,21 +541,13 @@ function Overview({
       setPersonal((me) => (me ? { ...me, avatar: null } : me));
     },
   };
-  const stamp = (value: string) =>
-    dateFormat(locale ?? "zh-CN", {
-      timeZone: data?.timeZone,
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(value));
   const capture = (
-    <div className={css.sec}>
+    <section className={todayCss.capture}>
+      <h2>{t("随手记", "Quick note")}</h2>
       <form
-        className={css.capture}
         onSubmit={(e) => {
           e.preventDefault();
+          if (!draft.trim()) return;
           void run(async () => {
             await props.capture(draft);
             setDraft("");
@@ -554,16 +562,40 @@ function Overview({
         <label className={css.sr} htmlFor="capture-text">
           {t("随手记一句", "Quick note")}
         </label>
-        <input
+        <textarea
+          rows={3}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           id="capture-text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder={t("随手记一句", "A quick note")}
+          placeholder={
+            data?.empty
+              ? t(
+                  "想到什么，先记下。开图会先存原文，不改你的字。",
+                  "Write a thought. Kaitu keeps your original words.",
+                )
+              : t("想到什么，先记下", "Write a thought")
+          }
           disabled={busy}
         />
-        <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !draft.trim()}>
+        <button type="submit" className={css.btn} disabled={busy || !draft.trim()}>
           {t("记下", "Add note")}
+        </button>
+        <button
+          type="button"
+          className={css.link}
+          onClick={() => {
+            document.getElementById("capture-text")?.focus();
+            setReceipt(t("可用系统听写输入，再点记下", "Use your system dictation, then save the note"));
+          }}
+        >
+          {t("说一段", "Dictate")}
         </button>
       </form>
       {receipt && (
@@ -574,7 +606,7 @@ function Overview({
           </button>
         </output>
       )}
-    </div>
+    </section>
   );
   const focus = data?.next[0];
   const startMatter = (text: string) => {
@@ -591,6 +623,22 @@ function Overview({
       refresh={refresh}
     />
   );
+  const renderTasks = (showAll = false) =>
+    data && (
+      <TodayTasks
+        data={data}
+        showAll={showAll}
+        busy={busy}
+        complete={(item) => void run(() => props.completeNext(item.file, item.id))}
+        ask={askNext}
+        schedule={(item) => setSlot({ file: item.file, id: item.id })}
+        review={() => startGuide(1)}
+        focusCard={adoptedCard}
+        focusTaskId={onboarding?.next?.id}
+        adopted={adoptedTasks.day === data.today ? adoptedTasks.ids : []}
+        all={() => openRecord("projects")}
+      />
+    );
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
   const plansCard = data?.plans && (
     <PlansCard
@@ -717,7 +765,10 @@ function Overview({
             className={css.settingsButton}
             aria-label={t("设置", "Settings")}
             aria-current={view === "settings" ? "page" : undefined}
-            onClick={() => setView("settings")}
+            onClick={() => {
+              setConnectionSection("overview");
+              setView("settings");
+            }}
           >
             <SettingsIcon />
             <span className={css.settingsLabel}>{t("设置", "Settings")}</span>
@@ -809,151 +860,129 @@ function Overview({
             }}
           />
         )}
-        {view === "overview" &&
-          !guideVisible &&
-          guide !== undefined &&
-          data &&
-          (data.empty ? (
-            <TodayStart start={startMatter} memory={() => startGuide(5)} />
-          ) : (
-            <>
-              <div className={css.sec}>
-                <div className={css.head}>
-                  <h1>
-                    {dateFormat(locale ?? "zh-CN", {
-                      timeZone: "UTC",
-                      month: "long",
-                      day: "numeric",
-                      weekday: "long",
-                    }).format(new Date(`${data.today}T12:00:00Z`))}
-                  </h1>
-                </div>
-                {capture}
-              </div>
-              <TodayTasks
-                data={data}
-                busy={busy}
-                complete={(item) => void run(() => props.completeNext(item.file, item.id))}
-                ask={askNext}
-                schedule={(item) => setSlot({ file: item.file, id: item.id })}
-                review={() => startGuide(1)}
-                focusCard={adoptedCard}
-                focusTaskId={onboarding?.next?.id}
-              />
-              {!focus && !adoptedCard && (
-                <button type="button" className={css.link} onClick={() => startMatter("")}>
-                  {t("整理一件事", "Think through one thing")}
-                </button>
+        {view === "overview" && !guideVisible && guide !== undefined && data && (
+          <div className={todayCss.layout}>
+            <div className={todayCss.left}>
+              {data.empty ? (
+                <TodayStart
+                  start={startMatter}
+                  memory={() => startGuide(5)}
+                  status={onboarding}
+                  hasWrittenMatter={hasWrittenMatter}
+                  connect={() => {
+                    setGuide(null);
+                    if (props.renderAsk) setView("ask");
+                    else props.onAgent();
+                  }}
+                  openModule={(id) => {
+                    setView("explore");
+                    setExplore(id);
+                  }}
+                />
+              ) : (
+                renderTasks()
               )}
-              {!!data.proposedTasks.length && (
-                <section className={css.sec}>
-                  <h2 className={css.eyebrow}>{t("待确认的待办建议", "Task suggestions to review")}</h2>
-                  <div className={css.card}>
-                    {data.proposedTasks.map((task) => (
-                      <div className={css.row} key={task.id}>
-                        <span>{task.title}</span>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={busy}
-                          onClick={() => void run(() => props.adoptTask(task.id))}
-                        >
-                          {t("采纳", "Adopt")}
-                        </button>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={busy}
-                          onClick={() => void run(() => props.cancelTask(task.id))}
-                        >
-                          {t("不用了", "Not needed")}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              {!data.empty && !focus && !adoptedCard && (
+                <section className={todayCss.focusSection}>
+                  <button type="button" className={css.btn} onClick={() => startMatter("")}>
+                    {t("从一件事开始", "Start with one thing")}
+                  </button>
                 </section>
               )}
-              <Agenda
-                data={calendar}
-                open={() => openRecord("calendar")}
-                proposals={pendingProposals}
-                busy={busy}
-                decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
-              />
-              {push &&
-                data.blocks
-                  // 加入日历成功不再列一遍；只有失败或需要手动导入的才显示。
-                  .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
-                  .map((block) => (
-                    <div className={css.row} key={block.id}>
-                      <span>{block.title}</span>
-                      <CalendarPushResult
-                        id={block.id}
-                        state={push}
-                        retry={async (id) => {
-                          setPush(
-                            await (push?.enabled ? props.retryCalendarPush(id) : props.removeCalendarPush()),
-                          );
-                        }}
-                      />
+              {!!data.proposedTasks.length && (
+                <section className={todayCss.suggestions}>
+                  <h2>
+                    {t(
+                      `AI 建议 · ${data.proposedTasks.length}`,
+                      `AI suggestions · ${data.proposedTasks.length}`,
+                    )}
+                  </h2>
+                  {data.proposedTasks.map((task) => (
+                    <div className={css.row} key={task.id}>
+                      <span className={todayCss.grow}>{task.title}</span>
+                      <button
+                        type="button"
+                        className={css.btn}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await props.adoptTask(task.id);
+                            const preferences = await props.loadPreferences();
+                            const previous = preferences.todayAdoptions;
+                            const next = {
+                              workspace: data.root,
+                              day: data.today,
+                              ids: [
+                                ...(previous?.workspace === data.root && previous.day === data.today
+                                  ? previous.ids
+                                  : []),
+                                task.id,
+                              ],
+                            };
+                            setAdoptedTasks(next);
+                            await props.savePreferences({
+                              locale: preferences.followSystem ? null : preferences.locale,
+                              todayAdoptions: next,
+                            });
+                          })
+                        }
+                      >
+                        {t("采纳", "Adopt")}
+                      </button>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() => void run(() => props.cancelTask(task.id))}
+                      >
+                        {t("不用了", "Not needed")}
+                      </button>
                     </div>
                   ))}
-              <details
-                className={todayCss.secondary}
-                open={todayDetails}
-                onToggle={(event) => setTodayDetails(event.currentTarget.open)}
-              >
-                <summary>{t("目标、资料与近期变化", "Goals, notes and recent changes")}</summary>
-                {todayDetails && (
-                  <div>
-                    {onboarding && (
-                      <OnboardingChecklist
-                        status={onboarding}
-                        restart={() => startGuide()}
-                        go={checklistAction}
-                      />
-                    )}
-                    <DataSummaries data={data} open={openSection} />
-                    {data.sections.some((section) => section.id === "finance") && (
-                      <TodayFinance {...props} today={data.today} open={() => openRecord("finance")} />
-                    )}
-                    <section className={css.sec}>
-                      <div className={css["sec-head"]}>
-                        <h2 className={css.eyebrow}>{t("最近的变化", "Recent changes")}</h2>
-                        {data.daily && (
-                          <details>
-                            <summary className={css.link}>
-                              {t("近期回顾", "Recent review")} · {data.daily.date}
-                            </summary>
-                            <div className={css.detailBody}>{data.daily.body}</div>
-                          </details>
-                        )}
-                      </div>
-                      {data.versions.slice(0, 3).map((version) => (
-                        <div className={css["feed-row"]} key={version.oid}>
-                          <span className={css.ini}>
-                            {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
-                          </span>
-                          <p>{versionText(version.text, locale ?? "zh-CN")}</p>
-                          <time className={css.small}>{stamp(version.time)}</time>
+                </section>
+              )}
+            </div>
+            <aside className={todayCss.right}>
+              {capture}
+              {!data.empty && (
+                <section className={todayCss.agenda}>
+                  <Agenda
+                    data={calendar}
+                    open={() => openRecord("calendar")}
+                    proposals={pendingProposals}
+                    busy={busy}
+                    decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
+                  />
+                  {push &&
+                    data.blocks
+                      .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
+                      .map((block) => (
+                        <div className={css.row} key={block.id}>
+                          <span>{block.title}</span>
+                          <CalendarPushResult
+                            id={block.id}
+                            state={push}
+                            retry={async (id) => {
+                              setPush(
+                                await (push.enabled
+                                  ? props.retryCalendarPush(id)
+                                  : props.removeCalendarPush()),
+                              );
+                            }}
+                          />
                         </div>
                       ))}
-                      {!data.versions.length && (
-                        <p className={css.small}>{t("还没有新的变化", "No changes yet")}</p>
-                      )}
-                    </section>
-                  </div>
-                )}
-              </details>
-              {data.sync.needsReview > 0 && (
-                <div className={todayCss.review}>
-                  <span className={css.small}>{t("待核对资料", "Notes to review")}</span>
-                  {data.sync.directionSuggestions > 0 && (
-                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
-                      {t(
-                        `${data.sync.directionSuggestions} 个方向建议`,
-                        `${data.sync.directionSuggestions} direction suggestions`,
-                      )}
+                </section>
+              )}
+              {(data.inboxNotes > 0 ||
+                data.sync.mapNeedsReview > 0 ||
+                data.sync.mapPendingImports > 0 ||
+                data.sync.directionSuggestions > 0) && (
+                <section className={todayCss.review}>
+                  <h2>{t("要你核对", "To review")}</h2>
+                  {data.inboxNotes > 0 && (
+                    <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
+                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
                     </button>
                   )}
                   {(data.sync.mapNeedsReview > 0 || data.sync.mapPendingImports > 0) && (
@@ -965,18 +994,45 @@ function Overview({
                         setExplore("footprints");
                       }}
                     >
-                      {t("足迹需要核对", "Footprints to review")}
+                      {t(
+                        `足迹里有 ${data.sync.mapNeedsReview + data.sync.mapPendingImports} 段经历待确认`,
+                        `${data.sync.mapNeedsReview + data.sync.mapPendingImports} footprints to review`,
+                      )}
                     </button>
                   )}
-                  {data.inboxNotes > 0 && (
-                    <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
-                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
+                  {data.sync.directionSuggestions > 0 && (
+                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
+                      {t(
+                        `${data.sync.directionSuggestions} 个方向建议`,
+                        `${data.sync.directionSuggestions} direction suggestions`,
+                      )}
                     </button>
                   )}
-                </div>
+                </section>
               )}
-            </>
-          ))}
+              {data.empty && (
+                <section className={todayCss.storage}>
+                  <h2>{t("你的资料在哪", "Where your data lives")}</h2>
+                  <p>
+                    {data.drive
+                      ? t(
+                          "都存在你的云盘文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your cloud folder, ready to take with you.",
+                        )
+                      : t(
+                          "都存在这台电脑上你选的文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your chosen local folder, ready to take with you.",
+                        )}
+                  </p>
+                  <button type="button" className={css.link} onClick={() => startGuide(STORAGE_STEP)}>
+                    {t("换个位置", "Change location")}
+                  </button>
+                </section>
+              )}
+            </aside>
+          </div>
+        )}
+
         {view === "records" && (
           <>
             <div className={css.sec}>
@@ -1070,8 +1126,8 @@ function Overview({
                     setExplore("modules");
                     setView("explore");
                   } else {
-                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : undefined);
-                    setChannelFocus(kind === "phone");
+                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : "phone");
+                    setChannelFocus(false);
                     setView("connections");
                   }
                 }}
@@ -1079,7 +1135,11 @@ function Overview({
             ) : record === "calendar" ? (
               <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
-              <ProjectsLibrary {...child} timeZone={data?.timeZone} />
+              <>
+                {plansCard}
+                {renderTasks(true)}
+                <ProjectsLibrary {...child} timeZone={data?.timeZone} />
+              </>
             ) : record === "health" ? (
               <HealthLibrary
                 {...child}
@@ -1132,7 +1192,8 @@ function Overview({
                   subscribe={props.subscribe}
                   channelSettings={props.channelSettings}
                   connect={() => {
-                    setView("connections");
+                    setConnectionSection("channels");
+                    setView("settings");
                     setChannelFocus(true);
                   }}
                 />
@@ -1257,11 +1318,15 @@ function Overview({
               startGuide();
             }}
             channelSettings={props.channelSettings}
-            focusSection={connectionSection}
-            onSectionFocused={() => setConnectionSection(undefined)}
+            section={connectionSection}
+            selectSection={(section) => {
+              setConnectionSection(section);
+              setView("settings");
+            }}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
+            aiKeyRequest={aiKeyRequest}
             onHandoverAnswer={handoverAnswer}
             locale={locale ?? "zh-CN"}
             followSystem={followSystem}

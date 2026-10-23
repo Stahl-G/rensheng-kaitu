@@ -1,315 +1,221 @@
-import { type ReactNode, useEffect, useState } from "react";
-import type {
-  FinanceCashflowData,
-  FinanceInvestmentsData,
-  FinanceOverviewData,
-  OverviewData,
-  OverviewNext,
-} from "../types.js";
-import type { FinancePageProps } from "./FinancePage.js";
+import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { OverviewData, OverviewNext } from "../types.js";
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
+import { exploreModules } from "./explore-modules.js";
 import { useLocale, useT } from "./i18n.js";
 import { nextPresentation } from "./next-presentation.js";
 
-const nf = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
-
-function formatCardDate(iso: string | null, today: string, locale: "zh-CN" | "en") {
-  if (!iso) return "";
-  const day = iso.slice(0, 10);
-  const todayAt = Date.parse(`${today}T12:00:00`);
-  const dayAt = Date.parse(`${day}T12:00:00`);
-  if (!Number.isFinite(todayAt) || !Number.isFinite(dayAt)) return day;
-  const diff = Math.round((todayAt - dayAt) / 86_400_000);
-  if (diff === 0) return locale === "en" ? "Today" : "今天";
-  if (diff === 1) return locale === "en" ? "Yesterday" : "昨天";
-  if (diff > 1 && diff < 7) return locale === "en" ? `${diff} days ago` : `${diff} 天前`;
-  const date = new Date(`${day}T12:00:00`);
-  if (locale === "en") return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
-}
-const money = (metric: { amount: string | null; record_ids: string[] } | undefined, currency: string) =>
-  metric?.amount !== null && metric?.amount !== undefined && metric.record_ids.length
-    ? `${currency} ${metric.amount}`
-    : "资料不足";
-export function TodayFinance({
-  today,
-  open,
-  ...props
-}: Pick<FinancePageProps, "loadFinanceOverview" | "loadFinanceCashflow" | "loadFinanceInvestments"> & {
-  today: string;
-  open: () => void;
-}) {
-  const [data, setData] = useState<{
-    overview: FinanceOverviewData;
-    flow: FinanceCashflowData;
-    investment: FinanceInvestmentsData;
-  } | null>(null);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let active = true;
-    void Promise.all([
-      props.loadFinanceOverview(),
-      props.loadFinanceCashflow(`${today.slice(0, 7)}-01`, today),
-      props.loadFinanceInvestments(),
-    ])
-      .then(([overview, flow, investment]) => {
-        if (active) setData({ overview, flow, investment });
-      })
-      .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : String(err));
-      });
-    return () => {
-      active = false;
-    };
-  }, [props.loadFinanceOverview, props.loadFinanceCashflow, props.loadFinanceInvestments, today]);
-  const currencies = [
-    ...new Set([
-      ...(data?.overview.currencies.map((g) => g.currency) ?? []),
-      ...(data?.flow.currencies.map((g) => g.currency) ?? []),
-    ]),
-  ];
-  return (
-    <section className={css.sec}>
-      <div className={css["sec-head"]}>
-        <h2 className={css["sum-h"]}>
-          <i className={css.dot} style={{ background: "var(--finance)" }} />
-          财务
-        </h2>
-        <button type="button" className={css.link} onClick={open}>
-          打开财务
-        </button>
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {data && !currencies.length && (
-        <p className={css.emptyState}>还没有财务资料，导入账单或账户余额后再来看。</p>
-      )}
-      {currencies.map((currency) => {
-        const balance = data?.overview.currencies.find((g) => g.currency === currency);
-        const flow = data?.flow.currencies.find((g) => g.currency === currency);
-        const investment = data?.investment.currencies.find((g) => g.currency === currency);
-        return (
-          <div className={`${css.fin} ${css.card}`} key={currency}>
-            {[
-              ["本月支出", money(flow?.consumption, currency)],
-              ["本月收入", money(flow?.income, currency)],
-              ["总资产", money(balance?.total_assets, currency)],
-              ["投资收益 · 未实现", money(investment?.unrealized_gain, currency)],
-            ].map(([label, value]) => (
-              <div className={css["fin-cell"]} key={label}>
-                <span className={css.small}>{label}</span>
-                <span className={`${css.big} ${css.num}`}>{value}</span>
-              </div>
-            ))}
-            <div className={css["fin-wide"]}>
-              <span className={css.small}>本月支出去向</span>
-              {data?.flow.consumption_categories
-                .filter((row) => row.currency === currency)
-                .map((row) => (
-                  <span key={row.category}>
-                    {{ expense: "消费", interest: "利息", refund: "退款" }[row.category]} ·{" "}
-                    {money(row.total, currency)}
-                  </span>
-                ))}
-              {!data?.flow.consumption_categories.some((row) => row.currency === currency) && (
-                <span className={css.small}>尚无支出分类</span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {!!data?.overview.pending.length && (
-        <div className={css.ask}>
-          <span>{data.overview.pending.length} 笔待核对</span>
-          <span>{data.overview.pending[0]?.description}</span>
-          <button type="button" className={css.link} onClick={open}>
-            去核对
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
-export function DataSummaries({ data, open }: { data: OverviewData; open: (id: string) => void }) {
-  const t = useT();
-  const locale = useLocale();
-  const sections = data.sections.filter((section) => section.id !== "finance");
-  if (!sections.length) return null;
-  return (
-    <section className={css.sec}>
-      <div className={css["sec-head"]}>
-        <h2 className={css.eyebrow}>{t("你的数据", "Your data")}</h2>
-      </div>
-      <div className={css.grid}>
-        {sections.map((section) => {
-          const when = formatCardDate(section.latest, data.today, locale);
-          return (
-            <button
-              type="button"
-              className={`${css.sum} ${css.card} ${css.summaryButton}`}
-              key={section.id}
-              onClick={() => open(section.id)}
-            >
-              <span className={css["sum-h"]}>
-                <i
-                  className={css.dot}
-                  style={{
-                    background: `var(--${({ health: "health", projects: "doing", feed: "news", calendar: "news", me: "me" } as Record<string, string>)[section.id] ?? "explore"})`,
-                  }}
-                />
-                {t(
-                  (
-                    { feed: "资讯", me: "个人档案", explore: "方向", projects: "在做的事" } as Record<
-                      string,
-                      string
-                    >
-                  )[section.id] ?? section.label,
-                  (
-                    {
-                      feed: "News",
-                      me: "Profile",
-                      explore: "Directions",
-                      projects: "Projects",
-                      health: "Health",
-                      calendar: "Schedule",
-                      learning: "Learning",
-                      decisions: "Decisions",
-                      reviews: "Reviews",
-                    } as Record<string, string>
-                  )[section.id] ?? section.label,
-                )}
-                <span>
-                  {t(`${section.count} 条`, `${section.count}`)}
-                  {when ? ` · ${when}` : ""}
-                </span>
-              </span>
-              {section.id === "health" && data.metrics.length ? (
-                <>
-                  <div className={css.pair}>
-                    {data.metrics.slice(0, 2).map((metric) => (
-                      <span className={css.stack} key={metric.key}>
-                        <span className={`${css.big} ${css.num}`}>
-                          {metric.value === null
-                            ? "尚无记录"
-                            : `${metric.estimated ? "约 " : ""}${nf.format(metric.value)} ${metric.unit}`}
-                        </span>
-                        <span className={css.small}>
-                          {metric.label} · {metric.days} 天有记录
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                  <div className={css.week}>
-                    {data.metrics
-                      .find((m) => m.key === "workouts")
-                      ?.daily.map((day) => (
-                        <span
-                          key={day.date}
-                          title={`${day.date}：${day.value === null ? "没记" : `${day.value} 次`}`}
-                        >
-                          <i style={day.value !== null ? { background: "var(--health)" } : {}} />
-                          {day.date.slice(8)}
-                        </span>
-                      ))}
-                  </div>
-                </>
-              ) : section.id === "projects" && data.projects.length ? (
-                data.projects.slice(0, 2).map((project) => (
-                  <span className={css.stack} key={project.slug}>
-                    <b>{project.title}</b>
-                    <span className={css.small}>
-                      {project.next[0] ?? t("还没有下一步", "No next step yet")}
-                    </span>
-                  </span>
-                ))
-              ) : section.preview?.length ? (
-                <span className={css.sumPreview}>
-                  {section.preview.map((line, index) => (
-                    <span key={`${index}-${line}`}>{line}</span>
-                  ))}
-                </span>
-              ) : (
-                <span className={css.small}>{t("查看全部资料与来源", "See all notes and sources")}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-export { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
-
-/** 主题只预填现有原文表单；保存与采纳仍走原流程。 */
 export function TodayStart({
   start,
   memory,
+  connect,
+  openModule,
+  storage,
+  status,
+  hasWrittenMatter = false,
   busy = false,
 }: {
   start: (text: string) => void;
   memory: () => void;
+  connect: () => void;
+  openModule?: (id: string) => void;
+  storage?: () => void;
+  status: import("@kaitu/core").OnboardingStatus | null;
+  hasWrittenMatter?: boolean;
   busy?: boolean;
 }) {
   const t = useT();
-  const [memoryShown, setMemoryShown] = useState(true);
-  const topics = [
-    ["工作", "Work", "在做的事", "What you're working on", "var(--doing)"],
-    ["身体", "Body", "吃睡与精力", "Food, rest and energy", "var(--health)"],
-    ["学习", "Learning", "想学的新东西", "Something to learn", "var(--explore)"],
-    ["关系", "Relationships", "重要的人", "People who matter", "var(--me)"],
-    ["生活", "Life", "住处与日常", "Home and everyday life", "var(--doing)"],
-    ["还说不清", "Not sure yet", "先说一句", "Start with a thought", "var(--finance)"],
+  const [goal, setGoal] = useState("");
+  const stepDone = (id: string) =>
+    id === "matter"
+      ? !!(
+          hasWrittenMatter ||
+          status?.draft ||
+          status?.next ||
+          status?.checklist.items.find((item) => item.id === id)?.done
+        )
+      : !!status?.checklist.items.find((item) => item.id === id)?.done;
+  const steps = [
+    ["matter", t("写下一件事", "Write down one thing"), t("就在上面", "Start above"), () => start(goal)],
+    [
+      "memory",
+      t("把 AI 记得的你搬过来", "Bring over what AI remembers"),
+      t("也可以导入笔记和日历", "You can also import notes and calendars"),
+      memory,
+    ],
+    [
+      "ai",
+      t("接上 AI（可以先跳过）", "Connect AI (optional)"),
+      t("不接也能记录、看日程和足迹", "Notes, schedules and footprints work without AI"),
+      connect,
+    ],
   ] as const;
   return (
-    <section className={todayCss.start} aria-label={t("从一件事开始", "Start with one thing")}>
-      <h1>{t("最近有什么事，\n你想理一理？", "What's on your mind lately?")}</h1>
-      <div className={todayCss.topics}>
-        {topics.map(([zh, en, hint, hintEn, color]) => (
-          <button
-            type="button"
-            key={en}
-            disabled={busy}
-            onClick={() =>
-              start(
-                zh === "还说不清"
-                  ? ""
-                  : t(`我想理一理${zh}：`, `I'd like to think about ${en.toLowerCase()}: `),
-              )
-            }
-          >
-            <b>
-              <i style={{ background: color }} />
+    <>
+      <section className={todayCss.start}>
+        <p className={css.eyebrow}>{t("欢迎来到开图", "Welcome to Kaitu")}</p>
+        <h1>{t("从一件事开始。", "Start with one thing.")}</h1>
+        <p>
+          {t(
+            "现在最想做成的一件事是什么？写一句就行，以后随时能改。",
+            "What would you most like to do? One sentence is enough; you can change it later.",
+          )}
+        </p>
+        <form
+          className={todayCss.goalForm}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (goal.trim()) start(goal.trim());
+          }}
+        >
+          <input
+            className={css.input}
+            aria-label={t("最想做成的一件事", "One thing to do")}
+            placeholder={t("比如：两年内出版第一本散文集", "For example: publish my first essay collection")}
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+          />
+          <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !goal.trim()}>
+            {t("就是它", "That's it")}
+          </button>
+        </form>
+        <div className={todayCss.topics}>
+          {(
+            [
+              ["工作", "work"],
+              ["身体", "body"],
+              ["学习", "learning"],
+              ["关系", "relationships"],
+              ["生活", "life"],
+            ] as const
+          ).map(([zh, en]) => (
+            <button
+              type="button"
+              className={css.btn}
+              key={en}
+              onClick={() => start(t(`我想理一理${zh}：`, `I'd like to think about ${en}: `))}
+            >
               {t(zh, en)}
-            </b>
-            <span>{t(hint, hintEn)}</span>
-          </button>
-        ))}
-      </div>
-      <button type="button" className={todayCss.direct} disabled={busy} onClick={() => start("")}>
-        <b>{t("我想直接说一句", "Say it in my own words")}</b>
-        <span aria-hidden="true">→</span>
-      </button>
-      {memoryShown && (
-        <div className={todayCss.memory}>
-          <div>
-            <b>{t("已经在用 ChatGPT、豆包？", "Already using an AI?")}</b>
-            <p>{t("把它记得的关于你的事搬过来。", "Bring over what it remembers about you.")}</p>
-          </div>
-          <button type="button" className={css.btn} disabled={busy} onClick={memory}>
-            {t("搬过来", "Bring it over")}
-          </button>
-          <button
-            type="button"
-            className={css.link}
-            aria-label={t("关闭记忆搬入提示", "Dismiss memory import tip")}
-            onClick={() => setMemoryShown(false)}
-          >
-            ×
+            </button>
+          ))}
+          <button type="button" className={css.link} onClick={() => start("")}>
+            {t("还没想好，我想直接说一段", "Not sure yet; start with a thought")}
           </button>
         </div>
+      </section>
+      {!steps.every(([id]) => stepDone(id)) && (
+        <section className={todayCss.steps}>
+          <h2>{t("三步用起来", "Three steps to get started")}</h2>
+          {steps.map(([id, title, hint, action], i) => (
+            <div className={css.row} key={id}>
+              <span aria-label={stepDone(id) ? t("已完成", "Done") : undefined}>
+                {stepDone(id) ? "✓" : i + 1}
+              </span>
+              <span className={todayCss.grow}>
+                <b>{title}</b>
+                <small>{hint}</small>
+              </span>
+              {i > 0 && (
+                <button type="button" className={css.btn} onClick={action}>
+                  {i === 1 ? t("搬过来", "Bring it over") : t("看看怎么接", "See how")}
+                </button>
+              )}
+            </div>
+          ))}
+        </section>
       )}
-    </section>
+      {openModule && (
+        <section className={todayCss.modules}>
+          <h2>{t("开图里可以放这些", "Make room for these")}</h2>
+          <div className={todayCss.moduleGrid}>
+            {exploreModules
+              .filter((entry) => entry.default)
+              .map((entry) => (
+                <button
+                  type="button"
+                  className={css.card}
+                  key={entry.id}
+                  onClick={() => openModule(entry.id)}
+                >
+                  <b>{t(entry.title[0], entry.title[1])}</b>
+                  <span>{t(entry.description[0], entry.description[1])}</span>
+                  <span className={todayCss.firstAction}>
+                    {t(
+                      entry.id === "footprints"
+                        ? "加上家乡"
+                        : entry.id === "health"
+                          ? "记一条健康记录"
+                          : entry.id === "news"
+                            ? "选几个关键词"
+                            : "写下一个想试的方向",
+                      entry.id === "footprints"
+                        ? "Add your hometown"
+                        : entry.id === "health"
+                          ? "Log a health record"
+                          : entry.id === "news"
+                            ? "Choose some keywords"
+                            : "Write an idea to try",
+                    )}{" "}
+                    →
+                  </span>
+                </button>
+              ))}
+          </div>
+          <button type="button" className={css.link} onClick={() => openModule("modules")}>
+            {t("更多模块 →", "More modules →")}
+          </button>
+        </section>
+      )}
+      {storage && (
+        <section className={todayCss.storage}>
+          <h2>{t("你的资料在哪", "Where your data lives")}</h2>
+          <p>
+            {t(
+              "都存在你选的文件夹里，是普通文件，随时可以带走。",
+              "Ordinary files in your chosen folder, ready to take with you.",
+            )}
+          </p>
+          <button type="button" className={css.link} onClick={storage}>
+            {t("换个位置", "Change location")}
+          </button>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** Only clipped goals become interactive; the full text remains unchanged. */
+export function TodayGoal({ text }: { text: string }) {
+  const t = useT();
+  const line = useRef<HTMLSpanElement>(null);
+  const [clipped, setClipped] = useState(false);
+  const [open, setOpen] = useState(false);
+  useLayoutEffect(() => {
+    setOpen(false);
+    const measure = () => {
+      const node = line.current;
+      if (node) setClipped(!!text && node.scrollWidth > node.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (line.current) observer.observe(line.current);
+    return () => observer.disconnect();
+  }, [text]);
+  return (
+    <div className={todayCss.goal}>
+      <span>{t("为了", "For")}</span>
+      <span ref={line} className={todayCss.goalLine}>
+        {text}
+      </span>
+      {clipped && (
+        <button type="button" className={css.link} aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? t("收起", "Show less") : t("展开", "Show more")}
+        </button>
+      )}
+      {open && <p>{text}</p>}
+    </div>
   );
 }
 
@@ -322,6 +228,9 @@ export function TodayTasks({
   review,
   focusCard,
   focusTaskId,
+  all,
+  adopted = [],
+  showAll = false,
 }: {
   data: OverviewData;
   busy: boolean;
@@ -331,15 +240,20 @@ export function TodayTasks({
   review: () => void;
   focusCard?: ReactNode;
   focusTaskId?: string;
+  all: () => void;
+  adopted?: string[];
+  showAll?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
   const focus = data.next[0];
   const focusText = focus && nextPresentation(focus, locale);
-  const upcoming = (focusCard ? data.allNext : data.allNext.slice(1)).filter(
-    (item) => item.id !== focusTaskId,
-  );
-  const [remainingOpen, setRemainingOpen] = useState(false);
+  const goal =
+    data.plans.goals.find((goal) => goal.next?.id === focus?.id)?.title ??
+    Object.values(data.plans.sources).find((source) => source.taskId === focus?.id)?.goalTitle;
+  const upcoming = (focusCard ? data.allNext : data.allNext.slice(1))
+    .filter((item) => item.id !== focusTaskId)
+    .sort((a, b) => Number(adopted.includes(b.id)) - Number(adopted.includes(a.id)));
   const extra = (item: OverviewNext, inRow = true) => (
     <details className={todayCss.more}>
       <summary
@@ -382,31 +296,27 @@ export function TodayTasks({
         </button>
         <span className={todayCss.nextTitle}>
           {display.title}
-          {display.source && display.source !== display.title && <small> · {display.source}</small>}
+          {adopted.includes(item.id) && <small>{t("刚采纳", "Just added")}</small>}
           {item.proposed && <small>{t(" · 建议", " · Suggested")}</small>}
         </span>
-        <span className={css.small}>{item.module}</span>
+        <span className={css.small}>
+          {data.blocks.find((block) => block.ref === item.id)?.start?.slice(11, 16)}
+        </span>
         {extra(item)}
       </div>
     );
   };
   return (
     <>
-      {(focus || focusCard) && (
-        <section className={css.sec}>
+      {!showAll && (focus || focusCard) && (
+        <section className={todayCss.focusSection}>
           {focusCard ??
             (focus && (
               <>
                 <h2 className={css.eyebrow}>{t("现在这件事", "One thing now")}</h2>
-                <div className={`${todayCss.focus} ${css.card}`}>
+                <div className={todayCss.focus}>
                   <h2>{focusText?.title}</h2>
-                  <p className={css.small}>
-                    {t(`来自 ${focus.module}`, `From ${focus.module}`)}
-                    {focusText?.source && focusText.source !== focusText.title
-                      ? ` · ${focusText.source}`
-                      : ""}
-                    {focus.proposed ? t(" · 建议，待核对", " · Suggested, to review") : ""}
-                  </p>
+                  {goal && <TodayGoal text={goal} />}
                   <div className={todayCss.actions}>
                     {!focus.proposed && (
                       <button
@@ -431,7 +341,11 @@ export function TodayTasks({
                     <button type="button" className={css.btn} onClick={() => ask(focus)}>
                       {t("交给 AI", "Ask AI")}
                     </button>
-                    {!focus.proposed && extra(focus, false)}
+                    {!focus.proposed && (
+                      <button type="button" className={css.btn} onClick={() => schedule(focus)}>
+                        {t("安排时间", "Schedule a time")}
+                      </button>
+                    )}
                   </div>
                 </div>
               </>
@@ -439,20 +353,16 @@ export function TodayTasks({
         </section>
       )}
       {upcoming.length > 0 && (
-        <section className={css.sec}>
-          <h2 className={css.eyebrow}>{t("接下来", "Up next")}</h2>
-          <div className={css.card}>{upcoming.slice(0, 2).map(row)}</div>
-          {upcoming.length > 2 && (
-            <details
-              className={todayCss.remaining}
-              onToggle={(event) => setRemainingOpen(event.currentTarget.open)}
-            >
-              <summary className={css.link}>
-                {t(`还有 ${upcoming.length - 2} 件`, `${upcoming.length - 2} more`)}
-              </summary>
-              {remainingOpen && <div className={css.card}>{upcoming.slice(2).map(row)}</div>}
-            </details>
-          )}
+        <section className={todayCss.upcoming}>
+          <div className={todayCss.sectionHead}>
+            <h2>{t("接下来", "Up next")}</h2>
+            {!showAll && (
+              <button type="button" className={css.link} onClick={all}>
+                {t(`全部 ${upcoming.length} 条`, `All ${upcoming.length}`)}
+              </button>
+            )}
+          </div>
+          <div>{(showAll ? upcoming : upcoming.slice(0, 3)).map(row)}</div>
         </section>
       )}
     </>
