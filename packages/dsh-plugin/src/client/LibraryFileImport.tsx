@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { type FileImportServices, OnboardingFileImport } from "./OnboardingSources.js";
 import styles from "./OnboardingSources.module.css";
 import css from "./Prototype.module.css";
+import { jsonImportSource } from "./file-import-source.js";
 import { useT } from "./i18n.js";
 
 /** A dropped File and a picked File take the same preview/confirmation path. */
@@ -32,6 +33,10 @@ export function LibraryFileImport(
       return;
     }
     setBusy(true);
+    const readError = () =>
+      new Error(
+        t("无法读取这个文件，请重新导出后再试。", "Could not read this file. Export it again and retry."),
+      );
     void (async () => {
       const extension = file.name.split(".").at(-1)?.toLowerCase();
       if (
@@ -45,7 +50,9 @@ export function LibraryFileImport(
               "Originals support up to 100,000 characters. Split this file into smaller parts.",
             ),
           );
-        const content = await file.text();
+        const content = await file.text().catch(() => {
+          throw readError();
+        });
         if (!content.trim() || content.length > 100000 || content.includes("\0"))
           throw new Error(
             t(
@@ -63,8 +70,9 @@ export function LibraryFileImport(
         else if (extension === "xml") source = "apple-health";
         else if (extension === "zip") source = "choose";
         else if (extension === "json") {
-          const content = JSON.parse(await file.text());
-          source = content?.format === "nutai.backup" ? "nut-ai" : "chatgpt-conversations";
+          source = await jsonImportSource(file).catch(() => {
+            throw readError();
+          });
         } else
           throw new Error(
             t(

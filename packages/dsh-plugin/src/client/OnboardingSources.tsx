@@ -96,11 +96,31 @@ export function OnboardingFileImport(
     setError("");
     try {
       await session.clear();
-      const base64 = await fileBase64(file);
+      // Match the existing 48 MiB base64 request limit before allocating the full upload.
+      if (Math.ceil(file.size / 3) * 4 > 48 * 1024 * 1024)
+        throw new Error(
+          t(
+            "文件超过 36 MiB，请拆成较小的导出文件。",
+            "This file exceeds 36 MiB. Split it into smaller exports.",
+          ),
+        );
+      const base64 = await fileBase64(file).catch(() => {
+        throw new Error(
+          t("无法读取这个文件，请重新导出后再试。", "Could not read this file. Export it again and retry."),
+        );
+      });
       if (!session.alive.current) return;
       await session.accept(await props.previewOnboardingImport(source, file.name, base64));
     } catch (err) {
-      setError(message(err));
+      const detail = message(err);
+      setError(
+        /Unexpected token|Unexpected end|JSON|无法读取 ChatGPT|Nut AI 备份格式/.test(detail)
+          ? t(
+              "这个 JSON 读不出来，请确认是完整的 ChatGPT 导出或 Nut AI 备份，并选择对应来源。",
+              "Could not read this JSON. Check that it is a complete ChatGPT export or Nut AI backup and choose the matching source.",
+            )
+          : detail,
+      );
     } finally {
       setBusy(false);
     }
@@ -148,6 +168,9 @@ export function OnboardingFileImport(
       <strong>{title}</strong>
       {!props.source && (
         <label>
+          {props.initialFile && (
+            <p>{t("请选择这个导出文件的来源。", "Choose the source of this export file.")}</p>
+          )}
           {t("资料类型", "File type")}
           <select
             value={source}
