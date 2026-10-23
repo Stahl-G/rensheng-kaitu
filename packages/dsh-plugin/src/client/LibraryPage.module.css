@@ -1,0 +1,153 @@
+.page {
+  display: grid;
+  gap: 20px;
+  container-type: inline-size;
+}
+.page h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.heading p {
+  margin: 0;
+  color: var(--ink2);
+}
+.page input,
+.page textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.inbox {
+  background: var(--surface);
+  padding: 24px 26px;
+  border-radius: var(--radius);
+}
+.categories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.category {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 180px;
+  text-align: left;
+  padding: 24px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.category:hover {
+  background: var(--control);
+}
+.count {
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 12px 0;
+  text-align: left;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+}
+button.row {
+  cursor: pointer;
+}
+.row time {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.ways button,
+.capture button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--secondary-line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.capture {
+  margin-top: 16px;
+}
+.capture label {
+  display: grid;
+  gap: 8px;
+}
+.capture textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+}
+.capture button {
+  margin: 12px 8px 0 0;
+}
+.page :focus-visible,
+.split :focus-visible {
+  outline: 3px solid var(--link-line);
+  outline-offset: 3px;
+}
+@container (max-width: 959px) {
+  .categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 639px) {
+  .categories {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .inbox {
+    padding: 20px;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+}
+.count.meta {
+  font-size: 32px;
+}
