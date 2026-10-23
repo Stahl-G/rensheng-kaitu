@@ -187,6 +187,7 @@ export function NewsPage(props: NewsPageProps) {
           </a>
         </h3>
         <Source item={item} />
+        {item.image && <NewsExtra item={item} />}
         {props.onLearn && (
           <button type="button" className={css.button} onClick={() => props.onLearn?.(item)}>
             {t("开始学习", "Start learning")}
