@@ -95,7 +95,9 @@ export function OverviewPage(props: OverviewPageProps) {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
     const load = async () => {
-      const modules = props.plugins ? ((await props.plugins("explore")) as ExploreModule[]) : [];
+      const modules = props.plugins
+        ? ((await props.plugins("explore").catch(() => [])) as ExploreModule[])
+        : [];
       if (!active) return null;
       setPluginModules(modules);
       const value = await props.loadPreferences(browserLocale());

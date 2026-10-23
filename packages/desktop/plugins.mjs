@@ -94,25 +94,29 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
     },
     explore() {
       const entries = installed().flatMap((name) => {
-        const pkg = JSON.parse(
-          readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
-        );
-        const entry = pkg.kaitu?.explore;
-        if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
-        const pair = (value) =>
-          typeof value === "string"
-            ? [value, value]
-            : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
-        return [
-          {
-            id: `plugin:${name}`,
-            name,
-            page: entry.page,
-            title: pair(entry.title),
-            description: pair(entry.description),
-            icon: typeof entry.icon === "string" ? entry.icon : "◇",
-          },
-        ];
+        try {
+          const pkg = JSON.parse(
+            readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
+          );
+          const entry = pkg.kaitu?.explore;
+          if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
+          const pair = (value) =>
+            typeof value === "string"
+              ? [value, value]
+              : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
+          return [
+            {
+              id: `plugin:${name}`,
+              name,
+              page: entry.page,
+              title: pair(entry.title),
+              description: pair(entry.description),
+              icon: typeof entry.icon === "string" ? entry.icon : "◇",
+            },
+          ];
+        } catch {
+          return [];
+        }
       });
       return entries;
     },

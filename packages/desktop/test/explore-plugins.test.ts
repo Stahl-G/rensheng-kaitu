@@ -65,3 +65,32 @@ it("discovers installed package metadata locally, preserves origins, and reflect
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+it("skips missing and interrupted packages while keeping other installed Explore entries", () => {
+  const home = mkdtempSync(join(tmpdir(), "kaitu-partial-explore-"));
+  const profile = join(home, "profiles/desktop");
+  try {
+    for (const name of ["first", "broken", "last"])
+      mkdirSync(join(profile, "node_modules", name), { recursive: true });
+    const manifest = join(profile, "package.json");
+    const before = JSON.stringify({ dependencies: { first: "1", missing: "1", broken: "1", last: "1" } });
+    writeFileSync(manifest, before);
+    for (const name of ["first", "last"])
+      writeFileSync(
+        join(profile, "node_modules", name, "package.json"),
+        JSON.stringify({ kaitu: { explore: { page: name, title: name } } }),
+      );
+    writeFileSync(join(profile, "node_modules/broken/package.json"), '{"kaitu":');
+    const service = createPluginService({
+      home,
+      archive: home,
+      runtime: home,
+      beforeChange: async () => {},
+      onChanged: async () => {},
+    });
+    expect(service.explore().map(({ id }) => id)).toEqual(["plugin:first", "plugin:last"]);
+    expect(readFileSync(manifest, "utf8")).toBe(before);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
