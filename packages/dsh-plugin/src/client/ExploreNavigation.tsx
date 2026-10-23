@@ -195,7 +195,12 @@ export function ExploreModulesPage({
         <button
           type="button"
           disabled={entries === null || busy}
-          onClick={() => void change([...defaultExploreEntries])}
+          onClick={() =>
+            void change([
+              ...defaultExploreEntries,
+              ...modules.filter(({ id }) => id.startsWith("plugin:")).map(({ id }) => id),
+            ])
+          }
         >
           {t("恢复默认布局", "Restore default layout")}
         </button>

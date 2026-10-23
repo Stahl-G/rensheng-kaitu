@@ -8,6 +8,7 @@ import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { ExploreModulesPage, ExploreNavigation } from "./ExploreNavigation.js";
+import { ExplorePluginFrame } from "./ExplorePluginFrame.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
@@ -86,16 +87,30 @@ export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
+  const [pluginModules, setPluginModules] = useState<ExploreModule[]>([]);
   const [preferencesFailed, setPreferencesFailed] = useState(false);
   const [preferencesAttempt, setPreferencesAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry starts a fresh read and cancels the previous effect.
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
-    void props
-      .loadPreferences(browserLocale())
+    const load = async () => {
+      const modules = props.plugins ? ((await props.plugins("explore")) as ExploreModule[]) : [];
+      if (!active) return null;
+      setPluginModules(modules);
+      const value = await props.loadPreferences(browserLocale());
+      const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
+      if (!fresh.length || !active) return value;
+      const saved = await props.savePreferences({
+        locale: value.followSystem ? null : value.locale,
+        exploreEntries: [...(value.exploreEntries ?? defaultExploreEntries), ...fresh],
+        explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
+      });
+      return { ...saved, followSystem: value.followSystem };
+    };
+    void load()
       .then((value) => {
-        if (!active) return;
+        if (!active || !value) return;
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
         setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
@@ -106,14 +121,20 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale("zh-CN");
         setPreferencesFailed(true);
       });
+    function retry() {
+      setPreferencesAttempt((attempt) => attempt + 1);
+    }
+    window.addEventListener("kaitu:plugins-changed", retry);
     return () => {
       active = false;
+      window.removeEventListener("kaitu:plugins-changed", retry);
     };
-  }, [props.loadPreferences, preferencesAttempt]);
+  }, [props.loadPreferences, props.plugins, preferencesAttempt]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
       <Overview
         {...props}
+        pluginModules={pluginModules}
         locale={locale}
         setLocale={setLocale}
         followSystem={followSystem}
@@ -134,6 +155,7 @@ export function OverviewPage(props: OverviewPageProps) {
 }
 
 function Overview({
+  pluginModules,
   locale,
   setLocale,
   followSystem,
@@ -143,6 +165,7 @@ function Overview({
   retryPreferences,
   ...props
 }: OverviewPageProps & {
+  pluginModules: ExploreModule[];
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
@@ -172,16 +195,35 @@ function Overview({
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
+  const [openedPlugins, setOpenedPlugins] = useState<string[]>([]);
+  const pluginRemoved = useCallback((id: string) => {
+    setExplore((current) => (current === id ? "footprints" : current));
+    setOpenedPlugins((current) => current.filter((opened) => opened !== id));
+    window.dispatchEvent(new Event("kaitu:plugins-changed"));
+  }, []);
+  useEffect(() => {
+    setOpenedPlugins((current) => {
+      const installed = current.filter((id) => pluginModules.some((entry) => entry.id === id));
+      return view === "explore" &&
+        pluginModules.some((entry) => entry.id === explore) &&
+        !installed.includes(explore)
+        ? [...installed, explore]
+        : installed;
+    });
+  }, [view, explore, pluginModules]);
+  const availableModules = [...exploreModules, ...pluginModules];
   const firstExplore =
-    exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "modules";
+    exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "modules";
   useEffect(() => {
     if (exploreEntries)
       setExplore((current) =>
-        current === "modules" || current === "loading" || exploreEntries.includes(current)
-          ? current
-          : firstExplore,
+        current.startsWith("plugin:") && !pluginModules.some((entry) => entry.id === current)
+          ? "footprints"
+          : current === "modules" || current === "loading" || exploreEntries.includes(current)
+            ? current
+            : firstExplore,
       );
-  }, [exploreEntries, firstExplore]);
+  }, [exploreEntries, firstExplore, pluginModules]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
   const [exploreFacts, setExploreFacts] = useState<{
@@ -299,7 +341,13 @@ function Overview({
       exploreContent.directions ===
       0;
   const exploreStart =
-    exploreContent && exploreEntries ? exploreDestination(exploreEntries, exploreContent) : null;
+    exploreContent && exploreEntries
+      ? exploreDestination(
+          exploreEntries,
+          exploreContent,
+          availableModules.map(({ id }) => id),
+        )
+      : null;
   useEffect(() => {
     if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
   }, [exploreStart]);
@@ -649,7 +697,7 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
-  const selectedExplore = exploreModules.find((entry) => entry.id === explore);
+  const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
     jobs: <JobsPage {...child} />,
@@ -1232,11 +1280,17 @@ function Overview({
                   </button>
                 </div>
               )}
-              <ExploreNavigation entries={exploreEntries} current={explore} open={setExplore} />
+              <ExploreNavigation
+                modules={availableModules}
+                entries={exploreEntries}
+                current={explore}
+                open={setExplore}
+              />
             </section>
             <div className={css.child}>
               {explore === "modules" ? (
                 <ExploreModulesPage
+                  modules={availableModules}
                   entries={exploreEntries}
                   current={explore}
                   open={setExplore}
@@ -1272,7 +1326,7 @@ function Overview({
                   }}
                 />
               ) : selectedExplore ? (
-                explorePages[selectedExplore.id]
+                (explorePages[selectedExplore.id] ?? null)
               ) : (
                 <output>{t("正在读取模块…", "Loading modules…")}</output>
               )}
@@ -1287,6 +1341,18 @@ function Overview({
             </div>
           </>
         )}
+        {pluginModules
+          .filter((entry) => openedPlugins.includes(entry.id))
+          .map((entry) => (
+            <div key={entry.id} className={css.child} hidden={view !== "explore" || explore !== entry.id}>
+              <ExplorePluginFrame
+                id={entry.id}
+                title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
+                plugins={props.plugins}
+                onRemoved={pluginRemoved}
+              />
+            </div>
+          ))}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
             {props.renderAsk(

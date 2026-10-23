@@ -39,7 +39,13 @@ export const exploreModules = [
   },
 ] as const;
 export const defaultExploreEntries = exploreModules.filter((entry) => entry.default).map(({ id }) => id);
-export type ExploreModule = (typeof exploreModules)[number];
+export interface ExploreModule {
+  id: string;
+  title: readonly [string, string];
+  description: readonly [string, string];
+  icon: string;
+  page?: string;
+}
 
 /** Counts come from the existing in-memory page projections, never a directory scan. */
 export interface ExploreContent {

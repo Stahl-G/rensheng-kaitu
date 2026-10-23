@@ -17,12 +17,16 @@ it("入口顺序、全隐藏及重新启用持久化，跟随系统语言仍保�
       followSystem: true,
       exploreEntries: ["news", "footprints", "health"],
     });
-    savePreferences({ exploreEntries: [] });
+    savePreferences({ exploreEntries: [], explorePlugins: ["plugin:synthetic"] });
     expect(resolvePreferences(ws, "zh-CN").exploreEntries).toEqual([]);
     savePreferences({ locale: "en" });
     expect(readPreferences().exploreEntries).toEqual([]);
     savePreferences({ exploreEntries: ["health", "news"] });
-    expect(readPreferences()).toEqual({ locale: "en", exploreEntries: ["health", "news"] });
+    expect(readPreferences()).toEqual({
+      locale: "en",
+      exploreEntries: ["health", "news"],
+      explorePlugins: ["plugin:synthetic"],
+    });
   } finally {
     vi.unstubAllEnvs();
     rmSync(state, { recursive: true, force: true });

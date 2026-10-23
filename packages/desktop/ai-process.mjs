@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
 
 /** A single owned Electron child, with IPC focus and bounded process-group shutdown. */
 export function createAiProcess(executable, env) {
@@ -6,19 +7,46 @@ export function createAiProcess(executable, env) {
   let starting;
   let stopping;
   let closed = false;
+  let ready;
+  let latestUrl;
   const send = (type) => {
     if (child?.connected) child.send({ type }, () => {});
   };
   return {
-    async open({ background = false } = {}) {
+    async open({ background = false, waitForUrl = false } = {}) {
       if (closed) throw new Error("开图正在退出");
       if (!child) {
         child = spawn(executable, [], {
           env: { ...env, KAITU_AI_BACKGROUND: background ? "1" : "0" },
           detached: process.platform !== "win32",
-          stdio: ["ignore", "ignore", "ignore", "ipc"],
+          stdio: ["ignore", "pipe", "ignore", "ipc"],
         });
         const launched = child;
+        latestUrl = undefined;
+        ready = new Promise((resolve, reject) => {
+          const lines = createInterface({ input: launched.stdout });
+          lines.on("line", (line) => {
+            try {
+              const message = JSON.parse(line);
+              if (message?.type !== "kaitu:web") return;
+              const url = URL.parse(message.url);
+              if (
+                url?.protocol === "http:" &&
+                url.hostname === "127.0.0.1" &&
+                url.searchParams.has("token")
+              ) {
+                latestUrl = url.href;
+                resolve();
+              }
+            } catch {
+              // CLI diagnostics are not routed to the workbench or its logs.
+            }
+          });
+          launched.once("exit", () => lines.close());
+          launched.once("exit", () => reject(new Error("插件页面服务已退出")));
+          launched.once("error", reject);
+        });
+        void ready.catch(() => {});
         starting = new Promise((resolve, reject) => {
           launched.once("spawn", resolve);
           launched.once("error", reject);
@@ -32,7 +60,19 @@ export function createAiProcess(executable, env) {
       }
       await starting;
       if (!background) send("kaitu:focus");
-      return { pid: child?.pid };
+      if (!waitForUrl) return { pid: child?.pid };
+      let timeout;
+      try {
+        await Promise.race([
+          ready,
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => reject(new Error("插件页面仍未就绪，请重试")), 20000);
+          }),
+        ]);
+        return { pid: child?.pid, url: latestUrl };
+      } finally {
+        clearTimeout(timeout);
+      }
     },
     close() {
       if (stopping) return stopping;

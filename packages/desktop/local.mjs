@@ -211,14 +211,18 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     ask,
     systemLocale: app.getPreferredSystemLanguages()[0] || "en",
     desktopUpdate: (action) => updater.request(action),
-    plugins: async (action, input) =>
-      action === "install"
+    plugins: async (action, input) => {
+      if (action === "explore") return plugins.explore();
+      if (action === "page")
+        return plugins.page(input, server.url, () => ai.open({ background: true, waitForUrl: true }));
+      return action === "install"
         ? plugins.install(input)
         : action === "remove"
           ? plugins.remove(input)
           : action === "open"
             ? ai.open()
-            : plugins.list(),
+            : plugins.list();
+    },
     pickDirectory: async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog(window, {
         title: "选择开图资料的存放文件夹",

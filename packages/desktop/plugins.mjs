@@ -76,6 +76,46 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       : [];
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   return {
+    async page(id, workbenchOrigin, open) {
+      const entry = this.explore().find((item) => item.id === id);
+      if (!entry) throw new KaituError("这个模块已卸载", "PLUGIN");
+      const { url } = await open();
+      const target = new URL(url);
+      if (
+        target.protocol !== "http:" ||
+        target.hostname !== "127.0.0.1" ||
+        target.username ||
+        target.password ||
+        target.origin === new URL(workbenchOrigin).origin
+      )
+        throw new KaituError("插件页面服务地址无效", "PLUGIN");
+      target.hash = new URLSearchParams({ "kaitu-page": entry.page, "kaitu-embed": "1" }).toString();
+      return target.href;
+    },
+    explore() {
+      const entries = installed().flatMap((name) => {
+        const pkg = JSON.parse(
+          readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
+        );
+        const entry = pkg.kaitu?.explore;
+        if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
+        const pair = (value) =>
+          typeof value === "string"
+            ? [value, value]
+            : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
+        return [
+          {
+            id: `plugin:${name}`,
+            name,
+            page: entry.page,
+            title: pair(entry.title),
+            description: pair(entry.description),
+            icon: typeof entry.icon === "string" ? entry.icon : "◇",
+          },
+        ];
+      });
+      return entries;
+    },
     async list() {
       let response;
       try {

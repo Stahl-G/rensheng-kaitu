@@ -10,6 +10,8 @@ export interface Preferences {
   todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
+  /** Installed plugin IDs already offered, including entries the user subsequently hid. */
+  explorePlugins?: string[];
   /** Resolved UI state only; an automatic choice is never persisted as a manual choice. */
   followSystem?: boolean;
 }
@@ -54,6 +56,7 @@ export function readPreferences(): Preferences {
       locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
       ...(adoptionList(value.todayAdoptions) ? { todayAdoptions: value.todayAdoptions } : {}),
       ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
+      ...(entryList(value.explorePlugins) ? { explorePlugins: value.explorePlugins } : {}),
     };
   } catch {
     return { locale: null };
@@ -66,10 +69,12 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     typeof input !== "object" ||
     Array.isArray(input) ||
     Object.keys(input).some(
-      (key) => key !== "locale" && key !== "exploreEntries" && key !== "todayAdoptions",
+      (key) =>
+        key !== "locale" && key !== "exploreEntries" && key !== "explorePlugins" && key !== "todayAdoptions",
     ) ||
     (input.todayAdoptions !== undefined && !adoptionList(input.todayAdoptions)) ||
     (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
+    (input.explorePlugins !== undefined && !entryList(input.explorePlugins)) ||
     (input.locale !== null && input.locale !== undefined && !locales.includes(input.locale))
   )
     throw new KaituError("界面偏好不合法", "BAD_ARGS");

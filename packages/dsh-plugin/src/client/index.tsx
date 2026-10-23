@@ -27,6 +27,7 @@ import type {
   NewsFeedback,
 } from "../types.js";
 import { HiddenHeroMark, KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
+import { registerExplorePluginRoute } from "./ExplorePluginRoute.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
@@ -37,6 +38,7 @@ export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
 
 export async function apply(ctx: Context) {
+  registerExplorePluginRoute(ctx);
   ctx.slots.inject("tool.call.toolview", () =>
     ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_card" }, OpenmaicCard),
   );
