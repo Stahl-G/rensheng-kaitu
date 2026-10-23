@@ -6,6 +6,11 @@ import { isICloudPath } from "./sync-location.js";
 
 const isWindows = process.platform === "win32";
 
+/** Disposable shared reading output, including cloud placeholders and conflict copies. */
+export function isUserProfile(file: string): boolean {
+  return /^\.?USER(?: \d+| \([^/]*\)| \[[^/]*\])?\.md(?:\.icloud)?$/i.test(file);
+}
+
 export function conflictOriginal(root: string, file: string): string | undefined {
   const name = basename(file);
   // 坚果云冲突副本的命名还没真机核对（HANDOFF §6），核对前只认通用写法，不猜「-冲突」之类的后缀，
@@ -80,6 +85,7 @@ export function syncInventory(root: string, prefix = "", icloud = false) {
   const conflicts: string[] = [];
   const unavailable: string[] = [];
   function walk(file: string) {
+    if (isUserProfile(file)) return;
     const placeholder = placeholderOriginal(file);
     if (placeholder) {
       if (icloud && !conflictOriginal(root, placeholder) && isEvictedICloudFile(join(root, placeholder)))

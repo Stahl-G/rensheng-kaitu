@@ -335,6 +335,7 @@ export function completeNext(ws: Workspace, file: string, id: string, now = new 
 
 export function ignoredWorkspaceChange(file: string): boolean {
   return (
+    isUserProfile(file) ||
     file === "OVERVIEW.md" ||
     file === "phone" ||
     file.startsWith("phone/") ||
@@ -404,3 +405,4 @@ export async function workspaceFileStampsAsync(
   options.signal?.throwIfAborted();
   return stamps;
 }
+import { isUserProfile } from "./sync-files.js";

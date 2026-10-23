@@ -22,6 +22,7 @@ import {
   cloudPlaceholder,
   conflictOriginal,
   isEvictedICloudFile,
+  isUserProfile,
   placeholderOriginal as placeholderName,
   syncInventory,
 } from "./sync-files.js";
@@ -234,7 +235,7 @@ export class Workspace {
   }
 
   pendingDownloads(): string[] {
-    return [...this.unread].filter((file) => this.isUnavailable(file));
+    return [...this.unread].filter((file) => !isUserProfile(file) && this.isUnavailable(file));
   }
 
   unavailableFiles(prefix = ""): string[] {

@@ -32,6 +32,7 @@ export * from "./secrets.js";
 
 export * from "./drive.js";
 export * from "./overview.js";
+export * from "./user-profile.js";
 export * from "./inbox.js";
 
 export * from "./projects.js";

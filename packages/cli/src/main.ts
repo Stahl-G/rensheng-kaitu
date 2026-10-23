@@ -24,6 +24,7 @@ import {
   cancelOnboardingPreview,
   cancelTask,
   completeTask,
+  configureProfilePublisher,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
   createProject,
@@ -64,6 +65,7 @@ import {
   recordReference,
   recordReferences,
   recordTypeSummary,
+  refreshUserProfile,
   reindexChats,
   removeMemory,
   removePhoto,
@@ -125,6 +127,7 @@ const HELP = `开图 kaitu
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
   kaitu agents-md                                  重新生成 AGENTS.md
+  kaitu profile-publisher enable | disable | refresh  在指定电脑生成 USER.md（换电脑前先 disable）
   kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
   kaitu mcp token [--rotate]                      查看或轮换 HTTP token
   kaitu onboarding status | reset                  查看引导 / 重置本机选择
@@ -608,6 +611,15 @@ async function run(argv: string[]): Promise<number> {
       }
       out(values, result, lines.join("\n"));
       return problems.length || result.validation?.length ? 1 : 0;
+    }
+    case "profile-publisher": {
+      const ws = workspace(values, false);
+      if (!["enable", "disable", "refresh"].includes(args[0] ?? ""))
+        throw new KaituError("使用 profile-publisher enable / disable / refresh", "BAD_ARGS");
+      const result =
+        args[0] === "refresh" ? refreshUserProfile(ws) : configureProfilePublisher(ws, args[0] === "enable");
+      out(values, result, result.status);
+      return 0;
     }
     case "doctor": {
       const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());
