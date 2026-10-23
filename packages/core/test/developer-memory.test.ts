@@ -11,6 +11,7 @@ import {
   installProjectMemory,
   logProject,
   projectMemoryContext,
+  projectMemoryPrompt,
   readProjectPage,
   runPhone,
 } from "../src/index.js";
@@ -79,6 +80,14 @@ it("新项目会话读取既有状态并写回现有项目日志；入口保留�
   });
   expect((await projectMemoryContext(ws, code)).project).toBeNull();
   await expect(installProjectMemory(ws, code)).rejects.toThrow("匹配多个项目");
+  // 项目页按当前项目安装：多个匹配时也能指定，用户自己的同名技能仍保留。
+  await expect(installProjectMemory(ws, code, project.slug)).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(fs.readFileSync(skill, "utf8")).toBe("user-owned skill\n");
+  const prompt = projectMemoryPrompt(ws, project.slug);
+  expect(prompt).toContain(`--project ${project.slug}`);
+  expect(prompt).toContain(`project log ${project.slug}`);
+  expect(prompt).toContain(ws.root);
+  expect(prompt).toContain(`--from '${code}'`);
 });
 
 it("纯 Git 模板建的记忆仓库能直接接管：已有文件不动，接着能给手机生成内容", async () => {

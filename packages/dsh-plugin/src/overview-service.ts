@@ -78,6 +78,7 @@ import {
   exportWorkspace,
   handoverPack,
   hideExperience,
+  installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -92,6 +93,7 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectMemoryPrompt,
   proposeTask,
   readAutomation,
   readAvatar,
@@ -753,6 +755,16 @@ export class KaituOverviewService extends TypertRemoteService {
   async projectBindGithub(slug: string, repo: string): Promise<ProjectDetailData> {
     await bindGithub(this.workspace, slug, repo);
     return readProjectPage(this.workspace, slug);
+  }
+
+  @Remote("projectMemoryPrompt")
+  async projectMemoryPrompt(slug: string, locale: string): Promise<string> {
+    return projectMemoryPrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("projectMemoryInstall")
+  async projectMemoryInstall(slug: string, directory: string): Promise<{ files: string[]; project: string }> {
+    return installProjectMemory(this.workspace, directory, slug);
   }
 
   @Remote("projectSync")

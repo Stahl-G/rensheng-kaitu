@@ -1,6 +1,7 @@
 import type { ProjectGoal } from "@kaitu/core";
 import { useEffect, useState } from "react";
 import type { DoingProject, ProjectDetailData } from "../types.js";
+import { AgentHandoff } from "./AgentHandoff.js";
 import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
@@ -549,6 +550,13 @@ export function ProjectsPage(
                   </details>
                 )}
               </section>
+              {props.projectMemoryPrompt && props.installProjectMemory && (
+                <AgentHandoff
+                  project={project}
+                  prompt={props.projectMemoryPrompt}
+                  install={props.installProjectMemory}
+                />
+              )}
               <section className={css.card}>
                 <h3>{t("最近日志", "Recent progress")}</h3>
                 {project.logs.length ? (

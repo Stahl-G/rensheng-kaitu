@@ -61,6 +61,7 @@ import {
   financeOverview,
   handoverPack,
   hideExperience,
+  installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -77,6 +78,7 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectMemoryPrompt,
   proposeTask,
   readAutomation,
   readAvatar,
@@ -460,6 +462,10 @@ export async function productRequest(
       return readProjectPage(ws, text(0));
     case "projectSync":
       return syncProject(ws, text(0));
+    case "projectMemoryPrompt":
+      return projectMemoryPrompt(ws, text(0), args[1] === "en" ? "en" : "zh-CN");
+    case "projectMemoryInstall":
+      return installProjectMemory(ws, text(1), text(0));
     case "experienceSource":
       return readExperienceSource(ws, text(0));
     case "hometownCities":
