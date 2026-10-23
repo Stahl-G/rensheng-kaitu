@@ -2,8 +2,9 @@ import { readdirSync } from "node:fs";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
+import type { Task } from "./tasks.js";
 import { localDate, parseTs } from "./time.js";
-import { readWorkbench } from "./workbench.js";
+import { type NextItem, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 function offset(date: string, days: number) {
@@ -58,6 +59,27 @@ function cloudWorkouts(ws: Workspace) {
 
 export function readHealthPage(ws: Workspace, now = new Date()) {
   const data = readWorkbench(ws, now);
+  const statusNext = data.statuses.find((s) => s.file === "health/STATUS.md")?.data.next ?? [];
+  const tasks = (data.records.task ?? []) as Task[];
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const references = new Set(statusNext.map((item) => item.ref ?? item.id));
+  const linked = (item: NextItem) => byId.get(item.ref ?? item.id);
+  const healthTasks = tasks.filter(
+    (task) => task.source === "health" || task.source?.startsWith("health/") || references.has(task.id),
+  );
+  // A status summary may lag behind N1. Read the task's current revision for actionable suggestions.
+  const next: (NextItem & { taskId?: string })[] = [
+    ...statusNext.filter((item) => !linked(item) && ["todo", "proposed"].includes(item.status)),
+    ...healthTasks
+      .filter((task) => ["open", "proposed"].includes(task.status))
+      .map((task) => ({
+        id: task.id,
+        taskId: task.id,
+        title: task.title,
+        due: task.due,
+        status: task.status === "proposed" ? ("proposed" as const) : ("todo" as const),
+      })),
+  ];
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
   const records = (type: string, field = "ts") =>
     (data.records[type] ?? []).filter((row) => Date.parse(String(row[field])) <= now.getTime());
@@ -235,8 +257,6 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
         notes: typeof r.notes === "string" ? r.notes : null,
       })),
     goals: data.goals.filter((g) => g.area === "health"),
-    next: (data.statuses.find((s) => s.file === "health/STATUS.md")?.data.next ?? []).filter(
-      (item) => item.status === "todo" || item.status === "proposed",
-    ),
+    next,
   };
 }
