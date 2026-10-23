@@ -42,8 +42,9 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
     expect(reads).not.toHaveBeenCalled();
     const first = readLibrary(ws, { section: "inbox" });
     expect(first.inbox).toHaveLength(40);
-    expect(reads.mock.calls).toHaveLength(41);
-    expect(reads.mock.calls.every(([file]) => file.startsWith("inbox/notes/"))).toBe(true);
+    expect(reads.mock.calls.filter(([file]) => file.startsWith("inbox/notes/"))).toHaveLength(41);
+    expect(reads.mock.calls.filter(([file]) => file === "me/STATUS.md")).toHaveLength(1);
+    expect(reads.mock.calls).toHaveLength(42);
     const seen = first.inbox.map((row) => row.file);
     let before = first.next;
     while (before) {
