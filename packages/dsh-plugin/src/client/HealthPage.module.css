@@ -37,7 +37,7 @@
 .header p {
   margin-top: 4px;
   color: var(--kt-muted);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .actions,
@@ -47,13 +47,13 @@
   gap: 8px;
 }
 .button {
-  min-height: 36px;
+  min-height: 44px;
   padding: 6px 16px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--kt-control);
   color: var(--kt-text);
-  font-size: 15px;
+  font-size: 14px;
 }
 .primary {
   background: var(--kt-primary);
@@ -63,7 +63,7 @@
   gap: 6px;
 }
 .tabs button {
-  min-height: 34px;
+  min-height: 36px;
   padding: 6px 14px;
   border: 0;
   border-radius: 999px; /* biome-ignore lint/correctness/noUnknownProperty: dsh requires round markers. */
@@ -129,7 +129,7 @@
 .stat dt,
 .stat small {
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 18px;
 }
 .stat dd {
@@ -174,7 +174,7 @@
 .photoDate,
 .next small {
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
 }
 .heatmap {
@@ -223,7 +223,7 @@
   border-radius: 6px;
   background: var(--kt-health-tint);
   color: var(--kt-health-ink);
-  font-size: 13px;
+  font-size: 12px;
 }
 .exercises {
   flex: 1 1 260px;
@@ -248,7 +248,7 @@
   padding: 0;
   background: transparent;
   color: var(--kt-link);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 .link:hover {
@@ -362,7 +362,7 @@
 .measurements {
   margin-top: 12px;
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .measurements strong {
   color: var(--kt-text);
@@ -412,17 +412,17 @@
   flex-direction: column;
   gap: 10px;
   margin-bottom: 12px;
-  box-shadow: inset 3px 0 0 var(--kt-health), var(--kt-shadow);
+  box-shadow: inset 3px 0 0 var(--kt-health);
 }
 .goal h3 {
   color: var(--kt-health-ink);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 .goal p > span {
   display: block;
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .next {
   display: flex;

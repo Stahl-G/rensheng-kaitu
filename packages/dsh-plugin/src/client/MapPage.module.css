@@ -1,9 +1,9 @@
 .page {
-  --atlas-water: #27495e;
-  --atlas-land: #e6dcc5;
-  --atlas-border: #aaa58e;
-  --atlas-muted: #647b7e;
-  --atlas-green: #e6dcc5;
+  --atlas-water: var(--map-sea);
+  --atlas-land: var(--map-land);
+  --atlas-border: var(--map-line);
+  --atlas-muted: var(--muted);
+  --atlas-green: var(--map-land);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -31,7 +31,7 @@
   flex-wrap: wrap;
 }
 .header .secondary {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .header h1 {
@@ -63,7 +63,7 @@
   padding: 8px 12px;
   background: var(--kt-control);
   color: var(--kt-text);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 .primary {
@@ -104,7 +104,7 @@
 }
 .editor label {
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--kt-secondary);
 }
 .fieldRow {
@@ -241,7 +241,7 @@
   background: var(--kt-card);
   color: var(--kt-secondary);
   box-shadow: var(--kt-shadow);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
 }
 .mapNotice button {
@@ -279,7 +279,7 @@
   border-radius: 8px;
   background: transparent;
   color: var(--kt-text);
-  font-size: 13px;
+  font-size: 14px;
 }
 .mapControls button[aria-label] {
   font-size: 18px;
@@ -296,7 +296,7 @@
 }
 .listHeading {
   padding: 4px 2px 12px;
-  font-size: 13px;
+  font-size: 12px;
 }
 .city {
   display: flex;
@@ -312,7 +312,7 @@
   color: var(--kt-text);
   box-shadow: var(--kt-shadow);
   text-align: left;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .city[aria-expanded="true"] {
@@ -325,7 +325,7 @@
 .city .secondary {
   display: block;
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 .cityShapes {
@@ -355,7 +355,7 @@
 }
 .reviewItem h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .candidate {
@@ -370,7 +370,7 @@
   border-radius: 8px;
   background: var(--kt-card);
   color: var(--kt-text);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 20px;
 }
 .candidate span {
@@ -389,7 +389,7 @@
 }
 .detailHeading .secondary {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 .experience {
@@ -406,7 +406,7 @@
 .experience .secondary,
 .source,
 .link {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 .status {
@@ -562,7 +562,7 @@
   align-items: center;
   gap: 12px;
   color: var(--kt-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 .source {
   overflow-wrap: anywhere;
@@ -574,14 +574,6 @@
 }
 
 /* 与开图探索页共用青绿、字体和卡片；海陆使用独立对比层级。 */
-body[data-ds-dark-theme] .page,
-[data-theme="dark"] .page {
-  --atlas-water: #1c293c;
-  --atlas-land: #554d43;
-  --atlas-border: #728185;
-  --atlas-muted: #a3bfba;
-  --atlas-green: #554d43;
-}
 .tools {
   display: flex;
   align-items: flex-start;
@@ -599,14 +591,14 @@ body[data-ds-dark-theme] .page,
   flex-basis: 100%;
 }
 .tools > .review summary {
-  font-size: 13px;
+  font-size: 12px;
   min-height: 20px;
 }
 .routeToggle {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--kt-secondary);
 }
 .routeToggle input {
@@ -623,25 +615,25 @@ body[data-ds-dark-theme] .page,
 }
 .homeStory p {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 12px;
   white-space: pre-wrap;
 }
 .homeStory h2 {
-  font-size: 17px;
+  font-size: 16px;
   margin: 0;
 }
 .homeBadge {
   display: inline-block;
   color: var(--kt-map-ink);
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
 }
 .timeline {
   min-width: 0;
 }
 .timeline h2 {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--kt-secondary);
 }
@@ -780,8 +772,8 @@ body[data-ds-dark-theme] .page,
   left: 24px;
   max-width: calc(100% - 150px);
   pointer-events: none;
-  color: #263f64;
-  background: #f4eddfeb;
+  color: var(--ink);
+  background: var(--surface);
   padding: 14px 18px;
   border-radius: 10px;
   text-shadow: none;
@@ -793,7 +785,7 @@ body[data-ds-dark-theme] .page,
 }
 .stateCaption p {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 .stateEmpty {
   position: absolute;
@@ -839,8 +831,8 @@ body[data-ds-dark-theme] .page,
   position: absolute;
   left: 14px;
   bottom: 12px;
-  color: #263f64;
-  background: #f4eddfeb;
+  color: var(--ink);
+  background: var(--surface);
   padding: 4px 7px;
   border-radius: 5px;
   font-size: 11px;
@@ -848,7 +840,7 @@ body[data-ds-dark-theme] .page,
 .meMarker {
   width: 0;
   height: 0;
-  color: #2b4c7e;
+  color: var(--link);
 }
 .meIcon {
   position: absolute;
@@ -885,10 +877,7 @@ body[data-ds-dark-theme] .page,
     animation: none;
   }
 }
-[data-theme="dark"] .meMarker,
-body[data-ds-dark-theme] .meMarker {
-  color: #f4eddf;
-}
+
 .page {
   position: relative;
 }
@@ -921,8 +910,8 @@ body[data-ds-dark-theme] .meMarker {
 
 .cityLabel {
   white-space: nowrap;
-  color: #263f64;
-  background: #f4eddfed;
+  color: var(--ink);
+  background: var(--surface);
   padding: 3px 7px;
   border-radius: 5px;
   font: 12px / 1.4 system-ui;
@@ -934,22 +923,6 @@ body[data-ds-dark-theme] .meMarker {
   top: -11px;
 }
 .cityPopup {
-  color: #263f64;
-  font: 13px / 1.5 system-ui;
-}
-[data-theme="dark"] .stateCaption,
-body[data-ds-dark-theme] .stateCaption {
-  color: #f6efdf;
-  background: #241f1bd9;
-}
-[data-theme="dark"] .cityLabel,
-body[data-ds-dark-theme] .cityLabel {
-  color: #f6efdf;
-  background: #241f1bed;
-}
-
-[data-theme="dark"] .routeKey,
-body[data-ds-dark-theme] .routeKey {
-  color: #f4eddf;
-  background: #241f1bed;
+  color: var(--ink);
+  font: 14px / 1.5 system-ui;
 }

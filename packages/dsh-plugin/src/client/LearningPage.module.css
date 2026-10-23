@@ -33,7 +33,7 @@
 .form select {
   box-sizing: border-box;
   width: 100%;
-  border: 1px solid var(--line, #ddd);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
   background: transparent;
@@ -52,7 +52,7 @@
   gap: 8px;
 }
 .topics button[aria-pressed="true"] {
-  outline: 2px solid var(--accent, #515b91);
+  outline: 3px solid var(--link-line);
   outline-offset: 2px;
 }
 .document {

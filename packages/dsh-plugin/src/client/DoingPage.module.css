@@ -38,7 +38,7 @@
   border-radius: 8px;
   background: var(--kt-primary);
   color: var(--kt-on-primary);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
 }
 .link {
@@ -46,7 +46,7 @@
   border: 0;
   background: transparent;
   color: var(--kt-link);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 18px;
 }
 .link:hover {
@@ -86,7 +86,7 @@
 .card h3,
 .topic h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 24px;
   font-weight: 600;
 }
@@ -101,7 +101,7 @@
   align-items: center;
   padding: 2px 9px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 18px;
 }
 .kind {
@@ -142,7 +142,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 18px;
   font-variant-numeric: tabular-nums;
 }
@@ -179,7 +179,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 18px;
 }
 .repoStats {
@@ -213,7 +213,7 @@
   font-weight: 500;
 }
 .due {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 18px;
   margin-left: auto;
   text-align: right;
@@ -233,7 +233,7 @@
   background: var(--kt-subtle);
 }
 .topic h3 {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 22px;
 }
 .progress {

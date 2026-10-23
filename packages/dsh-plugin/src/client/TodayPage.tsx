@@ -254,12 +254,12 @@ export function TodayStart({
   const t = useT();
   const [memoryShown, setMemoryShown] = useState(true);
   const topics = [
-    ["工作", "Work", "在做的事", "What you're working on", "#c89f78"],
-    ["身体", "Body", "吃睡与精力", "Food, rest and energy", "#88a68b"],
-    ["学习", "Learning", "想学的新东西", "Something to learn", "#a29bc7"],
-    ["关系", "Relationships", "重要的人", "People who matter", "#c69498"],
-    ["生活", "Life", "住处与日常", "Home and everyday life", "#8fa7ba"],
-    ["还说不清", "Not sure yet", "先说一句", "Start with a thought", "#c6bb88"],
+    ["工作", "Work", "在做的事", "What you're working on", "var(--doing)"],
+    ["身体", "Body", "吃睡与精力", "Food, rest and energy", "var(--health)"],
+    ["学习", "Learning", "想学的新东西", "Something to learn", "var(--explore)"],
+    ["关系", "Relationships", "重要的人", "People who matter", "var(--me)"],
+    ["生活", "Life", "住处与日常", "Home and everyday life", "var(--doing)"],
+    ["还说不清", "Not sure yet", "先说一句", "Start with a thought", "var(--finance)"],
   ] as const;
   return (
     <section className={todayCss.start} aria-label={t("从一件事开始", "Start with one thing")}>

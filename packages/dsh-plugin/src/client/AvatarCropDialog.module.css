@@ -19,7 +19,7 @@
 .hint {
   margin: 8px 0 18px;
   color: var(--kt-secondary);
-  font-size: 13px;
+  font-size: 12px;
 }
 .viewport {
   position: relative;
@@ -44,7 +44,7 @@
   align-items: center;
   gap: 16px;
   margin: 20px 0;
-  font-size: 13px;
+  font-size: 12px;
 }
 .zoom input {
   flex: 1;
@@ -53,7 +53,7 @@
 }
 .error {
   color: var(--kt-me-ink);
-  font-size: 13px;
+  font-size: 12px;
 }
 .actions {
   display: flex;

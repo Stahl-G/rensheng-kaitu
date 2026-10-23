@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <!-- 开图：一张正在展开的三折地图。左折最深（还折着），右折最亮（已展开）；路线在深折上为白，在亮折上为深朱。 -->
+  <!-- 开图：一张正在展开的三折地图。左折最深（还折着），右折最亮（已展开）；路线在深折上为白，在亮折上为墨蓝。 -->
   <defs>
     <clipPath id="kaitu-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
     <clipPath id="kaitu-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
   </defs>
-  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="#1B3254" stroke="#1B3254" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="#2B4C7E" stroke="#2B4C7E" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="#B8CBE4" stroke="#B8CBE4" stroke-width="1.5" stroke-linejoin="round"/>
-  <g clip-path="url(#kaitu-folded)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1B3254" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <path d="M4 10L17.33 6L17.33 38L4 42Z" fill="var(--mark-0, #1F3550)" stroke="var(--mark-0, #1F3550)" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M17.33 6L30.67 10L30.67 42L17.33 38Z" fill="var(--mark-1, #2B4C7E)" stroke="var(--mark-1, #2B4C7E)" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M30.67 10L44 6L44 38L30.67 42Z" fill="var(--mark-2, #E8DFCC)" stroke="var(--mark-2, #E8DFCC)" stroke-width="1.5" stroke-linejoin="round"/>
+  <g clip-path="url(#kaitu-folded)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="var(--mark-route, #FFFFFF)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#kaitu-open)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="var(--mark-0, #1F3550)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
 </svg>

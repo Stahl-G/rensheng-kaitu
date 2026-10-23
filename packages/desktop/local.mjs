@@ -257,11 +257,19 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         {
-          label: "人生开图",
+          label: "开图",
           submenu: [
-            { role: "about", label: "关于人生开图" },
+            { role: "about", label: "关于开图" },
             {
-              label: "设置",
+              label: "设置…",
+              accelerator: "CmdOrCtrl+,",
+              click: () =>
+                void window.webContents.executeJavaScript(
+                  'window.dispatchEvent(new Event("kaitu:settings"))',
+                ),
+            },
+            {
+              label: "自动任务",
               submenu: [
                 ["morning", "早间计划"],
                 ["organizer", "每日整理"],
@@ -278,8 +286,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
               })),
             },
             { type: "separator" },
-            { role: "hide", label: "隐藏人生开图" },
-            { role: "quit", label: "退出人生开图" },
+            { role: "hide", label: "隐藏开图" },
+            { role: "quit", label: "退出开图" },
           ],
         },
         { role: "editMenu", label: "编辑" },

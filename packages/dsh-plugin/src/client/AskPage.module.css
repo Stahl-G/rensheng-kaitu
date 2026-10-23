@@ -116,7 +116,13 @@
   flex-direction: column;
   gap: 14px;
   padding: 28px max(16px, 7%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    currentColor 20px,
+    currentColor calc(100% - 28px),
+    transparent 100%
+  );
 }
 .user {
   align-self: flex-end;
@@ -251,10 +257,10 @@
   padding: 12px 12px 10px 16px;
   border-radius: 20px;
   background: var(--kt-card);
-  box-shadow: var(--kt-shadow), 0 0 0 1px var(--kt-control);
+  box-shadow: 0 0 0 1px var(--kt-control);
 }
 .composer:focus-within {
-  box-shadow: var(--kt-shadow), 0 0 0 1.5px var(--kt-accent);
+  box-shadow: 0 0 0 1.5px var(--kt-accent);
 }
 .chat .composer textarea,
 .chat .composer textarea:focus-visible {
@@ -296,7 +302,7 @@
   border-radius: 18px;
   background: transparent;
   color: var(--kt-secondary);
-  font-size: 13px;
+  font-size: 12px;
   min-width: 0;
   max-width: 100%;
 }
@@ -414,7 +420,7 @@ output.progress,
   gap: 8px;
   margin: 4px max(16px, 7%);
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .connect button,
 .actions button,
@@ -472,7 +478,7 @@ output.progress,
 }
 .choice span {
   color: var(--kt-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 .choice[aria-pressed="true"] {
   border-color: var(--kt-accent);
@@ -560,7 +566,7 @@ output.progress,
   align-items: center;
   gap: 8px;
   padding: 8px;
-  font-size: 13px;
+  font-size: 12px;
 }
 .attachment img {
   width: 48px;
@@ -651,7 +657,7 @@ output.progress,
   background: transparent;
   color: var(--kt-secondary);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 .referenceTabs button:hover,

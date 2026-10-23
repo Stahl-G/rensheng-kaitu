@@ -1,36 +1,41 @@
+/* Shared brand seats can also live outside the product page in DSH. */
+body {
+  --mark-0: #1f3550;
+  --mark-1: #2b4c7e;
+  --mark-2: #e8dfcc;
+  --mark-route: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    --mark-0: #3a5a86;
+    --mark-1: #5c7daa;
+    --mark-2: #cfc4ad;
+    --mark-route: #ece6da;
+  }
+}
+body[data-ds-dark-theme] {
+  --mark-0: #3a5a86;
+  --mark-1: #5c7daa;
+  --mark-2: #cfc4ad;
+  --mark-route: #ece6da;
+}
 .fold0 {
-  fill: #1b3254;
-  stroke: #1b3254;
+  fill: var(--mark-0);
+  stroke: var(--mark-0);
 }
 .fold1 {
-  fill: #2b4c7e;
-  stroke: #2b4c7e;
+  fill: var(--mark-1);
+  stroke: var(--mark-1);
 }
 .fold2 {
-  fill: #b8cbe4;
-  stroke: #b8cbe4;
+  fill: var(--mark-2);
+  stroke: var(--mark-2);
 }
 .routeFolded {
-  stroke: #fff;
+  stroke: var(--mark-route);
 }
 .routeOpen {
-  stroke: #1b3254;
-}
-
-body[data-ds-dark-theme] .fold0,
-[data-theme="dark"] .fold0 {
-  fill: #365b90;
-  stroke: #365b90;
-}
-body[data-ds-dark-theme] .fold1,
-[data-theme="dark"] .fold1 {
-  fill: #7194c4;
-  stroke: #7194c4;
-}
-body[data-ds-dark-theme] .fold2,
-[data-theme="dark"] .fold2 {
-  fill: #b8cbe4;
-  stroke: #b8cbe4;
+  stroke: var(--mark-0);
 }
 
 .powered {

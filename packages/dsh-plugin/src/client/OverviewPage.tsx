@@ -16,6 +16,7 @@ import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryP
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
+import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingChecklist, OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
@@ -180,12 +181,10 @@ function Overview({
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
-  const [menu, setMenu] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
-  const account = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
   const writing = useRef(false);
   const refreshPending = useRef(false);
@@ -269,20 +268,22 @@ function Overview({
     };
   }, []);
   useEffect(() => {
-    if (!menu) return;
-    const close = (event: PointerEvent) => {
-      if (event.target instanceof Node && !account.current?.contains(event.target)) setMenu(false);
+    // The DSH plugin leaves the host's Settings shortcut untouched.
+    if (!props.renderAsk) return;
+    const openSettings = () => setView("settings");
+    const shortcut = (event: KeyboardEvent) => {
+      if (event.metaKey && !event.ctrlKey && !event.altKey && event.key === ",") {
+        event.preventDefault();
+        openSettings();
+      }
     };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenu(false);
-    };
-    document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", shortcut);
+    window.addEventListener("kaitu:settings", openSettings);
     return () => {
-      document.removeEventListener("pointerdown", close);
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", shortcut);
+      window.removeEventListener("kaitu:settings", openSettings);
     };
-  }, [menu]);
+  }, [props.renderAsk]);
   const run = async (operation: () => Promise<unknown>) => {
     writing.current = true;
     setBusy(true);
@@ -359,7 +360,6 @@ function Overview({
     setGuideSource(source);
     setGuide(step);
     setView("overview");
-    setMenu(false);
     if (source) openSource(source);
   };
   const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
@@ -480,7 +480,6 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
-  const savedOnly = !!data && data.sync.received > 0 && !data.sync.organizer && !data.sync.needsReview;
   const selectedExplore = exploreModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
@@ -524,7 +523,7 @@ function Overview({
       <header className={css.top}>
         <div className={css.brand}>
           <KaituMark size={26} />
-          {t("人生开图", "Kaitu")}
+          <span className={css.brandName}>{t("开图", "Kaitu")}</span>
         </div>
         <nav className={css.tabs} aria-label={t("主要导航", "Main navigation")}>
           {[
@@ -538,97 +537,68 @@ function Overview({
             <button
               type="button"
               key={id}
+              title={
+                id === "overview"
+                  ? t(
+                      "现在要做的一件事、接下来的安排，以及等你决定的 AI 建议",
+                      "Your current focus, upcoming plans, and AI suggestions awaiting your decision",
+                    )
+                  : id === "explore"
+                    ? t("你的足迹、健康，还有装上的插件", "Your places, health, and installed plugins")
+                    : id === "records"
+                      ? t(
+                          "你留下的每一条原文，以及从中整理出的笔记、日程、健康、财务",
+                          "Your originals, and the notes, schedule, health and finances organized from them",
+                        )
+                      : t(
+                          "和 AI 聊你的资料；每次只发送你允许的那部分",
+                          "Chat with AI about your notes; only the parts you allow are sent",
+                        )
+              }
               aria-current={view === id ? "page" : undefined}
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
                 if (id === "explore") setExplore(firstExplore);
                 setRecord("");
-                setMenu(false);
               }}
             >
-              {label}
+              <NavigationIcon page={id} />
+              <span>{label}</span>
+              {id === "records" && !!data?.inboxNotes && (
+                <span
+                  className={css.reviewBadge}
+                  aria-label={t(`${data.inboxNotes} 条要你核对`, `${data.inboxNotes} to review`)}
+                >
+                  {data.inboxNotes}
+                </span>
+              )}
             </button>
           ))}
         </nav>
         <div className={css.tools}>
           <button
             type="button"
-            className={`${css.link} ${css.sync}`}
-            onClick={() =>
-              data?.sync.cloudOrganizer?.unread
-                ? setView("connections")
-                : savedOnly
-                  ? openRecord("inbox")
-                  : void refresh()
-            }
+            className={css.settingsButton}
+            aria-label={t("设置", "Settings")}
+            aria-current={view === "settings" ? "page" : undefined}
+            onClick={() => setView("settings")}
           >
-            <i className={css.dot} style={{ background: error ? "var(--news)" : "var(--health)" }} />
-            {error
-              ? t("读取失败", "Couldn't load")
-              : !data
-                ? t("正在读取…", "Loading…")
-                : data.sync.cloudOrganizer?.unread && data.sync.cloudOrganizer.away
-                  ? t(
-                      `电脑不在时 ${data.sync.cloudOrganizer.away.agent.name} 处理了 ${data.sync.cloudOrganizer.away.actions} 条`,
-                      `${data.sync.cloudOrganizer.away.agent.name} handled ${data.sync.cloudOrganizer.away.actions} while away`,
-                    )
-                  : data.sync.needsReview
-                    ? t(`${data.sync.needsReview} 条要核对`, `${data.sync.needsReview} to review`)
-                    : data.sync.received
-                      ? data.sync.organizer
-                        ? t("已收到，等待每日整理", "Received; waiting for the daily organizer")
-                        : t(
-                            `已保存 ${data.sync.received} 条原文`,
-                            `${data.sync.received} saved note${data.sync.received > 1 ? "s" : ""}`,
-                          )
-                      : data.sync.updatedAt
-                        ? t(
-                            `已存版本 ${stamp(data.sync.updatedAt)}`,
-                            `Version saved ${stamp(data.sync.updatedAt)}`,
-                          )
-                        : t("本机资料", "On this computer")}
+            <SettingsIcon />
+            <span className={css.settingsLabel}>{t("设置", "Settings")}</span>
           </button>
-          <div className={css.account} ref={account}>
-            <button
-              type="button"
-              className={css.avatar}
-              aria-label={t("个人档案、AI 与连接、设置", "Profile, AI & connections, settings")}
-              aria-haspopup="menu"
-              aria-expanded={menu}
-              onClick={() => setMenu(!menu)}
-            >
-              {personal?.avatar ? (
-                <img src={personal.avatar} alt="" />
-              ) : (
-                Array.from(personal?.name || t("我", "Me"))[0]
-              )}
-            </button>
-            {menu && (
-              <div className={css.menu} role="menu">
-                {[
-                  ["profile", t("个人档案", "Profile")],
-                  ["connections", t("AI 与连接", "AI & connections")],
-                  ["settings", t("设置", "Settings")],
-                ].map(([id, title]) => (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    key={id}
-                    onClick={() => {
-                      setView(id as View);
-                      setMenu(false);
-                    }}
-                  >
-                    {title}
-                  </button>
-                ))}
-                <button type="button" role="menuitem" onClick={() => startGuide()}>
-                  {t("开始使用", "Get started")}
-                </button>
-              </div>
+          <button
+            type="button"
+            className={css.avatar}
+            aria-label={t("个人档案", "Profile")}
+            onClick={() => setView("profile")}
+          >
+            {personal?.avatar ? (
+              <img src={personal.avatar} alt="" />
+            ) : (
+              Array.from(personal?.name || t("我", "Me"))[0]
             )}
-          </div>
+          </button>
         </div>
       </header>
       <main
@@ -1008,6 +978,7 @@ function Overview({
             {...child}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
+            restartGuide={() => startGuide()}
             onImportMemory={() => startGuide(5)}
             refreshWorkspace={refresh}
             onWorkspaceCreated={async () => {
