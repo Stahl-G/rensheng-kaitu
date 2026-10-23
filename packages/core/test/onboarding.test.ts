@@ -26,6 +26,7 @@ import {
   parseMemoryPaste,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  processInbox,
   readExploration,
   readLibrary,
   readMe,
@@ -38,6 +39,7 @@ import {
   saveOnboardingMatter,
   splitImportedBlobs,
   stringifyFrontmatter,
+  ulid,
   validateWorkspace,
 } from "../src/index.js";
 
@@ -258,6 +260,104 @@ it("每日整理起草并归档的原文不再算等待整理，草稿仍能核�
     expect(projected(sleep.source)?.status).toBe("organized");
     expect(listTasks(ws).map((task) => task.source)).toEqual([sleep.source]);
     expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it.each([false, true])("手机原文核对、采纳及只存原文保留来源，跨日归档=%s", async (archived) => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-phone-matter-"));
+  try {
+    const ws = await initWorkspace(join(root, "ws"));
+    const input = { goal: "整理手机笔记", current: "已有原文", next: "写一条摘要" };
+    for (const action of ["adopt", "keep-draft", "keep-raw"]) {
+      const name = `ios-3fa9c1d2-${ulid()}.note.md`;
+      const source = `inbox/notes/2020-01-02/${name}`;
+      const original = `合成手机原文 ${action}`;
+      ws.writeText(
+        `inbox/agents/${name}`,
+        stringifyFrontmatter(
+          {
+            agent: "你（iPhone）",
+            kind: "capture",
+            origin: "user",
+            date: "2020-01-02",
+            created: "2020-01-01T16:30:00Z",
+          },
+          original,
+        ),
+      );
+      await processInbox(ws, { stableMs: 0 });
+      const projected = () =>
+        readLibrary(ws, { section: "inbox" }).inbox.find((entry) => entry.originalSource === source);
+      expect(projected()).toMatchObject({ file: source, originalSource: source, status: "raw" });
+      expect(readOnboardingMatter(ws, source).text.trim()).toBe(original);
+      if (action !== "keep-raw") await draftOnboardingMatter(ws, source, input);
+      if (archived) {
+        const result = await inboxNoteDone(ws, source);
+        expect(result.path).not.toContain("2020-01-02");
+        expect(projected()?.file).toBe(result.path);
+      }
+      if (action !== "keep-raw") {
+        expect(projected()?.status).toBe("review");
+        expect(readOnboardingMatter(ws, source).draft).toEqual(input);
+        expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).draft?.source).toBe(source);
+      }
+      if (action === "adopt") {
+        const next = await adoptOnboardingMatter(ws, source, input);
+        expect(next.source).toBe(source);
+        expect(onboardingStatus(ws, { stateRoot: join(root, "state") }).next?.source).toBe(source);
+        const done = await changeOnboardingNext(ws, next.id, next.rev, "complete", "写好了摘要");
+        expect(done).toMatchObject({ source, status: "done", result: "写好了摘要" });
+      } else {
+        await keepOnboardingMatter(ws, source);
+        expect(listTasks(ws, { status: "all" }).some((task) => task.source === source)).toBe(false);
+      }
+      expect(readOnboardingMatter(ws, source)).toMatchObject({ source, draft: null });
+      expect(readOnboardingMatter(ws, source).text.trim()).toBe(original);
+      expect(projected()?.status).toBe("organized");
+    }
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("原文来源校验拒绝手机记录、伪文件名、错日期及越界路径，投影不暴露无效核对入口", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-capture-source-"));
+  try {
+    const ws = await initWorkspace(join(root, "ws"));
+    const name = `ios-3fa9c1d2-${ulid()}.note.md`;
+    const source = `inbox/notes/2020-01-02/${name}`;
+    const content = stringifyFrontmatter({ kind: "capture", date: "2020-01-02" }, "合成原文");
+    ws.writeText(source, content);
+    const input = { goal: "整理", current: "", next: "写摘要" };
+    for (const invalid of [
+      source.replace("3fa9c1d2", "not-a-device"),
+      source.replace(".note.md", ".records.jsonl"),
+      source.replace(".note.md", ".actions.jsonl"),
+      source.replace(name, "custom.md"),
+      source.replace("2020-01-02", "2020-01-03"),
+      source.replace("inbox/notes/", "inbox/notes/done/"),
+      source.replace("inbox/notes/", "inbox/agents/"),
+      `../${source}`,
+      `/${source}`,
+      `${source}\n`,
+      source.replace(name, `../${name}`),
+      source.replaceAll("/", "\\"),
+    ]) {
+      expect(() => readOnboardingMatter(ws, invalid)).toThrow(expect.objectContaining({ code: "BAD_ARGS" }));
+      await expect(draftOnboardingMatter(ws, invalid, input)).rejects.toMatchObject({ code: "BAD_ARGS" });
+      await expect(adoptOnboardingMatter(ws, invalid, input)).rejects.toMatchObject({ code: "BAD_ARGS" });
+      await expect(keepOnboardingMatter(ws, invalid)).rejects.toMatchObject({ code: "BAD_ARGS" });
+    }
+    const unsupported = "inbox/notes/2020-01-02/custom.md";
+    ws.writeText(unsupported, content);
+    expect(
+      readLibrary(ws, { section: "inbox" }).inbox.find((entry) => entry.file === unsupported)?.originalSource,
+    ).toBeNull();
+    expect(readOnboardingMatter(ws, source)).toMatchObject({ source, draft: null });
+    expect(listTasks(ws, { status: "all" })).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
