@@ -135,6 +135,9 @@ export function NewsExtra({ item }: { item: NewsItem }) {
     <details className={css.rich}>
       <summary className={css.expandHint}>{t("来源与详情", "Sources and details")}</summary>
       <div className={css.expanded}>
+        {item.image && <NewsImage src={item.image} className={css.image} source={item.source} />}
+        {item.summary && <p>{item.summary}</p>}
+        {item.comment && <p>{item.comment}</p>}
         {item.details?.map((detail) => (
           <p key={detail}>{detail}</p>
         ))}
