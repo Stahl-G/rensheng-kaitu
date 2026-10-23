@@ -1,5 +1,5 @@
 import { cpSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { expect, it } from "vitest";
 import { assertAgentWrite } from "../src/agent-file-policy.js";
 import { isTracked } from "../src/history.js";
@@ -113,7 +113,7 @@ it("来源占位撤下旧正文，恢复后再生成；画像占位不阻断修�
   const task = addRecord(ws, "task", { title: "可撤下的合成任务", status: "open" }, { by: "user" });
   configureProfilePublisher(ws, true);
   const source = ws.resolve(task.file);
-  const missing = source.replace(/([^/]+)$/, ".$1.icloud");
+  const missing = join(dirname(source), `.${basename(source)}.icloud`);
   renameSync(source, `${source}.saved`);
   writeFileSync(missing, "");
   expect(refreshUserProfile(ws).status).toBe("unavailable");

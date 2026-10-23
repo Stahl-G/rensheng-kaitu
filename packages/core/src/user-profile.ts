@@ -45,7 +45,7 @@ function sourceFingerprint(ws: Workspace): string {
   };
   for (const entry of readdirSync(ws.resolve("memory"))) {
     const path = `memory/${entry}`;
-    const original = placeholderOriginal(path) ?? path;
+    const original = (placeholderOriginal(path) ?? path).replaceAll("\\", "/");
     if (original.endsWith(".md") && original !== "memory/MEMORY.md") collect(original, () => true);
   }
   // Only project metadata is a source; do not traverse attachments or architecture exports.
