@@ -366,7 +366,7 @@ export function InboxPage({
     }
   };
   const filtered = entries?.filter((entry) => status === "all" || entry.status === status) ?? [];
-  const selectedEntry = filtered.find((entry) => entry.file === selected) ?? filtered[0];
+  const selectedEntry = filtered.find((entry) => entry.file === selected);
   const away = overview?.sync.cloudOrganizer?.away;
   const sourceLabel = (id: string) =>
     id === "all"
@@ -509,10 +509,10 @@ export function InboxPage({
                     <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}
-                {review && selectedEntry.source === "me" && selectedEntry.status !== "organized" && (
+                {review && selectedEntry.originalSource && selectedEntry.status !== "organized" && (
                   <InboxReview
                     key={selectedEntry.file}
-                    file={selectedEntry.file}
+                    file={selectedEntry.originalSource}
                     services={review}
                     done={() => {
                       setSelected(
@@ -526,12 +526,12 @@ export function InboxPage({
                 )}
                 {!review &&
                   onReview &&
-                  selectedEntry.source === "me" &&
+                  selectedEntry.originalSource &&
                   selectedEntry.status !== "organized" && (
                     <button
                       type="button"
                       className={`${css.btn} ${css["btn-primary"]}`}
-                      onClick={() => onReview(selectedEntry.file)}
+                      onClick={() => onReview(selectedEntry.originalSource as string)}
                     >
                       {t("核对整理结果", "Review organized results")}
                     </button>
@@ -587,7 +587,16 @@ function InboxReview({
       active = false;
     };
   }, [file, services.readOnboardingMatter]);
-  const cannotAdopt = busy || !draft.next.trim();
+  const cannotAdopt =
+    busy ||
+    (["goal", "current", "next"] as const).some((key) => {
+      const value = draft[key].trim();
+      return (
+        (key !== "current" && !value) ||
+        value.length > (key === "current" ? 4000 : 2000) ||
+        /[\r\n]/.test(value)
+      );
+    });
   const save = async (keep = false) => {
     if (busy || (!keep && cannotAdopt)) return;
     setBusy(true);
@@ -624,8 +633,13 @@ function InboxReview({
                   <textarea
                     value={draft[key]}
                     disabled={busy}
-                    maxLength={10000}
-                    onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+                    maxLength={key === "current" ? 4000 : 2000}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        [key]: event.target.value.replace(/[\r\n]+/g, " "),
+                      }))
+                    }
                   />
                 </label>
               ))}
