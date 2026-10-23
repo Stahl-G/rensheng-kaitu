@@ -807,6 +807,9 @@ export function DirectionsPage(props: DirectionsPageProps) {
               const attempt =
                 ownAttempts.find((e) => e.status === "active") ??
                 ownAttempts.find((e) => e.status === "planned");
+              const hypothesis = directionText(d.hypothesis, 160);
+              const budget = directionText(attempt?.budget, 100);
+              const criteria = directionText(attempt?.criteria, 160);
               const change = async (status: Direction["status"]) => {
                 setBusy(true);
                 setError(null);
@@ -850,23 +853,31 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         {directionText(attempt.action, 100)}
                       </p>
                     )}
-                    {attempt && (
-                      <>
-                        <p className={css.ideaNext}>
-                          <span>{t("投入上限", "Budget")}</span>
-                          {directionText(attempt.budget, 100)}
-                        </p>
-                        <p className={css.ideaNext}>
-                          <span>{t("看什么", "What to observe")}</span>
-                          {directionText(attempt.criteria, 160)}
-                        </p>
-                        <p className={css.ideaNext}>
-                          <span>{t("期限", "Deadline")}</span>
-                          {attempt.deadline}
-                        </p>
-                      </>
+                    {budget && (
+                      <p className={css.ideaNext}>
+                        <span>{t("投入上限", "Budget")}</span>
+                        {budget}
+                      </p>
                     )}
-                    {!attempt && (
+                    {criteria && (
+                      <p className={css.ideaNext}>
+                        <span>{t("看什么", "What to observe")}</span>
+                        {criteria}
+                      </p>
+                    )}
+                    {attempt?.deadline && (
+                      <p className={css.ideaNext}>
+                        <span>{t("期限", "Deadline")}</span>
+                        {attempt.deadline}
+                      </p>
+                    )}
+                    {!attempt && hypothesis && (
+                      <p className={css.ideaNext}>
+                        <span>{t("想验证", "What to test")}</span>
+                        {hypothesis}
+                      </p>
+                    )}
+                    {!attempt && !hypothesis && (
                       <p className={css.ideaNext}>{t("还没有安排下一步", "No next step planned yet")}</p>
                     )}
                   </div>
