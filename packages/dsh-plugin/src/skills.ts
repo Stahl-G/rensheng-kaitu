@@ -12,17 +12,17 @@ import type {
 
 export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径都相对于开图工作区，与会话 cwd 无关。
 技能中的 CLI 步骤用下列开图工具完成，无需运行 shell、安装 CLI、注册 MCP 或另开 kaitu ui。
-- onboarding status/choose/matter-read/matter-draft/preview/confirm/setup-preview/setup-confirm/cancel → kaitu_onboarding（action）；引导内容取 status 的 content。
+- onboarding status/choose/matter-read/matter-draft/preview/setup-preview/setup-confirm/cancel → kaitu_onboarding（action）；引导内容取 status 的 content；搬记忆的 confirm 仅供用户界面使用。
 - status / record schema → kaitu_status；record add → kaitu_add_record；地点经历 → kaitu_add_experience。
 - record list / update / delete → kaitu_records；chats search → kaitu_search_chats。
 - 读取、列目录、写 Markdown/JSON → kaitu_workspace（read/list/write）；创建模块时一次提交 module.json、STATUS.md 和 schema。
-- validate → kaitu_validate；snapshot / agents-md → kaitu_workspace（snapshot/agents-md）；history → kaitu_history；确认恢复 → kaitu_restore。
-- memory list/search/add/update/rm/import → kaitu_memory；批量 import 先 dryRun，用户确认后使用完全相同的候选。
+- validate → kaitu_validate；snapshot / agents-md → kaitu_workspace（snapshot/agents-md）；history → kaitu_history；恢复建议 → kaitu_restore；实际恢复由用户在设置 → 版本历史里确认。
+- memory list/search/add/update/rm/import → kaitu_memory；批量 import 只预览；实际导入由用户在搬记忆界面粘贴、核对并确认。
 - 学习主题 → kaitu_learning（list/read/start/save）；用 save 追加用户实际表达的理解、疑问与下一步，不把 AI 讲解当作学会。
 - 概念卡/自判小测 → kaitu_learning_card；互动模拟 → kaitu_learning_widget。先问后展示，答案不自动回传模型。PPT 仅用户明确要求时用已安装的 openmaic_slide；不默认调用 openmaic_generate。
 - task add/list/done/cancel → kaitu_tasks；inbox notes/done/process → kaitu_inbox。
 - project list/new/show/link/set/log/sync → kaitu_projects；项目内文件用 project-read/project-write；自定义视图用 project_view_write（slug、view），格式按 project 技能。
-- import ${fileImportSources.join("/")} → kaitu_import，先 dryRun，再确认执行；文件用用户指定的本机绝对路径或工作区内相对路径。
+- import ${fileImportSources.join("/")} → kaitu_import，只预览，实际导入由用户在已有导入界面选择文件、核对并确认；文件用用户指定的本机绝对路径或工作区内相对路径。
 - photo add/list/rm → kaitu_photos；头像用「关于我」的上传入口。
 - drive status/enable/disable → kaitu_drive。迁移后工具和技能自动切换到新工作区。
 - 每日整理按 ORGANIZER.md 执行，归档交接用 kaitu_workspace archive-handoffs。

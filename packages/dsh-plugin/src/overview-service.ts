@@ -15,6 +15,7 @@ import {
   type HandoverPack,
   type Hometown,
   type ImportSource,
+  type JobsData,
   KaituError,
   type LearningCheckinInput,
   type LearningTopic,
@@ -101,6 +102,7 @@ import {
   readExploration,
   readExplorationSource,
   readHealthPage,
+  readJobs,
   readLearning,
   readLibrary,
   readLibraryDocument,
@@ -571,6 +573,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("replaceMemory")
   async replaceMemory(file: string, candidate: MemoryInput, expected: MemoryExpectation): Promise<void> {
     await this.write(() => replaceMemory(this.workspace, file, candidate, { by: "user", expected }));
+  }
+
+  @Remote("jobs")
+  async jobs(): Promise<JobsData> {
+    return readJobs(this.workspace);
   }
 
   @Remote("news")

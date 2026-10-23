@@ -3049,3 +3049,8 @@
     scroll-behavior: auto !important;
   }
 }
+.plugin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
