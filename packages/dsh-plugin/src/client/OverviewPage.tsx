@@ -1434,6 +1434,7 @@ function Overview({
         {["profile", "connections", "settings"].includes(view) && (
           <PersonalPages
             {...child}
+            builtinAi={!!props.renderAsk}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             restartGuide={() => startGuide()}

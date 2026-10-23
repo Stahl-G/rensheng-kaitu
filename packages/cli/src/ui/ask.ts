@@ -63,7 +63,7 @@ export interface AskService {
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
   send(id: string, text: string, images?: AskAttachment[]): Promise<unknown>;
-  settings(): Promise<{
+  settings(resolveImages?: boolean): Promise<{
     configured: boolean;
     search?: NetworkSearchSettings;
     supportsImages?: boolean;
@@ -413,7 +413,9 @@ export function createAskService(options: {
       if ((row.workspace ?? workspaceKey) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");
       const epoch = generation;
-      const connection = await options.settings();
+      const connection = await options.settings(
+        Array.isArray(images) && images.some((file) => file && !("kind" in file && file.kind === "file")),
+      );
       ready();
       if (epoch !== generation) throw new KaituError("AI 连接已改变，请重新发送", "AI_CONNECTION");
       const backend = connection.backend ?? "dsh";
@@ -443,10 +445,7 @@ export function createAskService(options: {
         images.some((file) => !file || typeof file.data !== "string" || file.data.length > 40 * 1024 * 1024)
       )
         throw new KaituError("每次最多添加 10 个附件，单个附件不超过 25MB", "AI_ATTACHMENT");
-      if (
-        images.some((file) => !("kind" in file && file.kind === "file")) &&
-        !(await options.settings()).supportsImages
-      )
+      if (images.some((file) => !("kind" in file && file.kind === "file")) && !connection.supportsImages)
         throw new KaituError("当前连接未启用图片，请切换模型后重试", "AI_IMAGE");
       ready();
       const blocks = [
@@ -564,8 +563,8 @@ export function createAskService(options: {
       options.workspace = workspace;
       relocating = false;
     },
-    settings: async () => {
-      const settings = await options.settings();
+    settings: async (resolveImages = false) => {
+      const settings = await options.settings(resolveImages);
       return { ...settings, mode: effectiveAskMode(settings, options.connection) };
     },
     support: options.support,

@@ -60,7 +60,7 @@ interface Settings {
   baseURL?: string;
   api?: string;
   protocols: { id: string; name: string }[];
-  supportsImages: boolean;
+  supportsImages?: boolean;
   providers: Provider[];
   /** 已添加的服务商和模型，存在 DSH 的 profile 里。 */
   saved?: { provider: string; name: string; models: string[] }[];
@@ -313,6 +313,7 @@ export function AskPage({
   };
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
+  const [catalogStatus, setCatalogStatus] = useState<string | null>(null);
   const selectThread = (id: string | null, follow = false) => {
     nearBottom.current = !id || follow;
     if (!nearBottom.current && scroll.current) scroll.current.scrollTop = 0;
@@ -528,14 +529,15 @@ export function AskPage({
     </div>
   );
   useEffect(() => {
-    let active = true;
+    if (!active) return;
+    let current = true;
     void Promise.all([
       call<Settings>("askSettings"),
       call<Automation>("automation"),
       call<Thread[]>("askList"),
     ])
       .then(([ai, auto, list]) => {
-        if (!active) return;
+        if (!current) return;
         setSettings(ai);
         setAsked(auto.asked);
         if (auto.asked) setAutomation(auto.tasks);
@@ -546,20 +548,21 @@ export function AskPage({
         }
       })
       .catch((err) => {
-        if (active) setError(err.message);
+        if (current) setError(err.message);
       });
     return () => {
-      active = false;
+      current = false;
     };
-  }, []);
+  }, [active]);
   useEffect(() => {
+    if (!active) return;
     const refresh = () =>
       void call<Settings>("askSettings")
         .then(setSettings)
         .catch((err) => setError(err.message));
     window.addEventListener("kaitu-ai-changed", refresh);
     return () => window.removeEventListener("kaitu-ai-changed", refresh);
-  }, []);
+  }, [active]);
   useEffect(() => {
     if (step && active) dialog.current?.showModal();
     else dialog.current?.close();
@@ -652,16 +655,15 @@ export function AskPage({
       );
       return;
     }
-    if (
-      files.some((file) => file.type.startsWith("image/")) &&
-      settings?.configured &&
-      !settings.supportsImages
-    ) {
-      setError(t("当前模型不支持图片", "This model does not support images"));
-      return;
-    }
     setReadingFiles(true);
     try {
+      if (files.some((file) => file.type.startsWith("image/"))) {
+        const connection =
+          settings.supportsImages === undefined ? await call<Settings>("askSettings", true) : settings;
+        setSettings(connection);
+        if (!connection.supportsImages)
+          throw new Error(t("当前模型不支持图片", "This model does not support images"));
+      }
       const added = await Promise.all(
         files.map(
           (file) =>
@@ -704,11 +706,24 @@ export function AskPage({
     setAtQuery(undefined);
     input.current?.focus();
   };
+  const loadSavedModels = () => {
+    setCatalogStatus("");
+    void call<Settings>("askSupport", "builtinSettings", { saved: true })
+      .then((catalog) => {
+        setSettings((current) => (current ? { ...current, saved: catalog.saved } : current));
+        setCatalogStatus(null);
+      })
+      .catch((err) => setCatalogStatus(err.message));
+  };
   const openModelMenu = () => {
     if (!settings?.configured) return;
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
-    if (modelMenu || !agent) return;
+    if (modelMenu) return;
+    if (!agent) {
+      loadSavedModels();
+      return;
+    }
     setAgentModels(null);
     setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
@@ -1341,7 +1356,18 @@ export function AskPage({
                           ))}
                       </>
                     ))}
+                  {settings?.choice !== "local" && catalogStatus !== null && (
+                    <p role={catalogStatus ? "alert" : "status"}>
+                      {catalogStatus || t("正在读取模型…", "Loading models…")}
+                      {catalogStatus && (
+                        <button type="button" onClick={loadSavedModels}>
+                          {t("重试读取", "Retry loading")}
+                        </button>
+                      )}
+                    </p>
+                  )}
                   {settings?.choice !== "local" &&
+                    catalogStatus === null &&
                     settings?.saved?.flatMap((row) =>
                       row.models.map((id) => (
                         <button
@@ -1427,7 +1453,7 @@ export function AskPage({
               onSaved={async () => {
                 const ai = await call<Settings>("askSettings");
                 setSettings(ai);
-                if (!ai.supportsImages) setAttachments([]);
+                if (ai.supportsImages === false) setAttachments([]);
                 setSessionReferences([]);
                 setStep(ai.choice !== "local" && !asked ? 2 : 0);
               }}

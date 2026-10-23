@@ -1,8 +1,10 @@
+import type { NetworkSearchSettings } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "./i18n.js";
 
 interface AiConnection {
   available?: boolean;
+  search?: NetworkSearchSettings;
   configured: boolean;
   choice?: "builtin" | "external" | "local";
   provider: string;
@@ -29,6 +31,7 @@ async function call<T>(method: string, ...args: unknown[]): Promise<T> {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
     body: JSON.stringify(args),
+    ...(["askSettings", "askSupport"].includes(method) ? { signal: AbortSignal.timeout(30000) } : {}),
   });
   const value = await response.json();
   if (!response.ok) throw new Error(value.error ?? "连接未完成，请重试");
@@ -41,11 +44,13 @@ export function useAiConnection({
   localOnly = false,
   onSaved,
   onSaving,
+  onLoaded,
 }: {
   focusKey?: number;
   localOnly?: boolean;
   onSaved: () => Promise<void>;
   onSaving?: (saving: boolean) => void;
+  onLoaded?: (settings: AiConnection) => void;
 }) {
   const t = useT();
   const [settings, setSettings] = useState<AiConnection | null>(null);
@@ -73,15 +78,14 @@ export function useAiConnection({
   // biome-ignore lint/correctness/useExhaustiveDependencies: Retry reloads the existing connection catalogue.
   useEffect(() => {
     let active = true;
+    setError("");
     void (async () => {
       try {
         const current = await call<AiConnection>("askSettings");
-        const catalog =
-          current.choice === "local"
-            ? await call<AiConnection>("askSupport", "builtinSettings", {})
-            : current;
+        const catalog = !localOnly ? await call<AiConnection>("askSupport", "builtinSettings", {}) : current;
         if (!active) return;
         setSettings({ ...catalog, localAgents: current.localAgents, localAgent: current.localAgent });
+        onLoaded?.(catalog);
         setForm({
           choice: localOnly || (!focusKey && current.choice === "local") ? "local" : "builtin",
           provider: catalog.provider,
@@ -188,6 +192,7 @@ export function useAiConnection({
         result.choice === "local" ? current : { ...result, localAgents: current?.localAgents },
       );
       setConnected(`${result.localAgent?.name ?? result.providerName} · ${result.model}`);
+      onLoaded?.(result);
       setNotice(
         result.choice === "local"
           ? t(

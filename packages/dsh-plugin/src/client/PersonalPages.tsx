@@ -5,7 +5,7 @@ import type {
   OrganizerStatus,
   SyncProvider,
 } from "@kaitu/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
@@ -72,6 +72,7 @@ export function PersonalPages(
       view: PersonalView;
       navigate: (view: PersonalView) => void;
       manageAi: () => void;
+      builtinAi: boolean;
       aiKeyRequest?: number;
       restartGuide: () => void;
       refreshWorkspace: () => Promise<void>;
@@ -97,16 +98,49 @@ export function PersonalPages(
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
   const [workspacePath, setWorkspacePath] = useState("");
+  const [ai, setAi] = useState<SettingsData["ai"]>(null);
+  const [calendarError, setCalendarError] = useState("");
+  const loadAttempt = useRef(0);
   const refresh = useCallback(async () => {
-    try {
-      const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
-      setData(settings);
-      setCalendarPush(calendar);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [props.loadSettings, props.loadCalendarPush]);
+    const attempt = ++loadAttempt.current;
+    const read = async <T,>(promise: Promise<T>): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error(t("读取超时，请重试", "Loading timed out. Retry."))),
+              10000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const current = () => attempt === loadAttempt.current;
+    const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+    setError("");
+    setCalendarError("");
+    const base = read(props.loadSettings())
+      .then((settings) => {
+        if (current()) setData(settings);
+      })
+      .catch((err) => {
+        if (current()) setError(message(err));
+      });
+    await Promise.all([
+      base,
+      read(props.loadCalendarPush())
+        .then((calendar) => {
+          if (current()) setCalendarPush(calendar);
+        })
+        .catch((err) => {
+          if (current()) setCalendarError(message(err));
+        }),
+    ]);
+  }, [props.loadSettings, props.loadCalendarPush, t]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -133,7 +167,7 @@ export function PersonalPages(
       const automation = await props.configureAutomation(tasks, times);
       setData((current) => (current ? { ...current, automation } : current));
     });
-  const search = data?.ai?.search;
+  const search = ai?.search;
   const selectedSearch = search?.providers.find((item) => item.id === searchProvider);
   const saveSearch = (remove = false) =>
     run(
@@ -150,6 +184,7 @@ export function PersonalPages(
         });
         const value = await response.json();
         if (!response.ok) throw new Error(value.error ?? "搜索设置未保存，请重试");
+        setAi((current) => (current ? { ...current, search: value } : current));
         setSearchKey("");
         window.dispatchEvent(new Event("kaitu-ai-changed"));
       },
@@ -244,14 +279,25 @@ export function PersonalPages(
         <h1>{section === "overview" ? t("设置", "Settings") : t(item[3], item[4])}</h1>
         {error && (
           <p role="alert" className={css.error}>
-            {error}
+            {error}{" "}
+            <button type="button" onClick={() => void refresh()}>
+              {t("重试读取", "Retry loading")}
+            </button>
+          </p>
+        )}
+        {calendarError && (
+          <p role="alert" className={css.error}>
+            {calendarError && `${t("日历状态读取失败", "Could not read calendar status")}: ${calendarError}`}{" "}
+            <button type="button" onClick={() => void refresh()}>
+              {t("重试读取", "Retry loading")}
+            </button>
           </p>
         )}
         {receipt && <output className={css.small}>{receipt}</output>}
         {section === "profile" ? (
           <MePage {...props} />
         ) : !data ? (
-          <p>{t("正在读取设置…", "Loading settings…")}</p>
+          !error && <p>{t("正在读取设置…", "Loading settings…")}</p>
         ) : (
           <>
             {section === "overview" && (
@@ -285,11 +331,13 @@ export function PersonalPages(
                     [
                       [
                         "ai",
-                        data.ai
-                          ? data.ai.configured
-                            ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}`
+                        ai
+                          ? ai.configured
+                            ? `${ai.providerName ?? "AI"} · ${ai.model}`
                             : t("还没连接", "Not connected")
-                          : t("由 DSH 管理", "Managed by DSH"),
+                          : props.builtinAi
+                            ? t("打开 AI 设置查看", "Open AI settings to check")
+                            : t("由 DSH 管理", "Managed by DSH"),
                       ],
                       [
                         "phone",
@@ -590,8 +638,8 @@ export function PersonalPages(
             )}
             {section === "ai" && (
               <>
-                {data.ai ? (
-                  <AiSettings focusKey={props.aiKeyRequest} onSaved={refresh} />
+                {props.builtinAi ? (
+                  <AiSettings focusKey={props.aiKeyRequest} onSaved={refresh} onLoaded={setAi} />
                 ) : (
                   <section className={css.sec}>
                     <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
@@ -615,7 +663,7 @@ export function PersonalPages(
                     </div>
                   </section>
                 )}
-                {data.ai?.configured && !data.automation.asked && (
+                {ai?.configured && !data.automation.asked && (
                   <p>
                     {t("要让开图每天帮你整理吗？", "Would you like Kaitu to organize each day?")}{" "}
                     <button type="button" className={css.link} onClick={() => select("automation")}>
@@ -712,7 +760,7 @@ export function PersonalPages(
             )}
             {section === "local-ai" && (
               <>
-                {data.ai && <AiSettings localOnly onSaved={refresh} />}
+                {props.builtinAi && <AiSettings localOnly onSaved={refresh} onLoaded={setAi} />}
                 <section className={css.sec} id="local-ai">
                   <div className={css["sec-head"]}>
                     <h2 className={css.eyebrow}>

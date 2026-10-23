@@ -22,7 +22,6 @@ import {
   type OnboardingSetupInput,
   type OnboardingTarget,
   type ProjectGoal,
-  type SettingsData,
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
@@ -269,13 +268,13 @@ export async function productRequest(
       case "askSetMode":
         return ask.setMode(text(0), text(1) as AskMode, args[2] === true);
       case "askSettings": {
-        const settings = await ask.settings();
+        const settings = await ask.settings(args[0] === true);
         if (settings.configured) recordOnboardingAiConnection(ws, "问问");
         return settings;
       }
       case "askConfigure": {
         const result = await ask.configure((args[0] ?? {}) as Record<string, unknown>);
-        if ((await ask.settings()).configured) recordOnboardingAiConnection(ws, "问问");
+        if ((result as { configured?: boolean }).configured) recordOnboardingAiConnection(ws, "问问");
         return result;
       }
       case "askList":
@@ -338,11 +337,8 @@ export async function productRequest(
       return completeNext(ws, text(0), text(1));
     case "workspaceBackup":
       return workspaceBackupRequest(ws, text(0), args[1]);
-    case "settings": {
-      const data: SettingsData = await readSettings(ws);
-      data.ai = ask ? await ask.settings() : null;
-      return data;
-    }
+    case "settings":
+      return readSettings(ws);
     case "setFinanceAccess":
       return setFinanceAccess(ws, text(0) as AgentConnectionId, args[1] as boolean);
     case "exportWorkspace":
