@@ -249,6 +249,8 @@ export function AskPage({
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
+  onToday,
+  onSettings,
 }: {
   workspace: string;
   active?: boolean;
@@ -257,6 +259,8 @@ export function AskPage({
   configureRequest?: number;
   configureBuiltin?: boolean;
   onConnections?: () => void;
+  onToday?: () => void;
+  onSettings?: (section: "ai" | "local-ai") => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -289,6 +293,37 @@ export function AskPage({
       if (configureBuiltin) setChoice("builtin");
     }
   }, [configureRequest, configureBuiltin]);
+  const [showThreads, setShowThreads] = useState(false);
+  const [checkingLocal, setCheckingLocal] = useState(false);
+  const connectKey = () => {
+    if (onSettings) {
+      onSettings("ai");
+      return;
+    }
+    setChoice("builtin");
+    setStep(1);
+    requestAnimationFrame(() =>
+      dialog.current?.querySelector<HTMLInputElement>('input[type="password"]')?.focus(),
+    );
+  };
+  const checkLocal = async () => {
+    setCheckingLocal(true);
+    setError("");
+    try {
+      const ai = await call<Settings>("askSettings");
+      setSettings(ai);
+      setAgentId(ai.localAgent?.id ?? ai.localAgents?.[0]?.id ?? "codebuddy");
+      if (onSettings) onSettings("local-ai");
+      else {
+        setChoice("local");
+        setStep(1);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCheckingLocal(false);
+    }
+  };
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
   const selectThread = (id: string | null, follow = false) => {
@@ -548,8 +583,7 @@ export function AskPage({
         setThreads(list);
         setLoaded(true);
         if (!configurationRequested.current) {
-          if (!ai.choice && !ai.configured) setStep(1);
-          else if (ai.configured && !auto.asked && ai.choice !== "local") setStep(2);
+          if (ai.configured && !auto.asked && ai.choice !== "local") setStep(2);
         }
       })
       .catch((err) => {
@@ -650,6 +684,7 @@ export function AskPage({
     }
   };
   const addFiles = async (files: File[]) => {
+    if (!settings?.configured) return;
     if (!files.length || busy || readingFiles) return;
     setError("");
     if (attachments.length + files.length > 10 || files.some((file) => file.size > 25 * 1024 * 1024)) {
@@ -848,8 +883,10 @@ export function AskPage({
       </div>
     );
   return (
-    <div className={css.chat}>
-      <nav className={css.threads} aria-label={t("对话", "Conversations")}>
+    <div
+      className={`${css.chat} ${loaded && !settings?.configured ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+    >
+      <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
           type="button"
           className={css.newThread}
@@ -886,6 +923,14 @@ export function AskPage({
         <div className={css.mobileNew}>
           <button
             type="button"
+            aria-expanded={showThreads}
+            aria-controls="ask-threads"
+            onClick={() => setShowThreads((value) => !value)}
+          >
+            {t("对话", "Conversations")}
+          </button>
+          <button
+            type="button"
             onClick={() => {
               selectThread(null);
               setDraft("");
@@ -905,24 +950,78 @@ export function AskPage({
               nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 40;
           }}
         >
-          {!events.some((event) => event.type === "user/message") && (
-            <div className={css.welcome}>
-              <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
-              <div className={css.suggestions}>
-                {questions.map((question) => (
-                  <button
-                    type="button"
-                    key={question}
-                    onClick={() => {
-                      setDraft(question);
-                      input.current?.focus();
-                    }}
-                  >
-                    {question}
+          {loaded && !settings?.configured ? (
+            <div className={css.noKey}>
+              <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
+              <p>
+                {t(
+                  "开图本身不带 AI。接上以后，问问只读你允许的那部分资料来回答；每次发出去的内容都写在输入框下面。",
+                  "Kaitu does not include an AI. Once connected, Ask reads the data you allow; the details appear below the composer before you send.",
+                )}
+              </p>
+              <section className={css.routes} aria-label={t("接 AI 的方式", "Ways to connect AI")}>
+                <div>
+                  <span>
+                    <strong>{t("填一个 DeepSeek Key", "Add a DeepSeek key")}</strong>{" "}
+                    <small>{t("推荐新手", "Good for starters")}</small>
+                    <p>
+                      {t("用自己的 Key 连接，按用量付费。", "Connect with your own key and pay for usage.")}
+                    </p>
+                  </span>
+                  <button type="button" className={css.routePrimary} onClick={connectKey}>
+                    {t("去填 Key", "Add a key")}
                   </button>
-                ))}
-              </div>
+                </div>
+                <div>
+                  <span>
+                    <strong>{t("用这台电脑上已经有的 AI", "Use AI already on this computer")}</strong>
+                    <p>
+                      {t(
+                        "装了 Claude Code 或 Codex 的话，可以直接接上。",
+                        "Connect an installed Agent such as Claude Code or Codex.",
+                      )}
+                    </p>
+                  </span>
+                  <button type="button" disabled={checkingLocal} onClick={() => void checkLocal()}>
+                    {checkingLocal ? t("正在检查…", "Checking…") : t("检查一下", "Check this computer")}
+                  </button>
+                </div>
+                <div>
+                  <span>
+                    <strong>{t("先不接", "Not now")}</strong>
+                    <p>
+                      {t(
+                        "记录、原文、日程、足迹、健康都照常能用。",
+                        "Notes, originals, calendar, footprints and health remain available.",
+                      )}
+                    </p>
+                  </span>
+                  <button type="button" disabled={!onToday} onClick={onToday}>
+                    {t("回到今天", "Back to Today")}
+                  </button>
+                </div>
+              </section>
             </div>
+          ) : (
+            !events.some((event) => event.type === "user/message") && (
+              <div className={css.welcome}>
+                <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
+                <div className={css.suggestions}>
+                  {questions.map((question) => (
+                    <button
+                      type="button"
+                      key={question}
+                      onClick={() => {
+                        setDraft(question);
+                        input.current?.focus();
+                      }}
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
           )}
           {events.map((event, index) => {
             const data = event.data;
@@ -1061,14 +1160,6 @@ export function AskPage({
             {error}
           </p>
         )}
-        {loaded && !settings?.configured && (
-          <div className={css.connect}>
-            <span>{t("连接 AI，就能在这里聊。", "Connect AI to start chatting here.")}</span>
-            <button type="button" onClick={() => setStep(1)}>
-              {t("连接 AI", "Connect AI")}
-            </button>
-          </div>
-        )}
         <form
           className={css.composer}
           onDragOver={(event) => {
@@ -1097,10 +1188,18 @@ export function AskPage({
           <textarea
             aria-label={t("给开图发消息", "Message Kaitu")}
             ref={input}
+            disabled={!settings?.configured}
             rows={2}
             value={draft}
             maxLength={100000}
-            placeholder={t("问问开图，或者让它帮你记一件事", "Ask Kaitu or tell it something to remember")}
+            placeholder={
+              settings?.configured
+                ? t("问问开图，或者让它帮你记一件事", "Ask Kaitu or tell it something to remember")
+                : t(
+                    "接上 AI 之后就能问，比如“我这周在忙什么”",
+                    "Once connected, ask something like “What am I working on this week?”",
+                  )
+            }
             onChange={(event) => {
               setDraft(event.target.value);
               cursor.current = event.target.selectionStart;
@@ -1265,7 +1364,7 @@ export function AskPage({
             <button
               type="button"
               className={css.model}
-              disabled={busy || settings?.choice === "local"}
+              disabled={busy || !settings?.configured || settings?.choice === "local"}
               onClick={() => {
                 cursor.current = input.current?.selectionStart ?? draft.length;
                 setAtQuery(undefined);
@@ -1412,8 +1511,8 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `${settings.providerName} · ${runtimeLabel}`
-            : t("Enter 发送 · Shift + Enter 换行", "Enter to send · Shift + Enter for a new line")}
+            ? `${settings.providerName} · ${runtimeLabel} · ${localRuntime ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve") : t("只读写允许的开图资料，不运行命令", "Reads and writes allowed Kaitu data; cannot run commands")}`
+            : t("接上 AI 后才能发送", "Connect an AI before sending")}
         </p>
       </section>
       <dialog
