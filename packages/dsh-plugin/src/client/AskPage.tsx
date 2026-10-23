@@ -166,7 +166,8 @@ function NativeApproval({
   event,
   resolution,
   session,
-}: { event: ChatEvent; resolution?: ChatEvent; session: string }) {
+  disabled,
+}: { event: ChatEvent; resolution?: ChatEvent; session: string; disabled: boolean }) {
   const t = useT();
   const [responding, setResponding] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -188,7 +189,7 @@ function NativeApproval({
     cancelled: t("请求已取消，未批准", "Request cancelled without approval"),
   };
   const answer = async (optionId: string | null) => {
-    if (responding || submitted || status) return;
+    if (disabled || responding || submitted || status) return;
     setResponding(true);
     setError("");
     try {
@@ -221,13 +222,17 @@ function NativeApproval({
             </output>
           )}
           <div className={`${css.actions} ${css.approvalActions}`}>
-            <button type="button" disabled={responding || submitted} onClick={() => void answer(null)}>
+            <button
+              type="button"
+              disabled={disabled || responding || submitted}
+              onClick={() => void answer(null)}
+            >
               {t("拒绝这一次", "Reject")}
             </button>
             {allow && (
               <button
                 type="button"
-                disabled={responding || submitted}
+                disabled={disabled || responding || submitted}
                 title={allow.name}
                 onClick={() => void answer(allow.optionId)}
               >
@@ -1002,6 +1007,7 @@ export function AskPage({
                 <NativeApproval
                   key={`${selected}:${event.id}`}
                   session={selected ?? ""}
+                  disabled={!settings?.configured}
                   event={event}
                   resolution={events.find(
                     (item) => item.type === "approval/resolved" && item.data.requestId === data.requestId,
