@@ -46,6 +46,8 @@ export function PersonalPages(
     MePageProps & {
       channelSettings?: ChannelRequest;
       channelFocus?: boolean;
+      focusSection?: "local-ai" | "cloud-organizer";
+      onSectionFocused?: () => void;
       onChannelFocused?: () => void;
       view: PersonalView;
       navigate: (view: PersonalView) => void;
@@ -91,6 +93,11 @@ export function PersonalPages(
     if (props.view === "connections" && data?.organizer.unread)
       document.getElementById("cloud-organizer")?.scrollIntoView({ block: "center" });
   }, [props.view, data?.organizer.unread]);
+  useEffect(() => {
+    if (props.view !== "connections" || !data || !props.focusSection) return;
+    document.getElementById(props.focusSection)?.scrollIntoView({ block: "center" });
+    props.onSectionFocused?.();
+  }, [props.view, props.focusSection, props.onSectionFocused, data]);
   const run = async (operation: () => Promise<unknown>, message = t("已保存", "Saved")) => {
     setBusy(true);
     setError("");
@@ -461,7 +468,7 @@ export function PersonalPages(
                 </div>
               </section>
             )}
-            <section className={css.sec}>
+            <section className={css.sec} id="local-ai">
               <div className={css["sec-head"]}>
                 <h2 className={css.eyebrow}>
                   {t("这台电脑上的 AI（进阶）", "AI on this computer (advanced)")}
