@@ -471,6 +471,16 @@ export async function productRequest(
           pick(lang, "先到「AI 与连接」连上 AI，开图才能帮你看", "Connect AI in AI & Connections first"),
           "AI_NOT_CONFIGURED",
         );
+      // 本机 Agent 自带读文件和命令工具，开图没法保证它只收发文字；这次只用内置模型。
+      if (((await ask.settings()).backend ?? "dsh") !== "dsh")
+        throw new KaituError(
+          pick(
+            lang,
+            "方向页的看法只用内置模型生成：本机 Agent 会带自己的读文件和命令工具，开图没法保证它只收发文字。请到「AI 与连接」切到内置模型再看。",
+            "Kaitu's view uses the built-in model only: local Agents bring their own file and command tools, so Kaitu can't keep them text-only. Switch to a built-in model in AI & Connections.",
+          ),
+          "AI_NOT_CONFIGURED",
+        );
       const service = ask;
       // 等 AI 是外部的事：立刻返回「正在看」，结果写进本机缓存，界面再读。
       return generateDirectionMap(

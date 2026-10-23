@@ -137,7 +137,7 @@ export function DirectionMap({
         {failure && (
           <p className={css.error} role="alert">
             {failure}{" "}
-            {/AI_NOT_CONFIGURED|连上 AI|Connect AI/.test(failure) && onConnect && (
+            {/连上 AI|AI 与连接|Connect AI|AI & Connections/.test(failure) && onConnect && (
               <button type="button" className={css.link} onClick={onConnect}>
                 {t("去连接 AI", "Connect AI")}
               </button>

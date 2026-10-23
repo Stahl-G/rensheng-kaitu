@@ -48,10 +48,12 @@ export async function createAgentRuntime(options: {
   path?: string;
   mcp: McpCommand;
   env?: NodeJS.ProcessEnv;
-  /** 只收发文字：不挂开图工具，所有权限请求直接拒绝。 */
+  /** 只收发文字的一次性对话。本机 Agent 自带读文件和命令工具，开图无法事前关掉，所以不接。 */
   textOnly?: boolean;
 }): Promise<AskRuntime> {
   const { agent } = options;
+  if (options.textOnly)
+    throw new KaituError(`${agent.name} 自带读文件和命令工具，不能用于只收发文字的对话`, "AI_CONNECTION");
   const env = agentEnvironment(agent, options.env);
   const bin = options.path;
   if (!bin)
@@ -127,7 +129,7 @@ export async function createAgentRuntime(options: {
     running.set(id, state);
     state.rpc = connectAcp(child, {
       permission(params) {
-        if (state.cancelled || closed || options.textOnly) return Promise.resolve(null);
+        if (state.cancelled || closed) return Promise.resolve(null);
         const choices = Array.isArray(params.options)
           ? params.options.filter(
               (item): item is { optionId: string; kind: string; name: string } =>
@@ -226,15 +228,13 @@ export async function createAgentRuntime(options: {
       if (!method) throw new Error("resume unsupported");
       const result = await state.rpc.request(method, {
         cwd: options.workspace,
-        mcpServers: options.textOnly
-          ? []
-          : [
-              {
-                name: "kaitu",
-                ...options.mcp,
-                env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
-              },
-            ],
+        mcpServers: [
+          {
+            name: "kaitu",
+            ...options.mcp,
+            env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
+          },
+        ],
         ...(resume ? { sessionId: resume } : {}),
       });
       state.upstream = result.sessionId ?? resume ?? "";

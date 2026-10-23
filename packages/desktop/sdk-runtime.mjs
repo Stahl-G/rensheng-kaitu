@@ -90,6 +90,13 @@ export function sdkRuntimePatch({
       id: "agent-instructions",
       config: { maxBytes: 65536, projectRootMarkers: ["AGENTS.md"] },
     },
+    // 只收发文字时不读工作区的 AGENTS.md 和技能，模型只看到这次给的材料。
+    ...(textOnly
+      ? [
+          { id: "skill-filesystem", disabled: true },
+          { id: "agent-instructions", disabled: true },
+        ]
+      : []),
     { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
     { id: "approval", config: { policy: "never" } },
     { id: "permission", disabled: true },
