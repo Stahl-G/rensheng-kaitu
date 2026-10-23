@@ -98,13 +98,8 @@ import {
   writeAgentsMd,
 } from "@kaitu/core";
 
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { channelsCommand, installShutdown } from "./channels.js";
 import { dshCommand, installDsh } from "./dsh.js";
 import { importFeishuFolder } from "./feishu.js";
-import { startMcpHttp } from "./mcp/http.js";
-import { createMcpServer } from "./mcp/server.js";
-import { startUi } from "./ui/server.js";
 
 const HELP = `开图 kaitu
 
@@ -364,6 +359,7 @@ async function run(argv: string[]): Promise<number> {
       return 0;
     }
     case "channels": {
+      const { channelsCommand } = await import("./channels.js");
       await channelsCommand(workspace(values), args, values.only, values["json-out"]);
       return 0;
     }
@@ -551,6 +547,8 @@ async function run(argv: string[]): Promise<number> {
       return 0;
     }
     case "ui": {
+      const { startUi } = await import("./ui/server.js");
+      const { installShutdown } = await import("./channels.js");
       const ws = workspace(values, true, true);
       const ui = await startUi(ws, {
         port: values.port === undefined ? undefined : Number(values.port),
@@ -573,6 +571,7 @@ async function run(argv: string[]): Promise<number> {
       if (tools !== "remote" && tools !== "all")
         throw new KaituError("--tools 只能是 remote 或 all", "BAD_ARGS");
       if (values.http) {
+        const { startMcpHttp } = await import("./mcp/http.js");
         const http = await startMcpHttp(ws, {
           port: values.port === undefined ? undefined : Number(values.port),
           tools,
@@ -587,6 +586,8 @@ async function run(argv: string[]): Promise<number> {
         process.once("SIGINT", stop);
         process.once("SIGTERM", stop);
       } else {
+        const { createMcpServer } = await import("./mcp/server.js");
+        const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
         const server = createMcpServer(ws, tools);
         await server.connect(new StdioServerTransport());
         const stop = () => {
