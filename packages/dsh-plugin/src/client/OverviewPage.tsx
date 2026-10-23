@@ -29,6 +29,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { TodayStart, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
+import { TodayWeather } from "./Weather.js";
 import {
   type ExploreModule,
   defaultExploreEntries,
@@ -51,6 +52,14 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  /** 今天页天气：读本机缓存、设城市；宿主没提供时不显示天气。 */
+  loadWeather?: () => Promise<import("@kaitu/core").WeatherState>;
+  setWeatherPlace?: (
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
   hosted?: boolean;
   load: () => Promise<OverviewData>;
@@ -928,6 +937,19 @@ function Overview({
             }}
           />
         )}
+        {view === "overview" &&
+          !guideVisible &&
+          guide !== undefined &&
+          data &&
+          props.loadWeather &&
+          props.setWeatherPlace && (
+            <TodayWeather
+              load={props.loadWeather}
+              setPlace={props.setWeatherPlace}
+              loadLifeMap={props.loadLifeMap}
+              subscribe={props.subscribe}
+            />
+          )}
         {view === "overview" && !guideVisible && guide !== undefined && data && (
           <div className={todayCss.layout}>
             <div className={todayCss.left}>

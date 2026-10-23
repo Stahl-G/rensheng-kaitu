@@ -1,5 +1,5 @@
 import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
@@ -9,6 +9,52 @@ import styles from "./LibraryPage.module.css";
 import css from "./Prototype.module.css";
 import { useLocale, useT, versionText } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
+
+const icon = (paths: ReactNode) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {paths}
+  </svg>
+);
+// 设计稿 C 的分类卡：模块色浅底和图标；笔记沿用中性色。
+const tones: Record<string, CSSProperties> = {
+  calendar: { "--tint": "var(--doing-tint)", "--tone": "var(--doing)" } as CSSProperties,
+  projects: { "--tint": "var(--news-tint)", "--tone": "var(--news)" } as CSSProperties,
+  health: { "--tint": "var(--health-tint)", "--tone": "var(--health)" } as CSSProperties,
+  finance: { "--tint": "var(--finance-tint)", "--tone": "var(--finance)" } as CSSProperties,
+};
+const icons: Record<string, ReactNode> = {
+  notes: icon(<path d="M6 3.5h8l4 4V20.5H6zM14 3.5v4h4M9 12h6M9 16h6" />),
+  calendar: icon(
+    <>
+      <rect x="3.5" y="5" width="17" height="15" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+    </>,
+  ),
+  projects: icon(
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="1" />
+    </>,
+  ),
+  health: icon(<path d="M3 12h4l3-8 4 16 3-8h4" />),
+  finance: icon(
+    <>
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18M7 15h4" />
+    </>,
+  ),
+};
 
 const SOURCE_EN: Record<string, string> = {
   开图: "Kaitu",
@@ -281,9 +327,13 @@ export function LibraryPage({
               type="button"
               className={styles.category}
               key={section.id}
+              style={tones[section.id]}
               onClick={() => open(section.id)}
             >
-              <strong>{t(section.title, LIBRARY_EN[section.id] ?? section.title)}</strong>
+              <strong className={styles.title}>
+                <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
+                {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+              </strong>
               <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
                 {section.count ?? "—"}
               </span>
@@ -296,8 +346,15 @@ export function LibraryPage({
             </button>
           ))}
         {onAdd && (
-          <button type="button" className={styles.category} onClick={() => onAdd("category")}>
-            <strong>＋ {t("添加一类", "Add a category")}</strong>
+          <button
+            type="button"
+            className={`${styles.category} ${styles.add}`}
+            onClick={() => onAdd("category")}
+          >
+            <strong className={styles.title}>
+              <span className={styles.icon}>{icon(<path d="M12 5v14M5 12h14" />)}</span>
+              {t("添加一类", "Add a category")}
+            </strong>
             <span className={styles.meta}>{t("比如工作与求职", "For example, work and jobs")}</span>
           </button>
         )}
