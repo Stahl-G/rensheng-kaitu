@@ -40,10 +40,12 @@ export function useAiConnection({
   focusKey = 0,
   localOnly = false,
   onSaved,
+  onSaving,
 }: {
   focusKey?: number;
   localOnly?: boolean;
   onSaved: () => Promise<void>;
+  onSaving?: (saving: boolean) => void;
 }) {
   const t = useT();
   const [settings, setSettings] = useState<AiConnection | null>(null);
@@ -158,6 +160,7 @@ export function useAiConnection({
   };
   const save = async () => {
     setSaving(true);
+    onSaving?.(true);
     setError("");
     setNotice("");
     try {
@@ -199,6 +202,7 @@ export function useAiConnection({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
+      onSaving?.(false);
     }
   };
   return {
