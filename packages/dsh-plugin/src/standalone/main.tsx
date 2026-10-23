@@ -62,7 +62,16 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, promptRequest, active) => (
+  renderAsk: (
+    prompt,
+    configureRequest,
+    configureBuiltin,
+    onConnections,
+    promptRequest,
+    active,
+    onToday,
+    onSettings,
+  ) => (
     <AskPage
       workspace={workspace}
       active={active}
@@ -71,6 +80,8 @@ const props: OverviewPageProps = {
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}
+      onToday={onToday}
+      onSettings={onSettings}
     />
   ),
   subscribe: (refresh) => {
@@ -95,7 +106,7 @@ const props: OverviewPageProps = {
   pickStorageFolder: () => call("pickStorageFolder"),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
-  loadLibrary: (query) => call("library", query),
+  loadLibrary: (query) => call("library", query ?? {}),
   loadLearning: (topic) => call("learningRead", topic),
   startLearning: (input) => call("learningStart", input),
   saveLearning: (input) => call("learningSave", input),
