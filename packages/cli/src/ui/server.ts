@@ -224,14 +224,27 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     string,
     { source: ImportSource; file: string; name: string; preview: unknown; digest: string; expires: number }
   >();
-  let queue: Promise<unknown> = Promise.resolve();
-  function exclusive<T>(operation: () => Promise<T>): Promise<T> {
-    const result = queue.then(operation);
-    queue = result.catch(() => {});
+  // 只有确实会互相冲突的事才排队，而且各排各的：写版本库、系统日历、收件箱、项目同步。
+  // 读取和简单写入不排队；搬存放位置要等所有车道停下再独占执行。
+  type Lane = "versions" | "calendar" | "inbox" | "projects";
+  const lanes: Record<Lane, Promise<unknown>> = {
+    versions: Promise.resolve(),
+    calendar: Promise.resolve(),
+    inbox: Promise.resolve(),
+    projects: Promise.resolve(),
+  };
+  function lane<T>(name: Lane, operation: () => Promise<T>): Promise<T> {
+    const result = lanes[name].then(operation);
+    lanes[name] = result.catch(() => {});
+    return result;
+  }
+  function everything<T>(operation: () => Promise<T>): Promise<T> {
+    const result = Promise.all(Object.values(lanes)).then(operation);
+    for (const name of Object.keys(lanes) as Lane[]) lanes[name] = result.catch(() => {});
     return result;
   }
   const pullCalendars = () =>
-    exclusive(async () => {
+    lane("calendar", async () => {
       await pullCalendarSubscriptions(ws);
       if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
       notify();
@@ -257,7 +270,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   });
   const syncCalendar = () => {
     if (!options.calendarExecutor) return;
-    void exclusive(async () => {
+    void lane("calendar", async () => {
       await calendarPush.sync(calendarPushEntries(ws));
       notify();
     }).catch(() => {});
@@ -288,7 +301,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       saveTimer = undefined;
       saveAt = Number.POSITIVE_INFINITY;
       saveQueued = true;
-      void exclusive(async () => {
+      void lane("versions", async () => {
         saveQueued = false;
         await saveExternal();
       }).catch(reportError);
@@ -325,7 +338,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearTimeout(inboxTimer);
     inboxTimer = setTimeout(() => {
       if (closed) return;
-      void exclusive(async () => {
+      void lane("inbox", async () => {
         const result = await processInbox(ws, { stableMs: options.inboxStableMs });
         if (result.processed.length || result.notes.length) notify();
         if (result.pending.length && !closed) scheduleInbox();
@@ -339,12 +352,15 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
+    // 首页重算只在内存里，不等任何队列；推到系统日历是外部的事，进日历车道。
     refreshTimer = setTimeout(() => {
-      void exclusive(async () => {
+      try {
         refreshOverview(ws);
-        if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
-        notify();
-      }).catch(reportError);
+      } catch {
+        return reportError();
+      }
+      notify();
+      syncCalendar();
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
@@ -540,7 +556,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             : method.startsWith("ask") || method === "projectGoalSuggest"
               ? await productRequest(ws, method, args, options.ask, calendarPush)
               : relocate || method === "restoreVersion"
-                ? await exclusive(async () => {
+                ? await everything(async () => {
                     await saveExternal();
                     const opening = method === "workspaceBackup" && args[0] === "activate";
                     const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
@@ -667,7 +683,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       if (url.pathname === "/api/import/preview") {
         const source = url.searchParams.get("source") as ImportSource;
         const bytes = await body(req, MAX_UPLOAD);
-        const result = await exclusive(async () => {
+        const result = await (async () => {
           const name = url.searchParams.get("name") ?? "";
           const file = stageUpload(ws, source, name, bytes);
           try {
@@ -686,11 +702,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             discardUpload(ws, file);
             throw error;
           }
-        });
+        })();
         return json(res, 200, result);
       }
       const data = (await requestJson(req, MAX_JSON)) as Record<string, unknown>;
-      const result = await exclusive(async () => {
+      const result = await (async () => {
         if (url.pathname === "/api/import/cancel") {
           const token = field(data, "token");
           const upload = uploads.get(token);
@@ -700,52 +716,55 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           }
           return { ok: true };
         }
-        await saveExternal();
         switch (url.pathname) {
           case "/api/sync/enable":
           case "/api/sync/disable":
           case "/api/drive/enable":
-          case "/api/drive/disable": {
-            await options.ask?.prepareRelocation();
-            await phones.stop();
-            const oldRoot = ws.root;
-            try {
-              await options.onWorkspaceChanging?.();
-              if (!url.pathname.endsWith("enable"))
-                return await disableSync(ws, {
-                  to: typeof data.to === "string" && data.to ? data.to : undefined,
-                });
-              // 只有开启同步才要说明同步方式；关闭沿用原来的 {to}。
-              const mode = url.pathname === "/api/drive/enable" ? "drive" : field(data, "mode");
-              if (!["icloud", "drive", "nutstore"].includes(mode))
-                throw new KaituError("请选择 icloud、drive 或 nutstore", "BAD_ARGS");
-              return await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
-                dir:
-                  typeof data.dir === "string" && data.dir
-                    ? data.dir
-                    : typeof data.driveDir === "string" && data.driveDir
-                      ? data.driveDir
-                      : undefined,
-                name: typeof data.name === "string" ? data.name : undefined,
-                ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
-              });
-            } finally {
+          case "/api/drive/disable":
+            return everything(async () => {
+              await saveExternal();
+              await options.ask?.prepareRelocation();
+              await phones.stop();
+              const oldRoot = ws.root;
               try {
-                startWatching();
-                if (ws.root !== oldRoot) {
-                  aiChild?.kill();
-                  aiChild = undefined;
-                  aiReady = undefined;
-                }
-                await options.onWorkspaceChanged?.();
+                await options.onWorkspaceChanging?.();
+                if (!url.pathname.endsWith("enable"))
+                  return await disableSync(ws, {
+                    to: typeof data.to === "string" && data.to ? data.to : undefined,
+                  });
+                // 只有开启同步才要说明同步方式；关闭沿用原来的 {to}。
+                const mode = url.pathname === "/api/drive/enable" ? "drive" : field(data, "mode");
+                if (!["icloud", "drive", "nutstore"].includes(mode))
+                  throw new KaituError("请选择 icloud、drive 或 nutstore", "BAD_ARGS");
+                return await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
+                  dir:
+                    typeof data.dir === "string" && data.dir
+                      ? data.dir
+                      : typeof data.driveDir === "string" && data.driveDir
+                        ? data.driveDir
+                        : undefined,
+                  name: typeof data.name === "string" ? data.name : undefined,
+                  ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
+                });
               } finally {
-                options.ask?.relocate(ws.root);
-                phones.start();
+                try {
+                  startWatching();
+                  if (ws.root !== oldRoot) {
+                    aiChild?.kill();
+                    aiChild = undefined;
+                    aiReady = undefined;
+                  }
+                  await options.onWorkspaceChanged?.();
+                } finally {
+                  options.ask?.relocate(ws.root);
+                  phones.start();
+                }
               }
-            }
-          }
+            });
           case "/api/projects/sync":
-            return typeof data.slug === "string" ? syncProject(ws, data.slug) : syncProjects(ws);
+            return lane<unknown>("projects", async () =>
+              typeof data.slug === "string" ? syncProject(ws, data.slug) : syncProjects(ws),
+            );
           case "/api/photos/delete":
             return removePhoto(ws, field(data, "id"), { by: "user" });
           case "/api/proposal": {
@@ -754,7 +773,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               field(data, "id"),
               field(data, "decision") as "confirmed" | "rejected",
             );
-            return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+            return {
+              ...result,
+              calendarPush: await lane("calendar", () => calendarPush.sync(calendarPushEntries(ws))),
+            };
           }
           case "/api/tasks/done":
             return completeTask(ws, field(data, "id"), { by: "user" });
@@ -762,42 +784,47 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             return completeNext(ws, field(data, "file"), field(data, "id"));
           case "/api/memory/delete":
             return removeMemory(ws, field(data, "file"), { by: "user" });
-          case "/api/restore": {
-            await options.ask?.prepareRelocation();
-            await phones.stop();
-            try {
-              return await restore(ws, field(data, "version"));
-            } finally {
-              options.ask?.relocate(ws.root);
-              phones.start();
-            }
-          }
-          case "/api/import/confirm": {
-            const token = field(data, "token");
-            const upload = uploads.get(token);
-            if (!upload || upload.expires < Date.now())
-              throw new KaituError("预览已过期，请重新选择文件", "CONFLICT");
-            try {
-              if (createHash("sha256").update(ws.readBytes(upload.file)).digest("hex") !== upload.digest)
-                throw new KaituError("文件已变化，请重新预览", "CONFLICT");
-              const preview = await importUpload(ws, upload.source, upload.file, true, upload.name);
-              if (JSON.stringify(preview) !== JSON.stringify(upload.preview)) {
-                throw new KaituError("文件夹已变化，请重新预览后确认", "CONFLICT");
+          case "/api/restore":
+            return everything(async () => {
+              await saveExternal();
+              await options.ask?.prepareRelocation();
+              await phones.stop();
+              try {
+                return await restore(ws, field(data, "version"));
+              } finally {
+                options.ask?.relocate(ws.root);
+                phones.start();
               }
-              const before = (await history(ws, { limit: 1 }))[0]?.oid;
-              return {
-                result: await importUpload(ws, upload.source, upload.file, false, upload.name),
-                before,
-              };
-            } finally {
-              discardUpload(ws, upload.file);
-              uploads.delete(token);
-            }
-          }
+            });
+          // 导入要先存一个「导入前」的版本好撤销，和写版本库排在同一条车道。
+          case "/api/import/confirm":
+            return lane("versions", async () => {
+              await saveExternal();
+              const token = field(data, "token");
+              const upload = uploads.get(token);
+              if (!upload || upload.expires < Date.now())
+                throw new KaituError("预览已过期，请重新选择文件", "CONFLICT");
+              try {
+                if (createHash("sha256").update(ws.readBytes(upload.file)).digest("hex") !== upload.digest)
+                  throw new KaituError("文件已变化，请重新预览", "CONFLICT");
+                const preview = await importUpload(ws, upload.source, upload.file, true, upload.name);
+                if (JSON.stringify(preview) !== JSON.stringify(upload.preview)) {
+                  throw new KaituError("文件夹已变化，请重新预览后确认", "CONFLICT");
+                }
+                const before = (await history(ws, { limit: 1 }))[0]?.oid;
+                return {
+                  result: await importUpload(ws, upload.source, upload.file, false, upload.name),
+                  before,
+                };
+              } finally {
+                discardUpload(ws, upload.file);
+                uploads.delete(token);
+              }
+            });
           default:
             throw new KaituError("接口不存在", "NOT_FOUND");
         }
-      });
+      })();
       notify();
       json(res, 200, result);
     } catch (error) {
@@ -874,7 +901,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await options.ask?.close();
     files.dispose();
     disposeNoteIndex(ws);
-    await exclusive(saveExternal);
+    await everything(saveExternal);
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

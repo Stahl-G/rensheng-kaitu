@@ -22,7 +22,6 @@ import {
   type OnboardingSetupInput,
   type OnboardingTarget,
   type ProjectGoal,
-  type SettingsData,
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
@@ -338,11 +337,9 @@ export async function productRequest(
       return completeNext(ws, text(0), text(1));
     case "workspaceBackup":
       return workspaceBackupRequest(ws, text(0), args[1]);
-    case "settings": {
-      const data: SettingsData = await readSettings(ws);
-      data.ai = ask ? await ask.settings() : null;
-      return data;
-    }
+    // 基础设置只读工作区；AI 状态由「AI 与连接」自己读 askSettings，互不等待。
+    case "settings":
+      return readSettings(ws);
     case "setFinanceAccess":
       return setFinanceAccess(ws, text(0) as AgentConnectionId, args[1] as boolean);
     case "exportWorkspace":

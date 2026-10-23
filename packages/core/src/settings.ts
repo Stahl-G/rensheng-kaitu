@@ -32,16 +32,11 @@ export async function readSettings(ws: Workspace) {
     backup: workspaceBackupStatus(ws),
     storage: driveStatus(ws),
     financeAccess: readFinanceAccess(ws),
-    versions: await history(ws),
+    // 设置页只列最近的版本；整部历史随版本数增长，读全量会拖慢整页。
+    versions: await history(ws, { limit: 100 }),
     version: kaituPackage.version,
     dshVersion: process.env.DSH_CLIENT_VERSION ?? null,
     timeZone: ws.timeZone(),
-    ai: null as {
-      configured: boolean;
-      model: string;
-      providerName?: string;
-      search?: NetworkSearchSettings;
-    } | null,
   };
 }
 export type SettingsData = Awaited<ReturnType<typeof readSettings>>;

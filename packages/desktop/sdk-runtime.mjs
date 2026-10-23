@@ -150,8 +150,11 @@ export function createSdkRuntime({
   const loadSettings = async () => {
     await loadDirectory();
     const stored = readSettings();
-    if (stored.provider && !providers.some((item) => item.id === stored.provider))
-      await savedProviders().catch(() => []);
+    // 自定义服务商的地址只在 DSH 的 profile 里，和模型菜单共用同一次读取。
+    if (stored.provider && !providers.some((item) => item.id === stored.provider)) {
+      loadSaved();
+      await saved;
+    }
     return { choice: stored.choice, ...selection(stored) };
   };
   const credential = (operation, input) =>
@@ -195,6 +198,7 @@ export function createSdkRuntime({
       throw new KaituError("请先添加这个搜索服务的 API Key", "AI_SEARCH_KEY");
     mkdirSync(home, { recursive: true, mode: 0o700 });
     writeFileSync(searchFile, JSON.stringify({ provider: entry.id }), { mode: 0o600 });
+    forget();
     return describeSearch();
   };
   // 已添加的服务商存在 DSH 的 profile 里（可以有多个）；自定义服务各自一个 id，按地址区分。
@@ -216,6 +220,25 @@ export function createSdkRuntime({
     }));
   };
   const saveProvider = (settings) => api.support("saveProvider", { patch: providerPatch(settings) });
+  // 「连没连 AI」每个 AI 功能都要问，只读设置文件和一次凭据状态，结果留在内存里，改配置时清掉。
+  // 已保存的服务商要起一个 DSH 进程才读得到，只给模型菜单用：在后台读，读好之前先给空列表。
+  let status;
+  let saved;
+  let savedRows = [];
+  const forget = () => {
+    status = undefined;
+    saved = undefined;
+  };
+  const loadSaved = () => {
+    saved ??= savedProviders().then(
+      (rows) => {
+        savedRows = rows;
+      },
+      () => {
+        saved = undefined;
+      },
+    );
+  };
   let capabilityRuntime;
   const api = {
     async support(method, input = {}) {
@@ -251,23 +274,36 @@ export function createSdkRuntime({
       return result.models;
     },
     async settings() {
-      const settings = await loadSettings();
-      const info = await credential("status", {
-        ref: credentialRef(settings.provider),
-        search: true,
-        settings,
+      status ??= (async () => {
+        const settings = await loadSettings();
+        const info = await credential("status", {
+          ref: credentialRef(settings.provider),
+          search: true,
+          settings,
+        });
+        return {
+          ...connectionInfo({
+            ...settings,
+            supportsImages: settings.supportsImages ?? info.supportsImages,
+            configured: settings.choice === "builtin" && info.configured,
+          }),
+          search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
+        };
+      })();
+      status.catch(() => {
+        status = undefined;
       });
-      return {
-        ...connectionInfo({
-          ...settings,
-          supportsImages: settings.supportsImages ?? info.supportsImages,
-          configured: settings.choice === "builtin" && info.configured,
-        }),
-        saved: await savedProviders().catch(() => []),
-        search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
-      };
+      loadSaved();
+      return { ...(await status), saved: savedRows };
     },
-    async configure(input) {
+    configure(input) {
+      // 失败时也清掉缓存的状态：钥匙可能已经存进去了。成功时各分支自己清过，并读回新状态。
+      return api.configureNow(input).catch((error) => {
+        forget();
+        throw error;
+      });
+    },
+    async configureNow(input) {
       await loadDirectory();
       if (input.search !== undefined) return configureSearch(input.search);
       if (input.choice !== "builtin" && input.choice !== "external")
@@ -315,6 +351,7 @@ export function createSdkRuntime({
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
+      forget();
       return api.settings();
     },
     async runtime(mode = "scoped", capabilities = false, connection = "local-ask", textOnly = false) {
@@ -331,8 +368,10 @@ export function createSdkRuntime({
           !(await savedProviders()).some(
             (row) => row.provider === settings.provider && row.models.includes(settings.model),
           )
-        )
+        ) {
           await saveProvider(settings);
+          saved = undefined;
+        }
       }
       const profile = join(
         home,

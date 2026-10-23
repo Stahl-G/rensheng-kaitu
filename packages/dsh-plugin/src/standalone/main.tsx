@@ -95,6 +95,7 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  loadAiStatus: () => call("askSettings"),
   organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),

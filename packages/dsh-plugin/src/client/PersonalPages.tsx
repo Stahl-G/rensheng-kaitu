@@ -2,6 +2,7 @@ import type {
   AgentConnectionId,
   CalendarPushSettings,
   HandoverPack,
+  NetworkSearchSettings,
   OrganizerStatus,
   SyncProvider,
 } from "@kaitu/core";
@@ -24,12 +25,21 @@ import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.
 import { aiHandover } from "./connections.js";
 import { type Locale, useT, versionText } from "./i18n.js";
 
+export interface AiStatus {
+  configured: boolean;
+  model: string;
+  providerName?: string;
+  search?: NetworkSearchSettings;
+}
+
 export interface PersonalServices extends CalendarPushServices, FileImportServices {
   desktopUpdate?: FeatureUpdateRequest;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  /** 开图 App 读「AI 与连接」的状态；没有时表示模型由 DSH 管理。 */
+  loadAiStatus?: () => Promise<AiStatus>;
   organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
@@ -97,16 +107,17 @@ export function PersonalPages(
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
   const [workspacePath, setWorkspacePath] = useState("");
+  const [ai, setAi] = useState<AiStatus | null>(null);
+  // 基础设置、日历、AI 状态各读各的：谁先回来先显示，一个慢或失败不挡另外两个。
   const refresh = useCallback(async () => {
-    try {
-      const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
-      setData(settings);
-      setCalendarPush(calendar);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [props.loadSettings, props.loadCalendarPush]);
+    const fail = (err: unknown) => setError(err instanceof Error ? err.message : String(err));
+    setError("");
+    await Promise.all([
+      props.loadSettings().then(setData, fail),
+      props.loadCalendarPush().then(setCalendarPush, fail),
+      props.loadAiStatus?.().then(setAi, fail),
+    ]);
+  }, [props.loadSettings, props.loadCalendarPush, props.loadAiStatus]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -133,7 +144,7 @@ export function PersonalPages(
       const automation = await props.configureAutomation(tasks, times);
       setData((current) => (current ? { ...current, automation } : current));
     });
-  const search = data?.ai?.search;
+  const search = ai?.search;
   const selectedSearch = search?.providers.find((item) => item.id === searchProvider);
   const saveSearch = (remove = false) =>
     run(
@@ -285,11 +296,13 @@ export function PersonalPages(
                     [
                       [
                         "ai",
-                        data.ai
-                          ? data.ai.configured
-                            ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}`
-                            : t("还没连接", "Not connected")
-                          : t("由 DSH 管理", "Managed by DSH"),
+                        !props.loadAiStatus
+                          ? t("由 DSH 管理", "Managed by DSH")
+                          : !ai
+                            ? t("正在读取…", "Loading…")
+                            : ai.configured
+                              ? `${ai.providerName ?? "AI"} · ${ai.model}`
+                              : t("还没连接", "Not connected"),
                       ],
                       [
                         "phone",
@@ -590,7 +603,7 @@ export function PersonalPages(
             )}
             {section === "ai" && (
               <>
-                {data.ai ? (
+                {props.loadAiStatus ? (
                   <AiSettings focusKey={props.aiKeyRequest} onSaved={refresh} />
                 ) : (
                   <section className={css.sec}>
@@ -615,7 +628,7 @@ export function PersonalPages(
                     </div>
                   </section>
                 )}
-                {data.ai?.configured && !data.automation.asked && (
+                {ai?.configured && !data.automation.asked && (
                   <p>
                     {t("要让开图每天帮你整理吗？", "Would you like Kaitu to organize each day?")}{" "}
                     <button type="button" className={css.link} onClick={() => select("automation")}>
@@ -712,7 +725,7 @@ export function PersonalPages(
             )}
             {section === "local-ai" && (
               <>
-                {data.ai && <AiSettings localOnly onSaved={refresh} />}
+                {props.loadAiStatus && <AiSettings localOnly onSaved={refresh} />}
                 <section className={css.sec} id="local-ai">
                   <div className={css["sec-head"]}>
                     <h2 className={css.eyebrow}>

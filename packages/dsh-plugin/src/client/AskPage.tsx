@@ -337,7 +337,6 @@ export function AskPage({
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [loaded, setLoaded] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
   const composing = useRef(false);
@@ -527,27 +526,35 @@ export function AskPage({
       )}
     </div>
   );
+  // 对话列表、AI 状态、自动整理各读各的：对话列表不等 AI 状态。
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      call<Settings>("askSettings"),
-      call<Automation>("automation"),
-      call<Thread[]>("askList"),
-    ])
-      .then(([ai, auto, list]) => {
+    const fail = (err: Error) => {
+      if (active) setError(err.message);
+    };
+    void call<Thread[]>("askList")
+      .then((list) => {
         if (!active) return;
-        setSettings(ai);
-        setAsked(auto.asked);
-        if (auto.asked) setAutomation(auto.tasks);
         setThreads(list);
-        setLoaded(true);
-        if (!configurationRequested.current) {
-          if (ai.configured && !auto.asked && ai.choice !== "local") setStep(2);
-        }
       })
-      .catch((err) => {
-        if (active) setError(err.message);
-      });
+      .catch(fail);
+    const ai = call<Settings>("askSettings");
+    const auto = call<Automation>("automation");
+    void ai.then((value) => {
+      if (active) setSettings(value);
+    }, fail);
+    void auto.then((value) => {
+      if (!active) return;
+      setAsked(value.asked);
+      if (value.asked) setAutomation(value.tasks);
+    }, fail);
+    // 连上 AI 但还没问过要不要自动整理时，提示这一步要两样都知道。
+    void Promise.all([ai, auto])
+      .then(([value, automation]) => {
+        if (!active || configurationRequested.current) return;
+        if (value.configured && !automation.asked && value.choice !== "local") setStep(2);
+      })
+      .catch(() => {});
     return () => {
       active = false;
     };
@@ -708,7 +715,14 @@ export function AskPage({
     if (!settings?.configured) return;
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
-    if (modelMenu || !agent) return;
+    if (modelMenu) return;
+    // 已保存的服务商在后台读；打开菜单时再取一次状态，读好的就会出现。
+    if (!agent) {
+      void call<Settings>("askSettings")
+        .then(setSettings)
+        .catch(() => {});
+      return;
+    }
     setAgentModels(null);
     setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
@@ -770,7 +784,7 @@ export function AskPage({
     );
   return (
     <div
-      className={`${css.chat} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+      className={`${css.chat} ${settings && !settings.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
     >
       <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
@@ -836,7 +850,7 @@ export function AskPage({
               nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 40;
           }}
         >
-          {loaded && !settings?.configured && !selected ? (
+          {settings && !settings.configured && !selected ? (
             <div className={css.noKey}>
               <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
               <p>
