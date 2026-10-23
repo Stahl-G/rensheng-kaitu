@@ -465,6 +465,7 @@ export function AskPage({
       <button
         type="button"
         className={css.threadMore}
+        disabled={!settings?.configured}
         aria-label={t("更多", "More")}
         aria-expanded={threadMenu?.id === thread.id}
         onClick={() => setThreadMenu(threadMenu?.id === thread.id ? null : { id: thread.id })}
@@ -699,6 +700,7 @@ export function AskPage({
     input.current?.focus();
   };
   const openModelMenu = () => {
+    if (!settings?.configured) return;
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
     if (modelMenu || !agent) return;
@@ -709,6 +711,7 @@ export function AskPage({
       .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
   };
   const switchModel = async (provider: string, id: string) => {
+    if (!settings?.configured) return;
     setModelMenu(false);
     setSaving(true);
     setError("");
@@ -762,7 +765,7 @@ export function AskPage({
     );
   return (
     <div
-      className={`${css.chat} ${loaded && !settings?.configured ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+      className={`${css.chat} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
     >
       <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
@@ -828,7 +831,7 @@ export function AskPage({
               nearBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 40;
           }}
         >
-          {loaded && !settings?.configured ? (
+          {loaded && !settings?.configured && !selected ? (
             <div className={css.noKey}>
               <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
               <p>
@@ -881,6 +884,7 @@ export function AskPage({
               </section>
             </div>
           ) : (
+            settings?.configured &&
             !events.some((event) => event.type === "user/message") && (
               <div className={css.welcome}>
                 <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
@@ -1260,7 +1264,7 @@ export function AskPage({
               <button
                 type="button"
                 className={css.model}
-                disabled={busy}
+                disabled={busy || !settings?.configured}
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
                 title={
