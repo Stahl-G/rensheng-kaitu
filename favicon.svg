@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
   <style>
-    .f0{fill:#1B3254;stroke:#1B3254}.f1{fill:#2B4C7E;stroke:#2B4C7E}.f2{fill:#B8CBE4;stroke:#B8CBE4}
-    @media (prefers-color-scheme: dark){.f0{fill:#365B90;stroke:#365B90}.f1{fill:#7194C4;stroke:#7194C4}}
+    .f0{fill:#1F3550;stroke:#1F3550}.f1{fill:#2B4C7E;stroke:#2B4C7E}.f2{fill:#E8DFCC;stroke:#E8DFCC}
+    @media (prefers-color-scheme: dark){.f0{fill:#3A5A86;stroke:#3A5A86}.f1{fill:#5C7DAA;stroke:#5C7DAA}.f2{fill:#CFC4AD;stroke:#CFC4AD}.rf{stroke:#ECE6DA}.ro{stroke:#3A5A86}}
   </style>
   <defs>
     <clipPath id="a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
@@ -10,6 +10,6 @@
   <path class="f0" d="M4 10L17.33 6L17.33 38L4 42Z" stroke-width="1.5" stroke-linejoin="round"/>
   <path class="f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z" stroke-width="1.5" stroke-linejoin="round"/>
   <path class="f2" d="M30.67 10L44 6L44 38L30.67 42Z" stroke-width="1.5" stroke-linejoin="round"/>
-  <g clip-path="url(#a)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
-  <g clip-path="url(#b)"><path d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1B3254" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#a)"><path class="rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g clip-path="url(#b)"><path class="ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16" fill="none" stroke="#1F3550" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g>
 </svg>
