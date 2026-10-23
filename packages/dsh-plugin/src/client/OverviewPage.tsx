@@ -22,7 +22,7 @@ import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
 import { OnboardingFileImport } from "./OnboardingSources.js";
-import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
+import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
@@ -156,7 +156,7 @@ function Overview({
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
-  const [connectionSection, setConnectionSection] = useState<"local-ai" | "cloud-organizer">();
+  const [connectionSection, setConnectionSection] = useState<SettingsSection>("overview");
   const [importSource, setImportSource] = useState<
     "choose" | "apple-health" | "chatgpt-conversations" | null
   >(null);
@@ -310,7 +310,10 @@ function Overview({
   useEffect(() => {
     // The DSH plugin leaves the host's Settings shortcut untouched.
     if (props.hosted || !props.renderAsk) return;
-    const openSettings = () => setView("settings");
+    const openSettings = () => {
+      setConnectionSection("overview");
+      setView("settings");
+    };
     const shortcut = (event: KeyboardEvent) => {
       if (event.metaKey && !event.ctrlKey && !event.altKey && event.key === ",") {
         event.preventDefault();
@@ -414,6 +417,7 @@ function Overview({
       setCalendarAdding(source === "calendar");
       setFinanceImporting(source === "finance");
     } else if (source === "mail") {
+      setConnectionSection("channels");
       setChannelFocus(true);
       setView("connections");
     }
@@ -677,7 +681,10 @@ function Overview({
             className={css.settingsButton}
             aria-label={t("设置", "Settings")}
             aria-current={view === "settings" ? "page" : undefined}
-            onClick={() => setView("settings")}
+            onClick={() => {
+              setConnectionSection("overview");
+              setView("settings");
+            }}
           >
             <SettingsIcon />
             <span className={css.settingsLabel}>{t("设置", "Settings")}</span>
@@ -1041,8 +1048,8 @@ function Overview({
                   if (kind === "file") setImportSource("choose");
                   else if (kind === "category") setView("explore");
                   else {
-                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : undefined);
-                    setChannelFocus(kind === "phone");
+                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : "phone");
+                    setChannelFocus(false);
                     setView("connections");
                   }
                 }}
@@ -1106,7 +1113,8 @@ function Overview({
                   subscribe={props.subscribe}
                   channelSettings={props.channelSettings}
                   connect={() => {
-                    setView("connections");
+                    setConnectionSection("channels");
+                    setView("settings");
                     setChannelFocus(true);
                   }}
                 />
@@ -1198,8 +1206,11 @@ function Overview({
               startGuide();
             }}
             channelSettings={props.channelSettings}
-            focusSection={connectionSection}
-            onSectionFocused={() => setConnectionSection(undefined)}
+            section={connectionSection}
+            selectSection={(section) => {
+              setConnectionSection(section);
+              setView("settings");
+            }}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
