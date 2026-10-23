@@ -156,17 +156,26 @@ export function PersonalPages(
   const [query, setQuery] = useState("");
   const item = settingItems.find(([id]) => id === section) ?? settingItems[0];
   const [phones, setPhones] = useState<
-    { name: string; configured: boolean; paired: boolean; running: boolean; error?: string }[]
-  >([]);
+    { name: string; configured: boolean; paired: boolean; running: boolean; error?: string }[] | null
+  >(null);
+  const [phoneError, setPhoneError] = useState("");
   useEffect(() => {
     if (section !== "overview") return;
     let active = true;
     void props
       .channelSettings?.("phone-list")
       .then((value) => {
-        if (active) setPhones(value as typeof phones);
+        if (active) {
+          setPhones(value as typeof phones);
+          setPhoneError("");
+        }
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (active) {
+          setPhones(null);
+          setPhoneError(err instanceof Error ? err.message : String(err));
+        }
+      });
     return () => {
       active = false;
     };
@@ -179,7 +188,7 @@ export function PersonalPages(
         data.backup.error ||
         t(`${data.backup.conflicts.length} 项同步冲突`, `${data.backup.conflicts.length} sync conflicts`),
     });
-  for (const phone of phones)
+  for (const phone of phones ?? [])
     if (phone.configured && (phone.error || !phone.paired))
       issues.push({
         section: "phone",
@@ -280,10 +289,16 @@ export function PersonalPages(
                       ],
                       [
                         "phone",
-                        phones
-                          .filter((phone) => phone.running)
-                          .map((phone) => phone.name)
-                          .join(" · ") || t("还没连接", "Not connected"),
+                        !props.channelSettings
+                          ? t("由宿主管理", "Managed by the host")
+                          : phoneError
+                            ? t("状态读取失败", "Could not read status")
+                            : !phones
+                              ? t("正在读取…", "Loading…")
+                              : phones
+                                  .filter((phone) => phone.running)
+                                  .map((phone) => phone.name)
+                                  .join(" · ") || t("还没连接", "Not connected"),
                       ],
                       ["storage", storageName(data.storage.provider)],
                       [
