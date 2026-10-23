@@ -460,6 +460,15 @@ export async function connectWorkspaceBackup(
   providedRemote?: BackupRemote,
   write: WorkspaceWrite = (operation) => operation(),
 ) {
+  return connectBackup(ws, input, providedRemote, write);
+}
+async function connectBackup(
+  ws: Workspace,
+  input: unknown,
+  providedRemote: BackupRemote | undefined,
+  write: WorkspaceWrite,
+  create = false,
+) {
   const args = z
     .object({
       repo: z.string(),
@@ -483,6 +492,7 @@ export async function connectWorkspaceBackup(
       generation,
     };
   });
+  if (create) await createPrivateGithubRepository(repo);
   const info = await remote.inspect(repo);
   const connection = {
     via: args.via,
@@ -496,6 +506,10 @@ export async function connectWorkspaceBackup(
     if (ws.root !== root || connectionGenerations.get(root) !== generation)
       throw new KaituError("备份连接已变化，请重新连接", "CONFLICT");
     if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
+    if (create) {
+      if (!info.private) throw new KaituError("仓库不是私有仓库，尚未开启同步", "GH_REQUEST");
+      if (!ws.exists("README.md")) ws.writeText("README.md", memoryRepositoryReadme);
+    }
     const previous = state(ws);
     store(ws, {
       ...previous,
@@ -505,7 +519,7 @@ export async function connectWorkspaceBackup(
       error: undefined,
     });
     refreshOverview(ws);
-    return workspaceBackupStatus(ws);
+    return create ? requestWorkspaceBackup(ws) : workspaceBackupStatus(ws);
   });
 }
 function remoteReceipts(text: string): PhoneReceipt[] {
@@ -835,17 +849,7 @@ export async function workspaceBackupRequest(
       return workspaceBackupStatus(ws);
     case "create": {
       if (!args.repo) throw new KaituError("请填写新仓库名称", "BAD_ARGS");
-      await write(async () => {
-        backupSelection(ws, args);
-        if (active.has(ws)) throw new KaituError("请等待本次同步完成", "BACKUP_BUSY");
-      });
-      await createPrivateGithubRepository(args.repo);
-      await write(async () => {
-        if (!ws.exists("README.md")) ws.writeText("README.md", memoryRepositoryReadme);
-      });
-      const status = await connectWorkspaceBackup(ws, { ...args, via: "gh" }, undefined, write);
-      if (!status.connection?.private) throw new KaituError("仓库不是私有仓库，尚未开启同步", "GH_REQUEST");
-      return write(async () => requestWorkspaceBackup(ws));
+      return connectBackup(ws, { ...args, via: "gh" }, undefined, write, true);
     }
     case "status":
       return workspaceBackupStatus(ws);
