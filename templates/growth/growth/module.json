@@ -1,0 +1,12 @@
+{
+  "id": "growth",
+  "name": "成长记录",
+  "version": 1,
+  "visibility": "agent",
+  "description": "父母维护一个孩子的成长资料 / A parent's workspace for one child",
+  "records": {},
+  "views": [{ "type": "doc", "title": "成长记录说明", "path": "STATUS.md" }],
+  "agent": {
+    "instructions": "此工作区只属于一个孩子，由父母维护。原文沿用收件箱，日程与待办沿用现有工具；不读取父母或其他孩子的工作区。只保留实际观察，不诊断、不做发育评估、性格判定或排名。小结先给父母核对，每句话有原始依据，确认后才入档。This workspace belongs to one child and is maintained by a parent. Preserve observations without diagnosis, developmental assessment, personality labels or ranking."
+  }
+}

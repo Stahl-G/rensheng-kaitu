@@ -5,6 +5,7 @@ import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { KaituError } from "./errors.js";
 import { ensureHistory, snapshot } from "./history.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listModules } from "./modules.js";
 import { populateSample } from "./sample.js";
 import { templateVersion } from "./template-version.js";
@@ -35,6 +36,7 @@ export interface InitOptions {
   sample?: boolean;
   timeZone?: string;
   now?: Date;
+  template?: "standard" | "growth";
 }
 
 export async function initWorkspace(root: string, opts: InitOptions = {}): Promise<Workspace> {
@@ -43,6 +45,15 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
   }
   // 用纯 Git 模板建的记忆仓库（根目录有 kaitu-backup.json）可以直接接管：只补缺的文件，已有的一律不动。
   const adopt = existsSync(join(root, "kaitu-backup.json"));
+  if (adopt && opts.template === "growth")
+    throw new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        "成长工作区需要一个空文件夹",
+        "Choose an empty folder for a growth workspace",
+      ),
+      "NOT_EMPTY",
+    );
   if (!adopt && existsSync(root) && readdirSync(root).some((n) => n !== ".DS_Store")) {
     throw new KaituError(`${root} 不是空目录，换一个位置或先清空`, "NOT_EMPTY");
   }
@@ -58,6 +69,7 @@ export async function initWorkspace(root: string, opts: InitOptions = {}): Promi
     // 模板的 .gitignore 不同步手机和收件箱文件，不能放进要推到 GitHub 的仓库。
     filter: (src) => !adopt || src !== join(template, ".gitignore"),
   });
+  if (opts.template === "growth") cpSync(join(template, "..", "growth"), root, { recursive: true });
   const ws = new Workspace(root);
   for (const d of EMPTY_DIRS) mkdirSync(join(ws.root, d), { recursive: true });
 

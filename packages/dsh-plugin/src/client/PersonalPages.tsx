@@ -72,6 +72,7 @@ export function PersonalPages(
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
   const [workspacePath, setWorkspacePath] = useState("");
+  const [workspaceTemplate, setWorkspaceTemplate] = useState<"standard" | "growth">("standard");
   const refresh = useCallback(async () => {
     try {
       const [settings, calendar] = await Promise.all([props.loadSettings(), props.loadCalendarPush()]);
@@ -177,6 +178,14 @@ export function PersonalPages(
         {data && props.view === "settings" && (
           <section className={css.sec}>
             <h2 className={css.eyebrow}>{t("资料位置", "Workspace location")}</h2>
+            <p className={css.small}>
+              {data.workspaceMode === "growth"
+                ? t(
+                    "成长模式 · 一个孩子一个工作区，由父母维护",
+                    "Growth mode · One child per workspace, maintained by a parent",
+                  )
+                : t("标准模式 · 你自己的规划与记录", "Standard mode · Your plans and notes")}
+            </p>
             <div className={`${css.card} ${css["list-card"]}`}>
               <div className={css["switch-row"]}>
                 <span>
@@ -203,10 +212,28 @@ export function PersonalPages(
                   onClick={() => {
                     setMoving(false);
                     setWorkspacePath("");
-                    setOpening(opening === "initialize" ? null : "initialize");
+                    setWorkspaceTemplate("standard");
+                    setOpening(
+                      opening === "initialize" && workspaceTemplate === "standard" ? null : "initialize",
+                    );
                   }}
                 >
-                  {t("新建空白工作区…", "Create a blank workspace…")}
+                  {t("标准模式：新建空白工作区…", "Standard mode: create a blank workspace…")}
+                </button>
+              )}
+              {props.workspaceBackup && (
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() => {
+                    setMoving(false);
+                    setWorkspacePath("");
+                    setWorkspaceTemplate("growth");
+                    setOpening("initialize");
+                  }}
+                >
+                  {t("成长模式：为一个孩子新建工作区…", "Growth mode: create a workspace for one child…")}
                 </button>
               )}
               {props.workspaceBackup && (
@@ -232,24 +259,36 @@ export function PersonalPages(
                   void run(
                     async () => {
                       const root = workspacePath.trim();
-                      if (opening === "initialize") await props.workspaceBackup?.("initialize", { root });
+                      if (opening === "initialize")
+                        await props.workspaceBackup?.("initialize", { root, template: workspaceTemplate });
                       await props.workspaceBackup?.("activate", { root });
-                      if (opening === "initialize") await props.onWorkspaceCreated();
+                      if (opening === "initialize" && workspaceTemplate === "standard")
+                        await props.onWorkspaceCreated();
                       else await props.refreshWorkspace();
                       setOpening(null);
                     },
                     opening === "initialize"
-                      ? t("已创建空白工作区", "Blank workspace created")
+                      ? workspaceTemplate === "growth"
+                        ? t(
+                            "已创建孩子的独立成长工作区",
+                            "Created a separate growth workspace for your child",
+                          )
+                        : t("已创建空白工作区", "Blank workspace created")
                       : t("已打开已有工作区", "Existing workspace opened"),
                   );
                 }}
               >
                 {opening === "initialize" && (
                   <p className={css.small}>
-                    {t(
-                      "选择一个空文件夹，生成独立的空白资料；当前资料会保留在原位置。",
-                      "Choose an empty folder for separate blank notes. Your current notes stay in their original location.",
-                    )}
+                    {workspaceTemplate === "growth"
+                      ? t(
+                          "为这个孩子选择一个空文件夹。新工作区由父母维护，沿用今天、资料和问问；当前资料保留在原位置。",
+                          "Choose an empty folder for this child. A parent maintains the new workspace using Today, Library and Ask; your current notes stay where they are.",
+                        )
+                      : t(
+                          "选择一个空文件夹，生成独立的空白资料；当前资料会保留在原位置。",
+                          "Choose an empty folder for separate blank notes. Your current notes stay in their original location.",
+                        )}
                   </p>
                 )}
                 <label>

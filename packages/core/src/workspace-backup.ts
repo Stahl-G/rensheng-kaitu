@@ -786,6 +786,7 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
       records: z.boolean().optional(),
       allowPublic: z.boolean().optional(),
       root: z.string().optional(),
+      template: z.enum(["standard", "growth"]).optional(),
       path: z.string().optional(),
       choice: z.enum(["local", "remote"]).optional(),
     })
@@ -859,6 +860,7 @@ export async function workspaceBackupRequest(ws: Workspace, operation: string, i
           );
         const initialized = await initWorkspace(args.root, {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          template: args.template,
         });
         return { root: initialized.root };
       }

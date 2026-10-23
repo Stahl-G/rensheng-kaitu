@@ -6,6 +6,7 @@ import { readAutomation } from "./automation.js";
 import { driveStatus } from "./drive.js";
 import { readFinanceAccess } from "./exposure.js";
 import { history } from "./history.js";
+import { moduleAtDirectory } from "./modules.js";
 import { organizerStatus } from "./organizer.js";
 import { workspaceBackupStatus } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
@@ -27,6 +28,7 @@ export interface NetworkSearchSettings {
 
 export async function readSettings(ws: Workspace) {
   return {
+    workspaceMode: moduleAtDirectory(ws, "growth")?.def.id === "growth" ? "growth" : "standard",
     automation: readAutomation(ws),
     organizer: organizerStatus(ws),
     backup: workspaceBackupStatus(ws),
