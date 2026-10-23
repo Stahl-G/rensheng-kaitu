@@ -316,7 +316,7 @@
 .trendLead:focus-visible,
 .button:focus-visible,
 .link:focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 3px solid var(--link-line);
   outline-offset: 4px;
 }
 .cardLead:hover .title,
@@ -546,7 +546,7 @@
   min-height: 36px;
 }
 .page summary:focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 3px solid var(--link-line);
   outline-offset: 3px;
 }
 @container (min-width: 960px) and (max-width: 1179px) {
