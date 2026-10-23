@@ -193,14 +193,19 @@ export function InboxPage({
   const filtered = entries?.filter((entry) => status === "all" || entry.status === status) ?? [];
   const selectedEntry = filtered.find((entry) => entry.file === selected) ?? filtered[0];
   const away = overview?.sync.cloudOrganizer?.away;
-  const filters = [
-    ["all", t("全部", "All")],
-    ["me", t("随手记", "Quick notes")],
-    ["mail", t("邮件", "Email")],
-    ["slack", "Slack"],
-    ["feishu", t("飞书", "Feishu")],
-    ["other", t("其他原文", "Other")],
-  ];
+  const sourceLabel = (id: string) =>
+    id === "all"
+      ? t("全部", "All")
+      : id === "me"
+        ? t("随手记", "Quick note")
+        : id === "mail"
+          ? t("邮件", "Email")
+          : id === "slack"
+            ? "Slack"
+            : id === "feishu"
+              ? t("飞书", "Feishu")
+              : t("其他原文", "Other");
+  const filters = ["all", "me", "mail", "slack", "feishu", "other"];
   return (
     <div className={css.sec}>
       {away && (
@@ -234,9 +239,9 @@ export function InboxPage({
         })}
       </div>
       <div className={css.subtabs} role="toolbar" aria-label={t("来源", "Source")}>
-        {filters.map(([id, label]) => (
+        {filters.map((id) => (
           <button type="button" aria-pressed={source === id} key={id} onClick={() => setSource(id as string)}>
-            {label}
+            {sourceLabel(id)}
           </button>
         ))}
       </div>
@@ -292,23 +297,7 @@ export function InboxPage({
                     {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
                   </time>
                   <span className={styles.meta}>
-                    {t(
-                      row.source === "me"
-                        ? "随手记"
-                        : row.source === "mail"
-                          ? "邮件"
-                          : row.source === "other"
-                            ? "其他原文"
-                            : row.source,
-                      row.source === "me"
-                        ? "Quick note"
-                        : row.source === "mail"
-                          ? "Email"
-                          : row.source === "other"
-                            ? "Other"
-                            : row.source,
-                    )}{" "}
-                    ·{" "}
+                    {sourceLabel(row.source)} ·{" "}
                     {t(
                       row.status === "review"
                         ? "要你核对"
@@ -421,8 +410,9 @@ function InboxReview({
       active = false;
     };
   }, [file, services.readOnboardingMatter]);
+  const cannotAdopt = busy || !draft.next.trim();
   const save = async (keep = false) => {
-    if (busy) return;
+    if (busy || (!keep && cannotAdopt)) return;
     setBusy(true);
     setError("");
     try {
@@ -462,11 +452,7 @@ function InboxReview({
                   />
                 </label>
               ))}
-              <button
-                type="submit"
-                className={`${css.btn} ${css["btn-primary"]}`}
-                disabled={busy || !draft.next.trim()}
-              >
+              <button type="submit" className={`${css.btn} ${css["btn-primary"]}`} disabled={cannotAdopt}>
                 {t("对，就这样", "Looks right")}
               </button>
             </form>
@@ -480,7 +466,7 @@ function InboxReview({
               <button
                 type="button"
                 className={`${css.btn} ${css["btn-primary"]}`}
-                disabled={busy}
+                disabled={cannotAdopt}
                 onClick={() => void save()}
               >
                 {t("对，就这样", "Looks right")}
