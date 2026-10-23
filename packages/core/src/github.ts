@@ -10,7 +10,7 @@ import { appendLog, readProject } from "./projects.js";
 import { type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, parseTs } from "./time.js";
-import type { Workspace } from "./workspace.js";
+import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export type GithubProblem = "gone_or_forbidden" | "rate_limited" | "network" | "archived" | "renamed" | null;
 export interface GithubSnapshot extends StoredRecord {
@@ -75,6 +75,7 @@ export interface GithubOptions {
   now?: Date;
   api?: string;
   fetch?: typeof fetch;
+  write?: WorkspaceWrite;
 }
 const stateFile = ".kaitu/github-state.json";
 const secretsFile = ".kaitu/secrets.json";
@@ -222,21 +223,23 @@ export async function bindGithub(ws: Workspace, slug: string, url: string, optio
   return queueGithub(ws, () => bindGithubNow(ws, slug, url, options));
 }
 async function bindGithubNow(ws: Workspace, slug: string, url: string, options: GithubOptions) {
-  readProject(ws, slug);
+  const write: WorkspaceWrite = options.write ?? ((operation) => operation());
   const repo = parseGithubRepo(url);
   const now = options.now ?? new Date();
-  const state = readState(ws);
+  const { state, request } = await write(async () => {
+    readProject(ws, slug);
+    const state = readState(ws);
+    return { state, request: requester(ws, state, options, now) };
+  });
   let canonical: string;
   try {
-    const result = await requester(ws, state, options, now)<Repo>(`/repos/${repo}`);
+    const result = await request<Repo>(`/repos/${repo}`);
     canonical = parseGithubRepo(result.body.full_name);
   } finally {
-    ws.writeJson(stateFile, state, { internal: true });
+    await write(async () => ws.writeJson(stateFile, state, { internal: true }));
   }
-  return batchOverview(ws, async () => {
-    bindRepo(ws, slug, canonical, now);
-    return syncGithubNow(ws, slug, options);
-  });
+  await write(async () => bindRepo(ws, slug, canonical, now));
+  return syncGithubNow(ws, slug, options);
 }
 // 同工作区的绑定、手动和后台同步共用队列；队列内直接调用 Now 函数，避免重入等待自身。
 const syncQueues = new Map<string, Promise<unknown>>();
@@ -254,156 +257,170 @@ function queueGithub<T>(ws: Workspace, action: () => Promise<T>): Promise<T> {
 }
 
 async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions) {
-  return batchOverview(ws, async () => {
-    const project = readProject(ws, slug);
-    let repo = project.data.github?.repo;
-    if (!repo) throw new KaituError("项目未绑定 GitHub 仓库", "BAD_ARGS");
-    const now = options.now ?? new Date();
+  const write: WorkspaceWrite = options.write ?? ((operation) => operation());
+  const { project, state, request } = await write(async () => {
     const state = readState(ws);
-    const checked_at = isoInZone(now, ws.timeZone());
-    const previousState = state.repos[slug];
-    let problem: GithubProblem = null;
-    try {
-      const request = requester(ws, state, options, now);
-      const info = (await request<Repo>(`/repos/${repo}`)).body;
-      const canonical = parseGithubRepo(info.full_name);
-      if (canonical !== repo) problem = "renamed";
-      repo = canonical;
-      if (info.archived) problem = "archived";
-      const base = `/repos/${repo}`;
-      const pulls = await request<unknown[]>(`${base}/pulls?state=open&per_page=1`);
-      const last = pulls.link
-        ?.split(",")
-        .find((part) => /rel="last"/.test(part))
-        ?.match(/<([^>]+)>/);
-      const open_prs = last ? Number(new URL(last[1] as string).searchParams.get("page")) : pulls.body.length;
-      const commits = (
-        await request<Commit[]>(`${base}/commits?sha=${encodeURIComponent(info.default_branch)}&per_page=10`)
-      ).body;
-      const release = await request<Release | null>(`${base}/releases/latest`, [404]);
-      const runs = await request<Runs>(
-        `${base}/actions/runs?branch=${encodeURIComponent(info.default_branch)}&per_page=1`,
-        [401, 403, 404],
-      );
-      const run = runs.body?.workflow_runs?.[0];
-      const ci: GithubSnapshot["ci"] =
-        runs.status !== 200
-          ? { state: "no_access", run_at: null, url: null }
-          : runs.body.total_count === 0
-            ? { state: "none", run_at: null, url: null }
-            : {
-                state:
-                  run?.status !== "completed"
-                    ? "running"
-                    : run.conclusion === "success"
-                      ? "success"
-                      : "failure",
-                run_at: run?.run_started_at ?? run?.created_at ?? null,
-                url: run?.html_url ?? null,
-              };
-      const data = {
-        project: slug,
-        repo,
-        stars: info.stargazers_count,
-        forks: info.forks_count,
-        open_issues: Math.max(0, info.open_issues_count - open_prs),
-        open_prs,
-        default_branch: info.default_branch,
-        archived: info.archived,
-        pushed_at: info.pushed_at,
-        latest_release:
-          release.status === 404 || !release.body
-            ? null
-            : {
-                tag: release.body.tag_name,
-                name: release.body.name ?? release.body.tag_name,
-                published_at: release.body.published_at,
-                url: release.body.html_url,
-              },
-        commits: commits.slice(0, 10).map((item) => ({
-          sha: item.sha.slice(0, 7),
-          title: [...(item.commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
-          date: item.commit.committer.date,
-        })),
-        ci,
-      };
-      if (
-        !schemas().builtin("github-snapshot.schema.json")({
-          ...data,
-          id: "00000000000000000000000000",
-          ts: checked_at,
-          by: "agent",
-        })
-      ) {
-        throw new GithubFailure("GitHub 返回的数据不合法", "network");
-      }
-      const existing = snapshots(ws, slug, now);
-      const today = localDate(now, ws.timeZone());
-      const current = existing.find((r) => localDate(parseTs(r.ts), ws.timeZone()) === today);
-      const same =
-        current &&
-        Object.entries(data).every(([key, value]) => JSON.stringify(current[key]) === JSON.stringify(value));
-      let record = current ?? null;
-      if (!same) {
-        const module = ws.readJson<ModuleDef>("projects/module.json");
-        if (!module.records?.github_snapshot) {
-          const template: ModuleDef = JSON.parse(
-            readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
+    return {
+      project: readProject(ws, slug),
+      state,
+      request: requester(ws, state, options, options.now ?? new Date()),
+    };
+  });
+  const boundRepo = project.data.github?.repo;
+  if (!boundRepo) throw new KaituError("项目未绑定 GitHub 仓库", "BAD_ARGS");
+  let repo = boundRepo;
+  const now = options.now ?? new Date();
+  const checked_at = isoInZone(now, ws.timeZone());
+  const previousState = state.repos[slug];
+  let problem: GithubProblem = null;
+  try {
+    const info = (await request<Repo>(`/repos/${repo}`)).body;
+    const canonical = parseGithubRepo(info.full_name);
+    if (canonical !== repo) problem = "renamed";
+    repo = canonical;
+    if (info.archived) problem = "archived";
+    const base = `/repos/${repo}`;
+    const pulls = await request<unknown[]>(`${base}/pulls?state=open&per_page=1`);
+    const last = pulls.link
+      ?.split(",")
+      .find((part) => /rel="last"/.test(part))
+      ?.match(/<([^>]+)>/);
+    const open_prs = last ? Number(new URL(last[1] as string).searchParams.get("page")) : pulls.body.length;
+    const commits = (
+      await request<Commit[]>(`${base}/commits?sha=${encodeURIComponent(info.default_branch)}&per_page=10`)
+    ).body;
+    const release = await request<Release | null>(`${base}/releases/latest`, [404]);
+    const runs = await request<Runs>(
+      `${base}/actions/runs?branch=${encodeURIComponent(info.default_branch)}&per_page=1`,
+      [401, 403, 404],
+    );
+    const run = runs.body?.workflow_runs?.[0];
+    const ci: GithubSnapshot["ci"] =
+      runs.status !== 200
+        ? { state: "no_access", run_at: null, url: null }
+        : runs.body.total_count === 0
+          ? { state: "none", run_at: null, url: null }
+          : {
+              state:
+                run?.status !== "completed"
+                  ? "running"
+                  : run.conclusion === "success"
+                    ? "success"
+                    : "failure",
+              run_at: run?.run_started_at ?? run?.created_at ?? null,
+              url: run?.html_url ?? null,
+            };
+    const data = {
+      project: slug,
+      repo,
+      stars: info.stargazers_count,
+      forks: info.forks_count,
+      open_issues: Math.max(0, info.open_issues_count - open_prs),
+      open_prs,
+      default_branch: info.default_branch,
+      archived: info.archived,
+      pushed_at: info.pushed_at,
+      latest_release:
+        release.status === 404 || !release.body
+          ? null
+          : {
+              tag: release.body.tag_name,
+              name: release.body.name ?? release.body.tag_name,
+              published_at: release.body.published_at,
+              url: release.body.html_url,
+            },
+      commits: commits.slice(0, 10).map((item) => ({
+        sha: item.sha.slice(0, 7),
+        title: [...(item.commit.message.split(/\r?\n/)[0] ?? "")].slice(0, 80).join(""),
+        date: item.commit.committer.date,
+      })),
+      ci,
+    };
+    if (
+      !schemas().builtin("github-snapshot.schema.json")({
+        ...data,
+        id: "00000000000000000000000000",
+        ts: checked_at,
+        by: "agent",
+      })
+    ) {
+      throw new GithubFailure("GitHub 返回的数据不合法", "network");
+    }
+    return await write(() =>
+      batchOverview(ws, async () => {
+        const existing = snapshots(ws, slug, now);
+        const today = localDate(now, ws.timeZone());
+        const current = existing.find((r) => localDate(parseTs(r.ts), ws.timeZone()) === today);
+        const same =
+          current &&
+          Object.entries(data).every(
+            ([key, value]) => JSON.stringify(current[key]) === JSON.stringify(value),
           );
-          module.records = {
-            ...module.records,
-            github_snapshot: template.records?.github_snapshot as NonNullable<ModuleDef["records"]>[string],
-          };
-          ws.writeJson("projects/module.json", module);
-        }
-        record = (
-          current
-            ? updateRecord(ws, "github_snapshot", current.id, { ...data, ts: checked_at })
-            : addRecord(ws, "github_snapshot", data, { now })
-        ).record as GithubSnapshot;
-        const previous = existing.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < today).at(-1);
-        const delta = previous ? data.stars - previous.stars : null;
-        const change = delta === null ? "首次记录" : `净变化 ${delta >= 0 ? "+" : ""}${delta}`;
-        appendLog(
-          ws,
-          slug,
-          `GitHub：Star ${data.stars}（${change}），Fork ${data.forks}，开放 Issue ${data.open_issues}、PR ${data.open_prs}`,
-          today,
-          "github",
-        );
-        if (data.latest_release && data.latest_release.tag !== existing.at(-1)?.latest_release?.tag) {
+        let record = current ?? null;
+        if (!same) {
+          const module = ws.readJson<ModuleDef>("projects/module.json");
+          if (!module.records?.github_snapshot) {
+            const template: ModuleDef = JSON.parse(
+              readFileSync(join(templateDir(), "projects/module.json"), "utf8"),
+            );
+            module.records = {
+              ...module.records,
+              github_snapshot: template.records?.github_snapshot as NonNullable<ModuleDef["records"]>[string],
+            };
+            ws.writeJson("projects/module.json", module);
+          }
+          record = (
+            current
+              ? updateRecord(ws, "github_snapshot", current.id, { ...data, ts: checked_at })
+              : addRecord(ws, "github_snapshot", data, { now })
+          ).record as GithubSnapshot;
+          const previous = existing.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < today).at(-1);
+          const delta = previous ? data.stars - previous.stars : null;
+          const change = delta === null ? "首次记录" : `净变化 ${delta >= 0 ? "+" : ""}${delta}`;
           appendLog(
             ws,
             slug,
-            `GitHub 发布：${data.latest_release.tag} ${data.latest_release.name}`,
+            `GitHub：Star ${data.stars}（${change}），Fork ${data.forks}，开放 Issue ${data.open_issues}、PR ${data.open_prs}`,
             today,
-            "github-release",
+            "github",
+          );
+          if (data.latest_release && data.latest_release.tag !== existing.at(-1)?.latest_release?.tag) {
+            appendLog(
+              ws,
+              slug,
+              `GitHub 发布：${data.latest_release.tag} ${data.latest_release.name}`,
+              today,
+              "github-release",
+            );
+          }
+        }
+        const renamed = project.data.github?.repo !== repo;
+        if (renamed) {
+          bindRepo(ws, slug, repo, now);
+          appendLog(
+            ws,
+            slug,
+            `GitHub 仓库改名：${project.data.github?.repo} → ${repo}`,
+            today,
+            "github-rename",
           );
         }
-      }
-      const renamed = project.data.github?.repo !== repo;
-      if (renamed) {
-        bindRepo(ws, slug, repo, now);
-        appendLog(
-          ws,
+        state.repos[slug] = { checked_at, ok_at: checked_at, error: null, problem };
+        ws.writeJson(stateFile, state, { internal: true });
+        return {
           slug,
-          `GitHub 仓库改名：${project.data.github?.repo} → ${repo}`,
-          today,
-          "github-rename",
-        );
-      }
-      state.repos[slug] = { checked_at, ok_at: checked_at, error: null, problem };
-      ws.writeJson(stateFile, state, { internal: true });
-      return {
-        slug,
-        repo,
-        ok: true,
-        problem,
-        statusChanged: !!previousState?.error || (previousState?.problem ?? null) !== problem,
-        snapshot: record,
-        version: same && !renamed ? null : await snapshot(ws, `同步了 GitHub：${project.data.title}`, now),
-      };
-    } catch (error) {
+          repo,
+          ok: true,
+          problem,
+          statusChanged: !!previousState?.error || (previousState?.problem ?? null) !== problem,
+          snapshot: record,
+          version: same && !renamed ? null : await snapshot(ws, `同步了 GitHub：${project.data.title}`, now),
+        };
+      }),
+    );
+  } catch (error) {
+    if (error instanceof KaituError && error.code === "CONFLICT") throw error;
+    return write(async () => {
       problem = error instanceof GithubFailure ? error.problem : "network";
       state.repos[slug] = {
         checked_at,
@@ -421,9 +438,10 @@ async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions
         snapshot: null,
         version: null,
       };
-    }
-  });
+    });
+  }
 }
+
 export function projectGithub(ws: Workspace, slug: string, now = new Date()) {
   const repo = readProject(ws, slug).data.github?.repo;
   if (!repo) return null;

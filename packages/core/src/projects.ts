@@ -19,7 +19,7 @@ import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { ModuleStatus } from "./workbench.js";
-import type { Workspace } from "./workspace.js";
+import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export interface ProjectLink {
   path: string;
@@ -462,7 +462,21 @@ function wordCount(text: string, markdown: boolean): number {
   );
 }
 
-export async function syncProject(ws: Workspace, slug: string, options: { now?: Date } = {}) {
+export async function syncProject(ws: Workspace, slug: string, options: GithubOptions = {}) {
+  const write: WorkspaceWrite = options.write ?? ((operation) => operation());
+  const local = await write(() => syncProjectLocal(ws, slug, options));
+  const github = local.github ? await syncGithub(ws, slug, options) : null;
+  if (github?.problem) local.issues.push({ path: github.repo, message: github.problem });
+  return {
+    slug,
+    metrics: local.metrics,
+    issues: local.issues,
+    version: github?.ok
+      ? github.version
+      : await write(() => snapshot(ws, `同步了项目进度：${local.title}`, local.now)),
+  };
+}
+async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
     const sorted = sortLog(project.log);
@@ -615,16 +629,10 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
       internal: true,
     });
-    const github = project.data.github ? await syncGithub(ws, slug, { now }) : null;
-    if (github?.problem) issues.push({ path: github.repo, message: github.problem });
-    return {
-      slug,
-      metrics: written,
-      issues,
-      version: github?.ok ? github.version : await snapshot(ws, `同步了项目进度：${project.data.title}`, now),
-    };
+    return { metrics: written, issues, github: !!project.data.github, title: project.data.title, now };
   });
 }
+
 export async function syncProjects(ws: Workspace) {
   return batchSnapshot(ws, "同步了项目进度", async () => {
     const results = [];

@@ -233,12 +233,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     queue = result.catch(() => {});
     return result;
   }
-  function calendarWriter() {
+  function workspaceWriter() {
     const generation = workspaceGeneration;
     return <T>(operation: () => Promise<T>) =>
       exclusive(() => {
         if (closed || generation !== workspaceGeneration)
-          throw new KaituError("资料位置或版本已变化，请重新拉取日历", "CONFLICT");
+          throw new KaituError("资料位置或版本已变化，请重试", "CONFLICT");
         return operation();
       });
   }
@@ -247,7 +247,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     if (pullingCalendars || closed) return;
     pullingCalendars = true;
     try {
-      await pullCalendarSubscriptions(ws, new Date(), calendarWriter());
+      await pullCalendarSubscriptions(ws, new Date(), workspaceWriter());
       syncCalendar();
       notify();
     } finally {
@@ -561,7 +561,15 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         if (method === "addCalendarSubscription") {
           if (typeof args[0] !== "string" || typeof args[1] !== "string")
             throw new KaituError("缺少有效参数", "BAD_ARGS");
-          const result = await addCalendarSubscription(ws, args[0], args[1], calendarWriter());
+          const result = await addCalendarSubscription(ws, args[0], args[1], workspaceWriter());
+          notify();
+          return json(res, 200, result);
+        }
+        if (
+          ["projectBindGithub", "projectSync", "onboardingMatterOrganize"].includes(method) ||
+          (method === "workspaceBackup" && ["create", "connect"].includes(String(args[0])))
+        ) {
+          const result = await productRequest(ws, method, args, options.ask, calendarPush, workspaceWriter());
           notify();
           return json(res, 200, result);
         }
