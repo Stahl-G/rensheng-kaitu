@@ -494,6 +494,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null,
           );
         if (method === "plugins") {
+          if (!options.plugins && args[0] === "explore") return json(res, 200, []);
           if (!options.plugins) throw new KaituError("插件只在开图 App 里可用", "BAD_ARGS");
           return json(
             res,
