@@ -413,5 +413,5 @@
   font-weight: 600;
 }
 .steps [aria-label] {
-  color: var(--accent);
+  color: var(--link);
 }
