@@ -451,7 +451,7 @@ export function HealthPage({
     [
       t("蛋白质", "Protein"),
       amount(protein.value, t("g / 天", "g / day"), protein.estimated),
-      coverage(protein.count),
+      `${coverage(protein.count)}${data?.nutrition.target?.length ? t(` · 目标 ${data.nutrition.target.join("–")} g / 天`, ` · Target ${data.nutrition.target.join("–")} g / day`) : ""}`,
     ],
     [
       t("睡眠", "Sleep"),
@@ -568,11 +568,25 @@ export function HealthPage({
       ) : (
         <>
           <dl className={css.overview} aria-label={t("健康概况", "Health summary")}>
-            {summary.map(([title, value, note]) => (
+            {summary.map(([title, value, note], index) => (
               <div className={css.card} key={title}>
                 <dt>{title}</dt>
                 <dd>
                   <strong>{value}</strong>
+                  {index === 0 && target?.[0] && training.week !== null && (
+                    <progress
+                      aria-label={t("本周训练目标", "Weekly workout goal")}
+                      value={training.week}
+                      max={target[0]}
+                    />
+                  )}
+                  {index === 1 && data.nutrition.target?.[0] && protein.value !== null && (
+                    <progress
+                      aria-label={t("每日蛋白质目标", "Daily protein goal")}
+                      value={protein.value}
+                      max={data.nutrition.target[0]}
+                    />
+                  )}
                   <small>{note}</small>
                 </dd>
               </div>
