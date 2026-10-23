@@ -1,5 +1,5 @@
 import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import styles from "./InboxPage.module.css";
@@ -142,13 +142,33 @@ export function InboxPage({
   const [error, setError] = useState("");
   const generation = useRef(0);
   const reload = useRef<() => Promise<void>>(async () => {});
+  const readMatter = review?.readOnboardingMatter;
+  const readPage = useCallback(
+    async (query: LibraryQuery) => {
+      const page = await loadLibrary(query);
+      if (!readMatter) return page;
+      const inbox = await Promise.all(
+        page.inbox.map(async (entry) => {
+          if (entry.source !== "me") return entry;
+          // Archive folders use the archive date; the capture date retains the original source identity.
+          const source = entry.file.startsWith("inbox/notes/done/")
+            ? `inbox/notes/${entry.date?.slice(0, 10)}/${entry.file.split("/").at(-1)}`
+            : entry.file;
+          const matter = await readMatter(source);
+          return { ...entry, file: matter.source, status: matter.draft ? ("review" as const) : entry.status };
+        }),
+      );
+      return { ...page, inbox };
+    },
+    [loadLibrary, readMatter],
+  );
   useEffect(() => {
     let active = true;
     const load = async () => {
       const seq = ++generation.current;
       setLoading(true);
       try {
-        const page = await loadLibrary({ section: "inbox", source });
+        const page = await readPage({ section: "inbox", source });
         if (!active || seq !== generation.current) return;
         setEntries(page.inbox);
         setStatus((current) =>
@@ -173,13 +193,13 @@ export function InboxPage({
       generation.current++;
       off?.();
     };
-  }, [loadLibrary, source, subscribe]);
+  }, [readPage, source, subscribe]);
   const more = async () => {
     if (!next || loading) return;
     const seq = generation.current;
     setLoading(true);
     try {
-      const page = await loadLibrary({ section: "inbox", source, before: next });
+      const page = await readPage({ section: "inbox", source, before: next });
       if (seq !== generation.current) return;
       setEntries((current) => [...(current ?? []), ...page.inbox]);
       setNext(page.next ?? null);
@@ -412,7 +432,16 @@ function InboxReview({
       active = false;
     };
   }, [file, services.readOnboardingMatter]);
-  const cannotAdopt = busy || !draft.next.trim();
+  const cannotAdopt =
+    busy ||
+    (["goal", "current", "next"] as const).some((key) => {
+      const value = draft[key].trim();
+      return (
+        (key !== "current" && !value) ||
+        value.length > (key === "current" ? 4000 : 2000) ||
+        /[\r\n]/.test(value)
+      );
+    });
   const save = async (keep = false) => {
     if (busy || (!keep && cannotAdopt)) return;
     setBusy(true);
@@ -449,8 +478,13 @@ function InboxReview({
                   <textarea
                     value={draft[key]}
                     disabled={busy}
-                    maxLength={10000}
-                    onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
+                    maxLength={key === "current" ? 4000 : 2000}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        [key]: event.target.value.replace(/[\r\n]+/g, " "),
+                      }))
+                    }
                   />
                 </label>
               ))}
