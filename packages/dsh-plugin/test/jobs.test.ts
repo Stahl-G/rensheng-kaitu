@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { productRequest } from "../../cli/src/ui/product.js";
 import { TYPERT } from "../lib/typert.host.js";
-import { ExploreNavigation } from "../src/client/ExploreNavigation.js";
+import { ExploreModulesPage } from "../src/client/ExploreNavigation.js";
 import { JobDetails } from "../src/client/JobsPage.js";
 import { defaultExploreEntries } from "../src/client/explore-modules.js";
 import { KaituOverviewService } from "../src/overview-service.js";
@@ -62,7 +62,7 @@ it("reads the existing source through Remote, keeps optional visibility and neve
     try {
       const visible = (entries: string[]) =>
         renderToStaticMarkup(
-          createElement(ExploreNavigation, {
+          createElement(ExploreModulesPage, {
             entries,
             current: "jobs",
             open: () => {},
