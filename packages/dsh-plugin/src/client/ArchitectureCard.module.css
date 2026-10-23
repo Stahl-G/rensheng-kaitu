@@ -1,0 +1,16 @@
+/* 项目架构图：Archify 生成的整页 HTML 放在隔离框里，外面只管尺寸。 */
+.frame {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 70vh;
+  min-height: 420px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--sunken);
+}
+.meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}

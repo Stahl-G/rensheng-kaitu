@@ -1,6 +1,7 @@
 import type { PlansData } from "@kaitu/core";
 import { useState } from "react";
 import css from "./Prototype.module.css";
+import { TodayGoal } from "./TodayPage.js";
 import { useT } from "./i18n.js";
 
 const AI_NAMES: Record<string, string> = {
@@ -69,8 +70,8 @@ export function PlansCard({
   const row = (goal: PlansData["goals"][number]) => (
     <div key={goal.id} id={`plan-${goal.id}`}>
       <div className={css.row}>
-        <span className={`${css["row-title"]} ${css.stack}`}>
-          <b>{goal.title}</b>
+        <div className={`${css["row-title"]} ${css.stack}`}>
+          <TodayGoal text={goal.title} title />
           <span className={css.small}>
             {origin(goal)}
             {goal.results
@@ -81,7 +82,7 @@ export function PlansCard({
               : ""}
             {goal.lastResult ? t(` · 最近：${goal.lastResult}`, ` · latest: ${goal.lastResult}`) : ""}
           </span>
-        </span>
+        </div>
         {goal.next ? (
           <span className={css.planNext}>
             <span className={css.chip}>

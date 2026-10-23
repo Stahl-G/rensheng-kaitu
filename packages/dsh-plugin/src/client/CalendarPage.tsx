@@ -72,7 +72,7 @@ export function Agenda({
   return (
     <section className={css.sec}>
       <div className={css["sec-head"]}>
-        <h2 className={css.eyebrow}>{t("今天的日程", "Today's schedule")}</h2>
+        <h2 className={css.eyebrow}>{t("日程", "Schedule")}</h2>
         <button type="button" className={css.link} onClick={open}>
           {t("看全部日程", "Full schedule")}
         </button>
@@ -86,11 +86,13 @@ export function Agenda({
           today
             .sort((a, b) => a.start.localeCompare(b.start))
             .map((event) => (
-              <div className={css["agenda-row"]} key={event.id}>
+              <div data-agenda-row className={css["agenda-row"]} key={event.id}>
                 <time>
                   {event.start ? calendarTime(event.start, data.timeZone, locale) : t("待定", "TBD")}
                 </time>
-                <span>{event.title}</span>
+                <span>
+                  {event.pending ? t(`AI 建议：${event.title}`, `Suggested: ${event.title}`) : event.title}
+                </span>
                 {event.pending ? (
                   <div className={css.confirmationActions}>
                     <button
@@ -99,15 +101,16 @@ export function Agenda({
                       disabled={busy}
                       onClick={() => decide(event.id, "confirmed")}
                     >
-                      {t("确认", "Confirm")}
+                      {t("加入", "Add")}
                     </button>
                     <button
                       type="button"
                       className={`${css.btn} ${css.confirmationDismiss}`}
+                      aria-label={t("忽略这条建议", "Dismiss suggestion")}
                       disabled={busy}
                       onClick={() => decide(event.id, "rejected")}
                     >
-                      {t("不用", "No thanks")}
+                      {t("×", "×")}
                     </button>
                   </div>
                 ) : (

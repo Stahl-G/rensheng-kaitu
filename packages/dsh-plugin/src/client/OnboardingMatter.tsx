@@ -9,6 +9,7 @@ import type {
 import { useEffect, useRef, useState } from "react";
 import css from "./Onboarding.module.css";
 import v2 from "./Prototype.module.css";
+import { TodayGoal } from "./TodayPage.js";
 import { useLocale, useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -474,12 +475,6 @@ export function OnboardingNextCard(
       setBusy(false);
     }
   };
-  const sourceLabel =
-    next.kind === "goal"
-      ? t("查看这个目标", "view this goal")
-      : next.kind === "conversation"
-        ? t("查看这段对话", "view this conversation")
-        : t("查看你写的这件事", "view what you wrote");
   const shown = next.kind === "goal" ? goalShown : !!original;
   return (
     <section
@@ -491,11 +486,8 @@ export function OnboardingNextCard(
         {next.status === "done" ? t("这一步已完成", "This step is done") : t("现在这件事", "One thing now")}
       </span>
       <h2>{next.next}</h2>
-      <p className={v2.small}>
-        {t("为了：", "For: ")}
-        {next.goal}
-        {next.due ? t(` · 安排到 ${next.due}`, ` · planned for ${next.due}`) : ""}
-      </p>
+      <TodayGoal text={next.goal} />
+      {next.due && <p className={v2.small}>{t(`安排到 ${next.due}`, `Planned for ${next.due}`)}</p>}
       <button
         type="button"
         className={v2.link}
@@ -508,8 +500,7 @@ export function OnboardingNextCard(
               })
         }
       >
-        {t("依据 · ", "Source · ")}
-        {shown ? t("收起", "hide") : sourceLabel}
+        {shown ? t("收起原始记录", "Hide original") : t("查看原始记录", "View original")}
       </button>
       {next.kind === "goal" && goalShown && (
         <p className={css.original}>
@@ -555,7 +546,7 @@ export function OnboardingNextCard(
                 setValue("");
               }}
             >
-              {t("完成并记一句结果", "Done, log one line")}
+              {t("完成", "Done")}
             </button>
             {props.onPrompt && (
               <button type="button" className={quiet} onClick={props.onPrompt}>

@@ -1,8 +1,14 @@
-import type { OnboardingImportPreview, OnboardingSetupInput, OnboardingSetupPreview } from "@kaitu/core";
+import type {
+  FileImportSource,
+  OnboardingImportPreview,
+  OnboardingSetupInput,
+  OnboardingSetupPreview,
+} from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import { FolderButton } from "./DshFiles.js";
 import styles from "./OnboardingSources.module.css";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 type Completion = { onDone: () => void | Promise<void>; onClose: () => void };
@@ -56,31 +62,81 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 const quiet = `${css.btn} ${css["btn-quiet"]}`;
 const primary = `${css.btn} ${css["btn-primary"]}`;
 
+export type FileImportServices = Pick<
+  OnboardingServices,
+  "previewOnboardingImport" | "confirmOnboardingImport" | "cancelOnboarding"
+>;
+
 export function OnboardingFileImport(
-  props: OnboardingServices & Completion & { source: "apple-health" | "chatgpt-conversations" },
+  props: FileImportServices &
+    Completion & {
+      source?: FileImportSource;
+      defaultSource?: FileImportSource;
+      initialFile?: File;
+    },
 ) {
+  const t = useT();
+  const [source, setSource] = useState<FileImportSource>(props.source ?? props.defaultSource ?? "ics");
+  const sources = {
+    "apple-health": { name: t("Apple 健康", "Apple Health"), accept: ".zip,.xml" },
+    "chatgpt-conversations": { name: t("ChatGPT 对话", "ChatGPT conversations"), accept: ".zip,.json" },
+    ics: { name: t("日历 ICS", "Calendar ICS"), accept: ".ics" },
+    "nut-ai": { name: t("Nut AI 备份", "Nut AI backup"), accept: ".json" },
+  } satisfies Record<FileImportSource, { name: string; accept: string }>;
+  const title = t("导入 ", "Import ") + sources[source].name;
   const session = usePreview<OnboardingImportPreview>(props.cancelOnboarding);
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(props.initialFile ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const preview = session.preview?.preview;
-  const health = props.source === "apple-health";
   async function prepare() {
     if (!file) return;
     setBusy(true);
     setError("");
     try {
       await session.clear();
-      const base64 = await fileBase64(file);
+      // Match the existing 48 MiB base64 request limit before allocating the full upload.
+      if (Math.ceil(file.size / 3) * 4 > 48 * 1024 * 1024)
+        throw new Error(
+          t(
+            "文件超过 36 MiB，请拆成较小的导出文件。",
+            "This file exceeds 36 MiB. Split it into smaller exports.",
+          ),
+        );
+      const base64 = await fileBase64(file).catch(() => {
+        throw new Error(
+          t("无法读取这个文件，请重新导出后再试。", "Could not read this file. Export it again and retry."),
+        );
+      });
       if (!session.alive.current) return;
-      await session.accept(await props.previewOnboardingImport(props.source, file.name, base64));
+      await session.accept(await props.previewOnboardingImport(source, file.name, base64));
     } catch (err) {
-      setError(message(err));
+      const detail = message(err);
+      setError(
+        (source === "chatgpt-conversations" || source === "nut-ai") &&
+          /Unexpected token|Unexpected end|JSON|无法读取 ChatGPT|Nut AI 备份格式|The import file could not be read/.test(
+            detail,
+          )
+          ? t(
+              "这个 JSON 读不出来，请确认是完整的 ChatGPT 导出或 Nut AI 备份，并选择对应来源。",
+              "Could not read this JSON. Check that it is a complete ChatGPT export or Nut AI backup and choose the matching source.",
+            )
+          : detail,
+      );
     } finally {
       setBusy(false);
     }
   }
+  const prepareRef = useRef(prepare);
+  prepareRef.current = prepare;
+  const automaticFile = useRef<File>();
+  useEffect(() => {
+    if (props.initialFile && props.source && automaticFile.current !== props.initialFile) {
+      automaticFile.current = props.initialFile;
+      void prepareRef.current();
+    }
+  }, [props.initialFile, props.source]);
   async function confirm() {
     if (!session.preview) return;
     setBusy(true);
@@ -111,30 +167,61 @@ export function OnboardingFileImport(
     }
   }
   return (
-    <section
-      className={`${css.card} ${css["sub-form"]}`}
-      aria-label={health ? "导入 Apple 健康" : "导入 ChatGPT 对话"}
-    >
-      <strong>{health ? "导入 Apple 健康" : "导入 ChatGPT 对话"}</strong>
-      <label>
-        {health ? "选择健康导出的 ZIP 或 XML 文件" : "选择 ChatGPT 导出的 ZIP 或 conversations.json"}
-        <input
-          type="file"
-          accept={health ? ".zip,.xml" : ".zip,.json"}
-          disabled={busy || !!preview}
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        />
-      </label>
+    <section className={`${css.card} ${css["sub-form"]}`} aria-label={title}>
+      <strong>{title}</strong>
+      {!props.source && (
+        <label>
+          {props.initialFile && (
+            <p>{t("请选择这个导出文件的来源。", "Choose the source of this export file.")}</p>
+          )}
+          {t("资料类型", "File type")}
+          <select
+            value={source}
+            disabled={busy || !!preview}
+            onChange={(event) => {
+              setSource(event.target.value as FileImportSource);
+              if (!props.initialFile) setFile(null);
+            }}
+          >
+            {Object.entries(sources).map(([id, item]) => (
+              <option key={id} value={id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {props.initialFile ? (
+        <p>{file?.name}</p>
+      ) : (
+        <label>
+          {t("选择导出文件", "Choose an export file")}
+          <input
+            key={source}
+            type="file"
+            accept={sources[source].accept}
+            disabled={busy || !!preview}
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+      )}
       {preview && (
         <div className={styles.preview}>
           <p>
-            新增 {preview.added} · 更新 {preview.updated} · 跳过 {preview.skipped}
+            {t(
+              `新增 ${preview.added} · 更新 ${preview.updated} · 跳过 ${preview.skipped}`,
+              `Add ${preview.added} · Update ${preview.updated} · Skip ${preview.skipped}`,
+            )}
           </p>
           {"types" in preview && (
             <ul className={styles.list}>
               {Object.entries(preview.types).map(([type, count]) => (
                 <li key={type}>
-                  {type}：新增 {count.added} · 更新 {count.updated} · 跳过 {count.skipped}
+                  {type} ·{" "}
+                  {t(
+                    `新增 ${count.added} · 更新 ${count.updated} · 跳过 ${count.skipped}`,
+                    `Add ${count.added} · Update ${count.updated} · Skip ${count.skipped}`,
+                  )}
                 </li>
               ))}
             </ul>
@@ -144,14 +231,17 @@ export function OnboardingFileImport(
               {preview.entries.map((entry) => (
                 <li key={entry.file}>
                   {entry.title} ·{" "}
-                  {entry.action === "added" ? "新增" : entry.action === "updated" ? "更新" : "跳过"}
+                  {t(
+                    entry.action === "added" ? "新增" : entry.action === "updated" ? "更新" : "跳过",
+                    entry.action === "added" ? "Add" : entry.action === "updated" ? "Update" : "Skip",
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </div>
       )}
-      {saved && <output>已导入，正在更新清单。</output>}
+      {saved && <output>{t("已导入，正在更新清单。", "Imported. Refreshing the list.")}</output>}
       {error && (
         <p className={css.error} role="alert">
           {error}
@@ -161,7 +251,11 @@ export function OnboardingFileImport(
         {preview ? (
           <>
             <button type="button" className={primary} disabled={busy} onClick={() => void confirm()}>
-              {busy ? "处理中…" : saved ? "重新读取结果" : "确认导入"}
+              {busy
+                ? t("处理中…", "Processing…")
+                : saved
+                  ? t("重新读取结果", "Reload result")
+                  : t("确认导入", "Confirm import")}
             </button>
             {!saved && (
               <button
@@ -170,17 +264,17 @@ export function OnboardingFileImport(
                 disabled={busy}
                 onClick={() => void session.clear().catch((err) => setError(message(err)))}
               >
-                重新选择
+                {t("重新预览", "Preview again")}
               </button>
             )}
           </>
         ) : (
           <button type="button" className={primary} disabled={busy || !file} onClick={() => void prepare()}>
-            {busy ? "正在预览…" : "预览导入"}
+            {busy ? t("正在预览…", "Preparing preview…") : t("预览导入", "Preview import")}
           </button>
         )}
         <button type="button" className={quiet} disabled={busy} onClick={() => void close()}>
-          {saved ? "关闭" : "取消"}
+          {saved ? t("关闭", "Close") : t("取消", "Cancel")}
         </button>
       </div>
     </section>

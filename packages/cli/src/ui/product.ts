@@ -61,6 +61,7 @@ import {
   financeOverview,
   handoverPack,
   hideExperience,
+  installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -78,6 +79,8 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectArchitecturePrompt,
+  projectMemoryPrompt,
   proposeTask,
   readAutomation,
   readAvatar,
@@ -98,12 +101,15 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
   readSettings,
+  readWeather,
   receiveBankNotification,
   recordOnboardingAiConnection,
   recoverExperienceImports,
+  refreshWeather,
   removeAvatar,
   replaceMemory,
   resolveExperience,
@@ -123,6 +129,7 @@ import {
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
+  setWeatherPlace,
   stageFinanceUpload,
   startLearning,
   syncProject,
@@ -463,6 +470,22 @@ export async function productRequest(
       return readProjectPage(ws, text(0));
     case "projectSync":
       return syncProject(ws, text(0));
+    case "projectMemoryPrompt":
+      return projectMemoryPrompt(ws, text(0), args[1] === "en" ? "en" : "zh-CN");
+    case "weather":
+      return readWeather();
+    case "weatherPlace": {
+      const state = setWeatherPlace(args[0] as Parameters<typeof setWeatherPlace>[0]);
+      // 取天气是等外部的事：先返回，界面稍后再读缓存。
+      void refreshWeather().catch(() => {});
+      return state;
+    }
+    case "projectArchitecturePrompt":
+      return projectArchitecturePrompt(ws, text(0), args[1] === "en" ? "en" : "zh-CN");
+    case "projectArchitecture":
+      return readProjectArchitecture(ws, text(0));
+    case "projectMemoryInstall":
+      return installProjectMemory(ws, text(1), text(0));
     case "experienceSource":
       return readExperienceSource(ws, text(0));
     case "hometownCities":

@@ -1,0 +1,203 @@
+.page {
+  display: grid;
+  /* 列宽跟页面走：一行不换行的长原文只能在预览里省略，不能把整页撑宽。 */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  container-type: inline-size;
+}
+.page h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.heading p {
+  margin: 0;
+  color: var(--ink2);
+}
+.page input,
+.page textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.inbox {
+  background: var(--surface);
+  padding: 24px 26px;
+  border-radius: var(--radius);
+}
+.categories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+/* 设计稿 C：每类一个模块色的浅渐变和图标，颜色由 --tint / --tone 传入。 */
+.category {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 172px;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, var(--tint, var(--control)), var(--surface) 72%);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: box-shadow 0.18s, transform 0.18s;
+}
+.category:hover {
+  box-shadow: 0 10px 26px rgba(32, 34, 31, 0.07);
+  transform: translateY(-2px);
+}
+.category time {
+  margin-top: auto;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+.icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--tone, var(--link));
+}
+.add {
+  justify-content: center;
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+}
+.add .icon {
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+  color: var(--ink2);
+}
+.add:hover {
+  border-color: var(--link-line);
+  background: var(--link-soft);
+  box-shadow: none;
+  transform: none;
+}
+.count {
+  margin-top: 6px;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 12px 0;
+  text-align: left;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  font: inherit;
+}
+button.row {
+  cursor: pointer;
+}
+.row time {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.ways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.ways button,
+.capture button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--secondary-line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.capture {
+  margin-top: 16px;
+}
+.capture label {
+  display: grid;
+  gap: 8px;
+}
+.capture textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+}
+.capture button {
+  margin: 12px 8px 0 0;
+}
+.page :focus-visible,
+.split :focus-visible {
+  outline: 3px solid var(--link-line);
+  outline-offset: 3px;
+}
+@container (max-width: 959px) {
+  .categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 639px) {
+  .categories {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .inbox {
+    padding: 20px;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+}
+.count.meta {
+  font-size: 32px;
+}
+
+.searchResults {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

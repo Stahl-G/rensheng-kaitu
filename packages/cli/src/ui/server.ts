@@ -52,6 +52,8 @@ import {
   restore,
   snapshotNow,
   stageUpload,
+  startProjectGithubSync,
+  startWeatherSync,
   startWorkspaceBackup,
   subscribeOrganizer,
   syncProject,
@@ -142,6 +144,7 @@ function englishError(error: KaituError): string {
     READ_ONLY: "This workspace is read-only. Check its folder permissions.",
     INVALID_RECORD: "Check the record's required fields and values, then try again.",
     INVALID_CONFIG: "Check the settings and try again.",
+    INVALID_IMPORT: "The import file could not be read. Check its format and export it again.",
     BAD_ARGS: "Check the input and try again.",
     AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
     PLUGIN_NETWORK: "The plugin catalog could not connect. Check the network and try again.",
@@ -263,6 +266,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   const stopBackup = startWorkspaceBackup(ws, notify);
+  const stopProjectSync = startProjectGithubSync(ws, notify);
+  const weather = startWeatherSync(notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
   const stopPhone = startPhoneSnapshots(ws, () => reportError());
   void pullCalendars().catch(() => {});
@@ -435,7 +440,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     res.setHeader("Cache-Control", "no-store");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://s3.amazonaws.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      "default-src 'self'; frame-src 'self' http://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://s3.amazonaws.com; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
     const hosts = [`127.0.0.1:${port}`, `localhost:${port}`];
     if (!hosts.includes(req.headers.host ?? "")) return json(res, 403, { error: "拒绝非本机 Host" });
@@ -492,6 +497,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             options.desktopUpdate ? await options.desktopUpdate(String(args[0] ?? "status")) : null,
           );
         if (method === "plugins") {
+          if (!options.plugins && args[0] === "explore") return json(res, 200, []);
           if (!options.plugins) throw new KaituError("插件只在开图 App 里可用", "BAD_ARGS");
           return json(
             res,
@@ -859,6 +865,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopBackup();
+    stopProjectSync();
+    weather.stop();
     stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);
@@ -879,6 +887,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     watcher?.close();
     unwatchFile(backupState, backupChanged);
     stopBackup();
+    stopProjectSync();
+    weather.stop();
     stopOrganizer();
     stopPhone();
     clearInterval(calendarTimer);

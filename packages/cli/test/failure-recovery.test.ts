@@ -141,3 +141,10 @@ it("同步冲突后又有本机编辑时 HTTP 要求重新核对，两份内容�
   expect(readdirSync(archive)).toEqual(saved);
   expect(ws.readText("me/profile.md")).toBe("remote edit\n");
 });
+
+it("没有桌面宿主仍能读取内置模块，插件写操作继续拒绝", async () => {
+  const { post } = await setup();
+  expect(await post("plugins", ["explore"])).toEqual({ status: 200, body: [] });
+  expect((await post("overview", [])).status).toBe(200);
+  expect((await post("plugins", ["install", "synthetic-plugin"])).status).toBe(400);
+});

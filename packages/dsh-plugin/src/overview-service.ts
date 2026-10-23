@@ -47,6 +47,7 @@ import {
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
+  type WeatherState,
   Workspace,
   addCalendarSubscription,
   addGoalNext,
@@ -78,6 +79,7 @@ import {
   exportWorkspace,
   handoverPack,
   hideExperience,
+  installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -93,6 +95,8 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectArchitecturePrompt,
+  projectMemoryPrompt,
   proposeTask,
   readAutomation,
   readAvatar,
@@ -112,10 +116,13 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
   readSettings,
+  readWeather,
   recoverExperienceImports,
+  refreshWeather,
   removeAvatar,
   replaceMemory,
   resolveExperience,
@@ -135,6 +142,7 @@ import {
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
+  setWeatherPlace,
   snapshot,
   startLearning,
   syncProject,
@@ -772,6 +780,43 @@ export class KaituOverviewService extends TypertRemoteService {
   async projectBindGithub(slug: string, repo: string): Promise<ProjectDetailData> {
     await bindGithub(this.workspace, slug, repo);
     return readProjectPage(this.workspace, slug);
+  }
+
+  @Remote("projectMemoryPrompt")
+  async projectMemoryPrompt(slug: string, locale: string): Promise<string> {
+    return projectMemoryPrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("weather")
+  async weather(): Promise<WeatherState> {
+    return readWeather();
+  }
+
+  @Remote("weatherPlace")
+  async weatherPlace(
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ): Promise<WeatherState> {
+    const state = setWeatherPlace({ name, latitude, longitude, source });
+    void refreshWeather().catch(() => {});
+    return state;
+  }
+
+  @Remote("projectArchitecturePrompt")
+  async projectArchitecturePrompt(slug: string, locale: string): Promise<string> {
+    return projectArchitecturePrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("projectArchitecture")
+  async projectArchitecture(slug: string): Promise<string | null> {
+    return readProjectArchitecture(this.workspace, slug);
+  }
+
+  @Remote("projectMemoryInstall")
+  async projectMemoryInstall(slug: string, directory: string): Promise<{ files: string[]; project: string }> {
+    return installProjectMemory(this.workspace, directory, slug);
   }
 
   @Remote("projectSync")
