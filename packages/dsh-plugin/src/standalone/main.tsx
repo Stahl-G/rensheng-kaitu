@@ -138,6 +138,7 @@ const props: OverviewPageProps = {
   editExperience: (id, changes, revision) => call("editExperience", id, changes, revision),
   hideExperience: (id, revision) => call("hideExperience", id, revision),
   unhideExperience: (id, revision) => call("unhideExperience", id, revision),
+  loadJobs: () => call("jobs"),
   loadNews: () => call("news"),
   saveNewsKeywords: (keywords) => call("saveNewsKeywords", keywords),
   suggestNewsKeywords: () => call("suggestNewsKeywords"),

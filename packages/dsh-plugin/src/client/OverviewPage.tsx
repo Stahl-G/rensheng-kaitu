@@ -10,6 +10,7 @@ import { ExploreNavigation } from "./ExploreNavigation.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
+import { JobsPage, type JobsPageProps } from "./JobsPage.js";
 import type { LearningSource } from "./LearningPage.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
@@ -38,6 +39,7 @@ import type { OnboardingServices } from "./onboarding-services.js";
 export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
+    JobsPageProps,
     OnboardingServices,
     Omit<NewsPageProps, "onPrompt" | "onLearn">,
     Omit<DoingPageProps, "onPrompt">,
@@ -482,6 +484,7 @@ function Overview({
   const selectedExplore = exploreModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
+    jobs: <JobsPage {...child} />,
     footprints: (
       <>
         <MapPage {...child} />
