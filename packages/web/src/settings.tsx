@@ -142,7 +142,7 @@ export function Settings({
         {drive?.mode === "drive" ? (
           <>
             <label>
-              本机目标（留空使用 ~/kaitu）
+              本机目标（留空使用 ~/kaitu-ai-memory）
               <input value={localDir} onInput={(e) => setLocalDir(e.currentTarget.value)} />
             </label>
             <button
@@ -334,7 +334,7 @@ export function Settings({
         ))}
       </Panel>
       <Panel title="隐私">
-        <p>默认放在本机 ~/kaitu；开启同步后，数据文件存到你的 Google Drive。</p>
+        <p>默认放在本机 ~/kaitu-ai-memory；开启同步后，数据文件存到你的 Google Drive。</p>
         <p class="muted path">当前工作区：{data.root}</p>
         <p>对话内容会发给你自己选择的模型服务。</p>
       </Panel>

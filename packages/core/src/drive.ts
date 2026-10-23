@@ -255,7 +255,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
       "CLOUD_UNAVAILABLE",
     );
   const old = ws.root;
-  const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu"));
+  const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu-ai-memory"));
   separate(old, target);
   const state = stateDirectory(old, ws.isICloud);
   separate(state, target);

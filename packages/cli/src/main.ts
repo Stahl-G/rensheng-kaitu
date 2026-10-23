@@ -100,7 +100,7 @@ import { startUi } from "./ui/server.js";
 const HELP = `开图 kaitu
 
 用法：
-  kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu）
+  kaitu init [目录] [--timezone Asia/Shanghai] [--sample]   创建工作区（默认 ~/kaitu-ai-memory）
   kaitu sync enable icloud|drive|nutstore [--dir <路径>] [--name kaitu-ai-memory]  选择同步文件夹（nutstore 为坚果云）
   kaitu sync disable [--to <目录>] | status          搬回本机 / 查看存放位置
   kaitu drive enable [--drive-dir <路径>] [--name kaitu-ai-memory]  开启 Google Drive 同步

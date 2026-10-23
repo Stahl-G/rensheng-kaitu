@@ -143,7 +143,7 @@ export function StorageChoice({
                 return base && (normalized === base || normalized.startsWith(`${base}/`));
               });
               const target = detected?.id ?? provider;
-              const name = target === "local" || target === "github" ? "kaitu" : "kaitu-ai-memory";
+              const name = "kaitu-ai-memory";
               const leaf = selected.split(/[\\/]/).at(-1)?.toLowerCase();
               setPath(
                 selected === storage.root || leaf === "kaitu" || leaf === "kaitu-ai-memory"

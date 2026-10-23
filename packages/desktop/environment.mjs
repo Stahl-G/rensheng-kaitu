@@ -5,7 +5,14 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 export function desktopPaths(env = process.env) {
   const state = env.KAITU_APP_HOME || join(homedir(), ".kaitu-app");
   if (!isAbsolute(state)) throw new Error("KAITU_APP_HOME 必须是绝对路径");
-  let workspace = env.KAITU_DIR || (env.KAITU_APP_HOME ? join(state, "workspace") : join(homedir(), "kaitu"));
+  const legacy = join(homedir(), "kaitu");
+  let workspace =
+    env.KAITU_DIR ||
+    (env.KAITU_APP_HOME
+      ? join(state, "workspace")
+      : existsSync(join(legacy, ".kaitu/config.json"))
+        ? legacy
+        : join(homedir(), "kaitu-ai-memory"));
   if (!env.KAITU_DIR && !env.KAITU_APP_HOME) {
     const localState =
       env.KAITU_LOCAL_STATE_DIR ||

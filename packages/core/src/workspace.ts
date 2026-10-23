@@ -31,9 +31,15 @@ import { assertTimeZone } from "./time.js";
 
 export const STATE_DIR = ".kaitu";
 
-/** 默认数据目录：--dir > KAITU_DIR > ~/kaitu */
+/** 默认数据目录：--dir > KAITU_DIR > 当前工作区 > 已有的 ~/kaitu > ~/kaitu-ai-memory */
 export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.KAITU_DIR || currentWorkspace(env) || join(env.HOME || homedir(), "kaitu"));
+  const home = env.HOME || homedir();
+  const legacy = join(home, "kaitu");
+  return resolve(
+    env.KAITU_DIR ||
+      currentWorkspace(env) ||
+      (existsSync(join(legacy, STATE_DIR, "config.json")) ? legacy : join(home, "kaitu-ai-memory")),
+  );
 }
 
 export function stateDirectory(root: string, icloud?: boolean): string {

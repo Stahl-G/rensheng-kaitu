@@ -63,6 +63,8 @@
 
 Windows CI 的 `packages/cli/test/status.test.ts` 偶发 15 秒超时（#153、#154 都碰到，重跑通过），和 PR 无关，单独处理。
 
+资料文件夹默认名（用户 10-23 定）：本机和云盘新建时都叫 `kaitu-ai-memory`（本机 `~/kaitu-ai-memory`）；已有的 `~/kaitu` 照旧打开，不迁移、不改名。iOS 不新建文件夹，同步引导里可以提示找这个名字。
+
 0.1.2 改为并行开发、最后集中验收（用户 10-23 定）：A 线 今天 → 设置，独占共享样式与 `OverviewPage.tsx` 接线；B 线 资料与问问 → 开图，只改自己页面的文件。原生菜单 / Cmd+, 和真实 DSH 三入口在四页合完后到 Mac 上一次验完。
 
 iOS 的 CI 已改成手动（Actions 额度）。iOS main 在 #40 的合并头上 build-for-testing 已通过（含 App、单测、UI 测试目标），#39 合并带来的编译错误已在 #40 里修掉；KaituKitTests 没有在这个头上重跑，DeviceFlows 还没在真机上跑过。
