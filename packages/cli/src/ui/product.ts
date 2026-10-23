@@ -67,6 +67,7 @@ import {
   loadFinanceInvestments,
   markOrganizerSeen,
   matterPrompt,
+  mediaLibraryLocation,
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
@@ -92,6 +93,7 @@ import {
   readLibrary,
   readLibraryDocument,
   readMe,
+  readMediaImage,
   readNews,
   readOnboardingMatter,
   readOverviewPage,
@@ -117,6 +119,7 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  selectMediaLibrary,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -493,6 +496,14 @@ export async function productRequest(
     case "dismissNews": {
       const result = await dismissNews(ws, text(0));
       return { id: result.record.id, status: "dismissed", version: result.version };
+    }
+    case "mediaLibraryLocation":
+      return mediaLibraryLocation(ws);
+    case "selectMediaLibrary":
+      return selectMediaLibrary(ws, text(0));
+    case "mediaImage": {
+      const image = await readMediaImage(ws, text(0));
+      return image ? `data:${image.contentType};base64,${image.bytes.toString("base64")}` : null;
     }
     case "healthPhoto": {
       const photo = readPhoto(ws, text(0));

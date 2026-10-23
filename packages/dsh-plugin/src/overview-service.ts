@@ -83,6 +83,7 @@ import {
   listLearning,
   markOrganizerSeen,
   matterPrompt,
+  mediaLibraryLocation,
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
@@ -106,6 +107,7 @@ import {
   readLearning,
   readLibrary,
   readLibraryDocument,
+  readMediaImage,
   readNews,
   readOnboardingMatter,
   readOverviewPage,
@@ -129,6 +131,7 @@ import {
   savePreferences,
   saveProjectGoal,
   scheduleNext,
+  selectMediaLibrary,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -705,6 +708,22 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("health")
   async health(): Promise<HealthData> {
     return readHealthPage(this.workspace);
+  }
+
+  @Remote("mediaLibraryLocation")
+  async mediaLibraryLocation(): Promise<string> {
+    return mediaLibraryLocation(this.workspace);
+  }
+
+  @Remote("selectMediaLibrary")
+  async selectMediaLibrary(folder: string): Promise<string> {
+    return selectMediaLibrary(this.workspace, folder);
+  }
+
+  @Remote("mediaImage")
+  async mediaImage(reference: string): Promise<string | null> {
+    const image = await readMediaImage(this.workspace, reference);
+    return image ? `data:${image.contentType};base64,${image.bytes.toString("base64")}` : null;
   }
 
   @Remote("healthPhoto")
