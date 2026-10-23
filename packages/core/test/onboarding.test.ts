@@ -84,6 +84,57 @@ it("粘贴解析保留未知与不合格式行，处理列表、时间及已有�
   }
 });
 
+it("连续标签各归目标和记忆，尾部分隔符不写入正文，隔天重复搬入不新增目标", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-inline-"));
+  const options = { stateRoot: join(root, "state") };
+  try {
+    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-26T12:00:00+08:00"));
+    const text = "[目标]完成纸桥模型[偏好]喜欢先画草图，再剪纸，[事实]已有一盒彩纸；[兴趣]折纸、";
+    const preview = previewOnboardingMemory(ws, text, "claude", options);
+    expect(preview.candidates.map((item) => [item.target, item.content])).toEqual([
+      ["goal", "完成纸桥模型"],
+      ["memory", "喜欢先画草图，再剪纸"],
+      ["memory", "已有一盒彩纸"],
+      ["memory", "折纸"],
+    ]);
+    for (const separator of ["，", ",", "；", ";", "、", " \t "])
+      expect(
+        parseMemoryPaste(`[偏好]喜欢先画草图${separator}[事实]已有彩纸${separator}`).map((item) => item.text),
+      ).toEqual(["喜欢先画草图", "已有彩纸"]);
+    expect(parseMemoryPaste("[没见过的类]原样内容，")[0]?.text).toBe("[没见过的类]原样内容，");
+    await confirmOnboardingMemory(
+      ws,
+      preview.token,
+      preview.candidates.map((item) => item.id),
+      options,
+    );
+    expect(ws.readJson<{ title: string }[]>("me/goals.json").map((goal) => goal.title)).toEqual([
+      "完成纸桥模型",
+    ]);
+    expect(
+      listMemories(ws)
+        .map((memory) => memory.text)
+        .sort(),
+    ).toEqual(["喜欢先画草图，再剪纸", "已有一盒彩纸", "折纸"].sort());
+    vi.setSystemTime(new Date("2026-10-28T12:00:00+08:00"));
+    const again = previewOnboardingMemory(ws, text, "claude", options);
+    await confirmOnboardingMemory(
+      ws,
+      again.token,
+      again.candidates.map((item) => item.id),
+      options,
+    );
+    expect(ws.readJson("me/goals.json")).toHaveLength(1);
+    expect(listMemories(ws)).toHaveLength(3);
+    expect(validateWorkspace(ws)).toEqual([]);
+  } finally {
+    vi.useRealTimers();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("本地接口只确认预览中所选的记忆，整批一个版本并能撤销", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   const previousState = process.env.KAITU_LOCAL_STATE_DIR;
@@ -614,7 +665,7 @@ it("旧版搬记忆挤成一条的目标和项目，启动时拆开；拆过就�
       {
         id: "doubao-20261019-aaaaaa",
         title:
-          "投稿散文 (2026-10) [在考虑] 要不要参加老虎杯 (2026-10) [偏好] 不爱被说教 [目标] 攒够一年生活费",
+          "投稿散文 (2026-10)[在考虑] 要不要参加老虎杯 (2026-10)，[偏好] 不爱被说教；[目标] 攒够一年生活费",
         status: "active",
       },
     ]);
