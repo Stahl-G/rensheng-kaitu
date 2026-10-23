@@ -270,3 +270,42 @@ it("后台同步只拉绑了 GitHub 的项目，数据没变不存新版本", as
   );
   expect(Object.keys(state.repos).sort()).toEqual([other.slug, slug].sort());
 });
+
+it("绑定预检也等待正在运行的同步，保留双方状态且不重入队列", async () => {
+  const { ws, slug, api } = await fixture();
+  await bindGithub(ws, slug, "Owner/demo", { api, now: at(15) });
+  const other = await createProject(ws, { title: "待绑定项目", kind: "personal" });
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let bindingRequested = false;
+  const syncing = syncGithub(ws, slug, {
+    api,
+    now: at(16),
+    fetch: async (...args) => {
+      entered.resolve();
+      await release.promise;
+      return fetch(...args);
+    },
+  });
+  await entered.promise;
+  const binding = bindGithub(ws, other.slug, "Owner/demo", {
+    api,
+    now: at(16),
+    fetch: async (...args) => {
+      bindingRequested = true;
+      return fetch(...args);
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(bindingRequested).toBe(false);
+  } finally {
+    release.resolve();
+    await Promise.allSettled([syncing, binding]);
+  }
+  expect((await syncing).ok).toBe(true);
+  expect((await binding).ok).toBe(true);
+  expect(bindingRequested).toBe(true);
+  expect(projectGithub(ws, slug, at(16))?.checked_at).toBe(projectGithub(ws, other.slug, at(16))?.checked_at);
+  expect(projectGithub(ws, slug, at(16))?.latest?.ts).toContain("2026-10-16");
+});

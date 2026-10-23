@@ -230,10 +230,10 @@ function Overview({
   const workspaceRoot = data?.root;
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;
-    hometown: boolean;
-    experiences: number;
-    newsTopics: number;
-    directions: number;
+    hometown?: boolean;
+    experiences?: number;
+    newsTopics?: number;
+    directions?: number;
   } | null>(null);
   const [exploreError, setExploreError] = useState("");
   const [exploreAttempt, setExploreAttempt] = useState(0);
@@ -256,50 +256,39 @@ function Overview({
       active = false;
     };
   }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
-  // Warm the existing page projections independently of Today. Opening Explore only reads this state.
+  // Read only on entering Explore or an explicit retry, never on unrelated workspace notifications.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
   useEffect(() => {
-    let sequence = 0;
-    if (!workspaceRoot) return;
+    let active = true;
     setExploreFacts(null);
-    const load = async () => {
-      const current = ++sequence;
-      try {
-        const [map, news, directions] = await Promise.all([
-          props.loadLifeMap(),
-          props.loadNews(),
-          props.loadExploration(),
-        ]);
-        if (current !== sequence) return;
+    setExploreError("");
+    if (!workspaceRoot || view !== "explore") return;
+    void Promise.allSettled([props.loadLifeMap(), props.loadNews(), props.loadExploration()]).then(
+      ([map, news, directions]) => {
+        if (!active) return;
         setExploreFacts({
           root: workspaceRoot,
-          hometown: !!map.hometown && map.hometown.status !== "missing",
-          experiences: map.experiences.length,
-          newsTopics: news.keywords?.length ?? 0,
-          directions: directions.directions.length,
+          ...(map.status === "fulfilled"
+            ? {
+                hometown: !!map.value.hometown && map.value.hometown.status !== "missing",
+                experiences: map.value.experiences.length,
+              }
+            : {}),
+          ...(news.status === "fulfilled" ? { newsTopics: news.value.keywords?.length ?? 0 } : {}),
+          ...(directions.status === "fulfilled" ? { directions: directions.value.directions.length } : {}),
         });
-        setExploreError("");
-      } catch (err) {
-        if (current === sequence) {
-          setExploreFacts(null);
-          setExploreError(err instanceof Error ? err.message : String(err));
-        }
-      }
-    };
-    void load();
-    const off = props.subscribe?.(() => void load());
+        setExploreError(
+          [map, news, directions]
+            .filter((result) => result.status === "rejected")
+            .map((result) => String(result.reason))
+            .join(" · "),
+        );
+      },
+    );
     return () => {
-      sequence++;
-      off?.();
+      active = false;
     };
-  }, [
-    workspaceRoot,
-    props.loadLifeMap,
-    props.loadNews,
-    props.loadExploration,
-    props.subscribe,
-    exploreAttempt,
-  ]);
+  }, [view, workspaceRoot, props.loadLifeMap, props.loadNews, props.loadExploration, exploreAttempt]);
   useEffect(() => {
     let active = true;
     void props
@@ -326,9 +315,20 @@ function Overview({
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
-    data && personal && exploreFacts && exploreFacts.root === workspaceRoot
+    data &&
+    personal &&
+    exploreFacts &&
+    exploreFacts.root === workspaceRoot &&
+    exploreFacts.hometown !== undefined &&
+    exploreFacts.experiences !== undefined &&
+    exploreFacts.newsTopics !== undefined &&
+    exploreFacts.directions !== undefined
       ? {
           ...exploreFacts,
+          hometown: exploreFacts.hometown,
+          experiences: exploreFacts.experiences,
+          newsTopics: exploreFacts.newsTopics,
+          directions: exploreFacts.directions,
           healthRecords: data.sections.find((section) => section.id === "health")?.count ?? 0,
           goals: personal.goals.length,
         }
@@ -349,7 +349,9 @@ function Overview({
           exploreContent,
           availableModules.map(({ id }) => id),
         )
-      : null;
+      : exploreError
+        ? firstExplore
+        : null;
   useEffect(() => {
     if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
   }, [exploreStart]);

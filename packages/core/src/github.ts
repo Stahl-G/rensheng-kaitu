@@ -219,6 +219,9 @@ function bindRepo(ws: Workspace, slug: string, repo: string, now: Date) {
   });
 }
 export async function bindGithub(ws: Workspace, slug: string, url: string, options: GithubOptions = {}) {
+  return queueGithub(ws, () => bindGithubNow(ws, slug, url, options));
+}
+async function bindGithubNow(ws: Workspace, slug: string, url: string, options: GithubOptions) {
   readProject(ws, slug);
   const repo = parseGithubRepo(url);
   const now = options.now ?? new Date();
@@ -232,14 +235,17 @@ export async function bindGithub(ws: Workspace, slug: string, url: string, optio
   }
   return batchOverview(ws, async () => {
     bindRepo(ws, slug, canonical, now);
-    return syncGithub(ws, slug, options);
+    return syncGithubNow(ws, slug, options);
   });
 }
-// 同一个工作区的 GitHub 同步排队：手动同步和后台每小时同步都改 github-state.json 和版本库。
+// 同工作区的绑定、手动和后台同步共用队列；队列内直接调用 Now 函数，避免重入等待自身。
 const syncQueues = new Map<string, Promise<unknown>>();
 
 export async function syncGithub(ws: Workspace, slug: string, options: GithubOptions = {}) {
-  const run = (syncQueues.get(ws.root) ?? Promise.resolve()).then(() => syncGithubNow(ws, slug, options));
+  return queueGithub(ws, () => syncGithubNow(ws, slug, options));
+}
+function queueGithub<T>(ws: Workspace, action: () => Promise<T>): Promise<T> {
+  const run = (syncQueues.get(ws.root) ?? Promise.resolve()).then(action);
   syncQueues.set(
     ws.root,
     run.catch(() => {}),

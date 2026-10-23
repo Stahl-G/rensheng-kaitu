@@ -9,7 +9,7 @@ description: 每天收工或用户问「这个项目今天怎么样」时，按�
 
 ## 1. 读事实
 
-1. `kaitu project sync <slug>`：拉 Star、Fork、开放 PR / issue、默认分支 CI 和最近提交；`kaitu project show <slug> --json-out` 读 STATUS、日志和现有 view.json。
+1. `kaitu project sync <slug>`：拉 Star、Fork、开放 PR / issue、默认分支 CI 和最近提交；`kaitu project show <slug> --json-out` 只读 STATUS 和日志，不返回视图。另行读取工作区里的 `projects/<slug>/view.json`；找不到才按缺省处理，读取失败不能当作没有视图。
 2. 有 `gh` 且已登录时，按用户时区的今天（YYYY-MM-DD）读明细；仓库名用项目绑定的 owner/repo：
    - `gh pr list --repo <repo> --state merged --search "merged:>=<今天>" --json number,title,url,labels`
    - `gh pr list --repo <repo> --state open --json number,title,url,isDraft,updatedAt`
@@ -31,7 +31,9 @@ description: 每天收工或用户问「这个项目今天怎么样」时，按�
 
 ## 3. 更新项目页视图
 
-在 `projects/<slug>/view.json` 里只更新 id 以 `daily-` 开头的积木，保留用户和别的 Agent 已有的积木与顺序；没有 view.json 时新建，标题用项目名。
+先读取 `projects/<slug>/view.json` 的完整内容。若已有 `{html}` 视图，原样保留整个文件，不添加日报积木、不转成积木视图；日报只追加到项目日志。若 JSON 解析失败或视图形式不支持，也不覆盖文件，在交付时说明未更新视图。
+
+只有既有积木视图，才只更新 id 以 `daily-` 开头的积木；保留其他顶层属性、用户和别的 Agent 的积木内容与相对顺序。确认文件不存在时才新建积木视图，标题用项目名。写入前重新读取并和开始时比较；期间发生变化就停止视图写入，保留他人的修改。
 
 - `daily-today`（note）：今天的一句话总结，结尾写日期；
 - `daily-roadmap`（milestones）：路线图里程碑，`done` 按文档；
