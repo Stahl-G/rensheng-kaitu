@@ -505,6 +505,8 @@ export function InboxPage({
                     >
                       {t(`变成下一步：${destination.title}`, `Next step: ${destination.title}`)}
                     </button>
+                  ) : selectedEntry.status === "organized" && sources ? (
+                    <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}
                 {review && selectedEntry.source === "me" && selectedEntry.status !== "organized" && (
