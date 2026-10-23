@@ -861,178 +861,176 @@ function Overview({
           />
         )}
         {view === "overview" && !guideVisible && guide !== undefined && data && (
-          <>
-            <div className={todayCss.layout}>
-              <div className={todayCss.left}>
-                {data.empty ? (
-                  <TodayStart
-                    start={startMatter}
-                    memory={() => startGuide(5)}
-                    status={onboarding}
-                    hasWrittenMatter={hasWrittenMatter}
-                    connect={() => {
-                      setGuide(null);
-                      if (props.renderAsk) setView("ask");
-                      else props.onAgent();
-                    }}
-                    openModule={(id) => {
-                      setView("explore");
-                      setExplore(id);
-                    }}
-                  />
-                ) : (
-                  renderTasks()
-                )}
-                {!data.empty && !focus && !adoptedCard && (
-                  <section className={todayCss.focusSection}>
-                    <button type="button" className={css.btn} onClick={() => startMatter("")}>
-                      {t("从一件事开始", "Start with one thing")}
-                    </button>
-                  </section>
-                )}
-                {!!data.proposedTasks.length && (
-                  <section className={todayCss.suggestions}>
-                    <h2>
-                      {t(
-                        `AI 建议 · ${data.proposedTasks.length}`,
-                        `AI suggestions · ${data.proposedTasks.length}`,
-                      )}
-                    </h2>
-                    {data.proposedTasks.map((task) => (
-                      <div className={css.row} key={task.id}>
-                        <span className={todayCss.grow}>{task.title}</span>
-                        <button
-                          type="button"
-                          className={css.btn}
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              await props.adoptTask(task.id);
-                              const preferences = await props.loadPreferences();
-                              const previous = preferences.todayAdoptions;
-                              const next = {
-                                workspace: data.root,
-                                day: data.today,
-                                ids: [
-                                  ...(previous?.workspace === data.root && previous.day === data.today
-                                    ? previous.ids
-                                    : []),
-                                  task.id,
-                                ],
-                              };
-                              setAdoptedTasks(next);
-                              await props.savePreferences({
-                                locale: preferences.followSystem ? null : preferences.locale,
-                                todayAdoptions: next,
-                              });
-                            })
-                          }
-                        >
-                          {t("采纳", "Adopt")}
-                        </button>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={busy}
-                          onClick={() => void run(() => props.cancelTask(task.id))}
-                        >
-                          {t("不用了", "Not needed")}
-                        </button>
-                      </div>
-                    ))}
-                  </section>
-                )}
-              </div>
-              <aside className={todayCss.right}>
-                {capture}
-                {!data.empty && (
-                  <section className={todayCss.agenda}>
-                    <Agenda
-                      data={calendar}
-                      open={() => openRecord("calendar")}
-                      proposals={pendingProposals}
-                      busy={busy}
-                      decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
-                    />
-                    {push &&
-                      data.blocks
-                        .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
-                        .map((block) => (
-                          <div className={css.row} key={block.id}>
-                            <span>{block.title}</span>
-                            <CalendarPushResult
-                              id={block.id}
-                              state={push}
-                              retry={async (id) => {
-                                setPush(
-                                  await (push.enabled
-                                    ? props.retryCalendarPush(id)
-                                    : props.removeCalendarPush()),
-                                );
-                              }}
-                            />
-                          </div>
-                        ))}
-                  </section>
-                )}
-                {(data.inboxNotes > 0 ||
-                  data.sync.mapNeedsReview > 0 ||
-                  data.sync.mapPendingImports > 0 ||
-                  data.sync.directionSuggestions > 0) && (
-                  <section className={todayCss.review}>
-                    <h2>{t("要你核对", "To review")}</h2>
-                    {data.inboxNotes > 0 && (
-                      <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
-                        {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
-                      </button>
+          <div className={todayCss.layout}>
+            <div className={todayCss.left}>
+              {data.empty ? (
+                <TodayStart
+                  start={startMatter}
+                  memory={() => startGuide(5)}
+                  status={onboarding}
+                  hasWrittenMatter={hasWrittenMatter}
+                  connect={() => {
+                    setGuide(null);
+                    if (props.renderAsk) setView("ask");
+                    else props.onAgent();
+                  }}
+                  openModule={(id) => {
+                    setView("explore");
+                    setExplore(id);
+                  }}
+                />
+              ) : (
+                renderTasks()
+              )}
+              {!data.empty && !focus && !adoptedCard && (
+                <section className={todayCss.focusSection}>
+                  <button type="button" className={css.btn} onClick={() => startMatter("")}>
+                    {t("从一件事开始", "Start with one thing")}
+                  </button>
+                </section>
+              )}
+              {!!data.proposedTasks.length && (
+                <section className={todayCss.suggestions}>
+                  <h2>
+                    {t(
+                      `AI 建议 · ${data.proposedTasks.length}`,
+                      `AI suggestions · ${data.proposedTasks.length}`,
                     )}
-                    {(data.sync.mapNeedsReview > 0 || data.sync.mapPendingImports > 0) && (
+                  </h2>
+                  {data.proposedTasks.map((task) => (
+                    <div className={css.row} key={task.id}>
+                      <span className={todayCss.grow}>{task.title}</span>
+                      <button
+                        type="button"
+                        className={css.btn}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await props.adoptTask(task.id);
+                            const preferences = await props.loadPreferences();
+                            const previous = preferences.todayAdoptions;
+                            const next = {
+                              workspace: data.root,
+                              day: data.today,
+                              ids: [
+                                ...(previous?.workspace === data.root && previous.day === data.today
+                                  ? previous.ids
+                                  : []),
+                                task.id,
+                              ],
+                            };
+                            setAdoptedTasks(next);
+                            await props.savePreferences({
+                              locale: preferences.followSystem ? null : preferences.locale,
+                              todayAdoptions: next,
+                            });
+                          })
+                        }
+                      >
+                        {t("采纳", "Adopt")}
+                      </button>
                       <button
                         type="button"
                         className={css.link}
-                        onClick={() => {
-                          setView("explore");
-                          setExplore("footprints");
-                        }}
+                        disabled={busy}
+                        onClick={() => void run(() => props.cancelTask(task.id))}
                       >
-                        {t(
-                          `足迹里有 ${data.sync.mapNeedsReview + data.sync.mapPendingImports} 段经历待确认`,
-                          `${data.sync.mapNeedsReview + data.sync.mapPendingImports} footprints to review`,
-                        )}
+                        {t("不用了", "Not needed")}
                       </button>
-                    )}
-                    {data.sync.directionSuggestions > 0 && (
-                      <button type="button" className={css.link} onClick={() => openSection("directions")}>
-                        {t(
-                          `${data.sync.directionSuggestions} 个方向建议`,
-                          `${data.sync.directionSuggestions} direction suggestions`,
-                        )}
-                      </button>
-                    )}
-                  </section>
-                )}
-                {data.empty && (
-                  <section className={todayCss.storage}>
-                    <h2>{t("你的资料在哪", "Where your data lives")}</h2>
-                    <p>
-                      {data.drive
-                        ? t(
-                            "都存在你的云盘文件夹里，是普通文件，随时可以带走。",
-                            "Ordinary files in your cloud folder, ready to take with you.",
-                          )
-                        : t(
-                            "都存在这台电脑上你选的文件夹里，是普通文件，随时可以带走。",
-                            "Ordinary files in your chosen local folder, ready to take with you.",
-                          )}
-                    </p>
-                    <button type="button" className={css.link} onClick={() => startGuide(STORAGE_STEP)}>
-                      {t("换个位置", "Change location")}
-                    </button>
-                  </section>
-                )}
-              </aside>
+                    </div>
+                  ))}
+                </section>
+              )}
             </div>
-          </>
+            <aside className={todayCss.right}>
+              {capture}
+              {!data.empty && (
+                <section className={todayCss.agenda}>
+                  <Agenda
+                    data={calendar}
+                    open={() => openRecord("calendar")}
+                    proposals={pendingProposals}
+                    busy={busy}
+                    decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
+                  />
+                  {push &&
+                    data.blocks
+                      .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
+                      .map((block) => (
+                        <div className={css.row} key={block.id}>
+                          <span>{block.title}</span>
+                          <CalendarPushResult
+                            id={block.id}
+                            state={push}
+                            retry={async (id) => {
+                              setPush(
+                                await (push.enabled
+                                  ? props.retryCalendarPush(id)
+                                  : props.removeCalendarPush()),
+                              );
+                            }}
+                          />
+                        </div>
+                      ))}
+                </section>
+              )}
+              {(data.inboxNotes > 0 ||
+                data.sync.mapNeedsReview > 0 ||
+                data.sync.mapPendingImports > 0 ||
+                data.sync.directionSuggestions > 0) && (
+                <section className={todayCss.review}>
+                  <h2>{t("要你核对", "To review")}</h2>
+                  {data.inboxNotes > 0 && (
+                    <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
+                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
+                    </button>
+                  )}
+                  {(data.sync.mapNeedsReview > 0 || data.sync.mapPendingImports > 0) && (
+                    <button
+                      type="button"
+                      className={css.link}
+                      onClick={() => {
+                        setView("explore");
+                        setExplore("footprints");
+                      }}
+                    >
+                      {t(
+                        `足迹里有 ${data.sync.mapNeedsReview + data.sync.mapPendingImports} 段经历待确认`,
+                        `${data.sync.mapNeedsReview + data.sync.mapPendingImports} footprints to review`,
+                      )}
+                    </button>
+                  )}
+                  {data.sync.directionSuggestions > 0 && (
+                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
+                      {t(
+                        `${data.sync.directionSuggestions} 个方向建议`,
+                        `${data.sync.directionSuggestions} direction suggestions`,
+                      )}
+                    </button>
+                  )}
+                </section>
+              )}
+              {data.empty && (
+                <section className={todayCss.storage}>
+                  <h2>{t("你的资料在哪", "Where your data lives")}</h2>
+                  <p>
+                    {data.drive
+                      ? t(
+                          "都存在你的云盘文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your cloud folder, ready to take with you.",
+                        )
+                      : t(
+                          "都存在这台电脑上你选的文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your chosen local folder, ready to take with you.",
+                        )}
+                  </p>
+                  <button type="button" className={css.link} onClick={() => startGuide(STORAGE_STEP)}>
+                    {t("换个位置", "Change location")}
+                  </button>
+                </section>
+              )}
+            </aside>
+          </div>
         )}
 
         {view === "records" && (
@@ -1234,18 +1232,7 @@ function Overview({
                   </button>
                 </div>
               )}
-              <ExploreNavigation
-                entries={exploreEntries}
-                current={explore}
-                open={setExplore}
-                save={async (entries) => {
-                  const saved = await props.savePreferences({
-                    locale: followSystem ? null : locale,
-                    exploreEntries: entries,
-                  });
-                  setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
-                }}
-              />
+              <ExploreNavigation entries={exploreEntries} current={explore} open={setExplore} />
             </section>
             <div className={css.child}>
               {explore === "modules" ? (

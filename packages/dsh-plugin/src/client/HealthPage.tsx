@@ -59,7 +59,8 @@ function Trend({
   const amount = makeAmount(t);
   const values = points.flatMap((p) => (p.value === null ? [] : [p.value]));
   const max = Math.max(...values, ...(target ?? []), 1);
-  const min = 0;
+  const min =
+    line && values.length ? Math.min(...values) - Math.max((max - Math.min(...values)) * 0.2, 1) : 0;
   const y = (value: number) => 112 - ((value - min) / (max - min || 1)) * 96;
   const x = (i: number) => 18 + (i * 564) / Math.max(points.length - 1, 1);
   const summary = points

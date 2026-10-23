@@ -230,7 +230,6 @@ export function ExploreNavigation({
   entries: string[] | null;
   current: string;
   open: (id: string) => void;
-  save: (entries: string[]) => Promise<unknown>;
   modules?: readonly ExploreEntry[];
 }) {
   const t = useT();
