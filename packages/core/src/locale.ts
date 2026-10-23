@@ -7,7 +7,6 @@ export const locales = ["zh-CN", "en"] as const;
 export type Locale = (typeof locales)[number];
 export interface Preferences {
   locale: Locale | null;
-  weatherCity?: string;
   todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
@@ -54,7 +53,6 @@ export function readPreferences(): Preferences {
     return {
       locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
       ...(adoptionList(value.todayAdoptions) ? { todayAdoptions: value.todayAdoptions } : {}),
-      ...(typeof value.weatherCity === "string" ? { weatherCity: value.weatherCity } : {}),
       ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
     };
   } catch {
@@ -68,12 +66,9 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     typeof input !== "object" ||
     Array.isArray(input) ||
     Object.keys(input).some(
-      (key) =>
-        key !== "locale" && key !== "exploreEntries" && key !== "weatherCity" && key !== "todayAdoptions",
+      (key) => key !== "locale" && key !== "exploreEntries" && key !== "todayAdoptions",
     ) ||
     (input.todayAdoptions !== undefined && !adoptionList(input.todayAdoptions)) ||
-    (input.weatherCity !== undefined &&
-      (typeof input.weatherCity !== "string" || input.weatherCity.length > 100)) ||
     (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
     (input.locale !== null && input.locale !== undefined && !locales.includes(input.locale))
   )
