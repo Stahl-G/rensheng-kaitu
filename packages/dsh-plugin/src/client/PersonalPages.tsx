@@ -7,6 +7,7 @@ import type {
 } from "@kaitu/core";
 import { useCallback, useEffect, useState } from "react";
 import type { AutomationKey, AutomationSettings, SettingsData } from "../types.js";
+import { AiSettings } from "./AiSettings.js";
 import { CalendarPushResult, type CalendarPushServices } from "./CalendarPush.js";
 import { type ChannelRequest, ChannelSettings } from "./ChannelSettings.js";
 import { CloudOrganizer } from "./CloudOrganizer.js";
@@ -70,6 +71,7 @@ export function PersonalPages(
       view: PersonalView;
       navigate: (view: PersonalView) => void;
       manageAi: () => void;
+      aiKeyRequest?: number;
       restartGuide: () => void;
       refreshWorkspace: () => Promise<void>;
       onWorkspaceCreated: () => Promise<void>;
@@ -156,17 +158,26 @@ export function PersonalPages(
   const [query, setQuery] = useState("");
   const item = settingItems.find(([id]) => id === section) ?? settingItems[0];
   const [phones, setPhones] = useState<
-    { name: string; configured: boolean; paired: boolean; running: boolean; error?: string }[]
-  >([]);
+    { name: string; configured: boolean; paired: boolean; running: boolean; error?: string }[] | null
+  >(null);
+  const [phoneError, setPhoneError] = useState("");
   useEffect(() => {
     if (section !== "overview") return;
     let active = true;
     void props
       .channelSettings?.("phone-list")
       .then((value) => {
-        if (active) setPhones(value as typeof phones);
+        if (active) {
+          setPhones(value as typeof phones);
+          setPhoneError("");
+        }
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (active) {
+          setPhones(null);
+          setPhoneError(err instanceof Error ? err.message : String(err));
+        }
+      });
     return () => {
       active = false;
     };
@@ -179,7 +190,7 @@ export function PersonalPages(
         data.backup.error ||
         t(`${data.backup.conflicts.length} 项同步冲突`, `${data.backup.conflicts.length} sync conflicts`),
     });
-  for (const phone of phones)
+  for (const phone of phones ?? [])
     if (phone.configured && (phone.error || !phone.paired))
       issues.push({
         section: "phone",
@@ -280,10 +291,16 @@ export function PersonalPages(
                       ],
                       [
                         "phone",
-                        phones
-                          .filter((phone) => phone.running)
-                          .map((phone) => phone.name)
-                          .join(" · ") || t("还没连接", "Not connected"),
+                        !props.channelSettings
+                          ? t("由宿主管理", "Managed by the host")
+                          : phoneError
+                            ? t("状态读取失败", "Could not read status")
+                            : !phones
+                              ? t("正在读取…", "Loading…")
+                              : phones
+                                  .filter((phone) => phone.running)
+                                  .map((phone) => phone.name)
+                                  .join(" · ") || t("还没连接", "Not connected"),
                       ],
                       ["storage", storageName(data.storage.provider)],
                       [
@@ -550,35 +567,39 @@ export function PersonalPages(
             )}
             {section === "ai" && (
               <>
-                <section className={css.sec}>
-                  <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
-                  <div className={`${css.card} ${css["list-card"]}`}>
-                    <div className={css.conn}>
-                      <span className={css.logo} style={{ background: "var(--explore)" }}>
-                        AI
-                      </span>
-                      <b>
-                        {data.ai
-                          ? `${data.ai.providerName ?? "AI"} · ${data.ai.model}`
-                          : t("由 DSH 管理", "Managed by DSH")}
-                      </b>
-                      <span className={css.small}>
-                        {data.ai
-                          ? data.ai.configured
-                            ? t("已连接", "Connected")
-                            : t("还没连接", "Not connected")
-                          : t("使用 DSH 的模型设置", "Uses DSH model settings")}
-                      </span>
-                      <button
-                        type="button"
-                        className={`${css.btn} ${css["btn-quiet"]}`}
-                        onClick={props.manageAi}
-                      >
-                        {t("管理模型", "Manage model")}
-                      </button>
+                {data.ai ? (
+                  <AiSettings focusKey={props.aiKeyRequest} onSaved={refresh} />
+                ) : (
+                  <section className={css.sec}>
+                    <h2 className={css.eyebrow}>{t("「问问」用的 AI", "The AI behind Ask")}</h2>
+                    <div className={`${css.card} ${css["list-card"]}`}>
+                      <div className={css.conn}>
+                        <span className={css.logo} style={{ background: "var(--explore)" }}>
+                          AI
+                        </span>
+                        <b>{t("由 DSH 管理", "Managed by DSH")}</b>
+                        <span className={css.small}>
+                          {t("使用 DSH 的模型设置", "Uses DSH model settings")}
+                        </span>
+                        <button
+                          type="button"
+                          className={`${css.btn} ${css["btn-quiet"]}`}
+                          onClick={props.manageAi}
+                        >
+                          {t("管理模型", "Manage model")}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </section>
+                  </section>
+                )}
+                {data.ai?.configured && !data.automation.asked && (
+                  <p>
+                    {t("要让开图每天帮你整理吗？", "Would you like Kaitu to organize each day?")}{" "}
+                    <button type="button" className={css.link} onClick={() => select("automation")}>
+                      {t("查看自动整理设置", "Review automation settings")}
+                    </button>
+                  </p>
+                )}
                 {search && (
                   <section className={css.sec}>
                     <h2 className={css.eyebrow}>网络搜索</h2>
@@ -652,7 +673,7 @@ export function PersonalPages(
                             )}
                             <button
                               type="button"
-                              className={`${css.btn} ${css["btn-primary"]}`}
+                              className={css.btn}
                               disabled={busy}
                               onClick={() => void saveSearch()}
                             >
@@ -668,6 +689,7 @@ export function PersonalPages(
             )}
             {section === "local-ai" && (
               <>
+                {data.ai && <AiSettings localOnly onSaved={refresh} />}
                 <section className={css.sec} id="local-ai">
                   <div className={css["sec-head"]}>
                     <h2 className={css.eyebrow}>

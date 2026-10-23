@@ -184,6 +184,7 @@ function Overview({
   >(null);
   const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
   const askPanel = useRef<HTMLDivElement>(null);
+  const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
@@ -495,28 +496,10 @@ function Overview({
     } else setView("connections");
   };
   const openAskSettings = (section: "ai" | "local-ai") => {
-    if (section === "local-ai") {
-      setConnectionSection(section);
-      setView("connections");
-    } else manageAi(true);
+    setConnectionSection(section);
+    if (section === "ai") setAiKeyRequest((n) => n + 1);
+    setView("settings");
   };
-  useEffect(() => {
-    if (!configureRequest || !configureBuiltin || view !== "ask") return;
-    const panel = askPanel.current;
-    if (!panel) return;
-    const focus = () => {
-      const input = panel.querySelector<HTMLInputElement>('dialog[open] input[type="password"]');
-      if (!input) return false;
-      input.focus();
-      return true;
-    };
-    if (focus()) return;
-    const observer = new MutationObserver(() => {
-      if (focus()) observer.disconnect();
-    });
-    observer.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
-    return () => observer.disconnect();
-  }, [configureRequest, configureBuiltin, view]);
   const openSource = (source: string) => {
     if (source === "calendar" || source === "finance") {
       openRecord(source);
@@ -1386,6 +1369,7 @@ function Overview({
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
+            aiKeyRequest={aiKeyRequest}
             onHandoverAnswer={handoverAnswer}
             locale={locale ?? "zh-CN"}
             followSystem={followSystem}
