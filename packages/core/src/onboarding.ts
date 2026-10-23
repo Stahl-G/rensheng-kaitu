@@ -446,8 +446,9 @@ const WHEN = new RegExp(
 );
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
 // 有的 AI 复制出来的回答没有换行，多条挤在一行里；在每个已知类别标签前断开。
+// 标签可紧贴上一段正文；分隔标点在解析各段时移除，正文里的标点保留。
 const INLINE_TAG = new RegExp(
-  `\\s+(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
+  `(?<=.)\\s*(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
   "gi",
 );
 
@@ -474,7 +475,7 @@ export function parseMemoryPaste(
       let group = category
         ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
         : undefined;
-      let body = group ? (match?.[2]?.trim() ?? original) : original;
+      let body = group ? (match?.[2]?.replace(/[，,；;、\s]+$/u, "") ?? original) : original;
       let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
       if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
       let content = time ? body.slice(0, time.index).trim() : body;
