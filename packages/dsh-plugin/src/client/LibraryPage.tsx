@@ -1,6 +1,7 @@
 import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
+import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import inboxStyles from "./InboxPage.module.css";
 import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
@@ -746,7 +747,10 @@ export function NotesPage({
       ) : !data ? (
         <p>{t("正在读取…", "Loading…")}</p>
       ) : !data.notes.some((item) => !item.file.startsWith("learning/")) ? (
-        <p className={css.small}>{t("决策记录也会显示在这里。", "Your decisions also appear here.")}</p>
+        <>
+          <p className={css.small}>{t("决策记录也会显示在这里。", "Your decisions also appear here.")}</p>
+          <AgentPhrases />
+        </>
       ) : (
         <div className={`${css.card} ${css["list-card"]}`}>
           {data.notes

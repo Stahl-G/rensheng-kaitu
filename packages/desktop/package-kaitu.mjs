@@ -86,7 +86,7 @@ const plan = [
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
   "Resources: 移除 app-update.yml；从 SVG 生成 PNG / ICNS；内置插件、初始化器、schemas、templates、data 与 DSH 协议转接包",
   "MacOS: xcrun clang 构建原生 Kaitu 启动入口 → Electron Node 初始化资料 → 独立本地工作台",
-  "首次启动：读取 current-workspace.json，否则 ~/kaitu；无模型也能记录与查看；确认自动任务后后台启动 AI，或主动打开 AI",
+  "首次启动：读取 current-workspace.json，否则已有的 ~/kaitu，再否则 ~/kaitu-ai-memory；无模型也能记录与查看；确认自动任务后后台启动 AI，或主动打开 AI",
   "数据目录：DSH_HOME、Electron userData / 日志 / 崩溃记录均在 ~/.kaitu-app/",
   identity
     ? `SIGN ${identity}：逐层签名 Electron / 内置 Mach-O / 应用，hardened runtime + DSH entitlements + timestamp`
@@ -157,7 +157,10 @@ for (const path of asar.listPackage(archive)) {
 // 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 0.2.1-rc.2。
 // 开图版本只用于 Info.plist 和关于面板。
 const about = "applicationVersion: app.getVersion()";
-const brandedMain = changes.get("lib/main.js").toString();
+let brandedMain = changes.get("lib/main.js").toString();
+const hostReady = "hostUrl = ready.url;";
+if (brandedMain.split(hostReady).length !== 2) throw new Error("宿主就绪结构已变化，请核对固定 DSH 构建");
+brandedMain = brandedMain.replace(hostReady, `${hostReady}\napp.emit("kaitu:host-ready", ready.url);`);
 if (brandedMain.split(about).length !== 2) throw new Error("关于面板结构已变化，请核对本地 DSH 构建");
 if (brandedMain.split("app.setAppLogsPath();").length !== 2)
   throw new Error("日志目录结构已变化，请核对本地 DSH 构建");

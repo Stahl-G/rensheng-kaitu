@@ -14,6 +14,11 @@ export interface DoingPageProps {
   saveProjectGoal: (slug: string, goal: ProjectGoal) => Promise<ProjectDetailData>;
   suggestProjectGoal?: (slug: string) => Promise<ProjectGoal>;
   syncProject: (slug: string) => Promise<unknown>;
+  /** 只有能访问本机代码仓库的入口提供；没有时项目页不显示「交给 Agent 接着做」。 */
+  projectMemoryPrompt?: (slug: string, locale: string) => Promise<string>;
+  installProjectMemory?: (slug: string, directory: string) => Promise<{ files: string[]; project: string }>;
+  projectArchitecturePrompt?: (slug: string, locale: string) => Promise<string>;
+  loadProjectArchitecture?: (slug: string) => Promise<string | null>;
   onPrompt: (text: string) => void;
 }
 const stages = { active: "进行中", paused: "暂停", idea: "想法", done: "完成" };

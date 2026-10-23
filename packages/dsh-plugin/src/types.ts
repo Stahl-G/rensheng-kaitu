@@ -238,6 +238,8 @@ export interface ProjectDetailData extends DoingProject {
   logs: { date: string; text: string }[];
   metrics: { date: string; kind: string; value: number }[];
   sources: string[];
+  /** projects/<slug>/architecture.html 的更新时间；没有架构图时为 null。 */
+  architecture: string | null;
 }
 
 export type { LearningTopic, StartLearningInput, LearningCheckinInput } from "@kaitu/core";

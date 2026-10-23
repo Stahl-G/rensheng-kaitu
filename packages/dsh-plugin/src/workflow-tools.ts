@@ -431,7 +431,7 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_import",
-    `导入用户指定的本机文件（${fileImportSources.map((id) => importSources[id].name).join("、")}），path 可为绝对路径。只预览数量，不执行导入。用户须在已有导入界面重新选择文件、核对并点击确认导入。`,
+    `导入用户指定的本机文件（${fileImportSources.map((id) => importSources[id].name).join("、")}），path 可为绝对路径。只预览数量，不执行导入。用户须在设置 → 同步与备份 → 资料 → 导入文件选择对应类型，重新选择文件、核对并点击确认导入。`,
     z
       .object({
         source: z.enum(fileImportSources),

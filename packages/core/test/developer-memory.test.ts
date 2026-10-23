@@ -10,9 +10,13 @@ import {
   initWorkspace,
   installProjectMemory,
   logProject,
+  projectArchitecturePrompt,
   projectMemoryContext,
+  projectMemoryPrompt,
+  readProjectArchitecture,
   readProjectPage,
   runPhone,
+  saveProjectArchitecture,
 } from "../src/index.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
@@ -79,6 +83,38 @@ it("新项目会话读取既有状态并写回现有项目日志；入口保留�
   });
   expect((await projectMemoryContext(ws, code)).project).toBeNull();
   await expect(installProjectMemory(ws, code)).rejects.toThrow("匹配多个项目");
+  // 项目页按当前项目安装：多个匹配时也能指定，用户自己的同名技能仍保留。
+  await expect(installProjectMemory(ws, code, project.slug)).rejects.toMatchObject({ code: "CONFLICT" });
+  expect(fs.readFileSync(skill, "utf8")).toBe("user-owned skill\n");
+  const prompt = projectMemoryPrompt(ws, project.slug);
+  expect(prompt).toContain(`--project ${project.slug}`);
+  expect(prompt).toContain(`project log ${project.slug}`);
+  expect(prompt).toContain(ws.root);
+  expect(prompt).toContain(`--from '${code}'`);
+  // Windows 上的编程 Agent 用 PowerShell：命令不能是 POSIX 的环境变量前缀写法。
+  const platform = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+  Object.defineProperty(process, "platform", { value: "win32" });
+  try {
+    expect(projectMemoryPrompt(ws, project.slug)).toMatch(/\$env:ELECTRON_RUN_AS_NODE=1; & '/);
+  } finally {
+    Object.defineProperty(process, "platform", platform);
+  }
+  // 没绑仓库的项目不给出一定会失败的命令。
+  const unbound = await createProject(ws, { title: "Unbound synthetic project", kind: "personal" });
+  expect(() => projectMemoryPrompt(ws, unbound.slug)).toThrow("先给这个项目绑定");
+  // Agent 用 Archify 画好后交回：只收 HTML，项目页据此显示架构图卡片。
+  expect(projectArchitecturePrompt(ws, project.slug)).toContain(
+    `project architecture ${project.slug} --file`,
+  );
+  expect(readProjectPage(ws, project.slug).architecture).toBeNull();
+  const notes = join(code, "notes.txt");
+  fs.writeFileSync(notes, "not a diagram");
+  expect(() => saveProjectArchitecture(ws, project.slug, notes)).toThrow("HTML");
+  const diagram = join(code, "architecture.html");
+  fs.writeFileSync(diagram, "<!doctype html><html><head></head><body><svg></svg></body></html>");
+  saveProjectArchitecture(ws, project.slug, diagram);
+  expect(readProjectArchitecture(ws, project.slug)).toContain("<svg>");
+  expect(readProjectPage(ws, project.slug).architecture).not.toBeNull();
 });
 
 it("纯 Git 模板建的记忆仓库能直接接管：已有文件不动，接着能给手机生成内容", async () => {

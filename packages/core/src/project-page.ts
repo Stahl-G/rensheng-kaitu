@@ -1,6 +1,7 @@
+import { statSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
-import { listProjects, readProject, setProject } from "./projects.js";
+import { listProjects, projectDirectory, readProject, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
 import type { ModuleStatus } from "./workbench.js";
@@ -61,6 +62,7 @@ export function readProjectPage(ws: Workspace, slug: string) {
   const summary = readProjectsPage(ws, slug).find((item) => item.slug === slug);
   if (!summary) throw new KaituError("找不到项目", "NOT_FOUND");
   const metrics = readRecords(ws, "project_metric").filter((row) => row.project === slug);
+  const architecture = `${projectDirectory(ws, slug)}/architecture.html`;
   return {
     ...summary,
     ...readProjectView(ws, slug),
@@ -73,6 +75,7 @@ export function readProjectPage(ws: Workspace, slug: string) {
       value: Number(row.value),
     })),
     sources: [summary.file, ...summary.metricFiles],
+    architecture: ws.exists(architecture) ? statSync(ws.resolve(architecture)).mtime.toISOString() : null,
   };
 }
 

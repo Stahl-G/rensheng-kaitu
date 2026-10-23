@@ -5,7 +5,15 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 export function desktopPaths(env = process.env) {
   const state = env.KAITU_APP_HOME || join(homedir(), ".kaitu-app");
   if (!isAbsolute(state)) throw new Error("KAITU_APP_HOME 必须是绝对路径");
-  let workspace = env.KAITU_DIR || (env.KAITU_APP_HOME ? join(state, "workspace") : join(homedir(), "kaitu"));
+  const legacy = join(homedir(), "kaitu");
+  let workspace =
+    env.KAITU_DIR ||
+    (env.KAITU_APP_HOME
+      ? join(state, "workspace")
+      : // 有 ~/kaitu 就照旧用它，包括搬去云盘后只剩迁移说明的情况：云盘暂时没挂上时报不可用，不另建空库。
+        existsSync(legacy)
+        ? legacy
+        : join(homedir(), "kaitu-ai-memory"));
   if (!env.KAITU_DIR && !env.KAITU_APP_HOME) {
     const localState =
       env.KAITU_LOCAL_STATE_DIR ||
