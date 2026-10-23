@@ -309,7 +309,8 @@ export function InboxPage({
       .catch(() => {});
   }, [channelSettings]);
   const [source, setSource] = useState("all");
-  const [status, setStatus] = useState<"review" | "all" | "raw">("review");
+  // null follows the default; an explicit choice survives pagination and refreshes.
+  const [status, setStatus] = useState<"review" | "all" | "saved" | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [entries, setEntries] = useState<InboxEntry[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
@@ -326,11 +327,6 @@ export function InboxPage({
         const page = await loadLibrary({ section: "inbox", source });
         if (!active || seq !== generation.current) return;
         setEntries(page.inbox);
-        setStatus((current) =>
-          current === "review" && !page.next && !page.inbox.some((row) => row.status === "review")
-            ? "all"
-            : current,
-        );
         setNext(page.next ?? null);
         setError("");
       } catch (err) {
@@ -365,7 +361,16 @@ export function InboxPage({
       if (seq === generation.current) setLoading(false);
     }
   };
-  const filtered = entries?.filter((entry) => status === "all" || entry.status === status) ?? [];
+  const activeStatus =
+    status ?? (next || entries?.some((entry) => entry.status === "review") ? "review" : "all");
+  const destinationFor = (entry: InboxEntry) => sources?.[entry.file.split("/").at(-1) ?? ""];
+  const savedAsIs = (entry: InboxEntry) =>
+    entry.status === "organized" && !!sources && !entry.destination && !destinationFor(entry);
+  const filtered =
+    entries?.filter(
+      (entry) =>
+        activeStatus === "all" || (activeStatus === "saved" ? savedAsIs(entry) : entry.status === "review"),
+    ) ?? [];
   const selectedEntry = filtered.find((entry) => entry.file === selected);
   const away = overview?.sync.cloudOrganizer?.away;
   const sourceLabel = (id: string) =>
@@ -432,11 +437,11 @@ export function InboxPage({
       ) : (
         <>
           <div className={css.subtabs} role="toolbar" aria-label={t("看哪些", "Show items")}>
-            {(["review", "all", "raw"] as const).map((value) => (
+            {(["review", "all", "saved"] as const).map((value) => (
               <button
                 type="button"
                 key={value}
-                aria-pressed={status === value}
+                aria-pressed={activeStatus === value}
                 onClick={() => {
                   setStatus(value);
                   setSelected(null);
@@ -476,14 +481,18 @@ export function InboxPage({
                     {t(
                       row.status === "review"
                         ? "要你核对"
-                        : row.status === "organized"
-                          ? "已整理"
-                          : "只存了原文",
+                        : savedAsIs(row)
+                          ? "只存了原文"
+                          : row.status === "organized"
+                            ? "已整理"
+                            : "还没整理",
                       row.status === "review"
                         ? "To review"
-                        : row.status === "organized"
-                          ? "Organized"
-                          : "Saved as is",
+                        : savedAsIs(row)
+                          ? "Saved as is"
+                          : row.status === "organized"
+                            ? "Organized"
+                            : "Not organized yet",
                     )}
                   </span>
                 </button>
@@ -496,7 +505,7 @@ export function InboxPage({
                 </p>
                 <blockquote className={inboxStyles.original}>{selectedEntry.text}</blockquote>
                 {(() => {
-                  const destination = sources?.[selectedEntry.file.split("/").at(-1) ?? ""];
+                  const destination = destinationFor(selectedEntry);
                   return destination ? (
                     <button
                       type="button"
@@ -505,7 +514,7 @@ export function InboxPage({
                     >
                       {t(`变成下一步：${destination.title}`, `Next step: ${destination.title}`)}
                     </button>
-                  ) : selectedEntry.status === "organized" && sources ? (
+                  ) : savedAsIs(selectedEntry) ? (
                     <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}

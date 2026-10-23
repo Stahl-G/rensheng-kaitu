@@ -5,7 +5,7 @@ import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { inboxNotes } from "./inbox-notes.js";
+import { inboxNotes, isCaptureSource } from "./inbox-notes.js";
 import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
@@ -62,10 +62,11 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
     const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
     if (!parsed) return [];
     const { data, body } = parsed;
-    const originalSource =
+    const captureSource =
       data.kind === "capture" && typeof data.date === "string"
         ? `inbox/notes/${data.date}/${basename(file)}`
         : null;
+    const originalSource = isCaptureSource(captureSource) ? captureSource : null;
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]

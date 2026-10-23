@@ -4,9 +4,19 @@ import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
+import { phoneInboxName } from "./phone-actions.js";
 import { isoInZone, localDate } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
+
+/** 原文的固定身份；归档后仍用保存时的日期和文件名。 */
+export function isCaptureSource(source: unknown): source is string {
+  if (typeof source !== "string") return false;
+  const match = /^inbox\/notes\/\d{4}-\d{2}-\d{2}\/([a-zA-Z0-9.-]+)$/.exec(source);
+  if (!match || match[0] !== source) return false;
+  const name = match[1] ?? "";
+  return /^[0-9a-z]{26}\.md$/.test(name) || (name.endsWith(".note.md") && phoneInboxName.test(name));
+}
 
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
 export async function captureNote(ws: Workspace, text: string, investment?: string, limit = 100000) {
