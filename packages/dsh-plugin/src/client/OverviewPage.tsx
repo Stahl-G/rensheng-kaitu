@@ -1,6 +1,6 @@
 import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
+import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
@@ -30,6 +30,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { TodayStart, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
+import { TodayWeather } from "./Weather.js";
 import {
   type ExploreModule,
   defaultExploreEntries,
@@ -56,6 +57,14 @@ export interface OverviewPageProps
   loadDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
   generateDirectionMap?: () => Promise<import("@kaitu/core").DirectionMapState>;
   dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
+  /** 今天页天气：读本机缓存、设城市；宿主没提供时不显示天气。 */
+  loadWeather?: () => Promise<import("@kaitu/core").WeatherState>;
+  setWeatherPlace?: (
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
   hosted?: boolean;
   load: () => Promise<OverviewData>;
@@ -317,6 +326,19 @@ function Overview({
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [learningTopic, setLearningTopic] = useState("");
   const [learningSource, setLearningSource] = useState<LearningSource>();
+  const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
+  const [libraryFile, setLibraryFile] = useState<string>();
+  const [libraryGoal, setLibraryGoal] = useState<string>();
+  useEffect(() => {
+    if (view !== "records" || record !== "projects" || !libraryGoal) return;
+    const target = document.getElementById(`plan-${libraryGoal}`);
+    if (!target) return;
+    const details = target.closest("details");
+    if (details) details.open = true;
+    target.tabIndex = -1;
+    target.focus();
+    target.scrollIntoView({ block: "center" });
+  }, [view, record, libraryGoal]);
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
@@ -493,6 +515,9 @@ function Overview({
     }
   };
   const openRecord = (id: string) => {
+    setLibraryEntry(undefined);
+    setLibraryFile(undefined);
+    setLibraryGoal(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
@@ -927,6 +952,19 @@ function Overview({
             }}
           />
         )}
+        {view === "overview" &&
+          !guideVisible &&
+          guide !== undefined &&
+          data &&
+          props.loadWeather &&
+          props.setWeatherPlace && (
+            <TodayWeather
+              load={props.loadWeather}
+              setPlace={props.setWeatherPlace}
+              loadLifeMap={props.loadLifeMap}
+              subscribe={props.subscribe}
+            />
+          )}
         {view === "overview" && !guideVisible && guide !== undefined && data && (
           <div className={todayCss.layout}>
             <div className={todayCss.left}>
@@ -1180,6 +1218,19 @@ function Overview({
               <LibraryPage
                 data={library}
                 open={openRecord}
+                onOpenOriginal={(entry) => {
+                  openRecord("inbox");
+                  setLibraryEntry(entry);
+                }}
+                onOpenGoal={(id) => {
+                  openRecord("projects");
+                  setLibraryGoal(id);
+                }}
+                onOpenNote={(file) => {
+                  openRecord("notes");
+                  setLearningTopic(file.startsWith("learning/") ? (file.split("/")[1] ?? "") : "");
+                  setLibraryFile(file.startsWith("learning/") ? undefined : file);
+                }}
                 overview={data}
                 capture={async (text) => {
                   await props.capture(text);
@@ -1222,6 +1273,7 @@ function Overview({
             ) : record === "inbox" ? (
               reviewMatter ? null : (
                 <InboxPage
+                  initialEntry={libraryEntry}
                   overview={data}
                   review={{
                     readOnboardingMatter: props.readOnboardingMatter,
@@ -1267,6 +1319,7 @@ function Overview({
               )
             ) : (
               <NotesPage
+                initialFile={libraryFile}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
                 loadLearning={props.loadLearning}

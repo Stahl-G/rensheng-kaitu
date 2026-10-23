@@ -144,6 +144,9 @@ const props: OverviewPageProps = {
   loadDirectionMap: () => call("directionMap"),
   generateDirectionMap: () => call("directionMapGenerate"),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
+  loadWeather: () => call("weather"),
+  setWeatherPlace: (name, latitude, longitude, source) =>
+    call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),

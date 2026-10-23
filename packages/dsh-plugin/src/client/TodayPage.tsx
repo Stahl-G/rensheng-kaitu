@@ -187,7 +187,7 @@ export function TodayStart({
 }
 
 /** Only clipped goals become interactive; the full text remains unchanged. */
-export function TodayGoal({ text }: { text: string }) {
+export function TodayGoal({ text, title = false }: { text: string; title?: boolean }) {
   const t = useT();
   const line = useRef<HTMLSpanElement>(null);
   const [clipped, setClipped] = useState(false);
@@ -196,25 +196,27 @@ export function TodayGoal({ text }: { text: string }) {
     setOpen(false);
     const measure = () => {
       const node = line.current;
-      if (node) setClipped(!!text && node.scrollWidth > node.clientWidth);
+      if (node)
+        setClipped(!!text && (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight));
     };
     measure();
     const observer = new ResizeObserver(measure);
     if (line.current) observer.observe(line.current);
     return () => observer.disconnect();
   }, [text]);
+  const Text = title ? "b" : "span";
   return (
-    <div className={todayCss.goal}>
-      <span>{t("为了", "For")}</span>
-      <span ref={line} className={todayCss.goalLine}>
+    <div className={`${todayCss.goal} ${title ? todayCss.goalTitle : ""}`}>
+      {!title && <span>{t("为了", "For")}</span>}
+      <Text ref={line} className={todayCss.goalLine}>
         {text}
-      </span>
+      </Text>
       {clipped && (
         <button type="button" className={css.link} aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? t("收起", "Show less") : t("展开", "Show more")}
         </button>
       )}
-      {open && <p>{text}</p>}
+      {open && clipped && <p>{text.replace(/(?<=.)(?=[[【][^\]】]{1,16}[\]】])/g, "\n")}</p>}
     </div>
   );
 }

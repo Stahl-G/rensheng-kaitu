@@ -277,10 +277,21 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.goalTitle {
+  color: inherit;
+}
+.goalTitle .goalLine {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .goal p {
   width: 100%;
   color: var(--ink2);
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 .start h1,
 .focus h2,
