@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { productCopyright, withProductCopyright } from "./brand.mjs";
 import { rewriteArchive } from "./package-archive.mjs";
 import { writePayload } from "./package-payload.mjs";
 import { readUpdateConfig } from "./update-config.mjs";
@@ -66,7 +67,7 @@ for (const path of asar.listPackage(archive)) {
   if (text.includes("DeepSeek Harness"))
     changes.set(name, Buffer.from(text.replaceAll("DeepSeek Harness", "人生开图")));
 }
-const main = changes.get("lib/main.js").toString();
+const main = withProductCopyright(changes.get("lib/main.js").toString());
 if (!main.includes("function quitWithoutConfirmation()")) throw new Error("DSH 退出入口已变化");
 changes.set(
   "lib/main.js",
@@ -136,6 +137,7 @@ await requireTools("rcedit")(exe, {
     ProductName: "人生开图",
     FileDescription: "人生开图",
     CompanyName: "Kaitu",
+    LegalCopyright: productCopyright,
     OriginalFilename: "Kaitu.exe",
     ProductVersion: version,
   },
@@ -173,6 +175,7 @@ if (!values.dir) {
     config: {
       appId: "ai.kaitu.app",
       productName: "人生开图",
+      copyright: productCopyright,
       artifactName: values.revision
         ? `Kaitu-Setup-\${version}-windows.${values.revision}-x64.\${ext}`
         : "Kaitu-Setup-${version}-x64.${ext}",
