@@ -1,10 +1,11 @@
 import type { LibraryQuery, PlansData } from "@kaitu/core";
-import { Fragment, useEffect, useRef, useState } from "react";
-import type { InboxEntry, LibraryData } from "../types.js";
+import { useEffect, useRef, useState } from "react";
+import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
+import styles from "./LibraryPage.module.css";
 import css from "./Prototype.module.css";
-import { useT } from "./i18n.js";
+import { useLocale, useT, versionText } from "./i18n.js";
 
 const SOURCE_EN: Record<string, string> = {
   开图: "Kaitu",
@@ -34,71 +35,249 @@ export interface LibraryProps extends LearningServices {
 export function LibraryPage({
   data,
   open,
-  inboxCount,
-}: { data: LibraryData | null; open: (id: string) => void; inboxCount?: number }) {
+  overview,
+  capture,
+  onAdd,
+}: {
+  data: LibraryData | null;
+  open: (id: string) => void;
+  inboxCount?: number;
+  overview?: OverviewData | null;
+  capture?: (text: string) => Promise<unknown>;
+  onAdd?: (kind: "file" | "phone" | "organizer" | "category") => void;
+}) {
   const t = useT();
-  const colors: Record<string, string> = {
-    calendar: "news",
-    projects: "doing",
-    health: "health",
-    finance: "finance",
-    notes: "explore",
-    inbox: "me",
+  const locale = useLocale();
+  const [query, setQuery] = useState("");
+  const [draft, setDraft] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const away = overview?.sync.cloudOrganizer?.away;
+  const items = data?.inbox ?? [];
+  const matches = (value: string) => value.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  const recent = items.filter((item) => matches(item.text));
+  const hints: Record<string, [string, string]> = {
+    calendar: ["添加日程或连接日历", "Add an event or connect a calendar"],
+    projects: ["记下正在做的项目", "Add a project you are working on"],
+    health: ["记录训练、饮食或睡眠", "Log training, meals or sleep"],
+    finance: ["导入账单并核对", "Import and review a statement"],
+    notes: ["记下笔记或一个决定", "Save a note or a decision"],
   };
   return (
-    <section className={css.mods} aria-label={t("各类资料", "Library sections")}>
-      {data?.sections.map((item) => {
-        const section =
-          item.id === "inbox" && inboxCount !== undefined ? { ...item, count: inboxCount } : item;
-        return (
-          <button
-            type="button"
-            className={`${css.mod} ${css.card} ${css.summaryButton}`}
-            key={section.id}
-            onClick={() => open(section.id)}
-          >
-            <span className={css["sum-h"]}>
-              <i className={css.dot} style={{ background: `var(--${colors[section.id]})` }} />
-              {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-              <span>›</span>
-            </span>
-            {section.count === null ? (
-              <span className={css["mod-empty"]}>{t("查看资料", "Browse items")}</span>
-            ) : section.count || (section.id === "inbox" && inboxCount !== undefined) ? (
-              <span className={`${css.big} ${css.num}`}>
-                {t(
-                  section.id === "inbox" && inboxCount !== undefined
-                    ? `${section.count} 条未整理`
-                    : `${section.count} ${section.id === "projects" ? "个项目" : "条"}`,
-                  section.id === "inbox" && inboxCount !== undefined
-                    ? `${section.count} to sort`
-                    : `${section.count} ${section.id === "projects" ? (section.count === 1 ? "project" : "projects") : section.count === 1 ? "item" : "items"}`,
-                )}
-              </span>
-            ) : (
-              <span className={css["mod-empty"]}>{t("还没有资料", "Nothing yet")}</span>
+    <div className={styles.page}>
+      <div className={styles.heading}>
+        <p>
+          {t(
+            "你留下的原文，和从中整理出的东西。原文永远保留。",
+            "What you've saved, and what Kaitu organized from it. Originals are always kept.",
+          )}
+        </p>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label={t("搜索资料", "Search library")}
+          placeholder={t("搜索原文、分类、笔记", "Search originals, categories and notes")}
+        />
+      </div>
+      <section
+        className={styles.inbox}
+        aria-label={t("收件箱", "Inbox")}
+        onDragOver={(event) => {
+          if (
+            capture &&
+            event.dataTransfer.types.includes("text/plain") &&
+            !event.dataTransfer.types.includes("Files")
+          )
+            event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          if (event.dataTransfer.files.length) {
+            onAdd?.("file");
+            return;
+          }
+          const text = event.dataTransfer.getData("text/plain");
+          if (capture && text) setDraft(text);
+        }}
+        onPaste={(event) => {
+          if (capture && !(event.target instanceof HTMLTextAreaElement)) {
+            const text = event.clipboardData.getData("text/plain");
+            if (text) {
+              event.preventDefault();
+              setDraft(text);
+            }
+          }
+        }}
+      >
+        <div className={styles.heading}>
+          <h2>{t("收件箱", "Inbox")}</h2>
+          <button type="button" className={css.link} onClick={() => open("inbox")}>
+            {t("查看全部", "View all")} ›
+          </button>
+        </div>
+        {away && (
+          <p className={styles.meta}>
+            {t(
+              `电脑不在时，云端整理员整理了 ${away.actions} 条`,
+              `While your computer was off, the cloud organizer sorted ${away.actions} items`,
+            )}{" "}
+            · {away.returnedAt.slice(0, 16).replace("T", " ")}
+          </p>
+        )}
+        {items.length === 0 && (
+          <p>
+            {t(
+              "所有进来的东西都先放在这里，整理好再分到下面各类。",
+              "Everything arrives here first, then is organized into the categories below.",
             )}
-            <span className={css.small}>
-              {section.sources.map((source, index) => (
-                <Fragment key={source}>
-                  {index ? t("、", ", ") : ""}
-                  <span className={css.nowrap}>{t(source, SOURCE_EN[source] ?? source)}</span>
-                </Fragment>
-              ))}
-              {section.latest && (
-                <span className={css.nowrap}>
-                  {section.sources.length ? " · " : ""}
-                  {t(
-                    `${section.id === "calendar" ? "最近同步" : "最近记录"} ${section.latest.slice(0, 10)}`,
-                    `${section.id === "calendar" ? "synced" : "latest"} ${section.latest.slice(0, 10)}`,
-                  )}
-                </span>
+          </p>
+        )}
+        {recent.slice(0, 3).map((item) => (
+          <button type="button" className={styles.row} key={item.file} onClick={() => open("inbox")}>
+            <time className={styles.meta}>{item.date?.slice(0, 10) ?? ""}</time>
+            <span className={styles.preview}>{item.text}</span>
+            <span className={css.chip}>
+              {t(
+                item.status === "review" ? "要你核对" : item.status === "organized" ? "已整理" : "只存了原文",
+                item.status === "review"
+                  ? "To review"
+                  : item.status === "organized"
+                    ? "Organized"
+                    : "Saved as is",
               )}
             </span>
           </button>
-        );
-      }) ?? <p className={css.small}>{t("正在读取资料…", "Loading…")}</p>}
-    </section>
+        ))}
+        <div className={styles.ways}>
+          {onAdd && (
+            <button type="button" onClick={() => onAdd("file")}>
+              {t("选择导出的资料", "Choose an export")}
+            </button>
+          )}
+          {capture && (
+            <button type="button" onClick={() => setDraft("")}>
+              {t("粘贴一段对话", "Paste a conversation")}
+            </button>
+          )}
+          {onAdd && (
+            <>
+              <button type="button" onClick={() => onAdd("phone")}>
+                {t("用手机发给开图", "Send from your phone")}
+              </button>
+              <button type="button" onClick={() => onAdd("organizer")}>
+                {t("让 Dot / Grok 挑邮件", "Let Dot / Grok pick email")}
+              </button>
+            </>
+          )}
+        </div>
+        {draft !== null && capture && (
+          <form
+            className={styles.capture}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (busy || !draft.trim()) return;
+              setBusy(true);
+              setError("");
+              try {
+                await capture(draft);
+                setDraft(null);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : String(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <label>
+              {t("原文", "Original text")}
+              <textarea
+                value={draft}
+                maxLength={100000}
+                disabled={busy}
+                onChange={(event) => setDraft(event.target.value)}
+              />
+            </label>
+            <button type="submit" disabled={busy || !draft.trim()}>
+              {busy ? t("正在保存…", "Saving…") : t("保存原文", "Save original")}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setDraft(null)}>
+              {t("取消", "Cancel")}
+            </button>
+          </form>
+        )}
+        {error && <p role="alert">{error}</p>}
+      </section>
+      <h2>{t("整理好的资料", "Organized items")}</h2>
+      <section className={styles.categories} aria-label={t("各类资料", "Library sections")}>
+        {data?.sections
+          .filter(
+            (section) =>
+              section.id !== "inbox" && matches(`${section.title} ${LIBRARY_EN[section.id] ?? ""}`),
+          )
+          .map((section) => (
+            <button
+              type="button"
+              className={styles.category}
+              key={section.id}
+              onClick={() => open(section.id)}
+            >
+              <strong>{t(section.title, LIBRARY_EN[section.id] ?? section.title)}</strong>
+              <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
+                {section.count ?? "—"}
+              </span>
+              <span className={styles.meta}>
+                {section.count === 0 && hints[section.id]
+                  ? t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")
+                  : section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
+              </span>
+              {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
+            </button>
+          ))}
+        {onAdd && (
+          <button type="button" className={styles.category} onClick={() => onAdd("category")}>
+            <strong>＋ {t("添加一类", "Add a category")}</strong>
+            <span className={styles.meta}>{t("比如工作与求职", "For example, work and jobs")}</span>
+          </button>
+        )}
+        {!data && <output>{t("正在读取资料…", "Loading…")}</output>}
+      </section>
+      {query && (
+        <section aria-label={t("笔记搜索结果", "Matching notes")}>
+          {data?.notes
+            .filter((note) => matches(note.title))
+            .map((note) => (
+              <button type="button" className={styles.row} key={note.file} onClick={() => open("notes")}>
+                {note.title}
+              </button>
+            ))}
+          {recent.length === 0 && !data?.notes.some((note) => matches(note.title)) && (
+            <p className={styles.meta}>{t("没有匹配的原文或笔记", "No matching originals or notes")}</p>
+          )}
+        </section>
+      )}
+      {!!overview?.versions.length && (
+        <section>
+          <div className={styles.heading}>
+            <h2>{t("最近的变化", "Recent changes")}</h2>
+            {overview.daily && (
+              <details>
+                <summary>
+                  {t("近期回顾", "Recent review")} · {overview.daily.date}
+                </summary>
+                <div className={css.detailBody}>{overview.daily.body}</div>
+              </details>
+            )}
+          </div>
+          {overview.versions.slice(0, 3).map((version) => (
+            <div className={styles.row} key={version.oid}>
+              <span>{versionText(version.text, locale)}</span>
+              <time className={styles.meta}>{version.time.slice(0, 16).replace("T", " ")}</time>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
   );
 }
 export function InboxPage({
