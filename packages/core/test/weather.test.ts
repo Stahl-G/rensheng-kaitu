@@ -33,7 +33,7 @@ const forecast = (temperature: number) => ({
 it("城市名换成坐标后取天气，失败保留上次的数字，换城市期间的旧结果不写回", async () => {
   vi.stubEnv("KAITU_LOCAL_STATE_DIR", state);
   try {
-    expect(readWeather()).toEqual({ place: null, forecast: null, stale: true });
+    expect(readWeather()).toEqual({ place: null, forecast: null, stale: true, error: null });
     expect(() => setWeatherPlace({ name: "不存在的合成城市" })).toThrow("没找到这个城市");
     const place = setWeatherPlace({ name: "杭州" }).place;
     expect(place?.latitude).toBeCloseTo(30.29, 1);
@@ -51,6 +51,12 @@ it("城市名换成坐标后取天气，失败保留上次的数字，换城市�
     const later = readWeather(new Date("2026-10-23T04:00:00Z"));
     expect(later.forecast?.current.temperature).toBe(21);
     expect(later.stale).toBe(true);
+    expect(later.error).toContain("503");
+    // 足迹里的现居城市不覆盖用户手选的城市；再设一次同一城市就是重试，清掉失败。
+    expect(
+      setWeatherPlace({ name: "合成足迹城", latitude: 1, longitude: 2, source: "footprints" }).place?.name,
+    ).toBe("杭州");
+    expect(setWeatherPlace({ name: "杭州" }).error).toBeNull();
     // 同一个城市再设一次不清缓存；换到别的城市先清空，取数据途中又换城市就不写回。
     expect(
       setWeatherPlace({ name: "杭州", latitude: place?.latitude, longitude: place?.longitude }).forecast,
@@ -63,6 +69,16 @@ it("城市名换成坐标后取天气，失败保留上次的数字，换城市�
       },
     });
     expect(changed).toBe(false);
+    expect(readWeather().forecast).toBeNull();
+    // 同名不同坐标：慢的旧请求回来时，按坐标判断已经换了地方，不写回。
+    const slow = await refreshWeather({
+      fetch: async () => {
+        setWeatherPlace({ name: "合成山城", latitude: 30.1, longitude: 107.2 });
+        return forecast(12);
+      },
+    });
+    expect(slow).toBe(false);
+    expect(readWeather().place?.latitude).toBe(30.1);
     expect(readWeather().forecast).toBeNull();
   } finally {
     rmSync(state, { recursive: true, force: true });

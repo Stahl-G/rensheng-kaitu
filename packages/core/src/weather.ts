@@ -8,6 +8,8 @@ export interface WeatherPlace {
   name: string;
   latitude: number;
   longitude: number;
+  /** manual：用户自己选的，足迹不覆盖；footprints：跟着足迹里的现居城市。 */
+  source: "manual" | "footprints";
 }
 export interface WeatherForecast {
   fetchedAt: string;
@@ -21,8 +23,10 @@ export interface WeatherState {
   forecast: WeatherForecast | null;
   /** 缓存超过一小时；界面照常显示旧数字，旁边写更新时间。 */
   stale: boolean;
+  /** 最近一次没取到的原因；取到后清空。 */
+  error: string | null;
 }
-type Cache = { place: WeatherPlace | null; forecast: WeatherForecast | null };
+type Cache = { place: WeatherPlace | null; forecast: WeatherForecast | null; error?: string | null };
 
 const HOUR = 3_600_000;
 const API = "https://api.open-meteo.com/v1/forecast";
@@ -34,7 +38,8 @@ function file() {
 function read(): Cache {
   try {
     const value = JSON.parse(readFileSync(file(), "utf8")) as Cache;
-    return { place: value.place ?? null, forecast: value.forecast ?? null };
+    const place = value.place ? { ...value.place, source: value.place.source ?? "manual" } : null;
+    return { place, forecast: value.forecast ?? null, error: value.error ?? null };
   } catch {
     return { place: null, forecast: null };
   }
@@ -47,10 +52,14 @@ function write(cache: Cache) {
 }
 
 export function readWeather(now = new Date()): WeatherState {
-  const { place, forecast } = read();
+  const { place, forecast, error } = read();
   const stale = !forecast || now.getTime() - Date.parse(forecast.fetchedAt) > HOUR;
-  return { place, forecast, stale };
+  return { place, forecast, stale, error: error ?? null };
 }
+
+/** 换城市以坐标为准：同名不同地、或中途换了又换回来，都按坐标区分。 */
+const key = (place: Pick<WeatherPlace, "latitude" | "longitude">) =>
+  `${place.latitude.toFixed(2)},${place.longitude.toFixed(2)}`;
 
 const valid = (place: WeatherPlace) =>
   !!place.name.trim() &&
@@ -65,27 +74,36 @@ export function setWeatherPlace(input: {
   name: string;
   latitude?: number;
   longitude?: number;
+  source?: WeatherPlace["source"];
 }): WeatherState {
   if (!input || typeof input.name !== "string") throw new KaituError("请提供城市名", "BAD_ARGS");
   let place: WeatherPlace;
   if (typeof input.latitude === "number" && typeof input.longitude === "number")
-    place = { name: input.name.trim(), latitude: input.latitude, longitude: input.longitude };
+    place = {
+      name: input.name.trim(),
+      latitude: input.latitude,
+      longitude: input.longitude,
+      source: input.source === "footprints" ? "footprints" : "manual",
+    };
   else {
     const city = resolvePlace(input.name)[0];
     if (!city) throw new KaituError("没找到这个城市，换个写法试试，比如「杭州」或「Hangzhou」", "NOT_FOUND");
-    place = { name: input.name.trim(), latitude: city.lat, longitude: city.lng };
+    place = { name: input.name.trim(), latitude: city.lat, longitude: city.lng, source: "manual" };
   }
   if (!valid(place)) throw new KaituError("城市信息不完整", "BAD_ARGS");
   const cache = read();
-  const same =
-    cache.place &&
-    Math.abs(cache.place.latitude - place.latitude) < 0.01 &&
-    Math.abs(cache.place.longitude - place.longitude) < 0.01;
-  write({ place, forecast: same ? cache.forecast : null });
+  // 用户手选的城市优先，足迹里的现居城市不覆盖它。
+  if (place.source === "footprints" && cache.place?.source === "manual") return readWeather();
+  const same = !!cache.place && key(cache.place) === key(place);
+  // 再设一次同一个城市就是「重试」：保留旧数字，清掉上次的失败。
+  write({ place, forecast: same ? cache.forecast : null, error: null });
   return readWeather();
 }
 
-type Fetch = (url: string) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
+type Fetch = (
+  url: string,
+  init?: { signal?: AbortSignal },
+) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
 
 /** 取一次 Open-Meteo，成功才覆盖缓存；失败保留上次的数字。返回是否有新数据。 */
 export async function refreshWeather(options: { fetch?: Fetch; now?: Date } = {}): Promise<boolean> {
@@ -100,9 +118,12 @@ export async function refreshWeather(options: { fetch?: Fetch; now?: Date } = {}
     timezone: "auto",
     forecast_days: "2",
   });
-  const response = await (options.fetch ?? fetch)(`${API}?${params}`);
-  if (!response.ok) throw new KaituError(`天气服务暂时不可用（${response.status}）`, "NETWORK");
-  const body = (await response.json()) as {
+  // 只要坐标没变就是同一次选择；中途换了城市，这次的结果和失败都不写回。
+  const current = () => {
+    const now = read();
+    return now.place && key(now.place) === key(place) ? now : null;
+  };
+  let body: {
     timezone: string;
     current: { time: string; temperature_2m: number; weather_code: number; is_day: number };
     hourly: { time: string[]; temperature_2m: number[]; weather_code: number[] };
@@ -113,6 +134,17 @@ export async function refreshWeather(options: { fetch?: Fetch; now?: Date } = {}
       sunset: string[];
     };
   };
+  try {
+    const response = await (options.fetch ?? fetch)(`${API}?${params}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) throw new KaituError(`天气服务暂时不可用（${response.status}）`, "NETWORK");
+    body = (await response.json()) as typeof body;
+  } catch (error) {
+    const now = current();
+    if (now) write({ ...now, error: error instanceof KaituError ? error.message : "暂时连不上天气服务" });
+    throw error;
+  }
   // 逐时从当前这一小时往后取 12 个；时间都是当地时间，和 current.time 同一格式。
   const start = Math.max(
     0,
@@ -139,9 +171,9 @@ export async function refreshWeather(options: { fetch?: Fetch; now?: Date } = {}
       code: body.hourly.weather_code[start + index] ?? 0,
     })),
   };
-  // 取数据期间用户换了城市，就不写回旧城市的天气。
-  if (read().place?.name !== place.name) return false;
-  write({ place, forecast });
+  const now = current();
+  if (!now?.place) return false;
+  write({ place: now.place, forecast, error: null });
   return true;
 }
 

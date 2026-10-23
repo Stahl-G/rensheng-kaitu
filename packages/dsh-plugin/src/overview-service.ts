@@ -774,8 +774,13 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("weatherPlace")
-  async weatherPlace(name: string, latitude?: number, longitude?: number): Promise<WeatherState> {
-    const state = setWeatherPlace({ name, latitude, longitude });
+  async weatherPlace(
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ): Promise<WeatherState> {
+    const state = setWeatherPlace({ name, latitude, longitude, source });
     void refreshWeather().catch(() => {});
     return state;
   }

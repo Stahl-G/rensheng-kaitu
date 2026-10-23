@@ -142,8 +142,8 @@ const props: OverviewPageProps = {
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
   loadWeather: () => call("weather"),
-  setWeatherPlace: (name, latitude, longitude) =>
-    call("weatherPlace", { name, ...(latitude === undefined ? {} : { latitude, longitude }) }),
+  setWeatherPlace: (name, latitude, longitude, source) =>
+    call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),

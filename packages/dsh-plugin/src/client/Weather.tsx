@@ -1,5 +1,5 @@
 import type { LifeMapData, WeatherForecast, WeatherState } from "@kaitu/core";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Weather.module.css";
 import { footprintAnchor } from "./footprint-state.js";
 import { useLocale, useT } from "./i18n.js";
@@ -49,7 +49,12 @@ export function TodayWeather({
   subscribe,
 }: {
   load: () => Promise<WeatherState>;
-  setPlace: (name: string, latitude?: number, longitude?: number) => Promise<WeatherState>;
+  setPlace: (
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ) => Promise<WeatherState>;
   loadLifeMap: () => Promise<LifeMapData>;
   subscribe?: (refresh: () => void) => () => void;
 }) {
@@ -60,36 +65,57 @@ export function TodayWeather({
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(() => rememberedOpen() ?? new Date().getHours() < 13);
+  // 只采用最后一次请求的结果，旧响应不覆盖新选的城市。
+  const generation = useRef(0);
+  const apply = useCallback(async (request: Promise<WeatherState>) => {
+    const id = ++generation.current;
+    const value = await request;
+    if (id === generation.current) setState(value);
+    return value;
+  }, []);
   const refresh = useCallback(() => {
-    void load()
-      .then(setState)
-      .catch(() => {});
-  }, [load]);
+    void apply(load()).catch(() => {});
+  }, [apply, load]);
   useEffect(() => {
     refresh();
-    return subscribe?.(refresh);
+    const off = subscribe?.(refresh);
+    // 后台每小时更新本机缓存；没有推送的宿主（如 DSH）靠每 10 分钟读一次缓存跟上。
+    const timer = setInterval(refresh, 10 * 60_000);
+    return () => {
+      off?.();
+      clearInterval(timer);
+    };
   }, [refresh, subscribe]);
-  // 足迹里有现居城市就以它为准；和已存的城市不同才更新。
+  // 还没有城市、或城市本来就跟着足迹时，用足迹里的现居城市；用户手选的不覆盖。
   useEffect(() => {
     let active = true;
     void Promise.all([load(), loadLifeMap()])
       .then(async ([current, map]) => {
         const home = footprintAnchor(map.experiences, map.asOf);
         if (!active || !home || !Number.isFinite(home.lat) || !Number.isFinite(home.lng)) return;
-        const same =
+        if (current.place?.source === "manual") return;
+        const lat = home.lat as number;
+        const lng = home.lng as number;
+        if (
           current.place &&
-          Math.abs(current.place.latitude - (home.lat as number)) < 0.01 &&
-          Math.abs(current.place.longitude - (home.lng as number)) < 0.01;
-        if (!same) setState(await setPlace(home.name, home.lat as number, home.lng as number));
+          current.place.latitude.toFixed(2) === lat.toFixed(2) &&
+          current.place.longitude.toFixed(2) === lng.toFixed(2)
+        )
+          return;
+        await apply(setPlace(home.name, lat, lng, "footprints"));
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [load, loadLifeMap, setPlace]);
-  // 换城市后后台去取；没有推送的宿主里读几次本机缓存，取到就停。
+  }, [apply, load, loadLifeMap, setPlace]);
+  // 刚换城市还没取到：读几次本机缓存，取到、失败或读满 10 次就停。
+  const placeKey = state?.place
+    ? `${state.place.latitude.toFixed(2)},${state.place.longitude.toFixed(2)}`
+    : "";
+  const waiting = !!placeKey && !state?.forecast && !state?.error;
   useEffect(() => {
-    if (!state?.place || state.forecast) return;
+    if (!waiting || !placeKey) return;
     let tries = 0;
     const timer = setInterval(() => {
       tries += 1;
@@ -97,7 +123,13 @@ export function TodayWeather({
       if (tries >= 10) clearInterval(timer);
     }, 3000);
     return () => clearInterval(timer);
-  }, [state?.place, state?.forecast, refresh]);
+  }, [waiting, placeKey, refresh]);
+  const retry = () => {
+    if (state?.place)
+      void apply(
+        setPlace(state.place.name, state.place.latitude, state.place.longitude, state.place.source),
+      ).catch(() => {});
+  };
   const toggle = () => {
     setOpen(!open);
     try {
@@ -114,7 +146,7 @@ export function TodayWeather({
           if (!draft.trim()) return;
           setError("");
           try {
-            setState(await setPlace(draft.trim()));
+            await apply(setPlace(draft.trim()));
             setAsking(false);
           } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
@@ -144,7 +176,20 @@ export function TodayWeather({
     );
   const forecast = state.forecast;
   if (!forecast)
-    return (
+    return state.error ? (
+      <div className={css.ask} role="alert">
+        <span>
+          {t(`暂时取不到${state.place.name}的天气：`, `Couldn't get the weather for ${state.place.name}: `)}
+          {state.error}
+        </span>
+        <button type="button" onClick={retry}>
+          {t("重试", "Retry")}
+        </button>
+        <button type="button" onClick={() => setAsking(true)}>
+          {t("换城市", "Change city")}
+        </button>
+      </div>
+    ) : (
       <output className={css.ask}>
         {t(`正在取${state.place.name}的天气…`, `Getting the weather for ${state.place.name}…`)}
       </output>
@@ -188,6 +233,7 @@ export function TodayWeather({
             {t("最低", "L")} {round(forecast.today.min)}
           </span>
           {updated && <small>{updated}</small>}
+          {credit}
           <button type="button" onClick={toggle}>
             {t("展开", "Expand")}
           </button>

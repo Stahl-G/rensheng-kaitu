@@ -58,6 +58,7 @@ export interface OverviewPageProps
     name: string,
     latitude?: number,
     longitude?: number,
+    source?: "manual" | "footprints",
   ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
   hosted?: boolean;

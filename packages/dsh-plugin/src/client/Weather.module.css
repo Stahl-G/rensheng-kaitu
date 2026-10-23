@@ -142,7 +142,8 @@
   font-weight: 600;
 }
 /* 出处跟着天空的文字色，不用全局链接色（夜空上看不见）。 */
-.wx .credit {
+.wx .credit,
+.bar .credit {
   align-self: flex-end;
   color: var(--sky-ink);
   text-decoration: none;
@@ -161,7 +162,7 @@
   font-weight: 250;
   line-height: 1;
 }
-.bar button:last-child {
+.bar .credit {
   margin-left: auto;
 }
 .ask {
