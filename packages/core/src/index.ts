@@ -74,6 +74,7 @@ export * from "./locale.js";
 export { localStateRoot } from "./local-state.js";
 export * from "./plans.js";
 export * from "./handover.js";
+export * from "./reading-pack.js";
 
 export * from "./agent-file-policy.js";
 
@@ -111,4 +112,3 @@ export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
 
 export * from "./jobs.js";
 export * from "./weather.js";
-export * from "./reading-pack.js";
