@@ -95,6 +95,12 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         ).href
       );
       const names = installed();
+      const versions = new Map(
+        names.map((name) => {
+          const file = join(profileDir("desktop"), "node_modules", name, "package.json");
+          return [name, existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).version : ""];
+        }),
+      );
       const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
       // 目录里的 kaitu-dsh 是给 DSH 装开图用的，开图 App 自己就是开图，不列出来。
       const catalog = index.plugins
@@ -108,11 +114,23 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
             version: latest?.version ?? "",
             spec: latest ? marketInstallTarget(plugin.name, latest).spec : "",
             installed: names.includes(plugin.name),
+            installedVersion: versions.get(plugin.name),
+            updateAvailable:
+              plugin.versions.findIndex((item) => item.version === versions.get(plugin.name)) > 0,
           };
         });
       const extra = names
         .filter((name) => !catalog.some((plugin) => plugin.name === name))
-        .map((name) => ({ name, title: name, description: "", version: "", spec: "", installed: true }));
+        .map((name) => ({
+          name,
+          title: name,
+          description: "",
+          version: "",
+          spec: "",
+          installed: true,
+          installedVersion: versions.get(name),
+          updateAvailable: false,
+        }));
       return [...catalog, ...extra];
     },
     async install(spec) {
