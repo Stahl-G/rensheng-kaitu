@@ -407,3 +407,11 @@
     order: 6;
   }
 }
+
+.moduleGrid .firstAction {
+  color: var(--link);
+  font-weight: 600;
+}
+.steps [aria-label] {
+  color: var(--accent);
+}

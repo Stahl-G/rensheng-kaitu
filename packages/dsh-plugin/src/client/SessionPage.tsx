@@ -27,7 +27,6 @@ export function SessionPage(props: Props) {
       <OverviewPage
         hosted
         {...props}
-        hosted
         onPrompt={(text) => void open(text)}
         onAgent={() => void open()}
         renderAsk={(prompt, _configure, _builtin, _connections, promptRequest) => (

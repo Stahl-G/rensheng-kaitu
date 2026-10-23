@@ -46,7 +46,6 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
-  hosted?: boolean;
   initialChatDraft?: string;
   hosted?: boolean;
   load: () => Promise<OverviewData>;
@@ -190,6 +189,24 @@ function Overview({
   }, [exploreEntries, firstExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
+  const [hasWrittenMatter, setHasWrittenMatter] = useState(false);
+  const emptyWorkspace = data?.empty;
+  const hasUserData = onboarding?.hasUserData;
+  useEffect(() => {
+    let active = true;
+    setHasWrittenMatter(false);
+    if (workspaceRoot && emptyWorkspace && hasUserData) {
+      void props
+        .loadLibrary({ section: "inbox", source: "me" })
+        .then((value) => {
+          if (active) setHasWrittenMatter(value.inbox.length > 0);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
   useEffect(() => {
     let active = true;
     if (workspaceRoot)
@@ -802,7 +819,12 @@ function Overview({
                     start={startMatter}
                     memory={() => startGuide(5)}
                     status={onboarding}
-                    connect={() => manageAi(true)}
+                    hasWrittenMatter={hasWrittenMatter}
+                    connect={() => {
+                      setGuide(null);
+                      if (props.renderAsk) setView("ask");
+                      else props.onAgent();
+                    }}
                     openModule={(id) => {
                       setView("explore");
                       setExplore(id);

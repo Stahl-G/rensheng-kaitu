@@ -14,6 +14,7 @@ export function TodayStart({
   openModule,
   storage,
   status,
+  hasWrittenMatter = false,
   busy = false,
 }: {
   start: (text: string) => void;
@@ -22,13 +23,19 @@ export function TodayStart({
   openModule?: (id: string) => void;
   storage?: () => void;
   status: import("@kaitu/core").OnboardingStatus | null;
+  hasWrittenMatter?: boolean;
   busy?: boolean;
 }) {
   const t = useT();
   const [goal, setGoal] = useState("");
   const stepDone = (id: string) =>
     id === "matter"
-      ? !!(status?.draft || status?.next || status?.checklist.items.find((item) => item.id === id)?.done)
+      ? !!(
+          hasWrittenMatter ||
+          status?.draft ||
+          status?.next ||
+          status?.checklist.items.find((item) => item.id === id)?.done
+        )
       : !!status?.checklist.items.find((item) => item.id === id)?.done;
   const steps = [
     ["matter", t("写下一件事", "Write down one thing"), t("就在上面", "Start above"), () => start(goal)],
@@ -134,6 +141,25 @@ export function TodayStart({
                 >
                   <b>{t(entry.title[0], entry.title[1])}</b>
                   <span>{t(entry.description[0], entry.description[1])}</span>
+                  <span className={todayCss.firstAction}>
+                    {t(
+                      entry.id === "footprints"
+                        ? "加上家乡"
+                        : entry.id === "health"
+                          ? "记一条健康记录"
+                          : entry.id === "news"
+                            ? "选几个关键词"
+                            : "写下一个想试的方向",
+                      entry.id === "footprints"
+                        ? "Add your hometown"
+                        : entry.id === "health"
+                          ? "Log a health record"
+                          : entry.id === "news"
+                            ? "Choose some keywords"
+                            : "Write an idea to try",
+                    )}{" "}
+                    →
+                  </span>
                 </button>
               ))}
           </div>
