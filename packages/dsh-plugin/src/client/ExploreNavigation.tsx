@@ -15,9 +15,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
-import css from "./Prototype.module.css";
-import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
+import css from "./ExploreNavigation.module.css";
+import { defaultExploreEntries, exploreModules } from "./explore-modules.js";
 import { useT } from "./i18n.js";
+
+export interface ExploreEntry {
+  id: string;
+  title: readonly [string, string];
+  description: readonly [string, string];
+  icon: string;
+}
 
 function Entry({
   entry,
@@ -25,12 +32,14 @@ function Entry({
   busy,
   open,
   hide,
+  first,
 }: {
-  entry: ExploreModule;
+  entry: ExploreEntry;
   current: string;
   busy: boolean;
   open: () => void;
   hide: () => void;
+  first: boolean;
 }) {
   const t = useT();
   const title = t(entry.title[0], entry.title[1]);
@@ -59,6 +68,7 @@ function Entry({
         <span>
           <strong>{title}</strong>
           <small>{t(entry.description[0], entry.description[1])}</small>
+          {first && <small>{t("打开开图时先到这里", "Opens first")}</small>}
         </span>
       </button>
       <div className={css.exploreEntryActions}>
@@ -86,28 +96,33 @@ function Entry({
   );
 }
 
-export function ExploreNavigation({
+export function ExploreModulesPage({
   entries,
   current,
   open,
   save,
+  modules = exploreModules,
+  summaries = {},
+  empty = false,
 }: {
   entries: string[] | null;
   current: string;
   open: (id: string) => void;
   save: (entries: string[]) => Promise<unknown>;
+  modules?: readonly ExploreEntry[];
+  summaries?: Record<string, string>;
+  empty?: boolean;
 }) {
   const t = useT();
-  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const available = new Map(exploreModules.map((entry) => [entry.id as string, entry]));
+  const available = new Map(modules.map((entry) => [entry.id as string, entry]));
   const visible = (entries ?? []).flatMap((id) => available.get(id) ?? []);
-  const hidden = exploreModules.filter((entry) => !entries?.includes(entry.id));
+  const hidden = modules.filter((entry) => !entries?.includes(entry.id));
   const change = async (next: string[]) => {
     setBusy(true);
     setError("");
@@ -120,7 +135,23 @@ export function ExploreNavigation({
     }
   };
   return (
-    <div className={css.exploreNavigation} aria-busy={busy || entries === null}>
+    <section
+      className={css.exploreNavigation}
+      aria-busy={busy || entries === null}
+      aria-label={t("全部模块", "All modules")}
+    >
+      <h1>{t("全部模块", "All modules")}</h1>
+      <p>
+        {empty
+          ? t(
+              "开图里可以放这些。选一个模块，记下第一条资料。",
+              "Here is what you can keep in Kaitu. Choose a module to add your first record.",
+            )
+          : t(
+              "拖动调整顺序。排在第一个的，就是点“开图”时打开的那一页。",
+              "Drag to reorder. The first one opens when you click Explore.",
+            )}
+      </p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -144,9 +175,15 @@ export function ExploreNavigation({
             {visible.map((entry) => (
               <Entry
                 key={entry.id}
-                entry={entry}
+                entry={{
+                  ...entry,
+                  description: summaries[entry.id]
+                    ? [summaries[entry.id] ?? "", summaries[entry.id] ?? ""]
+                    : entry.description,
+                }}
                 current={current}
                 busy={busy}
+                first={!empty && visible[0]?.id === entry.id}
                 open={() => open(entry.id)}
                 hide={() => void change((entries ?? []).filter((id) => id !== entry.id))}
               />
@@ -158,26 +195,19 @@ export function ExploreNavigation({
         <button
           type="button"
           disabled={entries === null || busy}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((value) => !value)}
-        >
-          {t("添加模块", "Add modules")}
-        </button>
-        <button
-          type="button"
-          disabled={entries === null || busy}
           onClick={() => void change([...defaultExploreEntries])}
         >
           {t("恢复默认布局", "Restore default layout")}
         </button>
       </div>
-      {expanded && (
-        <section className={css.explorePicker} aria-label={t("添加模块", "Add modules")}>
+      {hidden.length > 0 && (
+        <section className={css.explorePicker} aria-label={t("还可以添加", "Add more")}>
+          <h2>{t("还可以添加", "Add more")}</h2>
           {hidden.map((entry) => (
             <button
               key={entry.id}
               type="button"
-              disabled={busy}
+              disabled={busy || entries === null}
               onClick={() => void change([...(entries ?? []), entry.id])}
             >
               {t("添加", "Add")} {t(entry.title[0], entry.title[1])}
@@ -187,6 +217,57 @@ export function ExploreNavigation({
         </section>
       )}
       {error && <p role="alert">{error}</p>}
-    </div>
+    </section>
+  );
+}
+
+export function ExploreNavigation({
+  entries,
+  current,
+  open,
+  modules = exploreModules,
+}: {
+  entries: string[] | null;
+  current: string;
+  open: (id: string) => void;
+  save: (entries: string[]) => Promise<unknown>;
+  modules?: readonly ExploreEntry[];
+}) {
+  const t = useT();
+  return (
+    <nav className={css.tabs} aria-label={t("开图的模块", "Explore modules")} aria-busy={entries === null}>
+      {(entries ?? [])
+        .flatMap((id) => modules.find((entry) => entry.id === id) ?? [])
+        .map((entry) => (
+          <button
+            type="button"
+            key={entry.id}
+            aria-current={current === entry.id ? "page" : undefined}
+            onClick={() => open(entry.id)}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d={entry.icon} />
+            </svg>
+            {t(entry.title[0], entry.title[1])}
+          </button>
+        ))}
+      <button
+        type="button"
+        aria-current={current === "modules" ? "page" : undefined}
+        onClick={() => open("modules")}
+        disabled={entries === null}
+      >
+        <span aria-hidden="true">＋</span>
+        {t("全部模块", "All modules")}
+      </button>
+    </nav>
   );
 }

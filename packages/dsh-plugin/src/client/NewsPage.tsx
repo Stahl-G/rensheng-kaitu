@@ -1,6 +1,7 @@
+import { directionText } from "@kaitu/core/direction-copy";
 import { useCallback, useEffect, useState } from "react";
 import type { NewsAction, NewsData, NewsFeedback, NewsItem, NewsVia } from "../types.js";
-import { NewsExtra, NewsImage, TrendDetails } from "./NewsContent.js";
+import { NewsExtra, TrendDetails } from "./NewsContent.js";
 import css from "./NewsPage.module.css";
 import { NewsRules } from "./NewsRules.js";
 import { useLocale, useT } from "./i18n.js";
@@ -103,19 +104,17 @@ export function NewsPage(props: NewsPageProps) {
 
   const pickedCard = (item: NewsItem) => {
     const vote = data?.feedback[item.id];
-    const related = item.relevance?.ref || item.relevance?.reason;
+    const related = directionText(item.relevance?.reason || item.relevance?.ref, 180);
     return (
       <article key={item.id} className={css.card}>
-        <NewsImage src={item.image} className={css.image} source={item.kind ?? "article"} />
         <div className={css.body}>
-          <Source item={item} />
           <h3>
             <a href={safeLink(item.url)} target="_blank" rel="noreferrer">
               {item.title}
             </a>
           </h3>
-          {item.summary && <p className={css.reason}>{item.summary}</p>}
-          {item.comment && <p className={css.reason}>{item.comment}</p>}
+          {item.summary && <p className={css.reason}>{item.summary.split(/(?<=[。！？!?])\s*/)[0]}</p>}
+          <Source item={item} />
           <div className={css.cardFooter}>
             {related && (
               <span className={css.meta}>
@@ -131,12 +130,12 @@ export function NewsPage(props: NewsPageProps) {
               )}
               <button
                 type="button"
-                className={`${css.button} ${css.primary}`}
+                className={css.button}
                 disabled={busy !== null || added.includes(item.id)}
                 onClick={() => void tryItem(item.id)}
               >
                 {added.includes(item.id)
-                  ? t("已加到下一步", "Added to next steps")
+                  ? t("已加入 AI 建议", "Added as an AI suggestion")
                   : t("加到下一步", "Add to next steps")}
               </button>
               {vote ? (
@@ -178,7 +177,6 @@ export function NewsPage(props: NewsPageProps) {
 
   const row = (item: NewsItem) => (
     <article key={item.id} className={css.other}>
-      <NewsImage src={item.image} className={css.thumbnail} source={item.kind ?? "article"} />
       <div>
         <h3>
           <a href={safeLink(item.url)} target="_blank" rel="noreferrer">
@@ -259,21 +257,28 @@ export function NewsPage(props: NewsPageProps) {
       )}
       {added.length > 0 && (
         <output className={css.saved}>
-          {t("已加到下一步，等你确认", "Added to next steps for your review")}
+          {t("已加入 AI 建议，去今天页采纳", "Added as an AI suggestion. Adopt it in Today.")}
         </output>
       )}
       {!data ? (
         <p className={css.empty}>{t("正在整理资讯…", "Loading news…")}</p>
-      ) : !data.picked.length && !data.others.length && !data.trends.length ? (
-        <p className={css.empty}>
-          {t(
-            "还没有采集到资讯。可在设置中开启资讯搜索，或让你连接的 AI 帮你找。",
-            "No news yet. Enable news search in Settings or ask your connected AI to find some.",
-          )}
-        </p>
       ) : (
         <div className={css.columns}>
           <div className={css.main}>
+            {!data.picked.length && !data.others.length && !data.trends.length && (
+              <section className={css.sideCard}>
+                <h2>{t("从你关心的话题开始", "Start with what interests you")}</h2>
+                <p className={css.empty}>
+                  {t(
+                    "这里留下你关心的资讯和原始来源。先添加一个关注话题。",
+                    "Keep news you care about and its original sources here. Add an interest to get started.",
+                  )}
+                </p>
+                <button type="button" className={css.button} onClick={() => setRules(true)}>
+                  {t("添加关注话题", "Add an interest")}
+                </button>
+              </section>
+            )}
             {!!todayPicked.length && (
               <section aria-label={t("和你有关", "Relevant to you")}>
                 <div className={css.heading}>
@@ -341,18 +346,34 @@ export function NewsPage(props: NewsPageProps) {
               <div className={css.heading}>
                 <h2>{t("新闻从哪来", "News sources")}</h2>
               </div>
-              <dl className={css.sources}>
-                <div>
-                  <dt>{t("订阅源", "Subscriptions")}</dt>
-                  <dd>{data.feedCount === null ? "—" : t(`${data.feedCount} 个`, String(data.feedCount))}</dd>
-                </div>
-                {sources.map(([via, count]) => (
-                  <div key={via}>
-                    <dt>{via === "user" ? t("你", "You") : viaNames[via]}</dt>
-                    <dd>{t(`${count} 条`, String(count))}</dd>
+              <p className={css.meta}>
+                {sources.length
+                  ? t(
+                      `来自${sources.map(([via]) => (via === "user" ? "你保存的内容" : viaNames[via])).join("、")}，保留原始来源。`,
+                      `From ${sources.map(([via]) => (via === "user" ? "your saved items" : viaNames[via])).join(", ")}, with original sources.`,
+                    )
+                  : t(
+                      "你保存的文章和已连接来源的资讯会出现在这里。",
+                      "Articles you save and news from connected sources appear here.",
+                    )}
+              </p>
+              <details>
+                <summary className={css.link}>{t("来源统计", "Source counts")}</summary>
+                <dl className={css.sources}>
+                  <div>
+                    <dt>{t("订阅源", "Subscriptions")}</dt>
+                    <dd>
+                      {data.feedCount === null ? "—" : t(`${data.feedCount} 个`, String(data.feedCount))}
+                    </dd>
                   </div>
-                ))}
-              </dl>
+                  {sources.map(([via, count]) => (
+                    <div key={via}>
+                      <dt>{via === "user" ? t("你", "You") : viaNames[via]}</dt>
+                      <dd>{t(`${count} 条`, String(count))}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
             </section>
           </aside>
         </div>
