@@ -137,6 +137,43 @@ export function stateBinding(root: string, icloud?: boolean): Binding {
   return setStateBinding(root, state, mode, undefined, canonical(state) !== canonical(join(root, ".kaitu")));
 }
 
+/** 用户重新选中的云盘目录仍指向原本机状态时，接回原身份；不移动任何资料。 */
+export function reconnectWorkspaceState(previousRoot: string, root: string) {
+  const previousFile = bindingFile(previousRoot);
+  const targetFile = bindingFile(root);
+  if (
+    previousFile === targetFile ||
+    !existsSync(previousFile) ||
+    existsSync(targetFile) ||
+    existsSync(join(previousRoot, ".kaitu/config.json"))
+  )
+    return;
+  const previous = stateBinding(previousRoot);
+  const config = join(root, ".kaitu/config.json");
+  if (!existsSync(config) || !inside(canonical(root), realpathSync(config))) return;
+  const state = readWorkspaceConfig(root).state_dir;
+  // state_dir 是现有云盘工作区的明确关联，不能凭新目录名把别的工作区接到旧状态。
+  if (
+    previous.mode === "local" ||
+    typeof state !== "string" ||
+    !isAbsolute(state) ||
+    canonical(state) !== canonical(previous.state)
+  )
+    return;
+  if (!existsSync(previous.state))
+    throw new KaituError("原工作区的本机状态目录暂不可用，未重新绑定", "INVALID_STATE_DIR");
+  const original = readFileSync(previousFile);
+  setStateBinding(root, previous.state, previous.mode, previous.id, previous.migrating);
+  return {
+    // 指针保存失败时恢复旧登记，不能留下半完成的重连。
+    commit: () => rmSync(previousFile, { force: true }),
+    rollback: () => {
+      if (!existsSync(previousFile)) writeFileSync(previousFile, original, { mode: 0o600 });
+      rmSync(targetFile, { force: true });
+    },
+  };
+}
+
 function moveStateEntry(source: string, target: string): void {
   const info = lstatSync(source);
   if (existsSync(target)) {

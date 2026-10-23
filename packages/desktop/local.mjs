@@ -9,12 +9,16 @@ import {
   configureAutomation,
   initWorkspace,
   readAutomation,
+  rememberWorkspace,
+  schemas,
   splitImportedBlobs,
   upgradeWorkspace,
 } from "../core/dist/index.js";
+import { reconnectWorkspaceState } from "../core/dist/state-binding.js";
+import { readWorkspaceConfig } from "../core/dist/sync-files.js";
 import { createAiProcess } from "./ai-process.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
-import { desktopPaths } from "./environment.mjs";
+import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
@@ -91,12 +95,94 @@ body { margin: 0; height: 100vh; display: grid; place-items: center; font: 15px 
 </style>
 <p>正在打开资料…</p>`;
 
+export async function openDesktopWorkspace({
+  state,
+  workspace,
+  createWorkspace,
+  workspaceError,
+  window,
+  dialog,
+}) {
+  let root = workspace;
+  let canCreate = createWorkspace;
+  let failure = workspaceError;
+  let selected = false;
+  while (!window.isDestroyed()) {
+    let relocation;
+    try {
+      if (failure) throw failure;
+      assertDesktopIsolation(root, state);
+      if (selected) {
+        if (!schemas().builtin("config.schema.json")(readWorkspaceConfig(root)))
+          throw new Error("请选择包含有效开图资料配置的文件夹");
+        relocation = reconnectWorkspaceState(workspace, root);
+      }
+      // 先校验已有配置，再执行原有升级；误选普通文件夹不写资料。
+      let ws = new Workspace(root, { maintain: false, deferOverview: true });
+      if (!ws.exists(".kaitu/config.json")) {
+        if (!canCreate)
+          throw Object.assign(new Error("找不到这个位置的开图资料配置"), { code: "WORKSPACE_MISSING" });
+        ws = await initWorkspace(root, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+      } else {
+        if (!schemas().builtin("config.schema.json")(ws.readJson(".kaitu/config.json")))
+          throw new Error("这个文件夹的开图资料配置无效");
+        ws = new Workspace(root, { deferOverview: true });
+        // 其他资料还没下载时仍可进入现有只读/等待流程。
+        await upgradeWorkspace(ws)
+          .then(() => splitImportedBlobs(ws))
+          .catch((error) => {
+            if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
+          });
+      }
+      relocation?.commit();
+      rememberWorkspace(ws.root);
+      return ws;
+    } catch (error) {
+      relocation?.rollback();
+      failure = error;
+    }
+    if (window.isDestroyed()) return null;
+    const detail =
+      failure?.code === "CLOUD_UNAVAILABLE"
+        ? "云盘中的资料配置尚未下载。请让云盘完成下载后重试，或选择已下载的资料文件夹。"
+        : "原位置可能已改名、移动，或所在云盘暂未连接。若刚改名或移动，请重新选择；若云盘离线，请连接后重试。文件夹可以使用任意名字。";
+    const { response } = await dialog.showMessageBox(window, {
+      type: "warning",
+      title: "重新打开开图资料",
+      message: "暂时无法打开资料文件夹",
+      detail: `${detail}\n\n当前位置：${root}\n${failure?.code === "NOT_EMPTY" ? "这个位置已有其他文件，未新建工作区，也不需要清空。" : String(failure?.message ?? failure)}`,
+      buttons: ["重新选择资料文件夹", "重试", "退出"],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+    if (response === 2 || window.isDestroyed()) return null;
+    if (response === 1) {
+      failure = undefined;
+      continue;
+    }
+    const { canceled, filePaths } = await dialog.showOpenDialog(window, {
+      title: "选择已有的开图资料文件夹",
+      properties: ["openDirectory"],
+    });
+    if (!canceled && filePaths[0]) {
+      root = filePaths[0];
+      canCreate = false;
+      selected = true;
+      failure = undefined;
+    }
+    // 取消选择后继续显示恢复入口，不退出，也不初始化替代工作区。
+  }
+  return null;
+}
+
 export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
     return;
   }
-  const { state, workspace } = desktopPaths();
+  const paths = desktopPaths();
+  const { state } = paths;
   const resources = dirname(dirname(fileURLToPath(import.meta.url)));
   const hostResources = process.env.KAITU_HOST_RESOURCES || dirname(resources);
   const launcher =
@@ -135,16 +221,11 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   // 让 macOS 先把窗口放上屏幕，再开始可能卡住的读写。
   await new Promise((resolve) => setTimeout(resolve, 0));
   step("window");
-  let ws = new Workspace(workspace, { deferOverview: true });
-  if (!ws.exists(".kaitu/config.json"))
-    ws = await initWorkspace(workspace, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-  // 有文件还在云盘没下载时先不升级，下次启动再做；不能让启动停在这里。
-  else
-    await upgradeWorkspace(ws)
-      .then(() => splitImportedBlobs(ws))
-      .catch((error) => {
-        if (error?.code !== "CLOUD_UNAVAILABLE") throw error;
-      });
+  const ws = await openDesktopWorkspace({ ...paths, window, dialog });
+  if (!ws) {
+    app.quit();
+    return;
+  }
   step("workspace");
   // Retain the AI home already used by this installation, including its login and sessions.
   const aiHome = existsSync(join(state, "ai", "profiles", "desktop")) ? join(state, "ai") : state;
