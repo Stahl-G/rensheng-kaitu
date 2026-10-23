@@ -215,7 +215,6 @@ export function DirectionMap({
                     {direction.status === "paused" && (
                       <span className={css.meta}> · {t("先放一放", "Paused")}</span>
                     )}
-                    {direction.motivation && <p>{direction.motivation}</p>}
                   </div>
                 ))}
               </>
