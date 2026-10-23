@@ -559,6 +559,16 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadWeather: async () => {
+                const result = await ctx.remote.kaitu.weather();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              setWeatherPlace: async (name: string, latitude?: number, longitude?: number) => {
+                const result = await ctx.remote.kaitu.weatherPlace(name, latitude, longitude);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadLifeMap: async () => {
                 const result = await ctx.remote.kaitu.lifeMap();
                 if (!result.ok) throw new Error(result.error.message);

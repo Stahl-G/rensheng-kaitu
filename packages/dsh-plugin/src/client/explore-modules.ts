@@ -47,6 +47,21 @@ export interface ExploreModule {
   page?: string;
 }
 
+// 插件在 package.json 里写 SVG 路径就用它；已发布的插件写的是单个字，开图给常用插件配图标。
+const pluginIcons: Record<string, string> = {
+  // 命理与星象：弯月和一颗星
+  "plugin:kaitu-fortune":
+    "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5ZM17 3l.7 1.8 1.8.7-1.8.7L17 8l-.7-1.8-1.8-.7 1.8-.7Z",
+  // 写作：笔
+  "plugin:kaitu-novel-workspace": "M4 20h4L19 9l-4-4L4 16v4Zm9.5-13.5 4 4M4 20l4-4",
+  // Auday：声波
+  "plugin:kaitu-auday": "M3 12h1M7 9v6M11 5v14M15 8v8M19 10v4M21 12h0",
+};
+const pluginDefault = "M12 3 20.5 7.5v9L12 21l-8.5-4.5v-9L12 3Z";
+export function moduleIcon(entry: Pick<ExploreModule, "id" | "icon">): string {
+  return /^[Mm]\s*-?\d/.test(entry.icon) ? entry.icon : (pluginIcons[entry.id] ?? pluginDefault);
+}
+
 /** Counts come from the existing in-memory page projections, never a directory scan. */
 export interface ExploreContent {
   hometown: boolean;

@@ -47,6 +47,7 @@ import {
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
+  type WeatherState,
   Workspace,
   addCalendarSubscription,
   addGoalNext,
@@ -117,7 +118,9 @@ import {
   readProjectPage,
   readProjectsPage,
   readSettings,
+  readWeather,
   recoverExperienceImports,
+  refreshWeather,
   removeAvatar,
   replaceMemory,
   resolveExperience,
@@ -136,6 +139,7 @@ import {
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
+  setWeatherPlace,
   snapshot,
   startLearning,
   syncProject,
@@ -762,6 +766,18 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("projectMemoryPrompt")
   async projectMemoryPrompt(slug: string, locale: string): Promise<string> {
     return projectMemoryPrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("weather")
+  async weather(): Promise<WeatherState> {
+    return readWeather();
+  }
+
+  @Remote("weatherPlace")
+  async weatherPlace(name: string, latitude?: number, longitude?: number): Promise<WeatherState> {
+    const state = setWeatherPlace({ name, latitude, longitude });
+    void refreshWeather().catch(() => {});
+    return state;
   }
 
   @Remote("projectArchitecturePrompt")

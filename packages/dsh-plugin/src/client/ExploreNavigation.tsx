@@ -16,7 +16,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
 import css from "./ExploreNavigation.module.css";
-import { defaultExploreEntries, exploreModules } from "./explore-modules.js";
+import { defaultExploreEntries, exploreModules, moduleIcon } from "./explore-modules.js";
 import { useT } from "./i18n.js";
 
 export interface ExploreEntry {
@@ -63,7 +63,7 @@ function Entry({
           strokeLinejoin="round"
           aria-hidden="true"
         >
-          <path d={entry.icon} />
+          <path d={moduleIcon(entry)} />
         </svg>
         <span>
           <strong>{title}</strong>
@@ -258,7 +258,7 @@ export function ExploreNavigation({
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d={entry.icon} />
+              <path d={moduleIcon(entry)} />
             </svg>
             {t(entry.title[0], entry.title[1])}
           </button>

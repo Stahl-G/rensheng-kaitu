@@ -8,6 +8,7 @@ import {
   defaultRoot,
   initWorkspace,
   startProjectGithubSync,
+  startWeatherSync,
   startWorkspaceBackup,
   upgradeWorkspace,
 } from "@kaitu/core";
@@ -50,6 +51,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   if (config.automation === false) return;
   ctx.effect(() => startWorkspaceBackup(ws));
   ctx.effect(() => startProjectGithubSync(ws));
+  ctx.effect(() => startWeatherSync().stop);
   ctx.effect(() => startPhoneSnapshots(ws));
   collectors.start();
   ctx.effect(() => () => collectors.stop());
