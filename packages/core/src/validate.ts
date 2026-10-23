@@ -8,7 +8,7 @@ import { listModules, listRecordTypes, recordFilePattern } from "./modules.js";
 import { projectStatusFiles } from "./projects.js";
 import { recordLines } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
-import { placeholderOriginal } from "./sync-files.js";
+import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 import { localMonth, parseTs } from "./time.js";
 import type { Workspace } from "./workspace.js";
 
@@ -25,7 +25,7 @@ function walk(ws: Workspace, dir: string, out: string[]): void {
     if (entry.isSymbolicLink()) continue;
     if (name === ".git" || name === "node_modules") continue;
     const rel = dir ? `${dir}/${name}` : name;
-    if (ws.conflictCopy(rel) || placeholderOriginal(rel)) continue;
+    if (isUserProfile(rel) || ws.conflictCopy(rel) || placeholderOriginal(rel)) continue;
     if ([".kaitu/cache", ".kaitu/history.git", "handoffs/archive"].includes(rel)) continue;
     if (entry.isDirectory()) walk(ws, rel, out);
     else out.push(rel);

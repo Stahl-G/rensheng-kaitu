@@ -23,7 +23,7 @@ import { rememberOrganizer } from "./organizer.js";
 import { batchOverview, latestDaily, refreshOverview } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
-import { placeholderOriginal } from "./sync-files.js";
+import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 const pick = (zh: string, en: string) => translate(normalizeLocale(readPreferences().locale), zh, en);
 import { Workspace, stateDirectory } from "./workspace.js";
 
@@ -137,6 +137,7 @@ function token(ws: Workspace): string {
     : "";
 }
 function selected(path: string, c: Pick<BackupConnection, "text" | "records">): boolean {
+  if (isUserProfile(path)) return false;
   if (path === manifest) return true;
   const parts = path.split("/");
   if (parts.some((p) => !p || p === ".." || p.startsWith(".") || p === "node_modules") || path.includes("\\"))

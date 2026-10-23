@@ -5,12 +5,14 @@ import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
 import { HISTORY_MARKER } from "./history-ownership.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { placeholderOriginal } from "./sync-files.js";
+import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import { type Workspace, stateDirectory } from "./workspace.js";
 
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [
+  "USER.md",
+  ".kaitu/user-profile.json",
   ".kaitu/organizer.json",
   ".kaitu/feishu.json",
   "phone/",
@@ -37,6 +39,9 @@ export const NEVER_TRACK = [
 ];
 
 export const GITIGNORE = `.kaitu/organizer.json
+USER.md
+.USER.md.icloud
+.kaitu/user-profile.json
 .kaitu/feishu.json
 phone/
 .kaitu/phone-actions.json
@@ -72,6 +77,7 @@ const AUTHOR = { name: "开图", email: "kaitu@localhost" };
 
 function neverTrack(path: string): boolean {
   return (
+    isUserProfile(path) ||
     /^inbox\/processed\/.*(?:\.health[^/]*\.json|\.zip|\.xml)$/i.test(path) ||
     NEVER_TRACK.some((p) => (p.endsWith("/") ? path.startsWith(p) : path === p || path.startsWith(`${p}-`)))
   );
@@ -180,6 +186,7 @@ function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map
 }
 
 function snapshotFile(ws: Workspace, file: string): boolean {
+  if (isUserProfile(file)) return false;
   return (!ws.isICloud || !placeholderOriginal(file)) && !ws.conflictCopy(file) && !ws.isUnavailable(file);
 }
 
