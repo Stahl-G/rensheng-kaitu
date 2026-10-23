@@ -114,7 +114,10 @@ export function OnboardingFileImport(
     } catch (err) {
       const detail = message(err);
       setError(
-        /Unexpected token|Unexpected end|JSON|无法读取 ChatGPT|Nut AI 备份格式/.test(detail)
+        (source === "chatgpt-conversations" || source === "nut-ai") &&
+          /Unexpected token|Unexpected end|JSON|无法读取 ChatGPT|Nut AI 备份格式|The import file could not be read/.test(
+            detail,
+          )
           ? t(
               "这个 JSON 读不出来，请确认是完整的 ChatGPT 导出或 Nut AI 备份，并选择对应来源。",
               "Could not read this JSON. Check that it is a complete ChatGPT export or Nut AI backup and choose the matching source.",
