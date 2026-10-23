@@ -14,6 +14,7 @@ import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { JobsPage, type JobsPageProps } from "./JobsPage.js";
 import type { LearningSource } from "./LearningPage.js";
+import { LibraryFileImport } from "./LibraryFileImport.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
@@ -22,7 +23,6 @@ import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
-import { OnboardingFileImport } from "./OnboardingSources.js";
 import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
@@ -196,9 +196,12 @@ function Overview({
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
   const [connectionSection, setConnectionSection] = useState<SettingsSection>("overview");
-  const [importSource, setImportSource] = useState<
-    "choose" | "apple-health" | "chatgpt-conversations" | null
-  >(null);
+  const [importFile, setImportFile] = useState<File | null>();
+  const [importAttempt, setImportAttempt] = useState(0);
+  const openFileImport = (file: File | null) => {
+    setImportFile(file);
+    setImportAttempt((value) => value + 1);
+  };
   const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
   const askPanel = useRef<HTMLDivElement>(null);
   const [aiKeyRequest, setAiKeyRequest] = useState(0);
@@ -1140,39 +1143,18 @@ function Overview({
                 </h1>
               </div>
             </div>
-            {!record && importSource && (
-              <section className={css.sec} aria-label={t("导入已有导出文件", "Import an existing export")}>
-                {importSource === "choose" ? (
-                  <>
-                    <p>{t("选择导出文件的来源", "Choose the export source")}</p>
-                    <button type="button" className={css.btn} onClick={() => setImportSource("apple-health")}>
-                      Apple Health
-                    </button>
-                    <button
-                      type="button"
-                      className={css.btn}
-                      onClick={() => setImportSource("chatgpt-conversations")}
-                    >
-                      ChatGPT
-                    </button>
-                    <button type="button" className={css.link} onClick={() => setImportSource(null)}>
-                      {t("取消", "Cancel")}
-                    </button>
-                  </>
-                ) : (
-                  <OnboardingFileImport
-                    {...props}
-                    key={importSource}
-                    source={importSource}
-                    onDone={async () => {
-                      setImportSource(null);
-                      setLibrary(await props.loadLibrary({}));
-                      await refresh();
-                    }}
-                    onClose={() => setImportSource(null)}
-                  />
-                )}
-              </section>
+            {!record && importFile !== undefined && (
+              <LibraryFileImport
+                key={importAttempt}
+                {...props}
+                initialFile={importFile ?? undefined}
+                onDone={async () => {
+                  setLibrary(await props.loadLibrary({}));
+                  await refresh();
+                  setImportFile(undefined);
+                }}
+                onClose={() => setImportFile(undefined)}
+              />
             )}
             {record === "inbox" && reviewMatter && onboarding && (
               <section className={css.sec} aria-label={t("核对这条原文", "Review this original")}>
@@ -1223,8 +1205,9 @@ function Overview({
                   setLibrary(value);
                   await refresh();
                 }}
+                onFile={openFileImport}
                 onAdd={(kind) => {
-                  if (kind === "file") setImportSource("choose");
+                  if (kind === "file") openFileImport(null);
                   else if (kind === "category") {
                     setExplore("modules");
                     setView("explore");
