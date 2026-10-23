@@ -278,24 +278,24 @@ function App() {
                       {t("填入示例原文", "Use sample text")}
                     </button>
                   </form>
-                  <details>
-                    <summary>
-                      {t(
-                        `找回已保存的 ${state.notes.length} 条原文`,
-                        `Find ${state.notes.length} saved originals`,
-                      )}
-                    </summary>
-                    <InboxPage
-                      loadLibrary={store.library}
-                      subscribe={store.subscribe}
-                      connect={explain}
-                      openNext={explain}
-                      sources={{}}
-                      overview={data}
-                    />
-                  </details>
                 </section>
               </aside>
+              <details className={css.sec} style={{ gridColumn: "1 / -1" }}>
+                <summary>
+                  {t(
+                    `找回已保存的 ${state.notes.length} 条原文`,
+                    `Find ${state.notes.length} saved originals`,
+                  )}
+                </summary>
+                <InboxPage
+                  loadLibrary={store.library}
+                  subscribe={store.subscribe}
+                  connect={explain}
+                  openNext={explain}
+                  sources={{}}
+                  overview={data}
+                />
+              </details>
             </div>
           )}
         </main>
