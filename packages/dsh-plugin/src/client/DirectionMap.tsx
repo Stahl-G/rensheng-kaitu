@@ -65,7 +65,7 @@ export function DirectionMap({
   // biome-ignore lint/correctness/useExhaustiveDependencies: 连线由看法和当前资料算出，只在它们变化时重画。
   useLayoutEffect(() => {
     const root = board.current;
-    if (!root || !map) return;
+    if (!root || !input) return;
     const draw = () => {
       const box = root.getBoundingClientRect();
       if (box.width < 760) return setPaths([]);
@@ -124,28 +124,6 @@ export function DirectionMap({
     </div>
   );
   const failure = error || state.error;
-  if (!map)
-    return (
-      <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
-        {header}
-        <p className={css.intro}>
-          {t(
-            "开图会读你的目标、项目和最近的日志，画出这些事正在把你带向哪里，再说几句建议。看法不写进你的资料。",
-            "Kaitu reads your goals, projects and recent logs, shows where they are taking you, and adds a few suggestions. Nothing is written into your notes.",
-          )}
-        </p>
-        {failure && (
-          <p className={css.error} role="alert">
-            {failure}{" "}
-            {/连上 AI|AI 与连接|Connect AI|AI & Connections/.test(failure) && onConnect && (
-              <button type="button" className={css.link} onClick={onConnect}>
-                {t("去连接 AI", "Connect AI")}
-              </button>
-            )}
-          </p>
-        )}
-      </section>
-    );
   const title = (slug: string) => projects.find((p) => p.slug === slug)?.title ?? slug;
   const last = (slug: string) => projects.find((p) => p.slug === slug)?.logs[0];
   // 依据写明出自哪里：哪个目标、哪个项目的哪天日志或下一步。
@@ -174,6 +152,14 @@ export function DirectionMap({
   return (
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
       {header}
+      {!map && (
+        <p className={css.intro}>
+          {t(
+            "下面是你现在的目标、项目和下一步。点「让开图看一看」，开图会读最近的日志，说说这些事正在把你带向哪里。看法不写进你的资料。",
+            "Below are your current goals, projects and next steps. Choose “Ask Kaitu to look” and Kaitu reads your recent logs to say where they are taking you. Nothing is written into your notes.",
+          )}
+        </p>
+      )}
       {state.stale && (
         <output className={css.stale}>
           {t(
@@ -184,120 +170,130 @@ export function DirectionMap({
       )}
       {failure && (
         <p className={css.error} role="alert">
-          {failure}
+          {failure}{" "}
+          {/连上 AI|AI 与连接|Connect AI|AI & Connections/.test(failure) && onConnect && (
+            <button type="button" className={css.link} onClick={onConnect}>
+              {t("去连接 AI", "Connect AI")}
+            </button>
+          )}
         </p>
       )}
-      <div className={css.board} ref={board}>
-        <svg className={css.lines} aria-hidden="true">
-          {paths.map((path) => (
-            <path
-              key={path.d}
-              d={path.d}
-              fill="none"
-              stroke={`var(${path.tone})`}
-              strokeWidth="1.6"
-              strokeDasharray={path.dashed ? "5 5" : undefined}
-            />
-          ))}
-        </svg>
-        <div className={css.col}>
-          <h3>{t("想达成", "Want to reach")}</h3>
-          {goals.length === 0 && <p className={css.quiet}>{t("还没写下目标", "No goals written yet")}</p>}
-          {goals.map((goal) => (
-            <div
-              key={goal.id}
-              data-node={`goal:${goal.id}`}
-              className={css.goal}
-              style={{ ["--tone" as string]: `var(${toneOf(goal.id)})` }}
-            >
-              <strong>{goal.title}</strong>
-              {goal.why && <p>{goal.why}</p>}
-            </div>
-          ))}
-          {!!input?.directions.length && (
-            <>
-              <h3>{t("也在探索", "Also exploring")}</h3>
-              {input.directions.map((direction) => (
-                <div key={direction.id} className={`${css.card} ${css.direction}`}>
-                  <strong>{direction.title}</strong>
-                  {direction.status === "paused" && (
-                    <span className={css.meta}> · {t("先放一放", "Paused")}</span>
-                  )}
-                  {direction.motivation && <p>{direction.motivation}</p>}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-        <div className={css.col}>
-          <h3>{t("正在做", "Working on")}</h3>
-          {projects.map((project) => {
-            const recent = last(project.slug);
-            const own = links.filter((link) => link.project === project.slug);
-            const loose = map.unlinked.find((row) => row.project === project.slug);
-            return (
-              <div key={project.slug} data-node={`project:${project.slug}`} className={css.card}>
-                <button type="button" className={css.title} onClick={() => openProject(project.slug)}>
-                  {project.title}
-                </button>
-                {recent ? (
-                  <p>
-                    {t("最近：", "Latest: ")}
-                    {recent.text.split("\n")[0]?.replace(/^[-*]\s+/, "")}
-                    <span className={css.meta}> · {recent.date}</span>
-                  </p>
-                ) : (
-                  <p className={css.meta}>{t("最近 30 天没有记录", "No log in the last 30 days")}</p>
-                )}
-                {own.map((link) => (
-                  <p key={link.goal} className={css.why}>
-                    {t("开图觉得它在帮", "Kaitu thinks it helps")}「
-                    {goals.find((g) => g.id === link.goal)?.title}」：
-                    {link.reason}
-                    {from(link)}
-                    <button
-                      type="button"
-                      className={css.link}
-                      onClick={() => void dismiss(link.goal, link.project).then(setState)}
-                    >
-                      {t("不对", "Not right")}
-                    </button>
-                  </p>
-                ))}
-                {!own.length && loose && <p className={css.why}>{loose.note}</p>}
+      {(!!goals.length || !!projects.length) && (
+        <div className={css.board} ref={board}>
+          <svg className={css.lines} aria-hidden="true">
+            {paths.map((path) => (
+              <path
+                key={path.d}
+                d={path.d}
+                fill="none"
+                stroke={`var(${path.tone})`}
+                strokeWidth="1.6"
+                strokeDasharray={path.dashed ? "5 5" : undefined}
+              />
+            ))}
+          </svg>
+          <div className={css.col}>
+            <h3>{t("想达成", "Want to reach")}</h3>
+            {goals.length === 0 && <p className={css.quiet}>{t("还没写下目标", "No goals written yet")}</p>}
+            {goals.map((goal) => (
+              <div
+                key={goal.id}
+                data-node={`goal:${goal.id}`}
+                className={css.goal}
+                style={{ ["--tone" as string]: `var(${toneOf(goal.id)})` }}
+              >
+                <strong>{goal.title}</strong>
+                {goal.why && <p>{goal.why}</p>}
               </div>
-            );
-          })}
+            ))}
+            {!!input?.directions.length && (
+              <>
+                <h3>{t("也在探索", "Also exploring")}</h3>
+                {input.directions.map((direction) => (
+                  <div key={direction.id} className={`${css.card} ${css.direction}`}>
+                    <strong>{direction.title}</strong>
+                    {direction.status === "paused" && (
+                      <span className={css.meta}> · {t("先放一放", "Paused")}</span>
+                    )}
+                    {direction.motivation && <p>{direction.motivation}</p>}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+          <div className={css.col}>
+            <h3>{t("正在做", "Working on")}</h3>
+            {projects.map((project) => {
+              const recent = last(project.slug);
+              const own = links.filter((link) => link.project === project.slug);
+              const loose = map?.unlinked.find((row) => row.project === project.slug);
+              return (
+                <div key={project.slug} data-node={`project:${project.slug}`} className={css.card}>
+                  <button type="button" className={css.title} onClick={() => openProject(project.slug)}>
+                    {project.title}
+                  </button>
+                  {recent ? (
+                    <p>
+                      {t("最近：", "Latest: ")}
+                      {recent.text.split("\n")[0]?.replace(/^[-*]\s+/, "")}
+                      <span className={css.meta}> · {recent.date}</span>
+                    </p>
+                  ) : (
+                    <p className={css.meta}>{t("最近 30 天没有记录", "No log in the last 30 days")}</p>
+                  )}
+                  {own.map((link) => (
+                    <p key={link.goal} className={css.why}>
+                      {t("开图觉得它在帮", "Kaitu thinks it helps")}「
+                      {goals.find((g) => g.id === link.goal)?.title}」：
+                      {link.reason}
+                      {from(link)}
+                      <button
+                        type="button"
+                        className={css.link}
+                        onClick={() => void dismiss(link.goal, link.project).then(setState)}
+                      >
+                        {t("不对", "Not right")}
+                      </button>
+                    </p>
+                  ))}
+                  {!own.length && loose && <p className={css.why}>{loose.note}</p>}
+                </div>
+              );
+            })}
+          </div>
+          <div className={css.col}>
+            <h3>{t("下一步", "Next")}</h3>
+            {state.next.map((step) => (
+              <div
+                key={step.project}
+                data-node={`next:${step.project}`}
+                className={step.kind === "todo" ? css.card : `${css.card} ${css.suggested}`}
+              >
+                <strong>{step.text || t("还没有下一步", "No next step yet")}</strong>
+                <p className={css.meta}>
+                  {step.kind === "todo"
+                    ? t(`来自「${title(step.project)}」的下一步`, `From “${title(step.project)}”`)
+                    : step.kind === "proposed"
+                      ? t(
+                          `待你采纳的建议 · ${title(step.project)}`,
+                          `Suggestion waiting for you · ${title(step.project)}`,
+                        )
+                      : step.kind === "suggested"
+                        ? t(
+                            `开图建议 · ${title(step.project)}`,
+                            `Suggested by Kaitu · ${title(step.project)}`,
+                          )
+                        : t(
+                            `给「${title(step.project)}」定一个小动作`,
+                            `Pick a small step for “${title(step.project)}”`,
+                          )}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className={css.col}>
-          <h3>{t("下一步", "Next")}</h3>
-          {state.next.map((step) => (
-            <div
-              key={step.project}
-              data-node={`next:${step.project}`}
-              className={step.kind === "todo" ? css.card : `${css.card} ${css.suggested}`}
-            >
-              <strong>{step.text || t("还没有下一步", "No next step yet")}</strong>
-              <p className={css.meta}>
-                {step.kind === "todo"
-                  ? t(`来自「${title(step.project)}」的下一步`, `From “${title(step.project)}”`)
-                  : step.kind === "proposed"
-                    ? t(
-                        `待你采纳的建议 · ${title(step.project)}`,
-                        `Suggestion waiting for you · ${title(step.project)}`,
-                      )
-                    : step.kind === "suggested"
-                      ? t(`开图建议 · ${title(step.project)}`, `Suggested by Kaitu · ${title(step.project)}`)
-                      : t(
-                          `给「${title(step.project)}」定一个小动作`,
-                          `Pick a small step for “${title(step.project)}”`,
-                        )}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-      {!!map.mentor.length && (
+      )}
+      {!!map?.mentor.length && (
         <div className={css.mentor}>
           <h3>{t("开图想跟你说", "From Kaitu")}</h3>
           {map.mentor.map((item) => (

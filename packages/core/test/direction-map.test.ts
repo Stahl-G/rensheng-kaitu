@@ -136,6 +136,15 @@ it("从真实 STATUS 和待办组材料：只有 todo 是事实，待采纳的�
       { id: "maybe", title: "待采纳的建议", status: "proposed" },
     ],
   });
+  const d = await createProject(ws, { title: "合成丁", kind: "personal" });
+  await setProject(ws, d.slug, {
+    next: [
+      { id: "p1", title: "建议一", status: "proposed" },
+      { id: "p2", title: "建议二", status: "proposed" },
+      { id: "p3", title: "建议三", status: "proposed" },
+      { id: "real", title: "排在后面的真下一步", status: "todo" },
+    ],
+  });
   const c = await createProject(ws, { title: "合成丙", kind: "personal" });
   await addTask(ws, { title: "挂在项目上的待办", project: c.slug });
   const material = directionMapInput(ws, "zh-CN", new Date("2026-10-22T16:30:00Z"));
@@ -146,11 +155,17 @@ it("从真实 STATUS 和待办组材料：只有 todo 是事实，待采纳的�
   );
   expect(next).toEqual({
     合成甲: [
-      ["AI 提的还没采纳", "proposed"],
       ["修好排版", "todo"],
+      ["AI 提的还没采纳", "proposed"],
     ],
     合成乙: [["待采纳的建议", "proposed"]],
     合成丙: [["挂在项目上的待办", "todo"]],
+    // 截到三条之前先留用户定下的。
+    合成丁: [
+      ["排在后面的真下一步", "todo"],
+      ["建议一", "proposed"],
+      ["建议二", "proposed"],
+    ],
   });
   const steps = directionNext(material, {
     links: [],
@@ -166,6 +181,7 @@ it("从真实 STATUS 和待办组材料：只有 todo 是事实，待采纳的�
     合成甲: ["修好排版", "todo"],
     合成乙: ["待采纳的建议", "proposed"],
     合成丙: ["挂在项目上的待办", "todo"],
+    合成丁: ["排在后面的真下一步", "todo"],
   });
 });
 
@@ -190,7 +206,15 @@ it("资料变了就标成过期，对不上当前资料的看法撤下", async (
     suggestions: [],
     mentor: [],
   });
+  // 还没让 AI 看过时，事实照常给出：目标、项目和下一步。
+  expect(readDirectionMap(ws)).toMatchObject({
+    map: null,
+    input: { goals: [{ id: "run" }], projects: [{ slug: project.slug }] },
+    next: [{ project: project.slug, kind: "none" }],
+  });
   await new Promise<void>((resolve) => generateDirectionMap(ws, async () => answer, "zh-CN", resolve));
+  // 换成英文界面：中文写的看法先不显示，事实照常。
+  expect(readDirectionMap(ws, "en")).toMatchObject({ map: null, input: { goals: [{ id: "run" }] } });
   expect(readDirectionMap(ws)).toMatchObject({ stale: false, map: { links: [{ goal: "run" }] } });
 
   appendLog(ws, project.slug, "第二周两次", today);

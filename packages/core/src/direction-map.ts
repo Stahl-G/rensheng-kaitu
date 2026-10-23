@@ -100,8 +100,11 @@ export function directionMapInput(
         source: `p:${project.slug}`,
         title: project.title,
         stage: project.stage,
-        next: project.next
-          .filter((item) => item.status === "todo" || item.status === "proposed")
+        // 先留用户定下的，再留待采纳的建议，最后才截到三条。
+        next: [
+          ...project.next.filter((item) => item.status === "todo"),
+          ...project.next.filter((item) => item.status === "proposed"),
+        ]
           .slice(0, 3)
           .map((item) => ({
             source: `n:${project.slug}:${item.id}`,
@@ -340,15 +343,17 @@ function save(ws: Workspace, state: Partial<Saved>) {
  */
 export function readDirectionMap(ws: Workspace, locale: Locale = "zh-CN"): DirectionMapState {
   const saved = load(ws);
-  const input = saved.map ? directionMapInput(ws, locale) : null;
-  const map = saved.map && input ? verify(saved.map, input) : null;
+  // 目标、项目、下一步是事实，没生成过看法也照常画；看法是按某种语言写的，换了界面语言就先不显示。
+  const input = directionMapInput(ws, locale);
+  const usable = saved.map && saved.input?.locale === locale ? saved.map : null;
+  const map = usable ? verify(usable, input) : null;
   if (map) map.links = map.links.filter((link) => !saved.dismissed.includes(`${link.goal}|${link.project}`));
   return {
     map,
     input,
-    next: input ? directionNext(input, map) : [],
-    generatedAt: saved.generatedAt,
-    stale: !!(input && saved.input && fingerprint(input) !== fingerprint(saved.input)),
+    next: directionNext(input, map),
+    generatedAt: map ? saved.generatedAt : null,
+    stale: !!(map && saved.input && fingerprint(input) !== fingerprint(saved.input)),
     running: running.has(ws.root),
     error: saved.error,
     dismissed: saved.dismissed,
