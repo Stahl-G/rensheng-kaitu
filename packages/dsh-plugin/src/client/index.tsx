@@ -1,6 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
+import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
@@ -54,6 +55,8 @@ export async function apply(ctx: Context) {
       "remote.kaitu",
       "remote.kaituFinance",
       "remote.pluginManager",
+      "pluginNavigation",
+      "uiSession",
       "layout",
       "sessions",
       "conversation",
@@ -77,7 +80,7 @@ export async function apply(ctx: Context) {
           if (!result.ok) throw new Error(result.error.message);
           return result.value;
         },
-        open: () => ctx.layout.selectPanel("plugins" as MainPanelId),
+        open: () => ctx.pluginNavigation.openList(),
       });
       let opening: Promise<boolean> | undefined;
       const open = (text?: string) => {
