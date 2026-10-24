@@ -667,7 +667,7 @@ export function PersonalPages(
                           className={`${css.btn} ${css["btn-quiet"]}`}
                           onClick={props.manageAi}
                         >
-                          {t("管理模型", "Manage model")}
+                          {t("在问问中选择模型", "Choose a model in Ask")}
                         </button>
                       </div>
                     </div>

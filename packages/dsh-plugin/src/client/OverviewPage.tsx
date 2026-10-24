@@ -192,6 +192,7 @@ function Overview({
   retryPreferences?: () => void;
 }) {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
+  const builtinAi = !!props.renderAsk && !props.hosted;
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();
   const [guideKey, setGuideKey] = useState(0);
@@ -623,6 +624,10 @@ function Overview({
     } else openRecord(["learning", "decisions"].includes(id) ? "notes" : id);
   };
   const manageAi = (builtin = false) => {
+    if (props.hosted) {
+      setView("ask");
+      return;
+    }
     if (props.renderAsk) {
       setConfigureBuiltin(builtin);
       setConfigureRequest((n) => n + 1);
@@ -898,7 +903,7 @@ function Overview({
               ["explore", t("开图", "Explore")],
               ["records", t("资料", "Library")],
             ],
-            ...(props.renderAsk && !props.hosted ? [["ask", t("问问", "Ask")]] : []),
+            ...(props.renderAsk ? [["ask", t("问问", "Ask")]] : []),
           ].map(([id, label]) => (
             <button
               type="button"
@@ -1016,7 +1021,7 @@ function Overview({
               key={guideKey}
               status={onboarding}
               step={guide ?? 0}
-              builtin={!!props.renderAsk}
+              builtin={builtinAi}
               initialSource={guideSource}
               initialText={guideText}
               setStep={setGuide}
@@ -1295,7 +1300,7 @@ function Overview({
                   key={reviewMatter.source}
                   initial={reviewMatter}
                   content={onboarding.content.matter}
-                  builtin={!!props.renderAsk}
+                  builtin={builtinAi}
                   onPrompt={prompt}
                   onBusy={setBusy}
                   onDone={async () => {
@@ -1548,7 +1553,7 @@ function Overview({
         {["profile", "connections", "settings"].includes(view) && (
           <PersonalPages
             {...child}
-            builtinAi={!!props.renderAsk}
+            builtinAi={builtinAi}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             restartGuide={() => startGuide()}
