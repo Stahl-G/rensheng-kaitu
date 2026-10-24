@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开图今天 v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+.t-light{--bg:#F6F3EC;--surface:#FFFDF8;--soft:#ECE8DE;--line:#E2DDD1;--ink:#1D2027;--ink2:#555963;--ink3:#8A8D94;--btn:#22324F;--btnText:#fff;--link:#2B4C7E;--mark:#E9E1CC;--side:#EFEBE2;--pencil:#7E8FAD}
+.t-dark{--bg:#1C1B18;--surface:#25241F;--soft:#302E28;--line:#38362F;--ink:#EEE9DE;--ink2:#BDB7AA;--ink3:#8E897F;--btn:#A9BEDD;--btnText:#1C1B18;--link:#A9BEDD;--mark:#3A3528;--side:#22211D;--pencil:#8797B3}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#DCD8CF;font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","WenQuanYi Zen Hei",sans-serif;color:#1D2027}
+.serif{font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",serif}
+.num{font-variant-numeric:tabular-nums}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 20px;background:#F4F1EA;border-bottom:1px solid #D6D1C6;font-size:13px}
+.bar b{font-size:14px;margin-right:6px}
+.grp{display:flex;gap:4px;align-items:center}
+.grp span{color:#777;margin-right:2px}
+.grp button{border:1px solid #CFC9BC;background:#fff;border-radius:7px;padding:3px 10px;font-size:12.5px;color:#333}
+.grp button[aria-pressed=true]{background:#22324F;color:#fff;border-color:#22324F}
+.stage{padding:28px 20px 60px;display:flex;flex-wrap:wrap;gap:36px;justify-content:center;align-items:flex-start}
+
+/* mac */
+.win{width:1180px;height:800px;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0003;background:var(--bg);color:var(--ink);display:flex;flex-direction:column}
+.tb{height:52px;flex:none;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:0 18px;border-bottom:1px solid var(--line);position:relative}
+.tb .lights{position:static}
+.tabs{display:flex;gap:4px;background:var(--soft);border-radius:9px;padding:3px}
+.tabs span{padding:4px 16px;border-radius:7px;font-size:13.5px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.tabs span.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 2px #0000000d}
+.tabs .n{font-size:11px;color:var(--ink3);font-weight:400}
+.main{flex:1}
+.win.w900{width:900px}
+.side{background:var(--side);border-right:1px solid var(--line);padding:44px 12px 16px;display:flex;flex-direction:column;gap:2px;position:relative}
+.lights{position:absolute;top:14px;left:16px;display:flex;gap:8px}.lights i{width:12px;height:12px;border-radius:50%;background:#E0605A}.lights i+i{background:#E5B33D}.lights i+i+i{background:#62B556}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font-size:14px;color:var(--ink2)}
+.nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6}
+.nav.on{background:var(--soft);color:var(--ink);font-weight:600}
+.nav .n{margin-left:auto;font-size:12px;color:var(--ink3)}
+.side .where{margin-top:auto;font-size:11.5px;color:var(--ink3);padding:0 10px}
+.main{overflow:auto;padding:40px 64px 40px;position:relative}
+.w900 .main{padding:40px 40px}
+.col{max-width:620px;margin:0 auto}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--ink3)}
+.btn{border:0;border-radius:9px;padding:8px 15px;font-size:14px;font-weight:600;line-height:1.4}
+.btn.p{background:var(--btn);color:var(--btnText)}
+.btn.s{background:var(--soft);color:var(--ink)}
+.txt{border:0;background:none;color:var(--link);font-size:14px;padding:0}
+.quiet{border:0;background:none;color:var(--ink3);font-size:13px;padding:0}
+
+.mirror{font-size:25px;line-height:1.75;font-weight:400;margin:22px 0 0;letter-spacing:.01em}
+.mirror .f{background:linear-gradient(transparent 62%,var(--mark) 62%);cursor:pointer;padding:0 1px}
+.mirror .f:hover{background:linear-gradient(transparent 0,var(--mark) 0)}
+.src{font-size:12.5px;color:var(--ink3);margin-top:10px}
+
+.lab{font-size:12.5px;color:var(--ink3);letter-spacing:.06em;margin:46px 0 12px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.energy{display:flex;gap:18px;font-size:14px;letter-spacing:0}
+.energy button{border:0;background:none;padding:0 0 2px;color:var(--ink3);border-bottom:1.5px solid transparent}
+.energy button[aria-pressed=true]{color:var(--ink);border-bottom-color:var(--ink)}
+.opts{list-style:none;margin:0;padding:0}
+.opt{display:flex;align-items:baseline;gap:16px;padding:13px 0;border-top:1px solid var(--line);cursor:pointer}
+.opt:last-child{border-bottom:1px solid var(--line)}
+.opt .t{flex:1;font-size:19px;line-height:1.45}
+.opt .why{display:block;font-size:12.5px;color:var(--ink3);margin-top:3px;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC",sans-serif}
+.opt .d{font-size:13px;color:var(--ink3);white-space:nowrap}
+.opt .go{display:none;white-space:nowrap}
+.opt:hover .go{display:inline}
+.opt:hover .d{display:none}
+.opt.rest .t{color:var(--ink2)}
+.doing{padding:18px 0;border-top:1.5px solid var(--ink);border-bottom:1px solid var(--line)}
+.doing .k{font-size:12.5px;color:var(--ink3)}
+.doing .t{font-size:22px;margin:4px 0 12px;line-height:1.4}
+.doing .acts{display:flex;gap:18px;align-items:center}
+
+.ask{margin-top:46px;padding:22px 24px 18px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.ask .k{font-size:12.5px;color:var(--ink3);display:flex;justify-content:space-between;gap:12px}
+.ask .q{font-size:21px;line-height:1.55;margin:8px 0 14px}
+.ask .a{display:flex;gap:10px;align-items:center;border-top:1px solid var(--line);padding-top:12px}
+.ask input{flex:1;border:0;background:transparent;font-size:15px;outline:none;min-width:0}
+.ask input::placeholder{color:var(--ink3)}
+.ask .done{font-size:15px;color:var(--ink2);border-top:1px solid var(--line);padding-top:12px}
+
+.pencil{margin-top:22px;border-left:2px dashed var(--pencil);padding:2px 0 2px 14px}
+.pencil .k{font-size:13px;color:var(--ink3)}
+.pencil .row{display:flex;align-items:baseline;gap:14px;padding:6px 0;font-size:15px}
+.pencil .row span{flex:1}
+.pencil .row small{color:var(--ink3);font-size:12px}
+
+.foot{margin-top:40px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--ink3);border-top:1px solid var(--line);padding-top:14px}
+.capture{display:flex;align-items:center;gap:10px;flex:1}
+.capture .ph{color:var(--ink3);font-size:15px}
+kbd{font-family:inherit;font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--ink3)}
+
+.new .hello{font-size:30px;line-height:1.5;margin:28px 0 0}
+.new .ask{margin-top:28px}
+.new .ask .q{font-size:22px}
+.new textarea{width:100%;border:0;background:transparent;font-size:16px;resize:none;outline:none;min-height:72px;border-top:1px solid var(--line);padding-top:12px}
+.new textarea::placeholder{color:var(--ink3)}
+.doors{list-style:none;margin:0;padding:0}
+.doors li{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--line);font-size:16px}
+.doors li span{font-size:13px;color:var(--ink3)}
+
+/* phone */
+.phone{width:390px;height:844px;border-radius:44px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 18px 60px #0003,0 0 0 10px #111;position:relative}
+.ps{position:absolute;inset:0;padding:56px 22px 160px;overflow:auto;scrollbar-width:none}
+.sb{position:absolute;top:16px;left:34px;right:30px;display:flex;justify-content:space-between;font-size:15px;font-weight:600;z-index:2}
+.phone .top .btn{padding:7px 12px;font-size:13.5px}
+.phone .mirror{font-size:21px;line-height:1.7;margin-top:14px}
+.phone .lab{margin-top:34px}
+.phone .lab{flex-direction:column;align-items:flex-start;gap:12px}
+.phone .energy{gap:20px;font-size:14px}
+.phone .opt .t{font-size:17px}
+.phone .opt .go{display:none}
+.phone .ask{margin-top:34px;padding:18px}
+.phone .ask .q{font-size:19px}
+.phone .new .hello{font-size:26px}
+.pill{position:absolute;left:16px;right:16px;bottom:96px;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:10px 10px 10px 18px;box-shadow:0 4px 18px #0000000f}
+.pill .ph{flex:1;color:var(--ink3)}
+.pill i{width:30px;height:30px;border-radius:50%;background:var(--btn);display:grid;place-items:center;color:var(--btnText);font-style:normal;font-size:15px}
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:84px;background:var(--bg);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-top:9px;font-size:10.5px;color:var(--ink3);text-align:center}
+.tabbar svg{width:24px;height:24px;display:block;margin:0 auto 3px;stroke:currentColor;fill:none;stroke-width:1.6}
+.tabbar .on{color:var(--link);font-weight:600}
+
+.notes{flex-basis:100%;max-width:1180px;background:#FFFDF8;border-radius:12px;padding:24px 30px;font-size:14px;color:#333;box-shadow:0 4px 20px #0001;display:grid;grid-template-columns:1fr 1fr;gap:10px 44px}
+.notes h3{margin:0 0 8px;font-size:15px;grid-column:span 1}
+.notes p,.notes ul{margin:0 0 6px}
+.notes ul{padding-left:18px}
+.notes li{margin-bottom:5px}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<div class="stage" id="stage"></div>
+<script>
+const P=new URLSearchParams(location.search);
+const S={view:P.get('view')||'both',state:P.get('state')||'data',theme:P.get('theme')||'light',width:P.get('width')||'1180',energy:'hour',picked:null,answered:false,qi:0};
+const opts={view:[['both','桌面 + iPhone'],['desktop','桌面'],['phone','iPhone']],state:[['new','第一次打开'],['data','有资料'],['pending','有建议待看']],theme:[['light','浅色'],['dark','深色']],width:[['1180','宽'],['900','900']]};
+const lbl={view:'看',state:'状态',theme:'外观',width:'桌面宽度'};
+function bar(){document.getElementById('bar').innerHTML='<b>开图 · 今天 v4</b>'+Object.keys(opts).map(k=>`<div class="grp"><span>${lbl[k]}</span>${opts[k].map(([v,t])=>`<button aria-pressed="${S[k]===v}" onclick="set('${k}','${v}')">${t}</button>`).join('')}</div>`).join('')}
+function set(k,v){S[k]=v;if(k==='state'){S.picked=null;S.answered=false}const u=new URLSearchParams({view:S.view,state:S.state,theme:S.theme,width:S.width});history.replaceState(null,'','?'+u);render()}
+function act(k,v){S[k]=v;render()}
+const ic={today:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>',map:'<svg viewBox="0 0 24 24"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',lib:'<svg viewBox="0 0 24 24"><path d="M4 5h6v14H4zM10 5h4v14h-4zM15.5 5.5l3.8-.9 2.6 13.6-3.8.9z"/></svg>',ask:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>'};
+
+// synthetic person: 小林
+const ENERGY=[['hour','有一小时'],['ten','只有十分钟'],['tired','有点累']];
+const OPTS={
+ hour:[['从 34 张里挑出 3 张封面备选','年底出一本摄影集','45 分钟'],['读完合规备忘录第 3 节，记下 3 条疑问','转岗到清洁能源政策','40 分钟'],['去江边跑一次 8 公里','体脂降到 15%','50 分钟']],
+ ten:[['给印刷厂发邮件，问哑粉纸的纸样','年底出一本摄影集','5 分钟'],['把昨晚那句书稿想法补成一段','写完第一章','10 分钟'],['称一次体重','体脂降到 15%','1 分钟']],
+ tired:[['出门走二十分钟，不带耳机','睡得好一点','20 分钟'],['今晚早点睡','睡得好一点',''],['什么都不做也行','','',true]]};
+const QS=[['你说想出摄影集。是想自己留着，还是想卖给别人？','因为摄影集是你现在最在意的事'],['最近一次觉得「今天过得不错」，是哪天？那天做了什么？','开图还不知道什么让你开心']];
+
+function mirror(){return `<p class="mirror serif">摄影集<span class="f" title="projects/photo-book">十天没动了</span>，上次是从 80 张筛到 34 张。训练这个月<span class="f" title="health">12 次</span>，比上个月多 3 次。这周平均<span class="f" title="health/sleep">晚睡 40 分钟</span>。</p>`}
+function choose(phone){
+ if(S.picked!==null){const o=OPTS[S.energy][S.picked];return `<div class="lab"><span>此刻</span></div><div class="doing"><div class="k">在做 · 为了${o[1]||'自己'}</div><div class="t serif">${o[0]}</div><div class="acts"><button class="btn s" onclick="act('picked',null)">做完了，记一句</button><button class="quiet" onclick="act('picked',null)">换一件</button></div></div>`}
+ const en=ENERGY.map(([k,t])=>`<button aria-pressed="${S.energy===k}" onclick="act('energy','${k}')">${t}</button>`).join('');
+ const li=OPTS[S.energy].map(([t,w,d,rest],i)=>`<li class="opt${rest?' rest':''}" onclick="act('picked',${i})"><div class="t serif">${t}${w?`<span class="why">为了：${w}</span>`:''}</div>${d?`<span class="d num">${d}</span>`:''}<button class="txt go">就这件</button></li>`).join('');
+ return `<div class="lab"><span>此刻，挑一件就好</span><span class="energy">${en}</span></div><ul class="opts">${li}</ul>`;
+}
+function ask(){const [q,why]=QS[S.qi%QS.length];
+ return `<section class="ask"><div class="k"><span>开图想问你</span><button class="quiet" onclick="act('qi',${S.qi+1})">换一个问题</button></div><div class="q serif">${q}</div>${S.answered?`<div class="done">记下了。明天再问你别的。</div>`:`<div class="a"><input placeholder="随口答一句就行" onkeydown="if(event.key==='Enter')act('answered',true)"><button class="txt" onclick="act('answered',true)">记下</button></div>`}</section>`}
+function pencil(){return `<div class="pencil"><div class="k">晚间复盘时 Claude 留了 3 条建议</div>
+ <div class="row"><span>把「早上训练」改成「晚饭后训练」<small> · 记忆</small></span><button class="txt">确认</button><button class="quiet">不用</button></div>
+ <div class="row"><span>给印刷厂发邮件问纸样<small> · 下一步</small></span><button class="txt">确认</button><button class="quiet">不用</button></div>
+ <div class="row"><span>午饭：牛肉面，约 650 kcal<small> · 饮食</small></span><button class="txt">确认</button><button class="quiet">不用</button></div></div>`}
+function pencilPhone(){return `<div class="pencil"><div class="k">Claude 留了 3 条建议，在电脑上确认</div><div class="row"><span>把「早上训练」改成「晚饭后训练」</span></div><div class="row"><span>给印刷厂发邮件问纸样</span></div><button class="txt" style="font-size:13px">看全部 3 条</button></div>`}
+function newUser(phone){return `<div class="new"><p class="hello serif">开图还不认识你。<br>先从一件事说起。</p>
+ <section class="ask"><div class="k"><span>开图想问你</span></div><div class="q serif">最近有什么事，是你想改变的？</div><textarea placeholder="一句话就行，也可以粘贴一段和 AI 的对话"></textarea><div style="display:flex;justify-content:flex-end"><button class="btn p">写下这一句</button></div></section>
+ <div class="lab"><span>或者让开图先读一读你</span></div><ul class="doors"><li>从常用的 AI 搬来记忆<span>ChatGPT、Claude……</span></li><li>导入 Apple 健康<span>训练、睡眠、体重</span></li>${phone?'':'<li>写下去过的城市<span>会画成一张地图</span></li>'}</ul></div>`}
+function body(phone){
+ const st=S.state;
+ const top=phone?`<div class="top"><span class="num">10月24日 星期六</span>${st==='new'?'':`<button class="btn ${st==='pending'?'s':'p'}">带去 AI 聊</button>`}</div>`
+  :`<div class="top"><span class="num">10月24日 星期六 · 18° 多云</span>${st==='new'?'':`<span style="display:flex;gap:14px;align-items:center">${st==='pending'?'<button class="btn s">带去别的 AI 聊</button>':'<button class="txt">贴回 AI 回答</button><button class="btn p">带去别的 AI 聊</button>'}</span>`}</div>`;
+ if(st==='new')return top+newUser(phone);
+ let h=top+mirror();
+ if(st==='pending')h+=phone?pencilPhone():pencil();
+ h+=choose(phone)+ask();
+ if(!phone)h+=`<div class="foot"><div class="capture"><span class="ph">随手记一句</span><kbd>⌘ N</kbd></div><span>今天记了 4 条 · <button class="txt" style="font-size:13px">在资料里</button> · 资料在 iCloud 云盘</span></div>`;
+ else h+=`<div class="foot" style="border:0;justify-content:center"><span>今天记了 4 条 · <button class="txt" style="font-size:13px">在资料里</button></span></div>`;
+ return h;
+}
+function desktop(){const st=S.state;
+ const tabs=[['今天',st==='pending'?'3':''],['开图',''],['资料',''],['问问','']].map(([t,n],i)=>`<span class="${i===0?'on':''}">${t}${n?`<span class="n">${n}</span>`:''}</span>`).join('');
+ return `<div class="win ${S.theme==='dark'?'t-dark':'t-light'}${S.width==='900'?' w900':''}"><header class="tb"><div class="lights"><i></i><i></i><i></i></div><nav class="tabs">${tabs}</nav><span></span></header><main class="main"><div class="col">${body(false)}</div></main></div>`}
+function phone(){
+ const tabs=[['today','今天'],['map','开图'],['lib','资料'],['ask','问问']].map(([k,t],i)=>`<div class="${i===0?'on':''}">${ic[k]}${t}</div>`).join('');
+ return `<div class="phone ${S.theme==='dark'?'t-dark':'t-light'}"><div class="sb num"><span>9:41</span><span>●●●</span></div><div class="ps">${body(true)}</div>${S.state==='new'?'':'<div class="pill"><span class="ph">随手记一句</span><i>↑</i></div>'}<nav class="tabbar">${tabs}</nav></div>`}
+const notes=`<div class="notes">
+<div><h3>这一页回答什么</h3><p>不是「几点做什么」，而是「我现在什么样，此刻做点什么最值得」。</p><ul>
+<li><b>镜子</b>：两三句只从数据里算出来的事实，标出的词能点开看来源。不写评语。</li>
+<li><b>此刻</b>：按现在的状态给 2–3 件小事，每件连着一个在意的目标。没有时间、没有截止、不变红、不打勾；「什么都不做也行」是正式选项。</li>
+<li><b>开图想问你</b>：每天一个问题，随口答一句，开图就更认识你。不会用 AI 的人不用写提示词。</li>
+<li>今天记下的流水不上首页，一行「今天记了 4 条」通向资料。</li></ul></div>
+<div><h3>参考了谁</h3><ul>
+<li><b>How We Feel</b>（Ben Silbermann）：先问你现在怎么样，再给建议 → 「有一小时 / 只有十分钟 / 有点累」。</li>
+<li><b>Apple 日记</b>的「写作建议」与 <b>Day One</b> 的每日提问 → 「开图想问你」。</li>
+<li><b>Finch</b>：低能量时也有被允许的选项，不惩罚 → 「什么都不做也行」。</li>
+<li><b>Oura</b> 早上那一句状态总结 → 镜子，但只说事实。</li>
+<li><b>iA Writer</b> 与 Frank Chimero 的排版：一栏、正文字号说话，靠字而不是靠框 → 衬线正文、整页一个框。</li></ul></div>
+</div>`;
+function render(){bar();const st=document.getElementById('stage');
+ st.innerHTML=S.view==='desktop'?desktop():S.view==='phone'?phone():desktop()+phone()+notes}
+render();
+</script>
+</body>
+</html>

@@ -1,5 +1,7 @@
 # 首页 v3：去掉 AI 感
 
+> 已被 [home-v4](../home-v4/README.md) 取代：v3 把首页做成了按时间排的流水账，仍然是日程表。下面的文案规则在 v4 继续有效。
+
 设计稿：[`index.html`](index.html)，用 `?view=compare|desktop|phone&state=new|data|pending&theme=light|dark&width=1200|900` 切换。
 改前截图：`before-desktop.png`、`before-phone.png`（现在的体验站，有资料状态）。
 
