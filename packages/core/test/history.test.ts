@@ -1,16 +1,22 @@
 import fs, { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { describe, expect, it } from "vitest";
+import git from "isomorphic-git";
+import { describe, expect, it, vi } from "vitest";
 import { pendingWorkspaceFiles } from "../src/history.js";
 import {
   Workspace,
   addRecord,
+  deferSnapshots,
   doctor,
   history,
+  historyDirectory,
+  inboxNoteDone,
+  invalidateHistoryFile,
   isTracked,
   readRecords,
   restore,
   snapshot,
+  snapshotNow,
 } from "../src/index.js";
 import { freshWorkspace, tmp, workout } from "./helpers.js";
 
@@ -32,6 +38,91 @@ it("另一台电脑打开同步资料时，没有本机版本库也能读取并�
   expect(await history(opened)).toHaveLength(1);
   expect(opened.readText("me/profile.md")).toBe("# 合成跨设备档案\n");
   expect((await history(original))[0]?.message).toBe("初始化开图工作区");
+});
+
+it("后台版本保留同长度改写、追加记录、删除与收件箱归档，恢复可读回", async () => {
+  const ws = await freshWorkspace();
+  const file = "me/synthetic.md";
+  const note = "inbox/notes/2026-10-24/synthetic.note.md";
+  ws.writeText(file, "before\n");
+  ws.writeText("me/synthetic-delete.txt", "合成删除前\n");
+  ws.writeText(note, "合成待归档原文\n");
+  const before = await snapshotNow(ws, "改动前");
+  deferSnapshots(ws, () => {});
+  ws.writeText(file, "after!\n");
+  addRecord(ws, "workout", workout);
+  const moved = await inboxNoteDone(ws, note);
+  ws.writeText(file, "final!\n");
+  fs.rmSync(ws.resolve("me/synthetic-delete.txt"));
+  invalidateHistoryFile(ws, "me/synthetic-delete.txt");
+  await snapshotNow(ws, "后台保存", undefined, { changedOnly: true });
+  const head = (await history(ws))[0]?.oid as string;
+  const { blob } = await git.readBlob({
+    fs,
+    dir: ws.root,
+    gitdir: historyDirectory(ws),
+    oid: head,
+    filepath: file,
+  });
+  expect(Buffer.from(blob).toString()).toBe("final!\n");
+  expect(await isTracked(ws, note)).toBe(false);
+  expect(await isTracked(ws, moved.path)).toBe(true);
+  expect(await isTracked(ws, "me/synthetic-delete.txt")).toBe(false);
+  expect(readRecords(ws, "workout")).toHaveLength(1);
+  await restore(ws, before as string);
+  expect(ws.readText(note)).toContain("合成待归档原文");
+  expect(ws.readText(file)).toBe("before\n");
+  expect(readRecords(ws, "workout")).toEqual([]);
+});
+
+it("后台保存的未知事件和 ignore 变化仍盘点未报告的文件，敏感索引项仍移出", async () => {
+  const ws = await freshWorkspace();
+  const ignored = "me/synthetic-ignore.txt";
+  ws.writeText(".gitignore", `${ws.readText(".gitignore")}\n${ignored}\n`);
+  ws.writeText(ignored, "合成内容\n");
+  await snapshotNow(ws, "忽略文件");
+  expect(await isTracked(ws, ignored)).toBe(false);
+  ws.writeText(".gitignore", ws.readText(".gitignore").replace(`${ignored}\n`, ""));
+  await snapshotNow(ws, "更新忽略规则", undefined, { changedOnly: true });
+  expect(await isTracked(ws, ignored)).toBe(true);
+  writeFileSync(ws.resolve("me/unreported.txt"), "合成外部改动\n");
+  invalidateHistoryFile(ws, "工作区");
+  await snapshotNow(ws, "未知事件", undefined, { changedOnly: true });
+  expect(await isTracked(ws, "me/unreported.txt")).toBe(true);
+  await git.add({
+    fs,
+    dir: ws.root,
+    gitdir: historyDirectory(ws),
+    filepath: ".kaitu/secrets.json",
+    force: true,
+  });
+  writeFileSync(ws.resolve("me/staged.txt"), "合成已暂存内容\n");
+  await git.add({ fs, dir: ws.root, gitdir: historyDirectory(ws), filepath: "me/staged.txt" });
+  ws.writeText("me/synthetic.md", "普通改动\n");
+  const commit = vi.spyOn(git, "commit").mockRejectedValueOnce(new Error("synthetic commit failure"));
+  try {
+    await expect(snapshotNow(ws, "失败的后台保存", undefined, { changedOnly: true })).rejects.toThrow(
+      "synthetic commit failure",
+    );
+  } finally {
+    commit.mockRestore();
+  }
+  await snapshotNow(ws, "清理敏感索引", undefined, { changedOnly: true });
+  expect(await isTracked(ws, ".kaitu/secrets.json")).toBe(false);
+  expect(await isTracked(ws, "me/staged.txt")).toBe(true);
+});
+
+it("暂不提交的外部原文在下一次显式后台保存时一并进入版本", async () => {
+  const ws = await freshWorkspace();
+  const external = "inbox/notes/2026-10-24/external.note.md";
+  const own = "inbox/notes/2026-10-24/own.note.md";
+  ws.writeText(external, "合成外部原文\n");
+  expect(await snapshotNow(ws, () => null, undefined, { changedOnly: true })).toBeNull();
+  expect(await isTracked(ws, external)).toBe(false);
+  ws.writeText(own, "合成用户原文\n");
+  await snapshotNow(ws, "保存原文", undefined, { changedOnly: true });
+  expect(await isTracked(ws, external)).toBe(true);
+  expect(await isTracked(ws, own)).toBe(true);
 });
 
 describe("版本历史", () => {

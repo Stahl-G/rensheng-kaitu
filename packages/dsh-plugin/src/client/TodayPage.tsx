@@ -7,35 +7,239 @@ import { exploreModules } from "./explore-modules.js";
 import { useLocale, useT } from "./i18n.js";
 import { nextPresentation } from "./next-presentation.js";
 
+export function LifeHome({
+  data,
+  firstVisit,
+  capture,
+  writing,
+  start,
+  library,
+  connect,
+  openModule,
+  handover,
+  memory,
+}: {
+  data: OverviewData;
+  firstVisit: boolean;
+  capture: ReactNode;
+  writing: boolean;
+  start: () => void;
+  library: () => void;
+  connect: () => void;
+  openModule: (id: string) => void;
+  handover: () => void;
+  memory: () => void;
+}) {
+  const t = useT();
+  const recent = data.notes[0];
+  const health = data.sections.find((section) => section.id === "health");
+  const latest =
+    recent?.text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim() ||
+    data.sections.find((section) => section.preview.length)?.preview[0];
+  const cards = [
+    {
+      id: "health",
+      title: t("回看身体变化", "Notice changes in your body"),
+      description: t(
+        "记下吃了什么、运动和睡眠，慢慢看见自己的变化。",
+        "Keep track of meals, movement and sleep, and notice what changes.",
+      ),
+      detail:
+        health?.preview[0] ||
+        (health ? t(`已留下 ${health.count} 条健康记录`, `${health.count} health records kept`) : null),
+      action: t("打开健康", "Open health"),
+      open: () => openModule("health"),
+    },
+    {
+      id: "directions",
+      title: t("找一个新方向", "Find a new direction"),
+      description: t(
+        "从经历和兴趣出发，探索工作或生活的选择，试一小步。",
+        "Explore choices in work and life through your experience and interests. Try one small step.",
+      ),
+      detail: null,
+      action: t("探索方向", "Explore directions"),
+      open: () => openModule("directions"),
+    },
+    {
+      id: "handover",
+      title: t("换个 AI 接着聊", "Continue with another AI"),
+      description: t(
+        "选好要带的近况，预览、删改后，复制给你常用的 AI。",
+        "Choose what to bring, review and edit it, then copy it to the AI you use.",
+      ),
+      detail: null,
+      action: t("准备资料包", "Prepare a context pack"),
+      open: handover,
+    },
+  ];
+  return (
+    <section className={todayCss.lifeHome} aria-label={t("生活首页", "Life at a glance")}>
+      <header className={todayCss.lifeHeading}>
+        <p className={css.eyebrow}>{t("生活，慢慢有迹可循", "A little life, kept over time")}</p>
+        <h1>
+          {firstVisit
+            ? t("让 AI 了解你，从一件小事开始", "Let AI get to know you, one small moment at a time")
+            : t("把日子记下来，慢慢看见自己", "Keep your moments. Get to know yourself.")}
+        </h1>
+        <p>
+          {firstVisit
+            ? t(
+                "先留下一点生活，想聊时再接上 AI。",
+                "Keep a little of your life. Connect AI whenever you want to talk.",
+              )
+            : t(
+                "不用每天做计划。留下一点，也可以只是回来看一看。",
+                "No daily plan required. Leave a note, or simply look back.",
+              )}
+        </p>
+      </header>
+      <div className={todayCss.lifeHero}>
+        <div>
+          <h2>{t("先记下今天的一件事", "Keep one moment from today")}</h2>
+          <p>
+            {t(
+              "一顿饭、一次散步，或一个还没想明白的念头。",
+              "A meal, a walk, or a thought you are still figuring out.",
+            )}
+          </p>
+          {!writing && (
+            <button
+              id="life-capture-start"
+              type="button"
+              className={`${css.btn} ${css["btn-strong"]}`}
+              onClick={start}
+            >
+              {t("记一件事", "Write a moment")}
+              <span aria-hidden="true"> ↗</span>
+            </button>
+          )}
+          <small>
+            {t("不用连接 AI，写一句就能保存。", "No AI connection needed. A sentence is enough.")}
+          </small>
+        </div>
+        {!writing && (
+          <div className={todayCss.lifeNote}>
+            <span>
+              {latest
+                ? t("最近留下的", "Recently kept")
+                : firstVisit
+                  ? t("灵感示例 · 不会保存", "A writing idea · not saved")
+                  : t("你的积累", "What you have kept")}
+            </span>
+            <p>
+              {latest ||
+                (firstVisit
+                  ? t(
+                      "今天散步时，发现了一条想再走一次的小路。",
+                      "On my walk today, I found a path I want to take again.",
+                    )
+                  : t(
+                      "你保存的资料都在这里，随时可以回看。",
+                      "Your saved material is here whenever you want to revisit it.",
+                    ))}
+            </p>
+            {latest && (
+              <button type="button" className={css.link} onClick={library}>
+                {recent ? t("回看原文 →", "Read the original →") : t("打开资料 →", "Open library →")}
+              </button>
+            )}
+          </div>
+        )}
+        {writing && capture}
+      </div>
+      {firstVisit && (
+        <ol className={todayCss.lifeSteps}>
+          {[
+            [t("记一件事", "Write a moment"), t("写一句就好", "One sentence is enough"), start],
+            [
+              t("看看存了什么", "See what you saved"),
+              t("原文在资料里，随时可回看", "Your original words stay in Library"),
+              library,
+            ],
+            [
+              t("想聊时再连接 AI", "Connect AI when you want"),
+              t("可以以后再说", "There is no rush"),
+              connect,
+            ],
+          ].map(([title, hint, action], i) => (
+            <li key={String(title)}>
+              <button type="button" onClick={action as () => void}>
+                <span>{i + 1}</span>
+                <div>
+                  <b>{title as string}</b>
+                  <small>{hint as string}</small>
+                </div>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      <div className={todayCss.lifeCards}>
+        {cards.map((card) => (
+          <button
+            type="button"
+            className={todayCss.lifeCard}
+            id={card.id === "handover" ? "life-handover-start" : undefined}
+            data-kind={card.id}
+            key={card.id}
+            onClick={card.open}
+          >
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              aria-hidden="true"
+            >
+              <path
+                d={
+                  exploreModules.find((entry) => entry.id === card.id)?.icon ??
+                  "M3 7h7l2 2h9v11H3V7Zm3 0V3h11v6M8 13h8m-8 3h5"
+                }
+              />
+            </svg>
+            <h2>{card.title}</h2>
+            <p>{card.description}</p>
+            {card.detail && <span className={todayCss.lifeDetail}>{card.detail}</span>}
+            <b className={todayCss.lifeAction}>{card.action} →</b>
+          </button>
+        ))}
+      </div>
+      <div className={todayCss.lifeLinks}>
+        <button type="button" className={css.link} onClick={memory}>
+          {t("已有 AI 记忆？搬过来", "Already have AI memories? Bring them over")}
+        </button>
+        <button type="button" className={css.link} onClick={() => openModule("modules")}>
+          {t("看看全部模块 →", "Browse all modules →")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function TodayStart({
   start,
   memory,
   connect,
-  openModule,
   storage,
   status,
-  hasWrittenMatter = false,
   busy = false,
 }: {
   start: (text: string) => void;
   memory: () => void;
   connect: () => void;
-  openModule?: (id: string) => void;
   storage?: () => void;
   status: import("@kaitu/core").OnboardingStatus | null;
-  hasWrittenMatter?: boolean;
   busy?: boolean;
 }) {
   const t = useT();
   const [goal, setGoal] = useState("");
   const stepDone = (id: string) =>
     id === "matter"
-      ? !!(
-          hasWrittenMatter ||
-          status?.draft ||
-          status?.next ||
-          status?.checklist.items.find((item) => item.id === id)?.done
-        )
+      ? !!(status?.draft || status?.next || status?.checklist.items.find((item) => item.id === id)?.done)
       : !!status?.checklist.items.find((item) => item.id === id)?.done;
   const steps = [
     ["matter", t("写下一件事", "Write down one thing"), t("就在上面", "Start above"), () => start(goal)],
@@ -124,48 +328,6 @@ export function TodayStart({
               )}
             </div>
           ))}
-        </section>
-      )}
-      {openModule && (
-        <section className={todayCss.modules}>
-          <h2>{t("开图里可以放这些", "Make room for these")}</h2>
-          <div className={todayCss.moduleGrid}>
-            {exploreModules
-              .filter((entry) => entry.default)
-              .map((entry) => (
-                <button
-                  type="button"
-                  className={css.card}
-                  key={entry.id}
-                  onClick={() => openModule(entry.id)}
-                >
-                  <b>{t(entry.title[0], entry.title[1])}</b>
-                  <span>{t(entry.description[0], entry.description[1])}</span>
-                  <span className={todayCss.firstAction}>
-                    {t(
-                      entry.id === "footprints"
-                        ? "加上家乡"
-                        : entry.id === "health"
-                          ? "记一条健康记录"
-                          : entry.id === "news"
-                            ? "选几个关键词"
-                            : "写下一个想试的方向",
-                      entry.id === "footprints"
-                        ? "Add your hometown"
-                        : entry.id === "health"
-                          ? "Log a health record"
-                          : entry.id === "news"
-                            ? "Choose some keywords"
-                            : "Write an idea to try",
-                    )}{" "}
-                    →
-                  </span>
-                </button>
-              ))}
-          </div>
-          <button type="button" className={css.link} onClick={() => openModule("modules")}>
-            {t("更多模块 →", "More modules →")}
-          </button>
         </section>
       )}
       {storage && (

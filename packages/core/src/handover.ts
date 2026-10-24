@@ -278,7 +278,7 @@ const PATH_PATTERNS = [
   /(?<![\w.:/~-])(?:~|\/(?:Users|home|root|Volumes|private|var|tmp|opt|etc|mnt|media|Library|Applications|System))\/[^\s，。、；;,)）"'”’]+/g,
   /(?<![\w])[A-Za-z]:\\[^\s，。、；;,)）"'”’]+/g,
 ];
-function redact(text: string, locale: Locale): string {
+export function redact(text: string, locale: Locale): string {
   const key = pick(locale, "（密钥已去掉）", "(key removed)");
   const path = pick(locale, "（本机路径已去掉）", "(local path removed)");
   let out = text;

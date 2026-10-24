@@ -25,6 +25,7 @@ interface Binding {
   state: string;
   realState: string;
   migrating: boolean;
+  mediaRoot?: string;
   mode: "local" | "drive" | "icloud";
 }
 function canonical(path: string): string {
@@ -67,6 +68,7 @@ export function setStateBinding(
     migrating,
     realState: canonical(state),
     mode,
+    ...(old?.mediaRoot ? { mediaRoot: old.mediaRoot } : {}),
   };
   mkdirSync(join(localStateRoot(), "workspaces"), { recursive: true, mode: 0o700 });
   const temp = `${file}.${randomUUID()}.tmp`;
@@ -74,6 +76,16 @@ export function setStateBinding(
   renameSync(temp, file);
   return binding;
 }
+/** Per-device media selection stays in the existing local workspace registry. */
+export function setMediaRootBinding(root: string, mediaRoot: string): void {
+  const binding = { ...stateBinding(root), mediaRoot };
+  const file = bindingFile(root);
+  const temp = `${file}.${randomUUID()}.tmp`;
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(temp, JSON.stringify(binding), { mode: 0o600 });
+  renameSync(temp, file);
+}
+
 function cloudMode(root: string): Binding["mode"] {
   const home = process.env.HOME || homedir();
   if (

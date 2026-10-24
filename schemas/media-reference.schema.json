@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kaitu.local/schemas/media-reference.schema.json",
+  "title": "独立媒体库引用",
+  "description": "相对于本设备当前工作区所绑定媒体库根目录；原始文件名保留，工作区不保存媒体根的绝对路径。",
+  "type": "string",
+  "pattern": "^media:[0-9]{4}/(0[1-9]|1[0-2])/(?!\\.{1,2}$)[^/\\\\\\u0000-\\u001F]+$",
+  "examples": ["media:2026/10/IMG_1234.HEIC", "media:2026/10/IMG_1234 (1).HEIC"]
+}
