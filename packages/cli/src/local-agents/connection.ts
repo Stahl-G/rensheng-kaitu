@@ -14,7 +14,9 @@ export function createAgentConnection(options: {
       mode: AskMode,
       capabilities?: boolean,
       connection?: AgentConnectionId,
+      textOnly?: boolean,
     ): ReturnType<typeof createAgentRuntime>;
+    catalogSettings(includeSaved?: boolean): Promise<unknown>;
     support(method: string, input: Record<string, unknown>): Promise<unknown>;
   };
   env?: NodeJS.ProcessEnv;
@@ -49,8 +51,9 @@ export function createAgentConnection(options: {
     const path = saved.path ?? detected().find((item) => item.id === agent.id)?.path;
     return { agent, path };
   };
-  const settings = async () => {
-    if (!local()) return { ...(await options.sdk().settings()), backend: "dsh", localAgents: detected() };
+  const settings = async (resolveImages = false) => {
+    if (!local())
+      return { ...(await options.sdk().settings(resolveImages)), backend: "dsh", localAgents: detected() };
     const { agent, path } = current();
     return {
       choice: "local" as const,
@@ -106,12 +109,12 @@ export function createAgentConnection(options: {
       return list;
     },
     async support(method: string, input: Record<string, unknown>) {
-      if (method === "builtinSettings") return options.sdk().settings();
+      if (method === "builtinSettings") return options.sdk().catalogSettings(input.saved === true);
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },
-    runtime(mode: AskMode, connection: AgentConnectionId = "local-ask") {
-      if (!local()) return options.sdk().runtime(mode, false, connection);
+    runtime(mode: AskMode, connection: AgentConnectionId = "local-ask", textOnly = false) {
+      if (!local()) return options.sdk().runtime(mode, false, connection, textOnly);
       const { agent, path } = current();
       return createAgentRuntime({
         agent,
@@ -121,6 +124,7 @@ export function createAgentConnection(options: {
         path,
         mcp: { ...options.mcp, env: { ...options.mcp.env, KAITU_AGENT_CONNECTION: connection } },
         env: options.env,
+        textOnly,
       });
     },
   };

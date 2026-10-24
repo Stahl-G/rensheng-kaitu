@@ -20,10 +20,12 @@ import {
   addPhoto,
   addRecord,
   addTask,
+  agentReadingPack,
   bindGithub,
   cancelOnboardingPreview,
   cancelTask,
   completeTask,
+  configureProfilePublisher,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
   createProject,
@@ -51,6 +53,7 @@ import {
   listTasks,
   logProject,
   mcpToken,
+  normalizeLocale,
   onboardingStatus,
   previewOnboardingMemory,
   previewOnboardingSetup,
@@ -64,6 +67,7 @@ import {
   recordReference,
   recordReferences,
   recordTypeSummary,
+  refreshUserProfile,
   reindexChats,
   removeMemory,
   removePhoto,
@@ -125,6 +129,7 @@ const HELP = `开图 kaitu
   kaitu doctor                                     检查工作区
   kaitu validate [路径]                            按 schema 校验
   kaitu agents-md                                  重新生成 AGENTS.md
+  kaitu profile-publisher enable | disable | refresh  在指定电脑生成 USER.md（换电脑前先 disable）
   kaitu mcp [--http] [--port 4871] [--tools remote|all]  启动 MCP 服务
   kaitu mcp token [--rotate]                      查看或轮换 HTTP token
   kaitu onboarding status | reset                  查看引导 / 重置本机选择
@@ -137,6 +142,7 @@ const HELP = `开图 kaitu
   kaitu onboarding setup-confirm <token>           确认数据源设置
   kaitu onboarding cancel <token>                  放弃预览
   kaitu status [--json-out]                         今天、模块进度与最近 7 天数据
+  kaitu reading-pack [--locale zh-CN|en] [--json-out] 按本机 Agent 权限读取最新近况，不落盘
   kaitu investments [--json]
   kaitu learning list | read <主题>                 学习主题与下一步
   kaitu learning start --json '{"title":"…","source":{"title":"…","url":"…","text":"…"}}'  存一篇材料、开一个主题（已有就沿用）
@@ -225,6 +231,7 @@ const options = {
   dir: { type: "string" },
   json: { type: "string" },
   "json-out": { type: "boolean" },
+  locale: { type: "string" },
   by: { type: "string" },
   from: { type: "string" },
   to: { type: "string" },
@@ -609,6 +616,15 @@ async function run(argv: string[]): Promise<number> {
       out(values, result, lines.join("\n"));
       return problems.length || result.validation?.length ? 1 : 0;
     }
+    case "profile-publisher": {
+      const ws = workspace(values, false);
+      if (!["enable", "disable", "refresh"].includes(args[0] ?? ""))
+        throw new KaituError("使用 profile-publisher enable / disable / refresh", "BAD_ARGS");
+      const result =
+        args[0] === "refresh" ? refreshUserProfile(ws) : configureProfilePublisher(ws, args[0] === "enable");
+      out(values, result, result.status);
+      return 0;
+    }
     case "doctor": {
       const ws = new Workspace(values.dir ? resolve(values.dir) : defaultRoot());
       const checks = await doctor(ws);
@@ -631,6 +647,11 @@ async function run(argv: string[]): Promise<number> {
           : `${issues.map((i) => `${i.file}${i.line ? `:${i.line}` : ""}  ${i.message}`).join("\n")}\n\n共 ${issues.length} 处问题。`,
       );
       return issues.length === 0 ? 0 : 1;
+    }
+    case "reading-pack": {
+      const pack = agentReadingPack(workspace(values, false), "local-mcp", normalizeLocale(values.locale));
+      out(values, pack, pack.text);
+      return 0;
     }
     case "agents-md": {
       const ws = workspace(values);

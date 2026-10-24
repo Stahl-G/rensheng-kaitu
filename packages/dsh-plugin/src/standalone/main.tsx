@@ -114,6 +114,7 @@ const props: OverviewPageProps = {
   loadMediaImage: (reference) => call("mediaImage", reference),
   loadMediaLocation: () => call("mediaLibraryLocation"),
   selectMediaLibrary: (folder) => call("selectMediaLibrary", folder),
+  searchLibraryNotes: (query) => call("searchLibraryNotes", query),
   adoptTask: (id) => call("adoptTask", id),
   cancelTask: (id) => call("cancelTask", id),
   completeNext: (file, id) => call("completeNext", file, id),
@@ -144,6 +145,9 @@ const props: OverviewPageProps = {
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
+  loadDirectionMap: (locale) => call("directionMap", locale),
+  generateDirectionMap: (locale) => call("directionMapGenerate", locale),
+  dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
     call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),

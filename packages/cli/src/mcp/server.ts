@@ -4,6 +4,7 @@ import {
   addExperiences,
   addMemory,
   agentCanRead,
+  agentReadingPack,
   completeTask,
   dismissNews,
   explorationCommandSchema,
@@ -131,6 +132,12 @@ export function createMcpServer(
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), connection),
+  );
+  register(
+    "reading_pack",
+    "现取与交接包相同的近况，不落盘；敏感记忆排除，财务按当前连接权限决定。",
+    { locale: z.enum(["zh-CN", "en"]).optional() },
+    ({ locale }) => agentReadingPack(ws, connection, locale),
   );
   register("inbox_notes", "读取未整理的收件箱笔记及来源。", {}, () => inboxNotes(ws));
   register("news_read", "读取近期新闻推荐、今天 X 热门和来源数量。", {}, () => readNews(ws));

@@ -5,6 +5,7 @@ import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
+import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
 import { ExploreModulesPage, ExploreNavigation } from "./ExploreNavigation.js";
@@ -52,6 +53,10 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
+  loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
+  generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
+  dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
   /** 今天页天气：读本机缓存、设城市；宿主没提供时不显示天气。 */
   loadWeather?: () => Promise<import("@kaitu/core").WeatherState>;
   setWeatherPlace?: (
@@ -327,6 +332,7 @@ function Overview({
   const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
   const [libraryFile, setLibraryFile] = useState<string>();
   const [libraryGoal, setLibraryGoal] = useState<string>();
+  const [projectFocus, setProjectFocus] = useState<string>();
   useEffect(() => {
     if (view !== "records" || record !== "projects" || !libraryGoal) return;
     const target = document.getElementById(`plan-${libraryGoal}`);
@@ -516,6 +522,7 @@ function Overview({
     setLibraryEntry(undefined);
     setLibraryFile(undefined);
     setLibraryGoal(undefined);
+    setProjectFocus(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
@@ -757,19 +764,32 @@ function Overview({
             <div ref={planning} id="direction-plans" tabIndex={-1}>
               {plansCard}
             </div>
-            <ProgressMap
-              plans={data?.plans}
-              projects={data?.projects ?? []}
-              loadExploration={props.loadExploration}
-              subscribe={props.subscribe}
-              open={(section) => {
-                if (section === "projects") openRecord("projects");
-                else if (section === "plans") {
-                  planning.current?.scrollIntoView({ block: "start" });
-                  planning.current?.focus({ preventScroll: true });
-                } else setExplore("directions");
-              }}
-            />
+            {props.loadDirectionMap && props.generateDirectionMap && props.dismissDirectionLink ? (
+              <DirectionMap
+                load={props.loadDirectionMap}
+                generate={props.generateDirectionMap}
+                dismiss={props.dismissDirectionLink}
+                onConnect={() => setView("connections")}
+                openProject={(slug) => {
+                  openRecord("projects");
+                  setProjectFocus(slug);
+                }}
+              />
+            ) : (
+              <ProgressMap
+                plans={data?.plans}
+                projects={data?.projects ?? []}
+                loadExploration={props.loadExploration}
+                subscribe={props.subscribe}
+                open={(section) => {
+                  if (section === "projects") openRecord("projects");
+                  else if (section === "plans") {
+                    planning.current?.scrollIntoView({ block: "start" });
+                    planning.current?.focus({ preventScroll: true });
+                  } else setExplore("directions");
+                }}
+              />
+            )}
             {!data?.plans.goals.length && (
               <button type="button" className={css.btn} onClick={() => startMatter("")}>
                 {t("写下想做成的事", "Write down a goal")}
@@ -1183,6 +1203,7 @@ function Overview({
             )}
             {!record ? (
               <LibraryPage
+                searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
                 open={openRecord}
                 onOpenOriginal={(entry) => {
@@ -1224,7 +1245,7 @@ function Overview({
               <>
                 {plansCard}
                 {renderTasks(true)}
-                <ProjectsLibrary {...child} timeZone={data?.timeZone} />
+                <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
               </>
             ) : record === "health" ? (
               <HealthLibrary
@@ -1415,6 +1436,7 @@ function Overview({
         {["profile", "connections", "settings"].includes(view) && (
           <PersonalPages
             {...child}
+            builtinAi={!!props.renderAsk}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             restartGuide={() => startGuide()}

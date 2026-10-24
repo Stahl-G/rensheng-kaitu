@@ -16,6 +16,7 @@ import {
   MAX_PHOTO_BYTES,
   type Pose,
   type Workspace,
+  addCalendarSubscription,
   addPhotoBytes,
   assetsRoot,
   calendarPushEntries,
@@ -27,6 +28,7 @@ import {
   deferSnapshots,
   disableSync,
   discardUpload,
+  disposeNoteIndex,
   dshFiles,
   enableSync,
   externalHealthPaths,
@@ -223,18 +225,35 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     string,
     { source: ImportSource; file: string; name: string; preview: unknown; digest: string; expires: number }
   >();
+  // 本地写入、派生文件、版本快照和恢复共用顺序；网络拉取不占此队列。
+  let workspaceGeneration = 0;
   let queue: Promise<unknown> = Promise.resolve();
   function exclusive<T>(operation: () => Promise<T>): Promise<T> {
     const result = queue.then(operation);
     queue = result.catch(() => {});
     return result;
   }
-  const pullCalendars = () =>
-    exclusive(async () => {
-      await pullCalendarSubscriptions(ws);
-      if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
+  function workspaceWriter() {
+    const generation = workspaceGeneration;
+    return <T>(operation: () => Promise<T>) =>
+      exclusive(() => {
+        if (closed || generation !== workspaceGeneration)
+          throw new KaituError("资料位置或版本已变化，请重试", "CONFLICT");
+        return operation();
+      });
+  }
+  let pullingCalendars = false;
+  const pullCalendars = async () => {
+    if (pullingCalendars || closed) return;
+    pullingCalendars = true;
+    try {
+      await pullCalendarSubscriptions(ws, new Date(), workspaceWriter());
+      syncCalendar();
       notify();
-    });
+    } finally {
+      pullingCalendars = false;
+    }
+  };
   const calendarTimer = setInterval(() => void pullCalendars().catch(() => {}), 60000);
   calendarTimer.unref();
   let inboxTimer: ReturnType<typeof setTimeout> | undefined;
@@ -254,12 +273,21 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     messages.push(message);
     scheduleSave(versionDelay);
   });
+  let calendarQueue: Promise<unknown> = Promise.resolve();
+  async function calendarOperation<T>(operation: () => Promise<T>) {
+    let result!: Promise<T>;
+    // 只登记顺序，不把系统日历等待放进资料写入队列。搬移/恢复会等已登记操作结束。
+    await exclusive(async () => {
+      result = calendarQueue.then(operation);
+      calendarQueue = result.catch(() => {});
+    });
+    return result;
+  }
   const syncCalendar = () => {
-    if (!options.calendarExecutor) return;
-    void exclusive(async () => {
-      await calendarPush.sync(calendarPushEntries(ws));
-      notify();
-    }).catch(() => {});
+    if (!options.calendarExecutor || closed) return;
+    void calendarOperation(() => calendarPush.sync(calendarPushEntries(ws)))
+      .then(notify)
+      .catch(() => {});
   };
   const notify = () => {
     for (const client of clients)
@@ -341,9 +369,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     refreshTimer = setTimeout(() => {
       void exclusive(async () => {
         refreshOverview(ws);
-        if (options.calendarExecutor) await calendarPush.sync(calendarPushEntries(ws));
         notify();
-      }).catch(reportError);
+      })
+        .then(syncCalendar)
+        .catch(reportError);
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
@@ -522,15 +551,41 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               );
           return json(res, 200, folder);
         }
+        if (["configureCalendarPush", "retryCalendarPush", "removeCalendarPush"].includes(method)) {
+          const result = await calendarOperation(() =>
+            productRequest(ws, method, args, options.ask, calendarPush),
+          );
+          notify();
+          return json(res, 200, result);
+        }
+        if (method === "addCalendarSubscription") {
+          if (typeof args[0] !== "string" || typeof args[1] !== "string")
+            throw new KaituError("缺少有效参数", "BAD_ARGS");
+          const result = await addCalendarSubscription(ws, args[0], args[1], workspaceWriter());
+          notify();
+          return json(res, 200, result);
+        }
+        if (
+          ["projectBindGithub", "projectSync", "onboardingMatterOrganize"].includes(method) ||
+          (method === "workspaceBackup" && ["create", "connect"].includes(String(args[0])))
+        ) {
+          const result = await productRequest(ws, method, args, options.ask, calendarPush, workspaceWriter());
+          notify();
+          return json(res, 200, result);
+        }
+        const backupRead =
+          method === "workspaceBackup" && ["status", "prompts", "gh-status"].includes(String(args[0]));
         const relocate = method === "moveStorage" || (method === "workspaceBackup" && args[0] === "activate");
         let draftId: string | undefined;
         if (method === "openAi" && typeof args[0] === "string" && args[0].trim()) {
           if (args[0].length > 100000) throw new KaituError("请求内容过长", "BAD_ARGS");
           draftId = randomUUID();
-          ws.writeJson(
-            ".kaitu/cache/ai-draft.json",
-            { id: draftId, text: args[0] },
-            { internal: true, mode: 0o600 },
+          await exclusive(async () =>
+            ws.writeJson(
+              ".kaitu/cache/ai-draft.json",
+              { id: draftId, text: args[0] },
+              { internal: true, mode: 0o600 },
+            ),
           );
         }
         const result =
@@ -540,6 +595,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               ? await productRequest(ws, method, args, options.ask, calendarPush)
               : relocate || method === "restoreVersion"
                 ? await exclusive(async () => {
+                    workspaceGeneration++;
+                    await calendarQueue;
                     await saveExternal();
                     const opening = method === "workspaceBackup" && args[0] === "activate";
                     const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
@@ -560,11 +617,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                       }
                     }
                   })
-                : await productRequest(ws, method, args, options.ask, calendarPush);
+                : productMutations.has(method) && !backupRead
+                  ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
+                  : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
-        const backupRead =
-          method === "workspaceBackup" && ["status", "prompts", "gh-status"].includes(String(args[0]));
         if (productMutations.has(method) && !backupRead) notify();
         if (
           method === "openAi" &&
@@ -654,12 +711,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }
       if (url.pathname === "/api/photos/add") {
         const bytes = await body(req, MAX_PHOTO_BYTES);
-        const result = await addPhotoBytes(ws, bytes, {
-          pose: (url.searchParams.get("pose") ?? "other") as Pose,
-          ts: url.searchParams.get("ts") ?? undefined,
-          notes: url.searchParams.get("notes") ?? undefined,
-          by: "user",
-        });
+        const result = await exclusive(() =>
+          addPhotoBytes(ws, bytes, {
+            pose: (url.searchParams.get("pose") ?? "other") as Pose,
+            ts: url.searchParams.get("ts") ?? undefined,
+            notes: url.searchParams.get("notes") ?? undefined,
+            by: "user",
+          }),
+        );
         notify();
         return json(res, 200, result);
       }
@@ -699,12 +758,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           }
           return { ok: true };
         }
-        await saveExternal();
         switch (url.pathname) {
           case "/api/sync/enable":
           case "/api/sync/disable":
           case "/api/drive/enable":
           case "/api/drive/disable": {
+            workspaceGeneration++;
+            await calendarQueue;
+            await saveExternal();
             await options.ask?.prepareRelocation();
             await phones.stop();
             const oldRoot = ws.root;
@@ -753,7 +814,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               field(data, "id"),
               field(data, "decision") as "confirmed" | "rejected",
             );
-            return { ...result, calendarPush: await calendarPush.sync(calendarPushEntries(ws)) };
+            return { ...result, calendarPush: calendarPush.settings() };
           }
           case "/api/tasks/done":
             return completeTask(ws, field(data, "id"), { by: "user" });
@@ -762,6 +823,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/memory/delete":
             return removeMemory(ws, field(data, "file"), { by: "user" });
           case "/api/restore": {
+            workspaceGeneration++;
+            await calendarQueue;
+            await saveExternal();
             await options.ask?.prepareRelocation();
             await phones.stop();
             try {
@@ -772,6 +836,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             }
           }
           case "/api/import/confirm": {
+            await saveExternal();
             const token = field(data, "token");
             const upload = uploads.get(token);
             if (!upload || upload.expires < Date.now())
@@ -797,6 +862,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             throw new KaituError("接口不存在", "NOT_FOUND");
         }
       });
+      if (url.pathname === "/api/proposal") syncCalendar();
       notify();
       json(res, 200, result);
     } catch (error) {
@@ -872,7 +938,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
-    await exclusive(saveExternal);
+    disposeNoteIndex(ws);
+    await exclusive(async () => {
+      await calendarQueue;
+      await saveExternal();
+    });
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

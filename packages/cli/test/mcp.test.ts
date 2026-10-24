@@ -7,6 +7,7 @@ import {
   addMemory,
   addRecord,
   calendarPushEntries,
+  handoverPack,
   history,
   initWorkspace,
   mcpToken,
@@ -191,6 +192,10 @@ it("本机和远程 MCP 按连接读取财务，列表、搜索、索引和别�
         const records = await call(tools, "record_list", { type: "finance_account" });
         expect(records.text.includes("Synthetic wallet")).toBe(allowed);
         expect((await call(tools, "read_file", { path: "finance/STATUS.md" })).error).toBe(!allowed);
+        const pack = await call(tools, "reading_pack", { locale: "en", finance: !allowed });
+        expect(pack.error).toBe(false);
+        expect(JSON.parse(pack.text)).toEqual(handoverPack(ws, "en", new Date(), allowed));
+        expect(pack.text).not.toContain("合成敏感记忆");
       }
     }
   } finally {

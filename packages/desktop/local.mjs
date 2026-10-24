@@ -17,6 +17,7 @@ import {
 import { reconnectWorkspaceState } from "../core/dist/state-binding.js";
 import { readWorkspaceConfig } from "../core/dist/sync-files.js";
 import { createAiProcess } from "./ai-process.mjs";
+import { productCopyright } from "./brand.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
@@ -77,8 +78,8 @@ export function createLocalAsk({
     workspace: ws.root,
     workspaceKey: workspaceKeyFor(ws.root),
     workspaceKeyFor,
-    runtime: (mode, reader) => connection.runtime(mode, reader),
-    settings: () => connection.settings(),
+    runtime: (mode, reader, textOnly) => connection.runtime(mode, reader, textOnly),
+    settings: (resolveImages) => connection.settings(resolveImages),
     // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
     models: (input) => connection.models(input),
     configure: (input) => connection.configure(input),
@@ -256,6 +257,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   app.setAboutPanelOptions({
     applicationName: "人生开图",
     applicationVersion: featureVersion,
+    copyright: productCopyright,
     version: `Powered by DeepSeek Harness ${process.env.DSH_CLIENT_VERSION}`,
   });
   const ask = createLocalAsk({

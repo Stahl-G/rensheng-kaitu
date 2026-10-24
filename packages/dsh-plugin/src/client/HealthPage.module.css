@@ -430,10 +430,16 @@
 }
 .next {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-height: 40px;
   padding: 4px 2px;
+}
+.measurements [data-review="true"] {
+  outline: 2px solid var(--health);
+  outline-offset: 3px;
+  background: var(--health-tint);
 }
 .next > span:first-child {
   width: 14px;

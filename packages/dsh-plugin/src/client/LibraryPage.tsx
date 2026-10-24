@@ -1,4 +1,10 @@
-import type { LibraryQuery, OnboardingMatter, OnboardingMatterDraft, PlansData } from "@kaitu/core";
+import type {
+  LibraryQuery,
+  NoteSearchResult,
+  OnboardingMatter,
+  OnboardingMatterDraft,
+  PlansData,
+} from "@kaitu/core";
 import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import { AgentPhrases } from "./AgentPhrases.js";
@@ -79,10 +85,12 @@ const LIBRARY_EN: Record<string, string> = {
   inbox: "Inbox",
 };
 export interface LibraryProps extends LearningServices, Pick<MediaServices, "loadMediaImage"> {
+  searchLibraryNotes: (query: string) => Promise<NoteSearchResult[]>;
   loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
 }
 export function LibraryPage({
+  searchLibraryNotes,
   data,
   open,
   overview,
@@ -93,6 +101,7 @@ export function LibraryPage({
   onOpenNote,
   onOpenGoal,
 }: {
+  searchLibraryNotes: LibraryProps["searchLibraryNotes"];
   onFile?: (file: File) => void;
   onOpenOriginal: (entry: InboxEntry) => void;
   onOpenNote: (file: string) => void;
@@ -106,6 +115,26 @@ export function LibraryPage({
   const t = useT();
   const locale = useLocale();
   const [query, setQuery] = useState("");
+  const term = query.trim();
+  const [found, setFound] = useState<{ term: string; notes: NoteSearchResult[]; error?: string }>();
+  useEffect(() => {
+    let active = true;
+    if (!term || !data) return;
+    const timer = setTimeout(() => {
+      void searchLibraryNotes(term).then(
+        (notes) => {
+          if (active) setFound({ term, notes });
+        },
+        (error) => {
+          if (active) setFound({ term, notes: [], error: String(error) });
+        },
+      );
+    }, 100);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [term, searchLibraryNotes, data]);
   const [draft, setDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -115,7 +144,8 @@ export function LibraryPage({
   const searching = !!query.trim();
   const originals = searching ? items.filter((item) => matches(item.text)) : [];
   const goals = searching ? (overview?.plans.goals ?? []).filter((goal) => matches(goal.title)) : [];
-  const notes = searching ? (data?.notes ?? []).filter((note) => matches(note.title)) : [];
+  const notes = searching && found?.term === term ? found.notes : [];
+  const searchingNotes = searching && found?.term !== term;
   const hints: Record<string, [string, string]> = {
     calendar: ["添加日程或连接日历", "Add an event or connect a calendar"],
     projects: ["记下正在做的项目", "Add a project you are working on"],
@@ -137,7 +167,7 @@ export function LibraryPage({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label={t("搜索资料", "Search library")}
-          placeholder={t("搜索原文、目标、笔记标题", "Search originals, goals and note titles")}
+          placeholder={t("搜索原文、目标、笔记正文", "Search originals, goals and note contents")}
         />
       </div>
       {searching && (
@@ -149,10 +179,12 @@ export function LibraryPage({
             <>
               <output className={styles.meta}>
                 {t(
-                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记标题 ${notes.length}`,
-                  `Originals ${originals.length} · Goals ${goals.length} · Note titles ${notes.length}`,
+                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记 ${notes.length}${notes.length === 50 ? "（前 50 条）" : ""}`,
+                  `Originals ${originals.length} · Goals ${goals.length} · Notes ${notes.length}${notes.length === 50 ? " (first 50)" : ""}`,
                 )}
               </output>
+              {searchingNotes && <output>{t("正在搜索笔记正文…", "Searching note contents…")}</output>}
+              {found?.term === term && found.error && <p role="alert">{found.error}</p>}
               {originals.map((item) => (
                 <button
                   type="button"
@@ -184,12 +216,15 @@ export function LibraryPage({
                   onClick={() => onOpenNote(note.file)}
                 >
                   <span className={css.chip}>{t(note.kind, note.kind === "决定" ? "Decision" : "Note")}</span>
-                  <span className={styles.preview}>{note.title}</span>
+                  <span className={styles.preview}>
+                    {note.title}
+                    <small className={styles.meta}>{note.snippet}</small>
+                  </span>
                 </button>
               ))}
-              {!originals.length && !goals.length && !notes.length && (
+              {!searchingNotes && !found?.error && !originals.length && !goals.length && !notes.length && (
                 <p className={styles.meta}>
-                  {t("没有匹配的原文、目标或笔记标题", "No matching originals, goals or note titles")}
+                  {t("没有匹配的原文、目标或笔记正文", "No matching originals, goals or note contents")}
                 </p>
               )}
             </>

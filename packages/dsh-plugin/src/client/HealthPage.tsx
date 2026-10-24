@@ -10,6 +10,8 @@ export interface HealthPageProps {
   onPrompt: (text: string) => void;
   subscribe?: (refresh: () => void) => () => void;
   onReviewMeasurement?: (id: string) => void;
+  adoptTask: (id: string) => Promise<unknown>;
+  cancelTask: (id: string) => Promise<unknown>;
 }
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
@@ -316,6 +318,8 @@ export function HealthPage({
   onPrompt,
   subscribe,
   onReviewMeasurement,
+  adoptTask,
+  cancelTask,
 }: HealthPageProps) {
   const t = useT();
   const locale = useLocale();
@@ -354,6 +358,15 @@ export function HealthPage({
   const [tab, setTab] = useState("训练");
   const [showLog, setShowLog] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<{ id: string }>();
+  const measurement = useRef<HTMLParagraphElement>(null);
+  const [acting, setActing] = useState<string>();
+  const [receipt, setReceipt] = useState("");
+  useEffect(() => {
+    if (tab !== "身体数据" || !reviewTarget) return;
+    measurement.current?.focus({ preventScroll: true });
+    measurement.current?.scrollIntoView({ block: "center" });
+  }, [reviewTarget, tab]);
 
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
@@ -363,6 +376,7 @@ export function HealthPage({
     try {
       const result = await loadHealth();
       if (seq === sequence.current) setData(result);
+      return result;
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
@@ -375,6 +389,25 @@ export function HealthPage({
       off?.();
     };
   }, [refresh, subscribe]);
+  const decideTask = async (id: string, adopt: boolean) => {
+    if (acting) return;
+    setActing(id);
+    setReceipt("");
+    try {
+      await (adopt ? adoptTask(id) : cancelTask(id));
+      const result = await refresh();
+      if (!result) return;
+      setReceipt(
+        adopt
+          ? t("已采纳，已加入待办。", "Adopted and added to tasks.")
+          : t("已拒绝这条建议。", "Suggestion declined."),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setActing(undefined);
+    }
+  };
   const ask = (text: string) => {
     try {
       onPrompt(text);
@@ -604,13 +637,8 @@ export function HealthPage({
                 className={css.link}
                 onClick={() => {
                   setTab("身体数据");
-                  if (onReviewMeasurement) onReviewMeasurement(point.id);
-                  else
-                    requestAnimationFrame(() =>
-                      document
-                        .getElementById(`health-measurement-${point.id}`)
-                        ?.scrollIntoView({ block: "center" }),
-                    );
+                  setReviewTarget({ id: point.id });
+                  onReviewMeasurement?.(point.id);
                 }}
               >
                 {t("去核对", "Review")}
@@ -665,6 +693,7 @@ export function HealthPage({
               )}
             </section>
             <Section title={t("健康的下一步", "Health next steps")}>
+              {receipt && <output>{receipt}</output>}
               {!data.next.length ? (
                 <Empty>
                   {t(
@@ -681,6 +710,26 @@ export function HealthPage({
                       {item.status === "proposed" && <small>{t(" · AI 建议", " · AI suggestion")}</small>}
                       {item.due && <small> · {item.due}</small>}
                     </span>
+                    {item.status === "proposed" && item.taskId && (
+                      <div className={css.actions}>
+                        <button
+                          type="button"
+                          className={css.button}
+                          disabled={!!acting}
+                          onClick={() => void decideTask(item.taskId as string, true)}
+                        >
+                          {acting === item.taskId ? t("正在保存…", "Saving…") : t("采纳", "Adopt")}
+                        </button>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={!!acting}
+                          onClick={() => void decideTask(item.taskId as string, false)}
+                        >
+                          {t("不用了", "Not needed")}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -1008,8 +1057,14 @@ export function HealthPage({
                         )}
                         <div className={css.measurements}>
                           {metric.points.map((p) => (
-                            <p key={p.id} id={`health-measurement-${p.id}`} tabIndex={-1}>
-                              <time dateTime={p.ts}>{p.date}</time>
+                            <p
+                              key={p.id}
+                              id={`health-measurement-${p.id}`}
+                              tabIndex={-1}
+                              ref={reviewTarget?.id === p.id ? measurement : undefined}
+                              data-review={reviewTarget?.id === p.id}
+                            >
+                              <time dateTime={p.ts}>{stamp(p.ts)}</time>
                               <strong>
                                 {p.estimated && t("约 ", "about ")}
                                 {typeof p.value === "number" ? number(p.value) : p.value} {metric.unit}

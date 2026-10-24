@@ -2,6 +2,7 @@ export * from "./agents-md.js";
 export * from "./avatar.js";
 export { assetsRoot, schemasDir, templateDir } from "./assets.js";
 export * from "./chat-search.js";
+export * from "./note-search.js";
 export * from "./chats.js";
 export * from "./doctor.js";
 export * from "./doing-page.js";
@@ -32,6 +33,7 @@ export * from "./secrets.js";
 
 export * from "./drive.js";
 export * from "./overview.js";
+export * from "./user-profile.js";
 export * from "./inbox.js";
 
 export * from "./projects.js";
@@ -74,6 +76,7 @@ export * from "./locale.js";
 export { localStateRoot } from "./local-state.js";
 export * from "./plans.js";
 export * from "./handover.js";
+export * from "./reading-pack.js";
 
 export * from "./agent-file-policy.js";
 
@@ -110,5 +113,7 @@ export * from "./learning.js";
 export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
 
 export * from "./jobs.js";
+
 export * from "./media-library.js";
+export * from "./direction-map.js";
 export * from "./weather.js";

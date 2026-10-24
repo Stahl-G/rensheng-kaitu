@@ -1,0 +1,180 @@
+/* 方向页「我在推进什么」：三栏 + 虚线；颜色只用设计稿 C 的变量。 */
+.map {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin-bottom: 24px;
+  container-type: inline-size;
+}
+.lens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--control);
+  color: var(--ink2);
+  font-size: 14px;
+}
+.lens b {
+  color: var(--ink);
+}
+.primary {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary:disabled {
+  opacity: 0.6;
+}
+.intro {
+  margin: 0;
+  color: var(--ink2);
+}
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 14px;
+}
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 64px;
+}
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.col {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+.col h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.goal,
+.card {
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.goal {
+  border-left: 4px solid var(--tone);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 10%, var(--surface)), var(--surface) 75%);
+}
+.goal strong,
+.card strong {
+  font-size: 16px;
+}
+.goal p,
+.card p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.why {
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  color: var(--ink2);
+  font-size: 13px !important;
+}
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.suggested {
+  border-style: dashed;
+  background: transparent;
+}
+.quiet {
+  margin: 0;
+  color: var(--muted);
+}
+.mentor {
+  padding: 18px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.mentor h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+.mentor p {
+  margin: 6px 0;
+}
+.map :focus-visible {
+  outline: 3px solid var(--link-line);
+  outline-offset: 3px;
+}
+@container (max-width: 759px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .lines {
+    display: none;
+  }
+  .primary {
+    margin-left: 0;
+  }
+}
+.stale {
+  display: block;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  color: var(--ink2);
+  font-size: 14px;
+}
+.direction {
+  padding: 12px 16px;
+  background: var(--sunken);
+}
+.direction strong {
+  font-size: 15px;
+}

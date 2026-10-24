@@ -180,7 +180,9 @@ it("手机 records 不能伪装采纳；create_task 直接可用，adopt_task �
       await processInbox(ws, { stableMs: 0 });
     };
     const before = buildPhoneToday(await readOverviewPage(ws), now, ws);
-    expect(before.mobile.tasks).toEqual([]);
+    expect(before.mobile.tasks).toEqual([
+      expect.objectContaining({ id: proposed.id, rev: 1, status: "proposed" }),
+    ]);
     expect(schemas().builtin("phone-today.schema.json")(before)).toBe(true);
     await submit([create, adopt]);
     const rows = readRecords(ws, "task");

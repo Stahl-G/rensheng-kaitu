@@ -21,18 +21,36 @@ import {
   webRuntimePatch,
 } from "./sdk-search-settings.mjs";
 
-export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection = "local-ask" }) {
-  const web = [
-    ...webRuntimePatch(hostPlugin),
-    {
-      insert: [
-        { id: "kaitu-session-reference", name: "@deepseek-ai/dsh-session-reference" },
-        { id: "kaitu-file-reference", name: "@deepseek-ai/dsh-file-reference-local" },
-      ],
-    },
-  ];
-  if (mode === "full")
+export function sdkRuntimePatch({
+  workspace,
+  plugin,
+  hostPlugin,
+  mode,
+  connection = "local-ask",
+  textOnly = false,
+}) {
+  // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
+  const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
+    (id) => ({ id, disabled: true }),
+  );
+  // 只收发文字：不开网页和技能工具；万一还有工具被调用，宿主插件在执行前拒绝（KAITU_AGENT_TOOLS=none）。
+  const web = textOnly
+    ? [
+        { id: "tool-web", disabled: true },
+        { id: "tool-skill", disabled: true },
+      ]
+    : [
+        ...webRuntimePatch(hostPlugin),
+        {
+          insert: [
+            { id: "kaitu-session-reference", name: "@deepseek-ai/dsh-session-reference" },
+            { id: "kaitu-file-reference", name: "@deepseek-ai/dsh-file-reference-local" },
+          ],
+        },
+      ];
+  if (mode === "full" && !textOnly)
     return [
+      ...privacy,
       ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
       { id: "sandbox-policy", config: { mode: "danger-full-access", workspaceRoot: workspace } },
@@ -45,6 +63,7 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connectio
       },
     ];
   return [
+    ...privacy,
     ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
     { id: "sandbox", disabled: true },
@@ -77,10 +96,17 @@ export function sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connectio
       id: "agent-instructions",
       config: { maxBytes: 65536, projectRootMarkers: ["AGENTS.md"] },
     },
+    // 只收发文字时不读工作区的 AGENTS.md 和技能，模型只看到这次给的材料。
+    ...(textOnly
+      ? [
+          { id: "skill-filesystem", disabled: true },
+          { id: "agent-instructions", disabled: true },
+        ]
+      : []),
     { id: "sandbox-policy", config: { mode: "workspace-write", workspaceRoot: workspace } },
     { id: "approval", config: { policy: "never" } },
     { id: "permission", disabled: true },
-    { id: "tool-skill", disabled: false },
+    { id: "tool-skill", disabled: textOnly },
     {
       insert: [
         { id: "kaitu-sdk-host", name: hostPlugin },
@@ -121,22 +147,32 @@ export function createSdkRuntime({
       : { choice: undefined, provider: "deepseek-official", model: "" };
   let directory;
   const loadDirectory = async () => {
-    directory ??= credential("catalog").then((entries) => {
-      extendProviders(entries);
-      return entries;
-    });
+    directory ??= credential("catalog")
+      .then((entries) => {
+        extendProviders(entries);
+        return entries;
+      })
+      .catch((error) => {
+        directory = undefined;
+        throw error;
+      });
     return directory;
   };
   const loadSettings = async () => {
     await loadDirectory();
     const stored = readSettings();
-    if (stored.provider && !providers.some((item) => item.id === stored.provider))
-      await savedProviders().catch(() => []);
+    if (stored.provider && !providers.some((item) => item.id === stored.provider)) await savedProviders();
     return { choice: stored.choice, ...selection(stored) };
   };
   const credential = (operation, input) =>
     new Promise((resolve, reject) => {
       const child = spawn(executable, [helper, operation], { env, stdio: ["pipe", "pipe", "ignore"] });
+      const timer = setTimeout(() => {
+        child.kill("SIGTERM");
+        reject(new KaituError("AI 凭据读取超时，请重试", "AI_CREDENTIALS"));
+      }, 20000);
+      child.once("error", () => clearTimeout(timer));
+      child.once("exit", () => clearTimeout(timer));
       let output = "";
       child.stdout.on("data", (chunk) => {
         output += chunk;
@@ -197,18 +233,39 @@ export function createSdkRuntime({
   };
   const saveProvider = (settings) => api.support("saveProvider", { patch: providerPatch(settings) });
   let capabilityRuntime;
+  let capabilityAbort;
+  let connectionStatus;
   const api = {
     async support(method, input = {}) {
-      capabilityRuntime ??= api.runtime("scoped", true).catch((error) => {
-        capabilityRuntime = undefined;
-        throw error;
-      });
-      return (await capabilityRuntime).request(`kaitu/${method}`, input);
+      if (!capabilityRuntime) {
+        const controller = new AbortController();
+        capabilityAbort = controller;
+        capabilityRuntime = api
+          .runtime("scoped", true, "local-ask", false, controller.signal)
+          .catch((error) => {
+            if (capabilityAbort === controller) {
+              capabilityAbort = undefined;
+              capabilityRuntime = undefined;
+            }
+            throw error;
+          });
+      }
+      const result = await (await capabilityRuntime).request(`kaitu/${method}`, input);
+      if (method === "saveProvider" || (method === "authPoll" && result.status !== "running"))
+        connectionStatus = undefined;
+      return result;
     },
     async closeSupport() {
       const running = capabilityRuntime;
+      capabilityAbort?.abort();
+      capabilityAbort = undefined;
       capabilityRuntime = undefined;
-      if (running) await (await running).close();
+      connectionStatus = undefined;
+      if (running)
+        await running.then(
+          (runtime) => runtime.close(),
+          () => {},
+        );
     },
     async models(input) {
       const previous = await loadSettings();
@@ -230,24 +287,45 @@ export function createSdkRuntime({
       if (result.code) throw new KaituError(result.message, result.code);
       return result.models;
     },
-    async settings() {
-      const settings = await loadSettings();
-      const info = await credential("status", {
-        ref: credentialRef(settings.provider),
-        search: true,
-        settings,
+    async settings(resolveImages = false) {
+      // 连接判定不启动 SDK，也不读取模型目录；真实发送仍在 runtime 里验证。
+      connectionStatus ??= (async () => {
+        const settings = readSettings();
+        const info =
+          settings.choice === "builtin"
+            ? await credential("status", { ref: credentialRef(settings.provider), settings })
+            : { configured: false };
+        return {
+          ...connectionInfo({
+            ...settings,
+            configured: settings.choice === "builtin" && info.configured,
+          }),
+          supportsImages: settings.supportsImages,
+          providerName: providers.find((entry) => entry.id === settings.provider)?.name ?? settings.provider,
+        };
+      })().catch((error) => {
+        connectionStatus = undefined;
+        throw error;
       });
-      return {
-        ...connectionInfo({
-          ...settings,
-          supportsImages: settings.supportsImages ?? info.supportsImages,
-          configured: settings.choice === "builtin" && info.configured,
-        }),
-        saved: await savedProviders().catch(() => []),
-        search: searchSettings(info.search, preferredSearch(), nativeSearchInfo(settings, info.configured)),
-      };
+      const current = await connectionStatus;
+      if (resolveImages && current.configured && current.supportsImages === undefined) {
+        const info = await credential("model-status", { settings: readSettings() });
+        current.supportsImages = info.supportsImages ?? false;
+      }
+      return current;
+    },
+    async catalogSettings(includeSaved = false) {
+      // 仅 AI 设置和模型选择器显式读取完整目录；失败不能假装没有已保存服务商。
+      await loadDirectory();
+      const settings = await api.settings();
+      const saved =
+        includeSaved || !providers.some((entry) => entry.id === settings.provider)
+          ? await savedProviders()
+          : undefined;
+      return { ...settings, providers, ...(saved ? { saved } : {}), search: await describeSearch() };
     },
     async configure(input) {
+      connectionStatus = undefined;
       await loadDirectory();
       if (input.search !== undefined) return configureSearch(input.search);
       if (input.choice !== "builtin" && input.choice !== "external")
@@ -281,7 +359,7 @@ export function createSdkRuntime({
         // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
         const known =
           !input.apiKey &&
-          (await savedProviders().catch(() => [])).some(
+          (await savedProviders()).some(
             (row) => row.provider === settings.provider && row.models.includes(settings.model),
           );
         const result =
@@ -297,31 +375,33 @@ export function createSdkRuntime({
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
       return api.settings();
     },
-    async runtime(mode = "scoped", capabilities = false, connection = "local-ask") {
+    async runtime(
+      mode = "scoped",
+      capabilities = false,
+      connection = "local-ask",
+      textOnly = false,
+      signal = undefined,
+    ) {
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
       if (!capabilities) {
-        const info = await credential("status", { ref: credentialRef(settings.provider), settings });
+        const info = await credential("model-status", { ref: credentialRef(settings.provider), settings });
         settings.supportsImages ??= info.supportsImages;
         if (settings.choice !== "builtin" || !info.configured)
           throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
-        // 旧版只存在 kaitu-ai.json 里的服务商，第一次用时搬进 DSH 的 profile。
-        if (
-          !(await savedProviders()).some(
-            (row) => row.provider === settings.provider && row.models.includes(settings.model),
-          )
-        )
-          await saveProvider(settings);
       }
       const profile = join(
         home,
-        `kaitu-sdk-${capabilities ? "capabilities" : `${mode}-${connection}`}.patch.json`,
+        `kaitu-sdk-${capabilities ? "capabilities" : `${mode}-${connection}${textOnly ? "-text" : ""}`}.patch.json`,
       );
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(
         profile,
-        JSON.stringify(sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection })),
+        JSON.stringify([
+          ...(capabilities ? [] : providerPatch(settings)),
+          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly }),
+        ]),
         {
           mode: 0o600,
         },
@@ -330,13 +410,15 @@ export function createSdkRuntime({
         pathToFileURL(createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-sdk-protocol"))
           .href
       );
+      signal?.throwIfAborted();
       const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
         cwd: workspace,
         env: {
           ...env,
-          DSH_PERMISSION_MODE: mode === "full" ? "danger-full-access" : "workspace-write",
-          KAITU_AGENT_MODE: mode,
+          DSH_PERMISSION_MODE: mode === "full" && !textOnly ? "danger-full-access" : "workspace-write",
+          KAITU_AGENT_MODE: textOnly ? "scoped" : mode,
           KAITU_AGENT_CONNECTION: connection,
+          KAITU_AGENT_TOOLS: textOnly ? "none" : "",
           KAITU_DIR: workspace,
         },
         detached: process.platform !== "win32",
@@ -406,7 +488,7 @@ export function createSdkRuntime({
         await rpc.request(
           "initialize",
           { cwd: workspace, provider: settings.provider, model: settings.model, capabilities },
-          AbortSignal.timeout(20000),
+          signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
         );
       } catch {
         await close();

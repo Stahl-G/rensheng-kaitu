@@ -20,6 +20,7 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { productCopyright, withProductCopyright } from "./brand.mjs";
 import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
 import { createDmg } from "./package-dmg.mjs";
 import { writePayload as buildPayload } from "./package-payload.mjs";
@@ -157,7 +158,7 @@ for (const path of asar.listPackage(archive)) {
 // 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 0.2.1-rc.2。
 // 开图版本只用于 Info.plist 和关于面板。
 const about = "applicationVersion: app.getVersion()";
-let brandedMain = changes.get("lib/main.js").toString();
+let brandedMain = withProductCopyright(changes.get("lib/main.js").toString());
 const hostReady = "hostUrl = ready.url;";
 if (brandedMain.split(hostReady).length !== 2) throw new Error("宿主就绪结构已变化，请核对固定 DSH 构建");
 brandedMain = brandedMain.replace(hostReady, `${hostReady}\napp.emit("kaitu:host-ready", ready.url);`);
@@ -244,6 +245,7 @@ async function packageApplication() {
     set("CFBundleVersion", bundleBuild);
     set("CFBundleExecutable", "Kaitu");
     set("CFBundleIconFile", "Kaitu.icns");
+    set("NSHumanReadableCopyright", productCopyright);
     set("NSAppleEventsUsageDescription", "开图将你确认的时间段加入日历，并同步改期和取消。");
     set("NSMicrophoneUsageDescription", "人生开图使用麦克风将语音转为消息草稿。");
     // 取消 dsh:// 协议声明，避免抢占原 DSH 应用的链接。

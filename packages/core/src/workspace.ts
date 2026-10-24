@@ -16,18 +16,22 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
 import { invalidateHistoryFile, maintainHistoryIgnore } from "./history.js";
+import { invalidateNoteIndex } from "./note-search.js";
 import { holdOverview, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
   conflictOriginal,
   isEvictedICloudFile,
+  isUserProfile,
   placeholderOriginal as placeholderName,
   syncInventory,
 } from "./sync-files.js";
 import { isICloudPath } from "./sync-location.js";
 import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
+
+export type WorkspaceWrite = <T>(operation: () => Promise<T>) => Promise<T>;
 
 export const STATE_DIR = ".kaitu";
 
@@ -234,7 +238,7 @@ export class Workspace {
   }
 
   pendingDownloads(): string[] {
-    return [...this.unread].filter((file) => this.isUnavailable(file));
+    return [...this.unread].filter((file) => !isUserProfile(file) && this.isUnavailable(file));
   }
 
   unavailableFiles(prefix = ""): string[] {
@@ -279,6 +283,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
@@ -291,6 +296,7 @@ export class Workspace {
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
