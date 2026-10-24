@@ -1,6 +1,6 @@
 import { readdirSync, rmSync } from "node:fs";
 import { KaituError } from "./errors.js";
-import { snapshot } from "./history.js";
+import { invalidateHistoryFile, snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
 import {
   type StoredRecord,
@@ -64,6 +64,7 @@ export async function recoverRecordTransaction(ws: Workspace, id: string) {
     appendPreparedRecords(ws, missing);
     const version = await snapshot(ws, plan.message);
     rmSync(ws.resolve(path, { internal: true }));
+    invalidateHistoryFile(ws, path);
     return { id, version };
   });
 }

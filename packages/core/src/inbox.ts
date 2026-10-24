@@ -20,7 +20,7 @@ import { proposeBlock, writeDigest } from "./agent-tools.js";
 import { KaituError } from "./errors.js";
 import { hasFrontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { parseHealthInWorker } from "./health-import.js";
-import { batchSnapshot } from "./history.js";
+import { batchSnapshot, invalidateHistoryFile } from "./history.js";
 import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
@@ -363,6 +363,8 @@ function saveNote(ws: Workspace, file: string, errors: string[] = [], agent?: st
         const target = `inbox/notes/${date}/${basename(file)}`;
         mkdirSync(dirname(ws.resolve(target)), { recursive: true });
         renameSync(ws.resolve(file), ws.resolve(target));
+        invalidateHistoryFile(ws, file);
+        invalidateHistoryFile(ws, target);
         return target;
       }
     }
