@@ -7,7 +7,7 @@ on:
         description: Approved source commit (full SHA)
         required: true
         type: string
-        default: "33564781cfc00feb0602fb77ad5bee79ccea5027"
+        default: "290a6289146d718892ac91baa3b822bb80de8dbc"
       dsh_run_id:
         description: Existing input artifact's workflow run in this repository
         required: true
