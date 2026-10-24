@@ -47,7 +47,7 @@ const updateConfig = readUpdateConfig({
     values["update-public-key"] ??
     (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
 });
-const dshVersion = "0.2.1-rc.2";
+const dshVersion = "0.2.1-rc.3";
 if (manifest.version !== dshVersion || manifest.main !== "lib/main.js")
   throw new Error(`输入必须是 DSH ${dshVersion} 官方 Windows 桌面包`);
 const appDir = join(output, "win-unpacked");
