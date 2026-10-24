@@ -33,7 +33,7 @@ Get-AuthenticodeSignature .kaitu/dsh-windows.exe
 node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windows
 ```
 
-输出：`dist/windows/Kaitu-Setup-0.1.0-rc.4-x64.exe` 和 `dist/windows/win-unpacked/Kaitu.exe`。输出目录不得已存在。加 `--dir` 只生成应用目录；`--tools` 可指定构建工具目录。
+输出：`dist/windows/Kaitu-Setup-<version>-x64.exe` 和 `dist/windows/win-unpacked/Kaitu.exe`，版本取自 `packages/cli/package.json`。输出目录不得已存在。加 `--dir` 只生成应用目录；`--tools` 可指定构建工具目录。
 
 同一功能版本重发安装器时，可加 `--revision 2`，文件名变为 `Kaitu-Setup-0.1.0-rc.4-windows.2-x64.exe`，功能包与 npm 版本不变。官网从同一 Release 中选择最新上传的 Windows 安装包。
 
@@ -42,6 +42,22 @@ node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windo
 这次没有改变 npm 发布方式，也没有单独的 Windows 后端包。普通功能改动继续在同一仓库维护；宿主升级才需要分别适配桌面壳。
 
 从 0.1.1 起，正式版打包默认嵌入仓库中的公开验签公钥，可加 `--update-public-key <Ed25519公钥文件>` 指定公钥，使用与 Mac 相同的签名功能包更新频道；测试源可用 `--update-config <配置文件>`。检查、下载、重启与完整安装包兜底见 [desktop.md](desktop.md#开图功能包独立更新)。旧 RC 安装包需先覆盖安装一次新版，无须先卸载。
+
+## Actions 候选构建
+
+`.github/workflows/windows-candidate.yml` 仅由 `workflow_dispatch` 手动触发。GitHub 要求该 workflow 先存在于默认分支；只开草稿 PR 不会运行它，也不会生成安装器。
+
+它复用本仓库已有 Actions 输入 artifact，不下载上游安装器。输入 artifact 必须来自已获授权、已合法取得的原始 DSH 包，根目录包含 `deepseek-harness-0.2.1-rc.2-win-x64.exe`。执行者提供：
+
+- `source_commit`：经批准的源码完整提交 SHA。
+- `dsh_run_id`、`dsh_artifact_id`：本仓库保存该输入的 run ID 与 artifact ID。
+- `dsh_sha256`：从可信原始输入独立核对的 EXE SHA-256，不是 artifact ZIP 的哈希。
+
+workflow 先检查哈希和原始 EXE 的 Authenticode `Valid` 状态，再解压、调用现有打包器；缺文件、哈希不符、签名无效或构建失败即停止。它不运行上游安装器，不创建凭据，不签名 Kaitu，不发布 Release。
+
+`GITHUB_TOKEN` 仅有 `contents: read` 与读取已有 artifacts 所需的 `actions: read`；checkout 不保留凭据。产物通过 Actions 自带 artifact 机制上传，保留 7 天，名称含源码 SHA、run ID 与 attempt；包含 NSIS EXE、现有 `build.json`、输入与源码来源记录 `build-info.txt` 和 `SHA256SUMS`。没有输入 artifact 时，应交由已授权 Windows 使用上面的本机构建命令，不能改下载路径或放宽校验继续。
+
+构建成功只表示候选生成；首次启动、记录回读、插件嵌入/重复打开/宿主重启、退出后进程结束与安装升级仍需原生验收。
 
 ## 隔离调试
 
