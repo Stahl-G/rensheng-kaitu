@@ -3,23 +3,23 @@ import type { InboxEntry, LibraryData, OverviewData, OverviewNext } from "../typ
 
 // This is disposable browser demo state, never a Kaitu workspace or a new record format.
 const key = "kaitu:testsite:v1";
-const taskTitle = "给业余项目约一次 20 分钟的用户访谈";
+export const taskTitle = "给业余项目约一次 20 分钟的用户访谈";
 const goalTitle = "做出一个有人愿意用的业余项目";
 export const sampleNote = "示例：今晚走了三公里，明天想试试早点出门。";
 export const documents = [
   {
     file: "learning/interview/STATUS.md",
-    title: "第一次用户访谈（合成示例）",
+    title: "第一次用户访谈",
     kind: "笔记" as const,
     status: "先问对方最近一次怎么解决问题",
-    body: "# 第一次用户访谈\n\n这是小林的合成示例笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
+    body: "# 第一次用户访谈\n\n这是小林的笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
   },
   {
     file: "decisions/hangzhou/STATUS.md",
-    title: "要不要搬去杭州（合成示例）",
+    title: "要不要搬去杭州",
     kind: "决定" as const,
     status: "先短住，再决定",
-    body: "# 要不要搬去杭州\n\n小林的合成示例决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
+    body: "# 要不要搬去杭州\n\n小林的决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
   },
 ];
 type State = {
@@ -34,7 +34,7 @@ function seed(): State {
     notes: [
       {
         file: "inbox/notes/sample.md",
-        text: "合成示例 · 小林：想重新开始训练，也想每周给业余项目留一点时间。",
+        text: "小林：想重新开始训练，也想每周给业余项目留一点时间。",
         source: "me",
         originalSource: null,
         date: "2026-10-23T09:00:00Z",
@@ -100,6 +100,18 @@ export function reset() {
   state = seed();
   for (const listener of listeners) listener();
 }
+export function clear() {
+  // Keep the existing v1 shape, and never touch unrelated origin storage.
+  const next: State = { version: 1, notes: [], task: "skipped", result: "" };
+  try {
+    sessionStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    throw new Error("浏览器未能清除示例。 / Browser could not clear the demo.");
+  }
+  storageError = "";
+  state = next;
+  for (const listener of listeners) listener();
+}
 export async function capture(text: string) {
   const trimmed = text.trim();
   if (!trimmed || text.length > 4000)
@@ -128,7 +140,7 @@ export function dismiss() {
 export function complete(result: string) {
   if (state.task !== "open" || !result.trim())
     throw new Error("先采纳下一步，并记一句示例结果。 / Adopt the step and add a sample result first.");
-  commit({ ...state, task: "done", result: result.trim() });
+  commit({ ...state, task: "done", result });
 }
 export function overview(): OverviewData {
   const next: OverviewNext[] =
@@ -201,7 +213,7 @@ export async function library(query: LibraryQuery = {}): Promise<LibraryData> {
         id: "notes",
         title: "笔记与决策",
         count: documents.length,
-        sources: ["合成示例 / Synthetic samples"],
+        sources: ["示例 / Samples"],
         latest: null,
       },
       { id: "inbox", title: "收件箱", count: state.notes.length, sources: ["随手记"], latest: null },
