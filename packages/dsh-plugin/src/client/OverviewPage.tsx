@@ -27,6 +27,7 @@ import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
+import { Plugins } from "./Plugins.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
@@ -1504,6 +1505,9 @@ function Overview({
                 (explorePages[selectedExplore.id] ?? null)
               ) : (
                 <output>{t("正在读取模块…", "Loading modules…")}</output>
+              )}
+              {explore === "modules" && props.plugins && (
+                <Plugins request={props.plugins} openLabel={props.pluginOpenLabel} />
               )}
               {exploreError && (
                 <p role="alert">
