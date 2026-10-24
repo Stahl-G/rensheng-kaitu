@@ -591,18 +591,26 @@
   font-size: clamp(19px, 2.5vw, 25px);
   line-height: 1.9;
 }
-.mirror details {
-  font-family: var(--font);
-  font-size: 13px;
+.factLink {
+  display: inline;
+  border: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--link-line);
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
 }
-.mirror summary {
-  cursor: pointer;
-  color: var(--link);
+.restChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
 }
-.mirror details button {
-  display: block;
-  text-align: start;
-  margin: 8px 0;
+.restChoices output {
+  flex-basis: 100%;
+  color: var(--ink2);
 }
 .pick {
   border-top: 1px solid var(--line);
@@ -700,8 +708,12 @@
   padding: 20px 0;
   border-block: 1px solid var(--line);
 }
-.sourceRecord pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 13px;
+.sourceRecord details {
+  margin-block: 16px;
+}
+.sourceRecord summary {
+  cursor: pointer;
+}
+.sourceRecord li {
+  margin-block: 6px;
 }

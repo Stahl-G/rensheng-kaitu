@@ -45,3 +45,65 @@ export function nextPresentation(
     .trim();
   return { title, source };
 }
+
+/** Display choices keep the original next step and never invent a duration. */
+export function todayChoices(data: import("../types.js").OverviewData, energy: number) {
+  if (energy === 5) return [];
+  return data.allNext
+    .flatMap((item) => {
+      if (item.proposed) return [];
+      const goal =
+        data.plans.goals.find((goal) => goal.next?.id === item.id)?.title ??
+        Object.values(data.plans.sources).find((entry) => entry.taskId === item.id)?.goalTitle;
+      if (!goal) return [];
+      const match = /(\d+)\s*(分钟|小时|minutes?|mins?|hours?|hrs?)/i.exec(item.title);
+      const minutes = match ? Number(match[1]) * (/小时|hours?|hrs?/i.test(match[2] ?? "") ? 60 : 1) : null;
+      return [{ item, goal, minutes, opening: energy === 10 && (minutes === null || minutes > 10) }];
+    })
+    .slice(0, 3);
+}
+
+/** Use the workspace's already-resolved local day, including near UTC midnight. */
+export function todayDate(day: string, locale: Locale, short = false) {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    month: short ? "numeric" : "long",
+    day: "numeric",
+    ...(short ? {} : { weekday: "long" as const }),
+  }).format(new Date(`${day}T12:00:00Z`));
+}
+
+export function todaySourceGroups(
+  metric: import("../types.js").OverviewMetric,
+  timeZone: string,
+  locale: Locale,
+) {
+  const groups = new Map<string, { day: string; label: string; rows: Record<string, unknown>[] }>();
+  const dayFormat = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  try {
+    for (const entry of metric.sources) {
+      const row = JSON.parse(entry.text) as Record<string, unknown>;
+      const at = new Date(String(metric.key === "sleep" ? row.end : row.ts));
+      if (!Number.isFinite(at.getTime()) || typeof row.id !== "string") return [];
+      const parts = Object.fromEntries(dayFormat.formatToParts(at).map((part) => [part.type, part.value]));
+      const day = `${parts.year}-${parts.month}-${parts.day}`;
+      const key = metric.key === "workouts" ? `${day}:${row.session_id ?? row.id}` : day;
+      const group = groups.get(key) ?? { day, label: todayDate(day, locale, true), rows: [] };
+      group.rows.push(row);
+      groups.set(key, group);
+    }
+  } catch {
+    return [];
+  }
+  const result = [...groups.values()];
+  if (metric.key === "workouts" && result.length !== metric.value) return [];
+  return result.map((group) => ({
+    ...group,
+    label: `${group.label} · ${metric.key === "workouts" ? [...new Set(group.rows.map((row) => String(row.exercise ?? "")))].filter(Boolean).join("、") : metric.key === "sleep" ? (locale === "en" ? "Sleep" : "睡眠") : metric.key === "protein" ? (locale === "en" ? "Meals" : "饮食") : locale === "en" ? "Weight" : "体重"}`,
+  }));
+}

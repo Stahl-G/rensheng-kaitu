@@ -1056,6 +1056,7 @@ function Overview({
               capture={capture}
               start={() => setCaptureOpen(true)}
               library={() => openRecord(data.notes.length ? "inbox" : "")}
+              addNext={() => (data.plans.goals.length ? openRecord("projects") : startMatter(""))}
               busy={busy}
               loadLibrary={props.loadLibrary}
               save={async (text) => {

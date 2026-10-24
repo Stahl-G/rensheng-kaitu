@@ -1,10 +1,17 @@
 import type { ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { InboxEntry, LibraryData, OverviewData, OverviewNext, OverviewSource } from "../types.js";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type {
+  InboxEntry,
+  LibraryData,
+  OverviewData,
+  OverviewMetric,
+  OverviewNext,
+  OverviewSource,
+} from "../types.js";
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
-import { nextPresentation } from "./next-presentation.js";
+import { nextPresentation, todayChoices, todayDate, todaySourceGroups } from "./next-presentation.js";
 
 export function LifeHome({
   data,
@@ -13,6 +20,7 @@ export function LifeHome({
   writing,
   start,
   library,
+  addNext,
   handover,
   memory,
   busy,
@@ -29,6 +37,7 @@ export function LifeHome({
   writing: boolean;
   start: () => void;
   library: () => void;
+  addNext: () => void;
   handover: () => void;
   memory: () => void;
   busy: boolean;
@@ -44,7 +53,7 @@ export function LifeHome({
   const [energy, setEnergy] = useState(60);
   const sourceRegion = useRef<HTMLElement>(null);
   const sourceTrigger = useRef<HTMLButtonElement | null>(null);
-  const [factSource, setFactSource] = useState<OverviewSource | null>(null);
+  const [factSource, setFactSource] = useState<OverviewMetric | null>(null);
   useEffect(() => {
     if (factSource) sourceRegion.current?.focus();
   }, [factSource]);
@@ -52,8 +61,9 @@ export function LifeHome({
     setFactSource(null);
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
-  const [resting, setResting] = useState(false);
+  const [resting, setResting] = useState<string | null>(null);
   const [picked, setPicked] = useState<OverviewNext | null>(null);
+  const [pickedOpening, setPickedOpening] = useState(false);
   const [answer, setAnswer] = useState("");
   const [result, setResult] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -101,22 +111,36 @@ export function LifeHome({
   const question = saved
     ? noteBody(saved.text).split("\n")[1] || questionRef.current.text
     : questionRef.current.text;
-  // Duration comes only from an explicit estimate in the existing next step.
-  const duration = (item: OverviewNext) => {
-    const match =
-      /(?:约|大约|预计|about|estimate[ds]?)?\s*(\d+)\s*(分钟|小时|minutes?|mins?|hours?|hrs?)\b/i.exec(
-        item.title,
-      ) ?? /(\d+)\s*(分钟|小时)/.exec(item.title);
-    return match ? Number(match[1]) * (/小时|hour|hr/.test(match[2] ?? "") ? 60 : 1) : null;
+  const choices = useMemo(() => todayChoices(data, energy), [data, energy]);
+  const facts = useMemo(
+    () =>
+      data.metrics
+        .filter(
+          (metric) =>
+            metric.value !== null &&
+            metric.from &&
+            metric.to &&
+            ["workouts", "sleep", "protein", "weight"].includes(metric.key) &&
+            todaySourceGroups(metric, data.timeZone, locale).length,
+        )
+        .slice(0, 3),
+    [data.metrics, data.timeZone, locale],
+  );
+  const sourceGroups = useMemo(
+    () => (factSource ? todaySourceGroups(factSource, data.timeZone, locale) : []),
+    [factSource, data.timeZone, locale],
+  );
+  const paragraphs = new Map<string, OverviewMetric[]>();
+  for (const metric of facts) {
+    const key = `${metric.from}:${metric.to}`;
+    paragraphs.set(key, [...(paragraphs.get(key) ?? []), metric]);
+  }
+  const openFact = (event: import("react").MouseEvent<HTMLButtonElement>, metric: OverviewMetric) => {
+    sourceTrigger.current = event.currentTarget;
+    setFactSource(metric);
   };
-  const choices = data.allNext
-    .filter((item) => !item.proposed)
-    .filter((item) => (duration(item) ?? Number.POSITIVE_INFINITY) <= energy)
-    .slice(0, 3);
-  const recent = data.notes[0];
-  const facts = data.metrics
-    .filter((metric) => metric.value !== null && metric.from && metric.to && metric.sources.length)
-    .slice(0, 3);
+  const valueText = (metric: OverviewMetric) =>
+    `${metric.estimated ? t("约 ", "about ") : ""}${Number(metric.value?.toFixed(1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   const store = async (text: string, done: () => void | Promise<void>) => {
     if (savingRef.current || busy) return;
     savingRef.current = true;
@@ -135,49 +159,59 @@ export function LifeHome({
   return (
     <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
       <header>
-        <p className={css.eyebrow}>{data.today}</p>
-        <h1>
-          {firstVisit
-            ? t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")
-            : t("最近的你", "You, lately")}
-        </h1>
+        <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+        {firstVisit && (
+          <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
+        )}
       </header>
-      {!firstVisit && (
+      {!firstVisit && facts.length > 0 && (
         <div className={todayCss.mirror}>
-          {facts.map((metric) => (
-            <p key={metric.key}>
-              {metric.from} — {metric.to}，{metric.label} {metric.estimated ? t("约", "about ") : ""}
-              {Number(metric.value?.toFixed(1))} {metric.unit}。
-              <details>
-                <summary>{t("查看来源", "View sources")}</summary>
-                {metric.sources.map((entry, i) => (
-                  <button
-                    key={`${entry.file}:${i}`}
-                    type="button"
-                    className={css.link}
-                    onClick={(event) => {
-                      sourceTrigger.current = event.currentTarget;
-                      setFactSource(entry);
-                    }}
-                  >
-                    {t(`记录 ${i + 1}`, `Record ${i + 1}`)}
-                  </button>
+          {[...paragraphs.values()].map((metrics) => {
+            const first = metrics[0];
+            const recentWeek =
+              first?.to === data.today &&
+              Date.parse(`${first.to}T12:00:00Z`) - Date.parse(`${first.from}T12:00:00Z`) === 6 * 86400000;
+            return (
+              <p key={`${first?.from}:${first?.to}`}>
+                {recentWeek
+                  ? t("近七天，", "In the past seven days, ")
+                  : first?.from === first?.to && first?.from
+                    ? `${todayDate(first.from, locale, true)}，`
+                    : t("最近，", "Recently, ")}
+                {metrics.map((metric, i) => (
+                  <span key={metric.key}>
+                    {i > 0 ? t("，", ", ") : ""}
+                    {metric.key === "workouts"
+                      ? t("训练了", "you logged ")
+                      : metric.key === "sleep"
+                        ? recentWeek && metric.days === 7
+                          ? t("平均每天睡了", "you slept an average of ")
+                          : t("有睡眠记录的日子平均睡了", "on days with sleep records you averaged ")
+                        : metric.key === "protein"
+                          ? recentWeek && metric.days === 7
+                            ? t("蛋白质日均", "daily protein averaged ")
+                            : t(
+                                "有饮食记录的日子蛋白质日均",
+                                "on days with meal records daily protein averaged ",
+                              )
+                          : t("记录的体重为", "your recorded weight was ")}
+                    <button
+                      type="button"
+                      className={todayCss.factLink}
+                      aria-label={t(
+                        `${metric.label} ${valueText(metric)}，查看来源`,
+                        `${metric.label} ${valueText(metric)}, view sources`,
+                      )}
+                      onClick={(event) => openFact(event, metric)}
+                    >
+                      {valueText(metric)}
+                    </button>
+                  </span>
                 ))}
-              </details>
-            </p>
-          ))}
-          {!facts.length && data.notes[0] && (
-            <p>
-              {t("最近记下：", "Recently kept: ")}
-              <button
-                type="button"
-                className={css.link}
-                onClick={() => source({ file: recent?.file ?? "", text: noteBody(recent?.text ?? "") })}
-              >
-                {noteBody(data.notes[0].text).slice(0, 180)}
-              </button>
-            </p>
-          )}
+                {t("。", ".")}
+              </p>
+            );
+          })}
         </div>
       )}
       {!!data.proposedTasks.length && (
@@ -210,7 +244,38 @@ export function LifeHome({
           }}
         >
           <h2>{t("来源记录", "Source record")}</h2>
-          <pre>{factSource.text}</pre>
+          <p>
+            {factSource.from} — {factSource.to}
+          </p>
+          {factSource.key === "workouts" && (
+            <p>
+              {t(
+                `${factSource.value} 次训练 · ${factSource.sources.length} 条动作记录`,
+                `${factSource.value} workouts · ${factSource.sources.length} exercise records`,
+              )}
+            </p>
+          )}
+          {sourceGroups.map((group) => (
+            <details key={group.label} open>
+              <summary>{group.label}</summary>
+              <ul>
+                {group.rows.map((row) => (
+                  <li key={String(row.id)}>
+                    {factSource.key === "workouts"
+                      ? `${String(row.exercise)}${typeof row.sets === "number" ? t(` · ${row.sets} 组`, ` · ${row.sets} sets`) : ""}${typeof row.reps === "number" ? t(` × ${row.reps} 次`, ` × ${row.reps} reps`) : ""}${typeof row.weight_kg === "number" ? t(` · ${row.weight_kg} 公斤`, ` · ${row.weight_kg} kg`) : ""}`
+                      : factSource.key === "sleep"
+                        ? t(
+                            `睡眠 ${Number((Number(row.duration_min) / 60).toFixed(1))} 小时`,
+                            `Sleep: ${Number((Number(row.duration_min) / 60).toFixed(1))} hours`,
+                          )
+                        : factSource.key === "protein"
+                          ? `${String(row.meal ?? "")} · ${Number(row.uncertainty) > 0 ? t("约 ", "about ") : ""}${String(row.protein_g)} ${t("克蛋白质", "g protein")}`
+                          : `${String(row.value)} ${String(row.unit)}`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
           <button type="button" className={css.link} onClick={closeSource}>
             {t("收起来源", "Close source")}
           </button>
@@ -234,69 +299,94 @@ export function LifeHome({
                     aria-pressed={energy === value}
                     onClick={() => {
                       setEnergy(Number(value));
-                      setResting(false);
+                      setResting(null);
                     }}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              {choices.map((item) => {
-                const goal =
-                  data.plans.goals.find((goal) => goal.next?.id === item.id)?.title ??
-                  Object.values(data.plans.sources).find((entry) => entry.taskId === item.id)?.goalTitle;
-                return (
-                  <div className={todayCss.choice} key={`${item.file}:${item.id}`}>
-                    <button type="button" className={css.link} onClick={() => setPicked(item)}>
-                      {nextPresentation(item, locale).title}
+              {energy === 5 ? (
+                <div className={todayCss.restChoices}>
+                  {[
+                    t("歇一会儿", "Take a breather"),
+                    t("看看窗外", "Look out the window"),
+                    t("什么都不做也行", "It's okay to do nothing"),
+                  ].map((option) => (
+                    <button
+                      type="button"
+                      className={css.link}
+                      key={option}
+                      aria-pressed={resting === option}
+                      onClick={() => setResting(resting === option ? null : option)}
+                    >
+                      {option}
                     </button>
-                    {goal && (
+                  ))}
+                  {resting && <output>{resting}</output>}
+                </div>
+              ) : (
+                <>
+                  {choices.map(({ item, goal, minutes, opening }) => (
+                    <div className={todayCss.choice} key={`${item.file}:${item.id}`}>
+                      <button
+                        type="button"
+                        className={css.link}
+                        onClick={() => {
+                          setPicked(item);
+                          setPickedOpening(opening);
+                        }}
+                      >
+                        {opening ? t("先开个头：", "Start with: ") : ""}
+                        {nextPresentation(item, locale).title}
+                      </button>
                       <small>
                         {t("为了：", "For: ")}
                         {goal}
                       </small>
-                    )}
-                    <small>{t(`约 ${duration(item)} 分钟`, `About ${duration(item)} minutes`)}</small>
-                  </div>
-                );
-              })}
-              {!choices.length && (
-                <p>{t("还没有写明时长的小事。", "No small steps with a time estimate yet.")}</p>
-              )}
-              {energy === 5 && (
-                <button
-                  type="button"
-                  className={css.link}
-                  aria-pressed={resting}
-                  onClick={() => setResting(!resting)}
-                >
-                  {resting
-                    ? t("那就歇一会儿。", "Take a breather.")
-                    : t("什么都不做也行。", "It's okay to do nothing.")}
-                </button>
+                      {minutes !== null && (
+                        <small>
+                          {opening
+                            ? t(`整件事约 ${minutes} 分钟`, `Whole step: about ${minutes} minutes`)
+                            : t(`约 ${minutes} 分钟`, `About ${minutes} minutes`)}
+                        </small>
+                      )}
+                    </div>
+                  ))}
+                  {!choices.length && (
+                    <button type="button" className={css.link} onClick={addNext}>
+                      {t("写下一个下一步", "Write down a next step")}
+                    </button>
+                  )}
+                </>
               )}
             </>
           ) : (
             <>
               <p className={todayCss.doing}>
-                {t("在做：", "Doing: ")}
+                {pickedOpening ? t("先开个头：", "Starting with: ") : t("在做：", "Doing: ")}
                 {nextPresentation(picked, locale).title}
               </p>
               {result === null ? (
                 <button type="button" className={css.link} onClick={() => setResult("")}>
-                  {t("做完了，记一句", "Done — keep a sentence")}
+                  {pickedOpening
+                    ? t("先停下，记一句", "Pause — keep a sentence")
+                    : t("做完了，记一句", "Done — keep a sentence")}
                 </button>
               ) : (
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (!result.trim()) return;
-                    void store(`${picked.title}\n${result.trim()}`, () => {
-                      return complete(picked).then(() => {
-                        setPicked(null);
-                        setResult(null);
-                      });
-                    });
+                    void store(
+                      `${pickedOpening ? t("先开个头：", "Started: ") : ""}${picked.title}\n${result.trim()}`,
+                      () => {
+                        return (pickedOpening ? Promise.resolve() : complete(picked)).then(() => {
+                          setPicked(null);
+                          setResult(null);
+                        });
+                      },
+                    );
                   }}
                 >
                   <textarea

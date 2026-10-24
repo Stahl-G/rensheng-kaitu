@@ -1,9 +1,14 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { initWorkspace, readOverviewPage, stringifyFrontmatter } from "@kaitu/core";
+import { addGoalNext, addRecord, initWorkspace, readOverviewPage, stringifyFrontmatter } from "@kaitu/core";
 import { expect, it } from "vitest";
-import { nextPresentation } from "../src/client/next-presentation.js";
+import {
+  nextPresentation,
+  todayChoices,
+  todayDate,
+  todaySourceGroups,
+} from "../src/client/next-presentation.js";
 
 const file = "inbox/notes/2026-01-02/grok-bot-20260102T0800.note.md";
 
@@ -65,6 +70,68 @@ it("keeps raw title and provenance available through the real overview without r
     expect(item).toMatchObject({ title: next.title, ref: file, source: "grok-bot", by: "agent" });
     expect(nextPresentation(item)).toEqual({ title: "浏览资讯（资料）", source: "Grokbot 提供" });
     expect(ws.readText("feed/STATUS.md")).toBe(before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("无时长且关联目标的已采纳下一步可选，十分钟只开头，累时不推工作", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-today-choices-"));
+  try {
+    const ws = await initWorkspace(root);
+    ws.writeJson("me/goals.json", [
+      { id: "g1", title: "摄影集" },
+      { id: "g2", title: "整理照片" },
+    ]);
+    await addGoalNext(ws, "g1", "挑出封面候选");
+    await addGoalNext(ws, "g2", "整理照片 45分钟");
+    addRecord(ws, "task", { title: "未采纳的工作", status: "proposed" });
+    const data = await readOverviewPage(ws);
+    const raw = JSON.stringify(data);
+    expect(todayChoices(data, 60).map(({ item }) => item.title)).toEqual(["挑出封面候选", "整理照片 45分钟"]);
+    expect(todayChoices(data, 10).map(({ minutes, opening }) => ({ minutes, opening }))).toEqual([
+      { minutes: null, opening: true },
+      { minutes: 45, opening: true },
+    ]);
+    expect(todayChoices(data, 5)).toEqual([]);
+    expect(JSON.stringify(data)).toBe(raw);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("训练按工作区当地日期和 session 分组，UTC 午夜两边的动作仍能对应真实训练次数", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-today-sources-"));
+  try {
+    const ws = await initWorkspace(root, { timeZone: "America/Los_Angeles" });
+    for (const [ts, exercise] of [
+      ["2026-10-24T23:00:00Z", "深蹲"],
+      ["2026-10-25T00:30:00Z", "硬拉"],
+      ["2026-10-25T08:30:00Z", "深蹲"],
+    ])
+      addRecord(ws, "workout", {
+        ts,
+        exercise,
+        sets: 3,
+        reps: 12,
+        weight_kg: 40,
+        session_id: "same-session",
+      });
+    const data = await readOverviewPage(ws, new Date("2026-10-25T09:00:00Z"));
+    const metric = data.metrics.find((entry) => entry.key === "workouts");
+    if (!metric) throw new Error("Missing workout metric");
+    const groups = todaySourceGroups(metric, data.timeZone, "zh-CN");
+    expect(groups.map(({ rows }) => rows.map((row) => row.exercise))).toEqual([["深蹲", "硬拉"], ["深蹲"]]);
+    expect(groups).toHaveLength(metric.value ?? 0);
+    const early = await readOverviewPage(ws, new Date("2026-10-25T01:00:00Z"));
+    expect(todayDate(early.today, "zh-CN")).toContain("10月24日星期六");
+    expect(
+      todaySourceGroups(
+        { ...metric, sources: [{ file: "hidden", text: "invalid" }] },
+        data.timeZone,
+        "zh-CN",
+      ),
+    ).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
