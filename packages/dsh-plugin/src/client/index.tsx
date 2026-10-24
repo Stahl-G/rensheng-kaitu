@@ -31,6 +31,7 @@ import { registerExplorePluginRoute } from "./ExplorePluginRoute.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
+import { createHostPluginRequest } from "./host-plugins.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
 
@@ -52,6 +53,7 @@ export async function apply(ctx: Context) {
       "slots",
       "remote.kaitu",
       "remote.kaituFinance",
+      "remote.pluginManager",
       "layout",
       "sessions",
       "conversation",
@@ -59,6 +61,24 @@ export async function apply(ctx: Context) {
       "uiWorkspace",
     ],
     apply(ctx: Context) {
+      const plugins = createHostPluginRequest({
+        listBundles: async () => {
+          const result = await ctx.remote.pluginManager.listBundles();
+          if (!result.ok) throw new Error(result.error.message);
+          return result.value;
+        },
+        installBundle: async (spec) => {
+          const result = await ctx.remote.pluginManager.installBundle(spec);
+          if (!result.ok) throw new Error(result.error.message);
+          return result.value;
+        },
+        removeBundle: async (name) => {
+          const result = await ctx.remote.pluginManager.removeBundle(name);
+          if (!result.ok) throw new Error(result.error.message);
+          return result.value;
+        },
+        open: () => ctx.layout.selectPanel("plugins" as MainPanelId),
+      });
       let opening: Promise<boolean> | undefined;
       const open = (text?: string) => {
         if (opening) return opening;
@@ -148,6 +168,8 @@ export async function apply(ctx: Context) {
             key: panel,
             children: { "kaitu.ask.chat": { kind: "single", scope: "session" } },
             inject: () => ({
+              plugins,
+              pluginOpenLabel: ["管理 DSH 中的插件", "Manage plugins in DSH"] as const,
               askServices,
               fileServices: {
                 pickDirectory: () => ctx.get("uiWorkspace").pickDirectory(),

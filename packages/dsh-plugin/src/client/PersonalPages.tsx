@@ -32,6 +32,7 @@ export interface PersonalServices
   desktopUpdate?: FeatureUpdateRequest;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
+  pluginOpenLabel?: readonly [string, string];
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
   organizerSeen?: () => Promise<OrganizerStatus>;
@@ -667,7 +668,7 @@ export function PersonalPages(
                           className={`${css.btn} ${css["btn-quiet"]}`}
                           onClick={props.manageAi}
                         >
-                          {t("管理模型", "Manage model")}
+                          {t("在问问中选择模型", "Choose a model in Ask")}
                         </button>
                       </div>
                     </div>
@@ -1094,7 +1095,7 @@ export function PersonalPages(
             )}
             {section === "plugins" &&
               (props.plugins ? (
-                <Plugins request={props.plugins} />
+                <Plugins request={props.plugins} openLabel={props.pluginOpenLabel} />
               ) : (
                 <p>{t("插件由 DSH 管理。", "Plugins are managed by DSH.")}</p>
               ))}
