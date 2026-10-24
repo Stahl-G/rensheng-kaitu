@@ -204,7 +204,7 @@ export function PersonalPages(
   >(null);
   const [phoneError, setPhoneError] = useState("");
   useEffect(() => {
-    if (section !== "overview") return;
+    if (section !== "overview" || !props.phoneChannels || !props.channelSettings) return;
     let active = true;
     void props
       .channelSettings?.("phone-list")
@@ -223,7 +223,7 @@ export function PersonalPages(
     return () => {
       active = false;
     };
-  }, [section, props.channelSettings]);
+  }, [section, props.phoneChannels, props.channelSettings]);
   const issues: { section: SettingsSection; text: string }[] = [];
   if (data?.backup.error || data?.backup.conflicts.length)
     issues.push({
@@ -346,8 +346,8 @@ export function PersonalPages(
                       ],
                       [
                         "phone",
-                        !props.channelSettings
-                          ? t("由宿主管理", "Managed by the host")
+                        !props.phoneChannels || !props.channelSettings
+                          ? t("此宿主未提供", "Not available in this host")
                           : phoneError
                             ? t("状态读取失败", "Could not read status")
                             : !phones
