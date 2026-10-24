@@ -10,7 +10,12 @@ import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import inboxStyles from "./InboxPage.module.css";
-import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
+import {
+  type LearningDraftProps,
+  LearningPage,
+  type LearningServices,
+  type LearningSource,
+} from "./LearningPage.js";
 import styles from "./LibraryPage.module.css";
 import { MediaPreview, type MediaServices } from "./MediaPreview.js";
 import css from "./Prototype.module.css";
@@ -91,6 +96,8 @@ export interface LibraryProps extends LearningServices, Pick<MediaServices, "loa
 }
 export function LibraryPage({
   searchLibraryNotes,
+  query,
+  onQuery,
   data,
   open,
   overview,
@@ -102,6 +109,8 @@ export function LibraryPage({
   onOpenGoal,
 }: {
   searchLibraryNotes: LibraryProps["searchLibraryNotes"];
+  query: string;
+  onQuery: (query: string) => void;
   onFile?: (file: File) => void;
   onOpenOriginal: (entry: InboxEntry) => void;
   onOpenNote: (file: string) => void;
@@ -114,7 +123,6 @@ export function LibraryPage({
 }) {
   const t = useT();
   const locale = useLocale();
-  const [query, setQuery] = useState("");
   const term = query.trim();
   const [found, setFound] = useState<{ term: string; notes: NoteSearchResult[]; error?: string }>();
   useEffect(() => {
@@ -165,7 +173,7 @@ export function LibraryPage({
         <input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQuery(event.target.value)}
           aria-label={t("搜索资料", "Search library")}
           placeholder={t("搜索原文、目标、笔记正文", "Search originals, goals and note contents")}
         />
@@ -879,7 +887,8 @@ export function NotesPage({
   onPrompt: (text: string) => void;
   onSaved: () => void;
 } & Pick<LibraryProps, "loadLibraryDocument" | "loadMediaImage"> &
-  LearningServices) {
+  LearningServices &
+  LearningDraftProps) {
   const t = useT();
   const [file, setFile] = useState<string | null>(initialFile ?? null);
   const [body, setBody] = useState("");
