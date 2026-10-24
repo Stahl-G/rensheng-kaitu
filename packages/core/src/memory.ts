@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { snapshot } from "./history.js";
+import { invalidateHistoryFile, snapshot } from "./history.js";
 import type { By } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -388,6 +388,7 @@ export async function removeMemory(
   ws.assertDownloaded("memory");
   const { data } = readMemory(ws, file);
   rmSync(ws.resolve(memoryPath(file)));
+  invalidateHistoryFile(ws, memoryPath(file));
   rewriteIndex(ws);
   await snapshot(ws, `${opts.actor ?? who(opts.by)}删除了一条记忆：${data.name}`, opts.now);
   return { ...data, file };

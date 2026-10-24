@@ -7,6 +7,7 @@ import {
   createProject,
   history,
   initWorkspace,
+  isTracked,
   listTasks,
   readOnboardingMatter,
   readRecords,
@@ -25,6 +26,65 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+});
+
+it("同时保存的原文都进入真实版本，搬往同步目录期间的写入排在搬迁后", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
+  cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
+  const ws = await initWorkspace(join(root, "source"));
+  const entered = gate<void>();
+  const resume = gate<void>();
+  const ui = await startUi(ws, {
+    port: 0,
+    open: false,
+    versionDelayMs: 20,
+    snapshotDelayMs: 20,
+    onWorkspaceChanging: async () => {
+      entered.resolve();
+      await resume.promise;
+    },
+  });
+  cleanup.push(ui.close);
+  const post = (method: string, args: unknown[]) =>
+    fetch(`${ui.url}/api/product/${method}`, {
+      method: "POST",
+      headers: { "X-Kaitu": "1", Origin: ui.url },
+      body: JSON.stringify(args),
+    });
+  const captures = await Promise.all(
+    Array.from({ length: 12 }, async (_, i) => {
+      const response = await post("capture", [`合成并发原文 ${i}`]);
+      expect(response.status).toBe(200);
+      return ((await response.json()) as { path: string }).path;
+    }),
+  );
+  await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
+  for (const file of captures) expect(await isTracked(ws, file)).toBe(true);
+  const target = join(root, "sync");
+  const moving = post("moveStorage", [target, true, "nutstore"]);
+  await entered.promise;
+  let saved = false;
+  const saving = post("capture", ["合成搬迁期间原文"]).then((response) => {
+    saved = true;
+    return response;
+  });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(saved).toBe(false);
+  } finally {
+    resume.resolve();
+  }
+  expect((await moving).status).toBe(200);
+  expect(ws.root).toBe(target);
+  const response = await saving;
+  expect(response.status).toBe(200);
+  const { path } = (await response.json()) as { path: string };
+  expect(ws.readText(path)).toContain("合成搬迁期间原文");
+  expect((await post("moveStorage", [join(root, "back"), false, "local"])).status).toBe(200);
+  for (const file of [...captures, path]) {
+    expect(ws.exists(file)).toBe(true);
+    expect(await isTracked(ws, file)).toBe(true);
+  }
 });
 function gate<T>() {
   let resolve!: (value: T) => void;
