@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { doctor } from "./doctor.js";
-import { GITIGNORE, snapshot, userOwnsGitignore } from "./history.js";
+import { GITIGNORE, invalidateHistoryFile, snapshot, userOwnsGitignore } from "./history.js";
 import { type ModuleDef, listModules } from "./modules.js";
 import { batchOverview, renderOrganizer } from "./overview.js";
 import { syncMode } from "./sync-location.js";
@@ -127,7 +127,10 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   await batchOverview(ws, async () => {
     for (const dir of directories) mkdirSync(ws.resolve(dir), { recursive: true });
     for (const [file, content] of writes) ws.writeText(file, content);
-    for (const file of deletes) rmSync(ws.resolve(file));
+    for (const file of deletes) {
+      rmSync(ws.resolve(file));
+      invalidateHistoryFile(ws, file);
+    }
     writeAgentsMd(ws);
     // 现状刷新在缺 NOW.md 等文件时会跳过；规则文件直接补上，免得每次启动都重跑升级。
     ws.writeText("ORGANIZER.md", renderOrganizer());

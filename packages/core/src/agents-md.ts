@@ -120,6 +120,8 @@ ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${r
 只加载这次任务的一个相关 Skill：正本在 .agents/skills/<技能>/SKILL.md，.claude/skills/ 是副本。缺口只问一个会改变下一步的问题，已知信息直接用。需要更多现状才读 OVERVIEW.md 的相关摘要；整理员按 ORGANIZER.md 执行。
 字段不确定时用 kaitu record schema <类型>（DSH 用 kaitu_status 带 type；MCP 用 record_types）。类型从相关 module.json.records 或 kaitu record types 查。只能读写云盘、没有命令时，格式不确定才读 RECORDS.md 的相关类型，投递边界见 AGENT-README.md；不安装 CLI 来绕路。
 
+媒体引用写成 media:年/月/原始文件名，根目录由每台设备按工作区单独选择（默认工作区旁的 kaitu-media）；只按用户本机绑定解析，未绑定或未下载时保留文字和引用，不把媒体放进工作区、版本库或资料包，不凭原片保留的位置字段推定允许外发。人工说明只写同名 XMP 的 dc:description／Iptc4xmpExt:PersonInImage，没写说明或标人不新建 XMP。
+
 ## 边界
 
 1. 只写工作区内；程序状态、版本库和密钥由程序管理。记录用专用工具写入，保留 ID 和追加修订，不直接改数据 JSONL；项目链接目录只读。

@@ -22,6 +22,7 @@ export interface LibraryItem {
 export interface InboxEntry {
   file: string;
   text: string;
+  attachment?: string;
   source: string;
   /** Original capture identity, independent of its current archive path and display timestamp. */
   originalSource: string | null;
@@ -75,6 +76,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       {
         file,
         text: body.trim(),
+        ...(typeof data.attachment === "string" ? { attachment: data.attachment } : {}),
         originalSource,
         source:
           data.kind === "capture"

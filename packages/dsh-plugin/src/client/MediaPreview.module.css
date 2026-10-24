@@ -1,0 +1,28 @@
+.preview {
+  margin-block: 16px;
+  overflow-wrap: anywhere;
+}
+.preview figure {
+  margin: 0;
+}
+.preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  margin-block: 12px;
+  border-radius: 10px;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.choices [aria-pressed="true"] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.path {
+  overflow-wrap: anywhere;
+}

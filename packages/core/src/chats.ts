@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { unzipSync } from "fflate";
 import { updateChatIndex } from "./chat-search.js";
 import { KaituError } from "./errors.js";
-import { snapshot } from "./history.js";
+import { invalidateHistoryFile, snapshot } from "./history.js";
 import { schemas } from "./schema.js";
 import { isoInZone } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -235,7 +235,10 @@ export async function importChatgptConversations(
       document.file,
       `${[document.header, ...document.messages].map((row) => JSON.stringify(row)).join("\n")}\n`,
     );
-    if (previous && previous.file !== document.file) rmSync(chatPath(ws, previous.file));
+    if (previous && previous.file !== document.file) {
+      rmSync(chatPath(ws, previous.file));
+      invalidateHistoryFile(ws, previous.file);
+    }
   }
   result.version = await snapshot(ws, `导入（chatgpt）了 ${changed.length} 段对话`);
   updateChatIndex(ws, changed);

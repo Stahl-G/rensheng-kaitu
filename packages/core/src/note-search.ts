@@ -1,8 +1,10 @@
 import { type FSWatcher, readdirSync, watch } from "node:fs";
 import { setImmediate } from "node:timers/promises";
+import { assertAgentPath } from "./agent-file-policy.js";
 import { excerpt, openIndex } from "./chat-search.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
+import { redact } from "./handover.js";
 import { readLibraryDocument } from "./library.js";
 import type { Workspace } from "./workspace.js";
 
@@ -24,7 +26,8 @@ const notePath = /^(learning|decisions)\/[^./][^/]*\/STATUS\.md$/;
 export function invalidateNoteIndex(ws: Workspace, file: string): void {
   const state = indexes.get(ws);
   if (!state) return;
-  if (notePath.test(file)) state.dirty?.add(file);
+  const topicFile = file.replace(/^(learning\/[^./][^/]*\/)notes\.md$/, "$1STATUS.md");
+  if (notePath.test(topicFile)) state.dirty?.add(topicFile);
   else if (/^(learning|decisions)(\/[^./][^/]*)?$/.test(file)) state.dirty = null;
 }
 export function disposeNoteIndex(ws: Workspace): void {
@@ -70,7 +73,14 @@ async function synchronize(ws: Workspace, state: IndexState): Promise<void> {
             const { data, body } = parseFrontmatter(readLibraryDocument(ws, file));
             const title =
               typeof data.title === "string" ? data.title : (body.match(/^#\s+(.+)$/m)?.[1] ?? file);
-            insert.run(file, title, body);
+            const notesFile = file.replace(/\/STATUS\.md$/, "/notes.md");
+            let notes = "";
+            if (file.startsWith("learning/") && ws.exists(notesFile) && !ws.conflictCopy(notesFile)) {
+              assertAgentPath(ws.root, notesFile);
+              notes = ws.scanText(notesFile) ?? "";
+            }
+            // Keep one result per topic so existing UI routing opens its saved learning record.
+            insert.run(file, redact(title, "zh-CN"), redact([body, notes].join("\n\n"), "zh-CN"));
           }
           db.exec("COMMIT");
         } catch (error) {
