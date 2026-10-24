@@ -10,6 +10,25 @@ export interface LearningServices {
   startLearning: (input: StartLearningInput) => Promise<LearningTopic & { versionError?: string }>;
   saveLearning: (input: LearningCheckinInput) => Promise<LearningTopic & { versionError?: string }>;
 }
+export interface LearningDraft {
+  understanding: string;
+  questions: string;
+  next: string;
+  completed: string;
+  operationId: string;
+  saving?: boolean;
+}
+export const emptyLearningDraft: LearningDraft = {
+  understanding: "",
+  questions: "",
+  next: "",
+  completed: "",
+  operationId: "",
+};
+export interface LearningDraftProps {
+  draft: LearningDraft;
+  onDraft: (draft: LearningDraft | null) => void;
+}
 export type LearningSource = NonNullable<StartLearningInput["source"]>;
 export function learningPrompt(topic: LearningTopic, english = false) {
   const notes = topic.notes.trim().slice(-4000);
@@ -47,15 +66,16 @@ ${sources || "尚无来源节选，先问我这次想弄懂什么。"}
 我回答后，再用反馈和小提示分约 3–6 步推进，最后总结。反馈依据所给材料或当前例子中明确、可核对的推理；有争议或证据不足的解释列为待核实，不为确认我的答案编造机制。需要时用当前已有的 kaitu_learning_card/widget，否则用文字练习；卡片答案留在本地，需讨论就让我说出理由。总结后只保存我实际表达的理解、未解问题和一个小的下一步：用 kaitu_learning save，或既有文件工具；不能写入就让我回资料页填写。工具成功后才说已保存，不据讲解推断掌握。默认不做 PPT、不上传课堂；只有明确要求且工具存在时才用 openmaic_slide，不调用 openmaic_generate。`;
 }
 export function LearningPage(
-  props: LearningServices & {
-    data: LibraryData | null;
-    topic: string;
-    onTopic: (topic: string) => void;
-    source?: LearningSource;
-    onSourceConsumed: () => void;
-    onPrompt: (text: string) => void;
-    onSaved: () => void;
-  },
+  props: LearningServices &
+    LearningDraftProps & {
+      data: LibraryData | null;
+      topic: string;
+      onTopic: (topic: string) => void;
+      source?: LearningSource;
+      onSourceConsumed: () => void;
+      onPrompt: (text: string) => void;
+      onSaved: () => void;
+    },
 ) {
   const t = useT();
   const [detail, setDetail] = useState<LearningTopic | null>(null);
@@ -64,13 +84,14 @@ export function LearningPage(
   const [destination, setDestination] = useState("");
   const [url, setUrl] = useState("");
   const [material, setMaterial] = useState("");
-  const [understanding, setUnderstanding] = useState("");
-  const [questions, setQuestions] = useState("");
-  const [next, setNext] = useState("");
-  const [completed, setCompleted] = useState("");
+  const { understanding, questions, next, completed } = props.draft;
+  const changeDraft = (change: Partial<LearningDraft>) =>
+    props.onDraft({ ...props.draft, ...change, operationId: crypto.randomUUID() });
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const busy = working || !!props.draft.saving;
+  const submitting = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -78,16 +99,11 @@ export function LearningPage(
       mounted.current = false;
     };
   }, []);
-  const saveAttempt = useRef<{ content: string; id: string }>();
   const topics = props.data?.notes.filter((item) => item.file.startsWith("learning/")) ?? [];
   useEffect(() => {
     let active = true;
     setDetail(null);
     setError("");
-    setUnderstanding("");
-    setQuestions("");
-    setNext("");
-    setCompleted("");
     if (props.topic)
       void props
         .loadLearning(props.topic)
@@ -144,7 +160,8 @@ export function LearningPage(
     }
   };
   const save = async () => {
-    if (!detail || busy) return;
+    if (!detail || busy || submitting.current || !props.draft.operationId) return;
+    submitting.current = true;
     setBusy(true);
     setError("");
     setReceipt("");
@@ -161,17 +178,9 @@ export function LearningPage(
             }
           : {}),
       };
-      const content = JSON.stringify(input);
-      if (saveAttempt.current?.content !== content)
-        saveAttempt.current = { content, id: crypto.randomUUID() };
-      const value = await props.saveLearning({ ...input, operationId: saveAttempt.current.id });
+      const value = await props.saveLearning({ ...input, operationId: props.draft.operationId });
       if (!mounted.current) return;
-      saveAttempt.current = undefined;
       setDetail(value);
-      setUnderstanding("");
-      setQuestions("");
-      setNext("");
-      setCompleted("");
       setReceipt(
         value.versionError ??
           t("已保存理解、疑问与下一步。下次可接着学。", "Saved. You can pick up here next time."),
@@ -180,7 +189,8 @@ export function LearningPage(
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      submitting.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
   const pending = detail?.next.filter((item) => ["todo", "proposed"].includes(item.status)) ?? [];
@@ -217,7 +227,7 @@ export function LearningPage(
                   const value = await props.loadLearning(detail.topic);
                   if (mounted.current) {
                     setDetail(value);
-                    setCompleted("");
+                    changeDraft({ completed: "" });
                     setError("");
                   }
                 } catch (err) {
@@ -394,7 +404,7 @@ export function LearningPage(
                     rows={3}
                     maxLength={16384}
                     value={understanding}
-                    onChange={(event) => setUnderstanding(event.target.value)}
+                    onChange={(event) => changeDraft({ understanding: event.target.value })}
                   />
                 </label>
                 <label>
@@ -404,7 +414,7 @@ export function LearningPage(
                     rows={2}
                     maxLength={16384}
                     value={questions}
-                    onChange={(event) => setQuestions(event.target.value)}
+                    onChange={(event) => changeDraft({ questions: event.target.value })}
                   />
                 </label>
                 <label>
@@ -413,7 +423,7 @@ export function LearningPage(
                     disabled={busy}
                     maxLength={500}
                     value={next}
-                    onChange={(event) => setNext(event.target.value)}
+                    onChange={(event) => changeDraft({ next: event.target.value })}
                   />
                 </label>
                 {!!pending.length && (
@@ -422,7 +432,7 @@ export function LearningPage(
                     <select
                       disabled={busy}
                       value={completed}
-                      onChange={(event) => setCompleted(event.target.value)}
+                      onChange={(event) => changeDraft({ completed: event.target.value })}
                     >
                       <option value="">{t("暂不标完成", "Leave unchanged")}</option>
                       {pending.map((item) => (
@@ -433,6 +443,23 @@ export function LearningPage(
                     </select>
                   </label>
                 )}
+                <p className={css.small}>
+                  {t(
+                    "本次打开期间，切页或换主题会保留输入；保存后才写入资料。",
+                    "While the app is open, switching pages or topics keeps your draft. Only saving writes it to your files.",
+                  )}
+                </p>
+                <button
+                  type="button"
+                  className={css.link}
+                  disabled={busy || !(understanding || questions || next || completed)}
+                  onClick={() => {
+                    props.onDraft(null);
+                    setReceipt(t("已放弃本次输入。", "Draft discarded."));
+                  }}
+                >
+                  {t("放弃本次输入", "Discard this draft")}
+                </button>
                 <button
                   type="submit"
                   className={css.btn}

@@ -15,7 +15,7 @@ import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HandoverPanel } from "./Handover.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { JobsPage, type JobsPageProps } from "./JobsPage.js";
-import type { LearningSource } from "./LearningPage.js";
+import { type LearningDraft, type LearningSource, emptyLearningDraft } from "./LearningPage.js";
 import { LibraryFileImport } from "./LibraryFileImport.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
@@ -310,7 +310,60 @@ function Overview({
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
-  const [learningTopic, setLearningTopic] = useState("");
+  // Navigation owns unsaved input; no files, query results or whole pages are retained.
+  const [libraryQueries, setLibraryQueries] = useState<Record<string, string>>({});
+  const [learningTopics, setLearningTopics] = useState<Record<string, string>>({});
+  const [learningDrafts, setLearningDrafts] = useState<Record<string, LearningDraft>>({});
+  const learningSaves = useRef(new Map<string, ReturnType<LibraryProps["saveLearning"]>>());
+  const learningTopic = learningTopics[workspaceRoot ?? ""] ?? "";
+  const draftKey = JSON.stringify([workspaceRoot, learningTopic]);
+  const setLearningTopic = (topic: string) => {
+    if (workspaceRoot) setLearningTopics((current) => ({ ...current, [workspaceRoot]: topic }));
+  };
+  const updateLearningDraft = (key: string, draft: LearningDraft | null) => {
+    setLearningDrafts((current) => {
+      const next = { ...current };
+      if (draft) next[key] = draft;
+      else delete next[key];
+      return next;
+    });
+  };
+  const loadLearning = useCallback(
+    async (topic: string) => {
+      // Reopening during a save waits for that write, then reads its actual result.
+      await learningSaves.current.get(JSON.stringify([workspaceRoot, topic]))?.catch(() => {});
+      return props.loadLearning(topic);
+    },
+    [workspaceRoot, props.loadLearning],
+  );
+  const saveLearning: LibraryProps["saveLearning"] = (input) => {
+    const key = JSON.stringify([workspaceRoot, input.topic]);
+    const pending = learningSaves.current.get(key);
+    if (pending) return pending;
+    setLearningDrafts((current) => ({
+      ...current,
+      [key]: { ...(current[key] ?? emptyLearningDraft), saving: true },
+    }));
+    const saving = Promise.resolve()
+      .then(() => props.saveLearning(input))
+      .then((value) => {
+        setLearningDrafts((current) => {
+          if (current[key]?.operationId !== input.operationId) return current;
+          const next = { ...current };
+          delete next[key];
+          return next;
+        });
+        return value;
+      })
+      .finally(() => {
+        learningSaves.current.delete(key);
+        setLearningDrafts((current) =>
+          current[key] ? { ...current, [key]: { ...current[key], saving: false } } : current,
+        );
+      });
+    learningSaves.current.set(key, saving);
+    return saving;
+  };
   const [learningSource, setLearningSource] = useState<LearningSource>();
   const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
   const [libraryFile, setLibraryFile] = useState<string>();
@@ -326,7 +379,24 @@ function Overview({
     target.focus();
     target.scrollIntoView({ block: "center" });
   }, [view, record, libraryGoal]);
-  const [library, setLibrary] = useState<LibraryData | null>(null);
+  const [libraryState, setLibraryState] = useState<{ root: string | undefined; data: LibraryData } | null>(
+    null,
+  );
+  const library = libraryState?.root === workspaceRoot ? (libraryState?.data ?? null) : null;
+  const currentWorkspace = useRef(workspaceRoot);
+  currentWorkspace.current = workspaceRoot;
+  const setLibrary = useCallback(
+    (value: LibraryData) => {
+      if (currentWorkspace.current === workspaceRoot) setLibraryState({ root: workspaceRoot, data: value });
+    },
+    [workspaceRoot],
+  );
+  useEffect(() => {
+    if (!workspaceRoot) return;
+    setLearningSource(undefined);
+    setLibraryFile(undefined);
+    setLibraryEntry(undefined);
+  }, [workspaceRoot]);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
     data &&
@@ -437,7 +507,7 @@ function Overview({
   );
   // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
   useEffect(() => {
-    if (view !== "records") return;
+    if (view !== "records" || !workspaceRoot) return;
     let sequence = 0;
     const load = async () => {
       const seq = ++sequence;
@@ -456,7 +526,7 @@ function Overview({
       sequence++;
       off?.();
     };
-  }, [view, record, props.loadLibrary, props.subscribe]);
+  }, [view, record, workspaceRoot, props.loadLibrary, props.subscribe, setLibrary]);
   useEffect(() => {
     if (view === "ask") setAskVisited(true);
   }, [view]);
@@ -1237,6 +1307,11 @@ function Overview({
             )}
             {!record ? (
               <LibraryPage
+                key={workspaceRoot}
+                query={libraryQueries[workspaceRoot ?? ""] ?? ""}
+                onQuery={(query) => {
+                  if (workspaceRoot) setLibraryQueries((current) => ({ ...current, [workspaceRoot]: query }));
+                }}
                 searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
                 open={openRecord}
@@ -1342,12 +1417,15 @@ function Overview({
               )
             ) : (
               <NotesPage
+                key={workspaceRoot}
+                draft={learningDrafts[draftKey] ?? emptyLearningDraft}
+                onDraft={(draft) => updateLearningDraft(draftKey, draft)}
                 initialFile={libraryFile}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
-                loadLearning={props.loadLearning}
+                loadLearning={loadLearning}
                 startLearning={props.startLearning}
-                saveLearning={props.saveLearning}
+                saveLearning={saveLearning}
                 topic={learningTopic}
                 onTopic={setLearningTopic}
                 source={learningSource}
