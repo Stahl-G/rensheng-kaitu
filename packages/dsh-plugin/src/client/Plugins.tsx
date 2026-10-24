@@ -86,7 +86,7 @@ export function Plugins({
         >
           {refreshing ? t("正在刷新…", "Refreshing…") : t("刷新目录", "Refresh plugins")}
         </button>
-        {items?.some((item) => item.installed) && (
+        {(openLabel || items?.some((item) => item.installed)) && (
           <button
             type="button"
             className={css.link}
