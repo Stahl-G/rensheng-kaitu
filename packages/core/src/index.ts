@@ -113,5 +113,7 @@ export * from "./learning.js";
 export { renderTeachingFrame, FRAME_CSP } from "./teaching-frame.js";
 
 export * from "./jobs.js";
+
+export * from "./media-library.js";
 export * from "./direction-map.js";
 export * from "./weather.js";
