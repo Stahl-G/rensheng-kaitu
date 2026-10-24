@@ -165,7 +165,7 @@ function App() {
     <LocaleContext.Provider value={locale}>
       <FileServicesContext.Provider value={files}>
         <div className={css.app} data-theme={theme === "system" ? undefined : theme} lang={locale}>
-          <header className={css.top}>
+          <header className={`${css.top} ${preview.header}`}>
             <div className={css.brand}>
               <KaituMark size={26} />
               <span>{t("开图", "Kaitu")}</span>

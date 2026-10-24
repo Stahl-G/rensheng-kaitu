@@ -43,3 +43,13 @@
     padding: 14px;
   }
 }
+
+.header {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.header > :first-child {
+  white-space: nowrap;
+}
+.header > .tools {
+  justify-content: flex-end;
+}

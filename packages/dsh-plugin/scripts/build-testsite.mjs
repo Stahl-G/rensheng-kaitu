@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+import { transform } from "lightningcss";
 import { clientStyles } from "./client-styles.mjs";
 
 const pkg = fileURLToPath(new URL("..", import.meta.url));
@@ -29,7 +30,11 @@ const forbidden = Object.keys(result.metafile.inputs).filter((path) =>
 );
 if (forbidden.length) throw new Error(`TestSite must stay browser-only: ${forbidden.join(", ")}`);
 const script = result.outputFiles[0].contents;
-const css = `${readFileSync(resolve(pkg, "src/standalone/base.css"), "utf8")}\n${styles.css()}`;
+const css = transform({
+  filename: "testsite.css",
+  code: Buffer.from(`${readFileSync(resolve(pkg, "src/standalone/base.css"), "utf8")}\n${styles.css()}`),
+  minify: true,
+}).code;
 const stamp = (value) => createHash("sha256").update(value).digest("hex").slice(0, 12);
 const scriptName = `testsite.${stamp(script)}.js`;
 const styleName = `testsite.${stamp(css)}.css`;
