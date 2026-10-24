@@ -146,7 +146,8 @@ export function LifeHome({
         <div className={todayCss.mirror}>
           {facts.map((metric) => (
             <p key={metric.key}>
-              {metric.from} — {metric.to}，{metric.label} {Number(metric.value?.toFixed(1))} {metric.unit}。
+              {metric.from} — {metric.to}，{metric.label} {metric.estimated ? t("约", "about ") : ""}
+              {Number(metric.value?.toFixed(1))} {metric.unit}。
               <details>
                 <summary>{t("查看来源", "View sources")}</summary>
                 {metric.sources.map((entry, i) => (
