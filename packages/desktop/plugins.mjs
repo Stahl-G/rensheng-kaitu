@@ -179,6 +179,11 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
             title: text(plugin.title) || plugin.name,
             description: text(plugin.description),
             version: latest?.version ?? "",
+            license: bundledIndex.plugins.find(
+              (entry) => entry.name === plugin.name && entry.versions[0]?.version === latest?.version,
+            )?.license,
+            dshVersion: latest?.engines.dsh,
+            homepage: plugin.homepage,
             spec: latest ? marketInstallTarget(plugin.name, latest).spec : "",
             installed: names.includes(plugin.name),
             installedVersion: versions.get(plugin.name),
