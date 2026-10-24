@@ -1,11 +1,17 @@
 import type { ReactNode } from "react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { OverviewData, OverviewNext } from "../types.js";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type {
+  InboxEntry,
+  LibraryData,
+  OverviewData,
+  OverviewMetric,
+  OverviewNext,
+  OverviewSource,
+} from "../types.js";
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
-import { exploreModules } from "./explore-modules.js";
 import { useLocale, useT } from "./i18n.js";
-import { nextPresentation } from "./next-presentation.js";
+import { nextPresentation, todayChoices, todayDate, todaySourceGroups } from "./next-presentation.js";
 
 export function LifeHome({
   data,
@@ -14,10 +20,16 @@ export function LifeHome({
   writing,
   start,
   library,
-  connect,
-  openModule,
+  addNext,
   handover,
   memory,
+  busy,
+  save,
+  complete,
+  source,
+  adopt,
+  dismiss,
+  loadLibrary,
 }: {
   data: OverviewData;
   firstVisit: boolean;
@@ -25,197 +37,450 @@ export function LifeHome({
   writing: boolean;
   start: () => void;
   library: () => void;
-  connect: () => void;
-  openModule: (id: string) => void;
+  addNext: () => void;
   handover: () => void;
   memory: () => void;
+  busy: boolean;
+  save: (text: string) => Promise<unknown>;
+  complete: (item: OverviewNext) => Promise<unknown>;
+  source: (entry: OverviewSource) => void;
+  adopt: (id: string) => void;
+  dismiss: (id: string) => void;
+  loadLibrary: (query: { section: "inbox"; source: string; before?: string }) => Promise<LibraryData>;
 }) {
   const t = useT();
-  const recent = data.notes[0];
-  const health = data.sections.find((section) => section.id === "health");
-  const latest =
-    recent?.text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim() ||
-    data.sections.find((section) => section.preview.length)?.preview[0];
-  const cards = [
-    {
-      id: "health",
-      title: t("回看身体变化", "Notice changes in your body"),
-      description: t(
-        "记下吃了什么、运动和睡眠，慢慢看见自己的变化。",
-        "Keep track of meals, movement and sleep, and notice what changes.",
-      ),
-      detail:
-        health?.preview[0] ||
-        (health ? t(`已留下 ${health.count} 条健康记录`, `${health.count} health records kept`) : null),
-      action: t("打开健康", "Open health"),
-      open: () => openModule("health"),
-    },
-    {
-      id: "directions",
-      title: t("找一个新方向", "Find a new direction"),
-      description: t(
-        "从经历和兴趣出发，探索工作或生活的选择，试一小步。",
-        "Explore choices in work and life through your experience and interests. Try one small step.",
-      ),
-      detail: null,
-      action: t("探索方向", "Explore directions"),
-      open: () => openModule("directions"),
-    },
-    {
-      id: "handover",
-      title: t("换个 AI 接着聊", "Continue with another AI"),
-      description: t(
-        "选好要带的近况，预览、删改后，复制给你常用的 AI。",
-        "Choose what to bring, review and edit it, then copy it to the AI you use.",
-      ),
-      detail: null,
-      action: t("准备资料包", "Prepare a context pack"),
-      open: handover,
-    },
-  ];
+  const locale = useLocale();
+  const [energy, setEnergy] = useState(60);
+  const sourceRegion = useRef<HTMLElement>(null);
+  const sourceTrigger = useRef<HTMLButtonElement | null>(null);
+  const [factSource, setFactSource] = useState<OverviewMetric | null>(null);
+  useEffect(() => {
+    if (factSource) sourceRegion.current?.focus();
+  }, [factSource]);
+  const closeSource = () => {
+    setFactSource(null);
+    requestAnimationFrame(() => sourceTrigger.current?.focus());
+  };
+  const [resting, setResting] = useState<string | null>(null);
+  const [picked, setPicked] = useState<OverviewNext | null>(null);
+  const [pickedOpening, setPickedOpening] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const savingRef = useRef(false);
+  const [todayNotes, setTodayNotes] = useState<{ day: string; cutoff: string; entries: InboxEntry[] } | null>(
+    null,
+  );
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const entries: InboxEntry[] = [];
+      let before: string | undefined;
+      do {
+        const page = await loadLibrary({ section: "inbox", source: "me", before });
+        entries.push(...page.inbox.filter((entry) => entry.date?.startsWith(data.today)));
+        if (page.inbox.some((entry) => (entry.date ?? "") < data.today) || !page.next) break;
+        before = page.next;
+      } while (active);
+      if (active) setTodayNotes({ day: data.today, cutoff: data.cutoff, entries });
+    })().catch(() => {
+      if (active) setTodayNotes(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [data.today, data.cutoff, loadLibrary]);
+  const marker = `${data.today} · 开图想问你`;
+  const noteBody = (text: string) => text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+  const saved =
+    todayNotes?.day === data.today
+      ? todayNotes.entries.find((note) => note.text.startsWith(marker))
+      : undefined;
+  const proposedQuestion = firstVisit
+    ? t("最近有什么事，是你想改变的？", "What would you like to change lately?")
+    : data.plans.goals.find((goal) => !goal.next)
+      ? t(
+          `「${data.plans.goals.find((goal) => !goal.next)?.title}」，你想先试哪一步？`,
+          `What first step would you try for “${data.plans.goals.find((goal) => !goal.next)?.title}”?`,
+        )
+      : t("最近做的哪件事，让你觉得值得？", "What felt worthwhile lately?");
+  const questionRef = useRef({ day: data.today, text: proposedQuestion });
+  if (questionRef.current.day !== data.today)
+    questionRef.current = { day: data.today, text: proposedQuestion };
+  const question = saved
+    ? noteBody(saved.text).split("\n")[1] || questionRef.current.text
+    : questionRef.current.text;
+  const choices = useMemo(() => todayChoices(data, energy), [data, energy]);
+  const facts = useMemo(
+    () =>
+      data.metrics
+        .filter(
+          (metric) =>
+            metric.value !== null &&
+            metric.from &&
+            metric.to &&
+            ["workouts", "sleep", "protein", "weight"].includes(metric.key) &&
+            todaySourceGroups(metric, data.timeZone, locale).length,
+        )
+        .slice(0, 3),
+    [data.metrics, data.timeZone, locale],
+  );
+  const sourceGroups = useMemo(
+    () => (factSource ? todaySourceGroups(factSource, data.timeZone, locale) : []),
+    [factSource, data.timeZone, locale],
+  );
+  const paragraphs = new Map<string, OverviewMetric[]>();
+  for (const metric of facts) {
+    const key = `${metric.from}:${metric.to}`;
+    paragraphs.set(key, [...(paragraphs.get(key) ?? []), metric]);
+  }
+  const openFact = (event: import("react").MouseEvent<HTMLButtonElement>, metric: OverviewMetric) => {
+    sourceTrigger.current = event.currentTarget;
+    setFactSource(metric);
+  };
+  const valueText = (metric: OverviewMetric) =>
+    `${metric.estimated ? t("约 ", "about ") : ""}${Number(metric.value?.toFixed(1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
+  const store = async (text: string, done: () => void | Promise<void>) => {
+    if (savingRef.current || busy) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      await save(text);
+      await done();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
   return (
-    <section className={todayCss.lifeHome} aria-label={t("生活首页", "Life at a glance")}>
-      <header className={todayCss.lifeHeading}>
-        <p className={css.eyebrow}>{t("生活，慢慢有迹可循", "A little life, kept over time")}</p>
-        <h1>
-          {firstVisit
-            ? t("让 AI 了解你，从一件小事开始", "Let AI get to know you, one small moment at a time")
-            : t("把日子记下来，慢慢看见自己", "Keep your moments. Get to know yourself.")}
-        </h1>
-        <p>
-          {firstVisit
-            ? t(
-                "先留下一点生活，想聊时再接上 AI。",
-                "Keep a little of your life. Connect AI whenever you want to talk.",
-              )
-            : t(
-                "不用每天做计划。留下一点，也可以只是回来看一看。",
-                "No daily plan required. Leave a note, or simply look back.",
-              )}
-        </p>
-      </header>
-      <div className={todayCss.lifeHero}>
-        <div>
-          <h2>{t("先记下今天的一件事", "Keep one moment from today")}</h2>
-          <p>
-            {t(
-              "一顿饭、一次散步，或一个还没想明白的念头。",
-              "A meal, a walk, or a thought you are still figuring out.",
-            )}
-          </p>
-          {!writing && (
-            <button
-              id="life-capture-start"
-              type="button"
-              className={`${css.btn} ${css["btn-strong"]}`}
-              onClick={start}
-            >
-              {t("记一件事", "Write a moment")}
-              <span aria-hidden="true"> ↗</span>
-            </button>
-          )}
-          <small>
-            {t("不用连接 AI，写一句就能保存。", "No AI connection needed. A sentence is enough.")}
-          </small>
-        </div>
-        {!writing && (
-          <div className={todayCss.lifeNote}>
-            <span>
-              {latest
-                ? t("最近留下的", "Recently kept")
-                : firstVisit
-                  ? t("灵感示例 · 不会保存", "A writing idea · not saved")
-                  : t("你的积累", "What you have kept")}
-            </span>
-            <p>
-              {latest ||
-                (firstVisit
-                  ? t(
-                      "今天散步时，发现了一条想再走一次的小路。",
-                      "On my walk today, I found a path I want to take again.",
-                    )
-                  : t(
-                      "你保存的资料都在这里，随时可以回看。",
-                      "Your saved material is here whenever you want to revisit it.",
-                    ))}
-            </p>
-            {latest && (
-              <button type="button" className={css.link} onClick={library}>
-                {recent ? t("回看原文 →", "Read the original →") : t("打开资料 →", "Open library →")}
-              </button>
-            )}
-          </div>
+    <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
+      <header>
+        <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+        {firstVisit && (
+          <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
         )}
-        {writing && capture}
-      </div>
-      {firstVisit && (
-        <ol className={todayCss.lifeSteps}>
-          {[
-            [t("记一件事", "Write a moment"), t("写一句就好", "One sentence is enough"), start],
-            [
-              t("看看存了什么", "See what you saved"),
-              t("原文在资料里，随时可回看", "Your original words stay in Library"),
-              library,
-            ],
-            [
-              t("想聊时再连接 AI", "Connect AI when you want"),
-              t("可以以后再说", "There is no rush"),
-              connect,
-            ],
-          ].map(([title, hint, action], i) => (
-            <li key={String(title)}>
-              <button type="button" onClick={action as () => void}>
-                <span>{i + 1}</span>
-                <div>
-                  <b>{title as string}</b>
-                  <small>{hint as string}</small>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ol>
+      </header>
+      {!firstVisit && facts.length > 0 && (
+        <div className={todayCss.mirror}>
+          {[...paragraphs.values()].map((metrics) => {
+            const first = metrics[0];
+            const recentWeek =
+              first?.to === data.today &&
+              Date.parse(`${first.to}T12:00:00Z`) - Date.parse(`${first.from}T12:00:00Z`) === 6 * 86400000;
+            return (
+              <p key={`${first?.from}:${first?.to}`}>
+                {recentWeek
+                  ? t("近七天，", "In the past seven days, ")
+                  : first?.from === first?.to && first?.from
+                    ? `${todayDate(first.from, locale, true)}，`
+                    : t("最近，", "Recently, ")}
+                {metrics.map((metric, i) => (
+                  <span key={metric.key}>
+                    {i > 0 ? t("，", ", ") : ""}
+                    {metric.key === "workouts"
+                      ? t("训练了", "you logged ")
+                      : metric.key === "sleep"
+                        ? recentWeek && metric.days === 7
+                          ? t("平均每天睡了", "you slept an average of ")
+                          : t("有睡眠记录的日子平均睡了", "on days with sleep records you averaged ")
+                        : metric.key === "protein"
+                          ? recentWeek && metric.days === 7
+                            ? t("蛋白质日均", "daily protein averaged ")
+                            : t(
+                                "有饮食记录的日子蛋白质日均",
+                                "on days with meal records daily protein averaged ",
+                              )
+                          : t("记录的体重为", "your recorded weight was ")}
+                    <button
+                      type="button"
+                      className={todayCss.factLink}
+                      aria-label={t(
+                        `${metric.label} ${valueText(metric)}，查看来源`,
+                        `${metric.label} ${valueText(metric)}, view sources`,
+                      )}
+                      onClick={(event) => openFact(event, metric)}
+                    >
+                      {valueText(metric)}
+                    </button>
+                  </span>
+                ))}
+                {t("。", ".")}
+              </p>
+            );
+          })}
+        </div>
       )}
-      <div className={todayCss.lifeCards}>
-        {cards.map((card) => (
+      {!!data.proposedTasks.length && (
+        <section className={todayCss.aiSuggestions}>
+          <h2>{t("AI 留的建议", "Suggestions from AI")}</h2>
+          {data.proposedTasks.map((item) => (
+            <div className={css.row} key={item.id}>
+              <span>{item.title}</span>
+              <button type="button" className={css.link} disabled={busy} onClick={() => adopt(item.id)}>
+                {t("确认", "Confirm")}
+              </button>
+              <button type="button" className={css.link} disabled={busy} onClick={() => dismiss(item.id)}>
+                {t("不用", "Dismiss")}
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+      {factSource && (
+        <section
+          ref={sourceRegion}
+          tabIndex={-1}
+          className={todayCss.sourceRecord}
+          aria-label={t("来源记录", "Source record")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closeSource();
+            }
+          }}
+        >
+          <h2>{t("来源记录", "Source record")}</h2>
+          <p>
+            {factSource.from} — {factSource.to}
+          </p>
+          {factSource.key === "workouts" && (
+            <p>
+              {t(
+                `${factSource.value} 次训练 · ${factSource.sources.length} 条动作记录`,
+                `${factSource.value} workouts · ${factSource.sources.length} exercise records`,
+              )}
+            </p>
+          )}
+          {sourceGroups.map((group) => (
+            <details key={group.label} open>
+              <summary>{group.label}</summary>
+              <ul>
+                {group.rows.map((row) => (
+                  <li key={String(row.id)}>
+                    {factSource.key === "workouts"
+                      ? `${String(row.exercise)}${typeof row.sets === "number" ? t(` · ${row.sets} 组`, ` · ${row.sets} sets`) : ""}${typeof row.reps === "number" ? t(` × ${row.reps} 次`, ` × ${row.reps} reps`) : ""}${typeof row.weight_kg === "number" ? t(` · ${row.weight_kg} 公斤`, ` · ${row.weight_kg} kg`) : ""}`
+                      : factSource.key === "sleep"
+                        ? t(
+                            `睡眠 ${Number((Number(row.duration_min) / 60).toFixed(1))} 小时`,
+                            `Sleep: ${Number((Number(row.duration_min) / 60).toFixed(1))} hours`,
+                          )
+                        : factSource.key === "protein"
+                          ? `${String(row.meal ?? "")} · ${Number(row.uncertainty) > 0 ? t("约 ", "about ") : ""}${String(row.protein_g)} ${t("克蛋白质", "g protein")}`
+                          : `${String(row.value)} ${String(row.unit)}`}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+          <button type="button" className={css.link} onClick={closeSource}>
+            {t("收起来源", "Close source")}
+          </button>
+        </section>
+      )}
+      {!firstVisit && (
+        <section className={todayCss.pick}>
+          <h2>{t("此刻，挑一件就好", "Pick just one thing for now")}</h2>
+          {!picked ? (
+            <>
+              <div className={todayCss.energy}>
+                {[
+                  [60, t("有一小时", "An hour")],
+                  [10, t("只有十分钟", "Ten minutes")],
+                  [5, t("有点累", "A little tired")],
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    className={css.link}
+                    key={value}
+                    aria-pressed={energy === value}
+                    onClick={() => {
+                      setEnergy(Number(value));
+                      setResting(null);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {energy === 5 ? (
+                <div className={todayCss.restChoices}>
+                  {[
+                    t("歇一会儿", "Take a breather"),
+                    t("看看窗外", "Look out the window"),
+                    t("什么都不做也行", "It's okay to do nothing"),
+                  ].map((option) => (
+                    <button
+                      type="button"
+                      className={css.link}
+                      key={option}
+                      aria-pressed={resting === option}
+                      onClick={() => setResting(resting === option ? null : option)}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                  {resting && <output>{resting}</output>}
+                </div>
+              ) : (
+                <>
+                  {choices.map(({ item, goal, minutes, opening }) => (
+                    <div className={todayCss.choice} key={`${item.file}:${item.id}`}>
+                      <button
+                        type="button"
+                        className={css.link}
+                        onClick={() => {
+                          setPicked(item);
+                          setPickedOpening(opening);
+                        }}
+                      >
+                        {opening ? t("先开个头：", "Start with: ") : ""}
+                        {nextPresentation(item, locale).title}
+                      </button>
+                      <small>
+                        {t("为了：", "For: ")}
+                        {goal}
+                      </small>
+                      {minutes !== null && (
+                        <small>
+                          {opening
+                            ? t(`整件事约 ${minutes} 分钟`, `Whole step: about ${minutes} minutes`)
+                            : t(`约 ${minutes} 分钟`, `About ${minutes} minutes`)}
+                        </small>
+                      )}
+                    </div>
+                  ))}
+                  {!choices.length && (
+                    <button type="button" className={css.link} onClick={addNext}>
+                      {t("写下一个下一步", "Write down a next step")}
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p className={todayCss.doing}>
+                {pickedOpening ? t("先开个头：", "Starting with: ") : t("在做：", "Doing: ")}
+                {nextPresentation(picked, locale).title}
+              </p>
+              {result === null ? (
+                <button type="button" className={css.link} onClick={() => setResult("")}>
+                  {pickedOpening
+                    ? t("先停下，记一句", "Pause — keep a sentence")
+                    : t("做完了，记一句", "Done — keep a sentence")}
+                </button>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!result.trim()) return;
+                    void store(
+                      `${pickedOpening ? t("先开个头：", "Started: ") : ""}${picked.title}\n${result.trim()}`,
+                      () => {
+                        return (pickedOpening ? Promise.resolve() : complete(picked)).then(() => {
+                          setPicked(null);
+                          setResult(null);
+                        });
+                      },
+                    );
+                  }}
+                >
+                  <textarea
+                    aria-label={t("这次的结果", "What happened")}
+                    value={result}
+                    onChange={(e) => setResult(e.target.value)}
+                    disabled={saving}
+                  />
+                  <button className={css.btn} type="submit" disabled={saving || !result.trim()}>
+                    {t("保存结果", "Save result")}
+                  </button>
+                </form>
+              )}
+              <button
+                type="button"
+                className={css.link}
+                disabled={saving}
+                onClick={() => {
+                  setPicked(null);
+                  setResult(null);
+                }}
+              >
+                {t("换一件", "Choose another")}
+              </button>
+            </>
+          )}
+        </section>
+      )}
+      <section className={todayCss.question}>
+        <h2>{t("开图想问你", "A question for you")}</h2>
+        <p>{question}</p>
+        {saved ? (
           <button
             type="button"
-            className={todayCss.lifeCard}
-            id={card.id === "handover" ? "life-handover-start" : undefined}
-            data-kind={card.id}
-            key={card.id}
-            onClick={card.open}
+            className={css.link}
+            onClick={() => source({ ...saved, text: noteBody(saved.text) })}
           >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              aria-hidden="true"
-            >
-              <path
-                d={
-                  exploreModules.find((entry) => entry.id === card.id)?.icon ??
-                  "M3 7h7l2 2h9v11H3V7Zm3 0V3h11v6M8 13h8m-8 3h5"
-                }
-              />
-            </svg>
-            <h2>{card.title}</h2>
-            <p>{card.description}</p>
-            {card.detail && <span className={todayCss.lifeDetail}>{card.detail}</span>}
-            <b className={todayCss.lifeAction}>{card.action} →</b>
+            {t("已记下，回看原文", "Saved — read your words")}
           </button>
-        ))}
-      </div>
-      <div className={todayCss.lifeLinks}>
-        <button type="button" className={css.link} onClick={memory}>
-          {t("已有 AI 记忆？搬过来", "Already have AI memories? Bring them over")}
+        ) : (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (answer.trim())
+                void store(`${marker}\n${question}\n\n${answer.trim()}`, () => setAnswer(""));
+            }}
+          >
+            <textarea
+              aria-label={question}
+              placeholder={t("随口答一句就好", "A sentence is enough")}
+              rows={2}
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              disabled={saving}
+            />
+            <button
+              type="submit"
+              className={css.btn}
+              disabled={saving || busy || !answer.trim() || todayNotes?.day !== data.today}
+            >
+              {saving ? t("正在保存…", "Saving…") : t("写下这一句", "Keep this sentence")}
+            </button>
+          </form>
+        )}
+      </section>
+      {error && <p role="alert">{error}</p>}
+      <footer className={todayCss.homeLinks}>
+        <button id="life-capture-start" type="button" className={css.link} onClick={start}>
+          {t("随手记一句", "Keep a quick note")}
         </button>
-        <button type="button" className={css.link} onClick={() => openModule("modules")}>
-          {t("看看全部模块 →", "Browse all modules →")}
+        <button type="button" className={css.link} onClick={library}>
+          {todayNotes?.day === data.today
+            ? t(
+                `今天记了 ${todayNotes.entries.length} 条 · 在资料里`,
+                `${todayNotes.entries.length} notes today · Library`,
+              )
+            : t("在资料里回看", "Read in Library")}
         </button>
-      </div>
+        {firstVisit ? (
+          <button type="button" className={css.link} onClick={memory}>
+            {t("搬入 AI 记忆、对话或资料", "Bring AI memories, conversations or files")}
+          </button>
+        ) : (
+          <button
+            id="life-handover-start"
+            type="button"
+            className={`${css.btn} ${data.proposedTasks.length ? "" : css["btn-strong"]}`}
+            onClick={handover}
+          >
+            {t("带去别的 AI 聊", "Take this to another AI")}
+          </button>
+        )}
+      </footer>
+      {writing && capture}
     </section>
   );
 }
