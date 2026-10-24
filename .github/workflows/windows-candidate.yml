@@ -7,7 +7,11 @@ on:
         description: Approved source commit (full SHA)
         required: true
         type: string
-        default: "290a6289146d718892ac91baa3b822bb80de8dbc"
+      dsh_version:
+        description: Official DSH input version (must match the selected source's pinned runtime)
+        required: true
+        type: string
+        default: "0.2.1-rc.3"
       dsh_run_id:
         description: Existing input artifact's workflow run in this repository
         required: true
@@ -29,6 +33,8 @@ jobs:
   package:
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      DSH_VERSION: ${{ inputs.dsh_version }}
     defaults:
       run:
         shell: pwsh
@@ -40,6 +46,8 @@ jobs:
           DSH_ARTIFACT_ID: ${{ inputs.dsh_artifact_id }}
           DSH_SHA256: ${{ inputs.dsh_sha256 }}
         run: |
+          if ($env:DSH_VERSION -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') { throw 'Expected one exact DSH version' }
+          "DSH_INPUT_FILE=deepseek-harness-$env:DSH_VERSION-win-x64.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
           if ($env:SOURCE_COMMIT -notmatch '^[0-9a-fA-F]{40}$') { throw 'Expected a full source commit SHA' }
           if ($env:DSH_RUN_ID -notmatch '^[1-9][0-9]*$') { throw 'Expected one input run ID' }
           if ($env:DSH_ARTIFACT_ID -notmatch '^[1-9][0-9]*$') { throw 'Expected one input artifact ID' }
@@ -49,6 +57,16 @@ jobs:
         with:
           ref: ${{ inputs.source_commit }}
           persist-credentials: false
+
+      - name: Verify selected source runtime
+        run: |
+          $packager = Get-Content packages/desktop/package-windows.mjs -Raw
+          $pinned = [regex]::Match($packager, 'const dshVersion = "([^"]+)";')
+          $cli = Get-Content packages/cli/package.json -Raw | ConvertFrom-Json
+          if (!$pinned.Success -or $pinned.Groups[1].Value -ne $env:DSH_VERSION -or
+              $cli.dependencies.'@deepseek-ai/dsh' -ne $env:DSH_VERSION) {
+            throw 'Selected source and official DSH input must pin the same runtime version'
+          }
 
       # Reuse an already acquired input. Never download or run the upstream installer.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
@@ -64,12 +82,20 @@ jobs:
         env:
           DSH_SHA256: ${{ inputs.dsh_sha256 }}
         run: |
-          $inputExe = Join-Path $env:RUNNER_TEMP 'dsh-input/deepseek-harness-0.2.1-rc.2-win-x64.exe'
+          $inputExe = Join-Path (Join-Path $env:RUNNER_TEMP 'dsh-input') $env:DSH_INPUT_FILE
+          $inputFile = Get-Item -LiteralPath $inputExe
+          if ($inputFile.PSIsContainer -or ($inputFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'Expected a regular original installer file'
+          }
           if ((Get-FileHash $inputExe -Algorithm SHA256).Hash -ne $env:DSH_SHA256) {
             throw 'DSH input SHA-256 mismatch'
           }
           $signature = Get-AuthenticodeSignature $inputExe
           if ($signature.Status -ne 'Valid') { throw "DSH input signature: $($signature.Status)" }
+          if ($signature.SignerCertificate.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) -ne
+              'Hangzhou DeepSeek Artificial Intelligence Co., Ltd.') {
+            throw 'DSH input signer is not the verified official publisher'
+          }
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -86,7 +112,7 @@ jobs:
 
       - name: Extract input and build NSIS candidate
         run: |
-          $inputExe = Join-Path $env:RUNNER_TEMP 'dsh-input/deepseek-harness-0.2.1-rc.2-win-x64.exe'
+          $inputExe = Join-Path (Join-Path $env:RUNNER_TEMP 'dsh-input') $env:DSH_INPUT_FILE
           $source = Join-Path $env:RUNNER_TEMP 'dsh-windows'
           $tools = Join-Path $env:RUNNER_TEMP 'windows-tools'
           & "$tools/node_modules/7zip-bin/win/x64/7za.exe" x -y $inputExe "-o$source"
@@ -111,6 +137,8 @@ jobs:
             "Workflow commit: $env:WORKFLOW_SHA"
             "DSH input run: $env:DSH_RUN_ID"
             "DSH input artifact: $env:DSH_ARTIFACT_ID"
+            "DSH runtime: $env:DSH_VERSION"
+            "DSH input file: $env:DSH_INPUT_FILE"
             "DSH input SHA-256: $env:DSH_SHA256"
             "Installer Authenticode: $((Get-AuthenticodeSignature $installer.FullName).Status)"
             "Application Authenticode: $((Get-AuthenticodeSignature $exe).Status)"

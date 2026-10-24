@@ -1,6 +1,6 @@
 # Windows 安装包
 
-Windows 与 Mac 使用同一份 React 界面、core、资料服务、DSH 插件和问问 SDK。内核沿用 RC4 适配的 DSH 0.2.1-rc.2；只分别构建桌面启动入口、图标和安装器。
+Windows 与 Mac 使用同一份 React 界面、core、资料服务、DSH 插件和问问 SDK。本轮候选内核目标为 DSH 0.2.1-rc.3（源码须包含 #227 的适配）；只分别构建桌面启动入口、图标和安装器。
 
 ## 使用
 
@@ -22,14 +22,17 @@ Windows 用户从 [官网下载页](https://kaitu.si/download/#windows) 查看 D
 pnpm install --frozen-lockfile
 pnpm build
 npm install --prefix .kaitu/windows-tools --no-audit --no-fund electron-builder@26.17.0 sharp@0.35.5 @electron/asar@3.4.1 rcedit@4.0.1 7zip-bin@5.2.0
-curl.exe -L --fail https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-0.2.1-rc.2-win-x64.exe -o .kaitu/dsh-windows.exe
-Get-AuthenticodeSignature .kaitu/dsh-windows.exe
+$candidateInputExe = Read-Host '已有、合法取得的官方 DSH 0.2.1-rc.3 Windows x64 原始安装器绝对路径'
+$candidateInputHash = Read-Host '独立核实的原始安装器 SHA-256'
+if ($candidateInputHash -notmatch '^[0-9a-fA-F]{64}$') { throw '缺少可信哈希' }
+if ((Get-FileHash $candidateInputExe -Algorithm SHA256).Hash -ne $candidateInputHash) { throw '输入哈希不符' }
+if ((Get-AuthenticodeSignature $candidateInputExe).Status -ne 'Valid') { throw '输入签名无效' }
 ```
 
 先确认官方输入包的签名为 Valid，再解压，不运行官方安装器：
 
 ```powershell
-& .kaitu/windows-tools/node_modules/7zip-bin/win/x64/7za.exe x -y .kaitu/dsh-windows.exe '-o.kaitu/dsh-windows'
+& .kaitu/windows-tools/node_modules/7zip-bin/win/x64/7za.exe x -y $candidateInputExe '-o.kaitu/dsh-windows'
 node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windows
 ```
 
@@ -47,13 +50,14 @@ node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windo
 
 `.github/workflows/windows-candidate.yml` 仅由 `workflow_dispatch` 手动触发。GitHub 要求该 workflow 先存在于默认分支；只开草稿 PR 不会运行它，也不会生成安装器。
 
-它复用本仓库已有 Actions 输入 artifact，不下载上游安装器。输入 artifact 必须来自已获授权、已合法取得的原始 DSH 包，根目录包含 `deepseek-harness-0.2.1-rc.2-win-x64.exe`。执行者提供：
+它复用本仓库已有 Actions 输入 artifact，不下载上游安装器。输入 artifact 必须来自已获授权、已合法取得的原始 DSH 包，根目录包含 `deepseek-harness-<dsh_version>-win-x64.exe`，默认目标为 `0.2.1-rc.3`。执行者提供：
 
-- `source_commit`：经批准的源码完整提交 SHA。
+- `source_commit`：经批准的源码完整提交 SHA，必须显式填写，不沿用旧 main 默认值。目标 rc.3 时，源码须包含 #227 或其整合后继版本。
+- `dsh_version`：官方输入的精确版本，默认 `0.2.1-rc.3`；必须同时匹配所选源码的 Windows packager 和 CLI 固定运行时。
 - `dsh_run_id`、`dsh_artifact_id`：本仓库保存该输入的 run ID 与 artifact ID。
 - `dsh_sha256`：从可信原始输入独立核对的 EXE SHA-256，不是 artifact ZIP 的哈希。
 
-workflow 先检查哈希和原始 EXE 的 Authenticode `Valid` 状态，再解压、调用现有打包器；缺文件、哈希不符、签名无效或构建失败即停止。它不运行上游安装器，不创建凭据，不签名 Kaitu，不发布 Release。
+workflow 先校验所选源码与运行时版本一致，再检查原始 EXE 的独立可信哈希、Authenticode `Valid` 和官方 DeepSeek 发布者，再解压、调用现有打包器；缺文件、哈希不符、签名无效或构建失败即停止。它不运行上游安装器，不创建凭据，不签名 Kaitu，不发布 Release。已有官方安装目录只适用于单独核验的本地开发，不冒充此工作流要求的原始安装器 artifact；Kaitu 重包也不能作为原始 DSH 输入。
 
 `GITHUB_TOKEN` 仅有 `contents: read` 与读取已有 artifacts 所需的 `actions: read`；checkout 不保留凭据。产物通过 Actions 自带 artifact 机制上传，保留 7 天，名称含源码 SHA、run ID 与 attempt；包含 NSIS EXE、现有 `build.json`、输入与源码来源记录 `build-info.txt` 和 `SHA256SUMS`。没有输入 artifact 时，应交由已授权 Windows 使用上面的本机构建命令，不能改下载路径或放宽校验继续。
 
