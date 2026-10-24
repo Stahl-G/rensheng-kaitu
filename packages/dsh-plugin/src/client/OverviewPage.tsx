@@ -1058,6 +1058,11 @@ function Overview({
               library={() => openRecord(data.notes.length ? "inbox" : "")}
               addNext={() => (data.plans.goals.length ? openRecord("projects") : startMatter(""))}
               busy={busy}
+              loadProjects={props.loadProjects}
+              openProject={(slug) => {
+                openRecord("projects");
+                setProjectFocus(slug);
+              }}
               loadLibrary={props.loadLibrary}
               save={async (text) => {
                 const saved = await props.capture(text);

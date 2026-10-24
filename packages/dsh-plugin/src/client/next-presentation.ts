@@ -70,7 +70,9 @@ export function todayDate(day: string, locale: Locale, short = false) {
     month: short ? "numeric" : "long",
     day: "numeric",
     ...(short ? {} : { weekday: "long" as const }),
-  }).format(new Date(`${day}T12:00:00Z`));
+  })
+    .format(new Date(`${day}T12:00:00Z`))
+    .replace(/日(星期)/, "日 $1");
 }
 
 export function todaySourceGroups(
@@ -106,4 +108,22 @@ export function todaySourceGroups(
     ...group,
     label: `${group.label} · ${metric.key === "workouts" ? [...new Set(group.rows.map((row) => String(row.exercise ?? "")))].filter(Boolean).join("、") : metric.key === "sleep" ? (locale === "en" ? "Sleep" : "睡眠") : metric.key === "protein" ? (locale === "en" ? "Meals" : "饮食") : locale === "en" ? "Weight" : "体重"}`,
   }));
+}
+
+/** Only dated, nonempty past log entries can become a project fact. */
+export function todayProjectFacts(projects: import("../types.js").DoingProject[], today: string) {
+  return projects
+    .filter((project): project is typeof project & { recentLog: { date: string; text: string } } => {
+      const log = project.recentLog;
+      return (
+        project.stage === "active" &&
+        !!log?.text.trim() &&
+        /^\d{4}-\d{2}-\d{2}$/.test(log.date) &&
+        Number.isFinite(Date.parse(`${log.date}T12:00:00Z`)) &&
+        new Date(`${log.date}T12:00:00Z`).toISOString().slice(0, 10) === log.date &&
+        log.date <= today
+      );
+    })
+    .sort((a, b) => b.recentLog.date.localeCompare(a.recentLog.date))
+    .slice(0, 1);
 }

@@ -2,11 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addGoalNext, addRecord, initWorkspace, readOverviewPage, stringifyFrontmatter } from "@kaitu/core";
+import { createProject, readProjectsPage } from "@kaitu/core";
 import { expect, it } from "vitest";
 import {
   nextPresentation,
   todayChoices,
   todayDate,
+  todayProjectFacts,
   todaySourceGroups,
 } from "../src/client/next-presentation.js";
 
@@ -124,7 +126,7 @@ it("训练按工作区当地日期和 session 分组，UTC 午夜两边的动作
     expect(groups.map(({ rows }) => rows.map((row) => row.exercise))).toEqual([["深蹲", "硬拉"], ["深蹲"]]);
     expect(groups).toHaveLength(metric.value ?? 0);
     const early = await readOverviewPage(ws, new Date("2026-10-25T01:00:00Z"));
-    expect(todayDate(early.today, "zh-CN")).toContain("10月24日星期六");
+    expect(todayDate(early.today, "zh-CN")).toContain("10月24日 星期六");
     expect(
       todaySourceGroups(
         { ...metric, sources: [{ file: "hidden", text: "invalid" }] },
@@ -132,6 +134,36 @@ it("训练按工作区当地日期和 session 分组，UTC 午夜两边的动作
         "zh-CN",
       ),
     ).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("项目只陈述确有日期的过去日志，不把缺失日志或未来日期当作停滞", () => {
+  const project = { slug: "photos", title: "摄影集", stage: "active" };
+  const items = [
+    { ...project, recentLog: null },
+    { ...project, slug: "blank", recentLog: { date: "2026-10-01", text: " " } },
+    { ...project, slug: "invalid", recentLog: { date: "2026-02-30", text: "错误日期" } },
+    { ...project, slug: "future", recentLog: { date: "2026-12-01", text: "未来计划" } },
+    { ...project, slug: "older", recentLog: { date: "2025-10-14", text: "筛选了封面" } },
+    { ...project, recentLog: { date: "2026-10-14", text: "从80张筛到34张" } },
+  ] as import("../src/types.js").DoingProject[];
+  const original = JSON.stringify(items);
+  expect(todayProjectFacts(items, "2026-10-24").map((p) => p.slug)).toEqual(["photos"]);
+  expect(todayProjectFacts(items.slice(0, 4), "2026-10-24")).toEqual([]);
+  expect(JSON.stringify(items)).toBe(original);
+});
+
+it("首页项目事实来自现有项目日志接口，空日志保持无事实", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-project-fact-"));
+  try {
+    const ws = await initWorkspace(root);
+    const { slug } = await createProject(ws, { title: "摄影集", kind: "personal" });
+    expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24")).toEqual([]);
+    ws.writeText(`projects/${slug}/log.md`, "# 项目进展\n\n## 2026-10-14\n\n从80张筛到34张。\n");
+    const facts = todayProjectFacts(readProjectsPage(ws), "2026-10-24");
+    expect(facts.map((p) => p.recentLog)).toEqual([{ date: "2026-10-14", text: "从80张筛到34张。" }]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
