@@ -345,7 +345,11 @@ export function LifeHome({
       )}
       {!firstVisit && (
         <section className={todayCss.pick}>
-          <h2>{t("此刻，挑一件就好", "Pick just one thing for now")}</h2>
+          <h2>
+            {resting && energy === 5
+              ? t("此刻，休息就好", "Rest is enough for now")
+              : t("此刻，挑一件就好", "Pick just one thing for now")}
+          </h2>
           {!picked ? (
             <>
               <div className={todayCss.energy}>
@@ -369,23 +373,31 @@ export function LifeHome({
                 ))}
               </div>
               {energy === 5 ? (
-                <div className={todayCss.restChoices}>
-                  {[
-                    t("歇一会儿", "Take a breather"),
-                    t("看看窗外", "Look out the window"),
-                    t("什么都不做也行", "It's okay to do nothing"),
-                  ].map((option) => (
-                    <button
-                      type="button"
-                      className={css.link}
-                      key={option}
-                      aria-pressed={resting === option}
-                      onClick={() => setResting(resting === option ? null : option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                  {resting && <output>{resting}</output>}
+                <div className={todayCss.restChoices} data-selected={!!resting}>
+                  {resting ? (
+                    <>
+                      <p className={todayCss.doing}>{resting}</p>
+                      <button type="button" className={css.link} onClick={() => setResting(null)}>
+                        {t("换一件", "Choose another")}
+                      </button>
+                    </>
+                  ) : (
+                    [
+                      t("歇一会儿", "Take a breather"),
+                      t("看看窗外", "Look out the window"),
+                      t("什么都不做也行", "It's okay to do nothing"),
+                    ].map((option) => (
+                      <button
+                        type="button"
+                        className={css.link}
+                        key={option}
+                        aria-pressed={resting === option}
+                        onClick={() => setResting(option)}
+                      >
+                        {option}
+                      </button>
+                    ))
+                  )}
                 </div>
               ) : (
                 <>
