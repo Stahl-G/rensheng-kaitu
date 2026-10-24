@@ -289,6 +289,9 @@ function App() {
                 </summary>
                 <InboxPage
                   loadLibrary={store.library}
+                  loadMediaImage={async () => {
+                    throw new Error("Media needs the app; no files are read in this demo.");
+                  }}
                   subscribe={store.subscribe}
                   connect={explain}
                   openNext={explain}
