@@ -10,6 +10,7 @@ import {
   agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
+  captureNote,
   completeTask,
   confirmOnboardingSetup,
   createProject,
@@ -24,6 +25,7 @@ import {
   importSources,
   inboxNoteDone,
   inboxNotes,
+  isGrowthWorkspace,
   learningCheckinSchema,
   lifeMap,
   linkProject,
@@ -35,10 +37,12 @@ import {
   logProject,
   memoryInput,
   memoryType,
+  normalizeLocale,
   onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
   parseFrontmatter,
+  pick,
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
@@ -52,6 +56,7 @@ import {
   readLearning,
   readOnboardingMatter,
   readPhases,
+  readPreferences,
   readProject,
   readRecords,
   recordOnboardingAiConnection,
@@ -127,6 +132,11 @@ export function registerWorkflowTools(
 ) {
   const visibleMemories = (rows: ReturnType<typeof listMemories>) =>
     rows.filter((row) => agentCanRead(ws, `memory/${row.file}`, connection));
+  const scheduleNoteVersion = (message: string) => {
+    setImmediate(() => {
+      void queue(() => snapshot(ws, message)).catch(() => console.warn("原文已保存，后台版本记录未完成"));
+    });
+  };
   function register<T extends z.ZodType>(
     name: string,
     description: string,
@@ -417,17 +427,30 @@ export function registerWorkflowTools(
   );
   register(
     "kaitu_inbox",
-    "读取待整理笔记、完成后归档，或立即处理稳定的收件箱文件。",
+    "保存用户原文、读取待整理笔记、完成后归档，或立即处理稳定的收件箱文件。capture 只保存原文，不代表已整理或写入结构化记录。",
     z.discriminatedUnion("operation", [
+      z.object({ operation: z.enum(["capture", "capture-growth"]), text: text.max(100000) }).strict(),
       z.object({ operation: z.enum(["notes", "process"]) }).strict(),
       z.object({ operation: z.literal("done"), path: text }).strict(),
     ]),
-    (input) =>
-      input.operation === "notes"
+    (input) => {
+      if (input.operation === "capture" || input.operation === "capture-growth") {
+        if (input.operation === "capture-growth" && !isGrowthWorkspace(ws))
+          throw new Error(
+            pick(
+              normalizeLocale(readPreferences().locale),
+              "请先打开孩子的成长工作区；当前工作区不能保存成长原文。",
+              "Open the child's growth workspace first. Growth entries cannot be saved in this workspace.",
+            ),
+          );
+        return captureNote(ws, input.text, undefined, undefined, scheduleNoteVersion);
+      }
+      return input.operation === "notes"
         ? inboxNotes(ws)
         : input.operation === "done"
           ? inboxNoteDone(ws, input.path, "DeepSeek")
-          : processInbox(ws),
+          : processInbox(ws);
+    },
   );
   register(
     "kaitu_import",

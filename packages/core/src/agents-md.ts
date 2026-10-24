@@ -1,13 +1,22 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
+import { isGrowthWorkspace } from "./modules.js";
 import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
+const growthRoute = {
+  request: "记一条成长原文",
+  use: "log-growth",
+  read: "已明确的孩子工作区；不读取其他工作区",
+  done: "原文保存回执有 path；不等于已整理",
+  skill: "log-growth",
+  match: /log-growth|(?:记|保存|记录).{0,8}成长|成长.{0,8}(?:记录|日记)|growth (?:record|journal)/i,
+};
 const routes = [
   {
     request: "记一顿饭",
@@ -83,15 +92,29 @@ const routes = [
   },
 ];
 
-function skills() {
-  const dir = join(templateDir(), ".agents/skills");
-  return readdirSync(dir)
-    .sort()
-    .map((name) => ({ name, text: readFileSync(join(dir, name, "SKILL.md"), "utf8") }));
+function routesFor(ws?: Workspace) {
+  return ws && isGrowthWorkspace(ws) ? [growthRoute, ...routes] : routes;
+}
+
+function skillDirectories(ws?: Workspace) {
+  return [
+    join(templateDir(), ".agents/skills"),
+    ...(ws && isGrowthWorkspace(ws) ? [join(templateDir(), "../growth/.agents/skills")] : []),
+  ];
+}
+
+function skills(ws: Workspace) {
+  return skillDirectories(ws).flatMap((dir) =>
+    existsSync(dir)
+      ? readdirSync(dir)
+          .sort()
+          .map((name) => ({ name, text: readFileSync(join(dir, name, "SKILL.md"), "utf8") }))
+      : [],
+  );
 }
 
 /** 文件入口与内置 Agent 注入共用；不附带用户档案或全量格式。 */
-export function workspaceAgentGuide(): string {
+export function workspaceAgentGuide(ws?: Workspace): string {
   return `# 开图资料工作区
 
 这里是用户的个人资料。时区在 me/rules.md 的 timezone；时间用带偏移的 ISO 8601，日期按用户时区切分。
@@ -115,7 +138,9 @@ USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile
 
 | 用户说 | 用 | 最多读什么 | 做完的标志 |
 |---|---|---|---|
-${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${route.done} |`).join("\n")}
+${routesFor(ws)
+  .map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${route.done} |`)
+  .join("\n")}
 
 只加载这次任务的一个相关 Skill：正本在 .agents/skills/<技能>/SKILL.md，.claude/skills/ 是副本。缺口只问一个会改变下一步的问题，已知信息直接用。需要更多现状才读 OVERVIEW.md 的相关摘要；整理员按 ORGANIZER.md 执行。
 字段不确定时用 kaitu record schema <类型>（DSH 用 kaitu_status 带 type；MCP 用 record_types）。类型从相关 module.json.records 或 kaitu record types 查。只能读写云盘、没有命令时，格式不确定才读 RECORDS.md 的相关类型，投递边界见 AGENT-README.md；不安装 CLI 来绕路。
@@ -134,15 +159,20 @@ ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${r
 }
 
 /** 只为明确匹配的一个常用任务补齐现有技能，歧义交给运行时的技能发现。 */
-export function workspaceTaskSkill(request: string): { name: string; text: string } | undefined {
-  const matches = routes.filter((route) => route.match.test(request));
+export function workspaceTaskSkill(
+  request: string,
+  ws?: Workspace,
+): { name: string; text: string } | undefined {
+  const matches = routesFor(ws).filter((route) => route.match.test(request));
   if (matches.length !== 1 || !matches[0]?.skill) return;
   const name = matches[0].skill;
+  const file = skillDirectories(ws)
+    .map((dir) => join(dir, name, "SKILL.md"))
+    .find(existsSync);
+  if (!file) return;
   return {
     name,
-    text: parseFrontmatter(
-      readFileSync(join(templateDir(), ".agents/skills", name, "SKILL.md"), "utf8"),
-    ).body.trim(),
+    text: parseFrontmatter(readFileSync(file, "utf8")).body.trim(),
   };
 }
 
@@ -151,11 +181,11 @@ export function renderAgentsMd(ws: Workspace): string {
   const old = ws.exists("AGENTS.md") ? ws.readText("AGENTS.md") : "";
   const index = old.indexOf(USER_SECTION);
   const userPart = index >= 0 ? old.slice(index + USER_SECTION.length).replace(/^\n+/, "") : "";
-  return `${workspaceAgentGuide()}\n${USER_SECTION}\n${userPart}`;
+  return `${workspaceAgentGuide(ws)}\n${USER_SECTION}\n${userPart}`;
 }
 
 export function writeAgentsMd(ws: Workspace): void {
-  for (const skill of skills()) {
+  for (const skill of skills(ws)) {
     for (const base of [".agents", ".claude"])
       ws.writeText(`${base}/skills/${skill.name}/SKILL.md`, skill.text);
   }
