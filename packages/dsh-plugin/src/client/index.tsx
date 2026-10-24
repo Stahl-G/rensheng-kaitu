@@ -53,6 +53,7 @@ export async function apply(ctx: Context) {
       "slots",
       "remote.kaitu",
       "remote.kaituFinance",
+      "remote.pluginManager",
       "layout",
       "sessions",
       "conversation",
