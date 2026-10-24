@@ -59,6 +59,7 @@ export function PaperMap({
   const [failure, setFailure] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
+  const retryDetails = useRef<(() => void) | null>(null);
   const meMarker = useRef<Marker | null>(null);
   const originLabel = useRef<Marker | null>(null);
   const cityPopup = useRef<Popup | null>(null);
@@ -369,6 +370,12 @@ export function PaperMap({
         if (!request.signal.aborted && generation === styleGeneration) failDetails();
       }
     };
+    retryDetails.current = () => {
+      if (disposed || detailTimer) return;
+      remoteAttempted = false;
+      remoteStyle = undefined;
+      void details();
+    };
     const loadStyle = () => {
       cityPopup.current?.remove();
       ++styleGeneration;
@@ -562,6 +569,7 @@ export function PaperMap({
     window.addEventListener("online", online);
     return () => {
       disposed = true;
+      retryDetails.current = null;
       stopDetails();
       observer.disconnect();
       resize.disconnect();
@@ -684,6 +692,16 @@ export function PaperMap({
                   "城市细节暂不可用 · 全球底图仍可浏览",
                   "City details are temporarily unavailable · The global map remains available",
                 )}
+          {detailStatus !== "offline" && (
+            <button
+              type="button"
+              className={css.control}
+              disabled={detailStatus === "loading"}
+              onClick={() => retryDetails.current?.()}
+            >
+              {t("重试城市细节", "Retry city details")}
+            </button>
+          )}
         </output>
       )}
       {!ready && !failure && (
