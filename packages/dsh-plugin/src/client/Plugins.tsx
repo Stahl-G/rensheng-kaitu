@@ -4,13 +4,14 @@ import { useT } from "./i18n.js";
 
 export interface PluginItem {
   name: string;
-  title: string;
-  description: string;
+  title: string | { zh?: string; en?: string };
+  description: string | { zh?: string; en?: string };
   version: string;
   spec: string;
   installed: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;
+  removable?: boolean;
 }
 export type PluginRequest = (
   action: "list" | "install" | "remove" | "open" | "explore" | "page",
@@ -18,13 +19,22 @@ export type PluginRequest = (
 ) => Promise<unknown>;
 
 /** 开图 App 的插件：从开图插件目录安装，页面在 DSH 窗口里打开。 */
-export function Plugins({ request }: { request: PluginRequest }) {
+export function Plugins({
+  request,
+  openLabel,
+}: {
+  request: PluginRequest;
+  openLabel?: readonly [string, string];
+}) {
   const t = useT();
+  const text = (value: PluginItem["title"]) =>
+    typeof value === "string" ? value : t(value.zh ?? value.en ?? "", value.en ?? value.zh ?? "");
   const [items, setItems] = useState<PluginItem[] | null>(null);
   const [working, setWorking] = useState("");
   const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [receipt, setReceipt] = useState("");
   const load = useCallback(
     async (refresh = false) => {
       try {
@@ -49,8 +59,11 @@ export function Plugins({ request }: { request: PluginRequest }) {
     setWorking(name);
     setOperation(action);
     setError("");
+    setReceipt("");
     try {
-      await request(action, input);
+      const result = (await request(action, input)) as { application?: string } | undefined;
+      if (result?.application === "restart-required")
+        setReceipt(t("重启 DSH 后生效。", "Restart DSH to apply this change."));
       if (action !== "open") {
         window.dispatchEvent(new Event("kaitu:plugins-changed"));
         await load();
@@ -80,7 +93,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
             disabled={!!working}
             onClick={() => void run("open", "open")}
           >
-            {t("打开插件页面", "Open plugin pages")}
+            {openLabel ? t(openLabel[0], openLabel[1]) : t("打开插件页面", "Open plugin pages")}
           </button>
         )}
       </div>
@@ -89,6 +102,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
           {error}
         </p>
       )}
+      {receipt && <output>{receipt}</output>}
       {!items ? (
         !error && <p className={css.small}>{t("正在读取插件目录…", "Loading plugins…")}</p>
       ) : (
@@ -98,7 +112,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
             {items.map((item) => (
               <div className={css["switch-row"]} key={item.name}>
                 <span>
-                  <b>{item.title}</b>
+                  <b>{text(item.title)}</b>
                   {(item.installed ? item.installedVersion : item.version) && (
                     <span className={css.small}>
                       {" "}
@@ -108,7 +122,7 @@ export function Plugins({ request }: { request: PluginRequest }) {
                   {item.description && (
                     <>
                       <br />
-                      <span className={css.small}>{item.description}</span>
+                      <span className={css.small}>{text(item.description)}</span>
                     </>
                   )}
                 </span>
@@ -125,7 +139,9 @@ export function Plugins({ request }: { request: PluginRequest }) {
                         : t(`更新至 ${item.version}`, `Update to ${item.version}`)}
                     </button>
                   )}
-                  {!item.installed && !item.spec ? (
+                  {item.installed && item.removable === false ? (
+                    <span className={css.small}>{t("由 DSH 管理", "Managed by DSH")}</span>
+                  ) : !item.installed && !item.spec ? (
                     <span className={css.small}>{t("开发中", "In development")}</span>
                   ) : (
                     <button
