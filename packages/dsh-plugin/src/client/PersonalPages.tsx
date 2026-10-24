@@ -393,6 +393,7 @@ export function PersonalPages(
             {section === "storage" && (
               <section className={css.sec}>
                 <MediaLocation
+                  key={data.storage.root}
                   loadMediaLocation={props.loadMediaLocation}
                   selectMediaLibrary={props.selectMediaLibrary}
                   pickStorageFolder={props.pickStorageFolder}
