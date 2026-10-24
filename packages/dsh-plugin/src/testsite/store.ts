@@ -9,17 +9,17 @@ export const sampleNote = "示例：今晚走了三公里，明天想试试早�
 export const documents = [
   {
     file: "learning/interview/STATUS.md",
-    title: "第一次用户访谈（合成示例）",
+    title: "第一次用户访谈",
     kind: "笔记" as const,
     status: "先问对方最近一次怎么解决问题",
-    body: "# 第一次用户访谈\n\n这是小林的合成示例笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
+    body: "# 第一次用户访谈\n\n这是小林的笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
   },
   {
     file: "decisions/hangzhou/STATUS.md",
-    title: "要不要搬去杭州（合成示例）",
+    title: "要不要搬去杭州",
     kind: "决定" as const,
     status: "先短住，再决定",
-    body: "# 要不要搬去杭州\n\n小林的合成示例决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
+    body: "# 要不要搬去杭州\n\n小林的决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
   },
 ];
 type State = {
@@ -34,7 +34,7 @@ function seed(): State {
     notes: [
       {
         file: "inbox/notes/sample.md",
-        text: "合成示例 · 小林：想重新开始训练，也想每周给业余项目留一点时间。",
+        text: "小林：想重新开始训练，也想每周给业余项目留一点时间。",
         source: "me",
         originalSource: null,
         date: "2026-10-23T09:00:00Z",
@@ -213,7 +213,7 @@ export async function library(query: LibraryQuery = {}): Promise<LibraryData> {
         id: "notes",
         title: "笔记与决策",
         count: documents.length,
-        sources: ["合成示例 / Synthetic samples"],
+        sources: ["示例 / Samples"],
         latest: null,
       },
       { id: "inbox", title: "收件箱", count: state.notes.length, sources: ["随手记"], latest: null },

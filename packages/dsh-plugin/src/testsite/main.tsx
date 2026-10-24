@@ -26,7 +26,7 @@ const directionData = {
       ts: "2026-10-23T09:00:00Z",
       by: "agent",
       rev: 1,
-      title: "先去杭州短住一个周末（合成示例）",
+      title: "先去杭州短住一个周末",
       motivation: "小林想换一种生活节奏，但还不确定是否适合搬家。",
       hypothesis: "短住能帮助判断通勤与生活节奏是否合适。",
       unknowns: "预算、通勤时间以及离朋友更远的影响。",
@@ -77,7 +77,7 @@ function App() {
         id: "notes",
         title: "笔记与决策",
         count: store.documents.length,
-        sources: [t("合成示例", "Synthetic samples")],
+        sources: [t("示例", "Samples")],
         latest: null,
       },
       {
@@ -89,13 +89,7 @@ function App() {
       },
     ],
   };
-  const explain = () =>
-    setNotice(
-      t(
-        "本预览不运行 AI、日历、导入或连接；请体验示例建议的采纳和完成，完整功能在正式 App。",
-        "AI, calendars, imports and connections need the app. Try adopting and completing the sample suggestion here.",
-      ),
-    );
+  const explain = () => setNotice(t("这项需要正式 App。", "This needs the app."));
   function run(action: () => void) {
     try {
       action();
@@ -176,8 +170,8 @@ function App() {
             <div className={preview.demoBar} aria-label={t("示例状态", "Demo state")}>
               <span>
                 {t(
-                  "合成示例只存本标签页，刷新或恢复标签可能保留，不会上传。",
-                  "Synthetic demo; saved in this tab (refresh or tab restore may retain it), never uploaded.",
+                  "示例；资料只留本标签页，刷新保留，不会上传。",
+                  "Demo; data stays in this tab, survives refresh and is never uploaded.",
                 )}
               </span>
               <div className={preview.tools}>
@@ -222,12 +216,7 @@ function App() {
             )}
             {resetting && (
               <section className={preview.banner} aria-label={t("确认重置", "Confirm reset")}>
-                <p>
-                  {t(
-                    "清除本标签页的示例记录与进度？其他网站资料不受影响。",
-                    "Clear this tab's demo notes and progress? Other website data stays as it is.",
-                  )}
-                </p>
+                <p>{t("清空示例记录？", "Clear the demo notes?")}</p>
                 <div className={preview.tools}>
                   <button
                     type="button"
@@ -338,35 +327,24 @@ function App() {
               <>
                 <nav className={css.subtabs} aria-label={t("开图里的内容", "Explore sections")}>
                   <button type="button" disabled>
-                    {t("足迹 · 需 App", "Places · app")}
+                    {t("足迹", "Places")}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       navigate("overview");
-                      setNotice(
-                        t(
-                          "在首页点「打开健康示例」查看合成记录。",
-                          "Open the health sample card on Home to read synthetic records.",
-                        ),
-                      );
+                      setNotice(t("在首页点「打开健康」。", "Open Health from Home."));
                     }}
                   >
-                    {t("健康示例", "Health sample")}
+                    {t("健康", "Health")}
                   </button>
                   <button type="button" disabled>
-                    {t("资讯 · 需 App", "News · app")}
+                    {t("资讯", "News")}
                   </button>
                   <button type="button" aria-pressed="true">
                     {t("方向", "Directions")}
                   </button>
                 </nav>
-                <p className={css.small}>
-                  {t(
-                    "方向页可浏览合成示例；编辑、采纳方向和 AI 生成需正式 App。首页可体验采纳建议 → 完成。",
-                    "Browse a synthetic direction. Editing, adopting directions and AI generation need the app. Try adopting and completing a task on Home.",
-                  )}
-                </p>
                 <DirectionsPage
                   loadExploration={loadDirections}
                   writeExploration={unavailable}

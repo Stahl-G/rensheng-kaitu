@@ -25,11 +25,7 @@ function Dialog({ title, close, children }: { title: string; close: () => void; 
     >
       <div className={ui.dialogHead}>
         <h2 id={id}>{title}</h2>
-        <button
-          type="button"
-          onClick={close}
-          aria-label={title.startsWith("Synthetic") ? "Close" : "关闭 / Close"}
-        >
+        <button type="button" onClick={close} aria-label="关闭 / Close">
           ×
         </button>
       </div>
@@ -141,6 +137,15 @@ export function HomeScenes({
   const [handled, setHandled] = useState<number[]>([]);
   const isNew = mode === "new";
   const sampleOriginals = [
+    ["今天午饭吃了牛肉饭和青菜。", "Beef rice and greens for lunch today."],
+    [
+      "方向想法：先去杭州短住一个周末，再决定要不要搬家。",
+      "Direction idea: spend a weekend in Hangzhou before deciding whether to move.",
+    ],
+  ] as const;
+  const pendingSamples = sampleOriginals.map(([zh, en]) => t(zh, en));
+  // Keep confirmations saved before the copy update handled without rewriting their originals.
+  const previousSampleOriginals = [
     [
       "合成示例 · 午饭原文：今天吃了牛肉饭和青菜。没有估算营养。",
       "Synthetic sample · lunch original: beef rice and greens today. No nutrition estimate.",
@@ -150,10 +155,13 @@ export function HomeScenes({
       "Synthetic sample · direction idea: spend a weekend in Hangzhou before deciding whether to move.",
     ],
   ] as const;
-  const pendingSamples = sampleOriginals.map(([zh, en]) => t(zh, en));
   const isHandled = (index: number) =>
     handled.includes(index) ||
-    state.notes.some((note) => sampleOriginals[index]?.some((text) => note.text === text));
+    state.notes.some(
+      (note) =>
+        sampleOriginals[index]?.some((text) => note.text === text) ||
+        previousSampleOriginals[index]?.some((text) => note.text === text),
+    );
   const pending = mode === "pending" ? pendingSamples.filter((_, index) => !isHandled(index)).length : 0;
   const candidates = samplePackage
     ? [
@@ -161,36 +169,27 @@ export function HomeScenes({
           id: "profile",
           title: t("示例近况", "Sample context"),
           text: t(
-            "合成示例 · 小林在做设计，最近想重新开始训练。",
-            "Synthetic sample · Lin works in design and wants to start training again.",
+            "小林在做设计，最近想重新开始训练。",
+            "Lin works in design and wants to start training again.",
           ),
         },
         {
           id: "goal",
           title: t("示例下一步", "Sample next step"),
           text: t(
-            "合成示例 · 小林想每周给业余项目留一点时间。下一步是约一次用户访谈。",
-            "Synthetic sample · Lin wants to make time for a side project each week. The next step is to arrange a user interview.",
+            "小林想每周给业余项目留一点时间。下一步是约一次用户访谈。",
+            "Lin wants to make time for a side project each week. The next step is to arrange a user interview.",
           ),
         },
         {
           id: "health",
-          title: t("示例健康资料 · 敏感，默认不勾选", "Sample health data · sensitive, unchecked"),
-          text: t(
-            "合成示例 · 虚构体重记录：68.4 千克。",
-            "Synthetic sample · fictional weight record: 68.4 kg.",
-          ),
+          title: t("示例健康资料（敏感）", "Sample health data (sensitive)"),
+          text: t("体重：68.4 千克。", "Weight: 68.4 kg."),
         },
         {
           id: "others",
-          title: t(
-            "示例访谈转写 · 涉及他人，默认不勾选",
-            "Sample interview transcript · other people, unchecked",
-          ),
-          text: t(
-            "合成示例 · 虚构受访者：我通常周末才有空。",
-            "Synthetic sample · fictional interviewee: I usually have time on weekends.",
-          ),
+          title: t("示例访谈转写（涉及他人）", "Sample interview transcript · other people, unchecked"),
+          text: t("受访者说：我通常周末才有空。", "Interviewee: I usually have time on weekends."),
         },
       ]
     : [
@@ -199,8 +198,8 @@ export function HomeScenes({
           ? [
               {
                 id: "current-step",
-                title: t("已采纳的下一步 · 合成示例", "Adopted next step · synthetic sample"),
-                text: `${t("合成示例 · 下一步", "Synthetic sample · next step")}\n${store.taskTitle}`,
+                title: t("已采纳的下一步", "Adopted next step"),
+                text: `${t("下一步", "Next step")}\n${store.taskTitle}`,
               },
             ]
           : []),
@@ -208,7 +207,7 @@ export function HomeScenes({
           ? [
               {
                 id: "current-result",
-                title: t("已记下的结果 · 默认不勾选", "Recorded result · unchecked"),
+                title: t("已记下的结果", "Recorded result"),
                 text: state.result,
               },
             ]
@@ -268,39 +267,27 @@ export function HomeScenes({
     {
       kind: "meal" as const,
       title: t("这顿吃得怎么样", "How was this meal?"),
-      fact: t(
-        "写一句吃了什么，先原样存下。想估算营养，可以复制给你常用的 AI。",
-        "Write what you ate and keep the original. Copy it to your usual AI if you want a nutrition estimate.",
-      ),
+      fact: t("写一句吃了什么。", "Write what you ate."),
       action: t("记这顿 →", "Log this meal →"),
-      meta: t("存原文 · 不估算", "Save original · no estimate"),
       click: () => capture("meal"),
     },
     {
       kind: "body" as const,
       title: t("看看训练和身体的变化", "See training and body changes"),
       fact: isNew
-        ? t(
-            "用一份明确标注的合成记录，看看训练、睡眠和体重怎样放在一起。",
-            "Explore how training, sleep and weight appear together using labeled synthetic records.",
-          )
+        ? t("训练、睡眠和体重放在一起看。", "Training, sleep and weight in one place.")
         : t(
-            "合成示例：30 天训练 12 次，睡眠 7.1 小时，体重 68.4 → 67.9 千克。",
-            "Synthetic sample: 12 sessions in 30 days, 7.1 hours of sleep, weight 68.4 → 67.9 kg.",
+            "最近 30 天练了 12 次，平均睡 7.1 小时，体重 68.4 → 67.9 千克。",
+            "12 sessions in 30 days, 7.1 hours of sleep on average, weight 68.4 → 67.9 kg.",
           ),
-      action: t("打开健康示例 →", "Open health sample →"),
-      meta: t("合成记录 · 不用 AI", "Synthetic records · no AI"),
+      action: t("打开健康 →", "Open health →"),
       click: () => open("health"),
     },
     {
       kind: "path" as const,
       title: t("除了现在这条路，还可以怎么走", "What other paths could you try?"),
-      fact: t(
-        "合成示例：先去杭州短住一个周末。看看方向，以及为什么想试。",
-        "Synthetic sample: try a weekend in Hangzhou. Read the direction and the reason behind it.",
-      ),
+      fact: t("在试：去杭州短住一个周末。", "Trying: a weekend in Hangzhou."),
       action: t("看看方向 →", "Explore a direction →"),
-      meta: t("已有方向页 · 合成示例", "Existing direction page · sample"),
       click: directions,
     },
   ];
@@ -322,16 +309,10 @@ export function HomeScenes({
           </h1>
           {isNew && (
             <p className={ui.sub}>
-              {t(
-                "写一句关于自己就能开始。不用 Key，不用云盘。",
-                "Start with one sentence about yourself. No key or cloud account needed.",
-              )}
+              {t("写一句关于自己，就能开始。", "Start with one sentence about yourself.")}
             </p>
           )}
         </div>
-        {!isNew && (
-          <span className={ui.meta}>{t("浏览器示例 · 不获取天气", "Browser demo · no weather request")}</span>
-        )}
       </div>
       <div className={ui.capture}>
         <button type="button" className={ui.capturePrompt} onClick={() => capture()}>
@@ -340,10 +321,7 @@ export function HomeScenes({
                 "比如：在杭州做设计，最近想把散文集写完",
                 "For example: I design in Hangzhou and want to finish my essays",
               )
-            : t(
-                "随手记一句，吃了什么、想到什么都行",
-                "A sentence about what you ate, or what is on your mind",
-              )}
+            : t("随手记一句", "Write a quick note")}
         </button>
         <button type="button" className={isNew ? ui.primary : ui.secondary} onClick={() => capture()}>
           {isNew ? t("写下这一句", "Write this sentence") : t("记下", "Write a note")}
@@ -362,13 +340,7 @@ export function HomeScenes({
       {pending > 0 && (
         <section className={ui.pending} aria-label={t("等你确认", "Pending review")}>
           <div>
-            <strong>{t(`${pending} 条合成示例，等你确认`, `${pending} synthetic samples to review`)}</strong>
-            <p className={ui.meta}>
-              {t(
-                "预先写好的午饭原文和方向想法；没有 AI 分析。确认后才保存。",
-                "Prewritten meal and direction text; no AI analysis. Saved only after confirmation.",
-              )}
-            </p>
+            <strong>{t(`交来 ${pending} 条，等你确认`, `${pending} items waiting for you`)}</strong>
           </div>
           <button type="button" className={ui.primary} onClick={() => open("pending")}>
             {t(`去确认 ${pending} 条`, `Review ${pending} items`)}
@@ -380,7 +352,6 @@ export function HomeScenes({
           <article key={card.kind} className={ui.scene}>
             <div className={ui.art}>
               <SceneArt kind={card.kind} muted={isNew} />
-              <span>{t("示例插图 · 合成资料", "Sample illustration · synthetic data")}</span>
             </div>
             <div className={ui.sceneBody}>
               <h2>{card.title}</h2>
@@ -389,7 +360,6 @@ export function HomeScenes({
                 <button type="button" onClick={card.click}>
                   {card.action}
                 </button>
-                <small>{card.meta}</small>
               </div>
             </div>
           </article>
@@ -413,20 +383,11 @@ export function HomeScenes({
           <h2>{t("换个 AI，接着聊", "Switch AI and continue")}</h2>
           <p>
             {isNew
-              ? t(
-                  "用一份标了「示例」的资料包看看效果，不需要先写一句。",
-                  "Try a labeled sample package. You can start without writing a note.",
-                )
+              ? t("看看给 AI 的资料长什么样。", "See what your AI would get.")
               : t(
-                  "勾选要带的近况，复制给你常用的 AI，不用重新介绍自己。回答可以贴回来，确认后才记下。",
-                  "Choose context to copy to your usual AI. Continue without introducing yourself again. Paste the answer back and confirm before saving.",
+                  "复制给你常用的 AI，不用重新介绍自己。",
+                  "Copy it to your AI. No need to introduce yourself again.",
                 )}
-          </p>
-          <p className={ui.where}>
-            {t(
-              "资料在：本浏览器标签页 · 示例资料。仅复制所选内容到剪贴板，不会自动发给任何 AI。",
-              "Stored in: this browser tab · demo data. Only selected content is copied to the clipboard; nothing is sent to any AI automatically.",
-            )}
           </p>
         </div>
         <button
@@ -453,7 +414,9 @@ export function HomeScenes({
           <section>
             <div>
               <span className={ui.meta}>
-                {t("现在这件事 · 合成示例", "The next step · synthetic sample")}
+                {state.task === "proposed"
+                  ? t("建议的下一步", "Suggested next step")
+                  : t("现在这件事", "Now")}
               </span>
               <p>
                 <strong>
@@ -489,15 +452,9 @@ export function HomeScenes({
             ) : null}
           </section>
           <section>
-            <p>
-              {pending
-                ? t(`等你确认 ${pending} 条`, `${pending} items to review`)
-                : t("没有等你确认的内容", "Nothing waiting for review")}
-            </p>
+            <p>{pending ? t(`等你确认 ${pending} 条`, `${pending} items to review`) : null}</p>
             <button type="button" onClick={pending ? () => open("pending") : library}>
-              {pending
-                ? t("去确认 →", "Review →")
-                : t(`找回 ${state.notes.length} 条原文 →`, `Find ${state.notes.length} originals →`)}
+              {pending ? t("去确认 →", "Review →") : t("看看存下的内容 →", "See what you saved →")}
             </button>
           </section>
         </div>
@@ -512,19 +469,19 @@ export function HomeScenes({
           title={
             panel === "capture"
               ? context === "meal"
-                ? t("记这顿 · 保存原文", "Log a meal · save the original")
+                ? t("记这顿", "Log a meal")
                 : context === "chat"
-                  ? t("带入聊天原文", "Bring in conversation text")
+                  ? t("带入聊天", "Bring in a conversation")
                   : t("记一句", "Write a note")
               : panel === "health"
-                ? t("训练和身体 · 合成记录", "Training and body · synthetic records")
+                ? t("训练和身体的变化", "Training and body changes")
                 : panel === "package"
                   ? t("选择要带的内容", "Choose what to bring")
                   : panel === "answer"
-                    ? t("贴回回答 · 确认后保存", "Paste answer · confirm before saving")
+                    ? t("贴回回答", "Paste answer")
                     : panel === "complete"
                       ? t("完成并留下结果", "Complete and record a result")
-                      : t("确认合成示例原文", "Review synthetic sample originals")
+                      : t("确认这几条", "Review these items")
           }
           close={close}
         >
@@ -532,33 +489,14 @@ export function HomeScenes({
             <form
               onSubmit={async (event) => {
                 event.preventDefault();
-                if (
-                  await save(
-                    draft,
-                    t(
-                      "已保存原文，可到资料找回。没有进行 AI 分析。",
-                      "Original saved. Find it in Library. No AI analysis was performed.",
-                    ),
-                  )
-                ) {
+                if (await save(draft, t("已保存", "Saved"))) {
                   setPanel(null);
                   setDraft("");
                 }
               }}
             >
-              <p className={ui.meta}>
-                {context === "meal"
-                  ? t(
-                      "没有连接 AI：先保存吃了什么，不生成营养估算，也不记成已确认的饮食数据。",
-                      "No AI is connected. Save what you ate; no nutrition estimate or confirmed meal data is generated.",
-                    )
-                  : t(
-                      "原样保存在本标签页的资料中。请用示例文字，不要填真实个人资料。",
-                      "Kept exactly as written in this tab's Library. Use sample text without real personal data.",
-                    )}
-              </p>
               <label htmlFor="capture-text">
-                {context === "chat" ? t("聊天原文", "Conversation original") : t("这一句", "Your sentence")}
+                {context === "chat" ? t("聊天内容", "Conversation") : t("这一句", "Your sentence")}
               </label>
               <textarea
                 id="capture-text"
@@ -569,17 +507,14 @@ export function HomeScenes({
               />
               <div className={ui.tools}>
                 <button type="submit" className={ui.primary} disabled={busy || !draft.trim()}>
-                  {t("保存原文", "Save original")}
+                  {t("保存", "Save")}
                 </button>
                 <button
                   type="button"
                   onClick={() =>
                     setDraft(
                       context === "meal"
-                        ? t(
-                            "合成示例：午饭吃了牛肉饭和青菜。",
-                            "Synthetic sample: I had beef rice and greens for lunch.",
-                          )
+                        ? t("午饭吃了牛肉饭和青菜。", "I had beef rice and greens for lunch.")
                         : store.sampleNote,
                     )
                   }
@@ -594,28 +529,20 @@ export function HomeScenes({
           )}
           {panel === "health" && (
             <>
-              <p>
-                {t(
-                  "以下是预先写好的合成记录，用来体验查看资料；没有读取健康设备，也没有 AI 分析。插图不表示实际趋势。",
-                  "These prewritten synthetic records demonstrate reading data. No health device was read and no AI analysis was performed. The illustration does not represent a measured trend.",
-                )}
-              </p>
               <table className={ui.healthTable}>
-                <caption>
-                  {t("小林 · 合成健康摘要（示例 30 天）", "Lin · synthetic health summary (sample 30 days)")}
-                </caption>
+                <caption>{t("小林 · 最近 30 天（示例）", "Lin · last 30 days (sample)")}</caption>
                 <tbody>
                   <tr>
                     <th>{t("训练", "Training")}</th>
-                    <td>{t("合成：12 次", "Synthetic: 12 sessions")}</td>
+                    <td>{t("12 次", "12 sessions")}</td>
                   </tr>
                   <tr>
                     <th>{t("睡眠", "Sleep")}</th>
-                    <td>{t("合成：平均 7.1 小时", "Synthetic: average 7.1 hours")}</td>
+                    <td>{t("平均 7.1 小时", "7.1 hours on average")}</td>
                   </tr>
                   <tr>
                     <th>{t("体重", "Weight")}</th>
-                    <td>{t("合成：68.4 → 67.9 千克", "Synthetic: 68.4 → 67.9 kg")}</td>
+                    <td>{t("68.4 → 67.9 千克", "68.4 → 67.9 kg")}</td>
                   </tr>
                 </tbody>
               </table>
@@ -627,23 +554,12 @@ export function HomeScenes({
                   library();
                 }}
               >
-                {t("查看已保存原文 →", "Read saved originals →")}
+                {t("看看存下的内容 →", "See what you saved →")}
               </button>
             </>
           )}
           {panel === "package" && (
             <>
-              <p>
-                {samplePackage
-                  ? t(
-                      "这是合成示例，不含你的信息。健康、涉及他人及转写内容默认不勾选。",
-                      "This synthetic sample contains no personal information. Health, other people's information and transcripts are unchecked by default.",
-                    )
-                  : t(
-                      "从本标签页已保存的原文中选择。所有内容默认不勾选；请留意健康、涉及他人或转写内容。",
-                      "Choose from originals saved in this tab. All items start unchecked; take care with health, other people's information and transcripts.",
-                    )}
-              </p>
               <div className={ui.choices}>
                 {candidates.map((item) => (
                   <label key={item.id}>
@@ -665,29 +581,14 @@ export function HomeScenes({
                   </label>
                 ))}
               </div>
-              {!candidates.length && (
-                <p>
-                  {t(
-                    "还没有原文，可以直接用合成示例。",
-                    "No originals yet. Try the synthetic sample directly.",
-                  )}
-                </p>
-              )}
+              {!candidates.length && <p>{t("还没有内容。", "Nothing saved yet.")}</p>}
               {!samplePackage && (
                 <button type="button" onClick={() => openPackage(true)}>
-                  {t("改用合成示例", "Use synthetic samples instead")}
+                  {t("改用示例", "Use samples instead")}
                 </button>
               )}
-              <label htmlFor="package-preview">
-                {t("将复制的全部内容（仅所选原文）", "Everything to be copied (selected originals only)")}
-              </label>
+              <label htmlFor="package-preview">{t("将复制的内容", "To be copied")}</label>
               <textarea id="package-preview" rows={6} value={packageText} readOnly />
-              <p className={ui.meta}>
-                {t(
-                  "仅复制所选内容到剪贴板，不会自动发给任何 AI。复制不会保存回答或更改资料。",
-                  "Only selected content goes to the clipboard. Nothing is sent to an AI automatically. Copying does not save an answer or change your data.",
-                )}
-              </p>
               <div className={ui.tools}>
                 <button
                   type="button"
@@ -703,8 +604,8 @@ export function HomeScenes({
                     } catch {
                       setProblem(
                         t(
-                          "剪贴板复制失败。可选中上方预览手动复制；尚未自动复制。",
-                          "Clipboard copy failed. Select the preview to copy manually; automatic copying did not complete.",
+                          "复制失败，可以手动选中上面的内容。",
+                          "Couldn't copy. Select the text above instead.",
                         ),
                       );
                     } finally {
@@ -730,10 +631,7 @@ export function HomeScenes({
               </div>
               {copied && (
                 <output className={ui.notice} aria-live="polite">
-                  {t(
-                    "已复制所选内容。现在可自行粘贴给 AI。",
-                    "Selected content copied. You can now paste it into your AI.",
-                  )}
+                  {t("已复制", "Copied")}
                 </output>
               )}
             </>
@@ -746,31 +644,15 @@ export function HomeScenes({
                   setReviewing(true);
                   return;
                 }
-                if (
-                  await save(
-                    answer,
-                    t(
-                      "回答原文已保存；未自动采纳或改写任何资料。",
-                      "Answer original saved; no changes were applied automatically.",
-                    ),
-                  )
-                ) {
+                if (await save(answer, t("已保存", "Saved"))) {
                   setPanel(null);
                   setAnswer("");
                   setReviewing(false);
                 }
               }}
             >
-              <p>
-                {t(
-                  "把回答贴回来，先查看原文，再确认保存。不解析、不自动采纳建议。",
-                  "Paste an answer, review the original, then confirm to save. Suggestions are not parsed or adopted automatically.",
-                )}
-              </p>
               <label htmlFor="answer-text">
-                {reviewing
-                  ? t("待确认原文 · 保留换行和空格", "Original to confirm · spaces and line breaks preserved")
-                  : t("AI 回答原文", "AI answer original")}
+                {reviewing ? t("确认后保存", "Save after review") : t("AI 的回答", "AI answer")}
               </label>
               <textarea
                 id="answer-text"
@@ -782,9 +664,7 @@ export function HomeScenes({
               />
               <div className={ui.tools}>
                 <button type="submit" className={ui.primary} disabled={busy || !answer.trim()}>
-                  {reviewing
-                    ? t("确认保存原文", "Confirm and save original")
-                    : t("预览待确认原文", "Preview for confirmation")}
+                  {reviewing ? t("保存", "Save") : t("预览", "Preview")}
                 </button>
                 {reviewing ? (
                   <button type="button" onClick={() => setReviewing(false)}>
@@ -796,8 +676,8 @@ export function HomeScenes({
                     onClick={() =>
                       setAnswer(
                         t(
-                          "  合成示例：先约一位朋友，聊聊最近一次遇到的问题。\n下次带着访谈原话接着聊。  ",
-                          "  Synthetic sample: first ask a friend about a recent problem.\nBring their original words to the next conversation.  ",
+                          "  先约一位朋友，聊聊最近一次遇到的问题。\n下次带着访谈原话接着聊。  ",
+                          "  First ask a friend about a recent problem.\nBring their original words to the next conversation.  ",
                         ),
                       )
                     }
@@ -813,12 +693,6 @@ export function HomeScenes({
           )}
           {panel === "pending" && (
             <>
-              <p>
-                {t(
-                  "这些是预先写好的合成原文，没有 Agent 或手机传送资料。逐条确认后保存到资料，不生成饮食估算或方向。",
-                  "These are prewritten synthetic originals, with no Agent or phone transmission. Confirm each to save it in Library. No nutrition estimate or direction is generated.",
-                )}
-              </p>
               {pendingSamples.map(
                 (text, index) =>
                   !isHandled(index) && (
@@ -833,16 +707,13 @@ export function HomeScenes({
                             if (
                               await save(
                                 text,
-                                t(
-                                  "已确认并保存合成原文，可到资料找回。",
-                                  "Synthetic original confirmed and saved. Find it in Library.",
-                                ),
+                                t("已保存，可以到资料里找回。", "Saved. You can find it in Library."),
                               )
                             )
                               setHandled([...handled, index]);
                           }}
                         >
-                          {t("确认保存原文", "Confirm and save original")}
+                          {t("保存", "Save")}
                         </button>
                         <button type="button" disabled={busy} onClick={() => setHandled([...handled, index])}>
                           {t("略过", "Skip")}
@@ -851,7 +722,7 @@ export function HomeScenes({
                     </section>
                   ),
               )}
-              {!pending && <p>{t("已处理完本轮示例。", "All samples in this round have been handled.")}</p>}
+              {!pending && <p>{t("都处理完了。", "All done.")}</p>}
               <button type="button" onClick={close}>
                 {t("返回首页", "Back to Home")}
               </button>
@@ -868,9 +739,7 @@ export function HomeScenes({
                 });
               }}
             >
-              <label htmlFor="sample-result">
-                {t("记一句结果（合成示例）", "Record a result (synthetic sample)")}
-              </label>
+              <label htmlFor="sample-result">{t("记一句结果", "Record a result")}</label>
               <textarea
                 id="sample-result"
                 rows={4}
@@ -887,8 +756,8 @@ export function HomeScenes({
                   onClick={() =>
                     setDraft(
                       t(
-                        "合成示例：约好了周六和朋友聊一会，先问最近一次遇到的问题。",
-                        "Synthetic sample: arranged to talk with a friend on Saturday about a recent problem.",
+                        "约好了周六和朋友聊一会，先问最近一次遇到的问题。",
+                        "Arranged to talk with a friend on Saturday about a recent problem.",
                       ),
                     )
                   }

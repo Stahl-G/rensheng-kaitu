@@ -47,7 +47,7 @@ writeFileSync(
 <meta name="robots" content="noindex,nofollow">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>开图 · 浏览器示例 / Kaitu browser demo</title><link rel="stylesheet" href="./assets/${styleName}"></head>
-<body><div id="root"></div><noscript>请启用 JavaScript 体验合成示例。 / Enable JavaScript for the synthetic demo.</noscript>
+<body><div id="root"></div><noscript>请启用 JavaScript 查看示例。 / Enable JavaScript to view the demo.</noscript>
 <script type="module" src="./assets/${scriptName}"></script></body></html>\n`,
 );
 console.log(`Browser-only preview: ${output}`);

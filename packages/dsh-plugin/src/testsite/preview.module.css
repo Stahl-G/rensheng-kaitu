@@ -160,7 +160,7 @@
   color: var(--link);
   padding: 0;
 }
-.home button.capturePrompt {
+.home .capture button.capturePrompt {
   flex: 1;
   color: var(--muted);
   font-size: 15px;
@@ -502,7 +502,7 @@
   .capture {
     padding-left: 12px;
   }
-  .home button.capturePrompt {
+  .home .capture button.capturePrompt {
     font-size: 14px;
   }
   .capture .primary {
