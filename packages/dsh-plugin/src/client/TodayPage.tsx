@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
+  DoingProject,
   InboxEntry,
   LibraryData,
   OverviewData,
@@ -11,7 +12,13 @@ import type {
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
-import { nextPresentation, todayChoices, todayDate, todaySourceGroups } from "./next-presentation.js";
+import {
+  nextPresentation,
+  todayChoices,
+  todayDate,
+  todayProjectFacts,
+  todaySourceGroups,
+} from "./next-presentation.js";
 
 export function LifeHome({
   data,
@@ -30,7 +37,11 @@ export function LifeHome({
   adopt,
   dismiss,
   loadLibrary,
+  loadProjects,
+  openProject,
 }: {
+  loadProjects: () => Promise<DoingProject[]>;
+  openProject: (slug: string) => void;
   data: OverviewData;
   firstVisit: boolean;
   capture: ReactNode;
@@ -50,6 +61,22 @@ export function LifeHome({
 }) {
   const t = useT();
   const locale = useLocale();
+  const [projects, setProjects] = useState<{ cutoff: string; items: DoingProject[] } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void loadProjects()
+      .then((items) => {
+        if (active) setProjects({ cutoff: data.cutoff, items });
+      })
+      .catch(() => {
+        if (active) setProjects(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadProjects, data.cutoff]);
+  const projectFacts = todayProjectFacts(projects?.cutoff === data.cutoff ? projects.items : [], data.today);
+  const composing = useRef(false);
   const [energy, setEnergy] = useState(60);
   const sourceRegion = useRef<HTMLElement>(null);
   const sourceTrigger = useRef<HTMLButtonElement | null>(null);
@@ -158,8 +185,18 @@ export function LifeHome({
   };
   return (
     <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
-      <header>
+      <header className={todayCss.homeHeading}>
         <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+        {!firstVisit && (
+          <button
+            id="life-handover-start"
+            type="button"
+            className={`${css.btn} ${data.proposedTasks.length ? "" : css["btn-strong"]}`}
+            onClick={handover}
+          >
+            {t("带去别的 AI 聊", "Take this to another AI")}
+          </button>
+        )}
         {firstVisit && (
           <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
         )}
@@ -184,16 +221,9 @@ export function LifeHome({
                     {metric.key === "workouts"
                       ? t("训练了", "you logged ")
                       : metric.key === "sleep"
-                        ? recentWeek && metric.days === 7
-                          ? t("平均每天睡了", "you slept an average of ")
-                          : t("有睡眠记录的日子平均睡了", "on days with sleep records you averaged ")
+                        ? t("睡眠平均", "sleep averaged ")
                         : metric.key === "protein"
-                          ? recentWeek && metric.days === 7
-                            ? t("蛋白质日均", "daily protein averaged ")
-                            : t(
-                                "有饮食记录的日子蛋白质日均",
-                                "on days with meal records daily protein averaged ",
-                              )
+                          ? t("蛋白质日均", "daily protein averaged ")
                           : t("记录的体重为", "your recorded weight was ")}
                     <button
                       type="button"
@@ -214,6 +244,30 @@ export function LifeHome({
           })}
         </div>
       )}
+      {!firstVisit &&
+        projectFacts.map((project) => (
+          <p className={todayCss.projectFact} key={project.slug}>
+            {t(
+              `《${nextPresentation({ title: project.title }, locale).title}》在 `,
+              `“${project.title}” on `,
+            )}
+            <button
+              type="button"
+              className={todayCss.factLink}
+              onClick={() => openProject(project.slug)}
+              aria-label={t(
+                `${project.title} ${project.recentLog.date}，查看项目进展原文`,
+                `${project.title}, ${project.recentLog.date}, view project log`,
+              )}
+            >
+              {project.recentLog.date.slice(0, 4) === data.today.slice(0, 4)
+                ? todayDate(project.recentLog.date, locale, true)
+                : project.recentLog.date}
+            </button>
+            {t(" 记下了：", " recorded: ")}
+            {nextPresentation({ title: project.recentLog.text }, locale).title}
+          </p>
+        ))}
       {!!data.proposedTasks.length && (
         <section className={todayCss.aiSuggestions}>
           <h2>{t("AI 留的建议", "Suggestions from AI")}</h2>
@@ -247,6 +301,14 @@ export function LifeHome({
           <p>
             {factSource.from} — {factSource.to}
           </p>
+          {["sleep", "protein"].includes(factSource.key) && (
+            <p>
+              {t(
+                `按有记录的 ${factSource.days} ${factSource.key === "sleep" ? "晚" : "天"}计算${factSource.estimated ? "，含估算值" : ""}`,
+                `Average over ${factSource.days} recorded ${factSource.key === "sleep" ? "nights" : "days"}${factSource.estimated ? ", including estimates" : ""}`,
+              )}
+            </p>
+          )}
           {factSource.key === "workouts" && (
             <p>
               {t(
@@ -430,16 +492,29 @@ export function LifeHome({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (answer.trim())
+              if (!composing.current && answer.trim())
                 void store(`${marker}\n${question}\n\n${answer.trim()}`, () => setAnswer(""));
             }}
           >
-            <textarea
+            <input
               aria-label={question}
               placeholder={t("随口答一句就好", "A sentence is enough")}
-              rows={2}
+              type="text"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
+              onCompositionStart={() => {
+                composing.current = true;
+              }}
+              onCompositionEnd={() => {
+                composing.current = false;
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)
+                )
+                  event.preventDefault();
+              }}
               disabled={saving}
             />
             <button
@@ -447,7 +522,7 @@ export function LifeHome({
               className={css.btn}
               disabled={saving || busy || !answer.trim() || todayNotes?.day !== data.today}
             >
-              {saving ? t("正在保存…", "Saving…") : t("写下这一句", "Keep this sentence")}
+              {saving ? t("正在保存…", "Saving…") : t("记下", "Keep")}
             </button>
           </form>
         )}
@@ -469,16 +544,7 @@ export function LifeHome({
           <button type="button" className={css.link} onClick={memory}>
             {t("搬入 AI 记忆、对话或资料", "Bring AI memories, conversations or files")}
           </button>
-        ) : (
-          <button
-            id="life-handover-start"
-            type="button"
-            className={`${css.btn} ${data.proposedTasks.length ? "" : css["btn-strong"]}`}
-            onClick={handover}
-          >
-            {t("带去别的 AI 聊", "Take this to another AI")}
-          </button>
-        )}
+        ) : null}
       </footer>
       {writing && capture}
     </section>
