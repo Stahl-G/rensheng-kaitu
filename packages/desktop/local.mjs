@@ -304,7 +304,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
           ? plugins.remove(input)
           : action === "open"
             ? ai.open()
-            : plugins.list();
+            : plugins.list(input === "refresh");
     },
     pickDirectory: async () => {
       const { canceled, filePaths } = await dialog.showOpenDialog(window, {
