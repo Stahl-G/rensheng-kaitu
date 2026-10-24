@@ -22,11 +22,11 @@ import {
 import { readOverviewPage } from "../src/overview-page.js";
 import { buildPhoneLibrary } from "../src/phone-projections.js";
 import { validateWorkspace } from "../src/validate.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 describe("记忆", () => {
   it.each([undefined, false])("替换敏感记忆时候选 sensitive=%j 仍保留敏感标记", async (sensitive) => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, {
       type: "fact",
       name: "私下记录",
@@ -56,7 +56,7 @@ describe("记忆", () => {
     { source: "changed" },
     { sensitive: true },
   ])("用户确认前旧条变动时，归档和替换均拒绝且保留当前内容：%j", async (patch) => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, { type: "fact", name: "old", text: "合成原文", source: "synthetic" });
     const { file, ...data } = old;
     const current = { ...data, ...patch };
@@ -72,7 +72,7 @@ describe("记忆", () => {
     expect(normalizedMemory(ws, file)?.ended).toBeUndefined();
   });
   it("改标题和类型保留文件编号、正文和来源，普通更新不能夹带归档决定", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, {
       type: "fact",
       name: "original",
@@ -94,7 +94,7 @@ describe("记忆", () => {
   });
 
   it("用户替换和归档保留旧文件，当前索引、Agent、手机目录只列新的", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, { type: "fact", name: "city", text: "合成旧城市" });
     const candidate = { type: "context" as const, name: "city now", text: "合成新城市" };
     await expect(
@@ -128,7 +128,7 @@ describe("记忆", () => {
   });
 
   it("Agent 的 replaces 候选重复整理仍等待用户，确认后才替换且不重复导入", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, { type: "preference", name: "training", text: "合成早上练" });
     const file = "inbox/agents/synthetic.memory.json";
     const candidate = { type: "preference" as const, name: "training", text: "合成晚上练" };
@@ -145,7 +145,7 @@ describe("记忆", () => {
     expect(listMemories(ws).map((m) => m.text)).toEqual(["合成晚上练"]);
   });
   it("自己放进 memory/ 的普通 Markdown 也当记忆读：名字取标题", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     ws.writeText(
       "memory/我的训练习惯.md",
       "---\ntype: preference\n---\n# 训练时间\n\n喜欢晚上练，早上没精神。\n",
@@ -161,7 +161,7 @@ describe("记忆", () => {
   });
 
   it("只改正文时保留原来的类型（MCP 和问问的补丁里没写的字段是 undefined）", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const gym = await addMemory(ws, { type: "preference", name: "Exercise", text: "晚上训练" });
     expect(await updateMemory(ws, gym.file, { text: "早上训练", type: undefined })).toMatchObject({
       type: "preference",
@@ -170,7 +170,7 @@ describe("记忆", () => {
   });
 
   it("写了却认不出的记忆类型原样保留：校验报出来，不归到别的类型、不进资料包", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     ws.writeText("memory/context_mom.md", "---\ntype: persno\n---\n妈妈住在杭州。\n");
     expect(listMemories(ws).find((memory) => memory.text.includes("妈妈"))?.type).toBe("persno");
     expect(validateWorkspace(ws).some((issue) => issue.file === "memory/context_mom.md")).toBe(true);
@@ -182,7 +182,7 @@ describe("记忆", () => {
   });
 
   it("frontmatter 写坏时按敏感处理，不进资料包", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     ws.writeText("memory/fact_secret.md", "---\nsensitive: true\nname: [没写完\n---\n只给自己看的事。\n");
     // 敏感标记写成字符串 "true" 也从严
     ws.writeText("memory/context_diary.md", '---\nsensitive: "true"\n---\n日记里的私事。\n');
@@ -194,7 +194,7 @@ describe("记忆", () => {
   });
 
   it("记忆文件夹里有同步冲突副本时，其余记忆、个人档案和资料包照常读取", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const city = await addMemory(ws, { type: "fact", name: "city", text: "住在上海" });
     const original = join(ws.root, "memory", city.file);
     copyFileSync(original, original.replace(/\.md$/, " (Conflicted Copy).md"));
@@ -205,7 +205,7 @@ describe("记忆", () => {
   });
 
   it("增删后 MEMORY.md 同步", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const home = await addMemory(ws, { type: "fact", name: "Home", text: "在上海生活。喜欢散步。" });
     const gym = await addMemory(ws, { type: "preference", name: "Exercise", text: "晚上训练" });
     expect(ws.readText("memory/MEMORY.md").trim().split("\n")).toEqual([
@@ -218,7 +218,7 @@ describe("记忆", () => {
   });
 
   it("纯中文名称生成合法文件名，日期按用户时区", async () => {
-    const ws = await freshWorkspace("Asia/Shanghai");
+    const ws = await clonedWorkspace("Asia/Shanghai");
     const m = await addMemory(
       ws,
       { type: "preference", name: "训练时间偏好", text: "晚上训练" },
@@ -231,7 +231,7 @@ describe("记忆", () => {
 });
 
 it("整批记忆只生成一个版本，恢复后全部消失", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const before = await history(ws);
   const indexBefore = ws.readText("memory/MEMORY.md");
   const inputs = [

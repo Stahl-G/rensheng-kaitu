@@ -16,7 +16,6 @@ import {
   draftOnboardingMatter,
   history,
   inboxNoteDone,
-  initWorkspace,
   keepOnboardingMatter,
   listMemories,
   listProjects,
@@ -42,11 +41,12 @@ import {
   ulid,
   validateWorkspace,
 } from "../src/index.js";
+import { clonedWorkspace } from "./helpers.js";
 
 it("粘贴解析保留未知与不合格式行，处理列表、时间及已有和批内重复", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"));
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     await addMemory(ws, { type: "preference", name: "language", text: "用中文" });
     const candidates = parseMemoryPaste(
       [
@@ -88,7 +88,7 @@ it("连续标签各归目标和记忆，尾部分隔符不写入正文，隔天�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-inline-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-26T12:00:00+08:00"));
     const text = "[目标]完成纸桥模型[偏好]喜欢先画草图，再剪纸，[事实]已有一盒彩纸；[兴趣]折纸、";
@@ -139,7 +139,7 @@ it("本地接口只确认预览中所选的记忆，整批一个版本并能撤�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   const previousState = process.env.KAITU_LOCAL_STATE_DIR;
   process.env.KAITU_LOCAL_STATE_DIR = join(root, "state");
-  const ws = await initWorkspace(join(root, "ws"));
+  const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
   const ui = await startUi(ws, { port: 0, open: false, versionDelayMs: 10 });
   const call = (method: string, args: unknown[]) =>
     fetch(`${ui.url}/api/product/${method}`, {
@@ -188,7 +188,7 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Ho_Chi_Minh" });
+    const ws = await clonedWorkspace("Asia/Ho_Chi_Minh", join(root, "ws"));
     const config = ws.readText(".kaitu/config.json");
     expect(onboardingStatus(ws, options).showGuide).toBe(true);
     await saveOnboardingChoices(
@@ -273,7 +273,7 @@ it("清单随实际数据与恢复变化，本机选择不改配置，已有资�
 it("每日整理起草并归档的原文不再算等待整理，草稿仍能核对采纳；核对后只留原文也不再等待", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-organizer-notes-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"));
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const sleep = await saveOnboardingMatter(ws, "想把入睡时间调到 11 点前");
     const original = parseFrontmatter(ws.readText(sleep.source));
     original.data.date = "2020-01-02";
@@ -319,7 +319,7 @@ it("每日整理起草并归档的原文不再算等待整理，草稿仍能核�
 it.each([false, true])("手机原文核对、采纳及只存原文保留来源，跨日归档=%s", async (archived) => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-phone-matter-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"));
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const input = { goal: "整理手机笔记", current: "已有原文", next: "写一条摘要" };
     for (const action of ["adopt", "keep-draft", "keep-raw"]) {
       const name = `ios-3fa9c1d2-${ulid()}.note.md`;
@@ -377,7 +377,7 @@ it.each([false, true])("手机原文核对、采纳及只存原文保留来源�
 it("原文来源校验拒绝手机记录、伪文件名、错日期及越界路径，投影不暴露无效核对入口", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-capture-source-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"));
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const name = `ios-3fa9c1d2-${ulid()}.note.md`;
     const source = `inbox/notes/2020-01-02/${name}`;
     const content = stringifyFrontmatter({ kind: "capture", date: "2020-01-02" }, "合成原文");
@@ -417,7 +417,7 @@ it("原文来源校验拒绝手机记录、伪文件名、错日期及越界路�
 it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来源的下一步并可记结果", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-matter-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Ho_Chi_Minh" });
+    const ws = await clonedWorkspace("Asia/Ho_Chi_Minh", join(root, "ws"));
     const original = "我在准备一个合成展览。AI 建议整理作品、联系场地、制作海报。";
     const matter = await saveOnboardingMatter(ws, original);
     expect(readOnboardingMatter(ws, matter.source).text.trim()).toBe(original);
@@ -516,7 +516,7 @@ it("搬来的目标、项目和在考虑的事进对应模块，今天页列出�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-plans-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const pasted = [
       "[工作] 在上海做了 4 年运营 （2026-08）",
       "[目标] 2027 年 3 月前转岗做产品",
@@ -588,7 +588,7 @@ it("搬入时括号里的条件和记下的时间都留着；已有记忆也能�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-routes-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     await addMemory(ws, { type: "context", name: "thesis", text: "完成论文" });
     const long =
       "Ship the Kaitu desktop client with offline sync, local-first storage and a calm onboarding flow";
@@ -660,7 +660,7 @@ it("旧版搬记忆挤成一条的目标和项目，启动时拆开；拆过就�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-split-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     ws.writeJson("me/goals.json", [
       {
         id: "doubao-20261019-aaaaaa",
@@ -704,7 +704,7 @@ it("两个目标各有下一步：今天页卡片给还没做完的那一步，�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-two-goals-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     ws.writeJson("me/goals.json", [
       { id: "note-20261001-aaaaaa", title: "目标 A", status: "active" },
       { id: "note-20261002-bbbbbb", title: "目标 B", status: "active" },
@@ -735,7 +735,7 @@ it("没有方向模块的旧工作区也能搬入目标，「在考虑」记为�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-legacy-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     rmSync(join(ws.root, "explore/module.json"));
     const preview = previewOnboardingMemory(
       ws,
@@ -760,7 +760,7 @@ it("Agent 在 me/STATUS.md 手写没有 id 的下一步时，引导状态照常�
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     ws.writeText("me/STATUS.md", "---\nnext:\n  - 和家人吃饭\n---\n");
     expect(() => onboardingStatus(ws, options)).not.toThrow();
     expect(onboardingStatus(ws, options).draft).toBeNull();

@@ -9,7 +9,6 @@ import {
   calendarPushEntries,
   handoverPack,
   history,
-  initWorkspace,
   mcpToken,
   parseFrontmatter,
   readRecords,
@@ -20,6 +19,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { expect, it } from "vitest";
+import { clonedWorkspace } from "../../core/test/helpers.js";
 import { startMcpHttp } from "../src/mcp/http.js";
 import { type ToolSet, createMcpServer } from "../src/mcp/server.js";
 
@@ -28,7 +28,7 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
   const client = new Client({ name: "grok-bot", version: "1" });
   const localState = mkdtempSync(join(tmpdir(), "kaitu-mcp-state-"));
   try {
-    const ws = await initWorkspace(root);
+    const ws = await clonedWorkspace(undefined, root);
     const before = (await history(ws)).length;
     await client.connect(
       new StdioClientTransport({
@@ -89,7 +89,7 @@ it("SDK 通过 stdio 列出 remote 工具、记录训练并保存客户端来源
 
 it("HTTP 拒绝缺失或错误 token 和错误 Host，有效 token 能连接，轮换后旧 token 失效", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-http-"));
-  const ws = await initWorkspace(root);
+  const ws = await clonedWorkspace(undefined, root);
   const http = await startMcpHttp(ws, { port: 0 });
   const client = new Client({ name: "remote-client", version: "1" });
   try {
@@ -130,7 +130,7 @@ it("HTTP 拒绝缺失或错误 token 和错误 Host，有效 token 能连接，�
 it("本机和远程 MCP 按连接读取财务，列表、搜索、索引和别名都保留敏感记忆边界", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-sensitive-"));
   try {
-    const ws = await initWorkspace(root);
+    const ws = await clonedWorkspace(undefined, root);
     const open = await addMemory(ws, { type: "fact", name: "Open note", text: "合成公开记忆" });
     const secret = await addMemory(ws, {
       type: "fact",
@@ -206,7 +206,7 @@ it("本机和远程 MCP 按连接读取财务，列表、搜索、索引和别�
 it("MCP 日程回执仍待确认，模型不能伪造用户署名或经记录接口写目标", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-mcp-decisions-"));
   const client = new Client({ name: "synthetic-agent", version: "1" });
-  const server = await initWorkspace(root);
+  const server = await clonedWorkspace(undefined, root);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   try {
     await createMcpServer(server).connect(serverSide);

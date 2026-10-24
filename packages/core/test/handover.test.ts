@@ -12,7 +12,6 @@ import {
   confirmOnboardingMemory,
   directionsPrompt,
   handoverPack,
-  initWorkspace,
   onboardingStatus,
   parseFrontmatter,
   parseMatterAnswer,
@@ -27,11 +26,12 @@ import {
   updateRecord,
   validateWorkspace,
 } from "../src/index.js";
+import { clonedWorkspace } from "./helpers.js";
 
 it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参考链接仍可追溯", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-direction-copy-"));
   try {
-    const ws = await initWorkspace(join(root, "workspace"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "workspace"));
     const answer = JSON.stringify([
       {
         title: "试一次周末摄影",
@@ -84,7 +84,7 @@ it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核
     );
     expect(() => parseMatterAnswer("【现状】只有现状")).toThrow("目标");
     expect(() => parseMatterAnswer("[Goal] x\n[Path] only one part", "en")).toThrow("[Path]");
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const matter = await saveOnboardingMatter(ws, "想每周练三次，但总坚持不了两周。");
     const draft = await pasteOnboardingMatter(
       ws,
@@ -128,7 +128,7 @@ it("资料包只带目标、结果、下一步和非敏感记忆；方向建议�
   const root = mkdtempSync(join(tmpdir(), "kaitu-handover-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const preview = previewOnboardingMemory(
       ws,
       "[目标] 半年内跑完半马\n[偏好] 喜欢早上运动",
@@ -190,7 +190,7 @@ it("普通记忆里写着 Key 或本机路径时，资料包和方向提示词�
   const root = mkdtempSync(join(tmpdir(), "kaitu-redact-"));
   const options = { stateRoot: join(root, "state") };
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const secrets = [
       "sk-proj-SyntheticKey0123456789abcdef",
       "Hunter2!synthetic",
@@ -237,7 +237,7 @@ it("普通记忆里写着 Key 或本机路径时，资料包和方向提示词�
 it("最近 30 天的结果按完成时间算：两个月前定下、今天完成的一步也算，按完成先后排列", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-results-"));
   try {
-    const ws = await initWorkspace(join(root, "ws"), { timeZone: "Asia/Shanghai" });
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     ws.writeJson("me/goals.json", [
       { id: "note-20260801-abc123", title: "半年内跑完半马", status: "active" },
     ]);

@@ -17,7 +17,7 @@ import {
   validateWorkspace,
   writeAgentRecord,
 } from "../src/index.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 const experience = (title: string, start: string, source: string): ExperienceInput => ({
   title,
@@ -30,7 +30,7 @@ const experience = (title: string, start: string, source: string): ExperienceInp
 });
 
 it("排除一份来源跨定位行生效，批次撤销只影响原导入且恢复不覆盖后续人工修改", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const input: [ExperienceInput, ExperienceInput] = [
       experience("首访", "2018", "memory/travel.md#L1"),
@@ -95,7 +95,7 @@ it("排除一份来源跨定位行生效，批次撤销只影响原导入且恢�
 });
 
 it("跨文件导入中断后重启能补完批次，不重复已写入经历，非法整批无记录与恢复作业", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const append = ws.appendLine.bind(ws);
     const fault = vi.spyOn(ws, "appendLine").mockImplementation((path, line) => {
@@ -157,7 +157,7 @@ const photos = (): ExperienceInput[] => [
 ];
 
 it("照片收件的三城市一批先待核对，确认后整批撤销恢复，重扫去重且关闭来源阻止新增", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const deliver = async (name: string, rows = photos()) => {
       ws.writeText(
@@ -222,7 +222,7 @@ it("照片收件的三城市一批先待核对，确认后整批撤销恢复，�
 });
 
 it("批量确认跳过独立编辑隐藏、未知城市和非推测项，确认后的编辑隐藏仍不被撤销恢复回滚", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const input = [
       ...photos(),
@@ -285,7 +285,7 @@ it("批量确认跳过独立编辑隐藏、未知城市和非推测项，确认�
 });
 
 it("确认中途存储中断不显示半批路线，重启补完成员和批次指针后可整批撤销", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const imported = await addExperiences(ws, photos());
     if (!imported.batch_id) throw new Error("缺少批次");
@@ -313,7 +313,7 @@ it("确认中途存储中断不显示半批路线，重启补完成员和批次�
 });
 
 it("真实 Swift 无 title 文件的确认预览包含可核对城市、日期和经历类别", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     // iOS PR11 fca411f7 的原始 241 bytes，不给 producer 补造 title。
     const wire = readFileSync(new URL("./fixtures/ios-photos.records.jsonl", import.meta.url), "utf8");

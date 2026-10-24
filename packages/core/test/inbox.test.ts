@@ -12,10 +12,10 @@ import {
   readStatus,
   validateWorkspace,
 } from "../src/index.js";
-import { freshWorkspace, workout } from "./helpers.js";
+import { clonedWorkspace, workout } from "./helpers.js";
 
 it("四种收件箱各一个带来源版本，混合记录保留合法行与错误笔记，未稳定文件留到下一轮", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const date = localDate(new Date(), ws.timeZone());
     const files = {
@@ -86,7 +86,7 @@ it("四种收件箱各一个带来源版本，混合记录保留合法行与错�
 });
 
 it("记录补齐来源和本地日期，剥离传输字段，保留未知类型为笔记", async () => {
-  const ws = await freshWorkspace("America/New_York");
+  const ws = await clonedWorkspace("America/New_York");
   try {
     const input = [
       { type: "metric", kind: "weight", value: 70, unit: "kg", date: "2026-07-01", agent: "dot" },
@@ -158,7 +158,7 @@ it("记录补齐来源和本地日期，剥离传输字段，保留未知类型�
 });
 
 it("健康快捷指令稳定后才整批导入，重复投递无版本，失败文件作为附件转笔记", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const file = "inbox/health/daily.health.json";
     const samples = [
@@ -213,7 +213,7 @@ it("健康快捷指令稳定后才整批导入，重复投递无版本，失败�
 });
 
 it("健康并列列表：+07:00 的八天累计按本地日期导入，重复无版本，当天累计追加修订", async () => {
-  const ws = await freshWorkspace("Asia/Ho_Chi_Minh");
+  const ws = await clonedWorkspace("Asia/Ho_Chi_Minh");
   try {
     const file = "inbox/health/steps.health.json";
     const payload = {
@@ -269,7 +269,7 @@ it("健康并列列表：+07:00 的八天累计按本地日期导入，重复无
 });
 
 it("健康并列列表行数不一致时整份作为附件转笔记，不写入前面的有效行", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const file = "inbox/health/mismatch.health.json";
     const payload = {
@@ -292,7 +292,7 @@ it("健康并列列表行数不一致时整份作为附件转笔记，不写入�
 });
 
 it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字段的记忆和日程建议、没写日期的简报都照常处理", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   try {
     const today = localDate(new Date(), ws.timeZone());
     const files = {
@@ -358,7 +358,7 @@ it("收件箱按内容收文件：普通 .json 记录、.md 笔记、多写字�
 });
 
 it("Agent 放一份 replaces 之前文件的新文件就能修改或撤回，只能替换自己交的", async () => {
-  const ws = await freshWorkspace("Asia/Saigon");
+  const ws = await clonedWorkspace("Asia/Saigon");
   const meal = (kcal: number) => ({
     type: "meal",
     agent: "grok-bot",
@@ -386,7 +386,7 @@ it("Agent 放一份 replaces 之前文件的新文件就能修改或撤回，只
 });
 
 it("Agent 收件箱不能冒充用户或直接写目标，日程仍待确认并保留拒绝原因", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     ws.writeText(
       "inbox/agents/spoof.records.jsonl",

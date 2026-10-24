@@ -841,7 +841,7 @@ function Overview({
       <DirectionsPage
         {...child}
         goals={personal?.goals}
-        onConnect={() => setView("connections")}
+        onConnect={() => openAskSettings("ai")}
         planningContent={
           <>
             <div ref={planning} id="direction-plans" tabIndex={-1}>
@@ -852,7 +852,7 @@ function Overview({
                 load={props.loadDirectionMap}
                 generate={props.generateDirectionMap}
                 dismiss={props.dismissDirectionLink}
-                onConnect={() => setView("connections")}
+                onConnect={() => openAskSettings("ai")}
                 openProject={(slug) => {
                   openRecord("projects");
                   setProjectFocus(slug);
