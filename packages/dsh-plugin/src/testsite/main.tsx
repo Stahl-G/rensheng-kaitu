@@ -7,7 +7,7 @@ import { FileServicesContext } from "../client/DshFiles.js";
 import { InboxPage, LibraryPage } from "../client/LibraryPage.js";
 import { NavigationIcon } from "../client/NavigationIcon.js";
 import css from "../client/Prototype.module.css";
-import { TodayTasks } from "../client/TodayPage.js";
+import { LifeHome, TodayTasks } from "../client/TodayPage.js";
 import todayCss from "../client/TodayPage.module.css";
 import { type Locale, LocaleContext, browserLocale } from "../client/i18n.js";
 import type { InboxEntry } from "../types.js";
@@ -45,10 +45,18 @@ const files = { pickDirectory: unavailable, findFiles: unavailable, openPath: un
 function App() {
   const state = useSyncExternalStore(store.subscribe, store.snapshot);
   const [locale, setLocale] = useState<Locale>(() =>
-    browserLocale().toLowerCase().startsWith("zh") ? "zh-CN" : "en",
+    new URLSearchParams(location.search).get("lang") === "en"
+      ? "en"
+      : new URLSearchParams(location.search).get("lang") === "zh-CN"
+        ? "zh-CN"
+        : browserLocale().toLowerCase().startsWith("zh")
+          ? "zh-CN"
+          : "en",
   );
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
+  const [writing, setWriting] = useState(false);
   const [view, setView] = useState("overview");
+  const [query, setQuery] = useState("");
   const [section, setSection] = useState("");
   const [original, setOriginal] = useState<InboxEntry>();
   const [document, setDocument] = useState<string>();
@@ -106,6 +114,53 @@ function App() {
     setNotice("");
     setCompleting(false);
   }
+  const capture = (
+    <section className={todayCss.capture}>
+      <h2>{t("随手记", "Quick note")}</h2>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          try {
+            await store.capture(draft);
+            setWriting(false);
+            setDraft("");
+            setError("");
+            setNotice(t("已保存原文，可到资料找回", "Original saved. Find it in Library."));
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          }
+        }}
+      >
+        <label className={css.sr} htmlFor="capture-text">
+          {t("随手记一句", "Quick note")}
+        </label>
+        <textarea
+          id="capture-text"
+          rows={3}
+          maxLength={4000}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={t("写一条示例，不要填真实个人资料", "Use sample text, no personal data")}
+        />
+        <button type="submit" className={css.btn} disabled={!draft.trim()}>
+          {t("记下", "Add note")}
+        </button>
+        <button type="button" className={css.link} onClick={() => setDraft(store.sampleNote)}>
+          {t("填入示例原文", "Use sample text")}
+        </button>
+      </form>
+      <button
+        type="button"
+        className={css.link}
+        onClick={() => {
+          navigate("records");
+          openSection("inbox");
+        }}
+      >
+        {t(`找回已保存的 ${state.notes.length} 条原文 →`, `Find ${state.notes.length} saved originals →`)}
+      </button>
+    </section>
+  );
   return (
     <LocaleContext.Provider value={locale}>
       <FileServicesContext.Provider value={files}>
@@ -116,6 +171,9 @@ function App() {
               <span>{t("开图", "Kaitu")}</span>
             </div>
             <div className={preview.tools}>
+              <a className={css.link} href={locale === "en" ? "/en/" : "/"}>
+                {t("返回官网", "Back to website")}
+              </a>
               <button
                 type="button"
                 className={css.link}
@@ -164,8 +222,8 @@ function App() {
               </strong>
               <p>
                 {t(
-                  "试试：记一条示例原文 → 到资料找回；采纳示例建议 → 完成并记结果；搜索「访谈」或「杭州」。",
-                  "Try: save sample text → find it in Library; adopt a suggestion → finish and record a result; search “访谈” or “杭州”.",
+                  "试试：记一件事 → 到资料找回；也可浏览方向，或展开示例建议体验采纳与完成。",
+                  "Try: write a moment → find it in Library. Browse a direction, or expand the sample suggestion to adopt and complete it.",
                 )}
               </p>
               <p className={css.small}>
@@ -202,6 +260,7 @@ function App() {
                         store.reset();
                         setResetting(false);
                         setDraft("");
+                        setWriting(false);
                         setResult("");
                         setError("");
                         navigate("overview");
@@ -218,8 +277,34 @@ function App() {
               </section>
             )}
             {view === "overview" && (
-              <div className={todayCss.layout}>
-                <div className={todayCss.left}>
+              <>
+                <LifeHome
+                  data={{
+                    ...data,
+                    notes: state.notes.map((note) => ({
+                      file: note.file,
+                      text: note.text,
+                      date: note.date,
+                      status: "received" as const,
+                    })),
+                  }}
+                  firstVisit={state.notes.length === 1}
+                  capture={capture}
+                  writing={writing}
+                  start={() => setWriting(true)}
+                  library={() => {
+                    navigate("records");
+                    openSection("inbox");
+                  }}
+                  connect={explain}
+                  openModule={(id) => (id === "directions" ? navigate("explore") : explain())}
+                  handover={explain}
+                  memory={explain}
+                />
+                <details className={preview.banner}>
+                  <summary>
+                    {t("试试示例建议：采纳 → 完成", "Try a sample suggestion: adopt → complete")}
+                  </summary>
                   <TodayTasks
                     data={data}
                     busy={false}
@@ -309,57 +394,8 @@ function App() {
                   {state.task === "skipped" && (
                     <p>{t("已略过示例建议。重置可再体验。", "Suggestion dismissed. Reset to try again.")}</p>
                   )}
-                </div>
-                <aside className={todayCss.right}>
-                  <section className={todayCss.capture}>
-                    <h2>{t("随手记", "Quick note")}</h2>
-                    <form
-                      onSubmit={async (event) => {
-                        event.preventDefault();
-                        try {
-                          await store.capture(draft);
-                          setDraft("");
-                          setError("");
-                          setNotice(t("已保存原文，可到资料找回", "Original saved. Find it in Library."));
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : String(err));
-                        }
-                      }}
-                    >
-                      <label className={css.sr} htmlFor="capture-text">
-                        {t("随手记一句", "Quick note")}
-                      </label>
-                      <textarea
-                        id="capture-text"
-                        rows={3}
-                        maxLength={4000}
-                        value={draft}
-                        onChange={(event) => setDraft(event.target.value)}
-                        placeholder={t("写一条示例，不要填真实个人资料", "Use sample text, no personal data")}
-                      />
-                      <button type="submit" className={css.btn} disabled={!draft.trim()}>
-                        {t("记下", "Add note")}
-                      </button>
-                      <button type="button" className={css.link} onClick={() => setDraft(store.sampleNote)}>
-                        {t("填入示例原文", "Use sample text")}
-                      </button>
-                    </form>
-                    <button
-                      type="button"
-                      className={css.link}
-                      onClick={() => {
-                        navigate("records");
-                        openSection("inbox");
-                      }}
-                    >
-                      {t(
-                        `找回已保存的 ${state.notes.length} 条原文 →`,
-                        `Find ${state.notes.length} saved originals →`,
-                      )}
-                    </button>
-                  </section>
-                </aside>
-              </div>
+                </details>
+              </>
             )}
             {view === "records" && (
               <>
@@ -382,6 +418,7 @@ function App() {
                     key={original?.file ?? "all"}
                     initialEntry={original}
                     loadLibrary={store.library}
+                    loadMediaImage={unavailable}
                     subscribe={store.subscribe}
                     connect={explain}
                     openNext={() => navigate("overview")}
@@ -412,6 +449,8 @@ function App() {
                     data={library}
                     overview={data}
                     searchLibraryNotes={store.search}
+                    query={query}
+                    onQuery={setQuery}
                     open={openSection}
                     onOpenOriginal={(entry) => {
                       setOriginal(entry);
