@@ -67,7 +67,10 @@ for (const path of asar.listPackage(archive)) {
   if (text.includes("DeepSeek Harness"))
     changes.set(name, Buffer.from(text.replaceAll("DeepSeek Harness", "人生开图")));
 }
-const main = withProductCopyright(changes.get("lib/main.js").toString());
+let main = withProductCopyright(changes.get("lib/main.js").toString());
+const hostReady = "hostUrl = ready.url;";
+if (main.split(hostReady).length !== 2) throw new Error("宿主就绪结构已变化，请核对固定 DSH 构建");
+main = main.replace(hostReady, `${hostReady}\napp.emit("kaitu:host-ready", ready.url);`);
 if (!main.includes("function quitWithoutConfirmation()")) throw new Error("DSH 退出入口已变化");
 changes.set(
   "lib/main.js",

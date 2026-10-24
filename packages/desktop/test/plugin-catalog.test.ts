@@ -33,7 +33,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       ],
     },
   ];
-  vi.stubGlobal("fetch", async () => new Response(JSON.stringify(catalog)));
+  const fetchIndex = vi.fn(async () => new Response(JSON.stringify(catalog)));
   const writeInstalled = (version: string | null) => {
     writeFileSync(
       join(profile, "package.json"),
@@ -42,9 +42,19 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
     writeFileSync(join(installed, "package.json"), JSON.stringify({ name: packageName, version }));
   };
   try {
-    const service = createPluginService({ archive, runtime: join(root, "runtime"), home });
+    const create = () => createPluginService({ archive, runtime: join(root, "runtime"), home, fetchIndex });
+    const service = create();
     writeInstalled("1.0.0");
-    let item = (await service.list()).find((entry: { name: string }) => entry.name === packageName);
+    const initial = await service.list();
+    expect(fetchIndex).not.toHaveBeenCalled();
+    expect(initial.find((entry: { name: string }) => entry.name === "kaitu-auday")).toMatchObject({
+      installed: false,
+      spec: "",
+      version: "",
+    });
+    const [updated] = await Promise.all([service.list(true), service.list(true)]);
+    expect(fetchIndex).toHaveBeenCalledTimes(1);
+    let item = updated.find((entry: { name: string }) => entry.name === packageName);
     expect(item).toMatchObject({
       installed: true,
       installedVersion: "1.0.0",
@@ -58,8 +68,23 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
     writeInstalled("9.0.0");
     item = (await service.list()).find((entry: { name: string }) => entry.name === packageName);
     expect(item).toMatchObject({ installedVersion: "9.0.0", updateAvailable: false });
+    fetchIndex.mockRejectedValueOnce(new Error("offline"));
+    await expect(service.list(true)).rejects.toThrow("无法连接插件目录");
+    expect((await service.list()).find((entry: { name: string }) => entry.name === packageName)).toEqual(
+      item,
+    );
+    fetchIndex.mockResolvedValueOnce(new Response("not JSON"));
+    await expect(service.list(true)).rejects.toThrow();
+    expect((await service.list()).find((entry: { name: string }) => entry.name === packageName)).toEqual(
+      item,
+    );
+    writeInstalled(null);
+    for (const name of ["kaitu-novel-workspace", "kaitu-fortune", "kaitu-auday"]) {
+      expect((await create().list()).find((entry: { name: string }) => entry.name === name)).toMatchObject({
+        installed: false,
+      });
+    }
   } finally {
-    vi.unstubAllGlobals();
     rmSync(root, { recursive: true, force: true });
   }
 });

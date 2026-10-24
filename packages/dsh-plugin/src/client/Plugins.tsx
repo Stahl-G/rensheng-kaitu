@@ -24,16 +24,26 @@ export function Plugins({ request }: { request: PluginRequest }) {
   const [working, setWorking] = useState("");
   const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    try {
-      setItems((await request("list")) as PluginItem[]);
-      setError("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [request]);
+  const [refreshing, setRefreshing] = useState(false);
+  const load = useCallback(
+    async (refresh = false) => {
+      try {
+        setItems((await request("list")) as PluginItem[]);
+        setError("");
+        if (refresh) {
+          setRefreshing(true);
+          setItems((await request("list", "refresh")) as PluginItem[]);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (refresh) setRefreshing(false);
+      }
+    },
+    [request],
+  );
   useEffect(() => {
-    void load();
+    void load(true);
   }, [load]);
   const run = async (name: string, action: "install" | "remove" | "open", input?: string) => {
     setWorking(name);
@@ -55,6 +65,14 @@ export function Plugins({ request }: { request: PluginRequest }) {
     <section className={css.sec}>
       <div className={css["sec-head"]}>
         <h2 className={css.eyebrow}>{t("插件", "Plugins")}</h2>
+        <button
+          type="button"
+          className={css.link}
+          disabled={refreshing || !!working}
+          onClick={() => void load(true)}
+        >
+          {refreshing ? t("正在刷新…", "Refreshing…") : t("刷新目录", "Refresh plugins")}
+        </button>
         {items?.some((item) => item.installed) && (
           <button
             type="button"
@@ -107,24 +125,28 @@ export function Plugins({ request }: { request: PluginRequest }) {
                         : t(`更新至 ${item.version}`, `Update to ${item.version}`)}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className={`${css.btn} ${item.installed ? css["btn-quiet"] : css["btn-primary"]}`}
-                    disabled={!!working || (!item.installed && !item.spec)}
-                    onClick={() =>
-                      void (item.installed
-                        ? run(item.name, "remove", item.name)
-                        : run(item.name, "install", item.spec))
-                    }
-                  >
-                    {working === item.name && operation === (item.installed ? "remove" : "install")
-                      ? item.installed
-                        ? t("正在移除…", "Removing…")
-                        : t("正在安装…", "Installing…")
-                      : item.installed
-                        ? t("移除", "Remove")
-                        : t("安装", "Install")}
-                  </button>
+                  {!item.installed && !item.spec ? (
+                    <span className={css.small}>{t("开发中", "In development")}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className={`${css.btn} ${item.installed ? css["btn-quiet"] : css["btn-primary"]}`}
+                      disabled={!!working}
+                      onClick={() =>
+                        void (item.installed
+                          ? run(item.name, "remove", item.name)
+                          : run(item.name, "install", item.spec))
+                      }
+                    >
+                      {working === item.name && operation === (item.installed ? "remove" : "install")
+                        ? item.installed
+                          ? t("正在移除…", "Removing…")
+                          : t("正在安装…", "Installing…")
+                        : item.installed
+                          ? t("卸载", "Uninstall")
+                          : t("安装", "Install")}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

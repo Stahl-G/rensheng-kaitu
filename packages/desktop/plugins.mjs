@@ -3,12 +3,15 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import { createRequire } from "node:module";
 import { delimiter, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import bundledIndex from "../../docs/site/plugins/index.json" with { type: "json" };
 import { KaituError } from "../core/dist/index.js";
 
 /** 开图的插件目录（DSH 插件市场索引格式 1）。 */
 export const KAITU_PLUGIN_INDEX = "https://kaitu.si/plugins/index.json";
 // 后台 AI（DSH 窗口）和问问用不同的 DSH profile，插件两边都装，页面和工具才都能用。
 const PROFILES = ["desktop", "sdk"];
+// 待发布条目不进要求真实版本的 DSH market index，也不提供实验包安装地址。
+const pendingPlugins = [{ name: "kaitu-auday", title: "Auday", versions: [] }];
 
 /**
  * 插件 = DSH bundle。和 DSH 插件管理器做的一样：在 profile 目录里用 pnpm 装包，再把包名登记进
@@ -75,6 +78,39 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         )
       : [];
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
+  let market;
+  let bundled;
+  let remote = [];
+  let refreshing;
+  const readMarket = () => {
+    market ??= import(
+      pathToFileURL(
+        createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-plugin-market-index"),
+      ).href
+    );
+    return market;
+  };
+  const refreshCatalog = () => {
+    refreshing ??= (async () => {
+      let response;
+      try {
+        response = await fetchIndex(KAITU_PLUGIN_INDEX, {
+          signal: AbortSignal.timeout(15000),
+          credentials: "omit",
+        });
+      } catch (cause) {
+        throw Object.assign(new KaituError("无法连接插件目录，请检查网络后重试", "PLUGIN_NETWORK"), {
+          cause,
+        });
+      }
+      if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
+      const { parseMarketIndex } = await readMarket();
+      remote = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX).plugins;
+    })().finally(() => {
+      refreshing = undefined;
+    });
+    return refreshing;
+  };
   return {
     async page(id, workbenchOrigin, open) {
       const entry = this.explore().find((item) => item.id === id);
@@ -120,24 +156,10 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       });
       return entries;
     },
-    async list() {
-      let response;
-      try {
-        response = await fetchIndex(KAITU_PLUGIN_INDEX, {
-          signal: AbortSignal.timeout(15000),
-          credentials: "omit",
-        });
-      } catch (cause) {
-        throw Object.assign(new KaituError("无法连接插件目录，请检查网络后重试", "PLUGIN_NETWORK"), {
-          cause,
-        });
-      }
-      if (!response.ok) throw new KaituError(`插件目录读取失败（HTTP ${response.status}）`, "PLUGIN");
-      const { parseMarketIndex, marketInstallTarget } = await import(
-        pathToFileURL(
-          createRequire(join(modules, "package.json")).resolve("@deepseek-ai/dsh-plugin-market-index"),
-        ).href
-      );
+    async list(refresh = false) {
+      const { parseMarketIndex, marketInstallTarget } = await readMarket();
+      bundled ??= parseMarketIndex(bundledIndex, KAITU_PLUGIN_INDEX).plugins;
+      if (refresh) await refreshCatalog();
       const names = installed();
       const versions = new Map(
         names.map((name) => {
@@ -145,9 +167,10 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
           return [name, existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).version : ""];
         }),
       );
-      const index = parseMarketIndex(await response.json(), KAITU_PLUGIN_INDEX);
       // 目录里的 kaitu-dsh 是给 DSH 装开图用的，开图 App 自己就是开图，不列出来。
-      const catalog = index.plugins
+      const catalog = [
+        ...new Map([...pendingPlugins, ...bundled, ...remote].map((p) => [p.name, p])).values(),
+      ]
         .filter((plugin) => plugin.name !== "kaitu-dsh")
         .map((plugin) => {
           const latest = plugin.versions[0];

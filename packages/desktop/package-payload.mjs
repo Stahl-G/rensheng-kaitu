@@ -124,7 +124,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   cpSync(join(root, "THIRD_PARTY_NOTICES.md"), join(payload, "licenses", "THIRD_PARTY_NOTICES.md"));
   writeFileSync(
     join(payload, "licenses", "deepseek-harness.txt"),
-    asar.extractFile(archive, "dsh/node_modules/@deepseek-ai/dsh-brand/LICENSE"),
+    asar.extractFile(archive, join("dsh/node_modules/@deepseek-ai/dsh-brand", "LICENSE")),
   );
   for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
     cpSync(
