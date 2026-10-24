@@ -1,5 +1,23 @@
 # 交接说明：人生开图（开图 Kaitu）
 
+## 10-25 隔夜交审（2026-10-25 05:45 UTC+7）
+
+本节是本轮状态入口；下文保留历史，不把旧“待做/已合”描述当作当前发布依据。候选冻结，不改数据格式，只用合成资料。以下未合并项须 Opus 复核及用户批准。
+
+| 项目 | 状态与下一步 | 交审入口 |
+| --- | --- | --- |
+| 桌面 rc.4 | 已发布，冻结提交 42b7a26bb31f042c714dbf3c54361b0685179fc6；Mac arm64 完整包。host-2 RC 通道已验证，host-1 须手动安装；不是 Windows 安装包。 | [Release](https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.2-rc.4) |
+| iPhone 首页 v4 | #88 的日程建议改为顶部独立行，保留手机确认/拒绝；最终 head a0e7147c 的普通字号验证仍缺，不可按四组全过合并。#87 已被取代关闭。 | [#88 验证结论与缺口](https://github.com/Stahl-G/kaitu-ios/pull/88#issuecomment-6389794043) |
+| iPhone 休息态 | #89 head 33fa215 已获 Opus 复审认可；仍依赖 #88，依赖同步后需核验，不提前合。 | [#89](https://github.com/Stahl-G/kaitu-ios/pull/89) |
+| 桌面首页细节 | #239 head 021d4b3 已交审，CI 成功；中文输入法、大字号验证未完成。详细证据只在 PR，不纳入冻结 rc.4。 | [#239](https://github.com/Stahl-G/rensheng-kaitu/pull/239) |
+| iPhone 首页细节 | #90 head 0521633 已交审；完整重启、真实中文输入法、睡眠样本晚数仍有缺口，截图在线上传未完成。不得把缺口记为通过。 | [#90](https://github.com/Stahl-G/kaitu-ios/pull/90#issuecomment-6390362109) |
+| Windows / DSH 整合 | Windows 离线，未做原生验证。#228 已整合 #225–#227，后叠 #229、#233；后续从最新 main 整合时保留首页 v4，不重复套前三片。#233 写作目录仍为旧 0.3.1，需处理用户指定 0.1.2 的安装/迁移。#219/#231 工作流另审。 | [#228](https://github.com/Stahl-G/rensheng-kaitu/pull/228)、[#233](https://github.com/Stahl-G/rensheng-kaitu/pull/233)、[#231](https://github.com/Stahl-G/rensheng-kaitu/pull/231) |
+| 跨 AI 写回 | 方案阶段：先复用主动搬记忆及人工确认。现有直接写入 MCP 工具不是受限候选接口；不能承诺一个 Skill 在所有聊天产品自动实时写回。Hook 接线留后续交审，不新增 schema。 | [现有搬记忆技能](../templates/kaitu/.agents/skills/import-chatgpt-memory/SKILL.md) |
+| 公开 TestFlight | 只完成准备清单，不启用公开链接。需核 Apple 后台实际 build、是否 Internal Only、外部组、Beta Review、隐私/支持材料、符号化及通知范围。源码 B33 不证明后台可安装状态；CI 账户额度需所有者核实。 | [Apple 外测要求](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/) |
+
+顺序：#88 补齐验证并交审 → #89 同步依赖；#239 / #90 各自独立审查。Windows 原生部分待连接恢复；成长模式 #127 / #131 继续暂缓。同一事项连续两次失败只停该事项，记录后转下一项，不为变绿删除有效断言、不强推、不自动合并发布。
+
+
 ## 当前状态（先读这一节）
 
 - 阅读层开发（2026-10-23）：独立 `codex/readonly-user-profile` 增加只读 `USER.md` 与本机指定发布端，来源不全撤下正文；不进入历史、备份、下载检查。仅开发草稿，不合并、不发布、不改 rc.2 预览或真实工作区；用法见 [user-profile.md](user-profile.md)。MCP/CLI 阅读包和生成 AGENTS 入口各自另开小 PR。
