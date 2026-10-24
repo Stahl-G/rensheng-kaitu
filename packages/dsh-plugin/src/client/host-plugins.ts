@@ -21,6 +21,9 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
         title: entry.title,
         description: entry.description,
         version: latest?.version ?? "",
+        license: entry.license,
+        homepage: entry.homepage,
+        dshVersion: latest?.engines.dsh,
         spec:
           source && "url" in source
             ? `git+${source.url}#${source.commit}`
@@ -53,6 +56,12 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
           ...entry,
           installed: bundle?.installed ?? false,
           installedVersion: bundle?.version,
+          // Only offer a known older published version an update; never downgrade an unlisted version.
+          updateAvailable:
+            bundle?.installed === true &&
+            (index.plugins
+              .find((plugin) => plugin.name === entry.name)
+              ?.versions.findIndex((version) => version.version === bundle.version) ?? -1) > 0,
           removable: bundle?.removable,
         };
       });
