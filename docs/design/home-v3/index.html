@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>开图首页 v3</title>
+<style>
+:root{--note:#B4572E;--noteBg:#FBEDE4}
+.t-light{--bg:#F6F3EC;--surface:#FFFDF8;--soft:#ECE8DE;--line:#E2DDD1;--ink:#1D2027;--ink2:#555963;--ink3:#8A8D94;--btn:#22324F;--btnText:#fff;--link:#2B4C7E;--up:#3F7A55;--side:#EFEBE2}
+.t-dark{--bg:#1C1B18;--surface:#25241F;--soft:#302E28;--line:#38362F;--ink:#EEE9DE;--ink2:#BDB7AA;--ink3:#8E897F;--btn:#A9BEDD;--btnText:#1C1B18;--link:#A9BEDD;--up:#8DBE9C;--side:#22211D}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:#DCD8CF;font:15px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","WenQuanYi Zen Hei",sans-serif;color:#1D2027}
+.serif{font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",serif}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer}
+
+/* toolbar */
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:10px 20px;background:#F4F1EA;border-bottom:1px solid #D6D1C6;font-size:13px}
+.bar b{font-size:14px;margin-right:6px}
+.grp{display:flex;gap:4px;align-items:center}
+.grp span{color:#777;margin-right:2px}
+.grp button{border:1px solid #CFC9BC;background:#fff;border-radius:7px;padding:3px 10px;font-size:12.5px;color:#333}
+.grp button[aria-pressed=true]{background:#22324F;color:#fff;border-color:#22324F}
+.stage{padding:28px 20px 60px;display:flex;flex-direction:column;align-items:center;gap:28px}
+.pair{display:flex;gap:28px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+.cap{font-size:12px;color:#666;margin:0 0 8px;font-weight:600;letter-spacing:.02em}
+.shot{border-radius:12px;overflow:hidden;box-shadow:0 10px 40px #0002;display:block}
+
+/* mac window */
+.win{width:1200px;height:780px;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0003;background:var(--bg);color:var(--ink);display:grid;grid-template-columns:208px 1fr;position:relative}
+.win.w900{width:900px}
+.side{background:var(--side);border-right:1px solid var(--line);padding:44px 12px 16px;display:flex;flex-direction:column;gap:2px;position:relative}
+.lights{position:absolute;top:14px;left:16px;display:flex;gap:8px}.lights i{width:12px;height:12px;border-radius:50%;background:#E0605A}.lights i+i{background:#E5B33D}.lights i+i+i{background:#62B556}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font-size:14px;color:var(--ink2)}
+.nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6}
+.nav.on{background:var(--soft);color:var(--ink);font-weight:600}
+.nav .n{margin-left:auto;font-size:12px;color:var(--ink3)}
+.side .where{margin-top:auto;font-size:11.5px;color:var(--ink3);padding:0 10px;line-height:1.5}
+.main{overflow:hidden;padding:40px 56px 0}
+.w900 .main{padding:36px 36px 0}
+.col{max-width:700px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.date{font-size:30px;font-weight:700;margin:0;line-height:1.25}
+.wx{font-size:13px;color:var(--ink3);margin-top:4px}
+.acts{display:flex;align-items:center;gap:14px;flex:none}
+.btn{border:0;border-radius:9px;padding:8px 15px;font-size:14px;font-weight:600;line-height:1.4}
+.btn.p{background:var(--btn);color:var(--btnText)}
+.btn.s{background:var(--soft);color:var(--ink)}
+.txt{border:0;background:none;color:var(--link);font-size:14px;padding:0}
+.capture{margin-top:22px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:8px 0 10px}
+.capture .ph{flex:1;color:var(--ink3);font-size:16px}
+.capture kbd{font-size:12px;line-height:1;font-family:inherit;color:var(--ink3);border:1px solid var(--line);border-radius:5px;padding:3px 6px}
+.pend{margin-top:22px;display:flex;align-items:center;gap:16px;padding:14px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+.pend .tx{flex:1}.pend b{font-size:16px}.pend .src{display:block;font-size:13px;color:var(--ink3)}
+h2.sec{font-size:12.5px;font-weight:600;color:var(--ink3);margin:30px 0 8px;letter-spacing:.04em}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:52px 1fr auto;gap:12px;padding:7px 0;border-top:1px solid var(--line);align-items:baseline}
+.tl li:first-child{border-top:0}
+.tl time{font-size:13px;color:var(--ink3)}
+.tl .what{font-size:15px}.tl .what small{color:var(--ink3);font-size:13px;margin-left:8px}
+.tl .k{font-size:13px;color:var(--ink2)}
+.tl .quote{font-family:"Songti SC","Noto Serif SC",serif}
+.body{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:28px;align-items:end}
+.big{font-size:34px;font-weight:600;line-height:1.1;letter-spacing:-.01em}
+.big small{font-size:15px;font-weight:500;color:var(--ink2);margin-left:3px}
+.lab{font-size:12.5px;color:var(--ink3);margin-top:4px}
+.lab .up{color:var(--up)}
+.spark{display:block;margin-top:8px;width:100%;height:34px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:36px}
+.line{padding:8px 0;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.line b{font-weight:600}.line span{font-size:13px;color:var(--ink3)}
+.start{list-style:none;margin:6px 0 0;padding:0}
+.start li{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:1px solid var(--line);font-size:16px}
+.start li span{font-size:13px;color:var(--ink3)}
+.write{margin-top:26px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:18px 18px 14px}
+.write .ph{font-size:18px;color:var(--ink3);min-height:84px}
+.write .ft{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink3)}
+
+/* phone */
+.phone{width:390px;height:844px;border-radius:44px;overflow:hidden;background:var(--bg);color:var(--ink);box-shadow:0 18px 60px #0003,0 0 0 10px #111;position:relative}
+.ps{padding:58px 20px 100px;height:100%;overflow:hidden}
+.sb{position:absolute;top:16px;left:34px;right:30px;display:flex;justify-content:space-between;font-size:15px;font-weight:600}
+.ptop{display:flex;justify-content:space-between;align-items:flex-end}
+.pdate{font-size:13px;color:var(--ink3)}
+.ptitle{font-size:32px;font-weight:700;margin:0;line-height:1.2}
+.phone .capture .ph{font-size:16px}
+.phone .big{font-size:28px}
+.phone .body{grid-template-columns:1fr 1fr 1fr;gap:14px}
+.phone .tl li{grid-template-columns:44px 1fr auto;gap:10px}
+.phone .tl .what small{display:none}
+.phone .ptop .btn{padding:7px 12px;font-size:14px}
+.phone h2.sec{margin-top:24px}
+.pbtn{display:flex;gap:10px;margin-top:22px}
+.pbtn .btn{flex:1;padding:12px;font-size:15px}
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:84px;background:var(--bg);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-top:9px;font-size:10.5px;color:var(--ink3);text-align:center}
+.tabbar svg{width:24px;height:24px;display:block;margin:0 auto 3px;stroke:currentColor;fill:none;stroke-width:1.6}
+.tabbar .on{color:var(--link);font-weight:600}
+
+/* notes */
+.notes{max-width:1200px;width:100%;background:#FFFDF8;border-radius:12px;padding:22px 28px;font-size:14px;color:#333;box-shadow:0 4px 20px #0001}
+.notes h3{margin:0 0 10px;font-size:16px}
+.notes ol{margin:0;padding-left:20px;columns:2;column-gap:40px}
+.notes li{margin:0 0 8px;break-inside:avoid}
+.notes li b{color:#1D2027}
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<div class="stage" id="stage"></div>
+<script>
+const P=new URLSearchParams(location.search);
+const S={view:P.get('view')||'compare',state:P.get('state')||'data',theme:P.get('theme')||'light',width:P.get('width')||'1200'};
+const opts={view:[['compare','改前 / 改后'],['desktop','桌面'],['phone','iPhone']],state:[['new','第一次打开'],['data','有资料'],['pending','有待确认']],theme:[['light','浅色'],['dark','深色']],width:[['1200','1200'],['900','900']]};
+const lbl={view:'看',state:'状态',theme:'外观',width:'桌面宽度'};
+function bar(){document.getElementById('bar').innerHTML='<b>开图首页 v3</b>'+Object.keys(opts).map(k=>`<div class="grp"><span>${lbl[k]}</span>${opts[k].map(([v,t])=>`<button aria-pressed="${S[k]===v}" onclick="set('${k}','${v}')">${t}</button>`).join('')}</div>`).join('')}
+function set(k,v){S[k]=v;const u=new URLSearchParams(S);history.replaceState(null,'','?'+u);render()}
+const ic={
+ today:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>',
+ map:'<svg viewBox="0 0 24 24"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/></svg>',
+ lib:'<svg viewBox="0 0 24 24"><path d="M4 5h6v14H4zM10 5h4v14h-4zM15.5 5.5l3.8-.9 2.6 13.6-3.8.9z"/></svg>',
+ ask:'<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>'};
+// synthetic: weight 30 days 68.4 -> 67.9
+const W=[68.4,68.5,68.3,68.4,68.2,68.3,68.3,68.1,68.2,68.2,68.0,68.1,68.2,68.0,67.9,68.1,68.0,68.0,67.9,68.0,67.8,67.9,68.0,67.9,67.8,67.9,67.9,67.8,67.9,67.9];
+function spark(){const mn=67.7,mx=68.6,w=200,h=34;const pts=W.map((v,i)=>`${(i/(W.length-1)*w).toFixed(1)},${(h-2-(v-mn)/(mx-mn)*(h-4)).toFixed(1)}`).join(' ');const last=pts.split(' ').pop().split(',');return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="1.4" vector-effect="non-scaling-stroke"/><circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="var(--ink)"/></svg>`}
+const today=[
+ ['07:30','跑步','5.2 km · 28 分钟','配速 5′23″'],
+ ['08:10','早饭','燕麦、两个鸡蛋、咖啡','约 420 kcal'],
+ ['09:15','<span class="quote">“想周末去杭州住两天，看看那边的节奏。”</span>','',''],
+ ['12:40','午饭','牛肉面','约 650 kcal'],
+];
+function tl(phone){return `<ul class="tl num">${today.map(([t,w,s,k])=>`<li><time>${t}</time><div class="what">${w}${s?`<small>${s}</small>`:''}</div><div class="k">${k}</div></li>`).join('')}</ul>`}
+function body(){return `<div class="body num">
+ <div><div class="big">67.9<small>kg</small></div><div class="lab"><span class="up">↓ 0.5</span> 近 30 天</div>${spark()}</div>
+ <div><div class="big">12<small>次</small></div><div class="lab">训练 · 近 30 天</div></div>
+ <div><div class="big">7.1<small>小时</small></div><div class="lab">平均睡眠</div></div></div>`}
+function desktop(){
+ const st=S.state,narrow=S.width==='900';
+ const nav=[['today','今天',st==='pending'?'3':''],['map','开图',''],['lib','资料',''],['ask','问问','']].map(([k,t,n],i)=>`<div class="nav${i===0?' on':''}">${ic[k]}<span>${t}</span>${n?`<span class="n">${n}</span>`:''}</div>`).join('');
+ const head=(acts)=>`<div class="head"><div><h1 class="date serif num">10月24日 星期六</h1><div class="wx num">18° 多云</div></div>${acts?`<div class="acts">${acts}</div>`:''}</div>`;
+ let main;
+ if(st==='new'){
+  main=head('')+`<div class="write"><div class="ph">今天想记下的一件事……</div><div class="ft"><span>也可以粘贴一段和 AI 的对话</span><button class="btn p">写下这一句</button></div></div>
+  <h2 class="sec">或者从这里开始</h2>
+  <ul class="start"><li>记一顿饭<span>文字或照片都行</span></li><li>导入 Apple 健康<span>训练、睡眠、体重</span></li><li>从常用的 AI 搬来记忆<span>ChatGPT、Claude……</span></li><li>写下去过的城市<span>开图会画成地图</span></li></ul>`;
+ }else{
+  const ai=st==='pending'?`<button class="txt">贴回 AI 回答</button><button class="btn s">选择要带的内容</button>`:`<button class="txt">贴回 AI 回答</button><button class="btn p">选择要带的内容</button>`;
+  main=head(ai)+(st==='pending'?`<div class="pend"><div class="tx"><b>3 条等你确认</b><span class="src">Claude 晚间复盘整理的饮食和一条待办</span></div><button class="btn p">去确认 3 条</button></div>`:'')+
+  `<div class="capture"><span class="ph">随手记一句</span><kbd>⌘ N</kbd></div>
+  <h2 class="sec">今天</h2>${tl()}
+  <h2 class="sec">身体</h2>${body()}
+  <div class="row2" style="margin-top:30px">
+   <div><h2 class="sec" style="margin-top:0">在试的事</h2><div class="line"><b>去杭州短住一个周末</b><span class="num">11月2日前</span></div></div>
+   <div><h2 class="sec" style="margin-top:0">下一步</h2><div class="line"><b>约一次用户访谈</b><button class="txt">采纳</button></div></div>
+  </div>`;
+ }
+ return `<div class="win ${S.theme==='dark'?'t-dark':'t-light'}${narrow?' w900':''}"><aside class="side"><div class="lights"><i></i><i></i><i></i></div>${nav}<div class="where">资料在 iCloud 云盘 · 开图</div></aside><main class="main"><div class="col">${main}</div></main></div>`;
+}
+function phone(){
+ const st=S.state;let c;
+ const pb=st==='new'?'':`<button class="btn ${st==='pending'?'s':'p'}">选择要带的内容</button>`;
+ const top=`<div class="ptop"><div><div class="pdate num">10月24日 星期六 · 18°</div><h1 class="ptitle">今天</h1></div>${pb}</div>`;
+ if(st==='new'){
+  c=top+`<div class="write" style="margin-top:20px"><div class="ph" style="min-height:96px;font-size:17px">今天想记下的一件事……</div><div class="ft"><span></span><button class="btn p">写下这一句</button></div></div>
+  <h2 class="sec">或者从这里开始</h2><ul class="start"><li>记一顿饭<span>拍照或文字</span></li><li>导入 Apple 健康<span>训练、睡眠</span></li><li>从常用的 AI 搬来记忆<span></span></li><li>看看去过的地方<span></span></li></ul>`;
+ }else{
+  c=top+(st==='pending'?`<div class="pend" style="margin-top:16px"><div class="tx"><b>3 条等你确认</b><span class="src">在电脑上确认</span></div><button class="btn p">查看</button></div>`:'')+
+  `<div class="capture" style="margin-top:14px"><span class="ph">随手记一句</span></div>
+  <div style="height:14px"></div>${tl(true)}
+  <h2 class="sec">身体</h2>${body()}
+  <h2 class="sec">去过的地方</h2><div class="line"><b class="num">14 座城市</b><span>最近：杭州 · 10月</span></div>`;
+ }
+ const tabs=[['today','今天'],['map','开图'],['lib','资料'],['ask','问问']].map(([k,t],i)=>`<div class="${i===0?'on':''}">${ic[k]}${t}</div>`).join('');
+ return `<div class="phone ${S.theme==='dark'?'t-dark':'t-light'}"><div class="sb num"><span>9:41</span><span>●●●</span></div><div class="ps">${c}</div><nav class="tabbar">${tabs}</nav></div>`;
+}
+const notes=`<div class="notes"><h3>改了什么</h3><ol>
+<li><b>三张功能卡 → 今天发生的事。</b>首页按时间列出真实记录，读起来是一个人的一天，不是功能目录。</li>
+<li><b>插画 → 数据本身。</b>盘子、柱子、虚线全部拿掉；体重用这个人自己的 30 天折线。没数据就不画。</li>
+<li><b>框 → 留白和细线。</b>新用户只有输入区一个框；有资料时整页没有卡片。</li>
+<li><b>数字放大。</b>67.9 / 12 / 7.1 直接摆出来，等宽数字，说明用小字。</li>
+<li><b>标题改成名词。</b>“今天”“身体”“在试的事”“下一步”，不用问句，不用口号，链接不带箭头。</li>
+<li><b>“换个 AI”不再占一张卡。</b>成为日期旁唯一的主按钮；有待确认时让位给“去确认 3 条”。</li>
+<li><b>Mac 用侧边栏。</b>胶囊导航换成系统习惯的左侧列表，存放位置按实际配置显示在底部。</li>
+<li><b>没有免责声明。</b>不写“不会上传”“不代表”“仅供参考”“示例”。该做到的事由产品做到，不靠文字保证。</li>
+</ol></div>`;
+function render(){bar();const st=document.getElementById('stage');
+ if(S.view==='desktop')st.innerHTML=desktop();
+ else if(S.view==='phone')st.innerHTML=phone();
+ else st.innerHTML=`<div><p class="cap">改前：现在的体验站（有资料）</p><img class="shot" src="before-desktop.png" width="1200" alt="改前桌面"></div><div><p class="cap">改后</p>${desktop()}</div>
+ <div class="pair"><div><p class="cap">改前：iPhone 宽度</p><img class="shot" src="before-phone.png" width="390" alt="改前手机" style="border-radius:44px"></div><div><p class="cap">改后：iPhone</p>${phone()}</div></div>${notes}`;}
+render();
+</script>
+</body>
+</html>
