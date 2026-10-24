@@ -5,254 +5,193 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>首页场景稿</title>
 <style>
-:root{
-  --bg:#F5F2EA; --surface:#FFFDF8; --soft:#EFEBE1; --line:#E3DED2;
-  --ink:#1F2229; --ink2:#4E525B; --ink3:#7A7E86;
-  --btn:#22324F; --link:#2B4C7E; --health:#7D9B84; --paper:#E6D9BF;
-  --note:#B4572E; --noteBg:#FBEDE4;
-}
+:root{--note:#B4572E;--noteBg:#FBEDE4}
+.t-light{--bg:#F5F2EA;--surface:#FFFDF8;--soft:#EFEBE1;--line:#E3DED2;--ink:#1F2229;--ink2:#4E525B;--ink3:#7A7E86;--btn:#22324F;--btnText:#fff;--link:#2B4C7E;--chip:#DCE4F0;--meal:#EDE6D6;--plate:#FFFDF8;--plate2:#F4EFE4;--body:#EEF2EC;--bar:#7D9B84;--map:#E9EEF4;--route:#22324F;--land:#E7E1D3}
+.t-dark{--bg:#1E1D1A;--surface:#282722;--soft:#312F29;--line:#3B3933;--ink:#EDE8DD;--ink2:#C4BEB1;--ink3:#9A948A;--btn:#A9BEDD;--btnText:#1E1D1A;--link:#A9BEDD;--chip:#3A4558;--meal:#3A342A;--plate:#4A4438;--plate2:#3F3A30;--body:#2C332D;--bar:#7D9B84;--map:#2A3038;--route:#A9BEDD;--land:#3A3830}
 *{box-sizing:border-box}
-body{margin:0;background:#D9D6CE;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;color:var(--ink)}
-.board{padding:32px 40px 60px}
-.board>h1{font-size:22px;margin:0 0 4px}
-.board>p{margin:0 0 24px;color:#555;font-size:14px}
-.row{display:flex;gap:36px;align-items:flex-start;margin-bottom:40px}
+body{margin:0;background:#D9D6CE;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;color:#1F2229}
+.board{padding:28px 36px 60px}
+.board>h1{font-size:22px;margin:0 0 4px}.board>p{margin:0 0 14px;color:#555;font-size:14px}
+.tools{display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:#F2EFE8;border-radius:12px;padding:10px 14px;margin-bottom:22px;font-size:13px}
+.tools b{margin-right:6px}.tools button{border:1px solid #CFC9BC;background:#fff;border-radius:8px;padding:5px 10px;font:inherit;cursor:pointer}
+.tools button.on{background:#22324F;color:#fff;border-color:#22324F}
+.stage{display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap}
 .cap{font-size:14px;color:#555;margin:0 0 10px}
-/* reviewer annotations: only in this design file, never in the product */
 .anno{display:inline-block;font-size:11px;font-weight:700;color:var(--note);background:var(--noteBg);border:1px dashed var(--note);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px;white-space:nowrap}
-/* desktop */
-.desk{width:1200px;background:var(--bg);border-radius:12px;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.3)}
-.top{display:flex;justify-content:space-between;align-items:center;padding:18px 48px 8px}
-.brand{display:flex;gap:9px;align-items:center;font-weight:700;font-size:17px}
-.brand svg{width:22px;height:22px}
+.app{background:var(--bg);color:var(--ink)}
+.desk{border-radius:12px;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.3)}
+.top{display:flex;justify-content:space-between;align-items:center;padding:16px 40px 6px}
+.brand{display:flex;gap:9px;align-items:center;font-weight:700;font-size:17px}.brand svg{width:22px;height:22px}
 .rt{display:flex;gap:14px;align-items:center;font-size:13px;color:var(--ink2)}
-.av{width:32px;height:32px;border-radius:50%;background:#1F2229;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
-.tabs{margin:4px 48px 0;background:var(--soft);border-radius:12px;padding:5px;display:grid;grid-template-columns:repeat(4,1fr)}
-.tabs span{text-align:center;padding:10px 0;border-radius:9px;font-size:15px;color:var(--ink2)}
-.tabs .on{background:var(--surface);color:var(--btn);font-weight:700}
-.badge{display:inline-block;margin-left:5px;padding:0 6px;border-radius:9px;background:#DCE4F0;color:var(--link);font-size:11px;font-weight:700}
-.main{padding:24px 48px 32px}
+.av{width:32px;height:32px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:13px}
+.tabs{margin:4px 40px 0;background:var(--soft);border-radius:12px;padding:5px;display:grid;grid-template-columns:repeat(4,1fr)}
+.tabs span{text-align:center;padding:9px 0;border-radius:9px;font-size:15px;color:var(--ink2)}
+.tabs .on{background:var(--surface);color:var(--link);font-weight:700}
+.badge{display:inline-block;margin-left:5px;padding:0 6px;border-radius:9px;background:var(--chip);color:var(--link);font-size:11px;font-weight:700}
+.main{padding:22px 40px 28px}
 .eyebrow{font-size:13px;color:var(--ink3);margin:0 0 4px}
-.h1{font-family:"Songti SC","STSong","Noto Serif SC",serif;font-size:32px;font-weight:700;margin:0}
+.h1{font-family:"Songti SC","STSong","Noto Serif SC",serif;font-size:30px;font-weight:700;margin:0}
 .sub{color:var(--ink2);font-size:15px;margin:6px 0 0}
-.head{display:flex;justify-content:space-between;align-items:flex-end}
-.wx{font-size:14px;color:var(--ink2)}.wx b{font-size:22px;color:var(--ink);font-weight:600}
-.capture{display:flex;gap:10px;align-items:center;margin-top:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 16px}
-.capture .ph{flex:1;color:var(--ink3);font-size:15px}
-.btn{border:0;border-radius:10px;padding:9px 16px;font:inherit;font-size:14px;font-weight:600;white-space:nowrap}
-.btn.p{background:var(--btn);color:#fff}
-.btn.s{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.wx{font-size:14px;color:var(--ink2);white-space:nowrap}.wx b{font-size:21px;color:var(--ink);font-weight:600}
+.capture{display:flex;gap:8px;align-items:center;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 16px}
+.capture .ph{flex:1;color:var(--ink3);font-size:15px;min-width:0}
+.btn{border:0;border-radius:10px;padding:9px 15px;font:inherit;font-size:14px;font-weight:600;white-space:nowrap}
+.btn.p{background:var(--btn);color:var(--btnText)}
+.btn.s{background:var(--surface);border:1px solid var(--line);color:var(--ink)}
 .btn.q{background:var(--soft);color:var(--ink)}
 .lnk{color:var(--link);font-size:14px;font-weight:600}
 .meta{font-size:12.5px;color:var(--ink3)}
-.scenes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+.pending{display:flex;gap:14px;align-items:center;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--link);border-radius:14px;padding:14px 16px}
+.pending .tx{flex:1}.pending b{display:block;font-size:16px;margin-bottom:2px}
+.scenes{display:grid;gap:14px;margin-top:18px}
+.w1200 .scenes{grid-template-columns:repeat(3,1fr)}
+.w900 .scenes{grid-template-columns:repeat(3,1fr)}
 .scene{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
-.scene .img{height:128px;background:var(--soft);position:relative;display:grid;place-items:center}
-.scene .img svg{width:100%;height:100%}
-.tag{position:absolute;left:10px;top:10px;font-size:11px;background:rgba(255,253,248,.92);color:var(--ink2);border-radius:6px;padding:1px 6px}
-.scene .body{padding:14px 16px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
-.scene h3{font-size:17px;margin:0}
+.scene .img{height:118px;position:relative}.scene .img svg{width:100%;height:100%;display:block}
+.w900 .scene .img{height:96px}
+.tag{position:absolute;left:10px;top:10px;font-size:11px;background:var(--surface);opacity:.94;color:var(--ink2);border-radius:6px;padding:1px 6px}
+.scene .body{padding:13px 15px;display:flex;flex-direction:column;gap:5px;flex:1}
+.scene h3{font-size:16px;margin:0;line-height:1.35}
+.w900 .scene h3{font-size:15px}
 .scene .fact{font-size:13.5px;color:var(--ink2)}
-.scene .foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
-.ai{display:flex;gap:18px;align-items:center;margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 20px}
-.ai .ic{width:44px;height:44px;border-radius:12px;background:#E8EDF5;display:grid;place-items:center;flex:none}
-.ai .tx{flex:1}
-.ai h3{margin:0 0 3px;font-size:17px}
-.ai p{margin:0;font-size:13.5px;color:var(--ink2)}
+.scene .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
+.ai{display:flex;gap:16px;align-items:center;margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 18px}
+.w900 .ai{flex-wrap:wrap}
+.ai .ic{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;flex:none}
+.ai .tx{flex:1;min-width:260px}.ai h3{margin:0 0 3px;font-size:16px}.ai p{margin:0;font-size:13.5px;color:var(--ink2)}
 .ai .where{font-size:12px;color:var(--ink3);margin-top:6px}
-.changes{display:flex;gap:16px;margin-top:16px}
-.chg{flex:1;background:transparent;border-top:1px solid var(--line);padding:12px 2px 0;font-size:14px;color:var(--ink2);display:flex;justify-content:space-between;align-items:center}
+.changes{display:flex;gap:16px;margin-top:14px;flex-wrap:wrap}
+.chg{flex:1;min-width:280px;border-top:1px solid var(--line);padding:11px 2px 0;font-size:14px;color:var(--ink2);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .chg b{color:var(--ink)}
 /* phone */
-.phone{width:390px;height:844px;background:var(--bg);border-radius:40px;overflow:hidden;position:relative;box-shadow:0 18px 40px -18px rgba(0,0,0,.35);border:10px solid #1B1C1F}
+.phone{width:390px;height:844px;border-radius:44px;overflow:hidden;position:relative;box-shadow:0 18px 40px -18px rgba(0,0,0,.35);border:10px solid #1B1C1F}
 .status{height:44px;display:flex;justify-content:space-between;align-items:center;padding:0 26px;font-size:14px;font-weight:600}
-.pmain{padding:6px 18px 0;height:calc(100% - 44px - 78px);overflow:hidden}
-.pmain .h1{font-size:26px}
-.pcap{display:flex;gap:8px;align-items:center;margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 8px 8px 14px}
-.pcap .ph{flex:1;color:var(--ink3);font-size:14px}
-.pai{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
-.pai h3{margin:0 0 4px;font-size:16px}.pai p{margin:0;font-size:13px;color:var(--ink2)}
-.pai .btn{width:100%;margin-top:10px;padding:11px}
-.prow{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:10px}
-.prow .th{width:58px;height:58px;border-radius:10px;overflow:hidden;flex:none;background:var(--soft);position:relative}
-.prow .th svg{width:100%;height:100%}
-.prow .tx{flex:1;min-width:0}
-.prow b{font-size:15px;display:block}
-.prow span{font-size:12.5px;color:var(--ink2)}
+.pmain{padding:4px 16px 0;height:calc(100% - 44px - 78px);overflow:hidden}
+.pmain .h1{font-size:25px}
+.phone .capture{margin-top:10px;padding:7px 7px 7px 14px}.phone .capture .ph{font-size:14px}
+.phone .scene{margin-top:12px}.phone .scene .img{height:104px}
+.prow{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:9px;margin-top:9px}
+.prow .th{width:54px;height:54px;border-radius:10px;overflow:hidden;flex:none}.prow .th svg{width:100%;height:100%;display:block}
+.prow .tx{flex:1;min-width:0}.prow b{font-size:15px;display:block}.prow span{font-size:12.5px;color:var(--ink2)}
+.paimini{display:flex;gap:10px;align-items:center;margin-top:9px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px}
+.paimini .tx{flex:1;min-width:0}.paimini b{font-size:15px;display:block}.paimini span{font-size:12px;color:var(--ink3)}
 .tabbar{position:absolute;bottom:0;left:0;right:0;height:78px;background:var(--surface);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-top:10px;font-size:11px;color:var(--ink3);text-align:center}
-.tabbar .on{color:var(--btn);font-weight:700}
-.dot{width:22px;height:22px;margin:0 auto 4px;border-radius:7px;background:var(--soft)}
-.tabbar .on .dot{background:#DCE4F0}
-/* table */
-table{border-collapse:collapse;background:var(--surface);font-size:13.5px;width:1200px}
-th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
-th{background:var(--soft);font-weight:600}
+.tabbar .on{color:var(--link);font-weight:700}.dot{width:22px;height:22px;margin:0 auto 4px;border-radius:7px;background:var(--soft)}.tabbar .on .dot{background:var(--chip)}
+table{border-collapse:collapse;background:#FFFDF8;font-size:13.5px;max-width:1240px;margin-top:8px}
+th,td{border:1px solid #E3DED2;padding:8px 11px;text-align:left;vertical-align:top}th{background:#EFEBE1;font-weight:600}
+h2.sec{font-size:17px;margin:34px 0 6px}
 </style>
 </head>
 <body>
 <div class="board">
-<h1>首页场景稿 · 第 1 版</h1>
-<p>示例人物小林，全部内容为合成。<span class="anno">橙色虚线</span> 是审稿标注，只在这份稿里出现，不进产品。</p>
+<h1>首页场景稿 · 第 2 版</h1>
+<p>示例人物小林，全部内容为合成。<span class="anno">橙色虚线</span>是审稿标注，只在这份稿里出现，不进产品。用工具条切换状态、外观和桌面宽度。</p>
+<div class="tools" id="tools"></div>
+<div class="stage" id="stage"></div>
 
-<!-- ============ 桌面：有资料 ============ -->
-<div class="row">
-<div>
-<p class="cap">桌面 · 用了一段时间（1200 宽）</p>
-<div class="desk">
-  <div class="top"><div class="brand"><svg viewBox="0 0 48 48"><path d="M4 10L17.33 6V38L4 42Z" fill="#22324F"/><path d="M17.33 6L30.67 10V42L17.33 38Z" fill="#2B4C7E"/><path d="M30.67 10L44 6V38L30.67 42Z" fill="#E6D9BF"/></svg>开图</div><div class="rt">设置<div class="av">林</div></div></div>
-  <nav class="tabs"><span class="on">首页</span><span>开图</span><span>资料<i class="badge">2</i></span><span>问问</span></nav>
-  <div class="main">
-    <div class="head"><div><p class="eyebrow">让每个 AI，一读就认识你</p><p class="h1">10月24日 星期六</p></div><div class="wx">杭州 <b>18°</b> 多云</div></div>
-    <div class="capture"><span class="ph">随手记一句，或拍下这顿饭</span><button class="btn q">拍一张</button><button class="btn q">说一段</button><button class="btn s">记下</button></div>
-
-    <div class="scenes">
-      <div class="scene">
-        <div class="img">
-          <svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="#EDE6D6"/><ellipse cx="180" cy="70" rx="78" ry="44" fill="#FFFDF8"/><ellipse cx="180" cy="70" rx="58" ry="31" fill="#F4EFE4"/><circle cx="160" cy="62" r="16" fill="#C9A27A"/><rect x="178" y="56" width="34" height="20" rx="8" fill="#8FAF8F"/><circle cx="196" cy="84" r="9" fill="#E3B26B"/></svg>
-          <span class="tag">你的照片 · 今天 12:20</span>
-        </div>
-        <div class="body">
-          <h3>这顿吃得怎么样<span class="anno">已有 · 需接 AI</span></h3>
-          <div class="fact">午饭：牛肉饭、青菜。估算约 650 千卡，蛋白质 32 克</div>
-          <div class="meta">数值为估算 · 你确认后才记进饮食</div>
-          <div class="foot"><span class="lnk">再记一顿 →</span><span class="meta">存进你的资料</span></div>
-        </div>
-      </div>
-      <div class="scene">
-        <div class="img">
-          <svg viewBox="0 0 360 128" preserveAspectRatio="none"><rect width="360" height="128" fill="#EEF2EC"/><g fill="#7D9B84"><rect x="28" y="70" width="14" height="40" rx="3"/><rect x="62" y="56" width="14" height="54" rx="3"/><rect x="96" y="82" width="14" height="28" rx="3"/><rect x="130" y="48" width="14" height="62" rx="3"/><rect x="164" y="62" width="14" height="48" rx="3"/><rect x="198" y="40" width="14" height="70" rx="3"/><rect x="232" y="58" width="14" height="52" rx="3"/></g><polyline points="20,44 70,40 120,46 170,36 220,38 270,30 340,32" fill="none" stroke="#22324F" stroke-width="2.5"/></svg>
-          <span class="tag">来自你的健康记录</span>
-        </div>
-        <div class="body">
-          <h3>看看训练和身体的变化<span class="anno">已有 · 不用 AI</span></h3>
-          <div class="fact">最近 30 天练了 12 次，平均睡 7.1 小时，体重 68.4 → 67.9 千克</div>
-          <div class="meta">只显示记录里有的数字</div>
-          <div class="foot"><span class="lnk">打开健康 →</span><span class="meta">存进你的资料</span></div>
-        </div>
-      </div>
-      <div class="scene">
-        <div class="img">
-          <svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="#E9EEF4"/><path d="M40 98 C 100 90, 120 50, 180 56 S 260 40, 320 30" fill="none" stroke="#22324F" stroke-width="3"/><path d="M180 56 C 220 80, 260 96, 320 100" fill="none" stroke="#2B4C7E" stroke-width="2.5" stroke-dasharray="6 6"/><circle cx="180" cy="56" r="7" fill="#22324F"/><circle cx="320" cy="30" r="5" fill="#22324F"/><circle cx="320" cy="100" r="5" fill="#FFFDF8" stroke="#2B4C7E" stroke-width="2.5"/></svg>
-          <span class="tag">实线是在走的，虚线是想试的</span>
-        </div>
-        <div class="body">
-          <h3>除了现在这条路，还可以怎么走<span class="anno">已有 · AI 部分需接 AI</span></h3>
-          <div class="fact">在试：周末去书店市集摆一次摊（还剩 1 周）</div>
-          <div class="meta">自己写方向不用 AI；「让 AI 提几个」要接上 AI</div>
-          <div class="foot"><span class="lnk">看看方向 →</span><span class="meta">存进你的资料</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="ai">
-      <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22324F" stroke-width="1.7"><path d="M4 7h16v11H4zM8 7V4h8v3"/></svg></div>
-      <div class="tx">
-        <h3>换个 AI，接着聊<span class="anno">已有 · 不用 AI</span></h3>
-        <p>勾选要带的近况，复制给豆包、ChatGPT 或任何 AI，不用重新介绍自己。回答可以贴回来，确认后才记下。</p>
-        <div class="where">资料存在：这台电脑 · kaitu-ai-memory　·　发出去的只有你这次勾选的</div>
-      </div>
-      <button class="btn p">准备给 AI 的资料</button>
-      <span class="lnk" style="font-size:13px">更多连接方式</span>
-    </div>
-
-    <div class="changes">
-      <div class="chg"><span>现在这件事：<b>写《海边书店》第 3 章开头 500 字</b></span><span><button class="btn s">完成</button></span></div>
-      <div class="chg"><span>Agent 和手机交来 <b>2 条</b>，等你确认</span><span class="lnk">去看看 →</span></div>
-    </div>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- ============ 桌面：新用户 ============ -->
-<div class="row">
-<div>
-<p class="cap">桌面 · 第一次打开</p>
-<div class="desk">
-  <div class="top"><div class="brand"><svg viewBox="0 0 48 48"><path d="M4 10L17.33 6V38L4 42Z" fill="#22324F"/><path d="M17.33 6L30.67 10V42L17.33 38Z" fill="#2B4C7E"/><path d="M30.67 10L44 6V38L30.67 42Z" fill="#E6D9BF"/></svg>开图</div><div class="rt">设置<div class="av">我</div></div></div>
-  <nav class="tabs"><span class="on">首页</span><span>开图</span><span>资料</span><span>问问</span></nav>
-  <div class="main">
-    <p class="eyebrow">欢迎来到开图</p>
-    <p class="h1">让每个 AI，一读就认识你</p>
-    <p class="sub">先写一句关于自己。不用 Key，不用云盘，写下就保存在这台电脑上。</p>
-    <div class="capture" style="padding:10px 10px 10px 18px"><span class="ph">比如：在杭州做设计，最近想把散文集写完</span><button class="btn p">写下这一句</button></div>
-    <p class="meta" style="margin:10px 2px 0">已经在用 ChatGPT、豆包？<span class="lnk">带入已有聊天 →</span>　　<span class="lnk">先看看示例 →</span></p>
-
-    <p class="eyebrow" style="margin-top:26px">开图能帮你做的事<span class="anno">卡片内容为示例，图为插图</span></p>
-    <div class="scenes" style="margin-top:8px">
-      <div class="scene"><div class="img"><svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="#EDE6D6"/><ellipse cx="180" cy="70" rx="78" ry="44" fill="#FFFDF8"/><ellipse cx="180" cy="70" rx="58" ry="31" fill="#F4EFE4"/><circle cx="160" cy="62" r="16" fill="#C9A27A"/><rect x="178" y="56" width="34" height="20" rx="8" fill="#8FAF8F"/></svg><span class="tag">示例插图</span></div>
-        <div class="body"><h3>这顿吃得怎么样</h3><div class="fact">拍下或写一句吃了什么。接上 AI 后可以估算营养。</div><div class="foot"><span class="lnk">记一顿 →</span><span class="meta">没接 AI 也能先存下</span></div></div></div>
-      <div class="scene"><div class="img"><svg viewBox="0 0 360 128" preserveAspectRatio="none"><rect width="360" height="128" fill="#EEF2EC"/><g fill="#B9CBBE"><rect x="28" y="70" width="14" height="40" rx="3"/><rect x="62" y="56" width="14" height="54" rx="3"/><rect x="96" y="82" width="14" height="28" rx="3"/><rect x="130" y="48" width="14" height="62" rx="3"/><rect x="164" y="62" width="14" height="48" rx="3"/></g></svg><span class="tag">示例插图</span></div>
-        <div class="body"><h3>看看训练和身体的变化</h3><div class="fact">接上 Apple 健康，或导入导出文件。</div><div class="foot"><span class="lnk">接上健康数据 →</span><span class="meta">只读，不改你的数据</span></div></div></div>
-      <div class="scene"><div class="img"><svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="#E9EEF4"/><path d="M40 98 C 100 90, 120 50, 180 56 S 260 40, 320 30" fill="none" stroke="#9AAAC2" stroke-width="3"/><path d="M180 56 C 220 80, 260 96, 320 100" fill="none" stroke="#9AAAC2" stroke-width="2.5" stroke-dasharray="6 6"/></svg><span class="tag">示例插图</span></div>
-        <div class="body"><h3>除了现在这条路，还可以怎么走</h3><div class="fact">写下一个想试的方向，先试一小步。</div><div class="foot"><span class="lnk">写一个方向 →</span><span class="meta">不用 AI</span></div></div></div>
-    </div>
-    <div class="ai" style="opacity:.92">
-      <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22324F" stroke-width="1.7"><path d="M4 7h16v11H4zM8 7V4h8v3"/></svg></div>
-      <div class="tx"><h3>换个 AI，接着聊</h3><p>写下几句以后，可以一次复制给任何 AI，不用重新介绍自己。</p><div class="where">资料存在：这台电脑你选的文件夹，是普通文件，随时可以带走</div></div>
-      <span class="meta">写下第一句后可用</span>
-    </div>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- ============ iPhone ============ -->
-<div class="row">
-<div>
-<p class="cap">iPhone · 用了一段时间</p>
-<div class="phone">
-  <div class="status"><span>9:41</span><span>●●●</span></div>
-  <div class="pmain">
-    <p class="eyebrow">杭州 18° 多云</p>
-    <p class="h1">10月24日 星期六</p>
-    <div class="pcap"><span class="ph">随手记一句</span><button class="btn q">拍</button><button class="btn s">记下</button></div>
-    <div class="pai">
-      <h3>换个 AI，接着聊<span class="anno">要改：替换旧资料包</span></h3>
-      <p>勾选近况，复制给你常用的 AI，不用重新介绍自己。</p>
-      <button class="btn p">准备给 AI 的资料</button>
-      <p class="meta" style="margin-top:8px">发出去的只有你勾选的 · 资料在 iCloud 的 kaitu-ai-memory</p>
-    </div>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#EDE6D6"/><ellipse cx="29" cy="31" rx="20" ry="13" fill="#FFFDF8"/><circle cx="24" cy="29" r="6" fill="#C9A27A"/><rect x="30" y="26" width="11" height="7" rx="3" fill="#8FAF8F"/></svg></div><div class="tx"><b>这顿吃得怎么样</b><span>午饭约 650 千卡（估算）</span></div><span class="anno">已有·需接 AI</span></div>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#EEF2EC"/><g fill="#7D9B84"><rect x="8" y="30" width="6" height="20" rx="2"/><rect x="18" y="22" width="6" height="28" rx="2"/><rect x="28" y="34" width="6" height="16" rx="2"/><rect x="38" y="18" width="6" height="32" rx="2"/></g></svg></div><div class="tx"><b>训练和身体的变化</b><span>30 天练 12 次 · 平均睡 7.1 小时</span></div><span class="anno">已有</span></div>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#E9EEF4"/><path d="M6 46 C 18 40, 22 24, 30 26 S 44 18, 52 12" fill="none" stroke="#22324F" stroke-width="2.5"/><path d="M30 26 C 38 36, 44 42, 52 46" fill="none" stroke="#2B4C7E" stroke-width="2" stroke-dasharray="4 4"/></svg></div><div class="tx"><b>还可以怎么走</b><span>在试：周末市集摆摊</span></div><span class="anno">已有</span></div>
-    <p class="meta" style="margin:12px 2px 0">现在这件事：写第 3 章开头 500 字 · <span class="lnk" style="font-size:12.5px">完成</span></p>
-  </div>
-  <nav class="tabbar"><div class="on"><div class="dot"></div>首页</div><div><div class="dot"></div>开图</div><div><div class="dot"></div>资料</div><div><div class="dot"></div>问问</div></nav>
-</div>
-</div>
-
-<div>
-<p class="cap">iPhone · 第一次打开</p>
-<div class="phone">
-  <div class="status"><span>9:41</span><span>●●●</span></div>
-  <div class="pmain">
-    <p class="eyebrow">欢迎来到开图</p>
-    <p class="h1">让每个 AI，<br>一读就认识你</p>
-    <p class="sub" style="font-size:14px">先写一句关于自己。不用 Key，写下就保存在这台手机。</p>
-    <div class="pcap" style="padding:12px 14px;display:block"><span class="ph">比如：在杭州做设计，最近想把散文集写完</span></div>
-    <button class="btn p" style="width:100%;margin-top:10px;padding:13px">写下这一句</button>
-    <p class="meta" style="text-align:center;margin:10px 0 0"><span class="lnk" style="font-size:13px">带入已有聊天</span>　·　<span class="lnk" style="font-size:13px">先看看示例</span></p>
-    <p class="eyebrow" style="margin-top:20px">开图能帮你做的事<span class="anno">示例</span></p>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#EDE6D6"/><ellipse cx="29" cy="31" rx="20" ry="13" fill="#FFFDF8"/><circle cx="24" cy="29" r="6" fill="#C9A27A"/></svg></div><div class="tx"><b>这顿吃得怎么样</b><span>拍一张或写一句</span></div></div>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#EEF2EC"/><g fill="#B9CBBE"><rect x="8" y="30" width="6" height="20" rx="2"/><rect x="18" y="22" width="6" height="28" rx="2"/><rect x="28" y="34" width="6" height="16" rx="2"/></g></svg></div><div class="tx"><b>训练和身体的变化</b><span>读取 Apple 健康，只读</span></div></div>
-    <div class="prow"><div class="th"><svg viewBox="0 0 58 58"><rect width="58" height="58" fill="#E9EEF4"/><path d="M6 46 C 18 40, 22 24, 30 26 S 44 18, 52 12" fill="none" stroke="#9AAAC2" stroke-width="2.5"/></svg></div><div class="tx"><b>还可以怎么走</b><span>写下一个想试的方向</span></div></div>
-  </div>
-  <nav class="tabbar"><div class="on"><div class="dot"></div>首页</div><div><div class="dot"></div>开图</div><div><div class="dot"></div>资料</div><div><div class="dot"></div>问问</div></nav>
-</div>
-</div>
-</div>
-
-<!-- ============ 对照表 ============ -->
-<p class="cap">场景卡对照表</p>
+<h2 class="sec">能力按端列清（只有「已接通」的才在首页显示）</h2>
 <table>
-<tr><th>场景卡</th><th>点下去做什么</th><th>背后的资料流程</th><th>能力</th><th>图片来源</th></tr>
-<tr><td>这顿吃得怎么样</td><td>拍照或写一句 → 估算 → 确认后记进饮食</td><td>留下新变化</td><td>已有 · 需接 AI。没接 AI 时只存原文，不显示热量</td><td>用户自己的餐食照片；新用户用标「示例」的插图</td></tr>
-<tr><td>看看训练和身体的变化</td><td>看 30 天训练、睡眠、体重</td><td>关于我</td><td>已有 · 不用 AI</td><td>由健康记录画出的图</td></tr>
-<tr><td>除了现在这条路，还可以怎么走</td><td>写一个方向、试一小步</td><td>关于我 → 带给 AI</td><td>已有；「让 AI 提几个」需接 AI</td><td>方向线（实线在走、虚线想试）</td></tr>
-<tr><td>换个 AI，接着聊</td><td>勾选近况 → 复制 → 贴回回答 → 确认</td><td>带给 AI → 留下新变化</td><td>桌面已有；iPhone 要把旧的两步资料包换成这一步</td><td>图标，不用图片</td></tr>
-<tr><td>现在这件事 / 等你确认</td><td>完成；处理交来的原文和建议</td><td>留下新变化</td><td>已有</td><td>无</td></tr>
+<tr><th>能力</th><th>桌面</th><th>iPhone</th><th>首页怎么显示</th></tr>
+<tr><td>写一句记下（原文）</td><td>已接通</td><td>已接通</td><td>两端都显示「记一句」</td></tr>
+<tr><td>语音</td><td>只有系统听写提示，没有 App 内录音</td><td>已接通（设备端识别）</td><td>桌面不显示语音按钮；iPhone 显示「说」</td></tr>
+<tr><td>拍照记一顿</td><td>没有相机入口</td><td>问问能附照片；「拍照 → 估算营养 → 确认入饮食」这条完整流程未核实</td><td>两端都先不显示「拍照」，核实接通后再加</td></tr>
+<tr><td>营养估算 → 确认 → 记进饮食</td><td>健康页会跳到问问，由 AI 写入；没有专门的确认界面（待开发）</td><td>已接通：问问估算后有确认表单，写明「数值为估算」，确认才保存（需接 AI）</td><td>桌面吃饭卡只显示已有记录和「在问问里记这顿」；iPhone 显示「记这顿」</td></tr>
+<tr><td>训练和身体的变化</td><td>已接通（健康页）</td><td>已接通（健康同步、开图里的健康）</td><td>两端都显示</td></tr>
+<tr><td>方向（还可以怎么走）</td><td>已接通；「让 AI 提几个」需接 AI</td><td>没有方向页（10-21 决定 iPhone 开图先只做足迹和健康）</td><td>iPhone 第三张换成「看看去过的地方」（足迹已接通）</td></tr>
+<tr><td>换个 AI，接着聊（勾选 → 复制 → 贴回）</td><td>已接通</td><td>要改：现在是先「更新预览」再「确认保存」的两步资料包</td><td>两端都显示；iPhone 改完前沿用现有入口，不画成已改好</td></tr>
+<tr><td>用示例试资料包</td><td>待开发（用标了「示例」的合成资料预览和复制）</td><td>待开发</td><td>新用户可直接试，不需要先写一句</td></tr>
+</table>
+
+<h2 class="sec">主按钮怎么变</h2>
+<table>
+<tr><th>状态</th><th>唯一的实心主按钮</th><th>说明</th></tr>
+<tr><td>第一次打开</td><td>写下这一句</td><td>「用示例试一下」「带入已有聊天」是次要入口，不设门槛</td></tr>
+<tr><td>有资料</td><td>选择要带的内容（换个 AI，接着聊）</td><td>场景卡是次要入口；iPhone 上它排在第一张场景卡之后</td></tr>
+<tr><td>有待确认内容</td><td>去确认 N 条</td><td>移到记一句下面；换个 AI 的按钮降为次要</td></tr>
 </table>
 </div>
+
+<script>
+const S = { state: "data", theme: "light", width: 1200 };
+const mark = `<svg viewBox="0 0 48 48"><path d="M4 10L17.33 6V38L4 42Z" fill="#22324F"/><path d="M17.33 6L30.67 10V42L17.33 38Z" fill="#2B4C7E"/><path d="M30.67 10L44 6V38L30.67 42Z" fill="#E6D9BF"/></svg>`;
+const img = {
+  meal: (muted) => `<svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="var(--meal)"/><ellipse cx="180" cy="68" rx="78" ry="44" fill="var(--plate)"/><ellipse cx="180" cy="68" rx="58" ry="31" fill="var(--plate2)"/><circle cx="160" cy="60" r="16" fill="#C9A27A" opacity="${muted ? .55 : 1}"/><rect x="178" y="54" width="34" height="20" rx="8" fill="#8FAF8F" opacity="${muted ? .55 : 1}"/><circle cx="196" cy="82" r="9" fill="#E3B26B" opacity="${muted ? .55 : 1}"/></svg>`,
+  body: (muted) => `<svg viewBox="0 0 360 128" preserveAspectRatio="none"><rect width="360" height="128" fill="var(--body)"/><g fill="var(--bar)" opacity="${muted ? .45 : 1}"><rect x="28" y="70" width="14" height="40" rx="3"/><rect x="62" y="56" width="14" height="54" rx="3"/><rect x="96" y="82" width="14" height="28" rx="3"/><rect x="130" y="48" width="14" height="62" rx="3"/><rect x="164" y="62" width="14" height="48" rx="3"/><rect x="198" y="40" width="14" height="70" rx="3"/><rect x="232" y="58" width="14" height="52" rx="3"/></g>${muted ? "" : `<polyline points="20,44 70,40 120,46 170,36 220,38 270,30 340,32" fill="none" stroke="var(--route)" stroke-width="2.5"/>`}</svg>`,
+  path: (muted) => `<svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="var(--map)"/><path d="M40 98 C 100 90, 120 50, 180 56 S 260 40, 320 30" fill="none" stroke="var(--route)" stroke-width="3" opacity="${muted ? .4 : 1}"/><path d="M180 56 C 220 80, 260 96, 320 100" fill="none" stroke="var(--route)" stroke-width="2.5" stroke-dasharray="6 6" opacity="${muted ? .4 : .8}"/>${muted ? "" : `<circle cx="180" cy="56" r="7" fill="var(--route)"/><circle cx="320" cy="100" r="5" fill="var(--surface)" stroke="var(--route)" stroke-width="2.5"/>`}</svg>`,
+  map: (muted) => `<svg viewBox="0 0 360 128" preserveAspectRatio="xMidYMid slice"><rect width="360" height="128" fill="var(--map)"/><path d="M0 70 C 60 40, 120 90, 180 60 S 300 30, 360 60 V128 H0Z" fill="var(--land)"/><circle cx="120" cy="78" r="5" fill="var(--route)" opacity="${muted ? .4 : 1}"/><circle cx="196" cy="62" r="5" fill="var(--route)" opacity="${muted ? .4 : 1}"/><circle cx="262" cy="52" r="7" fill="var(--route)" opacity="${muted ? .4 : 1}"/><path d="M120 78 Q 160 50 196 62 T 262 52" fill="none" stroke="var(--route)" stroke-width="2" opacity="${muted ? .4 : 1}"/></svg>`,
+};
+const thumb = (k, m) => img[k](m).replace('viewBox="0 0 360 128"', 'viewBox="90 0 180 128"');
+
+function deskScenes(empty) {
+  const ex = empty ? `<span class="tag">示例插图</span>` : "";
+  const cards = empty ? [
+    ["meal", "这顿吃得怎么样", "写一句吃了什么，先存下。接上 AI 后，可以在问问里估算营养。", "记这顿 →", "没接 AI 也能先存下", "已有 · 估算需接 AI"],
+    ["body", "看看训练和身体的变化", "导入 Apple 健康导出文件，或接上手机同步。", "接上健康数据 →", "只读，不改原数据", "已有 · 不用 AI"],
+    ["path", "除了现在这条路，还可以怎么走", "写下一个想试的方向，先试一小步。", "写一个方向 →", "不用 AI", "已有 · 不用 AI"],
+  ] : [
+    ["meal", "这顿吃得怎么样", "午饭：牛肉饭、青菜。估算约 650 千卡（来自 iPhone，已确认）", "在问问里记这顿 →", "存进你的资料", "桌面：跳问问，确认界面待开发"],
+    ["body", "看看训练和身体的变化", "最近 30 天练了 12 次，平均睡 7.1 小时，体重 68.4 → 67.9 千克", "打开健康 →", "只显示记录里有的数字", "已有 · 不用 AI"],
+    ["path", "除了现在这条路，还可以怎么走", "在试：周末去书店市集摆一次摊（还剩 1 周）", "看看方向 →", "存进你的资料", "已有 · AI 提议需接 AI"],
+  ];
+  const tags = empty ? ["", "", ""] : ["你的照片 · 今天 12:20", "来自你的健康记录", "实线是在走的，虚线是想试的"];
+  return `<div class="scenes">${cards.map((c, i) => `<div class="scene"><div class="img">${img[c[0]](empty)}${empty ? ex : `<span class="tag">${tags[i]}</span>`}</div><div class="body"><h3>${c[1]}<span class="anno">${c[5]}</span></h3><div class="fact">${c[2]}</div><div class="foot"><span class="lnk">${c[3]}</span><span class="meta">${c[4]}</span></div></div></div>`).join("")}</div>`;
+}
+function aiCard(empty, primary) {
+  const btn = empty ? `<button class="btn s">用示例试一下</button>` : `<button class="btn ${primary ? "p" : "s"}">选择要带的内容</button>`;
+  const where = `资料在：<b style="color:var(--ink2)">这台电脑 · 我的开图</b><span class="anno">按实际位置和文件夹名显示</span>　·　仅复制所选内容到剪贴板，不会自动发给任何 AI`;
+  return `<div class="ai"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--link)" stroke-width="1.7"><path d="M4 7h16v11H4zM8 7V4h8v3"/></svg></div><div class="tx"><h3>换个 AI，接着聊<span class="anno">${empty ? "示例资料包：待开发" : "已有"}</span></h3><p>${empty ? "用一份标了「示例」的资料包看看效果，不含你的信息。" : "勾选要带的近况，复制给你常用的 AI，不用重新介绍自己。回答可以贴回来，确认后才记下。"}</p><div class="where">${empty ? "写下自己的资料后，这里换成你的内容" : where}</div></div>${btn}<span class="lnk" style="font-size:13px">更多连接方式</span></div>`;
+}
+function desk() {
+  const empty = S.state === "new", pending = S.state === "pending";
+  const head = empty
+    ? `<p class="eyebrow">欢迎来到开图</p><p class="h1">让每个 AI，一读就认识你</p><p class="sub">写一句关于自己就能开始。不用 Key，不用云盘。</p>
+       <div class="capture" style="padding:10px 10px 10px 18px"><span class="ph">比如：在杭州做设计，最近想把散文集写完</span><button class="btn p">写下这一句</button></div>
+       <p class="meta" style="margin:10px 2px 0">已经在用 ChatGPT、豆包？<span class="lnk">带入已有聊天 →</span></p>
+       <p class="eyebrow" style="margin-top:22px">开图能帮你做的事<span class="anno">卡片为示例</span></p>`
+    : `<div class="head"><div><p class="eyebrow">让每个 AI，一读就认识你</p><p class="h1">10月24日 星期六</p></div><div class="wx">杭州 <b>18°</b> 多云</div></div>
+       <div class="capture"><span class="ph">随手记一句，吃了什么、想到什么都行</span><button class="btn s">记下</button></div>
+       ${pending ? `<div class="pending"><div class="tx"><b>Agent 和手机交来 2 条，等你确认</b><span class="meta">一条午饭记录、一条方向建议。确认后才算数。</span></div><button class="btn p">去确认 2 条</button></div>` : ""}`;
+  const tail = empty ? "" : `<div class="changes"><div class="chg"><span>现在这件事：<b>写《海边书店》第 3 章开头 500 字</b></span><button class="btn s">完成</button></div>${pending ? "" : `<div class="chg"><span>没有等你确认的内容</span><span class="meta">全部资料 →</span></div>`}</div>`;
+  return `<div><p class="cap">桌面 · ${S.width} 宽</p><div class="app desk t-${S.theme} w${S.width}" style="width:${S.width}px">
+    <div class="top"><div class="brand">${mark}开图</div><div class="rt">设置<div class="av">${empty ? "我" : "林"}</div></div></div>
+    <nav class="tabs"><span class="on">首页</span><span>开图</span><span>资料${pending ? '<i class="badge">2</i>' : ""}</span><span>问问</span></nav>
+    <div class="main">${head}${deskScenes(empty)}${aiCard(empty, !pending)}${tail}</div></div></div>`;
+}
+function phone() {
+  const empty = S.state === "new", pending = S.state === "pending";
+  let body;
+  if (empty) {
+    body = `<p class="eyebrow">欢迎来到开图</p><p class="h1">让每个 AI，<br>一读就认识你</p>
+      <div class="capture" style="display:block;padding:12px 14px;margin-top:12px"><span class="ph">写一句关于自己，比如在做什么、想改变什么</span></div>
+      <button class="btn p" style="width:100%;margin-top:9px;padding:12px">写下这一句</button>
+      <p class="meta" style="text-align:center;margin:8px 0 0"><span class="lnk" style="font-size:13px">用示例试一下</span>　·　<span class="lnk" style="font-size:13px">带入已有聊天</span></p>
+      <div class="scene"><div class="img">${img.meal(true)}<span class="tag">示例插图</span></div><div class="body"><h3>这顿吃得怎么样<span class="anno">已有 · 需接 AI</span></h3><div class="fact">写一句吃了什么。接上 AI 后在问问里估算营养，确认才记进饮食。</div></div></div>
+      <div class="prow"><div class="th">${thumb("body", true)}</div><div class="tx"><b>训练和身体的变化</b><span>读取 Apple 健康，只读</span></div></div>`;
+  } else {
+    body = `<div class="head"><div><p class="eyebrow">杭州 18° 多云</p><p class="h1">10月24日 星期六</p></div></div>
+      <div class="capture"><span class="ph">随手记一句</span><button class="btn q">说</button><button class="btn s">记下</button></div>
+      ${pending ? `<div class="paimini" style="border-left:4px solid var(--link)"><div class="tx"><b>交来 2 条，等你确认</b><span>确认后才算数</span></div><button class="btn p">去确认</button></div>` : ""}
+      <div class="scene"><div class="img">${img.meal(false)}<span class="tag">你的照片 · 今天 12:20</span></div><div class="body"><h3>这顿吃得怎么样<span class="anno">已有 · 需接 AI</span></h3><div class="fact">午饭约 650 千卡，蛋白质 32 克（估算，已确认）</div><div class="foot"><span class="lnk">记这顿 →</span><span class="meta">存进你的资料</span></div></div></div>
+      <div class="prow"><div class="th">${thumb("body", false)}</div><div class="tx"><b>训练和身体的变化</b><span>30 天练 12 次 · 平均睡 7.1 小时</span></div></div>
+      ${pending ? "" : `<div class="prow"><div class="th">${thumb("map", false)}</div><div class="tx"><b>看看去过的地方</b><span>住过 3 个城市，去过 11 个</span></div></div>`}
+      <div class="paimini"><div class="tx"><b>换个 AI，接着聊<span class="anno">要改：旧两步资料包</span></b><span>仅复制所选内容，不会自动发送</span></div><button class="btn ${pending ? "s" : "p"}">选择内容</button></div>`;
+  }
+  return `<div><p class="cap">iPhone · 390×844</p><div class="app phone t-${S.theme}"><div class="status"><span>9:41</span><span>●●●</span></div><div class="pmain">${body}</div>
+    <nav class="tabbar"><div class="on"><div class="dot"></div>首页</div><div><div class="dot"></div>开图</div><div><div class="dot"></div>资料${pending ? " ·2" : ""}</div><div><div class="dot"></div>问问</div></nav></div></div>`;
+}
+function tools() {
+  const g = (label, key, opts) => `<span><b>${label}</b>${opts.map(([v, t]) => `<button class="${S[key] == v ? "on" : ""}" data-k="${key}" data-v="${v}">${t}</button>`).join(" ")}</span>`;
+  document.getElementById("tools").innerHTML =
+    g("状态", "state", [["new", "第一次打开"], ["data", "有资料"], ["pending", "有待确认"]]) +
+    g("外观", "theme", [["light", "浅色"], ["dark", "深色"]]) +
+    g("桌面宽度", "width", [[1200, "1200"], [900, "900"]]);
+  document.querySelectorAll("#tools button").forEach((b) => b.onclick = () => { S[b.dataset.k] = b.dataset.k === "width" ? +b.dataset.v : b.dataset.v; render(); });
+}
+function render() { tools(); document.getElementById("stage").innerHTML = desk() + phone(); }
+const q = new URLSearchParams(location.search);
+for (const k of ["state", "theme", "width"]) if (q.get(k)) S[k] = k === "width" ? +q.get(k) : q.get(k);
+render();
+</script>
 </body>
 </html>
