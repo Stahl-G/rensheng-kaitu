@@ -75,7 +75,7 @@ for (const name of pluginImports) {
   dependencies[name] = version;
 }
 for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
-  dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.2";
+  dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.3";
 const pluginPackage = {
   name: plugin.name,
   version: cli.version,
