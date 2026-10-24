@@ -2,6 +2,7 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HOST_API } from "./payload-loader.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
 const nodeBanner = [
@@ -19,7 +20,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   mkdirSync(join(payload, "dist"), { recursive: true });
   writeFileSync(
     join(payload, "payload.json"),
-    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: 1 }),
+    JSON.stringify({ version: payloadVersion, dshVersion, hostApi: HOST_API }),
   );
   await build({
     entryPoints: [join(directory, "plugin.mjs")],
@@ -119,6 +120,12 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     external: ["better-sqlite3"],
   });
   mkdirSync(join(payload, "licenses"), { recursive: true });
+  cpSync(join(root, "LICENSE"), join(payload, "licenses", "kaitu.txt"));
+  cpSync(join(root, "THIRD_PARTY_NOTICES.md"), join(payload, "licenses", "THIRD_PARTY_NOTICES.md"));
+  writeFileSync(
+    join(payload, "licenses", "deepseek-harness.txt"),
+    asar.extractFile(archive, "dsh/node_modules/@deepseek-ai/dsh-brand/LICENSE"),
+  );
   for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
     cpSync(
       join(root, "node_modules/@deepseek-ai", name, "LICENSE"),
@@ -137,7 +144,8 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     join(payload, "dist/client.js"),
     client.replace(
       navigation,
-      (_match, indent, call) => `${indent}ctx2.layout.selectPanel(panel);${indent}${call}`,
+      (_match, indent, call) =>
+        `${indent}if (new URLSearchParams(window.location.hash.slice(1)).get("kaitu-embed") !== "1") ctx2.layout.selectPanel(panel);${indent}${call}`,
     ),
   );
   const pluginManifest = JSON.parse(readFileSync(join(root, "packages/dsh-plugin/package.json"), "utf8"));

@@ -93,7 +93,7 @@
 .page button:focus-visible,
 .page select:focus-visible,
 .details summary:focus-visible {
-  outline: 2px solid var(--kt-accent);
+  outline: 3px solid var(--link-line);
   outline-offset: 4px;
 }
 .panel {
@@ -244,6 +244,7 @@
   flex: 1 1 200px;
 }
 .link {
+  min-height: 36px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -306,8 +307,11 @@
 }
 .missing {
   width: 60%;
-  height: 100%;
-  border: 1px dashed var(--kt-control);
+  height: 18px;
+  color: var(--kt-muted);
+  text-align: center;
+  font-size: 10px;
+  border: 1px dashed var(--line-strong);
   border-bottom: 0;
   border-radius: 4px 4px 0 0;
 }
@@ -426,10 +430,16 @@
 }
 .next {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   min-height: 40px;
   padding: 4px 2px;
+}
+.measurements [data-review="true"] {
+  outline: 2px solid var(--health);
+  outline-offset: 3px;
+  background: var(--health-tint);
 }
 .next > span:first-child {
   width: 14px;
@@ -466,4 +476,49 @@
     flex: 1;
     padding: 6px 10px;
   }
+}
+
+.overview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+.overview dt,
+.overview small {
+  color: var(--kt-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.overview dd {
+  margin: 8px 0 0;
+}
+.overview strong {
+  display: block;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.overview small {
+  display: block;
+  margin-top: 8px;
+}
+.warning {
+  color: var(--danger);
+}
+@container (max-width: 1179px) {
+  .overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container (max-width: 639px) {
+  .overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.overview progress {
+  width: 100%;
+  height: 8px;
+  margin-top: 10px;
+  accent-color: var(--health);
 }

@@ -2474,6 +2474,7 @@
   display: flex;
   flex-direction: column;
   overflow: auto;
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
   container-type: inline-size;
   scrollbar-gutter: stable;
 }
@@ -3012,6 +3013,9 @@
     padding-left: 32px;
     padding-right: 32px;
   }
+  .top {
+    padding-left: max(32px, var(--dsh-frame-leading-clearance, 0px));
+  }
 }
 @container (max-width: 959px) {
   .tabs button {
@@ -3023,6 +3027,9 @@
   .content {
     padding-left: 20px;
     padding-right: 20px;
+  }
+  .top {
+    padding-left: max(20px, var(--dsh-frame-leading-clearance, 0px));
   }
   .brandName,
   .settingsLabel {
@@ -3053,4 +3060,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.pluginFrame {
+  display: block;
+  width: 100%;
+  height: max(420px, calc(100dvh - 240px));
+  border: 0;
 }

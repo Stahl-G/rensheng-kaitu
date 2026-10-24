@@ -1,0 +1,140 @@
+.page {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 40px;
+}
+.navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: start;
+}
+.navigation input {
+  width: 100%;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  margin-bottom: 8px;
+}
+.navigation p {
+  margin: 18px 12px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.navigation button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.navigation button[aria-current] {
+  background: var(--link-soft);
+  color: var(--link);
+  font-weight: 600;
+}
+.body {
+  min-width: 0;
+}
+.body > h1 {
+  font-size: 28px;
+  margin-bottom: 12px;
+}
+.body > h2 {
+  font-size: 18px;
+  margin: 28px 0 14px;
+}
+.body > p {
+  color: var(--muted);
+}
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0 24px;
+}
+.cards button {
+  border: 0;
+  border-radius: 16px;
+  padding: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: start;
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+}
+.cards span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.cards strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.attention {
+  padding: 20px;
+  margin-top: 24px;
+  background: var(--control);
+  border-radius: 16px;
+}
+.attention h2 {
+  font-size: 18px;
+}
+.attention > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+.badge {
+  background: var(--danger);
+  color: var(--surface);
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 12px;
+}
+@container (max-width: 959px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+  .navigation {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .navigation input {
+    flex-basis: 100%;
+  }
+  .navigation p {
+    display: none;
+  }
+  .navigation button {
+    width: auto;
+  }
+}
+@container (max-width: 639px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+  .attention > div {
+    align-items: start;
+    flex-wrap: wrap;
+  }
+}

@@ -1,40 +1,43 @@
-import type { CalendarPushSettings, OnboardingStatus } from "@kaitu/core";
+import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import type { CalendarData, LibraryData, MeData, OverviewData } from "../types.js";
+import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
+import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
+import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
-import { ExploreNavigation } from "./ExploreNavigation.js";
+import { ExploreModulesPage, ExploreNavigation } from "./ExploreNavigation.js";
+import { ExplorePluginFrame } from "./ExplorePluginFrame.js";
 import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
 import { JobsPage, type JobsPageProps } from "./JobsPage.js";
 import type { LearningSource } from "./LearningPage.js";
+import { LibraryFileImport } from "./LibraryFileImport.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
-import { OnboardingNextCard } from "./OnboardingMatter.js";
-import { OnboardingChecklist, OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
-import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
+import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
+import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
+import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
-import {
-  CalendarPushResult,
-  CalendarSlotForm,
-  DataSummaries,
-  TodayFinance,
-  TodayStart,
-  TodayTasks,
-} from "./TodayPage.js";
+import { TodayStart, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
-import { type ExploreModule, defaultExploreEntries, exploreModules } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale, dateFormat, versionText } from "./i18n.js";
+import { TodayWeather } from "./Weather.js";
+import {
+  type ExploreModule,
+  defaultExploreEntries,
+  exploreDestination,
+  exploreModules,
+} from "./explore-modules.js";
+import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 export interface OverviewPageProps
@@ -50,7 +53,20 @@ export interface OverviewPageProps
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
+  /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
+  loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
+  generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
+  dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
+  /** 今天页天气：读本机缓存、设城市；宿主没提供时不显示天气。 */
+  loadWeather?: () => Promise<import("@kaitu/core").WeatherState>;
+  setWeatherPlace?: (
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
+  hosted?: boolean;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -67,6 +83,8 @@ export interface OverviewPageProps
     onConnections: () => void,
     promptRequest: number,
     active: boolean,
+    onToday: () => void,
+    onSettings: (section: "ai" | "local-ai") => void,
   ) => ReactNode;
 }
 type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
@@ -83,16 +101,32 @@ export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
+  const [pluginModules, setPluginModules] = useState<ExploreModule[]>([]);
   const [preferencesFailed, setPreferencesFailed] = useState(false);
   const [preferencesAttempt, setPreferencesAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry starts a fresh read and cancels the previous effect.
   useEffect(() => {
     let active = true;
     // 自动语言不写入偏好，只有用户明确选定的语言才固定下来。
-    void props
-      .loadPreferences(browserLocale())
+    const load = async () => {
+      const modules = props.plugins
+        ? ((await props.plugins("explore").catch(() => [])) as ExploreModule[])
+        : [];
+      if (!active) return null;
+      setPluginModules(modules);
+      const value = await props.loadPreferences(browserLocale());
+      const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
+      if (!fresh.length || !active) return value;
+      const saved = await props.savePreferences({
+        locale: value.followSystem ? null : value.locale,
+        exploreEntries: [...(value.exploreEntries ?? defaultExploreEntries), ...fresh],
+        explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
+      });
+      return { ...saved, followSystem: value.followSystem };
+    };
+    void load()
       .then((value) => {
-        if (!active) return;
+        if (!active || !value) return;
         setLocale(value.locale === "en" ? "en" : "zh-CN");
         setFollowSystem(value.followSystem ?? false);
         setExploreEntries(value.exploreEntries ?? [...defaultExploreEntries]);
@@ -103,14 +137,20 @@ export function OverviewPage(props: OverviewPageProps) {
         setLocale("zh-CN");
         setPreferencesFailed(true);
       });
+    function retry() {
+      setPreferencesAttempt((attempt) => attempt + 1);
+    }
+    window.addEventListener("kaitu:plugins-changed", retry);
     return () => {
       active = false;
+      window.removeEventListener("kaitu:plugins-changed", retry);
     };
-  }, [props.loadPreferences, preferencesAttempt]);
+  }, [props.loadPreferences, props.plugins, preferencesAttempt]);
   return (
     <LocaleContext.Provider value={locale ?? "zh-CN"}>
       <Overview
         {...props}
+        pluginModules={pluginModules}
         locale={locale}
         setLocale={setLocale}
         followSystem={followSystem}
@@ -131,6 +171,7 @@ export function OverviewPage(props: OverviewPageProps) {
 }
 
 function Overview({
+  pluginModules,
   locale,
   setLocale,
   followSystem,
@@ -140,6 +181,7 @@ function Overview({
   retryPreferences,
   ...props
 }: OverviewPageProps & {
+  pluginModules: ExploreModule[];
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
@@ -154,27 +196,196 @@ function Overview({
   const [guideKey, setGuideKey] = useState(0);
   const [guideSource, setGuideSource] = useState<string>();
   const [guideText, setGuideText] = useState("");
-  const [todayDetails, setTodayDetails] = useState(false);
+  const [adoptedTasks, setAdoptedTasks] = useState<{ day: string; ids: string[] }>({ day: "", ids: [] });
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
+  const [connectionSection, setConnectionSection] = useState<SettingsSection>("overview");
+  const [importFile, setImportFile] = useState<File | null>();
+  const [importAttempt, setImportAttempt] = useState(0);
+  const openFileImport = (file: File | null) => {
+    setImportFile(file);
+    setImportAttempt((value) => value + 1);
+  };
+  const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
+  const askPanel = useRef<HTMLDivElement>(null);
+  const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
   const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
   const [record, setRecord] = useState("");
   const [explore, setExplore] = useState("footprints");
-  const firstExplore = exploreEntries?.find((id) => exploreModules.some((entry) => entry.id === id)) ?? "";
+  const [openedPlugins, setOpenedPlugins] = useState<string[]>([]);
+  const pluginRemoved = useCallback((id: string) => {
+    setExplore((current) => (current === id ? "footprints" : current));
+    setOpenedPlugins((current) => current.filter((opened) => opened !== id));
+    window.dispatchEvent(new Event("kaitu:plugins-changed"));
+  }, []);
   useEffect(() => {
-    if (exploreEntries) setExplore((current) => (exploreEntries.includes(current) ? current : firstExplore));
-  }, [exploreEntries, firstExplore]);
+    setOpenedPlugins((current) => {
+      const installed = current.filter((id) => pluginModules.some((entry) => entry.id === id));
+      return view === "explore" &&
+        pluginModules.some((entry) => entry.id === explore) &&
+        !installed.includes(explore)
+        ? [...installed, explore]
+        : installed;
+    });
+  }, [view, explore, pluginModules]);
+  const availableModules = [...exploreModules, ...pluginModules];
+  const firstExplore =
+    exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "modules";
+  useEffect(() => {
+    if (exploreEntries)
+      setExplore((current) =>
+        current.startsWith("plugin:") && !pluginModules.some((entry) => entry.id === current)
+          ? "footprints"
+          : current === "modules" || current === "loading" || exploreEntries.includes(current)
+            ? current
+            : firstExplore,
+      );
+  }, [exploreEntries, firstExplore, pluginModules]);
   const [data, setData] = useState<OverviewData | null>(null);
+  const workspaceRoot = data?.root;
+  const [exploreFacts, setExploreFacts] = useState<{
+    root: string;
+    hometown?: boolean;
+    experiences?: number;
+    newsTopics?: number;
+    directions?: number;
+  } | null>(null);
+  const [exploreError, setExploreError] = useState("");
+  const [exploreAttempt, setExploreAttempt] = useState(0);
+  const planning = useRef<HTMLDivElement>(null);
+  const [hasWrittenMatter, setHasWrittenMatter] = useState(false);
+  const emptyWorkspace = data?.empty;
+  const hasUserData = onboarding?.hasUserData;
+  useEffect(() => {
+    let active = true;
+    setHasWrittenMatter(false);
+    if (workspaceRoot && emptyWorkspace && hasUserData) {
+      void props
+        .loadLibrary({ section: "inbox", source: "me" })
+        .then((value) => {
+          if (active) setHasWrittenMatter(value.inbox.length > 0);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [workspaceRoot, emptyWorkspace, hasUserData, props.loadLibrary]);
+  // Read only on entering Explore or an explicit retry, never on unrelated workspace notifications.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
+  useEffect(() => {
+    let active = true;
+    setExploreFacts(null);
+    setExploreError("");
+    if (!workspaceRoot || view !== "explore") return;
+    void Promise.allSettled([props.loadLifeMap(), props.loadNews(), props.loadExploration()]).then(
+      ([map, news, directions]) => {
+        if (!active) return;
+        setExploreFacts({
+          root: workspaceRoot,
+          ...(map.status === "fulfilled"
+            ? {
+                hometown: !!map.value.hometown && map.value.hometown.status !== "missing",
+                experiences: map.value.experiences.length,
+              }
+            : {}),
+          ...(news.status === "fulfilled" ? { newsTopics: news.value.keywords?.length ?? 0 } : {}),
+          ...(directions.status === "fulfilled" ? { directions: directions.value.directions.length } : {}),
+        });
+        setExploreError(
+          [map, news, directions]
+            .filter((result) => result.status === "rejected")
+            .map((result) => String(result.reason))
+            .join(" · "),
+        );
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [view, workspaceRoot, props.loadLifeMap, props.loadNews, props.loadExploration, exploreAttempt]);
+  useEffect(() => {
+    let active = true;
+    void props
+      .loadPreferences()
+      .then((value) => {
+        if (active)
+          setAdoptedTasks(
+            value.todayAdoptions && value.todayAdoptions.workspace === workspaceRoot
+              ? value.todayAdoptions
+              : { day: "", ids: [] },
+          );
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [workspaceRoot, props.loadPreferences]);
   const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
   const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   const [learningTopic, setLearningTopic] = useState("");
   const [learningSource, setLearningSource] = useState<LearningSource>();
+  const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
+  const [libraryFile, setLibraryFile] = useState<string>();
+  const [libraryGoal, setLibraryGoal] = useState<string>();
+  const [projectFocus, setProjectFocus] = useState<string>();
+  useEffect(() => {
+    if (view !== "records" || record !== "projects" || !libraryGoal) return;
+    const target = document.getElementById(`plan-${libraryGoal}`);
+    if (!target) return;
+    const details = target.closest("details");
+    if (details) details.open = true;
+    target.tabIndex = -1;
+    target.focus();
+    target.scrollIntoView({ block: "center" });
+  }, [view, record, libraryGoal]);
   const [library, setLibrary] = useState<LibraryData | null>(null);
   const [personal, setPersonal] = useState<MeData | null>(null);
+  const exploreContent =
+    data &&
+    personal &&
+    exploreFacts &&
+    exploreFacts.root === workspaceRoot &&
+    exploreFacts.hometown !== undefined &&
+    exploreFacts.experiences !== undefined &&
+    exploreFacts.newsTopics !== undefined &&
+    exploreFacts.directions !== undefined
+      ? {
+          ...exploreFacts,
+          hometown: exploreFacts.hometown,
+          experiences: exploreFacts.experiences,
+          newsTopics: exploreFacts.newsTopics,
+          directions: exploreFacts.directions,
+          healthRecords: data.sections.find((section) => section.id === "health")?.count ?? 0,
+          goals: personal.goals.length,
+        }
+      : null;
+  const exploreEmpty =
+    !!exploreContent &&
+    !exploreContent.hometown &&
+    exploreContent.experiences +
+      exploreContent.healthRecords +
+      exploreContent.newsTopics +
+      exploreContent.goals +
+      exploreContent.directions ===
+      0;
+  const exploreStart =
+    exploreContent && exploreEntries
+      ? exploreDestination(
+          exploreEntries,
+          exploreContent,
+          availableModules.map(({ id }) => id),
+        )
+      : exploreError
+        ? firstExplore
+        : null;
+  useEffect(() => {
+    if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
+  }, [exploreStart]);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
@@ -205,7 +416,7 @@ function Overview({
           () => props.loadOnboarding(locale),
           (introduction) => {
             setOnboarding(introduction);
-            setGuide((current) => (current === undefined ? (introduction.showGuide ? 0 : null) : current));
+            setGuide((current) => (current === undefined ? null : current));
           },
         ),
         update(props.loadCalendarPush, setPush),
@@ -237,7 +448,7 @@ function Overview({
       const seq = ++sequence;
       try {
         const value = await props.loadLibrary({
-          section: record === "notes" || record === "health" ? record : "summary",
+          section: record === "notes" || record === "health" ? record : record ? "summary" : undefined,
         });
         if (seq === sequence) setLibrary(value);
       } catch (err) {
@@ -269,8 +480,11 @@ function Overview({
   }, []);
   useEffect(() => {
     // The DSH plugin leaves the host's Settings shortcut untouched.
-    if (!props.renderAsk) return;
-    const openSettings = () => setView("settings");
+    if (props.hosted || !props.renderAsk) return;
+    const openSettings = () => {
+      setConnectionSection("overview");
+      setView("settings");
+    };
     const shortcut = (event: KeyboardEvent) => {
       if (event.metaKey && !event.ctrlKey && !event.altKey && event.key === ",") {
         event.preventDefault();
@@ -283,7 +497,7 @@ function Overview({
       document.removeEventListener("keydown", shortcut);
       window.removeEventListener("kaitu:settings", openSettings);
     };
-  }, [props.renderAsk]);
+  }, [props.hosted, props.renderAsk]);
   const run = async (operation: () => Promise<unknown>) => {
     writing.current = true;
     setBusy(true);
@@ -305,6 +519,10 @@ function Overview({
     }
   };
   const openRecord = (id: string) => {
+    setLibraryEntry(undefined);
+    setLibraryFile(undefined);
+    setLibraryGoal(undefined);
+    setProjectFocus(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
@@ -332,7 +550,7 @@ function Overview({
           : id === "directions"
             ? "directions"
             : id === "explore"
-              ? firstExplore
+              ? (exploreStart ?? "loading")
               : "health",
       );
       setView("explore");
@@ -345,12 +563,18 @@ function Overview({
       setView("ask");
     } else setView("connections");
   };
+  const openAskSettings = (section: "ai" | "local-ai") => {
+    setConnectionSection(section);
+    if (section === "ai") setAiKeyRequest((n) => n + 1);
+    setView("settings");
+  };
   const openSource = (source: string) => {
     if (source === "calendar" || source === "finance") {
       openRecord(source);
       setCalendarAdding(source === "calendar");
       setFinanceImporting(source === "finance");
     } else if (source === "mail") {
+      setConnectionSection("channels");
       setChannelFocus(true);
       setView("connections");
     }
@@ -404,21 +628,13 @@ function Overview({
       setPersonal((me) => (me ? { ...me, avatar: null } : me));
     },
   };
-  const stamp = (value: string) =>
-    dateFormat(locale ?? "zh-CN", {
-      timeZone: data?.timeZone,
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(new Date(value));
   const capture = (
-    <div className={css.sec}>
+    <section className={todayCss.capture}>
+      <h2>{t("随手记", "Quick note")}</h2>
       <form
-        className={css.capture}
         onSubmit={(e) => {
           e.preventDefault();
+          if (!draft.trim()) return;
           void run(async () => {
             await props.capture(draft);
             setDraft("");
@@ -433,16 +649,40 @@ function Overview({
         <label className={css.sr} htmlFor="capture-text">
           {t("随手记一句", "Quick note")}
         </label>
-        <input
+        <textarea
+          rows={3}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           id="capture-text"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder={t("随手记一句", "A quick note")}
+          placeholder={
+            data?.empty
+              ? t(
+                  "想到什么，先记下。开图会先存原文，不改你的字。",
+                  "Write a thought. Kaitu keeps your original words.",
+                )
+              : t("想到什么，先记下", "Write a thought")
+          }
           disabled={busy}
         />
-        <button type="submit" className={`${css.btn} ${css["btn-strong"]}`} disabled={busy || !draft.trim()}>
+        <button type="submit" className={css.btn} disabled={busy || !draft.trim()}>
           {t("记下", "Add note")}
+        </button>
+        <button
+          type="button"
+          className={css.link}
+          onClick={() => {
+            document.getElementById("capture-text")?.focus();
+            setReceipt(t("可用系统听写输入，再点记下", "Use your system dictation, then save the note"));
+          }}
+        >
+          {t("说一段", "Dictate")}
         </button>
       </form>
       {receipt && (
@@ -453,7 +693,7 @@ function Overview({
           </button>
         </output>
       )}
-    </div>
+    </section>
   );
   const focus = data?.next[0];
   const startMatter = (text: string) => {
@@ -470,6 +710,22 @@ function Overview({
       refresh={refresh}
     />
   );
+  const renderTasks = (showAll = false) =>
+    data && (
+      <TodayTasks
+        data={data}
+        showAll={showAll}
+        busy={busy}
+        complete={(item) => void run(() => props.completeNext(item.file, item.id))}
+        ask={askNext}
+        schedule={(item) => setSlot({ file: item.file, id: item.id })}
+        review={() => startGuide(1)}
+        focusCard={adoptedCard}
+        focusTaskId={onboarding?.next?.id}
+        adopted={adoptedTasks.day === data.today ? adoptedTasks.ids : []}
+        all={() => openRecord("projects")}
+      />
+    );
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
   const plansCard = data?.plans && (
     <PlansCard
@@ -480,26 +736,11 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
-  const selectedExplore = exploreModules.find((entry) => entry.id === explore);
+  const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     health: <HealthPage {...child} />,
     jobs: <JobsPage {...child} />,
-    footprints: (
-      <>
-        <MapPage {...child} />
-        <ProgressMap
-          plans={data?.plans}
-          projects={data?.projects ?? []}
-          loadExploration={props.loadExploration}
-          subscribe={props.subscribe}
-          open={(section) => {
-            if (section === "directions") setExplore("directions");
-            else if (section === "plans") setView("overview");
-            else openSection("projects");
-          }}
-        />
-      </>
-    ),
+    footprints: <MapPage {...child} />,
     news: (
       <NewsPage
         {...child}
@@ -514,7 +755,49 @@ function Overview({
       />
     ),
     directions: (
-      <DirectionsPage {...child} goals={personal?.goals} onConnect={() => setView("connections")} />
+      <DirectionsPage
+        {...child}
+        goals={personal?.goals}
+        onConnect={() => setView("connections")}
+        planningContent={
+          <>
+            <div ref={planning} id="direction-plans" tabIndex={-1}>
+              {plansCard}
+            </div>
+            {props.loadDirectionMap && props.generateDirectionMap && props.dismissDirectionLink ? (
+              <DirectionMap
+                load={props.loadDirectionMap}
+                generate={props.generateDirectionMap}
+                dismiss={props.dismissDirectionLink}
+                onConnect={() => setView("connections")}
+                openProject={(slug) => {
+                  openRecord("projects");
+                  setProjectFocus(slug);
+                }}
+              />
+            ) : (
+              <ProgressMap
+                plans={data?.plans}
+                projects={data?.projects ?? []}
+                loadExploration={props.loadExploration}
+                subscribe={props.subscribe}
+                open={(section) => {
+                  if (section === "projects") openRecord("projects");
+                  else if (section === "plans") {
+                    planning.current?.scrollIntoView({ block: "start" });
+                    planning.current?.focus({ preventScroll: true });
+                  } else setExplore("directions");
+                }}
+              />
+            )}
+            {!data?.plans.goals.length && (
+              <button type="button" className={css.btn} onClick={() => startMatter("")}>
+                {t("写下想做成的事", "Write down a goal")}
+              </button>
+            )}
+          </>
+        }
+      />
     ),
   };
 
@@ -532,7 +815,7 @@ function Overview({
               ["explore", t("开图", "Explore")],
               ["records", t("资料", "Library")],
             ],
-            ...(props.renderAsk ? [["ask", t("问问", "Ask")]] : []),
+            ...(props.renderAsk && !props.hosted ? [["ask", t("问问", "Ask")]] : []),
           ].map(([id, label]) => (
             <button
               type="button"
@@ -559,7 +842,7 @@ function Overview({
               onClick={() => {
                 setView(id as View);
                 if (id === "overview") void refresh();
-                if (id === "explore") setExplore(firstExplore);
+                if (id === "explore") setExplore(exploreStart ?? "loading");
                 setRecord("");
               }}
             >
@@ -582,7 +865,10 @@ function Overview({
             className={css.settingsButton}
             aria-label={t("设置", "Settings")}
             aria-current={view === "settings" ? "page" : undefined}
-            onClick={() => setView("settings")}
+            onClick={() => {
+              setConnectionSection("overview");
+              setView("settings");
+            }}
           >
             <SettingsIcon />
             <span className={css.settingsLabel}>{t("设置", "Settings")}</span>
@@ -678,148 +964,138 @@ function Overview({
           !guideVisible &&
           guide !== undefined &&
           data &&
-          (data.empty ? (
-            <TodayStart start={startMatter} memory={() => startGuide(5)} />
-          ) : (
-            <>
-              <div className={css.sec}>
-                <div className={css.head}>
-                  <h1>
-                    {dateFormat(locale ?? "zh-CN", {
-                      timeZone: "UTC",
-                      month: "long",
-                      day: "numeric",
-                      weekday: "long",
-                    }).format(new Date(`${data.today}T12:00:00Z`))}
-                  </h1>
-                </div>
-                {capture}
-              </div>
-              <TodayTasks
-                data={data}
-                busy={busy}
-                complete={(item) => void run(() => props.completeNext(item.file, item.id))}
-                ask={askNext}
-                schedule={(item) => setSlot({ file: item.file, id: item.id })}
-                review={() => startGuide(1)}
-                focusCard={adoptedCard}
-                focusTaskId={onboarding?.next?.id}
-              />
-              {!focus && !adoptedCard && (
-                <button type="button" className={css.link} onClick={() => startMatter("")}>
-                  {t("整理一件事", "Think through one thing")}
-                </button>
+          props.loadWeather &&
+          props.setWeatherPlace && (
+            <TodayWeather
+              load={props.loadWeather}
+              setPlace={props.setWeatherPlace}
+              loadLifeMap={props.loadLifeMap}
+              subscribe={props.subscribe}
+            />
+          )}
+        {view === "overview" && !guideVisible && guide !== undefined && data && (
+          <div className={todayCss.layout}>
+            <div className={todayCss.left}>
+              {data.empty ? (
+                <TodayStart
+                  start={startMatter}
+                  memory={() => startGuide(5)}
+                  status={onboarding}
+                  hasWrittenMatter={hasWrittenMatter}
+                  connect={() => {
+                    setGuide(null);
+                    if (props.renderAsk) setView("ask");
+                    else props.onAgent();
+                  }}
+                  openModule={(id) => {
+                    setView("explore");
+                    setExplore(id);
+                  }}
+                />
+              ) : (
+                renderTasks()
               )}
-              {!!data.proposedTasks.length && (
-                <section className={css.sec}>
-                  <h2 className={css.eyebrow}>{t("待确认的待办建议", "Task suggestions to review")}</h2>
-                  <div className={css.card}>
-                    {data.proposedTasks.map((task) => (
-                      <div className={css.row} key={task.id}>
-                        <span>{task.title}</span>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={busy}
-                          onClick={() => void run(() => props.adoptTask(task.id))}
-                        >
-                          {t("采纳", "Adopt")}
-                        </button>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={busy}
-                          onClick={() => void run(() => props.cancelTask(task.id))}
-                        >
-                          {t("不用了", "Not needed")}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              {!data.empty && !focus && !adoptedCard && (
+                <section className={todayCss.focusSection}>
+                  <button type="button" className={css.btn} onClick={() => startMatter("")}>
+                    {t("从一件事开始", "Start with one thing")}
+                  </button>
                 </section>
               )}
-              <Agenda
-                data={calendar}
-                open={() => openRecord("calendar")}
-                proposals={pendingProposals}
-                busy={busy}
-                decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
-              />
-              {push &&
-                data.blocks
-                  // 加入日历成功不再列一遍；只有失败或需要手动导入的才显示。
-                  .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
-                  .map((block) => (
-                    <div className={css.row} key={block.id}>
-                      <span>{block.title}</span>
-                      <CalendarPushResult
-                        id={block.id}
-                        state={push}
-                        retry={async (id) => {
-                          setPush(
-                            await (push?.enabled ? props.retryCalendarPush(id) : props.removeCalendarPush()),
-                          );
-                        }}
-                      />
+              {!!data.proposedTasks.length && (
+                <section className={todayCss.suggestions}>
+                  <h2>
+                    {t(
+                      `AI 建议 · ${data.proposedTasks.length}`,
+                      `AI suggestions · ${data.proposedTasks.length}`,
+                    )}
+                  </h2>
+                  {data.proposedTasks.map((task) => (
+                    <div className={css.row} key={task.id}>
+                      <span className={todayCss.grow}>{task.title}</span>
+                      <button
+                        type="button"
+                        className={css.btn}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await props.adoptTask(task.id);
+                            const preferences = await props.loadPreferences();
+                            const previous = preferences.todayAdoptions;
+                            const next = {
+                              workspace: data.root,
+                              day: data.today,
+                              ids: [
+                                ...(previous?.workspace === data.root && previous.day === data.today
+                                  ? previous.ids
+                                  : []),
+                                task.id,
+                              ],
+                            };
+                            setAdoptedTasks(next);
+                            await props.savePreferences({
+                              locale: preferences.followSystem ? null : preferences.locale,
+                              todayAdoptions: next,
+                            });
+                          })
+                        }
+                      >
+                        {t("采纳", "Adopt")}
+                      </button>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() => void run(() => props.cancelTask(task.id))}
+                      >
+                        {t("不用了", "Not needed")}
+                      </button>
                     </div>
                   ))}
-              <details
-                className={todayCss.secondary}
-                open={todayDetails}
-                onToggle={(event) => setTodayDetails(event.currentTarget.open)}
-              >
-                <summary>{t("目标、资料与近期变化", "Goals, notes and recent changes")}</summary>
-                {todayDetails && (
-                  <div>
-                    {plansCard}
-                    {onboarding && (
-                      <OnboardingChecklist
-                        status={onboarding}
-                        restart={() => startGuide()}
-                        go={checklistAction}
-                      />
-                    )}
-                    <DataSummaries data={data} open={openSection} />
-                    {data.sections.some((section) => section.id === "finance") && (
-                      <TodayFinance {...props} today={data.today} open={() => openRecord("finance")} />
-                    )}
-                    <section className={css.sec}>
-                      <div className={css["sec-head"]}>
-                        <h2 className={css.eyebrow}>{t("最近的变化", "Recent changes")}</h2>
-                        {data.daily && (
-                          <details>
-                            <summary className={css.link}>
-                              {t("近期回顾", "Recent review")} · {data.daily.date}
-                            </summary>
-                            <div className={css.detailBody}>{data.daily.body}</div>
-                          </details>
-                        )}
-                      </div>
-                      {data.versions.slice(0, 3).map((version) => (
-                        <div className={css["feed-row"]} key={version.oid}>
-                          <span className={css.ini}>
-                            {version.source === "user" ? t("我", "Me") : (version.actor?.[0] ?? t("图", "K"))}
-                          </span>
-                          <p>{versionText(version.text, locale ?? "zh-CN")}</p>
-                          <time className={css.small}>{stamp(version.time)}</time>
+                </section>
+              )}
+            </div>
+            <aside className={todayCss.right}>
+              {capture}
+              {!data.empty && (
+                <section className={todayCss.agenda}>
+                  <Agenda
+                    data={calendar}
+                    open={() => openRecord("calendar")}
+                    proposals={pendingProposals}
+                    busy={busy}
+                    decide={(id, decision) => void run(() => props.decideProposal(id, decision))}
+                  />
+                  {push &&
+                    data.blocks
+                      .filter((block) => ["error", "file"].includes(push.entries[block.id]?.status ?? ""))
+                      .map((block) => (
+                        <div className={css.row} key={block.id}>
+                          <span>{block.title}</span>
+                          <CalendarPushResult
+                            id={block.id}
+                            state={push}
+                            retry={async (id) => {
+                              setPush(
+                                await (push.enabled
+                                  ? props.retryCalendarPush(id)
+                                  : props.removeCalendarPush()),
+                              );
+                            }}
+                          />
                         </div>
                       ))}
-                      {!data.versions.length && (
-                        <p className={css.small}>{t("还没有新的变化", "No changes yet")}</p>
-                      )}
-                    </section>
-                  </div>
-                )}
-              </details>
-              {data.sync.needsReview > 0 && (
-                <div className={todayCss.review}>
-                  <span className={css.small}>{t("待核对资料", "Notes to review")}</span>
-                  {data.sync.directionSuggestions > 0 && (
-                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
-                      {t(
-                        `${data.sync.directionSuggestions} 个方向建议`,
-                        `${data.sync.directionSuggestions} direction suggestions`,
-                      )}
+                </section>
+              )}
+              {(data.inboxNotes > 0 ||
+                data.sync.mapNeedsReview > 0 ||
+                data.sync.mapPendingImports > 0 ||
+                data.sync.directionSuggestions > 0) && (
+                <section className={todayCss.review}>
+                  <h2>{t("要你核对", "To review")}</h2>
+                  {data.inboxNotes > 0 && (
+                    <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
+                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
                     </button>
                   )}
                   {(data.sync.mapNeedsReview > 0 || data.sync.mapPendingImports > 0) && (
@@ -831,18 +1107,45 @@ function Overview({
                         setExplore("footprints");
                       }}
                     >
-                      {t("足迹需要核对", "Footprints to review")}
+                      {t(
+                        `足迹里有 ${data.sync.mapNeedsReview + data.sync.mapPendingImports} 段经历待确认`,
+                        `${data.sync.mapNeedsReview + data.sync.mapPendingImports} footprints to review`,
+                      )}
                     </button>
                   )}
-                  {data.inboxNotes > 0 && (
-                    <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
-                      {t(`${data.inboxNotes} 条原文需要核对`, `${data.inboxNotes} notes to review`)}
+                  {data.sync.directionSuggestions > 0 && (
+                    <button type="button" className={css.link} onClick={() => openSection("directions")}>
+                      {t(
+                        `${data.sync.directionSuggestions} 个方向建议`,
+                        `${data.sync.directionSuggestions} direction suggestions`,
+                      )}
                     </button>
                   )}
-                </div>
+                </section>
               )}
-            </>
-          ))}
+              {data.empty && (
+                <section className={todayCss.storage}>
+                  <h2>{t("你的资料在哪", "Where your data lives")}</h2>
+                  <p>
+                    {data.drive
+                      ? t(
+                          "都存在你的云盘文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your cloud folder, ready to take with you.",
+                        )
+                      : t(
+                          "都存在这台电脑上你选的文件夹里，是普通文件，随时可以带走。",
+                          "Ordinary files in your chosen local folder, ready to take with you.",
+                        )}
+                  </p>
+                  <button type="button" className={css.link} onClick={() => startGuide(STORAGE_STEP)}>
+                    {t("换个位置", "Change location")}
+                  </button>
+                </section>
+              )}
+            </aside>
+          </div>
+        )}
+
         {view === "records" && (
           <>
             <div className={css.sec}>
@@ -860,16 +1163,90 @@ function Overview({
                 </h1>
               </div>
             </div>
+            {!record && importFile !== undefined && (
+              <LibraryFileImport
+                key={importAttempt}
+                {...props}
+                initialFile={importFile ?? undefined}
+                onDone={async () => {
+                  setLibrary(await props.loadLibrary({}));
+                  await refresh();
+                  setImportFile(undefined);
+                }}
+                onClose={() => setImportFile(undefined)}
+              />
+            )}
+            {record === "inbox" && reviewMatter && onboarding && (
+              <section className={css.sec} aria-label={t("核对这条原文", "Review this original")}>
+                <button
+                  type="button"
+                  className={css.link}
+                  disabled={busy}
+                  onClick={() => setReviewMatter(null)}
+                >
+                  {t("回到收件箱", "Back to inbox")}
+                </button>
+                <OnboardingMatter
+                  {...props}
+                  key={reviewMatter.source}
+                  initial={reviewMatter}
+                  content={onboarding.content.matter}
+                  builtin={!!props.renderAsk}
+                  onPrompt={prompt}
+                  onBusy={setBusy}
+                  onDone={async () => {
+                    setReviewMatter(null);
+                    await refresh();
+                  }}
+                />
+              </section>
+            )}
             {!record ? (
               <LibraryPage
+                searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
                 open={openRecord}
-                inboxCount={data ? data.sync.received + data.inboxNotes : undefined}
+                onOpenOriginal={(entry) => {
+                  openRecord("inbox");
+                  setLibraryEntry(entry);
+                }}
+                onOpenGoal={(id) => {
+                  openRecord("projects");
+                  setLibraryGoal(id);
+                }}
+                onOpenNote={(file) => {
+                  openRecord("notes");
+                  setLearningTopic(file.startsWith("learning/") ? (file.split("/")[1] ?? "") : "");
+                  setLibraryFile(file.startsWith("learning/") ? undefined : file);
+                }}
+                overview={data}
+                capture={async (text) => {
+                  await props.capture(text);
+                  const value = await props.loadLibrary({});
+                  setLibrary(value);
+                  await refresh();
+                }}
+                onFile={openFileImport}
+                onAdd={(kind) => {
+                  if (kind === "file") openFileImport(null);
+                  else if (kind === "category") {
+                    setExplore("modules");
+                    setView("explore");
+                  } else {
+                    setConnectionSection(kind === "organizer" ? "cloud-organizer" : "phone");
+                    setChannelFocus(false);
+                    setView("connections");
+                  }
+                }}
               />
             ) : record === "calendar" ? (
               <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
-              <ProjectsLibrary {...child} timeZone={data?.timeZone} />
+              <>
+                {plansCard}
+                {renderTasks(true)}
+                <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
+              </>
             ) : record === "health" ? (
               <HealthLibrary
                 {...child}
@@ -883,30 +1260,55 @@ function Overview({
                 timeZone={data?.timeZone}
               />
             ) : record === "inbox" ? (
-              <InboxPage
-                sources={data?.plans.sources}
-                openNext={(id, goalId) => {
-                  setGuide(null);
-                  setView("overview");
-                  setTodayDetails(true);
-                  setTimeout(
-                    () =>
-                      (
-                        document.getElementById(`next-${id}`) ?? document.getElementById(`plan-${goalId}`)
-                      )?.scrollIntoView({ block: "center" }),
-                    0,
-                  );
-                }}
-                loadLibrary={props.loadLibrary}
-                subscribe={props.subscribe}
-                channelSettings={props.channelSettings}
-                connect={() => {
-                  setView("connections");
-                  setChannelFocus(true);
-                }}
-              />
+              reviewMatter ? null : (
+                <InboxPage
+                  initialEntry={libraryEntry}
+                  overview={data}
+                  review={{
+                    readOnboardingMatter: props.readOnboardingMatter,
+                    adoptOnboardingMatter: async (...args) => {
+                      const result = await props.adoptOnboardingMatter(...args);
+                      await refresh();
+                      return result;
+                    },
+                    keepOnboardingMatter: async (file) => {
+                      const result = await props.keepOnboardingMatter(file);
+                      await refresh();
+                      return result;
+                    },
+                  }}
+                  onReview={(file) => {
+                    void props
+                      .readOnboardingMatter(file)
+                      .then(setReviewMatter)
+                      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+                  }}
+                  sources={data?.plans.sources}
+                  openNext={(id, goalId) => {
+                    setGuide(null);
+                    if (goalId) openSection("directions");
+                    else setView("overview");
+                    setTimeout(
+                      () =>
+                        (
+                          document.getElementById(`next-${id}`) ?? document.getElementById(`plan-${goalId}`)
+                        )?.scrollIntoView({ block: "center" }),
+                      0,
+                    );
+                  }}
+                  loadLibrary={props.loadLibrary}
+                  subscribe={props.subscribe}
+                  channelSettings={props.channelSettings}
+                  connect={() => {
+                    setConnectionSection("channels");
+                    setView("settings");
+                    setChannelFocus(true);
+                  }}
+                />
+              )
             ) : (
               <NotesPage
+                initialFile={libraryFile}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
                 loadLearning={props.loadLearning}
@@ -919,7 +1321,7 @@ function Overview({
                 onPrompt={prompt}
                 onSaved={() => {
                   void props
-                    .loadLibrary()
+                    .loadLibrary({})
                     .then(setLibrary)
                     .catch((err) => setError(String(err)));
                 }}
@@ -940,29 +1342,80 @@ function Overview({
                 </div>
               )}
               <ExploreNavigation
+                modules={availableModules}
                 entries={exploreEntries}
                 current={explore}
                 open={setExplore}
-                save={async (entries) => {
-                  const saved = await props.savePreferences({
-                    locale: followSystem ? null : locale,
-                    exploreEntries: entries,
-                  });
-                  setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
-                }}
               />
             </section>
             <div className={css.child}>
-              {selectedExplore ? (
-                explorePages[selectedExplore.id]
+              {explore === "modules" ? (
+                <ExploreModulesPage
+                  modules={availableModules}
+                  entries={exploreEntries}
+                  current={explore}
+                  open={setExplore}
+                  empty={exploreEmpty}
+                  summaries={
+                    exploreContent
+                      ? {
+                          footprints: t(
+                            `${exploreContent.hometown ? "已有家乡 · " : ""}${exploreContent.experiences} 段经历`,
+                            `${exploreContent.hometown ? "Hometown recorded · " : ""}${exploreContent.experiences} experiences`,
+                          ),
+                          health: t(
+                            `${exploreContent.healthRecords} 条记录`,
+                            `${exploreContent.healthRecords} records`,
+                          ),
+                          news: t(
+                            `${exploreContent.newsTopics} 个关键词`,
+                            `${exploreContent.newsTopics} keywords`,
+                          ),
+                          directions: t(
+                            `${exploreContent.goals} 个目标 · ${exploreContent.directions} 个方向`,
+                            `${exploreContent.goals} goals · ${exploreContent.directions} directions`,
+                          ),
+                        }
+                      : {}
+                  }
+                  save={async (entries) => {
+                    const saved = await props.savePreferences({
+                      locale: followSystem ? null : locale,
+                      exploreEntries: entries,
+                    });
+                    setExploreEntries(saved.exploreEntries ?? [...defaultExploreEntries]);
+                  }}
+                />
+              ) : selectedExplore ? (
+                (explorePages[selectedExplore.id] ?? null)
               ) : (
-                <p>{t("从添加模块开始安排这张开图。", "Use Add modules to arrange your Explore page.")}</p>
+                <output>{t("正在读取模块…", "Loading modules…")}</output>
+              )}
+              {exploreError && (
+                <p role="alert">
+                  {exploreError}{" "}
+                  <button type="button" className={css.link} onClick={() => setExploreAttempt((n) => n + 1)}>
+                    {t("重试读取", "Retry loading")}
+                  </button>
+                </p>
               )}
             </div>
           </>
         )}
+        {pluginModules
+          .filter((entry) => openedPlugins.includes(entry.id))
+          .map((entry) => (
+            <div key={entry.id} className={css.child} hidden={view !== "explore" || explore !== entry.id}>
+              <ExplorePluginFrame
+                id={entry.id}
+                title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
+                plugins={props.plugins}
+                onRemoved={pluginRemoved}
+              />
+            </div>
+          ))}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div className={css.askPanel} hidden={view !== "ask"}>
+          <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
             {props.renderAsk(
               promptDraft,
               configureRequest,
@@ -970,12 +1423,18 @@ function Overview({
               () => setView("connections"),
               promptRequest,
               view === "ask",
+              () => {
+                setGuide(null);
+                setView("overview");
+              },
+              openAskSettings,
             )}
           </div>
         )}
         {["profile", "connections", "settings"].includes(view) && (
           <PersonalPages
             {...child}
+            builtinAi={!!props.renderAsk}
             view={view as "profile" | "connections" | "settings"}
             navigate={setView}
             restartGuide={() => startGuide()}
@@ -987,9 +1446,15 @@ function Overview({
               startGuide();
             }}
             channelSettings={props.channelSettings}
+            section={connectionSection}
+            selectSection={(section) => {
+              setConnectionSection(section);
+              setView("settings");
+            }}
             channelFocus={channelFocus}
             onChannelFocused={() => setChannelFocus(false)}
             manageAi={props.renderAsk ? manageAi : props.onAgent}
+            aiKeyRequest={aiKeyRequest}
             onHandoverAnswer={handoverAnswer}
             locale={locale ?? "zh-CN"}
             followSystem={followSystem}

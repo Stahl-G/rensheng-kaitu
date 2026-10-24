@@ -190,18 +190,22 @@
   font-weight: 600;
 }
 
-/* Direction suggestions use compact full-width rows in the existing Kaitu palette. */
+/* C: one direction per card; existing details and edits remain available. */
 .directionList {
   display: grid;
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 .ideaRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 32px;
-  padding: 22px 0;
-  border-bottom: 1px solid var(--kt-control);
+  padding: 20px;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--surface);
+  border-radius: 16px;
   min-width: 0;
 }
 .ideaRow[data-paused="true"] {
@@ -232,7 +236,7 @@
   color: var(--kt-link);
 }
 .ideaTitle:focus-visible {
-  outline: 2px solid var(--kt-link);
+  outline: 3px solid var(--link-line);
   outline-offset: 4px;
 }
 .ideaTitle:active {
@@ -261,7 +265,7 @@
   gap: 16px;
   flex-shrink: 0;
 }
-@media (max-width: 700px) {
+@container (max-width: 959px) {
   .ideaRow {
     flex-direction: column;
     align-items: stretch;
@@ -270,5 +274,23 @@
   .ideaActions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+}
+
+.planning {
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+.ideaActions {
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+.ideaTitle {
+  min-height: 36px;
+}
+@container (max-width: 639px) {
+  .directionList {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

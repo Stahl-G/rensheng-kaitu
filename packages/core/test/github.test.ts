@@ -17,6 +17,7 @@ import {
   setGithubToken,
   setProject,
   stringifyFrontmatter,
+  syncBoundProjects,
   syncGithub,
   syncProject,
 } from "../src/index.js";
@@ -116,6 +117,51 @@ async function fixture() {
   const api = `http://127.0.0.1:${address.port}`;
   return { ws, slug, data, requests, api };
 }
+
+it.each([
+  ["sync", "success"],
+  ["sync", "failure"],
+  ["bind", "success"],
+  ["bind", "failure"],
+] as const)("凭据变更后丢弃旧 %s 的迟到 %s，不恢复缓存或写项目", async (operation, outcome) => {
+  const { ws, slug, data, api } = await fixture();
+  await bindGithub(ws, slug, "Owner/demo", { api, now: at(15) });
+  const project = readProject(ws, slug);
+  const status = ws.readText(`${project.dir}/STATUS.md`);
+  const records = ws.readText("projects/data/github/2026-10.jsonl");
+  data.repo.stargazers_count = 999;
+  let release!: () => void;
+  let entered!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const options = {
+    api,
+    now: at(16),
+    fetch: (async (...args) => {
+      entered();
+      await gate;
+      if (outcome === "failure") throw new Error("synthetic network failure");
+      return fetch(...args);
+    }) as typeof fetch,
+  };
+  const pending =
+    operation === "bind" ? bindGithub(ws, slug, "Owner/new", options) : syncGithub(ws, slug, options);
+  const rejected = expect(pending).rejects.toMatchObject({ code: "CONFLICT" });
+  await started;
+  setGithubToken(new Workspace(ws.root, { maintain: false }), "synthetic-replacement");
+  const invalidated = ws.readText(".kaitu/github-state.json");
+  release();
+  await rejected;
+  expect(ws.readText(".kaitu/github-state.json")).toBe(invalidated);
+  expect(ws.readText(`${project.dir}/STATUS.md`)).toBe(status);
+  expect(ws.readText("projects/data/github/2026-10.jsonl")).toBe(records);
+  expect(readProject(ws, slug).log).toBe(project.log);
+  expect((await syncGithub(ws, slug, { api, now: at(16) })).snapshot?.stars).toBe(999);
+});
 
 it("解析、核验、分页和条件缓存，同日只修订一条，按真实日期记录净下降", async () => {
   for (const input of [
@@ -239,4 +285,72 @@ it("权限、网络、部分响应失败与两种限流都保留最后有效快�
   data.failPath = "";
   expect((await syncGithub(ws, slug, { api, now: at(18) })).ok).toBe(true);
   expect(projectGithub(ws, slug, at(18))?.stale).toBe(false);
+});
+
+it("后台同步只拉绑了 GitHub 的项目，数据没变不存新版本", async () => {
+  const { ws, slug, data, requests, api } = await fixture();
+  await createProject(ws, { title: "没绑仓库", kind: "personal" });
+  await bindGithub(ws, slug, "owner/demo", { api, now: at(15) });
+  requests.length = 0;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 6) })).toBe(false);
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every((request) => request.url.startsWith("/repos/Owner/demo"))).toBe(true);
+  data.repo.stargazers_count = 121;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 7) })).toBe(true);
+  // 失败和恢复只改同步状态、不存版本，也要推回界面。
+  data.network = true;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 8) })).toBe(true);
+  data.network = false;
+  expect(await syncBoundProjects(ws, { api, now: at(15, 9) })).toBe(true);
+  expect(await syncBoundProjects(ws, { api, now: at(15, 10) })).toBe(false);
+  // 后台和手动同时拉不同项目时排队写状态，不互相覆盖。
+  const other = await createProject(ws, { title: "第二个", kind: "personal" });
+  await bindGithub(ws, other.slug, "owner/demo", { api, now: at(15, 10) });
+  await Promise.all([
+    syncGithub(ws, slug, { api, now: at(15, 11) }),
+    syncGithub(ws, other.slug, { api, now: at(15, 11) }),
+  ]);
+  const state = JSON.parse(
+    fs.readFileSync(ws.resolve(".kaitu/github-state.json", { internal: true }), "utf8"),
+  );
+  expect(Object.keys(state.repos).sort()).toEqual([other.slug, slug].sort());
+});
+
+it("绑定预检也等待正在运行的同步，保留双方状态且不重入队列", async () => {
+  const { ws, slug, api } = await fixture();
+  await bindGithub(ws, slug, "Owner/demo", { api, now: at(15) });
+  const other = await createProject(ws, { title: "待绑定项目", kind: "personal" });
+  const entered = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let bindingRequested = false;
+  const syncing = syncGithub(ws, slug, {
+    api,
+    now: at(16),
+    fetch: async (...args) => {
+      entered.resolve();
+      await release.promise;
+      return fetch(...args);
+    },
+  });
+  await entered.promise;
+  const binding = bindGithub(ws, other.slug, "Owner/demo", {
+    api,
+    now: at(16),
+    fetch: async (...args) => {
+      bindingRequested = true;
+      return fetch(...args);
+    },
+  });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(bindingRequested).toBe(false);
+  } finally {
+    release.resolve();
+    await Promise.allSettled([syncing, binding]);
+  }
+  expect((await syncing).ok).toBe(true);
+  expect((await binding).ok).toBe(true);
+  expect(bindingRequested).toBe(true);
+  expect(projectGithub(ws, slug, at(16))?.checked_at).toBe(projectGithub(ws, other.slug, at(16))?.checked_at);
+  expect(projectGithub(ws, slug, at(16))?.latest?.ts).toContain("2026-10-16");
 });

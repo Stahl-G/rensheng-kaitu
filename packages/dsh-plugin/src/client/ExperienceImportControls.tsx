@@ -62,10 +62,9 @@ export function ExperienceImportControls(
 ) {
   const t = useT();
   const sourceName = (locator: string) => (locator === "apple-photos" ? t("照片", "Photos") : locator);
+  // 来源和导入记录是管理用的，默认收起；有待处理的只在按钮上标数量，不自动展开挡住地图。
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (props.pending > 0 || props.reviewPending > 0) setOpen(true);
-  }, [props.pending, props.reviewPending]);
+  const waiting = props.pending + props.reviewPending;
   const [data, setData] = useState<ExperienceImportsData | null>(null);
   const [preview, setPreview] = useState<ExperienceBatchPreview | null>(null);
   const [source, setSource] = useState<ExperienceImportsData["sources"][number] | null>(null);
@@ -132,7 +131,10 @@ export function ExperienceImportControls(
   };
   return (
     <details open={open} className={css.review} onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>{t("来源与导入", "Sources and imports")}</summary>
+      <summary>
+        {t("来源与导入", "Sources and imports")}
+        {waiting > 0 && !open && <span>{t(`${waiting} 条待处理`, `${waiting} waiting`)}</span>}
+      </summary>
       {open && (
         <section aria-label={t("足迹来源与导入", "Footprint sources and imports")} aria-busy={busy}>
           {error && (

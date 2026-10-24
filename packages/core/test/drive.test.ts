@@ -84,6 +84,7 @@ it("Drive 自动发现本地化目录、迁移隔离状态，历史可恢复并�
     expect(readRecords(ws, "workout")[0]).toEqual(added.record);
     const versions = await history(ws);
     await disableDrive(ws);
+    // 从 ~/kaitu 开的同步，关掉后搬回 ~/kaitu，不改成新默认名。
     expect(ws.root).toBe(join(home, "kaitu"));
     expect(defaultRoot()).toBe(ws.root);
     expect(driveStatus(ws).mode).toBe("local");

@@ -8,6 +8,7 @@ import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
 import { timeZoneNotice } from "./time.js";
+import { refreshUserProfile } from "./user-profile.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
@@ -117,6 +118,11 @@ function put(ws: Workspace, file: string, text: string) {
 }
 
 export function refreshOverview(ws: Workspace, now = new Date()): void {
+  try {
+    refreshUserProfile(ws, now);
+  } catch {
+    /* Derived output cannot block original writes. */
+  }
   if (!ws.exists(".kaitu/config.json") || !ws.exists("NOW.md") || !ws.exists("me/rules.md")) return;
   if ([".kaitu/config.json", "NOW.md", "me/rules.md"].some((file) => ws.scanText(file) === undefined)) return;
   const data = readStatus(ws, now, true);

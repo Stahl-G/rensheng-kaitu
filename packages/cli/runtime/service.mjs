@@ -38,7 +38,7 @@ export function createWebAsk(ws, state) {
   return createAskService({
     state,
     workspace: ws.root,
-    runtime: (mode, reader) => connection.runtime(mode, reader),
+    runtime: (mode, reader, textOnly) => connection.runtime(mode, reader, textOnly),
     settings: () => connection.settings(),
     // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
     models: (input) => connection.models(input),

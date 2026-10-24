@@ -40,7 +40,7 @@ export const importSources = {
   "nut-ai": {
     name: "Nut AI",
     extensions: [".json"],
-    onboarding: false,
+    onboarding: true,
     run: (ws: Workspace, path: string, o: ImportOptions) => importNutAi(ws, path, o),
   },
 };

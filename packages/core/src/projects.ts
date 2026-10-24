@@ -10,7 +10,7 @@ import { normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
-import { projectGithub, syncGithub } from "./github.js";
+import { type GithubOptions, projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
@@ -19,7 +19,7 @@ import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { ModuleStatus } from "./workbench.js";
-import type { Workspace } from "./workspace.js";
+import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export interface ProjectLink {
   path: string;
@@ -462,7 +462,21 @@ function wordCount(text: string, markdown: boolean): number {
   );
 }
 
-export async function syncProject(ws: Workspace, slug: string, options: { now?: Date } = {}) {
+export async function syncProject(ws: Workspace, slug: string, options: GithubOptions = {}) {
+  const write: WorkspaceWrite = options.write ?? ((operation) => operation());
+  const local = await write(() => syncProjectLocal(ws, slug, options));
+  const github = local.github ? await syncGithub(ws, slug, options) : null;
+  if (github?.problem) local.issues.push({ path: github.repo, message: github.problem });
+  return {
+    slug,
+    metrics: local.metrics,
+    issues: local.issues,
+    version: github?.ok
+      ? github.version
+      : await write(() => snapshot(ws, `同步了项目进度：${local.title}`, local.now)),
+  };
+}
+async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
     const sorted = sortLog(project.log);
@@ -615,22 +629,56 @@ export async function syncProject(ws: Workspace, slug: string, options: { now?: 
     ws.writeText(`${project.dir}/STATUS.md`, stringifyFrontmatter(project.data, project.body), {
       internal: true,
     });
-    const github = project.data.github ? await syncGithub(ws, slug, { now }) : null;
-    if (github?.problem) issues.push({ path: github.repo, message: github.problem });
-    return {
-      slug,
-      metrics: written,
-      issues,
-      version: github?.ok ? github.version : await snapshot(ws, `同步了项目进度：${project.data.title}`, now),
-    };
+    return { metrics: written, issues, github: !!project.data.github, title: project.data.title, now };
   });
 }
+
 export async function syncProjects(ws: Workspace) {
   return batchSnapshot(ws, "同步了项目进度", async () => {
     const results = [];
     for (const slug of slugs(ws)) results.push(await syncProject(ws, slug));
     return results;
   });
+}
+
+/** 只拉绑了 GitHub 的项目；数据没变时 syncGithub 不写记录、不存版本。返回界面是否需要刷新：数据或同步状态变了。 */
+export async function syncBoundProjects(ws: Workspace, options: GithubOptions = {}): Promise<boolean> {
+  let changed = false;
+  for (const slug of slugs(ws)) {
+    try {
+      if (!readProject(ws, slug).data.github) continue;
+      const result = await syncGithub(ws, slug, options);
+      if (result.version || result.statusChanged) changed = true;
+    } catch {
+      // 单个项目读不了不挡其他项目；GitHub 的失败原因已由 syncGithub 记在项目上。
+    }
+  }
+  return changed;
+}
+
+/** 开图开着时在后台每小时拉一次项目的 GitHub 进度，结果通过 notify 推回界面。 */
+export function startProjectGithubSync(ws: Workspace, notify: () => void = () => {}, intervalMs = 3_600_000) {
+  let running = false;
+  const run = async () => {
+    if (running) return;
+    running = true;
+    try {
+      if (await syncBoundProjects(ws)) notify();
+    } catch {
+      // 云盘暂时卸载等读不到项目目录时跳过这一轮，下个小时再试，不让后台任务把 App 带崩。
+    } finally {
+      running = false;
+    }
+  };
+  // 启动后先让出一分钟给首屏，再按间隔拉取。
+  const first = setTimeout(() => void run(), Math.min(60_000, intervalMs));
+  const timer = setInterval(() => void run(), intervalMs);
+  first.unref();
+  timer.unref();
+  return () => {
+    clearTimeout(first);
+    clearInterval(timer);
+  };
 }
 
 export function rebaseProjectLinks(ws: Workspace, oldRoot: string, newRoot: string) {

@@ -62,7 +62,16 @@ const props: OverviewPageProps = {
     if (!response.ok) throw new Error(value.error ?? "采集设置失败");
     return value;
   },
-  renderAsk: (prompt, configureRequest, configureBuiltin, onConnections, promptRequest, active) => (
+  renderAsk: (
+    prompt,
+    configureRequest,
+    configureBuiltin,
+    onConnections,
+    promptRequest,
+    active,
+    onToday,
+    onSettings,
+  ) => (
     <AskPage
       workspace={workspace}
       active={active}
@@ -71,6 +80,8 @@ const props: OverviewPageProps = {
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}
+      onToday={onToday}
+      onSettings={onSettings}
     />
   ),
   subscribe: (refresh) => {
@@ -95,11 +106,12 @@ const props: OverviewPageProps = {
   pickStorageFolder: () => call("pickStorageFolder"),
   loadCalendar: () => call("calendar"),
   addCalendar: (url, name) => call("addCalendarSubscription", url, name),
-  loadLibrary: (query) => call("library", query),
+  loadLibrary: (query) => call("library", query ?? {}),
   loadLearning: (topic) => call("learningRead", topic),
   startLearning: (input) => call("learningStart", input),
   saveLearning: (input) => call("learningSave", input),
   loadLibraryDocument: (file) => call("libraryDocument", file),
+  searchLibraryNotes: (query) => call("searchLibraryNotes", query),
   adoptTask: (id) => call("adoptTask", id),
   cancelTask: (id) => call("cancelTask", id),
   completeNext: (file, id) => call("completeNext", file, id),
@@ -116,6 +128,10 @@ const props: OverviewPageProps = {
   loadProject: (slug) => call("projectDetail", slug),
   createProject: (title) => call("projectCreate", title),
   bindProjectGithub: (slug, repo) => call("projectBindGithub", slug, repo),
+  projectMemoryPrompt: (slug, locale) => call("projectMemoryPrompt", slug, locale),
+  installProjectMemory: (slug, directory) => call("projectMemoryInstall", slug, directory),
+  projectArchitecturePrompt: (slug, locale) => call("projectArchitecturePrompt", slug, locale),
+  loadProjectArchitecture: (slug) => call("projectArchitecture", slug),
   saveProjectGoal: (slug, goal) => call("projectGoalSave", slug, goal),
   suggestProjectGoal: (slug) => call("projectGoalSuggest", slug),
   syncProject: (slug) => call("projectSync", slug),
@@ -126,6 +142,12 @@ const props: OverviewPageProps = {
   writeExploration: (command) => call("explorationWrite", command),
   loadExplorationSource: (owner, id, reference) => call("explorationSource", owner, id, reference),
   loadLifeMap: () => call("lifeMap"),
+  loadDirectionMap: (locale) => call("directionMap", locale),
+  generateDirectionMap: (locale) => call("directionMapGenerate", locale),
+  dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
+  loadWeather: () => call("weather"),
+  setWeatherPlace: (name, latitude, longitude, source) =>
+    call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),

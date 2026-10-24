@@ -47,6 +47,7 @@ import {
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
+  type WeatherState,
   Workspace,
   addCalendarSubscription,
   addGoalNext,
@@ -71,6 +72,7 @@ import {
   defaultRoot,
   directionsPrompt,
   dismissNews,
+  disposeNoteIndex,
   draftOnboardingMatter,
   dshFiles,
   editCalendarBlock,
@@ -78,6 +80,7 @@ import {
   exportWorkspace,
   handoverPack,
   hideExperience,
+  installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -93,6 +96,8 @@ import {
   previewOnboardingImport,
   previewOnboardingMemory,
   previewOnboardingSetup,
+  projectArchitecturePrompt,
+  projectMemoryPrompt,
   proposeTask,
   readAutomation,
   readAvatar,
@@ -112,10 +117,13 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
   readSettings,
+  readWeather,
   recoverExperienceImports,
+  refreshWeather,
   removeAvatar,
   replaceMemory,
   resolveExperience,
@@ -132,9 +140,11 @@ import {
   saveProjectGoal,
   scheduleNext,
   selectMediaLibrary,
+  searchLibraryNotes,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
+  setWeatherPlace,
   snapshot,
   startLearning,
   syncProject,
@@ -187,7 +197,10 @@ export class KaituOverviewService extends TypertRemoteService {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => this.files.dispose());
+    ctx.effect(() => () => {
+      this.files.dispose();
+      disposeNoteIndex(this.workspace);
+    });
     this.scheduleLearningVersion = (message) => {
       setImmediate(() => {
         void this.write(() => snapshot(this.workspace, message)).catch((error) =>
@@ -382,6 +395,11 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("libraryDocument")
   async libraryDocument(file: string): Promise<string> {
     return readLibraryDocument(this.workspace, file);
+  }
+
+  @Remote("searchLibraryNotes")
+  async searchLibraryNotes(query: string): Promise<import("@kaitu/core").NoteSearchResult[]> {
+    return searchLibraryNotes(this.workspace, query);
   }
 
   @Remote("learningList")
@@ -772,6 +790,43 @@ export class KaituOverviewService extends TypertRemoteService {
   async projectBindGithub(slug: string, repo: string): Promise<ProjectDetailData> {
     await bindGithub(this.workspace, slug, repo);
     return readProjectPage(this.workspace, slug);
+  }
+
+  @Remote("projectMemoryPrompt")
+  async projectMemoryPrompt(slug: string, locale: string): Promise<string> {
+    return projectMemoryPrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("weather")
+  async weather(): Promise<WeatherState> {
+    return readWeather();
+  }
+
+  @Remote("weatherPlace")
+  async weatherPlace(
+    name: string,
+    latitude?: number,
+    longitude?: number,
+    source?: "manual" | "footprints",
+  ): Promise<WeatherState> {
+    const state = setWeatherPlace({ name, latitude, longitude, source });
+    void refreshWeather().catch(() => {});
+    return state;
+  }
+
+  @Remote("projectArchitecturePrompt")
+  async projectArchitecturePrompt(slug: string, locale: string): Promise<string> {
+    return projectArchitecturePrompt(this.workspace, slug, locale === "en" ? "en" : "zh-CN");
+  }
+
+  @Remote("projectArchitecture")
+  async projectArchitecture(slug: string): Promise<string | null> {
+    return readProjectArchitecture(this.workspace, slug);
+  }
+
+  @Remote("projectMemoryInstall")
+  async projectMemoryInstall(slug: string, directory: string): Promise<{ files: string[]; project: string }> {
+    return installProjectMemory(this.workspace, directory, slug);
   }
 
   @Remote("projectSync")

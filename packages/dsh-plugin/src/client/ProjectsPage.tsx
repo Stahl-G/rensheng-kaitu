@@ -1,6 +1,8 @@
 import type { ProjectGoal } from "@kaitu/core";
 import { useEffect, useState } from "react";
 import type { DoingProject, ProjectDetailData } from "../types.js";
+import { AgentHandoff } from "./AgentHandoff.js";
+import { ArchitectureCard } from "./ArchitectureCard.js";
 import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
@@ -322,7 +324,12 @@ function CustomView({ project }: { project: ProjectDetailData }) {
 }
 
 export function ProjectsPage(
-  props: DoingPageProps & { timeZone?: string; subscribe?: (refresh: () => void) => () => void },
+  props: DoingPageProps & {
+    timeZone?: string;
+    subscribe?: (refresh: () => void) => () => void;
+    /** 从别处点进来时直接打开这个项目的详情。 */
+    initialProject?: string;
+  },
 ) {
   const t = useT();
   const [projects, setProjects] = useState<DoingProject[] | null>(null);
@@ -380,6 +387,11 @@ export function ProjectsPage(
     setRepo(detail.github?.repo ?? "");
     setBinding(false);
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在指定的项目变化时打开一次。
+  useEffect(() => {
+    if (props.initialProject)
+      void open(props.initialProject).catch((err) => setError(String(err.message ?? err)));
+  }, [props.initialProject]);
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: props.timeZone }).format(new Date());
   const refresh = async () => {
     if (project) await open(project.slug);
@@ -495,113 +507,131 @@ export function ProjectsPage(
                 <Curve project={project} />
                 <Output project={project} />
               </div>
-              <section className={css.card}>
-                <h3>GitHub</h3>
-                {github(project)}
-                <button
-                  type="button"
-                  className={css.link}
-                  disabled={busy}
-                  onClick={() => setBinding(!binding)}
-                >
-                  {project.github
-                    ? t("更换 GitHub 仓库", "Change GitHub repository")
-                    : t("绑定 GitHub 仓库", "Link GitHub repository")}
-                </button>
-                {binding && (
-                  <form
-                    className={css.form}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void run(async () => {
-                        await props.bindProjectGithub(project.slug, repo);
-                        await refresh();
-                      });
-                    }}
-                  >
-                    <label>
-                      {t("仓库地址", "Repository")}
-                      <input
-                        placeholder="owner/repo"
-                        required
-                        value={repo}
-                        onChange={(event) => setRepo(event.target.value)}
-                      />
-                    </label>
-                    <button type="submit" className={css.primary} disabled={busy}>
-                      {t("校验并绑定", "Check and link")}
-                    </button>
-                  </form>
-                )}
-                {!!project.github?.latest?.commits.length && (
-                  <details>
-                    <summary>
-                      {t(
-                        `最近 ${project.github.latest.commits.length} 条提交`,
-                        `Recent commits · ${project.github.latest.commits.length}`,
-                      )}
-                    </summary>
-                    {project.github.latest.commits.map((commit) => (
-                      <p key={commit.sha}>
-                        {commit.date.slice(0, 10)} · {commit.title}
-                      </p>
-                    ))}
-                  </details>
-                )}
-              </section>
-              <section className={css.card}>
-                <h3>{t("最近日志", "Recent progress")}</h3>
-                {project.logs.length ? (
-                  project.logs.slice(0, 20).map((log) => (
-                    <div key={log.date}>
-                      <h4>{log.date}</h4>
-                      <p className={css.body}>{log.text}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className={css.muted}>
-                    {t("还没有日志，记下一次实际进展。", "No progress logged yet. Record what happened.")}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() =>
-                    props.onPrompt(
-                      t(
-                        `帮我给项目「${project.title}」记一次进展：`,
-                        `Help me log progress for “${project.title}”:`,
-                      ),
-                    )
-                  }
-                >
-                  {t("记一次进展", "Log progress")}
-                </button>
-              </section>
-              <section className={css.card}>
-                <h3>{t("来源", "Sources")}</h3>
-                {project.links.map((link) => (
-                  <p key={link.path}>
-                    <span className={css.role}>
-                      {
-                        {
-                          repo: t("仓库", "Repository"),
-                          manuscript: t("手稿", "Manuscript"),
-                          folder: t("文件夹", "Folder"),
-                        }[link.role]
-                      }
-                    </span>{" "}
-                    <OpenPath path={link.path} />
-                  </p>
-                ))}
-                {project.sources.map((file) => (
-                  <p key={file} className={css.muted}>
-                    {file}
-                  </p>
-                ))}
-              </section>
             </>
           )}
+          {/* Agent 写的视图只替换目标与进度部分；GitHub、交给 Agent、日志和来源始终保留。 */}
+          <>
+            <section className={css.card}>
+              <h3>GitHub</h3>
+              {github(project)}
+              <button type="button" className={css.link} disabled={busy} onClick={() => setBinding(!binding)}>
+                {project.github
+                  ? t("更换 GitHub 仓库", "Change GitHub repository")
+                  : t("绑定 GitHub 仓库", "Link GitHub repository")}
+              </button>
+              {binding && (
+                <form
+                  className={css.form}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run(async () => {
+                      await props.bindProjectGithub(project.slug, repo);
+                      await refresh();
+                    });
+                  }}
+                >
+                  <label>
+                    {t("仓库地址", "Repository")}
+                    <input
+                      placeholder="owner/repo"
+                      required
+                      value={repo}
+                      onChange={(event) => setRepo(event.target.value)}
+                    />
+                  </label>
+                  <button type="submit" className={css.primary} disabled={busy}>
+                    {t("校验并绑定", "Check and link")}
+                  </button>
+                </form>
+              )}
+              {!!project.github?.latest?.commits.length && (
+                <details>
+                  <summary>
+                    {t(
+                      `最近 ${project.github.latest.commits.length} 条提交`,
+                      `Recent commits · ${project.github.latest.commits.length}`,
+                    )}
+                  </summary>
+                  {project.github.latest.commits.map((commit) => (
+                    <p key={commit.sha}>
+                      {commit.date.slice(0, 10)} · {commit.title}
+                    </p>
+                  ))}
+                </details>
+              )}
+            </section>
+            {props.projectArchitecturePrompt &&
+              props.loadProjectArchitecture &&
+              (project.architecture ||
+                project.github ||
+                project.links.some((link) => link.role === "repo")) && (
+                <ArchitectureCard
+                  key={project.slug}
+                  project={project}
+                  prompt={props.projectArchitecturePrompt}
+                  load={props.loadProjectArchitecture}
+                />
+              )}
+            {props.projectMemoryPrompt && props.installProjectMemory && (
+              <AgentHandoff
+                key={project.slug}
+                project={project}
+                prompt={props.projectMemoryPrompt}
+                install={props.installProjectMemory}
+              />
+            )}
+            <section className={css.card}>
+              <h3>{t("最近日志", "Recent progress")}</h3>
+              {project.logs.length ? (
+                project.logs.slice(0, 20).map((log) => (
+                  <div key={log.date}>
+                    <h4>{log.date}</h4>
+                    <p className={css.body}>{log.text}</p>
+                  </div>
+                ))
+              ) : (
+                <p className={css.muted}>
+                  {t("还没有日志，记下一次实际进展。", "No progress logged yet. Record what happened.")}
+                </p>
+              )}
+              <button
+                type="button"
+                className={css.link}
+                onClick={() =>
+                  props.onPrompt(
+                    t(
+                      `帮我给项目「${project.title}」记一次进展：`,
+                      `Help me log progress for “${project.title}”:`,
+                    ),
+                  )
+                }
+              >
+                {t("记一次进展", "Log progress")}
+              </button>
+            </section>
+            <section className={css.card}>
+              <h3>{t("来源", "Sources")}</h3>
+              {project.links.map((link) => (
+                <p key={link.path}>
+                  <span className={css.role}>
+                    {
+                      {
+                        repo: t("仓库", "Repository"),
+                        manuscript: t("手稿", "Manuscript"),
+                        folder: t("文件夹", "Folder"),
+                      }[link.role]
+                    }
+                  </span>{" "}
+                  <OpenPath path={link.path} />
+                </p>
+              ))}
+              {project.sources.map((file) => (
+                <p key={file} className={css.muted}>
+                  {file}
+                </p>
+              ))}
+            </section>
+          </>
         </>
       ) : (
         <>

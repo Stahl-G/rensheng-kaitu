@@ -222,7 +222,8 @@ export async function enableSync(
     setStateBinding(old, state, mode);
     mkdirSync(join(old, ".kaitu"));
     ws.writeJson(".kaitu/config.json", { ...config, state_dir: state }, { internal: true });
-    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode, provider })}\n`);
+    // 记下开启同步前的本机位置，关闭同步时搬回原处。
+    writeFileSync(join(state, "sync-location.json"), `${JSON.stringify({ mode, provider, local: old })}\n`);
     // 配置留在同步文件夹，其他状态留在本机。
     rmSync(join(state, "config.json"));
     move(old, target);
@@ -246,6 +247,18 @@ export async function enableSync(
   return syncStatus(ws);
 }
 
+/** 关闭同步时默认搬回开启前的位置；早期版本没记下时，已有 ~/kaitu 的老用户回 ~/kaitu。 */
+function previousLocalRoot(state: string): string {
+  try {
+    const saved = JSON.parse(readFileSync(join(state, "sync-location.json"), "utf8")).local;
+    if (typeof saved === "string" && isAbsolute(saved)) return saved;
+  } catch {
+    // 没有记录时按默认位置处理。
+  }
+  const home = process.env.HOME || homedir();
+  return existsSync(join(home, "kaitu")) ? join(home, "kaitu") : join(home, "kaitu-ai-memory");
+}
+
 export async function disableSync(ws: Workspace, options: { to?: string } = {}) {
   if (syncStatus(ws).mode === "local") throw new KaituError("当前是本地模式", "CONFLICT");
   const unavailable = ws.unavailableFiles();
@@ -255,9 +268,9 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
       "CLOUD_UNAVAILABLE",
     );
   const old = ws.root;
-  const target = resolve(options.to ?? join(process.env.HOME || homedir(), "kaitu"));
-  separate(old, target);
   const state = stateDirectory(old, ws.isICloud);
+  const target = resolve(options.to ?? previousLocalRoot(state));
+  separate(old, target);
   separate(state, target);
   const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
   // 只允许替换开图自己留下的迁移说明目录。

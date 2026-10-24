@@ -24,6 +24,9 @@ export async function apply(ctx) {
   );
   ctx.inject(["fs"], (services) => {
     services.on("tools/execute", async (exec, next) => {
+      // 只收发文字的一次性对话（例如方向页的看法）：任何工具都在执行前拒绝。
+      if (process.env.KAITU_AGENT_TOOLS === "none")
+        throw new FsError("这次对话只收发文字，开图不执行任何工具", "FS_SANDBOX_DENIED");
       if (exec.name === "glob" || exec.name === "grep") {
         const args = exec.arguments ?? {};
         const target = await services.fs.resolve(args.path ?? ".", {

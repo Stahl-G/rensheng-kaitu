@@ -14,7 +14,7 @@ description: 用户要学习或接着学时，用已有材料一次问一个小�
 
 ## 材料与记录
 
-- 主题已存在就沿用，不重复创建；需要读取时用 kaitu_learning read（action、topic），外部 Agent 用现有文件工具读取同一 learning/<topic>/。
+- 主题已存在就沿用，不重复创建。DSH 里用 kaitu_learning（action、topic）；MCP 用 learning_list / learning_read / learning_start / learning_save；有命令行的 Agent 用 `kaitu learning list | read <主题> | start --json '…' | save --json '…'`，参数同这些工具；只能读写文件时直接读写同一 learning/<topic>/。
 - 新主题才整理用户提供的来源并建立 STATUS.md；联网仅用当前 Agent 具备的能力，不假装读过链接原文。
 - 总结时区分来源和用户实际表达，把真实理解、未解问题和一个下一步追加到 notes.md / STATUS.md；现有工具已处理校验和版本，不另要求用户运行 CLI。
 - 不直接修改长期目标或已确认日历；需要安排或调整长期目标时提出待确认变更。

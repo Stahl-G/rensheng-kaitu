@@ -3,7 +3,15 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry";
 import { CollectorService } from "@kaitu/channels/collectors";
 import { startPhoneSnapshots } from "@kaitu/core";
-import { Workspace, defaultRoot, initWorkspace, startWorkspaceBackup, upgradeWorkspace } from "@kaitu/core";
+import {
+  Workspace,
+  defaultRoot,
+  initWorkspace,
+  startProjectGithubSync,
+  startWeatherSync,
+  startWorkspaceBackup,
+  upgradeWorkspace,
+} from "@kaitu/core";
 import { TYPERT as contribution } from "../lib/typert.host.js";
 import { startCalendarLoop } from "./calendar-loop.js";
 import type { SkillContext, Context as ToolContext } from "./dsh.js";
@@ -42,6 +50,8 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   // automation: false 时后台工作（采集、日历推送、收件箱、定时任务）交给开图 App，插件只提供页面和工具。
   if (config.automation === false) return;
   ctx.effect(() => startWorkspaceBackup(ws));
+  ctx.effect(() => startProjectGithubSync(ws));
+  ctx.effect(() => startWeatherSync().stop);
   ctx.effect(() => startPhoneSnapshots(ws));
   collectors.start();
   ctx.effect(() => () => collectors.stop());

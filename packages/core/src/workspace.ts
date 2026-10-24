@@ -16,12 +16,14 @@ import { KaituError, ScopeError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { ownsLegacyHistory } from "./history-ownership.js";
 import { invalidateHistoryFile, maintainHistoryIgnore } from "./history.js";
+import { invalidateNoteIndex } from "./note-search.js";
 import { holdOverview, refreshOverview } from "./overview.js";
 import { migrateWorkspaceState, stateBinding } from "./state-binding.js";
 import {
   cloudPlaceholder,
   conflictOriginal,
   isEvictedICloudFile,
+  isUserProfile,
   placeholderOriginal as placeholderName,
   syncInventory,
 } from "./sync-files.js";
@@ -29,11 +31,17 @@ import { isICloudPath } from "./sync-location.js";
 import { ensureTaskModule } from "./tasks.js";
 import { assertTimeZone } from "./time.js";
 
+export type WorkspaceWrite = <T>(operation: () => Promise<T>) => Promise<T>;
+
 export const STATE_DIR = ".kaitu";
 
-/** 默认数据目录：--dir > KAITU_DIR > ~/kaitu */
+/** 默认数据目录：--dir > KAITU_DIR > 当前工作区 > 已有的 ~/kaitu（含搬去云盘后留下的迁移说明）> ~/kaitu-ai-memory */
 export function defaultRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return resolve(env.KAITU_DIR || currentWorkspace(env) || join(env.HOME || homedir(), "kaitu"));
+  const home = env.HOME || homedir();
+  const legacy = join(home, "kaitu");
+  return resolve(
+    env.KAITU_DIR || currentWorkspace(env) || (existsSync(legacy) ? legacy : join(home, "kaitu-ai-memory")),
+  );
 }
 
 export function stateDirectory(root: string, icloud?: boolean): string {
@@ -230,7 +238,7 @@ export class Workspace {
   }
 
   pendingDownloads(): string[] {
-    return [...this.unread].filter((file) => this.isUnavailable(file));
+    return [...this.unread].filter((file) => !isUserProfile(file) && this.isUnavailable(file));
   }
 
   unavailableFiles(prefix = ""): string[] {
@@ -275,6 +283,7 @@ export class Workspace {
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
     renameSync(tmp, abs);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 
@@ -287,6 +296,7 @@ export class Workspace {
     this.protectWrite(rel);
     mkdirSync(dirname(abs), { recursive: true });
     appendFileSync(abs, `${line}\n`);
+    invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
 

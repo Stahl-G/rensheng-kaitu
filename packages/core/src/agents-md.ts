@@ -34,12 +34,36 @@ const routes = [
     match: /待办|todo|to-do|task add/i,
   },
   {
+    request: "整理项目今天的进展",
+    use: "project-review",
+    read: "该项目 STATUS、日志与 view.json；有 gh 时读当天 PR 和 issue",
+    done: "日志有今天的日报，view.json 的 daily- 积木已更新并通过校验",
+    skill: "project-review",
+    match: /项目日报|项目.*今天|今天.*项目|project.*(?:review|today)|daily.*project/i,
+  },
+  {
     request: "项目推进了",
     use: "project",
     read: "该项目 STATUS.md，必要时读 log.md",
     done: "STATUS/日志已更新，回执有版本",
     skill: "project",
     match: /项目|project/i,
+  },
+  {
+    request: "存一篇文章去学 / 接着学",
+    use: "learn-topic；有命令行时 kaitu learning start / save",
+    read: "该主题 STATUS 与 notes；新主题只读用户给的材料",
+    done: "回执有 topic；记下的理解只来自用户原话",
+    skill: "learn-topic",
+    match: /学习|接着学|学一下|这篇文章|存.*文章|learn|article/i,
+  },
+  {
+    request: "帮我做个决定",
+    use: "decision",
+    read: "decisions/ 下同名档案与相关记忆",
+    done: "analysis.md 与 STATUS 已写；用户选定前保持待决定",
+    skill: "decision",
+    match: /做.*决定|决策|拿主意|decide|decision/i,
   },
   {
     request: "记住一件事",
@@ -72,13 +96,28 @@ export function workspaceAgentGuide(): string {
 
 这里是用户的个人资料。时区在 me/rules.md 的 timezone；时间用带偏移的 ISO 8601，日期按用户时区切分。
 
+## 先读这几个
+
+先读 USER.md（程序生成的一页画像，核对生成时间）→ NOW.md（核对计划日期）；其余按当前任务取。
+USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile.md 与 memory/MEMORY.md，再取必要的非敏感、未归档记忆；不把缺失当作没有资料。
+有 reading_pack 工具或支持的 kaitu reading-pack 命令时，按当前连接权限现取近况；没有时直接读正本。共享画像不含财务，财务只经有权限的工具取得。
+没有工具时，只往 inbox/agents/ 新建唯一命名的文件。普通原文用 <agent>-<唯一时间>.note.md；改画像、目标、规则或替换记忆都写成提议，等待用户处理，不直接改正本。
+三条边界：① 不改 USER.md、生成指南或数据 JSONL；② 不把 AI 建议标成用户确认，不自行归档/替换记忆；③ 不写工作区之外、程序状态、版本库或密钥。
+
+目录地图（只读本次需要的）：
+- me/：档案、目标、规则与确认过的阶段；NOW.md：最近计划。
+- memory/：记忆索引与条目；有 ended 的是旧事实，不当作当前画像。
+- projects/、learning/、decisions/：项目、学习与决定的状态及日志。
+- explore/、health/、feed/：方向与足迹、健康、资讯，按模块说明取。
+- inbox/agents/：新投递；inbox/notes/：待处理原文；handoffs/：接续任务的交接。
+
 ## 按当前任务做
 
 | 用户说 | 用 | 最多读什么 | 做完的标志 |
 |---|---|---|---|
 ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${route.done} |`).join("\n")}
 
-只加载这次任务的一个相关 Skill：正本在 .agents/skills/<技能>/SKILL.md，.claude/skills/ 是副本。缺口只问一个会改变下一步的问题，已知信息直接用。了解现状才读 OVERVIEW.md 的相关摘要，需要背景时再读档案与相关记忆；整理员按 ORGANIZER.md 执行。
+只加载这次任务的一个相关 Skill：正本在 .agents/skills/<技能>/SKILL.md，.claude/skills/ 是副本。缺口只问一个会改变下一步的问题，已知信息直接用。需要更多现状才读 OVERVIEW.md 的相关摘要；整理员按 ORGANIZER.md 执行。
 字段不确定时用 kaitu record schema <类型>（DSH 用 kaitu_status 带 type；MCP 用 record_types）。类型从相关 module.json.records 或 kaitu record types 查。只能读写云盘、没有命令时，格式不确定才读 RECORDS.md 的相关类型，投递边界见 AGENT-README.md；不安装 CLI 来绕路。
 
 媒体引用写成 media:年/月/原始文件名，根目录由每台设备按工作区单独选择（默认工作区旁的 kaitu-media）；只按用户本机绑定解析，未绑定或未下载时保留文字和引用，不把媒体放进工作区、版本库或资料包，不凭原片保留的位置字段推定允许外发。人工说明只写同名 XMP 的 dc:description／Iptc4xmpExt:PersonInImage，没写说明或标人不新建 XMP。

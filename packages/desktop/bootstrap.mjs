@@ -26,6 +26,11 @@ for (const name of ["userData", "sessionData", "logs", "crashDumps"]) {
 if (embedded) {
   let visible = process.env.KAITU_AI_BACKGROUND !== "1";
   void app.whenReady().then(() => app.dock?.hide());
+  app.on("kaitu:host-ready", (target) => {
+    const url = URL.parse(target);
+    if (url?.protocol === "http:" && url.hostname === "127.0.0.1" && url.searchParams.has("token"))
+      process.stdout.write(`${JSON.stringify({ type: "kaitu:web", url: url.href })}\n`);
+  });
   app.on("browser-window-created", (_event, window) => {
     window.on("show", () => {
       if (!visible) window.hide();

@@ -39,4 +39,42 @@ export const exploreModules = [
   },
 ] as const;
 export const defaultExploreEntries = exploreModules.filter((entry) => entry.default).map(({ id }) => id);
-export type ExploreModule = (typeof exploreModules)[number];
+export interface ExploreModule {
+  id: string;
+  title: readonly [string, string];
+  description: readonly [string, string];
+  icon: string;
+  page?: string;
+}
+
+// 插件在 package.json 的 kaitu.explore.icon 里写 24×24 的 SVG 路径就用它，否则用通用图标；开图不维护插件名单。
+const pluginDefault = "M12 3 20.5 7.5v9L12 21l-8.5-4.5v-9L12 3Z";
+export function moduleIcon(entry: Pick<ExploreModule, "id" | "icon">): string {
+  return /^[Mm]\s*-?\d/.test(entry.icon) ? entry.icon : pluginDefault;
+}
+
+/** Counts come from the existing in-memory page projections, never a directory scan. */
+export interface ExploreContent {
+  hometown: boolean;
+  experiences: number;
+  healthRecords: number;
+  newsTopics: number;
+  goals: number;
+  directions: number;
+}
+export function exploreDestination(
+  entries: readonly string[],
+  content: ExploreContent,
+  available: readonly string[] = exploreModules.map(({ id }) => id),
+): string {
+  if (
+    !content.hometown &&
+    !content.experiences &&
+    !content.healthRecords &&
+    !content.newsTopics &&
+    !content.goals &&
+    !content.directions
+  )
+    return "modules";
+  return entries.find((id) => available.includes(id)) ?? "modules";
+}

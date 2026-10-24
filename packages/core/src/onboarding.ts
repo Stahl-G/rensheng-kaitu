@@ -23,7 +23,13 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { type GithubProblem, bindGithub, parseGithubRepo, projectGithub } from "./github.js";
 import { batchSnapshot, history, snapshot } from "./history.js";
 import type { BatchImportResult } from "./importers/batch.js";
-import { archiveInboxNote, captureNote, findInboxNote, noteMetadata } from "./inbox-notes.js";
+import {
+  archiveInboxNote,
+  captureNote,
+  findInboxNote,
+  isCaptureSource,
+  noteMetadata,
+} from "./inbox-notes.js";
 import { type Locale, type Preferences, normalizeLocale, pick, readPreferences } from "./locale.js";
 import { type Memory, type MemoryInput, type MemoryType, importMemories, listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
@@ -440,8 +446,9 @@ const WHEN = new RegExp(
 );
 const onboardingTargets = ["memory", "goal", "project", "direction"] as const;
 // 有的 AI 复制出来的回答没有换行，多条挤在一行里；在每个已知类别标签前断开。
+// 标签可紧贴上一段正文；分隔标点在解析各段时移除，正文里的标点保留。
 const INLINE_TAG = new RegExp(
-  `\\s+(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
+  `(?<=.)\\s*(?=[[【](?:${CATEGORY_GROUPS.flatMap((group) => group.tags).join("|")})[\\]】])`,
   "gi",
 );
 
@@ -468,7 +475,7 @@ export function parseMemoryPaste(
       let group = category
         ? CATEGORY_GROUPS.find((item) => item.tags.some((tag) => tag === category))
         : undefined;
-      let body = group ? (match?.[2]?.trim() ?? original) : original;
+      let body = group ? (match?.[2]?.replace(/[，,；;、\s]+$/u, "") ?? original) : original;
       let time = group ? /\s*[（(]([^（）()]+)[）)]$/.exec(body) : null;
       if (time && !WHEN.test(time[1]?.trim() ?? "")) time = null;
       let content = time ? body.slice(0, time.index).trim() : body;
@@ -1337,8 +1344,7 @@ function isOnboardingTask(task: Task): boolean {
   return (
     task.status !== "proposed" &&
     typeof task.source === "string" &&
-    (/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(task.source) ||
-      goalSource.test(task.source)) &&
+    (isCaptureSource(task.source) || goalSource.test(task.source)) &&
     !!noteLine(task.notes ?? "", "当前目标")
   );
 }
@@ -1368,8 +1374,7 @@ function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
   };
 }
 export function readOnboardingMatter(ws: Workspace, source: string): OnboardingMatter {
-  if (typeof source !== "string" || !/^inbox\/notes\/\d{4}-\d{2}-\d{2}\/[0-9a-z]{26}\.md$/.test(source))
-    throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
+  if (!isCaptureSource(source)) throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
   const file = findInboxNote(ws, basename(source));
   const text = file ? ws.scanText(file) : undefined;
   if (!text || noteMetadata(text).kind !== "capture") throw new KaituError("原文记录不存在", "NOT_FOUND");

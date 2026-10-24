@@ -6,6 +6,7 @@ import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
 import type {
   AgentConnectionId,
+  FileImportSource,
   LearningCheckinInput,
   OnboardingAi,
   OnboardingChoices,
@@ -26,6 +27,7 @@ import type {
   NewsFeedback,
 } from "../types.js";
 import { HiddenHeroMark, KaituMark, KaituName, PoweredByDsh } from "./Brand.js";
+import { registerExplorePluginRoute } from "./ExplorePluginRoute.js";
 import { AskChat, type PluginAskServices } from "./PluginAsk.js";
 import { SessionPage } from "./SessionPage.js";
 import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
@@ -36,6 +38,7 @@ export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
 
 export async function apply(ctx: Context) {
+  registerExplorePluginRoute(ctx);
   ctx.slots.inject("tool.call.toolview", () =>
     ctx.slots.register({ name: "tool.call.toolview", key: "kaitu_learning_card" }, OpenmaicCard),
   );
@@ -283,11 +286,7 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              previewOnboardingImport: async (
-                source: "apple-health" | "chatgpt-conversations",
-                name: string,
-                base64: string,
-              ) => {
+              previewOnboardingImport: async (source: FileImportSource, name: string, base64: string) => {
                 const r = await ctx.remote.kaitu.onboardingImportPreview(source, name, base64);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
@@ -413,6 +412,11 @@ export async function apply(ctx: Context) {
               },
               adoptTask: async (id: string) => {
                 const result = await ctx.remote.kaitu.adoptTask(id);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              searchLibraryNotes: async (query: string) => {
+                const result = await ctx.remote.kaitu.searchLibraryNotes(query);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
@@ -560,6 +564,21 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadWeather: async () => {
+                const result = await ctx.remote.kaitu.weather();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              setWeatherPlace: async (
+                name: string,
+                latitude?: number,
+                longitude?: number,
+                source?: "manual" | "footprints",
+              ) => {
+                const result = await ctx.remote.kaitu.weatherPlace(name, latitude, longitude, source);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               loadLifeMap: async () => {
                 const result = await ctx.remote.kaitu.lifeMap();
                 if (!result.ok) throw new Error(result.error.message);
@@ -632,6 +651,26 @@ export async function apply(ctx: Context) {
               },
               saveProjectGoal: async (slug: string, goal: import("@kaitu/core").ProjectGoal) => {
                 const result = await ctx.remote.kaitu.projectGoalSave(slug, goal);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              projectMemoryPrompt: async (slug: string, locale: string) => {
+                const result = await ctx.remote.kaitu.projectMemoryPrompt(slug, locale);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              projectArchitecturePrompt: async (slug: string, locale: string) => {
+                const result = await ctx.remote.kaitu.projectArchitecturePrompt(slug, locale);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadProjectArchitecture: async (slug: string) => {
+                const result = await ctx.remote.kaitu.projectArchitecture(slug);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              installProjectMemory: async (slug: string, directory: string) => {
+                const result = await ctx.remote.kaitu.projectMemoryInstall(slug, directory);
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },

@@ -48,8 +48,12 @@ export async function createAgentRuntime(options: {
   path?: string;
   mcp: McpCommand;
   env?: NodeJS.ProcessEnv;
+  /** 只收发文字的一次性对话。本机 Agent 自带读文件和命令工具，开图无法事前关掉，所以不接。 */
+  textOnly?: boolean;
 }): Promise<AskRuntime> {
   const { agent } = options;
+  if (options.textOnly)
+    throw new KaituError(`${agent.name} 自带读文件和命令工具，不能用于只收发文字的对话`, "AI_CONNECTION");
   const env = agentEnvironment(agent, options.env);
   const bin = options.path;
   if (!bin)

@@ -1,0 +1,280 @@
+/* 设计稿 C「组件 · 天气」：天空渐变是画，不是界面色；文字颜色跟着天空走。 */
+.wx,
+.bar {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24px;
+  color: var(--sky-ink);
+  container-type: inline-size;
+}
+.wx {
+  border-radius: 22px;
+  min-height: 230px;
+}
+.bar {
+  border-radius: 14px;
+}
+.sky {
+  position: absolute;
+  inset: 0;
+  background: var(--sky);
+  pointer-events: none;
+}
+.atmosphere {
+  width: 100%;
+  height: 100%;
+}
+.clouds {
+  fill: #ffffff;
+  opacity: 0.2;
+}
+[data-tod="night"] .clouds {
+  opacity: 0.08;
+}
+.cloud {
+  animation: cloud-drift 12s ease-in-out infinite alternate;
+}
+.cloud:nth-child(2) {
+  animation-duration: 14s;
+  animation-delay: -6s;
+}
+.cloud:nth-child(3) {
+  animation-duration: 9s;
+  animation-delay: -3s;
+}
+.stars {
+  fill: #ffffff;
+}
+.star {
+  opacity: 0.45;
+  animation: star-glow 4s ease-in-out infinite alternate;
+}
+@keyframes cloud-drift {
+  from {
+    transform: translateX(-14px);
+  }
+  to {
+    transform: translateX(14px);
+  }
+}
+@keyframes star-glow {
+  from {
+    opacity: 0.22;
+  }
+  to {
+    opacity: 0.72;
+  }
+}
+.bar .cloud,
+.bar .star {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud,
+  .star {
+    animation: none;
+  }
+}
+.wx:not([data-tod="night"]) .sky,
+.bar:not([data-tod="night"]) .sky {
+  filter: brightness(var(--sky-dim, 1)) saturate(calc(0.3 + 0.7 * var(--sky-dim, 1)));
+}
+[data-tod="morning"] {
+  --sky: linear-gradient(180deg, #8db6de 0%, #c9dcec 60%, #f2dcc0 100%);
+  --sky-ink: #14233a;
+  --sky-line: rgba(20, 35, 58, 0.14);
+}
+[data-tod="noon"] {
+  --sky: linear-gradient(180deg, #3e82cc 0%, #79aee0 100%);
+  --sky-ink: #ffffff;
+  --sky-line: rgba(255, 255, 255, 0.24);
+}
+[data-tod="dusk"] {
+  --sky: linear-gradient(180deg, #3a4a7a 0%, #9c6f86 62%, #e39e7c 100%);
+  --sky-ink: #fff8f0;
+  --sky-line: rgba(255, 255, 255, 0.22);
+}
+[data-tod="night"] {
+  --sky: linear-gradient(180deg, #0b1022 0%, #1a2142 70%, #252c52 100%);
+  --sky-ink: #f2f4fa;
+  --sky-line: rgba(255, 255, 255, 0.16);
+}
+/* 深色模式下白天的天空压暗，夜晚不压；跟开图其他页面一样认系统设置和 data-theme。 */
+@media (prefers-color-scheme: dark) {
+  .wx,
+  .bar {
+    --sky-dim: 0.78;
+  }
+}
+[data-theme="dark"] .wx,
+[data-theme="dark"] .bar {
+  --sky-dim: 0.78;
+}
+[data-theme="light"] .wx,
+[data-theme="light"] .bar {
+  --sky-dim: 1;
+}
+.inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 230px;
+  box-sizing: border-box;
+  padding: 22px 32px 14px;
+}
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.place {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.temp {
+  font-size: 76px;
+  line-height: 1;
+  font-weight: 200;
+  letter-spacing: -0.04em;
+}
+.right {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+}
+.condition {
+  font-size: 26px;
+  font-weight: 300;
+}
+.right small,
+.bar small,
+.credit {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.wx button:not(.place),
+.bar button:not(.place) {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--sky-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hours {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+}
+.hours li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.hours span:first-child,
+.hours span:nth-child(2) {
+  font-size: 12px;
+  opacity: 0.8;
+}
+.hours span:last-child {
+  font-size: 16px;
+  font-weight: 600;
+}
+/* 出处跟着天空的文字色，不用全局链接色（夜空上看不见）。 */
+.wx .credit,
+.bar .credit {
+  align-self: flex-end;
+  color: var(--sky-ink);
+  text-decoration: none;
+}
+.barIn {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 10px 20px;
+}
+.barTemp {
+  font-size: 30px;
+  font-weight: 250;
+  line-height: 1;
+}
+.bar .credit {
+  margin-left: auto;
+}
+.ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+  margin-bottom: 24px;
+  padding: 8px 20px;
+  border-radius: 14px;
+  background: var(--control);
+  color: var(--ink);
+}
+.ask input {
+  width: 160px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+.ask button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--secondary-line);
+  border-radius: 10px;
+  background: var(--secondary);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.ask [role="alert"] {
+  color: var(--danger);
+  font-size: 13px;
+}
+.wx :focus-visible,
+.bar :focus-visible,
+.ask :focus-visible {
+  outline: 3px solid var(--link-line);
+  outline-offset: 3px;
+}
+@container (max-width: 639px) {
+  .inner {
+    padding: 18px 20px 12px;
+  }
+  .temp {
+    font-size: 56px;
+  }
+  .hours {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .hours li:nth-child(n + 5) {
+    display: none;
+  }
+}
