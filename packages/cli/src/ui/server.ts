@@ -183,7 +183,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         "npx",
         [
           "--yes",
-          "@deepseek-ai/dsh@0.2.1-rc.2",
+          "@deepseek-ai/dsh@0.2.1-rc.3",
           "web",
           "--patch",
           ws.resolve(".kaitu/cache/dsh/cordis.yml", { internal: true }),
