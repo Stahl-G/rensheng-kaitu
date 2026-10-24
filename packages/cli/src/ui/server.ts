@@ -317,27 +317,32 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       saveQueued = true;
       void exclusive(async () => {
         saveQueued = false;
-        await saveExternal();
+        await saveExternal(true);
       }).catch(reportError);
     }, delay);
   }
-  async function saveExternal() {
+  async function saveExternal(changedOnly = false) {
     const own = [...new Set(messages)];
     messages = [];
     let pending = true;
     let version: string | null;
     try {
-      version = await snapshotNow(ws, (files, hasPendingFiles) => {
-        // 显式原文要补存，但已经在版本里的原文不应无限重试。
-        pending = files.length > 0 || (own.length > 0 && hasPendingFiles);
-        if (!pending) return null;
-        return own.length
-          ? own.join("；")
-          : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
-              .slice(0, 3)
-              .map((file) => file.split("/").at(-1))
-              .join("、")}等 ${files.length} 个文件`;
-      });
+      version = await snapshotNow(
+        ws,
+        (files, hasPendingFiles) => {
+          // 显式原文要补存，但已经在版本里的原文不应无限重试。
+          pending = files.length > 0 || (own.length > 0 && hasPendingFiles);
+          if (!pending) return null;
+          return own.length
+            ? own.join("；")
+            : `${syncStatus(ws).mode === "drive" ? "云端改动" : "文件夹有改动"}：${files
+                .slice(0, 3)
+                .map((file) => file.split("/").at(-1))
+                .join("、")}等 ${files.length} 个文件`;
+        },
+        new Date(),
+        { changedOnly },
+      );
     } catch (error) {
       messages.unshift(...own);
       throw error;

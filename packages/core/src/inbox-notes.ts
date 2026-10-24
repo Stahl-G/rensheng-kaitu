@@ -2,7 +2,7 @@ import { mkdirSync, readdirSync, renameSync } from "node:fs";
 import { basename, dirname, relative } from "node:path";
 import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { snapshot } from "./history.js";
+import { invalidateHistoryFile, snapshot } from "./history.js";
 import { batchOverview } from "./overview.js";
 import { phoneInboxName } from "./phone-actions.js";
 import { isoInZone, localDate } from "./time.js";
@@ -142,6 +142,8 @@ export function moveInboxFile(ws: Workspace, file: string, directory: string) {
   const target = availableInboxPath(ws, directory, basename(file));
   mkdirSync(dirname(ws.resolve(target)), { recursive: true });
   renameSync(ws.resolve(file), ws.resolve(target));
+  invalidateHistoryFile(ws, file);
+  invalidateHistoryFile(ws, target);
   return target;
 }
 

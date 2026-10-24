@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import { isAbsolute, join, relative, sep } from "node:path";
-import git from "isomorphic-git";
+import { basename, isAbsolute, join, relative, sep } from "node:path";
+import git, { type TreeEntry } from "isomorphic-git";
 import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
 import { HISTORY_MARKER } from "./history-ownership.js";
@@ -132,6 +132,7 @@ async function headOid(ws: Workspace): Promise<string | null> {
 }
 
 const invalidated = new WeakMap<Workspace, Map<string, symbol>>();
+const savedRoots = new WeakMap<Workspace, { root: string; oid: string | null }>();
 
 /** 文件事件比 Git 索引的整秒 stat 更精确；只让这些路径重新读取内容。 */
 export function invalidateHistoryFile(ws: Workspace, file: string): void {
@@ -202,6 +203,40 @@ function pendingFiles(matrix: Awaited<ReturnType<typeof git.statusMatrix>>, incl
     .map(([file]) => file);
 }
 
+/** 单文件 status 直接查路径；statusMatrix 即使限路径也会先读取相邻目录。 */
+async function changedStatus(
+  ws: Workspace,
+  files: readonly string[],
+  io: ReturnType<typeof historyFs>,
+  cache: object,
+): Promise<Awaited<ReturnType<typeof git.statusMatrix>> | undefined> {
+  const gitdir = historyDirectory(ws);
+  const tracked = await git.listFiles({ fs: io, dir: ws.root, gitdir, cache });
+  const paths = [...new Set(files.filter((file) => !neverTrack(file)))];
+  for (const file of paths) {
+    // 目录创建/删除/替换沿用完整盘点，保留树与文件互换、符号链接的 Git 语义。
+    if (tracked.some((path) => path.startsWith(`${file}/`))) return;
+    try {
+      const stat = await fs.promises.lstat(join(ws.root, file));
+      if (!stat.isFile()) return;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  const matrix: Awaited<ReturnType<typeof git.statusMatrix>> = [];
+  // 索引已由 Git 读取；敏感路径仍全部移出，不能因缩小工作树查询而漏掉它们。
+  for (const file of tracked) if (neverTrack(file)) matrix.push([file, 0, 0, 1]);
+  for (const file of paths) {
+    if (!snapshotFile(ws, file)) continue;
+    const status = await git.status({ fs: io, dir: ws.root, gitdir, filepath: file, cache, refresh: false });
+    if (status === "ignored" || status === "absent") continue;
+    if (status === "unmodified") matrix.push([file, 1, 1, 1]);
+    else if (["deleted", "*deleted", "*absent"].includes(status)) matrix.push([file, 1, 0, 1]);
+    else matrix.push([file, 1, 2, 1]);
+  }
+  return matrix;
+}
+
 export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
   await ensureHistory(ws);
   const changedFiles = new Map(invalidated.get(ws));
@@ -261,15 +296,58 @@ function unavailableHistoryWrite(error: unknown): boolean {
   );
 }
 
+const indexTrees = new WeakMap<
+  Workspace,
+  { root: string; entries: Map<string, { content: string; oid: string }> }
+>();
+
+/** Git 树对象不可变；完整读取当前索引，只让变化的目录重新生成对象。 */
+async function indexTree(ws: Workspace, cache: object): Promise<string> {
+  const previous = indexTrees.get(ws);
+  const entries = new Map<string, { content: string; oid: string }>();
+  const dir = ws.root;
+  const gitdir = historyDirectory(ws);
+  const root = await git.walk({
+    fs,
+    dir,
+    gitdir,
+    cache,
+    trees: [git.STAGE()],
+    map: async (file, [stage]) => {
+      if (!stage) return;
+      const type = await stage.type();
+      return {
+        file,
+        path: basename(file),
+        mode: type === "tree" ? "040000" : (await stage.mode()).toString(8),
+        type,
+        oid: type === "tree" ? "" : await stage.oid(),
+      };
+    },
+    reduce: async (parent, children) => {
+      if (parent.type !== "tree") return parent;
+      const tree: TreeEntry[] = children.map(({ file: _file, ...entry }) => entry);
+      const content = JSON.stringify(tree);
+      const cached = previous?.root === dir ? previous.entries.get(parent.file) : undefined;
+      const oid = cached?.content === content ? cached.oid : await git.writeTree({ fs, dir, gitdir, tree });
+      entries.set(parent.file, { content, oid });
+      return { ...parent, oid };
+    },
+  });
+  indexTrees.set(ws, { root: dir, entries });
+  return root.oid;
+}
+
 /** 立刻存版本；可用本次盘点生成说明，返回 null 则跳过本次提交。 */
 export async function snapshotNow(
   ws: Workspace,
   message: SnapshotMessage,
   now = new Date(),
+  options: { changedOnly?: boolean } = {},
 ): Promise<string | null> {
   refreshOverview(ws, now);
   try {
-    return await saveSnapshot(ws, message, now);
+    return await saveSnapshot(ws, message, now, options);
   } catch (error) {
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
     if (!unavailableHistoryWrite(error)) throw error;
@@ -278,28 +356,59 @@ export async function snapshotNow(
   }
 }
 
-async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date): Promise<string | null> {
+async function saveSnapshot(
+  ws: Workspace,
+  message: SnapshotMessage,
+  now: Date,
+  options: { changedOnly?: boolean } = {},
+): Promise<string | null> {
   await ensureHistory(ws);
   const dir = ws.root;
   const io = historyFs(ws);
-  // 只在这次完整保存里共享 Git 对象与索引解析，不跨版本缓存工作区状态。
+  // 本轮共享 Git 对象与索引解析，不跨版本缓存工作区状态。
   const cache = {};
+  const head = await headOid(ws);
+  const saved = savedRoots.get(ws);
+  const current = saved?.root === ws.root && saved.oid === head;
+  if (!current) indexTrees.delete(ws);
   const changedFiles = new Map(invalidated.get(ws));
-  const matrix = await git.statusMatrix({
-    cache,
-    fs: historyFs(ws, changedFiles),
-    refresh: !changedFiles.size,
-    dir,
-    gitdir: historyDirectory(ws),
-    filter: (file) => snapshotFile(ws, file),
-  });
+  // 只供已建立文件监听的后台保存使用。入口写入和监听共用失效记录；启动、
+  // 换目录、未知事件和 ignore 规则变化仍完整盘点。恢复等边界调用保持默认。
+  const filepaths =
+    options.changedOnly &&
+    current &&
+    changedFiles.size > 0 &&
+    [...changedFiles.keys()].every(
+      (file) =>
+        file !== "工作区" &&
+        file !== "." &&
+        !file.startsWith("../") &&
+        file.split("/").at(-1) !== ".gitignore",
+    )
+      ? [...changedFiles.keys(), "OVERVIEW.md"]
+      : undefined;
+  const statusFs = historyFs(ws, changedFiles);
+  const matrix =
+    (filepaths && (await changedStatus(ws, filepaths, statusFs, cache))) ??
+    (await git.statusMatrix({
+      cache,
+      fs: statusFs,
+      refresh: !changedFiles.size,
+      dir,
+      gitdir: historyDirectory(ws),
+      filter: (file) => snapshotFile(ws, file),
+    }));
   let description: string;
   if (typeof message === "function") {
     const files = pendingFiles(matrix);
-    // 同一份完整盘点：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。
+    // 同一份状态查询：显式原文保存也要区分实际待存内容与已经落入上一版本的 no-op。
     const result = message(files, files.length > 0 || pendingFiles(matrix, true).length > 0);
     if (result === null) {
-      if (!files.length) clearInvalidated(ws, changedFiles);
+      // 暂不提交的外部收件箱仍是脏文件，下次显式保存原文时要一并入版本。
+      if (!pendingFiles(matrix, true).length) {
+        clearInvalidated(ws, changedFiles);
+        savedRoots.set(ws, { root: ws.root, oid: head });
+      }
       return null;
     }
     description = result;
@@ -319,6 +428,7 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
   }
   if (!additions.length && !removals.length) {
     clearInvalidated(ws, changedFiles);
+    savedRoots.set(ws, { root: ws.root, oid: head });
     return null;
   }
   if (removals.length) await git.remove({ fs, dir, gitdir: historyDirectory(ws), filepath: removals, cache });
@@ -331,10 +441,12 @@ async function saveSnapshot(ws: Workspace, message: SnapshotMessage, now: Date):
     fs,
     dir,
     gitdir: historyDirectory(ws),
+    tree: await indexTree(ws, cache),
     message: description,
     author: { ...AUTHOR, timestamp, timezoneOffset: now.getTimezoneOffset() },
   });
   clearInvalidated(ws, changedFiles);
+  savedRoots.set(ws, { root: ws.root, oid });
   return oid;
 }
 
@@ -448,6 +560,7 @@ export async function restore(
   for (const f of currentFiles) {
     if (!ws.conflictCopy(f) && !targetFiles.has(f) && !neverTrack(f)) {
       fs.rmSync(ws.resolve(f, { internal: true }), { force: true });
+      invalidateHistoryFile(ws, f);
       changed++;
     }
   }
@@ -457,6 +570,7 @@ export async function restore(
     const { blob } = await git.readBlob({ fs, dir, gitdir: historyDirectory(ws), oid: target, filepath: f });
     if (quarantineBankContent(ws, f, blob)) {
       fs.rmSync(ws.resolve(f), { force: true });
+      invalidateHistoryFile(ws, f);
       continue;
     }
     const abs = ws.resolve(f, { internal: true });
