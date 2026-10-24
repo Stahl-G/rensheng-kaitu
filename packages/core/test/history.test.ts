@@ -18,7 +18,7 @@ import {
   snapshot,
   snapshotNow,
 } from "../src/index.js";
-import { clonedWorkspace, tmp, workout } from "./helpers.js";
+import { clonedWorkspace, freshWorkspace, tmp, workout } from "./helpers.js";
 
 it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
   const original = await clonedWorkspace();
