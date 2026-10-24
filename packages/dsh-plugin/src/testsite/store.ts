@@ -3,7 +3,7 @@ import type { InboxEntry, LibraryData, OverviewData, OverviewNext } from "../typ
 
 // This is disposable browser demo state, never a Kaitu workspace or a new record format.
 const key = "kaitu:testsite:v1";
-const taskTitle = "给业余项目约一次 20 分钟的用户访谈";
+export const taskTitle = "给业余项目约一次 20 分钟的用户访谈";
 const goalTitle = "做出一个有人愿意用的业余项目";
 export const sampleNote = "示例：今晚走了三公里，明天想试试早点出门。";
 export const documents = [
@@ -100,6 +100,18 @@ export function reset() {
   state = seed();
   for (const listener of listeners) listener();
 }
+export function clear() {
+  // Keep the existing v1 shape, and never touch unrelated origin storage.
+  const next: State = { version: 1, notes: [], task: "skipped", result: "" };
+  try {
+    sessionStorage.setItem(key, JSON.stringify(next));
+  } catch {
+    throw new Error("浏览器未能清除示例。 / Browser could not clear the demo.");
+  }
+  storageError = "";
+  state = next;
+  for (const listener of listeners) listener();
+}
 export async function capture(text: string) {
   const trimmed = text.trim();
   if (!trimmed || text.length > 4000)
@@ -128,7 +140,7 @@ export function dismiss() {
 export function complete(result: string) {
   if (state.task !== "open" || !result.trim())
     throw new Error("先采纳下一步，并记一句示例结果。 / Adopt the step and add a sample result first.");
-  commit({ ...state, task: "done", result: result.trim() });
+  commit({ ...state, task: "done", result });
 }
 export function overview(): OverviewData {
   const next: OverviewNext[] =

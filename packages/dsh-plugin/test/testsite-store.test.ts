@@ -44,3 +44,30 @@ test("reset removes only demo state and clears adopted progress and captured not
   expect(store.snapshot().notes).toHaveLength(1);
   expect(store.snapshot().result).toBe("");
 });
+
+test("clear persists an empty demo, preserves unrelated storage and keeps prior state when persistence fails", async () => {
+  const values = new Map<string, string>([["other-app", "keep"]]);
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  };
+  vi.stubGlobal("sessionStorage", storage);
+  const store = await import("../src/testsite/store.js");
+  await store.capture("合成示例：保留到确认清除");
+  store.adopt();
+  store.complete("  合成示例：结果保留原样  ");
+  const prior = store.snapshot();
+  const persist = storage.setItem;
+  storage.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  expect(() => store.clear()).toThrow();
+  expect(store.snapshot()).toBe(prior);
+  storage.setItem = persist;
+  store.clear();
+  vi.resetModules();
+  const reloaded = await import("../src/testsite/store.js");
+  expect(reloaded.snapshot()).toEqual({ version: 1, notes: [], task: "skipped", result: "" });
+  expect(values.get("other-app")).toBe("keep");
+});
