@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   history,
-  initWorkspace,
   localDate,
   parseFrontmatter,
   readRecords,
@@ -12,7 +11,7 @@ import {
   stringifyFrontmatter,
 } from "@kaitu/core";
 import { afterEach, expect, it } from "vitest";
-import { appleHealthZip } from "../../core/test/helpers.js";
+import { appleHealthZip, clonedWorkspace } from "../../core/test/helpers.js";
 import { startUi } from "../src/ui/server.js";
 
 const cleanup: (() => Promise<void>)[] = [];
@@ -22,7 +21,7 @@ afterEach(async () => {
 async function setup() {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
-  const ws = await initWorkspace(root);
+  const ws = await clonedWorkspace(undefined, root);
   ws.writeText(
     "NOW.md",
     stringifyFrontmatter(

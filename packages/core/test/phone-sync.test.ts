@@ -38,12 +38,12 @@ import {
   connectWorkspaceBackup,
   syncWorkspaceBackup,
 } from "../src/workspace-backup.js";
-import { freshWorkspace, workout } from "./helpers.js";
+import { clonedWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
 
 it("未完成的记忆操作绑定首次 client_id，改投其他 op 不覆盖计划且原操作仍可恢复", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
   const action = {
     client_id: ulid(),
@@ -91,7 +91,7 @@ it("未完成的记忆操作绑定首次 client_id，改投其他 op 不覆盖�
 it.each([null, { type: "context", name: "new", text: "合成新记忆" }])(
   "手机记忆决定写完文件但回执前中断，重开可恢复：%j",
   async (candidate) => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧记忆" });
     const action = {
       client_id: ulid(),
@@ -132,7 +132,7 @@ it.each([null, { type: "context", name: "new", text: "合成新记忆" }])(
 );
 
 it("手机核对后旧条仍活跃但正文变了，确认返回 conflict 且不覆盖新内容", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
   const action = {
     client_id: ulid(),
@@ -156,7 +156,7 @@ it("手机核对后旧条仍活跃但正文变了，确认返回 conflict 且不
 });
 
 it("手机确认替换记忆后保留归档，重开重投不重复，陈旧的新操作返回冲突", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const old = await addMemory(ws, { type: "fact", name: "old", text: "合成旧说法" });
   const action = {
     client_id: ulid(),
@@ -197,7 +197,7 @@ it("手机确认替换记忆后保留归档，重开重投不重复，陈旧的�
 });
 
 it("手机记录同名重投跨重开及回执清理仍只入账一次，新文件仍能记相同内容", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = phoneFile("records.jsonl");
   const text = JSON.stringify({ type: "task", title: "合成重复投递", status: "open", origin: "user" });
   ws.writeText(file, text);
@@ -224,7 +224,7 @@ it("手机记录同名重投跨重开及回执清理仍只入账一次，新文�
 
 it("手机记录撤回及替换后，旧文件去重、陈旧替换拒绝，当前来源可继续替换", async () => {
   for (const withdrawOnly of [true, false]) {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const row = (title: string) => ({ type: "task", agent: "iPhone", title, status: "open" });
     const original = phoneFile("records.jsonl");
     const text = JSON.stringify(row("合成原任务"));
@@ -301,7 +301,7 @@ function remoteMock() {
 }
 
 it("today 的饮食合计只算当天，已入账的手机文件撤回后仍记在 accounted_refs", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const items = [{ name: "米饭", grams: 200 }];
   const meal = (kcal: number) =>
     JSON.stringify({ type: "meal", origin: "user", meal: "午", items, kcal, protein_g: 20, source: "user" });
@@ -341,7 +341,7 @@ it("today 的饮食合计只算当天，已入账的手机文件撤回后仍记�
 });
 
 it("快照投影符合手机契约且不带原文、凭据、链接路径或财务明细；生成目录不可被 Agent 改写或进历史", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const now = new Date("2026-10-18T12:00:00Z");
   ws.writeText(
     "projects/synthetic/STATUS.md",
@@ -440,7 +440,7 @@ it("快照投影符合手机契约且不带原文、凭据、链接路径或财�
 });
 
 it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核对当前状态并跨重开去重", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const note = phoneFile("note.md");
   ws.writeText(
     note,
@@ -554,7 +554,7 @@ it("手机原文保留 capture 和作者，记录 origin 映射 by，操作核�
 });
 
 it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手机文件处理后删除远端", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const m = remoteMock();
   await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
   await writePhoneSnapshots(ws);
@@ -580,7 +580,7 @@ it("本地 GitHub 模拟往返不受备份开关影响，快照只上传，手�
 });
 
 it("手机记录有一条不合格整份不写，重投不重复；冲突操作重投仍回冲突", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = phoneFile("records.jsonl");
   const text = [
     { type: "workout", origin: "user", exercise: "合成", sets: 3, reps: 12, weight_kg: 60, session_id: "s" },
@@ -608,7 +608,7 @@ it("手机记录有一条不合格整份不写，重投不重复；冲突操作�
 });
 
 it("云端整理员写的回执并进本机，手机重投不再执行；待整理原文随 GitHub 双向同步", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const m = remoteMock();
   await connectWorkspaceBackup(ws, { repo: "synthetic/phone", text: false, records: false }, m.remote);
   await writePhoneSnapshots(ws);
@@ -640,7 +640,7 @@ it("云端整理员写的回执并进本机，手机重投不再执行；待整�
 
 it("同目录 Agent 快照覆盖前保存来源与离线回执，已读记录在重开后保留", async () => {
   const { markOrganizerSeen, organizerStatus, writePhoneReceipts } = await import("../src/index.js");
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const now = new Date();
   await writePhoneSnapshots(ws, now, { force: true });
   const today = ws.readJson<Record<string, unknown>>("phone/today.json");
@@ -684,7 +684,7 @@ it("同目录 Agent 快照覆盖前保存来源与离线回执，已读记录在
 
 it("GitHub 在回写电脑快照之前记住远端整理员和新回执，重复同步不重复计数", async () => {
   const { markOrganizerSeen, organizerStatus } = await import("../src/index.js");
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const m = remoteMock();
   await connectWorkspaceBackup(ws, { repo: "synthetic/organizer", text: true, records: false }, m.remote);
   await writePhoneSnapshots(ws);
