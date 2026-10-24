@@ -8,7 +8,7 @@ import {
   readRecords,
   stageFinanceUpload,
 } from "../src/index.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 const cases = [
   ["wechat", "wechat.csv", "-12.34", "expense"],
@@ -35,7 +35,7 @@ it.each(cases)("%s 示例：解析方向、确认写入、去重与放弃", asyn
     ...(native[format] ? [native[format]] : []),
     ...(format === "htsec" ? ["htsec-today.csv"] : []),
   ]) {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     try {
       const account = addRecord(ws, "finance_account", {
         name: "Synthetic Account",

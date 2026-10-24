@@ -7,12 +7,12 @@ import { history, restore } from "../src/history.js";
 import { importAppleHealth, importHealthShortcut } from "../src/importers/apple-health.js";
 import { addRecord, deleteRecord, readRecords, updateRecord } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
-import { freshWorkspace, tmp } from "./helpers.js";
+import { clonedWorkspace, tmp } from "./helpers.js";
 
 const fixture = fileURLToPath(new URL("../../../examples/apple-health/export.xml", import.meta.url));
 
 it("完整日补导替换日总量且重放不累加，整夜片段补导保持同一睡眠记录", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = join(tmp(), "whole-day.health.json");
   const steps = (value: number, start: string, end: string) => ({
     type: "step_count",
@@ -55,7 +55,7 @@ it("完整日补导替换日总量且重放不累加，整夜片段补导保持�
 });
 
 it("Apple训练泛名升级保留id且重放幂等，人工修订和删除保持优先", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = join(tmp(), "workout-rename.health.json");
   const starts = [
     "2026-10-14T09:00:00+08:00",
@@ -140,7 +140,7 @@ it("Apple训练泛名升级保留id且重放幂等，人工修订和删除保持
 });
 
 it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等且整次可恢复", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const initial = (await history(ws))[0]?.oid as string;
   const zip = join(tmp(), "export.zip");
   writeFileSync(
@@ -198,7 +198,7 @@ it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等�
 });
 
 it("Apple Health：非法 XML 不留下整批中的前一条记录", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = join(tmp(), "export.xml");
   writeFileSync(file, readFileSync(fixture, "utf8").replace("</HealthData>", "<broken></HealthData>"));
   await expect(importAppleHealth(ws, file)).rejects.toThrow();
@@ -207,7 +207,7 @@ it("Apple Health：非法 XML 不留下整批中的前一条记录", async () =>
 });
 
 it("快捷指令复用映射：本地日期、两来源步数、睡眠合并与训练，XML 重导入不产生版本", async () => {
-  const ws = await freshWorkspace("America/New_York");
+  const ws = await clonedWorkspace("America/New_York");
   const file = join(tmp(), "daily.health.json");
   const raw = {
     format: "kaitu.health.v1",
@@ -327,7 +327,7 @@ it("快捷指令复用映射：本地日期、两来源步数、睡眠合并与�
 });
 
 it("健康并列列表中文睡眠阶段跨午夜合并，重叠只计一次，清醒与在床不计时长", async () => {
-  const ws = await freshWorkspace("Asia/Ho_Chi_Minh");
+  const ws = await clonedWorkspace("Asia/Ho_Chi_Minh");
   const file = join(tmp(), "sleep.health.json");
   writeFileSync(
     file,
@@ -358,7 +358,7 @@ it("健康并列列表中文睡眠阶段跨午夜合并，重叠只计一次，�
 });
 
 it("快捷指令样本写法不一时照常导入，不支持的类型和坏样本只跳过那一条", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "loose.health.json");
   writeFileSync(
     file,
@@ -415,7 +415,7 @@ it("快捷指令样本写法不一时照常导入，不支持的类型和坏样�
 });
 
 it("并列列表里一行读不出只跳过那一行，其余照常导入", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "steps.health.json");
   writeFileSync(
     file,
@@ -431,7 +431,7 @@ it("并列列表里一行读不出只跳过那一行，其余照常导入", asyn
 });
 
 it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏、身高与血糖照常入指标", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "extended.health.json");
   const raw = {
     format: "kaitu.health.v1",
@@ -522,7 +522,7 @@ it("扩展指标：步行心率、最大摄氧、呼吸、体温华氏转摄氏�
 });
 
 it("复合值：血压 120/80、心率与血氧日聚合 最小/均值/最大 字符串原样入指标", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "compound.health.json");
   const raw = {
     format: "kaitu.health.v1",
@@ -568,7 +568,7 @@ it("复合值：血压 120/80、心率与血氧日聚合 最小/均值/最大 �
 });
 
 it("复合指标按类型补非空单位并拒绝错误分量和不兼容单位", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "compound-boundaries.health.json");
   const valid = [
     ["BloodPressureRecord", "120/80"],
@@ -616,7 +616,7 @@ it("复合指标按类型补非空单位并拒绝错误分量和不兼容单位"
 });
 
 it("累计爬升下降允许零和正值，负值训练逐条跳过", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "workout-elevation-boundary.health.json");
   const amounts = [
     [0, 0],
@@ -649,7 +649,7 @@ it("累计爬升下降允许零和正值，负值训练逐条跳过", async () =
 });
 
 it("活动扩展：锻炼分钟、爬楼、步行跑步距离按天入 activity 记录", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "activity-ext.health.json");
   const raw = {
     format: "kaitu.health.v1",
@@ -690,7 +690,7 @@ it("活动扩展：锻炼分钟、爬楼、步行跑步距离按天入 activity 
 });
 
 it("训练扩展：新运动名与爬升、METs、配速、最大心率原样落记录", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   const file = join(tmp(), "workout-ext.health.json");
   const raw = {
     format: "kaitu.health.v1",
@@ -751,7 +751,7 @@ it("训练扩展：新运动名与爬升、METs、配速、最大心率原样落
 });
 
 it("手机采集窗口按另一时区的零点开始时，只写盖满的整天，不把已有整天步数改成半天", async () => {
-  const ws = await freshWorkspace("Asia/Shanghai");
+  const ws = await clonedWorkspace("Asia/Shanghai");
   addRecord(
     ws,
     "activity",
@@ -782,7 +782,7 @@ it("手机采集窗口按另一时区的零点开始时，只写盖满的整天�
 });
 
 it("当天累计保留导出顺序，旧文件和重放不覆盖，较新删除纠正允许下降", async () => {
-  const ws = await freshWorkspace("UTC");
+  const ws = await clonedWorkspace("UTC");
   const file = join(tmp(), "ordered.health.json");
   const now = new Date();
   const day = now.toISOString().slice(0, 10);
@@ -818,7 +818,7 @@ it("当天累计保留导出顺序，旧文件和重放不覆盖，较新删除�
 });
 
 it("延迟到达的历史未完整尾日跳过，完整日仍能以较新导出纠正", async () => {
-  const ws = await freshWorkspace("UTC");
+  const ws = await clonedWorkspace("UTC");
   const file = join(tmp(), "delayed.health.json");
   const end = `${new Date().toISOString().slice(0, 10)}T00:00:00Z`;
   const start = new Date(Date.parse(end) - 86400000).toISOString();

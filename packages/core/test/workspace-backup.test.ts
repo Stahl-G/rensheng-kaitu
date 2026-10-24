@@ -17,7 +17,7 @@ import {
   workspaceBackupRequest,
   workspaceBackupStatus,
 } from "../src/workspace-backup.js";
-import { freshWorkspace, tmp, workout } from "./helpers.js";
+import { clonedWorkspace, tmp, workout } from "./helpers.js";
 
 function remoteMock(isPrivate = true) {
   let files: BackupFiles = {};
@@ -43,7 +43,7 @@ function remoteMock(isPrivate = true) {
 }
 
 it("断开或较新的连接生效后，迟到的连接核验不能覆盖用户选择", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const { remote } = remoteMock();
   for (const change of ["disconnect", "connect"] as const) {
     let release!: () => void;
@@ -83,7 +83,7 @@ it("断开或较新的连接生效后，迟到的连接核验不能覆盖用户�
 });
 
 it("保留用户的无 remote 仓库与 worktree 指针；有明确来源的旧历史可迁往重定向 state", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   await git.init({ fs, dir: ws.root, defaultBranch: "main" });
   fs.writeFileSync(join(ws.root, "user.txt"), "user repo");
   await git.add({ fs, dir: ws.root, filepath: "user.txt" });
@@ -102,7 +102,7 @@ it("保留用户的无 remote 仓库与 worktree 指针；有明确来源的旧�
   fs.writeFileSync(join(ws.root, ".git"), pointer);
   new Workspace(ws.root);
   expect(fs.readFileSync(join(ws.root, ".git"), "utf8")).toBe(pointer);
-  const legacy = await freshWorkspace();
+  const legacy = await clonedWorkspace();
   const before = await history(legacy);
   fs.rmSync(join(legacy.root, ".kaitu/history.git", HISTORY_MARKER));
   fs.renameSync(join(legacy.root, ".kaitu/history.git"), join(legacy.root, ".git"));
@@ -115,7 +115,7 @@ it("保留用户的无 remote 仓库与 worktree 指针；有明确来源的旧�
 });
 
 it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重复同步不重复查可见性或提交", async () => {
-  const a = await freshWorkspace();
+  const a = await clonedWorkspace();
   a.writeText("me/profile.md", "# Synthetic author\n");
   a.writeJson(".kaitu/secrets.json", { github_token: "synthetic-only" }, { internal: true });
   a.writeText("health/files/example.mp4", "synthetic media");
@@ -193,7 +193,7 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
 });
 
 it("同记录并发修改与删除保留双方，普通不同记录可合并；选择后可继续同步", async () => {
-  const a = await freshWorkspace();
+  const a = await clonedWorkspace();
   const first = addRecord(a, "workout", workout);
   const m = remoteMock();
   await connectWorkspaceBackup(a, { repo: "synthetic/records", text: true, records: true }, m.remote);
@@ -234,7 +234,7 @@ it("同记录并发修改与删除保留双方，普通不同记录可合并；�
 });
 
 it("本机只开手机与待整理、远端全开且没有共同基线：清单不算冲突，解决真冲突后同步，远端其余文件和范围都留着", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const m = remoteMock();
   const remoteNote = "inbox/agents/synthetic-handoff.md";
   await m.remote.push("synthetic/memory", "main", null, {
@@ -285,7 +285,7 @@ it("本机只开手机与待整理、远端全开且没有共同基线：清单�
 });
 
 it("公开仓库默认不上传；后台等待与授权失败不挡住本地写入", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const pub = remoteMock(false);
   await connectWorkspaceBackup(ws, { repo: "synthetic/public", text: true, records: true }, pub.remote);
   await syncWorkspaceBackup(ws, pub.remote);
@@ -321,7 +321,7 @@ it("公开仓库默认不上传；后台等待与授权失败不挡住本地写�
 });
 
 it("GitHub API 接通空仓库初始化、缓存回读和非强推提交，可见性只在连接时请求", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   let head: string | null = null;
   let seq = 0;
   let inspections = 0;
@@ -400,7 +400,7 @@ it("GitHub API 接通空仓库初始化、缓存回读和非强推提交，可�
 });
 
 it("iCloud 占位不作为本地删除上传，下载后可继续，真实删除仍可同步", async () => {
-  const original = await freshWorkspace();
+  const original = await clonedWorkspace();
   const directory = original.resolve(".kaitu", { internal: true });
   setStateBinding(original.root, directory, "icloud");
   const ws = new Workspace(original.root);

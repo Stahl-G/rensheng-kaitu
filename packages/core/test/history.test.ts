@@ -12,10 +12,10 @@ import {
   restore,
   snapshot,
 } from "../src/index.js";
-import { freshWorkspace, tmp, workout } from "./helpers.js";
+import { clonedWorkspace, tmp, workout } from "./helpers.js";
 
 it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
-  const original = await freshWorkspace();
+  const original = await clonedWorkspace();
   original.writeText("me/profile.md", "# 合成跨设备档案\n");
   const root = join(tmp(), "GoogleDrive-test", "我的云端硬盘", "kaitu");
   cpSync(original.root, root, {
@@ -36,7 +36,7 @@ it("另一台电脑打开同步资料时，没有本机版本库也能读取并�
 
 describe("版本历史", () => {
   it("每次写入可回看，按路径过滤", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     addRecord(ws, "workout", workout);
     await snapshot(ws, "记录训练");
     ws.writeText("me/profile.md", "# 档案\n\n新内容\n");
@@ -51,7 +51,7 @@ describe("版本历史", () => {
   });
 
   it("恢复整个工作区，并且恢复本身可以撤销", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const [init] = await history(ws);
     addRecord(ws, "workout", workout);
     await snapshot(ws, "记录训练");
@@ -68,7 +68,7 @@ describe("版本历史", () => {
   });
 
   it("只恢复一个路径时其他文件不变", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const [init] = await history(ws);
     ws.writeText("me/profile.md", "改过的档案\n");
     addRecord(ws, "workout", workout);
@@ -80,7 +80,7 @@ describe("版本历史", () => {
   });
 
   it("恢复二进制文件不损坏", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0xff, 0x00, 0xfe, 0x80]);
     ws.writeText("health/files/report.pdf", bytes);
     await snapshot(ws, "体检原件");
@@ -92,7 +92,7 @@ describe("版本历史", () => {
   });
 
   it("密钥、索引、缓存不进版本历史，即使 .gitignore 被删", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     ws.writeJson(".kaitu/secrets.json", { oura: "secret-token" }, { internal: true, mode: 0o600 });
     ws.writeText(".kaitu/index.sqlite", "db", { internal: true });
     ws.writeText(".kaitu/cache/feed.json", "{}", { internal: true });
@@ -105,7 +105,7 @@ describe("版本历史", () => {
   });
 
   it("恢复不会动密钥文件", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const [init] = await history(ws);
     ws.writeJson(".kaitu/secrets.json", { oura: "t" }, { internal: true, mode: 0o600 });
     await restore(ws, init?.oid as string);
@@ -114,7 +114,7 @@ describe("版本历史", () => {
 });
 
 it("旧版本库打开即迁移，历史不丢且可恢复，版本库不跟踪自身", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const [initial] = await history(ws);
   ws.writeText("me/profile.md", "迁移前修改\n");
   await snapshot(ws, "迁移前");

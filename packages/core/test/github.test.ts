@@ -21,7 +21,7 @@ import {
   syncGithub,
   syncProject,
 } from "../src/index.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -30,7 +30,7 @@ afterEach(async () => {
 });
 const at = (day: number, hour = 4) => new Date(`2026-10-${day}T${String(hour).padStart(2, "0")}:00:00Z`);
 async function fixture() {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   cleanups.push(() => fs.rmSync(dirname(ws.root), { recursive: true, force: true }));
   const { slug } = await createProject(ws, { title: "demo", kind: "personal" });
   const requests: { url: string; headers: IncomingHttpHeaders }[] = [];
