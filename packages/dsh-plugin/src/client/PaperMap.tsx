@@ -59,6 +59,7 @@ export function PaperMap({
   const [failure, setFailure] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<LibreMap | null>(null);
+  const retryDetails = useRef<(() => void) | null>(null);
   const meMarker = useRef<Marker | null>(null);
   const originLabel = useRef<Marker | null>(null);
   const cityPopup = useRef<Popup | null>(null);
@@ -241,31 +242,64 @@ export function PaperMap({
       (!themeRoot.getAttribute("data-theme") && document.body.hasAttribute("data-ds-dark-theme"));
     let disposed = false;
     let styleGeneration = 0;
-    let remoteLoading = false;
+    let remoteAttempted = false;
     let remoteLoaded = false;
     let detailSource: string | undefined;
     let attributionInitialized = false;
     let m: LibreMap | undefined;
     let remoteStyle: StyleSpecification | undefined;
-    const controller = new AbortController();
+    let controller: AbortController | undefined;
+    let detailTimer: ReturnType<typeof setTimeout> | undefined;
+    const stopDetails = () => {
+      clearTimeout(detailTimer);
+      detailTimer = undefined;
+      controller?.abort();
+      controller = undefined;
+    };
+    const failDetails = () => {
+      if (disposed) return;
+      stopDetails();
+      remoteLoaded = false;
+      // Removing the optional sources also cancels pending tile requests.
+      for (const id of ["paper-hillshade", "detail-river", "detail-water"])
+        if (m?.getLayer(id)) m.removeLayer(id);
+      for (const id of ["paper-terrain", detailSource]) if (id && m?.getSource(id)) m.removeSource(id);
+      detailSource = undefined;
+      if (m?.getLayer("paper-relief")) m.setPaintProperty("paper-relief", "raster-opacity", 1);
+      setDetailStatus(navigator.onLine ? "unavailable" : "offline");
+    };
+    const waitForDetails = () => {
+      if (detailTimer) return;
+      m?.setPaintProperty("paper-relief", "raster-opacity", 1);
+      setDetailStatus("loading");
+      detailTimer = setTimeout(failDetails, 8000);
+    };
     const details = async () => {
-      if (!m || m.getZoom() < 5 || remoteLoaded || remoteLoading || !m.isStyleLoaded()) return;
+      if (!m || m.getZoom() < 5 || remoteAttempted || !m.isStyleLoaded()) return;
       if (!navigator.onLine) {
         setDetailStatus(navigator.onLine ? "unavailable" : "offline");
         return;
       }
-      remoteLoading = true;
-      setDetailStatus("loading");
+      remoteAttempted = true;
+      const request = new AbortController();
+      controller = request;
+      waitForDetails();
       const generation = styleGeneration;
       try {
         if (!remoteStyle) {
           const response = await fetch("https://tiles.openfreemap.org/styles/positron", {
-            signal: controller.signal,
+            signal: request.signal,
           });
           if (!response.ok) throw new Error("Map style unavailable");
           remoteStyle = (await response.json()) as StyleSpecification;
         }
-        if (disposed || generation !== styleGeneration || !m.isStyleLoaded() || m.getZoom() < 5) return;
+        if (disposed || request.signal.aborted || generation !== styleGeneration) return;
+        if (!m.isStyleLoaded() || m.getZoom() < 5) {
+          stopDetails();
+          remoteAttempted = false;
+          setDetailStatus(null);
+          return;
+        }
         const vector = Object.entries(remoteStyle.sources).find(([, source]) => source.type === "vector");
         if (!vector || vector[1].type !== "vector") throw new Error("Vector map unavailable");
         const [id, source] = vector;
@@ -333,17 +367,25 @@ export function PaperMap({
           );
         remoteLoaded = true;
       } catch {
-        if (!disposed) setDetailStatus(navigator.onLine ? "unavailable" : "offline");
-      } finally {
-        remoteLoading = false;
-        if (!disposed && generation !== styleGeneration) void details();
+        if (!request.signal.aborted && generation === styleGeneration) failDetails();
       }
+    };
+    retryDetails.current = () => {
+      if (disposed || detailTimer) return;
+      remoteAttempted = false;
+      remoteStyle = undefined;
+      void details();
     };
     const loadStyle = () => {
       cityPopup.current?.remove();
       ++styleGeneration;
       if (disposed) return;
+      stopDetails();
+      remoteAttempted = false;
+      setDetailStatus(null);
       const style = structuredClone(isDark() ? dark : light) as StyleSpecification;
+      const relief = style.layers.find((layer) => layer.id === "paper-relief");
+      if (relief?.type === "raster") relief.paint = { ...relief.paint, "raster-opacity": 1 };
       remoteLoaded = false;
       detailSource = undefined;
       m?.setStyle(style, { diff: false });
@@ -436,9 +478,29 @@ export function PaperMap({
         if (marker) marker.dataset.mapBearing = String(instance.getBearing());
       });
       const finishDetails = () => {
-        if (remoteLoaded && detailSource && instance.isSourceLoaded(detailSource))
-          setDetailStatus((status) => (status === "loading" ? null : status));
+        if (
+          detailTimer &&
+          remoteLoaded &&
+          detailSource &&
+          instance.isSourceLoaded(detailSource) &&
+          instance.isSourceLoaded("paper-terrain")
+        ) {
+          stopDetails();
+          instance.setPaintProperty("paper-relief", "raster-opacity", [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            5,
+            1,
+            7,
+            0,
+          ]);
+          setDetailStatus(null);
+        }
       };
+      m.on("sourcedataloading", (e) => {
+        if (remoteLoaded && (e.sourceId === detailSource || e.sourceId === "paper-terrain")) waitForDetails();
+      });
       m.on("idle", () => {
         finishDetails();
         if (!attributionInitialized) {
@@ -459,7 +521,7 @@ export function PaperMap({
       });
       m.on("error", (e) => {
         if ("sourceId" in e && e.sourceId === "paper-earth") setFailure(true);
-        else setDetailStatus(navigator.onLine ? "unavailable" : "offline");
+        else failDetails();
       });
       const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 12 });
       cityPopup.current = popup;
@@ -498,16 +560,17 @@ export function PaperMap({
       observer.observe(document.body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
     const resize = new ResizeObserver(() => m?.resize());
     resize.observe(el);
-    const offline = () => setDetailStatus("offline");
+    const offline = () => failDetails();
     const online = () => {
-      remoteLoaded = false;
+      remoteAttempted = false;
       void details();
     };
     window.addEventListener("offline", offline);
     window.addEventListener("online", online);
     return () => {
       disposed = true;
-      controller.abort();
+      retryDetails.current = null;
+      stopDetails();
       observer.disconnect();
       resize.disconnect();
       window.removeEventListener("offline", offline);
@@ -629,6 +692,16 @@ export function PaperMap({
                   "城市细节暂不可用 · 全球底图仍可浏览",
                   "City details are temporarily unavailable · The global map remains available",
                 )}
+          {detailStatus !== "offline" && (
+            <button
+              type="button"
+              className={css.control}
+              disabled={detailStatus === "loading"}
+              onClick={() => retryDetails.current?.()}
+            >
+              {t("重试城市细节", "Retry city details")}
+            </button>
+          )}
         </output>
       )}
       {!ready && !failure && (
