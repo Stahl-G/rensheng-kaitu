@@ -1,5 +1,5 @@
 diff --git a/packages/dsh-plugin/src/testsite/HomeScenes.tsx b/packages/dsh-plugin/src/testsite/HomeScenes.tsx
-index 7825318..7274d6a 100644
+index 7825318..648b10e 100644
 --- a/packages/dsh-plugin/src/testsite/HomeScenes.tsx
 +++ b/packages/dsh-plugin/src/testsite/HomeScenes.tsx
 @@ -25,11 +25,7 @@ function Dialog({ title, close, children }: { title: string; close: () => void;
@@ -32,7 +32,7 @@ index 7825318..7274d6a 100644
      ],
    ] as const;
    const pendingSamples = sampleOriginals.map(([zh, en]) => t(zh, en));
-@@ -161,25 +154,22 @@ export function HomeScenes({
+@@ -161,36 +154,27 @@ export function HomeScenes({
            id: "profile",
            title: t("示例近况", "Sample context"),
            text: t(
@@ -59,24 +59,25 @@ index 7825318..7274d6a 100644
 -            "合成示例 · 虚构体重记录：68.4 千克。",
 -            "Synthetic sample · fictional weight record: 68.4 kg.",
 -          ),
-+          title: t("示例健康资料（敏感，默认不勾）", "Sample health data (sensitive, unchecked)"),
++          title: t("示例健康资料（敏感）", "Sample health data (sensitive)"),
 +          text: t("体重：68.4 千克。", "Weight: 68.4 kg."),
          },
          {
            id: "others",
-@@ -187,10 +177,7 @@ export function HomeScenes({
-             "示例访谈转写 · 涉及他人，默认不勾选",
-             "Sample interview transcript · other people, unchecked",
-           ),
+-          title: t(
+-            "示例访谈转写 · 涉及他人，默认不勾选",
+-            "Sample interview transcript · other people, unchecked",
+-          ),
 -          text: t(
 -            "合成示例 · 虚构受访者：我通常周末才有空。",
 -            "Synthetic sample · fictional interviewee: I usually have time on weekends.",
 -          ),
++          title: t("示例访谈转写（涉及他人）", "Sample interview transcript · other people, unchecked"),
 +          text: t("受访者说：我通常周末才有空。", "Interviewee: I usually have time on weekends."),
          },
        ]
      : [
-@@ -199,8 +186,8 @@ export function HomeScenes({
+@@ -199,8 +183,8 @@ export function HomeScenes({
            ? [
                {
                  id: "current-step",
@@ -87,38 +88,37 @@ index 7825318..7274d6a 100644
                },
              ]
            : []),
-@@ -208,7 +195,7 @@ export function HomeScenes({
+@@ -208,7 +192,7 @@ export function HomeScenes({
            ? [
                {
                  id: "current-result",
 -                title: t("已记下的结果 · 默认不勾选", "Recorded result · unchecked"),
-+                title: t("已记下的结果（默认不勾）", "Recorded result (unchecked)"),
++                title: t("已记下的结果", "Recorded result"),
                  text: state.result,
                },
              ]
-@@ -269,11 +256,10 @@ export function HomeScenes({
+@@ -268,39 +252,27 @@ export function HomeScenes({
+     {
        kind: "meal" as const,
        title: t("这顿吃得怎么样", "How was this meal?"),
-       fact: t(
+-      fact: t(
 -        "写一句吃了什么，先原样存下。想估算营养，可以复制给你常用的 AI。",
 -        "Write what you ate and keep the original. Copy it to your usual AI if you want a nutrition estimate.",
-+        "写一句吃了什么，先存下。想估算营养，可以复制给你常用的 AI。",
-+        "Write what you ate and keep it. Copy it to your usual AI for a nutrition estimate.",
-       ),
+-      ),
++      fact: t("写一句吃了什么。", "Write what you ate."),
        action: t("记这顿 →", "Log this meal →"),
 -      meta: t("存原文 · 不估算", "Save original · no estimate"),
        click: () => capture("meal"),
      },
      {
-@@ -281,26 +267,21 @@ export function HomeScenes({
+       kind: "body" as const,
        title: t("看看训练和身体的变化", "See training and body changes"),
        fact: isNew
-         ? t(
+-        ? t(
 -            "用一份明确标注的合成记录，看看训练、睡眠和体重怎样放在一起。",
 -            "Explore how training, sleep and weight appear together using labeled synthetic records.",
-+            "接上健康数据后，训练、睡眠和体重放在一起看。",
-+            "Once health data is connected, training, sleep and weight show up together.",
-           )
+-          )
++        ? t("训练、睡眠和体重放在一起看。", "Training, sleep and weight in one place.")
          : t(
 -            "合成示例：30 天训练 12 次，睡眠 7.1 小时，体重 68.4 → 67.9 千克。",
 -            "Synthetic sample: 12 sessions in 30 days, 7.1 hours of sleep, weight 68.4 → 67.9 kg.",
@@ -143,7 +143,15 @@ index 7825318..7274d6a 100644
        click: directions,
      },
    ];
-@@ -329,9 +310,6 @@ export function HomeScenes({
+@@ -322,16 +294,10 @@ export function HomeScenes({
+           </h1>
+           {isNew && (
+             <p className={ui.sub}>
+-              {t(
+-                "写一句关于自己就能开始。不用 Key，不用云盘。",
+-                "Start with one sentence about yourself. No key or cloud account needed.",
+-              )}
++              {t("写一句关于自己，就能开始。", "Start with one sentence about yourself.")}
              </p>
            )}
          </div>
@@ -153,31 +161,42 @@ index 7825318..7274d6a 100644
        </div>
        <div className={ui.capture}>
          <button type="button" className={ui.capturePrompt} onClick={() => capture()}>
-@@ -362,11 +340,11 @@ export function HomeScenes({
+@@ -340,10 +306,7 @@ export function HomeScenes({
+                 "比如：在杭州做设计，最近想把散文集写完",
+                 "For example: I design in Hangzhou and want to finish my essays",
+               )
+-            : t(
+-                "随手记一句，吃了什么、想到什么都行",
+-                "A sentence about what you ate, or what is on your mind",
+-              )}
++            : t("随手记一句", "Write a quick note")}
+         </button>
+         <button type="button" className={isNew ? ui.primary : ui.secondary} onClick={() => capture()}>
+           {isNew ? t("写下这一句", "Write this sentence") : t("记下", "Write a note")}
+@@ -362,13 +325,7 @@ export function HomeScenes({
        {pending > 0 && (
          <section className={ui.pending} aria-label={t("等你确认", "Pending review")}>
            <div>
 -            <strong>{t(`${pending} 条合成示例，等你确认`, `${pending} synthetic samples to review`)}</strong>
-+            <strong>{t(`交来 ${pending} 条，等你确认`, `${pending} items waiting for you`)}</strong>
-             <p className={ui.meta}>
-               {t(
+-            <p className={ui.meta}>
+-              {t(
 -                "预先写好的午饭原文和方向想法；没有 AI 分析。确认后才保存。",
 -                "Prewritten meal and direction text; no AI analysis. Saved only after confirmation.",
-+                "一条午饭记录、一个方向想法。确认后才算数。",
-+                "A lunch note and a direction idea. Nothing counts until you confirm.",
-               )}
-             </p>
+-              )}
+-            </p>
++            <strong>{t(`交来 ${pending} 条，等你确认`, `${pending} items waiting for you`)}</strong>
            </div>
-@@ -380,7 +358,7 @@ export function HomeScenes({
+           <button type="button" className={ui.primary} onClick={() => open("pending")}>
+             {t(`去确认 ${pending} 条`, `Review ${pending} items`)}
+@@ -380,7 +337,6 @@ export function HomeScenes({
            <article key={card.kind} className={ui.scene}>
              <div className={ui.art}>
                <SceneArt kind={card.kind} muted={isNew} />
 -              <span>{t("示例插图 · 合成资料", "Sample illustration · synthetic data")}</span>
-+              <span>{t("示例", "Sample")}</span>
              </div>
              <div className={ui.sceneBody}>
                <h2>{card.title}</h2>
-@@ -389,7 +367,6 @@ export function HomeScenes({
+@@ -389,7 +345,6 @@ export function HomeScenes({
                  <button type="button" onClick={card.click}>
                    {card.action}
                  </button>
@@ -185,7 +204,32 @@ index 7825318..7274d6a 100644
                </div>
              </div>
            </article>
-@@ -453,7 +430,9 @@ export function HomeScenes({
+@@ -413,21 +368,12 @@ export function HomeScenes({
+           <h2>{t("换个 AI，接着聊", "Switch AI and continue")}</h2>
+           <p>
+             {isNew
+-              ? t(
+-                  "用一份标了「示例」的资料包看看效果，不需要先写一句。",
+-                  "Try a labeled sample package. You can start without writing a note.",
+-                )
++              ? t("看看给 AI 的资料长什么样。", "See what your AI would get.")
+               : t(
+-                  "勾选要带的近况，复制给你常用的 AI，不用重新介绍自己。回答可以贴回来，确认后才记下。",
+-                  "Choose context to copy to your usual AI. Continue without introducing yourself again. Paste the answer back and confirm before saving.",
++                  "复制给你常用的 AI，不用重新介绍自己。",
++                  "Copy it to your AI. No need to introduce yourself again.",
+                 )}
+           </p>
+-          <p className={ui.where}>
+-            {t(
+-              "资料在：本浏览器标签页 · 示例资料。仅复制所选内容到剪贴板，不会自动发给任何 AI。",
+-              "Stored in: this browser tab · demo data. Only selected content is copied to the clipboard; nothing is sent to any AI automatically.",
+-            )}
+-          </p>
+         </div>
+         <button
+           type="button"
+@@ -453,7 +399,9 @@ export function HomeScenes({
            <section>
              <div>
                <span className={ui.meta}>
@@ -196,19 +240,33 @@ index 7825318..7274d6a 100644
                </span>
                <p>
                  <strong>
-@@ -495,9 +474,7 @@ export function HomeScenes({
-                 : t("没有等你确认的内容", "Nothing waiting for review")}
-             </p>
+@@ -489,15 +437,9 @@ export function HomeScenes({
+             ) : null}
+           </section>
+           <section>
+-            <p>
+-              {pending
+-                ? t(`等你确认 ${pending} 条`, `${pending} items to review`)
+-                : t("没有等你确认的内容", "Nothing waiting for review")}
+-            </p>
++            <p>{pending ? t(`等你确认 ${pending} 条`, `${pending} items to review`) : null}</p>
              <button type="button" onClick={pending ? () => open("pending") : library}>
 -              {pending
 -                ? t("去确认 →", "Review →")
 -                : t(`找回 ${state.notes.length} 条原文 →`, `Find ${state.notes.length} originals →`)}
-+              {pending ? t("去确认 →", "Review →") : t("看看存下的原文 →", "See what you saved →")}
++              {pending ? t("去确认 →", "Review →") : t("看看存下的内容 →", "See what you saved →")}
              </button>
            </section>
          </div>
-@@ -517,14 +494,14 @@ export function HomeScenes({
-                   ? t("带入聊天原文", "Bring in conversation text")
+@@ -512,19 +454,19 @@ export function HomeScenes({
+           title={
+             panel === "capture"
+               ? context === "meal"
+-                ? t("记这顿 · 保存原文", "Log a meal · save the original")
++                ? t("记这顿", "Log a meal")
+                 : context === "chat"
+-                  ? t("带入聊天原文", "Bring in conversation text")
++                  ? t("带入聊天", "Bring in a conversation")
                    : t("记一句", "Write a note")
                : panel === "health"
 -                ? t("训练和身体 · 合成记录", "Training and body · synthetic records")
@@ -216,7 +274,8 @@ index 7825318..7274d6a 100644
                  : panel === "package"
                    ? t("选择要带的内容", "Choose what to bring")
                    : panel === "answer"
-                     ? t("贴回回答 · 确认后保存", "Paste answer · confirm before saving")
+-                    ? t("贴回回答 · 确认后保存", "Paste answer · confirm before saving")
++                    ? t("贴回回答", "Paste answer")
                      : panel === "complete"
                        ? t("完成并留下结果", "Complete and record a result")
 -                      : t("确认合成示例原文", "Review synthetic sample originals")
@@ -224,7 +283,51 @@ index 7825318..7274d6a 100644
            }
            close={close}
          >
-@@ -576,10 +553,7 @@ export function HomeScenes({
+@@ -532,33 +474,14 @@ export function HomeScenes({
+             <form
+               onSubmit={async (event) => {
+                 event.preventDefault();
+-                if (
+-                  await save(
+-                    draft,
+-                    t(
+-                      "已保存原文，可到资料找回。没有进行 AI 分析。",
+-                      "Original saved. Find it in Library. No AI analysis was performed.",
+-                    ),
+-                  )
+-                ) {
++                if (await save(draft, t("已保存", "Saved"))) {
+                   setPanel(null);
+                   setDraft("");
+                 }
+               }}
+             >
+-              <p className={ui.meta}>
+-                {context === "meal"
+-                  ? t(
+-                      "没有连接 AI：先保存吃了什么，不生成营养估算，也不记成已确认的饮食数据。",
+-                      "No AI is connected. Save what you ate; no nutrition estimate or confirmed meal data is generated.",
+-                    )
+-                  : t(
+-                      "原样保存在本标签页的资料中。请用示例文字，不要填真实个人资料。",
+-                      "Kept exactly as written in this tab's Library. Use sample text without real personal data.",
+-                    )}
+-              </p>
+               <label htmlFor="capture-text">
+-                {context === "chat" ? t("聊天原文", "Conversation original") : t("这一句", "Your sentence")}
++                {context === "chat" ? t("聊天内容", "Conversation") : t("这一句", "Your sentence")}
+               </label>
+               <textarea
+                 id="capture-text"
+@@ -569,17 +492,14 @@ export function HomeScenes({
+               />
+               <div className={ui.tools}>
+                 <button type="submit" className={ui.primary} disabled={busy || !draft.trim()}>
+-                  {t("保存原文", "Save original")}
++                  {t("保存", "Save")}
+                 </button>
+                 <button
+                   type="button"
                    onClick={() =>
                      setDraft(
                        context === "meal"
@@ -236,16 +339,16 @@ index 7825318..7274d6a 100644
                          : store.sampleNote,
                      )
                    }
-@@ -596,26 +570,24 @@ export function HomeScenes({
+@@ -594,28 +514,20 @@ export function HomeScenes({
+           )}
+           {panel === "health" && (
              <>
-               <p>
-                 {t(
+-              <p>
+-                {t(
 -                  "以下是预先写好的合成记录，用来体验查看资料；没有读取健康设备，也没有 AI 分析。插图不表示实际趋势。",
 -                  "These prewritten synthetic records demonstrate reading data. No health device was read and no AI analysis was performed. The illustration does not represent a measured trend.",
-+                  "数字是写好的示例，不来自任何设备。",
-+                  "Numbers are prewritten samples and come from no device.",
-                 )}
-               </p>
+-                )}
+-              </p>
                <table className={ui.healthTable}>
 -                <caption>
 -                  {t("小林 · 合成健康摘要（示例 30 天）", "Lin · synthetic health summary (sample 30 days)")}
@@ -269,53 +372,133 @@ index 7825318..7274d6a 100644
                    </tr>
                  </tbody>
                </table>
-@@ -636,8 +608,8 @@ export function HomeScenes({
-               <p>
-                 {samplePackage
-                   ? t(
+@@ -627,23 +539,12 @@ export function HomeScenes({
+                   library();
+                 }}
+               >
+-                {t("查看已保存原文 →", "Read saved originals →")}
++                {t("看看存下的内容 →", "See what you saved →")}
+               </button>
+             </>
+           )}
+           {panel === "package" && (
+             <>
+-              <p>
+-                {samplePackage
+-                  ? t(
 -                      "这是合成示例，不含你的信息。健康、涉及他人及转写内容默认不勾选。",
 -                      "This synthetic sample contains no personal information. Health, other people's information and transcripts are unchecked by default.",
-+                      "示例资料，不含你的信息。健康、涉及他人和录音转写的内容默认不勾。",
-+                      "Sample data with none of your information. Health, other people and transcripts are unchecked by default.",
-                     )
-                   : t(
-                       "从本标签页已保存的原文中选择。所有内容默认不勾选；请留意健康、涉及他人或转写内容。",
-@@ -666,20 +638,15 @@ export function HomeScenes({
+-                    )
+-                  : t(
+-                      "从本标签页已保存的原文中选择。所有内容默认不勾选；请留意健康、涉及他人或转写内容。",
+-                      "Choose from originals saved in this tab. All items start unchecked; take care with health, other people's information and transcripts.",
+-                    )}
+-              </p>
+               <div className={ui.choices}>
+                 {candidates.map((item) => (
+                   <label key={item.id}>
+@@ -665,29 +566,14 @@ export function HomeScenes({
+                   </label>
                  ))}
                </div>
-               {!candidates.length && (
+-              {!candidates.length && (
 -                <p>
 -                  {t(
 -                    "还没有原文，可以直接用合成示例。",
 -                    "No originals yet. Try the synthetic sample directly.",
 -                  )}
 -                </p>
-+                <p>{t("还没有原文，可以先用示例。", "Nothing saved yet. Try the sample first.")}</p>
-               )}
+-              )}
++              {!candidates.length && <p>{t("还没有内容。", "Nothing saved yet.")}</p>}
                {!samplePackage && (
                  <button type="button" onClick={() => openPackage(true)}>
 -                  {t("改用合成示例", "Use synthetic samples instead")}
 +                  {t("改用示例", "Use samples instead")}
                  </button>
                )}
-               <label htmlFor="package-preview">
+-              <label htmlFor="package-preview">
 -                {t("将复制的全部内容（仅所选原文）", "Everything to be copied (selected originals only)")}
-+                {t("将复制的内容（只有你勾选的）", "What will be copied (only what you checked)")}
-               </label>
+-              </label>
++              <label htmlFor="package-preview">{t("将复制的内容", "To be copied")}</label>
                <textarea id="package-preview" rows={6} value={packageText} readOnly />
-               <p className={ui.meta}>
-@@ -768,9 +735,7 @@ export function HomeScenes({
-                 )}
-               </p>
+-              <p className={ui.meta}>
+-                {t(
+-                  "仅复制所选内容到剪贴板，不会自动发给任何 AI。复制不会保存回答或更改资料。",
+-                  "Only selected content goes to the clipboard. Nothing is sent to an AI automatically. Copying does not save an answer or change your data.",
+-                )}
+-              </p>
+               <div className={ui.tools}>
+                 <button
+                   type="button"
+@@ -703,8 +589,8 @@ export function HomeScenes({
+                     } catch {
+                       setProblem(
+                         t(
+-                          "剪贴板复制失败。可选中上方预览手动复制；尚未自动复制。",
+-                          "Clipboard copy failed. Select the preview to copy manually; automatic copying did not complete.",
++                          "复制失败，可以手动选中上面的内容。",
++                          "Couldn't copy. Select the text above instead.",
+                         ),
+                       );
+                     } finally {
+@@ -730,10 +616,7 @@ export function HomeScenes({
+               </div>
+               {copied && (
+                 <output className={ui.notice} aria-live="polite">
+-                  {t(
+-                    "已复制所选内容。现在可自行粘贴给 AI。",
+-                    "Selected content copied. You can now paste it into your AI.",
+-                  )}
++                  {t("已复制", "Copied")}
+                 </output>
+               )}
+             </>
+@@ -746,31 +629,15 @@ export function HomeScenes({
+                   setReviewing(true);
+                   return;
+                 }
+-                if (
+-                  await save(
+-                    answer,
+-                    t(
+-                      "回答原文已保存；未自动采纳或改写任何资料。",
+-                      "Answer original saved; no changes were applied automatically.",
+-                    ),
+-                  )
+-                ) {
++                if (await save(answer, t("已保存", "Saved"))) {
+                   setPanel(null);
+                   setAnswer("");
+                   setReviewing(false);
+                 }
+               }}
+             >
+-              <p>
+-                {t(
+-                  "把回答贴回来，先查看原文，再确认保存。不解析、不自动采纳建议。",
+-                  "Paste an answer, review the original, then confirm to save. Suggestions are not parsed or adopted automatically.",
+-                )}
+-              </p>
                <label htmlFor="answer-text">
 -                {reviewing
 -                  ? t("待确认原文 · 保留换行和空格", "Original to confirm · spaces and line breaks preserved")
 -                  : t("AI 回答原文", "AI answer original")}
-+                {reviewing ? t("待确认的原文", "Text to confirm") : t("AI 回答原文", "AI answer original")}
++                {reviewing ? t("确认后保存", "Save after review") : t("AI 的回答", "AI answer")}
                </label>
                <textarea
                  id="answer-text"
-@@ -796,8 +761,8 @@ export function HomeScenes({
+@@ -782,9 +649,7 @@ export function HomeScenes({
+               />
+               <div className={ui.tools}>
+                 <button type="submit" className={ui.primary} disabled={busy || !answer.trim()}>
+-                  {reviewing
+-                    ? t("确认保存原文", "Confirm and save original")
+-                    : t("预览待确认原文", "Preview for confirmation")}
++                  {reviewing ? t("保存", "Save") : t("预览", "Preview")}
+                 </button>
+                 {reviewing ? (
+                   <button type="button" onClick={() => setReviewing(false)}>
+@@ -796,8 +661,8 @@ export function HomeScenes({
                      onClick={() =>
                        setAnswer(
                          t(
@@ -326,18 +509,20 @@ index 7825318..7274d6a 100644
                          ),
                        )
                      }
-@@ -815,8 +780,8 @@ export function HomeScenes({
+@@ -813,12 +678,6 @@ export function HomeScenes({
+           )}
+           {panel === "pending" && (
              <>
-               <p>
-                 {t(
+-              <p>
+-                {t(
 -                  "这些是预先写好的合成原文，没有 Agent 或手机传送资料。逐条确认后保存到资料，不生成饮食估算或方向。",
 -                  "These are prewritten synthetic originals, with no Agent or phone transmission. Confirm each to save it in Library. No nutrition estimate or direction is generated.",
-+                  "这些是写好的示例。逐条确认后才存进资料。",
-+                  "These are prewritten samples. Each is saved only after you confirm it.",
-                 )}
-               </p>
+-                )}
+-              </p>
                {pendingSamples.map(
-@@ -833,10 +798,7 @@ export function HomeScenes({
+                 (text, index) =>
+                   !isHandled(index) && (
+@@ -833,16 +692,13 @@ export function HomeScenes({
                              if (
                                await save(
                                  text,
@@ -349,7 +534,14 @@ index 7825318..7274d6a 100644
                                )
                              )
                                setHandled([...handled, index]);
-@@ -851,7 +813,7 @@ export function HomeScenes({
+                           }}
+                         >
+-                          {t("确认保存原文", "Confirm and save original")}
++                          {t("保存", "Save")}
+                         </button>
+                         <button type="button" disabled={busy} onClick={() => setHandled([...handled, index])}>
+                           {t("略过", "Skip")}
+@@ -851,7 +707,7 @@ export function HomeScenes({
                      </section>
                    ),
                )}
@@ -358,7 +550,7 @@ index 7825318..7274d6a 100644
                <button type="button" onClick={close}>
                  {t("返回首页", "Back to Home")}
                </button>
-@@ -868,9 +830,7 @@ export function HomeScenes({
+@@ -868,9 +724,7 @@ export function HomeScenes({
                  });
                }}
              >
@@ -369,7 +561,7 @@ index 7825318..7274d6a 100644
                <textarea
                  id="sample-result"
                  rows={4}
-@@ -887,8 +847,8 @@ export function HomeScenes({
+@@ -887,8 +741,8 @@ export function HomeScenes({
                    onClick={() =>
                      setDraft(
                        t(
@@ -381,7 +573,7 @@ index 7825318..7274d6a 100644
                      )
                    }
 diff --git a/packages/dsh-plugin/src/testsite/main.tsx b/packages/dsh-plugin/src/testsite/main.tsx
-index 9c68bff..f8d0ad9 100644
+index 9c68bff..e4b1276 100644
 --- a/packages/dsh-plugin/src/testsite/main.tsx
 +++ b/packages/dsh-plugin/src/testsite/main.tsx
 @@ -26,7 +26,7 @@ const directionData = {
@@ -393,35 +585,98 @@ index 9c68bff..f8d0ad9 100644
        motivation: "小林想换一种生活节奏，但还不确定是否适合搬家。",
        hypothesis: "短住能帮助判断通勤与生活节奏是否合适。",
        unknowns: "预算、通勤时间以及离朋友更远的影响。",
-@@ -176,8 +176,8 @@ function App() {
+@@ -77,7 +77,7 @@ function App() {
+         id: "notes",
+         title: "笔记与决策",
+         count: store.documents.length,
+-        sources: [t("合成示例", "Synthetic samples")],
++        sources: [t("示例", "Samples")],
+         latest: null,
+       },
+       {
+@@ -89,13 +89,7 @@ function App() {
+       },
+     ],
+   };
+-  const explain = () =>
+-    setNotice(
+-      t(
+-        "本预览不运行 AI、日历、导入或连接；请体验示例建议的采纳和完成，完整功能在正式 App。",
+-        "AI, calendars, imports and connections need the app. Try adopting and completing the sample suggestion here.",
+-      ),
+-    );
++  const explain = () => setNotice(t("这项需要正式 App。", "This needs the app."));
+   function run(action: () => void) {
+     try {
+       action();
+@@ -174,12 +168,7 @@ function App() {
+           </header>
+           <main className={`${css.content} ${todayCss.page} ${preview.main}`}>
              <div className={preview.demoBar} aria-label={t("示例状态", "Demo state")}>
-               <span>
-                 {t(
+-              <span>
+-                {t(
 -                  "合成示例只存本标签页，刷新或恢复标签可能保留，不会上传。",
 -                  "Synthetic demo; saved in this tab (refresh or tab restore may retain it), never uploaded.",
-+                  "这是示例，资料只留在这个浏览器标签页，不会上传。",
-+                  "Demo only. Everything stays in this browser tab and is never uploaded.",
-                 )}
-               </span>
+-                )}
+-              </span>
++              <span>{t("示例，不会上传。", "Demo. Nothing is uploaded.")}</span>
                <div className={preview.tools}>
-@@ -346,7 +346,7 @@ function App() {
+                 {(
+                   [
+@@ -222,12 +211,7 @@ function App() {
+             )}
+             {resetting && (
+               <section className={preview.banner} aria-label={t("确认重置", "Confirm reset")}>
+-                <p>
+-                  {t(
+-                    "清除本标签页的示例记录与进度？其他网站资料不受影响。",
+-                    "Clear this tab's demo notes and progress? Other website data stays as it is.",
+-                  )}
+-                </p>
++                <p>{t("清空示例记录？", "Clear the demo notes?")}</p>
+                 <div className={preview.tools}>
+                   <button
+                     type="button"
+@@ -338,35 +322,24 @@ function App() {
+               <>
+                 <nav className={css.subtabs} aria-label={t("开图里的内容", "Explore sections")}>
+                   <button type="button" disabled>
+-                    {t("足迹 · 需 App", "Places · app")}
++                    {t("足迹", "Places")}
+                   </button>
+                   <button
+                     type="button"
+                     onClick={() => {
                        navigate("overview");
-                       setNotice(
-                         t(
+-                      setNotice(
+-                        t(
 -                          "在首页点「打开健康示例」查看合成记录。",
-+                          "在首页点「打开健康」查看示例记录。",
-                           "Open the health sample card on Home to read synthetic records.",
-                         ),
-                       );
-@@ -363,7 +363,7 @@ function App() {
+-                          "Open the health sample card on Home to read synthetic records.",
+-                        ),
+-                      );
++                      setNotice(t("在首页点「打开健康」。", "Open Health from Home."));
+                     }}
+                   >
+-                    {t("健康示例", "Health sample")}
++                    {t("健康", "Health")}
+                   </button>
+                   <button type="button" disabled>
+-                    {t("资讯 · 需 App", "News · app")}
++                    {t("资讯", "News")}
+                   </button>
+                   <button type="button" aria-pressed="true">
+                     {t("方向", "Directions")}
+                   </button>
                  </nav>
-                 <p className={css.small}>
-                   {t(
+-                <p className={css.small}>
+-                  {t(
 -                    "方向页可浏览合成示例；编辑、采纳方向和 AI 生成需正式 App。首页可体验采纳建议 → 完成。",
-+                    "这里只能浏览示例方向；编辑方向和让 AI 提建议需要正式 App。",
-                     "Browse a synthetic direction. Editing, adopting directions and AI generation need the app. Try adopting and completing a task on Home.",
-                   )}
-                 </p>
+-                    "Browse a synthetic direction. Editing, adopting directions and AI generation need the app. Try adopting and completing a task on Home.",
+-                  )}
+-                </p>
+                 <DirectionsPage
+                   loadExploration={loadDirections}
+                   writeExploration={unavailable}
 diff --git a/packages/dsh-plugin/src/testsite/preview.module.css b/packages/dsh-plugin/src/testsite/preview.module.css
 index 95823e8..343f89f 100644
 --- a/packages/dsh-plugin/src/testsite/preview.module.css
@@ -444,3 +699,47 @@ index 95823e8..343f89f 100644
      font-size: 14px;
    }
    .capture .primary {
+diff --git a/packages/dsh-plugin/src/testsite/store.ts b/packages/dsh-plugin/src/testsite/store.ts
+index a391a5c..60f9f2f 100644
+--- a/packages/dsh-plugin/src/testsite/store.ts
++++ b/packages/dsh-plugin/src/testsite/store.ts
+@@ -9,17 +9,17 @@ export const sampleNote = "示例：今晚走了三公里，明天想试试早
+ export const documents = [
+   {
+     file: "learning/interview/STATUS.md",
+-    title: "第一次用户访谈（合成示例）",
++    title: "第一次用户访谈",
+     kind: "笔记" as const,
+     status: "先问对方最近一次怎么解决问题",
+-    body: "# 第一次用户访谈\n\n这是小林的合成示例笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
++    body: "# 第一次用户访谈\n\n这是小林的笔记。先问对方最近一次遇到问题的经过，再问用了什么办法。不要先介绍自己的产品。\n\n下一步：约一位朋友聊 20 分钟，把原话记下来。",
+   },
+   {
+     file: "decisions/hangzhou/STATUS.md",
+-    title: "要不要搬去杭州（合成示例）",
++    title: "要不要搬去杭州",
+     kind: "决定" as const,
+     status: "先短住，再决定",
+-    body: "# 要不要搬去杭州\n\n小林的合成示例决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
++    body: "# 要不要搬去杭州\n\n小林的决定：先安排一个周末短住，观察通勤和生活节奏。上海的工作暂时保持，预算还需要核对。",
+   },
+ ];
+ type State = {
+@@ -34,7 +34,7 @@ function seed(): State {
+     notes: [
+       {
+         file: "inbox/notes/sample.md",
+-        text: "合成示例 · 小林：想重新开始训练，也想每周给业余项目留一点时间。",
++        text: "小林：想重新开始训练，也想每周给业余项目留一点时间。",
+         source: "me",
+         originalSource: null,
+         date: "2026-10-23T09:00:00Z",
+@@ -213,7 +213,7 @@ export async function library(query: LibraryQuery = {}): Promise<LibraryData> {
+         id: "notes",
+         title: "笔记与决策",
+         count: documents.length,
+-        sources: ["合成示例 / Synthetic samples"],
++        sources: ["示例 / Samples"],
+         latest: null,
+       },
+       { id: "inbox", title: "收件箱", count: state.notes.length, sources: ["随手记"], latest: null },
