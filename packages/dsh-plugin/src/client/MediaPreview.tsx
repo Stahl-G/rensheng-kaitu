@@ -105,7 +105,7 @@ export function MediaLocation(
 ) {
   const t = useT();
   const [location, setLocation] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<"load" | "select" | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
@@ -113,8 +113,8 @@ export function MediaLocation(
       (value) => {
         if (active) setLocation(value);
       },
-      (err) => {
-        if (active) setError(String(err));
+      () => {
+        if (active) setError("load");
       },
     );
     return () => {
@@ -124,26 +124,41 @@ export function MediaLocation(
   return (
     <div className={css.card}>
       <h2 className={css.eyebrow}>{t("媒体库", "Media library")}</h2>
-      <p className={styles.path}>{location}</p>
+      <p className={styles.path}>
+        {location
+          ? location.split(/[\\/]/).filter(Boolean).at(-1) || t("已选择文件夹", "Folder selected")
+          : error
+            ? t("媒体库位置暂不可用", "Media library location unavailable")
+            : t("正在读取媒体库位置…", "Loading media library location…")}
+      </p>
       <p className={css.small}>
         {t(
-          "选择这台电脑上的 kaitu-media 文件夹，用来查看手机记入的照片。更换位置只修改本机绑定，不搬动原件。",
-          "Choose the kaitu-media folder on this computer to view photos captured on your phone. Changing the location only updates this computer’s binding; originals stay in place.",
+          "选择这台电脑上的媒体库文件夹，用来查看手机记入的照片。新建媒体库默认名为 kaitu-media，已有文件夹无需改名。更换位置只修改本机绑定，不搬动原件。",
+          "Choose the media library folder on this computer to view photos captured on your phone. New libraries default to kaitu-media; existing folders can keep any name. Changing the location only updates this computer’s binding; originals stay in place.",
         )}
       </p>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert">
+          {error === "load"
+            ? t("暂时无法读取媒体库位置，请重试。", "Unable to load the media library location. Try again.")
+            : t(
+                "未能选择媒体库，请选择工作区和 Git 仓库以外的可用文件夹后重试。",
+                "Unable to select the media library. Choose an available folder outside your workspace and Git repositories, then try again.",
+              )}
+        </p>
+      )}
       <button
         type="button"
         className={`${css.btn} ${css["btn-quiet"]}`}
         disabled={busy}
         onClick={() => {
           setBusy(true);
-          setError("");
+          setError(null);
           void (async () => {
             const folder = await props.pickStorageFolder();
             if (folder) setLocation(await props.selectMediaLibrary(folder));
           })()
-            .catch((err) => setError(String(err)))
+            .catch(() => setError("select"))
             .finally(() => setBusy(false));
         }}
       >
