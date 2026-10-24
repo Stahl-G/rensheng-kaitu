@@ -1,0 +1,134 @@
+name: Windows candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Approved source commit (full SHA)
+        required: true
+        type: string
+        default: "290a6289146d718892ac91baa3b822bb80de8dbc"
+      dsh_run_id:
+        description: Existing input artifact's workflow run in this repository
+        required: true
+        type: string
+      dsh_artifact_id:
+        description: Existing artifact containing the original signed DSH Windows EXE
+        required: true
+        type: string
+      dsh_sha256:
+        description: Independently verified SHA-256 of that original DSH EXE
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Validate input references
+        env:
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          DSH_RUN_ID: ${{ inputs.dsh_run_id }}
+          DSH_ARTIFACT_ID: ${{ inputs.dsh_artifact_id }}
+          DSH_SHA256: ${{ inputs.dsh_sha256 }}
+        run: |
+          if ($env:SOURCE_COMMIT -notmatch '^[0-9a-fA-F]{40}$') { throw 'Expected a full source commit SHA' }
+          if ($env:DSH_RUN_ID -notmatch '^[1-9][0-9]*$') { throw 'Expected one input run ID' }
+          if ($env:DSH_ARTIFACT_ID -notmatch '^[1-9][0-9]*$') { throw 'Expected one input artifact ID' }
+          if ($env:DSH_SHA256 -notmatch '^[0-9a-fA-F]{64}$') { throw 'Expected an independently verified input SHA-256' }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_commit }}
+          persist-credentials: false
+
+      # Reuse an already acquired input. Never download or run the upstream installer.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.dsh_run_id }}
+          artifact-ids: ${{ inputs.dsh_artifact_id }}
+          path: ${{ runner.temp }}/dsh-input
+          digest-mismatch: error
+
+      - name: Verify the original input
+        env:
+          DSH_SHA256: ${{ inputs.dsh_sha256 }}
+        run: |
+          $inputExe = Join-Path $env:RUNNER_TEMP 'dsh-input/deepseek-harness-0.2.1-rc.2-win-x64.exe'
+          if ((Get-FileHash $inputExe -Algorithm SHA256).Hash -ne $env:DSH_SHA256) {
+            throw 'DSH input SHA-256 mismatch'
+          }
+          $signature = Get-AuthenticodeSignature $inputExe
+          if ($signature.Status -ne 'Valid') { throw "DSH input signature: $($signature.Status)" }
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Install packaging tools
+        run: >-
+          npm install --prefix "$env:RUNNER_TEMP/windows-tools" --no-audit --no-fund
+          electron-builder@26.17.0 sharp@0.35.5 @electron/asar@3.4.1 rcedit@4.0.1 7zip-bin@5.2.0
+
+      - name: Extract input and build NSIS candidate
+        run: |
+          $inputExe = Join-Path $env:RUNNER_TEMP 'dsh-input/deepseek-harness-0.2.1-rc.2-win-x64.exe'
+          $source = Join-Path $env:RUNNER_TEMP 'dsh-windows'
+          $tools = Join-Path $env:RUNNER_TEMP 'windows-tools'
+          & "$tools/node_modules/7zip-bin/win/x64/7za.exe" x -y $inputExe "-o$source"
+          if ($LASTEXITCODE -ne 0) { throw "DSH extraction failed: $LASTEXITCODE" }
+          node packages/desktop/package-windows.mjs $source --tools $tools --output dist/windows-candidate
+          if ($LASTEXITCODE -ne 0) { throw "Windows packaging failed: $LASTEXITCODE" }
+
+      - name: Record candidate provenance and checksums
+        env:
+          DSH_RUN_ID: ${{ inputs.dsh_run_id }}
+          DSH_ARTIFACT_ID: ${{ inputs.dsh_artifact_id }}
+          DSH_SHA256: ${{ inputs.dsh_sha256 }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE 'dist/windows-candidate'
+          $installers = @(Get-ChildItem $output -Filter 'Kaitu-Setup-*-x64.exe' -File)
+          if ($installers.Count -ne 1) { throw 'Expected exactly one NSIS installer' }
+          $installer = $installers[0]
+          $exe = Join-Path $output 'win-unpacked/Kaitu.exe'
+          @(
+            "Source commit: $((git rev-parse HEAD).Trim())"
+            "Workflow commit: $env:WORKFLOW_SHA"
+            "DSH input run: $env:DSH_RUN_ID"
+            "DSH input artifact: $env:DSH_ARTIFACT_ID"
+            "DSH input SHA-256: $env:DSH_SHA256"
+            "Installer Authenticode: $((Get-AuthenticodeSignature $installer.FullName).Status)"
+            "Application Authenticode: $((Get-AuthenticodeSignature $exe).Status)"
+          ) | Set-Content (Join-Path $output 'build-info.txt') -Encoding utf8
+          @($installer.FullName, (Join-Path $output 'build.json'), (Join-Path $output 'build-info.txt')) |
+            ForEach-Object {
+              $hash = Get-FileHash $_ -Algorithm SHA256
+              "$($hash.Hash.ToLowerInvariant())  $(Split-Path $_ -Leaf)"
+            } | Set-Content (Join-Path $output 'SHA256SUMS') -Encoding utf8
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: windows-candidate-${{ inputs.source_commit }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/windows-candidate/Kaitu-Setup-*-x64.exe
+            dist/windows-candidate/build.json
+            dist/windows-candidate/build-info.txt
+            dist/windows-candidate/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
