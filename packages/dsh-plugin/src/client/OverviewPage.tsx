@@ -694,8 +694,20 @@ function Overview({
       setPersonal((me) => (me ? { ...me, avatar: null } : me));
     },
   };
+  const closeCapture = () => {
+    setCaptureOpen(false);
+    requestAnimationFrame(() => document.getElementById("life-capture-start")?.focus());
+  };
   const capture = (
-    <section className={todayCss.capture}>
+    <section
+      className={todayCss.capture}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !busy) {
+          event.preventDefault();
+          closeCapture();
+        }
+      }}
+    >
       <h2>{t("随手记", "Quick note")}</h2>
       <form
         onSubmit={(e) => {
@@ -745,15 +757,7 @@ function Overview({
           {busy ? t("正在保存…", "Saving…") : t("记下", "Add note")}
         </button>
         {captureOpen && (
-          <button
-            type="button"
-            className={css.link}
-            disabled={busy}
-            onClick={() => {
-              setCaptureOpen(false);
-              requestAnimationFrame(() => document.getElementById("life-capture-start")?.focus());
-            }}
-          >
+          <button type="button" className={css.link} disabled={busy} onClick={closeCapture}>
             {t("收起，保留草稿", "Close, keep draft")}
           </button>
         )}
@@ -1225,11 +1229,13 @@ function Overview({
                     readOnboardingMatter: props.readOnboardingMatter,
                     adoptOnboardingMatter: async (...args) => {
                       const result = await props.adoptOnboardingMatter(...args);
+                      setLibraryEntry(undefined);
                       await refresh();
                       return result;
                     },
                     keepOnboardingMatter: async (file) => {
                       const result = await props.keepOnboardingMatter(file);
+                      setLibraryEntry(undefined);
                       await refresh();
                       return result;
                     },

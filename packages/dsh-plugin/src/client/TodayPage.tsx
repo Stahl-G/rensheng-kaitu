@@ -42,7 +42,16 @@ export function LifeHome({
   const t = useT();
   const locale = useLocale();
   const [energy, setEnergy] = useState(60);
+  const sourceRegion = useRef<HTMLElement>(null);
+  const sourceTrigger = useRef<HTMLButtonElement | null>(null);
   const [factSource, setFactSource] = useState<OverviewSource | null>(null);
+  useEffect(() => {
+    if (factSource) sourceRegion.current?.focus();
+  }, [factSource]);
+  const closeSource = () => {
+    setFactSource(null);
+    requestAnimationFrame(() => sourceTrigger.current?.focus());
+  };
   const [resting, setResting] = useState(false);
   const [picked, setPicked] = useState<OverviewNext | null>(null);
   const [answer, setAnswer] = useState("");
@@ -145,7 +154,10 @@ export function LifeHome({
                     key={`${entry.file}:${i}`}
                     type="button"
                     className={css.link}
-                    onClick={() => setFactSource(entry)}
+                    onClick={(event) => {
+                      sourceTrigger.current = event.currentTarget;
+                      setFactSource(entry);
+                    }}
                   >
                     {t(`记录 ${i + 1}`, `Record ${i + 1}`)}
                   </button>
@@ -184,10 +196,21 @@ export function LifeHome({
         </section>
       )}
       {factSource && (
-        <section className={todayCss.sourceRecord} aria-label={t("来源记录", "Source record")}>
+        <section
+          ref={sourceRegion}
+          tabIndex={-1}
+          className={todayCss.sourceRecord}
+          aria-label={t("来源记录", "Source record")}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              closeSource();
+            }
+          }}
+        >
           <h2>{t("来源记录", "Source record")}</h2>
           <pre>{factSource.text}</pre>
-          <button type="button" className={css.link} onClick={() => setFactSource(null)}>
+          <button type="button" className={css.link} onClick={closeSource}>
             {t("收起来源", "Close source")}
           </button>
         </section>
@@ -340,7 +363,7 @@ export function LifeHome({
       </section>
       {error && <p role="alert">{error}</p>}
       <footer className={todayCss.homeLinks}>
-        <button type="button" className={css.link} onClick={start}>
+        <button id="life-capture-start" type="button" className={css.link} onClick={start}>
           {t("随手记一句", "Keep a quick note")}
         </button>
         <button type="button" className={css.link} onClick={library}>
