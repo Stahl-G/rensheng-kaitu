@@ -17,6 +17,7 @@ import {
   memoryRepositoryDescription,
 } from "./github-cli.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
+import { invalidateHistoryFile } from "./history.js";
 import { initWorkspace } from "./init.js";
 import { normalizeLocale, readPreferences, pick as translate } from "./locale.js";
 import { rememberOrganizer } from "./organizer.js";
@@ -602,8 +603,10 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
       controller.signal.throwIfAborted();
       const applyChanges = async () => {
         for (const path of changes) {
-          if (merged.files[path] === undefined) rmSync(ws.resolve(path));
-          else ws.writeText(path, merged.files[path] as string);
+          if (merged.files[path] === undefined) {
+            rmSync(ws.resolve(path));
+            invalidateHistoryFile(ws, path);
+          } else ws.writeText(path, merged.files[path] as string);
         }
         rememberOrganizer(ws, undefined, [], latestDaily(ws));
       };
@@ -731,8 +734,10 @@ export function resolveWorkspaceBackup(ws: Workspace, path: string, choice: "loc
   // 两份原文保留在本机历史文件，作者选择后也能回看。
   ws.writeJson(`.kaitu/backup-conflicts/${randomUUID()}.json`, conflict, { internal: true, mode: 0o600 });
   if (choice === "remote") {
-    if (conflict.remote === undefined) rmSync(ws.resolve(path), { force: true });
-    else ws.writeText(path, conflict.remote);
+    if (conflict.remote === undefined) {
+      rmSync(ws.resolve(path), { force: true });
+      invalidateHistoryFile(ws, path);
+    } else ws.writeText(path, conflict.remote);
   }
   if (conflict.remote === undefined) delete s.base[path];
   else s.base[path] = conflict.remote;
