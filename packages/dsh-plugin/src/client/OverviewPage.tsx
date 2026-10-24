@@ -1296,6 +1296,7 @@ function Overview({
             ) : record === "inbox" ? (
               reviewMatter ? null : (
                 <InboxPage
+                  loadMediaImage={props.loadMediaImage}
                   initialEntry={libraryEntry}
                   overview={data}
                   review={{
@@ -1342,6 +1343,7 @@ function Overview({
               )
             ) : (
               <NotesPage
+                loadMediaImage={props.loadMediaImage}
                 initialFile={libraryFile}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}

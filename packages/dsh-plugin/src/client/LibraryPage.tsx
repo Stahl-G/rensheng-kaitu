@@ -12,6 +12,7 @@ import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
 import inboxStyles from "./InboxPage.module.css";
 import { LearningPage, type LearningServices, type LearningSource } from "./LearningPage.js";
 import styles from "./LibraryPage.module.css";
+import { MediaPreview, type MediaServices } from "./MediaPreview.js";
 import css from "./Prototype.module.css";
 import { useLocale, useT, versionText } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
@@ -83,7 +84,7 @@ const LIBRARY_EN: Record<string, string> = {
   notes: "Notes and decisions",
   inbox: "Inbox",
 };
-export interface LibraryProps extends LearningServices {
+export interface LibraryProps extends LearningServices, Pick<MediaServices, "loadMediaImage"> {
   searchLibraryNotes: (query: string) => Promise<NoteSearchResult[]>;
   loadLibrary: (query?: LibraryQuery) => Promise<LibraryData>;
   loadLibraryDocument: (file: string) => Promise<string>;
@@ -428,6 +429,7 @@ export function LibraryPage({
 }
 export function InboxPage({
   initialEntry,
+  loadMediaImage,
   loadLibrary,
   subscribe,
   channelSettings,
@@ -437,7 +439,7 @@ export function InboxPage({
   overview,
   onReview,
   review,
-}: Pick<LibraryProps, "loadLibrary"> & {
+}: Pick<LibraryProps, "loadLibrary" | "loadMediaImage"> & {
   initialEntry?: InboxEntry;
   subscribe?: (refresh: () => void) => () => void;
   channelSettings?: ChannelRequest;
@@ -663,6 +665,12 @@ export function InboxPage({
                   {t("原文", "Original")} · {selectedEntry.date?.slice(0, 16).replace("T", " ")}
                 </p>
                 <blockquote className={inboxStyles.original}>{selectedEntry.text}</blockquote>
+                <MediaPreview
+                  key={selectedEntry.file}
+                  content={selectedEntry.text}
+                  attachment={selectedEntry.attachment}
+                  load={loadMediaImage}
+                />
                 {(() => {
                   const destination = destinationFor(selectedEntry);
                   return destination ? (
@@ -859,6 +867,7 @@ export function NotesPage({
   initialFile,
   data,
   loadLibraryDocument,
+  loadMediaImage,
   ...learning
 }: {
   initialFile?: string;
@@ -869,7 +878,7 @@ export function NotesPage({
   onSourceConsumed: () => void;
   onPrompt: (text: string) => void;
   onSaved: () => void;
-} & Pick<LibraryProps, "loadLibraryDocument"> &
+} & Pick<LibraryProps, "loadLibraryDocument" | "loadMediaImage"> &
   LearningServices) {
   const t = useT();
   const [file, setFile] = useState<string | null>(initialFile ?? null);
@@ -882,7 +891,7 @@ export function NotesPage({
     if (file)
       void loadLibraryDocument(file)
         .then((text) => {
-          if (active) setBody(text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, ""));
+          if (active) setBody(text);
         })
         .catch((err) => {
           if (active) setError(err instanceof Error ? err.message : String(err));
@@ -901,7 +910,8 @@ export function NotesPage({
             {t("← 笔记与决策", "← Notes and decisions")}
           </button>
           <article className={`${css.card} ${css.sum} ${css.detailBody}`}>
-            {body || t("正在读取…", "Loading…")}
+            {body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "") || t("正在读取…", "Loading…")}
+            <MediaPreview key={file} content={body} load={loadMediaImage} />
           </article>
         </>
       ) : !data ? (

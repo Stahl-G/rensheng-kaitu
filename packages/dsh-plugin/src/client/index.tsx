@@ -415,6 +415,21 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadMediaImage: async (reference: string) => {
+                const result = await ctx.remote.kaitu.mediaImage(reference);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              loadMediaLocation: async () => {
+                const result = await ctx.remote.kaitu.mediaLibraryLocation();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              selectMediaLibrary: async (folder: string) => {
+                const result = await ctx.remote.kaitu.selectMediaLibrary(folder);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
               searchLibraryNotes: async (query: string) => {
                 const result = await ctx.remote.kaitu.searchLibraryNotes(query);
                 if (!result.ok) throw new Error(result.error.message);
