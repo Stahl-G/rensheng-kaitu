@@ -1,10 +1,18 @@
 import type { LibraryQuery, NoteSearchResult } from "@kaitu/core";
-import type { InboxEntry, LibraryData, OverviewData, OverviewNext } from "../types.js";
+import type {
+  DoingProject,
+  InboxEntry,
+  LibraryData,
+  OverviewData,
+  OverviewMetric,
+  OverviewNext,
+} from "../types.js";
 
 // This is disposable browser demo state, never a Kaitu workspace or a new record format.
 const key = "kaitu:testsite:v1";
 export const taskTitle = "给业余项目约一次 20 分钟的用户访谈";
 const goalTitle = "做出一个有人愿意用的业余项目";
+export type DemoMode = "new" | "data" | "pending";
 export const sampleNote = "示例：今晚走了三公里，明天想试试早点出门。";
 export const documents = [
   {
@@ -37,7 +45,7 @@ function seed(): State {
         text: "小林：想重新开始训练，也想每周给业余项目留一点时间。",
         source: "me",
         originalSource: null,
-        date: "2026-10-23T09:00:00Z",
+        date: new Date().toISOString(),
         status: "raw",
         destination: null,
       },
@@ -46,7 +54,9 @@ function seed(): State {
     result: "",
   };
 }
-let state = seed();
+const emptyState = (): State => ({ version: 1, notes: [], task: "skipped", result: "" });
+let state = emptyState();
+let changedAt = Date.now();
 let storageError = "";
 try {
   const saved = sessionStorage.getItem(key);
@@ -91,6 +101,7 @@ function commit(next: State) {
     );
   }
   state = next;
+  changedAt = Math.max(Date.now(), changedAt + 1);
   for (const listener of listeners) listener();
 }
 export function reset() {
@@ -98,11 +109,12 @@ export function reset() {
   sessionStorage.removeItem(key);
   storageError = "";
   state = seed();
+  changedAt = Math.max(Date.now(), changedAt + 1);
   for (const listener of listeners) listener();
 }
 export function clear() {
   // Keep the existing v1 shape, and never touch unrelated origin storage.
-  const next: State = { version: 1, notes: [], task: "skipped", result: "" };
+  const next = emptyState();
   try {
     sessionStorage.setItem(key, JSON.stringify(next));
   } catch {
@@ -110,7 +122,22 @@ export function clear() {
   }
   storageError = "";
   state = next;
+  changedAt = Math.max(Date.now(), changedAt + 1);
   for (const listener of listeners) listener();
+}
+export const mode = (): DemoMode =>
+  state.task === "proposed" ? "pending" : state.notes.length ? "data" : "new";
+const hasSamples = () => state.notes.some((note) => note.file === "inbox/notes/sample.md");
+export function selectMode(next: DemoMode) {
+  if (next === "new") return clear();
+  if (!hasSamples() && state.notes.length >= 500)
+    throw new Error("演示记录已满，请重置后继续。 / Demo is full. Reset to continue.");
+  commit({
+    ...state,
+    notes: hasSamples() ? state.notes : [...state.notes, ...seed().notes],
+    task: next === "pending" ? "proposed" : "open",
+    result: "",
+  });
 }
 export async function capture(text: string) {
   const trimmed = text.trim();
@@ -137,10 +164,90 @@ export function dismiss() {
   if (state.task !== "proposed") throw new Error("这条建议已处理。 / Suggestion already handled.");
   commit({ ...state, task: "skipped" });
 }
-export function complete(result: string) {
+export function complete(result = state.notes[0]?.text ?? "") {
   if (state.task !== "open" || !result.trim())
     throw new Error("先采纳下一步，并记一句示例结果。 / Adopt the step and add a sample result first.");
   commit({ ...state, task: "done", result });
+}
+function dayAgo(days: number) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+export async function projects(): Promise<DoingProject[]> {
+  if (!hasSamples()) return [];
+  return [
+    {
+      slug: "sample-project",
+      title: "业余项目",
+      stage: "active",
+      kind: "personal",
+      links: [],
+      recentLog: { date: dayAgo(1), text: "整理了三位朋友提到的问题。" },
+      recent7: { words: null, commits: null, daily: [] },
+      next: [],
+      completion: null,
+      github: null,
+    },
+  ];
+}
+function metrics(): OverviewMetric[] {
+  if (!hasSamples()) return [];
+  const workouts = [5, 3, 1].map((days) => ({
+    id: `sample-workout-${days}`,
+    ts: `${dayAgo(days)}T18:00:00Z`,
+    exercise: "深蹲",
+    sets: 3,
+    reps: 12,
+    weight_kg: 40,
+  }));
+  const sleeps = [3, 2, 1].map((days) => ({
+    id: `sample-sleep-${days}`,
+    end: `${dayAgo(days)}T07:00:00Z`,
+    duration_min: 420,
+  }));
+  const meals = [3, 2, 1].flatMap((days) => [
+    {
+      id: `sample-meal-${days}-lunch`,
+      ts: `${dayAgo(days)}T12:00:00Z`,
+      meal: "午餐",
+      protein_g: 40,
+      uncertainty: 0.2,
+    },
+    {
+      id: `sample-meal-${days}-dinner`,
+      ts: `${dayAgo(days)}T18:00:00Z`,
+      meal: "晚餐",
+      protein_g: 35,
+      uncertainty: 0.2,
+    },
+  ]);
+  return [
+    {
+      key: "workouts",
+      label: "训练",
+      unit: "次",
+      value: workouts.length,
+      rows: workouts,
+      type: "workout",
+      estimated: false,
+    },
+    { key: "sleep", label: "睡眠", unit: "小时", value: 7, rows: sleeps, type: "sleep", estimated: false },
+    { key: "protein", label: "蛋白质", unit: "克", value: 75, rows: meals, type: "meal", estimated: true },
+  ].map(({ rows, type, ...metric }) => ({
+    ...metric,
+    from: dayAgo(6),
+    to: dayAgo(0),
+    days: 3,
+    cutoff: new Date(changedAt).toISOString(),
+    latest: dayAgo(1),
+    sources: rows.map((row) => ({
+      file: `health/data/${type}/${("ts" in row ? row.ts : row.end).slice(0, 7)}.jsonl`,
+      text: JSON.stringify(row),
+    })),
+    daily: [],
+    target: null,
+  }));
 }
 export function overview(): OverviewData {
   const next: OverviewNext[] =
@@ -161,28 +268,30 @@ export function overview(): OverviewData {
     root: "browser-demo",
     timeZone: "UTC",
     today: new Date().toISOString().slice(0, 10),
-    cutoff: "",
+    cutoff: new Date(changedAt).toISOString(),
     drive: false,
-    empty: false,
+    empty: state.notes.length === 0,
     sections: [],
     blocks: [],
     next,
     allNext: next,
     proposedTasks: state.task === "proposed" ? [{ id: "sample-interview", title: taskTitle }] : [],
     plans: {
-      goals: [
-        {
-          id: "sample-project",
-          title: goalTitle,
-          area: null,
-          origin: null,
-          next: next[0] ? { id: next[0].id, title: taskTitle, due: null, rev: 1 } : null,
-          results: state.task === "done" ? 1 : 0,
-          lastResult: state.result || null,
-        },
-      ],
-      projects: 0,
-      directions: 1,
+      goals: hasSamples()
+        ? [
+            {
+              id: "sample-project",
+              title: goalTitle,
+              area: null,
+              origin: null,
+              next: next[0] ? { id: next[0].id, title: taskTitle, due: null, rev: 1 } : null,
+              results: state.task === "done" ? 1 : 0,
+              lastResult: state.result || null,
+            },
+          ]
+        : [],
+      projects: hasSamples() ? 1 : 0,
+      directions: hasSamples() ? 1 : 0,
       sources: {},
     },
     sync: {
@@ -197,7 +306,7 @@ export function overview(): OverviewData {
     versions: [],
     daily: null,
     projects: [],
-    metrics: [],
+    metrics: metrics(),
     pending: 0,
     inboxNotes: state.notes.length,
     notes: [],
