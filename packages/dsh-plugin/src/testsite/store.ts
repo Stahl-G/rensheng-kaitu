@@ -1083,6 +1083,43 @@ const newsItems: NewsItem[] = articles.map(([title, source, date, url, summary, 
   via: "user",
   status: "new",
 }));
+// Official release timestamps remain UTC instants; Source displays them in the browser's time zone.
+newsItems.push(
+  {
+    id: "news-openspec-v1.15.0",
+    ts: "2026-10-24T00:50:05Z",
+    by: "user",
+    kind: "release",
+    title: "OpenSpec 1.15.0：独立安装与更新预览",
+    url: "https://github.com/Fission-AI/OpenSpec/releases/tag/v1.15.0",
+    source: "OpenSpec",
+    via: "user",
+    version: "1.15.0",
+    repo: "https://github.com/Fission-AI/OpenSpec",
+    published_at: "2026-10-24T00:50:05Z",
+    summary: "官方新增无需 Node.js 的独立安装、更新 dry-run，并加快 JSON 命令启动。",
+    relevance: { module: "projects", reason: "小林想让访谈工具的安装和更新更容易理解。" },
+    comment: "更新前先展示会改哪些文件，也适合用来检查小工具的交付体验。",
+    status: "new",
+  },
+  {
+    id: "news-claude-code-v2.1.310",
+    ts: "2026-10-23T23:39:00Z",
+    by: "user",
+    kind: "release",
+    title: "Claude Code 2.1.310：Monitor 扩展与兼容修复",
+    url: "https://github.com/anthropics/claude-code/releases/tag/v2.1.310",
+    source: "Anthropic",
+    via: "user",
+    version: "2.1.310",
+    repo: "https://github.com/anthropics/claude-code",
+    published_at: "2026-10-23T23:39:00Z",
+    summary: "官方扩展 Monitor 的运行环境，并修复兼容网关请求和 Windows hooks 的部分问题。",
+    relevance: { module: "projects", reason: "小林用 AI 协助原型开发，需要记录工具版本与复现环境。" },
+    comment: "先对照自己的工作流阅读修复项，再决定更新；不要只凭版本号判断效果。",
+    status: "new",
+  },
+);
 export async function news(): Promise<NewsData> {
   return {
     date: dayAgo(0),
