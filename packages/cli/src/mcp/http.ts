@@ -109,6 +109,7 @@ export async function startMcpHttp(ws: Workspace, options: { port?: number; tool
       await new Promise<void>((resolve, reject) =>
         http.close((error) => (error ? reject(error) : resolve())),
       );
+      await write(async () => {});
     },
   };
 }

@@ -254,9 +254,14 @@ export async function pendingWorkspaceFiles(ws: Workspace): Promise<string[]> {
 
 const deferred = new WeakMap<Workspace, (message: string) => void>();
 
-/** 界面进程里存版本交给后台：写入后立刻返回，版本稍后补存。 */
-export function deferSnapshots(ws: Workspace, schedule: (message: string) => void): void {
+/** 常驻进程里存版本交给后台；返回的函数恢复此前的调度。 */
+export function deferSnapshots(ws: Workspace, schedule: (message: string) => void): () => void {
+  const previous = deferred.get(ws);
   deferred.set(ws, schedule);
+  return () => {
+    if (previous) deferred.set(ws, previous);
+    else deferred.delete(ws);
+  };
 }
 
 /** 把工作区当前状态记为一个版本；没有改动时返回 null。 */

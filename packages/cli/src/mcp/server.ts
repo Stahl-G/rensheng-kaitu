@@ -9,6 +9,7 @@ import {
   cancelOnboardingPreview,
   completeTask,
   confirmOnboardingMemory,
+  deferSnapshots,
   dismissNews,
   explorationCommandSchema,
   inboxNoteDone,
@@ -25,6 +26,7 @@ import {
   memoryType,
   onboardingContent,
   onboardingStatus,
+  pendingWorkspaceFiles,
   pick,
   previewOnboardingMemory,
   projectGithub,
@@ -47,6 +49,7 @@ import {
   searchChats,
   searchMemories,
   snapshot,
+  snapshotNow,
   startLearning,
   startLearningSchema,
   syncProject,
@@ -65,9 +68,10 @@ export type ToolSet = "remote" | "all";
 type Operation = () => Promise<unknown>;
 export function writeQueue() {
   let queue: Promise<unknown> = Promise.resolve();
-  return (operation: Operation): Promise<unknown> => {
+  return (operation: Operation, after?: () => Promise<void>): Promise<unknown> => {
     const next = queue.then(operation);
-    queue = next.catch(() => {});
+    // 回执只等文件写完；后台版本仍先于后续写入，保留每批撤销的边界。
+    queue = next.then(() => after?.()).catch(() => {});
     return next;
   };
 }
@@ -78,7 +82,12 @@ export function createMcpServer(
   write = writeQueue(),
   connection: AgentConnectionId = tools === "remote" ? "remote-mcp" : "local-mcp",
 ) {
-  const server = new McpServer({ name: "kaitu", version: "0.0.0" });
+  const server = new McpServer({ name: "kaitu", version: "0.0.0" }, { capabilities: { logging: {} } });
+  const close = server.close.bind(server);
+  server.close = async () => {
+    await close();
+    await write(async () => {});
+  };
   server.server.oninitialized = () => {
     recordOnboardingAiConnection(ws, server.server.getClientVersion()?.name ?? "MCP");
   };
@@ -150,8 +159,9 @@ export function createMcpServer(
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
-    ({ text, ai, locale }, { signal }) =>
-      wrap(async () => {
+    async ({ text, ai, locale }, { signal }) => {
+      let saved = false;
+      const response = await wrap(async () => {
         if (!server.server.getClientCapabilities()?.elicitation?.form)
           throw new Error(
             pick(
@@ -199,15 +209,50 @@ export function createMcpServer(
           if (response.action !== "accept") return { action: response.action };
           const selected = z.array(z.string()).parse(response.content?.selected);
           if (!selected.length) return { action: "cancel" };
+          const messages: string[] = [];
           // 等用户时不占写队列；到真正写入时再核对取消、预览期限与选择范围。
-          return await write(async () => {
-            signal.throwIfAborted();
-            return confirmOnboardingMemory(ws, preview.token, selected);
-          });
+          return await write(
+            async () => {
+              signal.throwIfAborted();
+              const resumeSnapshots = deferSnapshots(ws, (message) => messages.push(message));
+              try {
+                const result = await confirmOnboardingMemory(ws, preview.token, selected);
+                saved = result.entries.length > 0;
+                return result;
+              } finally {
+                resumeSnapshots();
+              }
+            },
+            async () => {
+              if (!messages.length) return;
+              // 先把回执交给客户端，再在同一写队列中保存版本。
+              await new Promise<void>((resolve) => setImmediate(resolve));
+              try {
+                const version = await snapshotNow(ws, [...new Set(messages)].join("；"));
+                if (!version && (await pendingWorkspaceFiles(ws)).length)
+                  throw new Error("Version was not saved");
+              } catch (error) {
+                const message = pick(
+                  locale,
+                  "记忆文件已保存，但版本保存失败。请检查文件夹权限，并在开图历史中核对后重试保存版本。",
+                  "The memory files were saved, but saving the version failed. Check folder permissions, then review Kaitu’s history and retry saving the version.",
+                );
+                console.error(message, error);
+                await server.sendLoggingMessage({ level: "error", data: message }).catch(() => {});
+              }
+            },
+          );
         } finally {
           cancelOnboardingPreview(ws, preview.token);
         }
-      }),
+      });
+      if (saved && !("isError" in response))
+        response.content.push({
+          type: "text",
+          text: pick(locale, "已保存，正在存版本。", "Saved. Saving the version in the background."),
+        });
+      return response;
+    },
   );
   register("status", "读取今天计划、待确认数量、模块进度与近 7 天数据，无需确认。", {}, () =>
     readStatus(ws, new Date(), connection),
