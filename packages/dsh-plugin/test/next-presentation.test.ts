@@ -8,6 +8,7 @@ import {
   nextPresentation,
   todayChoices,
   todayDate,
+  todayProjectDate,
   todayProjectFacts,
   todaySourceGroups,
 } from "../src/client/next-presentation.js";
@@ -127,6 +128,11 @@ it("训练按工作区当地日期和 session 分组，UTC 午夜两边的动作
     expect(groups).toHaveLength(metric.value ?? 0);
     const early = await readOverviewPage(ws, new Date("2026-10-25T01:00:00Z"));
     expect(todayDate(early.today, "zh-CN")).toContain("10月24日 星期六");
+    expect(todayProjectDate("2026-10-24", early.today, "zh-CN")).toBe("今天");
+    expect(todayProjectDate("2026-10-23", early.today, "zh-CN")).toBe("昨天");
+    expect(todayProjectDate("2026-10-22", early.today, "zh-CN")).toBe("2天前");
+    expect(todayProjectDate("2026-10-17", early.today, "zh-CN")).toBe("10/17");
+    expect(todayProjectDate("2025-10-24", early.today, "en")).toBe("2025-10-24");
     expect(
       todaySourceGroups(
         { ...metric, sources: [{ file: "hidden", text: "invalid" }] },
@@ -155,7 +161,7 @@ it("项目只陈述确有日期的过去日志，不把缺失日志或未来日�
   expect(JSON.stringify(items)).toBe(original);
 });
 
-it("首页项目事实来自现有项目日志接口，空日志保持无事实", async () => {
+it("首页从现有原始日志优先取人工进展，只将同步正增量作为后备，读取不改来源", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-project-fact-"));
   try {
     const ws = await initWorkspace(root);
@@ -164,6 +170,50 @@ it("首页项目事实来自现有项目日志接口，空日志保持无事实"
     ws.writeText(`projects/${slug}/log.md`, "# 项目进展\n\n## 2026-10-14\n\n从80张筛到34张。\n");
     const facts = todayProjectFacts(readProjectsPage(ws), "2026-10-24");
     expect(facts.map((p) => p.recentLog)).toEqual([{ date: "2026-10-14", text: "从80张筛到34张。" }]);
+    const file = `projects/${slug}/log.md`;
+    ws.writeText(
+      file,
+      [
+        "# 项目进展",
+        "",
+        "## 2026-10-24",
+        "",
+        "- 字数 1,212（+1,200） <!-- sync:words -->",
+        "",
+        "## 2026-10-23",
+        "",
+        "- 创建合成示例。",
+        "",
+      ].join("\n"),
+    );
+    const original = ws.readText(file);
+    expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24")[0]?.recentLog).toEqual({
+      date: "2026-10-23",
+      text: "创建合成示例。",
+    });
+    expect(ws.readText(file)).toBe(original);
+    for (const text of [
+      "字数 12（首次统计） <!-- sync:words -->",
+      "字数 12（+0） <!-- sync:words -->",
+      "字数 12（-2） <!-- sync:words -->",
+      "0 次提交： <!-- sync:commits -->",
+    ]) {
+      ws.writeText(file, `# 项目进展\n\n## 2026-10-24\n\n- ${text}\n`);
+      expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24")).toEqual([]);
+    }
+    ws.writeText(file, "# 项目进展\n\n## 2026-10-24\n\n- 字数 1,212（+1,200） <!-- sync:words -->\n");
+    expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24")[0]?.recentLog).toEqual({
+      date: "2026-10-24",
+      text: "多写了 1,200 字。",
+    });
+    ws.writeText(
+      file,
+      "# 项目进展\n\n## 2026-10-24\n\n- 2 次提交：示例一；示例二 <!-- sync:commits -->\n",
+    );
+    expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24", "en")[0]?.recentLog).toEqual({
+      date: "2026-10-24",
+      text: "Added 2 commits.",
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

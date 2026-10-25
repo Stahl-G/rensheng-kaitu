@@ -16,6 +16,7 @@ import {
   nextPresentation,
   todayChoices,
   todayDate,
+  todayProjectDate,
   todayProjectFacts,
   todaySourceGroups,
 } from "./next-presentation.js";
@@ -75,7 +76,10 @@ export function LifeHome({
       active = false;
     };
   }, [loadProjects, data.cutoff]);
-  const projectFacts = todayProjectFacts(projects?.cutoff === data.cutoff ? projects.items : [], data.today);
+  const projectFacts = useMemo(
+    () => todayProjectFacts(projects?.cutoff === data.cutoff ? projects.items : [], data.today, locale),
+    [projects, data.cutoff, data.today, locale],
+  );
   const composing = useRef(false);
   const [energy, setEnergy] = useState(60);
   const sourceRegion = useRef<HTMLElement>(null);
@@ -167,7 +171,7 @@ export function LifeHome({
     setFactSource(metric);
   };
   const valueText = (metric: OverviewMetric) =>
-    `${metric.estimated ? t("约 ", "about ") : ""}${Number(metric.value?.toFixed(1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
+    `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   const store = async (text: string, done: () => void | Promise<void>) => {
     if (savingRef.current || busy) return;
     savingRef.current = true;
@@ -217,7 +221,6 @@ export function LifeHome({
                     : t("最近，", "Recently, ")}
                 {metrics.map((metric, i) => (
                   <span key={metric.key}>
-                    {i > 0 ? t("，", ", ") : ""}
                     {metric.key === "workouts"
                       ? t("训练了", "you logged ")
                       : metric.key === "sleep"
@@ -236,9 +239,9 @@ export function LifeHome({
                     >
                       {valueText(metric)}
                     </button>
+                    {i < metrics.length - 1 ? t("，", ", ") : t("。", ".")}
                   </span>
                 ))}
-                {t("。", ".")}
               </p>
             );
           })}
@@ -248,8 +251,8 @@ export function LifeHome({
         projectFacts.map((project) => (
           <p className={todayCss.projectFact} key={project.slug}>
             {t(
-              `《${nextPresentation({ title: project.title }, locale).title}》在 `,
-              `“${project.title}” on `,
+              `「${nextPresentation({ title: project.title }, locale).title}」`,
+              `“${project.title}” made progress `,
             )}
             <button
               type="button"
@@ -260,11 +263,9 @@ export function LifeHome({
                 `${project.title}, ${project.recentLog.date}, view project log`,
               )}
             >
-              {project.recentLog.date.slice(0, 4) === data.today.slice(0, 4)
-                ? todayDate(project.recentLog.date, locale, true)
-                : project.recentLog.date}
+              {todayProjectDate(project.recentLog.date, data.today, locale)}
             </button>
-            {t(" 记下了：", " recorded: ")}
+            {t("有进展：", ": ")}
             {nextPresentation({ title: project.recentLog.text }, locale).title}
           </p>
         ))}
