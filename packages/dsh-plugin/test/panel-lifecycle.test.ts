@@ -2,6 +2,8 @@ import { Context } from "@deepseek-ai/cordis";
 import type { SessionReference } from "@deepseek-ai/dsh-api-session-controller/client";
 import type { PropsRenderSlots } from "@deepseek-ai/dsh-client-ui-slots";
 import { createElement } from "react";
+// Vitest runs in Node without a DOM. This renderer commits real hook effects and
+// unmount cleanups; react-dom/server's static output cannot exercise those lifetimes.
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { expect, test, vi } from "vitest";
 import { PluginAsk, type PluginAskServices } from "../src/client/PluginAsk.js";
