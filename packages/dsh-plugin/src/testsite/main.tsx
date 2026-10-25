@@ -42,6 +42,18 @@ const unavailable = async () => {
   );
 };
 const files = { pickDirectory: unavailable, findFiles: unavailable, openPath: unavailable };
+let entryError = "";
+const entryUrl = new URL(location.href);
+if (entryUrl.searchParams.get("state") === "pending") {
+  try {
+    store.selectMode("pending");
+    // Consume the entry preset so refreshing keeps a suggestion already handled in this tab.
+    entryUrl.searchParams.delete("state");
+    history.replaceState(null, "", entryUrl);
+  } catch (err) {
+    entryError = err instanceof Error ? err.message : String(err);
+  }
+}
 function Dialog({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -94,7 +106,7 @@ function App() {
   const [original, setOriginal] = useState<InboxEntry>();
   const [document, setDocument] = useState<string>();
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState(store.loadError());
+  const [error, setError] = useState(entryError || store.loadError());
   const [resetting, setResetting] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const data = store.overview();
