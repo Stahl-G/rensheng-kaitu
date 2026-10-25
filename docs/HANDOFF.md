@@ -1,21 +1,21 @@
 # 交接说明：人生开图（开图 Kaitu）
 
-## 10-25 隔夜交审（2026-10-25 05:45 UTC+7）
+## 10-25 交审状态（2026-10-25 13:12 UTC+7）
 
-本节是本轮状态入口；下文保留历史，不把旧“待做/已合”描述当作当前发布依据。候选冻结，不改数据格式，只用合成资料。以下未合并项须 Opus 复核及用户批准。
+本节替代本分支较早的隔夜状态；下文保留历史，不把旧“待做/已合”描述当作当前发布依据。已发布 rc.4 保持冻结。开发、交审继续；主控列出可合 PR 编号和依赖顺序，由用户一批确认。发版及部署另行批准；体验站上线由 Opus 负责。
 
-| 项目 | 状态与下一步 | 交审入口 |
+| 项目 | 当前状态与下一步 | 入口 |
 | --- | --- | --- |
-| 桌面 rc.4 | 已发布，冻结提交 42b7a26bb31f042c714dbf3c54361b0685179fc6；Mac arm64 完整包。host-2 RC 通道已验证，host-1 须手动安装；不是 Windows 安装包。 | [Release](https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.2-rc.4) |
-| iPhone 首页 v4 | #88 的日程建议改为顶部独立行，保留手机确认/拒绝；最终 head a0e7147c 的普通字号验证仍缺，不可按四组全过合并。#87 已被取代关闭。 | [#88 验证结论与缺口](https://github.com/Stahl-G/kaitu-ios/pull/88#issuecomment-6389794043) |
-| iPhone 休息态 | #89 head 33fa215 已获 Opus 复审认可；仍依赖 #88，依赖同步后需核验，不提前合。 | [#89](https://github.com/Stahl-G/kaitu-ios/pull/89) |
-| 桌面首页细节 | #239 head 021d4b3 已交审，CI 成功；中文输入法、大字号验证未完成。详细证据只在 PR，不纳入冻结 rc.4。 | [#239](https://github.com/Stahl-G/rensheng-kaitu/pull/239) |
-| iPhone 首页细节 | #90 head 0521633 已交审；完整重启、真实中文输入法、睡眠样本晚数仍有缺口，截图在线上传未完成。不得把缺口记为通过。 | [#90](https://github.com/Stahl-G/kaitu-ios/pull/90#issuecomment-6390362109) |
-| Windows / DSH 整合 | Windows 离线，未做原生验证。#228 已整合 #225–#227，后叠 #229、#233；后续从最新 main 整合时保留首页 v4，不重复套前三片。#233 写作目录仍为旧 0.3.1，需处理用户指定 0.1.2 的安装/迁移。#219/#231 工作流另审。 | [#228](https://github.com/Stahl-G/rensheng-kaitu/pull/228)、[#233](https://github.com/Stahl-G/rensheng-kaitu/pull/233)、[#231](https://github.com/Stahl-G/rensheng-kaitu/pull/231) |
-| 跨 AI 写回 | 方案阶段：先复用主动搬记忆及人工确认。现有直接写入 MCP 工具不是受限候选接口；不能承诺一个 Skill 在所有聊天产品自动实时写回。Hook 接线留后续交审，不新增 schema。 | [现有搬记忆技能](../templates/kaitu/.agents/skills/import-chatgpt-memory/SKILL.md) |
-| 公开 TestFlight | 只完成准备清单，不启用公开链接。需核 Apple 后台实际 build、是否 Internal Only、外部组、Beta Review、隐私/支持材料、符号化及通知范围。源码 B33 不证明后台可安装状态；CI 账户额度需所有者核实。 | [Apple 外测要求](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/) |
+| 桌面 rc.4 | 已发布，冻结提交 42b7a26bb31f042c714dbf3c54361b0685179fc6，Mac arm64 完整包；不是 Windows 安装包。host-2 RC 通道已验证，host-1 须手动安装。后续 main 改动没有自动进入该包。 | [Release](https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.2-rc.4) |
+| 桌面首页 / 体验站 | #239 c8916ff 与 #241 3f31a7d 经 Opus 实跑认可、用户确认后依序合并。main 62598bb52031592d0a47c636d178f3b10de75ef6 的 CI 成功。体验站复用正式 TodayPage，网站部署未由 dot 执行。 | [#239](https://github.com/Stahl-G/rensheng-kaitu/pull/239)、[#241](https://github.com/Stahl-G/rensheng-kaitu/pull/241) |
+| iPhone 首页 v4 | #88 a0e7147c 普通字号浅深补验通过；与之前最终头大字结果合起来，日程四组验证齐。产品代码未改，仍待最终审查与合并确认。#87 已关闭。 | [#88 补验](https://github.com/Stahl-G/kaitu-ios/pull/88#issuecomment-6393998569) |
+| iPhone 休息态 / 细节 | #89 33fa215 已获 Opus 认可，仍依赖 #88。#90 844f4ca 修正人工日志优先/相对日期并移除缺样本解释，已附图交审；未以展示矩阵替代完整 UI 重启或真实中文 IME 验证。 | [#89](https://github.com/Stahl-G/kaitu-ios/pull/89)、[#90](https://github.com/Stahl-G/kaitu-ios/pull/90#issuecomment-6394143942) |
+| 插件四入口整合 | #242 4d4234d 基于 62598bb 去重整合 #228 → #229 → #233，保留 v4/体验站及应用版本。CI 成功，但四入口操作、白屏、完整闭环与 Windows 原生未验；不可称已可交付。旧分片保留至整合获审。 | [#242](https://github.com/Stahl-G/rensheng-kaitu/pull/242) |
+| 升级与目录 | 写作正式 0.1.2/MIT，旧 0.3.x 不静默降级；Fortune tag v0.1.2.1 的实包版本为 0.1.3/AGPL-3.0-only；Auday 仍预发行。#219 不单独合，#231 更新基线后另审。桌面 #222/#188 与写作 #1/#3/#4 已关闭，不重复操作。 | [目录核验](https://github.com/Stahl-G/rensheng-kaitu/pull/233#issuecomment-6394137994) |
+| 跨 AI 写回 | #243 2d618f29 已实现主动 Skill → 候选预览 → 客户端表单人工确认，复用现有保存/撤销。CI 成功；真实客户端表单、Skill 自动发现与真实模型行为未验，保存耗时缺口见 PR。这不是所有聊天产品自动实时 Hook。 | [#243](https://github.com/Stahl-G/rensheng-kaitu/pull/243) |
+| 公开 TestFlight | 准备清单完成，未启用公开链接。Apple 后台 build、Internal Only、外部组、Beta Review、隐私/支持材料、符号化及通知范围仍待核实；源码 B33 不证明后台最新可安装状态。 | [Apple 外测要求](https://developer.apple.com/help/app-store-connect/test-a-beta-version/invite-external-testers/) |
 
-顺序：#88 补齐验证并交审 → #89 同步依赖；#239 / #90 各自独立审查。Windows 原生部分待连接恢复；成长模式 #127 / #131 继续暂缓。同一事项连续两次失败只停该事项，记录后转下一项，不为变绿删除有效断言、不强推、不自动合并发布。
+本轮不改数据格式、不用真实资料/照片/Key、不强推。Mac 模拟器只由单一 iOS 线使用，Windows 离线不启动其原生线。同一事项连续两次失败记录后转其他项，不让整个工作停住，也不删除有效断言。成长 #127/#131 继续暂缓。截图、日志、耗时等验收证据仅放 PR 或仓库外。
 
 
 ## 当前状态（先读这一节）
