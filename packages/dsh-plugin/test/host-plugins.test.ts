@@ -57,7 +57,7 @@ test("pending plugins cannot be installed and failed host changes remain failure
 });
 
 test.each([
-  ["0.3.0", true],
+  ["0.3.0", false],
   ["0.3.1", false],
   ["9.0.0", false],
   ["0.1.2", false],
@@ -79,7 +79,7 @@ test.each([
   );
   expect(item).toMatchObject({
     installedVersion: version,
-    version: "0.3.1",
+    version: "0.1.2",
     updateAvailable,
     license: "MIT",
     dshVersion: "0.2.1-rc.2",

@@ -95,27 +95,15 @@
       },
       "versions": [
         {
-          "version": "0.3.1",
-          "publishTimestamp": 1792245619,
+          "version": "0.1.2",
+          "publishTimestamp": 1792752117,
           "source": {
             "type": "git",
             "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
-            "commit": "5eb30e2fbc7170f5df42833d96a484b4f903c05f"
+            "commit": "b1d45539d0de56ce632a01390b895e58791cb008"
           },
           "engines": {
             "dsh": "0.2.1-rc.2"
-          }
-        },
-        {
-          "version": "0.3.0",
-          "publishTimestamp": 1792323476,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
-            "commit": "54528297d33b47cc009ee23991dad48fc707ce4b"
-          },
-          "engines": {
-            "dsh": "0.2.0-rc.2"
           }
         }
       ],

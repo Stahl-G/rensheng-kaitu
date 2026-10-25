@@ -84,6 +84,21 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
         installed: false,
       });
     }
+    const novel = "kaitu-novel-workspace";
+    mkdirSync(join(profile, "node_modules", novel), { recursive: true });
+    for (const version of ["0.3.0", "0.3.1", "0.1.2"]) {
+      writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: version } }));
+      writeFileSync(
+        join(profile, "node_modules", novel, "package.json"),
+        JSON.stringify({ name: novel, version }),
+      );
+      expect((await create().list()).find((entry: { name: string }) => entry.name === novel)).toMatchObject({
+        installedVersion: version,
+        version: "0.1.2",
+        updateAvailable: false,
+        spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#b1d45539d0de56ce632a01390b895e58791cb008",
+      });
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
