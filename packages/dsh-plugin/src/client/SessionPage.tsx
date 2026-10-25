@@ -3,12 +3,14 @@ import { useState } from "react";
 import { type FileServices, FileServicesContext } from "./DshFiles.js";
 import { OverviewPage, type OverviewPageProps } from "./OverviewPage.js";
 import { PluginAsk, type PluginAskServices } from "./PluginAsk.js";
+import type { PluginAskSession } from "./plugin-ask-session.js";
 
 type Props = Omit<OverviewPageProps, "onAgent" | "onPrompt"> & {
   onAgent: () => Promise<void>;
   onPrompt: (text: string) => Promise<void>;
   fileServices: FileServices;
   askServices: PluginAskServices;
+  askSession: PluginAskSession;
 } & PropsRenderSlots<"kaitu.ask.chat">;
 
 export function SessionPage(props: Props) {
@@ -32,6 +34,7 @@ export function SessionPage(props: Props) {
         renderAsk={(prompt, _configure, _builtin, _connections, promptRequest) => (
           <PluginAsk
             services={props.askServices}
+            session={props.askSession}
             prompt={prompt}
             promptRequest={promptRequest}
             SessionProvider={props.SessionProvider}

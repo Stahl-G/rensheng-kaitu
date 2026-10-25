@@ -25,7 +25,7 @@ import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
 import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
-import { PersonalPages, type PersonalServices, type SettingsSection } from "./PersonalPages.js";
+import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { Plugins } from "./Plugins.js";
 import { ProgressMap } from "./ProgressMap.js";
@@ -41,6 +41,7 @@ import {
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
+import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
 
 export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
@@ -51,7 +52,7 @@ export interface OverviewPageProps
     Omit<DoingPageProps, "onPrompt">,
     Omit<DirectionsPageProps, "onPrompt" | "goals" | "onConnect">,
     Omit<MapPageProps, "onPrompt">,
-    Omit<HealthPageProps, "onPrompt">,
+    Omit<HealthPageProps, "onPrompt" | "selectedTab" | "onSelectTab">,
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
     LibraryProps {
@@ -69,6 +70,7 @@ export interface OverviewPageProps
   ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
   hosted?: boolean;
+  navigation?: PanelNavigation;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -89,7 +91,6 @@ export interface OverviewPageProps
     onSettings: (section: "ai" | "local-ai") => void,
   ) => ReactNode;
 }
-type View = "overview" | "explore" | "records" | "ask" | "profile" | "connections" | "settings";
 const modules = [
   ["calendar", "日程", "Schedule"],
   ["projects", "在做的事", "Projects"],
@@ -203,7 +204,6 @@ function Overview({
   const [calendarAdding, setCalendarAdding] = useState(false);
   const [financeImporting, setFinanceImporting] = useState(false);
   const [channelFocus, setChannelFocus] = useState(false);
-  const [connectionSection, setConnectionSection] = useState<SettingsSection>("overview");
   const [importFile, setImportFile] = useState<File | null>();
   const [importAttempt, setImportAttempt] = useState(0);
   const openFileImport = (file: File | null) => {
@@ -214,15 +214,27 @@ function Overview({
   const askPanel = useRef<HTMLDivElement>(null);
   const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
-  const [view, setView] = useState<View>(props.initialChatDraft ? "ask" : "overview");
-  const [record, setRecord] = useState("");
-  const [explore, setExplore] = useState("footprints");
+  const {
+    view,
+    setView,
+    record,
+    setRecord,
+    explore,
+    setExplore,
+    healthTab,
+    setHealthTab,
+    connectionSection,
+    setConnectionSection,
+  } = usePanelNavigation(props.navigation, !!props.initialChatDraft);
   const [openedPlugins, setOpenedPlugins] = useState<string[]>([]);
-  const pluginRemoved = useCallback((id: string) => {
-    setExplore((current) => (current === id ? "footprints" : current));
-    setOpenedPlugins((current) => current.filter((opened) => opened !== id));
-    window.dispatchEvent(new Event("kaitu:plugins-changed"));
-  }, []);
+  const pluginRemoved = useCallback(
+    (id: string) => {
+      setExplore((current) => (current === id ? "footprints" : current));
+      setOpenedPlugins((current) => current.filter((opened) => opened !== id));
+      window.dispatchEvent(new Event("kaitu:plugins-changed"));
+    },
+    [setExplore],
+  );
   useEffect(() => {
     setOpenedPlugins((current) => {
       const installed = current.filter((id) => pluginModules.some((entry) => entry.id === id));
@@ -245,7 +257,7 @@ function Overview({
             ? current
             : firstExplore,
       );
-  }, [exploreEntries, firstExplore, pluginModules]);
+  }, [exploreEntries, firstExplore, pluginModules, setExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
   const [exploreFacts, setExploreFacts] = useState<{
@@ -440,7 +452,7 @@ function Overview({
         : null;
   useEffect(() => {
     if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
-  }, [exploreStart]);
+  }, [exploreStart, setExplore]);
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -564,7 +576,7 @@ function Overview({
       document.removeEventListener("keydown", shortcut);
       window.removeEventListener("kaitu:settings", openSettings);
     };
-  }, [props.hosted, props.renderAsk]);
+  }, [props.hosted, props.renderAsk, setConnectionSection, setView]);
   const run = async (operation: () => Promise<unknown>) => {
     if (writing.current) return;
     writing.current = true;
@@ -831,7 +843,12 @@ function Overview({
   );
   const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
-    health: <HealthPage {...child} />,
+    health: (
+      <HealthPage
+        {...child}
+        {...(props.navigation ? { selectedTab: healthTab, onSelectTab: setHealthTab } : {})}
+      />
+    ),
     jobs: <JobsPage {...child} />,
     footprints: <MapPage {...child} />,
     news: (

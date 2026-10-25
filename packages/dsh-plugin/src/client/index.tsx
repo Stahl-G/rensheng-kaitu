@@ -35,6 +35,8 @@ import { type KaituSessionServices, openKaituSession } from "./agent-prompt.js";
 import { createHostPluginRequest } from "./host-plugins.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
+import { createPanelNavigation } from "./panel-navigation.js";
+import { createPluginAskSession } from "./plugin-ask-session.js";
 
 export const inject = ["slots", "remote", "layout"];
 const panel = "kaitu-overview" as MainPanelId;
@@ -139,6 +141,9 @@ export async function apply(ctx: Context) {
           return result.value;
         },
       };
+      const navigation = createPanelNavigation();
+      const askSession = createPluginAskSession(askServices);
+      ctx.effect(() => () => askSession.dispose());
       ctx.slots.inject("kaitu.ask.chat", () => ctx.slots.register({ name: "kaitu.ask.chat" }, AskChat));
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
@@ -174,6 +179,8 @@ export async function apply(ctx: Context) {
               plugins,
               pluginOpenLabel: ["管理 DSH 中的插件", "Manage plugins in DSH"] as const,
               askServices,
+              askSession,
+              navigation,
               fileServices: {
                 pickDirectory: () => ctx.get("uiWorkspace").pickDirectory(),
                 findFiles: async (query: string) => {

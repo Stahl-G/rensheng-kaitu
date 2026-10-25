@@ -48,12 +48,14 @@
     "@deepseek-ai/dsh-typert-registry": "0.2.1-rc.3",
     "@types/react": "18.3.31",
     "@types/react-dom": "^18.3.7",
+    "@types/react-test-renderer": "18.3.1",
     "clsx": "2.1.1",
     "esbuild": "0.28.2",
     "lightningcss": "1.33.0",
     "maplibre-gl": "6.11.2",
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "react-test-renderer": "18.3.1"
   },
   "exports": {
     ".": {
