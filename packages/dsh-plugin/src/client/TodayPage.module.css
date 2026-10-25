@@ -590,17 +590,23 @@
 .mirror {
   font-size: clamp(19px, 2.5vw, 25px);
   line-height: 1.9;
+  overflow-wrap: normal;
+  line-break: strict;
 }
 .factLink {
   display: inline;
   border: 0;
-  padding: 0 3px;
+  padding: 0;
+  margin: 0;
   border-radius: 3px;
   background: linear-gradient(transparent 65%, color-mix(in srgb, var(--link) 9%, transparent) 65%);
   color: inherit;
   font: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
   text-decoration: none;
-  margin-inline: 0.12em;
 }
 .restChoices {
   display: flex;

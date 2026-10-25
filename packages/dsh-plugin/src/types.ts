@@ -167,6 +167,8 @@ export interface DoingProject {
   stage: "idea" | "active" | "paused" | "done";
   kind: "work" | "learning" | "personal";
   links: { path: string; role: "manuscript" | "repo" | "folder" }[];
+  /** Already returned by readProjectsPage; retains sync markers for fact selection. */
+  log?: string;
   recentLog: { date: string; text: string } | null;
   recent7: {
     words: number | null;
