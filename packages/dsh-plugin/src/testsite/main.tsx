@@ -4,8 +4,12 @@ import { KaituMark } from "../client/Brand.js";
 import { DirectionsPage } from "../client/DirectionsPage.js";
 import { DocumentBody } from "../client/DocumentBody.js";
 import { FileServicesContext } from "../client/DshFiles.js";
+import { HandoverPanel } from "../client/Handover.js";
+import { HealthPage } from "../client/HealthPage.js";
 import { InboxPage, LibraryPage } from "../client/LibraryPage.js";
+import { MapPage } from "../client/MapPage.js";
 import { NavigationIcon } from "../client/NavigationIcon.js";
+import { NewsPage } from "../client/NewsPage.js";
 import css from "../client/Prototype.module.css";
 import { LifeHome } from "../client/TodayPage.js";
 import todayCss from "../client/TodayPage.module.css";
@@ -14,31 +18,13 @@ import type { InboxEntry } from "../types.js";
 import preview from "./preview.module.css";
 import * as store from "./store.js";
 
-const directionData = {
-  references: { projects: [], decisions: [] },
-  experiments: [],
-  checkins: [],
-  notes: [],
-  timeline: [],
-  directions: [
-    {
-      id: "sample-hangzhou",
-      ts: "2026-10-23T09:00:00Z",
-      by: "agent",
-      rev: 1,
-      title: "先去杭州短住一个周末",
-      motivation: "小林想换一种生活节奏，但还不确定是否适合搬家。",
-      hypothesis: "短住能帮助判断通勤与生活节奏是否合适。",
-      unknowns: "预算、通勤时间以及离朋友更远的影响。",
-      status: "suggested" as const,
-      favorite: false,
-    },
-  ],
+const mapOptions = {
+  offline: true,
+  workerUrl: new URL("./assets/map-worker.js", location.href.split("?")[0]).href,
 };
-const loadDirections = async () => directionData;
 const unavailable = async () => {
   throw new Error(
-    "此项需要正式 App；本预览不运行 AI、不读取文件，也不保存方向修改。 / This needs the app. No AI, file access or direction edits in this preview.",
+    "此项需要正式 App；本预览不运行 AI、不读取文件，不读取系统文件。 / This needs the app. No AI or system file access in this preview.",
   );
 };
 const files = { pickDirectory: unavailable, findFiles: unavailable, openPath: unavailable };
@@ -94,14 +80,14 @@ function App() {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const mode = store.mode();
   const [homeKey, setHomeKey] = useState(0);
-  const [panel, setPanel] = useState<"capture" | "package" | "answer" | "project" | null>(null);
+  const [panel, setPanel] = useState<"capture" | "package" | "answer" | "project" | "prompt" | null>(null);
   const [draft, setDraft] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [projectLog, setProjectLog] = useState("");
   const [view, setView] = useState("overview");
   const [query, setQuery] = useState("");
+  const [explore, setExplore] = useState("places");
   const [section, setSection] = useState("");
   const [original, setOriginal] = useState<InboxEntry>();
   const [document, setDocument] = useState<string>();
@@ -109,38 +95,38 @@ function App() {
   const [error, setError] = useState(entryError || store.loadError());
   const [resetting, setResetting] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const [systemDark, setSystemDark] = useState(() => matchMedia("(prefers-color-scheme: dark)").matches);
+  useEffect(() => {
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   const data = store.overview();
-  const candidates = [
-    ...state.notes.map((note) => ({ id: note.file, title: note.text.slice(0, 70), text: note.text })),
-    ...data.plans.goals.map((goal) => ({
-      id: goal.id,
-      title: goal.title,
-      text: [goal.title, goal.next?.title, goal.lastResult].filter(Boolean).join("\n"),
-    })),
-  ];
-  const packageText = candidates
-    .filter((item) => selected.includes(item.id))
-    .map((item) => item.text)
-    .join("\n\n");
+  const docs = store.allDocuments();
   const library = {
     inbox: state.notes,
-    notes: store.documents,
+    notes: docs,
     sections: [
       {
         id: "notes",
-        title: "笔记与决策",
-        count: store.documents.length,
-        sources: [t("示例", "Samples")],
+        title: t("笔记与资料", "Notes and documents"),
+        count: docs.length,
+        sources: ["小林"],
         latest: null,
       },
       {
         id: "inbox",
-        title: "收件箱",
+        title: t("收件箱", "Inbox"),
         count: state.notes.length,
         sources: [t("随手记", "Quick notes")],
         latest: null,
       },
     ],
+  };
+  const prompt = (text: string) => {
+    setProjectLog(text);
+    setPanel("prompt");
   };
   const explain = () => setNotice(t("这项需要正式 App。", "This needs the app."));
   async function saveDraft() {
@@ -179,7 +165,7 @@ function App() {
       <FileServicesContext.Provider value={files}>
         <div
           className={`${css.app} ${preview.app}`}
-          data-theme={theme === "system" ? undefined : theme}
+          data-theme={theme === "system" ? (systemDark ? "dark" : "light") : theme}
           lang={locale}
         >
           <header className={`${css.top} ${preview.header}`}>
@@ -310,9 +296,9 @@ function App() {
                 busy={busy}
                 start={() => setPanel("capture")}
                 save={store.capture}
-                complete={async () => store.complete()}
-                adopt={() => run(store.adopt)}
-                dismiss={() => run(store.dismiss)}
+                complete={async (item) => store.complete(undefined, item.id)}
+                adopt={(id) => run(() => store.adopt(id))}
+                dismiss={(id) => run(() => store.dismiss(id))}
                 loadLibrary={store.library}
                 loadProjects={store.projects}
                 openProject={(slug) => {
@@ -336,10 +322,7 @@ function App() {
                 }}
                 addNext={explain}
                 memory={() => setPanel("capture")}
-                handover={() => {
-                  setSelected([]);
-                  setPanel("package");
-                }}
+                handover={() => navigate("package")}
               />
             )}
             {view === "records" && (
@@ -372,13 +355,11 @@ function App() {
                   />
                 ) : document ? (
                   <article className={`${css.card} ${css.sum}`}>
-                    <DocumentBody
-                      content={store.documents.find((note) => note.file === document)?.body ?? ""}
-                    />
+                    <DocumentBody content={docs.find((note) => note.file === document)?.body ?? ""} />
                   </article>
                 ) : section === "notes" ? (
                   <section className={css.sec}>
-                    {store.documents.map((note) => (
+                    {docs.map((note) => (
                       <button
                         type="button"
                         className={css.btn}
@@ -402,40 +383,92 @@ function App() {
                       setSection("inbox");
                     }}
                     onOpenNote={setDocument}
-                    onOpenGoal={() => navigate("overview")}
+                    onOpenGoal={() => setDocument("me/goals.md")}
                   />
                 )}
               </>
             )}
+            {view === "package" && (
+              <HandoverPanel
+                loadHandover={store.handover}
+                initialIncludeFinance={false}
+                onAnswer={async (answer) => {
+                  setDraft(answer);
+                  setReviewing(true);
+                  setPanel("answer");
+                }}
+              />
+            )}
             {view === "explore" && (
               <>
                 <nav className={css.subtabs} aria-label={t("开图里的内容", "Explore sections")}>
-                  <button type="button" disabled>
-                    {t("足迹", "Places")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigate("overview");
-                      setNotice(t("点健康数字可看来源记录。", "Select a health number to read its sources."));
-                    }}
-                  >
-                    {t("健康", "Health")}
-                  </button>
-                  <button type="button" disabled>
-                    {t("资讯", "News")}
-                  </button>
-                  <button type="button" aria-pressed="true">
-                    {t("方向", "Directions")}
-                  </button>
+                  {[
+                    ["places", t("足迹", "Places")],
+                    ["health", t("健康", "Health")],
+                    ["news", t("资讯", "News")],
+                    ["directions", t("方向", "Directions")],
+                  ].map(([id, title]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={explore === id}
+                      onClick={() => setExplore(id ?? "places")}
+                    >
+                      {title}
+                    </button>
+                  ))}
                 </nav>
-                <DirectionsPage
-                  loadExploration={loadDirections}
-                  writeExploration={unavailable}
-                  loadExplorationSource={unavailable}
-                  onPrompt={explain}
-                  onConnect={explain}
-                />
+                {explore === "places" && (
+                  <MapPage
+                    mapOptions={mapOptions}
+                    loadLifeMap={store.lifeMap}
+                    loadExperienceSource={store.experienceSource}
+                    subscribe={store.subscribe}
+                    hometownCities={store.hometownCities}
+                    saveHometown={store.saveHometown}
+                    editExperience={store.editExperience}
+                    hideExperience={store.hideExperience}
+                    unhideExperience={store.unhideExperience}
+                    resolveExperience={unavailable}
+                    onPrompt={prompt}
+                    loadExperienceImports={store.experienceImports}
+                    previewExperienceBatch={unavailable}
+                    setExperienceSource={unavailable}
+                    changeExperienceBatch={unavailable}
+                    recoverExperienceImports={unavailable}
+                  />
+                )}
+                {explore === "health" && (
+                  <HealthPage
+                    loadHealth={store.loadHealth}
+                    loadHealthPhoto={unavailable}
+                    subscribe={store.subscribe}
+                    onPrompt={prompt}
+                    adoptTask={async () => store.adopt()}
+                    cancelTask={async () => store.dismiss()}
+                  />
+                )}
+                {explore === "news" && (
+                  <NewsPage
+                    showEarlierDetails
+                    loadNews={store.news}
+                    subscribe={store.subscribe}
+                    tryNews={store.tryNews}
+                    dismissNews={store.dismissNews}
+                    feedbackNews={store.feedbackNews}
+                    saveNewsKeywords={store.saveNewsKeywords}
+                    onPrompt={prompt}
+                  />
+                )}
+                {explore === "directions" && (
+                  <DirectionsPage
+                    loadExploration={store.exploration}
+                    writeExploration={store.writeExploration}
+                    loadExplorationSource={store.explorationSource}
+                    subscribe={store.subscribe}
+                    onPrompt={prompt}
+                  />
+                )}
               </>
             )}
           </main>
@@ -448,13 +481,15 @@ function App() {
                     ? t("选择要带的内容", "Choose what to bring")
                     : panel === "answer"
                       ? t("贴回回答", "Paste answer")
-                      : t("项目进展原文", "Project log")
+                      : panel === "prompt"
+                        ? t("AI 提示词", "AI prompt")
+                        : t("项目进展原文", "Project log")
               }
               close={() => {
                 if (!busy) setPanel(null);
               }}
             >
-              {panel === "project" && <DocumentBody content={projectLog} />}
+              {(panel === "project" || panel === "prompt") && <DocumentBody content={projectLog} />}
               {(panel === "capture" || panel === "answer") && (
                 <form
                   onSubmit={(event) => {
@@ -489,63 +524,6 @@ function App() {
                     )}
                   </div>
                 </form>
-              )}
-              {panel === "package" && (
-                <>
-                  <div className={preview.choices}>
-                    {candidates.map((item) => (
-                      <label key={item.id}>
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(item.id)}
-                          onChange={(event) =>
-                            setSelected(
-                              event.target.checked
-                                ? [...selected, item.id]
-                                : selected.filter((id) => id !== item.id),
-                            )
-                          }
-                        />
-                        <span>{item.title}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <label htmlFor="package-preview">{t("将复制的内容", "To be copied")}</label>
-                  <textarea id="package-preview" rows={6} value={packageText} readOnly />
-                  <div className={preview.tools}>
-                    <button
-                      type="button"
-                      className={css.btn}
-                      disabled={!packageText}
-                      onClick={() => {
-                        void navigator.clipboard
-                          .writeText(packageText)
-                          .then(() => setNotice(t("已复制", "Copied")))
-                          .catch(() =>
-                            setError(
-                              t(
-                                "复制失败，可以手动选中上面的内容。",
-                                "Couldn't copy. Select the text above instead.",
-                              ),
-                            ),
-                          );
-                      }}
-                    >
-                      {t("复制所选内容", "Copy selected content")}
-                    </button>
-                    <button
-                      type="button"
-                      className={css.link}
-                      onClick={() => {
-                        setDraft("");
-                        setReviewing(false);
-                        setPanel("answer");
-                      }}
-                    >
-                      {t("贴回回答", "Paste answer")}
-                    </button>
-                  </div>
-                </>
               )}
               {notice && <output aria-live="polite">{notice}</output>}
               {error && <p role="alert">{error}</p>}

@@ -27,9 +27,12 @@ async function copyText(text: string, fallback: HTMLTextAreaElement | null) {
 export function HandoverPanel({
   loadHandover,
   onAnswer,
+  initialIncludeFinance,
 }: {
   loadHandover: (locale?: Locale, includeFinance?: boolean) => Promise<HandoverPack>;
   onAnswer: (answer: string) => Promise<void>;
+  /** Browser demos may preload a synthetic pack; normal products still ask first. */
+  initialIncludeFinance?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -42,7 +45,7 @@ export function HandoverPanel({
   const [error, setError] = useState("");
   const [area, setArea] = useState<HTMLTextAreaElement | null>(null);
   const [pending, setPending] = useState<{ id: string; on: boolean } | null>(null);
-  const [includeFinance, setIncludeFinance] = useState<boolean | null>(null);
+  const [includeFinance, setIncludeFinance] = useState<boolean | null>(initialIncludeFinance ?? null);
   useEffect(() => {
     if (includeFinance === null) return;
     let active = true;
