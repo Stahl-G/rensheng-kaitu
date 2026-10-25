@@ -25,6 +25,7 @@ const animate = () => (window.matchMedia("(prefers-reduced-motion: reduce)").mat
 
 type City = { id: string; place: Place; experiences: Experience[] };
 export function PaperMap({
+  options,
   cities,
   cityNames = {},
   previous,
@@ -38,6 +39,7 @@ export function PaperMap({
   hometown,
   onAdd,
 }: {
+  options?: { offline: boolean; workerUrl: string };
   cities: City[];
   cityNames?: Record<string, string>;
   previous?: Place;
@@ -233,7 +235,8 @@ export function PaperMap({
     if (!container.current) return;
     const el = container.current;
     registerPaperTiles();
-    const worker = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    const worker =
+      options?.workerUrl ?? URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
     setWorkerUrl(worker);
     const themeRoot = el.closest("[data-theme]") ?? document.body;
     const color = (token: string) => getComputedStyle(el).getPropertyValue(token).trim();
@@ -275,6 +278,7 @@ export function PaperMap({
       detailTimer = setTimeout(failDetails, 8000);
     };
     const details = async () => {
+      if (options?.offline) return;
       if (!m || m.getZoom() < 5 || remoteAttempted || !m.isStyleLoaded()) return;
       if (!navigator.onLine) {
         setDetailStatus(navigator.onLine ? "unavailable" : "offline");
@@ -582,9 +586,9 @@ export function PaperMap({
       meMarker.current = null;
       map.current = null;
       m?.remove();
-      URL.revokeObjectURL(worker);
+      if (!options?.workerUrl) URL.revokeObjectURL(worker);
     };
-  }, [update]);
+  }, [update, options]);
   const cameraKey = JSON.stringify(
     mode === "now"
       ? [mode, data.me?.lng, data.me?.lat]

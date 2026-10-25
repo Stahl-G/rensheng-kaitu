@@ -83,6 +83,7 @@ test("Today demo scenarios keep sources and goal links through review, capture a
     removeItem: (key: string) => values.delete(key),
   });
   const store = await import("../src/testsite/store.js");
+  store.clear();
   expect(store.overview().empty).toBe(true);
   await store.capture("  合成原文\n保留换行  ");
   expect(store.overview().metrics).toEqual([]);
@@ -115,4 +116,71 @@ test("Today demo scenarios keep sources and goal links through review, capture a
   expect(reloaded.overview().allNext).toEqual([]);
   expect(reloaded.snapshot().notes.some((note) => note.text === "  合成原文\n保留换行  ")).toBe(true);
   expect(await reloaded.projects()).toHaveLength(1);
+});
+
+test("Xiaolin projections share recorded-day totals and keep partial weeks bounded", async () => {
+  vi.useFakeTimers();
+  try {
+    vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
+    vi.stubGlobal("sessionStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {} });
+    const store = await import("../src/testsite/store.js");
+    const overview = store.overview();
+    const health = store.healthData();
+    const workouts = overview.metrics.find((m) => m.key === "workouts");
+    const recent = health.training.recent.filter(
+      (r) => r.date >= (workouts?.from ?? "") && r.date <= overview.today,
+    );
+    expect(workouts?.value).toBe(recent.length);
+    expect(health.training.week).toBe(health.training.recent.filter((r) => r.date >= "2026-10-19").length);
+    const sleep = overview.metrics.find((m) => m.key === "sleep");
+    const nights = health.sleep.filter((r) => r.date >= (sleep?.from ?? "") && r.value !== null);
+    expect(sleep?.value).toBe(
+      Number((nights.reduce((sum, r) => sum + (r.value ?? 0), 0) / nights.length).toFixed(1)),
+    );
+    const protein = overview.metrics.find((m) => m.key === "protein");
+    const days = health.nutrition.protein.filter((r) => r.value !== null);
+    expect(protein?.value).toBe(
+      Number((days.reduce((sum, r) => sum + (r.value ?? 0), 0) / days.length).toFixed(1)),
+    );
+    const pack = await store.handover();
+    expect(
+      pack.sections
+        .find((s) => s.id === "results")
+        ?.lines.some((line) => line.includes(`${workouts?.value} 次`)),
+    ).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Xiaolin news proposals and direction changes survive session reload", async () => {
+  const values = new Map<string, string>();
+  vi.stubGlobal("sessionStorage", {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  });
+  const store = await import("../src/testsite/store.js");
+  const news = (await store.news()).picked[0];
+  if (!news) throw new Error("Missing news sample");
+  await store.tryNews(news.id);
+  expect(store.overview().proposedTasks.some((t) => t.id === news.id)).toBe(true);
+  store.adopt(news.id);
+  expect(store.overview().allNext.some((t) => t.id === news.id)).toBe(true);
+  const suggestion = (await store.exploration()).directions.find((d) => d.status === "suggested");
+  if (!suggestion) throw new Error("Missing direction sample");
+  await store.writeExploration({
+    operation: "update_direction",
+    id: suggestion.id,
+    expected_revision: suggestion.rev ?? 1,
+    data: { status: "active" },
+  });
+  await store.feedbackNews(news.id, "useful");
+  vi.resetModules();
+  const reloaded = await import("../src/testsite/store.js");
+  expect(reloaded.overview().allNext.some((t) => t.id === news.id)).toBe(true);
+  expect((await reloaded.news()).feedback[news.id]).toBe("useful");
+  expect((await reloaded.exploration()).directions.find((d) => d.id === suggestion.id)?.status).toBe(
+    "active",
+  );
 });

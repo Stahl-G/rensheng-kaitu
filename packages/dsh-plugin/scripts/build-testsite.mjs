@@ -11,6 +11,13 @@ const pkg = fileURLToPath(new URL("..", import.meta.url));
 const output = resolve(pkg, "../../dist/site-preview/testsite");
 mkdirSync(resolve(output, "assets"), { recursive: true });
 const styles = clientStyles("");
+const worker = await build({
+  entryPoints: [resolve(pkg, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs")],
+  bundle: true,
+  format: "iife",
+  minify: true,
+  write: false,
+});
 const result = await build({
   entryPoints: [resolve(pkg, "src/testsite/main.tsx")],
   outfile: resolve(output, "assets/testsite.js"),
@@ -40,12 +47,14 @@ const scriptName = `testsite.${stamp(script)}.js`;
 const styleName = `testsite.${stamp(css)}.css`;
 writeFileSync(resolve(output, "assets", scriptName), script);
 writeFileSync(resolve(output, "assets", styleName), css);
+writeFileSync(resolve(output, "assets/map-worker.js"), worker.outputFiles[0].contents);
 writeFileSync(
   resolve(output, "index.html"),
   `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<link rel="icon" href="data:,">
 <title>开图 · 浏览器示例 / Kaitu browser demo</title><link rel="stylesheet" href="./assets/${styleName}"></head>
 <body><div id="root"></div><noscript>请启用 JavaScript 查看示例。 / Enable JavaScript to view the demo.</noscript>
 <script type="module" src="./assets/${scriptName}"></script></body></html>\n`,

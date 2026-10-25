@@ -17,6 +17,7 @@ import { type Locale, useLocale, useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
+  mapOptions?: { offline: boolean; workerUrl: string };
   subscribe?: (refresh: () => void) => () => void;
   loadExperienceSource: (id: string) => Promise<import("../types.js").ExperienceSource>;
   loadLifeMap: () => Promise<LifeMapData>;
@@ -267,6 +268,7 @@ function ExperienceDetails({
 }
 
 export function MapPage({
+  mapOptions,
   subscribe,
   loadExperienceSource,
   loadLifeMap,
@@ -793,6 +795,7 @@ export function MapPage({
           )}
           <div className={css.layout} data-view={view} data-selected={!!city}>
             <PaperMap
+              options={mapOptions}
               cities={cities}
               cityNames={data.cityNames}
               previous={previousPlace}
@@ -1028,10 +1031,15 @@ export function MapPage({
           <details className={css.review}>
             <summary>{t("地图资料去向", "Map data and connections")}</summary>
             <p>
-              {t(
-                "全球底图保存在本机。拉近城市时，按视野向 OpenFreeMap 和 AWS Terrain Tiles 下载瓦片；请求包含地图区域与常规网络信息。",
-                "The global map is local. Zooming into cities downloads visible tiles from OpenFreeMap and AWS Terrain Tiles. Requests include the map area and ordinary network metadata.",
-              )}
+              {mapOptions?.offline
+                ? t(
+                    "全球底图保存在本机，放大时继续使用本地地图。",
+                    "The global map is local and stays local when zoomed in.",
+                  )
+                : t(
+                    "全球底图保存在本机。拉近城市时，按视野向 OpenFreeMap 和 AWS Terrain Tiles 下载瓦片；请求包含地图区域与常规网络信息。",
+                    "The global map is local. Zooming into cities downloads visible tiles from OpenFreeMap and AWS Terrain Tiles. Requests include the map area and ordinary network metadata.",
+                  )}
             </p>
           </details>
           {compact && details}

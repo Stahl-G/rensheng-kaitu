@@ -7,6 +7,8 @@ import { NewsRules } from "./NewsRules.js";
 import { useLocale, useT } from "./i18n.js";
 
 export interface NewsPageProps {
+  /** Curated archives can expose original dates and full cards together. */
+  showEarlierDetails?: boolean;
   loadNews: () => Promise<NewsData>;
   subscribe?: (refresh: () => void) => () => void;
   tryNews: (id: string) => Promise<NewsAction>;
@@ -319,11 +321,11 @@ export function NewsPage(props: NewsPageProps) {
               </section>
             )}
             {!!earlierItems.length && (
-              <details>
+              <details open={props.showEarlierDetails || undefined}>
                 <summary className={css.link}>
                   {t("昨日及更早", "Yesterday and earlier")} · {earlierItems.length}
                 </summary>
-                {earlierItems.map(row)}
+                {earlierItems.map(props.showEarlierDetails ? pickedCard : row)}
               </details>
             )}
           </div>
@@ -361,7 +363,7 @@ export function NewsPage(props: NewsPageProps) {
                       "Articles you save and news from connected sources appear here.",
                     )}
               </p>
-              <details>
+              <details open={props.showEarlierDetails || undefined}>
                 <summary className={css.link}>{t("来源统计", "Source counts")}</summary>
                 <dl className={css.sources}>
                   <div>
