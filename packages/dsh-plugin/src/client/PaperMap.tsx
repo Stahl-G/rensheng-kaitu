@@ -1,5 +1,6 @@
 import {
   type GeoJSONSource,
+  type GeoJSONSourceSpecification,
   Map as LibreMap,
   LngLatBounds,
   Marker,
@@ -18,6 +19,7 @@ import { useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 import dark from "./map-assets/kaitu-paper-dark.json";
 import light from "./map-assets/kaitu-paper.json";
+import countries from "./map-assets/ne_110m_countries.json";
 import { registerPaperTiles } from "./paper-tiles-protocol.js";
 import { terrainAttribution } from "./terrain-attribution.js";
 
@@ -54,7 +56,7 @@ export function PaperMap({
   onAdd: (state: FootprintState) => void;
 }) {
   const t = useT();
-  const [mode, setMode] = useState<FootprintState>("now");
+  const [mode, setMode] = useState<FootprintState>(options?.offline ? "history" : "now");
   const [ready, setReady] = useState(false);
   const [detailStatus, setDetailStatus] = useState<"loading" | "offline" | "unavailable" | null>(null);
   const [cityZoom, setCityZoom] = useState(false);
@@ -99,47 +101,60 @@ export function PaperMap({
     showRoutes,
     showAllPlaces,
   };
-  const camera = useCallback((snapshot: Pick<typeof latest.current, "mode" | "data"> = latest.current) => {
-    const m = map.current;
-    const { mode, data } = snapshot;
-    if (!m) return;
-    m.stop();
-    if (mode === "now" && coordinate(data.me))
-      m.flyTo({ center: [data.me.lng, data.me.lat], zoom: 8, duration: animate() });
-    else if (mode === "history" && data.history.length) {
-      const bounds = new LngLatBounds();
-      const anchor = data.history[0]?.lng ?? 0;
-      for (const p of data.history)
-        if (coordinate(p)) {
-          let lng = p.lng;
-          while (lng - anchor > 180) lng -= 360;
-          while (lng - anchor < -180) lng += 360;
-          bounds.extend([lng, p.lat]);
-        }
-      for (const route of data.routes.features)
-        if (route.properties.kind === "history") {
-          for (const point of route.geometry.coordinates) {
-            let lng = point[0] as number;
+  const camera = useCallback(
+    (snapshot: Pick<typeof latest.current, "mode" | "data" | "showAllPlaces"> = latest.current) => {
+      const m = map.current;
+      const { mode, data } = snapshot;
+      if (!m) return;
+      m.stop();
+      if (snapshot.showAllPlaces && data.all.some(coordinate)) {
+        const bounds = new LngLatBounds();
+        for (const place of data.all) if (coordinate(place)) bounds.extend([place.lng, place.lat]);
+        m.fitBounds(bounds, {
+          padding: { top: 180, right: 75, bottom: 100, left: 75 },
+          maxZoom: 5,
+          duration: animate(),
+        });
+        return;
+      }
+      if (mode === "now" && coordinate(data.me))
+        m.flyTo({ center: [data.me.lng, data.me.lat], zoom: 8, duration: animate() });
+      else if (mode === "history" && data.history.length) {
+        const bounds = new LngLatBounds();
+        const anchor = data.history[0]?.lng ?? 0;
+        for (const p of data.history)
+          if (coordinate(p)) {
+            let lng = p.lng;
             while (lng - anchor > 180) lng -= 360;
             while (lng - anchor < -180) lng += 360;
-            bounds.extend([lng, point[1] as number]);
+            bounds.extend([lng, p.lat]);
           }
-        }
-      const width = m.getContainer().clientWidth;
-      const height = m.getContainer().clientHeight;
-      const base = Math.min(100, width * 0.12, height * 0.15);
-      m.fitBounds(bounds, {
-        padding: {
-          top: base + Math.min(70, height * 0.12),
-          right: base,
-          bottom: base + Math.min(80, height * 0.14),
-          left: base + Math.min(80, width * 0.12),
-        },
-        maxZoom: 5,
-        duration: animate(),
-      });
-    } else m.flyTo({ center: [20, 20], zoom: 1.5, duration: animate() });
-  }, []);
+        for (const route of data.routes.features)
+          if (route.properties.kind === "history") {
+            for (const point of route.geometry.coordinates) {
+              let lng = point[0] as number;
+              while (lng - anchor > 180) lng -= 360;
+              while (lng - anchor < -180) lng += 360;
+              bounds.extend([lng, point[1] as number]);
+            }
+          }
+        const width = m.getContainer().clientWidth;
+        const height = m.getContainer().clientHeight;
+        const base = Math.min(100, width * 0.12, height * 0.15);
+        m.fitBounds(bounds, {
+          padding: {
+            top: base + Math.min(70, height * 0.12),
+            right: base,
+            bottom: base + Math.min(80, height * 0.14),
+            left: base + Math.min(80, width * 0.12),
+          },
+          maxZoom: 5,
+          duration: animate(),
+        });
+      } else m.flyTo({ center: [20, 20], zoom: 1.5, duration: animate() });
+    },
+    [],
+  );
   const update = useCallback(
     (
       m: LibreMap,
@@ -234,7 +249,7 @@ export function PaperMap({
   useEffect(() => {
     if (!container.current) return;
     const el = container.current;
-    registerPaperTiles();
+    if (!options?.offline) registerPaperTiles();
     const worker =
       options?.workerUrl ?? URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
     setWorkerUrl(worker);
@@ -387,7 +402,29 @@ export function PaperMap({
       stopDetails();
       remoteAttempted = false;
       setDetailStatus(null);
-      const style = structuredClone(isDark() ? dark : light) as StyleSpecification;
+      const style: StyleSpecification = options?.offline
+        ? {
+            version: 8,
+            sources: {
+              "paper-land": { type: "geojson", data: countries as GeoJSONSourceSpecification["data"] },
+            },
+            layers: [
+              { id: "paper-water", type: "background", paint: { "background-color": color("--map-sea") } },
+              {
+                id: "paper-land",
+                type: "fill",
+                source: "paper-land",
+                paint: { "fill-color": color("--map-land") },
+              },
+              {
+                id: "paper-borders",
+                type: "line",
+                source: "paper-land",
+                paint: { "line-color": color("--map-line"), "line-width": 0.8 },
+              },
+            ],
+          }
+        : (structuredClone(isDark() ? dark : light) as StyleSpecification);
       const relief = style.layers.find((layer) => layer.id === "paper-relief");
       if (relief?.type === "raster") relief.paint = { ...relief.paint, "raster-opacity": 1 };
       remoteLoaded = false;
@@ -590,17 +627,19 @@ export function PaperMap({
     };
   }, [update, options]);
   const cameraKey = JSON.stringify(
-    mode === "now"
-      ? [mode, data.me?.lng, data.me?.lat]
-      : mode === "history"
-        ? [
-            mode,
-            data.history.map((p) => [p.lng, p.lat]),
-            data.routes.features
-              .filter((f) => f.properties.kind === "history")
-              .map((f) => [f.geometry.coordinates[0], f.geometry.coordinates.at(-1)]),
-          ]
-        : [mode],
+    showAllPlaces
+      ? data.all.map((p) => [p.lng, p.lat])
+      : mode === "now"
+        ? [mode, data.me?.lng, data.me?.lat]
+        : mode === "history"
+          ? [
+              mode,
+              data.history.map((p) => [p.lng, p.lat]),
+              data.routes.features
+                .filter((f) => f.properties.kind === "history")
+                .map((f) => [f.geometry.coordinates[0], f.geometry.coordinates.at(-1)]),
+            ]
+          : [mode],
   );
   useEffect(() => {
     if (map.current && ready && cameraKey) camera();

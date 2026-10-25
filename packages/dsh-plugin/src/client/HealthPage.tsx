@@ -22,7 +22,7 @@ const makeAmount =
   (value: number | null, unit: string, estimated = false) =>
     value === null
       ? t("暂无记录", "No records yet")
-      : `${estimated ? t("约 ", "about ") : ""}${number(value)} ${unit}`;
+      : `${estimated ? t("约 ", "about ") : ""}${number(estimated && /^(?:克|g)(?:\s|$)/.test(unit) ? Math.round(value) : value)} ${unit}`;
 function Empty({ children }: { children: ReactNode }) {
   const t = useT();
   return (
@@ -484,8 +484,8 @@ export function HealthPage({
     [t("本周训练", "Workouts this week"), amount(training?.week ?? null, t("次", "sessions")), ruleText],
     [
       t("蛋白质", "Protein"),
-      amount(protein.value, t("g / 天", "g / day"), protein.estimated),
-      `${coverage(protein.count)}${data?.nutrition.target?.length ? t(` · 目标 ${data.nutrition.target.join("–")} g / 天`, ` · Target ${data.nutrition.target.join("–")} g / day`) : ""}`,
+      amount(protein.value, t("克 / 天", "g / day"), protein.estimated),
+      `${coverage(protein.count)}${data?.nutrition.target?.length ? t(` · 目标 ${data.nutrition.target.join("–")} 克 / 天`, ` · Target ${data.nutrition.target.join("–")} g / day`) : ""}`,
     ],
     [
       t("睡眠", "Sleep"),
@@ -953,7 +953,7 @@ export function HealthPage({
                   <Trend
                     title={t("近 7 天蛋白质", "Protein over 7 days")}
                     points={data.nutrition.protein}
-                    unit="g"
+                    unit={t("克", "g")}
                     target={data.nutrition.target}
                   />
                 </div>
@@ -989,7 +989,7 @@ export function HealthPage({
                         <span className={css.grow}>{meal.items}</span>
                         <span>
                           {amount(meal.kcal, "kcal", meal.estimated)} · {t("蛋白质", "Protein")}{" "}
-                          {amount(meal.protein, "g", meal.estimated)}
+                          {amount(meal.protein, t("克", "g"), meal.estimated)}
                         </span>
                       </article>
                     ))

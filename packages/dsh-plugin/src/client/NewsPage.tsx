@@ -44,14 +44,14 @@ function dayOf(item: NewsItem) {
 }
 
 function Source({ item }: { item: NewsItem }) {
-  const t = useT();
   const locale = useLocale();
   return (
     <span className={css.source}>
       <span className={css.initial} data-via={item.via} aria-hidden="true">
         {Array.from(item.source)[0]?.toUpperCase() ?? "?"}
       </span>
-      {item.source} · {item.via === "user" ? t("你", "You") : viaNames[item.via]}
+      {item.source}
+      {item.via === "user" ? "" : ` · ${viaNames[item.via]}`}
       {item.published_at ? ` · ${new Date(item.published_at).toLocaleDateString(locale)}` : ""}
     </span>
   );
@@ -231,7 +231,7 @@ export function NewsPage(props: NewsPageProps) {
                   timeZone: "UTC",
                 }).format(
                   new Date(`${data.date}T12:00:00Z`),
-                )} · ${t(`今日 ${todayItems.length + data.trends.length} 条`, `${todayItems.length + data.trends.length} today`)}${earlierItems.length ? t(` · 更早 ${earlierItems.length} 条已收起`, ` · ${earlierItems.length} earlier, collapsed`) : ""}`
+                )} · ${t(`今日 ${todayItems.length + data.trends.length} 条`, `${todayItems.length + data.trends.length} today`)}${earlierItems.length ? t(` · 更早 ${earlierItems.length} 条${props.showEarlierDetails ? "" : "已收起"}`, ` · ${earlierItems.length} earlier${props.showEarlierDetails ? "" : ", collapsed"}`) : ""}`
               : t("正在读取资讯…", "Loading news…")}
           </p>
         </div>

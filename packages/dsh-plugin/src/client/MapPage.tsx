@@ -297,7 +297,7 @@ export function MapPage({
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState("map");
   const [showRoutes, setShowRoutes] = useState(true);
-  const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const [showAllPlaces, setShowAllPlaces] = useState(!!mapOptions?.offline);
   const [chapterLimit, setChapterLimit] = useState(30);
   const [detailLimit, setDetailLimit] = useState(30);
   const [compact, setCompact] = useState(false);

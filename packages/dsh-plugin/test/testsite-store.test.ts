@@ -142,6 +142,10 @@ test("Xiaolin projections share recorded-day totals and keep partial weeks bound
     expect(protein?.value).toBe(
       Number((days.reduce((sum, r) => sum + (r.value ?? 0), 0) / days.length).toFixed(1)),
     );
+    const recordedSteps = health.steps.filter((p) => p.value !== null);
+    expect(recordedSteps.length).toBeGreaterThan(0);
+    expect(recordedSteps.every((p) => p.date < overview.today && (p.value ?? 0) > 0)).toBe(true);
+    expect(health.next.some((n) => n.status === "todo")).toBe(true);
     const pack = await store.handover();
     expect(
       pack.sections
