@@ -10,7 +10,8 @@ import type {
 } from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import type { PluginAskSession } from "./plugin-ask-session.js";
 
 declare module "@deepseek-ai/dsh-api-session-controller/client" {
   interface SessionReferenceSourceMap {
@@ -24,7 +25,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 }
 
 export interface PluginAskServices {
-  sessions: ISessions;
+  sessions: Pick<ISessions, "create" | "retain" | "scope">;
   workspaces: { create(input: { path: string }): Promise<{ workspaceId: string }> };
   conversation: { input: { for(scope: Context): { setDraft(text: string): void } } };
   workspacePath: () => Promise<string>;
@@ -54,41 +55,33 @@ export function AskChat({
 /** 插件版的问问：在开图工作区开一个 DSH 会话，就地显示，不跳去 DSH 的对话页。 */
 export function PluginAsk({
   services,
+  session,
   prompt,
   promptRequest = 0,
   SessionProvider,
   renderSlot,
 }: {
   services: PluginAskServices;
+  session: PluginAskSession;
   prompt: string;
   promptRequest?: number;
 } & PropsRenderSlots<"kaitu.ask.chat">) {
   const [reference, setReference] = useState<SessionReference | null>(null);
   const [error, setError] = useState("");
-  const held = useRef<SessionReference | null>(null);
   useEffect(() => {
     let alive = true;
     void (async () => {
       try {
-        const target = await services.workspaces.create({ path: await services.workspacePath() });
-        const id = await services.sessions.create({
-          workspaceId: target.workspaceId as NonNullable<Parameters<ISessions["create"]>[0]>["workspaceId"],
-        });
-        const next = services.sessions.retain(id, { source: "kaituAsk" });
-        await next.ready;
-        if (!alive) return next.release();
-        held.current = next;
-        setReference(next);
+        const next = await session.open();
+        if (alive) setReference(next);
       } catch (err) {
         if (alive) setError(err instanceof Error ? err.message : String(err));
       }
     })();
     return () => {
       alive = false;
-      held.current?.release();
-      held.current = null;
     };
-  }, [services]);
+  }, [session]);
   useEffect(() => {
     if (!reference || (!prompt && !promptRequest)) return;
     const scope = services.sessions.scope(reference.sessionId);

@@ -12,6 +12,8 @@ export interface HealthPageProps {
   onReviewMeasurement?: (id: string) => void;
   adoptTask: (id: string) => Promise<unknown>;
   cancelTask: (id: string) => Promise<unknown>;
+  selectedTab?: string;
+  onSelectTab?: (tab: string) => void;
 }
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
@@ -320,6 +322,8 @@ export function HealthPage({
   onReviewMeasurement,
   adoptTask,
   cancelTask,
+  selectedTab,
+  onSelectTab,
 }: HealthPageProps) {
   const t = useT();
   const locale = useLocale();
@@ -355,7 +359,9 @@ export function HealthPage({
     muscle_mass: t("肌肉量", "Muscle mass"),
   };
   const [data, setData] = useState<HealthData | null>(null);
-  const [tab, setTab] = useState("训练");
+  const [localTab, setLocalTab] = useState("训练");
+  const tab = selectedTab ?? localTab;
+  const setTab = onSelectTab ?? setLocalTab;
   const [showLog, setShowLog] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<{ id: string }>();
