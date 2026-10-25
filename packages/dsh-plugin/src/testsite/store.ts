@@ -130,6 +130,8 @@ export const mode = (): DemoMode =>
 const hasSamples = () => state.notes.some((note) => note.file === "inbox/notes/sample.md");
 export function selectMode(next: DemoMode) {
   if (next === "new") return clear();
+  if (!hasSamples() && state.notes.length >= 500)
+    throw new Error("演示记录已满，请重置后继续。 / Demo is full. Reset to continue.");
   commit({
     ...state,
     notes: hasSamples() ? state.notes : [...state.notes, ...seed().notes],
@@ -240,7 +242,7 @@ function metrics(): OverviewMetric[] {
     cutoff: new Date(changedAt).toISOString(),
     latest: dayAgo(1),
     sources: rows.map((row) => ({
-      file: `health/data/${type}/${dayAgo(0).slice(0, 7)}.jsonl`,
+      file: `health/data/${type}/${("ts" in row ? row.ts : row.end).slice(0, 7)}.jsonl`,
       text: JSON.stringify(row),
     })),
     daily: [],
