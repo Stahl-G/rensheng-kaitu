@@ -4,13 +4,17 @@ import { useT } from "./i18n.js";
 
 export interface PluginItem {
   name: string;
-  title: string;
-  description: string;
+  title: string | { zh?: string; en?: string };
+  description: string | { zh?: string; en?: string };
   version: string;
   spec: string;
   installed: boolean;
   installedVersion?: string;
   updateAvailable?: boolean;
+  license?: string;
+  homepage?: string;
+  dshVersion?: string;
+  removable?: boolean;
 }
 export type PluginRequest = (
   action: "list" | "install" | "remove" | "open" | "explore" | "page",
@@ -18,13 +22,22 @@ export type PluginRequest = (
 ) => Promise<unknown>;
 
 /** 开图 App 的插件：从开图插件目录安装，页面在 DSH 窗口里打开。 */
-export function Plugins({ request }: { request: PluginRequest }) {
+export function Plugins({
+  request,
+  openLabel,
+}: {
+  request: PluginRequest;
+  openLabel?: readonly [string, string];
+}) {
   const t = useT();
+  const text = (value: PluginItem["title"]) =>
+    typeof value === "string" ? value : t(value.zh ?? value.en ?? "", value.en ?? value.zh ?? "");
   const [items, setItems] = useState<PluginItem[] | null>(null);
   const [working, setWorking] = useState("");
   const [operation, setOperation] = useState("");
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [receipt, setReceipt] = useState("");
   const load = useCallback(
     async (refresh = false) => {
       try {
@@ -49,8 +62,11 @@ export function Plugins({ request }: { request: PluginRequest }) {
     setWorking(name);
     setOperation(action);
     setError("");
+    setReceipt("");
     try {
-      await request(action, input);
+      const result = (await request(action, input)) as { application?: string } | undefined;
+      if (result?.application === "restart-required")
+        setReceipt(t("重启 DSH 后生效。", "Restart DSH to apply this change."));
       if (action !== "open") {
         window.dispatchEvent(new Event("kaitu:plugins-changed"));
         await load();
@@ -73,14 +89,14 @@ export function Plugins({ request }: { request: PluginRequest }) {
         >
           {refreshing ? t("正在刷新…", "Refreshing…") : t("刷新目录", "Refresh plugins")}
         </button>
-        {items?.some((item) => item.installed) && (
+        {(openLabel || items?.some((item) => item.installed)) && (
           <button
             type="button"
             className={css.link}
             disabled={!!working}
             onClick={() => void run("open", "open")}
           >
-            {t("打开插件页面", "Open plugin pages")}
+            {openLabel ? t(openLabel[0], openLabel[1]) : t("打开插件页面", "Open plugin pages")}
           </button>
         )}
       </div>
@@ -89,26 +105,53 @@ export function Plugins({ request }: { request: PluginRequest }) {
           {error}
         </p>
       )}
+      {receipt && <output>{receipt}</output>}
       {!items ? (
         !error && <p className={css.small}>{t("正在读取插件目录…", "Loading plugins…")}</p>
       ) : (
         <section className={css.card}>
           <h3>{t("开图插件", "Kaitu plugins")}</h3>
+          <p className={css.small}>
+            {t(
+              "这里列出已发布的目录版本。DSH rc.3 适配候选尚未发布，不作为更新提供。",
+              "This directory lists published versions. DSH rc.3 adaptation candidates are not yet released or offered as updates.",
+            )}
+          </p>
           <div className={css["list-card"]}>
             {items.map((item) => (
               <div className={css["switch-row"]} key={item.name}>
                 <span>
-                  <b>{item.title}</b>
-                  {(item.installed ? item.installedVersion : item.version) && (
+                  <b>{text(item.title)}</b>
+                  {item.installed && item.installedVersion && (
                     <span className={css.small}>
                       {" "}
-                      · {item.installed ? item.installedVersion : item.version}
+                      · {t(`已安装 ${item.installedVersion}`, `Installed ${item.installedVersion}`)}
                     </span>
+                  )}
+                  {(item.version || item.license || item.dshVersion) && (
+                    <>
+                      <br />
+                      <span className={css.small}>
+                        {item.version && t(`目录版本 ${item.version}`, `Catalog version ${item.version}`)}
+                        {item.license &&
+                          t(` · 目录代码许可 ${item.license}`, ` · Catalog code license ${item.license}`)}
+                        {item.dshVersion &&
+                          t(` · 声明适配 DSH ${item.dshVersion}`, ` · Declares DSH ${item.dshVersion}`)}
+                      </span>
+                    </>
+                  )}
+                  {item.homepage && (
+                    <>
+                      {" · "}
+                      <a href={item.homepage} target="_blank" rel="noreferrer">
+                        {t("项目与第三方许可", "Project and third-party licenses")}
+                      </a>
+                    </>
                   )}
                   {item.description && (
                     <>
                       <br />
-                      <span className={css.small}>{item.description}</span>
+                      <span className={css.small}>{text(item.description)}</span>
                     </>
                   )}
                 </span>
@@ -125,7 +168,9 @@ export function Plugins({ request }: { request: PluginRequest }) {
                         : t(`更新至 ${item.version}`, `Update to ${item.version}`)}
                     </button>
                   )}
-                  {!item.installed && !item.spec ? (
+                  {item.installed && item.removable === false ? (
+                    <span className={css.small}>{t("由 DSH 管理", "Managed by DSH")}</span>
+                  ) : !item.installed && !item.spec ? (
                     <span className={css.small}>{t("开发中", "In development")}</span>
                   ) : (
                     <button
