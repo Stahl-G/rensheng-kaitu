@@ -206,10 +206,7 @@ it("首页从现有原始日志优先取人工进展，只将同步正增量作�
       date: "2026-10-24",
       text: "多写了 1,200 字。",
     });
-    ws.writeText(
-      file,
-      "# 项目进展\n\n## 2026-10-24\n\n- 2 次提交：示例一；示例二 <!-- sync:commits -->\n",
-    );
+    ws.writeText(file, "# 项目进展\n\n## 2026-10-24\n\n- 2 次提交：示例一；示例二 <!-- sync:commits -->\n");
     expect(todayProjectFacts(readProjectsPage(ws), "2026-10-24", "en")[0]?.recentLog).toEqual({
       date: "2026-10-24",
       text: "Added 2 commits.",
