@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { KaituMark } from "../client/Brand.js";
 import { DirectionsPage } from "../client/DirectionsPage.js";
@@ -7,10 +7,10 @@ import { FileServicesContext } from "../client/DshFiles.js";
 import { InboxPage, LibraryPage } from "../client/LibraryPage.js";
 import { NavigationIcon } from "../client/NavigationIcon.js";
 import css from "../client/Prototype.module.css";
+import { LifeHome } from "../client/TodayPage.js";
 import todayCss from "../client/TodayPage.module.css";
 import { type Locale, LocaleContext, browserLocale } from "../client/i18n.js";
 import type { InboxEntry } from "../types.js";
-import { type DemoMode, HomeScenes } from "./HomeScenes.js";
 import preview from "./preview.module.css";
 import * as store from "./store.js";
 
@@ -42,6 +42,32 @@ const unavailable = async () => {
   );
 };
 const files = { pickDirectory: unavailable, findFiles: unavailable, openPath: unavailable };
+function Dialog({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const id = useId();
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      className={preview.dialog}
+      aria-labelledby={id}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+    >
+      <div className={preview.dialogHead}>
+        <h2 id={id}>{title}</h2>
+        <button type="button" className={css.link} onClick={close} aria-label="关闭 / Close">
+          ×
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
 function App() {
   const state = useSyncExternalStore(store.subscribe, store.snapshot);
   const [locale, setLocale] = useState<Locale>(() =>
@@ -54,11 +80,14 @@ function App() {
           : "en",
   );
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
-  const [mode, setMode] = useState<DemoMode>(() => {
-    const requested = new URLSearchParams(location.search).get("state");
-    return requested === "pending" ? "pending" : state.notes.length === 0 ? "new" : "data";
-  });
+  const mode = store.mode();
   const [homeKey, setHomeKey] = useState(0);
+  const [panel, setPanel] = useState<"capture" | "package" | "answer" | "project" | null>(null);
+  const [draft, setDraft] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [projectLog, setProjectLog] = useState("");
   const [view, setView] = useState("overview");
   const [query, setQuery] = useState("");
   const [section, setSection] = useState("");
@@ -69,6 +98,18 @@ function App() {
   const [resetting, setResetting] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
   const data = store.overview();
+  const candidates = [
+    ...state.notes.map((note) => ({ id: note.file, title: note.text.slice(0, 70), text: note.text })),
+    ...data.plans.goals.map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      text: [goal.title, goal.next?.title, goal.lastResult].filter(Boolean).join("\n"),
+    })),
+  ];
+  const packageText = candidates
+    .filter((item) => selected.includes(item.id))
+    .map((item) => item.text)
+    .join("\n\n");
   const library = {
     inbox: state.notes,
     notes: store.documents,
@@ -90,6 +131,19 @@ function App() {
     ],
   };
   const explain = () => setNotice(t("这项需要正式 App。", "This needs the app."));
+  async function saveDraft() {
+    setBusy(true);
+    try {
+      await store.capture(draft);
+      setDraft("");
+      setPanel(null);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
   function run(action: () => void) {
     try {
       action();
@@ -150,7 +204,7 @@ function App() {
             </div>
             <nav className={css.tabs} aria-label={t("主要导航", "Main navigation")}>
               {[
-                ["overview", t("首页", "Home")],
+                ["overview", t("今天", "Today")],
                 ["explore", t("开图", "Explore")],
                 ["records", t("资料", "Library")],
               ].map(([id, title]) => (
@@ -168,18 +222,13 @@ function App() {
           </header>
           <main className={`${css.content} ${todayCss.page} ${preview.main}`}>
             <div className={preview.demoBar} aria-label={t("示例状态", "Demo state")}>
-              <span>
-                {t(
-                  "示例；资料只留本标签页，刷新保留，不会上传。",
-                  "Demo; data stays in this tab, survives refresh and is never uploaded.",
-                )}
-              </span>
+              <span>{t("示例，不会上传。", "Demo. Nothing is uploaded.")}</span>
               <div className={preview.tools}>
                 {(
                   [
                     ["new", t("第一次打开", "New user")],
                     ["data", t("有资料", "With data")],
-                    ["pending", t("有待确认", "Pending review")],
+                    ["pending", t("有建议待看", "Suggestions to review")],
                   ] as const
                 ).map(([id, title]) => (
                   <button
@@ -192,8 +241,7 @@ function App() {
                         return;
                       }
                       run(() => {
-                        if (id !== "new" && !state.notes.length) store.reset();
-                        setMode(id);
+                        store.selectMode(id);
                         setHomeKey((key) => key + 1);
                         navigate("overview");
                       });
@@ -226,7 +274,6 @@ function App() {
                         store.clear();
                         setResetting(false);
                         setHomeKey((key) => key + 1);
-                        setMode("new");
                         setError("");
                         navigate("overview");
                         setNotice(t("示例已重置", "Demo reset"));
@@ -242,20 +289,45 @@ function App() {
               </section>
             )}
             {view === "overview" && (
-              <HomeScenes
+              <LifeHome
                 key={homeKey}
-                mode={mode}
-                setMode={setMode}
-                state={state}
-                t={t}
-                locale={locale}
+                data={data}
+                firstVisit={data.empty}
+                writing={false}
+                capture={null}
+                busy={busy}
+                start={() => setPanel("capture")}
+                save={store.capture}
+                complete={async () => store.complete()}
+                adopt={() => run(store.adopt)}
+                dismiss={() => run(store.dismiss)}
+                loadLibrary={store.library}
+                loadProjects={store.projects}
+                openProject={(slug) => {
+                  void store.projects().then((items) => {
+                    const project = items.find((item) => item.slug === slug);
+                    if (!project?.recentLog) return;
+                    setProjectLog(
+                      `# ${project.title}\n\n## ${project.recentLog.date}\n\n${project.recentLog.text}`,
+                    );
+                    setPanel("project");
+                  });
+                }}
+                source={(entry) => {
+                  navigate("records");
+                  setSection("inbox");
+                  setOriginal(state.notes.find((note) => note.file === entry.file));
+                }}
                 library={() => {
                   navigate("records");
                   openSection("inbox");
                 }}
-                directions={() => navigate("explore")}
-                notice={setNotice}
-                error={setError}
+                addNext={explain}
+                memory={() => setPanel("capture")}
+                handover={() => {
+                  setSelected([]);
+                  setPanel("package");
+                }}
               />
             )}
             {view === "records" && (
@@ -333,7 +405,7 @@ function App() {
                     type="button"
                     onClick={() => {
                       navigate("overview");
-                      setNotice(t("在首页点「打开健康」。", "Open Health from Home."));
+                      setNotice(t("点健康数字可看来源记录。", "Select a health number to read its sources."));
                     }}
                   >
                     {t("健康", "Health")}
@@ -355,6 +427,118 @@ function App() {
               </>
             )}
           </main>
+          {panel && (
+            <Dialog
+              title={
+                panel === "capture"
+                  ? t("随手记一句", "Quick note")
+                  : panel === "package"
+                    ? t("选择要带的内容", "Choose what to bring")
+                    : panel === "answer"
+                      ? t("贴回回答", "Paste answer")
+                      : t("项目进展原文", "Project log")
+              }
+              close={() => {
+                if (!busy) setPanel(null);
+              }}
+            >
+              {panel === "project" && <DocumentBody content={projectLog} />}
+              {(panel === "capture" || panel === "answer") && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (panel === "answer" && !reviewing) setReviewing(true);
+                    else if (!busy) void saveDraft();
+                  }}
+                >
+                  <label htmlFor="demo-draft">
+                    {panel === "answer" ? t("AI 的回答", "AI answer") : t("这一句", "Your sentence")}
+                  </label>
+                  <textarea
+                    id="demo-draft"
+                    rows={5}
+                    maxLength={4000}
+                    value={draft}
+                    readOnly={panel === "answer" && reviewing}
+                    onChange={(event) => setDraft(event.target.value)}
+                  />
+                  <div className={preview.tools}>
+                    <button type="submit" className={css.btn} disabled={busy || !draft.trim()}>
+                      {panel === "answer" && !reviewing ? t("预览", "Preview") : t("保存", "Save")}
+                    </button>
+                    {panel === "answer" && reviewing ? (
+                      <button type="button" className={css.link} onClick={() => setReviewing(false)}>
+                        {t("返回修改", "Back to edit")}
+                      </button>
+                    ) : (
+                      <button type="button" className={css.link} onClick={() => setDraft(store.sampleNote)}>
+                        {t("填入示例", "Use sample text")}
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+              {panel === "package" && (
+                <>
+                  <div className={preview.choices}>
+                    {candidates.map((item) => (
+                      <label key={item.id}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(item.id)}
+                          onChange={(event) =>
+                            setSelected(
+                              event.target.checked
+                                ? [...selected, item.id]
+                                : selected.filter((id) => id !== item.id),
+                            )
+                          }
+                        />
+                        <span>{item.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <label htmlFor="package-preview">{t("将复制的内容", "To be copied")}</label>
+                  <textarea id="package-preview" rows={6} value={packageText} readOnly />
+                  <div className={preview.tools}>
+                    <button
+                      type="button"
+                      className={css.btn}
+                      disabled={!packageText}
+                      onClick={() => {
+                        void navigator.clipboard
+                          .writeText(packageText)
+                          .then(() => setNotice(t("已复制", "Copied")))
+                          .catch(() =>
+                            setError(
+                              t(
+                                "复制失败，可以手动选中上面的内容。",
+                                "Couldn't copy. Select the text above instead.",
+                              ),
+                            ),
+                          );
+                      }}
+                    >
+                      {t("复制所选内容", "Copy selected content")}
+                    </button>
+                    <button
+                      type="button"
+                      className={css.link}
+                      onClick={() => {
+                        setDraft("");
+                        setReviewing(false);
+                        setPanel("answer");
+                      }}
+                    >
+                      {t("贴回回答", "Paste answer")}
+                    </button>
+                  </div>
+                </>
+              )}
+              {notice && <output aria-live="polite">{notice}</output>}
+              {error && <p role="alert">{error}</p>}
+            </Dialog>
+          )}
         </div>
       </FileServicesContext.Provider>
     </LocaleContext.Provider>
