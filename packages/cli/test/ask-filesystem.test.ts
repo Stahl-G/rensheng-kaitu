@@ -14,7 +14,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { FsError as BackendError } from "@deepseek-ai/dsh-fs";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
 import { addMemory, initWorkspace, parseFrontmatter, setFinanceAccess } from "@kaitu/core";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
 
@@ -74,6 +74,53 @@ test("Ask file reads reject outside paths and symlinks, including a replaced res
       code: "FS_SANDBOX_DENIED",
     });
   } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("SDK host keeps an authorized workspace alias usable for session cwd checks", async () => {
+  const temp = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-sdk-cwd-")));
+  const root = join(temp, "workspace");
+  const alias = join(temp, "selected-workspace");
+  const ctx = new Context();
+  try {
+    await initWorkspace(root);
+    symlinkSync(root, alias, process.platform === "win32" ? "junction" : "dir");
+    writeFileSync(join(root, "allowed.md"), "synthetic readable file");
+    writeFileSync(join(temp, "outside.md"), "synthetic outside file");
+    symlinkSync(join(temp, "outside.md"), join(root, "escape.md"));
+    const otherAlias = join(temp, "unselected-alias");
+    symlinkSync(root, otherAlias, process.platform === "win32" ? "junction" : "dir");
+    vi.stubEnv("KAITU_DIR", alias);
+    vi.stubEnv("KAITU_DSH_MODULES", resolve(import.meta.dirname, "../node_modules"));
+    // @ts-expect-error Desktop host is shipped as native ESM.
+    const { apply } = await import("../../desktop/sdk-host.mjs");
+    let files: LocalFileSystem | undefined;
+    await apply({
+      provide() {},
+      get() {},
+      inject() {},
+      async plugin(Files: typeof LocalFileSystem, config: { cwd: string }) {
+        files = new Files(ctx, { ...config, diffBasisMaxBytes: 1024 * 1024 });
+      },
+    });
+    if (!files) throw new Error("SDK host did not install its filesystem");
+    // DSH workingDirectory.ensure resolves the original session header cwd before any model call.
+    const cwd = await files.resolve(alias);
+    expect((await files.stat(cwd))?.type).toBe("directory");
+    expect(await files.readText(await files.resolve(join(alias, "allowed.md")))).toBe(
+      "synthetic readable file",
+    );
+    for (const path of [
+      join(temp, "outside.md"),
+      join(alias, "escape.md"),
+      join(alias, ".kaitu/secrets.json"),
+      join(otherAlias, "allowed.md"),
+    ])
+      await expect(files.resolve(path)).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
+  } finally {
+    vi.unstubAllEnvs();
+    await ctx.fiber.dispose();
     rmSync(temp, { recursive: true, force: true });
   }
 });
