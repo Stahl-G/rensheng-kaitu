@@ -10,6 +10,7 @@ import {
   agentCanRead,
   cancelOnboardingPreview,
   cancelTask,
+  captureMemory,
   completeTask,
   confirmOnboardingSetup,
   createProject,
@@ -33,12 +34,14 @@ import {
   listProjects,
   listTasks,
   logProject,
+  memoryCaptureSchema,
   memoryInput,
   memoryType,
   onboardingMatterSuggestionSchema,
   onboardingSetupSchema,
   onboardingStatus,
   parseFrontmatter,
+  pendingWorkspaceFiles,
   previewOnboardingMemory,
   previewOnboardingSetup,
   processInbox,
@@ -64,6 +67,7 @@ import {
   searchMemories,
   setProject,
   snapshot,
+  snapshotNow,
   startLearning,
   startLearningSchema,
   stringifyFrontmatter,
@@ -348,8 +352,22 @@ export function registerWorkflowTools(
     },
   );
   register(
+    "kaitu_memory_capture",
+    "自然事实、偏好、决定自动保存，不逐条确认；AI估算/建议必须标来源和不确定性。临时、引用、假设不入长期记忆。先消解实体/时间/单位/上下文，仍影响行为的冲突交conflict。更正用replaces/expected；重试复用idempotency_key；回执含回读和撤销file。",
+    z.object(memoryCaptureSchema.shape).strict(),
+    (input) =>
+      captureMemory(ws, input, {
+        scheduleVersion: (message) => {
+          void queue(async () => {
+            const version = await snapshotNow(ws, message);
+            if (!version && (await pendingWorkspaceFiles(ws)).length) throw new Error("版本尚未保存");
+          }).catch((error) => console.error("记忆文件已保存，可单条撤销；版本保存失败", error));
+        },
+      }),
+  );
+  register(
     "kaitu_memory",
-    "记忆增删查与批量导入预览。import 只预览；用户在搬记忆界面粘贴、核对后确认保存。敏感内容须用户明确要求。",
+    "记忆增删查与批量导入预览。import 只预览；用户在搬记忆界面粘贴、核对后确认保存。敏感个人内容标 sensitive；自然表达用 kaitu_memory_capture 保留分类与原话。",
     z.discriminatedUnion("operation", [
       z.object({ operation: z.literal("list") }).strict(),
       z.object({ operation: z.literal("search"), query: text }).strict(),

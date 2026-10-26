@@ -66,11 +66,11 @@ const routes = [
     match: /做.*决定|决策|拿主意|decide|decision/i,
   },
   {
-    request: "记住一件事",
-    use: "kaitu memory add --type preference --name 名称 --text 内容",
-    read: "无需先读资料",
-    done: "回执有 file 后说「已记住」",
-    skill: undefined,
+    request: "自然说出事实、偏好或决定",
+    use: "import-chatgpt-memory；memory_capture（DSH：kaitu_memory_capture）",
+    read: "相关记忆；明确纠正时读原条",
+    done: "回执含落盘回读 entry；个人档案可单条撤销",
+    skill: "import-chatgpt-memory",
     match: /记住|偏好|remember|preference/i,
   },
   {
@@ -102,11 +102,11 @@ export function workspaceAgentGuide(): string {
 USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile.md 与 memory/MEMORY.md，再取必要的非敏感、未归档记忆；不把缺失当作没有资料。
 有 reading_pack 工具或支持的 kaitu reading-pack 命令时，按当前连接权限现取近况；没有时直接读正本。共享画像不含财务，财务只经有权限的工具取得。
 没有工具时，只往 inbox/agents/ 新建唯一命名的文件。普通原文用 <agent>-<唯一时间>.note.md；改画像、目标、规则或替换记忆都写成提议，等待用户处理，不直接改正本。
-三条边界：① 不改 USER.md、生成指南或数据 JSONL；② 不把 AI 建议标成用户确认，不自行归档/替换记忆；③ 不写工作区之外、程序状态、版本库或密钥。
+三条边界：① 不改 USER.md、生成指南或数据 JSONL；② 不把 AI 建议标成用户确认，纠正记忆用自动记录入口关联原条；③ 不写工作区之外、程序状态、版本库或密钥。
 
 目录地图（只读本次需要的）：
 - me/：档案、目标、规则与确认过的阶段；NOW.md：最近计划。
-- memory/：记忆索引与条目；有 ended 的是旧事实，不当作当前画像。
+- memory/：记忆索引与条目；以索引/列表为当前状态；有 ended 或被其他活跃条目的 replaces 关联的是旧事实，不当作当前画像。
 - projects/、learning/、decisions/：项目、学习与决定的状态及日志。
 - explore/、health/、feed/：方向与足迹、健康、资讯，按模块说明取。
 - inbox/agents/：新投递；inbox/notes/：待处理原文；handoffs/：接续任务的交接。
@@ -125,9 +125,9 @@ ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${r
 ## 边界
 
 1. 只写工作区内；程序状态、版本库和密钥由程序管理。记录用专用工具写入，保留 ID 和追加修订，不直接改数据 JSONL；项目链接目录只读。
-2. 改目标/规则/长期投入、外部日历、批量导入、删除模块或超过 10 条记录、自动任务、记忆归档/替换先确认。AI 待办提议保持 proposed，不自行填 by/user、source、confirmed 或 status 绕过；用户在界面采纳后才进入今天。其他 AI 提议保持 suggested/pending，用户采纳才生效。批量导入先预览；项目可见性变更须用户明确选择，云端旧副本由用户清理。
-3. 日常记录可直接保存、可撤销；自动记忆保存后告知，用户要求暂停时停止。敏感记忆须用户明确要求并标 sensitive；归档/替换只提候选，确认前保留旧条，文件名稳定，保留原正文与来源。健康只做记录、趋势和提醒。activity 的 source_exported_at 由健康导入器保存来源导出时间，手工记录不填写或修改。
-4. 普通文档修改后校验相关路径并保存版本；对用户说版本、历史、恢复。回执有 id/file 才确认数据已保存，有版本才确认版本已保存；只有结果不确定或用户要求核对时才读回。云盘新建文件只说「已投递」，note 只保存原文，不能当餐食入账。
+2. 改目标/规则/长期投入、外部日历、批量导入、删除模块或超过 10 条记录、自动任务先确认。普通个人记忆的自动保存、明确纠正与单条可恢复撤销无需重复确认。AI 待办提议保持 proposed，不自行填 by/user、source、confirmed 或 status 绕过；用户在界面采纳后才进入今天。其他 AI 提议保持 suggested/pending，用户采纳才生效。批量导入先预览；项目可见性变更须用户明确选择，云端旧副本由用户清理。
+3. 日常个人事实、偏好、决定默认自动记录，不逐条确认；使用 memory_capture（DSH：kaitu_memory_capture），按 import-chatgpt-memory 技能保留来源、时间与原话。AI估算/建议标 origin 和 uncertainty，不升级为用户承诺；临时、引用、假设不作长期事实。纠正用 replaces/expected 追加关联原条；撤销在个人档案单条归档，保留历史。用户要求暂停时停止；敏感个人陈述自动标 sensitive，不进入共享资料包。健康只做记录、趋势和提醒。activity 的 source_exported_at 由健康导入器保存来源导出时间，手工记录不填写或修改。
+4. 普通文档修改后校验相关路径并保存版本；对用户说版本、历史、恢复。回执有 id/file 才确认数据已保存，有版本才确认版本已保存；自动记忆由写入工具回读；其他记录只有结果不确定或用户要求核对时才读回。云盘新建文件只说「已投递」，note 只保存原文，不能当餐食入账。
 5. 摘要可能不完整。CLOUD_UNAVAILABLE 表示未下载或暂不可读，不是文件不存在；说明缺口后停止读取。其他错误只用原工具重试一次，第二次失败就报告缺口，不换工具/别名/整目录扫描循环读取。写入结果未知时核对原回执或复用原幂等标识，不另建记录重试。
 6. ${AI_NETWORK_RULES}
 

@@ -5,18 +5,61 @@
   "type": "object",
   "required": ["type", "name", "text", "created", "updated"],
   "properties": {
-    "type": { "enum": ["preference", "fact", "context", "person", "decision"] },
-    "name": { "type": "string", "minLength": 1 },
-    "text": { "type": "string", "minLength": 1 },
-    "source": { "type": "string" },
-    "created": { "type": "string", "format": "date" },
-    "updated": { "type": "string", "format": "date" },
-    "sensitive": { "type": "boolean" },
-    "ended": { "type": "string", "format": "date", "description": "用户确认这条记忆不再成立的日期" },
+    "type": {
+      "enum": ["preference", "fact", "context", "person", "decision"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string"
+    },
+    "created": {
+      "type": "string",
+      "format": "date"
+    },
+    "updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "sensitive": {
+      "type": "boolean"
+    },
+    "ended": {
+      "type": "string",
+      "format": "date",
+      "description": "用户确认这条记忆不再成立的日期"
+    },
     "replaced_by": {
       "type": "string",
       "pattern": "^[^./\\\\][^/\\\\]*\\.md$",
       "description": "替换它的新记忆文件名；记忆改标题或类型也不改文件名"
+    },
+    "origin": {
+      "enum": ["user-stated", "ai-estimate", "ai-suggestion"],
+      "description": "用户陈述、AI估算或AI建议；不代表已采纳承诺"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "evidence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uncertainty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replaces": {
+      "type": "string",
+      "pattern": "^[^./\\\\][^/\\\\]*\\.md$",
+      "description": "更正关联；保留原条目，撤销新条目后恢复旧条目"
     }
   }
 }

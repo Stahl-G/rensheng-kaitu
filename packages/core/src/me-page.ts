@@ -1,7 +1,12 @@
 import { readAvatar } from "./avatar.js";
 import { committedExperiences } from "./experience-imports.js";
 import { parseFrontmatter } from "./frontmatter.js";
-import { type MemoryReplacement, listMemories, pendingMemoryReplacements } from "./memory.js";
+import {
+  type MemoryInput,
+  type MemoryReplacement,
+  listMemories,
+  pendingMemoryReplacements,
+} from "./memory.js";
 import type { Workspace } from "./workspace.js";
 export interface MeGoal {
   id: string;
@@ -28,7 +33,7 @@ export interface MeData {
   avatar: string | null;
   goals: MeGoal[];
   rules: MeRules;
-  memories: {
+  memories: (Pick<MemoryInput, "origin" | "observed_at" | "evidence" | "uncertainty" | "replaces"> & {
     file: string;
     name: string;
     type: "preference" | "fact" | "context" | "person" | "decision";
@@ -37,7 +42,7 @@ export interface MeData {
     sensitive: boolean;
     ended?: string;
     replaced_by?: string;
-  }[];
+  })[];
   archivedMemories: MeData["memories"];
   memoryReplacements: MemoryReplacement[];
   /** 读书和工作经历，按开始时间从近到远；简历就是这份列表。 */
@@ -54,7 +59,26 @@ export interface MeData {
 
 export function readMe(ws: Workspace): MeData {
   const memories = listMemories(ws, { includeArchived: true }).map(
-    ({ file, name, type, text, source, sensitive, ended, replaced_by }) => ({
+    ({
+      file,
+      name,
+      type,
+      text,
+      source,
+      sensitive,
+      ended,
+      replaced_by,
+      origin,
+      observed_at,
+      evidence,
+      uncertainty,
+      replaces,
+    }) => ({
+      origin,
+      observed_at,
+      evidence,
+      uncertainty,
+      replaces,
       file,
       name,
       type,

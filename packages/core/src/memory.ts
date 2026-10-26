@@ -1,5 +1,7 @@
-import { readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { linkSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
+import { z } from "zod";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { invalidateHistoryFile, snapshot } from "./history.js";
@@ -17,6 +19,11 @@ export interface MemoryInput {
   text: string;
   source?: string;
   sensitive?: boolean;
+  origin?: "user-stated" | "ai-estimate" | "ai-suggestion";
+  observed_at?: string;
+  evidence?: string;
+  uncertainty?: string;
+  replaces?: string;
 }
 
 export type MemoryPatch = Partial<Pick<MemoryInput, "name" | "text" | "type" | "sensitive">>;
@@ -208,6 +215,7 @@ function availableFile(ws: Workspace, type: MemoryType, name: string): string {
 /** 校验和读取用同一份补齐后的记忆：没有 frontmatter 的普通 Markdown 也算合法记忆。 */
 export function normalizedMemory(ws: Workspace, file: string): Memory | undefined {
   const path = memoryPath(file);
+  if (!ws.exists(path)) return undefined;
   const text = ws.scanText(path);
   if (text === undefined) return undefined;
   return looseMemory(file, text, localDate(statSync(ws.resolve(path)).mtime, ws.timeZone()));
@@ -229,7 +237,7 @@ function readMemory(ws: Workspace, file: string): { data: Memory; body: string }
 export function listMemories(ws: Workspace, options: { includeArchived?: boolean } = {}): MemoryEntry[] {
   if (!ws.exists("memory")) return [];
   const order = Object.keys(TYPES);
-  return readdirSync(ws.resolve("memory"))
+  const entries = readdirSync(ws.resolve("memory"))
     .filter((file) => file.endsWith(".md") && file !== "MEMORY.md" && !file.startsWith("."))
     .flatMap((file) => {
       // 同步冲突副本不是记忆，先跳过，免得一份副本让全部记忆读不出来。
@@ -239,7 +247,7 @@ export function listMemories(ws: Workspace, options: { includeArchived?: boolean
       const data = ws.scanParsed(path, "memory", (text) =>
         looseMemory(file, text, localDate(statSync(ws.resolve(path)).mtime, ws.timeZone())),
       );
-      return data && (options.includeArchived || !data.ended) ? [{ ...data, file }] : [];
+      return data ? [{ ...data, file }] : [];
     })
     .sort(
       (a, b) =>
@@ -247,6 +255,25 @@ export function listMemories(ws: Workspace, options: { includeArchived?: boolean
         String(b.updated).localeCompare(String(a.updated)) ||
         a.file.localeCompare(b.file),
     );
+  // A correction is one atomic new file. Originals remain intact; undoing it revives the predecessor.
+  const superseded = new Map<string, MemoryEntry>();
+  const byFile = new Map(entries.map((entry) => [entry.file, entry]));
+  for (const entry of entries.filter((item) => !item.ended)) {
+    let previous = entry.replaces;
+    const visited = new Set<string>();
+    while (previous && !visited.has(previous)) {
+      visited.add(previous);
+      superseded.set(previous, entry);
+      previous = byFile.get(previous)?.replaces;
+    }
+  }
+  return entries.flatMap((entry) => {
+    const replacement = superseded.get(entry.file);
+    if (!replacement) return options.includeArchived || !entry.ended ? [entry] : [];
+    return options.includeArchived
+      ? [{ ...entry, ended: replacement.created, replaced_by: replacement.file }]
+      : [];
+  });
 }
 
 export function searchMemories(ws: Workspace, query: string): MemoryEntry[] {
@@ -256,14 +283,16 @@ export function searchMemories(ws: Workspace, query: string): MemoryEntry[] {
   );
 }
 
-function rewriteIndex(ws: Workspace): void {
-  const lines = listMemories(ws).map((m) => {
+function rewriteIndex(ws: Workspace): MemoryEntry[] {
+  const entries = listMemories(ws);
+  const lines = entries.map((m) => {
     const name = m.name.replace(/\s+/g, " ").trim();
     const text = m.text.replace(/\s+/g, " ").trim();
     const summary = text.match(/^.*?(?:[。！？]|[.!?](?=\s|$)|$)/u)?.[0]?.trim() || text;
     return `- [${TYPES[m.type]}] ${name} —— ${summary}（${m.file}）`;
   });
   ws.writeText("memory/MEMORY.md", lines.length ? `${lines.join("\n")}\n` : "");
+  return entries;
 }
 
 export async function addMemory(
@@ -290,6 +319,8 @@ export async function updateMemory(
   opts: MemoryOptions = {},
 ): Promise<MemoryEntry> {
   const current = readMemory(ws, file);
+  if (current.data.origin)
+    throw new KaituError("自动记录的更正须追加关联原条，请用 memory_capture 或个人档案替换", "CONFLICT");
   ws.assertDownloaded("memory");
   const now = opts.now ?? new Date();
   // 只改交来的字段：没写的（undefined）保留原值，不把类型等必填项清空。
@@ -338,6 +369,24 @@ export async function replaceMemory(
   const date = localDate(opts.now ?? new Date(), ws.timeZone());
   // 和普通 Agent 写入一样，只接受候选内容，不能夹带归档字段。
   const candidate = memoryInput(input as unknown as Record<string, unknown>);
+  if (current.data.origin) {
+    const key = `profile-correction:${file}:${createHash("sha256").update(JSON.stringify(candidate)).digest("hex")}`;
+    const previous = normalizedMemory(ws, captureFile(key));
+    const result = await captureMemory(ws, {
+      ...candidate,
+      source: candidate.source ?? current.data.source ?? "个人档案 / Profile",
+      idempotency_key: key,
+      scope: "personal",
+      origin: "user-stated",
+      evidence: candidate.text,
+      observed_at: previous?.observed_at ?? isoInZone(opts.now ?? new Date(), ws.timeZone()),
+      replaces: file,
+      expected: opts.expected,
+    });
+    if (!result.entry) throw new KaituError("更正尚未保存", "CONFLICT");
+    return result.entry;
+  }
+
   const data: Memory = {
     ...candidate,
     // A replacement cannot silently make an existing private memory readable to agents.
@@ -429,4 +478,127 @@ export function importMemoryFile(
   opts: MemoryOptions & { dryRun?: boolean } = {},
 ) {
   return importMemories(ws, JSON.parse(readFileSync(file, "utf8")), opts);
+}
+
+function captureFile(key: string): string {
+  return `context_capture-${createHash("sha256").update(key).digest("hex")}.md`;
+}
+
+/** One observation per call: no review queue and no multi-file transaction to recover. */
+export const memoryCaptureSchema = z
+  .object({
+    idempotency_key: z.string().min(1).max(300),
+    type: z.enum(["preference", "fact", "context", "person", "decision"]),
+    name: z.string().min(1).max(300),
+    text: z.string().min(1).max(20000),
+    source: z.string().min(1).max(1000),
+    origin: z.enum(["user-stated", "ai-estimate", "ai-suggestion"]),
+    observed_at: z.iso.datetime({ offset: true }),
+    evidence: z.string().min(1).max(20000),
+    uncertainty: z.string().min(1).max(2000).optional(),
+    sensitive: z.boolean().optional(),
+    scope: z.enum(["personal", "temporary", "quoted", "hypothetical"]),
+    conflict: z.string().min(1).optional(),
+    replaces: z.string().optional(),
+    expected: z
+      .object({
+        type: z.enum(["preference", "fact", "context", "person", "decision"]),
+        name: z.string(),
+        text: z.string(),
+        source: z.string().nullable(),
+        sensitive: z.boolean(),
+      })
+      .optional(),
+  })
+  .strict();
+
+export async function captureMemory(
+  ws: Workspace,
+  raw: z.input<typeof memoryCaptureSchema>,
+  options: { scheduleVersion?: (message: string) => void } = {},
+) {
+  const input = memoryCaptureSchema.parse(raw);
+  if (input.scope !== "personal") return { status: "skipped", reason: input.scope };
+  if (input.conflict) return { status: "needs-clarification", reason: input.conflict };
+  if (input.origin !== "user-stated" && !input.uncertainty)
+    throw new KaituError("AI 估算或建议须注明不确定性", "INVALID_MEMORY");
+  const { idempotency_key, scope, conflict, expected, ...observation } = input;
+  const file = captureFile(idempotency_key);
+  const path = memoryPath(file);
+  const label =
+    input.origin === "ai-estimate"
+      ? "[AI 估算 / AI estimate · 未核实] "
+      : input.origin === "ai-suggestion"
+        ? "[AI 建议 / AI suggestion · 尚未采纳] "
+        : "";
+  const candidate = {
+    ...observation,
+    type: input.origin === "user-stated" ? input.type : ("context" as const),
+    text: `${label}${input.text}${input.origin !== "user-stated" ? `（不确定性 / Uncertainty: ${input.uncertainty}）` : ""}`,
+    sensitive: input.sensitive ?? false,
+  };
+  ws.assertDownloaded("memory");
+  if (input.replaces) {
+    const original = normalizedMemory(ws, input.replaces);
+    candidate.sensitive ||= !!original?.sensitive;
+  }
+  let previous = normalizedMemory(ws, file);
+  if (previous) {
+    for (const [key, value] of Object.entries(candidate))
+      if (previous[key as keyof Memory] !== value)
+        throw new KaituError("同一幂等标识已有不同内容，未覆盖", "CONFLICT");
+  } else {
+    if (input.replaces) {
+      const old = listMemories(ws).find((item) => item.file === input.replaces);
+      if (!old || !expected) throw new KaituError("更正对象已变化，请先回读", "CONFLICT");
+      assertExpected(old, expected);
+      if (input.origin !== "user-stated" && old.origin !== input.origin)
+        throw new KaituError("AI 推测不能更正用户陈述", "CONFLICT");
+      candidate.sensitive ||= !!old.sensitive;
+    }
+    const date = localDate(new Date(), ws.timeZone());
+    const data: Memory = { ...candidate, created: date, updated: date };
+    validateMemory(data);
+    // Publish once, atomically, including across two local clients using the same key.
+    const temporary = `memory/.capture-${ulid()}.tmp`;
+    ws.writeText(temporary, stringifyFrontmatter(data));
+    try {
+      linkSync(ws.resolve(temporary), ws.resolve(path));
+      invalidateHistoryFile(ws, path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      previous = normalizedMemory(ws, file);
+      if (
+        !previous ||
+        Object.entries(candidate).some(([key, value]) => previous?.[key as keyof Memory] !== value)
+      )
+        throw new KaituError("同一幂等标识已有不同内容，未覆盖", "CONFLICT");
+    } finally {
+      rmSync(ws.resolve(temporary), { force: true });
+    }
+  }
+  // Read the authoritative file, never use a chat reply as proof of persistence.
+  const entry = { ...readMemory(ws, file).data, file };
+  let status = entry.ended ? "undone" : previous ? "duplicate" : "saved";
+  try {
+    const current = rewriteIndex(ws);
+    if (!entry.ended && !current.some((item) => item.file === file)) status = "superseded";
+    const message = `自动记录：${entry.name}`;
+    let version: string | null = null;
+    if (options.scheduleVersion) options.scheduleVersion(message);
+    else version = await snapshot(ws, message);
+    return {
+      status,
+      entry,
+      version,
+      ...(!version ? { notice: "记忆文件已保存，可单条撤销；本次版本尚未核实。" } : {}),
+    };
+  } catch (error) {
+    return {
+      status,
+      entry,
+      version: null,
+      warning: `记忆文件已保存；索引或版本待重试：${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
