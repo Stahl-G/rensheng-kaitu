@@ -5,7 +5,7 @@ import { initWorkspace, readOnboardingMatter, saveOnboardingMatter } from "@kait
 import { afterEach, expect, test, vi } from "vitest";
 import { agentEnvironment, cliCommand, localAgent } from "../src/local-agents/agents.js";
 import { createAgentConnection } from "../src/local-agents/connection.js";
-import { createAgentRuntime } from "../src/local-agents/runtime.js";
+import { agentSessionOptions, createAgentRuntime } from "../src/local-agents/runtime.js";
 import { createAskService } from "../src/ui/ask.js";
 import { organizeOnboardingMatter } from "../src/ui/onboarding-ai.js";
 
@@ -43,6 +43,8 @@ import {appendFileSync,existsSync,unlinkSync} from 'node:fs';
 import {basename} from 'node:path';
 const send = x => process.stdout.write(JSON.stringify(x)+'\\n');
 const tag = basename(process.argv[1] || 'synthetic').replace(/\\.mjs$/, '');
+const modeOptions = [{value:'default',name:'Ask'},{value:'auto',name:'Auto',description:existsSync('unsafe-auto')?'Skips all permission checks':'AI classifier reviews actions; risky actions are denied'},{value:'bypassPermissions',name:'Bypass'}];
+const modes = value => existsSync('no-modes') ? {} : existsSync('legacy-modes') ? {modes:{currentModeId:value,availableModes:modeOptions.map(x=>({...x,id:x.value}))}} : {configOptions:[{id:'mode',category:'mode',currentValue:value,options:modeOptions}]};
 let permitted;
 createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line), p=m.params||{};
@@ -51,7 +53,11 @@ createInterface({input:process.stdin}).on('line',line=>{
  if(m.method==='initialize')send({id:m.id,result:{agentCapabilities:{loadSession:true}}});
  else if(m.method==='session/new'||m.method==='session/load'){
    if(m.method==='session/new'&&existsSync('fail-new-once')){unlinkSync('fail-new-once');send({id:m.id,error:{message:'boom'}});return;}
-   send({id:m.id,result:{sessionId:p.sessionId||('upstream-'+tag),configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]}]}});
+   const mode=modes('default');send({id:m.id,result:{sessionId:p.sessionId||('upstream-'+tag),...mode,configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]},...(mode.configOptions||[])]}});
+ }
+ else if((m.method==='session/set_config_option'&&p.configId==='mode')||m.method==='session/set_mode'){
+   if(existsSync('mode-fail'))send({id:m.id,error:{message:'mode unavailable'}});
+   else send({id:m.id,result:m.method==='session/set_mode'?{}:modes(existsSync('mode-ignore')?'default':p.value)});
  }
  else if(m.method==='session/set_config_option')send({id:m.id,result:{configOptions:[{id:'model',category:'model',currentValue:p.value}]}});
  else if(m.method==='session/prompt') {
@@ -74,11 +80,11 @@ createInterface({input:process.stdin}).on('line',line=>{
     mcp: { command: process.execPath, args: [] },
   };
 }
-function setup(f: ReturnType<typeof fixture>) {
+function setup(f: ReturnType<typeof fixture>, permissionMode?: string) {
   let backend = "codebuddy:test";
   const options = {
     ...f,
-    runtime: () => createAgentRuntime({ ...f, agent: localAgent("codebuddy") }),
+    runtime: () => createAgentRuntime({ ...f, agent: localAgent("codebuddy"), permissionMode }),
     settings: async () => ({
       configured: true,
       provider: "codebuddy",
@@ -275,6 +281,19 @@ test("local agent: model choice, CLI identity, and switching back to the SDK pro
     { id: "m1", name: "M1" },
     { id: "m2", name: "M2" },
   ]);
+  expect(await connection.support("localAgentModes", {})).toMatchObject({
+    modes: [{ id: "default" }, { id: "auto" }],
+  });
+  await connection.configure({ choice: "local", agent: "codebuddy", path: f.path, permissionMode: "auto" });
+  await expect(
+    connection.configure({
+      choice: "local",
+      agent: "codebuddy",
+      path: f.path,
+      permissionMode: "bypassPermissions",
+    }),
+  ).rejects.toThrow(/未提供/);
+  expect(await connection.settings()).toMatchObject({ permissionMode: "auto" });
   // 换模型仍是同一个连接，打开会话后切到所选模型。
   await connection.configure({ choice: "local", agent: "codebuddy", path: f.path, model: "m2" });
   expect(await connection.settings()).toMatchObject({ model: "m2", backend: first.backend });
@@ -293,6 +312,96 @@ test("local agent: model choice, CLI identity, and switching back to the SDK pro
   await expect(
     connection.configure({ choice: "local", agent: "codebuddy", path: join(f.state, "missing") }),
   ).rejects.toThrow(/未找到/);
+});
+
+test.each([false, true])(
+  "native Auto applies before prompts and restored sessions (legacy=%s)",
+  async (legacy) => {
+    const f = fixture();
+    const agent = localAgent("codebuddy");
+    expect(
+      (await agentSessionOptions(agent, f.path, f.state)).permissionModes.modes.map((x) => x.id),
+    ).toEqual(["default", "auto"]);
+    if (legacy) writeFileSync(join(f.workspace, "legacy-modes"), "");
+    for (let i = 0; i < 2; i++) {
+      const runtime = await createAgentRuntime({ ...f, agent, permissionMode: "auto" });
+      try {
+        await runtime.request("session/prompt", {
+          sessionId: "auto",
+          contentBlocks: [{ type: "text", text: "synthetic" }],
+        });
+      } finally {
+        await runtime.close();
+      }
+    }
+    const trace = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((x) => JSON.parse(x));
+    expect(trace.filter((x) => x.method === "session/load")).toHaveLength(1);
+    expect(
+      trace.filter((x) => (legacy ? x.method === "session/set_mode" : x.params?.configId === "mode")),
+    ).toHaveLength(2);
+    const firstPrompt = trace.findIndex((x) => x.method === "session/prompt");
+    expect(
+      trace
+        .slice(0, firstPrompt)
+        .some((x) => (legacy ? x.method === "session/set_mode" : x.params?.configId === "mode")),
+    ).toBe(true);
+  },
+);
+test.each(["no-modes", "unsafe-auto", "mode-fail", "mode-ignore"])(
+  "Auto %s blocks before sending and supports explicit ask fallback",
+  async (flag) => {
+    const f = fixture();
+    writeFileSync(join(f.workspace, flag), "");
+    const runtime = await createAgentRuntime({
+      ...f,
+      agent: localAgent("codebuddy"),
+      permissionMode: "auto",
+    });
+    try {
+      await expect(
+        runtime.request("session/prompt", {
+          sessionId: "auto",
+          contentBlocks: [{ type: "text", text: "synthetic" }],
+        }),
+      ).rejects.toThrow(/权限模式/);
+    } finally {
+      await runtime.close();
+    }
+    expect(readFileSync(join(f.workspace, "trace.jsonl"), "utf8")).not.toContain('"method":"session/prompt"');
+    rmSync(join(f.workspace, flag));
+    const ask = await createAgentRuntime({ ...f, agent: localAgent("codebuddy"), permissionMode: "default" });
+    try {
+      await ask.request("session/prompt", {
+        sessionId: "ask",
+        contentBlocks: [{ type: "text", text: "synthetic" }],
+      });
+    } finally {
+      await ask.close();
+    }
+  },
+);
+test("Auto never answers residual approvals itself and rejection is not retried", async () => {
+  const f = fixture();
+  const { ask } = setup(f, "auto");
+  try {
+    const row = await ask.create();
+    ask.subscribe(row.id, (event) => {
+      if (event.type === "approval/asked") void ask.permission(row.id, String(event.data.requestId), null);
+    });
+    await ask.send(row.id, "permit");
+    expect(ask.events(row.id).find((x) => x.type === "approval/resolved")?.data.status).toBe("rejected");
+    const trace = readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((x) => JSON.parse(x));
+    expect(trace.filter((x) => x.method === "session/prompt")).toHaveLength(1);
+    expect(trace.find((x) => x.id === 9001 && x.result)?.result.outcome).toEqual({ outcome: "cancelled" });
+  } finally {
+    await ask.close();
+  }
 });
 test("CodeBuddy keeps only its own login variables; Kaitu, Electron and other credentials are removed", () => {
   const env = agentEnvironment(localAgent("codebuddy"), {

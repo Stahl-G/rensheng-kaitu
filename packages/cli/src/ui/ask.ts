@@ -72,6 +72,7 @@ export interface AskService {
     backend?: string;
     supportsAttachments?: boolean;
     fullOnly?: boolean;
+    permissionMode?: string;
     mode?: AskMode;
     provider: string;
     model: string;

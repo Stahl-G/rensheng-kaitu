@@ -4,6 +4,7 @@ import { createInterface } from "node:readline";
 interface AcpChoice {
   value?: string;
   name?: string;
+  description?: string;
 }
 interface AcpResult {
   sessionId?: string;
@@ -16,6 +17,24 @@ interface AcpResult {
     options?: (AcpChoice & { options?: AcpChoice[] })[];
   }[];
   models?: { currentModelId?: string; availableModels?: { modelId: string; name?: string }[] };
+  modes?: { currentModeId?: string; availableModes?: { id: string; name: string; description?: string }[] };
+}
+
+export function sessionModes(result: AcpResult) {
+  const option = result.configOptions?.find((item) => item.category === "mode" || item.id === "mode");
+  return option
+    ? {
+        configId: option.id,
+        current: typeof option.currentValue === "string" ? option.currentValue : undefined,
+        modes: (option.options ?? [])
+          .flatMap((item) => item.options ?? [item])
+          .map((item) => ({
+            id: item.value ?? "",
+            name: item.name ?? item.value ?? "",
+            description: item.description,
+          })),
+      }
+    : { current: result.modes?.currentModeId, modes: result.modes?.availableModes ?? [] };
 }
 
 /** 会话可选的模型：新版 ACP 放在 configOptions 的 model 项里，旧版放在 models 里。 */
