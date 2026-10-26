@@ -36,6 +36,8 @@ test("native modes remain explicit and resolved approvals share collapsed steps"
     return { ok: true, json: async () => values[method] ?? {} };
   });
   vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
   let stream!: { onmessage: (message: { data: string }) => void };
   vi.stubGlobal(
     "EventSource",
@@ -114,6 +116,24 @@ test("native modes remain explicit and resolved approvals share collapsed steps"
     expect(requests.filter((x) => x.method === "askPermission")).toEqual([
       { method: "askPermission", args: ["s1", "pending", null] },
     ]);
+    act(() => {
+      emit(6, "user/message", { content: [{ type: "text", text: "next synthetic turn" }] });
+      emit(7, "tool/call", { callId: "widget", name: "openmaic_widget", arguments: "{}" });
+      emit(8, "tool/result", {
+        message: { toolCallId: "widget", content: [] },
+        meta: { kind: "openmaic-widget", html: "<p>Synthetic</p>", title: "Widget", widgetType: "code" },
+      });
+      emit(9, "approval/asked", { requestId: "second", reason: "Second turn", detail: "{}", options: [] });
+      emit(10, "approval/resolved", { requestId: "second", status: "rejected" });
+    });
+    const turns = root.root
+      .findAllByType("details")
+      .filter((x) => String(x.props.className).includes("progress"));
+    expect(turns).toHaveLength(2);
+    expect(turns[0].findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(true);
+    expect(turns[1].findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(false);
+    expect(turns[1].findAllByType("iframe")).toHaveLength(0);
+    expect(root.root.findAllByType("iframe")).toHaveLength(1);
   } finally {
     if (root) act(() => root.unmount());
   }

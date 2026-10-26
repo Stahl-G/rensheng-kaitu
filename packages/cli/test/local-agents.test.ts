@@ -53,6 +53,7 @@ createInterface({input:process.stdin}).on('line',line=>{
  if(m.method==='initialize')send({id:m.id,result:{agentCapabilities:{loadSession:true}}});
  else if(m.method==='session/new'||m.method==='session/load'){
    if(m.method==='session/new'&&existsSync('fail-new-once')){unlinkSync('fail-new-once');send({id:m.id,error:{message:'boom'}});return;}
+   if(m.method==='session/load'&&existsSync('fail-load-once')){unlinkSync('fail-load-once');send({id:m.id,error:{message:'session unavailable'}});return;}
    const mode=modes('default');send({id:m.id,result:{sessionId:p.sessionId||('upstream-'+tag),...mode,configOptions:[{id:'model',category:'model',currentValue:'m1',options:[{value:'m1',name:'M1'},{value:'m2',name:'M2'}]},...(mode.configOptions||[])]}});
  }
  else if((m.method==='session/set_config_option'&&p.configId==='mode')||m.method==='session/set_mode'){
@@ -403,6 +404,52 @@ test("Auto never answers residual approvals itself and rejection is not retried"
     await ask.close();
   }
 });
+test.each(["mode-fail", "mode-ignore"])(
+  "resumed session keeps its context after %s and explicit ask fallback",
+  async (flag) => {
+    const f = fixture();
+    const agent = localAgent("codebuddy");
+    const send = async (permissionMode: string) => {
+      const runtime = await createAgentRuntime({ ...f, agent, permissionMode });
+      try {
+        return await runtime.request("session/prompt", {
+          sessionId: "retained",
+          contentBlocks: [{ type: "text", text: "synthetic" }],
+        });
+      } finally {
+        await runtime.close();
+      }
+    };
+    const trace = () =>
+      readFileSync(join(f.workspace, "trace.jsonl"), "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+    await send("auto");
+    const file = readdirSync(join(f.state, "local-agents")).find((name) =>
+      name.endsWith("-sessions.json"),
+    ) as string;
+    const mapping = () => JSON.parse(readFileSync(join(f.state, "local-agents", file), "utf8")).retained;
+    const upstream = mapping();
+    writeFileSync(join(f.workspace, flag), "");
+    await expect(send("auto")).rejects.toThrow(/权限模式/);
+    expect(trace().filter((frame) => frame.method === "session/prompt")).toHaveLength(1);
+    expect(mapping()).toBe(upstream);
+    rmSync(join(f.workspace, flag));
+    await send("default");
+    expect(trace().filter((frame) => frame.method === "session/new")).toHaveLength(1);
+    const loads = trace().filter((frame) => frame.method === "session/load");
+    expect(loads).toHaveLength(2);
+    expect(loads.every((frame) => frame.params.sessionId === upstream)).toBe(true);
+    // Agent 明确拒绝续接才淘汰映射；失败当轮不自动另建会话或发送。
+    writeFileSync(join(f.workspace, "fail-load-once"), "");
+    await expect(send("default")).rejects.toMatchObject({ code: "AI_CONNECTION" });
+    expect(mapping()).toBeUndefined();
+    expect(trace().filter((frame) => frame.method === "session/new")).toHaveLength(1);
+    await send("default");
+    expect(trace().filter((frame) => frame.method === "session/new")).toHaveLength(2);
+  },
+);
 test("CodeBuddy keeps only its own login variables; Kaitu, Electron and other credentials are removed", () => {
   const env = agentEnvironment(localAgent("codebuddy"), {
     CODEBUDDY_API_KEY: "synthetic",

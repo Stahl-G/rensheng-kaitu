@@ -1,7 +1,16 @@
 import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
 import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
 import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
-import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";
@@ -787,6 +796,37 @@ export function AskPage({
       setSaving(false);
     }
   };
+  const progress = useMemo(() => {
+    const resolutions = new Map<unknown, ChatEvent>();
+    for (const event of events)
+      if (event.type === "approval/resolved" && !resolutions.has(event.data.requestId))
+        resolutions.set(event.data.requestId, event);
+    const groups = new Map<
+      ChatEvent,
+      { steps: ChatEvent[]; results: Map<unknown, ChatEvent>; last: boolean }
+    >();
+    let turn: ChatEvent[] = [];
+    const group = (last: boolean) => {
+      const results = new Map<unknown, ChatEvent>();
+      for (const event of turn) {
+        const callId = (event.data.message as { toolCallId?: string } | undefined)?.toolCallId;
+        if (event.type === "tool/result" && !results.has(callId)) results.set(callId, event);
+      }
+      const steps = turn.filter((event) =>
+        event.type === "approval/asked"
+          ? typeof event.data.requestId === "string" && resolutions.has(event.data.requestId)
+          : event.type === "tool/call" && !teachingResult(results.get(event.data.callId)),
+      );
+      if (steps[0]) groups.set(steps[0], { steps, results, last });
+    };
+    for (const event of events)
+      if (event.type === "user/message") {
+        group(false);
+        turn = [];
+      } else turn.push(event);
+    group(true);
+    return { resolutions, groups };
+  }, [events]);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   const waiting =
     busy &&
@@ -948,7 +988,7 @@ export function AskPage({
               </div>
             )
           )}
-          {events.map((event, index) => {
+          {events.map((event) => {
             const data = event.data;
             const message = data.message as { content?: unknown } | undefined;
             if (event.type === "user/message")
@@ -973,39 +1013,16 @@ export function AskPage({
                   <DocumentBody content={text(message?.content)} />
                 </article>
               );
-            const resolution = (item: ChatEvent) =>
-              events.find(
-                (result) =>
-                  result.type === "approval/resolved" && result.data.requestId === item.data.requestId,
-              );
-            if (event.type === "tool/call" || (event.type === "approval/asked" && resolution(event))) {
-              const start = events.slice(0, index).findLastIndex((item) => item.type === "user/message");
-              const next = events.findIndex((item, i) => i > index && item.type === "user/message");
-              const turn = events.slice(start + 1, next < 0 ? undefined : next);
-              const steps = turn.filter(
-                (item) =>
-                  (item.type === "approval/asked" &&
-                    typeof item.data.requestId === "string" &&
-                    resolution(item)) ||
-                  (item.type === "tool/call" &&
-                    !turn.some(
-                      (result) =>
-                        result.type === "tool/result" &&
-                        (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId &&
-                        teachingResult(result),
-                    )),
-              );
-              if (!steps.length || steps[0] !== event) return null;
+            if (
+              event.type === "tool/call" ||
+              (event.type === "approval/asked" && progress.resolutions.has(data.requestId))
+            ) {
+              const group = progress.groups.get(event);
+              if (!group) return null;
+              const { steps, results } = group;
               const calls = steps.filter((item) => item.type === "tool/call");
-              const running = busy && next < 0;
-              const active = calls.findLast(
-                (item) =>
-                  !turn.some(
-                    (result) =>
-                      result.type === "tool/result" &&
-                      (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
-                  ),
-              );
+              const running = busy && group.last;
+              const active = calls.findLast((item) => !results.has(item.data.callId));
               const name = String(active?.data.name ?? "");
               const activity = !active
                 ? t("正在整理回答", "Preparing a response")
@@ -1028,7 +1045,7 @@ export function AskPage({
                       <NativeApproval
                         key={item.id}
                         event={item}
-                        resolution={resolution(item)}
+                        resolution={progress.resolutions.get(item.data.requestId)}
                         session={selected ?? ""}
                         disabled={!settings?.configured}
                       />
@@ -1038,11 +1055,7 @@ export function AskPage({
                         event={item}
                         session={selected ?? ""}
                         finished={!running}
-                        result={turn.find(
-                          (result) =>
-                            result.type === "tool/result" &&
-                            (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
-                        )}
+                        result={results.get(item.data.callId)}
                       />
                     ),
                   )}
@@ -1065,9 +1078,7 @@ export function AskPage({
                   session={selected ?? ""}
                   disabled={!settings?.configured}
                   event={event}
-                  resolution={events.find(
-                    (item) => item.type === "approval/resolved" && item.data.requestId === data.requestId,
-                  )}
+                  resolution={progress.resolutions.get(data.requestId)}
                 />
               );
             if (event.type === "approval/asked")

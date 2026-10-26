@@ -6,6 +6,8 @@ interface AcpChoice {
   name?: string;
   description?: string;
 }
+/** Agent 明确返回的 RPC 错误，不包含连接中断或本地超时。 */
+export class AcpResponseError extends Error {}
 interface AcpResult {
   sessionId?: string;
   agentCapabilities?: { loadSession?: boolean; sessionCapabilities?: { resume?: boolean } };
@@ -120,7 +122,7 @@ export function connectAcp(
         if (!entry) return;
         clearTimeout(entry.timer);
         pending.delete(frame.id);
-        if (frame.error) entry.reject(new Error(`ACP：${frame.error.message ?? "请求失败"}`));
+        if (frame.error) entry.reject(new AcpResponseError(`ACP：${frame.error.message ?? "请求失败"}`));
         else entry.resolve(frame.result);
       }
     } catch {

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join, resolve } from "node:path";
 import { KaituError, workspaceAgentGuide, workspaceTaskSkill } from "@kaitu/core";
 import type { AskRuntime } from "../ui/ask.js";
-import { connectAcp, sessionModels, sessionModes } from "./acp.js";
+import { AcpResponseError, connectAcp, sessionModels, sessionModes } from "./acp.js";
 import { type LocalAgent, agentEnvironment, launchAgent, terminateAgent } from "./agents.js";
 import { localAgentPrivacy } from "./privacy.js";
 
@@ -247,6 +247,7 @@ export async function createAgentRuntime(options: {
       },
     });
     const resume = sessions[id];
+    let resumeRejected = false;
     try {
       const init = await state.rpc.request("initialize", initialize);
       const method = resume
@@ -257,17 +258,22 @@ export async function createAgentRuntime(options: {
             : undefined
         : "session/new";
       if (!method) throw new Error("resume unsupported");
-      const result = await state.rpc.request(method, {
-        cwd: options.workspace,
-        mcpServers: [
-          {
-            name: "kaitu",
-            ...options.mcp,
-            env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
-          },
-        ],
-        ...(resume ? { sessionId: resume } : {}),
-      });
+      const result = await state.rpc
+        .request(method, {
+          cwd: options.workspace,
+          mcpServers: [
+            {
+              name: "kaitu",
+              ...options.mcp,
+              env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
+            },
+          ],
+          ...(resume ? { sessionId: resume } : {}),
+        })
+        .catch((error) => {
+          resumeRejected = !!resume && error instanceof AcpResponseError;
+          throw error;
+        });
       state.upstream = result.sessionId ?? resume ?? "";
       state.fresh = method === "session/new";
       if (!state.upstream) throw new Error("no session ID");
@@ -319,8 +325,8 @@ export async function createAgentRuntime(options: {
       state.rpc.close();
       await terminateAgent(child);
       running.delete(id);
-      // 续接失败时丢掉这条映射，下次改走新建，避免坏 id 一直卡住。
-      if (resume && sessions[id] === resume) {
+      // 只淘汰被 Agent 明确拒绝续接的 ID；设置失败/超时/取消不代表上下文无效。
+      if (resumeRejected && !state.cancelled && !closed && sessions[id] === resume) {
         delete sessions[id];
         persistSessions();
       }
