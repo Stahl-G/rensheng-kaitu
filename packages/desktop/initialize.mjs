@@ -24,8 +24,9 @@ if (!/["\s]id["]?\s*:\s*["']?webserver\b/.test(after)) {
     compressionLevel: 1,
     compressionThresholdBytes: 1024,
   };
-  after = after.trimStart().startsWith("[")
-    ? after.replace("[", `[\n${JSON.stringify({ id: "webserver", config })},`)
+  const flowArray = /^((?:\s*#[^\n]*(?:\n|$))*\s*)\[/;
+  after = flowArray.test(after)
+    ? after.replace(flowArray, `$1[\n${JSON.stringify({ id: "webserver", config })},`)
     : `- id: webserver\n  config: ${JSON.stringify(config)}\n${after}`;
 }
 if (after !== before) {
