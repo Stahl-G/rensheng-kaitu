@@ -116,24 +116,38 @@ test("native modes remain explicit and resolved approvals share collapsed steps"
     expect(requests.filter((x) => x.method === "askPermission")).toEqual([
       { method: "askPermission", args: ["s1", "pending", null] },
     ]);
-    act(() => {
-      emit(6, "user/message", { content: [{ type: "text", text: "next synthetic turn" }] });
-      emit(7, "tool/call", { callId: "widget", name: "openmaic_widget", arguments: "{}" });
-      emit(8, "tool/result", {
-        message: { toolCallId: "widget", content: [] },
+    for (const [i, teachingFirst] of [false, true].entries()) {
+      const id = 6 + i * 6;
+      const ordinary = { message: { toolCallId: "t", content: [] } };
+      const teaching = {
+        ...ordinary,
         meta: { kind: "openmaic-widget", html: "<p>Synthetic</p>", title: "Widget", widgetType: "code" },
+      };
+      act(() => {
+        emit(id, "user/message", { content: [{ type: "text", text: "next synthetic turn" }] });
+        // 同 callId 跨轮复用；任一 teaching 结果都不应吞掉前轮普通工具步骤。
+        emit(id + 1, "tool/call", { callId: "t", name: "openmaic_widget", arguments: "{}" });
+        emit(id + 2, "tool/result", teachingFirst ? teaching : ordinary);
+        emit(id + 3, "tool/result", teachingFirst ? ordinary : teaching);
+        emit(id + 4, "approval/asked", {
+          requestId: `second-${i}`,
+          reason: "Second turn",
+          detail: "{}",
+          options: [],
+        });
+        emit(id + 5, "approval/resolved", { requestId: `second-${i}`, status: "rejected" });
       });
-      emit(9, "approval/asked", { requestId: "second", reason: "Second turn", detail: "{}", options: [] });
-      emit(10, "approval/resolved", { requestId: "second", status: "rejected" });
-    });
-    const turns = root.root
-      .findAllByType("details")
-      .filter((x) => String(x.props.className).includes("progress"));
-    expect(turns).toHaveLength(2);
-    expect(turns[0].findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(true);
-    expect(turns[1].findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(false);
-    expect(turns[1].findAllByType("iframe")).toHaveLength(0);
-    expect(root.root.findAllByType("iframe")).toHaveLength(1);
+      const turns = root.root
+        .findAllByType("details")
+        .filter((x) => String(x.props.className).includes("progress"));
+      expect(turns).toHaveLength(i + 2);
+      expect(turns[0].findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(true);
+      const current = turns[i + 1];
+      expect(current.findAllByType("pre").some((x) => x.children.includes('{"command":"date"}'))).toBe(false);
+      expect(current.findAllByType("iframe")).toHaveLength(0);
+      expect(current.findAllByType("span").some((x) => x.children.includes("1 步"))).toBe(true);
+      expect(root.root.findAllByType("iframe")).toHaveLength(i + 1);
+    }
   } finally {
     if (root) act(() => root.unmount());
   }

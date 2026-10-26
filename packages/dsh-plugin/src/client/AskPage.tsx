@@ -808,14 +808,16 @@ export function AskPage({
     let turn: ChatEvent[] = [];
     const group = (last: boolean) => {
       const results = new Map<unknown, ChatEvent>();
+      const teaching = new Set<unknown>();
       for (const event of turn) {
         const callId = (event.data.message as { toolCallId?: string } | undefined)?.toolCallId;
         if (event.type === "tool/result" && !results.has(callId)) results.set(callId, event);
+        if (event.type === "tool/result" && teachingResult(event)) teaching.add(callId);
       }
       const steps = turn.filter((event) =>
         event.type === "approval/asked"
           ? typeof event.data.requestId === "string" && resolutions.has(event.data.requestId)
-          : event.type === "tool/call" && !teachingResult(results.get(event.data.callId)),
+          : event.type === "tool/call" && !teaching.has(event.data.callId),
       );
       if (steps[0]) groups.set(steps[0], { steps, results, last });
     };
