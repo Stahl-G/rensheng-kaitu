@@ -245,3 +245,12 @@ Kaitu.app profile 与 DSH 插件形态均使用显式工作区入口；DSH 自�
 ### 开图自有运行配置的隐私默认值
 
 开图 App 的 desktop 与各 SDK 模式默认关闭额外会话日志、产品/会话遥测及请求附带的插件清单。正常模型消息、鉴权和工具调用保持；使用 AI 时，所选内容仍会发送给你选择的模型服务商。此配置不改外部独立 DSH 的用户 profile。
+
+
+## 原生宿主的测试隔离
+
+`DSH_HOME` 隔离 DSH profile 和宿主资料，不隔离 Electron 桌面壳。官方 rc.3 桌面入口独立读取 `app.getPath("userData")`，并调用不带路径的 `app.setAppLogsPath()`；仅设置 `HOME`、`DSH_HOME` 或 `DSH_AGENTS_HOME` 不能作为 macOS 桌面壳已完整隔离的依据。
+
+测试入口须在导入宿主主模块之前，使用 Electron 的 `app.setPath()` 显式设置 `home`、`appData`、`userData`、`sessionData` 和 `crashDumps`，并将 `app.setAppLogsPath()` 指向合成目录。随后核对实际 helper 参数及宿主 profile 路径。官方原包没有提供覆盖全部这些路径的环境变量入口；不要直接启动它并把环境变量隔离称为完整隔离。需要纯原包验收时，使用独立测试系统账户或虚拟机；不能用修改过的测试壳结果冒充官方原包验收。
+
+Kaitu.app 的测试启动方式见 [桌面隔离验收](desktop.md#隔离验收)，其 bootstrap 会显式设置桌面壳路径。上述隔离要求不需要读取真实 profile、复制凭据、删除真实目录或改变系统安全设置。
