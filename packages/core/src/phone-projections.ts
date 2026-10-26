@@ -61,8 +61,16 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
     mobile: {
       version: 1,
       actions: hasTasks
-        ? ["adopt_task", "create_task", "update_task", "complete_task", "cancel_task", "complete_next"]
-        : ["complete_next"],
+        ? [
+            "adopt_task",
+            "create_task",
+            "update_task",
+            "complete_task",
+            "cancel_task",
+            "complete_next",
+            "capture_memory",
+          ]
+        : ["complete_next", "capture_memory"],
       tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
         ({ id, rev, title, status, ts, due }) => ({
           id,

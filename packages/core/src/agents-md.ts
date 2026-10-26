@@ -107,6 +107,7 @@ USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile
 目录地图（只读本次需要的）：
 - me/：档案、目标、规则与确认过的阶段；NOW.md：最近计划。
 - memory/：记忆索引与条目；以索引/列表为当前状态；有 ended 或被其他活跃条目的 replaces 关联的是旧事实，不当作当前画像。
+- 手机自然记忆仅在 today.mobile.actions 声明 capture_memory 时投递，沿用相同来源/幂等/纠正规则；以回执 memory.file/status 核对共享库结果，未支持时不得声称已入共享库。
 - projects/、learning/、decisions/：项目、学习与决定的状态及日志。
 - explore/、health/、feed/：方向与足迹、健康、资讯，按模块说明取。
 - inbox/agents/：新投递；inbox/notes/：待处理原文；handoffs/：接续任务的交接。

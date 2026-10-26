@@ -6,6 +6,7 @@ export interface PhoneReceipt {
   status: "applied" | "duplicate" | "conflict" | "rejected";
   message?: string;
   target?: { id: string; rev: number };
+  memory?: { file: string; status: "saved" | "duplicate" | "undone" | "superseded" };
   at: string;
 }
 export function phoneReceipts(ws: Workspace): PhoneReceipt[] {

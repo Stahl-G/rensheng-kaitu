@@ -27,6 +27,20 @@
               "rev": { "type": "integer", "minimum": 1 }
             }
           },
+          "memory": {
+            "type": "object",
+            "required": ["file", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "pattern": "^[^./\\\\][^/\\\\]*\\.md$"
+              },
+              "status": {
+                "enum": ["saved", "duplicate", "undone", "superseded"]
+              }
+            }
+          },
           "at": { "type": "string", "format": "date-time" }
         }
       }
