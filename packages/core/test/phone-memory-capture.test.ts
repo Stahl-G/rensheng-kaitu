@@ -38,6 +38,50 @@ const filename = () => `inbox/agents/ios-3fa9c1d2-${ulid()}.actions.jsonl`;
 const apply = (ws: Workspace, action: unknown) => applyPhoneActions(ws, filename(), JSON.stringify(action));
 const receipt = (ws: Workspace, id: string) => phoneReceipts(ws).find((item) => item.ref === id);
 
+it.each([true, false])("手机按已发布能力撤销自动记忆并恢复原条（有待办类型：%s）", async (hasTasks) => {
+  const ws = await clonedWorkspace();
+  if (!hasTasks) {
+    const module = ws.readJson<{ records: Record<string, unknown> }>("me/module.json");
+    module.records.task = undefined;
+    ws.writeJson("me/module.json", module);
+  }
+  const deliver = async (action: { client_id: string; device: string; op: string }) => {
+    await writePhoneSnapshots(ws, new Date(), { force: true });
+    const today = ws.readJson<{ mobile: { actions: string[] } }>("phone/today.json");
+    if (!today.mobile.actions.includes(action.op)) throw new Error(`手机不能投递未声明的 ${action.op}`);
+    const file = `inbox/agents/ios-${action.device}-${action.client_id}.actions.jsonl`;
+    ws.writeText(file, JSON.stringify(action));
+    expect((await processInbox(ws, { stableMs: 0 })).processed).toContain(file);
+    return receipt(ws, action.client_id);
+  };
+  await deliver(observation());
+  const original = listMemories(ws)[0];
+  const correction = observation();
+  const corrected = {
+    ...correction,
+    args: {
+      ...correction.args,
+      text: "更正为电子地图",
+      evidence: "更正为电子地图",
+      replaces: original.file,
+      expected: memoryExpectation(original),
+    },
+  };
+  await deliver(corrected);
+  const replacement = listMemories(ws)[0];
+  const undo = {
+    ...observation(),
+    op: "replace_memory",
+    args: { file: replacement.file, candidate: null, expected: memoryExpectation(replacement) },
+  };
+  expect(await deliver(undo)).toMatchObject({ status: "applied" });
+  expect(listMemories(new Workspace(ws.root)).map((entry) => entry.file)).toEqual([original.file]);
+  expect(await deliver(corrected)).toMatchObject({
+    status: "duplicate",
+    memory: { file: replacement.file, status: "undone" },
+  });
+});
+
 it("手机能力声明后经真实收件箱落盘，保留写者与事实来源，重复和重开可回读同一文件", async () => {
   const ws = await clonedWorkspace();
   await writePhoneSnapshots(ws, new Date(), { force: true });
