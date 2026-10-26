@@ -113,8 +113,8 @@ export function Plugins({
           <h3>{t("开图插件", "Kaitu plugins")}</h3>
           <p className={css.small}>
             {t(
-              "这里列出已发布的目录版本。DSH rc.3 适配候选尚未发布，不作为更新提供。",
-              "This directory lists published versions. DSH rc.3 adaptation candidates are not yet released or offered as updates.",
+              "本轮提供 DSH rc.3 本地测试候选，尚未正式发布。请核对每项的版本与兼容要求。",
+              "This build offers local DSH rc.3 test candidates, not formal releases. Check each entry's version and compatibility.",
             )}
           </p>
           <div className={css["list-card"]}>

@@ -33,14 +33,15 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
         installed: false,
       };
     });
-  catalog.push({
-    name: "kaitu-auday",
-    title: "Auday",
-    description: { zh: "开发中", en: "In development" },
-    version: "",
-    spec: "",
-    installed: false,
-  });
+  if (!catalog.some((entry) => entry.name === "kaitu-auday"))
+    catalog.push({
+      name: "kaitu-auday",
+      title: "Auday",
+      description: { zh: "开发中", en: "In development" },
+      version: "",
+      spec: "",
+      installed: false,
+    });
   const changed = async (operation: Promise<ChangeResult>) => {
     const result = await operation;
     if (result.application !== "applied" && result.application !== "restart-required")
@@ -56,7 +57,7 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
           ...entry,
           installed: bundle?.installed ?? false,
           installedVersion: bundle?.version,
-          // Only offer a known older published version an update; never downgrade an unlisted version.
+          // Only offer a known older catalog version an update; never downgrade an unlisted version.
           updateAvailable:
             bundle?.installed === true &&
             (index.plugins
