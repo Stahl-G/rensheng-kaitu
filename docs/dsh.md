@@ -6,7 +6,7 @@ DSH 0.2.1-rc.3 插件提供今天、开图、资料、问问四入口。切去�
 
 问问复用同一个 DSH 原生会话引用，主面板切换不释放该会话或重新预填编辑器。引用由插件持有，卸载插件时释放；消息、草稿、模型和凭据继续由 DSH 管理。
 
-推荐用 DeepSeek Harness 桌面应用（0.2.1-rc.2）：
+推荐用 DeepSeek Harness 桌面应用（0.2.1-rc.3）：
 
 1. 安装并打开一次桌面应用，在 **设置 → 模型** 配好模型（DeepSeek、opencode-go 或其他 API Key）。
 2. 在开图仓库运行 `pnpm build`，然后：
@@ -38,7 +38,7 @@ DSH 0.2.1-rc.3 插件提供今天、开图、资料、问问四入口。切去�
    命令只生成状态目录内的 `cache/dsh/cordis.yml`，输出一行启动命令：
 
    ```sh
-   npx @deepseek-ai/dsh@0.2.1-rc.2 web --patch '/本机状态目录/cache/dsh/cordis.yml'
+   npx @deepseek-ai/dsh@0.2.1-rc.3 web --patch '/本机状态目录/cache/dsh/cordis.yml'
    ```
 
 3. 复制实际输出的命令运行。首次运行 npx 需要联网下载 dsh。
@@ -52,7 +52,7 @@ DSH 0.2.1-rc.3 插件提供今天、开图、资料、问问四入口。切去�
 插件注册技能 provider、说明、工作流工具和开图页面。补记时间用带时区偏移的 `ts`。
 手动配置参见 [cordis.example.yml](../packages/dsh-plugin/cordis.example.yml)，插件路径必须填 `dist/index.js` 的绝对路径。
 
-当前按 dsh `0.2.1-rc.2` 源码与同版 npm 类型实现。
+当前运行时与 npm 类型固定为 dsh `0.2.1-rc.3`。下文标注 rc.2 的源码核查和实测记录保留为历史依据；不代表 rc.3 的原生验收。
 对话工具沿用 `tools.register()` 和 `systemPrompt.section()`；总览通过严格生成的 Remote 和 Slots 接入。
 已有桌面对话写入结果见 [HANDOFF §0.1](HANDOFF.md#01-现在能用什么均已真机实测)。
 
