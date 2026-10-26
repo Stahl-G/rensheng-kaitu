@@ -4,7 +4,10 @@ import { createInterface } from "node:readline";
 interface AcpChoice {
   value?: string;
   name?: string;
+  description?: string;
 }
+/** Agent 明确返回的 RPC 错误，不包含连接中断或本地超时。 */
+export class AcpResponseError extends Error {}
 interface AcpResult {
   sessionId?: string;
   agentCapabilities?: { loadSession?: boolean; sessionCapabilities?: { resume?: boolean } };
@@ -16,6 +19,24 @@ interface AcpResult {
     options?: (AcpChoice & { options?: AcpChoice[] })[];
   }[];
   models?: { currentModelId?: string; availableModels?: { modelId: string; name?: string }[] };
+  modes?: { currentModeId?: string; availableModes?: { id: string; name: string; description?: string }[] };
+}
+
+export function sessionModes(result: AcpResult) {
+  const option = result.configOptions?.find((item) => item.category === "mode" || item.id === "mode");
+  return option
+    ? {
+        configId: option.id,
+        current: typeof option.currentValue === "string" ? option.currentValue : undefined,
+        modes: (option.options ?? [])
+          .flatMap((item) => item.options ?? [item])
+          .map((item) => ({
+            id: item.value ?? "",
+            name: item.name ?? item.value ?? "",
+            description: item.description,
+          })),
+      }
+    : { current: result.modes?.currentModeId, modes: result.modes?.availableModes ?? [] };
 }
 
 /** 会话可选的模型：新版 ACP 放在 configOptions 的 model 项里，旧版放在 models 里。 */
@@ -101,7 +122,7 @@ export function connectAcp(
         if (!entry) return;
         clearTimeout(entry.timer);
         pending.delete(frame.id);
-        if (frame.error) entry.reject(new Error(`ACP：${frame.error.message ?? "请求失败"}`));
+        if (frame.error) entry.reject(new AcpResponseError(`ACP：${frame.error.message ?? "请求失败"}`));
         else entry.resolve(frame.result);
       }
     } catch {

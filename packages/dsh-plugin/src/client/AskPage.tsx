@@ -1,7 +1,16 @@
 import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
 import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
 import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
-import { Fragment, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";
@@ -48,6 +57,7 @@ interface Settings {
   configured: boolean;
   choice?: "builtin" | "external" | "local";
   fullOnly?: boolean;
+  permissionMode?: string;
   mode?: "full" | "scoped";
   supportsAttachments?: boolean;
   localAgent?: { id: string; name: string; path?: string; status: string };
@@ -270,6 +280,9 @@ export function AskPage({
   const t = useT();
   const locale = useLocale();
   const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
+  const [agentModes, setAgentModes] = useState<{ modes: { id: string; name: string }[] } | string | null>(
+    null,
+  );
   const [modelQuery, setModelQuery] = useState("");
   const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -734,12 +747,16 @@ export function AskPage({
       return;
     }
     setAgentModels(null);
+    setAgentModes(null);
     setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
       .then(setAgentModels)
       .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
+    void call<{ modes: { id: string; name: string }[] }>("askSupport", "localAgentModes", {})
+      .then(setAgentModes)
+      .catch((err) => setAgentModes(err instanceof Error ? err.message : String(err)));
   };
-  const switchModel = async (provider: string, id: string) => {
+  const switchModel = async (provider: string, id: string, permissionMode?: string) => {
     if (!settings?.configured) return;
     setModelMenu(false);
     setSaving(true);
@@ -750,7 +767,13 @@ export function AskPage({
         await call<Settings>(
           "askConfigure",
           agent
-            ? { choice: "local", agent: agent.id, path: agent.path, model: id }
+            ? {
+                choice: "local",
+                agent: agent.id,
+                path: agent.path,
+                ...(id !== "默认模型" ? { model: id } : {}),
+                ...(permissionMode ? { permissionMode } : {}),
+              }
             : { choice: "builtin", provider, model: id },
         ),
       );
@@ -773,6 +796,39 @@ export function AskPage({
       setSaving(false);
     }
   };
+  const progress = useMemo(() => {
+    const resolutions = new Map<unknown, ChatEvent>();
+    for (const event of events)
+      if (event.type === "approval/resolved" && !resolutions.has(event.data.requestId))
+        resolutions.set(event.data.requestId, event);
+    const groups = new Map<
+      ChatEvent,
+      { steps: ChatEvent[]; results: Map<unknown, ChatEvent>; last: boolean }
+    >();
+    let turn: ChatEvent[] = [];
+    const group = (last: boolean) => {
+      const results = new Map<unknown, ChatEvent>();
+      const teaching = new Set<unknown>();
+      for (const event of turn) {
+        const callId = (event.data.message as { toolCallId?: string } | undefined)?.toolCallId;
+        if (event.type === "tool/result" && !results.has(callId)) results.set(callId, event);
+        if (event.type === "tool/result" && teachingResult(event)) teaching.add(callId);
+      }
+      const steps = turn.filter((event) =>
+        event.type === "approval/asked"
+          ? typeof event.data.requestId === "string" && resolutions.has(event.data.requestId)
+          : event.type === "tool/call" && !teaching.has(event.data.callId),
+      );
+      if (steps[0]) groups.set(steps[0], { steps, results, last });
+    };
+    for (const event of events)
+      if (event.type === "user/message") {
+        group(false);
+        turn = [];
+      } else turn.push(event);
+    group(true);
+    return { resolutions, groups };
+  }, [events]);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   const waiting =
     busy &&
@@ -934,7 +990,7 @@ export function AskPage({
               </div>
             )
           )}
-          {events.map((event, index) => {
+          {events.map((event) => {
             const data = event.data;
             const message = data.message as { content?: unknown } | undefined;
             if (event.type === "user/message")
@@ -959,31 +1015,16 @@ export function AskPage({
                   <DocumentBody content={text(message?.content)} />
                 </article>
               );
-            if (event.type === "tool/call") {
-              const start = events.slice(0, index).findLastIndex((item) => item.type === "user/message");
-              if (events.slice(start + 1, index).some((item) => item.type === "tool/call")) return null;
-              const next = events.findIndex((item, i) => i > index && item.type === "user/message");
-              const turn = events.slice(start + 1, next < 0 ? undefined : next);
-              const calls = turn.filter(
-                (item) =>
-                  item.type === "tool/call" &&
-                  !turn.some(
-                    (result) =>
-                      result.type === "tool/result" &&
-                      (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId &&
-                      teachingResult(result),
-                  ),
-              );
-              if (!calls.length) return null;
-              const running = busy && next < 0;
-              const active = calls.findLast(
-                (item) =>
-                  !turn.some(
-                    (result) =>
-                      result.type === "tool/result" &&
-                      (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
-                  ),
-              );
+            if (
+              event.type === "tool/call" ||
+              (event.type === "approval/asked" && progress.resolutions.has(data.requestId))
+            ) {
+              const group = progress.groups.get(event);
+              if (!group) return null;
+              const { steps, results } = group;
+              const calls = steps.filter((item) => item.type === "tool/call");
+              const running = busy && group.last;
+              const active = calls.findLast((item) => !results.has(item.data.callId));
               const name = String(active?.data.name ?? "");
               const activity = !active
                 ? t("正在整理回答", "Preparing a response")
@@ -998,22 +1039,28 @@ export function AskPage({
                     <span className={`${css.dot} ${running ? css.pulse : ""}`} />
                     {running ? activity : t("处理步骤", "Steps")}
                     <span className={css.stepCount}>
-                      {t(`${calls.length} 步`, `${calls.length} ${calls.length === 1 ? "step" : "steps"}`)}
+                      {t(`${steps.length} 步`, `${steps.length} ${steps.length === 1 ? "step" : "steps"}`)}
                     </span>
                   </summary>
-                  {calls.map((item) => (
-                    <Tool
-                      key={item.id}
-                      event={item}
-                      session={selected ?? ""}
-                      finished={!running}
-                      result={turn.find(
-                        (result) =>
-                          result.type === "tool/result" &&
-                          (result.data.message as { toolCallId?: string })?.toolCallId === item.data.callId,
-                      )}
-                    />
-                  ))}
+                  {steps.map((item) =>
+                    item.type === "approval/asked" ? (
+                      <NativeApproval
+                        key={item.id}
+                        event={item}
+                        resolution={progress.resolutions.get(item.data.requestId)}
+                        session={selected ?? ""}
+                        disabled={!settings?.configured}
+                      />
+                    ) : (
+                      <Tool
+                        key={item.id}
+                        event={item}
+                        session={selected ?? ""}
+                        finished={!running}
+                        result={results.get(item.data.callId)}
+                      />
+                    ),
+                  )}
                 </details>
               );
             }
@@ -1033,9 +1080,7 @@ export function AskPage({
                   session={selected ?? ""}
                   disabled={!settings?.configured}
                   event={event}
-                  resolution={events.find(
-                    (item) => item.type === "approval/resolved" && item.data.requestId === data.requestId,
-                  )}
+                  resolution={progress.resolutions.get(data.requestId)}
                 />
               );
             if (event.type === "approval/asked")
@@ -1324,6 +1369,49 @@ export function AskPage({
                         "Uses the selected Agent's local capabilities and its own approval flow.",
                       )}
                     </p>
+                  )}
+                  {settings?.choice === "local" && (
+                    <section aria-label={t("权限模式", "Permission mode")}>
+                      <p>{t("权限模式（下次发送生效）", "Permission mode (next message)")}</p>
+                      {agentModes === null ? (
+                        <span>{t("正在读取模式…", "Loading modes…")}</span>
+                      ) : typeof agentModes === "string" ? (
+                        <span role="alert">{agentModes}</span>
+                      ) : (
+                        <>
+                          {!agentModes.modes.some((item) => item.id === "auto") && (
+                            <p>
+                              {t(
+                                "此 Agent 暂无可用的 Auto 模式。",
+                                "Auto mode is unavailable for this Agent.",
+                              )}
+                            </p>
+                          )}
+                          {agentModes.modes.map((item) => (
+                            <button
+                              type="button"
+                              key={item.id}
+                              className={css.model}
+                              disabled={busy || saving}
+                              aria-pressed={settings.permissionMode === item.id}
+                              onClick={() => void switchModel(settings.provider, settings.model, item.id)}
+                            >
+                              {item.id === "auto"
+                                ? t("Auto · 自动审查", "Auto · reviewed actions")
+                                : item.name}
+                            </button>
+                          ))}
+                          {agentModes.modes.some((item) => item.id === "auto") && (
+                            <p>
+                              {t(
+                                "Auto 逐动作审查，危险操作仍可拒绝。",
+                                "Auto reviews each action; risky operations can still be denied.",
+                              )}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </section>
                   )}
                   {settings?.choice === "local" &&
                     (agentModels === null ? (

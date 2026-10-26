@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { type AgentConnectionId, KaituError } from "@kaitu/core";
 import type { AskMode, AskService } from "../ui/ask.js";
 import { agentEnvironment, findAgent, localAgent, localAgents } from "./agents.js";
-import { type McpCommand, agentModels, createAgentRuntime } from "./runtime.js";
+import { type McpCommand, agentSessionOptions, createAgentRuntime } from "./runtime.js";
 
 export function createAgentConnection(options: {
   state: string;
@@ -22,9 +22,8 @@ export function createAgentConnection(options: {
   env?: NodeJS.ProcessEnv;
 }) {
   const file = join(options.state, "local-agent.json");
-  let saved: { choice?: string; agent?: string; path?: string; model?: string } = existsSync(file)
-    ? JSON.parse(readFileSync(file, "utf8"))
-    : {};
+  let saved: { choice?: string; agent?: string; path?: string; model?: string; permissionMode?: string } =
+    existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
   const save = (next: typeof saved) => {
     mkdirSync(options.state, { recursive: true, mode: 0o700 });
     writeFileSync(`${file}.tmp`, JSON.stringify(next), { mode: 0o600 });
@@ -34,7 +33,17 @@ export function createAgentConnection(options: {
   const local = () => saved.choice === "local";
   // 每次发消息都会读设置；CLI 位置只在启动时找一次，模型列表按 CLI 缓存。
   let installed: { id: string; name: string; path: string }[] | undefined;
-  const models = new Map<string, Promise<{ id: string; name?: string }[]>>();
+  const metadata = new Map<string, ReturnType<typeof agentSessionOptions>>();
+  const sessionOptions = (agent: ReturnType<typeof localAgent>, path: string) => {
+    const key = `${agent.id}:${path}`;
+    let value = metadata.get(key);
+    if (!value) {
+      value = agentSessionOptions(agent, path, options.state, options.env);
+      metadata.set(key, value);
+      value.catch(() => metadata.delete(key));
+    }
+    return value;
+  };
   const find = (id: string, custom?: string) => {
     const agent = localAgent(id);
     return findAgent(agent, custom, agentEnvironment(agent, options.env));
@@ -61,6 +70,7 @@ export function createAgentConnection(options: {
       provider: agent.id,
       providerName: agent.name,
       model: saved.model ?? "默认模型",
+      permissionMode: saved.permissionMode,
       supportsImages: false,
       supportsAttachments: false,
       // 换了 agent 或 CLI（另一个安装或登录环境）就算换了连接：旧对话要新建；换模型仍续接原会话。
@@ -78,16 +88,32 @@ export function createAgentConnection(options: {
       if (input.choice === "local") {
         const agent = localAgent(typeof input.agent === "string" ? input.agent : undefined);
         const selected = typeof input.path === "string" && input.path.trim() ? input.path.trim() : undefined;
-        if (!find(agent.id, selected))
+        const path = find(agent.id, selected);
+        if (!path)
           throw new KaituError(
             `未找到 ${agent.name} CLI，请安装并登录，或填写已有 CLI 的绝对路径`,
             "AI_CONNECTION",
           );
+        const permissionMode =
+          input.permissionMode === undefined
+            ? saved.agent === agent.id && saved.path === selected
+              ? saved.permissionMode
+              : undefined
+            : input.permissionMode;
+        if (
+          permissionMode !== undefined &&
+          (typeof permissionMode !== "string" ||
+            !(await sessionOptions(agent, path)).permissionModes.modes.some(
+              (mode) => mode.id === permissionMode,
+            ))
+        )
+          throw new KaituError(`${agent.name} 未提供所选权限模式，连接未改变`, "AI_PERMISSION_MODE");
         save({
           choice: "local",
           agent: agent.id,
           ...(selected ? { path: selected } : {}),
           ...(typeof input.model === "string" && input.model ? { model: input.model } : {}),
+          ...(permissionMode ? { permissionMode: String(permissionMode) } : {}),
         });
         return settings();
       }
@@ -100,15 +126,14 @@ export function createAgentConnection(options: {
       const agent = localAgent(input.agent);
       const path = find(agent.id, typeof input.path === "string" && input.path ? input.path : undefined);
       if (!path) throw new KaituError(`未找到 ${agent.name} CLI`, "AI_CONNECTION");
-      let list = models.get(path);
-      if (!list) {
-        list = agentModels(agent, path, options.state, options.env);
-        models.set(path, list);
-        list.catch(() => models.delete(path));
-      }
-      return list;
+      return (await sessionOptions(agent, path)).models;
     },
     async support(method: string, input: Record<string, unknown>) {
+      if (method === "localAgentModes" && local()) {
+        const { agent, path } = current();
+        if (!path) throw new KaituError("请先连接本机 Agent", "AI_CONNECTION");
+        return (await sessionOptions(agent, path)).permissionModes;
+      }
       if (method === "builtinSettings") return options.sdk().catalogSettings(input.saved === true);
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
@@ -119,6 +144,7 @@ export function createAgentConnection(options: {
       return createAgentRuntime({
         agent,
         model: saved.model,
+        permissionMode: saved.permissionMode,
         workspace: options.workspace(),
         state: options.state,
         path,
