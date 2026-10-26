@@ -10,7 +10,7 @@ test("host installation and removal update status without removing directory ent
     listBundles: async () => bundles,
     installBundle: async (spec) => {
       calls.push(spec);
-      bundles = [{ name: "kaitu-fortune", installed: true, removable: true, version: "0.1.3" } as BundleInfo];
+      bundles = [{ name: "kaitu-fortune", installed: true, removable: true, version: "0.1.4" } as BundleInfo];
       return { application: "applied" } as ChangeResult;
     },
     removeBundle: async (name) => {
@@ -21,6 +21,12 @@ test("host installation and removal update status without removing directory ent
     open: () => {},
   });
   const before = (await request("list")) as PluginItem[];
+  for (const name of ["kaitu-fortune", "kaitu-novel-workspace", "kaitu-auday"]) {
+    const entries = before.filter((item) => item.name === name);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].dshVersion).toBe("0.2.1-rc.3");
+    expect(entries[0].spec).toMatch(/^git\+https:.*#[a-f0-9]{40}$/);
+  }
   const entry = before.find((item) => item.name === "kaitu-fortune");
   expect(entry?.spec).toMatch(/^git\+https:.*#[a-f0-9]{40}$/);
   await request("install", entry?.spec);
@@ -34,7 +40,7 @@ test("host installation and removal update status without removing directory ent
   expect(calls).toEqual([entry?.spec, entry?.name]);
 });
 
-test("pending plugins cannot be installed and failed host changes remain failures", async () => {
+test("unlisted specs cannot be installed and failed host changes remain failures", async () => {
   const calls: string[] = [];
   const request = createHostPluginRequest({
     listBundles: async () => [],
@@ -49,8 +55,7 @@ test("pending plugins cannot be installed and failed host changes remain failure
     open: () => {},
   });
   const items = (await request("list")) as PluginItem[];
-  const pending = items.find((item) => item.name === "kaitu-auday");
-  await expect(request("install", pending?.spec)).rejects.toThrow();
+  await expect(request("install", "")).rejects.toThrow();
   expect(calls).toEqual([]);
   await expect(request("install", items.find((item) => item.spec)?.spec)).rejects.toThrow("install refused");
   await expect(request("remove", "kaitu-fortune")).resolves.toEqual({ application: "restart-required" });
@@ -59,9 +64,12 @@ test("pending plugins cannot be installed and failed host changes remain failure
 test.each([
   ["0.3.0", false],
   ["0.3.1", false],
+  ["0.3.2", false],
   ["9.0.0", false],
-  ["0.1.2", false],
-])("published catalog does not downgrade installed %s", async (version, updateAvailable) => {
+  ["0.4.0", false],
+  ["0.3.3-rc.1", false],
+  ["0.1.2", true],
+])("candidate catalog only updates a known older installed version %s", async (version, updateAvailable) => {
   const request = createHostPluginRequest({
     listBundles: async () => [
       { name: "kaitu-novel-workspace", installed: true, removable: true, version } as BundleInfo,
@@ -79,14 +87,14 @@ test.each([
   );
   expect(item).toMatchObject({
     installedVersion: version,
-    version: "0.1.2",
+    version: "0.3.3-rc.1",
     updateAvailable,
     license: "MIT",
-    dshVersion: "0.2.1-rc.2",
+    dshVersion: "0.2.1-rc.3",
   });
 });
 
-test("published Fortune updates show the released AGPL package, not the rc.3 draft", async () => {
+test("local Fortune catalog selects the pinned rc.3 AGPL candidate", async () => {
   const request = createHostPluginRequest({
     listBundles: async () => [
       { name: "kaitu-fortune", installed: true, removable: true, version: "0.1.1" } as BundleInfo,
@@ -102,12 +110,12 @@ test("published Fortune updates show the released AGPL package, not the rc.3 dra
   const item = ((await request("list")) as PluginItem[]).find((item) => item.name === "kaitu-fortune");
   expect(item).toMatchObject({
     installedVersion: "0.1.1",
-    version: "0.1.3",
+    version: "0.1.4",
     updateAvailable: true,
     license: "AGPL-3.0-only",
-    dshVersion: "0.2.1-rc.2",
+    dshVersion: "0.2.1-rc.3",
   });
   expect(item?.spec).toBe(
-    "git+https://github.com/Stahl-G/dsh-kaitu-fortune.git#dfbb17f941609ff59d6583ebb5d74aa029a6630e",
+    "git+https://github.com/Stahl-G/dsh-kaitu-fortune.git#ae0ee876fb13bb33115bcb56a2a6eca2b61042f0",
   );
 });
