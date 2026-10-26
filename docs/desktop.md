@@ -11,16 +11,15 @@ pnpm build
 node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dmg
 ```
 
-输入为已安装的 DSH **0.2.1-rc.2、arm64** 应用。后处理工具来自
+输入为已安装的 DSH **0.2.1-rc.3、arm64** 应用；脚本拒绝其他内核版本。后处理工具默认来自
 `~/Developer/deepseek-harness-rc2` 已安装的依赖，另需 macOS 的 Xcode Command Line Tools。
 输入应用和 DSH 源码保持只读，输出为 `dist/Kaitu.app`、`dist/Kaitu.dmg`。
 省略 `--dmg` 只生成应用。未设置签名变量时使用 ad-hoc 签名。
 
 可用 `--output /你的目录/Kaitu.app` 更换输出位置，DMG 总是在同一目录；已有输出不会被覆盖。
-用 `--dsh-root /源码目录` 更换 DSH 工具来源。加 `--dry-run` 只列出操作步骤，
-也可传入一个空的 `.app` 目录查看流程。
+用 `--dsh-root /源码目录` 更换 DSH 工具来源。`--dry-run` 会列出操作步骤，并读取真实输入应用校验内核版本、主入口与 arm64 架构；不会复制、写入或签名，空 `.app` 目录不能通过校验。
 
-脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本，关于面板显示 `开图版本+dsh.0.2.1-rc.2`。
+脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本，关于面板显示开图功能版本与 `Powered by DeepSeek Harness 0.2.1-rc.3`。
 插件与初始化器随应用打包，运行时不依赖本仓库。自动更新源、强制更新查询与 `dsh://` 注册会移除。
 
 ## 开图功能包独立更新
@@ -29,18 +28,18 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --d
 
 发布前预检、版本范围冻结、中断恢复与完成标准，统一遵循 [HANDOFF.md 的发版规则](HANDOFF.md)。
 
-DSH 固定为 `0.2.1-rc.2`，宿主接口版本为 `1`。功能更新不修改 `.app`，不更换 Electron、DSH、原生启动器或协议桥接。
+DSH 固定为 `0.2.1-rc.3`，宿主接口版本为 `2`。功能更新不修改 `.app`，不更换 Electron、DSH、原生启动器或协议桥接。
 界面、资料服务、开图工具与技能一起更新，保证前后端同版。启动后在后台检查一次，此后每 24 小时检查，不阻塞首屏。
 发现新版会显示更新提示，用户点击下载，下载后自行选择立即或稍后重启；设置中可关闭自动检查，也可恢复上一版功能。
 恢复功能版本不恢复用户资料；需要回退资料时使用资料的版本历史。
 
 首次安装须使用带 `kaitu-loader.mjs` 的新宿主。旧 App 没有该加载器，不能只靠功能包取得更新能力。
-更新包放在本机 App 状态目录的 `updates/dsh-0.2.1-rc.2-host-1/`，不放工作区或同步盘。
+更新包放在本机 App 状态目录的 `updates/dsh-0.2.1-rc.3-host-2/`，不放工作区或同步盘。
 启动器仍从签名 App 读取。功能包的 `node_modules` 只链接宿主中的固定 DSH 桥接，包内不能分发内核依赖。
 
 发布配置是只含公钥的 JSON：`{"feedUrl":"https://你的发布地址/latest.json","publicKey":"PEM 格式 Ed25519 公钥"}`。
-Mac 和 Windows 打包宿主默认嵌入 `packages/desktop/update-public-key.pem` 中经批准的公开验签公钥，也支持 `--update-public-key <Ed25519公钥文件>` 指定公钥。使用已有 GitHub Releases 的正式版频道：
-`https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.2-host-1/latest.json`。
+Mac 和 Windows 打包宿主默认嵌入 `packages/desktop/update-public-key.pem` 中经批准的公开验签公钥，也支持 `--update-public-key <Ed25519公钥文件>` 指定公钥。当前代码配置的 GitHub Releases 正式版兼容频道为：
+`https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.3-host-2/latest.json`。
 这是独立的兼容频道，不依赖 GitHub 的 latest Release，也不固定到 0.1.1。应用版本的 Release 保存不可覆盖的 `kaitu-features.zip`；频道 Release 只更新签名 `latest.json`，指向新的版本 ZIP。
 频道 Release 标为预发布，避免成为官网或 GitHub 的最新应用版本；它只是分发入口，清单内容只指向已发布的正式功能版本，不向正式版用户推送 RC。
 将来更换 DSH 或宿主接口时创建新的兼容频道，保留旧频道的最后一个兼容版本，不能用不兼容清单覆盖旧频道。
@@ -127,7 +126,7 @@ Apple 的应用与 Helper 版本字段只写数字：例如 `0.1.1-rc.1` 的
 默认模式中，导入和照片原件须先放入工作区，问问不执行项目外部链接访问/同步或工作区迁移。
 切换「完整 Agent」须二次确认，只对当前对话生效。此模式以 DSH 标准完整权限重启 SDK 并续接同一会话，可使用命令、文件和联网。新对话回到默认模式。
 已有会话通过 DSH SDK `session/resume` 恢复；原生注入的指令和运行时上下文不作为用户消息展示。
-定时任务保留隐藏的 Electron 进程，因为 0.2.1-rc.2 SDK profile 不含 schedule 需要的 sessionController。
+定时任务继续由隐藏的 Electron 进程执行；问问使用无界面的 SDK profile。
 重复启动复用原后台进程；退出会关闭 SDK 与后台任务进程。
 API Key 自动引导只在 Kaitu.app 关闭；`kaitu dsh --install` 和 `kaitu dsh` 的 DSH 入口恢复引导。
 插件市场和运行时配置只通过高级设置进入。
@@ -135,11 +134,19 @@ API Key 自动引导只在 Kaitu.app 关闭；`kaitu dsh --install` 和 `kaitu d
 ## 隔离验收
 
 ```sh
-KAITU_APP_HOME=/tmp/kaitu-test/state \
-KAITU_DIR=/tmp/kaitu-test/workspace \
-KAITU_APP_PORT=0 \
-/path/to/Kaitu.app/Contents/MacOS/Kaitu
+kaitu_test_root="$(mktemp -d /tmp/kaitu-native-test.XXXXXX)"
+mkdir -p "$kaitu_test_root/home" "$kaitu_test_root/agents"
+env -i PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  HOME="$kaitu_test_root/home" \
+  DSH_AGENTS_HOME="$kaitu_test_root/agents" \
+  KAITU_APP_HOME="$kaitu_test_root/state" \
+  KAITU_DIR="$kaitu_test_root/workspace" \
+  KAITU_LOCAL_STATE_DIR="$kaitu_test_root/local-state" \
+  KAITU_APP_PORT=0 \
+  /path/to/Kaitu.app/Contents/MacOS/Kaitu
 ```
+
+使用全新目录和合成资料，不填写凭据。清空继承环境后只保留启动所需路径，避免继承开发终端的模型密钥或 DSH profile 设置。`HOME` 隔离用户级文件，`DSH_AGENTS_HOME` 隔离共享指令，`KAITU_LOCAL_STATE_DIR` 隔离工作区指针、状态映射与偏好；仅设置 App 目录和资料目录还不足以隔离这些本机状态。退出后确认本次启动的 App、SDK 和后台 AI 进程都已结束，再清理测试目录。
 
 显式指定隔离目录后不读取真实工作区指针。`KAITU_APP_HOME` 与 `KAITU_DIR` 必须是绝对路径。
 `KAITU_APP_PORT` 只影响主动启动的内置 AI，普通资料界面始终使用系统分配的本机端口。
@@ -183,9 +190,13 @@ Calendar 的脚本接口不提供账户选择；新建日历所属账户随本�
 6. 确认「开图」日历位于 iCloud 账户，在 iPhone 和手表核对事件与提醒。
    本次自动检查与浏览器验收没有操作真实 Calendar.app，也未验证设备同步、系统授权弹窗或正式签名产物的授权归属。
 
-## DSH 0.2.1-rc.2 适配
+## 当前 DSH 0.2.1-rc.3 适配
 
-内核及 npm 引擎固定为 0.2.1-rc.2，Cordis 对齐宿主的 4.0.5。HOST_API 保持 1：开图功能包桥接协议未变。
+当前内核与 npm 引擎固定为 `0.2.1-rc.3`，`HOST_API=2`。宿主通过就绪流提供经过鉴权的插件页地址，独立功能包必须同时匹配这两个版本。rc.2 / host-1 安装不能直接接受 rc.3 / host-2 功能包；升级内核须重新安装完整宿主。DSH 插件也须在 rc.3 宿主上验证。
+
+## 历史：DSH 0.2.1-rc.2 适配与验证
+
+以下记录是 rc.2 / host-1 当时的实现与验证，不代表 rc.3 真机验收结果。该轮内核及 npm 引擎固定为 0.2.1-rc.2，Cordis 对齐宿主的 4.0.5，HOST_API 为 1。
 删除 rc.2 的手动 Agent 恢复、followup 与句柄销毁分支，恢复统一走 SDK `session/resume`，并转发 `session/wait`。
 恢复入口仍核对所属工作区，应用当前对话模式；完整 Agent 与资料模式共用这条接入。
 
