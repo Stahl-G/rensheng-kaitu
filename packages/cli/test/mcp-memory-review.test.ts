@@ -238,3 +238,35 @@ it("关闭 MCP 等待后台版本，版本失败通知客户端且文件仍可�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("自然记录 MCP 无表单能力也自动持久，重连读取相同来源，重复调用不重复入账", async () => {
+  const ws = await clonedWorkspace();
+  const input = {
+    idempotency_key: "mcp-synthetic/1",
+    type: "fact",
+    name: "合成折纸",
+    text: "我的纸桥模型使用蓝纸",
+    evidence: "我的纸桥模型使用蓝纸",
+    source: "synthetic-message/1",
+    origin: "user-stated",
+    observed_at: "2026-10-26T10:00:00Z",
+    scope: "personal",
+  };
+  for (let session = 0; session < 2; session++) {
+    const client = new Client({ name: "synthetic-auto-memory", version: "1" });
+    const server = createMcpServer(ws);
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    try {
+      await server.connect(serverSide);
+      await client.connect(clientSide);
+      expect(body(await client.callTool({ name: "memory_capture", arguments: input }))).toMatchObject({
+        status: session ? "duplicate" : "saved",
+        entry: { text: input.text, origin: "user-stated", source: input.source },
+      });
+      expect(body(await client.callTool({ name: "memory_list", arguments: {} }))).toHaveLength(1);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  }
+});

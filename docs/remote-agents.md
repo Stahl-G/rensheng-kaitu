@@ -20,12 +20,12 @@ HTTP 默认 remote 集合：读取状态、记录、记忆、对话和文档（�
 
 ## 记住这次变化
 
-现有 `import-chatgpt-memory` Skill 也是当前对话的入口：只取用户明确的新事实、偏好、决定，保留原话的限定、日期和来源。用户看到的是「记住这次变化 → 勾选候选 → 我确认」。
-`onboarding_memory_review` 复用搬记忆的本机暂存、去重和版本逻辑，通过 MCP form elicitation 向用户展示候选；模型参数没有 selected / confirmed，只有客户端表单提交的选择能进入本工具的确认步骤。空选、取消、过期以及确认前失败不写正本，等待确认不占写队列。来源可从记忆回读，整批撤销仍在开图历史中完成；确认后丢失回执须先回读，不能假定保存成功或失败。
-客户端须支持 form elicitation 并将选择交给用户；不能由模型或 hook 自动填写 accept。这是客户端交互约定，不是抵御恶意客户端的权限隔离，现有 memory_save / record_add 仍是独立的直接写入工具，Skill 明确不把它们用作候选入口。
-不支持确认表单、没有本机工具或未连接时，Skill 提供候选文字，用户复制到开图「从常用的 AI 搬来记忆」预览确认；不宣称已经保存。目标、项目和方向继续在该既有入口选择去处。不会扫描 transcript、改全局配置、开公网服务或承诺所有聊天自动实时回传。
+`import-chatgpt-memory` Skill 主动整理当前对话的新事实、偏好、决定，保留原话的限定、日期和来源，保存后简短告知并提供个人档案的撤销入口。
+默认自然记录使用 `memory_capture`（内置问问为 `kaitu_memory_capture`），一条一写，不要求客户端确认表单。返回 entry 为文件回读，含 origin、observed_at、evidence 及 AI 内容的 uncertainty；临时/引用/假设跳过，无法消解且影响行为的 conflict 不写并返回 needs-clarification。重试复用 idempotency_key；同键不同内容报冲突。明确纠正通过 replaces/expected 追加关联原条；个人档案可单条撤销，不恢复整个工作区。
 
-接口依据：[Agent Skills 规范](https://agentskills.io/specification)、[MCP 工具的人机交互](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[MCP elicitation 表单与选择](https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation)。已核对 [Claude Code hook 生命周期和项目配置](https://code.claude.com/docs/en/hooks)：hook 是特定运行时的自动事件，不能证明模型总结就是用户事实。本版使用主动 Skill，不需要安装 hook；客户端的真实渲染与 Skill 自动发现须分别验收。
+`onboarding_memory_review` 保留为用户明确要求逐条审阅时的可选表单；批量搬入旧记忆仍有预览。自然记录 Skill 不走这个门，也不自动填写 accept。宿主的工具安全审批、读取范围、外发与凭据权限照常生效，本功能没有修改或绕过它们。
+
+提取由当前 AI 执行；不会扫描所有聊天或安装 hook。真实模型提取质量、宿主权限弹窗及外部客户端的 Skill 发现需另行验收，不能由本地合成工具调用证明。
 
 ## 自愿开放公网
 

@@ -7,6 +7,7 @@ import {
   agentCanRead,
   agentReadingPack,
   cancelOnboardingPreview,
+  captureMemory,
   completeTask,
   confirmOnboardingMemory,
   deferSnapshots,
@@ -22,6 +23,7 @@ import {
   listProjects,
   listTasks,
   logProject,
+  memoryCaptureSchema,
   memoryInput,
   memoryType,
   onboardingContent,
@@ -145,11 +147,33 @@ export function createMcpServer(
   register("onboarding_status", "读取首次使用内容、待核对草稿、已采纳下一步和实时开始清单。", {}, () =>
     onboardingStatus(ws),
   );
+  register(
+    "memory_capture",
+    "自动保存本次自然表达的个人事实、偏好或决定，无须逐条确认；AI估算/建议须标来源和不确定性。临时/引用/假设不进长期记忆。返回落盘回读与撤销用file；更正用replaces和expected，不覆盖原条。先按实体、时间、单位和上下文消解，只有仍影响后续行为的冲突才交conflict。重试复用原idempotency_key。",
+    memoryCaptureSchema.shape,
+    (input) =>
+      captureMemory(ws, input, {
+        scheduleVersion: (message) => {
+          void write(async () => {
+            const version = await snapshotNow(ws, message);
+            if (!version && (await pendingWorkspaceFiles(ws)).length) throw new Error("版本尚未保存");
+          }).catch(async (error) => {
+            await server
+              .sendLoggingMessage({
+                level: "error",
+                data: `记忆文件已保存，可单条撤销；版本保存失败：${String(error)}`,
+              })
+              .catch(() => {});
+          });
+        },
+      }),
+    true,
+  );
   server.registerTool(
     "onboarding_memory_review",
     {
       description:
-        "把当前对话中用户明确说出的新事实、偏好、决定送入开图记忆预览；客户端向用户展示原文并勾选确认后才保存。只交本次变化，不交推断或全量历史。不支持用户确认表单时不写入，请复制到开图搬记忆入口。",
+        "仅在用户主动要求逐条审核时使用；默认自然记录用 memory_capture。把当前对话中用户明确说出的新事实、偏好、决定送入开图记忆预览；客户端向用户展示原文并勾选确认后才保存。只交本次变化，不交推断或全量历史。不支持用户确认表单时不写入，请复制到开图搬记忆入口。",
       inputSchema: {
         text: text
           .max(20000)
@@ -393,7 +417,7 @@ export function createMcpServer(
   );
   register(
     "memory_save",
-    "保存一条记忆，无需确认；有对应模块的内容写模块，敏感信息仅在用户明确要求时保存。",
+    "兼容直接保存一条记忆；自然表达默认用 memory_capture 保留原话、分类和幂等标识。有对应模块的内容写模块，敏感个人内容标 sensitive。",
     memory,
     (input) => addMemory(ws, memoryInput(input), { actor: actor() }),
     true,

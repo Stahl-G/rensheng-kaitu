@@ -17,6 +17,7 @@ export const skillToolGuide = `在 dsh 中执行开图技能时，所有路径�
 - record list / update / delete → kaitu_records；chats search → kaitu_search_chats。
 - 读取、列目录、写 Markdown/JSON → kaitu_workspace（read/list/write）；创建模块时一次提交 module.json、STATUS.md 和 schema。
 - validate → kaitu_validate；snapshot / agents-md → kaitu_workspace（snapshot/agents-md）；history → kaitu_history；恢复建议 → kaitu_restore；实际恢复由用户在设置 → 版本历史里确认。
+- 自然个人事实/偏好/决定及明确纠正 → kaitu_memory_capture，自动保存并回读，不走 onboarding 的 confirm；AI估算/建议必须标来源和不确定性，撤销在个人档案单条进行。
 - memory list/search/add/update/rm/import → kaitu_memory；批量 import 只预览；实际导入由用户在搬记忆界面粘贴、核对并确认。
 - 学习主题 → kaitu_learning（list/read/start/save）；用 save 追加用户实际表达的理解、疑问与下一步，不把 AI 讲解当作学会。
 - 概念卡/自判小测 → kaitu_learning_card；互动模拟 → kaitu_learning_widget。先问后展示，答案不自动回传模型。PPT 仅用户明确要求时用已安装的 openmaic_slide；不默认调用 openmaic_generate。

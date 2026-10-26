@@ -406,6 +406,8 @@ iOS 的 CI 已改成手动（Actions 额度）。iOS main 在 #40 的合并头�
 
 ### 2026-10-25：当前对话记忆候选
 
+以下为历史机制。2026-10-26 用户改为自然表达后自动记录，当前行为以 PRODUCT.md「默认行为」和 import-chatgpt-memory Skill 为准；逐条表单仅在用户主动要求审阅时使用。
+
 - 独立分支 `codex/conversation-memory-preview`：沿用 `import-chatgpt-memory` 单一 Skill，主动挑用户明确的新事实、偏好和决定；MCP `onboarding_memory_review` 复用搬记忆预览，由客户端原生表单收集用户选择后才写入。
 - 不支持确认表单时保留复制到开图预览的路径。Skill 不构成权限隔离，不读取全量历史或安装自动 hook；直接写入工具不充当候选入口。没有新增数据格式、依赖或持久权限，待交审，不自动合并或发布。
 

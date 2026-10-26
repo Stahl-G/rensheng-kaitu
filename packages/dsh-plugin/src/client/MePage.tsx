@@ -173,12 +173,30 @@ export function MePage({
       <p>{memory.text}</p>
       <span className={css.src}>
         {[
-          sourceLabel(memory.source),
+          memory.origin
+            ? t(
+                {
+                  "user-stated": "用户陈述",
+                  "ai-estimate": "AI 估算 · 未核实",
+                  "ai-suggestion": "AI 建议 · 尚未采纳",
+                }[memory.origin],
+                memory.origin,
+              )
+            : "",
+          memory.observed_at ?? "",
+          memory.origin ? memory.source : sourceLabel(memory.source),
           memory.sensitive ? t("敏感 · 不进资料包", "Sensitive · left out of packs") : "",
         ]
           .filter(Boolean)
           .join(" · ")}
       </span>
+      {memory.evidence && (
+        <details>
+          <summary>{t("原话与依据", "Evidence")}</summary>
+          <p>{memory.evidence}</p>
+          {memory.uncertainty && <p>{memory.uncertainty}</p>}
+        </details>
+      )}
       {memory.ended && (
         <span className={css.src}>
           {memory.replaced_by
@@ -219,7 +237,9 @@ export function MePage({
             disabled={busy}
             onClick={() => void mutateMemory(() => archiveMemory(memory.file, expectedMemory(memory)))}
           >
-            {t("这条不再成立", "This no longer applies")}
+            {memory.origin
+              ? t("撤销这条自动记录", "Undo this automatic memory")
+              : t("这条不再成立", "This no longer applies")}
           </button>
         </span>
       )}
