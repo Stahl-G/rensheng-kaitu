@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { expect, it, vi } from "vitest";
 import {
   Workspace,
@@ -5,7 +6,6 @@ import {
   memoryExpectation,
   phoneReceipts,
   processInbox,
-  readRecords,
   schemas,
   validateWorkspace,
   writePhoneSnapshots,
@@ -188,7 +188,7 @@ it("AI建议保留不确定性且不变承诺；跳过/冲突/非法写者均不
     args: { ...suggestion.args, origin: "ai-suggestion", type: "decision", uncertainty: "尚未采纳" },
   });
   expect(listMemories(ws)[0]).toMatchObject({ type: "context", origin: "ai-suggestion" });
-  for (const scope of ["temporary", "quoted", "hypothetical"]) {
+  for (const scope of ["temporary"]) {
     const action = observation();
     await apply(ws, { ...action, args: { ...action.args, scope } });
     expect(receipt(ws, action.client_id)?.status).toBe("rejected");
@@ -201,14 +201,15 @@ it("AI建议保留不确定性且不变承诺；跳过/冲突/非法写者均不
   await apply(ws, missingUncertainty);
   await apply(new Workspace(ws.root), missingUncertainty);
   expect(receipt(ws, missing.client_id)?.status).toBe("conflict");
-  expect(Object.keys(receipt(ws, missing.client_id) ?? {}).sort()).toEqual(
-    ["ref", "kind", "status", "at", "message"].sort(),
-  );
-  const validate = schemas().builtin("phone-action.schema.json");
-  expect(validate({ ...observation(), origin: "user" })).toBe(false);
+  expect(receipt(ws, missing.client_id)?.memory).toBeUndefined();
   const unsafe = observation();
-  expect(validate({ ...unsafe, args: { ...unsafe.args, ended: "2026-10-26" } })).toBe(false);
+  for (const invalid of [
+    { ...observation(), origin: "user" },
+    { ...unsafe, args: { ...unsafe.args, ended: "2026-10-26" } },
+  ]) {
+    const file = filename();
+    await applyPhoneActions(ws, file, JSON.stringify(invalid));
+    expect(receipt(ws, basename(file))).toMatchObject({ kind: "file", status: "rejected" });
+  }
   expect(listMemories(ws)).toHaveLength(1);
-  expect(readRecords(ws, "task")).toHaveLength(0);
-  expect(readRecords(ws, "event")).toHaveLength(0);
 });

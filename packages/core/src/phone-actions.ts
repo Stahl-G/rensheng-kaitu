@@ -185,7 +185,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
               seen[action.client_id] = { capture: input };
               ws.writeJson(ledgerFile, seen, { internal: true });
             }
-            const result = await captureMemory(ws, input);
+            const result = await captureMemory(ws, input, { now: new Date(action.at) });
             if (!result.entry) {
               receipt.status = result.status === "needs-clarification" ? "conflict" : "rejected";
               receipt.message = result.reason;
@@ -197,7 +197,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
             ) {
               receipt.status = result.status === "saved" ? "applied" : "duplicate";
               receipt.memory = { file: result.entry.file, status: result.status };
-              receipt.message = result.warning ?? result.notice;
+              receipt.message = result.warning;
             }
             break;
           }

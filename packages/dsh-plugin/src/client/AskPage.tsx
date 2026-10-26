@@ -1379,14 +1379,6 @@ export function AskPage({
                         <span role="alert">{agentModes}</span>
                       ) : (
                         <>
-                          {!agentModes.modes.some((item) => item.id === "auto") && (
-                            <p>
-                              {t(
-                                "此 Agent 暂无可用的 Auto 模式。",
-                                "Auto mode is unavailable for this Agent.",
-                              )}
-                            </p>
-                          )}
                           {agentModes.modes.map((item) => (
                             <button
                               type="button"
@@ -1401,14 +1393,6 @@ export function AskPage({
                                 : item.name}
                             </button>
                           ))}
-                          {agentModes.modes.some((item) => item.id === "auto") && (
-                            <p>
-                              {t(
-                                "Auto 逐动作审查，危险操作仍可拒绝。",
-                                "Auto reviews each action; risky operations can still be denied.",
-                              )}
-                            </p>
-                          )}
                         </>
                       )}
                     </section>

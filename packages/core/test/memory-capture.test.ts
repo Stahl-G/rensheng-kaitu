@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { handoverPack } from "../src/handover.js";
 import { history } from "../src/history.js";
@@ -11,7 +12,6 @@ import {
   replaceMemory,
   updateMemory,
 } from "../src/memory.js";
-import { readRecords } from "../src/records.js";
 import { validateWorkspace } from "../src/validate.js";
 import { Workspace } from "../src/workspace.js";
 import { clonedWorkspace } from "./helpers.js";
@@ -89,8 +89,6 @@ it("估算有依据和误差，建议不变成事实或日程承诺，禁止直�
       });
   }
   expect(handoverPack(ws, "en").text).toContain("AI estimate");
-  expect(readRecords(ws, "task")).toHaveLength(0);
-  expect(readRecords(ws, "event")).toHaveLength(0);
   await expect(captureMemory(ws, { ...observation, origin: "ai-estimate" })).rejects.toMatchObject({
     code: "INVALID_MEMORY",
   });
@@ -101,22 +99,13 @@ it("临时、引用、假设不入长期画像；时间/单位的变化可存，
   for (const scope of ["temporary", "quoted", "hypothetical"] as const)
     expect((await captureMemory(ws, { ...observation, scope })).status).toBe("skipped");
   expect(listMemories(ws)).toHaveLength(0);
-  // Semantic classification/resolution is supplied by the current AI, not a regex extractor.
-  for (const [index, text] of ["昨天合成模型重82g", "今天合成模型重81.5g（0.0815kg）"].entries())
-    await captureMemory(ws, {
-      ...observation,
-      idempotency_key: `weight-${index}`,
-      type: "fact",
-      text,
-      evidence: text,
-    });
   const result = await captureMemory(ws, {
     ...observation,
     idempotency_key: "conflict",
     conflict: "同一模型同一时刻给了两个重量，会影响材料计算",
   });
   expect(result.status).toBe("needs-clarification");
-  expect(listMemories(ws)).toHaveLength(2);
+  expect(listMemories(ws)).toHaveLength(0);
 });
 
 it("重复触发只存一次，同键异文拒绝，写入失败和已存文件后的索引失败可恢复", async () => {
@@ -161,7 +150,9 @@ it("版本保存失败仍可单条撤销纠正并恢复旧条，历史原文不�
   const ws = await clonedWorkspace();
   const first = await captureMemory(ws, observation);
   if (!first.entry) throw new Error("Missing original");
-  const snapshot = vi.spyOn(historyModule, "snapshot").mockResolvedValueOnce(null);
+  const snapshot = vi
+    .spyOn(historyModule, "snapshot")
+    .mockRejectedValueOnce(new Error("synthetic snapshot failure"));
   const second = await captureMemory(ws, {
     ...observation,
     idempotency_key: "history-failure",
@@ -174,7 +165,7 @@ it("版本保存失败仍可单条撤销纠正并恢复旧条，历史原文不�
   expect(second).toMatchObject({
     status: "saved",
     version: null,
-    notice: expect.stringContaining("版本尚未核实"),
+    warning: expect.stringContaining("synthetic snapshot failure"),
   });
   if (!second.entry) throw new Error("Missing correction");
   await archiveMemory(ws, second.entry.file, { by: "user", expected: memoryExpectation(second.entry) });
@@ -189,10 +180,47 @@ it("个人档案纠正自动记录也复用追加关联，撤销恢复原条，�
     ws,
     first.entry.file,
     { type: "preference", name: "new", text: "合成新偏好" },
-    { by: "user", expected: memoryExpectation(first.entry) },
+    { by: "user", now: new Date("2020-01-02T12:00:00Z"), expected: memoryExpectation(first.entry) },
   );
-  expect(next).toMatchObject({ replaces: first.entry.file, sensitive: true });
+  expect(next).toMatchObject({
+    replaces: first.entry.file,
+    sensitive: true,
+    created: "2020-01-02",
+    updated: "2020-01-02",
+  });
   expect((await captureMemory(ws, { ...observation, sensitive: true })).status).toBe("superseded");
   await archiveMemory(ws, next.file, { by: "user", expected: memoryExpectation(next) });
   expect(listMemories(new Workspace(ws.root))[0]?.text).toBe(observation.text);
+});
+
+const keyCases = JSON.parse(
+  readFileSync(new URL("./fixtures/memory-capture.json", import.meta.url), "utf8"),
+) as {
+  keyCases: { name: string; key: string; valid: boolean }[];
+  turnCases: { name: string; finalKey: string; finalValid: boolean }[];
+};
+
+it("完整幂等键按Unicode码点边界拒绝，不截断、不改键；旧键撤销后重投不复活", async () => {
+  const ws = await clonedWorkspace();
+  for (const item of [
+    ...keyCases.keyCases.map((item) => ({ ...item, key: item.key })),
+    ...keyCases.turnCases.map((item) => ({ ...item, key: item.finalKey, valid: item.finalValid })),
+  ]) {
+    const input = { ...observation, idempotency_key: item.key };
+    const before = ws.readText("memory/MEMORY.md");
+    if (!item.valid) {
+      await expect(captureMemory(ws, input)).rejects.toThrow();
+      expect(ws.readText("memory/MEMORY.md")).toBe(before);
+      continue;
+    }
+    const result = await captureMemory(ws, input, { scheduleVersion: () => {} });
+    if (!result.entry) throw new Error(item.name);
+    const bytes = ws.readText(`memory/${result.entry.file}`);
+    await archiveMemory(ws, result.entry.file, { by: "user", expected: memoryExpectation(result.entry) });
+    const ended = ws.readText(`memory/${result.entry.file}`);
+    const repeated = await captureMemory(new Workspace(ws.root), input, { scheduleVersion: () => {} });
+    expect(repeated).toMatchObject({ status: "undone", entry: { file: result.entry.file } });
+    expect(ws.readText(`memory/${result.entry.file}`)).toBe(ended);
+    expect(bytes).not.toBe(ended);
+  }
 });

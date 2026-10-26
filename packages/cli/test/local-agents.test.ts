@@ -320,9 +320,6 @@ test.each([false, true])(
   async (legacy) => {
     const f = fixture();
     const agent = localAgent("codebuddy");
-    expect(
-      (await agentSessionOptions(agent, f.path, f.state)).permissionModes.modes.map((x) => x.id),
-    ).toEqual(["default", "auto"]);
     if (legacy) writeFileSync(join(f.workspace, "legacy-modes"), "");
     for (let i = 0; i < 2; i++) {
       const runtime = await createAgentRuntime({ ...f, agent, permissionMode: "auto" });

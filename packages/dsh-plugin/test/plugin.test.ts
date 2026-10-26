@@ -4,11 +4,9 @@ import { join } from "node:path";
 import {
   Workspace,
   addRecords,
-  archiveMemory,
   history,
   initWorkspace,
   listMemories,
-  memoryExpectation,
   readRecords,
   validateWorkspace,
 } from "@kaitu/core";
@@ -98,7 +96,7 @@ it("合法训练写入并存版本，非法记录返回原始校验错误且不�
   }
 });
 
-it("问问自然记忆入口直接持久，保留AI分类；用户可单击归档且重开可回读", async () => {
+it("问问工具直接持久AI记忆，重开可回读，后台存版本不追加未核实提示", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-dsh-memory-"));
   try {
     const ws = await initWorkspace(root);
@@ -136,9 +134,8 @@ it("问问自然记忆入口直接持久，保留AI分类；用户可单击归�
     await queue(async () => {});
     const entry = listMemories(ws)[0];
     if (!entry) throw new Error("Missing persisted memory");
-    await archiveMemory(ws, entry.file, { by: "user", expected: memoryExpectation(entry) });
-    expect(listMemories(new Workspace(root))).toEqual([]);
-    expect(listMemories(new Workspace(root), { includeArchived: true })[0]?.ended).toBeTruthy();
+    expect(listMemories(new Workspace(root))).toMatchObject([entry]);
+    expect(response).not.toHaveProperty("result.notice");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

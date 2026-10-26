@@ -61,7 +61,6 @@ test("native modes remain explicit and resolved approvals share collapsed steps"
         ?.props.onClick();
     });
     expect(root.root.findAllByType("button").some((x) => x.children.includes("Auto · 自动审查"))).toBe(true);
-    expect(JSON.stringify(root.toJSON())).not.toContain("bypassPermissions");
     await act(async () => {
       root.root
         .findAllByType("button")

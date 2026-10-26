@@ -372,17 +372,21 @@ export async function replaceMemory(
   if (current.data.origin) {
     const key = `profile-correction:${file}:${createHash("sha256").update(JSON.stringify(candidate)).digest("hex")}`;
     const previous = normalizedMemory(ws, captureFile(key));
-    const result = await captureMemory(ws, {
-      ...candidate,
-      source: candidate.source ?? current.data.source ?? "个人档案 / Profile",
-      idempotency_key: key,
-      scope: "personal",
-      origin: "user-stated",
-      evidence: candidate.text,
-      observed_at: previous?.observed_at ?? isoInZone(opts.now ?? new Date(), ws.timeZone()),
-      replaces: file,
-      expected: opts.expected,
-    });
+    const result = await captureMemory(
+      ws,
+      {
+        ...candidate,
+        source: candidate.source ?? current.data.source ?? "个人档案 / Profile",
+        idempotency_key: key,
+        scope: "personal",
+        origin: "user-stated",
+        evidence: candidate.text,
+        observed_at: previous?.observed_at ?? isoInZone(opts.now ?? new Date(), ws.timeZone()),
+        replaces: file,
+        expected: opts.expected,
+      },
+      { now: opts.now },
+    );
     if (!result.entry) throw new KaituError("更正尚未保存", "CONFLICT");
     return result.entry;
   }
@@ -515,7 +519,7 @@ export const memoryCaptureSchema = z
 export async function captureMemory(
   ws: Workspace,
   raw: z.input<typeof memoryCaptureSchema>,
-  options: { scheduleVersion?: (message: string) => void } = {},
+  options: Pick<MemoryOptions, "now"> & { scheduleVersion?: (message: string) => void } = {},
 ) {
   const input = memoryCaptureSchema.parse(raw);
   if (input.scope !== "personal") return { status: "skipped", reason: input.scope };
@@ -556,7 +560,7 @@ export async function captureMemory(
         throw new KaituError("AI 推测不能更正用户陈述", "CONFLICT");
       candidate.sensitive ||= !!old.sensitive;
     }
-    const date = localDate(new Date(), ws.timeZone());
+    const date = localDate(options.now ?? new Date(), ws.timeZone());
     const data: Memory = { ...candidate, created: date, updated: date };
     validateMemory(data);
     // Publish once, atomically, including across two local clients using the same key.
@@ -586,12 +590,11 @@ export async function captureMemory(
     const message = `自动记录：${entry.name}`;
     let version: string | null = null;
     if (options.scheduleVersion) options.scheduleVersion(message);
-    else version = await snapshot(ws, message);
+    else version = await snapshot(ws, message, options.now);
     return {
       status,
       entry,
       version,
-      ...(!version ? { notice: "记忆文件已保存，可单条撤销；本次版本尚未核实。" } : {}),
     };
   } catch (error) {
     return {

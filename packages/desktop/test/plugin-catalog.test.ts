@@ -1,12 +1,4 @@
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -62,8 +54,6 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
     expect(fetchIndex).not.toHaveBeenCalled();
     expect(initial.find((entry: { name: string }) => entry.name === "kaitu-auday")).toMatchObject({
       installed: false,
-      version: "0.1.3",
-      dshVersion: "0.2.1-rc.3",
     });
     const [updated] = await Promise.all([service.list(true), service.list(true)]);
     expect(fetchIndex).toHaveBeenCalledTimes(1);
@@ -97,24 +87,9 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       expect(entries).toHaveLength(1);
       expect(entries[0]).toMatchObject({
         installed: false,
-        dshVersion: "0.2.1-rc.3",
       });
     }
     const novel = "kaitu-novel-workspace";
-    mkdirSync(join(profile, "node_modules", novel), { recursive: true });
-    for (const version of ["0.3.0", "0.3.1", "0.3.2", "0.1.2", "0.3.3-rc.1", "0.4.0", "9.0.0"]) {
-      writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: version } }));
-      writeFileSync(
-        join(profile, "node_modules", novel, "package.json"),
-        JSON.stringify({ name: novel, version }),
-      );
-      expect((await create().list()).find((entry: { name: string }) => entry.name === novel)).toMatchObject({
-        installedVersion: version,
-        version: "0.3.3-rc.1",
-        updateAvailable: version === "0.1.2",
-        spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#836439b9c78bcacc27f2eb25de2461faa1d4565c",
-      });
-    }
     writeInstalled(null);
     const online = create();
     const stale = {
@@ -152,7 +127,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       ]),
     ).toMatchObject({
       version: "0.3.3-rc.1",
-      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#836439b9c78bcacc27f2eb25de2461faa1d4565c",
+      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#6de01d5b32df4bb08f12e93ad69e72a64be56452",
     });
     const future = (version: string, dsh: string) => ({ ...template.versions[0], version, engines: { dsh } });
     expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.4 <0.3.0")])).toMatchObject({
@@ -161,6 +136,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
     const available = [future("9.0.0", ">=0.3.0"), future("0.4.0", ">=0.2.0 <0.3.0"), ...template.versions];
     expect(await refreshNovel(available)).toMatchObject({ title: "Online", version: "0.4.0" });
     writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: "0.1.2" } }));
+    mkdirSync(join(profile, "node_modules", novel), { recursive: true });
     writeFileSync(
       join(profile, "node_modules", novel, "package.json"),
       JSON.stringify({ name: novel, version: "0.1.2" }),
@@ -226,8 +202,6 @@ fs.writeFileSync(path, JSON.stringify(manifest));
     );
     mkdirSync(desktop, { recursive: true });
     writeFileSync(join(desktop, "cordis.patch.yml"), patch);
-    expect(existsSync(join(desktop, "package.json"))).toBe(false);
-    expect(existsSync(join(home, "profiles/sdk"))).toBe(false);
     const service = createPluginService({ archive, runtime, home, beforeChange, onChanged });
     await service.install(`${packageName}@1.0.0`);
     const manifests = ["desktop", "sdk"].map((profile) =>

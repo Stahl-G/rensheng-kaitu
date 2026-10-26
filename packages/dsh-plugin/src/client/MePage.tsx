@@ -3,6 +3,7 @@ import type { MeData, MeRules } from "../types.js";
 import { AvatarCropDialog } from "./AvatarCropDialog.js";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
+import { memoryDisplayText } from "./memory-presentation.js";
 
 const GOAL_SOURCES: Record<string, [string, string]> = {
   chatgpt: ["从 ChatGPT 搬来", "From ChatGPT"],
@@ -170,7 +171,7 @@ export function MePage({
   }, [loadMe]);
   const fact = (memory: MeData["memories"][number]) => (
     <div className={css.fact} key={memory.file}>
-      <p>{memory.text}</p>
+      <p>{memoryDisplayText(memory)}</p>
       <span className={css.src}>
         {[
           memory.origin
@@ -190,11 +191,11 @@ export function MePage({
           .filter(Boolean)
           .join(" · ")}
       </span>
-      {memory.evidence && (
+      {memory.uncertainty && <p className={css.src}>{memory.uncertainty}</p>}
+      {memory.evidence && memory.evidence !== memoryDisplayText(memory) && (
         <details>
           <summary>{t("原话与依据", "Evidence")}</summary>
           <p>{memory.evidence}</p>
-          {memory.uncertainty && <p>{memory.uncertainty}</p>}
         </details>
       )}
       {memory.ended && (

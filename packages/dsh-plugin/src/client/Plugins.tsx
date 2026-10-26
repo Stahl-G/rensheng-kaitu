@@ -111,12 +111,6 @@ export function Plugins({
       ) : (
         <section className={css.card}>
           <h3>{t("开图插件", "Kaitu plugins")}</h3>
-          <p className={css.small}>
-            {t(
-              "本轮提供 DSH rc.3 本地测试候选，尚未正式发布。请核对每项的版本与兼容要求。",
-              "This build offers local DSH rc.3 test candidates, not formal releases. Check each entry's version and compatibility.",
-            )}
-          </p>
           <div className={css["list-card"]}>
             {items.map((item) => (
               <div className={css["switch-row"]} key={item.name}>
