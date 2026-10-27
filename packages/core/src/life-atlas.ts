@@ -1,13 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  renameSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
@@ -16,6 +8,14 @@ import { mapDomains, scoreDomain, totalCoverage } from "@kaitu/cartographer/doma
 import { PARAMETER_PORTS, STYLE_PORTS, settings } from "@kaitu/cartographer/settings";
 import { KaituError } from "./errors.js";
 import type { AtlasSource } from "./life-atlas-source.js";
+import {
+  ATLAS_LIMIT,
+  atlasStorage,
+  deleteAtlasFiles,
+  discardAtlasJob,
+  terrainFiles,
+  terrainKey,
+} from "./life-atlas-storage.js";
 import { localStateRoot } from "./local-state.js";
 import type { Workspace } from "./workspace.js";
 export type { MapSettings } from "@kaitu/cartographer";
@@ -31,6 +31,8 @@ export interface AtlasCandidate {
   domains: string[];
   slots: Record<string, number>;
   archived?: boolean;
+  deleting?: boolean;
+  terrainKey?: string;
 }
 interface Manifest {
   version: 1;
@@ -42,12 +44,15 @@ export interface LifeAtlasState {
   running: boolean;
   progress: number;
   error: string | null;
+  errorKind?: "source" | "generate";
   active: string | null;
   latest: string | null;
   candidates: AtlasCandidate[];
   modules: AtlasSource["modules"];
   gaps: string[];
-  resource: AtlasResource | null;
+  resource?: AtlasResource | null;
+  resourceId: string | null;
+  storage: ReturnType<typeof atlasStorage>;
   domains: AtlasDomain[];
   coverage: number | null;
 }
@@ -65,11 +70,13 @@ interface Session {
   loading: boolean;
   running: boolean;
   progress: number;
-  error: string | null;
+  sourceError: string | null;
+  generationError: string | null;
   latest: string | null;
   requested: boolean;
   refreshTimer?: ReturnType<typeof setTimeout>;
   resources: Map<string, AtlasResource>;
+  storage: ReturnType<typeof atlasStorage>;
   listeners: Set<() => void>;
 }
 const sessions = new Map<string, Session>();
@@ -95,10 +102,12 @@ function session(ws: Workspace) {
     loading: false,
     running: false,
     progress: 0,
-    error: null,
+    sourceError: null,
+    generationError: null,
     latest: null,
     requested: false,
     resources: new Map(),
+    storage: atlasStorage(dir, manifest.candidates.length),
     listeners: subscriptions.get(ws.root) ?? new Set(),
   };
   subscriptions.set(ws.root, s.listeners);
@@ -121,11 +130,11 @@ function job<T>(data: object, progress?: (fraction: number) => void): Promise<T>
   return new Promise((resolve, reject) => {
     const worker = new Worker(entry, { workerData: data, resourceLimits: { maxOldGenerationSizeMb: 256 } });
     let settled = false;
-    const finish = (error?: Error, result?: T) => {
+    const finish = async (error?: Error, result?: T) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      void worker.terminate();
+      await worker.terminate();
       if (error) reject(error);
       else resolve(result as T);
     };
@@ -149,10 +158,10 @@ function refreshSource(s: Session) {
   void job<AtlasSource>({ kind: "source", root: s.root })
     .then((source) => {
       s.source = source;
-      s.error = null;
+      s.sourceError = null;
     })
     .catch((error) => {
-      s.error = error.message;
+      s.sourceError = error.message;
     })
     .finally(() => {
       s.loading = false;
@@ -165,7 +174,7 @@ export function invalidateLifeAtlas(ws: Workspace, file?: string) {
   if (
     file &&
     file !== "工作区" &&
-    !/(?:STATUS\.md|module\.json|me\/goals\.json|me\/profile\.md|data\/.*\.jsonl)$/.test(file)
+    !/(?:STATUS\.md|module\.json|me\/goals\.json|me\/profile\.md|.*\.jsonl)$/.test(file)
   )
     return;
   const s = sessions.get(ws.root);
@@ -191,7 +200,12 @@ function resource(s: Session, id: string) {
   if (s.resources.size > 3) s.resources.delete(s.resources.keys().next().value as string);
   return value;
 }
-export function readLifeAtlas(ws: Workspace, id?: string, now = new Date()): LifeAtlasState {
+export function readLifeAtlas(
+  ws: Workspace,
+  id?: string,
+  now = new Date(),
+  knownResourceId?: string,
+): LifeAtlasState {
   const s = session(ws);
   s.requested = true;
   refreshSource(s);
@@ -223,30 +237,38 @@ export function readLifeAtlas(ws: Workspace, id?: string, now = new Date()): Lif
     loading: s.loading,
     running: s.running,
     progress: s.progress,
-    error: s.error,
+    error: s.sourceError ?? s.generationError,
+    errorKind: s.sourceError ? "source" : s.generationError ? "generate" : undefined,
     active: s.manifest.active,
     latest: s.latest,
     candidates: s.manifest.candidates,
     modules: s.source?.modules ?? [],
     gaps: s.source?.gaps ?? [],
-    resource: candidate ? resource(s, candidate.id) : null,
+    resource: candidate ? (knownResourceId === candidate.id ? undefined : resource(s, candidate.id)) : null,
+    resourceId: candidate?.id ?? null,
+    storage: s.storage,
     domains,
     coverage: totalCoverage(mapped),
   };
 }
+export function readLifeAtlasProgress(ws: Workspace) {
+  const s = session(ws);
+  return { running: s.running, progress: s.progress };
+}
 function capacity(s: Session) {
-  let bytes = 0;
-  for (const dir of ["maps", "cache"])
-    if (existsSync(join(s.dir, dir)))
-      for (const name of readdirSync(join(s.dir, dir))) bytes += statSync(join(s.dir, dir, name)).size;
-  if (s.manifest.candidates.length >= 50 || bytes + 64 * 1024 ** 2 > 512 * 1024 ** 2)
-    throw new KaituError("地图存档已达到上限，已有方案完整保留", "STORAGE_LIMIT");
+  s.storage = atlasStorage(s.dir, s.manifest.candidates.length);
+  if (s.storage.count >= ATLAS_LIMIT.count || s.storage.bytes >= ATLAS_LIMIT.bytes)
+    throw new KaituError("地图存档已达到上限，请在存档中永久删除不需要的已移除方案后重试", "STORAGE_LIMIT");
 }
 /** Returns immediately. Only this workspace's generation job is exclusive; reads stay available. */
 export function generateLifeAtlas(ws: Workspace, input: AtlasGenerateInput) {
   const s = session(ws);
   if (s.running) throw new KaituError("地图正在生成", "BUSY");
-  if (!s.source || s.loading) throw new KaituError("正在读取模块，请稍后生成", "BUSY");
+  if (!s.source || s.loading)
+    throw new KaituError(
+      s.sourceError ?? "正在读取模块，请稍后生成",
+      s.sourceError ? "SOURCE_UNAVAILABLE" : "BUSY",
+    );
   if (
     !input ||
     !Array.isArray(input.domains) ||
@@ -287,14 +309,18 @@ export function generateLifeAtlas(ws: Workspace, input: AtlasGenerateInput) {
     domains: input.domains,
     slots,
   };
+  const before = new Set(terrainFiles(s.dir));
+  s.latest = null;
   s.running = true;
   s.progress = 0;
-  s.error = null;
+  s.generationError = null;
   void job({ kind: "generate", directory: s.dir, ...candidate }, (fraction) => {
     s.progress = Math.max(0, Math.min(1, fraction));
-    notify(s);
   })
-    .then(() => {
+    .then((result) => {
+      candidate.terrainKey = (result as { key: string }).key;
+      if (atlasStorage(s.dir, s.manifest.candidates.length).bytes > ATLAS_LIMIT.bytes)
+        throw new KaituError("新地图超出存档空间，请永久删除不需要的已移除方案后重试", "STORAGE_LIMIT");
       persist(s, {
         ...s.manifest,
         candidates: [...s.manifest.candidates, candidate],
@@ -303,19 +329,32 @@ export function generateLifeAtlas(ws: Workspace, input: AtlasGenerateInput) {
       s.latest = candidate.id;
     })
     .catch((error) => {
-      s.error = error.message;
+      s.generationError = error.message;
+      try {
+        discardAtlasJob(s.dir, candidate.id, before);
+      } catch (cleanup) {
+        s.generationError += `；清理未保存地图失败：${(cleanup as Error).message}`;
+      }
     })
     .finally(() => {
       s.running = false;
+      try {
+        s.storage = atlasStorage(s.dir, s.manifest.candidates.length);
+      } catch (error) {
+        s.generationError = (error as Error).message;
+      }
       notify(s);
     });
+  notify(s);
   return readLifeAtlas(ws);
 }
-export function changeLifeAtlas(ws: Workspace, id: string, action: "adopt" | "archive" | "restore") {
+export type AtlasAction = "adopt" | "archive" | "restore" | "delete";
+export function changeLifeAtlas(ws: Workspace, id: string, action: AtlasAction) {
   const s = session(ws);
   const manifest = structuredClone(s.manifest);
   const candidate = manifest.candidates.find((c) => c.id === id);
   if (!candidate) throw new KaituError("地图方案不存在", "NOT_FOUND");
+  if (candidate.deleting && action !== "delete") throw new KaituError("请先完成永久删除", "BAD_ARGS");
   if (action === "adopt") {
     if (candidate.archived) throw new KaituError("请先恢复地图", "BAD_ARGS");
     manifest.active = id;
@@ -323,8 +362,22 @@ export function changeLifeAtlas(ws: Workspace, id: string, action: "adopt" | "ar
     if (s.manifest.active === id) throw new KaituError("请先切换地图再移除", "BAD_ARGS");
     candidate.archived = true;
   } else if (action === "restore") candidate.archived = undefined;
-  else throw new KaituError("未知地图操作", "BAD_ARGS");
+  else if (action === "delete") {
+    if (s.running) throw new KaituError("请等待当前地图生成完成后删除", "BUSY");
+    if (s.manifest.active === id || !candidate.archived)
+      throw new KaituError("只能永久删除已移除且非当前的地图", "BAD_ARGS");
+    // Persist intent before removing files. An interrupted deletion remains visible and retryable.
+    candidate.terrainKey = terrainKey(s.dir, candidate);
+    candidate.deleting = true;
+    persist(s, structuredClone(manifest));
+    const retained = manifest.candidates.filter((c) => c.id !== id);
+    deleteAtlasFiles(s.dir, candidate, retained);
+    manifest.candidates = retained;
+    s.resources.delete(id);
+    if (s.latest === id) s.latest = null;
+  } else throw new KaituError("未知地图操作", "BAD_ARGS");
   persist(s, manifest);
+  s.storage = atlasStorage(s.dir, manifest.candidates.length);
   notify(s);
   return readLifeAtlas(ws);
 }

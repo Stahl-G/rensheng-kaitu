@@ -16,7 +16,7 @@ const nodeBanner = [
   "const __dirname = kaituDirname(__filename);",
 ].join("\n");
 
-export async function writePayload({ payload, archive, asar, payloadVersion, dshVersion }) {
+export async function writePayload({ payload, archive, asar, payloadVersion, dshVersion, target }) {
   const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json"));
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
@@ -146,7 +146,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     banner: { js: nodeBanner },
     external: ["better-sqlite3"],
   });
-  await bundleCartographerWorker(payload);
+  await bundleCartographerWorker(payload, "dist", target);
   mkdirSync(join(payload, "licenses"), { recursive: true });
   cpSync(join(root, "LICENSE"), join(payload, "licenses", "kaitu.txt"));
   cpSync(join(root, "THIRD_PARTY_NOTICES.md"), join(payload, "licenses", "THIRD_PARTY_NOTICES.md"));

@@ -5,5 +5,4 @@ export interface Fact {
   detail?: string
 }
 export interface Domain { id: string; title: string; facts: Fact[]; priority?: number }
-export interface LifeData { title: string; domains: Domain[]; sources: string[]; bytesRead: number; gaps: string[]; watchedFiles?:string[] }
-
+export interface LifeData { title: string; domains: Domain[]; sources: string[]; bytesRead: number; gaps: string[] }

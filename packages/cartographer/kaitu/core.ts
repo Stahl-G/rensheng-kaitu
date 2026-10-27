@@ -5,10 +5,9 @@ import { serialize, deserialize } from 'node:v8'
 import { generateWorld, type Progress } from '../src/gen/world.js'
 import { DEFAULT_PARAMS, type World } from '../src/gen/types.js'
 import { RNG, hashString } from '../src/gen/rng.js'
-import type { LifeData } from './workspace.js'
 
 export const UPSTREAM_SHA='e8c8db8919abe6a074e4d72e2f431e46bf93f2d1'
-export const GENERATOR_VERSION='kaitu-desktop-0.2.0'
+export const GENERATOR_VERSION='kaitu-desktop-0.2.1'
 export const THEME_CONFIG={width:640,height:400,landRatio:.58,plates:8,mountains:.65,erosion:.75,rainfall:.85,coastRoughness:.18,sketch:'mainland-v1'}
 export interface Anchor {x:number;y:number}
 export interface Terrain {world:World;anchors:Anchor[]}
@@ -47,21 +46,9 @@ export function getTerrain(dir:string, seed:string, variant=0, progress?:Progres
      const s=Math.hypot((x/world.W-tx),(y/world.H-ty))*2 + Math.max(0,3-world.coastDist[i])*.015
      if(s<score){score=s;best=i}
    }
-   if(best<0) throw new Error('This terrain has no room for the reserved label slots; choose a different seed explicitly.')
+   if(best<0) throw new Error('当前地形放不下全部区域，请提高大陆面积或降低海岸曲折程度后重试。')
    anchors.push({x:best%world.W,y:Math.floor(best/world.W)})
  }
  const terrain={world,anchors};atomic(path,serialize(terrain));return {terrain,cacheHit:false,key}
-}
-/** Assignment is append-only. New domains cannot move or rename existing domains. */
-export function layout(dir:string,data:LifeData,anchors:Anchor[],filename='domain-slots-v2.json') {
- const path=join(dir,filename)
- const slots:Record<string,number>=existsSync(path)?JSON.parse(readFileSync(path,'utf8')):Object.create(null)
- for(const d of [...data.domains].sort((a,b)=>(b.priority??0)-(a.priority??0)||a.id.localeCompare(b.id))) if(slots[d.id]===undefined) {
-   const free=anchors.findIndex((_,i)=>!Object.values(slots).includes(i))
-   if(free<0)throw new Error('All 12 map slots are assigned. Explicit map replanning is required to add another domain.')
-   slots[d.id]=free
- }
- atomic(path,JSON.stringify(slots,null,2))
- return data.domains.map(d=>({...d,anchor:anchors[slots[d.id]],slot:slots[d.id]}))
 }
 export { atomic }

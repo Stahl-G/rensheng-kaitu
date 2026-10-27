@@ -1,13 +1,14 @@
 import { PARAMETER_PORTS, STYLE_PORTS, settings } from "@kaitu/cartographer/settings";
-import type { AtlasGenerateInput, LifeAtlasState, MapSettings } from "@kaitu/core";
+import type { AtlasAction, AtlasGenerateInput, LifeAtlasState, MapSettings } from "@kaitu/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import css from "./LifeAtlasPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 
 export interface LifeAtlasPageProps {
-  loadLifeAtlas: (id?: string, refresh?: boolean) => Promise<LifeAtlasState>;
+  loadLifeAtlas: (id?: string, refresh?: boolean, knownResourceId?: string) => Promise<LifeAtlasState>;
+  loadLifeAtlasProgress?: () => Promise<{ running: boolean; progress: number }>;
   generateLifeAtlas: (input: AtlasGenerateInput) => Promise<LifeAtlasState>;
-  changeLifeAtlas: (id: string, action: "adopt" | "archive" | "restore") => Promise<LifeAtlasState>;
+  changeLifeAtlas: (id: string, action: AtlasAction) => Promise<LifeAtlasState>;
   subscribe?: (refresh: () => void) => () => void;
 }
 const styleNames: Record<string, readonly [string, string]> = {
@@ -49,6 +50,7 @@ export function atlasLabel(title: string): string[] {
 }
 export function LifeAtlasPage({
   loadLifeAtlas,
+  loadLifeAtlasProgress,
   generateLifeAtlas,
   changeLifeAtlas,
   subscribe,
@@ -59,6 +61,7 @@ export function LifeAtlasPage({
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [history, setHistory] = useState(false);
+  const [deleting, setDeleting] = useState<string>();
   const [config, setConfig] = useState<MapSettings>(() => settings());
   const [selected, setSelected] = useState<string[]>([]);
   const [preview, setPreview] = useState<string>();
@@ -68,9 +71,14 @@ export function LifeAtlasPage({
   const initialized = useRef(false);
   const request = useRef(0);
   const pendingCandidate = useRef(false);
+  const cachedResource = useRef<Pick<LifeAtlasState, "resourceId" | "resource">>({ resourceId: null });
   const regionElements = useRef(new Map<string, SVGPathElement>());
   const apply = useCallback((value: LifeAtlasState) => {
-    setState(value);
+    if (value.resource !== undefined) cachedResource.current = value;
+    setState({
+      ...value,
+      resource: value.resource === undefined ? cachedResource.current.resource : value.resource,
+    });
     setError("");
     if (!initialized.current && !value.loading && !value.error) {
       const current = value.candidates.find((c) => c.id === value.active);
@@ -93,7 +101,7 @@ export function LifeAtlasPage({
   const refresh = useCallback(
     (reload = false) => {
       const id = ++request.current;
-      void loadLifeAtlas(preview, reload)
+      void loadLifeAtlas(preview, reload, cachedResource.current.resourceId ?? undefined)
         .then((value) => {
           if (request.current === id) apply(value);
         })
@@ -112,9 +120,25 @@ export function LifeAtlasPage({
   useEffect(() => subscribe?.(refresh), [subscribe, refresh]);
   useEffect(() => {
     if (!state?.loading && !state?.running) return;
-    const timer = setInterval(refresh, 1200);
-    return () => clearInterval(timer);
-  }, [state?.loading, state?.running, refresh]);
+    let cancelled = false;
+    const poll = () => {
+      if (!state.running || !loadLifeAtlasProgress) return refresh();
+      void loadLifeAtlasProgress()
+        .then((progress) => {
+          if (cancelled) return;
+          setState((prior) => prior && { ...prior, ...progress });
+          if (!progress.running) refresh();
+        })
+        .catch(() => {
+          if (!cancelled) refresh();
+        });
+    };
+    const timer = setInterval(poll, 1200);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [state?.loading, state?.running, refresh, loadLifeAtlasProgress]);
   // Freshness changes with time even when no record is uploaded.
   useEffect(() => {
     const timer = setInterval(refresh, 60_000);
@@ -147,12 +171,13 @@ export function LifeAtlasPage({
       setError(err instanceof Error ? err.message : String(err));
     }
   };
-  const change = async (id: string, action: "adopt" | "archive" | "restore") => {
+  const change = async (id: string, action: AtlasAction) => {
     try {
       request.current++;
       const value = await changeLifeAtlas(id, action);
       setPreview(undefined);
       setPinned(null);
+      setDeleting(undefined);
       apply(value);
       if (action === "adopt") {
         const c = value.candidates.find((item) => item.id === id);
@@ -162,7 +187,13 @@ export function LifeAtlasPage({
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      try {
+        apply(await loadLifeAtlas());
+      } catch {
+        /* retain the action error */
+      }
+      setError(message);
     }
   };
   const close = () => {
@@ -202,8 +233,11 @@ export function LifeAtlasPage({
       {(error || state?.error) && (
         <p className={css.error} role="alert">
           {error || state?.error}{" "}
-          <button type="button" onClick={() => refresh(true)}>
-            {t("重试读取", "Retry")}
+          <button
+            type="button"
+            onClick={() => (state?.errorKind === "generate" ? void start() : refresh(true))}
+          >
+            {state?.errorKind === "generate" ? t("重新生成", "Generate again") : t("重试读取", "Retry")}
           </button>
         </p>
       )}
@@ -213,12 +247,7 @@ export function LifeAtlasPage({
             <legend>
               {t("选择入图的模块", "Choose areas to map")} · {selected.length}/12
             </legend>
-            <p>
-              {t(
-                "前两个区域靠近中心。未选择的模块仍保留在开图里。",
-                "The first two areas sit near the center. Other modules remain available in Kaitu.",
-              )}
-            </p>
+            <p>{t("前两个区域靠近中心。", "The first two areas sit near the center.")}</p>
             <div className={css.modules}>
               {state?.modules.map((m) => (
                 <label key={m.id}>
@@ -355,12 +384,7 @@ export function LifeAtlasPage({
                   ? t("生成新方案并保存", "Generate and save a candidate")
                   : t("生成我的地图", "Generate my map")}
             </button>
-            <small>
-              {t(
-                "每次生成都会存档。换回旧图，资料仍显示最新内容。",
-                "Every candidate is saved. Older maps always show your latest records.",
-              )}
-            </small>
+            <small>{t("每次生成都会存档。", "Every candidate is saved.")}</small>
           </fieldset>
         </div>
       )}
@@ -475,7 +499,7 @@ export function LifeAtlasPage({
                           x={p.x}
                           y={p.y - 5 - (lines.length - 1 - i) * 28}
                           textAnchor="middle"
-                          fontFamily="Songti SC, Noto Serif CJK SC, serif"
+                          fontFamily="Songti SC, SimSun, Microsoft YaHei, Noto Serif CJK SC, serif"
                           fontSize="26"
                           fontWeight="600"
                           fill={resource.settings.style === "teyvat" ? "#fbf7e8" : "#493a29"}
@@ -578,12 +602,6 @@ export function LifeAtlasPage({
                   {detail.score.missing.join(" · ")}
                 </p>
               )}
-              <small>
-                {t(
-                  "圆环衡量资料覆盖程度，不代表人生的成绩。",
-                  "Coverage describes your records, not your achievement.",
-                )}
-              </small>
             </aside>
           )}
         </div>
@@ -600,22 +618,46 @@ export function LifeAtlasPage({
       )}
       {!!state?.gaps.length && (
         <p className={css.error}>
-          {t(
-            "以下资料尚不可读取，地图未据此推断：",
-            "These records could not be read and were not inferred: ",
-          )}
+          {t("以下资料尚不可读取：", "These records could not be read: ")}
           {state.gaps.join(" · ")}
         </p>
       )}
       {history && (
         <section className={css.history} aria-label={t("地图存档", "Map history")}>
-          <h3>{t("每一张都能找回来", "Keep the maps you tried")}</h3>
+          <h3>{t("地图存档", "Map history")}</h3>
           <p>
             {t(
-              "存档只保存地图样式、地形与领域位置；资料始终取当前版本。移除后的方案可以恢复。",
-              "History stores terrain, style and area positions. Your records stay current. Removed candidates can be restored.",
+              "旧地图显示最新资料。移除可恢复；永久删除后释放存档空间。",
+              "Older maps show current records. Removed maps can be restored; permanent deletion frees storage.",
             )}
           </p>
+          {state?.storage && (
+            <p>
+              {state.storage.count}/{state.storage.maxCount} · {(state.storage.bytes / 1024 ** 2).toFixed(1)}{" "}
+              / {state.storage.maxBytes / 1024 ** 2} MiB
+            </p>
+          )}
+          {deleting && (
+            <div role="alertdialog" aria-label={t("永久删除地图", "Permanently delete map")}>
+              <p>
+                {t(
+                  "永久删除这张已移除的地图？删除后无法恢复。你的资料和当前地图会保留。",
+                  "Permanently delete this removed map? This cannot be undone. Your records and current map will be kept.",
+                )}
+              </p>
+              <p>
+                {new Date(state?.candidates.find((c) => c.id === deleting)?.createdAt ?? "").toLocaleString(
+                  locale,
+                )}
+              </p>
+              <button type="button" onClick={() => setDeleting(undefined)}>
+                {t("取消", "Cancel")}
+              </button>
+              <button type="button" disabled={state?.running} onClick={() => void change(deleting, "delete")}>
+                {t("确认永久删除", "Delete permanently")}
+              </button>
+            </div>
+          )}
           {[...(state?.candidates ?? [])].reverse().map((c) => (
             <div key={c.id}>
               <span>
@@ -625,9 +667,14 @@ export function LifeAtlasPage({
                 {c.archived ? t(" · 已移除", " · Removed") : ""}
               </span>
               {c.archived ? (
-                <button type="button" onClick={() => void change(c.id, "restore")}>
-                  {t("恢复", "Restore")}
-                </button>
+                <>
+                  <button type="button" disabled={c.deleting} onClick={() => void change(c.id, "restore")}>
+                    {t("恢复", "Restore")}
+                  </button>
+                  <button type="button" disabled={state?.running} onClick={() => setDeleting(c.id)}>
+                    {c.deleting ? t("重试永久删除", "Retry deletion") : t("永久删除", "Delete permanently")}
+                  </button>
+                </>
               ) : (
                 c.id !== state?.active && (
                   <>

@@ -17,6 +17,8 @@ test("new Explore default is the map; explicit user ordering and empty selection
 test("existing map collapses controls and keyboard activation opens the correct domain", async () => {
   const config = settings();
   const value: LifeAtlasState = {
+    resourceId: "one",
+    storage: { count: 2, bytes: 1000, maxCount: 50, maxBytes: 512 * 1024 ** 2 },
     loading: false,
     running: false,
     progress: 0,
@@ -78,6 +80,8 @@ test("existing map collapses controls and keyboard activation opens the correct 
       },
     ],
   };
+  value.candidates.push({ ...value.candidates[0], id: "old", archived: true });
+  const change = vi.fn(async () => ({ ...value, candidates: [value.candidates[0]] }));
   const load = vi.fn(async () => value);
   const generate = vi.fn(async () => ({
     ...value,
@@ -90,7 +94,7 @@ test("existing map collapses controls and keyboard activation opens the correct 
       createElement(LifeAtlasPage, {
         loadLifeAtlas: load,
         generateLifeAtlas: generate,
-        changeLifeAtlas: vi.fn(),
+        changeLifeAtlas: change,
       }),
     );
   });
@@ -116,6 +120,40 @@ test("existing map collapses controls and keyboard activation opens the correct 
   expect(generate).toHaveBeenCalled();
   expect(load).not.toHaveBeenCalledWith("older-candidate", false);
   expect(JSON.stringify(root.toJSON())).toContain("Synthetic save failed");
+  act(() =>
+    root.root
+      .findAllByType("button")
+      .find((b) => b.children.includes("地图存档"))
+      ?.props.onClick(),
+  );
+  act(() =>
+    root.root
+      .findAllByType("button")
+      .find((b) => b.children.includes("永久删除"))
+      ?.props.onClick(),
+  );
+  expect(root.root.findByProps({ role: "alertdialog" })).toBeTruthy();
+  expect(change).not.toHaveBeenCalled();
+  act(() =>
+    root.root
+      .findAllByType("button")
+      .find((b) => b.children.includes("取消"))
+      ?.props.onClick(),
+  );
+  expect(change).not.toHaveBeenCalled();
+  act(() =>
+    root.root
+      .findAllByType("button")
+      .find((b) => b.children.includes("永久删除"))
+      ?.props.onClick(),
+  );
+  await act(async () => {
+    await root.root
+      .findAllByType("button")
+      .find((b) => b.children.includes("确认永久删除"))
+      ?.props.onClick();
+  });
+  expect(change).toHaveBeenCalledWith("old", "delete");
   act(() => root.unmount());
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")).toHaveLength(2);
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")[1]).toMatch(/…$/);

@@ -3,7 +3,7 @@ import { buildRegions, REGION_VERSION } from './regions.js'
 import { renderNative } from './render.js'
 import { marginOf, compassSpot } from '../src/render/atlas/index.js'
 import { themeById } from '../src/render/atlas/styles.js'
-import { settings, type MapSettings } from './settings.js'
+import { type MapSettings } from './settings.js'
 import { THEME_CONFIG } from './core.js'
 export { settings, PARAMETER_PORTS, STYLE_PORTS } from './settings.js'
 export type { MapSettings } from './settings.js'
@@ -15,7 +15,7 @@ export type { Fact, LifeData } from './workspace.js'
 /** Called only inside a desktop worker. Terrain cache contains no personal records. */
 export function generateAtlas(cache: string, seed: string, variant: number, input: MapSettings,
  progress?: (stage: string, fraction: number) => void) {
- const selected = settings(input)
+ const selected = input
  const result = getTerrain(cache,seed,variant,progress,{...THEME_CONFIG,...selected.terrain})
  const regions = buildRegions(result.terrain)
  const svg = renderNative(result.terrain,selected.style,'',true,selected)

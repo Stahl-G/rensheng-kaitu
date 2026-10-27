@@ -855,6 +855,7 @@ function Overview({
         <LifeAtlasPage
           key={workspaceRoot}
           loadLifeAtlas={props.loadLifeAtlas}
+          loadLifeAtlasProgress={props.loadLifeAtlasProgress}
           generateLifeAtlas={props.generateLifeAtlas}
           changeLifeAtlas={props.changeLifeAtlas}
           subscribe={props.subscribe}

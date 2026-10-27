@@ -27,8 +27,9 @@
     "evidence-based domain coverage/freshness, independent labels, accessible local preview",
     "validated settings ports, user-selected modules, saved candidates, adoption and recoverable history",
     "NodeNext imports and offline system-font substitution; removed Vite-only debug logging",
-    "Desktop worker adapter exports native SVG and stable province geometry; life data stays in the current workspace projection"
+    "Desktop worker adapter exports native SVG and stable province geometry; life data stays in the current workspace projection",
+    "Remove unused fork export helpers; bundle pinned OFL Chinese font for consistent offline measurement."
   ],
-  "asset_audit": "Generated procedural paths and native theme code only. No game images, logos, observed geographic datasets, downloaded fonts, or third-party image assets are distributed. Teyvat is retained solely as an upstream research theme name. Generated personal data and maps remain outside this repository.",
+  "asset_audit": "Generated procedural paths and native theme code; no game images, logos or observed geographic datasets. An unmodified OFL Noto Serif SC font is bundled for offline Chinese rendering; see fonts/SOURCE.json and OFL.txt. Teyvat remains an upstream native theme. Personal maps stay outside this repository.",
   "kaitu_fork_commit": "6f5fe21"
 }

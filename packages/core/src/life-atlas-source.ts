@@ -34,39 +34,43 @@ export function atlasSource(ws: Workspace): AtlasSource {
     if (fact && !d.facts.some((f) => f.id === fact.id)) d.facts.push(fact);
   };
   function text(file: string) {
-    if (!ws.exists(file)) return "";
-    if (
-      statSync(ws.resolve(file)).size > 512_000 ||
-      bytesRead + statSync(ws.resolve(file)).size > 4_000_000
-    ) {
+    try {
+      if (!ws.exists(file)) return "";
+      const bytes = statSync(ws.resolve(file)).size;
+      if (bytes > 512_000 || bytesRead + bytes > 4_000_000) {
+        gaps.push(file);
+        return "";
+      }
+      const value = ws.scanText(file);
+      if (value === undefined) {
+        gaps.push(file);
+        return "";
+      }
+      sources.push(file);
+      bytesRead += bytes;
+      return value;
+    } catch {
       gaps.push(file);
       return "";
     }
-    const value = ws.scanText(file);
-    if (value === undefined) {
-      gaps.push(file);
-      return "";
-    }
-    if (value.length > 512_000 || bytesRead + value.length > 4_000_000) {
-      gaps.push(file);
-      return "";
-    }
-    sources.push(file);
-    bytesRead += value.length;
-    return value;
   }
-  const modules = listModules(ws).slice(0, 24);
+  const allModules = listModules(ws);
+  const modules = allModules.slice(0, 24);
+  if (allModules.length > modules.length) gaps.push("模块读取预算：超过 24 个模块");
   for (const { dir, def } of modules) {
     if (["me", "explore"].includes(dir)) continue;
     const id = def.id === "jobs" ? "work" : def.id;
     add(id, id === "work" ? "工作与求职" : def.name);
-    const files = [
-      `${dir}/STATUS.md`,
-      ...readdirSync(ws.resolve(dir), { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && entry.name !== "data" && !entry.name.startsWith("."))
-        .slice(0, 40)
-        .map((entry) => `${dir}/${entry.name}/STATUS.md`),
-    ];
+    const files = [`${dir}/STATUS.md`];
+    try {
+      const children = readdirSync(ws.resolve(dir), { withFileTypes: true }).filter(
+        (entry) => entry.isDirectory() && entry.name !== "data" && !entry.name.startsWith("."),
+      );
+      if (children.length > 40) gaps.push(`${dir}：子目录读取预算超过 40 个`);
+      files.push(...children.slice(0, 40).map((entry) => `${dir}/${entry.name}/STATUS.md`));
+    } catch {
+      gaps.push(dir);
+    }
     for (const file of files) {
       try {
         const value = text(file);
@@ -173,7 +177,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
         gaps.push(dir);
         return [];
       }
-      if (names.some((name) => ws.scanText(`${dir}/${name}`) === undefined)) {
+      if (names.some((name) => ws.isUnavailable(`${dir}/${name}`) || ws.conflictCopy(`${dir}/${name}`))) {
         gaps.push(dir);
         return [];
       }
@@ -228,11 +232,13 @@ export function atlasSource(ws: Workspace): AtlasSource {
             },
           ]
         : [
-            { id: "focus", label: "关注的事项", factIds: [], kinds: ["topic", "project", "context", "goal"] },
+            { id: "focus", label: "关注的事项", factIds: [], kinds: ["topic", "project", "context"] },
             {
               id: "state",
               label: "已有状态记录",
-              factIds: d.facts.filter((f) => f.kind !== "plan" && !!f.updated).map((f) => f.id),
+              factIds: d.facts
+                .filter((f) => f.kind !== "plan" && f.kind !== "goal" && !!f.updated)
+                .map((f) => f.id),
             },
             { id: "next", label: "下一步", factIds: [], kinds: ["plan", "goal"] },
             {

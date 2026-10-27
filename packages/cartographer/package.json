@@ -14,7 +14,8 @@
   "files": [
     "dist",
     "LICENSE",
-    "UPSTREAM.json"
+    "UPSTREAM.json",
+    "fonts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

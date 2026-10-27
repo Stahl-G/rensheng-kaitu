@@ -12,8 +12,9 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// Host 2 reports the authenticated plugin-page URL through its captured ready stream.
-export const HOST_API = 2;
+// Host 3 includes the native canvas runtime required by life-map payloads.
+// Host 2 cannot acquire native dependencies through a feature update.
+export const HOST_API = 3;
 export const DSH_VERSION = "0.2.1-rc.3";
 
 export function updateRoot(state) {

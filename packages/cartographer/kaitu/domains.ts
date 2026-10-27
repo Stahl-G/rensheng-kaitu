@@ -8,7 +8,7 @@ export interface Facet {
 export interface DomainRule {
  id: string; title: string; priority?: number
  temporal: {kind:'live'|'historical'; cadenceDays?:number}
- includeDomains?: string[]; factIds?: string[]; userFacts?: Fact[]; userFactIds?:string[]; facets: Facet[]
+ includeDomains?: string[]; factIds?: string[]; facets: Facet[]
 }
 /** Local Agent output contract, independent of the original workspace schema. No cloud calls. */
 export interface DomainPlan {version:1; modules?:string[]; discover?:boolean; domains:DomainRule[]}
@@ -17,7 +17,7 @@ export interface MappedDomain extends Domain {
 }
 export interface DomainScore {coverage:number|null; freshness:number|null; clarity:number; latest:string|null; missing:string[]}
 const safeId=/^[\p{L}\p{N}][\p{L}\p{N}_-]{0,79}$/u
-const uncertain=new Set(['unknown','inferred','needs_review','suggested'])
+const uncertain=new Set(['unknown','inferred','needs_review','suggested','planned'])
 const dedupe=(facts:Fact[])=>[...new Map(facts.map(f=>[f.id,f])).values()]
 
 export function validatePlan(plan:DomainPlan) {
@@ -30,7 +30,6 @@ export function validatePlan(plan:DomainPlan) {
   if(d.temporal.kind==='live'&&(!Number.isFinite(d.temporal.cadenceDays)||d.temporal.cadenceDays!<1))throw new Error(`Invalid update cadence: ${d.id}`)
   if(!Array.isArray(d.facets)||d.facets.length>16||new Set(d.facets.map(f=>f.id)).size!==d.facets.length)throw new Error(`Invalid coverage facets: ${d.id}`)
   for(const f of d.facets)if(!f.id||!f.label||!Array.isArray(f.factIds))throw new Error(`Invalid evidence facet: ${d.id}`)
-  for(const f of d.userFacts??[])if(!f.source.startsWith('conversation:')||!f.id||!f.title)throw new Error('User facts require explicit conversation provenance.')
  }
 }
 function defaultRule(d:Domain):DomainRule {
@@ -57,9 +56,9 @@ export function mapDomains(data:LifeData,plan?:DomainPlan):MappedDomain[] {
  return rules.map(rule=>{
   const facts=dedupe([
    ...data.domains.filter(d=>rule.includeDomains?.includes(d.id)).flatMap(d=>d.facts),
-   ...(rule.factIds??[]).map(id=>all.get(id)).filter((f):f is Fact=>!!f),...(rule.userFacts??[])
+   ...(rule.factIds??[]).map(id=>all.get(id)).filter((f):f is Fact=>!!f)
   ])
-  return {id:rule.id,title:rule.title,priority:rule.priority,facts,temporal:rule.temporal,facets:rule.facets.map(f=>({...f,evidence:dedupe(facts.filter(item=>f.factIds.includes(item.id)||f.kinds?.includes(item.kind))).filter(f=>!uncertain.has(f.status))}))}
+  return {id:rule.id,title:rule.title,priority:rule.priority,facts,temporal:rule.temporal,facets:rule.facets.map(f=>({...f,evidence:dedupe(facts.filter(item=>f.factIds.includes(item.id)||f.kinds?.includes(item.kind))).filter(f=>(!uncertain.has(f.status)||(f.status==='planned'&&(f.kind==='plan'||f.kind==='goal'))))}))}
  })
 }
 /** Semantic dimensions count once; duplicating uploads/facts never increases coverage. */

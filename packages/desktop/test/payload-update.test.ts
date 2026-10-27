@@ -19,6 +19,30 @@ import { HOST_API, rollback, selectPayload, selection, updateRoot } from "../pay
 import { createPayloadUpdater, installPayload, verifyRelease } from "../payload-update.mjs";
 import { readUpdateConfig } from "../update-config.mjs";
 
+it("the signed host-2 loader refuses a host-3 map payload before touching native dependencies", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-host-compatibility-"));
+  try {
+    // Selection logic is unchanged; exercise it with the previous signed host's API identity.
+    const source = readFileSync(new URL("../payload-loader.mjs", import.meta.url), "utf8");
+    const legacy = await import(
+      `data:text/javascript;base64,${Buffer.from(source.replace("export const HOST_API = 3;", "export const HOST_API = 2;")).toString("base64")}`
+    );
+    const legacyRoot = legacy.updateRoot(root);
+    const version = "0.1.1-rc.1";
+    mkdirSync(join(legacyRoot, version), { recursive: true });
+    writeFileSync(
+      join(legacyRoot, version, "payload.json"),
+      JSON.stringify({ version, dshVersion: "0.2.1-rc.3", hostApi: HOST_API }),
+    );
+    legacy.activate(root, version, null);
+    expect(() => legacy.selectPayload(root, join(root, "old-host-without-canvas"))).toThrow(/不兼容/);
+    expect(selectPayload(root, join(root, "new-host"))).toBe(join(root, "new-host/kaitu"));
+    expect(selection(root)).toEqual({ current: null, previous: null });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("真实下载已签名功能包，切换后读取新功能，回退保留内核和原版本", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-feature-update-"));
   const state = join(root, "state");
@@ -173,6 +197,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
     ).toThrow();
     expect(() => verifyRelease(signed({ ...release, dshVersion: "0.2.1-rc.2" }), publicKey)).toThrow();
     expect(() => verifyRelease(signed({ ...release, hostApi: 1 }), publicKey)).toThrow();
+    expect(() => verifyRelease(signed({ ...release, hostApi: 2 }), publicKey)).toThrow();
     await expect(
       installPayload({ state, resources, release, bytes: Buffer.from("broken") }),
     ).rejects.toThrow();

@@ -1,9 +1,25 @@
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  truncateSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
-import { expect, test } from "vitest";
+import { mapDomains, scoreDomain } from "@kaitu/cartographer/domains";
+import { expect, test, vi } from "vitest";
 import { atlasSource } from "../src/life-atlas-source.js";
-import { changeLifeAtlas, generateLifeAtlas, invalidateLifeAtlas, readLifeAtlas } from "../src/life-atlas.js";
+import {
+  changeLifeAtlas,
+  generateLifeAtlas,
+  invalidateLifeAtlas,
+  readLifeAtlas,
+  readLifeAtlasProgress,
+  subscribeLifeAtlas,
+} from "../src/life-atlas.js";
 import { localStateRoot } from "../src/local-state.js";
 import { addRecord, deleteRecord } from "../src/records.js";
 import type { Workspace } from "../src/workspace.js";
@@ -34,11 +50,16 @@ test("map histories preserve terrain and positions while projecting current reco
   );
   const source = await settled(ws);
   expect(source.modules.find((m) => m.id === "health")?.recommended).toBe(true);
-  const before = performance.now();
+  const changed = vi.fn();
+  const stop = subscribeLifeAtlas(ws, changed);
   expect(generateLifeAtlas(ws, { domains: ["health", "learning"] }).running).toBe(true);
-  expect(performance.now() - before).toBeLessThan(300);
+  expect(readLifeAtlasProgress(ws).running).toBe(true);
   const first = await settled(ws);
   const firstId = first.active as string;
+  expect(changed).toHaveBeenCalledTimes(2); // start and completion, never each worker progress update
+  stop();
+  expect(readLifeAtlas(ws, undefined, undefined, firstId).resource).toBeUndefined();
+  expect(JSON.stringify(readLifeAtlasProgress(ws))).not.toContain("svg");
   expect(first.resource?.settings.style).toBe("fantasy");
   expect(first.resource?.svg).toContain("<svg");
   expect(first.resource?.svg).not.toContain("@import");
@@ -58,6 +79,25 @@ test("map histories preserve terrain and positions while projecting current reco
   expect(updated.resource?.key).toBe(key);
   expect(updated.candidates).toHaveLength(1);
   expect(updated.domains.find((d) => d.id === "learning")?.facts[0]?.title).toBe("合成测试：新的学习主题");
+  const healthModule = JSON.parse(ws.readText("health/module.json"));
+  healthModule.records.workout.path = "records/workouts/{YYYY-MM}.jsonl";
+  ws.writeJson("health/module.json", healthModule);
+  const custom = addRecord(ws, "workout", {
+    exercise: "合成非 data 目录训练",
+    sets: 3,
+    reps: 5,
+    weight_kg: 20,
+    session_id: "synthetic",
+    ts: "2026-10-21T12:00:00+08:00",
+  });
+  invalidateLifeAtlas(ws, custom.file);
+  const customUpdated = await settled(ws);
+  expect(
+    customUpdated.domains
+      .find((d) => d.id === "health")
+      ?.facts.some((f) => f.title === "合成非 data 目录训练"),
+  ).toBe(true);
+  expect(customUpdated.resource?.key).toBe(key);
   generateLifeAtlas(ws, { domains: ["health", "learning", "finance"], sameTerrain: true });
   const second = await settled(ws);
   const secondId = second.latest as string;
@@ -90,8 +130,10 @@ test("map histories preserve terrain and positions while projecting current reco
     "cartography",
     createHash("sha256").update(ws.root).digest("hex").slice(0, 24),
   );
+  const mapsBefore = readdirSync(join(folder, "maps"));
+  const cacheBefore = readdirSync(join(folder, "cache"));
   mkdirSync(join(folder, "manifest.json.tmp"));
-  generateLifeAtlas(ws, { domains: ["health", "learning"], sameTerrain: true });
+  generateLifeAtlas(ws, { domains: ["health", "learning"] });
   let failed = readLifeAtlas(ws);
   const deadline = Date.now() + 20_000;
   while (failed.running && Date.now() < deadline) {
@@ -103,6 +145,16 @@ test("map histories preserve terrain and positions while projecting current reco
   expect(failed.active).toBe(firstId);
   expect(failed.resource?.key).toBe(key);
   expect(failed.candidates).toHaveLength(3);
+  expect(readdirSync(join(folder, "maps"))).toEqual(mapsBefore);
+  expect(readdirSync(join(folder, "cache"))).toEqual(cacheBefore);
+  rmSync(join(folder, "manifest.json.tmp"), { recursive: true });
+  changeLifeAtlas(ws, secondId, "archive");
+  const removed = changeLifeAtlas(ws, secondId, "delete");
+  expect(removed.candidates).toHaveLength(2);
+  expect(existsSync(join(folder, "maps", `${secondId}.json`))).toBe(false);
+  expect(existsSync(join(folder, "cache", `${key}.terrain`))).toBe(true);
+  expect(() => changeLifeAtlas(ws, firstId, "delete")).toThrow();
+  expect(ws.readText("learning/agent/STATUS.md")).toContain("新的学习主题");
   // All persisted map files contain only rendering resources/config, never source facts.
   const root = join(localStateRoot(), "cartography");
   for (const dir of readdirSync(root)) {
@@ -141,4 +193,70 @@ test("projection treats education as history, respects record deletions and leav
   expect(source.data.domains.find((d) => d.id === "health")?.facts).toEqual([]);
   deleteRecord(ws, "experience", record.record.id);
   expect(atlasSource(ws).data.domains.find((d) => d.id === "experience")?.facts).toEqual([]);
+  addRecord(ws, "experience", {
+    title: "尚未发生的合成经历",
+    fact_status: "planned",
+    event_type: "studied",
+    place: { name: "测试", precision: "unknown" },
+    time_precision: "year",
+    source: "synthetic-test",
+    ts: "2026-10-20T00:00:00+08:00",
+  });
+  const planned = atlasSource(ws);
+  const [domain] = mapDomains(planned.data, {
+    version: 1,
+    discover: false,
+    domains: planned.rules.filter((r) => r.id === "experience"),
+  });
+  expect(scoreDomain(domain, new Date("2026-10-27T00:00:00Z")).coverage).toBe(0);
 });
+
+test("full archives can permanently delete a map, reclaim actual bytes and generate again", async () => {
+  const ws = await freshWorkspace();
+  const folder = join(
+    localStateRoot(),
+    "cartography",
+    createHash("sha256").update(ws.root).digest("hex").slice(0, 24),
+  );
+  const { settings } = await import("@kaitu/cartographer/settings");
+  const shared = "a".repeat(24);
+  const unique = "b".repeat(24);
+  const candidates = Array.from({ length: 50 }, (_, i) => ({
+    id: `synthetic-${i}`,
+    createdAt: "2026-10-20T00:00:00Z",
+    seed: "storage-test",
+    variant: 0,
+    settings: settings(),
+    domains: ["health"],
+    slots: { health: 0 },
+    archived: i !== 0,
+  }));
+  mkdirSync(join(folder, "maps"), { recursive: true });
+  mkdirSync(join(folder, "cache"));
+  for (const c of candidates)
+    writeFileSync(
+      join(folder, "maps", `${c.id}.json`),
+      JSON.stringify({ key: c.id === "synthetic-49" ? unique : shared }),
+    );
+  writeFileSync(
+    join(folder, "manifest.json"),
+    JSON.stringify({ version: 1, active: "synthetic-0", candidates }),
+  );
+  writeFileSync(join(folder, "cache", `${shared}.terrain`), "synthetic shared cache");
+  const large = join(folder, "cache", `${unique}.terrain`);
+  writeFileSync(large, "");
+  truncateSync(large, 512 * 1024 ** 2); // sparse, disposable synthetic file
+  await settled(ws);
+  expect(() => generateLifeAtlas(ws, { domains: ["health"] })).toThrow(/上限/);
+  expect(() => changeLifeAtlas(ws, "synthetic-0", "delete")).toThrow();
+  const freed = changeLifeAtlas(ws, "synthetic-49", "delete");
+  expect(freed.storage.count).toBe(49);
+  expect(freed.storage.bytes).toBeLessThan(10_000);
+  expect(existsSync(large)).toBe(false);
+  expect(existsSync(join(folder, "cache", `${shared}.terrain`))).toBe(true);
+  generateLifeAtlas(ws, { domains: ["health"] });
+  const next = await settled(ws);
+  expect(next.candidates).toHaveLength(50);
+  expect(next.active).toBe("synthetic-0");
+  expect(readLifeAtlas(ws, next.latest as string).resource?.svg).toContain("<svg");
+}, 40_000);
