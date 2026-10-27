@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import fs, { readFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { handoverPack } from "../src/handover.js";
 import { history } from "../src/history.js";
@@ -13,6 +14,7 @@ import {
   updateMemory,
 } from "../src/memory.js";
 import { validateWorkspace } from "../src/validate.js";
+import { readWorkbench } from "../src/workbench.js";
 import { Workspace } from "../src/workspace.js";
 import { clonedWorkspace } from "./helpers.js";
 
@@ -170,6 +172,43 @@ it("版本保存失败仍可单条撤销纠正并恢复旧条，历史原文不�
   if (!second.entry) throw new Error("Missing correction");
   await archiveMemory(ws, second.entry.file, { by: "user", expected: memoryExpectation(second.entry) });
   expect(listMemories(new Workspace(ws.root))[0]?.text).toBe(observation.text);
+});
+
+it("版本库写入失败返回空版本也保留真实提示，重试成功后清除", async () => {
+  const ws = await clonedWorkspace();
+  const write = fs.writeFileSync.bind(fs);
+  const fail = vi.spyOn(fs, "writeFileSync").mockImplementation((...args) => {
+    if (String(args[0]).endsWith("/kaitu-internal-history"))
+      throw Object.assign(new Error("synthetic ENOSPC"), { code: "ENOSPC" });
+    return write(...args);
+  });
+  let result: Awaited<ReturnType<typeof captureMemory>>;
+  try {
+    result = await captureMemory(ws, observation);
+  } finally {
+    fail.mockRestore();
+  }
+  expect(result).toMatchObject({ status: "saved", version: null, warning: expect.any(String) });
+  expect(listMemories(ws)).toHaveLength(1);
+  expect(readWorkbench(ws).warnings).toHaveLength(1);
+  const retried = await captureMemory(ws, observation);
+  expect(retried).toMatchObject({ status: "duplicate", version: expect.any(String) });
+  expect(retried).not.toHaveProperty("warning");
+  expect(readWorkbench(ws).warnings).toEqual([]);
+});
+
+it("UTF8原键决定文件名，规范等价的NFC与NFD键仍是不同观察", async () => {
+  const ws = await clonedWorkspace();
+  const entries = [];
+  for (const key of ["é", "e\u0301"]) {
+    const result = await captureMemory(ws, { ...observation, idempotency_key: key });
+    expect(result.entry?.file).toBe(
+      `context_capture-${createHash("sha256").update(Buffer.from(key, "utf8")).digest("hex")}.md`,
+    );
+    entries.push(result.entry);
+  }
+  expect(entries[0]?.file).not.toBe(entries[1]?.file);
+  expect(listMemories(new Workspace(ws.root))).toHaveLength(2);
 });
 
 it("个人档案纠正自动记录也复用追加关联，撤销恢复原条，保留敏感标记", async () => {

@@ -4,7 +4,8 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { invalidateHistoryFile, snapshot } from "./history.js";
+import { historyNeedsRetry, invalidateHistoryFile, snapshot } from "./history.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import type { By } from "./records.js";
 import { formatErrors, schemas } from "./schema.js";
 import { isoInZone, localDate } from "./time.js";
@@ -520,7 +521,13 @@ export async function captureMemory(
   ws: Workspace,
   raw: z.input<typeof memoryCaptureSchema>,
   options: Pick<MemoryOptions, "now"> & { scheduleVersion?: (message: string) => void } = {},
-) {
+): Promise<{
+  status: string;
+  reason?: string;
+  entry?: MemoryEntry;
+  version?: string | null;
+  warning?: string;
+}> {
   const input = memoryCaptureSchema.parse(raw);
   if (input.scope !== "personal") return { status: "skipped", reason: input.scope };
   if (input.conflict) return { status: "needs-clarification", reason: input.conflict };
@@ -595,6 +602,15 @@ export async function captureMemory(
       status,
       entry,
       version,
+      ...(historyNeedsRetry(ws)
+        ? {
+            warning: pick(
+              normalizeLocale(readPreferences().locale),
+              "记忆文件已保存；版本尚未保存，请稍后重试。",
+              "Memory saved; version history could not be saved. Please retry later.",
+            ),
+          }
+        : {}),
     };
   } catch (error) {
     return {

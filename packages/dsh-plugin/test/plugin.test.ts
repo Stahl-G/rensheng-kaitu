@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import fs, { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -7,10 +7,11 @@ import {
   history,
   initWorkspace,
   listMemories,
+  readOverviewPage,
   readRecords,
   validateWorkspace,
 } from "@kaitu/core";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { ToolDefinition } from "../src/dsh.js";
 import { apply } from "../src/tools.js";
 
@@ -111,6 +112,7 @@ it("问问工具直接持久AI记忆，重开可回读，后台存版本不追�
         },
       },
       { workspace: root },
+      ws,
     );
     const input = {
       idempotency_key: "dsh-synthetic/1",
@@ -136,6 +138,35 @@ it("问问工具直接持久AI记忆，重开可回读，后台存版本不追�
     if (!entry) throw new Error("Missing persisted memory");
     expect(listMemories(new Workspace(root))).toMatchObject([entry]);
     expect(response).not.toHaveProperty("result.notice");
+    expect((await readOverviewPage(ws)).warnings).toEqual([]);
+
+    const write = fs.writeFileSync.bind(fs);
+    const failure = vi.spyOn(fs, "writeFileSync").mockImplementation((...args) => {
+      if (String(args[0]).endsWith("/kaitu-internal-history"))
+        throw Object.assign(new Error("synthetic background ENOSPC"), { code: "ENOSPC" });
+      return write(...args);
+    });
+    try {
+      await tools
+        .get("kaitu_memory_capture")
+        ?.execute(
+          { ...input, idempotency_key: "dsh-synthetic/background-failure" },
+          { signal: new AbortController().signal },
+        );
+      await queue(async () => {});
+    } finally {
+      failure.mockRestore();
+    }
+    expect(listMemories(ws)).toHaveLength(2);
+    expect((await readOverviewPage(ws)).warnings).toHaveLength(1);
+    const retried = (await tools
+      .get("kaitu_workspace")
+      ?.execute(
+        { operation: "snapshot", message: "retry synthetic background version" },
+        { signal: new AbortController().signal },
+      )) as { ok: boolean };
+    expect(retried.ok).toBe(true);
+    expect((await readOverviewPage(ws)).warnings).toEqual([]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

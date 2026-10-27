@@ -6,7 +6,7 @@ import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { snapshot } from "./history.js";
+import { historyNeedsRetry, snapshot } from "./history.js";
 import { countInboxNotes } from "./inbox-notes.js";
 import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listMemories } from "./memory.js";
@@ -129,6 +129,14 @@ export function readWorkbench(
   const connection = remote === true ? "remote-mcp" : remote || undefined;
   const today = localDate(now, ws.timeZone());
   const warnings: string[] = [];
+  if (historyNeedsRetry(ws))
+    warnings.push(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        "资料已保存；版本记录暂未完成，请稍后重试。",
+        "Your files are saved; version history could not be saved. Please retry later.",
+      ),
+    );
   if (templateOutdated(ws)) warnings.push("内置模板有更新，运行 kaitu upgrade。");
   function read<T>(label: string, fn: () => T, fallback: T): T {
     try {
