@@ -5,7 +5,7 @@ import css from "./LifeAtlasPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 
 export interface LifeAtlasPageProps {
-  loadLifeAtlas: (id?: string) => Promise<LifeAtlasState>;
+  loadLifeAtlas: (id?: string, refresh?: boolean) => Promise<LifeAtlasState>;
   generateLifeAtlas: (input: AtlasGenerateInput) => Promise<LifeAtlasState>;
   changeLifeAtlas: (id: string, action: "adopt" | "archive" | "restore") => Promise<LifeAtlasState>;
   subscribe?: (refresh: () => void) => () => void;
@@ -90,16 +90,19 @@ export function LifeAtlasPage({
       if (!value.error) setExpanded(false);
     }
   }, []);
-  const refresh = useCallback(() => {
-    const id = ++request.current;
-    void loadLifeAtlas(preview)
-      .then((value) => {
-        if (request.current === id) apply(value);
-      })
-      .catch((err) => {
-        if (request.current === id) setError(String(err.message ?? err));
-      });
-  }, [loadLifeAtlas, preview, apply]);
+  const refresh = useCallback(
+    (reload = false) => {
+      const id = ++request.current;
+      void loadLifeAtlas(preview, reload)
+        .then((value) => {
+          if (request.current === id) apply(value);
+        })
+        .catch((err) => {
+          if (request.current === id) setError(String(err.message ?? err));
+        });
+    },
+    [loadLifeAtlas, preview, apply],
+  );
   useEffect(() => {
     refresh();
     return () => {
@@ -199,7 +202,7 @@ export function LifeAtlasPage({
       {(error || state?.error) && (
         <p className={css.error} role="alert">
           {error || state?.error}{" "}
-          <button type="button" onClick={refresh}>
+          <button type="button" onClick={() => refresh(true)}>
             {t("重试读取", "Retry")}
           </button>
         </p>
@@ -207,7 +210,9 @@ export function LifeAtlasPage({
       {(!resource || expanded) && (
         <div className={css.settings}>
           <fieldset disabled={state?.running || state?.loading}>
-            <legend>{t("选择入图的模块", "Choose areas to map")}</legend>
+            <legend>
+              {t("选择入图的模块", "Choose areas to map")} · {selected.length}/12
+            </legend>
             <p>
               {t(
                 "前两个区域靠近中心。未选择的模块仍保留在开图里。",
@@ -220,6 +225,7 @@ export function LifeAtlasPage({
                   <input
                     type="checkbox"
                     checked={selected.includes(m.id)}
+                    disabled={selected.length >= 12 && !selected.includes(m.id)}
                     onChange={(event) =>
                       setSelected((ids) =>
                         event.target.checked ? [...ids, m.id] : ids.filter((id) => id !== m.id),

@@ -67,6 +67,7 @@ import {
   handoverPack,
   hideExperience,
   installProjectMemory,
+  invalidateLifeAtlas,
   keepOnboardingMatter,
   lifeMap,
   listLearning,
@@ -471,6 +472,7 @@ export async function productRequest(
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
     case "lifeAtlas":
+      if (args[1] === true) invalidateLifeAtlas(ws);
       return readLifeAtlas(ws, typeof args[0] === "string" ? args[0] : undefined);
     case "lifeAtlasGenerate":
       return generateLifeAtlas(ws, args[0] as AtlasGenerateInput);

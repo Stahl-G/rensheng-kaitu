@@ -1,9 +1,15 @@
 import { readdirSync, statSync } from "node:fs";
 import type { DomainRule, Fact, LifeData } from "@kaitu/cartographer";
 import { parseFrontmatter } from "./frontmatter.js";
-import { listModules, listRecordTypes, recordFilePattern, resolveRecordPath } from "./modules.js";
+import {
+  type RecordTypeRef,
+  listModules,
+  listRecordTypes,
+  recordFilePattern,
+  resolveRecordPath,
+} from "./modules.js";
 import { onboardingModuleChoices } from "./onboarding.js";
-import { readRecords } from "./records.js";
+import { type StoredRecord, readRecords } from "./records.js";
 import type { Workspace } from "./workspace.js";
 
 export interface AtlasSource {
@@ -52,7 +58,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
   const modules = listModules(ws).slice(0, 24);
   for (const { dir, def } of modules) {
     if (["me", "explore"].includes(dir)) continue;
-    const id = dir === "jobs" ? "work" : dir;
+    const id = def.id === "jobs" ? "work" : def.id;
     add(id, id === "work" ? "工作与求职" : def.name);
     const files = [
       `${dir}/STATUS.md`,
@@ -118,7 +124,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
             ? "learning"
             : /创作|writing/i.test(area)
               ? "creation"
-              : (modules.find((m) => m.dir === area || m.def.name === area)?.dir ?? "goals");
+              : (modules.find((m) => m.dir === area || m.def.name === area)?.def.id ?? "goals");
       add(
         id,
         (
@@ -153,74 +159,57 @@ export function atlasSource(ws: Workspace): AtlasSource {
         updated: profileDate,
       });
   }
-  // Fold complete revision streams through the existing reader. Skip an entire type when
-  // it exceeds the bounded projection budget; a partial stream could resurrect deleted data.
-  for (const ref of listRecordTypes(ws).filter((r) => !["me", "explore"].includes(r.module.dir))) {
+  // Read complete revision streams through the existing reader. A partial stream could
+  // resurrect deleted data, so unavailable or oversized types are omitted as a whole.
+  function records(ref: RecordTypeRef): StoredRecord[] {
     const { dir, match } = recordFilePattern(ref);
-    const abs = resolveRecordPath(ws, ref, dir);
-    if (!ws.exists(dir)) continue;
-    const names = readdirSync(abs).filter((name) => match.test(name));
-    if (!names.length) continue;
-    if (
-      names.length > 120 ||
-      names.some((name) => statSync(resolveRecordPath(ws, ref, `${dir}/${name}`)).size > 512_000)
-    ) {
-      gaps.push(dir);
-      continue;
-    }
-    const bytes = names.reduce(
-      (n, name) => n + statSync(resolveRecordPath(ws, ref, `${dir}/${name}`)).size,
-      0,
-    );
-    if (bytesRead + bytes > 4_000_000) {
-      gaps.push(dir);
-      continue;
-    }
     try {
-      // scanText refuses undownloaded cloud placeholders. Do not use only part of a type.
+      const abs = resolveRecordPath(ws, ref, dir);
+      if (!ws.exists(dir)) return [];
+      const names = readdirSync(abs).filter((name) => match.test(name));
+      const sizes = names.map((name) => statSync(resolveRecordPath(ws, ref, `${dir}/${name}`)).size);
+      const bytes = sizes.reduce((n, size) => n + size, 0);
+      if (names.length > 120 || sizes.some((size) => size > 512_000) || bytesRead + bytes > 4_000_000) {
+        gaps.push(dir);
+        return [];
+      }
       if (names.some((name) => ws.scanText(`${dir}/${name}`) === undefined)) {
         gaps.push(dir);
-        continue;
+        return [];
       }
       bytesRead += bytes;
       sources.push(dir);
-      const id = ref.module.dir === "jobs" ? "work" : ref.module.dir;
-      for (const row of readRecords(ws, ref.type).slice(-5)) {
-        const title =
-          typeof row.title === "string"
-            ? row.title
-            : typeof row.exercise === "string"
-              ? row.exercise
-              : (ref.def.label ?? ref.type);
-        add(id, id === "work" ? "工作与求职" : ref.module.def.name, {
-          id: `record:${ref.type}:${row.id}`,
-          title,
-          kind: "context",
-          status: row.review ? "needs_review" : "recorded",
-          source: dir,
-          updated: row.ts,
-        });
-      }
+      return readRecords(ws, ref.type);
     } catch {
       gaps.push(dir);
+      return [];
     }
   }
-  if (modules.some((m) => m.def.records?.experience)) {
-    add("experience", "来路");
-    try {
-      for (const row of readRecords(ws, "experience").slice(-100))
-        if (typeof row.title === "string")
-          add("experience", "来路", {
-            id: row.id,
-            title: row.title,
-            kind: "experience",
-            status: row.review ? "needs_review" : String(row.fact_status ?? "unknown"),
-            source: "explore/data/experiences",
-            updated:
-              typeof row.start === "string" && row.time_precision !== "unknown" ? row.start : undefined,
-          });
-    } catch {
-      gaps.push("explore/data/experiences");
+  for (const ref of listRecordTypes(ws).filter((r) => modules.some((m) => m.dir === r.module.dir))) {
+    const historical = ref.type === "experience";
+    if (!historical && ["me", "explore"].includes(ref.module.def.id)) continue;
+    const id = historical ? "experience" : ref.module.def.id === "jobs" ? "work" : ref.module.def.id;
+    const title = historical ? "来路" : id === "work" ? "工作与求职" : ref.module.def.name;
+    add(id, title);
+    for (const row of records(ref).slice(historical ? -100 : -5)) {
+      const factTitle =
+        typeof row.title === "string"
+          ? row.title
+          : typeof row.exercise === "string"
+            ? row.exercise
+            : (ref.def.label ?? ref.type);
+      add(id, title, {
+        id: `record:${ref.type}:${row.id}`,
+        title: factTitle,
+        kind: historical ? "experience" : "context",
+        status: row.review ? "needs_review" : historical ? String(row.fact_status ?? "unknown") : "recorded",
+        source: recordFilePattern(ref).dir,
+        updated: historical
+          ? typeof row.start === "string" && row.time_precision !== "unknown"
+            ? row.start
+            : undefined
+          : row.ts,
+      });
     }
   }
   const rules: DomainRule[] = [...domains.values()].map((d) => ({

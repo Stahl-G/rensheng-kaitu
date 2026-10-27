@@ -100,6 +100,8 @@ test("projection treats education as history, respects record deletions and leav
   expect(empty.modules.every((m) => !m.available && !m.recommended)).toBe(true);
   ws.writeText("learning/llm/STATUS.md", "---\ntitle: 大语言模型基础\nupdated: 2026-10-20\n---\n");
   ws.writeText("me/profile.md", "学历：合成测试大学\n");
+  ws.writeJson("家庭事务/module.json", { id: "family", name: "家庭", version: 1, visibility: "agent" });
+  ws.writeText("家庭事务/STATUS.md", "---\ntitle: 合成家庭计划\nupdated: 2026-10-20T00:00:00Z\n---\n");
   const record = addRecord(ws, "experience", {
     title: "合成测试大学",
     fact_status: "user_reported",
@@ -113,6 +115,7 @@ test("projection treats education as history, respects record deletions and leav
   expect(source.data.domains.find((d) => d.id === "learning")?.facts.map((f) => f.title)).toEqual([
     "大语言模型基础",
   ]);
+  expect(source.data.domains.find((d) => d.id === "family")?.title).toBe("家庭");
   expect(source.rules.find((r) => r.id === "experience")?.temporal.kind).toBe("historical");
   expect(source.data.domains.find((d) => d.id === "experience")?.facts[0]?.title).toBe("合成测试大学");
   expect(source.data.domains.find((d) => d.id === "health")?.facts).toEqual([]);
