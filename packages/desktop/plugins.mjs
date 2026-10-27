@@ -12,8 +12,6 @@ import { DSH_VERSION } from "./payload-loader.mjs";
 export const KAITU_PLUGIN_INDEX = "https://kaitu.si/plugins/index.json";
 // 后台 AI（DSH 窗口）和问问用不同的 DSH profile，插件两边都装，页面和工具才都能用。
 const PROFILES = ["desktop", "sdk"];
-// 没有精确候选的条目才显示占位；当前随包候选来自草稿提交，不表示已发布或部署。
-const pendingPlugins = [{ name: "kaitu-auday", title: "Auday", versions: [] }];
 const compatibleVersion = (plugin) =>
   plugin?.versions.find(
     (version) =>
@@ -187,7 +185,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       );
       const directory = new Map();
       const knownVersions = new Map();
-      for (const plugin of [...pendingPlugins, ...bundled, ...remote]) {
+      for (const plugin of [...bundled, ...remote]) {
         const known = knownVersions.get(plugin.name) ?? new Set();
         for (const version of plugin.versions) known.add(version.version);
         knownVersions.set(plugin.name, known);
