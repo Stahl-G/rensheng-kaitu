@@ -19,7 +19,7 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --d
 可用 `--output /你的目录/Kaitu.app` 更换输出位置，DMG 总是在同一目录；已有输出不会被覆盖。
 用 `--dsh-root /源码目录` 更换 DSH 工具来源。`--dry-run` 会列出操作步骤，并读取真实输入应用校验内核版本、主入口与 arm64 架构；不会复制、写入或签名，空 `.app` 目录不能通过校验。
 
-脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本，关于面板显示开图功能版本与 `Powered by DeepSeek Harness 0.2.1-rc.3`。
+脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本；关于面板显示开图功能版本、离线随包的官方 Powered by DeepSeek Harness Badge，以及宿主实际 DSH 版本。
 插件与初始化器随应用打包，运行时不依赖本仓库。自动更新源、强制更新查询与 `dsh://` 注册会移除。
 
 ## 开图功能包独立更新

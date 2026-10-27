@@ -134,7 +134,7 @@ await build({
   format: "cjs",
   jsx: "automatic",
   // 隐私说明等正文写成 Markdown 文件，按文本打包。
-  loader: { ".md": "text", ".svg": "dataurl" },
+  loader: { ".md": "text", ".svg": "dataurl", ".png": "dataurl" },
   external: ["react", "react/*", "@deepseek-ai/cordis", "@deepseek-ai/dsh-client-ui-primitives"],
   plugins: [styles.plugin],
   banner: {
