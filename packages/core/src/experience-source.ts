@@ -3,9 +3,19 @@ import { open } from "node:fs/promises";
 import { extname, relative, sep } from "node:path";
 import { KaituError } from "./errors.js";
 import { committedExperiences } from "./experience-imports.js";
+import { readResume } from "./resume.js";
 import type { Workspace } from "./workspace.js";
 
 export type ExperienceSource =
+  | {
+      kind: "attachment";
+      locator: string;
+      file: string;
+      name: string;
+      mime: string;
+      data: string;
+      page: number;
+    }
   | {
       kind: "local";
       locator: string;
@@ -37,6 +47,20 @@ export async function readSourceContent(ws: Workspace, locator: string): Promise
   }
   const match = /^(.*?)(?::L?(\d+)(?:-L?\d+)?|#L(\d+)(?:-L?\d+)?|#[^#]*)?$/.exec(locator);
   const file = match?.[1] ?? locator;
+  if (file.startsWith("me/files/resumes/")) {
+    if (!ws.exists(file))
+      return { kind: "unavailable", locator, reason: "原文已移动或不在当前工作区，经历仍保留" };
+    const source = readResume(ws, file);
+    return {
+      kind: "attachment",
+      locator,
+      file,
+      name: source.name,
+      mime: source.mime,
+      data: source.data,
+      page: Number(/#page=(\d+)$/.exec(locator)?.[1]) || 1,
+    };
+  }
   if (![".md", ".json", ".jsonl", ".txt"].includes(extname(file).toLowerCase()))
     return { kind: "unavailable", locator, reason: "这条经历尚未附可打开的原文路径" };
   const absolute = ws.resolve(file);

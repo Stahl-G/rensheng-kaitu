@@ -5,7 +5,7 @@ import {
   readProjectPage,
   validateProjectGoal,
 } from "@kaitu/core";
-import type { AskService } from "./ask.js";
+import type { AskAttachment, AskService } from "./ask.js";
 
 export async function suggestProjectGoal(
   ws: Workspace,
@@ -36,6 +36,7 @@ export async function askText(
   prompt: string,
   messages: { timeout: string; empty: string },
   ms = 60000,
+  attachments: AskAttachment[] = [],
 ): Promise<string> {
   const thread = await ask.create();
   let stop = () => {};
@@ -58,7 +59,7 @@ export async function askText(
         else reject(new KaituError(messages.empty, "AI_FAILED"));
       });
     });
-    const sending = ask.send(thread.id, prompt);
+    const sending = ask.send(thread.id, prompt, attachments);
     void sending.catch(() => {});
     return await Promise.race([response, sending.then(() => response)]);
   } catch (error) {

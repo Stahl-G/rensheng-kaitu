@@ -43,6 +43,8 @@ import {
   type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
+  type ResumeReceipt,
+  type ResumeUpload,
   type SettingsData,
   type StartLearningInput,
   type SyncProvider,
@@ -80,6 +82,7 @@ import {
   exportWorkspace,
   handoverPack,
   hideExperience,
+  importResume,
   installProjectMemory,
   keepOnboardingMatter,
   lifeMap,
@@ -120,6 +123,7 @@ import {
   readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
+  readResume,
   readSettings,
   readWeather,
   recoverExperienceImports,
@@ -130,6 +134,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resumePrompt,
   saveAvatar,
   saveHometown,
   saveLearningCheckin,
@@ -150,6 +155,7 @@ import {
   syncProject,
   tryNews,
   unhideExperience,
+  uploadResume,
   workspaceBackupRequest,
   writeExploration,
 } from "@kaitu/core";
@@ -721,6 +727,26 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("me")
   async me(): Promise<MeData> {
     return readMe(this.workspace);
+  }
+
+  @Remote("resumeUpload")
+  async resumeUpload(name: string, base64: string): Promise<ResumeUpload> {
+    return this.write(() => uploadResume(this.workspace, name, base64));
+  }
+
+  @Remote("resumePrompt")
+  async resumePrompt(file: string): Promise<string> {
+    const source = readResume(this.workspace, file);
+    return resumePrompt(
+      source.mime === "application/pdf"
+        ? await uploadResume(this.workspace, source.name, source.data)
+        : source,
+    );
+  }
+
+  @Remote("resumeImport")
+  async resumeImport(file: string, answer: string): Promise<ResumeReceipt> {
+    return this.write(() => importResume(this.workspace, file, answer));
   }
 
   @Remote("health")

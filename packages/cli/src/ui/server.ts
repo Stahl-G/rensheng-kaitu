@@ -528,7 +528,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         const method = url.pathname.slice("/api/product/".length);
         const args = await requestJson(
           req,
-          ["financeImportPreview", "onboardingImportPreview", "askSend"].includes(method)
+          ["financeImportPreview", "onboardingImportPreview", "askSend", "resumeUpload"].includes(method)
             ? 49 * 1024 * 1024
             : 3 * 1024 * 1024,
         );

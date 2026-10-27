@@ -192,6 +192,14 @@ export function listProjects(ws: Workspace, options: { now?: Date; slug?: string
         title: project.data.title,
         kind: project.data.kind,
         stage: project.data.stage,
+        blocked: (project.data.blocked ?? []).flatMap((item) => {
+          if (typeof item === "string") return [item];
+          if (item && typeof item === "object") {
+            if ("title" in item && typeof item.title === "string") return [item.title];
+            if ("reason" in item && typeof item.reason === "string") return [item.reason];
+          }
+          return [];
+        }),
         links: project.data.links,
         progress: project.data.progress ?? null,
         next: project.data.next ?? [],

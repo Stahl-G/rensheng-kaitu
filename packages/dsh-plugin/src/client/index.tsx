@@ -497,6 +497,27 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              uploadResume: async (name: string, base64: string) => {
+                const result = await ctx.remote.kaitu.resumeUpload(name, base64);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              resumePrompt: async (file: string) => {
+                const result = await ctx.remote.kaitu.resumePrompt(file);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              importResume: async (file: string, answer: string) => {
+                const result = await ctx.remote.kaitu.resumeImport(file, answer);
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              resumeConnection: async () => ({
+                configured: false,
+                provider: "",
+                model: "",
+                supportsImages: false,
+              }),
               loadNews: async () => {
                 const result = await ctx.remote.kaitu.news();
                 if (!result.ok) throw new Error(result.error.message);

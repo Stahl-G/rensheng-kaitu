@@ -108,7 +108,7 @@ export function readMe(ws: Workspace): MeData {
       .filter(
         (item) =>
           (item.event_type === "studied" || item.event_type === "worked") &&
-          !["planned", "suggested"].includes(item.fact_status),
+          ["user_reported", "observed"].includes(item.fact_status),
       )
       .map((item) => ({
         id: item.id,

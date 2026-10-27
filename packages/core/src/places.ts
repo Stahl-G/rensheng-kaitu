@@ -192,11 +192,14 @@ function importedKeys(ws: Workspace): Set<string> {
   return seen;
 }
 
-function prepareExperience(item: ExperienceInput) {
+function prepareExperience(item: ExperienceInput, previous?: Experience) {
   if (
     !item?.place ||
     Object.hasOwn(item, "review") ||
-    Object.keys(item.place).some((field) => !["name", "country"].includes(field))
+    Object.keys(item.place).some((field) => !["name", "country"].includes(field)) ||
+    typeof item.place.name !== "string" ||
+    !item.place.name.trim() ||
+    (item.place.country !== undefined && typeof item.place.country !== "string")
   )
     throw new KaituError("地点只接受城市名 name 和国家代码 country，坐标由城市表提供", "BAD_ARGS");
   if (
@@ -206,6 +209,12 @@ function prepareExperience(item: ExperienceInput) {
       item.end.slice(0, Math.min(item.start.length, item.end.length))
   )
     throw new KaituError("结束时间不能早于开始时间，请核对经历日期", "BAD_ARGS");
+  if (
+    previous &&
+    item.place.name.trim() === previous.place.name.trim() &&
+    (item.place.country?.trim().toUpperCase() ?? "") === (previous.place.country?.trim().toUpperCase() ?? "")
+  )
+    return { ...item, place: previous.place, review: previous.review };
   const candidates = resolvePlace(item.place.name, item.place.country);
   const city = candidates.length === 1 ? candidates[0] : undefined;
   return {
@@ -245,7 +254,10 @@ export async function editExperience(
 ) {
   const current = currentRevision(ws, id, expectedRevision);
   if (current.deleted) throw new KaituError("这条经历已隐藏，请先撤销隐藏", "NOT_FOUND");
-  const input = prepareExperience({ ...changes, source: String(current.source) });
+  const input = prepareExperience(
+    { ...changes, source: String(current.source) },
+    current as unknown as Experience,
+  );
   const record = updateRecord(
     ws,
     "experience",
@@ -291,7 +303,7 @@ export async function addExperiences(
   const excluded = excludedExperienceSources(ws);
   const accepted = items.filter((item) => !excluded.has(experienceSourceKey(item?.source)));
   const excluded_count = items.length - accepted.length;
-  const data = accepted.map(prepareExperience);
+  const data = accepted.map((item) => prepareExperience(item));
   const prepared = addRecords(ws, "experience", data, { by, dryRun: true });
   const seen = importedKeys(ws);
   const freshIndices = new Set<number>();

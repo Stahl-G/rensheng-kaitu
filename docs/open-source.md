@@ -40,6 +40,7 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | 项目 | 开图用于哪里 | 许可证 |
 |---|---|---|
 | [fflate](https://github.com/101arrowz/fflate) | ZIP 数据解压、导入与功能更新包解压 | MIT |
+| [unpdf](https://github.com/unjs/unpdf) | 本机提取简历 PDF 文字与页码，拒绝损坏或无文字文件；内含 Mozilla PDF.js | MIT / Apache-2.0 |
 | [saxes](https://github.com/lddubeau/saxes) | Apple Health XML 解析 | ISC |
 | [ical.js](https://github.com/kewisch/ical.js) | ICS 日历解析与订阅数据处理 | MPL-2.0 |
 | [isomorphic-git](https://github.com/isomorphic-git/isomorphic-git) | 资料版本历史与撤销 | MIT |

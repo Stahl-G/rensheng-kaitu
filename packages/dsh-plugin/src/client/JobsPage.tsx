@@ -6,6 +6,7 @@ import { useT } from "./i18n.js";
 export interface JobsPageProps {
   loadJobs: () => Promise<JobsData>;
   subscribe?: (refresh: () => void) => () => void;
+  embedded?: boolean;
 }
 
 function sourceLink(value?: string) {
@@ -71,6 +72,7 @@ export function JobsPage(props: JobsPageProps) {
   const t = useT();
   const [data, setData] = useState<JobsData | null>(null);
   const [error, setError] = useState("");
+  const [limit, setLimit] = useState(20);
   const refresh = useCallback(async () => {
     try {
       setData(await props.loadJobs());
@@ -87,7 +89,7 @@ export function JobsPage(props: JobsPageProps) {
   return (
     <section className={css.page} aria-label={t("岗位箱", "Job inbox")}>
       <header>
-        <h1>{t("岗位箱", "Job inbox")}</h1>
+        {props.embedded ? <h2>{t("求职", "Job search")}</h2> : <h1>{t("岗位箱", "Job inbox")}</h1>}
         <p>
           {t(
             "读取已有岗位来源，展开查看详情。",
@@ -112,9 +114,14 @@ export function JobsPage(props: JobsPageProps) {
       {data?.available && !data.items.length && (
         <p>{t("来源中还没有岗位。", "The source has no positions yet.")}</p>
       )}
-      {data?.items.map((item, index) => (
+      {data?.items.slice(0, limit).map((item, index) => (
         <JobDetails key={`${index}:${item.id ?? ""}`} item={item} />
       ))}
+      {data && data.items.length > limit && (
+        <button type="button" onClick={() => setLimit((count) => count + 20)}>
+          {t("查看更多岗位", "Show more positions")}
+        </button>
+      )}
     </section>
   );
 }

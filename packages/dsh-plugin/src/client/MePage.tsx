@@ -101,11 +101,11 @@ type CareerItem = MeData["career"][number];
 
 function period(item: CareerItem, t: Translate): string {
   if (!item.start) return t("时间未知", "Dates unknown");
-  return `${item.start} – ${item.end ?? t("至今", "present")}`;
+  return `${item.start} – ${item.end ?? t("结束时间未记录", "End date not recorded")}`;
 }
 
 /** 简历由经历生成：工作在前，读书在后，各自从近到远。 */
-function downloadResume(data: MeData, t: Translate) {
+export function downloadResume(data: MeData, t: Translate) {
   const lines = [`# ${data.name ?? t("简历", "Résumé")}`, ""];
   if (data.bio) lines.push(data.bio, "");
   for (const [kind, heading] of [

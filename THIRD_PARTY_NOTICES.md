@@ -7,6 +7,7 @@
 |---|---|---|
 | DSH ChatGPT SIWC 0.9.4（固定源码 e7a3e450ed7aab5e44179cd0039ef200c1050b0b） | MIT | https://github.com/Fanch-hui/dsh-plugin-chatgpt-siwc |
 | DeepSeek Harness 官方 Badge（原始 PNG，固定素材 commit 22ddee3792402c3e70ec5f86a63c3e3e895a2f60） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness/blob/22ddee3792402c3e70ec5f86a63c3e3e895a2f60/packages/experimental/skill-badge/assets/dsh-badge.png |
+| unpdf 1.9.1（本机简历 PDF 文字提取；内含 Mozilla PDF.js） | MIT / PDF.js Apache-2.0 | https://github.com/unjs/unpdf |
 | fflate | MIT | https://github.com/101arrowz/fflate |
 | saxes | ISC | https://github.com/lddubeau/saxes |
 | ical.js | MPL-2.0 | https://github.com/kewisch/ical.js |

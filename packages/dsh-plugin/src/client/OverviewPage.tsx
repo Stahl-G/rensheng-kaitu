@@ -14,7 +14,7 @@ import { FeatureUpdates } from "./FeatureUpdates.js";
 import { FinancePage, type FinancePageProps } from "./FinancePage.js";
 import { HandoverPanel } from "./Handover.js";
 import { HealthPage, type HealthPageProps } from "./HealthPage.js";
-import { JobsPage, type JobsPageProps } from "./JobsPage.js";
+import type { JobsPageProps } from "./JobsPage.js";
 import { type LearningDraft, type LearningSource, emptyLearningDraft } from "./LearningPage.js";
 import { LibraryFileImport } from "./LibraryFileImport.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
@@ -31,9 +31,11 @@ import { PlansCard } from "./Plans.js";
 import { Plugins } from "./Plugins.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
+import type { ResumeServices } from "./ResumeImport.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
+import { WorkPage } from "./WorkPage.js";
 import {
   type ExploreModule,
   defaultExploreEntries,
@@ -48,6 +50,7 @@ export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
     PersonalServices,
     JobsPageProps,
+    Partial<ResumeServices>,
     OnboardingServices,
     Omit<NewsPageProps, "onPrompt" | "onLearn">,
     Omit<DoingPageProps, "onPrompt">,
@@ -867,7 +870,15 @@ function Overview({
         {...(props.navigation ? { selectedTab: healthTab, onSelectTab: setHealthTab } : {})}
       />
     ),
-    jobs: <JobsPage {...child} />,
+    jobs: (
+      <WorkPage
+        {...child}
+        openProjects={(slug) => {
+          openRecord("projects");
+          if (slug) setProjectFocus(slug);
+        }}
+      />
+    ),
     footprints: <MapPage {...child} />,
     news: (
       <NewsPage

@@ -66,6 +66,7 @@ import {
   generateLifeAtlas,
   handoverPack,
   hideExperience,
+  importResume,
   installProjectMemory,
   invalidateLifeAtlas,
   keepOnboardingMatter,
@@ -114,6 +115,7 @@ import {
   readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
+  readResume,
   readSettings,
   readWeather,
   receiveBankNotification,
@@ -126,6 +128,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resumePrompt,
   saveAvatar,
   saveHometown,
   saveLearningCheckin,
@@ -146,6 +149,7 @@ import {
   syncProject,
   tryNews,
   unhideExperience,
+  uploadResume,
   workspaceBackupRequest,
   writeExploration,
 } from "@kaitu/core";
@@ -153,6 +157,7 @@ import { directionGeneration } from "./directions-ai.js";
 import { suggestNewsKeywords } from "./news-ai.js";
 import { organizeOnboardingMatter } from "./onboarding-ai.js";
 import { askTextOnly, suggestProjectGoal } from "./project-ai.js";
+import { extractResume } from "./resume-ai.js";
 
 import type { AskMode, AskService } from "./ask.js";
 
@@ -161,6 +166,8 @@ export const planMutations = new Set(["decideProposal", "scheduleNext", "editCal
 
 export const productMutations = new Set([
   "archiveMemory",
+  "resumeUpload",
+  "resumeImport",
   "replaceMemory",
   "learningStart",
   "learningSave",
@@ -235,6 +242,24 @@ export async function productRequest(
     return args[i] as number;
   };
   const locale = (i: number): Locale => normalizeLocale(args[i]);
+  if (method === "resumeUpload") return uploadResume(ws, text(0), text(1));
+  if (method === "resumeExtract") return extractResume(ws, text(0), ask);
+  if (method === "resumeImport") return importResume(ws, text(0), text(1));
+  if (method === "resumePrompt") {
+    const source = readResume(ws, text(0));
+    const upload =
+      source.mime === "application/pdf" ? await uploadResume(ws, source.name, source.data) : source;
+    return resumePrompt(upload);
+  }
+  if (method === "resumeConnection") {
+    const settings = await ask?.settings(true);
+    return {
+      configured: settings?.configured ?? false,
+      supportsImages: settings?.supportsImages ?? false,
+      provider: settings?.providerName || settings?.provider || "",
+      model: settings?.model || "",
+    };
+  }
   if (method === "archiveMemory")
     return archiveMemory(ws, text(0), { by: "user", expected: args[1] as MemoryExpectation });
   if (method === "replaceMemory")
