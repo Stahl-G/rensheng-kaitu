@@ -296,3 +296,9 @@ yahoo-finance2 4.0.3（MIT）：https://github.com/gadicc/yahoo-finance2 。仅�
 - 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.3/packages/web
 - 复用发布包的提供方实现，Key 在开图适配层通过本机凭据服务读取，不写入提供方配置。
 - 完整许可证随 npm 依赖及桌面载荷的 `licenses/` 目录保留。
+
+## Cartographer
+
+Procedural terrain and native atlas renderer from Jannchie/cartographer, commit `e8c8db8919abe6a074e4d72e2f431e46bf93f2d1`, MIT, Copyright (c) 2026 Jianqi Pan. The maintained Kaitu adapter is based on local fork `6f5fe21`. Source, license, and modifications are in `packages/cartographer/`. No game images, logos, downloaded fonts or personal maps are included.
+
+@napi-rs/canvas 1.0.9 supplies offline font measurement and SVG/PNG export (MIT). Platform binaries are bundled with the desktop feature payload.

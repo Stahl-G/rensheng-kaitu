@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node
 import { createRequire, findPackageJSON } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { bundleCartographerWorker } from "./package-cartographer.mjs";
 import { HOST_API } from "./payload-loader.mjs";
 import { adaptSiwcSource } from "./siwc-compat.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -145,6 +146,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     banner: { js: nodeBanner },
     external: ["better-sqlite3"],
   });
+  await bundleCartographerWorker(payload);
   mkdirSync(join(payload, "licenses"), { recursive: true });
   cpSync(join(root, "LICENSE"), join(payload, "licenses", "kaitu.txt"));
   cpSync(join(root, "THIRD_PARTY_NOTICES.md"), join(payload, "licenses", "THIRD_PARTY_NOTICES.md"));

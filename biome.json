@@ -10,7 +10,8 @@
       "packages/core/data/cities.json",
       "packages/dsh-plugin/src/client/map-assets/paper-tiles.json",
       ".claude/settings.local.json",
-      "dsh-novel-workspace/**"
+      "dsh-novel-workspace/**",
+      "packages/cartographer/**"
     ]
   },
   "formatter": {

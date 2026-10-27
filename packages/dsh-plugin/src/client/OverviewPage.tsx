@@ -19,6 +19,7 @@ import { type LearningDraft, type LearningSource, emptyLearningDraft } from "./L
 import { LibraryFileImport } from "./LibraryFileImport.js";
 import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryPage.js";
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
+import { LifeAtlasPage, type LifeAtlasPageProps } from "./LifeAtlasPage.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
 import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
@@ -55,7 +56,8 @@ export interface OverviewPageProps
     Omit<HealthPageProps, "onPrompt" | "selectedTab" | "onSelectTab">,
     Omit<FinancePageProps, "onPrompt" | "today" | "timeZone">,
     CalendarPageProps,
-    LibraryProps {
+    LibraryProps,
+    Partial<LifeAtlasPageProps> {
   /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
   loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
@@ -245,7 +247,10 @@ function Overview({
         : installed;
     });
   }, [view, explore, pluginModules]);
-  const availableModules = [...exploreModules, ...pluginModules];
+  const availableModules = [
+    ...exploreModules.filter((entry) => entry.id !== "life-map" || props.loadLifeAtlas),
+    ...pluginModules,
+  ];
   const firstExplore =
     exploreEntries?.find((id) => availableModules.some((entry) => entry.id === id)) ?? "modules";
   useEffect(() => {
@@ -441,15 +446,17 @@ function Overview({
       exploreContent.directions ===
       0;
   const exploreStart =
-    exploreContent && exploreEntries
-      ? exploreDestination(
-          exploreEntries,
-          exploreContent,
-          availableModules.map(({ id }) => id),
-        )
-      : exploreError
-        ? firstExplore
-        : null;
+    firstExplore === "life-map"
+      ? firstExplore
+      : exploreContent && exploreEntries
+        ? exploreDestination(
+            exploreEntries,
+            exploreContent,
+            availableModules.map(({ id }) => id),
+          )
+        : exploreError
+          ? firstExplore
+          : null;
   useEffect(() => {
     if (exploreStart) setExplore((current) => (current === "loading" ? exploreStart : current));
   }, [exploreStart, setExplore]);
@@ -843,6 +850,16 @@ function Overview({
   );
   const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
+    "life-map":
+      props.loadLifeAtlas && props.generateLifeAtlas && props.changeLifeAtlas ? (
+        <LifeAtlasPage
+          key={workspaceRoot}
+          loadLifeAtlas={props.loadLifeAtlas}
+          generateLifeAtlas={props.generateLifeAtlas}
+          changeLifeAtlas={props.changeLifeAtlas}
+          subscribe={props.subscribe}
+        />
+      ) : null,
     health: (
       <HealthPage
         {...child}

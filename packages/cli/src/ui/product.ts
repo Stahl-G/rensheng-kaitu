@@ -1,5 +1,6 @@
 import {
   type AgentConnectionId,
+  type AtlasGenerateInput,
   type AutomationKey,
   type BankMail,
   CalendarPush,
@@ -40,6 +41,7 @@ import {
   cancelTask,
   captureNote,
   changeExperienceBatch,
+  changeLifeAtlas,
   changeOnboardingNext,
   commitFinanceImport,
   completeNext,
@@ -61,6 +63,7 @@ import {
   financeCashflow,
   financeOverview,
   generateDirectionMap,
+  generateLifeAtlas,
   handoverPack,
   hideExperience,
   installProjectMemory,
@@ -99,6 +102,7 @@ import {
   readLearning,
   readLibrary,
   readLibraryDocument,
+  readLifeAtlas,
   readMe,
   readMediaImage,
   readNews,
@@ -466,6 +470,12 @@ export async function productRequest(
       return readProjectPage(ws, text(0));
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
+    case "lifeAtlas":
+      return readLifeAtlas(ws, typeof args[0] === "string" ? args[0] : undefined);
+    case "lifeAtlasGenerate":
+      return generateLifeAtlas(ws, args[0] as AtlasGenerateInput);
+    case "lifeAtlasChange":
+      return changeLifeAtlas(ws, text(0), text(1) as "adopt" | "archive" | "restore");
     case "directionMap":
       return readDirectionMap(ws, locale(0));
     case "directionMapGenerate": {
