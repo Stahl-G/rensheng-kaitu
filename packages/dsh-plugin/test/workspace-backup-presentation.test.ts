@@ -75,6 +75,8 @@ test("同步状态订阅保留未保存的范围选择；实际连接与同步�
     });
     expect(request).toHaveBeenCalledWith("connect", expect.objectContaining({ text: true, records: false }));
     expect(workspaceBackupStatus(ws).connection?.text).toBe(true);
+    expect(workspaceBackupStatus(ws).lastSync).toBeTruthy();
+    expect(JSON.stringify(view.toJSON())).toContain("当前连接尚未完成同步");
 
     const completed = workspaceBackupStatus(ws).lastSync;
     fail = true;
