@@ -512,12 +512,12 @@ export function ProjectsPage(
           {/* Agent 写的视图只替换目标与进度部分；GitHub、交给 Agent、日志和来源始终保留。 */}
           <>
             <section className={css.card}>
-              <h3>GitHub</h3>
+              <h3>{t("项目 GitHub 仓库", "Project GitHub repository")}</h3>
               {github(project)}
               <button type="button" className={css.link} disabled={busy} onClick={() => setBinding(!binding)}>
                 {project.github
-                  ? t("更换 GitHub 仓库", "Change GitHub repository")
-                  : t("绑定 GitHub 仓库", "Link GitHub repository")}
+                  ? t("更换项目 GitHub 仓库", "Change project GitHub repository")
+                  : t("绑定项目 GitHub 仓库", "Link project GitHub repository")}
               </button>
               {binding && (
                 <form
@@ -735,8 +735,8 @@ export function ProjectsPage(
                       }
                     >
                       {item.github
-                        ? t("更换 GitHub 仓库", "Change GitHub repository")
-                        : t("绑定 GitHub 仓库", "Link GitHub repository")}
+                        ? t("更换项目 GitHub 仓库", "Change project GitHub repository")
+                        : t("绑定项目 GitHub 仓库", "Link project GitHub repository")}
                     </button>
                   </div>
                 </article>
