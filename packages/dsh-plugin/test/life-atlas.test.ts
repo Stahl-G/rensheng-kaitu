@@ -78,12 +78,18 @@ test("existing map collapses controls and keyboard activation opens the correct 
       },
     ],
   };
+  const load = vi.fn(async () => value);
+  const generate = vi.fn(async () => ({
+    ...value,
+    latest: "older-candidate",
+    error: "Synthetic save failed",
+  }));
   let root!: ReactTestRenderer;
   await act(async () => {
     root = create(
       createElement(LifeAtlasPage, {
-        loadLifeAtlas: vi.fn(async () => value),
-        generateLifeAtlas: vi.fn(),
+        loadLifeAtlas: load,
+        generateLifeAtlas: generate,
         changeLifeAtlas: vi.fn(),
       }),
     );
@@ -95,6 +101,21 @@ test("existing map collapses controls and keyboard activation opens the correct 
   expect(JSON.stringify(root.toJSON())).toContain("合成测试散步计划");
   act(() => root.root.findByType("aside").props.onKeyDown({ key: "Escape" }));
   expect(root.root.findAllByType("aside")).toHaveLength(0);
+  act(() =>
+    root.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("调整地图"))
+      ?.props.onClick(),
+  );
+  await act(async () => {
+    await root.root
+      .findAllByType("button")
+      .find((button) => button.children.includes("生成新方案并保存"))
+      ?.props.onClick();
+  });
+  expect(generate).toHaveBeenCalled();
+  expect(load).not.toHaveBeenCalledWith("older-candidate", false);
+  expect(JSON.stringify(root.toJSON())).toContain("Synthetic save failed");
   act(() => root.unmount());
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")).toHaveLength(2);
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")[1]).toMatch(/…$/);

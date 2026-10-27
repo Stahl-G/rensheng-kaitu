@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { atlasSource } from "../src/life-atlas-source.js";
@@ -83,6 +84,25 @@ test("map histories preserve terrain and positions while projecting current reco
   const third = await settled(ws);
   expect(readLifeAtlas(ws, third.latest as string).resource?.key).not.toBe(key);
   expect(third.active).toBe(firstId);
+  // A failed save must not replace the active map or add an unsaved candidate.
+  const folder = join(
+    localStateRoot(),
+    "cartography",
+    createHash("sha256").update(ws.root).digest("hex").slice(0, 24),
+  );
+  mkdirSync(join(folder, "manifest.json.tmp"));
+  generateLifeAtlas(ws, { domains: ["health", "learning"], sameTerrain: true });
+  let failed = readLifeAtlas(ws);
+  const deadline = Date.now() + 20_000;
+  while (failed.running && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    failed = readLifeAtlas(ws);
+  }
+  expect(failed.running).toBe(false);
+  expect(failed.error).toBeTruthy();
+  expect(failed.active).toBe(firstId);
+  expect(failed.resource?.key).toBe(key);
+  expect(failed.candidates).toHaveLength(3);
   // All persisted map files contain only rendering resources/config, never source facts.
   const root = join(localStateRoot(), "cartography");
   for (const dir of readdirSync(root)) {

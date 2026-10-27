@@ -86,7 +86,7 @@ export function LifeAtlasPage({
     }
     if (pendingCandidate.current && !value.running) {
       pendingCandidate.current = false;
-      if (value.latest && value.latest !== value.active) setPreview(value.latest);
+      if (!value.error && value.latest && value.latest !== value.active) setPreview(value.latest);
       if (!value.error) setExpanded(false);
     }
   }, []);
