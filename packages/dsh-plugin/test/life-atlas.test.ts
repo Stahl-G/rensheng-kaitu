@@ -1,10 +1,46 @@
 import { settings } from "@kaitu/cartographer/settings";
-import type { LifeAtlasState } from "@kaitu/core";
+import { type LifeAtlasState, readPreferences, savePreferences } from "@kaitu/core";
 import { createElement } from "react";
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { expect, test, vi } from "vitest";
 import { LifeAtlasPage, atlasLabel } from "../src/client/LifeAtlasPage.js";
-import { defaultExploreEntries, exploreDestination } from "../src/client/explore-modules.js";
+import {
+  defaultExploreEntries,
+  exploreDestination,
+  migrateLifeMapFirst,
+} from "../src/client/explore-modules.js";
+
+test("map-first migration persists across restarts and preserves later reorder or hiding", () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-map-pref-"));
+  vi.stubEnv("KAITU_LOCAL_STATE_DIR", root);
+  try {
+    savePreferences({ locale: null, exploreEntries: ["news", "health", "life-map"] });
+    const migration = migrateLifeMapFirst(readPreferences());
+    expect(migration?.exploreEntries).toEqual(["life-map", "news", "health"]);
+    savePreferences(migration ?? {});
+    savePreferences({ exploreEntries: ["health", "news"] });
+    const entry = new URL("../../core/dist/index.js", import.meta.url).href;
+    const reopened = JSON.parse(
+      execFileSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          `import {readPreferences} from ${JSON.stringify(entry)}; console.log(JSON.stringify(readPreferences()))`,
+        ],
+        { encoding: "utf8" },
+      ),
+    );
+    expect(reopened.exploreEntries).toEqual(["health", "news"]);
+    expect(migrateLifeMapFirst(reopened)).toBeNull();
+    savePreferences({ exploreEntries: [] });
+    expect(migrateLifeMapFirst(readPreferences())).toBeNull();
+    expect(readPreferences().exploreEntries).toEqual([]);
+  } finally {
+    vi.unstubAllEnvs();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("new Explore default is the map; explicit user ordering and empty selection still work", () => {
   const empty = { hometown: false, experiences: 0, healthRecords: 0, newsTopics: 0, goals: 0, directions: 0 };
@@ -158,3 +194,7 @@ test("existing map collapses controls and keyboard activation opens the correct 
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")).toHaveLength(2);
   expect(atlasLabel("很长的中文模块名称需要保持可读而且不能超出边界")[1]).toMatch(/…$/);
 });
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";

@@ -164,8 +164,12 @@ export function useAiConnection({
       if (request !== modelRequest.current) return;
       setModels(list);
       const firstModel = list[0];
-      if (form.provider === "chatgpt-siwc" && !form.model && firstModel)
-        setForm((current) => ({ ...current, model: firstModel.id }));
+      if (form.provider === "chatgpt-siwc" && firstModel)
+        setForm((current) =>
+          current.provider === "chatgpt-siwc" && !current.model
+            ? { ...current, model: firstModel.id }
+            : current,
+        );
       setNotice(
         list.length
           ? t(`${list.length} 个可选模型，也可以手填`, `${list.length} models; you can also enter an ID`)

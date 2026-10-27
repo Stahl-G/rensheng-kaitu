@@ -60,6 +60,44 @@ test("an already authorized ChatGPT account loads and selects an available model
   }
 });
 
+test("a model typed while the ChatGPT directory is loading is not overwritten", async () => {
+  const settings = {
+    configured: false,
+    provider: "chatgpt-siwc",
+    providerName: "ChatGPT",
+    model: "",
+    auth: "dsh",
+    protocols: [],
+    providers: [{ id: "chatgpt-siwc", name: "ChatGPT", authMethods: [{ id: "oauth" }] }],
+    localAgents: [],
+  };
+  setup(async () => response(settings));
+  let finish!: (value: unknown) => void;
+  vi.stubGlobal("fetch", (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    if (method === "askModels")
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    if (method === "askSupport" && JSON.parse(init.body)[0] === "siwc/status")
+      return Promise.resolve(response(connected));
+    return Promise.resolve(response(settings));
+  });
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AiSettings, { onSaved: async () => {} }));
+    });
+    await act(async () =>
+      root.root.findByProps({ "aria-label": "模型" }).props.onChange({ target: { value: "my-model" } }),
+    );
+    await act(async () => finish(response([{ id: "first-model" }])));
+    expect(root.root.findByProps({ "aria-label": "模型" }).props.value).toBe("my-model");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
 test("local agent settings do not present an installed agent as the active ChatGPT connection", async () => {
   const settings = {
     configured: true,

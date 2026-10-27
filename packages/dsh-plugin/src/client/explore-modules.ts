@@ -46,6 +46,14 @@ export const exploreModules = [
   },
 ] as const;
 export const defaultExploreEntries = exploreModules.filter((entry) => entry.default).map(({ id }) => id);
+export function migrateLifeMapFirst(value: { exploreEntries?: string[]; lifeMapFirstMigrated?: boolean }) {
+  if (value.lifeMapFirstMigrated) return null;
+  const entries = value.exploreEntries ?? defaultExploreEntries;
+  return {
+    exploreEntries: ["life-map", ...entries.filter((id) => id !== "life-map")],
+    lifeMapFirstMigrated: true,
+  };
+}
 export interface ExploreModule {
   id: string;
   title: readonly [string, string];

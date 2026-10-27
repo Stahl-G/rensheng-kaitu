@@ -39,6 +39,7 @@ import {
   defaultExploreEntries,
   exploreDestination,
   exploreModules,
+  migrateLifeMapFirst,
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
@@ -121,20 +122,18 @@ export function OverviewPage(props: OverviewPageProps) {
       setPluginModules(modules);
       const value = await props.loadPreferences(browserLocale());
       const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
-      const migrateMap = !!props.loadLifeAtlas && !localStorage.getItem("kaitu-life-map-first-v1");
-      const entries = value.exploreEntries ?? defaultExploreEntries;
-      const ordered = migrateMap ? ["life-map", ...entries.filter((id) => id !== "life-map")] : entries;
+      const migration = props.loadLifeAtlas ? migrateLifeMapFirst(value) : null;
       if (!active) return value;
-      if (!fresh.length && (!migrateMap || ordered.join("\0") === entries.join("\0"))) {
-        if (migrateMap) localStorage.setItem("kaitu-life-map-first-v1", "1");
-        return value;
-      }
+      if (!fresh.length && !migration) return value;
       const saved = await props.savePreferences({
         locale: value.followSystem ? null : value.locale,
-        exploreEntries: [...ordered, ...fresh],
+        exploreEntries: [
+          ...(migration?.exploreEntries ?? value.exploreEntries ?? defaultExploreEntries),
+          ...fresh,
+        ],
+        ...(migration ? { lifeMapFirstMigrated: true } : {}),
         explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
       });
-      if (migrateMap && active) localStorage.setItem("kaitu-life-map-first-v1", "1");
       return { ...saved, followSystem: value.followSystem };
     };
     void load()

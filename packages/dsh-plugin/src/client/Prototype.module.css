@@ -1913,11 +1913,6 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-@container (max-width: 639px) {
-  .storageRow {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 .conn {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) auto;
@@ -1987,6 +1982,11 @@
 }
 .switch-row:first-child {
   border-top: 0;
+}
+@container (max-width: 639px) {
+  .storageRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .switch-row label b {
   display: block;
