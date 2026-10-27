@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import fs, { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { expect, it, vi } from "vitest";
 import { handoverPack } from "../src/handover.js";
 import { history } from "../src/history.js";
@@ -178,7 +179,7 @@ it("版本库写入失败返回空版本也保留真实提示，重试成功后�
   const ws = await clonedWorkspace();
   const write = fs.writeFileSync.bind(fs);
   const fail = vi.spyOn(fs, "writeFileSync").mockImplementation((...args) => {
-    if (String(args[0]).endsWith("/kaitu-internal-history"))
+    if (basename(String(args[0])) === "kaitu-internal-history")
       throw Object.assign(new Error("synthetic ENOSPC"), { code: "ENOSPC" });
     return write(...args);
   });

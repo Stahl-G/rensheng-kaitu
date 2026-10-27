@@ -1,6 +1,6 @@
 import fs, { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import {
   Workspace,
   addRecords,
@@ -142,7 +142,7 @@ it("问问工具直接持久AI记忆，重开可回读，后台存版本不追�
 
     const write = fs.writeFileSync.bind(fs);
     const failure = vi.spyOn(fs, "writeFileSync").mockImplementation((...args) => {
-      if (String(args[0]).endsWith("/kaitu-internal-history"))
+      if (basename(String(args[0])) === "kaitu-internal-history")
         throw Object.assign(new Error("synthetic background ENOSPC"), { code: "ENOSPC" });
       return write(...args);
     });
