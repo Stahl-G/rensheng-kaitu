@@ -127,7 +127,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       ]),
     ).toMatchObject({
       version: "0.3.3-rc.1",
-      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#6de01d5b32df4bb08f12e93ad69e72a64be56452",
+      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#59b5ed8a911cd6f2a5feccd8ec569a57856bcde2",
     });
     const future = (version: string, dsh: string) => ({ ...template.versions[0], version, engines: { dsh } });
     expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.4 <0.3.0")])).toMatchObject({

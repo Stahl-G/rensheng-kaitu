@@ -100,7 +100,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
-            "commit": "6de01d5b32df4bb08f12e93ad69e72a64be56452"
+            "commit": "59b5ed8a911cd6f2a5feccd8ec569a57856bcde2"
           },
           "engines": {
             "dsh": "0.2.1-rc.3"
@@ -231,7 +231,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/Stahl-G/dsh-kaitu-auday-skill.git",
-            "commit": "827175cf926d0df69f004f19509e5dc80b2087dd"
+            "commit": "abdacac7c90235d5e6515f7629fb134641f84ab7"
           },
           "engines": {
             "dsh": "0.2.1-rc.3"
