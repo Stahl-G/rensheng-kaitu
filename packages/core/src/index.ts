@@ -118,3 +118,5 @@ export * from "./jobs.js";
 export * from "./media-library.js";
 export * from "./direction-map.js";
 export * from "./weather.js";
+
+export * from "./life-atlas.js";

@@ -119,7 +119,15 @@ console.log(
 const requireDsh = createRequire(join(resolve(values["dsh-root"]), "apps/desktop/package.json"));
 const asarPath = requireDsh.resolve("@electron/asar", { paths: [requireDsh.resolve("app-builder-lib")] });
 const asar = requireDsh(asarPath);
-const writePayload = (payload) => buildPayload({ payload, archive, asar, payloadVersion, dshVersion });
+const writePayload = (payload) =>
+  buildPayload({
+    payload,
+    archive,
+    asar,
+    payloadVersion,
+    dshVersion,
+    target: { platform: "darwin", arch: "arm64" },
+  });
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const dshVersion = manifest.version;
@@ -378,7 +386,8 @@ async function signApplication(temporary) {
     // 与 DSH 的两层配置一致：Electron 需要 JIT、动态库与录音权限；
     // 内置运行时仅 Node / LibreOffice 需要 JIT，其余原生文件无额外权限。
     optionsForFile: (file) => {
-      const runtime = /\/Contents\/Resources\/(?:runtime\/|app\.asar\.unpacked\/dsh\/)/.test(file);
+      const runtime =
+        /\/Contents\/Resources\/(?:runtime\/|kaitu\/node_modules\/|app\.asar\.unpacked\/dsh\/)/.test(file);
       const jit =
         /\/dependencies\/node\/bin\/node$/.test(file) ||
         /\/libreoffice-kit-darwin-arm64\/bin\/libreoffice-kit$/.test(file);

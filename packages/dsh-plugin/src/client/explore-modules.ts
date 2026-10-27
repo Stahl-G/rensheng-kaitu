@@ -3,6 +3,13 @@
  */
 export const exploreModules = [
   {
+    id: "life-map",
+    default: true,
+    title: ["人生地图", "Life map"],
+    description: ["让关心的事逐渐成图", "Map the parts of life you care about"],
+    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
+  },
+  {
     id: "footprints",
     default: true,
     title: ["足迹", "Footprints"],
@@ -67,6 +74,7 @@ export function exploreDestination(
   content: ExploreContent,
   available: readonly string[] = exploreModules.map(({ id }) => id),
 ): string {
+  if (entries.find((id) => available.includes(id)) === "life-map") return "life-map";
   if (
     !content.hometown &&
     !content.experiences &&

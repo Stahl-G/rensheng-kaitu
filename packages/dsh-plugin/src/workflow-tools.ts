@@ -125,17 +125,18 @@ const next = z
 
 export function registerWorkflowTools(
   ctx: Context,
-  ws: Workspace,
+  workspace: Workspace | (() => Workspace),
   queue: MutationQueue,
   connection: AgentConnectionId = "local-ask",
 ) {
-  const visibleMemories = (rows: ReturnType<typeof listMemories>) =>
+  const getWorkspace = typeof workspace === "function" ? workspace : () => workspace;
+  const visibleMemories = (ws: Workspace, rows: ReturnType<typeof listMemories>) =>
     rows.filter((row) => agentCanRead(ws, `memory/${row.file}`, connection));
   function register<T extends z.ZodType>(
     name: string,
     description: string,
     schema: T,
-    run: (input: z.infer<T>) => unknown | Promise<unknown>,
+    run: (ws: Workspace, input: z.infer<T>) => unknown | Promise<unknown>,
     readOnly: boolean | ((input: z.infer<T>) => boolean) = false,
   ) {
     ctx.tools.register({
@@ -151,9 +152,10 @@ export function registerWorkflowTools(
           try {
             exec.signal.throwIfAborted();
             const input = schema.parse(args);
+            const ws = getWorkspace();
             if (!(typeof readOnly === "function" ? readOnly(input) : readOnly))
               recordOnboardingAiConnection(ws, "DSH");
-            return { ok: true, result: await run(input) };
+            return { ok: true, result: await run(ws, input) };
           } catch (error) {
             return { ok: false, error: (error as Error).message };
           }
@@ -169,7 +171,7 @@ export function registerWorkflowTools(
       z.object({ action: z.literal("start"), input: startLearningSchema }).strict(),
       z.object({ action: z.literal("save"), input: learningCheckinSchema }).strict(),
     ]),
-    (input) => {
+    (ws, input) => {
       switch (input.action) {
         case "list":
           return listLearning(ws);
@@ -216,7 +218,7 @@ export function registerWorkflowTools(
       z.object({ action: z.literal("setup-preview"), input: onboardingSetupSchema }).strict(),
       z.object({ action: z.literal("setup-confirm"), token: text }).strict(),
     ]),
-    (input) => {
+    (ws, input) => {
       switch (input.action) {
         case "matter-read":
           return readOnboardingMatter(ws, input.source);
@@ -239,24 +241,24 @@ export function registerWorkflowTools(
     },
     (input) => input.action === "preview" || input.action === "cancel",
   );
-  register("kaitu_investment_list", "列出项目、学习主题与长期投入。", z.object({}).strict(), () =>
+  register("kaitu_investment_list", "列出项目、学习主题与长期投入。", z.object({}).strict(), (ws) =>
     listInvestments(ws),
   );
-  register("kaitu_phase_list", "读取阶段建议与用户回顾。", z.object({}).strict(), () => readPhases(ws));
-  register("kaitu_exploration_read", "读取方向、依据、尝试与认识变化。", z.object({}).strict(), () =>
+  register("kaitu_phase_list", "读取阶段建议与用户回顾。", z.object({}).strict(), (ws) => readPhases(ws));
+  register("kaitu_exploration_read", "读取方向、依据、尝试与认识变化。", z.object({}).strict(), (ws) =>
     readExploration(ws),
   );
   register(
     "kaitu_experience_imports",
     "读取足迹来源与导入状态，来源与批次控制由用户在界面处理。",
     z.object({}).strict(),
-    () => readExperienceImports(ws),
+    (ws) => readExperienceImports(ws),
   );
   register(
     "kaitu_exploration_write",
     "记录方向建议、尝试与结果。修改带预期版本；AI 不能替用户决定方向状态。",
     z.object({ command: explorationCommandSchema }).strict(),
-    ({ command }) => writeExploration(ws, command, "agent"),
+    (ws, { command }) => writeExploration(ws, command, "agent"),
   );
   register(
     "kaitu_records",
@@ -276,7 +278,7 @@ export function registerWorkflowTools(
         .strict(),
       z.object({ operation: z.literal("delete"), type: text, id: text }).strict(),
     ]),
-    (input) =>
+    (ws, input) =>
       input.operation === "list"
         ? publicRecords(ws, input.type, readRecords(ws, input.type, input), connection)
         : writeAgentRecord(
@@ -293,7 +295,7 @@ export function registerWorkflowTools(
     "kaitu_restore",
     "提出恢复建议，不执行恢复。用户须在设置的版本历史里选择版本并点击确认恢复。",
     z.object({ version: text, path: text.optional() }).strict(),
-    async ({ version, path }) => {
+    async (ws, { version, path }) => {
       const versions = (await history(ws)).filter((item) => item.oid.startsWith(version));
       if (versions.length !== 1) throw new Error("请从版本历史中选择唯一的版本");
       return {
@@ -312,7 +314,7 @@ export function registerWorkflowTools(
     "kaitu_search_chats",
     "检索已导入的历史对话，返回来源路径。",
     z.object({ query: text, limit: z.number().int().min(1).max(100).optional() }).strict(),
-    ({ query, limit }) => searchChats(ws, query, { limit }),
+    (ws, { query, limit }) => searchChats(ws, query, { limit }),
   );
   register(
     "kaitu_workspace",
@@ -330,7 +332,7 @@ export function registerWorkflowTools(
       z.object({ operation: z.literal("agents-md") }).strict(),
       z.object({ operation: z.literal("archive-handoffs"), files: z.array(text).min(1), date }).strict(),
     ]),
-    async (input) => {
+    async (ws, input) => {
       switch (input.operation) {
         case "read":
           return { path: input.path, content: readAgentFile(ws, input.path, connection) };
@@ -355,7 +357,7 @@ export function registerWorkflowTools(
     "kaitu_memory_capture",
     "自然事实、偏好、决定自动保存，不逐条确认；AI估算/建议必须标来源和不确定性。临时、引用、假设不入长期记忆。先消解实体/时间/单位/上下文，仍影响行为的冲突交conflict。更正用replaces/expected；重试复用idempotency_key；回执含回读和撤销file。",
     z.object(memoryCaptureSchema.shape).strict(),
-    (input) =>
+    (ws, input) =>
       captureMemory(ws, input, {
         scheduleVersion: (message) => {
           void queue(async () => {
@@ -388,12 +390,12 @@ export function registerWorkflowTools(
         })
         .strict(),
     ]),
-    (input) => {
+    (ws, input) => {
       switch (input.operation) {
         case "list":
-          return visibleMemories(listMemories(ws));
+          return visibleMemories(ws, listMemories(ws));
         case "search":
-          return visibleMemories(searchMemories(ws, input.query));
+          return visibleMemories(ws, searchMemories(ws, input.query));
         case "add":
           return addMemory(ws, memoryInput(input.entry), { by: "agent", actor: "DeepSeek" });
         case "update": {
@@ -424,7 +426,7 @@ export function registerWorkflowTools(
       z.object({ operation: z.literal("add"), task }).strict(),
       z.object({ operation: z.enum(["done", "cancel"]), id: text }).strict(),
     ]),
-    (input) =>
+    (ws, input) =>
       input.operation === "list"
         ? listTasks(ws, input)
         : input.operation === "add"
@@ -440,7 +442,7 @@ export function registerWorkflowTools(
       z.object({ operation: z.enum(["notes", "process"]) }).strict(),
       z.object({ operation: z.literal("done"), path: text }).strict(),
     ]),
-    (input) =>
+    (ws, input) =>
       input.operation === "notes"
         ? inboxNotes(ws)
         : input.operation === "done"
@@ -460,7 +462,7 @@ export function registerWorkflowTools(
         to: date.optional(),
       })
       .strict(),
-    ({ source, path, ...options }) =>
+    (ws, { source, path, ...options }) =>
       importSources[source].run(ws, inputPath(ws, path), { ...options, dryRun: true }),
     true,
   );
@@ -480,7 +482,7 @@ export function registerWorkflowTools(
         .strict(),
       z.object({ operation: z.literal("delete"), id: text }).strict(),
     ]),
-    (input) =>
+    (ws, input) =>
       input.operation === "list"
         ? readRecords(ws, "photo")
         : input.operation === "delete"
@@ -491,13 +493,13 @@ export function registerWorkflowTools(
     "kaitu_life_map",
     "查询人生地图或按城市名检索离线地点候选。",
     z.object({ name: text.optional(), country: text.optional() }).strict(),
-    ({ name, country }) => (name ? resolvePlace(name, country) : lifeMap(ws)),
+    (ws, { name, country }) => (name ? resolvePlace(name, country) : lifeMap(ws)),
   );
   register(
     "project_view_write",
     "写入项目自定义 view.json，按 schema 校验。",
     z.object({ slug: text, view: z.unknown() }).strict(),
-    ({ slug, view }) => writeProjectView(ws, slug, view),
+    (ws, { slug, view }) => writeProjectView(ws, slug, view),
   );
   register(
     "kaitu_projects",
@@ -550,7 +552,7 @@ export function registerWorkflowTools(
         })
         .strict(),
     ]),
-    async (input) => {
+    async (ws, input) => {
       switch (input.operation) {
         case "list":
           return listProjects(ws);
@@ -613,7 +615,7 @@ export function registerWorkflowTools(
         .strict(),
       z.object({ operation: z.literal("disable"), to: text.optional(), confirmed: z.boolean() }).strict(),
     ]),
-    (input) => {
+    (ws, input) => {
       if (input.operation === "status") return driveStatus(ws);
       if (!input.confirmed) throw new Error("迁移工作区须先获得用户确认");
       return input.operation === "enable"

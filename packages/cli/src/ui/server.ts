@@ -37,6 +37,7 @@ import {
   ignoredWorkspaceChange,
   importUpload,
   invalidateHistoryFile,
+  invalidateLifeAtlas,
   invalidateWorkspaceBackup,
   normalizeLocale,
   onboardingStatus,
@@ -57,6 +58,7 @@ import {
   startProjectGithubSync,
   startWeatherSync,
   startWorkspaceBackup,
+  subscribeLifeAtlas,
   subscribeOrganizer,
   syncProject,
   syncProjects,
@@ -293,6 +295,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
+  let stopAtlas = subscribeLifeAtlas(ws, notify);
+  let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
   const weather = startWeatherSync(notify);
@@ -368,6 +372,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
     invalidateHistoryFile(ws, file);
+    invalidateLifeAtlas(ws, file);
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
@@ -434,6 +439,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     void poll();
   };
   function startWatching() {
+    if (atlasRoot !== ws.root) {
+      stopAtlas();
+      stopAtlas = subscribeLifeAtlas(ws, notify);
+      atlasRoot = ws.root;
+    }
     watcher?.close();
     stopPolling();
     try {
@@ -935,6 +945,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
+    stopAtlas();
     stopBackup();
     stopProjectSync();
     weather.stop();
@@ -961,6 +972,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   } catch (error) {
     watcher?.close();
     unwatchFile(backupState, backupChanged);
+    stopAtlas();
     stopBackup();
     stopProjectSync();
     weather.stop();

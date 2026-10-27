@@ -405,6 +405,15 @@ function localRead<T>(ws: Workspace, file: string, fallback: T, options: Onboard
   const path = join(localDirectory(ws, options), file);
   return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : fallback;
 }
+/** Existing onboarding interests, without reading or changing life records. */
+export function onboardingModuleChoices(ws: Workspace): string[] {
+  const choices = localRead<LocalOnboardingChoices | null>(ws, "choices.json", null, {});
+  return (choices?.starts ?? []).flatMap((id) => {
+    const module = ONBOARDING.starts.find((item) => item.id === id)?.module;
+    return module ? [module] : [];
+  });
+}
+
 function localWrite(ws: Workspace, file: string, value: unknown, options: OnboardingOptions) {
   const dir = localDirectory(ws, options);
   mkdirSync(dir, { recursive: true, mode: 0o700 });

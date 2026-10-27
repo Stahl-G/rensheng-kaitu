@@ -14,12 +14,16 @@ export function confinedFileSystem(
   attachmentRoot = undefined,
   connection = "local-ask",
 ) {
-  const ws = new Workspace(root, { maintain: false });
+  let ws;
+  const getWorkspace = () => {
+    ws ??= new Workspace(root, { maintain: false });
+    return ws;
+  };
   const memoryIndex = (target) => target.targetKey === join(realpathSync.native(root), "memory", "MEMORY.md");
   const contains = (path) => {
     if (attachments.has(path)) return true;
     try {
-      return agentCanRead(ws, path, connection);
+      return agentCanRead(getWorkspace(), path, connection);
     } catch {
       return false;
     }
@@ -79,7 +83,7 @@ export function confinedFileSystem(
       const fresh = await this.checked(target);
       signal?.throwIfAborted();
       return memoryIndex(fresh)
-        ? readAgentFile(ws, "memory/MEMORY.md", connection)
+        ? readAgentFile(getWorkspace(), "memory/MEMORY.md", connection)
         : super.readText(fresh, signal);
     }
     async streamText(target, signal) {

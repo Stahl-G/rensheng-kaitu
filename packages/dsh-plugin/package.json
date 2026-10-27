@@ -27,7 +27,8 @@
     "@kaitu/channels": "workspace:*",
     "@kaitu/core": "workspace:*",
     "react-easy-crop": "6.2.4",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "@kaitu/cartographer": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.5",
