@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { agentCanRead } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { userProfileSections } from "./handover.js";
+import { redact, userProfileSections } from "./handover.js";
 import { type Locale, pick } from "./locale.js";
-import { findRecordType, recordFilePattern } from "./modules.js";
+import { findRecordType, listModules, recordFilePattern } from "./modules.js";
 import { placeholderOriginal, syncInventory } from "./sync-files.js";
 import type { Workspace } from "./workspace.js";
 
@@ -15,6 +16,53 @@ const unavailable = (locale: Locale) =>
     "画像暂不可用，请读 me/ 和 memory/ 正本；来源下载齐全后会重新生成。",
     "Profile unavailable. Read the originals in me/ and memory/; regeneration waits for all sources.",
   );
+
+/** Shared, disposable discovery view. No memory titles, finance, summaries or record rows. */
+export function userNavigation(ws: Workspace) {
+  const reader = { id: "handover", finance: false } as const;
+  const modules = listModules(ws)
+    .filter((module) => agentCanRead(ws, `${module.dir}/module.json`, reader))
+    .map((module) => ({ path: `${module.dir}/module.json`, title: redact(module.def.name, "zh-CN") }));
+  const paths = new Set(["NOW.md", "me/profile.md", "me/rules.md", "me/goals.json", "me/STATUS.md"]);
+  let available = true;
+  // Match the established project/topic layout; attachments, JSONL and private memories stay out.
+  for (const directory of ["projects", "learning", "decisions"]) {
+    if (!agentCanRead(ws, directory, reader)) continue;
+    const inventory = syncInventory(ws.root, directory, true);
+    const supported = (path: string) =>
+      /^(projects|learning|decisions)\/[^/.][^/]*\/(STATUS|log|notes)\.md$/.test(path);
+    if (inventory.unavailable.some((path) => supported(path) || !path.split("/").at(-1)?.includes(".")))
+      available = false;
+    for (const path of inventory.files) if (supported(path)) paths.add(path);
+  }
+  const files: { path: string; title: string; updated_at: string }[] = [];
+  for (const path of [...paths].sort()) {
+    if (!agentCanRead(ws, path, reader)) continue;
+    if (ws.isUnavailable(path)) {
+      available = false;
+      continue;
+    }
+    if (!ws.exists(path)) continue;
+    const title = ws.scanParsed(path, "agent-navigation-title", (text) => {
+      // A missing/invalid summary never makes an original undiscoverable.
+      try {
+        const { data, body } = parseFrontmatter(text);
+        return redact(
+          typeof data.title === "string" ? data.title : (body.match(/^# +(.+)$/m)?.[1] ?? path),
+          "zh-CN",
+        ).slice(0, 120);
+      } catch {
+        return path;
+      }
+    });
+    if (title === undefined) {
+      available = false;
+      continue;
+    }
+    files.push({ path, title, updated_at: lstatSync(ws.resolve(path)).mtime.toISOString() });
+  }
+  return { version: 1, status: available ? "available" : "unavailable", modules, files };
+}
 
 /** Explicit designation only: other computers keep writing originals, never elect themselves. */
 export function configureProfilePublisher(ws: Workspace, enabled: boolean) {
@@ -34,7 +82,7 @@ export function configureProfilePublisher(ws: Workspace, enabled: boolean) {
   return result;
 }
 
-function sourceFingerprint(ws: Workspace): string {
+function sourceFingerprint(ws: Workspace, navigation: ReturnType<typeof userNavigation>): string {
   const files = new Set([".kaitu/config.json", "me/goals.json", "me/rules.md"]);
   const collect = (dir: string, accept: (file: string) => boolean) => {
     const inventory = syncInventory(ws.root, dir, true);
@@ -61,7 +109,7 @@ function sourceFingerprint(ws: Workspace): string {
     const { dir, match } = recordFilePattern(ref);
     collect(dir, (path) => match.test(path.slice(dir.length + 1)));
   }
-  const hash = createHash("sha256");
+  const hash = createHash("sha256").update(JSON.stringify(navigation));
   for (const file of [...files].sort()) {
     if (!lstatSync(ws.resolve(file, { internal: true })).isFile()) throw new Error("Source unavailable");
     hash.update(file).update("\0").update(ws.readBytes(file)).update("\0");
@@ -85,17 +133,33 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
   let based_on = "unavailable";
   let body = unavailable(locale);
   try {
-    based_on = sourceFingerprint(ws);
+    const navigation = userNavigation(ws);
+    if (navigation.status !== "available") throw new Error("Navigation unavailable");
+    based_on = sourceFingerprint(ws, navigation);
     const sections = userProfileSections(ws, locale, now).filter((section) => section.defaultOn);
     const lines = [pick(locale, "# 用户近况", "# User profile")];
-    // Bound the file, retaining whole lines and their source references.
+    // Reserve space for identity and each active section; a long task list cannot crowd them out.
     for (const section of sections) {
-      const selected: string[] = [];
+      const selected = [`## ${section.title}`];
       for (const line of section.lines.slice(0, 10)) {
-        if (Buffer.byteLength([...lines, ...selected, line].join("\n")) > 3000) break;
+        if (Buffer.byteLength([...selected, line].join("\n")) > 340) break;
         selected.push(line);
       }
-      if (selected.length) lines.push("", `## ${section.title}`, ...selected);
+      if (selected.length > 1) lines.push("", ...selected);
+    }
+    lines.push(
+      "",
+      pick(locale, "## 按需查原文", "## Read originals on demand"),
+      pick(
+        locale,
+        "NOW.md：核对计划日期；身份与重点见 me/。目录不含全文，未命中不代表没有。",
+        "NOW.md: check the plan date; identity and priorities are in me/. This directory is not full-text search.",
+      ),
+    );
+    for (const module of navigation.modules) {
+      const line = `- ${module.title} (${module.path})`;
+      if (Buffer.byteLength([...lines, line].join("\n")) > 3000) break;
+      lines.push(line);
     }
     body = lines.join("\n");
   } catch {

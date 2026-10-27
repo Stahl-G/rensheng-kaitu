@@ -11,6 +11,7 @@ import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
 import { localDate, parseTs } from "./time.js";
+import { userNavigation } from "./user-profile.js";
 import type { Workspace } from "./workspace.js";
 
 type Overview = Awaited<ReturnType<typeof readOverviewPage>>;
@@ -333,5 +334,5 @@ export function buildPhoneLibrary(ws: Workspace, data: Overview, generatedAt: st
     items.push({ kind: "note", title: clip(n.firstLine, 40), date, path: n.path });
   }
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  return { ...envelope("library", generatedAt), items };
+  return { ...envelope("library", generatedAt), items, navigation: userNavigation(ws) };
 }
