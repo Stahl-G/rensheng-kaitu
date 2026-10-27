@@ -430,7 +430,17 @@ function sections(
 
 /** Shared file projection: reuse handover filtering/redaction, never request finance. */
 export function userProfileSections(ws: Workspace, locale: Locale, now: Date) {
-  const list = sections(locale, now, handoverData(ws, now), { id: "handover", finance: false }, true);
+  const data = handoverData(ws, now);
+  const list = sections(locale, now, data, { id: "handover", finance: false }, true);
+  // Keep a current correction discoverable even when many older facts fill the section.
+  const about = list.find((section) => section.id === "about");
+  if (about) {
+    const corrections = data.memories
+      .filter((memory) => memory.replaces && ["preference", "fact", "context"].includes(memory.type))
+      .filter((memory) => agentCanRead(ws, `memory/${memory.file}`, { id: "handover", finance: false }))
+      .map((memory) => `- ${clip(memory.text, locale)} (memory/${memory.file} · ${memory.updated})`);
+    about.lines = [...new Set([...about.lines.slice(0, 1), ...corrections, ...about.lines.slice(1)])];
+  }
   const today = localDate(now, ws.timeZone());
   const phases = records(ws, "phase")
     .filter(

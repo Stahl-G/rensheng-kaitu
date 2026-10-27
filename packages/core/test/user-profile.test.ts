@@ -8,6 +8,7 @@ import {
   addMemory,
   addRecord,
   archiveMemory,
+  captureMemory,
   configureProfilePublisher,
   deleteRecord,
   handoverPack,
@@ -197,4 +198,105 @@ it("导航占位标为不可用，失败保留上一代，恢复后发现没有�
     ws.readJson<{ navigation: ReturnType<typeof userNavigation> }>("phone/library.json").navigation.status,
   ).toBe("available");
   expect(JSON.parse(before).navigation.files).toEqual(userNavigation(ws).files);
+});
+
+it("长身份和纠正保留节选与来源，明确省略且不使整节消失", async () => {
+  const ws = await initWorkspace(join(tmp(), "ws"));
+  const identity = await addMemory(ws, {
+    type: "fact",
+    name: "identity",
+    text: `合成身份：研究员。${"身份限定条件".repeat(30)}`,
+  });
+  const request = {
+    idempotency_key: "old",
+    type: "fact" as const,
+    name: "location",
+    text: "旧住址",
+    source: "synthetic",
+    origin: "user-stated" as const,
+    observed_at: "2026-10-27T12:00:00Z",
+    evidence: "旧住址",
+    scope: "personal" as const,
+  };
+  const old = (await captureMemory(ws, request)).entry;
+  if (!old) throw new Error("Missing original memory");
+  const corrected = (
+    await captureMemory(ws, {
+      ...request,
+      idempotency_key: "corrected",
+      text: `纠正：现在住杭州。${"新的限定条件".repeat(30)}`,
+      evidence: "纠正：现在住杭州",
+      replaces: old.file,
+      expected: memoryExpectation(old),
+    })
+  ).entry;
+  if (!corrected) throw new Error("Missing corrected memory");
+  await addMemory(ws, { type: "context", name: "extra", text: "更多合成背景".repeat(30) });
+  configureProfilePublisher(ws, true);
+  for (const locale of ["zh-CN", "en"] as const) {
+    refreshUserProfile(ws, new Date(), locale);
+    const text = ws.readText("USER.md");
+    expect(text).toContain("合成身份：研究员");
+    expect(text).toContain("纠正：现在住杭州");
+    expect(text).toContain(identity.file);
+    expect(text).toContain(corrected.file);
+    expect(text).not.toContain("旧住址");
+    expect(text).toContain(locale === "en" ? "excerpt; read source" : "节选，须回读");
+    expect(text).toContain(locale === "en" ? "more in originals" : "更多见原文");
+    expect(Buffer.byteLength(text.split("---").slice(2).join("---"))).toBeLessThanOrEqual(3002);
+    expect(text).not.toContain("�");
+  }
+});
+
+it("大量既有事实不会把当前纠正挤出画像", async () => {
+  const ws = await initWorkspace(join(tmp(), "ws"));
+  for (let index = 0; index < 14; index++)
+    await addMemory(ws, { type: "preference", name: `p${index}`, text: `合成偏好 ${index}` });
+  const request = {
+    idempotency_key: "old-late",
+    type: "fact" as const,
+    name: "住处",
+    text: "先前住处",
+    source: "synthetic",
+    origin: "user-stated" as const,
+    observed_at: "2026-10-27T12:00:00Z",
+    evidence: "先前住处",
+    scope: "personal" as const,
+  };
+  const old = (await captureMemory(ws, request)).entry;
+  if (!old) throw new Error("Missing original memory");
+  const corrected = (
+    await captureMemory(ws, {
+      ...request,
+      idempotency_key: "new-late",
+      text: "纠正：新住处",
+      evidence: "纠正：新住处",
+      replaces: old.file,
+      expected: memoryExpectation(old),
+    })
+  ).entry;
+  if (!corrected) throw new Error("Missing corrected memory");
+  configureProfilePublisher(ws, true);
+  const text = ws.readText("USER.md");
+  expect(text).toContain("纠正：新住处");
+  expect(text).toContain(corrected.file);
+  expect(text).not.toContain("先前住处");
+});
+
+it("无关附件占位不影响导航或触发下载，必要原文占位仍失效", async () => {
+  const original = await initWorkspace(join(tmp(), "ws"));
+  setStateBinding(original.root, original.resolve(".kaitu", { internal: true }), "icloud");
+  const ws = new Workspace(original.root, { maintain: false });
+  ws.writeText("learning/topic/notes.md", "# 合成学习原文");
+  configureProfilePublisher(ws, true);
+  const before = userNavigation(ws);
+  writeFileSync(ws.resolve("learning/topic/.assets.icloud"), "");
+  const checked = vi.spyOn(ws, "isUnavailable");
+  expect(userNavigation(ws)).toEqual(before);
+  expect(refreshUserProfile(ws).status).toBe("current");
+  expect(ws.readText("USER.md")).not.toContain("画像暂不可用");
+  expect(checked.mock.calls.flat().some((path) => path.includes("assets"))).toBe(false);
+  checked.mockRestore();
+  writeFileSync(ws.resolve("learning/topic/.notes.md.icloud"), "");
+  expect(userNavigation(ws).status).toBe("unavailable");
 });

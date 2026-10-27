@@ -28,12 +28,25 @@ export function userNavigation(ws: Workspace) {
   // Match the established project/topic layout; attachments, JSONL and private memories stay out.
   for (const directory of ["projects", "learning", "decisions"]) {
     if (!agentCanRead(ws, directory, reader)) continue;
-    const inventory = syncInventory(ws.root, directory, true);
-    const supported = (path: string) =>
-      /^(projects|learning|decisions)\/[^/.][^/]*\/(STATUS|log|notes)\.md$/.test(path);
-    if (inventory.unavailable.some((path) => supported(path) || !path.split("/").at(-1)?.includes(".")))
+    if (ws.isUnavailable(directory)) {
       available = false;
-    for (const path of inventory.files) if (supported(path)) paths.add(path);
+      continue;
+    }
+    if (!ws.exists(directory)) continue;
+    for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+      const child = `${directory}/${entry.name}`;
+      const original = placeholderOriginal(child);
+      // Only immediate topic directories and the three indexed documents matter.
+      if (original && !original.split("/").at(-1)?.includes(".")) {
+        if (ws.isUnavailable(original)) available = false;
+      } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        if (ws.isUnavailable(child)) {
+          available = false;
+          continue;
+        }
+        for (const name of ["STATUS.md", "log.md", "notes.md"]) paths.add(`${child}/${name}`);
+      }
+    }
   }
   const files: { path: string; title: string; updated_at: string }[] = [];
   for (const path of [...paths].sort()) {
@@ -62,6 +75,20 @@ export function userNavigation(ws: Workspace) {
     files.push({ path, title, updated_at: lstatSync(ws.resolve(path)).mtime.toISOString() });
   }
   return { version: 1, status: available ? "available" : "unavailable", modules, files };
+}
+
+function profileExcerpt(line: string, budget: number, locale: Locale): string {
+  if (Buffer.byteLength(line) <= budget) return line;
+  const reference = line.match(/(?: \([^)]*\))+$/u)?.[0] ?? "";
+  const suffix = pick(locale, "…（节选，须回读）", "… (excerpt; read source)") + reference;
+  if (Buffer.byteLength(suffix) >= budget)
+    return pick(locale, "- 条目过长，请查本节原文", "- Long entry; read this section's sources");
+  let prefix = "";
+  for (const char of line.slice(0, line.length - reference.length)) {
+    if (Buffer.byteLength(prefix + char + suffix) > budget) break;
+    prefix += char;
+  }
+  return prefix + suffix;
 }
 
 /** Explicit designation only: other computers keep writing originals, never elect themselves. */
@@ -138,14 +165,21 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
     based_on = sourceFingerprint(ws, navigation);
     const sections = userProfileSections(ws, locale, now).filter((section) => section.defaultOn);
     const lines = [pick(locale, "# 用户近况", "# User profile")];
-    // Reserve space for identity and each active section; a long task list cannot crowd them out.
+    // Keep source references and a visible excerpt even when the first fact is long.
     for (const section of sections) {
       const selected = [`## ${section.title}`];
-      for (const line of section.lines.slice(0, 10)) {
-        if (Buffer.byteLength([...selected, line].join("\n")) > 340) break;
-        selected.push(line);
+      const omitted = pick(locale, "- …（更多见原文）", "- … (more in originals)");
+      const budget = section.id === "about" ? 600 : 340;
+      for (const [index, line] of section.lines.slice(0, 10).entries()) {
+        let remaining = budget - Buffer.byteLength([...selected, omitted].join("\n")) - 1;
+        // Reserve room for both an identity and another current/corrected fact.
+        if (section.id === "about" && index === 0 && section.lines.length > 1)
+          remaining = Math.floor(remaining / 2);
+        if (remaining < 80) break;
+        selected.push(profileExcerpt(line, remaining, locale));
       }
-      if (selected.length > 1) lines.push("", ...selected);
+      if (selected.length - 1 < section.lines.length) selected.push(omitted);
+      if (section.lines.length) lines.push("", ...selected);
     }
     lines.push(
       "",
