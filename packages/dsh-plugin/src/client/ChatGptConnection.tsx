@@ -15,7 +15,7 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
   const t = useT();
   const [status, setStatus] = useState<Status>();
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [welcome, setWelcome] = useState(false);
   const welcomeDialog = useRef<HTMLDialogElement>(null);
   const pending = useRef<AbortController | null>(null);
@@ -82,7 +82,7 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
     return stop;
   }, []);
   return (
-    <section aria-label={t("ChatGPT 连接", "ChatGPT connection")}>
+    <section aria-label={t("ChatGPT 连接", "ChatGPT connection")} aria-busy={busy}>
       {welcome && (
         <dialog
           ref={welcomeDialog}
@@ -112,6 +112,11 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
           "The authorization page identifies Kaitu ChatGPT SIWC; it does not grant access to ChatGPT history, memory or connectors.",
         )}
       </p>
+      {!status && busy && (
+        <p>
+          <output>{t("正在检查 ChatGPT 连接…", "Checking ChatGPT connection…")}</output>
+        </p>
+      )}
       {status?.authenticated ? (
         <>
           <p>

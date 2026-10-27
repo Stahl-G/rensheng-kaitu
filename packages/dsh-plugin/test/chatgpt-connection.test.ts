@@ -25,6 +25,44 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+test("initial status shows progress; a startup failure offers retry and recovery enables sign-in", async () => {
+  let finish!: (value: unknown) => void;
+  const actions: string[] = [];
+  setup(async (name) => {
+    actions.push(name);
+    if (actions.length === 1)
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    return response(name === "siwc/beginSignIn" ? signingIn : disconnected);
+  });
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(ChatGptConnection, { onAuthorized: vi.fn() }));
+    });
+    expect(root.root.findByType("output").children).toContain("正在检查 ChatGPT 连接…");
+    expect(button(root, "Continue with ChatGPT")?.props.disabled).toBe(true);
+    await act(async () => {
+      finish({ ok: false, json: async () => ({ error: "synthetic startup failure" }) });
+    });
+    expect(root.root.findByProps({ role: "alert" }).children).toContain("synthetic startup failure");
+    expect(root.root.findAllByType("output")).toHaveLength(0);
+    expect(button(root, "重试")?.props.disabled).toBe(false);
+    await act(async () => {
+      await button(root, "重试")?.props.onClick();
+    });
+    expect(button(root, "Continue with ChatGPT")?.props.disabled).toBe(false);
+    await act(async () => {
+      await button(root, "Continue with ChatGPT")?.props.onClick();
+    });
+    expect(actions).toEqual(["siwc/status", "siwc/status", "siwc/beginSignIn"]);
+    expect(button(root, "取消登录")).toBeDefined();
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
 test.each(["network", "http", "json"])(
   "OAuth polling recovers from one %s error, clears it, and completes once",
   async (failure) => {

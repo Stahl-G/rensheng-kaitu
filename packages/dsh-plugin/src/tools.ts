@@ -52,12 +52,32 @@ function parameters(properties: Record<string, unknown>, required: string[] = []
   return { type: "object", properties, required, additionalProperties: false };
 }
 
-export function apply(ctx: Context, config: Config = {}, workspace?: Workspace): MutationQueue {
+/** SDK 注册时不打开资料；主程序已经负责工作区准备，实际工具调用时仅打开它。 */
+export function applyDeferred(ctx: Context, config: Config = {}): MutationQueue {
+  return apply(ctx, config, () => new Workspace(config.workspace ?? defaultRoot(), { maintain: false }));
+}
+
+export function apply(
+  ctx: Context,
+  config: Config = {},
+  workspace?: Workspace | (() => Workspace),
+): MutationQueue {
   if (config.workspace !== undefined && !isAbsolute(config.workspace)) {
     throw new Error("workspace 必须是绝对路径");
   }
-  const ws = workspace ?? new Workspace(config.workspace ?? defaultRoot());
-  if (!ws.exists(".kaitu/config.json")) throw new Error(`${ws.root} 还不是开图工作区，先运行 kaitu init`);
+  let opened: Workspace | undefined;
+  const getWorkspace = () => {
+    if (opened) return opened;
+    const ws =
+      typeof workspace === "function"
+        ? workspace()
+        : (workspace ?? new Workspace(config.workspace ?? defaultRoot()));
+    if (!ws.exists(".kaitu/config.json")) throw new Error(`${ws.root} 还不是开图工作区，先运行 kaitu init`);
+    opened = ws;
+    return ws;
+  };
+  // 普通 DSH 插件的准备时机不变；只有显式传入的工厂延迟到工具执行。
+  if (typeof workspace !== "function") getWorkspace();
   ctx.systemPrompt?.section({
     name: "kaitu:workspace",
     order: 3000,
@@ -72,13 +92,13 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     pending = result.catch(() => {});
     return result;
   };
-  registerWorkflowTools(ctx, ws, queue, config.connection ?? "local-ask");
+  registerWorkflowTools(ctx, getWorkspace, queue, config.connection ?? "local-ask");
   registerLearningAids(ctx);
   function register(
     toolName: string,
     description: string,
     schema: ReturnType<typeof parameters>,
-    run: (args: Record<string, unknown>) => unknown | Promise<unknown>,
+    run: (ws: Workspace, args: Record<string, unknown>) => unknown | Promise<unknown>,
   ) {
     ctx.tools.register({
       name: toolName,
@@ -92,12 +112,13 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
         const result = pending.then(async () => {
           try {
             exec.signal.throwIfAborted();
-            recordOnboardingAiConnection(ws, "DSH");
             const input = object(args);
             for (const key of Object.keys(input)) {
               if (!Object.hasOwn(schema.properties, key)) throw new Error(`未知参数：${key}`);
             }
-            return JSON.parse(JSON.stringify(await run(input)));
+            const ws = getWorkspace();
+            recordOnboardingAiConnection(ws, "DSH");
+            return JSON.parse(JSON.stringify(await run(ws, input)));
           } catch (error) {
             return { ok: false, error: error instanceof Error ? error.message : String(error) };
           }
@@ -112,7 +133,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     "kaitu_status",
     `查看工作区、今天现状与可用记录类型；传 type 查看字段规范。${ctx.systemPrompt ? "" : instructions}`,
     parameters({ type: { type: "string", minLength: 1, description: "要查看字段规范的记录类型，可省略" } }),
-    (args) => {
+    (ws, args) => {
       if (args.type !== undefined && (typeof args.type !== "string" || !args.type.trim())) {
         throw new Error("type 必须是非空字符串");
       }
@@ -147,7 +168,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
       },
       ["type", "fields"],
     ),
-    async (args) => {
+    async (ws, args) => {
       if (typeof args.type !== "string" || !args.type.trim()) throw new Error("type 必须是非空字符串");
       if (["experience_source", "experience_batch"].includes(String(args.type)))
         throw new Error("来源与导入控制由用户在界面处理");
@@ -195,9 +216,12 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
       },
       ["items"],
     ),
-    async (args) => ({ ok: true, ...(await addExperiences(ws, args.items as ExperienceInput[], "agent")) }),
+    async (ws, args) => ({
+      ok: true,
+      ...(await addExperiences(ws, args.items as ExperienceInput[], "agent")),
+    }),
   );
-  register("kaitu_validate", "校验当前工作区，返回问题原文。", parameters({}), () => {
+  register("kaitu_validate", "校验当前工作区，返回问题原文。", parameters({}), (ws) => {
     const issues = validateWorkspace(ws);
     return { ok: issues.length === 0, issues };
   });
@@ -205,7 +229,7 @@ export function apply(ctx: Context, config: Config = {}, workspace?: Workspace):
     "kaitu_history",
     "查看最近 N 个版本，默认 10，最多 50。",
     parameters({ limit: { type: "integer", minimum: 1, maximum: 50 } }),
-    async (args) => {
+    async (ws, args) => {
       const limit = args.limit === undefined ? 10 : args.limit;
       if (typeof limit !== "number" || !Number.isInteger(limit) || limit < 1 || limit > 50) {
         throw new Error("limit 必须是 1 至 50 的整数");

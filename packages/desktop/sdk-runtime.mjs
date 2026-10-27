@@ -28,12 +28,32 @@ export function sdkRuntimePatch({
   mode,
   connection = "local-ask",
   textOnly = false,
+  capabilities = false,
 }) {
   // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
   const siwc = { insert: [{ id: "chatgpt-siwc", name: join(dirname(hostPlugin), "chatgpt-siwc.mjs") }] };
   const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
     (id) => ({ id, disabled: true }),
   );
+  // 目录中这几项是资料工具插件；账号与禁用工具的请求不启动它们，也不改已保存的启用设置。
+  const workspacePlugins =
+    capabilities || textOnly
+      ? ["kaitu-novel-workspace", "kaitu-sf-consistency", "kaitu-fortune", "kaitu-auday"].map((id) => ({
+          id,
+          disabled: true,
+        }))
+      : [];
+  // 账号服务与资料无关：不加载工作区、资料工具、技能、联网工具或会话 RPC。
+  if (capabilities)
+    return [
+      ...privacy,
+      ...workspacePlugins,
+      siwc,
+      { id: "sdk-jsonrpc-server", disabled: true },
+      { id: "agent-instructions", disabled: true },
+      { id: "skill-filesystem", disabled: true },
+      { insert: [{ id: "kaitu-sdk-support", name: join(dirname(hostPlugin), "sdk-support.mjs") }] },
+    ];
   // 只收发文字：不开网页和技能工具；万一还有工具被调用，宿主插件在执行前拒绝（KAITU_AGENT_TOOLS=none）。
   const web = textOnly
     ? [
@@ -60,12 +80,13 @@ export function sdkRuntimePatch({
       {
         insert: [
           { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-          { id: "kaitu", name: plugin, config: { workspace, connection } },
+          { id: "kaitu-tools", name: plugin, config: { workspace, connection } },
         ],
       },
     ];
   return [
     ...privacy,
+    ...workspacePlugins,
     siwc,
     ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
@@ -114,7 +135,7 @@ export function sdkRuntimePatch({
       insert: [
         { id: "kaitu-sdk-host", name: hostPlugin },
         { id: "kaitu-sdk-rpc", name: join(dirname(hostPlugin), "sdk-rpc.mjs") },
-        { id: "kaitu", name: plugin, config: { workspace, connection } },
+        { id: "kaitu-tools", name: plugin, config: { workspace, connection } },
       ],
     },
   ];
@@ -478,7 +499,7 @@ export function createSdkRuntime({
         profile,
         JSON.stringify([
           ...(capabilities ? [] : providerPatch(settings)),
-          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly }),
+          ...sdkRuntimePatch({ workspace, plugin, hostPlugin, mode, connection, textOnly, capabilities }),
         ]),
         {
           mode: 0o600,
@@ -492,14 +513,15 @@ export function createSdkRuntime({
       if (settings.provider === "chatgpt-siwc" && (signingOut || siwcEpoch !== siwcGeneration))
         throw new KaituError("ChatGPT 连接已退出，请重新连接", "AI_CONNECTION");
       const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
-        cwd: workspace,
+        // 宿主只在本机程序目录启动；会话 cwd 由 initialize 明确传入，避免启动器读取资料里的 .env。
+        cwd: home,
         env: {
           ...env,
           DSH_PERMISSION_MODE: mode === "full" && !textOnly ? "danger-full-access" : "workspace-write",
-          KAITU_AGENT_MODE: textOnly ? "scoped" : mode,
-          KAITU_AGENT_CONNECTION: connection,
-          KAITU_AGENT_TOOLS: textOnly ? "none" : "",
-          KAITU_DIR: workspace,
+          KAITU_AGENT_MODE: capabilities ? undefined : textOnly ? "scoped" : mode,
+          KAITU_AGENT_CONNECTION: capabilities ? undefined : connection,
+          KAITU_AGENT_TOOLS: capabilities ? undefined : textOnly ? "none" : "",
+          KAITU_DIR: capabilities ? undefined : workspace,
         },
         detached: process.platform !== "win32",
         stdio: ["pipe", "pipe", "ignore"],
@@ -574,7 +596,9 @@ export function createSdkRuntime({
       try {
         await rpc.request(
           "initialize",
-          { cwd: workspace, provider: settings.provider, model: settings.model, capabilities },
+          capabilities
+            ? { capabilities: true }
+            : { cwd: workspace, provider: settings.provider, model: settings.model },
           signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
         );
       } catch {

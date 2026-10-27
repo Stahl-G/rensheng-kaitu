@@ -4,8 +4,13 @@ import { expect, test, vi } from "vitest";
 import { clonedWorkspace } from "../../core/test/helpers.js";
 import type { ToolDefinition } from "../src/dsh.js";
 import { apply } from "../src/index.js";
+// @ts-expect-error Desktop entry points are native ESM.
+const { apply: applySdkTools } = await import("../../desktop/sdk-tools.mjs");
 
-test("插件卸载等待已进入写队列的工作完成", async () => {
+test.each([
+  { name: "DSH", activate: apply },
+  { name: "Ask", activate: applySdkTools },
+])("$name 插件卸载等待已进入写队列的工作完成", async ({ activate }) => {
   const ws = await clonedWorkspace();
   const ctx = new Context();
   const tools = new Map<string, ToolDefinition>();
@@ -17,7 +22,7 @@ test("插件卸载等待已进入写队列的工作完成", async () => {
   });
   ctx.provide("skills", { registerProvider: () => () => {} });
   ctx.provide("typert", { register: () => () => {} });
-  await apply(ctx, { workspace: ws.root, automation: false });
+  await activate(ctx, { workspace: ws.root, automation: false });
   let release!: () => void;
   let entered!: () => void;
   const gated = new Promise<null>((resolve) => {
