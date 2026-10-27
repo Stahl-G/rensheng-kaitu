@@ -103,12 +103,14 @@ export function useAiConnection({
           auth: catalog.auth ?? "key",
           api: catalog.api ?? catalog.protocols[0]?.id ?? "",
           baseURL: catalog.baseURL ?? "",
-          agent: current.localAgent?.id ?? current.localAgents?.[0]?.id ?? "",
-          path: current.localAgent?.path ?? "",
+          agent: current.choice === "local" ? (current.localAgent?.id ?? "") : "",
+          path: current.choice === "local" ? (current.localAgent?.path ?? "") : "",
           apiKey: "",
         });
         setConnected(
-          current.configured ? `${current.localAgent?.name ?? current.providerName} · ${current.model}` : "",
+          current.configured
+            ? `${current.choice === "local" ? (current.localAgent?.name ?? current.providerName) : current.providerName} · ${current.model}`
+            : "",
         );
         setError("");
       } catch (err) {
@@ -162,8 +164,12 @@ export function useAiConnection({
       if (request !== modelRequest.current) return;
       setModels(list);
       const firstModel = list[0];
-      if (form.provider === "chatgpt-siwc" && !form.model && firstModel)
-        setForm((current) => ({ ...current, model: firstModel.id }));
+      if (form.provider === "chatgpt-siwc" && firstModel)
+        setForm((current) =>
+          current.provider === "chatgpt-siwc" && !current.model
+            ? { ...current, model: firstModel.id }
+            : current,
+        );
       setNotice(
         list.length
           ? t(`${list.length} 个可选模型，也可以手填`, `${list.length} models; you can also enter an ID`)

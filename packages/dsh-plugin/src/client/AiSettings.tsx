@@ -56,6 +56,9 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
         )}
       </p>
     );
+  const official = settings.providers.find((item) => item.id === "chatgpt-siwc");
+  const manualProviders = settings.providers.filter((item) => item.id !== "chatgpt-siwc");
+  const manualDefault = recommended?.id !== "chatgpt-siwc" ? recommended : manualProviders[0];
   return (
     <form
       className={css.form}
@@ -72,24 +75,45 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
               "AI is not connected. Notes and your library remain available.",
             )}
       </p>
+      {localOnly && (
+        <p>
+          {t(
+            "选择本机 Agent 并保存后，问问才会切换到该 Agent。",
+            "Ask switches to a local agent only after you select and save it.",
+          )}
+        </p>
+      )}
       <fieldset disabled={saving} className={css.fields}>
         {!localOnly && (
           <fieldset className={css.choices}>
             <legend>{t("用哪个 AI", "Choose an AI")}</legend>
-            {recommended && (
+            {official && (
               <label>
                 <input
                   type="radio"
                   name="ai-choice"
-                  checked={form.choice === "builtin" && form.provider === recommended.id}
-                  onChange={() => chooseProvider(recommended.id)}
+                  checked={form.choice === "builtin" && form.provider === official.id}
+                  onChange={() => chooseProvider(official.id)}
                 />
                 <span>
-                  <b>{recommended.name}</b>
-                  <small>{t("用自己的 Key 连接", "Connect with your own key")}</small>
+                  <b>{t("官方登录", "Official sign-in")}</b>
+                  <small>{t("使用 ChatGPT 计划", "Use your ChatGPT plan")}</small>
                 </span>
               </label>
             )}
+            <label>
+              <input
+                type="radio"
+                name="ai-choice"
+                checked={form.choice === "builtin" && form.provider !== "chatgpt-siwc"}
+                disabled={!manualProviders.length}
+                onChange={() => chooseProvider(manualDefault?.id ?? "")}
+              />
+              <span>
+                <b>{t("手动配置", "Manual setup")}</b>
+                <small>{t("使用服务商的 API Key", "Use a provider API key")}</small>
+              </span>
+            </label>
             <label>
               <input
                 type="radio"
@@ -99,27 +123,12 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
                 onChange={() => change({ choice: "local", apiKey: "" })}
               />
               <span>
-                <b>{t("这台电脑上的 Agent", "Agent on this computer")}</b>
+                <b>{t("本机 Agent（ACP）", "Local agent (ACP)")}</b>
                 <small>
                   {settings.localAgents?.length
                     ? settings.localAgents.map((agent) => agent.name).join(" · ")
                     : t("没有检测到已安装的 Agent", "No installed agents detected")}
                 </small>
-              </span>
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="ai-choice"
-                checked={form.choice === "builtin" && form.provider !== recommended?.id}
-                disabled={settings.providers.length < 2}
-                onChange={() =>
-                  chooseProvider(settings.providers.find((item) => item.id !== recommended?.id)?.id ?? "")
-                }
-              />
-              <span>
-                <b>{t("其他 AI 服务", "Other AI providers")}</b>
-                <small>{t("用 Key 或已有账号连接", "Connect with a key or provider account")}</small>
               </span>
             </label>
           </fieldset>
@@ -134,9 +143,11 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
                 disabled={!settings.localAgents?.length}
                 onChange={(event) => change({ agent: event.target.value, path: "" })}
               >
-                {!settings.localAgents?.length && (
-                  <option value="">{t("没有检测到已安装的 Agent", "No installed agents detected")}</option>
-                )}
+                <option value="">
+                  {settings.localAgents?.length
+                    ? t("请选择本机 Agent", "Select a local agent")
+                    : t("没有检测到已安装的 Agent", "No installed agents detected")}
+                </option>
                 {settings.localAgents?.map((agent) => (
                   <option key={agent.id} value={agent.id}>
                     {agent.name}
@@ -155,7 +166,7 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
           </>
         ) : (
           <>
-            {form.provider !== recommended?.id && (
+            {form.provider !== "chatgpt-siwc" && (
               <label>
                 {t("AI 服务", "AI provider")}
                 <select
@@ -163,7 +174,7 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
                   value={form.provider}
                   onChange={(event) => chooseProvider(event.target.value)}
                 >
-                  {settings.providers.map((item) => (
+                  {manualProviders.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
                     </option>
@@ -201,7 +212,7 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
               <ChatGptConnection
                 onAuthorized={() => {
                   change({ auth: "dsh", apiKey: "" });
-                  setNotice(t("已授权，请获取并选择模型", "Authorized. Fetch and select a model."));
+                  void loadModels();
                 }}
               />
             )}

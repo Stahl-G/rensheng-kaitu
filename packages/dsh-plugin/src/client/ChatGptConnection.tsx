@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import css from "./AiSettings.module.css";
+import base from "./Prototype.module.css";
 import logo from "./chatgpt-logo-white.svg";
 import { useT } from "./i18n.js";
 import { call } from "./useAiConnection.js";
@@ -44,8 +45,8 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
       setStatus(next);
       setError("");
       if (next.signingIn) timer.current = setTimeout(() => void poll(), 1000);
-      else if (completedSignIn && next.authenticated && next.planEnabled) {
-        if (!localStorage.getItem("kaitu-chatgpt-plan-welcome")) setWelcome(true);
+      else if ((completedSignIn || name === "status") && next.authenticated && next.planEnabled) {
+        if (completedSignIn && !localStorage.getItem("kaitu-chatgpt-plan-welcome")) setWelcome(true);
         authorized.current();
       }
     };
@@ -86,18 +87,23 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
       {welcome && (
         <dialog
           ref={welcomeDialog}
+          className={css.planDialog}
           onCancel={dismissWelcome}
           aria-label={t("正在使用 ChatGPT 计划", "You’re using your ChatGPT plan")}
         >
+          <h2>{t("正在使用 ChatGPT 计划", "You’re using your ChatGPT plan")}</h2>
           <p>
             {t(
               "开图中的符合条件的 AI 请求将使用你的 ChatGPT 计划额度。你可以在 ChatGPT 设置中管理用量。",
               "Eligible AI requests in Kaitu use your ChatGPT plan. You can manage usage in ChatGPT settings.",
             )}
           </p>
-          <button type="button" onClick={dismissWelcome}>
+          <button type="button" className={`${base.btn} ${base["btn-primary"]}`} onClick={dismissWelcome}>
             {t("知道了", "Got it")}
           </button>
+          <a className={base.link} href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
+            {t("管理用量", "Manage usage")} ↗
+          </a>
         </dialog>
       )}
       <p>
@@ -125,12 +131,12 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
               : t("未获 ChatGPT 计划权限", "ChatGPT plan permission not granted")}
             {status.email ? ` · ${status.email}` : ""}
           </p>
-          <button type="button" disabled={busy} onClick={() => void run("signOut")}>
+          <button type="button" className={base.btn} disabled={busy} onClick={() => void run("signOut")}>
             {t("退出", "Sign out")}
           </button>
         </>
       ) : status?.signingIn ? (
-        <button type="button" disabled={busy} onClick={() => void run("cancelSignIn")}>
+        <button type="button" className={base.btn} disabled={busy} onClick={() => void run("cancelSignIn")}>
           {t("取消登录", "Cancel sign-in")}
         </button>
       ) : (
@@ -143,12 +149,12 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
           <img src={logo} alt="" width="21" height="21" /> Continue with ChatGPT
         </button>
       )}{" "}
-      <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
+      <a className={base.link} href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
         {t("管理用量", "Manage usage")} ↗
       </a>
       {(error || status?.error) && <p role="alert">{error || status?.error}</p>}
       {!status && error && (
-        <button type="button" disabled={busy} onClick={() => void run("status")}>
+        <button type="button" className={base.btn} disabled={busy} onClick={() => void run("status")}>
           {t("重试", "Retry")}
         </button>
       )}

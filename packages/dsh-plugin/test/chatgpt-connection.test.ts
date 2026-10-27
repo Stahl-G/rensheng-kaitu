@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
+import { AiSettings } from "../src/client/AiSettings.js";
 import { ChatGptConnection } from "../src/client/ChatGptConnection.js";
 
 const disconnected = { authenticated: false, planEnabled: false, signingIn: false };
@@ -23,6 +24,144 @@ function button(root: ReactTestRenderer, label: string) {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+test("an already authorized ChatGPT account loads and selects an available model", async () => {
+  const settings = {
+    configured: false,
+    provider: "chatgpt-siwc",
+    providerName: "ChatGPT",
+    model: "",
+    auth: "dsh",
+    protocols: [],
+    providers: [{ id: "chatgpt-siwc", name: "ChatGPT", authMethods: [{ id: "oauth" }] }],
+    localAgents: [],
+  };
+  setup(async (name) => response(name === "siwc/status" ? connected : settings));
+  const calls: string[] = [];
+  vi.stubGlobal("fetch", (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1) as string;
+    calls.push(method);
+    if (method === "askModels") return Promise.resolve(response([{ id: "synthetic-model" }]));
+    if (method === "askSupport" && JSON.parse(init.body)[0] === "siwc/status")
+      return Promise.resolve(response(connected));
+    return Promise.resolve(response(settings));
+  });
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AiSettings, { onSaved: async () => {} }));
+    });
+    expect(calls.filter((method) => method === "askModels")).toHaveLength(1);
+    expect(root.root.findByProps({ "aria-label": "模型" }).props.value).toBe("synthetic-model");
+    expect(root.root.findAllByType("dialog")).toHaveLength(0);
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
+test("a model typed while the ChatGPT directory is loading is not overwritten", async () => {
+  const settings = {
+    configured: false,
+    provider: "chatgpt-siwc",
+    providerName: "ChatGPT",
+    model: "",
+    auth: "dsh",
+    protocols: [],
+    providers: [{ id: "chatgpt-siwc", name: "ChatGPT", authMethods: [{ id: "oauth" }] }],
+    localAgents: [],
+  };
+  setup(async () => response(settings));
+  let finish!: (value: unknown) => void;
+  vi.stubGlobal("fetch", (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    if (method === "askModels")
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    if (method === "askSupport" && JSON.parse(init.body)[0] === "siwc/status")
+      return Promise.resolve(response(connected));
+    return Promise.resolve(response(settings));
+  });
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AiSettings, { onSaved: async () => {} }));
+    });
+    await act(async () =>
+      root.root.findByProps({ "aria-label": "模型" }).props.onChange({ target: { value: "my-model" } }),
+    );
+    await act(async () => finish(response([{ id: "first-model" }])));
+    expect(root.root.findByProps({ "aria-label": "模型" }).props.value).toBe("my-model");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
+test("local agent settings do not present an installed agent as the active ChatGPT connection", async () => {
+  const settings = {
+    configured: true,
+    choice: "builtin",
+    provider: "chatgpt-siwc",
+    providerName: "ChatGPT 计划",
+    model: "synthetic-model",
+    protocols: [],
+    providers: [],
+    localAgents: [{ id: "codebuddy", name: "CodeBuddy", path: "/synthetic/codebuddy" }],
+    localAgent: { id: "codebuddy", name: "CodeBuddy" },
+  };
+  setup(async () => response(settings));
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AiSettings, { localOnly: true, onSaved: async () => {} }));
+    });
+    expect(root.root.findByProps({ "aria-label": "Agent" }).props.value).toBe("");
+    expect(button(root, "测试连接")?.props.disabled).toBe(true);
+    expect(JSON.stringify(root.toJSON())).toContain("当前连接：ChatGPT 计划 · synthetic-model");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
+test("official sign-in, manual setup and ACP are separate choices", async () => {
+  const settings = {
+    configured: false,
+    choice: "builtin",
+    provider: "chatgpt-siwc",
+    providerName: "ChatGPT",
+    model: "",
+    auth: "dsh",
+    protocols: [{ id: "openai", name: "OpenAI" }],
+    providers: [
+      { id: "chatgpt-siwc", name: "ChatGPT", authMethods: [{ id: "oauth" }] },
+      { id: "deepseek-official", name: "DeepSeek", recommended: true },
+    ],
+    localAgents: [{ id: "codebuddy", name: "CodeBuddy", path: "/synthetic/codebuddy" }],
+  };
+  setup(async () => response(settings));
+  vi.stubGlobal("fetch", (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    if (method === "askModels") return Promise.resolve(response([{ id: "synthetic-model" }]));
+    if (method === "askSupport" && JSON.parse(init.body)[0] === "siwc/status")
+      return Promise.resolve(response(connected));
+    return Promise.resolve(response(settings));
+  });
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AiSettings, { onSaved: async () => {} }));
+    });
+    const choices = root.root.findAllByType("input").filter((node) => node.props.name === "ai-choice");
+    expect(choices).toHaveLength(3);
+    expect(choices[0]?.props.checked).toBe(true);
+    await act(async () => choices[1]?.props.onChange());
+    expect(root.root.findByProps({ "aria-label": "AI 服务" }).props.value).toBe("deepseek-official");
+    await act(async () => choices[2]?.props.onChange());
+    expect(root.root.findByProps({ "aria-label": "Agent" }).props.value).toBe("");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
 });
 
 test("initial status shows progress; a startup failure offers retry and recovery enables sign-in", async () => {

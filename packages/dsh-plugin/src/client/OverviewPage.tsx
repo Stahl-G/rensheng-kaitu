@@ -41,6 +41,7 @@ import {
   defaultExploreEntries,
   exploreDestination,
   exploreModules,
+  migrateLifeMapFirst,
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
@@ -124,10 +125,16 @@ export function OverviewPage(props: OverviewPageProps) {
       setPluginModules(modules);
       const value = await props.loadPreferences(browserLocale());
       const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
-      if (!fresh.length || !active) return value;
+      const migration = props.loadLifeAtlas ? migrateLifeMapFirst(value) : null;
+      if (!active) return value;
+      if (!fresh.length && !migration) return value;
       const saved = await props.savePreferences({
         locale: value.followSystem ? null : value.locale,
-        exploreEntries: [...(value.exploreEntries ?? defaultExploreEntries), ...fresh],
+        exploreEntries: [
+          ...(migration?.exploreEntries ?? value.exploreEntries ?? defaultExploreEntries),
+          ...fresh,
+        ],
+        ...(migration ? { lifeMapFirstMigrated: true } : {}),
         explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
       });
       return { ...saved, followSystem: value.followSystem };

@@ -10,6 +10,8 @@ export interface Preferences {
   todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
+  /** One-time migration of older Explore layouts to put the life map first. */
+  lifeMapFirstMigrated?: boolean;
   /** Installed plugin IDs already offered, including entries the user subsequently hid. */
   explorePlugins?: string[];
   /** Resolved UI state only; an automatic choice is never persisted as a manual choice. */
@@ -56,6 +58,9 @@ export function readPreferences(): Preferences {
       locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
       ...(adoptionList(value.todayAdoptions) ? { todayAdoptions: value.todayAdoptions } : {}),
       ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
+      ...(typeof value.lifeMapFirstMigrated === "boolean"
+        ? { lifeMapFirstMigrated: value.lifeMapFirstMigrated }
+        : {}),
       ...(entryList(value.explorePlugins) ? { explorePlugins: value.explorePlugins } : {}),
     };
   } catch {
@@ -70,10 +75,15 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     Array.isArray(input) ||
     Object.keys(input).some(
       (key) =>
-        key !== "locale" && key !== "exploreEntries" && key !== "explorePlugins" && key !== "todayAdoptions",
+        key !== "locale" &&
+        key !== "exploreEntries" &&
+        key !== "explorePlugins" &&
+        key !== "todayAdoptions" &&
+        key !== "lifeMapFirstMigrated",
     ) ||
     (input.todayAdoptions !== undefined && !adoptionList(input.todayAdoptions)) ||
     (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
+    (input.lifeMapFirstMigrated !== undefined && typeof input.lifeMapFirstMigrated !== "boolean") ||
     (input.explorePlugins !== undefined && !entryList(input.explorePlugins)) ||
     (input.locale !== null && input.locale !== undefined && !locales.includes(input.locale))
   )

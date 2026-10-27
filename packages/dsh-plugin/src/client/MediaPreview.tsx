@@ -122,7 +122,7 @@ export function MediaLocation(
     };
   }, [props.loadMediaLocation]);
   return (
-    <div className={css.card}>
+    <div className={`${css.card} ${styles.location}`}>
       <h2 className={css.eyebrow}>{t("媒体库", "Media library")}</h2>
       <p className={styles.path}>
         {location
