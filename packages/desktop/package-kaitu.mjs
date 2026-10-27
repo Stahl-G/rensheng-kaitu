@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { productCopyright, withProductCopyright } from "./brand.mjs";
 import { rewriteArchive as rebuildArchive } from "./package-archive.mjs";
+import { verifyCartographerPayload } from "./package-cartographer.mjs";
 import { createDmg } from "./package-dmg.mjs";
 import { writePayload as buildPayload } from "./package-payload.mjs";
 import { readUpdateConfig } from "./update-config.mjs";
@@ -126,7 +127,7 @@ const writePayload = (payload) =>
     asar,
     payloadVersion,
     dshVersion,
-    target: { platform: "darwin", arch: "arm64" },
+    target: { platform: "darwin", arch: "arm64", deferNativeValidation: !values["payload-only"] },
   });
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
@@ -305,6 +306,7 @@ async function packageApplication() {
     for (const attribute of ["com.apple.FinderInfo", "com.apple.ResourceFork"])
       execFileSync("/usr/bin/xattr", ["-dr", attribute, output]);
     execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", output], { stdio: "inherit" });
+    verifyCartographerPayload(payload, "@napi-rs/canvas-darwin-arm64");
     if (notaryProfile) {
       const zip = join(temporary, "Kaitu.zip");
       execFileSync("/usr/bin/ditto", ["-c", "-k", "--keepParent", output, zip]);

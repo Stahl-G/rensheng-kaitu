@@ -51,7 +51,18 @@ export async function bundleCartographerWorker(destination, workerDirectory = "d
   cpSync(join(root, "packages/cartographer/fonts"), join(destination, "data/cartographer/fonts"), {
     recursive: true,
   });
-  // Execute from the emitted payload, so a missing/wrong-architecture binary fails packaging.
+  mkdirSync(join(destination, "licenses"), { recursive: true });
+  cpSync(join(root, "packages/cartographer/LICENSE"), join(destination, "licenses/cartographer.txt"));
+  cpSync(
+    join(root, "packages/cartographer/UPSTREAM.json"),
+    join(destination, "licenses/cartographer-source.json"),
+  );
+  cpSync(join(dirname(canvasManifest), "LICENSE"), join(destination, "licenses/canvas.txt"));
+  if (!target?.deferNativeValidation) verifyCartographerPayload(destination, nativeName);
+}
+
+// A complete macOS App validates native loading after its bundle has been signed.
+export function verifyCartographerPayload(destination, nativeName) {
   const proof = execFileSync(
     process.execPath,
     [
@@ -64,17 +75,10 @@ export async function bundleCartographerWorker(destination, workerDirectory = "d
     const c=createCanvas(100,80),ctx=c.getContext('2d'); ctx.font='40px "Kaitu Font Check"';
     const glyphs=['健','康','学','习'].map(ch=>{ctx.clearRect(0,0,100,80);ctx.fillText(ch,0,55);return Buffer.from(ctx.getImageData(0,0,100,80).data)});
     if(glyphs.some((g,i)=>!g.some(v=>v)||(i>0&&g.equals(glyphs[0])))) throw Error('CJK glyphs are missing');
-    console.log(JSON.stringify({platform:process.platform,arch:process.arch,nativePackage:${JSON.stringify(nativeName)},font:'Noto Serif SC',chineseGlyphs:4,pngBytes:c.toBuffer('image/png').length}));
+    process.stdout.write(JSON.stringify({platform:process.platform,arch:process.arch,nativePackage:${JSON.stringify(nativeName)},font:'Noto Serif SC',chineseGlyphs:4,pngBytes:c.toBuffer('image/png').length})+'\\n',()=>process.exit(0));
   `,
     ],
-    { cwd: destination, encoding: "utf8" },
+    { cwd: destination, encoding: "utf8", timeout: 30_000, killSignal: "SIGKILL" },
   );
   console.log(`Cartographer payload verified: ${proof.trim()}`);
-  mkdirSync(join(destination, "licenses"), { recursive: true });
-  cpSync(join(root, "packages/cartographer/LICENSE"), join(destination, "licenses/cartographer.txt"));
-  cpSync(
-    join(root, "packages/cartographer/UPSTREAM.json"),
-    join(destination, "licenses/cartographer-source.json"),
-  );
-  cpSync(join(dirname(canvasManifest), "LICENSE"), join(destination, "licenses/canvas.txt"));
 }
