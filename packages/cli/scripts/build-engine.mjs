@@ -40,4 +40,4 @@ for (const name of ["sdk-credentials", "sdk-providers", "sdk-search-settings", "
   cpSync(join(desktop, `${name}.mjs`), join(output, `${name}.mjs`));
 cpSync(join(root, "packages/core/data"), join(root, "packages/cli/dist/data"), { recursive: true });
 
-await bundleCartographerWorker(output, ".", { platform: process.platform, arch: process.arch });
+await bundleCartographerWorker(output, ".");

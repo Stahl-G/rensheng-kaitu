@@ -1,21 +1,19 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 /** Native N-API canvas stays external to esbuild; ship the installed platform binary with the worker. */
-export async function bundleCartographerWorker(
-  destination,
-  workerDirectory = "dist",
-  target = { platform: process.platform, arch: process.arch },
-) {
-  const nativeName = {
-    "darwin-arm64": "@napi-rs/canvas-darwin-arm64",
-    "win32-x64": "@napi-rs/canvas-win32-x64-msvc",
-  }[`${target.platform}-${target.arch}`];
-  if (!nativeName || target.platform !== process.platform || target.arch !== process.arch)
+export async function bundleCartographerWorker(destination, workerDirectory = "dist", target = undefined) {
+  // Desktop installers have explicit supported targets. CLI/Web builds use the installed host binding.
+  if (
+    target &&
+    (!["darwin-arm64", "win32-x64"].includes(`${target.platform}-${target.arch}`) ||
+      target.platform !== process.platform ||
+      target.arch !== process.arch)
+  )
     throw new Error(
       `Unsupported Cartographer build target ${target.platform}-${target.arch} on ${process.platform}-${process.arch}; build macOS arm64 / Windows x64 on matching runners. Universal and cross builds are unsupported.`,
     );
@@ -36,6 +34,14 @@ export async function bundleCartographerWorker(
   const requireAtlas = createRequire(join(root, "packages/cartographer/package.json"));
   const canvasManifest = requireAtlas.resolve("@napi-rs/canvas/package.json");
   const requireCanvas = createRequire(canvasManifest);
+  const musl = process.platform === "linux" && !process.report.getReport().header.glibcVersionRuntime;
+  const nativePrefix = `@napi-rs/canvas-${process.platform}-${process.arch}`;
+  const nativeName = Object.keys(JSON.parse(readFileSync(canvasManifest, "utf8")).optionalDependencies).find(
+    (name) =>
+      (name === nativePrefix || name.startsWith(`${nativePrefix}-`)) &&
+      (process.platform !== "linux" || name.endsWith("-musl") === musl),
+  );
+  if (!nativeName) throw new Error(`No canvas binding for ${process.platform}-${process.arch}`);
   for (const name of ["@napi-rs/canvas", nativeName]) {
     const source = dirname(requireCanvas.resolve(`${name}/package.json`));
     const target = join(destination, "node_modules", name);

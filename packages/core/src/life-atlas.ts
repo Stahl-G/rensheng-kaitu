@@ -125,8 +125,15 @@ function persist(s: Session, manifest = s.manifest) {
   s.manifest = manifest;
 }
 function job<T>(data: object, progress?: (fraction: number) => void): Promise<T> {
-  let entry = new URL("./life-atlas-worker.js", import.meta.url);
-  if (!existsSync(fileURLToPath(entry))) entry = new URL("../dist/life-atlas-worker.js", import.meta.url);
+  const entry = [
+    "./life-atlas-worker.js",
+    "../dist/life-atlas-worker.js",
+    "../engine/life-atlas-worker.js",
+    "../../dist/engine/life-atlas-worker.js",
+  ]
+    .map((path) => new URL(path, import.meta.url))
+    .find((path) => existsSync(fileURLToPath(path)));
+  if (!entry) return Promise.reject(new Error("地图生成组件缺失，请重新安装完整功能包"));
   return new Promise((resolve, reject) => {
     const worker = new Worker(entry, { workerData: data, resourceLimits: { maxOldGenerationSizeMb: 256 } });
     let settled = false;
