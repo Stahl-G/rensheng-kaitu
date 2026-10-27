@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +35,7 @@ import {JsonRpcLineTransport} from ${JSON.stringify(protocol)};
 const rpc = new JsonRpcLineTransport(process.stdin, process.stdout);
 let seq = process.pid * 100000;
 rpc.onRequest(async (method, params) => {
-  appendFileSync(${JSON.stringify(calls)}, JSON.stringify({method, params})+'\\n');
+  appendFileSync(${JSON.stringify(calls)}, JSON.stringify({method, params, hostCwd:process.cwd()})+'\\n');
   if (method === 'initialize') {
     const patch = JSON.parse(readFileSync(process.argv[process.argv.indexOf('--patch') + 1], 'utf8'));
     const provider = patch.flatMap(row => row.insert ?? []).find(row => row.id === 'chatgpt-siwc');
@@ -115,6 +115,10 @@ test("idle sign-out invalidates real Ask caches; re-login sends spawn a fresh pr
     expect(ask.events(row.id).filter((row) => row.type === "assistant/message")).toHaveLength(3);
     const full = await f.sdk.runtime("full");
     await full.close();
+    for (const row of f.requests().filter((row) => row.method === "initialize")) {
+      expect(realpathSync(row.hostCwd)).toBe(realpathSync(f.home));
+      if (!row.params.capabilities) expect(row.params.cwd).toBe(f.workspace);
+    }
   } finally {
     await ask.close();
     await f.sdk.closeSupport();

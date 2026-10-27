@@ -14,9 +14,34 @@ import { Context } from "@deepseek-ai/cordis";
 import { FsError as BackendError } from "@deepseek-ai/dsh-fs";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
 import { addMemory, initWorkspace, parseFrontmatter, setFinanceAccess } from "@kaitu/core";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import { Workspace as HostWorkspace } from "../../core/dist/workspace.js";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
+
+test("scoped filesystem registration does not open data; unavailable policy still denies the first access", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-lazy-fs-")));
+  writeFileSync(join(root, "NOW.md"), "synthetic data");
+  class HostFiles {
+    async resolve(path: string) {
+      const target = resolve(root, path);
+      return { displayPath: target, targetKey: realpathSync(target) };
+    }
+  }
+  const open = vi.spyOn(HostWorkspace.prototype, "root", "set").mockImplementation(() => {
+    throw new Error("synthetic unavailable policy data");
+  });
+  try {
+    const files = new (confinedFileSystem(HostFiles, BackendError, root))();
+    expect(files.sandboxMode).toBe("workspace-write");
+    expect(open).not.toHaveBeenCalled();
+    await expect(files.resolve("NOW.md")).rejects.toMatchObject({ code: "FS_SANDBOX_DENIED" });
+    expect(open).toHaveBeenCalledTimes(1);
+  } finally {
+    open.mockRestore();
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("Ask file reads reject outside paths and symlinks, including a replaced resolved target", async () => {
   const temp = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-ask-fs-")));

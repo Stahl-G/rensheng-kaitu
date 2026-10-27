@@ -35,10 +35,19 @@ export function sdkRuntimePatch({
   const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
     (id) => ({ id, disabled: true }),
   );
+  // 目录中这几项是资料工具插件；账号与禁用工具的请求不启动它们，也不改已保存的启用设置。
+  const workspacePlugins =
+    capabilities || textOnly
+      ? ["kaitu-novel-workspace", "kaitu-sf-consistency", "kaitu-fortune", "kaitu-auday"].map((id) => ({
+          id,
+          disabled: true,
+        }))
+      : [];
   // 账号服务与资料无关：不加载工作区、资料工具、技能、联网工具或会话 RPC。
   if (capabilities)
     return [
       ...privacy,
+      ...workspacePlugins,
       siwc,
       { id: "sdk-jsonrpc-server", disabled: true },
       { id: "agent-instructions", disabled: true },
@@ -77,6 +86,7 @@ export function sdkRuntimePatch({
     ];
   return [
     ...privacy,
+    ...workspacePlugins,
     siwc,
     ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
@@ -503,7 +513,8 @@ export function createSdkRuntime({
       if (settings.provider === "chatgpt-siwc" && (signingOut || siwcEpoch !== siwcGeneration))
         throw new KaituError("ChatGPT 连接已退出，请重新连接", "AI_CONNECTION");
       const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
-        cwd: capabilities ? home : workspace,
+        // 宿主只在本机程序目录启动；会话 cwd 由 initialize 明确传入，避免启动器读取资料里的 .env。
+        cwd: home,
         env: {
           ...env,
           DSH_PERMISSION_MODE: mode === "full" && !textOnly ? "danger-full-access" : "workspace-write",
