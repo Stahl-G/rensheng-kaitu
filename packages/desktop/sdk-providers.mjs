@@ -13,7 +13,6 @@ export const providers = [
     id: "chatgpt-siwc",
     name: "ChatGPT 计划",
     authMethods: [{ id: "oauth", label: "Continue with ChatGPT" }],
-    authKey: "chatgpt-siwc",
   },
   {
     id: "openai",

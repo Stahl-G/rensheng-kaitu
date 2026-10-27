@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import css from "./AiSettings.module.css";
 import logo from "./chatgpt-logo-white.svg";
 import { useT } from "./i18n.js";
+import { call } from "./useAiConnection.js";
 
 type Status = {
   authenticated: boolean;
@@ -10,16 +11,6 @@ type Status = {
   email?: string;
   error?: string;
 };
-async function action(name: string): Promise<Status> {
-  const response = await fetch("/api/product/askSupport", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
-    body: JSON.stringify([`siwc/${name}`, {}]),
-  });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value.error ?? "ChatGPT connection failed");
-  return value;
-}
 export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
   const t = useT();
   const [status, setStatus] = useState<Status>();
@@ -27,61 +18,75 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
   const [busy, setBusy] = useState(false);
   const [welcome, setWelcome] = useState(false);
   const welcomeDialog = useRef<HTMLDialogElement>(null);
+  const pending = useRef<AbortController | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const authorized = useRef(onAuthorized);
+  authorized.current = onAuthorized;
   useEffect(() => {
     if (welcome && welcomeDialog.current && !welcomeDialog.current.open) welcomeDialog.current.showModal();
   }, [welcome]);
-  const run = async (name: string) => {
-    setBusy(true);
-    setError("");
-    try {
-      const next = await action(name);
-      setStatus(next);
-      return next;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
+  const dismissWelcome = () => {
+    localStorage.setItem("kaitu-chatgpt-plan-welcome", "1");
+    setWelcome(false);
   };
-  // Load the current local connection when the provider is selected.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run is recreated with each render.
-  useEffect(() => {
-    void run("status");
-  }, []);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: poll only for the lifetime of an attempt.
-  useEffect(() => {
-    if (!status?.signingIn) return;
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      try {
-        const next = await action("status");
-        if (!active) return;
-        setStatus(next);
-        if (!next.signingIn && next.authenticated && next.planEnabled) {
-          if (!localStorage.getItem("kaitu-chatgpt-plan-welcome")) setWelcome(true);
-          onAuthorized();
-        } else if (next.signingIn) timer = setTimeout(() => void poll(), 1000);
-      } catch (err) {
-        if (active) setError(String(err));
+  const stop = () => {
+    pending.current?.abort();
+    clearTimeout(timer.current);
+  };
+  const run = async (name: string) => {
+    stop();
+    const controller = new AbortController();
+    pending.current = controller;
+    const current = () => pending.current === controller && !controller.signal.aborted;
+    const request = (action: string) => call<Status>("askSupport", [`siwc/${action}`, {}], controller.signal);
+    let failures = 0;
+    const accept = (next: Status, completedSignIn: boolean) => {
+      setStatus(next);
+      setError("");
+      if (next.signingIn) timer.current = setTimeout(() => void poll(), 1000);
+      else if (completedSignIn && next.authenticated && next.planEnabled) {
+        if (!localStorage.getItem("kaitu-chatgpt-plan-welcome")) setWelcome(true);
+        authorized.current();
       }
     };
-    timer = setTimeout(() => void poll(), 1000);
-    return () => {
-      active = false;
-      clearTimeout(timer);
+    const poll = async () => {
+      try {
+        const next = await request("status");
+        if (!current()) return;
+        failures = 0;
+        accept(next, true);
+      } catch (err) {
+        if (!current()) return;
+        setError(err instanceof Error ? err.message : String(err));
+        failures = Math.min(failures + 1, 4);
+        timer.current = setTimeout(() => void poll(), Math.min(1000 * 2 ** failures, 10000));
+      }
     };
-  }, [status?.signingIn]);
+    setBusy(true);
+    setError("");
+    if (name === "cancelSignIn") setStatus((value) => value && { ...value, signingIn: false });
+    try {
+      const next = await request(name);
+      if (!current()) return;
+      accept(next, name === "beginSignIn");
+      if (name === "signOut") window.dispatchEvent(new Event("kaitu-ai-changed"));
+    } catch (err) {
+      if (current()) setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (current()) setBusy(false);
+    }
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount owns the connection request and its cleanup.
+  useEffect(() => {
+    void run("status");
+    return stop;
+  }, []);
   return (
     <section aria-label={t("ChatGPT 连接", "ChatGPT connection")}>
       {welcome && (
         <dialog
           ref={welcomeDialog}
-          aria-modal="true"
-          onCancel={() => {
-            localStorage.setItem("kaitu-chatgpt-plan-welcome", "1");
-            setWelcome(false);
-          }}
+          onCancel={dismissWelcome}
           aria-label={t("正在使用 ChatGPT 计划", "You’re using your ChatGPT plan")}
         >
           <p>
@@ -90,13 +95,7 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
               "Eligible AI requests in Kaitu use your ChatGPT plan. You can manage usage in ChatGPT settings.",
             )}
           </p>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("kaitu-chatgpt-plan-welcome", "1");
-              setWelcome(false);
-            }}
-          >
+          <button type="button" onClick={dismissWelcome}>
             {t("知道了", "Got it")}
           </button>
         </dialog>
@@ -121,13 +120,7 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
               : t("未获 ChatGPT 计划权限", "ChatGPT plan permission not granted")}
             {status.email ? ` · ${status.email}` : ""}
           </p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() =>
-              void run("signOut").then(() => window.dispatchEvent(new Event("kaitu-ai-changed")))
-            }
-          >
+          <button type="button" disabled={busy} onClick={() => void run("signOut")}>
             {t("退出", "Sign out")}
           </button>
         </>

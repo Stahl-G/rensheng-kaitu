@@ -205,7 +205,7 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
                 }}
               />
             )}
-            {provider?.authKey && form.provider !== "chatgpt-siwc" && (
+            {provider?.authKey && (
               <DshAuthorization
                 provider={provider}
                 onAuthorized={() => {

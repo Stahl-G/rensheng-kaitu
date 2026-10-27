@@ -229,12 +229,6 @@ export function createSdkRuntime({
           baseURL: row.baseURL,
         })),
     );
-    const status = await api.support("siwc/status");
-    if (status.authenticated && status.planEnabled) {
-      const refreshed = await api.support("siwc/refreshModels");
-      if (refreshed.models.length)
-        rows.push({ provider: "chatgpt-siwc", models: refreshed.models.map((m) => m.id) });
-    }
     return rows.map((row) => ({
       ...row,
       name: providers.find((item) => item.id === row.provider)?.name ?? row.provider,
@@ -245,27 +239,67 @@ export function createSdkRuntime({
   let capabilityAbort;
   let connectionStatus;
   const activeSiwcRuntimes = new Set();
-  const api = {
-    async support(method, input = {}) {
-      if (method === "siwc/signOut") await Promise.all([...activeSiwcRuntimes].map((close) => close()));
-      if (!capabilityRuntime) {
-        const controller = new AbortController();
-        capabilityAbort = controller;
-        capabilityRuntime = api
-          .runtime("scoped", true, "local-ask", false, controller.signal)
-          .catch((error) => {
-            if (capabilityAbort === controller) {
+  let siwcIdentity;
+  let siwcModels = [];
+  let siwcGeneration = 0;
+  let signingOut;
+  const siwcReady = async () => {
+    const status = await api.support("siwc/status");
+    return { configured: status.authenticated && status.planEnabled };
+  };
+  const requestSupport = async (method, input) => {
+    if (!capabilityRuntime) {
+      const controller = new AbortController();
+      capabilityAbort = controller;
+      capabilityRuntime = api
+        .runtime("scoped", true, "local-ask", false, controller.signal)
+        .then((runtime) => {
+          runtime.onNotification((method) => {
+            if (method === "runtime.exit" && capabilityAbort === controller) {
               capabilityAbort = undefined;
               capabilityRuntime = undefined;
+              connectionStatus = undefined;
             }
-            throw error;
           });
+          return runtime;
+        })
+        .catch((error) => {
+          if (capabilityAbort === controller) {
+            capabilityAbort = undefined;
+            capabilityRuntime = undefined;
+          }
+          throw error;
+        });
+    }
+    const result = await (await capabilityRuntime).request(`kaitu/${method}`, input);
+    if (method.startsWith("siwc/") && typeof result.authenticated === "boolean") {
+      const identity = JSON.stringify([result.authenticated, result.planEnabled, result.activeAccountId]);
+      if (siwcIdentity !== undefined && identity !== siwcIdentity) connectionStatus = undefined;
+      siwcIdentity = identity;
+      if (!result.authenticated) siwcModels = [];
+    }
+    if (method === "siwc/models") siwcModels = result;
+    if (
+      ["siwc/beginSignIn", "siwc/cancelSignIn", "siwc/signOut", "saveProvider"].includes(method) ||
+      (method === "authPoll" && result.status !== "running")
+    )
+      connectionStatus = undefined;
+    return result;
+  };
+  const api = {
+    async support(method, input = {}) {
+      if (method !== "siwc/signOut") return requestSupport(method, input);
+      if (!signingOut) {
+        siwcGeneration++;
+        signingOut = (async () => {
+          await Promise.all([...activeSiwcRuntimes].map((close) => close()));
+          return requestSupport(method, input);
+        })().finally(() => {
+          signingOut = undefined;
+          connectionStatus = undefined;
+        });
       }
-      const result = await (await capabilityRuntime).request(`kaitu/${method}`, input);
-      if (method.startsWith("siwc/")) connectionStatus = undefined;
-      if (method === "saveProvider" || (method === "authPoll" && result.status !== "running"))
-        connectionStatus = undefined;
-      return result;
+      return signingOut;
     },
     async closeSupport() {
       const running = capabilityRuntime;
@@ -303,14 +337,12 @@ export function createSdkRuntime({
       return result.models;
     },
     async settings(resolveImages = false) {
-      // 连接判定不启动 SDK，也不读取模型目录；真实发送仍在 runtime 里验证。
+      // SIWC 状态由能力进程读取并缓存；其他服务只查本机凭据，不读模型目录。
       connectionStatus ??= (async () => {
         const settings = readSettings();
         const info =
           settings.provider === "chatgpt-siwc" && settings.choice === "builtin"
-            ? await api
-                .support("siwc/status")
-                .then((status) => ({ configured: status.authenticated && status.planEnabled }))
+            ? await siwcReady()
             : settings.choice === "builtin"
               ? await credential("status", { ref: credentialRef(settings.provider), settings })
               : { configured: false };
@@ -346,6 +378,16 @@ export function createSdkRuntime({
         includeSaved || !providers.some((entry) => entry.id === settings.provider)
           ? await savedProviders()
           : undefined;
+      if (saved) {
+        const models =
+          settings.provider === "chatgpt-siwc" ? await api.models({ provider: "chatgpt-siwc" }) : siwcModels;
+        if (models.length)
+          saved.push({
+            provider: "chatgpt-siwc",
+            name: "ChatGPT 计划",
+            models: models.map((model) => model.id),
+          });
+      }
       return { ...settings, providers, ...(saved ? { saved } : {}), search: await describeSearch() };
     },
     async configure(input) {
@@ -380,9 +422,6 @@ export function createSdkRuntime({
         )
           throw new KaituError("更换 Base URL 后请填入该服务的 API Key", "AI_KEY");
         if (settings.provider === "chatgpt-siwc") {
-          const status = await api.support("siwc/status");
-          if (!status.authenticated || !status.planEnabled)
-            throw new KaituError(status.error ?? "请先登录 ChatGPT", "AI_AUTH");
           const models = await api.support("siwc/models");
           const model = models.find((item) => item.id === settings.model);
           if (!model) throw new KaituError("模型不在当前账号目录中，请刷新模型列表", "AI_MODEL");
@@ -417,15 +456,14 @@ export function createSdkRuntime({
       textOnly = false,
       signal = undefined,
     ) {
+      const siwcEpoch = siwcGeneration;
       if (!["scoped", "full"].includes(mode)) throw new Error("无效模式");
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
       if (!capabilities) {
         const info =
           settings.provider === "chatgpt-siwc"
-            ? await api
-                .support("siwc/status")
-                .then((status) => ({ configured: status.authenticated && status.planEnabled }))
+            ? await siwcReady()
             : await credential("model-status", { ref: credentialRef(settings.provider), settings });
         settings.supportsImages ??= info.supportsImages;
         if (settings.choice !== "builtin" || !info.configured)
@@ -451,6 +489,8 @@ export function createSdkRuntime({
           .href
       );
       signal?.throwIfAborted();
+      if (settings.provider === "chatgpt-siwc" && (signingOut || siwcEpoch !== siwcGeneration))
+        throw new KaituError("ChatGPT 连接已退出，请重新连接", "AI_CONNECTION");
       const child = spawn(executable, ["--expose-internals", entry, "--profile", "sdk", "--patch", profile], {
         cwd: workspace,
         env: {
@@ -471,6 +511,7 @@ export function createSdkRuntime({
       let closing;
       child.stdin.on("error", () => {});
       const failed = () => {
+        if (dead) return;
         dead = true;
         rpc.close();
         for (const sessionId of active)
@@ -481,6 +522,7 @@ export function createSdkRuntime({
               error: "内置 AI 已退出，请重新连接后继续",
             });
         active.clear();
+        for (const listener of listeners) listener("runtime.exit", {});
       };
       child.once("error", failed);
       child.once("exit", failed);
@@ -541,7 +583,7 @@ export function createSdkRuntime({
       }
       return {
         request(method, params) {
-          if (dead) throw new Error("内置 AI 已退出");
+          if (dead) throw new KaituError("内置 AI 已退出", "AI_RUNTIME_EXIT");
           if (method === "session/prompt") active.add(params.sessionId);
           return rpc.request(
             method,
@@ -551,6 +593,10 @@ export function createSdkRuntime({
         },
         onNotification(listener) {
           listeners.add(listener);
+          if (dead)
+            queueMicrotask(() => {
+              if (listeners.has(listener)) listener("runtime.exit", {});
+            });
           return () => listeners.delete(listener);
         },
         close,

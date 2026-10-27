@@ -166,3 +166,50 @@ test("first message of a new conversation is not lost to list()", async () => {
     rmSync(temp, { recursive: true, force: true });
   }
 });
+
+test("a rejected send transport is discarded before retrying without reconfiguring", async () => {
+  const temp = mkdtempSync(join(tmpdir(), "kaitu-ask-retry-"));
+  let spawnCount = 0;
+  let sends = 0;
+  const ask = createAskService({
+    state: join(temp, "state"),
+    workspace: temp,
+    settings: async () => ({ configured: true, provider: "synthetic", model: "synthetic" }),
+    configure: async () => ({}),
+    models: async () => [],
+    runtime: async () => {
+      const instance = ++spawnCount;
+      let notify: Parameters<AskRuntime["onNotification"]>[0] = () => {};
+      return {
+        onNotification(listener) {
+          notify = listener;
+          return () => {};
+        },
+        async request(_method, params) {
+          if (++sends === 2 && instance === 1) throw Error("transport closed before exit notification");
+          notify("session.event", {
+            sessionId: params.sessionId,
+            event: {
+              seq: sends,
+              type: "user/message",
+              data: { content: params.contentBlocks, source: { kind: "user" } },
+            },
+          });
+          notify("session.status", { sessionId: params.sessionId, status: "idle" });
+          return { accepted: true };
+        },
+        async close() {},
+      };
+    },
+  });
+  try {
+    const row = await ask.create();
+    await ask.send(row.id, "first");
+    await expect(ask.send(row.id, "failed transport")).rejects.toMatchObject({ code: "AI_CONNECTION" });
+    await ask.send(row.id, "retry");
+    expect(spawnCount).toBe(2);
+  } finally {
+    await ask.close();
+    rmSync(temp, { recursive: true, force: true });
+  }
+});

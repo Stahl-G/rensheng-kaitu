@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { createRequire, findPackageJSON } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { HOST_API } from "./payload-loader.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
@@ -159,18 +159,15 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     join(payload, "licenses", "deepseek-harness.txt"),
     asar.extractFile(archive, join("dsh/node_modules/@deepseek-ai/dsh-brand", "LICENSE")),
   );
-  cpSync(
-    join(root, "node_modules/dsh-plugin-chatgpt-siwc/LICENSE"),
-    join(payload, "licenses/chatgpt-siwc.txt"),
-  );
-  const requireSiwc = createRequire(requirePlugin.resolve("dsh-plugin-chatgpt-siwc"));
-  for (const dependency of ["jose", "ws", "zod"]) {
-    let dir = dirname(requireSiwc.resolve(dependency));
-    while (!existsSync(join(dir, "package.json"))) dir = dirname(dir);
-    cpSync(
-      join(dir, dependency === "jose" ? "LICENSE.md" : "LICENSE"),
-      join(payload, `licenses/chatgpt-siwc-${dependency}.txt`),
-    );
+  const siwcEntry = pathToFileURL(requirePlugin.resolve("dsh-plugin-chatgpt-siwc")).href;
+  for (const dependency of ["dsh-plugin-chatgpt-siwc", "jose", "ws", "zod"]) {
+    const manifest = findPackageJSON(dependency, siwcEntry);
+    if (!manifest) throw new Error(`Missing license package: ${dependency}`);
+    const dir = dirname(manifest);
+    const license = ["LICENSE", "LICENSE.md"].find((file) => existsSync(join(dir, file)));
+    if (!license) throw new Error(`Missing license: ${dependency}`);
+    const name = dependency === "dsh-plugin-chatgpt-siwc" ? "chatgpt-siwc" : `chatgpt-siwc-${dependency}`;
+    cpSync(join(dir, license), join(payload, `licenses/${name}.txt`));
   }
   for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
     cpSync(

@@ -26,16 +26,24 @@ interface AiConnection {
   localAgents?: { id: string; name: string; path: string }[];
   localAgent?: { id: string; name: string; path?: string };
 }
-async function call<T>(method: string, ...args: unknown[]): Promise<T> {
-  const response = await fetch(`/api/product/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
-    body: JSON.stringify(args),
-    ...(["askSettings", "askSupport"].includes(method) ? { signal: AbortSignal.timeout(30000) } : {}),
-  });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value.error ?? "连接未完成，请重试");
-  return value;
+export async function call<T>(method: string, args: unknown[] = [], signal?: AbortSignal): Promise<T> {
+  const timeout = new AbortController();
+  const timer = ["askSettings", "askSupport"].includes(method)
+    ? setTimeout(() => timeout.abort(new Error("连接请求超时，请重试")), 30000)
+    : undefined;
+  try {
+    const response = await fetch(`/api/product/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
+      body: JSON.stringify(args),
+      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
+    });
+    const value = await response.json();
+    if (!response.ok) throw new Error(value.error ?? "连接未完成，请重试");
+    return value;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Uses the existing Ask connection flow; credentials never enter workspace files. */
@@ -82,7 +90,9 @@ export function useAiConnection({
     void (async () => {
       try {
         const current = await call<AiConnection>("askSettings");
-        const catalog = !localOnly ? await call<AiConnection>("askSupport", "builtinSettings", {}) : current;
+        const catalog = !localOnly
+          ? await call<AiConnection>("askSupport", ["builtinSettings", {}])
+          : current;
         if (!active) return;
         setSettings({ ...catalog, localAgents: current.localAgents, localAgent: current.localAgent });
         onLoaded?.(catalog);
@@ -148,7 +158,7 @@ export function useAiConnection({
     setLoadingModels(true);
     setNotice("");
     try {
-      const list = await call<typeof models>("askModels", connection());
+      const list = await call<typeof models>("askModels", [connection()]);
       if (request !== modelRequest.current) return;
       setModels(list);
       const firstModel = list[0];
@@ -171,8 +181,7 @@ export function useAiConnection({
     setError("");
     setNotice("");
     try {
-      const result = await call<AiConnection>(
-        "askConfigure",
+      const result = await call<AiConnection>("askConfigure", [
         form.choice === "local"
           ? { choice: "local", agent: form.agent, ...(form.path.trim() ? { path: form.path.trim() } : {}) }
           : {
@@ -183,7 +192,7 @@ export function useAiConnection({
                 ? {}
                 : { supportsImages: models.find((item) => item.id === form.model)?.image }),
             },
-      );
+      ]);
       if (!result.configured)
         throw new Error(t("尚未连接，请检查服务和模型设置", "Not connected; check the provider and model"));
       setForm((current) => ({
