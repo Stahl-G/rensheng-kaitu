@@ -122,6 +122,23 @@ test("idle sign-out invalidates real Ask caches; re-login sends spawn a fresh pr
   }
 });
 
+test("account sign-in and models work without a workspace directory", async () => {
+  const f = fixture();
+  rmSync(f.workspace, { recursive: true });
+  try {
+    expect((await f.sdk.support("siwc/status")).authenticated).toBe(true);
+    await f.sdk.support("siwc/beginSignIn");
+    expect(await f.sdk.support("siwc/models")).toEqual([{ id: "synthetic", name: "Synthetic" }]);
+    await f.sdk.support("siwc/cancelSignIn");
+    await f.sdk.support("siwc/signOut");
+    const initialization = f.requests().find((row) => row.method === "initialize");
+    expect(initialization.params).not.toHaveProperty("cwd");
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test("non-ChatGPT saves and saved models work when SIWC is unavailable; invalid ChatGPT selections preserve settings", async () => {
   const f = fixture();
   f.select("deepseek-official");
