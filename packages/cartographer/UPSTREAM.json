@@ -1,0 +1,35 @@
+{
+  "repository": "https://github.com/Jannchie/cartographer",
+  "commit": "e8c8db8919abe6a074e4d72e2f431e46bf93f2d1",
+  "branch": "master",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Jianqi Pan",
+  "retained": [
+    "procedural terrain, tectonics, erosion, climate, hydrology",
+    "shared naming, geometry and world types",
+    "native paper-map renderer and eight upstream themes",
+    "SVG marching-squares contours and river smoothing"
+  ],
+  "removed": [
+    "Vue UI and editor",
+    "Three.js 3D, hologram and settlement views",
+    "video and showcase scripts",
+    "Earth/China observed-data loaders and bundled elevation data",
+    "public images, favicon, plates and documentation screenshots",
+    "upstream automation workflows and browser app build"
+  ],
+  "local_changes": [
+    "remove observed-Earth generation branches",
+    "share integer hash used by river smoothing in gen/util.ts",
+    "seeded contiguous mainland through upstream WorldSketch",
+    "share upstream political territory cost for stable life provinces",
+    "optional native glyph density, furniture and compass scale; upstream defaults preserved",
+    "evidence-based domain coverage/freshness, independent labels, accessible local preview",
+    "validated settings ports, user-selected modules, saved candidates, adoption and recoverable history",
+    "NodeNext imports and offline system-font substitution; removed Vite-only debug logging",
+    "Desktop worker adapter exports native SVG and stable province geometry; life data stays in the current workspace projection",
+    "Remove unused fork export helpers; bundle pinned OFL Chinese font for consistent offline measurement."
+  ],
+  "asset_audit": "Generated procedural paths and native theme code; no game images, logos or observed geographic datasets. An unmodified OFL Noto Serif SC font is bundled for offline Chinese rendering; see fonts/SOURCE.json and OFL.txt. Teyvat remains an upstream native theme. Personal maps stay outside this repository.",
+  "kaitu_fork_commit": "6f5fe21"
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@kaitu/cartographer",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/kaitu/index.js",
+  "types": "dist/kaitu/index.d.ts",
+  "exports": {
+    ".": "./dist/kaitu/index.js",
+    "./settings": "./dist/kaitu/settings.js",
+    "./domains": "./dist/kaitu/domains.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "UPSTREAM.json",
+    "fonts"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "1.0.9"
+  }
+}

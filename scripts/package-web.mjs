@@ -69,6 +69,10 @@ const dependencies = Object.fromEntries(
     ([name]) => name.startsWith("@deepseek-ai/") || name === "@vscode/ripgrep",
   ),
 );
+// npm omits nested node_modules from packed files; installation supplies the host's native binding.
+dependencies["@napi-rs/canvas"] = JSON.parse(
+  readFileSync(join(root, "packages/cartographer/package.json"), "utf8"),
+).dependencies["@napi-rs/canvas"];
 for (const name of pluginImports) {
   const version = plugin.dependencies[name] ?? cli.dependencies[name];
   if (!version) throw new Error(`插件 bundle 引用了未声明的依赖：${name}`);

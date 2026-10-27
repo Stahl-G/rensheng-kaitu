@@ -2,6 +2,7 @@ import { cpSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { bundleCartographerWorker } from "../../desktop/package-cartographer.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const { build } = createRequire(join(root, "packages/dsh-plugin/package.json"))("esbuild");
@@ -38,3 +39,5 @@ for (const [name, entry] of Object.entries({
 for (const name of ["sdk-credentials", "sdk-providers", "sdk-search-settings", "sdk-rpc", "sdk-support"])
   cpSync(join(desktop, `${name}.mjs`), join(output, `${name}.mjs`));
 cpSync(join(root, "packages/core/data"), join(root, "packages/cli/dist/data"), { recursive: true });
+
+await bundleCartographerWorker(output, ".");

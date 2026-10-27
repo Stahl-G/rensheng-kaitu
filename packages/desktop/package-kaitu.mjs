@@ -119,7 +119,15 @@ console.log(
 const requireDsh = createRequire(join(resolve(values["dsh-root"]), "apps/desktop/package.json"));
 const asarPath = requireDsh.resolve("@electron/asar", { paths: [requireDsh.resolve("app-builder-lib")] });
 const asar = requireDsh(asarPath);
-const writePayload = (payload) => buildPayload({ payload, archive, asar, payloadVersion, dshVersion });
+const writePayload = (payload) =>
+  buildPayload({
+    payload,
+    archive,
+    asar,
+    payloadVersion,
+    dshVersion,
+    target: { platform: "darwin", arch: "arm64" },
+  });
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const dshVersion = manifest.version;

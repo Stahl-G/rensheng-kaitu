@@ -54,7 +54,14 @@ const appDir = join(output, "win-unpacked");
 cpSync(source, appDir, { recursive: true });
 const resources = join(appDir, "resources");
 const payload = join(resources, "kaitu");
-await writePayload({ payload, archive, asar, payloadVersion: version, dshVersion });
+await writePayload({
+  payload,
+  archive,
+  asar,
+  payloadVersion: version,
+  dshVersion,
+  target: { platform: "win32", arch: "x64" },
+});
 cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
 if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
 rmSync(join(resources, "app-update.yml"), { force: true });
