@@ -111,6 +111,26 @@ export function apply(ctx) {
       initialized = true;
       return result;
     }
+    if (method.startsWith("kaitu/siwc/")) {
+      const action = method.slice("kaitu/siwc/".length);
+      const service = ctx.get("chatgptSiwc");
+      if (service && action === "models") {
+        const status = await service.refreshModels();
+        if (status.error) throw new Error(status.error);
+        return (await ctx.llm.listModels("chatgpt-siwc")).map((model) => ({
+          id: model.id,
+          name: model.name ?? model.id,
+          ...(model.inputModalities
+            ? { image: model.inputModalities.includes("image") }
+            : typeof model.imageInput === "boolean"
+              ? { image: model.imageInput }
+              : {}),
+        }));
+      }
+      if (!service || !["status", "beginSignIn", "cancelSignIn", "signOut", "refreshModels"].includes(action))
+        throw new Error("ChatGPT 连接不可用");
+      return service[action]();
+    }
     if (method === "kaitu/directory") {
       return { providers: ctx.llm.listConfigurableProviders(), authorization: ctx.authorization.list() };
     }

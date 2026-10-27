@@ -1,4 +1,5 @@
 import css from "./AiSettings.module.css";
+import { ChatGptConnection } from "./ChatGptConnection.js";
 import { DshAuthorization } from "./DshAuthorization.js";
 import base from "./Prototype.module.css";
 import { useT } from "./i18n.js";
@@ -196,7 +197,15 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
                 </label>
               </>
             )}
-            {provider?.authKey && (
+            {form.provider === "chatgpt-siwc" && (
+              <ChatGptConnection
+                onAuthorized={() => {
+                  change({ auth: "dsh", apiKey: "" });
+                  setNotice(t("已授权，请获取并选择模型", "Authorized. Fetch and select a model."));
+                }}
+              />
+            )}
+            {provider?.authKey && form.provider !== "chatgpt-siwc" && (
               <DshAuthorization
                 provider={provider}
                 onAuthorized={() => {

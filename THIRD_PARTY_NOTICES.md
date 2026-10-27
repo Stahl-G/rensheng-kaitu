@@ -5,6 +5,7 @@
 
 | 名称 | 许可证 | 仓库 |
 |---|---|---|
+| DSH ChatGPT SIWC 0.9.4（固定源码 e7a3e450ed7aab5e44179cd0039ef200c1050b0b） | MIT | https://github.com/Fanch-hui/dsh-plugin-chatgpt-siwc |
 | fflate | MIT | https://github.com/101arrowz/fflate |
 | saxes | ISC | https://github.com/lddubeau/saxes |
 | ical.js | MPL-2.0 | https://github.com/kewisch/ical.js |

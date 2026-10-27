@@ -30,6 +30,7 @@ export function sdkRuntimePatch({
   textOnly = false,
 }) {
   // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
+  const siwc = { insert: [{ id: "chatgpt-siwc", name: join(dirname(hostPlugin), "chatgpt-siwc.mjs") }] };
   const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
     (id) => ({ id, disabled: true }),
   );
@@ -51,6 +52,7 @@ export function sdkRuntimePatch({
   if (mode === "full" && !textOnly)
     return [
       ...privacy,
+      siwc,
       ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
       { id: "sandbox-policy", config: { mode: "danger-full-access", workspaceRoot: workspace } },
@@ -64,6 +66,7 @@ export function sdkRuntimePatch({
     ];
   return [
     ...privacy,
+    siwc,
     ...web,
     { id: "sdk-jsonrpc-server", disabled: true },
     { id: "sandbox", disabled: true },
@@ -226,6 +229,12 @@ export function createSdkRuntime({
           baseURL: row.baseURL,
         })),
     );
+    const status = await api.support("siwc/status");
+    if (status.authenticated && status.planEnabled) {
+      const refreshed = await api.support("siwc/refreshModels");
+      if (refreshed.models.length)
+        rows.push({ provider: "chatgpt-siwc", models: refreshed.models.map((m) => m.id) });
+    }
     return rows.map((row) => ({
       ...row,
       name: providers.find((item) => item.id === row.provider)?.name ?? row.provider,
@@ -235,8 +244,10 @@ export function createSdkRuntime({
   let capabilityRuntime;
   let capabilityAbort;
   let connectionStatus;
+  const activeSiwcRuntimes = new Set();
   const api = {
     async support(method, input = {}) {
+      if (method === "siwc/signOut") await Promise.all([...activeSiwcRuntimes].map((close) => close()));
       if (!capabilityRuntime) {
         const controller = new AbortController();
         capabilityAbort = controller;
@@ -251,6 +262,7 @@ export function createSdkRuntime({
           });
       }
       const result = await (await capabilityRuntime).request(`kaitu/${method}`, input);
+      if (method.startsWith("siwc/")) connectionStatus = undefined;
       if (method === "saveProvider" || (method === "authPoll" && result.status !== "running"))
         connectionStatus = undefined;
       return result;
@@ -270,6 +282,9 @@ export function createSdkRuntime({
     async models(input) {
       const previous = await loadSettings();
       const settings = selection(input, previous);
+      if (settings.provider === "chatgpt-siwc") {
+        return api.support("siwc/models");
+      }
       if (settings.auth === "dsh") {
         const models = await api.support("models", { provider: settings.provider });
         return models.map((item) => ({
@@ -292,9 +307,13 @@ export function createSdkRuntime({
       connectionStatus ??= (async () => {
         const settings = readSettings();
         const info =
-          settings.choice === "builtin"
-            ? await credential("status", { ref: credentialRef(settings.provider), settings })
-            : { configured: false };
+          settings.provider === "chatgpt-siwc" && settings.choice === "builtin"
+            ? await api
+                .support("siwc/status")
+                .then((status) => ({ configured: status.authenticated && status.planEnabled }))
+            : settings.choice === "builtin"
+              ? await credential("status", { ref: credentialRef(settings.provider), settings })
+              : { configured: false };
         return {
           ...connectionInfo({
             ...settings,
@@ -308,7 +327,12 @@ export function createSdkRuntime({
         throw error;
       });
       const current = await connectionStatus;
-      if (resolveImages && current.configured && current.supportsImages === undefined) {
+      if (
+        resolveImages &&
+        current.configured &&
+        current.supportsImages === undefined &&
+        current.provider !== "chatgpt-siwc"
+      ) {
         const info = await credential("model-status", { settings: readSettings() });
         current.supportsImages = info.supportsImages ?? false;
       }
@@ -355,21 +379,32 @@ export function createSdkRuntime({
           !input.apiKey
         )
           throw new KaituError("更换 Base URL 后请填入该服务的 API Key", "AI_KEY");
-        const ref = credentialRef(settings.provider);
-        // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
-        const known =
-          !input.apiKey &&
-          (await savedProviders()).some(
-            (row) => row.provider === settings.provider && row.models.includes(settings.model),
-          );
-        const result =
-          settings.auth === "dsh" || (known && !input.apiKey)
-            ? await credential("status", { settings, ref })
-            : await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
-        if (!result.configured)
-          throw new KaituError(result.message ?? "请先完成此服务的登录", result.code ?? "AI_AUTH");
-        if (input.apiKey) await credential("save", { ref, apiKey: input.apiKey.trim() });
-        await saveProvider(settings);
+        if (settings.provider === "chatgpt-siwc") {
+          const status = await api.support("siwc/status");
+          if (!status.authenticated || !status.planEnabled)
+            throw new KaituError(status.error ?? "请先登录 ChatGPT", "AI_AUTH");
+          const models = await api.support("siwc/models");
+          const model = models.find((item) => item.id === settings.model);
+          if (!model) throw new KaituError("模型不在当前账号目录中，请刷新模型列表", "AI_MODEL");
+          settings.supportsImages = model.image;
+          settings.auth = "dsh";
+        } else {
+          const ref = credentialRef(settings.provider);
+          // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
+          const known =
+            !input.apiKey &&
+            (await savedProviders()).some(
+              (row) => row.provider === settings.provider && row.models.includes(settings.model),
+            );
+          const result =
+            settings.auth === "dsh" || (known && !input.apiKey)
+              ? await credential("status", { settings, ref })
+              : await credential("validate", { settings, ref, apiKey: input.apiKey?.trim() });
+          if (!result.configured)
+            throw new KaituError(result.message ?? "请先完成此服务的登录", result.code ?? "AI_AUTH");
+          if (input.apiKey) await credential("save", { ref, apiKey: input.apiKey.trim() });
+          await saveProvider(settings);
+        }
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
@@ -386,7 +421,12 @@ export function createSdkRuntime({
       // 能力进程只用来读写服务商和登录，不需要当前选中的模型。
       const settings = capabilities ? {} : await loadSettings();
       if (!capabilities) {
-        const info = await credential("model-status", { ref: credentialRef(settings.provider), settings });
+        const info =
+          settings.provider === "chatgpt-siwc"
+            ? await api
+                .support("siwc/status")
+                .then((status) => ({ configured: status.authenticated && status.planEnabled }))
+            : await credential("model-status", { ref: credentialRef(settings.provider), settings });
         settings.supportsImages ??= info.supportsImages;
         if (settings.choice !== "builtin" || !info.configured)
           throw new KaituError("请先连接内置 AI", "AI_CONNECTION");
@@ -451,7 +491,10 @@ export function createSdkRuntime({
       rpc.start();
       const close = () => {
         closing ??= (async () => {
-          if (dead) return;
+          if (dead) {
+            activeSiwcRuntimes.delete(close);
+            return;
+          }
           try {
             await rpc.request("shutdown", {}, AbortSignal.timeout(1500));
           } catch {
@@ -481,9 +524,11 @@ export function createSdkRuntime({
             await wait(2000);
           }
           rpc.close();
+          activeSiwcRuntimes.delete(close);
         })();
         return closing;
       };
+      if (!capabilities && settings.provider === "chatgpt-siwc") activeSiwcRuntimes.add(close);
       try {
         await rpc.request(
           "initialize",

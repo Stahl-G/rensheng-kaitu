@@ -10,6 +10,12 @@ export const providers = [
     modelsApi: "openai-completions",
   },
   {
+    id: "chatgpt-siwc",
+    name: "ChatGPT 计划",
+    authMethods: [{ id: "oauth", label: "Continue with ChatGPT" }],
+    authKey: "chatgpt-siwc",
+  },
+  {
     id: "openai",
     name: "OpenAI",
     api: "openai-responses",
@@ -199,6 +205,7 @@ export function connectionInfo(settings) {
 export function providerPatch(settings) {
   const entry = providers.find((item) => item.id === settings.provider) ?? providers[0];
   const apiKeyEnv = credentialRef(entry.id);
+  if (entry.id === "chatgpt-siwc") return [];
   if (entry.id === "deepseek-official")
     return [
       {

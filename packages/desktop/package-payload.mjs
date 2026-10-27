@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +90,39 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     banner: { js: nodeBanner },
     external: ["@deepseek-ai/*", "better-sqlite3"],
   });
+  // Bundle the reviewed SIWC host implementation; DSH services remain shared with the host.
+  await build({
+    entryPoints: [requirePlugin.resolve("dsh-plugin-chatgpt-siwc")],
+    outfile: join(payload, "dist/chatgpt-siwc.mjs"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["@deepseek-ai/*"],
+    plugins: [
+      {
+        name: "siwc-json-credential-record",
+        setup(builder) {
+          builder.onLoad({ filter: /storage[\\/]state\.js$/ }, (args) => {
+            if (!args.path.includes("dsh-plugin-chatgpt-siwc")) return;
+            const source = readFileSync(args.path, "utf8");
+            const original = "return { kind: 'grant', payload: state };";
+            if (source.split(original).length !== 2)
+              throw new Error("SIWC credential storage changed; review compatibility patch");
+            // DSH 0.2.1 rejects undefined in JSON records; omit absent optional fields.
+            return {
+              contents: source.replace(
+                original,
+                "return { kind: 'grant', payload: JSON.parse(JSON.stringify(state)) };",
+              ),
+              loader: "js",
+            };
+          });
+        },
+      },
+    ],
+  });
   await build({
     entryPoints: [join(directory, "sdk-host.mjs")],
     outfile: join(payload, "dist/sdk-host.mjs"),
@@ -126,6 +159,19 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     join(payload, "licenses", "deepseek-harness.txt"),
     asar.extractFile(archive, join("dsh/node_modules/@deepseek-ai/dsh-brand", "LICENSE")),
   );
+  cpSync(
+    join(root, "node_modules/dsh-plugin-chatgpt-siwc/LICENSE"),
+    join(payload, "licenses/chatgpt-siwc.txt"),
+  );
+  const requireSiwc = createRequire(requirePlugin.resolve("dsh-plugin-chatgpt-siwc"));
+  for (const dependency of ["jose", "ws", "zod"]) {
+    let dir = dirname(requireSiwc.resolve(dependency));
+    while (!existsSync(join(dir, "package.json"))) dir = dirname(dir);
+    cpSync(
+      join(dir, dependency === "jose" ? "LICENSE.md" : "LICENSE"),
+      join(payload, `licenses/chatgpt-siwc-${dependency}.txt`),
+    );
+  }
   for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
     cpSync(
       join(root, "node_modules/@deepseek-ai", name, "LICENSE"),
@@ -155,7 +201,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   cpSync(join(root, "packages/core/data"), join(payload, "data"), { recursive: true });
   // 插件里用到的每个 DSH 入口都转接到宿主自带的同一份模块；从构建结果里找，内核新增子路径时不会漏。
   const bridges = new Map();
-  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs", "dist/cli.mjs"])
+  for (const file of ["dist/index.js", "dist/sdk-plugin.mjs", "dist/cli.mjs", "dist/chatgpt-siwc.mjs"])
     for (const [, name, subpath] of readFileSync(join(payload, file), "utf8").matchAll(
       /from ?"(@deepseek-ai\/[\w-]+)(\/[\w-]+)?"/g,
     ))

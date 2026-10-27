@@ -134,7 +134,7 @@ export function useAiConnection({
       choice: "builtin",
       provider: id,
       model: settings?.provider === id ? settings.model : "",
-      auth: settings?.provider === id ? (settings.auth ?? "key") : "key",
+      auth: id === "chatgpt-siwc" ? "dsh" : settings?.provider === id ? (settings.auth ?? "key") : "key",
       apiKey: "",
     });
   const connection = () => ({
@@ -151,6 +151,9 @@ export function useAiConnection({
       const list = await call<typeof models>("askModels", connection());
       if (request !== modelRequest.current) return;
       setModels(list);
+      const firstModel = list[0];
+      if (form.provider === "chatgpt-siwc" && !form.model && firstModel)
+        setForm((current) => ({ ...current, model: firstModel.id }));
       setNotice(
         list.length
           ? t(`${list.length} 个可选模型，也可以手填`, `${list.length} models; you can also enter an ID`)

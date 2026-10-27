@@ -1335,6 +1335,14 @@ export function AskPage({
             >
               {t("引用资料", "Reference files")}
             </button>
+            {settings?.configured && settings.provider === "chatgpt-siwc" && (
+              <span>
+                {t("正在使用 ChatGPT 计划", "Using ChatGPT plan")} ·{" "}
+                <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
+                  {t("管理用量", "Manage usage")}
+                </a>
+              </span>
+            )}
             <span className={css.modelWrap}>
               <button
                 type="button"
