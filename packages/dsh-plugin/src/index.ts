@@ -4,6 +4,7 @@ import type { TypertContribution } from "@deepseek-ai/dsh-typert-registry";
 import { CollectorService } from "@kaitu/channels/collectors";
 import { startPhoneSnapshots } from "@kaitu/core";
 import {
+  KaituError,
   Workspace,
   defaultRoot,
   initWorkspace,
@@ -39,7 +40,10 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   if (!ws.exists(".kaitu/config.json")) {
     ws = await initWorkspace(ws.root, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   } else {
-    await upgradeWorkspace(ws);
+    await upgradeWorkspace(ws).catch((error: unknown) => {
+      // 云盘未下载时推迟迁移，仍启动账号设置和工具；具体文件的读写继续由 Workspace 拒绝。
+      if (!(error instanceof KaituError) || error.code !== "CLOUD_UNAVAILABLE") throw error;
+    });
   }
   registerSkills(ctx as unknown as SkillContext, ws);
   const queue = applyTools(ctx as unknown as ToolContext, config, ws);
