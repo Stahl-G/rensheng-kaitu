@@ -227,6 +227,7 @@ await packageApplication();
 
 async function packageApplication() {
   const temporary = mkdtempSync(join(tmpdir(), "kaitu-package-"));
+  let signed = false;
   try {
     mkdirSync(dirname(output), { recursive: true });
     execFileSync("/usr/bin/ditto", [source, output]);
@@ -306,6 +307,7 @@ async function packageApplication() {
     for (const attribute of ["com.apple.FinderInfo", "com.apple.ResourceFork"])
       execFileSync("/usr/bin/xattr", ["-dr", attribute, output]);
     execFileSync("/usr/bin/codesign", ["--verify", "--deep", "--strict", output], { stdio: "inherit" });
+    signed = true;
     verifyCartographerPayload(payload, "@napi-rs/canvas-darwin-arm64");
     if (notaryProfile) {
       const zip = join(temporary, "Kaitu.zip");
@@ -317,7 +319,8 @@ async function packageApplication() {
     console.log(`完成：${output}`);
   } catch (error) {
     // 输出目录由本次调用创建；失败不留下一个貌似可用的应用。
-    rmSync(output, { recursive: true, force: true });
+    if (!signed) rmSync(output, { recursive: true, force: true });
+    else console.error(`签名后的候选包保留用于诊断：${output}`);
     throw error;
   } finally {
     rmSync(temporary, { recursive: true, force: true });
