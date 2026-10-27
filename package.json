@@ -19,6 +19,7 @@
     "@deepseek-ai/dsh-web-search-exa": "0.2.1-rc.3",
     "@deepseek-ai/dsh-web-search-perplexity": "0.2.1-rc.3",
     "@types/node": "^22.10.0",
+    "dsh-plugin-chatgpt-siwc": "0.9.4",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
   }

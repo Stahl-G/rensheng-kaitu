@@ -249,6 +249,16 @@ export function createAskService(options: {
         runtime = value;
         value.onNotification((method, params) => {
           if (epoch !== generation) return;
+          if (method === "runtime.exit") {
+            if (runtime !== value) return;
+            runtime = undefined;
+            starting = undefined;
+            runtimeMode = undefined;
+            for (const id of busy)
+              append(id, "session.status", { status: "idle", error: "内置 AI 已退出，可以重新发送" });
+            busy.clear();
+            return;
+          }
           const id = params.sessionId;
           if (typeof id !== "string" || !threads.some((row) => row.id === id)) return;
           if (method === "session.status") {
@@ -469,8 +479,9 @@ export function createAskService(options: {
       busy.add(id);
       row.mode = mode;
       append(id, "session.status", { status: "running" });
+      let client: AskRuntime | undefined;
       try {
-        const client = await start(mode);
+        client = await start(mode);
         if (history) echoes.set(id, blocks);
         const result = await client.request("session/prompt", {
           sessionId: id,
@@ -490,6 +501,15 @@ export function createAskService(options: {
         saveIndex();
         return result;
       } catch (error) {
+        // A failed transport must not pin the next send to the same resolved startup promise.
+        if (
+          client &&
+          runtime === client &&
+          (!(error instanceof KaituError) || error.code === "AI_RUNTIME_EXIT")
+        ) {
+          runtime = undefined;
+          starting = undefined;
+        }
         busy.delete(id);
         echoes.delete(id);
         if (error instanceof KaituError) {

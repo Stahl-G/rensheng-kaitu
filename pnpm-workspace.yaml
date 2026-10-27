@@ -11,3 +11,4 @@ allowBuilds:
 # DSH 0.2.1-rc.3 is newer than pnpm's default release-age window.
 minimumReleaseAgeExclude:
   - "@deepseek-ai/*"
+  - dsh-plugin-chatgpt-siwc@0.9.4

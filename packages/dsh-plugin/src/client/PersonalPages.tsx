@@ -23,6 +23,7 @@ import settingsCss from "./SettingsPage.module.css";
 import { PROVIDERS, StorageChoice } from "./StorageChoice.js";
 import { WorkspaceBackup, type WorkspaceBackupRequest } from "./WorkspaceBackup.js";
 import { aiHandover } from "./connections.js";
+import dshBadge from "./dsh-badge.png";
 import { type Locale, useT, versionText } from "./i18n.js";
 
 export interface PersonalServices
@@ -1103,11 +1104,26 @@ export function PersonalPages(
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
                 {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}
-                <p className={css.small}>
-                  {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}
-                  {data.dshVersion ? ` · Powered by DeepSeek Harness ${data.dshVersion}` : ""} ·{" "}
-                  {t("时区", "Time zone")} {data.timeZone}
-                </p>
+                <div className={`${css.small} ${settingsCss.buildInfo}`}>
+                  <span>
+                    {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}
+                  </span>
+                  {data.dshVersion && (
+                    <span className={settingsCss.engineCredit}>
+                      <a
+                        href="https://github.com/deepseek-ai/deepseek-harness"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img src={dshBadge} alt="Powered by DeepSeek Harness" width={121} height={20} />
+                      </a>
+                      <span>{data.dshVersion}</span>
+                    </span>
+                  )}
+                  <span>
+                    {t("时区", "Time zone")} {data.timeZone}
+                  </span>
+                </div>
               </section>
             )}
           </>

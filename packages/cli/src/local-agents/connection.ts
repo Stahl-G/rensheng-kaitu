@@ -135,6 +135,8 @@ export function createAgentConnection(options: {
         return (await sessionOptions(agent, path)).permissionModes;
       }
       if (method === "builtinSettings") return options.sdk().catalogSettings(input.saved === true);
+      // Account settings remain usable while a local Agent is the selected chat backend.
+      if (method.startsWith("siwc/")) return options.sdk().support(method, input);
       if (local()) throw new KaituError("本机 Agent 只接收文字，不能用附件和引用", "AI_CONNECTION");
       return options.sdk().support(method, input);
     },

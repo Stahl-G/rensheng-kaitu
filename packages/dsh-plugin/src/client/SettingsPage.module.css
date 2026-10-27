@@ -110,6 +110,16 @@
   padding: 1px 7px;
   font-size: 12px;
 }
+.buildInfo,
+.engineCredit {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.engineCredit img {
+  display: block;
+}
 @container (max-width: 959px) {
   .page {
     grid-template-columns: minmax(0, 1fr);
