@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
 import { expect, it } from "vitest";
 import {
+  type ResumeEntry,
   changeExperienceBatch,
   editExperience,
   importResume,
@@ -103,6 +104,136 @@ it("简历写进同一经历正本，保留页码；并行职位不合并，跨�
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+const datedRole = (start: string, end?: string, role = "Engineer"): ResumeEntry => ({
+  kind: "worked",
+  organization: "Temporal Studio",
+  role,
+  start,
+  end,
+  evidence: `Temporal Studio ${role} ${start}${end ? ` to ${end}` : ""}`,
+  page: 1,
+  subject: "self",
+});
+async function importRows(ws: Awaited<ReturnType<typeof clonedWorkspace>>, entries: ResumeEntry[]) {
+  const source = await uploadResume(ws, "temporal.pdf", pdf(entries.map((row) => row.evidence).join("; ")));
+  return importResume(ws, source.file, JSON.stringify({ entries }));
+}
+
+it("同组织职位的近邻开始月份留待核对，重复投递该冲突不会再写一条", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    await importRows(ws, [datedRole("2020-06")]);
+    expect(await importRows(ws, [datedRole("2020-07")])).toMatchObject({ added: 1, pending: 1 });
+    expect(readMe(ws).career).toHaveLength(1);
+    expect(readRecordRevisions(ws, "experience").map((row) => row.fact_status)).toEqual([
+      "user_reported",
+      "suggested",
+    ]);
+    expect(await importRows(ws, [datedRole("2020-07")])).toMatchObject({ added: 0, duplicates: 1 });
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it.each([
+  [datedRole("2020-06", "2022-12"), datedRole("2021-04", "2023-01")],
+  [datedRole("2020"), datedRole("2020-06")],
+  [datedRole("2020-06"), datedRole("2020")],
+])("同组织职位的时间重叠或不同精度包含不冒充两段确定经历 %#", async (prior, next) => {
+  const ws = await clonedWorkspace();
+  try {
+    await importRows(ws, [prior]);
+    expect(await importRows(ws, [next])).toMatchObject({ added: 1, pending: 1 });
+    expect(readMe(ws).career).toHaveLength(1);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("明确分开的再入职独立保留；缺结束日期不补成无限重叠区间", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    for (const row of [
+      datedRole("2020-06", "2020-06"),
+      datedRole("2020-07", "2021-03"),
+      datedRole("2023-04"),
+      datedRole("2026-01", "2026-06"),
+    ])
+      expect(await importRows(ws, [row])).toMatchObject({ added: 1, pending: 0 });
+    expect(readMe(ws).career).toHaveLength(4);
+    expect(new Set(readMe(ws).career.map((row) => row.id)).size).toBe(4);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("同一组织并行不同职位和不同组织同职位不作为日期冲突或合并", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    const other = {
+      ...datedRole("2020-06", "2022-06"),
+      organization: "Another Studio",
+      evidence: "Another Studio Engineer 2020-06 to 2022-06",
+    };
+    expect(
+      await importRows(ws, [
+        datedRole("2020-06", "2022-06"),
+        datedRole("2020-06", "2022-06", "Designer"),
+        other,
+      ]),
+    ).toMatchObject({ added: 3, pending: 0, duplicates: 0 });
+    expect(readMe(ws).career).toHaveLength(3);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it.each(["Remote", undefined])(
+  "导入 %s 后只改标题备注保留 unknown 地点，不产生地名核对；真正改城市才解析",
+  async (city) => {
+    const ws = await clonedWorkspace();
+    try {
+      await importRows(ws, [
+        {
+          ...datedRole("2020-06"),
+          city,
+          evidence: `Temporal Studio Engineer 2020-06${city ? ` ${city}` : ""}`,
+        },
+      ]);
+      const initial = lifeMap(ws).experiences[0];
+      if (!initial) throw new Error("Expected imported career");
+      const changes = {
+        place: { name: initial.place.name, country: initial.place.country },
+        event_type: initial.event_type,
+        fact_status: initial.fact_status,
+        start: initial.start,
+        time_precision: initial.time_precision,
+        title: "Temporal Studio · Engineer (corrected)",
+        notes: `${initial.notes}\nCorrected note`,
+      };
+      await editExperience(ws, initial.id, changes, 1);
+      const edited = readRecordRevisions(ws, "experience").at(-1);
+      expect(edited).toMatchObject({
+        place: initial.place,
+        title: changes.title,
+        notes: changes.notes,
+        rev: 2,
+      });
+      expect(edited?.review).toBeUndefined();
+      expect(lifeMap(ws).experiences[0]?.review).toBeUndefined();
+      await editExperience(ws, initial.id, { ...changes, place: { name: "Paris", country: "FR" } }, 2);
+      expect(lifeMap(ws).experiences[0]?.place).toMatchObject({
+        precision: "city",
+        name: "Paris",
+        country: "FR",
+      });
+      expect(validateWorkspace(ws)).toEqual([]);
+    } finally {
+      rmSync(ws.root, { recursive: true, force: true });
+    }
+  },
+);
 
 it("损坏、无文字、伪造证据或页码不会写入；歧义不进入简历，修正后批次撤销保留用户修订", async () => {
   const ws = await clonedWorkspace();

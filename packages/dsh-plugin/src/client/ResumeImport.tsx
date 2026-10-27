@@ -33,6 +33,7 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
   const [receipt, setReceipt] = useState<ResumeReceipt>();
   const [prompt, setPrompt] = useState("");
   const [external, setExternal] = useState(false);
+  const [extracted, setExtracted] = useState(false);
   const [cropFile, setCropFile] = useState<File>();
   useEffect(() => {
     let active = true;
@@ -95,6 +96,7 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
             const file = event.target.files?.[0];
             event.currentTarget.value = "";
             setExternal(false);
+            setExtracted(false);
             setUpload(undefined);
             setReceipt(undefined);
             setPrompt("");
@@ -131,7 +133,7 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
       )}
       {upload && !receipt && (
         <>
-          {connection?.configured && props.extractResume && (
+          {connection?.configured && props.extractResume && !extracted && (
             <button
               className={css.primary}
               type="button"
@@ -139,7 +141,11 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
               onClick={() =>
                 void run(t("正在抽取并记录经历…", "Extracting and recording experience…"), async () => {
                   const result = await props.extractResume?.(upload.file);
-                  if (result) await commit(result.answer);
+                  if (result) {
+                    setAnswer(result.answer);
+                    setExtracted(true);
+                    await commit(result.answer);
+                  }
                 })
               }
             >
@@ -168,13 +174,18 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
           >
             {t("用常用 AI 整理 →", "Use my usual AI →")}
           </button>
-          {external && (
+          {(external || extracted) && (
             <>
               <p className={css.meta}>
-                {t(
-                  "复制提示词；截图同时由你附给 AI。把 JSON 回答贴回即记录，不需逐条批准。",
-                  "Copy the prompt; attach the screenshot yourself if needed. Paste the JSON response to record it without approving each fact.",
-                )}
+                {extracted
+                  ? t(
+                      "已保留 AI 抽取结果。可以修改后重试保存，不会重新调用模型。",
+                      "The AI result is kept. Correct it and retry saving without calling the model again.",
+                    )
+                  : t(
+                      "复制提示词；截图同时由你附给 AI。把 JSON 回答贴回即记录，不需逐条批准。",
+                      "Copy the prompt; attach the screenshot yourself if needed. Paste the JSON response to record it without approving each fact.",
+                    )}
               </p>
               {prompt && (
                 <details>
@@ -202,7 +213,9 @@ export function ResumeImport(props: ResumeServices & { onChanged: () => Promise<
                 disabled={!!busy || !answer.trim()}
                 onClick={() => void run(t("正在记录经历…", "Recording experience…"), () => commit(answer))}
               >
-                {t("记录这次导入", "Record this import")}
+                {extracted
+                  ? t("保存纠正结果", "Save corrected results")
+                  : t("记录这次导入", "Record this import")}
               </button>
             </>
           )}

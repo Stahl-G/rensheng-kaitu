@@ -10,6 +10,7 @@ import {
   experienceSourceKey,
   recoverExperienceImports,
 } from "./experience-imports.js";
+import { partialDateBounds } from "./experience-time.js";
 import { type Experience, resolvePlace } from "./places.js";
 import { addRecords, readRecordRevisions } from "./records.js";
 import type { Workspace } from "./workspace.js";
@@ -167,6 +168,26 @@ function dateInEvidence(value: string | undefined, evidence: string): boolean {
 }
 const identity = (item: Pick<Experience, "event_type" | "title" | "start">) =>
   JSON.stringify([item.event_type, normalize(item.title ?? ""), item.start ?? ""]);
+const roleIdentity = (item: Pick<Experience, "event_type" | "title">) =>
+  JSON.stringify([item.event_type, normalize(item.title ?? "")]);
+
+/** Candidate matching never merges records or treats a missing end as ongoing. */
+function conflictingDates(a: Pick<Experience, "start" | "end">, b: Pick<Experience, "start" | "end">) {
+  const startA = partialDateBounds(a.start);
+  const startB = partialDateBounds(b.start);
+  if (!startA || !startB) return true;
+  const endA = partialDateBounds(a.end);
+  const endB = partialDateBounds(b.end);
+  // Explicitly separate periods can be a return to the same role, even in adjacent months.
+  if ((endA && endA.to < startB.from) || (endB && endB.to < startA.from)) return false;
+  if (startA.from <= startB.to && startB.from <= startA.to) return true;
+  const month = (value: string) => Number(value.slice(0, 4)) * 12 + Number(value.slice(5, 7));
+  if (Math.abs(month(startA.from) - month(startB.from)) <= 1) return true;
+  return !!(
+    (endA && startA.from <= startB.to && startB.from <= endA.to) ||
+    (endB && startB.from <= startA.to && startA.from <= endB.to)
+  );
+}
 
 /** The same experience records and transaction/undo mechanism as the life map. */
 export async function importResume(ws: Workspace, file: string, answer: string): Promise<ResumeReceipt> {
@@ -210,7 +231,14 @@ export async function importResume(ws: Workspace, file: string, answer: string):
   const history = readRecordRevisions(ws, "experience").filter(
     (item) => !item.deleted,
   ) as unknown as Experience[];
-  const seen = new Map(history.map((item) => [identity(item), item]));
+  const candidates = new Map<string, Experience[]>();
+  const remember = (item: Experience) => {
+    const key = roleIdentity(item);
+    const entries = candidates.get(key) ?? [];
+    entries.push(item);
+    candidates.set(key, entries);
+  };
+  for (const item of history) remember(item);
   const exact = new Set(history.map((item) => `${identity(item)}:${item.end ?? ""}`));
   const data: Record<string, unknown>[] = [];
   const freshKeys = new Set<string>();
@@ -243,8 +271,7 @@ export async function importResume(ws: Workspace, file: string, answer: string):
     if (source.mime !== "application/pdf" && item.page !== 1)
       throw new KaituError("截图页码应为 1 / Screenshot page must be 1", "INVALID_IMPORT");
     const title = [item.organization, item.role].filter(Boolean).join(" · ");
-    const candidate = { title, event_type: item.kind, start: item.start };
-    const old = seen.get(identity(candidate));
+    const candidate = { title, event_type: item.kind, start: item.start, end: item.end };
     if (
       exact.has(`${identity(candidate)}:${item.end ?? ""}`) &&
       (item.start ||
@@ -261,7 +288,7 @@ export async function importResume(ws: Workspace, file: string, answer: string):
     }
     const uncertain =
       item.subject === "uncertain" ||
-      !!old ||
+      (candidates.get(roleIdentity(candidate)) ?? []).some((old) => conflictingDates(candidate, old)) ||
       !dateInEvidence(item.start, item.evidence) ||
       !dateInEvidence(item.end, item.evidence) ||
       !!(item.city && !normalize(item.evidence).includes(normalize(item.city)));
@@ -304,7 +331,7 @@ export async function importResume(ws: Workspace, file: string, answer: string):
     data.push(value);
     freshKeys.add(`${identity(candidate)}:${item.end ?? ""}`);
     exact.add(`${identity(candidate)}:${item.end ?? ""}`);
-    seen.set(identity(candidate), value as unknown as Experience);
+    remember(value as unknown as Experience);
   }
   const prepared = addRecords(ws, "experience", data, { by: "import:resume", dryRun: true });
   const result = await commitExperienceImport(
