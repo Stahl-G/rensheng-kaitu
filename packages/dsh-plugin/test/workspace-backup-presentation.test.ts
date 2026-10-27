@@ -53,7 +53,7 @@ test("同步状态订阅保留未保存的范围选择；实际连接与同步�
         .map((input) => input.props.checked),
     ).toEqual([false, false]);
     expect(workspaceBackupStatus(ws).connection).toBeNull();
-    expect(JSON.stringify(view.toJSON())).toContain(ws.root);
+    expect(view.root.findAllByType("span").some((span) => span.children.includes(ws.root))).toBe(true);
     expect(JSON.stringify(view.toJSON())).toContain("GitHub 已授权，尚未连接资料库");
 
     await act(async () => {
