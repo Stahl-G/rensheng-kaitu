@@ -43,6 +43,8 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   }
   registerSkills(ctx as unknown as SkillContext, ws);
   const queue = applyTools(ctx as unknown as ToolContext, config, ws);
+  // 卸载时排空写入队列，等进行中的写入结束。
+  ctx.effect(() => () => queue(async () => {}));
   ctx.typert.register(contribution as TypertContribution);
   const collectors = new CollectorService(ws);
   new KaituOverviewService(ctx, config, ws, queue, collectors);

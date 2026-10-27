@@ -291,7 +291,10 @@ export async function createAgentRuntime(options: {
       }
       if (options.permissionMode) {
         const modes = permissionModes(agent, result);
-        if (!modes.modes.some((item) => item.id === options.permissionMode))
+        if (
+          !["default", "ask", agent.autoMode].includes(options.permissionMode) ||
+          !modes.modes.some((item) => item.id === options.permissionMode)
+        )
           throw new KaituError(
             `${agent.name} 未提供所选权限模式，消息未发送，请重新选择`,
             "AI_PERMISSION_MODE",
