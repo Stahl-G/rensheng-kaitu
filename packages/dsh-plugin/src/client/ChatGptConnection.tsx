@@ -108,8 +108,8 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
       </p>
       <p>
         {t(
-          "授权页面显示 DSH ChatGPT SIWC；不会提供 ChatGPT 聊天记录、记忆或连接器。",
-          "The authorization page identifies DSH ChatGPT SIWC; it does not grant access to ChatGPT history, memory or connectors.",
+          "授权页面显示 Kaitu ChatGPT SIWC；不会提供 ChatGPT 聊天记录、记忆或连接器。",
+          "The authorization page identifies Kaitu ChatGPT SIWC; it does not grant access to ChatGPT history, memory or connectors.",
         )}
       </p>
       {status?.authenticated ? (

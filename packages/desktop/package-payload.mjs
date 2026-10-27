@@ -3,6 +3,7 @@ import { createRequire, findPackageJSON } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { HOST_API } from "./payload-loader.mjs";
+import { adaptSiwcSource } from "./siwc-compat.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
 const nodeBanner = [
@@ -102,23 +103,15 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     external: ["@deepseek-ai/*"],
     plugins: [
       {
-        name: "siwc-json-credential-record",
+        name: "kaitu-siwc-compatibility",
         setup(builder) {
-          builder.onLoad({ filter: /storage[\\/]state\.js$/ }, (args) => {
-            if (!args.path.includes("dsh-plugin-chatgpt-siwc")) return;
-            const source = readFileSync(args.path, "utf8");
-            const original = "return { kind: 'grant', payload: state };";
-            if (source.split(original).length !== 2)
-              throw new Error("SIWC credential storage changed; review compatibility patch");
-            // DSH 0.2.1 rejects undefined in JSON records; omit absent optional fields.
-            return {
-              contents: source.replace(
-                original,
-                "return { kind: 'grant', payload: JSON.parse(JSON.stringify(state)) };",
-              ),
-              loader: "js",
-            };
-          });
+          builder.onLoad(
+            { filter: /(?:storage[\\/]state|api[\\/]controller|auth[\\/](?:index|loopback))\.js$/ },
+            (args) => {
+              if (!args.path.includes("dsh-plugin-chatgpt-siwc")) return;
+              return { contents: adaptSiwcSource(args.path, readFileSync(args.path, "utf8")), loader: "js" };
+            },
+          );
         },
       },
     ],
