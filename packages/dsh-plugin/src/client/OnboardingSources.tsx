@@ -282,6 +282,7 @@ export function OnboardingFileImport(
 }
 
 export function OnboardingSetup(props: OnboardingServices & Completion & { source: "projects" | "news" }) {
+  const t = useT();
   const session = usePreview<OnboardingSetupPreview>(props.cancelOnboarding);
   const [mode, setMode] = useState<"folder" | "github">("folder");
   const [title, setTitle] = useState("");
@@ -382,7 +383,7 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
               disabled={locked}
               onClick={() => setMode("github")}
             >
-              GitHub 仓库
+              {t("项目 GitHub 仓库", "Project GitHub repository")}
             </button>
           </div>
           <div className={css.fields}>
@@ -417,7 +418,7 @@ export function OnboardingSetup(props: OnboardingServices & Completion & { sourc
             </label>
           ) : (
             <label>
-              GitHub 仓库
+              {t("项目 GitHub 仓库", "Project GitHub repository")}
               <input
                 value={github}
                 placeholder="owner/repo 或仓库网址"

@@ -115,6 +115,12 @@ export function StorageChoice({
           );
         })}
       </fieldset>
+      <p className={css.small}>
+        {t(
+          "可以只用 GitHub，不必同时连 Drive。桌面始终读写所选的本地文件夹。",
+          "You can use GitHub without Drive. The desktop app always reads and writes the selected local folder.",
+        )}
+      </p>
       <label>
         {t("文件夹位置", "Folder")}
         <input

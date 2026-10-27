@@ -1,6 +1,7 @@
 import type { githubCliStatus, workspaceBackupPrompts, workspaceBackupStatus } from "@kaitu/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import css from "./Prototype.module.css";
+import type { StorageInfo } from "./StorageChoice.js";
 import { useT } from "./i18n.js";
 type Status = ReturnType<typeof workspaceBackupStatus>;
 export type WorkspaceBackupRequest = (operation: string, input?: Record<string, unknown>) => Promise<unknown>;
@@ -9,11 +10,13 @@ export function WorkspaceBackup({
   subscribe,
   pickFolder,
   onActivated,
+  storage,
 }: {
   request: WorkspaceBackupRequest;
   subscribe?: (refresh: () => void) => () => void;
   pickFolder: () => Promise<string | null>;
   onActivated: () => Promise<void>;
+  storage: StorageInfo;
 }) {
   const t = useT();
   const [status, setStatus] = useState<Status>();
@@ -105,23 +108,56 @@ export function WorkspaceBackup({
     }
   };
   const c = status?.connection;
+  const normalizePath = (path: string) => path.replaceAll("\\", "/").replace(/\/+$/, "");
+  const drive = storage.suggested?.drive;
+  const inDrive =
+    drive &&
+    (normalizePath(storage.root) === normalizePath(drive) ||
+      normalizePath(storage.root).startsWith(`${normalizePath(drive)}/`));
   return (
     <section id="workspace-backup" className={css.sec}>
       <h2 className={css.eyebrow}>{t("GitHub 同步", "GitHub sync")}</h2>
       <div className={`${css.card} ${css["sub-form"]}`}>
+        <p>
+          <b>{t("当前资料位置", "Current workspace location")}</b>
+          <br />
+          <span className={css.small}>{storage.root}</span>
+        </p>
+        <p className={css.small}>
+          {t(
+            "开图读写这个本地文件夹；GitHub 同步其中选中的资料文件。可以只用 GitHub，不必同时连 Drive。",
+            "Kaitu reads and writes this local folder; GitHub syncs the selected files in it. You can use GitHub without Drive.",
+          )}
+        </p>
+        {inDrive && c?.enabled && (
+          <p className={css.small}>
+            {t(
+              "这个文件夹也在 Google Drive 同步目录内：同一份本地资料通过 Drive 和 GitHub 两条通道同步。Drive 上传状态请在 Google Drive 查看。",
+              "This folder is also inside Google Drive: the same local files use both Drive and GitHub sync. Check Drive upload status in Google Drive.",
+            )}
+          </p>
+        )}
         {!c && (
           <output>
             {status
-              ? t(
-                  "尚未连接 GitHub 仓库，本机资料照常保存",
-                  "No GitHub repository connected; local files still save",
-                )
+              ? gh?.authenticated
+                ? t("GitHub 已授权，尚未连接资料库", "GitHub authorized; no workspace repository connected")
+                : status.tokenConfigured
+                  ? t(
+                      "已保存 GitHub 凭据，尚未连接资料库",
+                      "GitHub credentials saved; no workspace repository connected",
+                    )
+                  : t(
+                      "尚未连接 GitHub 仓库，本机资料照常保存",
+                      "No GitHub repository connected; local files still save",
+                    )
               : t("正在读取同步状态…", "Loading sync status…")}
           </output>
         )}
         {c && (
           <output>
-            {c.repo} · {c.private ? t("私有仓库", "Private repository") : t("公开仓库", "Public repository")}{" "}
+            {t("同步到", "Sync to")} {c.repo} ·{" "}
+            {c.private ? t("私有资料库", "Private workspace repository") : t("公开仓库", "Public repository")}{" "}
             ·{" "}
             {status.running
               ? t("正在同步…", "Syncing…")
@@ -130,11 +166,11 @@ export function WorkspaceBackup({
                   ? t("有冲突，等待你选择保留版本", "Conflicts need your choice")
                   : status.error
                     ? t("同步失败", "Sync failed")
-                    : t("已连接", "Connected")
+                    : t("已连接，后台每分钟检查", "Connected; checked every minute in the background")
                 : t("同步未开启", "Sync disabled")}
-            {status.lastSync
+            {status.lastSync && new Date(status.lastSync) >= new Date(c.checkedAt)
               ? ` · ${t("上次同步", "Last synced")} ${new Date(status.lastSync).toLocaleString()}`
-              : ` · ${t("尚未完成首次同步", "First sync not completed")}`}
+              : ` · ${t("当前连接尚未完成同步", "No completed sync for this connection yet")}`}
           </output>
         )}
         {status?.running && (
@@ -159,12 +195,23 @@ export function WorkspaceBackup({
         )}
         {c && (
           <p className={css.small}>
-            {t(
-              `已保存同步范围：文字 ${c.text ? "启用" : "关闭"}；结构化资料 ${c.records ? "启用" : "关闭"}`,
-              `Saved sync scope: text ${c.text ? "on" : "off"}; structured data ${c.records ? "on" : "off"}`,
-            )}
+            {!c.text && !c.records
+              ? t(
+                  "普通资料范围尚未选择；手机快照、收件与回执按手机通道单独处理。",
+                  "No regular workspace files selected; phone snapshots, inbox files and receipts use their own sync rules.",
+                )
+              : t(
+                  `已保存同步范围：文字 ${c.text ? "启用" : "关闭"}；结构化资料 ${c.records ? "启用" : "关闭"}`,
+                  `Saved sync scope: text ${c.text ? "on" : "off"}; structured data ${c.records ? "on" : "off"}`,
+                )}
           </p>
         )}
+        <p className={css.small}>
+          {t(
+            "同步真实的文字和结构化文件，并非只上传 AI 摘要。照片、视频、凭据和本机状态不在此范围；手机页面由电脑或整理 Agent 更新，操作等待处理回执。",
+            "Syncs actual text and structured files, not just AI summaries. Photos, videos, credentials and local app state are excluded; a computer or organizer Agent updates phone views and processes actions.",
+          )}
+        </p>
         {status?.error && (
           <p className={css.error} role="alert">
             {status.error}
@@ -173,10 +220,10 @@ export function WorkspaceBackup({
         {c && !c.private && !c.enabled && (
           <p role="alert">{t("公开仓库，未开启上传", "Public repository; upload is off")}</p>
         )}
-        <details open={!c}>
+        <details open={!c || (!c.text && !c.records)}>
           <summary>
             {c
-              ? t("更换仓库 / 从仓库恢复", "Change repository / restore")
+              ? t("同步范围 / 更换仓库 / 恢复", "Sync scope / change repository / restore")
               : t("连接已有仓库 / 从仓库恢复", "Connect an existing repository / restore")}
           </summary>
           <label>
@@ -191,6 +238,12 @@ export function WorkspaceBackup({
               placeholder="owner/kaitu-ai-memory"
             />
           </label>
+          <p className={css.small}>
+            {t(
+              "kaitu-ai-memory 只是建议名称，也可使用已有的开图资料库。",
+              "kaitu-ai-memory is only a suggested name; you can use an existing Kaitu workspace repository.",
+            )}
+          </p>
           <label>
             {t("连接方式", "Connection method")}
             <select
@@ -295,7 +348,7 @@ export function WorkspaceBackup({
               >
                 {busy
                   ? t("正在创建并连接…", "Creating and connecting…")
-                  : t("建一个私有记忆仓库", "Create a private memory repository")}
+                  : t("新建私有资料库", "Create a private workspace repository")}
               </button>
             )}{" "}
             <button

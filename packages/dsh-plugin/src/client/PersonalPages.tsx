@@ -247,7 +247,7 @@ export function PersonalPages(
       text: t(`${calendarErrors} 个日程需要处理`, `${calendarErrors} calendar items need attention`),
     });
   const storageName = (id: SyncProvider | undefined) => {
-    const item = PROVIDERS.find((entry) => entry.id === id) ?? PROVIDERS[0];
+    const item = PROVIDERS.find((entry) => entry.id === (id ?? "local"));
     return t(item?.zh ?? "", item?.en ?? "");
   };
   return (
@@ -406,6 +406,10 @@ export function PersonalPages(
                       <b>{storageName(data.storage.provider)}</b>
                       <br />
                       <span className={css.small}>{data.storage.root}</span>
+                      <br />
+                      <span className={css.small}>
+                        {t("开图当前读写的本地文件夹", "The local folder Kaitu currently reads and writes")}
+                      </span>
                     </span>
                     <button
                       type="button"
@@ -418,6 +422,14 @@ export function PersonalPages(
                       {t("迁移当前资料…", "Move current notes…")}
                     </button>
                   </div>
+                  <button type="button" className={css.link} onClick={() => select("backup")}>
+                    {data.backup.connection
+                      ? t(
+                          `GitHub 同步到 ${data.backup.connection.repo} · 查看范围与状态`,
+                          `GitHub sync to ${data.backup.connection.repo} · view scope and status`,
+                        )
+                      : t("GitHub 尚未连接 · 设置同步", "GitHub not connected · set up sync")}
+                  </button>
                   {props.workspaceBackup && (
                     <button
                       type="button"
@@ -535,6 +547,7 @@ export function PersonalPages(
               <>
                 {props.workspaceBackup && (
                   <WorkspaceBackup
+                    storage={data.storage}
                     request={props.workspaceBackup}
                     subscribe={props.subscribe}
                     pickFolder={props.pickStorageFolder}
