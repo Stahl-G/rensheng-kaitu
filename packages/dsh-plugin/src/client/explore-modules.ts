@@ -33,8 +33,8 @@ export const exploreModules = [
   {
     id: "jobs",
     default: false,
-    title: ["求职", "Job search"],
-    description: ["查看已有岗位和原始来源", "Browse existing positions and their sources"],
+    title: ["工作与求职", "Work and job search"],
+    description: ["工作进展、求职与共同履历", "Work progress, job search and your résumé"],
     icon: "M8 6V3h8v3M3 6h18v15H3V6Zm0 6h18m-11-2v4h4v-4",
   },
 ] as const;

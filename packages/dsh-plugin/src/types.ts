@@ -165,6 +165,7 @@ export interface DoingProject {
   slug: string;
   title: string;
   stage: "idea" | "active" | "paused" | "done";
+  blocked?: string[];
   kind: "work" | "learning" | "personal";
   links: { path: string; role: "manuscript" | "repo" | "folder" }[];
   /** Already returned by readProjectsPage; retains sync markers for fact selection. */

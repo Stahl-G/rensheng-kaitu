@@ -54,6 +54,7 @@
     "isomorphic-git": "^1.27.0",
     "read-excel-file": "9.3.12",
     "saxes": "^6.0.0",
+    "unpdf": "1.9.1",
     "xls-reader": "0.7.0",
     "yahoo-finance2": "4.0.3",
     "yaml": "^2.6.0",

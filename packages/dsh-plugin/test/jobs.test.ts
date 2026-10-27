@@ -68,7 +68,7 @@ it("reads the existing source through Remote, keeps optional visibility and neve
             open: () => {},
             save: async (entries) => savePreferences({ exploreEntries: entries }),
           }),
-        ).includes('aria-label="隐藏入口：求职"');
+        ).includes('aria-label="隐藏入口：工作与求职"');
       expect(visible(prior.exploreEntries ?? [...defaultExploreEntries])).toBe(false);
       savePreferences({ exploreEntries: ["news", "jobs", "footprints"] });
       expect(visible(readPreferences().exploreEntries ?? [])).toBe(true);

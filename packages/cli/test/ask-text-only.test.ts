@@ -1,10 +1,11 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { initWorkspace } from "@kaitu/core";
+import { initWorkspace, uploadResume } from "@kaitu/core";
 import { expect, test } from "vitest";
 import { type AskRuntime, createAskService } from "../src/ui/ask.js";
 import { askTextOnly } from "../src/ui/project-ai.js";
+import { extractResume } from "../src/ui/resume-ai.js";
 
 /** 假的 AI 进程：记下收到的请求、是否以只收发文字启动、是否被关掉。 */
 async function fake(
@@ -12,12 +13,17 @@ async function fake(
 ) {
   const temp = mkdtempSync(join(tmpdir(), "kaitu-text-only-"));
   const ws = await initWorkspace(join(temp, "workspace"), { timeZone: "Asia/Shanghai" });
-  const seen = { methods: [] as string[], textOnly: [] as (boolean | undefined)[], closed: 0 };
+  const seen = {
+    methods: [] as string[],
+    prompts: [] as unknown[],
+    textOnly: [] as (boolean | undefined)[],
+    closed: 0,
+  };
   let notify: Parameters<AskRuntime["onNotification"]>[0] = () => {};
   const ask = createAskService({
     state: join(temp, "state"),
     workspace: ws.root,
-    settings: async () => ({ configured: true, provider: "fake", model: "fake" }),
+    settings: async () => ({ configured: true, supportsImages: true, provider: "fake", model: "fake" }),
     configure: async () => ({}),
     models: async () => [],
     runtime: async (_mode, _connection, textOnly): Promise<AskRuntime> => {
@@ -30,6 +36,7 @@ async function fake(
         async request(method, params) {
           seen.methods.push(method);
           if (method !== "session/prompt") return {};
+          seen.prompts.push(params.contentBlocks);
           const sessionId = params.sessionId;
           turn(
             (seq, type, data) => notify("session.event", { sessionId, event: { seq, type, data } }),
@@ -43,7 +50,7 @@ async function fake(
       };
     },
   });
-  return { ask, seen };
+  return { ask, seen, ws };
 }
 const messages = { timeout: "超时了", empty: "没有回答" };
 
@@ -75,4 +82,26 @@ test("只回文字时照常拿到回答", async () => {
   await expect(askTextOnly(ask, "画图", messages)).resolves.toBe('{"links":[]}');
   expect(seen.closed).toBe(1);
   expect(ask.list()).toEqual([]);
+});
+
+test("截图抽取只发送所选附件，禁工具且不写经历，不留下内部对话", async () => {
+  const { ask, seen, ws } = await fake((emit, idle) => {
+    emit(1, "assistant/message", { message: { content: [{ type: "text", text: '{"entries":[]}' }] } });
+    idle();
+  });
+  const data = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  const source = await uploadResume(ws, "synthetic.png", data);
+  expect(await extractResume(ws, source.file, ask)).toMatchObject({
+    answer: '{"entries":[]}',
+    provider: "fake",
+    model: "fake",
+  });
+  expect(seen.prompts[0]).toEqual([
+    expect.objectContaining({ type: "text" }),
+    { type: "image", data, mimeType: "image/png" },
+  ]);
+  expect(seen.textOnly).toEqual([true]);
+  expect(ask.list()).toEqual([]);
+  expect(seen.closed).toBe(1);
+  expect(ws.exists("explore/data/experiences")).toBe(false);
 });

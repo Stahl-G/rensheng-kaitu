@@ -114,6 +114,7 @@ export async function commitExperienceImport(
   entries: StoredRecord[],
   counts: { input_count: number; duplicate_count: number; excluded_count: number },
   by: By,
+  parser = "city-experiences-v1",
 ) {
   if (!entries.length) return { batch_id: null, version: null };
   const now = isoInZone(new Date(), ws.timeZone());
@@ -123,7 +124,7 @@ export async function commitExperienceImport(
     [
       {
         state: "committed",
-        parser: "city-experiences-v1",
+        parser,
         ...counts,
         items: entries.map((record) => ({ id: record.id, revision: record.rev ?? 1 })),
         withdrawn: [],

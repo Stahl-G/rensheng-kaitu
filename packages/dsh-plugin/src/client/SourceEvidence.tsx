@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExperienceSource } from "../types.js";
 import css from "./MapPage.module.css";
 import { useT } from "./i18n.js";
@@ -14,6 +14,17 @@ export function SourceEvidence({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attachment = useMemo(() => {
+    if (source?.kind !== "attachment") return null;
+    const bytes = Uint8Array.from(atob(source.data), (value) => value.charCodeAt(0));
+    return URL.createObjectURL(new Blob([bytes], { type: source.mime }));
+  }, [source]);
+  useEffect(
+    () => () => {
+      if (attachment) URL.revokeObjectURL(attachment);
+    },
+    [attachment],
+  );
   useEffect(() => {
     if (source?.kind === "local" && source.focusLine) focus.current?.scrollIntoView({ block: "nearest" });
   }, [source]);
@@ -53,6 +64,27 @@ export function SourceEvidence({
       {open && (
         <div aria-label={t("来源原文", "Source text")}>
           {error && <p role="alert">{error}</p>}
+          {source?.kind === "attachment" && attachment && (
+            <>
+              <p className={css.source}>
+                {source.name} · {t(`第 ${source.page} 页`, `Page ${source.page}`)}
+              </p>
+              {source.mime.startsWith("image/") && (
+                <img
+                  src={`data:${source.mime};base64,${source.data}`}
+                  alt={t("导入的本人经历截图", "Imported personal career screenshot")}
+                  style={{ maxWidth: "100%", maxHeight: 600, objectFit: "contain" }}
+                />
+              )}
+              <a href={`${attachment}#page=${source.page}`} target="_blank" rel="noreferrer">
+                {t("打开原件 ↗", "Open original ↗")}
+              </a>
+              {" · "}
+              <a href={attachment} download={source.name}>
+                {t("下载原件", "Download original")}
+              </a>
+            </>
+          )}
           {source?.kind === "local" && (
             <>
               <p className={css.source}>
