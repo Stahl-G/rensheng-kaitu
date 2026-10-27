@@ -1,5 +1,6 @@
 import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
+import { agentCanRead } from "./exposure.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
@@ -44,6 +45,10 @@ export async function writePhoneSnapshots(
     const file = `phone/${name}.json`;
     if (ws.exists(file)) {
       const previous = ws.readJson<typeof value>(file);
+      if ("navigation" in value && value.navigation.status === "unavailable" && "navigation" in previous)
+        value.navigation.files = previous.navigation.files.filter((file) =>
+          agentCanRead(ws, file.path, { id: "handover", finance: false }),
+        );
       if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
         continue;
     }

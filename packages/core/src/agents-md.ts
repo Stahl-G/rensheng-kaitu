@@ -99,6 +99,7 @@ export function workspaceAgentGuide(): string {
 ## 先读这几个
 
 先读 USER.md（程序生成的一页画像，核对生成时间）→ NOW.md（核对计划日期）；其余按当前任务取。
+USER.md 的领域入口与 phone/library.json 的 navigation 同源；后者只供支持 version=1 的读取端查找原文，不把人用 items 直接注入 AI。
 USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile.md 与 memory/MEMORY.md，再取必要的非敏感、未归档记忆；不把缺失当作没有资料。
 有 reading_pack 工具或支持的 kaitu reading-pack 命令时，按当前连接权限现取近况；没有时直接读正本。共享画像不含财务，财务只经有权限的工具取得。
 没有工具时，只往 inbox/agents/ 新建唯一命名的文件。普通原文用 <agent>-<唯一时间>.note.md；改画像、目标、规则或替换记忆都写成提议，等待用户处理，不直接改正本。
