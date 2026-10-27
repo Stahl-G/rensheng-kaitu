@@ -26,3 +26,13 @@
 .path {
   overflow-wrap: anywhere;
 }
+.location {
+  padding: 20px;
+}
+.location h2 {
+  margin: 0 0 8px;
+}
+.location p {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}

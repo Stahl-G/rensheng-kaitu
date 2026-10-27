@@ -98,3 +98,28 @@
   padding: 10px 16px;
   font-weight: 600;
 }
+
+.planDialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 48px));
+  padding: 28px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
+}
+.planDialog::backdrop {
+  background: rgb(31 30 29 / 42%);
+}
+.planDialog p {
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+.planDialog h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+.planDialog a {
+  margin-inline-start: 16px;
+}

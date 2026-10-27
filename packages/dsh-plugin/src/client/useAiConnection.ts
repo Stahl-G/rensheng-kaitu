@@ -103,12 +103,14 @@ export function useAiConnection({
           auth: catalog.auth ?? "key",
           api: catalog.api ?? catalog.protocols[0]?.id ?? "",
           baseURL: catalog.baseURL ?? "",
-          agent: current.localAgent?.id ?? current.localAgents?.[0]?.id ?? "",
-          path: current.localAgent?.path ?? "",
+          agent: current.choice === "local" ? (current.localAgent?.id ?? "") : "",
+          path: current.choice === "local" ? (current.localAgent?.path ?? "") : "",
           apiKey: "",
         });
         setConnected(
-          current.configured ? `${current.localAgent?.name ?? current.providerName} · ${current.model}` : "",
+          current.configured
+            ? `${current.choice === "local" ? (current.localAgent?.name ?? current.providerName) : current.providerName} · ${current.model}`
+            : "",
         );
         setError("");
       } catch (err) {

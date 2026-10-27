@@ -402,7 +402,7 @@ export function PersonalPages(
                 />
                 <h2 className={css.eyebrow}>{t("资料位置", "Workspace location")}</h2>
                 <div className={`${css.card} ${css["list-card"]}`}>
-                  <div className={css["switch-row"]}>
+                  <div className={`${css["switch-row"]} ${css.storageRow}`}>
                     <span>
                       <b>{storageName(data.storage.provider)}</b>
                       <br />
@@ -419,34 +419,36 @@ export function PersonalPages(
                       {t("迁移当前资料…", "Move current notes…")}
                     </button>
                   </div>
-                  {props.workspaceBackup && (
-                    <button
-                      type="button"
-                      className={`${css.btn} ${css["btn-quiet"]}`}
-                      disabled={busy}
-                      onClick={() => {
-                        setMoving(false);
-                        setWorkspacePath("");
-                        setOpening(opening === "initialize" ? null : "initialize");
-                      }}
-                    >
-                      {t("新建空白工作区…", "Create a blank workspace…")}
-                    </button>
-                  )}
-                  {props.workspaceBackup && (
-                    <button
-                      type="button"
-                      className={`${css.btn} ${css["btn-quiet"]}`}
-                      disabled={busy}
-                      onClick={() => {
-                        setMoving(false);
-                        setWorkspacePath("");
-                        setOpening(opening === "activate" ? null : "activate");
-                      }}
-                    >
-                      {t("打开已有工作区…", "Open an existing workspace…")}
-                    </button>
-                  )}
+                  <div className={css.storageActions}>
+                    {props.workspaceBackup && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-quiet"]}`}
+                        disabled={busy}
+                        onClick={() => {
+                          setMoving(false);
+                          setWorkspacePath("");
+                          setOpening(opening === "initialize" ? null : "initialize");
+                        }}
+                      >
+                        {t("新建空白工作区…", "Create a blank workspace…")}
+                      </button>
+                    )}
+                    {props.workspaceBackup && (
+                      <button
+                        type="button"
+                        className={`${css.btn} ${css["btn-quiet"]}`}
+                        disabled={busy}
+                        onClick={() => {
+                          setMoving(false);
+                          setWorkspacePath("");
+                          setOpening(opening === "activate" ? null : "activate");
+                        }}
+                      >
+                        {t("打开已有工作区…", "Open an existing workspace…")}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {opening && props.workspaceBackup && (
                   <form
