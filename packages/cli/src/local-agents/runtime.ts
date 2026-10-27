@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join, resolve } from "node:path";
 import { KaituError, workspaceAgentGuide, workspaceTaskSkill } from "@kaitu/core";
 import type { AskRuntime } from "../ui/ask.js";
-import { connectAcp, sessionModels } from "./acp.js";
+import { AcpResponseError, connectAcp, sessionModels, sessionModes } from "./acp.js";
 import { type LocalAgent, agentEnvironment, launchAgent, terminateAgent } from "./agents.js";
 import { localAgentPrivacy } from "./privacy.js";
 
@@ -23,8 +23,27 @@ const initialize = {
   clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
   clientInfo: { name: "kaitu", version: "0.1" },
 };
+function permissionModes(agent: LocalAgent, result: Parameters<typeof sessionModes>[0]) {
+  const modes = sessionModes(result);
+  return {
+    ...modes,
+    modes: modes.modes.filter(
+      (item) =>
+        ["default", "ask"].includes(item.id) ||
+        (item.id === agent.autoMode &&
+          /review|classif|审查|分类/i.test(item.description ?? "") &&
+          /den(y|ied)|reject|拒绝/i.test(item.description ?? "") &&
+          !/skip.*(?:permission|check)|bypass/i.test(item.description ?? "")),
+    ),
+  };
+}
 /** 开一个空会话读出 agent 可选的模型，不发消息；会话放在开图自己的目录，不进资料文件夹。 */
-export async function agentModels(agent: LocalAgent, bin: string, state: string, env?: NodeJS.ProcessEnv) {
+export async function agentSessionOptions(
+  agent: LocalAgent,
+  bin: string,
+  state: string,
+  env?: NodeJS.ProcessEnv,
+) {
   const cwd = join(state, "local-agents", "models");
   mkdirSync(cwd, { recursive: true, mode: 0o700 });
   const child = launchAgent(agent, bin, cwd, agentEnvironment(agent, env));
@@ -32,7 +51,15 @@ export async function agentModels(agent: LocalAgent, bin: string, state: string,
   const rpc = connectAcp(child, { update() {}, timeout: 30000 });
   try {
     await rpc.request("initialize", initialize);
-    return sessionModels(await rpc.request("session/new", { cwd, mcpServers: [] })).models;
+    const result = await rpc.request("session/new", { cwd, mcpServers: [] });
+    const modes = permissionModes(agent, result);
+    return {
+      models: sessionModels(result).models,
+      permissionModes: {
+        current: modes.current,
+        modes: modes.modes,
+      },
+    };
   } catch {
     throw new KaituError(`${agent.name} 未能列出模型，请检查 CLI 登录和网络`, "AI_CONNECTION");
   } finally {
@@ -40,9 +67,13 @@ export async function agentModels(agent: LocalAgent, bin: string, state: string,
     await terminateAgent(child);
   }
 }
+export async function agentModels(agent: LocalAgent, bin: string, state: string, env?: NodeJS.ProcessEnv) {
+  return (await agentSessionOptions(agent, bin, state, env)).models;
+}
 export async function createAgentRuntime(options: {
   agent: LocalAgent;
   model?: string;
+  permissionMode?: string;
   workspace: string;
   state: string;
   path?: string;
@@ -216,6 +247,7 @@ export async function createAgentRuntime(options: {
       },
     });
     const resume = sessions[id];
+    let resumeRejected = false;
     try {
       const init = await state.rpc.request("initialize", initialize);
       const method = resume
@@ -226,17 +258,22 @@ export async function createAgentRuntime(options: {
             : undefined
         : "session/new";
       if (!method) throw new Error("resume unsupported");
-      const result = await state.rpc.request(method, {
-        cwd: options.workspace,
-        mcpServers: [
-          {
-            name: "kaitu",
-            ...options.mcp,
-            env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
-          },
-        ],
-        ...(resume ? { sessionId: resume } : {}),
-      });
+      const result = await state.rpc
+        .request(method, {
+          cwd: options.workspace,
+          mcpServers: [
+            {
+              name: "kaitu",
+              ...options.mcp,
+              env: Object.entries(options.mcp.env ?? {}).map(([name, value]) => ({ name, value })),
+            },
+          ],
+          ...(resume ? { sessionId: resume } : {}),
+        })
+        .catch((error) => {
+          resumeRejected = !!resume && error instanceof AcpResponseError;
+          throw error;
+        });
       state.upstream = result.sessionId ?? resume ?? "";
       state.fresh = method === "session/new";
       if (!state.upstream) throw new Error("no session ID");
@@ -252,20 +289,49 @@ export async function createAgentRuntime(options: {
         if (choices.configId && sessionModels(changed).current !== options.model)
           throw new Error("model unavailable");
       }
+      if (options.permissionMode) {
+        const modes = permissionModes(agent, result);
+        if (
+          !["default", "ask", agent.autoMode].includes(options.permissionMode) ||
+          !modes.modes.some((item) => item.id === options.permissionMode)
+        )
+          throw new KaituError(
+            `${agent.name} 未提供所选权限模式，消息未发送，请重新选择`,
+            "AI_PERMISSION_MODE",
+          );
+        const changed = await state.rpc
+          .request(modes.configId ? "session/set_config_option" : "session/set_mode", {
+            sessionId: state.upstream,
+            ...(modes.configId
+              ? { configId: modes.configId, value: options.permissionMode }
+              : { modeId: options.permissionMode }),
+          })
+          .catch(() => {
+            throw new KaituError(
+              `${agent.name} 未能切换权限模式，消息未发送；可切回询问模式重试`,
+              "AI_PERMISSION_MODE",
+            );
+          });
+        // 旧 session/set_mode 的成功响应可以是空对象；configOptions 必须回报所选值。
+        const applied = sessionModes(changed).current;
+        if ((modes.configId || applied !== undefined) && applied !== options.permissionMode)
+          throw new KaituError(`${agent.name} 未确认所选权限模式，消息未发送`, "AI_PERMISSION_MODE");
+      }
       sessions[id] = state.upstream;
       persistSessions();
       return state;
-    } catch {
+    } catch (error) {
       cancelPermissions(id);
       state.rpc.close();
       await terminateAgent(child);
       running.delete(id);
-      // 续接失败时丢掉这条映射，下次改走新建，避免坏 id 一直卡住。
-      if (resume && sessions[id] === resume) {
+      // 只淘汰被 Agent 明确拒绝续接的 ID；设置失败/超时/取消不代表上下文无效。
+      if (resumeRejected && !state.cancelled && !closed && sessions[id] === resume) {
         delete sessions[id];
         persistSessions();
       }
       if (state.cancelled || closed) throw cancelledError;
+      if (error instanceof KaituError) throw error;
       throw new KaituError(
         `${agent.name} 未能连接或续接，请检查 CLI 登录、网络和所选模型；原记录保留，可新建对话重试`,
         "AI_CONNECTION",

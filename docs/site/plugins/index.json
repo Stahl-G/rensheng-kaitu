@@ -95,6 +95,18 @@
       },
       "versions": [
         {
+          "version": "0.3.3-rc.1",
+          "publishTimestamp": 1793003293,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-novel-workspace.git",
+            "commit": "59b5ed8a911cd6f2a5feccd8ec569a57856bcde2"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.3"
+          }
+        },
+        {
           "version": "0.1.2",
           "publishTimestamp": 1792752117,
           "source": {
@@ -131,6 +143,18 @@
         "sortKeys": {}
       },
       "versions": [
+        {
+          "version": "0.1.4",
+          "publishTimestamp": 1792832443,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-kaitu-fortune.git",
+            "commit": "0c10cacd349b59a167305a27481bc25b817bae4a"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.3"
+          }
+        },
         {
           "version": "0.1.3",
           "publishTimestamp": 1792764373,
@@ -181,6 +205,40 @@
         }
       ],
       "license": "AGPL-3.0-only"
+    },
+    {
+      "name": "kaitu-auday",
+      "title": "Auday",
+      "description": {
+        "zh": "实验性 macOS 接入，将所选 Auday 原文送入开图收件箱",
+        "en": "Experimental macOS connection to import selected Auday text into the Kaitu inbox"
+      },
+      "author": "Stahl-G",
+      "homepage": "https://github.com/Stahl-G/dsh-kaitu-auday-skill",
+      "repository": {
+        "url": "https://github.com/Stahl-G/dsh-kaitu-auday-skill"
+      },
+      "metadata": {
+        "category": "life",
+        "keywords": ["Auday", "原文", "inbox"],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.3",
+          "publishTimestamp": 1793003141,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-kaitu-auday-skill.git",
+            "commit": "abdacac7c90235d5e6515f7629fb134641f84ab7"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.3"
+          }
+        }
+      ],
+      "license": "MIT"
     }
   ]
 }

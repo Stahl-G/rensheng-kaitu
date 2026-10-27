@@ -54,7 +54,7 @@ export function ExplorePluginFrame({
           className={css.pluginFrame}
           title={title}
           src={url}
-          sandbox="allow-scripts allow-same-origin allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
           onLoad={() => setLoaded(true)}
         />
       )}

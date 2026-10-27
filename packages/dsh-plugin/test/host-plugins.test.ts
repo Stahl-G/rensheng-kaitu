@@ -10,7 +10,7 @@ test("host installation and removal update status without removing directory ent
     listBundles: async () => bundles,
     installBundle: async (spec) => {
       calls.push(spec);
-      bundles = [{ name: "kaitu-fortune", installed: true, removable: true, version: "0.1.3" } as BundleInfo];
+      bundles = [{ name: "kaitu-fortune", installed: true, removable: true, version: "0.1.4" } as BundleInfo];
       return { application: "applied" } as ChangeResult;
     },
     removeBundle: async (name) => {
@@ -21,8 +21,12 @@ test("host installation and removal update status without removing directory ent
     open: () => {},
   });
   const before = (await request("list")) as PluginItem[];
+  for (const name of ["kaitu-fortune", "kaitu-novel-workspace", "kaitu-auday"]) {
+    const entries = before.filter((item) => item.name === name);
+    expect(entries).toHaveLength(1);
+  }
   const entry = before.find((item) => item.name === "kaitu-fortune");
-  expect(entry?.spec).toMatch(/^git\+https:.*#[a-f0-9]{40}$/);
+  expect(entry?.license).toBe("AGPL-3.0-only");
   await request("install", entry?.spec);
   expect(((await request("list")) as PluginItem[]).find((item) => item.name === entry?.name)?.installed).toBe(
     true,
@@ -34,7 +38,7 @@ test("host installation and removal update status without removing directory ent
   expect(calls).toEqual([entry?.spec, entry?.name]);
 });
 
-test("pending plugins cannot be installed and failed host changes remain failures", async () => {
+test("unlisted specs cannot be installed and failed host changes remain failures", async () => {
   const calls: string[] = [];
   const request = createHostPluginRequest({
     listBundles: async () => [],
@@ -49,19 +53,18 @@ test("pending plugins cannot be installed and failed host changes remain failure
     open: () => {},
   });
   const items = (await request("list")) as PluginItem[];
-  const pending = items.find((item) => item.name === "kaitu-auday");
-  await expect(request("install", pending?.spec)).rejects.toThrow();
+  await expect(request("install", "")).rejects.toThrow();
   expect(calls).toEqual([]);
   await expect(request("install", items.find((item) => item.spec)?.spec)).rejects.toThrow("install refused");
   await expect(request("remove", "kaitu-fortune")).resolves.toEqual({ application: "restart-required" });
 });
 
 test.each([
-  ["0.3.0", false],
-  ["0.3.1", false],
+  ["0.3.2", false],
   ["9.0.0", false],
-  ["0.1.2", false],
-])("published catalog does not downgrade installed %s", async (version, updateAvailable) => {
+  ["0.3.3-rc.1", false],
+  ["0.1.2", true],
+])("candidate catalog only updates a known older installed version %s", async (version, updateAvailable) => {
   const request = createHostPluginRequest({
     listBundles: async () => [
       { name: "kaitu-novel-workspace", installed: true, removable: true, version } as BundleInfo,
@@ -79,35 +82,9 @@ test.each([
   );
   expect(item).toMatchObject({
     installedVersion: version,
-    version: "0.1.2",
+    version: "0.3.3-rc.1",
     updateAvailable,
     license: "MIT",
-    dshVersion: "0.2.1-rc.2",
+    dshVersion: "0.2.1-rc.3",
   });
-});
-
-test("published Fortune updates show the released AGPL package, not the rc.3 draft", async () => {
-  const request = createHostPluginRequest({
-    listBundles: async () => [
-      { name: "kaitu-fortune", installed: true, removable: true, version: "0.1.1" } as BundleInfo,
-    ],
-    installBundle: async () => {
-      throw new Error("No package changes in this check");
-    },
-    removeBundle: async () => {
-      throw new Error("No package changes in this check");
-    },
-    open: () => {},
-  });
-  const item = ((await request("list")) as PluginItem[]).find((item) => item.name === "kaitu-fortune");
-  expect(item).toMatchObject({
-    installedVersion: "0.1.1",
-    version: "0.1.3",
-    updateAvailable: true,
-    license: "AGPL-3.0-only",
-    dshVersion: "0.2.1-rc.2",
-  });
-  expect(item?.spec).toBe(
-    "git+https://github.com/Stahl-G/dsh-kaitu-fortune.git#dfbb17f941609ff59d6583ebb5d74aa029a6630e",
-  );
 });

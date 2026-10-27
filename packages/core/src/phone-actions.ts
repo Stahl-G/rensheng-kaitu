@@ -6,6 +6,9 @@ import {
   type MemoryExpectation,
   type MemoryInput,
   archiveMemory,
+  captureMemory,
+  listMemories,
+  memoryCaptureSchema,
   memoryExpectation,
   normalizedMemory,
   replaceMemory,
@@ -43,6 +46,8 @@ interface Action {
 type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & {
   task?: StoredRecord;
   memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
+  capture?: ReturnType<typeof memoryCaptureSchema.parse>;
+  captureResult?: PhoneReceipt["memory"];
 };
 function prepareTask(ws: Workspace, action: Action): StoredRecord {
   const { id, expected_rev, title, due, notes } = action.args;
@@ -80,11 +85,21 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   const seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
   // 云端整理员处理过的操作只留在回执里，本机账本没有。
   for (const r of phoneReceipts(ws))
-    if (r.kind === "action" && !seen[r.ref]?.status && !seen[r.ref]?.memory && !seen[r.ref]?.task)
+    if (
+      r.kind === "action" &&
+      !seen[r.ref]?.status &&
+      !seen[r.ref]?.memory &&
+      !seen[r.ref]?.task &&
+      !seen[r.ref]?.capture
+    )
       seen[r.ref] =
         r.status === "conflict" || r.status === "rejected"
           ? { status: r.status, message: r.message }
-          : { status: "applied", ...(r.target ? { target: r.target } : {}) };
+          : {
+              status: "applied",
+              ...(r.target ? { target: r.target } : {}),
+              ...(r.memory ? { captureResult: r.memory } : {}),
+            };
   const receipts: PhoneReceipt[] = [];
   let openTasks: Set<string> | undefined;
   const validate = schemas().builtin("phone-action.schema.json");
@@ -111,12 +126,49 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       at: new Date().toISOString(),
     };
     const first = seen[action.client_id];
-    if (first?.status)
+    if (
+      first?.capture &&
+      (action.op !== "capture_memory" || !isDeepStrictEqual(first.capture, action.args))
+    ) {
+      receipt.status = "conflict";
+      receipt.message = "这个 client_id 已绑定首次记忆内容，请沿首次操作重试";
+      receipts.push(receipt);
+      continue;
+    }
+    if (action.op === "capture_memory" && first && !first.capture) {
+      // Another consumer may have processed it. Never reinterpret an old action ID as a new write.
+      const prior = first.captureResult;
+      const current = prior && normalizedMemory(ws, prior.file);
+      if (prior && current) {
+        receipt.status = "duplicate";
+        receipt.memory = {
+          file: prior.file,
+          status: current.ended
+            ? "undone"
+            : listMemories(ws).some((entry) => entry.file === prior.file)
+              ? "duplicate"
+              : "superseded",
+        };
+      } else {
+        receipt.status = "conflict";
+        receipt.message = "这个 client_id 已处理，请回读原回执，不作为新记忆重投";
+      }
+      receipts.push(receipt);
+      continue;
+    }
+    if (
+      first?.status &&
+      (action.op !== "capture_memory" || first.status === "conflict" || first.status === "rejected")
+    )
       Object.assign(
         receipt,
         first.status === "applied"
           ? { status: "duplicate", ...(first.target ? { target: first.target } : {}) }
-          : first,
+          : {
+              status: first.status,
+              ...(first.message ? { message: first.message } : {}),
+              ...(first.target ? { target: first.target } : {}),
+            },
       );
     else if (first?.memory && action.op !== "replace_memory") {
       receipt.status = "conflict";
@@ -127,6 +179,28 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       const { id, file: target, decision } = action.args;
       try {
         switch (action.op) {
+          case "capture_memory": {
+            const input = first?.capture ?? memoryCaptureSchema.parse(action.args);
+            if (!first?.capture) {
+              seen[action.client_id] = { capture: input };
+              ws.writeJson(ledgerFile, seen, { internal: true });
+            }
+            const result = await captureMemory(ws, input, { now: new Date(action.at) });
+            if (!result.entry) {
+              receipt.status = result.status === "needs-clarification" ? "conflict" : "rejected";
+              receipt.message = result.reason;
+            } else if (
+              result.status === "saved" ||
+              result.status === "duplicate" ||
+              result.status === "undone" ||
+              result.status === "superseded"
+            ) {
+              receipt.status = result.status === "saved" ? "applied" : "duplicate";
+              receipt.memory = { file: result.entry.file, status: result.status };
+              receipt.message = result.warning;
+            }
+            break;
+          }
           case "complete_next":
             if (action.args.expected_next) {
               if (!statusFiles(ws).some((item) => item.file === target))
@@ -219,10 +293,13 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         receipt.status = "conflict";
         receipt.message = (error as Error).message;
       }
+      const capture = seen[action.client_id]?.capture;
       seen[action.client_id] = {
+        ...(capture ? { capture } : {}),
         status: receipt.status,
         ...(receipt.message ? { message: receipt.message } : {}),
         ...(receipt.target ? { target: receipt.target } : {}),
+        ...(receipt.memory ? { captureResult: receipt.memory } : {}),
       };
       ws.writeJson(ledgerFile, seen, { internal: true });
     }

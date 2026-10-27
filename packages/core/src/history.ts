@@ -74,6 +74,12 @@ inbox/rejected/
 `;
 
 const AUTHOR = { name: "开图", email: "kaitu@localhost" };
+const failedSnapshots = new WeakSet<Workspace>();
+
+/** 只反映实际失败；正常的空版本或排队保存不算失败。 */
+export function historyNeedsRetry(ws: Workspace): boolean {
+  return failedSnapshots.has(ws);
+}
 
 function neverTrack(path: string): boolean {
   return (
@@ -350,10 +356,14 @@ export async function snapshotNow(
   now = new Date(),
   options: { changedOnly?: boolean } = {},
 ): Promise<string | null> {
-  refreshOverview(ws, now);
   try {
-    return await saveSnapshot(ws, message, now, options);
+    refreshOverview(ws, now);
+    const version = await saveSnapshot(ws, message, now, options);
+    if (version || (failedSnapshots.has(ws) && !(await pendingWorkspaceFiles(ws)).length))
+      failedSnapshots.delete(ws);
+    return version;
   } catch (error) {
+    failedSnapshots.add(ws);
     if (error instanceof KaituError && error.code === "CLOUD_UNAVAILABLE") return null;
     if (!unavailableHistoryWrite(error)) throw error;
     console.warn("数据已保存，版本稍后由开图补存（运行 kaitu ui 或 kaitu snapshot）");

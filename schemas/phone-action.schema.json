@@ -22,7 +22,8 @@
         "adopt_draft",
         "answer_question",
         "trial_checkin",
-        "replace_memory"
+        "replace_memory",
+        "capture_memory"
       ]
     },
     "args": { "type": "object" }
@@ -258,6 +259,120 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "capture_memory"
+          }
+        }
+      },
+      "then": {
+        "required": ["origin"],
+        "properties": {
+          "origin": {
+            "const": "assistant"
+          },
+          "args": {
+            "type": "object",
+            "properties": {
+              "idempotency_key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "type": {
+                "type": "string",
+                "enum": ["preference", "fact", "context", "person", "decision"]
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              },
+              "origin": {
+                "type": "string",
+                "enum": ["user-stated", "ai-estimate", "ai-suggestion"]
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              },
+              "uncertainty": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2000
+              },
+              "sensitive": {
+                "type": "boolean"
+              },
+              "scope": {
+                "type": "string",
+                "enum": ["personal", "temporary", "quoted", "hypothetical"]
+              },
+              "conflict": {
+                "type": "string",
+                "minLength": 1
+              },
+              "replaces": {
+                "type": "string"
+              },
+              "expected": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["preference", "fact", "context", "person", "decision"]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": ["string", "null"]
+                  },
+                  "sensitive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["type", "name", "text", "source", "sensitive"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "idempotency_key",
+              "type",
+              "name",
+              "text",
+              "source",
+              "origin",
+              "observed_at",
+              "evidence",
+              "scope"
+            ],
+            "additionalProperties": false
           }
         }
       }

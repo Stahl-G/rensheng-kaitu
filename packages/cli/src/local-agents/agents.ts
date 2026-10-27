@@ -12,10 +12,19 @@ export interface LocalAgent {
   args: string[];
   /** 这个 agent 自己的登录变量前缀，其余密钥不传给它。 */
   env: string[];
+  /** 已核实为逐动作审查、保留拒绝的原生模式；不按名字猜其他 Agent 的 Auto 语义。 */
+  autoMode?: string;
 }
 // 启动参数参考 Open Design 的 runtime 清单（Apache-2.0）；claude、codex 用 Zed 的 ACP 适配器。
 export const localAgents: LocalAgent[] = [
-  { id: "codebuddy", name: "CodeBuddy", bins: ["codebuddy", "cbc"], args: ["--acp"], env: ["CODEBUDDY_"] },
+  {
+    id: "codebuddy",
+    name: "CodeBuddy",
+    bins: ["codebuddy", "cbc"],
+    args: ["--acp"],
+    env: ["CODEBUDDY_"],
+    autoMode: "auto",
+  },
   { id: "claude", name: "Claude Code", bins: ["claude-agent-acp"], args: [], env: ["ANTHROPIC_", "CLAUDE_"] },
   { id: "codex", name: "Codex", bins: ["codex-acp"], args: [], env: ["OPENAI_", "CODEX_"] },
   { id: "opencode", name: "OpenCode", bins: ["opencode"], args: ["acp"], env: ["OPENCODE_"] },
