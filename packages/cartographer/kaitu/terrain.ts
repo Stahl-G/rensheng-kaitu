@@ -3,18 +3,24 @@ import { DEFAULT_PARAMS, type World } from '../src/gen/types.js'
 import { RNG, hashString } from '../src/gen/rng.js'
 
 export const UPSTREAM_SHA='e8c8db8919abe6a074e4d72e2f431e46bf93f2d1'
-export const GENERATOR_VERSION='kaitu-desktop-0.2.1'
-export const THEME_CONFIG={width:640,height:400,landRatio:.58,plates:8,mountains:.65,erosion:.75,rainfall:.85,coastRoughness:.18,sketch:'mainland-v1'}
+export const GENERATOR_VERSION='kaitu-desktop-0.2.2'
+export const THEME_CONFIG={width:640,height:400,landRatio:.58,plates:8,mountains:.65,erosion:.75,rainfall:.85,coastRoughness:.18,sketch:'mainland-v2'}
 export interface Anchor {x:number;y:number}
 export interface Terrain {world:World;anchors:Anchor[]}
 /** A seeded land intention uses upstream sketch → erosion → hydrology; no replacement terrain algorithm. */
 export function mainland(seed:string,variant:number,W:number,H:number,landRatio=.58) {
- const rng=new RNG(hashString(`${seed}#mainland${variant}`)),phase=rng.range(0,Math.PI*2)
+ const rng=new RNG(hashString(`${seed}#mainland${variant}`))
+ const phase=()=>rng.range(0,Math.PI*2)
+ const rotation=phase(),p1=phase(),p2=phase(),p3=phase()
+ const lobes=rng.int(2,5),stretch=rng.range(.92,1.08)
+ const radius=.36*Math.sqrt(landRatio/.58),cx=rng.range(.47,.53),cy=rng.range(.47,.53)
  const land=new Float32Array(W*H)
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-  const radius=.405*Math.sqrt(landRatio/.58),dx=(x/W-.5)/radius,dy=(y/H-.51)/radius,a=Math.atan2(dy,dx)
-  const coast=1+.065*Math.sin(a*3+phase)+.045*Math.cos(a*5-phase)
-  land[y*W+x]=Math.hypot(dx,dy)<coast?1:0
+  const dx=(x/W-cx)/radius,dy=(y/H-cy)/radius
+  const u=(dx*Math.cos(rotation)+dy*Math.sin(rotation))/stretch
+  const v=(-dx*Math.sin(rotation)+dy*Math.cos(rotation))*stretch,a=Math.atan2(v,u)
+  const coast=.90+.14*Math.sin(a*lobes+p1)+.10*Math.cos(a*(lobes+1)+p2)+.08*Math.sin(a*7+p3)
+  land[y*W+x]=Math.hypot(u,v)<coast?1:0
  }
  const jitter=()=>rng.range(-.025,.025)
  return {land,ranges:[
