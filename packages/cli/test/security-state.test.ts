@@ -41,6 +41,57 @@ import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { agentSearch } from "../../desktop/sdk-search.mjs";
 
+it("人用混合快照保留财务，但 Agent 全文读取与 grep 不返回快照或别名", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-phone-private-")));
+  try {
+    const ws = await initWorkspace(root);
+    const secret = "SYNTHETIC_PRIVATE_ATLAS_FINANCE";
+    for (const name of ["life-atlas", "library"]) {
+      ws.writeJson(`phone/${name}.json`, {
+        format: `kaitu.phone.${name}`,
+        domains: [{ id: "finance", title: secret }],
+      });
+      symlinkSync(ws.resolve(`phone/${name}.json`), join(root, `${name}-alias.json`));
+      expect(ws.readText(`phone/${name}.json`)).toContain(secret);
+    }
+    ws.writeText("public.md", "Synthetic public source");
+    for (const connection of ["remote-mcp", "local-ask"] as const) {
+      setFinanceAccess(ws, connection, true);
+      for (const path of [
+        "phone/life-atlas.json",
+        "phone/library.json",
+        "life-atlas-alias.json",
+        "library-alias.json",
+      ])
+        expect(() => readAgentFile(ws, path, connection)).toThrow();
+      const result = await agentSearch(
+        root,
+        "grep",
+        { pattern: ".*" },
+        undefined,
+        "synthetic-rg",
+        async (_executable: string, args: string[]) => ({
+          stdout: args
+            .slice(args.indexOf("--") + 1)
+            .map((file) => {
+              expect(file).not.toMatch(/(?:life-atlas|library)(?:-alias)?\.json$/);
+              return JSON.stringify({
+                type: "match",
+                data: { path: { text: file }, line_number: 1, lines: { text: readFileSync(file, "utf8") } },
+              });
+            })
+            .join("\n"),
+        }),
+        connection,
+      );
+      expect(JSON.stringify(result)).not.toContain(secret);
+      expect(result.matches.some((row: { path: string }) => row.path === "public.md")).toBe(true);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("财务模块改目录后，文件、别名、搜索和记录投影仍遵循各连接开关", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-renamed-finance-")));
   try {

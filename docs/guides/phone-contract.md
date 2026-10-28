@@ -108,3 +108,13 @@ Cartographer AtlasResource（SVG、尺寸、margin、regions、compass、setting
 不发布候选历史、缓存或本机路径。采用地图、源资料变化和重新启动会触发后台投影；
 资料读取失败保留已发布快照，UI 按快照时间展示。生成失败仍可发布原采用地图。
 手机只读，首版不生成、不采用、不改写地图。
+
+人生地图保留用户已采用的全部领域（包括财务），仅供手机 UI 查看。
+不传重复携带事实的 facets；手机只使用 id/title/slot/facts/temporal/score。
+桌面 agentCanRead 与 iOS AskWorkspace 在读取入口拒绝 phone/life-atlas.json 和 phone/library.json，
+同时检查实际路径，链接别名也不能绕过；人可视页面仍通过既有 WorkspaceStore.read 读取。
+现有公共导航只使用过滤过的 library.navigation，不增加这些混合快照或地图事实到 AI 薄上下文。
+
+单份 UTF-8 JSON 上限与手机一致，均为 16 MiB；超限时保留上次快照并报告错误。
+SVG、区域与领域资料封装于同一个 JSON，使用既有临时文件 + rename 原子写入；
+Drive 沿用读取前后版本核对，GitHub 沿用文件 blob 版本，手机在验证成功后才替换缓存。

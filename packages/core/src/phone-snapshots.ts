@@ -67,7 +67,10 @@ export async function writePhoneSnapshots(
       !previous ||
       JSON.stringify({ ...atlas, generated_at: previous.generated_at }) !== JSON.stringify(previous)
     ) {
-      ws.writeJson(file, atlas);
+      const content = `${JSON.stringify(atlas, null, 2)}\n`;
+      if (Buffer.byteLength(content) > 16 * 1024 * 1024)
+        throw new Error("人生地图快照超过 16 MiB，已保留上次版本；请在电脑减少入图资料后重试");
+      ws.writeText(file, content);
       writes++;
     }
   }

@@ -270,13 +270,22 @@ export function phoneLifeAtlas(ws: Workspace, now = new Date()) {
     if (domain.score.freshness !== null)
       domain.score.freshness = Math.round(domain.score.freshness * 100) / 100;
   }
+  const domains: Pick<AtlasDomain, "id" | "title" | "slot" | "facts" | "temporal" | "score">[] =
+    state.domains.map(({ id, title, slot, facts, temporal, score }) => ({
+      id,
+      title,
+      slot,
+      facts,
+      temporal,
+      score,
+    }));
   return {
     format: "kaitu.phone.life-atlas",
     version: 1,
     generated_at: now.toISOString(),
     resourceId: state.resourceId,
     resource: state.resource,
-    domains: state.domains,
+    domains,
     coverage: state.coverage,
     gaps: state.gaps,
   };

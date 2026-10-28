@@ -50,6 +50,7 @@ test("map histories preserve terrain and positions while projecting current reco
     "learning/agent/STATUS.md",
     "---\ntitle: Agent 与 AI 基础\nupdated: 2026-10-20T08:00:00Z\nstage: active\n---\n",
   );
+  ws.writeText("finance/STATUS.md", "---\ntitle: 合成私密财务\nupdated: 2026-10-20T08:00:00Z\n---\n");
   const source = await settled(ws);
   expect(source.modules.find((m) => m.id === "health")?.recommended).toBe(true);
   const changed = vi.fn();
@@ -74,8 +75,20 @@ test("map histories preserve terrain and positions while projecting current reco
   expect(phone?.resourceId).toBe(firstId);
   expect(phone?.resource).toEqual(first.resource);
   expect(phone).not.toHaveProperty("candidates");
+  expect(phone?.domains.every((d) => !("facets" in d))).toBe(true);
   await writePhoneSnapshots(ws, new Date("2026-10-28T08:00:00Z"), { force: true });
   expect(ws.readJson<{ resourceId: string }>("phone/life-atlas.json").resourceId).toBe(firstId);
+  const published = ws.readText("phone/life-atlas.json");
+  const originalSvg = first.resource?.svg as string;
+  if (first.resource) first.resource.svg = "x".repeat(16 * 1024 * 1024);
+  try {
+    await expect(writePhoneSnapshots(ws, new Date("2026-10-28T08:01:00Z"), { force: true })).rejects.toThrow(
+      "16 MiB",
+    );
+    expect(ws.readText("phone/life-atlas.json")).toBe(published);
+  } finally {
+    if (first.resource) first.resource.svg = originalSvg;
+  }
   const key = first.resource?.key;
   const borders = first.resource?.regions.borders;
   ws.writeText(
@@ -120,8 +133,13 @@ test("map histories preserve terrain and positions while projecting current reco
     ["learning", 1],
     ["finance", 2],
   ]);
-  expect(preview.domains.find((d) => d.id === "finance")?.facts).toEqual([]);
+  expect(preview.domains.find((d) => d.id === "finance")?.facts.some((f) => f.title === "合成私密财务")).toBe(
+    true,
+  );
   changeLifeAtlas(ws, secondId, "adopt");
+  const shared = phoneLifeAtlas(ws);
+  expect(shared?.domains.some((d) => d.id === "finance")).toBe(true);
+  expect(JSON.stringify(shared)).toContain("合成私密财务");
   changeLifeAtlas(ws, firstId, "archive");
   expect(() => readLifeAtlas(ws, firstId)).toThrow();
   changeLifeAtlas(ws, firstId, "restore");
