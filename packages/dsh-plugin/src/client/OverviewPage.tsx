@@ -1455,6 +1455,7 @@ function Overview({
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
+                active={view === "explore" && explore === entry.id}
                 onDraft={(text) => {
                   if (handoffPending.current || !props.renderAsk) return false;
                   const event = new Event("kaitu:before-ask-draft", { cancelable: true });
