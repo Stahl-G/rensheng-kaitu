@@ -30,6 +30,7 @@ export function effectiveAskMode(settings: { fullOnly?: boolean }, connection = 
   return settings.fullOnly && connection === "local-ask" ? "full" : "scoped";
 }
 export interface AskThread {
+  handoff?: { requestId: string; phase: "ready" | "started" };
   mode?: AskMode;
   backend?: string;
   /** 每个 AI 连接看过的事件数；换回来时只补它没看过的部分。 */
@@ -57,12 +58,12 @@ export interface AskService {
   /** 后台一次性对话：不进问问历史。textOnly 时只收发文字，执行层拒绝工具调用。 */
   background(connection?: AgentConnectionId, options?: { textOnly?: boolean }): AskService;
   list(): AskThread[];
-  create(): Promise<AskThread>;
+  create(requestId?: string): Promise<AskThread>;
   organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
   remove(id: string): void;
   events(id: string): AskEvent[];
   subscribe(id: string, listener: (event: AskEvent) => void): () => void;
-  send(id: string, text: string, images?: AskAttachment[]): Promise<unknown>;
+  send(id: string, text: string, images?: AskAttachment[], requestId?: string): Promise<unknown>;
   settings(resolveImages?: boolean): Promise<{
     configured: boolean;
     search?: NetworkSearchSettings;
@@ -184,6 +185,7 @@ export function createAskService(options: {
       : [];
   };
   const discardEmptyThread = (id: string) => {
+    if (thread(id).handoff?.phase === "started") return;
     if (busy.has(id) || events(id).some((event) => event.type !== "session.status")) return;
     threads.splice(
       threads.findIndex((row) => row.id === id),
@@ -385,10 +387,16 @@ export function createAskService(options: {
       if (options.transient) temporaryEvents.delete(id);
       else rmSync(join(directory, `${id}.jsonl`), { force: true });
     },
-    async create() {
+    async create(requestId) {
       ready();
+      if (requestId !== undefined && !/^[a-zA-Z0-9_-]{8,128}$/.test(requestId))
+        throw new KaituError("无效的请求标识", "AI_CONNECTION");
+      const previous = requestId && threads.find((row) => row.handoff?.requestId === requestId);
+      if (previous) return previous;
       const settings = await options.settings();
       ready();
+      const concurrent = requestId && threads.find((row) => row.handoff?.requestId === requestId);
+      if (concurrent) return concurrent;
       if (!settings.configured) throw new KaituError("请先连接 AI，再开始对话", "AI_CONNECTION");
       const mode = effectiveAskMode(settings, options.connection);
       if (settings.fullOnly && mode !== "full")
@@ -403,6 +411,7 @@ export function createAskService(options: {
         updated: now,
         mode,
         workspace: options.workspace,
+        ...(requestId ? { handoff: { requestId, phase: "ready" as const } } : {}),
       };
       threads.push(row);
       saveIndex();
@@ -418,9 +427,13 @@ export function createAskService(options: {
         group.delete(listener);
       };
     },
-    async send(id, text, images = []) {
+    async send(id, text, images = [], requestId = undefined) {
       ready();
       const row = thread(id);
+      if (requestId !== undefined) {
+        if (row.handoff?.requestId !== requestId) throw new KaituError("请求与对话不匹配", "AI_CONNECTION");
+        if (row.handoff.phase === "started") return { status: "already-started" };
+      }
       if ((row.workspace ?? workspaceKey) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");
       const epoch = generation;
@@ -459,6 +472,12 @@ export function createAskService(options: {
       if (images.some((file) => !("kind" in file && file.kind === "file")) && !connection.supportsImages)
         throw new KaituError("当前连接未启用图片，请切换模型后重试", "AI_IMAGE");
       ready();
+      // Recheck after async settings: simultaneous retries must not start a second turn.
+      if (requestId !== undefined) {
+        if (row.handoff?.phase !== "ready") return { status: "already-started" };
+        row.handoff.phase = "started";
+        saveIndex();
+      }
       const blocks = [
         { type: "text", text: text.trim() },
         ...images.map((file) => ({
@@ -480,9 +499,11 @@ export function createAskService(options: {
       row.mode = mode;
       append(id, "session.status", { status: "running" });
       let client: AskRuntime | undefined;
+      let dispatched = false;
       try {
         client = await start(mode);
         if (history) echoes.set(id, blocks);
+        dispatched = true;
         const result = await client.request("session/prompt", {
           sessionId: id,
           fresh,
@@ -501,6 +522,11 @@ export function createAskService(options: {
         saveIndex();
         return result;
       } catch (error) {
+        // Only a failure before dispatch is known safe to retry with the same operation.
+        if (requestId !== undefined && !dispatched && row.handoff?.requestId === requestId) {
+          row.handoff.phase = "ready";
+          saveIndex();
+        }
         // A failed transport must not pin the next send to the same resolved startup promise.
         if (
           client &&
