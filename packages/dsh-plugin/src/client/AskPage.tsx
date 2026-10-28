@@ -18,11 +18,13 @@ import { DocumentBody } from "./DocumentBody.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
+import type { AskAutoSubmit, AskHandoffStatus } from "./ask-handoff.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
 
 interface Thread {
+  handoff?: { requestId: string; phase: "ready" | "started" };
   id: string;
   title: string;
   created: string;
@@ -73,7 +75,13 @@ interface Settings {
   supportsImages?: boolean;
   providers: Provider[];
   /** 已添加的服务商和模型，存在 DSH 的 profile 里。 */
-  saved?: { provider: string; name: string; models: string[] }[];
+  saved?: { provider: string; name: string; models: string[]; auth?: "key" | "dsh" }[];
+  reasoningEffort?: string;
+  modelCapabilityError?: boolean;
+  modelCapabilities?: {
+    id: string;
+    reasoning?: { efforts: { id: string; name?: string }[]; defaultEffort?: string };
+  }[];
 }
 interface Automation {
   asked: boolean;
@@ -262,6 +270,7 @@ export function AskPage({
   initialPrompt = "",
   initialPromptRequest = 0,
   initialPromptNewConversation = false,
+  autoSubmit,
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
@@ -273,6 +282,7 @@ export function AskPage({
   initialPrompt?: string;
   initialPromptRequest?: number;
   initialPromptNewConversation?: boolean;
+  autoSubmit?: AskAutoSubmit;
   configureRequest?: number;
   configureBuiltin?: boolean;
   onConnections?: () => void;
@@ -282,10 +292,16 @@ export function AskPage({
   const t = useT();
   const locale = useLocale();
   const [agentModels, setAgentModels] = useState<{ id: string; name?: string }[] | string | null>(null);
+  const [otherAgentModels, setOtherAgentModels] = useState<Record<string, { id: string; name?: string }[]>>(
+    {},
+  );
   const [agentModes, setAgentModes] = useState<{ modes: { id: string; name: string }[] } | string | null>(
     null,
   );
   const [modelQuery, setModelQuery] = useState("");
+  const modelRequestSeq = useRef(0);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
+  const [addMenu, setAddMenu] = useState(false);
   const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -329,8 +345,43 @@ export function AskPage({
   };
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
+  useEffect(() => {
+    if (!modelMenu) modelRequestSeq.current++;
+  }, [modelMenu]);
+  useEffect(
+    () => () => {
+      modelRequestSeq.current++;
+    },
+    [],
+  );
   const [catalogStatus, setCatalogStatus] = useState<string | null>(null);
+  const drafts = useRef(
+    new Map<
+      string | null,
+      {
+        text: string;
+        attachments: AttachmentInput[];
+        sessions: { id: string; title: string; mention: string }[];
+        files: { path: string; kind: "file" | "directory"; mention: string }[];
+      }
+    >(),
+  );
   const selectThread = (id: string | null, follow = false) => {
+    const current = draftSnapshot.current;
+    if (current.selected !== id) {
+      drafts.current.set(current.selected, {
+        text: current.draft,
+        attachments: current.attachments,
+        sessions: current.sessions,
+        files: current.files,
+      });
+      const next = drafts.current.get(id);
+      setDraft(next?.text ?? "");
+      setAttachments(next?.attachments ?? []);
+      setSessionReferences(next?.sessions ?? []);
+      setFileReferences(next?.files ?? []);
+    }
+    activeSession.current = id;
     nearBottom.current = !id || follow;
     if (!nearBottom.current && scroll.current) scroll.current.scrollTop = 0;
     setSelected(id);
@@ -346,6 +397,23 @@ export function AskPage({
   const [sessionReferences, setSessionReferences] = useState<
     { id: string; title: string; mention: string }[]
   >([]);
+  const [fileReferences, setFileReferences] = useState<
+    { path: string; kind: "file" | "directory"; mention: string }[]
+  >([]);
+  const draftSnapshot = useRef({
+    selected,
+    draft,
+    attachments,
+    sessions: sessionReferences,
+    files: fileReferences,
+  });
+  draftSnapshot.current = {
+    selected,
+    draft,
+    attachments,
+    sessions: sessionReferences,
+    files: fileReferences,
+  };
   const [atQuery, setAtQuery] = useState<string | undefined>();
   const cursor = useRef(0);
   const upload = useRef<HTMLInputElement>(null);
@@ -639,8 +707,8 @@ export function AskPage({
       draft.trim() ||
       (attachments.length
         ? t("请看看这些附件", "Please review these attachments")
-        : sessionReferences.length
-          ? t("参考这些对话帮我继续", "Help me continue using these conversations")
+        : sessionReferences.length || fileReferences.length
+          ? t("参考这些资料帮我继续", "Help me continue using these references")
           : "");
     if (!value || busy || readingFiles || !settings?.configured) return;
     nearBottom.current = true;
@@ -648,26 +716,43 @@ export function AskPage({
     const pendingText = value;
     const pendingAttachments = attachments;
     const pendingReferences = sessionReferences;
-    const payload = [value, ...sessionReferences.map((reference) => reference.mention)].join("\n");
+    const pendingFiles = fileReferences;
+    const payload = [
+      value,
+      ...fileReferences.map((reference) => reference.mention),
+      ...sessionReferences.map((reference) => reference.mention),
+    ].join("\n");
+    draftSnapshot.current = { ...draftSnapshot.current, draft: "", attachments: [], sessions: [], files: [] };
     setDraft("");
     setAttachments([]);
     setSessionReferences([]);
+    setFileReferences([]);
     setError("");
     setSending(true);
+    let id = selected;
     try {
-      let id = selected;
       if (!id) {
         const thread = await call<Thread>("askCreate");
         id = thread.id;
-        activeSession.current = id;
-        selectThread(id, true);
+        if (activeSession.current === null) selectThread(id, true);
       }
       await call("askSend", id, payload, pendingAttachments);
       await refreshThreads();
     } catch (err) {
-      setDraft((current) => (current.trim() ? current : pendingText));
-      setAttachments((current) => (current.length ? current : pendingAttachments));
-      setSessionReferences((current) => (current.length ? current : pendingReferences));
+      if (activeSession.current === id) {
+        setDraft((current) => (current.trim() ? current : pendingText));
+        setAttachments((current) => (current.length ? current : pendingAttachments));
+        setSessionReferences((current) => (current.length ? current : pendingReferences));
+        setFileReferences((current) => (current.length ? current : pendingFiles));
+      } else {
+        const previous = drafts.current.get(id);
+        drafts.current.set(id, {
+          text: previous?.text.trim() ? previous.text : pendingText,
+          attachments: previous?.attachments.length ? previous.attachments : pendingAttachments,
+          sessions: previous?.sessions.length ? previous.sessions : pendingReferences,
+          files: previous?.files.length ? previous.files : pendingFiles,
+        });
+      }
       try {
         await refreshThreads();
       } catch {
@@ -678,6 +763,76 @@ export function AskPage({
       setSending(false);
     }
   };
+  const handoffSelect = useRef(selectThread);
+  handoffSelect.current = selectThread;
+  const handoffAttempt = useRef<string>();
+  const [handoffRetry, setHandoffRetry] = useState(0);
+  const [handoffState, setHandoffState] = useState<
+    "saved" | "sending" | "retry" | "uncertain" | "failed" | null
+  >(null);
+  const checkHandoff = useCallback(async () => {
+    if (!autoSubmit) return;
+    const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
+    setHandoffState(
+      receipt.status === "completed"
+        ? "saved"
+        : receipt.status === "running"
+          ? "sending"
+          : receipt.status === "ready" || receipt.status === "not_found"
+            ? "retry"
+            : receipt.status,
+    );
+    return receipt;
+  }, [autoSubmit]);
+  useEffect(() => {
+    if (autoSubmit && events.at(-1)?.type === "session.status")
+      void checkHandoff().catch(() => setHandoffState("uncertain"));
+  }, [autoSubmit, events, checkHandoff]);
+  useEffect(() => {
+    if (!autoSubmit || !loaded) return;
+    if (!settings?.configured) {
+      setHandoffState("retry");
+      return;
+    }
+    const attempt = `${autoSubmit.requestId}:${handoffRetry}`;
+    if (handoffAttempt.current === attempt) return;
+    handoffAttempt.current = attempt;
+    const current = () => handoffAttempt.current === attempt;
+    const run = async () => {
+      setHandoffState("sending");
+      try {
+        const thread = await call<Thread>("askCreate", autoSubmit.requestId);
+        if (!current()) return;
+        handoffSelect.current(thread.id, true);
+        await refreshThreads();
+        if (thread.handoff && thread.handoff.phase !== "ready") {
+          await checkHandoff();
+          return;
+        }
+        const references = autoSubmit.references.flatMap((path) => {
+          const mention = formatFileMention({ path, kind: "file" }, false);
+          return mention ? [mention] : [];
+        });
+        await call<{ status?: string }>(
+          "askSend",
+          thread.id,
+          [autoSubmit.text, ...references].join("\n"),
+          [],
+          autoSubmit.requestId,
+        );
+        if (current()) await checkHandoff();
+      } catch (err) {
+        if (!current()) return;
+        try {
+          await checkHandoff();
+        } catch {
+          setHandoffState("uncertain");
+        }
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void run();
+  }, [autoSubmit, handoffRetry, loaded, settings?.configured, refreshThreads, checkHandoff]);
   const addFiles = async (files: File[]) => {
     if (!settings?.configured) return;
     if (!files.length || busy || readingFiles) return;
@@ -730,50 +885,137 @@ export function AskPage({
     let mention = formatFileMention({ path, kind }, false);
     if (!mention) return;
     if (kind === "directory" && mention.startsWith('@"')) mention += '"';
-    setDraft(
-      token
-        ? `${draft.slice(0, position - token.prefix.length)}${mention} ${draft.slice(position)}`
-        : `${draft}${draft && !/\s$/.test(draft) ? " " : ""}${mention} `,
+    setDraft(token ? `${draft.slice(0, position - token.prefix.length)}${draft.slice(position)}` : draft);
+    setFileReferences((current) =>
+      current.some((item) => item.path === path && item.kind === kind)
+        ? current
+        : [...current, { path, kind, mention }],
     );
     setReferences(false);
     setAtQuery(undefined);
     input.current?.focus();
   };
   const loadSavedModels = () => {
+    const request = modelRequestSeq.current;
     setCatalogStatus("");
     void call<Settings>("askSupport", "builtinSettings", { saved: true })
       .then((catalog) => {
-        setSettings((current) => (current ? { ...current, saved: catalog.saved } : current));
-        setCatalogStatus(null);
+        if (request !== modelRequestSeq.current) return;
+        setSettings((current) => {
+          if (!current) return current;
+          const siwc = current.saved?.find((row) => row.provider === "chatgpt-siwc");
+          const saved = catalog.saved ?? [];
+          return {
+            ...current,
+            saved: siwc && !saved.some((row) => row.provider === siwc.provider) ? [...saved, siwc] : saved,
+            modelCapabilities:
+              current.choice !== "local" &&
+              catalog.provider === current.provider &&
+              catalog.model === current.model
+                ? catalog.modelCapabilities
+                : undefined,
+          };
+        });
+        setCatalogStatus(
+          catalog.modelCapabilityError
+            ? t("模型能力读取失败，请重试", "Could not load model capabilities. Try again.")
+            : null,
+        );
       })
-      .catch((err) => setCatalogStatus(err.message));
+      .catch((err) => {
+        if (request === modelRequestSeq.current) setCatalogStatus(err.message);
+      });
+    if (settings?.provider !== "chatgpt-siwc" || settings?.choice === "local") {
+      void call<{ authenticated: boolean; planEnabled: boolean }>("askSupport", "siwc/status", {})
+        .then((status) =>
+          status.authenticated && status.planEnabled
+            ? call<{ id: string }[]>("askSupport", "siwc/models", {})
+            : [],
+        )
+        .then((models) => {
+          if (request !== modelRequestSeq.current || !models.length) return;
+          setSettings((current) =>
+            current
+              ? {
+                  ...current,
+                  saved: [
+                    ...(current.saved ?? []).filter((row) => row.provider !== "chatgpt-siwc"),
+                    {
+                      provider: "chatgpt-siwc",
+                      name: t("ChatGPT 计划", "ChatGPT plan"),
+                      models: models.map((model) => model.id),
+                    },
+                  ],
+                }
+              : current,
+          );
+        })
+        .catch(() => {});
+    }
   };
   const openModelMenu = () => {
-    if (!settings?.configured) return;
+    if (!settings?.configured || saving || busy) return;
+    modelRequestSeq.current++;
+    setAddMenu(false);
+    setModelQuery("");
     setModelMenu(!modelMenu);
     const agent = settings?.choice === "local" ? settings.localAgent : undefined;
     if (modelMenu) return;
+    loadSavedModels();
+    setOtherAgentModels({});
+    const request = modelRequestSeq.current;
+    for (const candidate of settings?.localAgents ?? []) {
+      if (candidate.id === agent?.id) continue;
+      void call<{ id: string; name?: string }[]>("askModels", { agent: candidate.id, path: candidate.path })
+        .then((models) => {
+          if (request === modelRequestSeq.current)
+            setOtherAgentModels((current) => ({
+              ...current,
+              [candidate.id]: models.length
+                ? models
+                : [{ id: "默认模型", name: t("默认模型", "Default model") }],
+            }));
+        })
+        .catch(() => {});
+    }
     if (!agent) {
-      loadSavedModels();
       return;
     }
     setAgentModels(null);
     setAgentModes(null);
     setModelQuery("");
     void call<{ id: string; name?: string }[]>("askModels", { agent: agent.id, path: agent.path })
-      .then(setAgentModels)
-      .catch((err) => setAgentModels(err instanceof Error ? err.message : String(err)));
+      .then((models) => {
+        if (request === modelRequestSeq.current) setAgentModels(models);
+      })
+      .catch((err) => {
+        if (request === modelRequestSeq.current)
+          setAgentModels(err instanceof Error ? err.message : String(err));
+      });
     void call<{ modes: { id: string; name: string }[] }>("askSupport", "localAgentModes", {})
-      .then(setAgentModes)
-      .catch((err) => setAgentModes(err instanceof Error ? err.message : String(err)));
+      .then((modes) => {
+        if (request === modelRequestSeq.current) setAgentModes(modes);
+      })
+      .catch((err) => {
+        if (request === modelRequestSeq.current)
+          setAgentModes(err instanceof Error ? err.message : String(err));
+      });
   };
-  const switchModel = async (provider: string, id: string, permissionMode?: string) => {
-    if (!settings?.configured) return;
+  const switchModel = async (
+    provider: string,
+    id: string,
+    permissionMode?: string,
+    reasoningEffort?: string | null,
+    forceBuiltin = false,
+    auth?: "key" | "dsh",
+  ) => {
+    if (!settings?.configured || saving || busy) return;
+    modelRequestSeq.current++;
     setModelMenu(false);
     setSaving(true);
     setError("");
     try {
-      const agent = settings?.choice === "local" ? settings.localAgent : undefined;
+      const agent = !forceBuiltin && settings?.choice === "local" ? settings.localAgent : undefined;
       setSettings(
         await call<Settings>(
           "askConfigure",
@@ -785,12 +1027,50 @@ export function AskPage({
                 ...(id !== "默认模型" ? { model: id } : {}),
                 ...(permissionMode ? { permissionMode } : {}),
               }
-            : { choice: "builtin", provider, model: id },
+            : {
+                choice: "builtin",
+                provider,
+                model: id,
+                ...(auth ? { auth } : {}),
+                ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
+              },
         ),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      modelRequestSeq.current++;
+      setSaving(false);
+    }
+  };
+  const switchToAgent = async (agent: { id: string; path: string }, model: string) => {
+    if (saving || busy) return;
+    if (attachments.length || fileReferences.length || sessionReferences.length) {
+      setError(
+        t(
+          "本机 Agent 不支持这些附件或引用，请先移除",
+          "Remove attachments and references before switching to a local Agent",
+        ),
+      );
+      return;
+    }
+    modelRequestSeq.current++;
+    setModelMenu(false);
+    setSaving(true);
+    setError("");
+    try {
+      setSettings(
+        await call<Settings>("askConfigure", {
+          choice: "local",
+          agent: agent.id,
+          path: agent.path,
+          ...(model !== "默认模型" ? { model } : {}),
+        }),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      modelRequestSeq.current++;
       setSaving(false);
     }
   };
@@ -869,9 +1149,6 @@ export function AskPage({
           className={css.newThread}
           onClick={() => {
             selectThread(null);
-            setDraft("");
-            setAttachments([]);
-            setSessionReferences([]);
             setError("");
           }}
         >
@@ -910,9 +1187,6 @@ export function AskPage({
             type="button"
             onClick={() => {
               selectThread(null);
-              setDraft("");
-              setAttachments([]);
-              setSessionReferences([]);
             }}
           >
             {t("＋ 新对话", "+ New conversation")}
@@ -1128,6 +1402,55 @@ export function AskPage({
             {error}
           </p>
         )}
+        {handoffState && (
+          <output className={css.notice}>
+            {handoffState === "saved"
+              ? t("已保存", "Saved")
+              : handoffState === "sending"
+                ? t("已保存，正在发送…", "Saved, sending…")
+                : handoffState === "retry"
+                  ? t("已保存，未能发送", "Saved, not sent")
+                  : handoffState === "failed"
+                    ? t("回复未完成", "Response failed")
+                    : t("发送结果未知", "Send status unknown")}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && <p>{autoSubmit.text}</p>}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && <small>{autoSubmit.capturedPath}</small>}
+            {(handoffState === "uncertain" || handoffState === "failed" || handoffState === "sending") && (
+              <button
+                type="button"
+                onClick={() =>
+                  void checkHandoff()
+                    .then((receipt) => {
+                      if (receipt?.sessionId) handoffSelect.current(receipt.sessionId, true);
+                    })
+                    .catch((err) => setError(String(err)))
+                }
+              >
+                {t("查看对话", "View conversation")}
+              </button>
+            )}
+            {handoffState === "retry" && settings?.configured && (
+              <button type="button" onClick={() => setHandoffRetry((n) => n + 1)}>
+                {t("重试", "Retry")}
+              </button>
+            )}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(autoSubmit.text)
+                      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+                  }
+                >
+                  {t("复制", "Copy")}
+                </button>
+              )}
+          </output>
+        )}
         <form
           className={css.composer}
           onDragOver={(event) => {
@@ -1140,12 +1463,14 @@ export function AskPage({
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setModelMenu(false);
+              setAddMenu(false);
               closeReferences();
             }
           }}
           onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
               setModelMenu(false);
+              setAddMenu(false);
             }
           }}
           onSubmit={(event) => {
@@ -1224,6 +1549,22 @@ export function AskPage({
                 aria-label={t(`移除引用 ${reference.title}`, `Remove reference ${reference.title}`)}
                 onClick={() =>
                   setSessionReferences((current) => current.filter((item) => item.id !== reference.id))
+                }
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {fileReferences.map((reference) => (
+            <div key={`${reference.kind}:${reference.path}`} className={css.attachment}>
+              <span>{reference.path}</span>
+              <button
+                type="button"
+                aria-label={t(`移除引用 ${reference.path}`, `Remove reference ${reference.path}`)}
+                onClick={() =>
+                  setFileReferences((current) =>
+                    current.filter((item) => item.path !== reference.path || item.kind !== reference.kind),
+                  )
                 }
               >
                 ×
@@ -1321,44 +1662,67 @@ export function AskPage({
                 event.target.value = "";
               }}
             />
-            <button
-              type="button"
-              className={css.add}
-              aria-label={t("添加附件", "Add attachment")}
-              disabled={
-                busy || readingFiles || !settings?.configured || settings?.supportsAttachments === false
-              }
-              onClick={() => upload.current?.click()}
-            >
-              ＋
-            </button>
-            <button
-              type="button"
-              className={css.model}
-              disabled={busy || !settings?.configured || settings?.choice === "local"}
-              onClick={() => {
-                cursor.current = input.current?.selectionStart ?? draft.length;
-                setAtQuery(undefined);
-                if (settings?.choice === "local") return;
-                setReferences(!references);
-                setModelMenu(false);
-              }}
-            >
-              {t("引用资料", "Reference files")}
-            </button>
-            {settings?.configured && settings.provider === "chatgpt-siwc" && (
-              <span>
-                {t("正在使用 ChatGPT 计划", "Using ChatGPT plan")} ·{" "}
-                <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">
-                  {t("管理用量", "Manage usage")}
-                </a>
-              </span>
-            )}
+            <span className={css.addWrap}>
+              <button
+                type="button"
+                className={css.add}
+                aria-label={t("添加", "Add")}
+                aria-haspopup="dialog"
+                aria-expanded={addMenu}
+                disabled={busy || readingFiles || !settings?.configured}
+                onClick={() => {
+                  setAddMenu(!addMenu);
+                  setModelMenu(false);
+                }}
+              >
+                ＋
+              </button>
+              {addMenu && (
+                <dialog
+                  open
+                  className={`${v2["mode-pop"]} ${css.addPopover}`}
+                  aria-label={t("添加内容", "Add content")}
+                >
+                  <button
+                    type="button"
+                    className={css.menuItem}
+                    disabled={settings?.supportsAttachments === false}
+                    onClick={() => {
+                      setAddMenu(false);
+                      upload.current?.click();
+                    }}
+                  >
+                    {t("添加附件", "Add attachments")}
+                  </button>
+                  {settings?.choice !== "local" &&
+                    (["files", "sessions"] as const).map((kind) => (
+                      <button
+                        type="button"
+                        className={css.menuItem}
+                        key={kind}
+                        onClick={() => {
+                          cursor.current = input.current?.selectionStart ?? draft.length;
+                          setReferenceKind(kind);
+                          setAtQuery(undefined);
+                          setReferences(true);
+                          setAddMenu(false);
+                        }}
+                      >
+                        {kind === "files"
+                          ? t("引用文件或文件夹", "Reference files or folders")
+                          : t("引用其他对话", "Reference another conversation")}
+                      </button>
+                    ))}
+                </dialog>
+              )}
+            </span>
             <span className={css.modelWrap}>
               <button
                 type="button"
                 className={css.model}
-                disabled={busy || !settings?.configured}
+                disabled={busy || saving || !settings?.configured}
+                ref={modelTrigger}
+                aria-label={t("选择模型", "Choose model")}
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
                 title={
@@ -1370,7 +1734,7 @@ export function AskPage({
               >
                 <span className={css.modelName}>
                   {settings?.configured
-                    ? `${localRuntime ? `${runtimeLabel} · ` : ""}${settings.providerName} · ${settings.model}`
+                    ? `${localRuntime ? `${runtimeLabel} · ` : ""}${settings.providerName} · ${settings.model}${settings.reasoningEffort ? ` · ${settings.reasoningEffort}` : ""}`
                     : t("连接 AI", "Connect AI")}
                 </span>
                 <span aria-hidden="true">⌄</span>
@@ -1380,7 +1744,39 @@ export function AskPage({
                   open
                   className={`${v2["mode-pop"]} ${css.modelPopover}`}
                   aria-label={t("当前 AI", "Current AI")}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setModelMenu(false);
+                      modelTrigger.current?.focus();
+                      return;
+                    }
+                    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                    const items = Array.from(
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+                    );
+                    if (!items.length) return;
+                    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+                    const next =
+                      event.key === "ArrowDown"
+                        ? (index + 1) % items.length
+                        : index <= 0
+                          ? items.length - 1
+                          : index - 1;
+                    event.preventDefault();
+                    items[next]?.focus();
+                  }}
                 >
+                  <input
+                    className={css.modelSearch}
+                    type="search"
+                    value={modelQuery}
+                    onChange={(event) => setModelQuery(event.target.value)}
+                    placeholder={t("搜索模型或服务商…", "Search models or providers…")}
+                    // biome-ignore lint/a11y/noAutofocus: 打开模型面板后立即可键盘搜索。
+                    autoFocus
+                  />
                   {localRuntime && (
                     <p className={v2.small}>
                       {t(
@@ -1425,20 +1821,9 @@ export function AskPage({
                       <span className={css.model}>{settings.model}</span>
                     ) : (
                       <>
-                        {agentModels.length > 8 && (
-                          <input
-                            className={css.modelSearch}
-                            type="search"
-                            value={modelQuery}
-                            onChange={(event) => setModelQuery(event.target.value)}
-                            placeholder={t("搜索模型…", "Search models…")}
-                            // biome-ignore lint/a11y/noAutofocus: 打开菜单就是为了挑模型。
-                            autoFocus
-                          />
-                        )}
                         {agentModels
                           .filter((item) =>
-                            `${item.id} ${item.name ?? ""}`
+                            `${settings.providerName} ${item.id} ${item.name ?? ""}`
                               .toLowerCase()
                               .includes(modelQuery.trim().toLowerCase()),
                           )
@@ -1456,7 +1841,7 @@ export function AskPage({
                           ))}
                       </>
                     ))}
-                  {settings?.choice !== "local" && catalogStatus !== null && (
+                  {catalogStatus !== null && (
                     <p role={catalogStatus ? "alert" : "status"}>
                       {catalogStatus || t("正在读取模型…", "Loading models…")}
                       {catalogStatus && (
@@ -1467,23 +1852,105 @@ export function AskPage({
                     </p>
                   )}
                   {settings?.choice !== "local" &&
-                    catalogStatus === null &&
-                    settings?.saved?.flatMap((row) =>
-                      row.models.map((id) => (
+                  settings?.modelCapabilities?.find((model) => model.id === settings.model)?.reasoning
+                    ?.efforts?.length ? (
+                    <section aria-label={t("推理强度", "Reasoning effort")}>
+                      <p>{t("推理强度（下次发送生效）", "Reasoning effort (next message)")}</p>
+                      {settings.modelCapabilities.find((model) => model.id === settings.model)?.reasoning
+                        ?.defaultEffort && (
                         <button
                           type="button"
-                          key={`${row.provider}/${id}`}
                           className={css.model}
+                          disabled={saving || busy}
                           aria-pressed={
-                            settings.configured && settings.provider === row.provider && settings.model === id
+                            !settings.reasoningEffort ||
+                            settings.reasoningEffort ===
+                              settings.modelCapabilities.find((model) => model.id === settings.model)
+                                ?.reasoning?.defaultEffort
                           }
-                          disabled={busy || saving}
-                          onClick={() => void switchModel(row.provider, id)}
+                          onClick={() => void switchModel(settings.provider, settings.model, undefined, null)}
                         >
-                          {row.name} · {id}
+                          {t("默认", "Default")}
                         </button>
-                      )),
-                    )}
+                      )}
+                      {settings.modelCapabilities
+                        .find((model) => model.id === settings.model)
+                        ?.reasoning?.efforts.filter(
+                          (effort) =>
+                            effort.id !==
+                            settings.modelCapabilities?.find((model) => model.id === settings.model)
+                              ?.reasoning?.defaultEffort,
+                        )
+                        .map((effort) => (
+                          <button
+                            type="button"
+                            key={effort.id}
+                            className={css.model}
+                            disabled={saving || busy}
+                            aria-pressed={settings.reasoningEffort === effort.id}
+                            onClick={() =>
+                              void switchModel(settings.provider, settings.model, undefined, effort.id)
+                            }
+                          >
+                            {effort.name ?? effort.id}
+                          </button>
+                        ))}
+                    </section>
+                  ) : null}
+                  {settings?.saved?.map((row) => {
+                    const models = row.models.filter((id) =>
+                      `${row.name} ${id}`.toLowerCase().includes(modelQuery.trim().toLowerCase()),
+                    );
+                    return models.length ? (
+                      <section className={css.modelGroup} key={row.provider}>
+                        <p>{row.name}</p>
+                        {models.map((id) => (
+                          <button
+                            type="button"
+                            key={id}
+                            className={css.menuItem}
+                            aria-pressed={
+                              settings.configured &&
+                              settings.choice !== "local" &&
+                              settings.provider === row.provider &&
+                              settings.model === id
+                            }
+                            disabled={busy || saving}
+                            onClick={() =>
+                              void switchModel(row.provider, id, undefined, undefined, true, row.auth)
+                            }
+                          >
+                            {id}
+                          </button>
+                        ))}
+                      </section>
+                    ) : null;
+                  })}
+                  {settings?.localAgents
+                    ?.filter((agent) => agent.id !== settings.localAgent?.id)
+                    .map((agent) => {
+                      const models = (otherAgentModels[agent.id] ?? []).filter((model) =>
+                        `${agent.name} ${model.id} ${model.name ?? ""}`
+                          .toLowerCase()
+                          .includes(modelQuery.trim().toLowerCase()),
+                      );
+                      return models.length ? (
+                        <section className={css.modelGroup} key={agent.id}>
+                          <p>{agent.name}</p>
+                          {models.map((model) => (
+                            <button
+                              type="button"
+                              className={css.menuItem}
+                              key={model.id}
+                              disabled={busy || saving}
+                              onClick={() => void switchToAgent(agent, model.id)}
+                            >
+                              {model.name ?? model.id}
+                            </button>
+                          ))}
+                        </section>
+                      ) : null;
+                    })}
                   <button
                     type="button"
                     className={css.model}
@@ -1518,7 +1985,10 @@ export function AskPage({
                 aria-label={t("发送", "Send")}
                 disabled={
                   readingFiles ||
-                  (!draft.trim() && !attachments.length && !sessionReferences.length) ||
+                  (!draft.trim() &&
+                    !attachments.length &&
+                    !sessionReferences.length &&
+                    !fileReferences.length) ||
                   !settings?.configured
                 }
               >
@@ -1529,7 +1999,12 @@ export function AskPage({
         </form>
         <p className={css.scope}>
           {settings?.configured
-            ? `${settings.providerName} · ${runtimeLabel} · ${localRuntime ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve") : t("只读写允许的开图资料，不运行命令", "Reads and writes allowed Kaitu data; cannot run commands")}`
+            ? localRuntime
+              ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve")
+              : t(
+                  "只读写允许的开图资料，不运行命令",
+                  "Reads and writes allowed Kaitu data; cannot run commands",
+                )
             : t("接上 AI 后才能发送", "Connect an AI before sending")}
         </p>
       </section>
@@ -1551,10 +2026,12 @@ export function AskPage({
               localOnly={connectionLocalOnly}
               onSaving={setSaving}
               onSaved={async () => {
+                modelRequestSeq.current++;
                 const ai = await call<Settings>("askSettings");
                 setSettings(ai);
                 if (ai.supportsImages === false) setAttachments([]);
                 setSessionReferences([]);
+                setFileReferences([]);
                 setStep(ai.choice !== "local" && !asked ? 2 : 0);
               }}
             />

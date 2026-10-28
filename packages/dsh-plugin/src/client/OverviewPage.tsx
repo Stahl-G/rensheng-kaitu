@@ -81,6 +81,7 @@ export interface OverviewPageProps
   ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
   navigation?: PanelNavigation;
+  captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
@@ -101,6 +102,7 @@ export interface OverviewPageProps
     onToday: () => void,
     onSettings: (section: "ai" | "local-ai") => void,
     newConversation: boolean,
+    autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
   ) => ReactNode;
 }
 const modules = [
@@ -516,6 +518,42 @@ function Overview({
       unsubscribe?.();
     };
   }, [props.loadHome, props.subscribe]);
+  const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
+  const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
+  const homeSaving = useRef(false);
+  const saveHome = async (text: string, send: boolean) => {
+    if (!props.captureOnce || homeSaving.current) return;
+    homeSaving.current = true;
+    try {
+      const content = text.trim();
+      if (!content) return;
+      if (homeOperation.current?.text !== content)
+        homeOperation.current = { text: content, id: crypto.randomUUID() };
+      const operation = homeOperation.current;
+      const receipt = operation.path
+        ? { status: "saved", path: operation.path }
+        : await props.captureOnce(content, operation.id);
+      if (receipt.status !== "saved" || !receipt.path)
+        throw new Error(
+          t(
+            "保存结果不明，请保留原文并检查资料。",
+            "Save status is uncertain. Keep the text and check Library.",
+          ),
+        );
+      operation.path = receipt.path;
+      if (send) {
+        setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
+        setView("ask");
+      }
+      setHomeAskText("");
+      setHomeAskError("");
+      if (!send) homeOperation.current = null;
+    } catch (error) {
+      setHomeAskError(error instanceof Error ? error.message : String(error));
+    } finally {
+      homeSaving.current = false;
+    }
+  };
   const [homeAskText, setHomeAskText] = useState("");
   const [homeAskError, setHomeAskError] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
@@ -1183,18 +1221,16 @@ function Overview({
                   />
                 ) : undefined
               }
+              save={
+                props.captureOnce
+                  ? (text) => {
+                      void saveHome(text, false);
+                    }
+                  : undefined
+              }
               ask={(text) => {
-                if (!handoffAsk(text)) {
-                  setHomeAskError(
-                    t(
-                      "问问里还有未发送的内容，请先处理后再继续。",
-                      "Finish the unsent content in Ask before continuing.",
-                    ),
-                  );
-                  return;
-                }
-                setHomeAskError("");
-                setHomeAskText("");
+                if (props.captureOnce) void saveHome(text, true);
+                else handoffAsk(text);
               }}
               canAsk={!!props.renderAsk}
               askError={homeAskError}
@@ -1530,6 +1566,7 @@ function Overview({
               },
               openAskSettings,
               promptNewConversation,
+              homeSubmit,
             )}
           </div>
         )}

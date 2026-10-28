@@ -21,6 +21,7 @@ import {
 
 export function LifeHome({
   home,
+  save,
   data,
   firstVisit,
   capture,
@@ -46,6 +47,7 @@ export function LifeHome({
   loadProjects,
   openProject,
 }: {
+  save?: (text: string) => void;
   home?: import("@kaitu/core").HomeState | null;
   loadProjects: () => Promise<DoingProject[]>;
   openProject: (slug: string) => void;
@@ -358,6 +360,16 @@ export function LifeHome({
             </div>
           )}
           {voiceMessage && <output>{voiceMessage}</output>}
+          {save && (
+            <button
+              type="button"
+              className={css.btn}
+              disabled={!askText.trim()}
+              onClick={() => save(askText)}
+            >
+              {t("记下", "Save")}
+            </button>
+          )}
           <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
             {t("去问问继续", "Continue in Ask")}
           </button>

@@ -73,10 +73,12 @@ const props: OverviewPageProps = {
     onToday,
     onSettings,
     newConversation,
+    autoSubmit,
   ) => (
     <AskPage
       workspace={workspace}
       active={active}
+      autoSubmit={autoSubmit}
       initialPrompt={prompt}
       initialPromptRequest={promptRequest}
       initialPromptNewConversation={newConversation}
@@ -161,6 +163,7 @@ const props: OverviewPageProps = {
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadHome: () => call("home"),
+  captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
     call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
