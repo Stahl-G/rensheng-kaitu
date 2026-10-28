@@ -10,6 +10,7 @@ import {
   roleLabels,
   sampleCard,
   specialtyLabels,
+  startingSettings,
 } from "./card.js";
 import { decisionYears, eligibility } from "./decisions.js";
 import { liquid, netWorth, yuan } from "./finance.js";
@@ -85,24 +86,57 @@ function importPage() {
   return `<main class="import-page"><h1>${t("从你开始。", "Begin with you.")}</h1><div class="import-grid"><section class="panel"><h2>ChatGPT / Claude / Gemini</h2>${button("copy-prompt", t("复制角色卡提示词", "Copy character prompt"), "primary")}<details><summary>${t("查看提示词", "View prompt")}</summary><textarea id="prompt" readonly>${e(cardPrompt(locale))}</textarea></details></section><section class="panel"><label for="paste">${t("粘贴角色卡 JSON", "Paste character JSON")}</label><textarea id="paste">${e(pasted)}</textarea>${button("parse", t("检查角色卡 →", "Review character →"), "primary")}${button("manual", t("自己填写", "Fill in myself"), "text-button")}</section></div></main>`;
 }
 function reviewPage() {
-  return `<main class="review-page"><h1>${t("带上现在的你。", "Bring who you are today.")}</h1><form id="review-form"><section class="panel"><div class="field-row"><label>${t("昵称", "Alias")}<input name="name" value="${e(card.name)}" maxlength="24"></label><label>${t("年龄", "Age")}<input name="age" type="number" min="18" max="90" required value="${card.age ?? ""}"></label></div><div class="field-row"><label>${t("职业", "Role")}<select name="role">${Object.entries(
-    roleLabels,
-  )
-    .map(([k, v]) => option(k, pair(v), card.role))
-    .join("")}</select></label><label>${t("学历", "Education")}<select name="education">${Object.entries(
-    educationLabels,
-  )
-    .map(([k, v]) => option(k, pair(v), card.education))
-    .join("")}</select></label><label>${t("专业方向", "Specialty")}<select name="specialty">${Object.entries(
-    specialtyLabels,
-  )
-    .map(([k, v]) => option(k, pair(v), card.specialty))
-    .join(
-      "",
-    )}</select></label></div><label>${t("你想做的一件事", "Something you want to do")}<input name="project" maxlength="80" value="${e(card.project)}"></label><div class="attributes">${dimensions.map((k) => `<div class="attribute-row"><label for="${k}">${pair(labels[k])}</label><input id="${k}" name="${k}" type="number" min="0" max="100" placeholder="${t("未知", "Unknown")}" value="${card.attributes[k].value ?? ""}"><input name="source-${k}" value="${e(card.attributes[k].source)}" maxlength="160" aria-label="${pair(labels[k])} ${t("依据", "source")}" placeholder="${t("来源 / 游戏设定", "Source / game setting")}"></div>`).join("")}</div><details><summary>${t("开局设定", "Starting assumptions")}</summary><p>${t("未知属性保留未知，推演采用中性 50。模拟开局：现金 ¥26,000，存款 ¥64,000，无负债。", "Unknown attributes remain unknown; simulation uses neutral 50. Simulated start: ¥26,000 cash, ¥64,000 deposits, no debt.")}</p></details><button class="primary" type="submit">${t("开始这局人生 →", "Start this life →")}</button></section></form></main>`;
+  const bg = card.background ?? {
+    education: "",
+    major: "",
+    industry: "",
+    occupation: "",
+    experienceYears: null,
+    source: "",
+  };
+  const start = startingSettings(card);
+  const field = (name: string, label: string, value: string, max = 100) =>
+    `<label>${label}<input name="${name}" value="${e(value)}" maxlength="${max}"></label>`;
+  const select = (name: string, label: string, options: Record<string, [string, string]>, value: string) =>
+    `<label>${label}<select name="${name}">${Object.entries(options)
+      .map(([k, v]) => option(k, pair(v), value))
+      .join("")}</select></label>`;
+  return `<main class="review-page"><h1>${t("带上现在的你。", "Bring who you are today.")}</h1><form id="review-form"><section class="panel"><h2>${t("个人资料", "Personal background")}</h2><div class="field-row">${field("name", t("昵称", "Alias"), card.name, 24)}<label>${t("年龄", "Age")}<input name="age" type="number" min="18" max="90" required value="${card.age ?? ""}"></label>${select("role", t("就业状态", "Employment status"), roleLabels, card.role)}</div><div class="field-row">${field("bg-education", t("已完成学历层次", "Completed qualification"), bg.education, 80)}${field("bg-major", t("具体所学专业", "Field of study"), bg.major)}</div><div class="field-row">${field("bg-industry", t("行业", "Industry"), bg.industry)}${field("bg-occupation", t("具体岗位", "Occupation"), bg.occupation)}<label>${t("实际工作年数", "Known work experience")}<input name="experience" type="number" min="0" max="76" placeholder="${t("未知", "Unknown")}" value="${bg.experienceYears ?? ""}"></label></div>${field("background-source", t("资料依据 / 无法读取项", "Evidence / inaccessible items"), bg.source, 500)}${field("project", t("你想做的一件事", "Something you want to do"), card.project, 80)}<h2>${t("游戏状态", "Game stats")}</h2><div class="attributes">${dimensions.map((k) => `<div class="attribute-row"><label for="${k}">${pair(labels[k])}</label><input id="${k}" name="${k}" type="number" min="0" max="100" placeholder="${t("未知", "Unknown")}" value="${card.attributes[k].value ?? ""}"><input name="source-${k}" value="${e(card.attributes[k].source)}" maxlength="160" aria-label="${pair(labels[k])} ${t("依据", "source")}" placeholder="${t("来源 / 游戏设定", "Source / game setting")}"></div>`).join("")}</div><details open><summary>${t("模拟开局设定", "Simulation starting settings")}</summary><div class="field-row">${select("game-role", t("游戏就业状态", "Game employment"), Object.fromEntries(Object.entries(roleLabels).filter(([k]) => k !== "unknown")), start.role)}<label>${t("游戏工龄", "Game experience")}<input name="game-experience" type="number" min="0" max="76" required value="${start.experienceYears}"></label></div><div class="field-row"><label>${t("模拟现金 · RMB", "Simulated cash · RMB")}<input name="game-cash" type="number" min="0" max="1000000000" required value="${start.cash}"></label><label>${t("模拟存款 · RMB", "Simulated deposits · RMB")}<input name="game-deposits" type="number" min="0" max="1000000000" required value="${start.deposits}"></label></div><div class="field-row">${select("education", t("学历规则标签", "Education rule tag"), educationLabels, card.education)}${select("specialty", t("专业规则标签", "Field rule tag"), specialtyLabels, card.specialty)}</div></details><div class="form-actions">${button("edit-paste", t("返回原文", "Back to pasted text"), "text-button")}<button class="primary" type="submit">${t("开始这局人生 →", "Start this life →")}</button></div></section></form></main>`;
+}
+function readReview(form: HTMLFormElement) {
+  const d = new FormData(form);
+  const num = (name: string) => (d.get(name) === "" ? null : Number(d.get(name)));
+  return parseCard(
+    JSON.stringify({
+      ...card,
+      name: d.get("name"),
+      age: num("age"),
+      role: d.get("role"),
+      education: d.get("education"),
+      specialty: d.get("specialty"),
+      project: d.get("project"),
+      background: {
+        education: d.get("bg-education"),
+        major: d.get("bg-major"),
+        industry: d.get("bg-industry"),
+        occupation: d.get("bg-occupation"),
+        experienceYears: num("experience"),
+        source: d.get("background-source"),
+      },
+      starting: {
+        role: d.get("game-role"),
+        experienceYears: num("game-experience"),
+        cash: num("game-cash"),
+        deposits: num("game-deposits"),
+      },
+      attributes: Object.fromEntries(
+        dimensions.map((k) => [k, { value: num(k), source: d.get(`source-${k}`) }]),
+      ),
+    }),
+  );
 }
 function identity(s: State) {
-  return `<aside class="identity panel"><div class="portrait" aria-hidden="true">${e(card.name.slice(0, 1) || "·")}</div><h2>${e(card.name || t("玩家", "Player"))}</h2><div class="identity-age">${s.age} ${t("岁", "years")}</div><div class="tag">${pair(roleLabels[s.role])}${s.abroad ? ` · ${t("海外", "Abroad")}` : ""}</div><div class="stat-list">${dimensions.map((k) => `<div><span>${pair(labels[k])}</span><b>${s.props[k]}</b><progress max="100" value="${s.props[k]}" aria-label="${pair(labels[k])}"></progress></div>`).join("")}</div><div class="networth"><span>${t("模拟净资产", "Simulated net assets")}</span><strong>${money(netWorth(s.assets))}</strong></div><details><summary>${t("开局资料", "Starting profile")}</summary>${dimensions.map((k) => `<p>${pair(labels[k])}：${card.attributes[k].value ?? t("未知", "Unknown")} ${e(card.attributes[k].source)}</p>`).join("")}</details></aside>`;
+  return `<aside class="identity panel"><div class="portrait" aria-hidden="true">${e(card.name.slice(0, 1) || "·")}</div><h2>${e(card.name || t("玩家", "Player"))}</h2><div class="identity-age">${s.age} ${t("岁", "years")}</div><div class="tag">${pair(roleLabels[s.role])}${s.abroad ? ` · ${t("海外", "Abroad")}` : ""}</div><div class="stat-list">${dimensions.map((k) => `<div><span>${pair(labels[k])}</span><b>${s.props[k]}</b><progress max="100" value="${s.props[k]}" aria-label="${pair(labels[k])}"></progress></div>`).join("")}</div><div class="networth"><span>${t("模拟净资产", "Simulated net assets")}</span><strong>${money(netWorth(s.assets))}</strong></div><details><summary>${t("开局资料", "Starting profile")}</summary><p>${e([card.background?.education, card.background?.major, card.background?.industry, card.background?.occupation].filter(Boolean).join(" · "))}</p><p>${t("原始就业状态", "Original employment")}: ${pair(roleLabels[card.role])} · ${t("实际工龄", "Known experience")}: ${card.background?.experienceYears ?? t("未知", "Unknown")}</p>${dimensions.map((k) => `<p>${pair(labels[k])}：${card.attributes[k].value ?? t("未知", "Unknown")} ${e(card.attributes[k].source)}</p>`).join("")}</details></aside>`;
 }
 function story(st: Story) {
   return `<article class="event ${st.kind}"><span class="event-dot"></span><p>${e(pair(st.text))}</p>${st.support ? `<div class="support">${st.support.map((s) => `<a href="${e(s.url)}" target="_blank" rel="noreferrer">${e(s.label)} ↗</a>`).join(" · ")}</div>` : ""}</article>`;
@@ -400,26 +434,7 @@ function render() {
   });
   click("language", () => {
     const form = document.getElementById("review-form");
-    if (form instanceof HTMLFormElement) {
-      const d = new FormData(form);
-      card = parseCard(
-        JSON.stringify({
-          ...card,
-          name: d.get("name"),
-          age: d.get("age") === "" ? null : Number(d.get("age")),
-          role: d.get("role"),
-          education: d.get("education"),
-          specialty: d.get("specialty"),
-          project: d.get("project"),
-          attributes: Object.fromEntries(
-            dimensions.map((k) => [
-              k,
-              { value: d.get(k) === "" ? null : Number(d.get(k)), source: d.get(`source-${k}`) },
-            ]),
-          ),
-        }),
-      );
-    }
+    if (form instanceof HTMLFormElement) card = readReview(form);
     pasted = document.querySelector<HTMLTextAreaElement>("#paste")?.value ?? pasted;
     locale = locale === "zh" ? "en" : "zh";
     render();
@@ -432,8 +447,15 @@ function render() {
     render();
   });
   click("manual", () => {
+    pasted = document.querySelector<HTMLTextAreaElement>("#paste")?.value ?? pasted;
     card = blankCard();
+    error = "";
     page = "review";
+    render();
+  });
+  click("edit-paste", () => {
+    page = "import";
+    error = "";
     render();
   });
   click("copy-prompt", async () => {
@@ -451,29 +473,26 @@ function render() {
   document.getElementById("review-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     try {
-      const d = new FormData(event.target as HTMLFormElement);
-      card = parseCard(
-        JSON.stringify({
-          version: 2,
-          name: d.get("name"),
-          age: Number(d.get("age")),
-          role: d.get("role"),
-          education: d.get("education"),
-          specialty: d.get("specialty"),
-          project: d.get("project"),
-          attributes: Object.fromEntries(
-            dimensions.map((k) => [
-              k,
-              { value: d.get(k) === "" ? null : Number(d.get(k)), source: d.get(`source-${k}`) },
-            ]),
-          ),
-        }),
-      );
+      card = readReview(event.target as HTMLFormElement);
       begin();
     } catch (reason) {
       report(reason);
     }
   });
+  for (const [fact, game] of [
+    ["role", "game-role"],
+    ["experience", "game-experience"],
+  ]) {
+    const source = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${fact}"]`);
+    const target = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${game}"]`);
+    target?.addEventListener("change", () => {
+      target.dataset.edited = "true";
+    });
+    source?.addEventListener("change", () => {
+      if (target && !target.dataset.edited && source.value && source.value !== "unknown")
+        target.value = source.value;
+    });
+  }
   for (const id of ["pause", "skip"]) {
     const control = document.getElementById(id);
     if (control instanceof HTMLButtonElement) control.disabled = pending() || nextOffset() >= YEARS;

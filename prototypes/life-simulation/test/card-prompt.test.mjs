@@ -46,3 +46,47 @@ test("generated prompts allow scoped read-only evidence and distinguish unavaila
   assert.equal(state.education, "degree");
   assert.equal(state.props.knowledge, 62);
 });
+
+test("pasted prose, fences and quoted braces preserve details; malformed and multiple cards explain the failure", () => {
+  const card = blankCard();
+  card.age = 42;
+  card.background = {
+    education: "博士",
+    major: "凝聚态物理",
+    industry: "金融",
+    occupation: "量化研究员",
+    experienceYears: 7,
+    source: "用户说：“研究 {模型}”。来自当前对话。",
+  };
+  const json = JSON.stringify(card);
+  for (const text of [
+    json,
+    `说明 {不是 JSON}。\n${json}\n附注 {不是卡片}`,
+    `说明 {背景}\n\`\`\`json\n${json}\n\`\`\`\n其他 {注释}`,
+  ])
+    assert.deepEqual(parseCard(text), card);
+  const state = initialState(card, "details");
+  assert.equal(state.experience, 7);
+  assert.equal(card.role, "unknown");
+  assert.equal(card.background.occupation, "量化研究员");
+  card.starting = { role: "student", experienceYears: 2, cash: 13000, deposits: 25000 };
+  const start = initialState(card, "override");
+  assert.equal(start.role, "student");
+  assert.equal(start.experience, 2);
+  assert.equal(start.assets.cash, 1300000);
+  assert.equal(card.role, "unknown");
+  assert.equal(card.background.experienceYears, 7);
+  assert.throws(() => parseCard(json + json), /Multiple cards/);
+  assert.throws(() => parseCard('{"version":2,"age":}'), /Cannot read card JSON/);
+  assert.throws(() => parseCard('{"version":2'), /Missing closing/);
+  assert.throws(() => parseCard(JSON.stringify({ ...card, role: "量化研究员" })), /role:.*employed/);
+  assert.throws(
+    () => parseCard(JSON.stringify({ ...card, background: { experienceYears: -1 } })),
+    /background.experienceYears/,
+  );
+  const legacy = { ...card };
+  legacy.background = undefined;
+  legacy.starting = undefined;
+  assert.equal(parseCard(JSON.stringify(legacy)).version, 2);
+  assert.equal(parseCard(JSON.stringify(legacy)).background.experienceYears, null);
+});

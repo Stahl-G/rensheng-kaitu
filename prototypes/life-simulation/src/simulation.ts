@@ -1,4 +1,4 @@
-import { type Card, dimensions, parseCard } from "./card.js";
+import { type Card, dimensions, parseCard, startingSettings } from "./card.js";
 import { applyDecision, decisionYears, eligibility, progressChains } from "./decisions.js";
 import { createEngine } from "./engine.js";
 import { events, support } from "./events.js";
@@ -50,9 +50,10 @@ export interface Run {
 export const defaultHabits = (): Habits => ({ jobSearch: false, training: false, monthlyInvestment: 0 });
 export function initialState(card: Card, seed: string): State {
   if (card.age === null) throw new Error("请填写当前年龄 / Enter your current age");
+  const start = startingSettings(card);
   const assets: BalanceSheet = {
-    cash: yuan(26000),
-    deposits: yuan(64000),
+    cash: yuan(start.cash),
+    deposits: yuan(start.deposits),
     bonds: 0,
     stocks: 0,
     property: 0,
@@ -63,10 +64,10 @@ export function initialState(card: Card, seed: string): State {
   return {
     age: card.age,
     props: Object.fromEntries(dimensions.map((k) => [k, card.attributes[k].value ?? 50])) as State["props"],
-    role: card.role === "unknown" ? "employed" : card.role,
+    role: start.role,
     education: card.education,
     specialty: card.specialty,
-    experience: Math.max(0, Math.min(20, card.age - 23)),
+    experience: start.experienceYears,
     assets,
     abroad: false,
     investor: false,
