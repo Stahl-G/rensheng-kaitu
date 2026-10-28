@@ -143,7 +143,11 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         target.origin === new URL(workbenchOrigin).origin
       )
         throw new KaituError("插件页面服务地址无效", "PLUGIN");
-      target.hash = new URLSearchParams({ "kaitu-page": entry.page, "kaitu-embed": "1" }).toString();
+      target.hash = new URLSearchParams({
+        "kaitu-page": entry.page,
+        "kaitu-embed": "1",
+        "kaitu-parent": new URL(workbenchOrigin).origin,
+      }).toString();
       return target.href;
     },
     explore() {

@@ -95,6 +95,7 @@ export interface OverviewPageProps
     active: boolean,
     onToday: () => void,
     onSettings: (section: "ai" | "local-ai") => void,
+    newConversation: boolean,
   ) => ReactNode;
 }
 const modules = [
@@ -486,6 +487,13 @@ function Overview({
   }, [captureOpen, view]);
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
+  const [promptNewConversation, setPromptNewConversation] = useState(false);
+  const handoffPending = useRef(false);
+  // Reset after the submitted prompt has been rendered in Ask.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: promptRequest signals each handoff.
+  useEffect(() => {
+    handoffPending.current = false;
+  }, [promptRequest]);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
@@ -625,7 +633,8 @@ function Overview({
     setRecord(modules.some(([key]) => key === id) ? id : "");
     setView("records");
   };
-  const prompt = (text: string) => {
+  const prompt = (text: string, newConversation = false) => {
+    setPromptNewConversation(newConversation);
     setPromptDraft(text);
     setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
@@ -1446,6 +1455,14 @@ function Overview({
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
+                onDraft={(text) => {
+                  if (handoffPending.current || !props.renderAsk) return false;
+                  const event = new Event("kaitu:before-ask-draft", { cancelable: true });
+                  if (!window.dispatchEvent(event)) return false;
+                  handoffPending.current = true;
+                  prompt(text, true);
+                  return true;
+                }}
               />
             </div>
           ))}
@@ -1463,6 +1480,7 @@ function Overview({
                 setView("overview");
               },
               openAskSettings,
+              promptNewConversation,
             )}
           </div>
         )}

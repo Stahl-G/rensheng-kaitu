@@ -71,12 +71,14 @@ const props: OverviewPageProps = {
     active,
     onToday,
     onSettings,
+    newConversation,
   ) => (
     <AskPage
       workspace={workspace}
       active={active}
       initialPrompt={prompt}
       initialPromptRequest={promptRequest}
+      initialPromptNewConversation={newConversation}
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}

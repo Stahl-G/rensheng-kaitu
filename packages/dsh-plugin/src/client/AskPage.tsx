@@ -261,6 +261,7 @@ export function AskPage({
   active = true,
   initialPrompt = "",
   initialPromptRequest = 0,
+  initialPromptNewConversation = false,
   configureRequest = 0,
   configureBuiltin = false,
   onConnections,
@@ -271,6 +272,7 @@ export function AskPage({
   active?: boolean;
   initialPrompt?: string;
   initialPromptRequest?: number;
+  initialPromptNewConversation?: boolean;
   configureRequest?: number;
   configureBuiltin?: boolean;
   onConnections?: () => void;
@@ -291,6 +293,7 @@ export function AskPage({
   const [draft, setDraft] = useState(initialPrompt);
   useEffect(() => {
     if (!initialPrompt && !initialPromptRequest) return;
+    if (initialPromptNewConversation) setSelected(null);
     setDraft(initialPrompt);
     const frame = requestAnimationFrame(() => {
       const field = input.current;
@@ -298,7 +301,7 @@ export function AskPage({
       field?.setSelectionRange(field.value.length, field.value.length);
     });
     return () => cancelAnimationFrame(frame);
-  }, [initialPrompt, initialPromptRequest]);
+  }, [initialPrompt, initialPromptRequest, initialPromptNewConversation]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const configurationRequested = useRef(false);
@@ -360,6 +363,14 @@ export function AskPage({
   const activeSession = useRef<string | null>(null);
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
+  useEffect(() => {
+    const guard = (event: Event) => {
+      if (draft.trim() || attachments.length || sessionReferences.length || busy || readingFiles)
+        event.preventDefault();
+    };
+    window.addEventListener("kaitu:before-ask-draft", guard);
+    return () => window.removeEventListener("kaitu:before-ask-draft", guard);
+  }, [draft, attachments, sessionReferences, busy, readingFiles]);
   const referenceThreads = threads.filter(
     (thread) =>
       thread.id !== selected &&
