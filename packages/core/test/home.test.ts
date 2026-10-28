@@ -118,10 +118,50 @@ it("projects existing goals, projects and learning without reading or mutating t
         }),
       ]),
     );
+    const withRevision = readHome({
+      ...input,
+      records: {
+        ...input.records,
+        task: (input.records.task ?? []).map((record) => ({ ...record, rev: 3 })),
+      },
+    });
+    expect(
+      withRevision.threads.find((thread) => thread.key === "project:linked")?.next?.precondition,
+    ).toEqual({ kind: "task", expectedRev: 3 });
+    const withoutRevision = readHome({
+      ...input,
+      records: { ...input.records, task: (input.records.task ?? []).map(({ rev, ...record }) => record) },
+    });
+    expect(withoutRevision.threads.find((thread) => thread.key === "project:linked")?.next).toMatchObject({
+      file: "task",
+      precondition: null,
+    });
+    const multipleDays = readHome({
+      ...input,
+      projects: input.projects.map((item) => ({
+        ...item,
+        metricFiles: ["projects/data/project_metric/2026-10.jsonl"],
+        recent7: {
+          ...item.recent7,
+          daily: [
+            { date: "2026-10-27", words: 100, commits: 2 },
+            { date: "2026-10-28", words: 0, commits: 0 },
+          ],
+        },
+      })),
+    });
+    expect(
+      multipleDays.traces.filter(
+        (trace) => trace.kind === "project-metric" && trace.key.startsWith("project:fixture:"),
+      ),
+    ).toHaveLength(1);
+    expect(multipleDays.traces.some((trace) => trace.kind === "project-metric" && trace.value === 0)).toBe(
+      false,
+    );
     expect(home.threads.find((thread) => thread.key === "project:linked")?.next).toMatchObject({
       id: task.record.id,
       file: "task",
-      precondition: { kind: "task", expectedRev: task.record.rev ?? 1 },
+      precondition: null,
     });
     expect(home.threads.find((thread) => thread.kind === "goal")).toMatchObject({
       file: "me/goals.json",
