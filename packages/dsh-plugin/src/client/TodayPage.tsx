@@ -171,18 +171,6 @@ export function LifeHome({
   };
   const [selectedThread, setSelectedThread] = useState(0);
   const [atlasData, setAtlasData] = useState<import("@kaitu/core").LifeAtlasState | null>(null);
-  const atlasContainer = useRef<HTMLDivElement>(null);
-  const [atlasWidth, setAtlasWidth] = useState(900);
-  useLayoutEffect(() => {
-    const element = atlasContainer.current;
-    if (!element) return;
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width) setAtlasWidth(width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
   const [atlasImage, setAtlasImage] = useState<string | null>(null);
   const [atlasStatus, setAtlasStatus] = useState<"loading" | "ready" | "error">("loading");
   // biome-ignore lint/correctness/useExhaustiveDependencies: workspace notifications refresh the adopted map preview.
@@ -260,25 +248,6 @@ export function LifeHome({
     sourceTrigger.current = event.currentTarget;
     setFactSource(metric);
   };
-  const focused = home?.data?.threads[selectedThread];
-  const focusedDomain =
-    focused &&
-    atlasData?.domains.find((d) =>
-      d.facts.some((f) => f.source === focused.file && (focused.kind !== "goal" || f.id === focused.id)),
-    );
-  const focusedPoint = focusedDomain && atlasData?.resource?.regions.provinces[focusedDomain.slot];
-  const previewHeight = atlasData?.resource
-    ? Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)
-    : 148;
-  const previewY = atlasData?.resource
-    ? Math.max(
-        0,
-        Math.min(
-          atlasData.resource.height - previewHeight,
-          (focusedPoint?.y ?? atlasData.resource.height / 2) - previewHeight / 2,
-        ),
-      )
-    : 0;
   const valueText = (metric: OverviewMetric) =>
     `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   return (
@@ -289,7 +258,7 @@ export function LifeHome({
       <header className={todayCss.homeHeading}>
         <div className={todayCss.dateWeather}>
           <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
-          {weather}
+          {weather && <div className={todayCss.weatherSlot}>{weather}</div>}
         </div>
         {!home && !firstVisit && (
           <button
@@ -306,15 +275,15 @@ export function LifeHome({
         )}
       </header>
       {loadAtlas && (
-        <div ref={atlasContainer} className={todayCss.atlasPreview}>
+        <div className={todayCss.atlasPreview}>
           <button type="button" className={css.link} onClick={openAtlas}>
             {t("人生地图", "Life map")}
           </button>
           {atlasImage && atlasData?.resource ? (
             <svg
               width="100%"
-              height="148"
-              viewBox={`0 ${previewY} ${atlasData.resource.width} ${previewHeight}`}
+              height="100%"
+              viewBox={`0 0 ${atlasData.resource.width} ${atlasData.resource.height}`}
             >
               <title>{t("人生地图", "Life map")}</title>
               <image
@@ -391,9 +360,7 @@ export function LifeHome({
             if (askText.trim()) ask(askText);
           }}
         >
-          <label className={home ? css.sr : undefined} htmlFor="today-ask">
-            {t("想聊些什么？", "What would you like to talk about?")}
-          </label>
+          <label htmlFor="today-ask">{t("此刻，想聊什么？", "What’s on your mind?")}</label>
           <textarea
             id="today-ask"
             value={askText}
@@ -664,67 +631,50 @@ function Savepoint({
   const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
   return (
     <div className={todayCss.savepointGrid}>
-      <article id="home-savepoint" className={todayCss.savepointCard}>
-        <p className={css.eyebrow}>{t("存档点", "Save point")}</p>
+      <section id="home-savepoint" className={todayCss.continueSection}>
+        <div className={todayCss.sectionHeading}>
+          <h2>{t("接着上次", "Pick up where you left off")}</h2>
+          <button type="button" className={css.link} onClick={library}>
+            {t("查看全部", "View all")}
+          </button>
+        </div>
         {thread ? (
-          <>
-            <h2>{thread.title}</h2>
-            <dl className={todayCss.savepointFields}>
-              {thread.progress && (
-                <>
-                  <dt>{t("走到这里", "Progress")}</dt>
-                  <dd>
-                    {thread.progress.label} {thread.progress.current} / {thread.progress.target}{" "}
-                    {thread.progress.unit}
-                  </dd>
-                </>
-              )}
-              {thread.last && (
-                <>
-                  <dt>{t("上次", "Last time")}</dt>
-                  <dd>
-                    {thread.last.text}
-                    {thread.last.date && <time>{thread.last.date}</time>}
-                  </dd>
-                </>
-              )}
-              <dt>{t("下一步", "Next")}</dt>
-              <dd>{thread.next?.title ?? t("还没有下一步", "No next step yet")}</dd>
-            </dl>
-            <div className={todayCss.savepointActions}>
+          [thread, ...threads.filter((item) => item.key !== thread.key)].slice(0, 2).map((item) => (
+            <article key={item.key} className={todayCss.continueCard} data-selected={item.key === thread.key}>
+              <button
+                type="button"
+                className={todayCss.projectChoice}
+                onClick={() => select(threads.indexOf(item))}
+              >
+                <h3>{item.title}</h3>
+                {(item.last || item.next) && <p>{item.last?.text ?? item.next?.title}</p>}
+              </button>
               <button
                 type="button"
                 className={css.btn}
-                onClick={() => (thread.kind === "project" ? openProject(thread.id) : library())}
+                aria-label={t(`打开${item.title}`, `Open ${item.title}`)}
+                onClick={() => (item.kind === "project" ? openProject(item.id) : library())}
               >
-                {t("打开", "Open")}
+                →
               </button>
-              {threads.length > 1 && (
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() => select((selected + 1) % threads.length)}
-                >
-                  {t("换一个", "Another")}
-                </button>
-              )}
-            </div>
-          </>
+            </article>
+          ))
         ) : (
-          <>
-            <h2>{data.loading ? t("正在读取…", "Loading…") : t("还没有存档点", "No save points yet")}</h2>
+          <div className={todayCss.continueCard}>
+            <p>{data.loading ? t("正在读取…", "Loading…") : t("还没有项目", "No projects yet")}</p>
             <button type="button" className={css.btn} onClick={library}>
               {t("打开资料", "Open Library")}
             </button>
-          </>
+          </div>
         )}
         {data.error && <p role="alert">{data.error}</p>}
-      </article>
+      </section>
       <aside className={todayCss.savepointSide}>
-        {!!data.data?.traces.length && (
+        {
           <section className={todayCss.savepointCard}>
             <h3>{t("最近的痕迹", "Recent traces")}</h3>
-            {data.data.traces.slice(0, 3).map((trace) => (
+            {!data.data?.traces.length && <p>{t("还没有近期痕迹", "No recent traces")}</p>}
+            {data.data?.traces.slice(0, 3).map((trace) => (
               <p key={trace.key}>
                 <span>
                   {trace.label}
@@ -736,7 +686,7 @@ function Savepoint({
               </p>
             ))}
           </section>
-        )}
+        }
         {!!data.data?.pending.length && (
           <section className={todayCss.savepointCard}>
             <h3>{t("待确认", "Pending")}</h3>

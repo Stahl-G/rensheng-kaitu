@@ -120,7 +120,7 @@ export function TodayWeather({
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState(false);
-  const [open, setOpen] = useState(() => rememberedOpen() ?? new Date().getHours() < 13);
+  const [open, setOpen] = useState(() => rememberedOpen() ?? false);
   // 只采用最后一次请求的结果，旧响应不覆盖新选的城市。
   const generation = useRef(0);
   const apply = useCallback(async (request: Promise<WeatherState>) => {

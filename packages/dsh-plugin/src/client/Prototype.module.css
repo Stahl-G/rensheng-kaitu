@@ -3083,3 +3083,62 @@
   height: max(420px, calc(100dvh - 240px));
   border: 0;
 }
+
+.referenceApp .top {
+  max-width: 1440px;
+  padding: 12px 28px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+}
+.referenceApp .tabs {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  gap: 6px;
+}
+.referenceApp .tabs button {
+  min-height: 44px;
+  font-size: 17px;
+  padding: 0 24px;
+  gap: 8px;
+}
+.referenceApp .tabs button svg {
+  width: 20px;
+  height: 20px;
+}
+.referenceApp .tools {
+  grid-column: 3;
+  grid-row: 1;
+}
+.referenceApp .content {
+  max-width: 1440px;
+}
+@media (max-width: 760px) {
+  .referenceApp .top {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .referenceApp .brandName {
+    display: none;
+  }
+  .referenceApp .tabs {
+    justify-content: center;
+  }
+  .referenceApp .tabs button {
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 14px;
+  }
+  .referenceApp .tabs button svg {
+    display: none;
+  }
+}
+
+.referenceApp .todayContent {
+  padding: 6px 0 20px;
+  gap: 16px;
+}

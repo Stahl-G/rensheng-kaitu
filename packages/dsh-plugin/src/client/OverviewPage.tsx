@@ -1036,7 +1036,11 @@ function Overview({
   };
 
   return (
-    <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
+    <div
+      className={`${css.app} ${props.loadHome ? css.referenceApp : ""}`}
+      data-theme={theme}
+      lang={locale === "en" ? "en" : "zh-CN"}
+    >
       <header className={css.top}>
         <div className={css.brand}>
           <KaituMark size={26} />
@@ -1122,7 +1126,7 @@ function Overview({
         </div>
       </header>
       <main
-        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? todayCss.page : ""}`}
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? `${todayCss.page} ${props.loadHome ? css.todayContent : ""}` : ""}`}
       >
         {props.desktopUpdate && view !== "settings" && (
           <FeatureUpdates request={props.desktopUpdate} compact />
