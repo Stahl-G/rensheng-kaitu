@@ -6,6 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
+import { createHomeCache } from "@kaitu/core";
 import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
@@ -296,6 +297,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
+  const home = createHomeCache(ws, notify);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
@@ -373,6 +375,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     if (closed || ignoredWorkspaceChange(file)) return;
     invalidateHistoryFile(ws, file);
     invalidateLifeAtlas(ws, file);
+    home.invalidate();
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
@@ -604,37 +607,40 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         }
         const result =
-          method === "openAi"
-            ? await openAi()
-            : method.startsWith("ask") || method === "projectGoalSuggest"
-              ? await productRequest(ws, method, args, options.ask, calendarPush)
-              : relocate || method === "restoreVersion"
-                ? await exclusive(async () => {
-                    workspaceGeneration++;
-                    await calendarQueue;
-                    await saveExternal();
-                    const opening = method === "workspaceBackup" && args[0] === "activate";
-                    const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
-                    await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
-                    await phones.stop();
-                    const oldRoot = ws.root;
-                    try {
-                      if (relocate) await options.onWorkspaceChanging?.();
-                      return await productRequest(ws, method, args, options.ask, calendarPush);
-                    } finally {
+          method === "home"
+            ? home.read()
+            : method === "openAi"
+              ? await openAi()
+              : method.startsWith("ask") || method === "projectGoalSuggest"
+                ? await productRequest(ws, method, args, options.ask, calendarPush)
+                : relocate || method === "restoreVersion"
+                  ? await exclusive(async () => {
+                      workspaceGeneration++;
+                      await calendarQueue;
+                      await saveExternal();
+                      const opening = method === "workspaceBackup" && args[0] === "activate";
+                      const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
+                      await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
+                      await phones.stop();
+                      const oldRoot = ws.root;
                       try {
-                        if (ws.root !== oldRoot) startWatching();
-                        if (relocate) await options.onWorkspaceChanged?.();
+                        if (relocate) await options.onWorkspaceChanging?.();
+                        return await productRequest(ws, method, args, options.ask, calendarPush);
                       } finally {
-                        options.ask?.relocate(ws.root);
-                        phones.start();
-                        notify();
+                        try {
+                          if (ws.root !== oldRoot) startWatching();
+                          home.invalidate();
+                          if (relocate) await options.onWorkspaceChanged?.();
+                        } finally {
+                          options.ask?.relocate(ws.root);
+                          phones.start();
+                          notify();
+                        }
                       }
-                    }
-                  })
-                : productMutations.has(method) && !backupRead
-                  ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
-                  : await productRequest(ws, method, args, options.ask, calendarPush);
+                    })
+                  : productMutations.has(method) && !backupRead
+                    ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
+                    : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
         if (productMutations.has(method) && !backupRead) notify();
@@ -946,6 +952,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopAtlas();
+    home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();
@@ -973,6 +980,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     watcher?.close();
     unwatchFile(backupState, backupChanged);
     stopAtlas();
+    home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();

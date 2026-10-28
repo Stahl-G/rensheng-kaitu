@@ -146,6 +146,16 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     banner: { js: nodeBanner },
     external: ["better-sqlite3"],
   });
+  await build({
+    entryPoints: [join(root, "packages/core/dist/home-worker.js")],
+    outfile: join(payload, "dist/home-worker.js"),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    banner: { js: nodeBanner },
+    external: ["better-sqlite3"],
+  });
   await bundleCartographerWorker(payload, "dist", target);
   mkdirSync(join(payload, "licenses"), { recursive: true });
   cpSync(join(root, "LICENSE"), join(payload, "licenses", "kaitu.txt"));
