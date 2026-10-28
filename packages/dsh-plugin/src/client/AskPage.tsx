@@ -1598,7 +1598,7 @@ export function AskPage({
                       <>
                         {agentModels
                           .filter((item) =>
-                            `${item.id} ${item.name ?? ""}`
+                            `${settings.providerName} ${item.id} ${item.name ?? ""}`
                               .toLowerCase()
                               .includes(modelQuery.trim().toLowerCase()),
                           )
