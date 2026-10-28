@@ -4,172 +4,397 @@ import {
   blankCard,
   cardPrompt,
   dimensions,
+  educationLabels,
   labels,
   parseCard,
   roleLabels,
   sampleCard,
+  specialtyLabels,
 } from "./card.js";
+import { decisionYears, eligibility } from "./decisions.js";
+import { liquid, netWorth, yuan } from "./finance.js";
 import { escapeHtml as e, exportPng, mapSvg } from "./map.js";
-import { type Choice, type Run, type World, choices, simulate } from "./simulation.js";
-
-let locale: Locale = "zh";
+import { marketConfig, marketFor } from "./market.js";
+import {
+  type Decision,
+  type DecisionKind,
+  type Focus,
+  type State,
+  type Story,
+  decisionLabels,
+  focusLabels,
+} from "./model.js";
+import { sceneSvg } from "./scene.js";
+import {
+  type Config,
+  type Run,
+  YEARS,
+  defaultHabits,
+  initialState,
+  parseSave,
+  simulate,
+  step,
+} from "./simulation.js";
+let locale: Locale = navigator.language.startsWith("zh") ? "zh" : "en";
 let page: "home" | "import" | "review" | "play" = "home";
-let card: Card = blankCard();
-let choice: Choice = "learn";
-let world: World = "everyday";
-let worldSeed = seed();
-let lifeSeed = seed();
-let sampleIndex = 0;
+let card = blankCard();
+let run: Run | null = null;
+let config: Config | null = null;
+let playing = false;
+let speed = 1;
+let timer: ReturnType<typeof setTimeout> | undefined;
+let selected = 0;
 let pasted = "";
 let error = "";
-let run: Run | null = null;
-let revealed = 0;
-let selected = 0;
-let checkpoint = false;
-function required<T extends Element>(selector: string): T {
-  const element = document.querySelector<T>(selector);
-  if (!element) throw new Error(`Missing page element: ${selector}`);
-  return element;
-}
-const root = required<HTMLDivElement>("#app");
+let subchoice: DecisionKind | null = null;
+let sampleIndex = 0;
+const root = document.querySelector<HTMLDivElement>("#app");
+if (!root) throw new Error("Missing app");
 const t = (zh: string, en: string) => (locale === "zh" ? zh : en);
-const pair = (value: readonly [string, string]) => value[locale === "zh" ? 0 : 1];
-function seed() {
-  return crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
-}
-function option(value: string, label: string, current: string) {
-  return `<option value="${e(value)}"${value === current ? " selected" : ""}>${e(label)}</option>`;
-}
-function button(id: string, label: string, cls = "") {
-  return `<button type="button" id="${id}" class="${cls}">${label}</button>`;
-}
-function status() {
-  return `<p class="error" role="alert">${e(error)}</p>`;
-}
+const pair = (v: readonly [string, string]) => v[locale === "zh" ? 0 : 1];
+const money = (n: number) =>
+  `¥${(n / 100).toLocaleString(locale === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 0 })}`;
+const seed = () => crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
+const button = (id: string, label: string, cls = "") =>
+  `<button type="button" id="${id}" class="${cls}">${label}</button>`;
+const option = (value: string, label: string, current: string) =>
+  `<option value="${e(value)}"${value === current ? " selected" : ""}>${e(label)}</option>`;
+const state = (): State =>
+  run?.changed.at(-1)?.state ?? run?.initial ?? initialState(sampleCard(0, locale), "home");
+const shownState = (): State => run?.changed[selected - 1]?.state ?? state();
+const nextOffset = () => run?.changed.length ?? 0;
+const pending = () => !!run && decisionYears.includes(nextOffset()) && !config?.decisions[nextOffset()];
 function header() {
-  return `<header><button type="button" id="home" class="brand"><span class="brand-icon">开</span><span>开图 <b>KAITU</b></span></button><div class="header-right"><span class="edition">${t("人生往后推 / 原型 01", "THE NEXT CHAPTER / 01")}</span>${button("language", locale === "zh" ? "EN" : "中文", "quiet")}</div></header>`;
+  return `<header>${button("home", `<span class="brand-icon">开</span><span>开图 <b>KAITU</b></span>`, "brand")}<div class="header-right"><span class="edition">${t("人生往后推 · 原型", "THE NEXT CHAPTER · PROTOTYPE")}</span>${button("language", locale === "zh" ? "EN" : "中文", "quiet")}</div></header>`;
 }
 function home() {
-  return `<main class="welcome"><section class="intro"><div class="eyebrow">${t("如果，只改变一件事", "WHAT IF ONE THING CHANGED")}</div><h1>${t("人生的下一页，<br>还有别的写法。", "Your next chapter.<br>A different way.")}</h1><p class="lead">${t("从此刻出发，看看十年后的两种可能。", "Begin here. Explore two possible paths over ten years.")}</p><div class="entry-actions">${button("random", `<span class="action-index">01</span><span>${t("随机人生", "A random life")}</span><span>↗</span>`, "entry primary")}${button("personal", `<span class="action-index">02</span><span>${t("用我的资料", "Use my profile")}</span><span>↗</span>`, "entry")}</div><div class="welcome-bottom"><span>${t("免登录 · 免安装", "No login · No installation")}</span>${button("load", t("载入开局", "Load a saved start"), "text-button")}<input type="file" id="load-file" accept=".json,application/json" hidden></div>${status()}</section><section class="hero-map">${mapSvg(null, 7, locale)}<div class="paper-note">${t("同一个世界<br>两条未走过的路", "One world<br>Two unwritten paths")}</div></section></main>`;
+  return `<main class="welcome"><section class="intro"><div class="eyebrow">${t("下一页，怎么过", "HOW WILL THE NEXT CHAPTER GO")}</div><h1>${t("把人生往后推。<br>这次，你来选。", "A life ahead.<br>Your turn to choose.")}</h1><div class="entry-actions">${button("random", t("随机人生 ↗", "A random life ↗"), "entry primary")}${button("personal", t("用我的资料 ↗", "Use my profile ↗"), "entry")}</div><div class="welcome-bottom"><span>${t("免登录 · 免安装", "No login · No installation")}</span>${button("load", t("载入这局人生", "Load a saved life"), "text-button")}<input id="load-file" type="file" accept=".json,application/json" hidden></div></section><section class="home-scene">${sceneSvg(initialState(sampleCard(0, locale), "home"), locale)}</section></main>`;
 }
 function importPage() {
-  return `<main class="import-page"><div class="eyebrow">01 / ${t("带来角色卡", "BRING YOUR CHARACTER")}</div><h1>${t("从你开始。", "Begin with you.")}</h1><div class="import-grid"><section class="panel"><span class="step-number">1</span><h2>${t("去常用的 AI", "Go to your AI")}</h2><div class="ai-list"><span>ChatGPT</span><span>Claude</span><span>Gemini</span></div>${button("copy-prompt", t("复制角色卡提示词", "Copy character prompt"), "primary")}<details id="prompt-details"><summary>${t("查看提示词", "View prompt")}</summary><textarea id="prompt" readonly aria-label="${t("角色卡提示词", "Character prompt")}">${e(cardPrompt(locale))}</textarea></details></section><section class="panel"><span class="step-number">2</span><h2>${t("把角色卡带回来", "Bring the card back")}</h2><label for="paste">${t("粘贴 AI 生成的 JSON", "Paste the JSON from your AI")}</label><textarea id="paste" placeholder="JSON">${e(pasted)}</textarea>${status()}${button("parse", t("检查角色卡 →", "Review character →"), "primary")}${button("manual", t("自己填写", "Fill in myself"), "text-button")}</section></div></main>`;
+  return `<main class="import-page"><h1>${t("从你开始。", "Begin with you.")}</h1><div class="import-grid"><section class="panel"><h2>ChatGPT / Claude / Gemini</h2>${button("copy-prompt", t("复制角色卡提示词", "Copy character prompt"), "primary")}<details><summary>${t("查看提示词", "View prompt")}</summary><textarea id="prompt" readonly>${e(cardPrompt(locale))}</textarea></details></section><section class="panel"><label for="paste">${t("粘贴角色卡 JSON", "Paste character JSON")}</label><textarea id="paste">${e(pasted)}</textarea>${button("parse", t("检查角色卡 →", "Review character →"), "primary")}${button("manual", t("自己填写", "Fill in myself"), "text-button")}</section></div></main>`;
 }
 function reviewPage() {
-  const attributeFields = dimensions
-    .map((key) => {
-      const score = card.attributes[key];
-      return `<div class="attribute-row"><label for="${key}">${pair(labels[key])}</label><select id="${key}" name="${key}">${option("", t("未知", "Unknown"), score.value === null ? "" : String(score.value))}${[1, 2, 3, 4, 5].map((value) => option(String(value), String(value), String(score.value))).join("")}</select><input name="source-${key}" aria-label="${pair(labels[key])}${t("依据", " source")}" value="${e(score.source)}" maxlength="160" placeholder="${t("依据 / 游戏设定", "Source / game setting")}"></div>`;
-    })
-    .join("");
-  return `<main class="review-page"><div class="eyebrow">02 / ${t("这一页，由你落笔", "SET YOUR STARTING POINT")}</div><h1>${t("带上现在的你。", "Bring who you are today.")}</h1><form id="review-form"><div class="review-grid"><section class="panel"><div class="section-heading"><h2>${t("角色卡", "Character card")}</h2><span class="tag">${t("游戏设定", "Game settings")}</span></div><div class="field-row"><label>${t("昵称", "Alias")}<input name="name" value="${e(card.name)}" maxlength="24"></label><label>${t("当前年龄", "Current age")}<input name="age" type="number" min="0" max="110" required value="${card.age ?? ""}"></label></div><label>${t("当前状态", "Current role")}<select name="role">${Object.entries(
+  return `<main class="review-page"><h1>${t("带上现在的你。", "Bring who you are today.")}</h1><form id="review-form"><section class="panel"><div class="field-row"><label>${t("昵称", "Alias")}<input name="name" value="${e(card.name)}" maxlength="24"></label><label>${t("年龄", "Age")}<input name="age" type="number" min="18" max="90" required value="${card.age ?? ""}"></label></div><div class="field-row"><label>${t("职业", "Role")}<select name="role">${Object.entries(
     roleLabels,
   )
-    .map(([value, label]) => option(value, pair(label), card.role))
+    .map(([k, v]) => option(k, pair(v), card.role))
+    .join("")}</select></label><label>${t("学历", "Education")}<select name="education">${Object.entries(
+    educationLabels,
+  )
+    .map(([k, v]) => option(k, pair(v), card.education))
+    .join("")}</select></label><label>${t("专业方向", "Specialty")}<select name="specialty">${Object.entries(
+    specialtyLabels,
+  )
+    .map(([k, v]) => option(k, pair(v), card.specialty))
     .join(
       "",
-    )}</select></label><label>${t("你想做的一件事", "Something you want to do")}<input name="project" maxlength="40" value="${e(card.project)}"></label><div class="attributes">${attributeFields}</div><details><summary>${t("规则与设定", "Rules and assumptions")}</summary><dl><dt>${t("未知项", "Unknown values")}</dt><dd>${t("界面保留未知；推演用中性档 3", "Remain unknown; simulation uses neutral level 3")}</dd><dt>${t("分值", "Scores")}</dt><dd>${t("1–5 的游戏设定", "Game settings from 1 to 5")}</dd><dt>${t("事件权重", "Event weights")}</dt><dd>${t("作者设定，非个人预测概率", "Authored assumptions, not personal probabilities")}</dd><dt>${t("资料", "Profile")}</dt><dd>${t("仅本页内存；关闭即清除", "In page memory; cleared on close")}</dd></dl></details></section><section class="choices-panel"><h2>${t("试着改变一件事", "Try one small change")}</h2><div class="choice-list">${Object.entries(
-    choices,
+    )}</select></label></div><label>${t("你想做的一件事", "Something you want to do")}<input name="project" maxlength="80" value="${e(card.project)}"></label><div class="attributes">${dimensions.map((k) => `<div class="attribute-row"><label for="${k}">${pair(labels[k])}</label><input id="${k}" name="${k}" type="number" min="0" max="100" placeholder="${t("未知", "Unknown")}" value="${card.attributes[k].value ?? ""}"><input name="source-${k}" value="${e(card.attributes[k].source)}" maxlength="160" aria-label="${pair(labels[k])} ${t("依据", "source")}" placeholder="${t("来源 / 游戏设定", "Source / game setting")}"></div>`).join("")}</div><details><summary>${t("开局设定", "Starting assumptions")}</summary><p>${t("未知属性保留未知，推演采用中性 50。模拟开局：现金 ¥26,000，存款 ¥64,000，无负债。", "Unknown attributes remain unknown; simulation uses neutral 50. Simulated start: ¥26,000 cash, ¥64,000 deposits, no debt.")}</p></details><button class="primary" type="submit">${t("开始这局人生 →", "Start this life →")}</button></section></form></main>`;
+}
+function identity(s: State) {
+  return `<aside class="identity panel"><div class="portrait" aria-hidden="true">${e(card.name.slice(0, 1) || "·")}</div><h2>${e(card.name || t("玩家", "Player"))}</h2><div class="identity-age">${s.age} ${t("岁", "years")}</div><div class="tag">${pair(roleLabels[s.role])}${s.abroad ? ` · ${t("海外", "Abroad")}` : ""}</div><div class="stat-list">${dimensions.map((k) => `<div><span>${pair(labels[k])}</span><b>${s.props[k]}</b><progress max="100" value="${s.props[k]}" aria-label="${pair(labels[k])}"></progress></div>`).join("")}</div><div class="networth"><span>${t("模拟净资产", "Simulated net assets")}</span><strong>${money(netWorth(s.assets))}</strong></div><details><summary>${t("开局资料", "Starting profile")}</summary>${dimensions.map((k) => `<p>${pair(labels[k])}：${card.attributes[k].value ?? t("未知", "Unknown")} ${e(card.attributes[k].source)}</p>`).join("")}</details></aside>`;
+}
+function story(st: Story) {
+  return `<article class="event ${st.kind}"><span class="event-dot"></span><p>${e(pair(st.text))}</p>${st.support ? `<div class="support">${st.support.map((s) => `<a href="${e(s.url)}" target="_blank" rel="noreferrer">${e(s.label)} ↗</a>`).join(" · ")}</div>` : ""}</article>`;
+}
+function controls() {
+  const finished = nextOffset() >= YEARS;
+  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}${button("restart", t("重玩同一开局", "Replay this start"), "text-button")}</div>${
+    finished
+      ? ""
+      : `<div class="focus-row"><span>${t("下一年重心", "Next year’s focus")}</span>${Object.entries(
+          focusLabels,
+        )
+          .map(
+            ([k, v]) =>
+              `<button type="button" data-focus="${k}" aria-pressed="${(config?.plans[nextOffset()]?.focus ?? state().focus) === k}">${pair(v)}</button>`,
+          )
+          .join("")}</div>`
+  }`;
+}
+function choicePanel() {
+  if (!pending()) return "";
+  const s = state();
+  const k = subchoice;
+  if (k === "business") {
+    const cost = yuan(
+      42000 * (1 + marketFor(config?.worldSeed ?? "", (config?.year ?? 2026) + nextOffset()).demand),
+    );
+    return `<section class="decision-panel"><div class="eyebrow">${t("创业 · 启动资金", "BUSINESS · FUNDING")}</div><h2>${t("先开起来，钱怎么来？", "How will you fund the start?")}</h2><div class="decision-options"><button data-funding="self" ${liquid(s.assets) < cost + yuan(12000) ? "disabled" : ""}>${t("自筹", "Self-fund")} · ${money(cost)}<small>${t("保留 ¥12,000 缓冲", "Keep ¥12,000 reserve")}</small></button><button data-funding="loan">${t("借款 ¥60,000", "Borrow ¥60,000")}<small>${t("模拟年利率 6.5%", "Simulated annual interest 6.5%")}</small></button></div>${button("choice-back", t("返回", "Back"), "text-button")}</section>`;
+  }
+  if (k === "invest")
+    return `<section class="decision-panel"><h2>${t("这笔钱放在哪里？", "Where will this money go?")}</h2><div class="decision-options"><button data-investment="bonds">${t("债券基金", "Bond fund")}</button><button data-investment="index">${t("股票指数", "Stock index")}</button><button data-investment="property" ${liquid(s.assets) < yuan(262000) ? "disabled" : ""}>${t("房产", "Property")}<small>¥250,000 + ¥12,000 ${t("缓冲", "reserve")}</small></button></div>${button("choice-back", t("返回", "Back"), "text-button")}</section>`;
+  if (k === "custom")
+    return `<section class="decision-panel"><h2>${e(card.project || t("你想做的一件事", "Something you want to do"))}</h2><div class="decision-options">${[
+      ["creative", t("创作 / 做作品", "Create something")],
+      ["learning", t("学一项技能", "Learn a skill")],
+      ["community", t("组织 / 连接他人", "Bring people together")],
+    ]
+      .map(([v, label]) => `<button data-custom="${v}">${label}</button>`)
+      .join(
+        "",
+      )}</div><div class="tag">${t("选择对应事件路线 · 无在线模型", "Choose an event route · No online model")}</div>${button("choice-back", t("返回", "Back"), "text-button")}</section>`;
+  const costs: Record<DecisionKind, string> = {
+    career: t("求职 ¥4,500 · 可能待业", "Search ¥4,500 · Job-gap risk"),
+    business: t("客户、回款与融资", "Customers, cash flow, financing"),
+    abroad: t("搬迁最高 ¥48,000", "Relocation up to ¥48,000"),
+    invest: t("流动资金的 40% · 有涨有跌", "40% of available cash · Gains or losses"),
+    study: t("学费 ¥28,000 · 暂停全职", "Tuition ¥28,000 · Leave full-time work"),
+    stay: t("维持安排 · 风险仍在", "Keep routines · Risks remain"),
+    custom: t("试作 ¥4,500", "An experiment · ¥4,500"),
+  };
+  return `<section class="decision-panel"><div class="eyebrow">${t("人生抉择", "A LIFE DECISION")} / ${s.age} → ${s.age + 1}</div><h2>${t("这一段，往哪里走？", "Where next?")}</h2><div class="decision-options">${Object.entries(
+    decisionLabels,
   )
+    .map(([key, label]) => {
+      const blocked = eligibility(s, key as DecisionKind);
+      return `<button type="button" data-decision="${key}"${blocked ? " disabled" : ""}>${pair(label)}<small>${blocked ? pair(blocked) : costs[key as DecisionKind]}</small></button>`;
+    })
+    .join("")}</div></section>`;
+}
+const entryLabels: Record<string, [string, string]> = {
+  salary: ["工资 / 生活收入", "Earned income"],
+  "business-income": ["经营收入", "Business income"],
+  "extra-income": ["额外收入", "Extra income"],
+  "tax-social": ["税与社保", "Tax & social"],
+  living: ["生活支出", "Living"],
+  interest: ["利息", "Interest"],
+  principal: ["归还本金（转账）", "Principal (transfer)"],
+  children: ["养育", "Children"],
+  "partner-support": ["伴侣支持", "Partner support"],
+  "investment-fees": ["投资费用", "Investment fees"],
+  unexpected: ["意外支出", "Unexpected costs"],
+  stocks: ["股票盈亏", "Stock return"],
+  bonds: ["债券盈亏", "Bond return"],
+  deposits: ["存款利息", "Deposit return"],
+  property: ["房产涨跌", "Property return"],
+  startup: ["创业启动", "Startup"],
+  "business-closure": ["停业损失", "Closure"],
+  tuition: ["学费", "Tuition"],
+  relocation: ["搬迁", "Relocation"],
+  moving: ["搬家", "Moving"],
+  "fraud-loss": ["诈骗损失", "Fraud loss"],
+  "career-cost": ["转职成本", "Career cost"],
+  "custom-project": ["自定义试作", "Custom experiment"],
+  training: ["职训", "Training"],
+  "job-search": ["定期求职", "Job search"],
+  rest: ["休整", "Rest"],
+  "sale-fees": ["出售费用", "Sale fees"],
+};
+function ledgerPanel(s: State) {
+  const row = run?.changed[selected - 1];
+  const groups = new Map<string, number>();
+  for (const en of row?.journal.entries ?? []) {
+    if (en.kind === "transfer") continue;
+    groups.set(en.label, (groups.get(en.label) ?? 0) + (en.kind === "expense" ? -en.amount : en.amount));
+  }
+  const gross =
+    row?.journal.entries.filter((e) => e.kind === "income").reduce((n, e) => n + e.amount, 0) ?? 0;
+  const costs =
+    row?.journal.entries.filter((e) => e.kind === "expense").reduce((n, e) => n + e.amount, 0) ?? 0;
+  const tax =
+    row?.journal.entries.filter((e) => e.label === "tax-social").reduce((n, e) => n + e.amount, 0) ?? 0;
+  const living =
+    row?.journal.entries
+      .filter((e) => e.label === "living" || e.label === "children")
+      .reduce((n, e) => n + e.amount, 0) ?? 0;
+  const ratios = gross
+    ? ([
+        ["税社保", "Tax & social", tax],
+        ["生活", "Living", living],
+        ["其他开支", "Other costs", costs - tax - living],
+        ["结余", "Saved income", gross - costs],
+      ] as const)
+    : [];
+  return `<aside class="finances panel"><div class="section-heading"><h2>${t("这一年的账", "This year’s money")}</h2><span class="tag">${t("模拟 RMB", "SIM RMB")}</span></div><dl class="balance">${[
+    ["cash", t("现金", "Cash")],
+    ["deposits", t("存款", "Deposits")],
+    ["bonds", t("债券", "Bonds")],
+    ["stocks", t("股票", "Stocks")],
+    ["property", t("房产", "Property")],
+    ["debt", t("负债", "Debt")],
+  ]
     .map(
-      ([value, label], index) =>
-        `<label class="choice"><input type="radio" name="choice" value="${value}"${choice === value ? " checked" : ""}><span class="choice-number">0${index + 1}</span><span>${pair(label)}</span></label>`,
+      ([key, label]) =>
+        `<div><dt>${label}</dt><dd>${money(s.assets[key as keyof Omit<State["assets"], "interestRate">])}</dd></div>`,
     )
     .join(
       "",
-    )}</div><h2>${t("故事的世界", "The world around you")}</h2><select name="world" aria-label="${t("故事的世界", "Story world")}">${option("everyday", t("日常世界", "Everyday world"), world)}${option("orbital", t("轨道来信 · 科幻", "Letters from orbit · Sci-fi"), world)}</select><details><summary>${t("同一开局", "Reproducible start")}</summary><label>${t("世界种子", "World seed")}<input name="worldSeed" maxlength="40" required value="${e(worldSeed)}"></label><label>${t("人生种子", "Life seed")}<input name="lifeSeed" maxlength="40" required value="${e(lifeSeed)}"></label></details>${status()}<button class="primary start" type="submit">${t("展开这十年 →", "Unfold ten years →")}</button></section></div></form></main>`;
+    )}<div><dt>${t("借款利率", "Debt rate")}</dt><dd>${(s.assets.interestRate * 100).toFixed(1)}%</dd></div></dl><details open><summary>${t("净资产变化", "Net asset movement")} ${row ? money(row.journal.closing - row.journal.opening) : ""}</summary><dl class="journal">${[...groups].map(([k, v]) => `<div><dt>${entryLabels[k] ? pair(entryLabels[k]) : e(k)}</dt><dd>${v > 0 ? "+" : ""}${money(v)}</dd></div>`).join("")}</dl></details><div class="principal-note">${t("归还本金 · 资产负债转账", "Principal · balance transfer")}: ${money(row?.journal.principalPaid ?? 0)}</div><details><summary>${t("收入去向 · 估算", "Income allocation · estimate")}</summary><dl>${ratios.map(([zh, en, value]) => `<div><dt>${t(zh, en)}</dt><dd>${Math.round((value / gross) * 100)}%</dd></div>`).join("")}</dl></details><details id="habits-panel"><summary>${t("长期习惯", "Long-term habits")}</summary><label class="check"><input id="habit-job" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).jobSearch ? "checked" : ""}>${t("每两年找一次转职", "Job search every two years")}</label><label class="check"><input id="habit-training" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).training ? "checked" : ""}>${t("每两年一次职训", "Training every two years")}</label><label>${t("每月定投 · RMB", "Monthly investment · RMB")}<select id="habit-invest">${[0, 500, 1000, 2000].map((n) => option(String(n), money(yuan(n)), String((config?.plans[nextOffset()]?.habits ?? state().habits).monthlyInvestment / 100))).join("")}</select></label>${s.habitsPending.length ? `<div class="tag">${t("等待资金或身份条件", "Waiting for funds or role")}: ${s.habitsPending.map((k) => (k === "training" ? t("职训", "Training") : k === "investment" ? t("定投", "Investment") : t("转职", "Search"))).join("、")}</div>` : ""}</details><div class="household"><b>${t("生活", "Life")}</b><span>${t({ rent: "租住", shared: "合租", owned: "自有住房", temporary: "临时住宿" }[s.housing], s.housing)}</span>${s.family.partner ? `<span>${t("伴侣", "Partner")}</span>` : ""}${s.family.children ? `<span>${t("孩子", "Children")} × ${s.family.children}</span>` : ""}${s.family.pet ? `<span>${t("宠物", "Pet")}</span>` : ""}</div></aside>`;
+}
+function conclusion() {
+  if (nextOffset() < YEARS || !run) return "";
+  const a = run.baseline.at(-1)?.state;
+  const b = state();
+  return `<section class="ending-card"><div class="eyebrow">${t("十二年之后", "TWELVE YEARS LATER")}</div><h2>${t("你走过的路，留下了这些变化。", "These choices left their marks.")}</h2><table><thead><tr><th></th><th>${t("照现在过", "As things are")}</th><th>${t("你的选择", "Your choices")}</th></tr></thead><tbody><tr><td>${t("模拟净资产", "Simulated net assets")}</td><td>${money(a ? netWorth(a.assets) : 0)}</td><td>${money(netWorth(b.assets))}</td></tr>${dimensions.map((k) => `<tr><td>${pair(labels[k])}</td><td>${a?.props[k]}</td><td>${b.props[k]}</td></tr>`).join("")}</tbody></table><div class="ending-actions">${button("again", t("再来一局 ↗", "Another life ↗"), "primary")}${button("save", t("导出这局人生 JSON", "Export this life JSON"))}${button("png", t("导出对照卡 PNG", "Export comparison PNG"))}</div></section>`;
 }
 function playPage() {
-  if (!run) return "";
-  const index = Math.max(0, selected - 1);
-  const a = run.baseline[index];
-  const b = run.changed[index];
-  const finished = revealed === 10;
-  const scores = (line: typeof a) =>
-    dimensions
-      .map(
-        (key) =>
-          `<span>${pair(labels[key])}<b>${card.attributes[key].value === null ? "?" : line.state.props[key].toFixed(1)}</b></span>`,
-      )
-      .join("");
-  const story = (line: typeof a, changed: boolean) =>
-    `<article class="story ${changed ? "changed" : ""}"><div class="story-heading"><span>${changed ? t("改变一件事", "One small change") : t("照现在过", "As things are")}</span><span class="story-stage">${line.state.props.STAGE}/5</span></div><p>${e(pair(line.text))}</p><div class="score-strip">${scores(line)}</div></article>`;
-  const control =
-    revealed === 5 && !checkpoint
-      ? `<section class="checkpoint"><span class="eyebrow">${t("第五年 · 停一停", "YEAR FIVE · A PAUSE")}</span><h2>${t("接下来，还为它留时间吗？", "Keep making room for it?")}</h2>${button("continue", t("继续这个节奏", "Keep this rhythm"), "primary")}${button("loosen", t("让它慢下来", "Ease the commitment"), "quiet")}</section>`
-      : finished
-        ? `<section class="ending"><span class="eyebrow">${t("十年，一页暂告段落", "TEN YEARS, ONE CHAPTER")}</span><h2>${t("接下来的一步，<br>留给现实中的你。", "The next step<br>is yours to take.")}</h2><div class="ending-actions">${button("export", t("保存分叉图 PNG ↓", "Save map as PNG ↓"), "primary")}${button("save", t("保存开局", "Save start"), "quiet")}</div>${button("replay", t("同一开局，再选一次 ↗", "Same start, another choice ↗"), "text-button")}</section>`
-        : `<div class="play-controls">${button("next", t("下一年 →", "Next year →"), "primary")}${button("skip", revealed < 5 ? t("看到第五年", "Go to year five") : t("看到十年后", "Go to the ending"), "quiet")}</div>`;
-  return `<main class="play-page"><div class="play-top"><div><div class="eyebrow">${world === "orbital" ? t("科幻推演", "SCI-FI SCENARIO") : t("日常世界 · 推演", "EVERYDAY WORLD · SIMULATION")}</div><h1>${finished ? t("两条路，都曾是可能。", "Both paths were possible.") : t("如果，往前走十年。", "What if you walked ten years?")}</h1></div><span class="year-counter">${revealed}<small> / 10</small></span></div><div class="play-grid"><section class="map-panel">${mapSvg(run, revealed, locale)}</section><section class="narrative">${revealed === 0 ? `<div class="opening"><span class="eyebrow">${t("从今天开始", "BEGIN TODAY")}</span><h2>${e(card.name || t("你", "You"))} · ${card.age}${t(" 岁", " years old")}</h2><p>${e(pair(choices[choice]))}</p></div>` : `<div class="year-heading"><span>${a.year}</span><span>${a.age}${t(" 岁", " years old")}</span></div><p class="world-event">${e(pair(a.world))}</p>${story(a, false)}${story(b, true)}`}${control}${status()}${revealed ? `<nav class="year-nav" aria-label="${t("已推演的年份", "Years explored")}">${Array.from({ length: revealed }, (_, i) => `<button type="button" data-year="${i + 1}"${selected === i + 1 ? ' aria-current="step"' : ""}>${i + 1}</button>`).join("")}</nav>` : ""}</section></div></main>`;
+  if (!run || !config) return "";
+  const s = shownState();
+  const row = run.changed[selected - 1];
+  return `<main class="game-shell">${identity(s)}<section class="game-main"><div class="scene-top"><span>${row?.year ?? config.year} · ${s.age} ${t("岁", "years")}</span><span>${row?.market.crisis ? t("市场冲击", "Market shock") : t("日子继续", "Life goes on")} · ${t("指数", "Index")} ${((row?.market.returns.stocks ?? 0) * 100).toFixed(1)}%</span></div><div class="life-scene">${sceneSvg(s, locale)}</div>${controls()}${choicePanel()}<section class="events-feed" aria-label="${t("年度事件", "Annual events")}">${row?.stories.map(story).join("") ?? ""}</section>${conclusion()}<nav class="year-nav" aria-label="${t("年份回顾", "Year review")}">${run.changed.map((r, i) => `<button type="button" data-year="${i + 1}" aria-current="${selected === i + 1 ? "true" : "false"}">${r.age}${r.decision ? " ◆" : ""}</button>`).join("")}</nav><details id="route-panel" class="route-review"><summary>${t("双线回顾", "Two paths")} · ${t("同一个世界", "One shared world")}</summary>${mapSvg(run, selected, locale)}<div class="baseline-story">${run.baseline[selected - 1]?.stories.map(story).join("") ?? ""}</div></details><details id="rules-panel" class="rules"><summary>${t("规则、参数与来源", "Rules, parameters & sources")}</summary><p>${t("人民币为游戏金额；初始资产统一设定。四属性未知用中性 50，原卡仍保留未知。行情均值、波动、税社保和事件概率是作者设定，不是个人预测。", "RMB amounts and starting balances are simulated. Unknown stats use neutral 50; the source card retains unknown. Return means, volatility, tax/social rates and event odds are authored game assumptions, not personal predictions.")}</p><p>${t("一般知识对投资行为只有弱关联；性格随机项独立。知识不改变市场回报。定投按每月末结算，年内用平滑路径复合到同一年度行情。", "General knowledge has a weak game association with investment behavior; temperament is independent. Knowledge never changes market returns. Recurring investments settle at each month-end on a smooth path compounding to the shared annual return.")}</p><ul>${(["deposits", "bonds", "stocks", "property"] as const).map((k) => `<li>${pair(entryLabels[k])}: μ ${(marketConfig[k].mean * 100).toFixed(1)}%, σ ${(marketConfig[k].volatility * 100).toFixed(1)}% · <a href="${marketConfig[k].reference}" target="_blank" rel="noreferrer">${t("机制参考", "Mechanism reference")}</a></li>`).join("")}</ul><code>${e(config.worldSeed)} / ${e(config.lifeSeed)}</code></details></section>${ledgerPanel(s)}</main>`;
 }
-function readReview() {
-  const form = document.querySelector<HTMLFormElement>("#review-form");
-  if (!form) return;
-  const data = new FormData(form);
-  const raw = {
-    ...card,
-    name: data.get("name"),
-    age: data.get("age") === "" ? null : Number(data.get("age")),
-    role: data.get("role"),
-    project: data.get("project"),
-    attributes: Object.fromEntries(
-      dimensions.map((key) => [
-        key,
-        { value: data.get(key) === "" ? null : Number(data.get(key)), source: data.get(`source-${key}`) },
-      ]),
-    ),
-  };
-  card = parseCard(JSON.stringify(raw));
-  choice = data.get("choice") as Choice;
-  world = data.get("world") as World;
-  worldSeed = String(data.get("worldSeed") || "").trim();
-  lifeSeed = String(data.get("lifeSeed") || "").trim();
+function report(reason: unknown) {
+  playing = false;
+  error = reason instanceof Error ? reason.message : String(reason);
+  render();
 }
 function click(id: string, fn: () => void | Promise<void>) {
   document.getElementById(id)?.addEventListener("click", () => {
-    Promise.resolve()
-      .then(fn)
-      .catch((reason) => {
-        error = reason instanceof Error ? reason.message : String(reason);
-        render();
-      });
+    Promise.resolve().then(fn).catch(report);
   });
 }
-function downloadStart() {
-  if (!run) return;
-  const blob = new Blob(
-    [JSON.stringify({ kind: "kaitu-simulation", version: 1, config: run.config }, null, 2)],
-    { type: "application/json" },
+function onAll(selector: string, fn: (el: HTMLElement) => void) {
+  for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+    el.addEventListener("click", () => {
+      try {
+        fn(el);
+      } catch (reason) {
+        report(reason);
+      }
+    });
+  }
+}
+function begin(c?: Config) {
+  clearTimeout(timer);
+  config = c ?? {
+    card: structuredClone(card),
+    worldSeed: seed(),
+    lifeSeed: seed(),
+    year: new Date().getUTCFullYear(),
+    decisions: {},
+    plans: {},
+  };
+  card = config.card;
+  run = { config, initial: initialState(card, config.lifeSeed), baseline: [], changed: [] };
+  page = "play";
+  playing = true;
+  error = "";
+  subchoice = null;
+  advance();
+  window.scrollTo(0, 0);
+}
+function randomStart() {
+  performance.mark("kaitu:random-input");
+  card = sampleCard(sampleIndex++, locale);
+  begin();
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      performance.measure("kaitu:random-to-paint", "kaitu:random-input");
+    }),
   );
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "kaitu-start.json";
-  link.click();
+}
+function advance(renderNow = true) {
+  if (!run || !config) return;
+  if (pending() || nextOffset() >= YEARS) {
+    playing = false;
+    if (renderNow) render();
+    return;
+  }
+  const i = nextOffset();
+  const b = step(run.baseline.at(-1)?.state ?? run.initial, config, i, true);
+  const c = step(state(), config, i);
+  run.baseline.push(b);
+  run.changed.push(c);
+  selected = nextOffset();
+  if (pending() || nextOffset() >= YEARS) playing = false;
+  if (renderNow) render();
+}
+function decide(d: Decision) {
+  if (!config) return;
+  performance.mark("kaitu:decision-input");
+  const i = nextOffset();
+  config.decisions[i] = d;
+  subchoice = null;
+  playing = true;
+  try {
+    advance();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        performance.measure("kaitu:decision-to-paint", "kaitu:decision-input");
+      }),
+    );
+  } catch (reason) {
+    delete config.decisions[i];
+    report(reason);
+  }
+}
+function updatePlan(patch: Partial<{ focus: Focus; habits: State["habits"] }>) {
+  if (!config || nextOffset() >= YEARS) return;
+  config.plans[nextOffset()] = {
+    ...(config.plans[nextOffset()] ?? { focus: state().focus, habits: structuredClone(state().habits) }),
+    ...patch,
+  };
+  render();
+}
+function save() {
+  if (!config) return;
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify({ kind: "kaitu-simulation", version: 2, config }, null, 2)], {
+      type: "application/json",
+    }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "kaitu-life.json";
+  a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function render() {
+  clearTimeout(timer);
+  if (!root) return;
+  const openPanels = [...document.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map(
+    (el) => el.id,
+  );
   document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
-  root.innerHTML = `${header() + (page === "home" ? home() : page === "import" ? importPage() : page === "review" ? reviewPage() : playPage())}<footer><span>KAITU © 2026</span><span>${t("这是推演，不是预测", "A simulation, not a prediction")}</span><a href="./vendor/remake/LICENSE" target="_blank" rel="noreferrer">Remake · MIT</a></footer>`;
+  root.innerHTML = `${
+    header() +
+    (error ? `<div class="error" role="alert">${e(error)}</div>` : "") +
+    (page === "home"
+      ? home()
+      : page === "import"
+        ? importPage()
+        : page === "review"
+          ? reviewPage()
+          : playPage())
+  }<footer><span>KAITU · ${t("推演", "SIMULATION")}</span><a href="./vendor/remake/LICENSE" target="_blank" rel="noreferrer">Remake · MIT</a></footer>`;
+  for (const id of openPanels) {
+    const panel = document.getElementById(id);
+    if (panel instanceof HTMLDetailsElement) panel.open = true;
+  }
   click("home", () => {
+    playing = false;
     page = "home";
     error = "";
     render();
   });
   click("language", () => {
-    readReview();
+    const form = document.getElementById("review-form");
+    if (form instanceof HTMLFormElement) {
+      const d = new FormData(form);
+      card = parseCard(
+        JSON.stringify({
+          ...card,
+          name: d.get("name"),
+          age: d.get("age") === "" ? null : Number(d.get("age")),
+          role: d.get("role"),
+          education: d.get("education"),
+          specialty: d.get("specialty"),
+          project: d.get("project"),
+          attributes: Object.fromEntries(
+            dimensions.map((k) => [
+              k,
+              { value: d.get(k) === "" ? null : Number(d.get(k)), source: d.get(`source-${k}`) },
+            ]),
+          ),
+        }),
+      );
+    }
     pasted = document.querySelector<HTMLTextAreaElement>("#paste")?.value ?? pasted;
     locale = locale === "zh" ? "en" : "zh";
     render();
   });
-  click("random", () => {
-    card = sampleCard(sampleIndex++, locale);
-    worldSeed = seed();
-    lifeSeed = seed();
-    page = "review";
-    error = "";
-    render();
-  });
+  click("random", randomStart);
+  click("again", randomStart);
   click("personal", () => {
     page = "import";
     error = "";
@@ -178,115 +403,135 @@ function render() {
   click("manual", () => {
     card = blankCard();
     page = "review";
-    error = "";
     render();
   });
-  document.querySelector("#paste")?.addEventListener("input", (event) => {
-    pasted = (event.target as HTMLTextAreaElement).value;
+  click("copy-prompt", async () => {
+    await navigator.clipboard.writeText(cardPrompt(locale));
+    const b = document.getElementById("copy-prompt");
+    if (b) b.textContent = t("已复制", "Copied");
   });
   click("parse", () => {
+    pasted = document.querySelector<HTMLTextAreaElement>("#paste")?.value ?? pasted;
     card = parseCard(pasted);
     page = "review";
     error = "";
     render();
   });
-  click("copy-prompt", async () => {
-    try {
-      await navigator.clipboard.writeText(cardPrompt(locale));
-      required<HTMLButtonElement>("#copy-prompt").textContent = t("已复制 ✓", "Copied ✓");
-    } catch {
-      const details = required<HTMLDetailsElement>("#prompt-details");
-      details.open = true;
-      document.querySelector<HTMLTextAreaElement>("#prompt")?.select();
-    }
-  });
-  document.querySelector("#review-form")?.addEventListener("submit", (event) => {
+  document.getElementById("review-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     try {
-      readReview();
-      if (!worldSeed || !lifeSeed) throw new Error(t("请填写两个种子", "Enter both seeds"));
-      run = simulate({ card, choice, world, worldSeed, lifeSeed, year: new Date().getUTCFullYear() });
-      revealed = 0;
-      selected = 0;
-      checkpoint = false;
-      page = "play";
-      error = "";
-      render();
-      window.scrollTo(0, 0);
+      const d = new FormData(event.target as HTMLFormElement);
+      card = parseCard(
+        JSON.stringify({
+          version: 2,
+          name: d.get("name"),
+          age: Number(d.get("age")),
+          role: d.get("role"),
+          education: d.get("education"),
+          specialty: d.get("specialty"),
+          project: d.get("project"),
+          attributes: Object.fromEntries(
+            dimensions.map((k) => [
+              k,
+              { value: d.get(k) === "" ? null : Number(d.get(k)), source: d.get(`source-${k}`) },
+            ]),
+          ),
+        }),
+      );
+      begin();
     } catch (reason) {
-      error = reason instanceof Error ? reason.message : String(reason);
-      render();
+      report(reason);
     }
   });
-  const reveal = (n: number) => {
-    revealed = n;
-    selected = n;
-    error = "";
-    render();
-  };
-  click("next", () => reveal(Math.min(10, revealed + 1)));
-  click("skip", () => reveal(revealed < 5 ? 5 : 10));
-  for (const id of ["continue", "loosen"])
-    click(id, () => {
-      if (!run) return;
-      checkpoint = true;
-      run = simulate({ ...run.config, secondHalf: id === "continue" });
-      selected = 5;
-      render();
-    });
-  click("replay", () => {
-    page = "review";
-    error = "";
-    render();
-    window.scrollTo(0, 0);
+  for (const id of ["pause", "skip"]) {
+    const control = document.getElementById(id);
+    if (control instanceof HTMLButtonElement) control.disabled = pending() || nextOffset() >= YEARS;
+  }
+  click("pause", () => {
+    if (pending() || nextOffset() >= YEARS) return;
+    playing = !playing;
+    selected = nextOffset();
+    if (playing) advance();
+    else render();
   });
-  click("export", async () => {
-    await exportPng(mapSvg(run, 10, locale, true));
-    required<HTMLButtonElement>("#export").textContent = t("已导出 PNG ✓", "PNG exported ✓");
+  click("skip", () => {
+    playing = false;
+    while (!pending() && nextOffset() < YEARS) advance(false);
+    render();
   });
-  click("save", downloadStart);
-  for (const btn of document.querySelectorAll<HTMLButtonElement>("[data-year]"))
-    btn.addEventListener("click", () => {
-      selected = Number(btn.dataset.year);
+  click("restart", () => {
+    if (config) begin({ ...structuredClone(config), decisions: {}, plans: {} });
+  });
+  onAll("[data-speed]", (el) => {
+    speed = Number(el.dataset.speed);
+    render();
+  });
+  onAll("[data-focus]", (el) => updatePlan({ focus: el.dataset.focus as Focus }));
+  onAll("[data-year]", (el) => {
+    selected = Number(el.dataset.year);
+    playing = false;
+    render();
+  });
+  onAll("[data-decision]", (el) => {
+    const kind = el.dataset.decision as DecisionKind;
+    if (["business", "invest", "custom"].includes(kind)) {
+      subchoice = kind;
       render();
+    } else decide({ kind });
+  });
+  onAll("[data-funding]", (el) =>
+    decide({ kind: "business", funding: el.dataset.funding as Decision["funding"] }),
+  );
+  onAll("[data-investment]", (el) =>
+    decide({ kind: "invest", investment: el.dataset.investment as Decision["investment"] }),
+  );
+  onAll("[data-custom]", (el) => decide({ kind: "custom", custom: el.dataset.custom as Decision["custom"] }));
+  click("choice-back", () => {
+    subchoice = null;
+    render();
+  });
+  for (const id of ["habit-job", "habit-training", "habit-invest"])
+    document.getElementById(id)?.addEventListener("change", () => {
+      const h = { ...(config?.plans[nextOffset()]?.habits ?? state().habits) };
+      if (id === "habit-job") h.jobSearch = (document.getElementById(id) as HTMLInputElement).checked;
+      if (id === "habit-training") h.training = (document.getElementById(id) as HTMLInputElement).checked;
+      if (id === "habit-invest")
+        h.monthlyInvestment = yuan(Number((document.getElementById(id) as HTMLSelectElement).value));
+      updatePlan({ habits: h });
     });
+  click("save", save);
+  click("png", () => exportPng(mapSvg(run, nextOffset(), locale, true)));
   click("load", () => document.getElementById("load-file")?.click());
-  document.querySelector("#load-file")?.addEventListener("change", async (event) => {
+  document.getElementById("load-file")?.addEventListener("change", async (event) => {
     try {
-      const file = (event.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      if (file.size > 20000) throw new Error(t("开局文件超过 20 KB", "Saved start exceeds 20 KB"));
-      const saved = JSON.parse(await file.text());
-      const c = saved.config;
-      if (
-        saved.kind !== "kaitu-simulation" ||
-        saved.version !== 1 ||
-        !c ||
-        !Object.hasOwn(choices, c.choice) ||
-        !["everyday", "orbital"].includes(c.world) ||
-        !Number.isInteger(c.year) ||
-        c.year < 1900 ||
-        c.year > 2200 ||
-        [c.worldSeed, c.lifeSeed].some((s) => typeof s !== "string" || !s.trim() || s.length > 40) ||
-        (c.secondHalf !== undefined && typeof c.secondHalf !== "boolean")
-      )
-        throw new Error(t("无法读取这个开局文件", "This saved start is invalid"));
-      card = parseCard(JSON.stringify(c.card));
-      choice = c.choice;
-      world = c.world;
-      worldSeed = c.worldSeed;
-      lifeSeed = c.lifeSeed;
-      run = simulate({ card, choice, world, worldSeed, lifeSeed, year: c.year, secondHalf: c.secondHalf });
+      const f = (event.target as HTMLInputElement).files?.[0];
+      if (!f) return;
+      if (f.size > 100000) throw new Error("存档过长 / Save too large");
+      config = parseSave(await f.text());
+      run = simulate(config);
+      card = config.card;
+      selected = YEARS;
       page = "play";
-      revealed = 10;
-      selected = 10;
-      checkpoint = true;
+      playing = false;
       error = "";
       render();
     } catch (reason) {
-      error = reason instanceof Error ? reason.message : String(reason);
-      render();
+      report(reason);
     }
   });
+  if (page === "play" && playing && !pending() && nextOffset() < YEARS)
+    timer = setTimeout(() => {
+      try {
+        advance();
+      } catch (reason) {
+        report(reason);
+      }
+    }, 1200 / speed);
 }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && playing) {
+    playing = false;
+    render();
+  }
+});
 render();
