@@ -57,7 +57,7 @@ test("native modes remain explicit and resolved approvals share collapsed steps"
     await act(async () => {
       root.root
         .findAllByType("button")
-        .find((x) => x.props["aria-haspopup"] === "dialog")
+        .find((x) => x.props["aria-label"] === "选择模型")
         ?.props.onClick();
     });
     expect(root.root.findAllByType("button").some((x) => x.children.includes("Auto · 自动审查"))).toBe(true);

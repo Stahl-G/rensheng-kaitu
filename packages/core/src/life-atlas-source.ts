@@ -189,13 +189,36 @@ export function atlasSource(ws: Workspace): AtlasSource {
       return [];
     }
   }
+  const isActualWorkout = (row: StoredRecord) =>
+    !row.review &&
+    (row.by === "user" || row.by === "import:apple-health") &&
+    typeof row.ts === "string" &&
+    Number.isFinite(Date.parse(row.ts));
   for (const ref of listRecordTypes(ws).filter((r) => modules.some((m) => m.dir === r.module.dir))) {
     const historical = ref.type === "experience";
     if (!historical && ["me", "explore"].includes(ref.module.def.id)) continue;
     const id = historical ? "experience" : ref.module.def.id === "jobs" ? "work" : ref.module.def.id;
     const title = historical ? "来路" : id === "work" ? "工作与求职" : ref.module.def.name;
     add(id, title);
-    for (const row of records(ref).slice(historical ? -100 : -5)) {
+    const all = records(ref);
+    const selected = all.slice(historical ? -100 : -5);
+    // Preserve actual history beyond the short presentation list. A future-dated row
+    // must not displace the latest completed workout used for the activity light.
+    if (ref.type === "workout") {
+      const verified = all
+        .filter(isActualWorkout)
+        .sort((a, b) => Date.parse(String(a.ts)) - Date.parse(String(b.ts)));
+      const latestCompleted = verified.findLast((row) => Date.parse(String(row.ts)) <= Date.now());
+      for (const row of [verified[0], latestCompleted, verified.at(-1)])
+        if (row && !selected.some((item) => item.id === row.id)) selected.unshift(row);
+    }
+    if (historical) {
+      const confirmed = all.find(
+        (row) => !row.review && ["observed", "user_reported"].includes(String(row.fact_status)),
+      );
+      if (confirmed && !selected.some((row) => row.id === confirmed.id)) selected.unshift(confirmed);
+    }
+    for (const row of selected) {
       const factTitle =
         typeof row.title === "string"
           ? row.title
@@ -208,6 +231,9 @@ export function atlasSource(ws: Workspace): AtlasSource {
         kind: historical ? "experience" : "context",
         status: row.review ? "needs_review" : historical ? String(row.fact_status ?? "unknown") : "recorded",
         source: recordFilePattern(ref).dir,
+        // A recorded workout's ts is the event start, including Apple Health imports.
+        // Other record timestamps or STATUS updates do not prove actual activity.
+        ...(ref.type === "workout" && isActualWorkout(row) ? { actualActivityAt: row.ts } : {}),
         updated: historical
           ? typeof row.start === "string" && row.time_precision !== "unknown"
             ? row.start

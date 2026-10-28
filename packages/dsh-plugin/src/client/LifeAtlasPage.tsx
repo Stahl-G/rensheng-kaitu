@@ -1,6 +1,6 @@
 import { PARAMETER_PORTS, STYLE_PORTS, settings } from "@kaitu/cartographer/settings";
 import type { AtlasAction, AtlasGenerateInput, LifeAtlasState, MapSettings } from "@kaitu/core";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import css from "./LifeAtlasPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 
@@ -30,6 +30,10 @@ const parameterNames = {
   plates: "Tectonic plates",
 };
 const colors = ["#7d8f65", "#ad885a", "#8b9a88", "#b3966d", "#8a9c9f", "#b08a80"];
+/** Keep the map's available height stable when its scroll container moves. */
+export function mapAvailableHeight(viewportHeight: number, mapTop: number, scrollTop: number): number {
+  return Math.max(200, viewportHeight - (mapTop + scrollTop) - 16);
+}
 /** Fits long Chinese/Latin labels into two lines; full names remain in accessible region controls. */
 export function atlasLabel(title: string): string[] {
   const lines: string[] = [];
@@ -61,6 +65,9 @@ export function LifeAtlasPage({
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [history, setHistory] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [mapHeight, setMapHeight] = useState(400);
+  const mapFrame = useRef<HTMLDivElement>(null);
   const [deleting, setDeleting] = useState<string>();
   const [config, setConfig] = useState<MapSettings>(() => settings());
   const [selected, setSelected] = useState<string[]>([]);
@@ -139,12 +146,46 @@ export function LifeAtlasPage({
       clearInterval(timer);
     };
   }, [state?.loading, state?.running, refresh, loadLifeAtlasProgress]);
-  // Freshness changes with time even when no record is uploaded.
+  // Recheck only when an active light expires; opening the map also reads current data.
   useEffect(() => {
-    const timer = setInterval(refresh, 60_000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+    const deadlines = (state?.domains ?? [])
+      .filter((domain) => domain.score.glow)
+      .flatMap((domain) => domain.facts.map((fact) => Date.parse(fact.actualActivityAt ?? "")))
+      .filter((time) => Number.isFinite(time) && time <= Date.now() && time + 7 * 86400000 > Date.now())
+      .map((time) => time + 7 * 86400000);
+    if (!deadlines.length) return;
+    const timer = setTimeout(refresh, Math.max(0, Math.min(...deadlines) - Date.now()) + 50);
+    return () => clearTimeout(timer);
+  }, [state?.domains, refresh]);
   const resource = state?.resource;
+  useEffect(() => {
+    if (!resource || typeof window === "undefined") return;
+    const measure = () => {
+      const map = mapFrame.current;
+      if (!map) return;
+      let root = map.parentElement;
+      while (root && !/(auto|scroll)/.test(window.getComputedStyle(root).overflowY))
+        root = root.parentElement;
+      if (root) {
+        const top = map.getBoundingClientRect().top - root.getBoundingClientRect().top - root.clientTop;
+        setMapHeight(mapAvailableHeight(root.clientHeight, top, root.scrollTop));
+      } else {
+        const scrolling = document.scrollingElement;
+        setMapHeight(
+          mapAvailableHeight(window.innerHeight, map.getBoundingClientRect().top, scrolling?.scrollTop ?? 0),
+        );
+      }
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const section = mapFrame.current?.closest("section");
+    if (section) observer?.observe(section);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [resource]);
   const nativeSvg = resource?.svg;
   const image = useMemo(
     () => (nativeSvg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(nativeSvg)}` : ""),
@@ -202,6 +243,151 @@ export function LifeAtlasPage({
     setHover(null);
     if (id) regionElements.current.get(id)?.focus();
   };
+  const settingsPanel = (
+    <div className={`${css.settings} ${resource ? css.sidebar : ""}`}>
+      <fieldset disabled={state?.running || state?.loading}>
+        <legend>
+          {t("选择入图的模块", "Choose areas to map")} · {selected.length}/12
+        </legend>
+        <p>{t("前两个区域靠近中心。", "The first two areas sit near the center.")}</p>
+        <div className={css.modules}>
+          {state?.modules.map((m) => (
+            <label key={m.id}>
+              <input
+                type="checkbox"
+                checked={selected.includes(m.id)}
+                disabled={selected.length >= 12 && !selected.includes(m.id)}
+                onChange={(event) =>
+                  setSelected((ids) =>
+                    event.target.checked ? [...ids, m.id] : ids.filter((id) => id !== m.id),
+                  )
+                }
+              />
+              <span>
+                {m.title}
+                <small>
+                  {m.available ? t("已有资料", "Records available") : t("资料待补充", "No details yet")}
+                </small>
+              </span>
+            </label>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <ol className={css.order}>
+            {selected.map((id, i) => (
+              <li key={id}>
+                <span>{state?.modules.find((m) => m.id === id)?.title ?? id}</span>
+                <button
+                  type="button"
+                  disabled={i === 0 || (!!current && keepTerrain)}
+                  aria-label={t(
+                    `将 ${state?.modules.find((m) => m.id === id)?.title ?? id} 提前`,
+                    `Move ${id} earlier`,
+                  )}
+                  onClick={() =>
+                    setSelected((ids) => {
+                      const next = [...ids];
+                      [next[i - 1], next[i]] = [next[i] as string, next[i - 1] as string];
+                      return next;
+                    })
+                  }
+                >
+                  ↑
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+        {!state?.modules.length && !state?.loading && (
+          <p>
+            {t(
+              "还没有可入图的模块。先在「全部模块」或资料里选择关注的领域。",
+              "No areas are available yet. Choose your interests in All modules or add records first.",
+            )}
+          </p>
+        )}
+      </fieldset>
+      <fieldset disabled={state?.running}>
+        <legend>{t("地图样式", "Map style")}</legend>
+        <label>
+          {t("风格", "Style")}
+          <select
+            value={config.style}
+            onChange={(event) => setConfig({ ...config, style: event.target.value as MapSettings["style"] })}
+          >
+            {STYLE_PORTS.map((style) => (
+              <option key={style} value={style}>
+                {t(...(styleNames[style] ?? [style, style]))}
+              </option>
+            ))}
+          </select>
+        </label>
+        {current && (
+          <label className={css.check}>
+            <input
+              type="checkbox"
+              checked={keepTerrain}
+              onChange={(event) => {
+                setKeepTerrain(event.target.checked);
+                if (event.target.checked && current)
+                  setConfig({ ...config, terrain: current.settings.terrain });
+              }}
+            />
+            {t("保留当前地形与区域位置", "Keep current terrain and region positions")}
+          </label>
+        )}
+        <div className={css.parameters}>
+          {Object.entries(PARAMETER_PORTS).map(([key, spec]) => (
+            <label key={key}>
+              {t(spec.label, parameterNames[key as keyof typeof parameterNames])}
+              <output>
+                {config.terrain[key as keyof MapSettings["terrain"]].toFixed("integer" in spec ? 0 : 2)}
+              </output>
+              <input
+                aria-label={t(spec.label, parameterNames[key as keyof typeof parameterNames])}
+                type="range"
+                min={spec.min}
+                max={spec.max}
+                step={"integer" in spec ? 1 : 0.01}
+                disabled={!!current && keepTerrain}
+                value={config.terrain[key as keyof MapSettings["terrain"]]}
+                onChange={(event) =>
+                  setConfig({
+                    ...config,
+                    terrain: { ...config.terrain, [key]: Number(event.target.value) },
+                  })
+                }
+              />
+            </label>
+          ))}
+        </div>
+        <label>
+          {t("地形纹理", "Terrain detail")}
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step=".05"
+            value={config.glyphDensity}
+            onChange={(event) => setConfig({ ...config, glyphDensity: Number(event.target.value) })}
+          />
+        </label>
+        <button
+          type="button"
+          className={css.primary}
+          disabled={state?.running || state?.loading || !selected.length || selected.length > 12}
+          onClick={() => void start()}
+        >
+          {state?.running
+            ? t("正在生成…", "Generating…")
+            : current
+              ? t("生成新方案并保存", "Generate and save a candidate")
+              : t("生成我的地图", "Generate my map")}
+        </button>
+        <small>{t("每次生成都会存档。", "Every candidate is saved.")}</small>
+      </fieldset>
+    </div>
+  );
   if (!state && !error) return <output>{t("正在读取地图…", "Opening your map…")}</output>;
   return (
     <section className={css.page} aria-label={t("人生地图", "Life map")}>
@@ -241,153 +427,7 @@ export function LifeAtlasPage({
           </button>
         </p>
       )}
-      {(!resource || expanded) && (
-        <div className={css.settings}>
-          <fieldset disabled={state?.running || state?.loading}>
-            <legend>
-              {t("选择入图的模块", "Choose areas to map")} · {selected.length}/12
-            </legend>
-            <p>{t("前两个区域靠近中心。", "The first two areas sit near the center.")}</p>
-            <div className={css.modules}>
-              {state?.modules.map((m) => (
-                <label key={m.id}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(m.id)}
-                    disabled={selected.length >= 12 && !selected.includes(m.id)}
-                    onChange={(event) =>
-                      setSelected((ids) =>
-                        event.target.checked ? [...ids, m.id] : ids.filter((id) => id !== m.id),
-                      )
-                    }
-                  />
-                  <span>
-                    {m.title}
-                    <small>
-                      {m.available ? t("已有资料", "Records available") : t("资料待补充", "No details yet")}
-                    </small>
-                  </span>
-                </label>
-              ))}
-            </div>
-            {selected.length > 0 && (
-              <ol className={css.order}>
-                {selected.map((id, i) => (
-                  <li key={id}>
-                    <span>{state?.modules.find((m) => m.id === id)?.title ?? id}</span>
-                    <button
-                      type="button"
-                      disabled={i === 0 || (!!current && keepTerrain)}
-                      aria-label={t(
-                        `将 ${state?.modules.find((m) => m.id === id)?.title ?? id} 提前`,
-                        `Move ${id} earlier`,
-                      )}
-                      onClick={() =>
-                        setSelected((ids) => {
-                          const next = [...ids];
-                          [next[i - 1], next[i]] = [next[i] as string, next[i - 1] as string];
-                          return next;
-                        })
-                      }
-                    >
-                      ↑
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {!state?.modules.length && !state?.loading && (
-              <p>
-                {t(
-                  "还没有可入图的模块。先在「全部模块」或资料里选择关注的领域。",
-                  "No areas are available yet. Choose your interests in All modules or add records first.",
-                )}
-              </p>
-            )}
-          </fieldset>
-          <fieldset disabled={state?.running}>
-            <legend>{t("地图样式", "Map style")}</legend>
-            <label>
-              {t("风格", "Style")}
-              <select
-                value={config.style}
-                onChange={(event) =>
-                  setConfig({ ...config, style: event.target.value as MapSettings["style"] })
-                }
-              >
-                {STYLE_PORTS.map((style) => (
-                  <option key={style} value={style}>
-                    {t(...(styleNames[style] ?? [style, style]))}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {current && (
-              <label className={css.check}>
-                <input
-                  type="checkbox"
-                  checked={keepTerrain}
-                  onChange={(event) => {
-                    setKeepTerrain(event.target.checked);
-                    if (event.target.checked && current)
-                      setConfig({ ...config, terrain: current.settings.terrain });
-                  }}
-                />
-                {t("保留当前地形与区域位置", "Keep current terrain and region positions")}
-              </label>
-            )}
-            <div className={css.parameters}>
-              {Object.entries(PARAMETER_PORTS).map(([key, spec]) => (
-                <label key={key}>
-                  {t(spec.label, parameterNames[key as keyof typeof parameterNames])}
-                  <output>
-                    {config.terrain[key as keyof MapSettings["terrain"]].toFixed("integer" in spec ? 0 : 2)}
-                  </output>
-                  <input
-                    aria-label={t(spec.label, parameterNames[key as keyof typeof parameterNames])}
-                    type="range"
-                    min={spec.min}
-                    max={spec.max}
-                    step={"integer" in spec ? 1 : 0.01}
-                    disabled={!!current && keepTerrain}
-                    value={config.terrain[key as keyof MapSettings["terrain"]]}
-                    onChange={(event) =>
-                      setConfig({
-                        ...config,
-                        terrain: { ...config.terrain, [key]: Number(event.target.value) },
-                      })
-                    }
-                  />
-                </label>
-              ))}
-            </div>
-            <label>
-              {t("地形纹理", "Terrain detail")}
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step=".05"
-                value={config.glyphDensity}
-                onChange={(event) => setConfig({ ...config, glyphDensity: Number(event.target.value) })}
-              />
-            </label>
-            <button
-              type="button"
-              className={css.primary}
-              disabled={state?.running || state?.loading || !selected.length || selected.length > 12}
-              onClick={() => void start()}
-            >
-              {state?.running
-                ? t("正在生成…", "Generating…")
-                : current
-                  ? t("生成新方案并保存", "Generate and save a candidate")
-                  : t("生成我的地图", "Generate my map")}
-            </button>
-            <small>{t("每次生成都会存档。", "Every candidate is saved.")}</small>
-          </fieldset>
-        </div>
-      )}
+      {!resource && settingsPanel}
       {(state?.loading || state?.running) && (
         <output className={css.status}>
           {state.running
@@ -408,202 +448,208 @@ export function LifeAtlasPage({
         </div>
       )}
       {resource && (
-        <div className={css.mapLayout}>
-          <div className={css.map}>
-            <svg
-              viewBox={`0 0 ${resource.width} ${resource.height}`}
-              aria-label={t("人生地图区域", "Life map regions")}
-              className={css.canvas}
+        <div className={css.workspace} style={{ "--map-height": `${mapHeight}px` } as CSSProperties}>
+          <div className={css.mapLayout}>
+            <div
+              className={css.map}
+              ref={mapFrame}
+              style={{ maxWidth: (mapHeight * resource.width) / resource.height }}
             >
-              <title>
-                {t(
-                  "人生地图：用 Tab 选择区域，回车查看，Esc 关闭",
-                  "Life map: Tab to a region, Enter to open, Escape to close",
-                )}
-              </title>
-              <image href={image} width={resource.width} height={resource.height} />
-              <g transform={`translate(${resource.margin} ${resource.margin})`}>
-                {resource.regions.provinces.map((p) => (
-                  <path
-                    key={p.slot}
-                    d={p.path}
-                    fill="#efe5ca"
-                    fillOpacity={
-                      0.78 * (1 - (state?.domains.find((d) => d.slot === p.slot)?.score.clarity ?? 0.12))
-                    }
-                    fillRule="evenodd"
-                    pointerEvents="none"
-                  />
-                ))}
-                <path
-                  d={resource.regions.borders}
-                  fill="none"
-                  stroke="#8b7758"
-                  strokeWidth=".9"
-                  opacity=".24"
-                  pointerEvents="none"
-                />
-                {state?.domains.map((d) => {
-                  const p = resource.regions.provinces[d.slot];
-                  if (!p) return null;
-                  return (
-                    <path
-                      key={d.id}
-                      ref={(node) => {
-                        if (node) regionElements.current.set(d.id, node);
-                        else regionElements.current.delete(d.id);
-                      }}
-                      className={css.province}
-                      d={p.path}
-                      fill={colors[d.slot % colors.length]}
-                      fillOpacity=".13"
-                      fillRule="evenodd"
-                      stroke="#86724f"
-                      strokeWidth="1.1"
-                      strokeOpacity=".55"
-                      // biome-ignore lint/a11y/useSemanticElements: SVG paths implement keyboard and focus behavior for province buttons.
-                      role="button"
-                      tabIndex={0}
-                      aria-label={d.title}
-                      aria-pressed={pinned === d.id}
-                      onMouseEnter={() => setHover(d.id)}
-                      onMouseLeave={() => setHover(null)}
-                      onFocus={() => setHover(d.id)}
-                      onBlur={() => setHover(null)}
-                      onClick={() => setPinned(pinned === d.id ? null : d.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setPinned(d.id);
-                        }
-                        if (event.key === "Escape") {
-                          setPinned(null);
-                          setHover(null);
-                        }
-                      }}
-                    >
-                      <title>{d.title}</title>
-                    </path>
-                  );
-                })}
-                {state?.domains.map((d) => {
-                  const p = resource.regions.provinces[d.slot];
-                  if (!p) return null;
-                  const lines = atlasLabel(d.title);
-                  return (
-                    <g key={d.id} pointerEvents="none">
-                      <path d={`M${p.x} ${p.y - 32 - (lines.length - 1) * 28}l4 5-4 5-4-5Z`} fill="#826b44" />
-                      {lines.map((line, i) => (
-                        <text
-                          key={`${i}-${line}`}
-                          x={p.x}
-                          y={p.y - 5 - (lines.length - 1 - i) * 28}
-                          textAnchor="middle"
-                          fontFamily="Songti SC, SimSun, Microsoft YaHei, Noto Serif CJK SC, serif"
-                          fontSize="26"
-                          fontWeight="600"
-                          fill={resource.settings.style === "teyvat" ? "#fbf7e8" : "#493a29"}
-                          stroke={resource.settings.style === "teyvat" ? "#244840" : "#efe2bf"}
-                          strokeWidth="4"
-                          paintOrder="stroke"
-                        >
-                          {line}
-                        </text>
-                      ))}
-                    </g>
-                  );
-                })}
-                <g
-                  transform={`translate(${resource.compass.cx} ${resource.compass.cy})`}
-                  pointerEvents="none"
+              <div className={css.mapViewport}>
+                <svg
+                  viewBox={`0 0 ${resource.width} ${resource.height}`}
+                  aria-label={t("人生地图区域", "Life map regions")}
+                  className={css.canvas}
+                  style={{
+                    width: `min(${zoom * 100}%, ${(mapHeight * zoom * resource.width) / resource.height}px)`,
+                  }}
                 >
-                  <circle r="34" fill="none" stroke="#b2a480" strokeWidth="3.5" />
-                  <circle
-                    r="34"
-                    fill="none"
-                    stroke="#6f8056"
-                    strokeWidth="4.5"
-                    strokeDasharray={2 * Math.PI * 34}
-                    strokeDashoffset={2 * Math.PI * 34 * (1 - (state?.coverage ?? 0))}
-                    transform="rotate(-90)"
-                  />
-                  <circle r="21" fill="#eadbb6" />
-                  <text textAnchor="middle" y="5" fontSize="14" fill="#4f593e">
-                    {state?.coverage === null ? "—" : `${Math.round((state?.coverage ?? 0) * 100)}%`}
-                  </text>
-                  <text textAnchor="middle" y="61" fontSize="14" fill="#7c6d50">
-                    {t("档案完善度", "Profile coverage")}
-                  </text>
-                </g>
-              </g>
-            </svg>
-            {detail && !pinned && (
-              <output className={css.hover}>
-                <strong>{detail.title}</strong>
-                <span>{detail.facts[0]?.title ?? t("资料待补充", "No details yet")}</span>
-                <small>{t("点击展开资料", "Click to open records")}</small>
-              </output>
+                  <title>
+                    {t(
+                      "人生地图：用 Tab 选择区域，回车查看，Esc 关闭",
+                      "Life map: Tab to a region, Enter to open, Escape to close",
+                    )}
+                  </title>
+                  <image href={image} width={resource.width} height={resource.height} />
+                  <g transform={`translate(${resource.margin} ${resource.margin})`}>
+                    {resource.regions.provinces.map((p) => (
+                      <path
+                        key={p.slot}
+                        d={p.path}
+                        fill="#efe5ca"
+                        fillOpacity={
+                          0.78 * (1 - (state?.domains.find((d) => d.slot === p.slot)?.score.clarity ?? 0.12))
+                        }
+                        fillRule="evenodd"
+                        pointerEvents="none"
+                      />
+                    ))}
+                    <path
+                      d={resource.regions.borders}
+                      fill="none"
+                      stroke="#8b7758"
+                      strokeWidth=".9"
+                      opacity=".24"
+                      pointerEvents="none"
+                    />
+                    {state?.domains.map((d) => {
+                      const p = resource.regions.provinces[d.slot];
+                      if (!p) return null;
+                      return (
+                        <path
+                          key={d.id}
+                          ref={(node) => {
+                            if (node) regionElements.current.set(d.id, node);
+                            else regionElements.current.delete(d.id);
+                          }}
+                          className={css.province}
+                          d={p.path}
+                          fill={colors[d.slot % colors.length]}
+                          fillOpacity=".13"
+                          fillRule="evenodd"
+                          stroke="#86724f"
+                          strokeWidth="1.1"
+                          strokeOpacity=".55"
+                          // biome-ignore lint/a11y/useSemanticElements: SVG paths implement keyboard and focus behavior for province buttons.
+                          role="button"
+                          tabIndex={0}
+                          aria-label={d.title}
+                          aria-pressed={pinned === d.id}
+                          onMouseEnter={() => setHover(d.id)}
+                          onMouseLeave={() => setHover(null)}
+                          onFocus={() => setHover(d.id)}
+                          onBlur={() => setHover(null)}
+                          onClick={() => setPinned(pinned === d.id ? null : d.id)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setPinned(d.id);
+                            }
+                            if (event.key === "Escape") {
+                              setPinned(null);
+                              setHover(null);
+                            }
+                          }}
+                        >
+                          <title>{d.title}</title>
+                        </path>
+                      );
+                    })}
+                    {state?.domains.map((d) => {
+                      const p = resource.regions.provinces[d.slot];
+                      if (!p) return null;
+                      const lines = atlasLabel(d.title);
+                      return (
+                        <g key={d.id} pointerEvents="none">
+                          {!!d.score.glow && (
+                            <circle
+                              cx={p.x + 26}
+                              cy={p.y - 32}
+                              r="7"
+                              fill="#d69330"
+                              stroke="#fff1c4"
+                              strokeWidth="3"
+                            />
+                          )}
+                          <path
+                            d={`M${p.x} ${p.y - 32 - (lines.length - 1) * 28}l4 5-4 5-4-5Z`}
+                            fill="#826b44"
+                          />
+                          {lines.map((line, i) => (
+                            <text
+                              key={`${i}-${line}`}
+                              x={p.x}
+                              y={p.y - 5 - (lines.length - 1 - i) * 28}
+                              textAnchor="middle"
+                              fontFamily="Songti SC, SimSun, Microsoft YaHei, Noto Serif CJK SC, serif"
+                              fontSize="26"
+                              fontWeight="600"
+                              fill={resource.settings.style === "teyvat" ? "#fbf7e8" : "#493a29"}
+                              stroke={resource.settings.style === "teyvat" ? "#244840" : "#efe2bf"}
+                              strokeWidth="4"
+                              paintOrder="stroke"
+                            >
+                              {line}
+                            </text>
+                          ))}
+                        </g>
+                      );
+                    })}
+                    <g
+                      transform={`translate(${resource.compass.cx} ${resource.compass.cy})`}
+                      pointerEvents="none"
+                    >
+                      <circle r="30" fill="#eadbb6" stroke="#b2a480" strokeWidth="2" />
+                      <path d="M0 -22L6 0 0 22 -6 0Z" fill="#6f8056" stroke="#4f593e" strokeWidth="1" />
+                    </g>
+                  </g>
+                </svg>
+              </div>
+              <nav className={css.zoomControls} aria-label={t("地图缩放", "Map zoom")}>
+                <button
+                  type="button"
+                  aria-label={t("缩小地图", "Zoom out")}
+                  disabled={zoom <= 1}
+                  onClick={() => setZoom((value) => Math.max(1, value - 0.25))}
+                >
+                  −
+                </button>
+                <button type="button" onClick={() => setZoom(1)}>
+                  {t("适应窗口", "Fit")}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t("放大地图", "Zoom in")}
+                  disabled={zoom >= 3}
+                  onClick={() => setZoom((value) => Math.min(3, value + 0.25))}
+                >
+                  +
+                </button>
+              </nav>
+              {detail && !pinned && (
+                <output className={css.hover}>
+                  <strong>{detail.title}</strong>
+                  <span>{detail.facts[0]?.title ?? t("资料待补充", "No details yet")}</span>
+                  <small>{t("点击展开资料", "Click to open records")}</small>
+                </output>
+              )}
+            </div>
+            {detail && pinned && (
+              <aside
+                className={css.detail}
+                aria-label={detail.title}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") close();
+                }}
+              >
+                <button type="button" className={css.close} onClick={close}>
+                  {t("关闭", "Close")} ×
+                </button>
+                <h3>{detail.title}</h3>
+                {detail.facts.length ? (
+                  <ul>
+                    {detail.facts.map((fact) => (
+                      <li key={fact.id}>
+                        <span>{fact.title}</span>
+                        <small>
+                          {fact.updated?.slice(0, 10) ?? t("日期待补充", "Undated")} ·{" "}
+                          {fact.status === "needs_review" || fact.status === "unknown"
+                            ? t("待核实", "Unverified")
+                            : fact.kind === "goal" || fact.kind === "plan"
+                              ? t("目标与计划", "Goal / plan")
+                              : t("资料记录", "Recorded")}
+                        </small>
+                        <small className={css.source}>{fact.source}</small>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{t("这个领域还没有资料。", "No records in this area yet.")}</p>
+                )}
+              </aside>
             )}
           </div>
-          {detail && pinned && (
-            <aside
-              className={css.detail}
-              aria-label={detail.title}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") close();
-              }}
-            >
-              <button type="button" className={css.close} onClick={close}>
-                {t("关闭", "Close")} ×
-              </button>
-              <h3>{detail.title}</h3>
-              <p>
-                {t("档案完善度", "Profile coverage")} ·{" "}
-                {detail.score.coverage === null
-                  ? t("待了解", "Not assessed")
-                  : `${Math.round(detail.score.coverage * 100)}%`}
-              </p>
-              <small>
-                {detail.temporal.kind === "historical"
-                  ? t("来路经历保留，不随时间变淡。", "Past experiences stay clear over time.")
-                  : detail.score.latest
-                    ? t(
-                        `最近资料：${detail.score.latest}；时间越久，地图逐渐变淡。`,
-                        `Latest record: ${detail.score.latest}. Older records gradually fade.`,
-                      )
-                    : t(
-                        "资料日期待补充，不能判断近期状态。",
-                        "Dates are missing; current status is unknown.",
-                      )}
-              </small>
-              {detail.facts.length ? (
-                <ul>
-                  {detail.facts.map((fact) => (
-                    <li key={fact.id}>
-                      <span>{fact.title}</span>
-                      <small>
-                        {fact.updated?.slice(0, 10) ?? t("日期待补充", "Undated")} ·{" "}
-                        {fact.status === "needs_review" || fact.status === "unknown"
-                          ? t("待核实", "Unverified")
-                          : fact.kind === "goal" || fact.kind === "plan"
-                            ? t("目标与计划", "Goal / plan")
-                            : t("资料记录", "Recorded")}
-                      </small>
-                      <small className={css.source}>{fact.source}</small>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>{t("这个领域还没有资料。", "No records in this area yet.")}</p>
-              )}
-              {!!detail.score.missing.length && (
-                <p>
-                  {t("还可以补充：", "You can add: ")}
-                  {detail.score.missing.join(" · ")}
-                </p>
-              )}
-            </aside>
-          )}
+          {expanded && settingsPanel}
         </div>
       )}
       {resource && !!omitted.length && (

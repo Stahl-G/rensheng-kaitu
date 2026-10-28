@@ -211,6 +211,123 @@ test("projection treats education as history, respects record deletions and leav
   expect(scoreDomain(domain, new Date("2026-10-27T00:00:00Z")).coverage).toBe(0);
 });
 
+test("real activity illuminates briefly while explored terrain remains clear", async () => {
+  const ws = await freshWorkspace();
+  ws.writeText(
+    "health/STATUS.md",
+    "---\nupdated: 2026-10-26\nnext:\n  - id: plan\n    title: 合成计划\n    status: todo\n---\n",
+  );
+  addRecord(
+    ws,
+    "workout",
+    {
+      exercise: "未经确认的合成记录",
+      sets: 3,
+      reps: 5,
+      weight_kg: 20,
+      session_id: "agent",
+      ts: "2026-10-26T11:00:00Z",
+    },
+    { by: "agent" },
+  );
+  const sourceBefore = atlasSource(ws);
+  const plan = {
+    version: 1 as const,
+    discover: false,
+    domains: sourceBefore.rules.filter((r) => r.id === "health"),
+  };
+  const before = mapDomains(sourceBefore.data, plan)[0];
+  expect(scoreDomain(before, new Date("2026-10-27T00:00:00Z"))).toMatchObject({ clarity: 0.18, glow: 0 });
+  addRecord(
+    ws,
+    "workout",
+    {
+      exercise: "合成训练",
+      sets: 3,
+      reps: 5,
+      weight_kg: 20,
+      session_id: "test",
+      ts: "2026-10-26T10:00:00Z",
+    },
+    { by: "user" },
+  );
+  for (const ts of ["2020-01-01T10:00:00Z", "2030-01-01T10:00:00Z"])
+    addRecord(
+      ws,
+      "workout",
+      { exercise: "合成日期边界", sets: 3, reps: 5, weight_kg: 20, session_id: ts, ts },
+      { by: "user" },
+    );
+  for (let i = 0; i < 6; i++)
+    addRecord(
+      ws,
+      "workout",
+      {
+        exercise: `未经确认的合成记录 ${i}`,
+        sets: 3,
+        reps: 5,
+        weight_kg: 20,
+        session_id: `agent-${i}`,
+        ts: "2026-10-26T12:00:00Z",
+      },
+      { by: "agent" },
+    );
+  const source = atlasSource(ws);
+  const domain = mapDomains(source.data, {
+    ...plan,
+    domains: source.rules.filter((r) => r.id === "health"),
+  })[0];
+  const recent = scoreDomain(domain, new Date("2026-10-27T00:00:00Z"));
+  const later = scoreDomain(domain, new Date("2026-11-26T00:00:00Z"));
+  expect(recent).toMatchObject({ clarity: 1, glow: 1 });
+  expect(later).toMatchObject({ clarity: 1, glow: 0 });
+  await settled(ws);
+  generateLifeAtlas(ws, { domains: ["health"] });
+  await settled(ws);
+  const today = readLifeAtlas(ws, undefined, new Date("2026-10-27T00:00:00Z"));
+  const nextMonth = readLifeAtlas(ws, undefined, new Date("2026-11-26T00:00:00Z"));
+  expect(nextMonth.active).toBe(today.active);
+  expect(nextMonth.resource?.key).toBe(today.resource?.key);
+  expect(today.domains[0].score).toMatchObject({ clarity: 1, glow: 1 });
+  expect(nextMonth.domains[0].score).toMatchObject({ clarity: 1, glow: 0 });
+  const agent = { ...domain, facts: domain.facts.map((f) => ({ ...f, actualActivityAt: undefined })) };
+  expect(scoreDomain(agent, new Date("2026-10-27T00:00:00Z"))).toMatchObject({ clarity: 0.18, glow: 0 });
+  const imported = await freshWorkspace();
+  addRecord(
+    imported,
+    "workout",
+    {
+      exercise: "合成导入训练",
+      sets: 3,
+      reps: 5,
+      weight_kg: 20,
+      session_id: "imported",
+      ts: "2026-10-26T10:00:00Z",
+    },
+    { by: "import:apple-health" },
+  );
+  const importedSource = atlasSource(imported);
+  const importedDomain = mapDomains(importedSource.data, {
+    version: 1,
+    discover: false,
+    domains: importedSource.rules.filter((r) => r.id === "health"),
+  })[0];
+  expect(scoreDomain(importedDomain, new Date("2026-10-27T00:00:00Z"))).toMatchObject({
+    clarity: 1,
+    glow: 1,
+  });
+  const past = {
+    ...domain,
+    facts: [
+      { id: "past", title: "合成经历", kind: "experience" as const, status: "user_reported", source: "test" },
+    ],
+  };
+  expect(scoreDomain(past, new Date("2030-01-01"))).toMatchObject({ clarity: 1, glow: 0 });
+  expect(
+    scoreDomain({ ...past, facts: [{ ...past.facts[0], status: "inferred" }] }, new Date("2030-01-01")),
+  ).toMatchObject({ clarity: 0.18, glow: 0 });
+}, 40_000);
+
 test("full archives can permanently delete a map, reclaim actual bytes and generate again", async () => {
   const ws = await freshWorkspace();
   const folder = join(

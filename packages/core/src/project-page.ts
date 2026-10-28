@@ -3,8 +3,9 @@ import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
 import { listProjects, projectDirectory, readProject, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
-import { listTasks } from "./tasks.js";
-import type { ModuleStatus } from "./workbench.js";
+import { type Task, listTasks } from "./tasks.js";
+import { localDate } from "./time.js";
+import type { ModuleStatus, WorkbenchData } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export type ProjectGoal = NonNullable<ModuleStatus["progress"]>;
@@ -36,15 +37,37 @@ export function projectSummary(text: string) {
     .join(" · ");
 }
 
-export function readProjectsPage(ws: Workspace, slug?: string) {
-  const tasks = listTasks(ws);
-  return listProjects(ws, { slug }).map((project) => {
+export function readProjectsPage(
+  ws: Workspace,
+  slug?: string,
+  now = new Date(),
+  loaded?: Pick<WorkbenchData, "projects" | "records">,
+) {
+  const tasks = new Map<string, ReturnType<typeof listTasks>>();
+  const openTasks = loaded
+    ? ((loaded.records.task ?? []).filter((task) => task.status === "open") as Task[])
+    : listTasks(ws);
+  for (const task of openTasks) {
+    if (!task.project) continue;
+    const group = tasks.get(task.project) ?? [];
+    group.push(task);
+    tasks.set(task.project, group);
+  }
+  const today = localDate(now, ws.timeZone());
+  const projects = loaded
+    ? loaded.projects.filter((project) => !slug || project.slug === slug)
+    : listProjects(ws, { slug, now });
+  return projects.map((project) => {
     const next = [...project.next];
-    for (const task of tasks.filter((task) => task.project === project.slug)) {
+    for (const task of tasks.get(project.slug) ?? []) {
       if (!next.some((item) => item.id === task.id || item.title === task.title))
         next.push({ id: task.id, title: task.title, status: "todo", due: task.due });
     }
-    const recent = projectLogs(project.log)[0];
+    const recent = projectLogs(project.log).find((entry) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || entry.date > today) return false;
+      const date = new Date(`${entry.date}T12:00:00Z`);
+      return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === entry.date;
+    });
     return {
       ...project,
       next,

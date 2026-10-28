@@ -183,8 +183,10 @@ export function createSdkRuntime({
     return directory;
   };
   const loadSettings = async () => {
-    await loadDirectory();
     const stored = readSettings();
+    // ChatGPT SIWC is a built-in route; it does not need the pi-ai catalog
+    // subprocess before a conversation can start.
+    if (stored.provider !== "chatgpt-siwc") await loadDirectory();
     if (stored.provider && !providers.some((item) => item.id === stored.provider)) await savedProviders();
     return { choice: stored.choice, ...selection(stored) };
   };
@@ -346,6 +348,7 @@ export function createSdkRuntime({
           id: item.id,
           name: item.name,
           image: item.inputModalities?.includes("image"),
+          ...(item.reasoning?.efforts?.length ? { reasoning: item.reasoning } : {}),
         }));
       }
       const result = await credential("models", {
@@ -394,14 +397,27 @@ export function createSdkRuntime({
     async catalogSettings(includeSaved = false) {
       // 仅 AI 设置和模型选择器显式读取完整目录；失败不能假装没有已保存服务商。
       await loadDirectory();
-      const settings = await api.settings();
+      let settings;
+      let modelCapabilityError;
+      try {
+        settings = await api.settings();
+      } catch {
+        settings = connectionInfo({ ...(await loadSettings()), configured: false });
+        modelCapabilityError = true;
+      }
       const saved =
         includeSaved || !providers.some((entry) => entry.id === settings.provider)
           ? await savedProviders()
           : undefined;
+      let models = siwcModels;
+      if (settings.provider === "chatgpt-siwc" && !modelCapabilityError) {
+        try {
+          models = await api.models({ provider: "chatgpt-siwc" });
+        } catch {
+          modelCapabilityError = true;
+        }
+      }
       if (saved) {
-        const models =
-          settings.provider === "chatgpt-siwc" ? await api.models({ provider: "chatgpt-siwc" }) : siwcModels;
         if (models.length)
           saved.push({
             provider: "chatgpt-siwc",
@@ -409,7 +425,22 @@ export function createSdkRuntime({
             models: models.map((model) => model.id),
           });
       }
-      return { ...settings, providers, ...(saved ? { saved } : {}), search: await describeSearch() };
+      let modelCapabilities = settings.provider === "chatgpt-siwc" && !modelCapabilityError ? models : [];
+      if (settings.provider !== "chatgpt-siwc" && settings.auth === "dsh") {
+        try {
+          modelCapabilities = await api.models({ provider: settings.provider, auth: "dsh" });
+        } catch {
+          modelCapabilityError = true;
+        }
+      }
+      return {
+        ...settings,
+        providers,
+        ...(saved ? { saved } : {}),
+        ...(modelCapabilities.length ? { modelCapabilities } : {}),
+        ...(modelCapabilityError ? { modelCapabilityError } : {}),
+        search: await describeSearch(),
+      };
     },
     async configure(input) {
       connectionStatus = undefined;
@@ -446,9 +477,32 @@ export function createSdkRuntime({
           const models = await api.support("siwc/models");
           const model = models.find((item) => item.id === settings.model);
           if (!model) throw new KaituError("模型不在当前账号目录中，请刷新模型列表", "AI_MODEL");
+          if (input.reasoningEffort === null) {
+            const defaultEffort = model.reasoning?.defaultEffort;
+            if (!defaultEffort) throw new KaituError("该模型未提供默认推理档位", "AI_MODEL");
+            settings.reasoningEffort = defaultEffort;
+          }
+          if (
+            settings.reasoningEffort &&
+            !model.reasoning?.efforts?.some((effort) => effort.id === settings.reasoningEffort)
+          )
+            throw new KaituError("该模型没有提供所选推理档位", "AI_MODEL");
           settings.supportsImages = model.image;
           settings.auth = "dsh";
         } else {
+          if (input.reasoningEffort !== undefined) {
+            if (settings.auth !== "dsh") throw new KaituError("该服务未提供推理档位", "AI_MODEL");
+            const model = (
+              await api.models({ provider: settings.provider, model: settings.model, auth: "dsh" })
+            ).find((item) => item.id === settings.model);
+            if (input.reasoningEffort === null) {
+              const defaultEffort = model?.reasoning?.defaultEffort;
+              if (!defaultEffort) throw new KaituError("该模型未提供默认推理档位", "AI_MODEL");
+              settings.reasoningEffort = defaultEffort;
+            }
+            if (!model?.reasoning?.efforts?.some((effort) => effort.id === settings.reasoningEffort))
+              throw new KaituError("该模型没有提供所选推理档位", "AI_MODEL");
+          }
           const ref = credentialRef(settings.provider);
           // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
           const known =
@@ -468,6 +522,8 @@ export function createSdkRuntime({
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
+      // Another read can have cached the old connection while this save awaited validation.
+      connectionStatus = undefined;
       return api.settings();
     },
     async runtime(
@@ -598,7 +654,12 @@ export function createSdkRuntime({
           "initialize",
           capabilities
             ? { capabilities: true }
-            : { cwd: workspace, provider: settings.provider, model: settings.model },
+            : {
+                cwd: workspace,
+                provider: settings.provider,
+                model: settings.model,
+                ...(settings.reasoningEffort ? { reasoningEffort: settings.reasoningEffort } : {}),
+              },
           signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
         );
       } catch {

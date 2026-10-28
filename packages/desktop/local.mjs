@@ -23,6 +23,7 @@ import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
+import { createSpeech } from "./speech.mjs";
 
 export function createLocalAsk({
   state,
@@ -188,6 +189,8 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   const hostResources = process.env.KAITU_HOST_RESOURCES || dirname(resources);
   const launcher =
     process.platform === "win32" ? app.getPath("exe") : join(dirname(app.getPath("exe")), "Kaitu");
+  const speech = createSpeech(join(dirname(launcher), "KaituSpeech"));
+  app.on("before-quit", speech.close);
   // 每一步的时间记下来：启动慢时看是哪一步。
   const log = join(state, "logs", "startup.log");
   writeFileSync(log, "");
@@ -288,6 +291,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     },
   });
   const server = await startUi(ws, {
+    speech: speech.request,
     port: 0,
     open: false,
     webRoot: join(resources, "web"),

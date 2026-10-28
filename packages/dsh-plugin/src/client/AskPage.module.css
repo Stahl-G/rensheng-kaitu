@@ -329,6 +329,44 @@
 .modelWrap {
   min-width: 0;
   max-width: 40%;
+  margin-left: auto;
+}
+.addWrap {
+  position: relative;
+}
+.addPopover {
+  left: 0;
+  right: auto;
+  width: max-content;
+}
+.menuItem {
+  border: 0;
+  background: transparent;
+  color: var(--kt-text);
+  text-align: left;
+  border-radius: 8px;
+  padding: 9px 12px;
+}
+.menuItem:hover {
+  background: var(--kt-subtle);
+}
+.menuItem[aria-pressed="true"] {
+  background: var(--kt-subtle);
+  color: var(--kt-link);
+}
+.menuItem[aria-pressed="true"]::after {
+  content: "✓";
+  float: right;
+}
+.modelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.modelGroup p {
+  color: var(--kt-muted);
+  font-size: 12px;
+  padding: 4px 12px;
 }
 .modelSearch {
   position: sticky;
@@ -373,7 +411,7 @@ output.progress,
 .send {
   width: 36px;
   height: 36px;
-  margin-left: auto;
+  margin-left: 0;
   flex: none;
   border-radius: 50%;
   border: 0;

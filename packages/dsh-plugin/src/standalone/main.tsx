@@ -19,6 +19,7 @@ if (initialChatDraft)
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
 let workspace = "";
 const props: OverviewPageProps = {
+  speech: (action, locale) => call("speech", action, locale),
   initialChatDraft,
   phoneChannels: true,
   loadCalendarPush: () => call("calendarPush"),
@@ -71,12 +72,16 @@ const props: OverviewPageProps = {
     active,
     onToday,
     onSettings,
+    newConversation,
+    autoSubmit,
   ) => (
     <AskPage
       workspace={workspace}
       active={active}
+      autoSubmit={autoSubmit}
       initialPrompt={prompt}
       initialPromptRequest={promptRequest}
+      initialPromptNewConversation={newConversation}
       configureRequest={configureRequest}
       configureBuiltin={configureBuiltin}
       onConnections={onConnections}
@@ -157,6 +162,8 @@ const props: OverviewPageProps = {
   loadDirectionMap: (locale) => call("directionMap", locale),
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
+  loadHome: () => call("home"),
+  captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
     call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),

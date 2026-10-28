@@ -49,6 +49,7 @@ it("discovers installed package metadata locally, preserves origins, and reflect
     expect(route.origin).toBe("http://127.0.0.1:34567");
     expect(new URLSearchParams(route.hash.slice(1)).get("kaitu-page")).toBe("synthetic-page");
     expect(new URLSearchParams(route.hash.slice(1)).get("kaitu-embed")).toBe("1");
+    expect(new URLSearchParams(route.hash.slice(1)).get("kaitu-parent")).toBe("http://127.0.0.1:23456");
     for (const url of ["https://untrusted.example/", "http://localhost:34567/", "http://127.0.0.1:23456/"])
       await expect(
         make().page("plugin:synthetic-plugin", "http://127.0.0.1:23456", async () => ({ url })),

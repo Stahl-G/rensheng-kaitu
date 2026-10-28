@@ -117,9 +117,9 @@ export function createAgentConnection(options: {
         });
         return settings();
       }
-      const result = await options.sdk().configure(input);
+      await options.sdk().configure(input);
       if (input.choice) save({ choice: String(input.choice) });
-      return result;
+      return settings();
     },
     async models(input: Record<string, unknown>) {
       if (typeof input.agent !== "string") return options.sdk().models(input);

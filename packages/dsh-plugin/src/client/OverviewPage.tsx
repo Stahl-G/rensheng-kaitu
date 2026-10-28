@@ -75,8 +75,14 @@ export interface OverviewPageProps
     source?: "manual" | "footprints",
   ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
+  speech?: (
+    action: "status" | "start" | "stop" | "cancel",
+    locale?: string,
+  ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
   navigation?: PanelNavigation;
+  captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
+  loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -95,6 +101,8 @@ export interface OverviewPageProps
     active: boolean,
     onToday: () => void,
     onSettings: (section: "ai" | "local-ai") => void,
+    newConversation: boolean,
+    autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
   ) => ReactNode;
 }
 const modules = [
@@ -484,8 +492,79 @@ function Overview({
   useEffect(() => {
     if (captureOpen && view === "overview") document.getElementById("capture-text")?.focus();
   }, [captureOpen, view]);
+  const [homeState, setHomeState] = useState<import("@kaitu/core").HomeState | null>(null);
+  useEffect(() => {
+    const loadHome = props.loadHome;
+    if (!loadHome) return;
+    let live = true;
+    const refresh = () => {
+      void loadHome()
+        .then((value) => {
+          if (live) setHomeState(value);
+        })
+        .catch(() => {
+          if (live)
+            setHomeState((current) => ({
+              data: current?.data ?? null,
+              loading: false,
+              error: "首页读取失败",
+            }));
+        });
+    };
+    refresh();
+    const unsubscribe = props.subscribe?.(refresh);
+    return () => {
+      live = false;
+      unsubscribe?.();
+    };
+  }, [props.loadHome, props.subscribe]);
+  const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
+  const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
+  const homeSaving = useRef(false);
+  const saveHome = async (text: string, send: boolean) => {
+    if (!props.captureOnce || homeSaving.current) return;
+    homeSaving.current = true;
+    try {
+      const content = text.trim();
+      if (!content) return;
+      if (homeOperation.current?.text !== content)
+        homeOperation.current = { text: content, id: crypto.randomUUID() };
+      const operation = homeOperation.current;
+      const receipt = operation.path
+        ? { status: "saved", path: operation.path }
+        : await props.captureOnce(content, operation.id);
+      if (receipt.status !== "saved" || !receipt.path)
+        throw new Error(
+          t(
+            "保存结果不明，请保留原文并检查资料。",
+            "Save status is uncertain. Keep the text and check Library.",
+          ),
+        );
+      operation.path = receipt.path;
+      if (send) {
+        setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
+        setView("ask");
+      }
+      setHomeAskText("");
+      setHomeAskError("");
+      if (!send) homeOperation.current = null;
+    } catch (error) {
+      setHomeAskError(error instanceof Error ? error.message : String(error));
+    } finally {
+      homeSaving.current = false;
+    }
+  };
+  const [homeAskText, setHomeAskText] = useState("");
+  const [homeAskError, setHomeAskError] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
+  const [promptNewConversation, setPromptNewConversation] = useState(false);
+  const handoffPending = useRef(false);
+  // Reset after the submitted prompt has been rendered in Ask.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: promptRequest signals each handoff.
+  useEffect(() => {
+    handoffPending.current = false;
+  }, [promptRequest]);
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
@@ -625,11 +704,20 @@ function Overview({
     setRecord(modules.some(([key]) => key === id) ? id : "");
     setView("records");
   };
-  const prompt = (text: string) => {
+  const prompt = (text: string, newConversation = false) => {
+    setPromptNewConversation(newConversation);
     setPromptDraft(text);
     setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
+  };
+  const handoffAsk = (text: string) => {
+    if (handoffPending.current || !props.renderAsk) return false;
+    const event = new Event("kaitu:before-ask-draft", { cancelable: true });
+    if (!window.dispatchEvent(event)) return false;
+    handoffPending.current = true;
+    prompt(text, true);
+    return true;
   };
   const askNext = (item: { title: string; module: string }) =>
     prompt(
@@ -1109,13 +1197,13 @@ function Overview({
         {view === "overview" && !guideVisible && guide !== undefined && data && (
           <>
             <LifeHome
+              home={homeState}
               data={data}
               firstVisit={data.empty && !onboarding?.hasUserData}
               writing={captureOpen}
               capture={capture}
               start={() => setCaptureOpen(true)}
               library={() => openRecord(data.notes.length ? "inbox" : "")}
-              addNext={() => (data.plans.goals.length ? openRecord("projects") : startMatter(""))}
               busy={busy}
               loadProjects={props.loadProjects}
               openProject={(slug) => {
@@ -1123,25 +1211,37 @@ function Overview({
                 setProjectFocus(slug);
               }}
               loadLibrary={props.loadLibrary}
-              save={async (text) => {
-                const saved = await props.capture(text);
-                await refresh();
-                return saved;
+              weather={
+                props.loadWeather && props.setWeatherPlace ? (
+                  <TodayWeather
+                    load={props.loadWeather}
+                    setPlace={props.setWeatherPlace}
+                    loadLifeMap={props.loadLifeMap}
+                    subscribe={props.subscribe}
+                  />
+                ) : undefined
+              }
+              save={
+                props.captureOnce
+                  ? (text) => {
+                      void saveHome(text, false);
+                    }
+                  : undefined
+              }
+              ask={(text) => {
+                if (props.captureOnce) void saveHome(text, true);
+                else handoffAsk(text);
               }}
-              complete={async (item) => {
-                await props.completeNext(item.file, item.id);
-                await refresh();
-              }}
-              source={(entry) => {
-                openRecord("inbox");
-                setLibraryEntry({
-                  ...entry,
-                  source: "me",
-                  originalSource: entry.file,
-                  date: data.today,
-                  status: "raw",
-                  destination: null,
-                });
+              canAsk={!!props.renderAsk}
+              askError={homeAskError}
+              askText={homeAskText}
+              setAskText={setHomeAskText}
+              speech={props.speech}
+              insertSpeech={(text) => setHomeAskText((current) => (current ? `${current}\n${text}` : text))}
+              loadAtlas={props.loadLifeAtlas}
+              openAtlas={() => {
+                setExplore("life-map");
+                setView("explore");
               }}
               adopt={(id) => void run(() => props.adoptTask(id))}
               dismiss={(id) => void run(() => props.cancelTask(id))}
@@ -1446,6 +1546,8 @@ function Overview({
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
+                active={view === "explore" && explore === entry.id}
+                onDraft={handoffAsk}
               />
             </div>
           ))}
@@ -1463,6 +1565,8 @@ function Overview({
                 setView("overview");
               },
               openAskSettings,
+              promptNewConversation,
+              homeSubmit,
             )}
           </div>
         )}

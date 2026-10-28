@@ -1,12 +1,11 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addGoalNext, addRecord, initWorkspace, readOverviewPage, stringifyFrontmatter } from "@kaitu/core";
+import { addRecord, initWorkspace, readOverviewPage, stringifyFrontmatter } from "@kaitu/core";
 import { createProject, readProjectsPage } from "@kaitu/core";
 import { expect, it } from "vitest";
 import {
   nextPresentation,
-  todayChoices,
   todayDate,
   todayProjectDate,
   todayProjectFacts,
@@ -73,31 +72,6 @@ it("keeps raw title and provenance available through the real overview without r
     expect(item).toMatchObject({ title: next.title, ref: file, source: "grok-bot", by: "agent" });
     expect(nextPresentation(item)).toEqual({ title: "浏览资讯（资料）", source: "Grokbot 提供" });
     expect(ws.readText("feed/STATUS.md")).toBe(before);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-it("无时长且关联目标的已采纳下一步可选，十分钟只开头，累时不推工作", async () => {
-  const root = mkdtempSync(join(tmpdir(), "kaitu-today-choices-"));
-  try {
-    const ws = await initWorkspace(root);
-    ws.writeJson("me/goals.json", [
-      { id: "g1", title: "摄影集" },
-      { id: "g2", title: "整理照片" },
-    ]);
-    await addGoalNext(ws, "g1", "挑出封面候选");
-    await addGoalNext(ws, "g2", "整理照片 45分钟");
-    addRecord(ws, "task", { title: "未采纳的工作", status: "proposed" });
-    const data = await readOverviewPage(ws);
-    const raw = JSON.stringify(data);
-    expect(todayChoices(data, 60).map(({ item }) => item.title)).toEqual(["挑出封面候选", "整理照片 45分钟"]);
-    expect(todayChoices(data, 10).map(({ minutes, opening }) => ({ minutes, opening }))).toEqual([
-      { minutes: null, opening: true },
-      { minutes: 45, opening: true },
-    ]);
-    expect(todayChoices(data, 5)).toEqual([]);
-    expect(JSON.stringify(data)).toBe(raw);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
