@@ -171,7 +171,15 @@ export function readWorkbench(
       data: { date: null, blocks: [] } as TodayPlan,
       body: "",
     }),
-    projects: read("项目", () => listProjects(ws, { now }), []),
+    projects: read(
+      "项目",
+      () =>
+        listProjects(ws, {
+          now,
+          onError: (slug) => warnings.push(`项目 ${slug} 暂时无法读取，请检查文件格式。`),
+        }),
+      [],
+    ),
     statuses: statusFiles(ws)
       .filter(({ file }) => !connection || agentCanRead(ws, file, connection))
       .flatMap(({ file, module }) =>

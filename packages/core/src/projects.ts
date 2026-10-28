@@ -162,7 +162,10 @@ export function projectStatusFiles(ws: Workspace) {
     }
   });
 }
-export function listProjects(ws: Workspace, options: { now?: Date; slug?: string } = {}) {
+export function listProjects(
+  ws: Workspace,
+  options: { now?: Date; slug?: string; onError?: (slug: string, error: unknown) => void } = {},
+) {
   const now = options.now ?? new Date();
   const tz = ws.timeZone();
   const today = localDate(now, tz);
@@ -178,7 +181,7 @@ export function listProjects(ws: Workspace, options: { now?: Date; slug?: string
         if (list) list.push(r);
         else allMetrics.set(key, [r]);
       }
-  return (options.slug ? [options.slug] : slugs(ws)).flatMap((slug) => {
+  const projectFor = (slug: string) => {
     const project = projectSnapshot(ws, slug);
     const metrics = allMetrics.get(slug) ?? [];
     const words = metrics.filter((r) => r.kind === "words");
@@ -265,6 +268,15 @@ export function listProjects(ws: Workspace, options: { now?: Date; slug?: string
         ],
       },
     ];
+  };
+  return (options.slug ? [options.slug] : slugs(ws)).flatMap((slug) => {
+    try {
+      return projectFor(slug);
+    } catch (error) {
+      if (!options.onError) throw error;
+      options.onError(slug, error);
+      return [];
+    }
   });
 }
 export async function createProject(ws: Workspace, input: ProjectInput) {

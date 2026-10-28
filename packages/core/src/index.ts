@@ -9,6 +9,7 @@ export * from "./doing-page.js";
 export * from "./errors.js";
 export * from "./frontmatter.js";
 export * from "./history.js";
+export * from "./home.js";
 export * from "./init.js";
 export * from "./importers/apple-health.js";
 export type { BatchImportResult, Counts } from "./importers/batch.js";
