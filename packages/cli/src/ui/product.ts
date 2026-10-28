@@ -315,8 +315,10 @@ export async function productRequest(
       }
       case "askList":
         return ask.list();
+      case "askHandoffStatus":
+        return ask.handoffStatus(text(0));
       case "askCreate":
-        return ask.create();
+        return ask.create(typeof args[0] === "string" ? args[0] : undefined);
       case "askOrganize":
         return ask.organize(text(0), (args[1] ?? {}) as Record<string, unknown>);
       case "askRemove":
@@ -324,7 +326,12 @@ export async function productRequest(
       case "askEvents":
         return ask.events(text(0));
       case "askSend":
-        return ask.send(text(0), text(1), args[2] as import("./ask.js").AskAttachment[] | undefined);
+        return ask.send(
+          text(0),
+          text(1),
+          args[2] as import("./ask.js").AskAttachment[] | undefined,
+          typeof args[3] === "string" ? args[3] : undefined,
+        );
     }
   }
   switch (method) {
