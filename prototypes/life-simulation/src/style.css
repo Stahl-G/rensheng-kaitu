@@ -1394,3 +1394,51 @@ footer {
   opacity: 0.4;
   cursor: default;
 }
+
+.game-menu {
+  position: relative;
+}
+.game-menu summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 24px;
+  padding: 3px 12px;
+}
+.game-menu summary::-webkit-details-marker {
+  display: none;
+}
+.game-menu > div {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  padding: 10px;
+  min-width: 170px;
+  z-index: 30;
+  background: #fffdf7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px #302b2420;
+}
+#restart-dialog {
+  max-width: 420px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdf7;
+  color: var(--ink);
+}
+#restart-dialog::backdrop {
+  background: #25272180;
+}
+#restart-dialog h2 {
+  font-size: 25px;
+  margin-bottom: 12px;
+}
+#restart-dialog p {
+  margin-bottom: 24px;
+}
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}

@@ -48,6 +48,7 @@ let pasted = "";
 let error = "";
 let subchoice: DecisionKind | null = null;
 let sampleIndex = 0;
+let restartWasPlaying: boolean | null = null;
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing app");
 const t = (zh: string, en: string) => (locale === "zh" ? zh : en);
@@ -75,7 +76,7 @@ const yearTimer = createYearTimer(
   },
 );
 function header() {
-  return `<header>${button("home", `<span class="brand-icon">开</span><span>开图 <b>KAITU</b></span>`, "brand")}<div class="header-right"><span class="edition">${t("人生往后推 · 原型", "THE NEXT CHAPTER · PROTOTYPE")}</span>${button("language", locale === "zh" ? "EN" : "中文", "quiet")}</div></header>`;
+  return `<header>${button("home", `<span class="brand-icon">开</span><span>开图 <b>KAITU</b></span>`, "brand")}<div class="header-right"><span class="edition">${t("人生往后推 · 原型", "THE NEXT CHAPTER · PROTOTYPE")}</span>${button("language", locale === "zh" ? "EN" : "中文", "quiet")}${page === "play" ? `<details id="game-menu" class="game-menu"><summary aria-label="${t("更多操作", "More actions")}">···</summary><div>${button("restart", t("重玩同一开局", "Replay this start"), "text-button")}</div></details>` : ""}</div></header>`;
 }
 function home() {
   return `<main class="welcome"><section class="intro"><div class="eyebrow">${t("下一页，怎么过", "HOW WILL THE NEXT CHAPTER GO")}</div><h1>${t("把人生往后推。<br>这次，你来选。", "A life ahead.<br>Your turn to choose.")}</h1><div class="entry-actions">${button("random", t("随机人生 ↗", "A random life ↗"), "entry primary")}${button("personal", t("用我的资料 ↗", "Use my profile ↗"), "entry")}</div><div class="welcome-bottom"><span>${t("免登录 · 免安装", "No login · No installation")}</span>${button("load", t("载入这局人生", "Load a saved life"), "text-button")}<input id="load-file" type="file" accept=".json,application/json" hidden></div></section><section class="home-scene">${sceneSvg(initialState(sampleCard(0, locale), "home"), locale)}</section></main>`;
@@ -108,7 +109,7 @@ function story(st: Story) {
 }
 function controls() {
   const finished = nextOffset() >= YEARS;
-  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<span class="year-duration">${t("约", "About")} ${yearDuration(speed) / 1000} ${t("秒 / 年", "sec / year")}</span><div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}${button("restart", t("重玩同一开局", "Replay this start"), "text-button")}</div>${
+  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<span class="year-duration">${t("约", "About")} ${yearDuration(speed) / 1000} ${t("秒 / 年", "sec / year")}</span><div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}</div>${
     finished
       ? ""
       : `<div class="focus-row"><span>${t("下一年重心", "Next year’s focus")}</span>${Object.entries(
@@ -243,6 +244,25 @@ function playPage() {
   const row = run.changed[selected - 1];
   return `<main class="game-shell">${identity(s)}<section class="game-main"><div class="scene-top"><span>${row?.year ?? config.year} · ${s.age} ${t("岁", "years")}</span><span>${row?.market.crisis ? t("市场冲击", "Market shock") : t("日子继续", "Life goes on")} · ${t("指数", "Index")} ${((row?.market.returns.stocks ?? 0) * 100).toFixed(1)}%</span></div><div class="life-scene">${sceneSvg(s, locale)}</div>${controls()}${choicePanel()}<section class="events-feed" aria-label="${t("年度事件", "Annual events")}">${row?.stories.map(story).join("") ?? ""}</section>${conclusion()}<nav class="year-nav" aria-label="${t("年份回顾", "Year review")}">${run.changed.map((r, i) => `<button type="button" data-year="${i + 1}" aria-current="${selected === i + 1 ? "true" : "false"}">${r.age}${r.decision ? " ◆" : ""}</button>`).join("")}</nav><details id="route-panel" class="route-review"><summary>${t("双线回顾", "Two paths")} · ${t("同一个世界", "One shared world")}</summary>${mapSvg(run, selected, locale)}<div class="baseline-story">${run.baseline[selected - 1]?.stories.map(story).join("") ?? ""}</div></details><details id="rules-panel" class="rules"><summary>${t("规则、参数与来源", "Rules, parameters & sources")}</summary><p>${t("人民币为游戏金额；初始资产统一设定。四属性未知用中性 50，原卡仍保留未知。行情均值、波动、税社保和事件概率是作者设定，不是个人预测。", "RMB amounts and starting balances are simulated. Unknown stats use neutral 50; the source card retains unknown. Return means, volatility, tax/social rates and event odds are authored game assumptions, not personal predictions.")}</p><p>${t("一般知识对投资行为只有弱关联；性格随机项独立。知识不改变市场回报。定投按每月末结算，年内用平滑路径复合到同一年度行情。", "General knowledge has a weak game association with investment behavior; temperament is independent. Knowledge never changes market returns. Recurring investments settle at each month-end on a smooth path compounding to the shared annual return.")}</p><ul>${(["deposits", "bonds", "stocks", "property"] as const).map((k) => `<li>${pair(entryLabels[k])}: μ ${(marketConfig[k].mean * 100).toFixed(1)}%, σ ${(marketConfig[k].volatility * 100).toFixed(1)}% · <a href="${marketConfig[k].reference}" target="_blank" rel="noreferrer">${t("机制参考", "Mechanism reference")}</a></li>`).join("")}</ul><code>${e(config.worldSeed)} / ${e(config.lifeSeed)}</code></details></section>${ledgerPanel(s)}</main>`;
 }
+function restartDialog() {
+  return `<dialog id="restart-dialog" aria-labelledby="restart-title"><h2 id="restart-title">${t("重新开始这一局？", "Restart this life?")}</h2><p>${t("当前进度会被替换。", "This will replace your current progress.")}</p><div class="dialog-actions">${button("restart-cancel", t("取消", "Cancel"), "primary")}${button("restart-confirm", t("确认重玩", "Restart"))}</div></dialog>`;
+}
+function requestRestart() {
+  if (!config) return;
+  if (nextOffset() >= YEARS) {
+    begin({ ...structuredClone(config), decisions: {}, plans: {} });
+    return;
+  }
+  restartWasPlaying = playing;
+  playing = false;
+  render();
+}
+function cancelRestart() {
+  if (restartWasPlaying === null) return;
+  playing = restartWasPlaying && !document.hidden;
+  restartWasPlaying = null;
+  render();
+}
 function report(reason: unknown) {
   playing = false;
   error = reason instanceof Error ? reason.message : String(reason);
@@ -266,6 +286,7 @@ function onAll(selector: string, fn: (el: HTMLElement) => void) {
 }
 function begin(c?: Config) {
   yearTimer.stop();
+  restartWasPlaying = null;
   config = c ?? {
     card: structuredClone(card),
     worldSeed: seed(),
@@ -366,7 +387,7 @@ function render() {
         : page === "review"
           ? reviewPage()
           : playPage())
-  }<footer><span>KAITU · ${t("推演", "SIMULATION")}</span><a href="./vendor/remake/LICENSE" target="_blank" rel="noreferrer">Remake · MIT</a></footer>`;
+  }${page === "play" ? restartDialog() : ""}<footer><span>KAITU · ${t("推演", "SIMULATION")}</span><a href="./vendor/remake/LICENSE" target="_blank" rel="noreferrer">Remake · MIT</a></footer>`;
   for (const id of openPanels) {
     const panel = document.getElementById(id);
     if (panel instanceof HTMLDetailsElement) panel.open = true;
@@ -468,9 +489,22 @@ function render() {
     while (!pending() && nextOffset() < YEARS) advance(false);
     render();
   });
-  click("restart", () => {
-    if (config) begin({ ...structuredClone(config), decisions: {}, plans: {} });
+  click("restart", requestRestart);
+  click("restart-cancel", cancelRestart);
+  click("restart-confirm", () => {
+    if (restartWasPlaying !== null && config) begin({ ...structuredClone(config), decisions: {}, plans: {} });
   });
+  const restart = document.getElementById("restart-dialog");
+  if (restart instanceof HTMLDialogElement) {
+    restart.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      cancelRestart();
+    });
+    if (restartWasPlaying !== null) {
+      restart.showModal();
+      document.getElementById("restart-cancel")?.focus();
+    }
+  }
   onAll("[data-speed]", (el) => {
     speed = Number(el.dataset.speed);
     render();
@@ -541,6 +575,7 @@ function render() {
   yearTimer.schedule(speed);
 }
 document.addEventListener("visibilitychange", () => {
+  if (document.hidden && restartWasPlaying !== null) restartWasPlaying = false;
   if (document.hidden && playing) {
     playing = false;
     render();
