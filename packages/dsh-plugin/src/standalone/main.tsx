@@ -19,6 +19,7 @@ if (initialChatDraft)
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
 let workspace = "";
 const props: OverviewPageProps = {
+  speech: (action, locale) => call("speech", action, locale),
   initialChatDraft,
   phoneChannels: true,
   loadCalendarPush: () => call("calendarPush"),

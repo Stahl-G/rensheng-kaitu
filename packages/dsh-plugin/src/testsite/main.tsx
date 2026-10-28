@@ -301,6 +301,7 @@ function App() {
                 askError=""
                 askText={homeAsk}
                 setAskText={setHomeAsk}
+                insertSpeech={(text) => setHomeAsk((current) => (current ? `${current}\n${text}` : text))}
                 openAtlas={() => {}}
                 adopt={(id) => run(() => store.adopt(id))}
                 dismiss={(id) => run(() => store.dismiss(id))}

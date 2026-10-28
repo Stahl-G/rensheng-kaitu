@@ -75,6 +75,10 @@ export interface OverviewPageProps
     source?: "manual" | "footprints",
   ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
+  speech?: (
+    action: "status" | "start" | "stop" | "cancel",
+    locale?: string,
+  ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
   navigation?: PanelNavigation;
   load: () => Promise<OverviewData>;
@@ -1158,6 +1162,8 @@ function Overview({
               askError={homeAskError}
               askText={homeAskText}
               setAskText={setHomeAskText}
+              speech={props.speech}
+              insertSpeech={(text) => setHomeAskText((current) => (current ? `${current}\n${text}` : text))}
               loadAtlas={props.loadLifeAtlas}
               openAtlas={() => {
                 setExplore("life-map");

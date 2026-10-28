@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   DoingProject,
   InboxEntry,
@@ -34,6 +34,8 @@ export function LifeHome({
   askError,
   askText,
   setAskText,
+  speech,
+  insertSpeech,
   loadAtlas,
   openAtlas,
   adopt,
@@ -58,6 +60,11 @@ export function LifeHome({
   askError: string;
   askText: string;
   setAskText: (text: string) => void;
+  speech?: (
+    action: "status" | "start" | "stop" | "cancel",
+    locale?: string,
+  ) => Promise<{ available: boolean; state: string; text: string }>;
+  insertSpeech: (text: string) => void;
   loadAtlas?: () => Promise<import("@kaitu/core").LifeAtlasState>;
   openAtlas: () => void;
   adopt: (id: string) => void;
@@ -66,6 +73,67 @@ export function LifeHome({
 }) {
   const t = useT();
   const locale = useLocale();
+  const [voice, setVoice] = useState<{ available: boolean; state: string; text: string }>({
+    available: false,
+    state: "idle",
+    text: "",
+  });
+  const [voiceMessage, setVoiceMessage] = useState("");
+  const voiceActive = useRef(false);
+  const voiceEpoch = useRef(0);
+  useEffect(() => {
+    if (!speech) return;
+    let live = true;
+    void speech("status")
+      .then((value) => {
+        if (live) setVoice(value);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+      voiceEpoch.current++;
+      if (voiceActive.current) void speech("cancel");
+    };
+  }, [speech]);
+  const applyVoice = useCallback(
+    (value: { available: boolean; state: string; text: string }) => {
+      if (!voiceActive.current) return;
+      setVoice(value);
+      if (voiceActive.current && !["starting", "recording", "stopping"].includes(value.state)) {
+        voiceActive.current = false;
+        if ((value.state === "done" || value.state === "timeout") && value.text) insertSpeech(value.text);
+        setVoiceMessage(
+          value.state === "denied"
+            ? t("未获得麦克风或语音识别权限。", "Microphone or speech permission denied.")
+            : value.state === "unavailable"
+              ? t("本机语音识别不可用。", "On-device speech recognition is unavailable.")
+              : value.state === "timeout"
+                ? t("录音已超时结束，请检查文字。", "Recording timed out; review the text.")
+                : value.state === "error"
+                  ? t("语音识别失败，请重试。", "Speech recognition failed; try again.")
+                  : value.state === "done" && !value.text
+                    ? t("没有识别到语音。", "No speech was recognized.")
+                    : "",
+        );
+      }
+    },
+    [insertSpeech, t],
+  );
+  useEffect(() => {
+    if (!speech || !["starting", "recording", "stopping"].includes(voice.state)) return;
+    const epoch = voiceEpoch.current;
+    const timer = setInterval(() => {
+      void speech("status")
+        .then((value) => {
+          if (epoch === voiceEpoch.current) applyVoice(value);
+        })
+        .catch(() => {
+          if (epoch === voiceEpoch.current)
+            setVoiceMessage(t("语音识别连接失败。", "Speech connection failed."));
+        });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [speech, voice.state, applyVoice, t]);
   const [projects, setProjects] = useState<{ cutoff: string; items: DoingProject[] } | null>(null);
   useEffect(() => {
     let active = true;
@@ -213,6 +281,66 @@ export function LifeHome({
             onChange={(event) => setAskText(event.target.value)}
             placeholder={t("写下来，或使用系统听写", "Write here or use system dictation")}
           />
+          {voice.available && speech && (
+            <div>
+              {!["starting", "recording", "stopping"].includes(voice.state) ? (
+                <button
+                  type="button"
+                  className={css.btn}
+                  onClick={() => {
+                    setVoiceMessage("");
+                    const epoch = ++voiceEpoch.current;
+                    voiceActive.current = true;
+                    void speech("start", locale)
+                      .then((value) => {
+                        if (epoch === voiceEpoch.current) applyVoice(value);
+                      })
+                      .catch(() => {
+                        if (epoch !== voiceEpoch.current) return;
+                        voiceActive.current = false;
+                        setVoiceMessage(t("无法启动语音。", "Could not start speech."));
+                      });
+                  }}
+                >
+                  {t("说一段", "Speak")}
+                </button>
+              ) : (
+                <>
+                  <output>
+                    {voice.state === "recording" ? t("正在听…", "Listening…") : t("正在处理…", "Working…")}
+                  </output>
+                  {voice.state === "recording" && (
+                    <button
+                      type="button"
+                      className={css.btn}
+                      onClick={() => {
+                        const epoch = voiceEpoch.current;
+                        void speech("stop").then((value) => {
+                          if (epoch === voiceEpoch.current) applyVoice(value);
+                        });
+                      }}
+                    >
+                      {t("完成", "Done")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      const epoch = ++voiceEpoch.current;
+                      voiceActive.current = false;
+                      void speech("cancel").then((value) => {
+                        if (epoch === voiceEpoch.current) setVoice(value);
+                      });
+                    }}
+                  >
+                    {t("取消", "Cancel")}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {voiceMessage && <output>{voiceMessage}</output>}
           <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
             {t("去问问继续", "Continue in Ask")}
           </button>

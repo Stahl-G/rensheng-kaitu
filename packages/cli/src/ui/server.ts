@@ -88,6 +88,7 @@ export interface UiOptions {
   openAi?: () => Promise<{ url?: string }>;
   pickDirectory?: () => Promise<string | null>;
   desktopUpdate?: (action: string) => Promise<unknown>;
+  speech?: (action: string, locale?: string) => Promise<unknown>;
   /** 开图 App 的插件：list、install、remove、open（打开 DSH 窗口里的插件页面）。 */
   plugins?: (action: string, input?: string) => Promise<unknown>;
   systemLocale?: string;
@@ -533,6 +534,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             : 3 * 1024 * 1024,
         );
         if (!Array.isArray(args)) throw new KaituError("参数必须是数组", "BAD_ARGS");
+        if (method === "speech") {
+          const action = String(args[0] ?? "status");
+          if (!["status", "start", "stop", "cancel"].includes(action))
+            throw new KaituError("无效语音操作", "BAD_ARGS");
+          return json(
+            res,
+            200,
+            options.speech
+              ? await options.speech(action, String(args[1] ?? ""))
+              : { state: "unavailable", text: "", available: false },
+          );
+        }
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
         if (method === "desktopUpdate")
           return json(
