@@ -20,4 +20,5 @@
 9. 验证用的设施（测试机、合成工作区、走查清单、截图脚本）可以建，但放在仓库外，不算产品代码，也不受第 6 条“不加测试”的限制。
 10. 新文件、新目录、新字段先查有没有通用标准或主流工具的叫法（如 AGENTS.md、SKILL.md、iCalendar、vCard、OPML、GeoJSON、beancount、Obsidian 属性），有就照用；没有才自己起名，并在 PR 描述里写明查过什么。已有的数据不为改名而改名，需要对齐时优先加一份标准格式的导出。
 
-11. 普通个人事实、偏好与决定按当前用户授权自动记录，不要求逐条确认。生成指南与 import-chatgpt-memory Skill 必须一致；记忆新增可选 origin/observed_at/evidence/uncertainty/replaces 字段见 schemas/memory.schema.json。纠正以新条关联旧条，保留原文；AI估算和建议不得升级为用户事实或承诺。外发、共享、不可恢复删除、凭据和系统权限边界保持。
+11. 界面不写解释性文字：不加说明行、提示小字、图注、「放心」「不会……」「都还在」之类的安抚句，也不在按钮旁解释它会做什么。界面只放内容、状态和操作；看不懂说明设计要改，不靠加一句话补。错误提示只写发生了什么和能做什么。
+12. 普通个人事实、偏好与决定按当前用户授权自动记录，不要求逐条确认。生成指南与 import-chatgpt-memory Skill 必须一致；记忆新增可选 origin/observed_at/evidence/uncertainty/replaces 字段见 schemas/memory.schema.json。纠正以新条关联旧条，保留原文；AI估算和建议不得升级为用户事实或承诺。外发、共享、不可恢复删除、凭据和系统权限边界保持。
