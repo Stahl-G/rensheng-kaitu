@@ -241,6 +241,60 @@ test("project and learning content explores land without claiming recent activit
   expect(scoreDomain(d, new Date("2026-10-27"))).toMatchObject({ clarity: 0.18, glow: 0 });
 });
 
+test("cached activity selection refreshes across event boundaries and backwards without file changes", async () => {
+  const ws = await freshWorkspace();
+  for (const date of ["2026-01-01", "2026-10-26", "2026-11-09", "2026-12-01"])
+    addRecord(
+      ws,
+      "workout",
+      { exercise: "合成训练", sets: 3, reps: 5, weight_kg: 20, session_id: date, ts: `${date}T10:00:00Z` },
+      { by: "user" },
+    );
+  for (let i = 2; i <= 7; i++)
+    addRecord(
+      ws,
+      "workout",
+      {
+        exercise: "合成待核",
+        sets: 3,
+        reps: 5,
+        weight_kg: 20,
+        session_id: `other-${i}`,
+        ts: `2026-12-0${i}T10:00:00Z`,
+      },
+      { by: "agent" },
+    );
+  async function at(now: Date) {
+    for (let i = 0; i < 1000; i++) {
+      const state = readLifeAtlas(ws, undefined, now);
+      if (!state.loading) {
+        expect(state.error).toBeNull();
+        return state;
+      }
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    throw new Error("source did not settle");
+  }
+  const initial = new Date("2026-10-27");
+  await at(initial);
+  generateLifeAtlas(ws, { domains: ["health"] });
+  await settled(ws);
+  const key = readLifeAtlas(ws).resource?.key;
+  for (const time of ["2026-11-10", "2026-10-27", "2025-12-31"]) {
+    const now = new Date(time);
+    const warm = await at(now);
+    const source = atlasSource(ws, now);
+    const fresh = mapDomains(source.data, {
+      version: 1,
+      discover: false,
+      domains: source.rules.filter((r) => r.id === "health"),
+    })[0];
+    expect(warm.domains[0].score).toEqual(scoreDomain(fresh, now));
+    expect(warm.resource?.key).toBe(key);
+    expect(warm.running).toBe(false);
+  }
+}, 40_000);
+
 test("activity selection and scoring share an injected clock", async () => {
   const ws = await freshWorkspace();
   const dates = [

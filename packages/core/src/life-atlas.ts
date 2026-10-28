@@ -215,6 +215,15 @@ export function readLifeAtlas(
 ): LifeAtlasState {
   const s = session(ws);
   s.requested = true;
+  const window = s.source?.selectionWindow;
+  if (
+    !s.loading &&
+    !s.sourceError &&
+    window &&
+    ((window.from !== null && now.getTime() < window.from) ||
+      (window.until !== null && now.getTime() >= window.until))
+  )
+    s.dirty = true;
   refreshSource(s, now);
   const candidate = s.manifest.candidates.find((c) => c.id === (id ?? s.manifest.active) && !c.archived);
   if (id && !candidate) throw new KaituError("地图方案不存在", "NOT_FOUND");

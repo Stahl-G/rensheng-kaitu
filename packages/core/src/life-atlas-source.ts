@@ -17,12 +17,15 @@ export interface AtlasSource {
   rules: DomainRule[];
   modules: { id: string; title: string; available: boolean; recommended: boolean }[];
   gaps: string[];
+  /** Internal cache validity for time-dependent activity selection; not a persisted map field. */
+  selectionWindow: { from: number | null; until: number | null };
 }
 
 /** Runs in the background worker; uses the existing workspace reader and record revision semantics. */
 export function atlasSource(ws: Workspace, now = new Date()): AtlasSource {
   const domains = new Map<string, { id: string; title: string; facts: Fact[]; priority?: number }>();
   const gaps: string[] = [];
+  const selectionWindow: AtlasSource["selectionWindow"] = { from: null, until: null };
   const sources: string[] = [];
   let bytesRead = 0;
   const add = (id: string, title: string, fact?: Fact) => {
@@ -224,6 +227,17 @@ export function atlasSource(ws: Workspace, now = new Date()): AtlasSource {
         .filter(isActualWorkout)
         .sort((a, b) => Date.parse(String(a.ts)) - Date.parse(String(b.ts)));
       const latestCompleted = verified.findLast((row) => Date.parse(String(row.ts)) <= now.getTime());
+      const next = verified.find((row) => Date.parse(String(row.ts)) > now.getTime());
+      if (latestCompleted)
+        selectionWindow.from = Math.max(
+          selectionWindow.from ?? Number.NEGATIVE_INFINITY,
+          Date.parse(String(latestCompleted.ts)),
+        );
+      if (next)
+        selectionWindow.until = Math.min(
+          selectionWindow.until ?? Number.POSITIVE_INFINITY,
+          Date.parse(String(next.ts)),
+        );
       for (const row of [verified[0], latestCompleted, verified.at(-1)])
         if (row && !selected.some((item) => item.id === row.id)) selected.unshift(row);
     }
@@ -303,6 +317,7 @@ export function atlasSource(ws: Workspace, now = new Date()): AtlasSource {
       (["health", "work"].indexOf(b.id) < 0 ? 2 : ["health", "work"].indexOf(b.id)),
   );
   return {
+    selectionWindow,
     data: { title: "人生地图", domains: [...domains.values()], sources, bytesRead, gaps },
     rules,
     modules: ordered.map((d) => ({
