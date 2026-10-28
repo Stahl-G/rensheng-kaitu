@@ -395,14 +395,20 @@ export function createSdkRuntime({
     async catalogSettings(includeSaved = false) {
       // 仅 AI 设置和模型选择器显式读取完整目录；失败不能假装没有已保存服务商。
       await loadDirectory();
-      const settings = await api.settings();
+      let settings;
+      let modelCapabilityError;
+      try {
+        settings = await api.settings();
+      } catch {
+        settings = connectionInfo({ ...(await loadSettings()), configured: false });
+        modelCapabilityError = true;
+      }
       const saved =
         includeSaved || !providers.some((entry) => entry.id === settings.provider)
           ? await savedProviders()
           : undefined;
-      let modelCapabilityError;
       let models = siwcModels;
-      if (settings.provider === "chatgpt-siwc") {
+      if (settings.provider === "chatgpt-siwc" && !modelCapabilityError) {
         try {
           models = await api.models({ provider: "chatgpt-siwc" });
         } catch {

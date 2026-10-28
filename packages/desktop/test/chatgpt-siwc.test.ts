@@ -271,6 +271,22 @@ test("a model capability failure preserves the other saved providers", async () 
   }
 });
 
+test("unavailable ChatGPT status does not hide other saved models", async () => {
+  const f = fixture();
+  f.select();
+  writeFileSync(f.unavailable, "fail");
+  try {
+    const catalog = await f.sdk.catalogSettings(true);
+    expect(catalog.modelCapabilityError).toBe(true);
+    expect(
+      catalog.saved.some((row) => row.provider === "deepseek-official" && row.models.includes("synthetic")),
+    ).toBe(true);
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
 test("non-ChatGPT saves and saved models work when SIWC is unavailable; invalid ChatGPT selections preserve settings", async () => {
   const f = fixture();
   f.select("deepseek-official");
