@@ -1115,7 +1115,6 @@ function Overview({
               capture={capture}
               start={() => setCaptureOpen(true)}
               library={() => openRecord(data.notes.length ? "inbox" : "")}
-              addNext={() => (data.plans.goals.length ? openRecord("projects") : startMatter(""))}
               busy={busy}
               loadProjects={props.loadProjects}
               openProject={(slug) => {
@@ -1127,10 +1126,6 @@ function Overview({
                 const saved = await props.capture(text);
                 await refresh();
                 return saved;
-              }}
-              complete={async (item) => {
-                await props.completeNext(item.file, item.id);
-                await refresh();
               }}
               source={(entry) => {
                 openRecord("inbox");

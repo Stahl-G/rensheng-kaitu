@@ -14,7 +14,6 @@ import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import {
   nextPresentation,
-  todayChoices,
   todayDate,
   todayProjectDate,
   todayProjectFacts,
@@ -28,12 +27,10 @@ export function LifeHome({
   writing,
   start,
   library,
-  addNext,
   handover,
   memory,
   busy,
   save,
-  complete,
   source,
   adopt,
   dismiss,
@@ -49,12 +46,10 @@ export function LifeHome({
   writing: boolean;
   start: () => void;
   library: () => void;
-  addNext: () => void;
   handover: () => void;
   memory: () => void;
   busy: boolean;
   save: (text: string) => Promise<unknown>;
-  complete: (item: OverviewNext) => Promise<unknown>;
   source: (entry: OverviewSource) => void;
   adopt: (id: string) => void;
   dismiss: (id: string) => void;
@@ -81,7 +76,6 @@ export function LifeHome({
     [projects, data.cutoff, data.today, locale],
   );
   const composing = useRef(false);
-  const [energy, setEnergy] = useState(60);
   const sourceRegion = useRef<HTMLElement>(null);
   const sourceTrigger = useRef<HTMLButtonElement | null>(null);
   const [factSource, setFactSource] = useState<OverviewMetric | null>(null);
@@ -92,11 +86,7 @@ export function LifeHome({
     setFactSource(null);
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
-  const [resting, setResting] = useState<string | null>(null);
-  const [picked, setPicked] = useState<OverviewNext | null>(null);
-  const [pickedOpening, setPickedOpening] = useState(false);
   const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const savingRef = useRef(false);
@@ -142,7 +132,6 @@ export function LifeHome({
   const question = saved
     ? noteBody(saved.text).split("\n")[1] || questionRef.current.text
     : questionRef.current.text;
-  const choices = useMemo(() => todayChoices(data, energy), [data, energy]);
   const facts = useMemo(
     () =>
       data.metrics
@@ -342,152 +331,6 @@ export function LifeHome({
           <button type="button" className={css.link} onClick={closeSource}>
             {t("收起来源", "Close source")}
           </button>
-        </section>
-      )}
-      {!firstVisit && (
-        <section className={todayCss.pick}>
-          <h2>
-            {resting && energy === 5
-              ? t("此刻，休息就好", "Rest is enough for now")
-              : t("此刻，挑一件就好", "Pick just one thing for now")}
-          </h2>
-          {!picked ? (
-            <>
-              <div className={todayCss.energy}>
-                {[
-                  [60, t("有一小时", "An hour")],
-                  [10, t("只有十分钟", "Ten minutes")],
-                  [5, t("有点累", "A little tired")],
-                ].map(([value, label]) => (
-                  <button
-                    type="button"
-                    className={css.link}
-                    key={value}
-                    aria-pressed={energy === value}
-                    onClick={() => {
-                      setEnergy(Number(value));
-                      setResting(null);
-                    }}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              {energy === 5 ? (
-                <div className={todayCss.restChoices} data-selected={!!resting}>
-                  {resting ? (
-                    <>
-                      <p className={todayCss.doing}>{resting}</p>
-                      <button type="button" className={css.link} onClick={() => setResting(null)}>
-                        {t("换一件", "Choose another")}
-                      </button>
-                    </>
-                  ) : (
-                    [
-                      t("歇一会儿", "Take a breather"),
-                      t("看看窗外", "Look out the window"),
-                      t("什么都不做也行", "It's okay to do nothing"),
-                    ].map((option) => (
-                      <button
-                        type="button"
-                        className={css.link}
-                        key={option}
-                        aria-pressed={resting === option}
-                        onClick={() => setResting(option)}
-                      >
-                        {option}
-                      </button>
-                    ))
-                  )}
-                </div>
-              ) : (
-                <>
-                  {choices.map(({ item, goal, minutes, opening }) => (
-                    <div className={todayCss.choice} key={`${item.file}:${item.id}`}>
-                      <button
-                        type="button"
-                        className={css.link}
-                        onClick={() => {
-                          setPicked(item);
-                          setPickedOpening(opening);
-                        }}
-                      >
-                        {opening ? t("先开个头：", "Start with: ") : ""}
-                        {nextPresentation(item, locale).title}
-                      </button>
-                      <small>
-                        {t("为了：", "For: ")}
-                        {goal}
-                      </small>
-                      {minutes !== null && (
-                        <small>
-                          {opening
-                            ? t(`整件事约 ${minutes} 分钟`, `Whole step: about ${minutes} minutes`)
-                            : t(`约 ${minutes} 分钟`, `About ${minutes} minutes`)}
-                        </small>
-                      )}
-                    </div>
-                  ))}
-                  {!choices.length && (
-                    <button type="button" className={css.link} onClick={addNext}>
-                      {t("写下一个下一步", "Write down a next step")}
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              <p className={todayCss.doing}>
-                {pickedOpening ? t("先开个头：", "Starting with: ") : t("在做：", "Doing: ")}
-                {nextPresentation(picked, locale).title}
-              </p>
-              {result === null ? (
-                <button type="button" className={css.link} onClick={() => setResult("")}>
-                  {pickedOpening
-                    ? t("先停下，记一句", "Pause — keep a sentence")
-                    : t("做完了，记一句", "Done — keep a sentence")}
-                </button>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!result.trim()) return;
-                    void store(
-                      `${pickedOpening ? t("先开个头：", "Started: ") : ""}${picked.title}\n${result.trim()}`,
-                      () => {
-                        return (pickedOpening ? Promise.resolve() : complete(picked)).then(() => {
-                          setPicked(null);
-                          setResult(null);
-                        });
-                      },
-                    );
-                  }}
-                >
-                  <textarea
-                    aria-label={t("这次的结果", "What happened")}
-                    value={result}
-                    onChange={(e) => setResult(e.target.value)}
-                    disabled={saving}
-                  />
-                  <button className={css.btn} type="submit" disabled={saving || !result.trim()}>
-                    {t("保存结果", "Save result")}
-                  </button>
-                </form>
-              )}
-              <button
-                type="button"
-                className={css.link}
-                disabled={saving}
-                onClick={() => {
-                  setPicked(null);
-                  setResult(null);
-                }}
-              >
-                {t("换一件", "Choose another")}
-              </button>
-            </>
-          )}
         </section>
       )}
       <section className={todayCss.question}>

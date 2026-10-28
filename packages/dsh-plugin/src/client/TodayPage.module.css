@@ -577,9 +577,7 @@
   overflow-wrap: anywhere;
 }
 .mirrorHome h1,
-.mirror,
-.doing,
-.choice > button {
+.mirror {
   font-family: var(--serif);
   font-weight: 400;
 }
@@ -611,61 +609,13 @@
   box-decoration-break: clone;
   text-decoration: none;
 }
-.restChoices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-.restChoices output {
-  flex-basis: 100%;
-  color: var(--ink2);
-}
-.pick {
-  border-top: 1px solid var(--line);
-  margin-top: 32px;
-  padding: 26px 0;
-}
-.pick h2,
 .question h2,
 .aiSuggestions h2 {
   font-size: 15px;
   font-weight: 600;
 }
-.energy {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin: 20px 0;
-}
-.energy button[aria-pressed="true"] {
-  text-decoration: underline;
-  text-underline-offset: 6px;
-}
-.choice {
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
-}
-.choice > button {
-  display: block;
-  font-size: 23px;
-  text-align: start;
-}
-.choice small {
-  display: block;
-  color: var(--ink2);
-  margin-top: 5px;
-}
-.doing {
-  font-size: 25px;
-}
-.pick form {
-  display: grid;
-  gap: 12px;
-}
-.pick > button {
-  margin: 12px 20px 0 0;
-}
 .question {
+  margin-top: 32px;
   border: 1px solid var(--line);
   padding: 24px;
   border-radius: 8px;
@@ -706,9 +656,6 @@
   }
   .question {
     padding: 18px;
-  }
-  .energy {
-    gap: 14px;
   }
 }
 
@@ -773,13 +720,4 @@
 }
 .question form > button {
   flex-shrink: 0;
-}
-
-.restChoices[data-selected="true"] {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-}
-.restChoices[data-selected="true"] .doing {
-  margin: 0;
 }
