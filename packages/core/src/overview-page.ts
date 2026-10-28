@@ -12,7 +12,7 @@ import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, summarizeStatus, workoutSessions } from "./status.js";
 import { localDate, localMonth, parseTs } from "./time.js";
-import { readWorkbench } from "./workbench.js";
+import { type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 const RECORD_NAMES: Record<string, string> = {
@@ -60,8 +60,8 @@ function organizerOn(ws: Workspace): boolean {
 }
 
 /** 总览只做查询与投影，文件和记录均通过现有 core 接口读取。 */
-export async function readOverviewPage(ws: Workspace, now = new Date()) {
-  const data = readWorkbench(ws, now);
+export async function readOverviewPage(ws: Workspace, now = new Date(), loaded?: WorkbenchData) {
+  const data = loaded ?? readWorkbench(ws, now);
   const status = summarizeStatus(data);
   const cutoff = now.toISOString();
   const localDays = new Map<string, string>();
