@@ -85,3 +85,72 @@ test("model search chooses the matching provider and a failed switch keeps the o
     if (root) act(() => root.unmount());
   }
 });
+
+test("closing and reopening the picker discards an earlier model response", async () => {
+  const settings = {
+    configured: true,
+    choice: "builtin",
+    provider: "first",
+    providerName: "First",
+    model: "shared",
+    protocols: [],
+    providers: [],
+    localAgents: [],
+  };
+  let resolveOld!: (value: unknown) => void;
+  let loads = 0;
+  vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    const args = JSON.parse(init.body);
+    let value: unknown = {};
+    if (method === "askSettings") value = settings;
+    else if (method === "askList") value = [];
+    else if (method === "overview") value = { projects: [], allNext: [], notes: [] };
+    else if (method === "automation") value = { asked: true, tasks: {} };
+    else if (method === "askSupport" && args[0] === "builtinSettings") {
+      loads++;
+      value =
+        loads === 1
+          ? await new Promise((resolve) => {
+              resolveOld = resolve;
+            })
+          : { ...settings, saved: [{ provider: "new", name: "New", models: ["new-model"] }] };
+    } else if (method === "askSupport") value = { authenticated: false };
+    return { ok: true, json: async () => value };
+  });
+  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal(
+    "EventSource",
+    class {
+      close() {}
+    },
+  );
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AskPage, { workspace: "synthetic" }));
+    });
+    const button = () => root.root.findAllByType("button").find((x) => x.props["aria-label"] === "选择模型");
+    await act(async () => {
+      button()?.props.onClick();
+    });
+    await act(async () => {
+      button()?.props.onClick();
+    });
+    await act(async () => {
+      button()?.props.onClick();
+    });
+    await act(async () => {
+      resolveOld({ ...settings, saved: [{ provider: "old", name: "Old", models: ["old-model"] }] });
+    });
+    const labels = root.root
+      .findAllByType("button")
+      .flatMap((item) => item.children.filter((part) => typeof part === "string"));
+    expect(labels).toContain("new-model");
+    expect(labels).not.toContain("old-model");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});

@@ -336,6 +336,15 @@ export function AskPage({
   };
   const [questions, setQuestions] = useState<string[]>([]);
   const [modelMenu, setModelMenu] = useState(false);
+  useEffect(() => {
+    if (!modelMenu) modelRequestSeq.current++;
+  }, [modelMenu]);
+  useEffect(
+    () => () => {
+      modelRequestSeq.current++;
+    },
+    [],
+  );
   const [catalogStatus, setCatalogStatus] = useState<string | null>(null);
   const selectThread = (id: string | null, follow = false) => {
     nearBottom.current = !id || follow;
