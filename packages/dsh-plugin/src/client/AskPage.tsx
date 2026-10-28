@@ -767,9 +767,7 @@ export function AskPage({
   handoffSelect.current = selectThread;
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
-  const [handoffState, setHandoffState] = useState<
-    "saved" | "sending" | "retry" | "uncertain" | "failed" | null
-  >(null);
+  const [handoffState, setHandoffState] = useState<"sending" | "retry" | "uncertain" | "failed" | null>(null);
   const checkHandoff = useCallback(async () => {
     if (!autoSubmit) return;
     const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
@@ -1404,15 +1402,13 @@ export function AskPage({
         )}
         {handoffState && (
           <output className={css.notice}>
-            {handoffState === "saved"
-              ? t("已保存", "Saved")
-              : handoffState === "sending"
-                ? t("已保存，正在发送…", "Saved, sending…")
-                : handoffState === "retry"
-                  ? t("已保存，未能发送", "Saved, not sent")
-                  : handoffState === "failed"
-                    ? t("回复未完成", "Response failed")
-                    : t("发送结果未知", "Send status unknown")}
+            {handoffState === "sending"
+              ? t("已保存，正在发送…", "Saved, sending…")
+              : handoffState === "retry"
+                ? t("已保存，未能发送", "Saved, not sent")
+                : handoffState === "failed"
+                  ? t("回复未完成", "Response failed")
+                  : t("发送结果未知", "Send status unknown")}
             {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
               autoSubmit && <p>{autoSubmit.text}</p>}
             {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
