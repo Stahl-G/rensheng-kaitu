@@ -40,6 +40,7 @@ import {
   cancelOnboardingPreview,
   cancelTask,
   captureNote,
+  captureNoteOnce,
   changeExperienceBatch,
   changeLifeAtlas,
   changeOnboardingNext,
@@ -93,6 +94,7 @@ import {
   readAutomation,
   readAvatar,
   readCalendar,
+  readCaptureReceipt,
   readDirectionMap,
   readDoing,
   readExperienceImports,
@@ -209,6 +211,7 @@ export const productMutations = new Set([
   "recoverExperienceImports",
   "explorationWrite",
   "capture",
+  "captureOnce",
   "decideProposal",
   "resolveExperience",
   "saveHometown",
@@ -485,6 +488,10 @@ export async function productRequest(
     }
     case "capture":
       return captureNote(ws, text(0));
+    case "captureOnce":
+      return captureNoteOnce(ws, text(0), text(1));
+    case "captureReceipt":
+      return readCaptureReceipt(ws, text(0));
     case "me":
       return readMe(ws);
     case "health":

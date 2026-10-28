@@ -62,6 +62,7 @@ import {
   cancelOnboardingPreview,
   cancelTask,
   captureNote,
+  captureNoteOnce,
   changeExperienceBatch,
   changeOnboardingNext,
   completeNext,
@@ -105,6 +106,7 @@ import {
   readAutomation,
   readAvatar,
   readCalendar,
+  readCaptureReceipt,
   readDoing,
   readExperienceImports,
   readExperienceSource,
@@ -191,7 +193,7 @@ declare module "@deepseek-ai/cordis" {
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
-  private readonly scheduleLearningVersion: (message: string) => void;
+  private readonly scheduleVersion: (message: string) => void;
 
   constructor(
     ctx: Context,
@@ -207,10 +209,10 @@ export class KaituOverviewService extends TypertRemoteService {
       this.files.dispose();
       disposeNoteIndex(this.workspace);
     });
-    this.scheduleLearningVersion = (message) => {
+    this.scheduleVersion = (message) => {
       setImmediate(() => {
         void this.write(() => snapshot(this.workspace, message)).catch((error) =>
-          ctx.logger.warn(`学习资料已保存，后台版本记录未完成：${String(error)}`),
+          ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`),
         );
       });
     };
@@ -422,16 +424,14 @@ export class KaituOverviewService extends TypertRemoteService {
   async learningStart(
     input: StartLearningInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
-    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleLearningVersion));
+    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleVersion));
   }
 
   @Remote("learningSave")
   async learningSave(
     input: LearningCheckinInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string; replayed?: boolean }> {
-    return this.write(() =>
-      saveLearningCheckin(this.workspace, input, new Date(), this.scheduleLearningVersion),
-    );
+    return this.write(() => saveLearningCheckin(this.workspace, input, new Date(), this.scheduleVersion));
   }
 
   @Remote("calendar")
@@ -590,6 +590,18 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("capture")
   async capture(text: string): Promise<{ path: string; version: string | null }> {
     return this.write(() => captureNote(this.workspace, text));
+  }
+
+  @Remote("captureOnce")
+  async captureOnce(text: string, operationId: string): Promise<Awaited<ReturnType<typeof captureNoteOnce>>> {
+    return this.write(() =>
+      captureNoteOnce(this.workspace, text, operationId, { scheduleVersion: this.scheduleVersion }),
+    );
+  }
+
+  @Remote("captureReceipt")
+  async captureReceipt(operationId: string): Promise<ReturnType<typeof readCaptureReceipt>> {
+    return readCaptureReceipt(this.workspace, operationId);
   }
 
   @Remote("archiveMemory")
