@@ -616,24 +616,26 @@ export function LifeHome({
           </button>
         </section>
       )}
-      <footer className={todayCss.homeLinks}>
-        <button id="life-capture-start" type="button" className={css.link} onClick={start}>
-          {t("随手记一句", "Keep a quick note")}
-        </button>
-        <button type="button" className={css.link} onClick={library}>
-          {todayNotes?.day === data.today
-            ? t(
-                `今天记了 ${todayNotes.entries.length} 条 · 在资料里`,
-                `${todayNotes.entries.length} notes today · Library`,
-              )
-            : t("在资料里回看", "Read in Library")}
-        </button>
-        {firstVisit ? (
-          <button type="button" className={css.link} onClick={memory}>
-            {t("搬入 AI 记忆、对话或资料", "Bring AI memories, conversations or files")}
+      {!home && (
+        <footer className={todayCss.homeLinks}>
+          <button id="life-capture-start" type="button" className={css.link} onClick={start}>
+            {t("随手记一句", "Keep a quick note")}
           </button>
-        ) : null}
-      </footer>
+          <button type="button" className={css.link} onClick={library}>
+            {todayNotes?.day === data.today
+              ? t(
+                  `今天记了 ${todayNotes.entries.length} 条 · 在资料里`,
+                  `${todayNotes.entries.length} notes today · Library`,
+                )
+              : t("在资料里回看", "Read in Library")}
+          </button>
+          {firstVisit ? (
+            <button type="button" className={css.link} onClick={memory}>
+              {t("搬入 AI 记忆、对话或资料", "Bring AI memories, conversations or files")}
+            </button>
+          ) : null}
+        </footer>
+      )}
       {writing && capture}
     </section>
   );

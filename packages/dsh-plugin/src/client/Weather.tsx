@@ -230,9 +230,7 @@ export function TodayWeather({
           }
         }}
       >
-        <label htmlFor="weather-city">
-          {t("告诉开图你在哪个城市，这里就显示天气", "Tell Kaitu your city to see the weather here")}
-        </label>
+        <label htmlFor="weather-city">{t("选择城市", "Choose city")}</label>
         <input
           id="weather-city"
           value={draft}
