@@ -1110,6 +1110,32 @@
 .continueCard {
   min-width: 0;
 }
+@media (min-width: 761px) and (max-height: 800px) {
+  .continueSection,
+  .savepointCard {
+    padding: 14px;
+  }
+  .sectionHeading {
+    margin-bottom: 8px;
+  }
+  .continueCard {
+    padding: 8px;
+    margin-top: 8px;
+    gap: 10px;
+  }
+  .projectSymbol {
+    width: 44px;
+    height: 48px;
+    font-size: 24px;
+  }
+  .projectChoice h3 {
+    font-size: 18px;
+  }
+  .savepointSide .savepointCard > p {
+    padding-top: 8px;
+    margin-top: 8px;
+  }
+}
 @media (max-width: 760px) {
   .projectSymbol {
     width: 44px;
