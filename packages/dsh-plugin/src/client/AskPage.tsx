@@ -775,7 +775,7 @@ export function AskPage({
     const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
     setHandoffState(
       receipt.status === "completed"
-        ? "saved"
+        ? null
         : receipt.status === "running"
           ? "sending"
           : receipt.status === "ready" || receipt.status === "not_found"

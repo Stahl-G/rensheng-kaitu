@@ -155,7 +155,9 @@ export function readHome(input: HomeSources): HomeData {
             due: raw.due ?? null,
             precondition: unique
               ? tasks.length
-                ? { kind: "task", expectedRev: tasks[0]?.rev ?? 1 }
+                ? typeof tasks[0]?.rev === "number" && Number.isInteger(tasks[0].rev) && tasks[0].rev >= 1
+                  ? { kind: "task", expectedRev: tasks[0].rev }
+                  : null
                 : { kind: "status", expectedNext: statusNext[0] as NextItem }
               : null,
           }
@@ -209,7 +211,7 @@ export function readHome(input: HomeSources): HomeData {
         ["words", entry.words],
         ["commits", entry.commits],
       ] as const) {
-        if (value === null) continue;
+        if (value === null || value === 0) continue;
         traces.push({
           key: `project:${project.slug}:${date}:${unit}`,
           date,
@@ -253,11 +255,18 @@ export function readHome(input: HomeSources): HomeData {
     });
   }
   traces.sort((a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key));
+  const sources = new Set<string>();
+  const recentTraces = traces.filter((trace) => {
+    const source = trace.kind === "project-metric" ? trace.key.split(":").slice(0, 2).join(":") : trace.key;
+    if (sources.has(source)) return false;
+    sources.add(source);
+    return true;
+  });
   return {
     today: overview.today,
     lastAuthored: null,
     threads,
-    traces: traces.slice(0, 3),
+    traces: recentTraces.slice(0, 3),
     pending: overview.proposedTasks.slice(0, 2).map(({ id, title }) => ({ id, title })),
     atlas: null,
   };
