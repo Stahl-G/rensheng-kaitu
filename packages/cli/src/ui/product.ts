@@ -315,6 +315,8 @@ export async function productRequest(
       }
       case "askList":
         return ask.list();
+      case "askHandoffStatus":
+        return ask.handoffStatus(text(0));
       case "askCreate":
         return ask.create(typeof args[0] === "string" ? args[0] : undefined);
       case "askOrganize":

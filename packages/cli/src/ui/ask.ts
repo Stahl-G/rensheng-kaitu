@@ -30,7 +30,7 @@ export function effectiveAskMode(settings: { fullOnly?: boolean }, connection = 
   return settings.fullOnly && connection === "local-ask" ? "full" : "scoped";
 }
 export interface AskThread {
-  handoff?: { requestId: string; phase: "ready" | "started" };
+  handoff?: { requestId: string; phase: "ready" | "started" | "completed" | "failed" | "uncertain" };
   mode?: AskMode;
   backend?: string;
   /** 每个 AI 连接看过的事件数；换回来时只补它没看过的部分。 */
@@ -59,6 +59,10 @@ export interface AskService {
   background(connection?: AgentConnectionId, options?: { textOnly?: boolean }): AskService;
   list(): AskThread[];
   create(requestId?: string): Promise<AskThread>;
+  handoffStatus(requestId: string): {
+    status: "not_found" | "ready" | "running" | "completed" | "failed" | "uncertain";
+    sessionId?: string;
+  };
   organize(id: string, change: { title?: unknown; pinned?: unknown; archived?: unknown }): AskThread;
   remove(id: string): void;
   events(id: string): AskEvent[];
@@ -185,7 +189,7 @@ export function createAskService(options: {
       : [];
   };
   const discardEmptyThread = (id: string) => {
-    if (thread(id).handoff?.phase === "started") return;
+    if (thread(id).handoff && thread(id).handoff?.phase !== "ready") return;
     if (busy.has(id) || events(id).some((event) => event.type !== "session.status")) return;
     threads.splice(
       threads.findIndex((row) => row.id === id),
@@ -278,6 +282,14 @@ export function createAskService(options: {
             };
             if (event?.type === "turn/end") {
               const reason = event.data.reason as { kind?: string } | undefined;
+              const handoff = thread(id).handoff;
+              if (
+                handoff?.phase === "started" &&
+                ["completed", "error", "blocked"].includes(reason?.kind ?? "")
+              ) {
+                handoff.phase = reason?.kind === "completed" ? "completed" : "failed";
+                saveIndex();
+              }
               if (reason?.kind === "error" || reason?.kind === "blocked") {
                 busy.delete(id);
                 append(id, "session.status", {
@@ -387,6 +399,16 @@ export function createAskService(options: {
       if (options.transient) temporaryEvents.delete(id);
       else rmSync(join(directory, `${id}.jsonl`), { force: true });
     },
+    handoffStatus(requestId) {
+      ready();
+      const row = threads.find((item) => item.handoff?.requestId === requestId);
+      if (!row?.handoff) return { status: "not_found" };
+      const phase = row.handoff.phase;
+      return {
+        sessionId: row.id,
+        status: phase === "started" ? (busy.has(row.id) ? "running" : "uncertain") : phase,
+      };
+    },
     async create(requestId) {
       ready();
       if (requestId !== undefined && !/^[a-zA-Z0-9_-]{8,128}$/.test(requestId))
@@ -430,9 +452,13 @@ export function createAskService(options: {
     async send(id, text, images = [], requestId = undefined) {
       ready();
       const row = thread(id);
+      if (requestId === undefined && row.handoff?.phase === "started" && !busy.has(id)) {
+        row.handoff.phase = "uncertain";
+        saveIndex();
+      }
       if (requestId !== undefined) {
         if (row.handoff?.requestId !== requestId) throw new KaituError("请求与对话不匹配", "AI_CONNECTION");
-        if (row.handoff.phase === "started") return { status: "already-started" };
+        if (row.handoff.phase !== "ready") return { status: "already-started" };
       }
       if ((row.workspace ?? workspaceKey) !== options.workspace)
         throw new KaituError("资料已迁移，请新建对话继续；原对话记录仍可查看", "AI_CONNECTION");

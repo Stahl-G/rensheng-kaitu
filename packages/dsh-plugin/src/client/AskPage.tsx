@@ -18,7 +18,7 @@ import { DocumentBody } from "./DocumentBody.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
-import type { AskAutoSubmit } from "./ask-handoff.js";
+import type { AskAutoSubmit, AskHandoffStatus } from "./ask-handoff.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
 import { WidgetCard } from "./openmaic/WidgetCard.js";
@@ -756,7 +756,27 @@ export function AskPage({
   handoffSelect.current = selectThread;
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
-  const [handoffState, setHandoffState] = useState<"saved" | "sending" | "retry" | "uncertain" | null>(null);
+  const [handoffState, setHandoffState] = useState<
+    "saved" | "sending" | "retry" | "uncertain" | "failed" | null
+  >(null);
+  const checkHandoff = useCallback(async () => {
+    if (!autoSubmit) return;
+    const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
+    setHandoffState(
+      receipt.status === "completed"
+        ? "saved"
+        : receipt.status === "running"
+          ? "sending"
+          : receipt.status === "ready" || receipt.status === "not_found"
+            ? "retry"
+            : receipt.status,
+    );
+    return receipt;
+  }, [autoSubmit]);
+  useEffect(() => {
+    if (autoSubmit && events.at(-1)?.type === "session.status")
+      void checkHandoff().catch(() => setHandoffState("uncertain"));
+  }, [autoSubmit, events, checkHandoff]);
   useEffect(() => {
     if (!autoSubmit || !loaded) return;
     if (!settings?.configured) {
@@ -774,28 +794,26 @@ export function AskPage({
         if (!current()) return;
         handoffSelect.current(thread.id, true);
         await refreshThreads();
-        if (thread.handoff?.phase === "started") {
-          setHandoffState("uncertain");
+        if (thread.handoff && thread.handoff.phase !== "ready") {
+          await checkHandoff();
           return;
         }
         const references = autoSubmit.references.flatMap((path) => {
           const mention = formatFileMention({ path, kind: "file" }, false);
           return mention ? [mention] : [];
         });
-        const result = await call<{ status?: string }>(
+        await call<{ status?: string }>(
           "askSend",
           thread.id,
           [autoSubmit.text, ...references].join("\n"),
           [],
           autoSubmit.requestId,
         );
-        if (current()) setHandoffState(result?.status === "already-started" ? "uncertain" : "saved");
+        if (current()) await checkHandoff();
       } catch (err) {
         if (!current()) return;
         try {
-          const list = await call<Thread[]>("askList");
-          const existing = list.find((row) => row.handoff?.requestId === autoSubmit.requestId);
-          setHandoffState(existing?.handoff?.phase === "started" ? "uncertain" : "retry");
+          await checkHandoff();
         } catch {
           setHandoffState("uncertain");
         }
@@ -803,7 +821,7 @@ export function AskPage({
       }
     };
     void run();
-  }, [autoSubmit, handoffRetry, loaded, settings?.configured, refreshThreads]);
+  }, [autoSubmit, handoffRetry, loaded, settings?.configured, refreshThreads, checkHandoff]);
   const addFiles = async (files: File[]) => {
     if (!settings?.configured) return;
     if (!files.length || busy || readingFiles) return;
@@ -1381,30 +1399,45 @@ export function AskPage({
                 ? t("已保存，正在发送…", "Saved, sending…")
                 : handoffState === "retry"
                   ? t("已保存，未能发送", "Saved, not sent")
-                  : t("已保存，请查看对话状态", "Saved; check the conversation")}
-            {(handoffState === "retry" || handoffState === "uncertain") && autoSubmit && (
-              <p>{autoSubmit.text}</p>
-            )}
-            {(handoffState === "retry" || handoffState === "uncertain") && autoSubmit && (
-              <small>{autoSubmit.capturedPath}</small>
+                  : handoffState === "failed"
+                    ? t("回复未完成", "Response failed")
+                    : t("发送结果未知", "Send status unknown")}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && <p>{autoSubmit.text}</p>}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && <small>{autoSubmit.capturedPath}</small>}
+            {(handoffState === "uncertain" || handoffState === "failed" || handoffState === "sending") && (
+              <button
+                type="button"
+                onClick={() =>
+                  void checkHandoff()
+                    .then((receipt) => {
+                      if (receipt?.sessionId) handoffSelect.current(receipt.sessionId, true);
+                    })
+                    .catch((err) => setError(String(err)))
+                }
+              >
+                {t("查看对话", "View conversation")}
+              </button>
             )}
             {handoffState === "retry" && settings?.configured && (
               <button type="button" onClick={() => setHandoffRetry((n) => n + 1)}>
                 {t("重试", "Retry")}
               </button>
             )}
-            {(handoffState === "retry" || handoffState === "uncertain") && autoSubmit && (
-              <button
-                type="button"
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(autoSubmit.text)
-                    .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-                }
-              >
-                {t("复制", "Copy")}
-              </button>
-            )}
+            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
+              autoSubmit && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigator.clipboard
+                      .writeText(autoSubmit.text)
+                      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+                  }
+                >
+                  {t("复制", "Copy")}
+                </button>
+              )}
           </output>
         )}
         <form

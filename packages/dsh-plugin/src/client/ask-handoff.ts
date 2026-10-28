@@ -5,3 +5,8 @@ export interface AskAutoSubmit {
   references: string[];
   capturedPath: string;
 }
+
+export interface AskHandoffStatus {
+  status: "not_found" | "ready" | "running" | "completed" | "failed" | "uncertain";
+  sessionId?: string;
+}
