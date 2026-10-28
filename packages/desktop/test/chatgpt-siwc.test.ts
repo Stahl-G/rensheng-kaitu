@@ -47,7 +47,7 @@ rpc.onRequest(async (method, params) => {
   if (method === 'kaitu/saveProvider') return [];
   if (method.startsWith('kaitu/siwc/')) {
     if (existsSync(${JSON.stringify(unavailable)})) throw Error('ChatGPT service unavailable');
-    if (method.endsWith('/models')) return [{id:'synthetic',name:'Synthetic'}];
+    if (method.endsWith('/models')) return [{id:'synthetic',name:'Synthetic',reasoning:{efforts:[{id:'high',name:'High'}]}}];
     return {authenticated:!method.endsWith('/signOut'),planEnabled:true,signingIn:false,activeAccountId:'synthetic',models:[]};
   }
   if (method === 'session/prompt') {
@@ -132,11 +132,53 @@ test("account sign-in and models work without a workspace directory", async () =
   try {
     expect((await f.sdk.support("siwc/status")).authenticated).toBe(true);
     await f.sdk.support("siwc/beginSignIn");
-    expect(await f.sdk.support("siwc/models")).toEqual([{ id: "synthetic", name: "Synthetic" }]);
+    expect(await f.sdk.support("siwc/models")).toEqual([
+      { id: "synthetic", name: "Synthetic", reasoning: { efforts: [{ id: "high", name: "High" }] } },
+    ]);
     await f.sdk.support("siwc/cancelSignIn");
     await f.sdk.support("siwc/signOut");
     const initialization = f.requests().find((row) => row.method === "initialize");
     expect(initialization.params).not.toHaveProperty("cwd");
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("advertised reasoning effort persists and reaches the next SDK initialization", async () => {
+  const f = fixture();
+  f.select();
+  try {
+    await f.sdk.configure({
+      choice: "builtin",
+      provider: "chatgpt-siwc",
+      model: "synthetic",
+      reasoningEffort: "high",
+    });
+    const runtime = await f.sdk.runtime();
+    expect(
+      f
+        .requests()
+        .filter((row) => row.method === "initialize" && !row.params.capabilities)
+        .at(-1).params.reasoningEffort,
+    ).toBe("high");
+    await runtime.close();
+    await expect(
+      f.sdk.configure({
+        choice: "builtin",
+        provider: "chatgpt-siwc",
+        model: "synthetic",
+        reasoningEffort: "unsupported",
+      }),
+    ).rejects.toMatchObject({ code: "AI_MODEL" });
+    expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBe("high");
+    await f.sdk.configure({
+      choice: "builtin",
+      provider: "chatgpt-siwc",
+      model: "synthetic",
+      reasoningEffort: null,
+    });
+    expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBeUndefined();
   } finally {
     await f.sdk.closeSupport();
     rmSync(f.root, { recursive: true, force: true });

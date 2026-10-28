@@ -346,6 +346,7 @@ export function createSdkRuntime({
           id: item.id,
           name: item.name,
           image: item.inputModalities?.includes("image"),
+          ...(item.reasoning?.efforts?.length ? { reasoning: item.reasoning } : {}),
         }));
       }
       const result = await credential("models", {
@@ -409,7 +410,19 @@ export function createSdkRuntime({
             models: models.map((model) => model.id),
           });
       }
-      return { ...settings, providers, ...(saved ? { saved } : {}), search: await describeSearch() };
+      const modelCapabilities =
+        settings.provider === "chatgpt-siwc"
+          ? siwcModels
+          : settings.auth === "dsh"
+            ? await api.models({ provider: settings.provider, auth: "dsh" })
+            : [];
+      return {
+        ...settings,
+        providers,
+        ...(saved ? { saved } : {}),
+        ...(modelCapabilities.length ? { modelCapabilities } : {}),
+        search: await describeSearch(),
+      };
     },
     async configure(input) {
       connectionStatus = undefined;
@@ -446,6 +459,11 @@ export function createSdkRuntime({
           const models = await api.support("siwc/models");
           const model = models.find((item) => item.id === settings.model);
           if (!model) throw new KaituError("模型不在当前账号目录中，请刷新模型列表", "AI_MODEL");
+          if (
+            settings.reasoningEffort &&
+            !model.reasoning?.efforts?.some((effort) => effort.id === settings.reasoningEffort)
+          )
+            throw new KaituError("该模型没有提供所选推理档位", "AI_MODEL");
           settings.supportsImages = model.image;
           settings.auth = "dsh";
         } else {
@@ -598,7 +616,12 @@ export function createSdkRuntime({
           "initialize",
           capabilities
             ? { capabilities: true }
-            : { cwd: workspace, provider: settings.provider, model: settings.model },
+            : {
+                cwd: workspace,
+                provider: settings.provider,
+                model: settings.model,
+                ...(settings.reasoningEffort ? { reasoningEffort: settings.reasoningEffort } : {}),
+              },
           signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
         );
       } catch {

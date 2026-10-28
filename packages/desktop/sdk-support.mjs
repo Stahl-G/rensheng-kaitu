@@ -79,6 +79,7 @@ export function apply(ctx) {
         return (await ctx.llm.listModels("chatgpt-siwc")).map((model) => ({
           id: model.id,
           name: model.name ?? model.id,
+          ...(model.reasoning?.efforts?.length ? { reasoning: model.reasoning } : {}),
           ...(model.inputModalities
             ? { image: model.inputModalities.includes("image") }
             : typeof model.imageInput === "boolean"

@@ -180,10 +180,21 @@ export function selection(input, previous = {}) {
       : entry.api;
   if (provider === "kaitu-custom" && !protocols.some((item) => item.id === api))
     throw new Error("请选择支持的 API 协议");
+  const reasoningEffort =
+    input.reasoningEffort === null
+      ? undefined
+      : (input.reasoningEffort ??
+        (previous.provider === provider && previous.model === model ? previous.reasoningEffort : undefined));
+  if (
+    reasoningEffort !== undefined &&
+    (typeof reasoningEffort !== "string" || !/^[\w.:-]{1,64}$/.test(reasoningEffort))
+  )
+    throw new Error("请选择有效的推理档位");
   return {
     provider,
     model,
     auth: input.auth ?? (previous.provider === provider ? previous.auth : undefined),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
     ...(entry.catalog ? { catalog: true, baseURL, api } : {}),
     supportsImages:
       input.supportsImages ??
