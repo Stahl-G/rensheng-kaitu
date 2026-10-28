@@ -15,7 +15,7 @@ export interface DomainPlan {version:1; modules?:string[]; discover?:boolean; do
 export interface MappedDomain extends Domain {
  temporal:DomainRule['temporal']; facets:(Facet & {evidence:Fact[]})[]
 }
-export interface DomainScore {coverage:number|null; freshness:number|null; clarity:number; latest:string|null; missing:string[]}
+export interface DomainScore {coverage:number|null; freshness:number|null; clarity:number; glow?:number; latest:string|null; missing:string[]}
 const safeId=/^[\p{L}\p{N}][\p{L}\p{N}_-]{0,79}$/u
 const uncertain=new Set(['unknown','inferred','needs_review','suggested','planned'])
 const dedupe=(facts:Fact[])=>[...new Map(facts.map(f=>[f.id,f])).values()]
@@ -78,8 +78,11 @@ export function scoreDomain(domain:MappedDomain,now:Date):DomainScore {
   // Undated evidence stays explicitly unknown; it is never stamped as today's data.
   freshness=scores.length?scores.reduce((a,b)=>a+b,0)/known.length:null
  }
- const clarity=.18+.82*(coverage??0)*(domain.temporal.kind==='historical'?1:.35+.65*(freshness??.35))
- return {coverage,freshness,clarity,latest,missing:applicable.filter(f=>!f.evidence.length).map(f=>f.label)}
+ const activityDates=domain.facts.filter(f=>!uncertain.has(f.status)).map(f=>Date.parse(f.actualActivityAt??'')).filter(n=>Number.isFinite(n)&&n<=now.getTime())
+ const hasExperience=domain.facts.some(f=>f.kind==='experience'&&['observed','user_reported'].includes(f.status))
+ const clarity=hasExperience||activityDates.length?1:.18
+ const glow=activityDates.some(n=>now.getTime()-n<7*86400000)?1:0
+ return {coverage,freshness,clarity,glow,latest,missing:applicable.filter(f=>!f.evidence.length).map(f=>f.label)}
 }
 export function totalCoverage(domains:MappedDomain[]) {
  const applicable=domains.flatMap(d=>d.facets).filter(f=>f.applicable!==false)
