@@ -296,7 +296,6 @@ function App() {
                 busy={busy}
                 start={() => setPanel("capture")}
                 save={store.capture}
-                complete={async (item) => store.complete(undefined, item.id)}
                 adopt={(id) => run(() => store.adopt(id))}
                 dismiss={(id) => run(() => store.dismiss(id))}
                 loadLibrary={store.library}
@@ -320,7 +319,6 @@ function App() {
                   navigate("records");
                   openSection("inbox");
                 }}
-                addNext={explain}
                 memory={() => setPanel("capture")}
                 handover={() => navigate("package")}
               />
