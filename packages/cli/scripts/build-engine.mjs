@@ -41,3 +41,16 @@ for (const name of ["sdk-credentials", "sdk-providers", "sdk-search-settings", "
 cpSync(join(root, "packages/core/data"), join(root, "packages/cli/dist/data"), { recursive: true });
 
 await bundleCartographerWorker(output, ".");
+
+await build({
+  entryPoints: [join(root, "packages/core/dist/home-worker.js")],
+  outfile: join(output, "home-worker.js"),
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node22",
+  external: ["better-sqlite3"],
+  banner: {
+    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+  },
+});
