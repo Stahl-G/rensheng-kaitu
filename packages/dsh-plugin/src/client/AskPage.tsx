@@ -772,7 +772,12 @@ export function AskPage({
           return {
             ...current,
             saved: siwc && !saved.some((row) => row.provider === siwc.provider) ? [...saved, siwc] : saved,
-            modelCapabilities: catalog.modelCapabilities,
+            modelCapabilities:
+              current.choice !== "local" &&
+              catalog.provider === current.provider &&
+              catalog.model === current.model
+                ? catalog.modelCapabilities
+                : undefined,
           };
         });
         setCatalogStatus(null);
@@ -809,7 +814,7 @@ export function AskPage({
     }
   };
   const openModelMenu = () => {
-    if (!settings?.configured) return;
+    if (!settings?.configured || saving || busy) return;
     modelRequestSeq.current++;
     setAddMenu(false);
     setModelQuery("");
@@ -864,7 +869,7 @@ export function AskPage({
     forceBuiltin = false,
     auth?: "key" | "dsh",
   ) => {
-    if (!settings?.configured) return;
+    if (!settings?.configured || saving || busy) return;
     modelRequestSeq.current++;
     setModelMenu(false);
     setSaving(true);
@@ -894,10 +899,12 @@ export function AskPage({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      modelRequestSeq.current++;
       setSaving(false);
     }
   };
   const switchToAgent = async (agent: { id: string; path: string }, model: string) => {
+    if (saving || busy) return;
     if (attachments.length || fileReferences.length || sessionReferences.length) {
       setError(
         t(
@@ -923,6 +930,7 @@ export function AskPage({
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      modelRequestSeq.current++;
       setSaving(false);
     }
   };
@@ -1531,7 +1539,7 @@ export function AskPage({
               <button
                 type="button"
                 className={css.model}
-                disabled={busy || !settings?.configured}
+                disabled={busy || saving || !settings?.configured}
                 ref={modelTrigger}
                 aria-label={t("选择模型", "Choose model")}
                 aria-haspopup="dialog"
@@ -1694,36 +1702,35 @@ export function AskPage({
                         ))}
                     </section>
                   ) : null}
-                  {catalogStatus === null &&
-                    settings?.saved?.map((row) => {
-                      const models = row.models.filter((id) =>
-                        `${row.name} ${id}`.toLowerCase().includes(modelQuery.trim().toLowerCase()),
-                      );
-                      return models.length ? (
-                        <section className={css.modelGroup} key={row.provider}>
-                          <p>{row.name}</p>
-                          {models.map((id) => (
-                            <button
-                              type="button"
-                              key={id}
-                              className={css.menuItem}
-                              aria-pressed={
-                                settings.configured &&
-                                settings.choice !== "local" &&
-                                settings.provider === row.provider &&
-                                settings.model === id
-                              }
-                              disabled={busy || saving}
-                              onClick={() =>
-                                void switchModel(row.provider, id, undefined, undefined, true, row.auth)
-                              }
-                            >
-                              {id}
-                            </button>
-                          ))}
-                        </section>
-                      ) : null;
-                    })}
+                  {settings?.saved?.map((row) => {
+                    const models = row.models.filter((id) =>
+                      `${row.name} ${id}`.toLowerCase().includes(modelQuery.trim().toLowerCase()),
+                    );
+                    return models.length ? (
+                      <section className={css.modelGroup} key={row.provider}>
+                        <p>{row.name}</p>
+                        {models.map((id) => (
+                          <button
+                            type="button"
+                            key={id}
+                            className={css.menuItem}
+                            aria-pressed={
+                              settings.configured &&
+                              settings.choice !== "local" &&
+                              settings.provider === row.provider &&
+                              settings.model === id
+                            }
+                            disabled={busy || saving}
+                            onClick={() =>
+                              void switchModel(row.provider, id, undefined, undefined, true, row.auth)
+                            }
+                          >
+                            {id}
+                          </button>
+                        ))}
+                      </section>
+                    ) : null;
+                  })}
                   {settings?.localAgents
                     ?.filter((agent) => agent.id !== settings.localAgent?.id)
                     .map((agent) => {
@@ -1824,6 +1831,7 @@ export function AskPage({
               localOnly={connectionLocalOnly}
               onSaving={setSaving}
               onSaved={async () => {
+                modelRequestSeq.current++;
                 const ai = await call<Settings>("askSettings");
                 setSettings(ai);
                 if (ai.supportsImages === false) setAttachments([]);

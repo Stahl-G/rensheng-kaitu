@@ -154,3 +154,94 @@ test("closing and reopening the picker discards an earlier model response", asyn
     if (root) act(() => root.unmount());
   }
 });
+
+test("a delayed old catalog cannot attach its effort to a same-named model after switching", async () => {
+  const first = {
+    configured: true,
+    choice: "builtin",
+    provider: "first",
+    providerName: "First",
+    model: "shared",
+    protocols: [],
+    providers: [],
+    localAgents: [],
+  };
+  const second = { ...first, provider: "second", providerName: "Second" };
+  const firstCatalog = {
+    ...first,
+    saved: [{ provider: "second", name: "Second", models: ["shared"] }],
+    modelCapabilities: [{ id: "shared", reasoning: { efforts: [{ id: "high", name: "High" }] } }],
+  };
+  let resolveOld!: (value: unknown) => void;
+  let resolveSave!: (value: unknown) => void;
+  let catalogLoads = 0;
+  vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    const args = JSON.parse(init.body);
+    let value: unknown = {};
+    if (method === "askSettings") value = first;
+    else if (method === "askList") value = [];
+    else if (method === "overview") value = { projects: [], allNext: [], notes: [] };
+    else if (method === "automation") value = { asked: true, tasks: {} };
+    else if (method === "askConfigure")
+      value = await new Promise((resolve) => {
+        resolveSave = resolve;
+      });
+    else if (method === "askSupport" && args[0] === "builtinSettings") {
+      catalogLoads++;
+      value =
+        catalogLoads === 1
+          ? firstCatalog
+          : catalogLoads === 2
+            ? await new Promise((resolve) => {
+                resolveOld = resolve;
+              })
+            : second;
+    } else if (method === "askSupport") value = { authenticated: false };
+    return { ok: true, json: async () => value };
+  });
+  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal(
+    "EventSource",
+    class {
+      close() {}
+    },
+  );
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AskPage, { workspace: "synthetic" }));
+    });
+    const trigger = () => root.root.findAllByType("button").find((x) => x.props["aria-label"] === "选择模型");
+    await act(async () => {
+      trigger()?.props.onClick();
+    });
+    await act(async () => {
+      trigger()?.props.onClick();
+    });
+    await act(async () => {
+      trigger()?.props.onClick();
+    });
+    const model = root.root.findAllByType("button").find((x) => x.children.includes("shared"));
+    expect(model).toBeDefined();
+    act(() => {
+      void model?.props.onClick();
+    });
+    expect(trigger()?.props.disabled).toBe(true);
+    await act(async () => {
+      resolveSave(second);
+    });
+    await act(async () => {
+      resolveOld(firstCatalog);
+    });
+    await act(async () => {
+      trigger()?.props.onClick();
+    });
+    expect(root.root.findAllByType("section").some((x) => x.props["aria-label"] === "推理强度")).toBe(false);
+    expect(trigger()?.findAllByType("span")[0]?.children.join("")).toContain("Second");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});

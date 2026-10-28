@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +24,7 @@ function fixture() {
   for (const dir of [home, workspace, payload]) mkdirSync(dir);
   const calls = join(root, "calls.jsonl");
   const unavailable = join(root, "unavailable");
+  const holdModels = join(root, "hold-models");
   const helper = join(root, "credentials.mjs");
   writeFileSync(
     helper,
@@ -47,7 +56,10 @@ rpc.onRequest(async (method, params) => {
   if (method === 'kaitu/saveProvider') return [];
   if (method.startsWith('kaitu/siwc/')) {
     if (existsSync(${JSON.stringify(unavailable)})) throw Error('ChatGPT service unavailable');
-    if (method.endsWith('/models')) return [{id:'synthetic',name:'Synthetic',reasoning:{efforts:[{id:'high',name:'High'}]}}];
+    if (method.endsWith('/models')) {
+      while (existsSync(${JSON.stringify(holdModels)})) await new Promise(resolve => setTimeout(resolve, 10));
+      return [{id:'synthetic',name:'Synthetic',reasoning:{efforts:[{id:'high',name:'High'}]}}];
+    }
     return {authenticated:!method.endsWith('/signOut'),planEnabled:true,signingIn:false,activeAccountId:'synthetic',models:[]};
   }
   if (method === 'session/prompt') {
@@ -81,7 +93,7 @@ rpc.start();`,
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-  return { root, home, workspace, sdk, select, requests, unavailable };
+  return { root, home, workspace, sdk, select, requests, unavailable, holdModels };
 }
 
 test("idle sign-out invalidates real Ask caches; re-login sends spawn a fresh process without saving the model", async () => {
@@ -180,6 +192,31 @@ test("advertised reasoning effort persists and reaches the next SDK initializati
     });
     expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBeUndefined();
   } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("a settings read during a delayed provider switch cannot retain the old connection", async () => {
+  const f = fixture();
+  f.select("deepseek-official");
+  writeFileSync(f.holdModels, "hold");
+  try {
+    const saving = f.sdk.configure({ choice: "builtin", provider: "chatgpt-siwc", model: "synthetic" });
+    const until = Date.now() + 5000;
+    while (
+      (!existsSync(join(f.root, "calls.jsonl")) ||
+        !f.requests().some((row) => row.method === "kaitu/siwc/models")) &&
+      Date.now() < until
+    )
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(f.requests().some((row) => row.method === "kaitu/siwc/models")).toBe(true);
+    expect((await f.sdk.settings()).provider).toBe("deepseek-official");
+    rmSync(f.holdModels);
+    expect((await saving).provider).toBe("chatgpt-siwc");
+    expect((await f.sdk.settings()).provider).toBe("chatgpt-siwc");
+  } finally {
+    rmSync(f.holdModels, { force: true });
     await f.sdk.closeSupport();
     rmSync(f.root, { recursive: true, force: true });
   }

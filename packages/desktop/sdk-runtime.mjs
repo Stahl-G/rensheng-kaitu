@@ -486,6 +486,8 @@ export function createSdkRuntime({
       }
       mkdirSync(home, { recursive: true, mode: 0o700 });
       writeFileSync(settingsFile, JSON.stringify(settings), { mode: 0o600 });
+      // Another read can have cached the old connection while this save awaited validation.
+      connectionStatus = undefined;
       return api.settings();
     },
     async runtime(
