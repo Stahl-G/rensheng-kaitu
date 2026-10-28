@@ -350,6 +350,14 @@
 .menuItem:hover {
   background: var(--kt-subtle);
 }
+.menuItem[aria-pressed="true"] {
+  background: var(--kt-subtle);
+  color: var(--kt-link);
+}
+.menuItem[aria-pressed="true"]::after {
+  content: "✓";
+  float: right;
+}
 .modelGroup {
   display: flex;
   flex-direction: column;
