@@ -3,8 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
-import { mainland } from "../../cartographer/kaitu/terrain.js";
 import { settings } from "../../cartographer/kaitu/settings.js";
+import { mainland } from "../../cartographer/kaitu/terrain.js";
 import { bundleCartographerWorker } from "../package-cartographer.mjs";
 
 it("ships a matching native binary and CJK font, then renders in the standalone payload", async () => {
@@ -83,12 +83,12 @@ it("ships a matching native binary and CJK font, then renders in the standalone 
   }
 }, 40_000);
 
-
 it("keeps a seeded coastline reproducible while new seeds change its silhouette", () => {
   const first = mainland("00000000-0000-4000-8000-000000000001", 0, 160, 100).land;
   expect(mainland("00000000-0000-4000-8000-000000000001", 0, 160, 100).land).toEqual(first);
   const next = mainland("00000000-0000-4000-8000-000000000002", 0, 160, 100).land;
-  let intersection = 0, union = 0;
+  let intersection = 0;
+  let union = 0;
   for (let i = 0; i < first.length; i++) {
     if (first[i] && next[i]) intersection++;
     if (first[i] || next[i]) union++;
