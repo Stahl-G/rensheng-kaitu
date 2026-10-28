@@ -171,26 +171,45 @@ export function LifeHome({
   };
   const [selectedThread, setSelectedThread] = useState(0);
   const [atlasData, setAtlasData] = useState<import("@kaitu/core").LifeAtlasState | null>(null);
+  const atlasContainer = useRef<HTMLDivElement>(null);
+  const [atlasWidth, setAtlasWidth] = useState(900);
+  useLayoutEffect(() => {
+    const element = atlasContainer.current;
+    if (!element) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setAtlasWidth(width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const [atlasImage, setAtlasImage] = useState<string | null>(null);
   const [atlasStatus, setAtlasStatus] = useState<"loading" | "ready" | "error">("loading");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: workspace notifications refresh the adopted map preview.
   useEffect(() => {
     if (!loadAtlas) return;
     let active = true;
-    void loadAtlas()
-      .then((atlas) => {
-        if (active) {
-          setAtlasData(atlas);
-          setAtlasImage(atlas.resource?.svg ?? null);
-          setAtlasStatus("ready");
-        }
-      })
-      .catch(() => {
-        if (active) setAtlasStatus("error");
-      });
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const load = () => {
+      void loadAtlas()
+        .then((atlas) => {
+          if (active) {
+            setAtlasData(atlas);
+            setAtlasImage(atlas.resource?.svg ?? null);
+            setAtlasStatus(atlas.loading ? "loading" : "ready");
+            if (atlas.loading) retry = setTimeout(load, 150);
+          }
+        })
+        .catch(() => {
+          if (active) setAtlasStatus("error");
+        });
+    };
+    load();
     return () => {
       active = false;
+      clearTimeout(retry);
     };
-  }, [loadAtlas]);
+  }, [loadAtlas, data.cutoff]);
   const [todayNotes, setTodayNotes] = useState<{ day: string; cutoff: string; entries: InboxEntry[] } | null>(
     null,
   );
@@ -268,7 +287,7 @@ export function LifeHome({
         )}
       </header>
       {loadAtlas && (
-        <div className={todayCss.atlasPreview}>
+        <div ref={atlasContainer} className={todayCss.atlasPreview}>
           <button type="button" className={css.link} onClick={openAtlas}>
             {t("人生地图", "Life map")}
           </button>
@@ -276,7 +295,7 @@ export function LifeHome({
             <svg
               width="100%"
               height="148"
-              viewBox={`0 0 ${atlasData.resource.width} ${atlasData.resource.height}`}
+              viewBox={`0 ${Math.max(0, (atlasData.resource.height - Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)) / 2)} ${atlasData.resource.width} ${Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)}`}
             >
               <title>{t("人生地图", "Life map")}</title>
               <image
