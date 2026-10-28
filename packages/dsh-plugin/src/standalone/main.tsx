@@ -160,6 +160,7 @@ const props: OverviewPageProps = {
   loadDirectionMap: (locale) => call("directionMap", locale),
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
+  loadHome: () => call("home"),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
     call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),

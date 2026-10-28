@@ -772,3 +772,147 @@
   gap: 8px 16px;
   min-width: 0;
 }
+
+.savepointHome {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px 24px 24px;
+}
+.savepointHome .homeHeading {
+  margin-bottom: 12px;
+}
+.savepointHome .dateWeather {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(220px, 360px);
+  width: 100%;
+}
+.savepointHome .atlasPreview {
+  margin: 0;
+  width: 100%;
+  background: #efe5ca;
+  border-color: #d9c9a6;
+}
+.savepointHome .atlasPreview img {
+  height: 148px;
+  object-fit: contain;
+}
+.savepointGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 18px;
+  margin-top: 16px;
+}
+.savepointCard {
+  min-width: 0;
+  padding: 20px 24px;
+  background: #fffdf8;
+  border: 1px solid #e8e1d2;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgb(60 40 10 / 5%);
+}
+.savepointCard h2 {
+  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-size: 24px;
+  font-weight: 500;
+  margin: 8px 0 14px;
+  overflow-wrap: anywhere;
+}
+.savepointCard h3 {
+  font-size: 13px;
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+.savepointFields {
+  background: #faf6ec;
+  border: 1px solid #efe6d3;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px 12px;
+  font-size: 14px;
+}
+.savepointFields dt {
+  color: var(--muted);
+}
+.savepointFields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.savepointFields time {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.savepointActions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.savepointSide {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.savepointSide .savepointCard {
+  padding: 14px 16px;
+}
+.savepointSide p {
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+}
+.savepointSide time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.savepointHome .askHome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 18px;
+  background: rgb(255 253 248 / 90%);
+  box-shadow: 0 8px 24px rgb(40 30 10 / 8%);
+}
+.savepointHome .askHome textarea {
+  min-height: 44px;
+  height: 44px;
+  flex: 1 1 220px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+.savepointHome .homeLinks {
+  margin-top: 12px;
+}
+@media (max-width: 680px) {
+  .savepointHome {
+    padding: 12px;
+  }
+  .savepointHome .dateWeather {
+    grid-template-columns: 1fr;
+  }
+  .savepointGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .savepointCard {
+    padding: 16px;
+  }
+  .savepointHome .atlasPreview img {
+    height: 110px;
+  }
+  .savepointFields {
+    grid-template-columns: 56px minmax(0, 1fr);
+    padding: 10px;
+    gap: 8px;
+  }
+  .savepointCard h2 {
+    font-size: 21px;
+  }
+}

@@ -81,6 +81,7 @@ export interface OverviewPageProps
   ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
   navigation?: PanelNavigation;
+  loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -489,6 +490,32 @@ function Overview({
   useEffect(() => {
     if (captureOpen && view === "overview") document.getElementById("capture-text")?.focus();
   }, [captureOpen, view]);
+  const [homeState, setHomeState] = useState<import("@kaitu/core").HomeState | null>(null);
+  useEffect(() => {
+    const loadHome = props.loadHome;
+    if (!loadHome) return;
+    let live = true;
+    const refresh = () => {
+      void loadHome()
+        .then((value) => {
+          if (live) setHomeState(value);
+        })
+        .catch(() => {
+          if (live)
+            setHomeState((current) => ({
+              data: current?.data ?? null,
+              loading: false,
+              error: "首页读取失败",
+            }));
+        });
+    };
+    refresh();
+    const unsubscribe = props.subscribe?.(refresh);
+    return () => {
+      live = false;
+      unsubscribe?.();
+    };
+  }, [props.loadHome, props.subscribe]);
   const [homeAskText, setHomeAskText] = useState("");
   const [homeAskError, setHomeAskError] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
@@ -1132,6 +1159,7 @@ function Overview({
         {view === "overview" && !guideVisible && guide !== undefined && data && (
           <>
             <LifeHome
+              home={homeState}
               data={data}
               firstVisit={data.empty && !onboarding?.hasUserData}
               writing={captureOpen}
@@ -1148,7 +1176,6 @@ function Overview({
               weather={
                 props.loadWeather && props.setWeatherPlace ? (
                   <TodayWeather
-                    compact
                     load={props.loadWeather}
                     setPlace={props.setWeatherPlace}
                     loadLifeMap={props.loadLifeMap}

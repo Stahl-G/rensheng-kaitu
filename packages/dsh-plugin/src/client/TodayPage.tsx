@@ -20,6 +20,7 @@ import {
 } from "./next-presentation.js";
 
 export function LifeHome({
+  home,
   data,
   firstVisit,
   capture,
@@ -45,6 +46,7 @@ export function LifeHome({
   loadProjects,
   openProject,
 }: {
+  home?: import("@kaitu/core").HomeState | null;
   loadProjects: () => Promise<DoingProject[]>;
   openProject: (slug: string) => void;
   data: OverviewData;
@@ -139,6 +141,7 @@ export function LifeHome({
   const [projects, setProjects] = useState<{ cutoff: string; items: DoingProject[] } | null>(null);
   useEffect(() => {
     let active = true;
+    if (home) return;
     void loadProjects()
       .then((items) => {
         if (active) setProjects({ cutoff: data.cutoff, items });
@@ -149,7 +152,7 @@ export function LifeHome({
     return () => {
       active = false;
     };
-  }, [loadProjects, data.cutoff]);
+  }, [loadProjects, data.cutoff, home]);
   const projectFacts = useMemo(
     () => todayProjectFacts(projects?.cutoff === data.cutoff ? projects.items : [], data.today, locale),
     [projects, data.cutoff, data.today, locale],
@@ -188,6 +191,7 @@ export function LifeHome({
   );
   useEffect(() => {
     let active = true;
+    if (home) return;
     void (async () => {
       const entries: InboxEntry[] = [];
       let before: string | undefined;
@@ -204,7 +208,7 @@ export function LifeHome({
     return () => {
       active = false;
     };
-  }, [data.today, data.cutoff, loadLibrary]);
+  }, [data.today, data.cutoff, loadLibrary, home]);
   const facts = useMemo(
     () =>
       data.metrics
@@ -235,13 +239,16 @@ export function LifeHome({
   const valueText = (metric: OverviewMetric) =>
     `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   return (
-    <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
+    <section
+      className={`${todayCss.mirrorHome} ${home ? todayCss.savepointHome : ""}`}
+      aria-label={t("今天", "Today")}
+    >
       <header className={todayCss.homeHeading}>
         <div className={todayCss.dateWeather}>
           <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
           {weather}
         </div>
-        {!firstVisit && (
+        {!home && !firstVisit && (
           <button
             id="life-handover-start"
             type="button"
@@ -251,7 +258,7 @@ export function LifeHome({
             {t("带去别的 AI 聊", "Take this to another AI")}
           </button>
         )}
-        {firstVisit && (
+        {!home && firstVisit && (
           <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
         )}
       </header>
@@ -271,6 +278,9 @@ export function LifeHome({
           )}
         </button>
       )}
+      {home && (
+        <Savepoint data={home} openProject={openProject} library={library} adopt={adopt} dismiss={dismiss} />
+      )}
       {canAsk && (
         <form
           className={todayCss.askHome}
@@ -279,12 +289,14 @@ export function LifeHome({
             if (askText.trim()) ask(askText);
           }}
         >
-          <label htmlFor="today-ask">{t("想聊些什么？", "What would you like to talk about?")}</label>
+          <label className={home ? css.sr : undefined} htmlFor="today-ask">
+            {t("想聊些什么？", "What would you like to talk about?")}
+          </label>
           <textarea
             id="today-ask"
             value={askText}
             onChange={(event) => setAskText(event.target.value)}
-            placeholder={t("写下来，或使用系统听写", "Write here or use system dictation")}
+            placeholder={t("此刻想到的…", "Something on your mind…")}
           />
           {voice.available && speech && (
             <div>
@@ -352,7 +364,7 @@ export function LifeHome({
           {askError && <p role="alert">{askError}</p>}
         </form>
       )}
-      {!firstVisit && facts.length > 0 && (
+      {!home && !firstVisit && facts.length > 0 && (
         <div className={todayCss.mirror}>
           {[...paragraphs.values()].map((metrics) => {
             const first = metrics[0];
@@ -394,7 +406,8 @@ export function LifeHome({
           })}
         </div>
       )}
-      {!firstVisit &&
+      {!home &&
+        !firstVisit &&
         projectFacts.map((project) => (
           <p className={todayCss.projectFact} key={project.slug}>
             {t(
@@ -511,6 +524,119 @@ export function LifeHome({
       </footer>
       {writing && capture}
     </section>
+  );
+}
+
+function Savepoint({
+  data,
+  openProject,
+  library,
+  adopt,
+  dismiss,
+}: {
+  data: import("@kaitu/core").HomeState;
+  openProject: (slug: string) => void;
+  library: () => void;
+  adopt: (id: string) => void;
+  dismiss: (id: string) => void;
+}) {
+  const t = useT();
+  const [selected, setSelected] = useState(0);
+  const threads = data.data?.threads ?? [];
+  const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
+  return (
+    <div className={todayCss.savepointGrid}>
+      <article className={todayCss.savepointCard}>
+        <p className={css.eyebrow}>{t("存档点", "Save point")}</p>
+        {thread ? (
+          <>
+            <h2>{thread.title}</h2>
+            <dl className={todayCss.savepointFields}>
+              {thread.progress && (
+                <>
+                  <dt>{t("走到这里", "Progress")}</dt>
+                  <dd>
+                    {thread.progress.label} {thread.progress.current} / {thread.progress.target}{" "}
+                    {thread.progress.unit}
+                  </dd>
+                </>
+              )}
+              {thread.last && (
+                <>
+                  <dt>{t("上次", "Last time")}</dt>
+                  <dd>
+                    {thread.last.text}
+                    {thread.last.date && <time>{thread.last.date}</time>}
+                  </dd>
+                </>
+              )}
+              <dt>{t("下一步", "Next")}</dt>
+              <dd>{thread.next?.title ?? t("还没有下一步", "No next step yet")}</dd>
+            </dl>
+            <div className={todayCss.savepointActions}>
+              <button
+                type="button"
+                className={css.btn}
+                onClick={() => (thread.kind === "project" ? openProject(thread.id) : library())}
+              >
+                {t("打开", "Open")}
+              </button>
+              {threads.length > 1 && (
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => setSelected((selected + 1) % threads.length)}
+                >
+                  {t("换一个", "Another")}
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>{data.loading ? t("正在读取…", "Loading…") : t("还没有存档点", "No save points yet")}</h2>
+            <button type="button" className={css.btn} onClick={library}>
+              {t("打开资料", "Open Library")}
+            </button>
+          </>
+        )}
+        {data.error && <p role="alert">{data.error}</p>}
+      </article>
+      <aside className={todayCss.savepointSide}>
+        {!!data.data?.traces.length && (
+          <section className={todayCss.savepointCard}>
+            <h3>{t("最近的痕迹", "Recent traces")}</h3>
+            {data.data.traces.slice(0, 3).map((trace) => (
+              <p key={trace.key}>
+                <span>
+                  {trace.label}
+                  {trace.value !== null
+                    ? ` ${trace.estimated ? "≈" : ""}${trace.value} ${trace.unit ?? ""}`
+                    : ""}
+                </span>
+                <time>{trace.date}</time>
+              </p>
+            ))}
+          </section>
+        )}
+        {!!data.data?.pending.length && (
+          <section className={todayCss.savepointCard}>
+            <h3>{t("待确认", "Pending")}</h3>
+            {data.data.pending.slice(0, 2).map((item) => (
+              <div key={item.id}>
+                <p>{item.title}</p>
+                <button type="button" className={css.btn} onClick={() => adopt(item.id)}>
+                  {t("采纳", "Adopt")}
+                </button>
+                <button type="button" className={css.link} onClick={() => dismiss(item.id)}>
+                  {t("略过", "Dismiss")}
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+      </aside>
+    </div>
   );
 }
 
