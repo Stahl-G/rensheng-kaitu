@@ -24,6 +24,7 @@ import {
   decisionLabels,
   focusLabels,
 } from "./model.js";
+import { createYearTimer, yearDuration } from "./playback.js";
 import { sceneSvg } from "./scene.js";
 import {
   type Config,
@@ -42,7 +43,6 @@ let run: Run | null = null;
 let config: Config | null = null;
 let playing = false;
 let speed = 1;
-let timer: ReturnType<typeof setTimeout> | undefined;
 let selected = 0;
 let pasted = "";
 let error = "";
@@ -64,6 +64,16 @@ const state = (): State =>
 const shownState = (): State => run?.changed[selected - 1]?.state ?? state();
 const nextOffset = () => run?.changed.length ?? 0;
 const pending = () => !!run && decisionYears.includes(nextOffset()) && !config?.decisions[nextOffset()];
+const yearTimer = createYearTimer(
+  () => page === "play" && playing && !document.hidden && !pending() && nextOffset() < YEARS,
+  () => {
+    try {
+      advance();
+    } catch (reason) {
+      report(reason);
+    }
+  },
+);
 function header() {
   return `<header>${button("home", `<span class="brand-icon">开</span><span>开图 <b>KAITU</b></span>`, "brand")}<div class="header-right"><span class="edition">${t("人生往后推 · 原型", "THE NEXT CHAPTER · PROTOTYPE")}</span>${button("language", locale === "zh" ? "EN" : "中文", "quiet")}</div></header>`;
 }
@@ -98,7 +108,7 @@ function story(st: Story) {
 }
 function controls() {
   const finished = nextOffset() >= YEARS;
-  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}${button("restart", t("重玩同一开局", "Replay this start"), "text-button")}</div>${
+  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<span class="year-duration">${t("约", "About")} ${yearDuration(speed) / 1000} ${t("秒 / 年", "sec / year")}</span><div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}${button("restart", t("重玩同一开局", "Replay this start"), "text-button")}</div>${
     finished
       ? ""
       : `<div class="focus-row"><span>${t("下一年重心", "Next year’s focus")}</span>${Object.entries(
@@ -255,7 +265,7 @@ function onAll(selector: string, fn: (el: HTMLElement) => void) {
   }
 }
 function begin(c?: Config) {
-  clearTimeout(timer);
+  yearTimer.stop();
   config = c ?? {
     card: structuredClone(card),
     worldSeed: seed(),
@@ -340,7 +350,7 @@ function save() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function render() {
-  clearTimeout(timer);
+  yearTimer.stop();
   if (!root) return;
   const openPanels = [...document.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map(
     (el) => el.id,
@@ -451,8 +461,7 @@ function render() {
     if (pending() || nextOffset() >= YEARS) return;
     playing = !playing;
     selected = nextOffset();
-    if (playing) advance();
-    else render();
+    render();
   });
   click("skip", () => {
     playing = false;
@@ -519,14 +528,17 @@ function render() {
       report(reason);
     }
   });
-  if (page === "play" && playing && !pending() && nextOffset() < YEARS)
-    timer = setTimeout(() => {
-      try {
-        advance();
-      } catch (reason) {
-        report(reason);
-      }
-    }, 1200 / speed);
+  // A user opening/closing details pauses the year without rerendering the disclosure.
+  // Listen to summary clicks, not toggle: default-open panels also emit toggle on render.
+  for (const summary of document.querySelectorAll(".game-shell summary")) {
+    summary.addEventListener("click", () => {
+      playing = false;
+      yearTimer.stop();
+      const pause = document.getElementById("pause");
+      if (pause) pause.textContent = t("继续", "Continue");
+    });
+  }
+  yearTimer.schedule(speed);
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && playing) {
