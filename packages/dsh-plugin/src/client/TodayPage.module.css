@@ -845,7 +845,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  height: clamp(310px, 38vh, 360px);
+  height: clamp(360px, 46vh, 430px);
   padding: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1037,4 +1037,86 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 1;
   overflow: hidden;
+}
+
+.savepointHome .askHome {
+  align-content: stretch;
+}
+.composer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.savepointHome .composer textarea {
+  flex: 1;
+  min-height: 180px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: vertical;
+}
+.composerTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  background: var(--control);
+}
+.composerTools > button[type="button"] {
+  margin-right: auto;
+}
+.voiceTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  order: 2;
+}
+.voiceButton {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--link-line);
+  border-radius: 50%;
+  background: var(--link);
+  color: var(--bg);
+  box-shadow: 0 3px 10px #0002;
+  cursor: pointer;
+}
+.projectSymbol {
+  width: 60px;
+  height: 60px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  border-radius: 10px;
+  background: var(--control);
+  color: var(--link);
+}
+.projectSymbol[data-kind="learning"] {
+  color: var(--ink2);
+}
+.continueCard {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .projectSymbol {
+    width: 44px;
+    height: 48px;
+    font-size: 24px;
+  }
+  .savepointHome .atlasPreview {
+    height: 360px;
+  }
 }

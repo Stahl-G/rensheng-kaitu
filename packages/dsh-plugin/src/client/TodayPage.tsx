@@ -361,85 +361,103 @@ export function LifeHome({
           }}
         >
           <label htmlFor="today-ask">{t("此刻，想聊什么？", "What’s on your mind?")}</label>
-          <textarea
-            id="today-ask"
-            value={askText}
-            onChange={(event) => setAskText(event.target.value)}
-            placeholder={t("此刻想到的…", "Something on your mind…")}
-          />
-          {voice.available && speech && (
-            <div>
-              {!["starting", "recording", "stopping"].includes(voice.state) ? (
+          <div className={todayCss.composer}>
+            <textarea
+              id="today-ask"
+              value={askText}
+              onChange={(event) => setAskText(event.target.value)}
+              placeholder={t("此刻想到的…", "Something on your mind…")}
+            />
+            <div className={todayCss.composerTools}>
+              {voice.available && speech && (
+                <div className={todayCss.voiceTools}>
+                  {!["starting", "recording", "stopping"].includes(voice.state) ? (
+                    <button
+                      type="button"
+                      className={todayCss.voiceButton}
+                      onClick={() => {
+                        setVoiceMessage("");
+                        const epoch = ++voiceEpoch.current;
+                        voiceActive.current = true;
+                        void speech("start", locale)
+                          .then((value) => {
+                            if (epoch === voiceEpoch.current) applyVoice(value);
+                          })
+                          .catch(() => {
+                            if (epoch !== voiceEpoch.current) return;
+                            voiceActive.current = false;
+                            setVoiceMessage(t("无法启动语音。", "Could not start speech."));
+                          });
+                      }}
+                    >
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        aria-hidden="true"
+                      >
+                        <rect x="9" y="3" width="6" height="12" rx="3" />
+                        <path d="M6 11v2a6 6 0 0 0 12 0v-2M12 19v3M8 22h8" />
+                      </svg>
+                      <span className={css.sr}>{t("说一段", "Speak")}</span>
+                    </button>
+                  ) : (
+                    <>
+                      <output>
+                        {voice.state === "recording"
+                          ? t("正在听…", "Listening…")
+                          : t("正在处理…", "Working…")}
+                      </output>
+                      {voice.state === "recording" && (
+                        <button
+                          type="button"
+                          className={css.btn}
+                          onClick={() => {
+                            const epoch = voiceEpoch.current;
+                            void speech("stop").then((value) => {
+                              if (epoch === voiceEpoch.current) applyVoice(value);
+                            });
+                          }}
+                        >
+                          {t("完成", "Done")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={css.link}
+                        onClick={() => {
+                          const epoch = ++voiceEpoch.current;
+                          voiceActive.current = false;
+                          void speech("cancel").then((value) => {
+                            if (epoch === voiceEpoch.current) setVoice(value);
+                          });
+                        }}
+                      >
+                        {t("取消", "Cancel")}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {voiceMessage && <output>{voiceMessage}</output>}
+              {save && (
                 <button
                   type="button"
                   className={css.btn}
-                  onClick={() => {
-                    setVoiceMessage("");
-                    const epoch = ++voiceEpoch.current;
-                    voiceActive.current = true;
-                    void speech("start", locale)
-                      .then((value) => {
-                        if (epoch === voiceEpoch.current) applyVoice(value);
-                      })
-                      .catch(() => {
-                        if (epoch !== voiceEpoch.current) return;
-                        voiceActive.current = false;
-                        setVoiceMessage(t("无法启动语音。", "Could not start speech."));
-                      });
-                  }}
+                  disabled={!askText.trim()}
+                  onClick={() => save(askText)}
                 >
-                  {t("说一段", "Speak")}
+                  {t("记下", "Save")}
                 </button>
-              ) : (
-                <>
-                  <output>
-                    {voice.state === "recording" ? t("正在听…", "Listening…") : t("正在处理…", "Working…")}
-                  </output>
-                  {voice.state === "recording" && (
-                    <button
-                      type="button"
-                      className={css.btn}
-                      onClick={() => {
-                        const epoch = voiceEpoch.current;
-                        void speech("stop").then((value) => {
-                          if (epoch === voiceEpoch.current) applyVoice(value);
-                        });
-                      }}
-                    >
-                      {t("完成", "Done")}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={css.link}
-                    onClick={() => {
-                      const epoch = ++voiceEpoch.current;
-                      voiceActive.current = false;
-                      void speech("cancel").then((value) => {
-                        if (epoch === voiceEpoch.current) setVoice(value);
-                      });
-                    }}
-                  >
-                    {t("取消", "Cancel")}
-                  </button>
-                </>
               )}
+              <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
+                {t("去问问 →", "Ask →")}
+              </button>
             </div>
-          )}
-          {voiceMessage && <output>{voiceMessage}</output>}
-          {save && (
-            <button
-              type="button"
-              className={css.btn}
-              disabled={!askText.trim()}
-              onClick={() => save(askText)}
-            >
-              {t("记下", "Save")}
-            </button>
-          )}
-          <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
-            {t("去问问继续", "Continue in Ask")}
-          </button>
+          </div>
           {askError && <p role="alert">{askError}</p>}
         </form>
       )}
@@ -641,13 +659,21 @@ function Savepoint({
         {thread ? (
           [thread, ...threads.filter((item) => item.key !== thread.key)].slice(0, 2).map((item) => (
             <article key={item.key} className={todayCss.continueCard} data-selected={item.key === thread.key}>
+              <span className={todayCss.projectSymbol} data-kind={item.kind} aria-hidden="true">
+                {item.kind === "learning" ? "▤" : item.kind === "goal" ? "◎" : "▧"}
+              </span>
               <button
                 type="button"
                 className={todayCss.projectChoice}
                 onClick={() => select(threads.indexOf(item))}
               >
-                <h3>{item.title}</h3>
-                {(item.last || item.next) && <p>{item.last?.text ?? item.next?.title}</p>}
+                <h3 title={item.title}>{item.title}</h3>
+                {(item.last || item.next) && (
+                  <p title={item.last?.text ?? item.next?.title}>
+                    {item.last ? t("上次：", "Last: ") : t("下一步：", "Next: ")}
+                    {item.last?.text ?? item.next?.title}
+                  </p>
+                )}
               </button>
               <button
                 type="button"
