@@ -260,6 +260,25 @@ export function LifeHome({
     sourceTrigger.current = event.currentTarget;
     setFactSource(metric);
   };
+  const focused = home?.data?.threads[selectedThread];
+  const focusedDomain =
+    focused &&
+    atlasData?.domains.find((d) =>
+      d.facts.some((f) => f.source === focused.file && (focused.kind !== "goal" || f.id === focused.id)),
+    );
+  const focusedPoint = focusedDomain && atlasData?.resource?.regions.provinces[focusedDomain.slot];
+  const previewHeight = atlasData?.resource
+    ? Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)
+    : 148;
+  const previewY = atlasData?.resource
+    ? Math.max(
+        0,
+        Math.min(
+          atlasData.resource.height - previewHeight,
+          (focusedPoint?.y ?? atlasData.resource.height / 2) - previewHeight / 2,
+        ),
+      )
+    : 0;
   const valueText = (metric: OverviewMetric) =>
     `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   return (
@@ -295,7 +314,7 @@ export function LifeHome({
             <svg
               width="100%"
               height="148"
-              viewBox={`0 ${Math.max(0, (atlasData.resource.height - Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)) / 2)} ${atlasData.resource.width} ${Math.min(atlasData.resource.height, (atlasData.resource.width * 148) / atlasWidth)}`}
+              viewBox={`0 ${previewY} ${atlasData.resource.width} ${previewHeight}`}
             >
               <title>{t("人生地图", "Life map")}</title>
               <image
