@@ -2,6 +2,9 @@
   display: grid;
   gap: 18px;
   min-width: 0;
+  width: 100%;
+  max-width: 1000px;
+  margin-inline: auto;
   color: var(--ink);
 }
 .page button,
@@ -169,8 +172,32 @@
 .mapLayout {
   display: flex;
   gap: 16px;
+  justify-content: center;
   align-items: flex-start;
   min-width: 0;
+}
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+.workspace > .mapLayout {
+  flex: 1;
+}
+.sidebar {
+  box-sizing: border-box;
+  width: 330px;
+  flex: 0 0 330px;
+  grid-template-columns: 1fr;
+  max-height: var(--map-height);
+  overflow-y: auto;
+  padding: 16px;
+  gap: 20px;
+}
+.sidebar .modules,
+.sidebar .parameters {
+  grid-template-columns: 1fr;
 }
 .map {
   position: relative;
@@ -181,10 +208,30 @@
   background: #e7dbb8;
   box-shadow: 0 3px 15px #493c2612;
 }
+.mapViewport {
+  overflow: auto;
+  max-height: var(--map-height);
+}
 .canvas {
   display: block;
   width: 100%;
   height: auto;
+  margin-inline: auto;
+}
+.zoomControls {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  display: flex;
+  gap: 4px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.zoomControls button {
+  min-height: 32px;
+  padding: 4px 9px;
+  background: #f7eed8ee;
 }
 .province {
   cursor: pointer;
@@ -291,6 +338,18 @@
   }
 }
 @media (max-width: 700px) {
+  .workspace {
+    flex-direction: column;
+  }
+  .workspace > .mapLayout {
+    width: 100%;
+    flex: none;
+  }
+  .sidebar {
+    width: 100%;
+    flex-basis: auto;
+    max-height: none;
+  }
   .settings {
     grid-template-columns: 1fr;
   }
@@ -299,5 +358,11 @@
   }
   .toolbar > div {
     flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .province {
+    transition: none;
   }
 }

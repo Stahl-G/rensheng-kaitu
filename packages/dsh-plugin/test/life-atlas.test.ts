@@ -135,6 +135,20 @@ test("existing map collapses controls and keyboard activation opens the correct 
     );
   });
   expect(root.root.findAllByType("fieldset")).toHaveLength(0);
+  const svg = () => root.root.findByProps({ "aria-label": "人生地图区域" });
+  const fitWidth = svg().props.style.width;
+  act(() => root.root.findByProps({ "aria-label": "放大地图" }).props.onClick());
+  expect(svg().props.style.width).not.toBe(fitWidth);
+  expect(generate).not.toHaveBeenCalled();
+  act(() =>
+    root.root
+      .findByType("nav")
+      .findAllByType("button")
+      .find((button) => button.children.includes("适应窗口"))
+      ?.props.onClick(),
+  );
+  expect(svg().props.style.width).toBe(fitWidth);
+  expect(change).not.toHaveBeenCalled();
   const region = root.root.findByProps({ role: "button" });
   act(() => region.props.onKeyDown({ key: "Enter", preventDefault() {} }));
   expect(root.root.findByType("aside").props["aria-label"]).toBe("健康");
