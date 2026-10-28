@@ -260,6 +260,7 @@ export function readLifeAtlas(
 }
 /** Disposable phone projection of the adopted map; never exports candidates or terrain caches. */
 export function phoneLifeAtlas(ws: Workspace, now = new Date()) {
+  if (!session(ws).manifest.active) return;
   const state = readLifeAtlas(ws, undefined, now);
   if (state.loading) return;
   if (state.errorKind === "source" && state.error) throw new KaituError(state.error, "SOURCE_UNAVAILABLE");
