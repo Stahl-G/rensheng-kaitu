@@ -28,9 +28,10 @@ function fixture() {
   const failModels = join(root, "fail-models");
   const noDefault = join(root, "no-default");
   const helper = join(root, "credentials.mjs");
+  const credentialCalls = join(root, "credential-calls.jsonl");
   writeFileSync(
     helper,
-    `for await (const chunk of process.stdin) {}\nprocess.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true,"search":{}}');`,
+    `import {appendFileSync} from 'node:fs'; for await (const chunk of process.stdin) {}\nappendFileSync(${JSON.stringify(credentialCalls)}, JSON.stringify(process.argv[2])+'\\n'); process.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true,"search":{}}');`,
   );
   const modules = fileURLToPath(new URL("../../cli/node_modules", import.meta.url));
   const protocol = pathToFileURL(
@@ -96,8 +97,37 @@ rpc.start();`,
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-  return { root, home, workspace, sdk, select, requests, unavailable, holdModels, failModels, noDefault };
+  return {
+    root,
+    home,
+    workspace,
+    sdk,
+    select,
+    requests,
+    unavailable,
+    holdModels,
+    failModels,
+    noDefault,
+    credentialCalls,
+  };
 }
+
+test("ChatGPT conversation startup does not launch the unrelated provider catalog", async () => {
+  const f = fixture();
+  f.select();
+  try {
+    const runtime = await f.sdk.runtime();
+    await runtime.close();
+    const calls = existsSync(f.credentialCalls) ? readFileSync(f.credentialCalls, "utf8") : "";
+    expect(calls).not.toContain('"catalog"');
+    // Catalogs remain available when explicitly requested by the picker.
+    await f.sdk.catalogSettings(true);
+    expect(readFileSync(f.credentialCalls, "utf8")).toContain('"catalog"');
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 test("idle sign-out invalidates real Ask caches; re-login sends spawn a fresh process without saving the model", async () => {
   const f = fixture();

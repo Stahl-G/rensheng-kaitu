@@ -183,8 +183,10 @@ export function createSdkRuntime({
     return directory;
   };
   const loadSettings = async () => {
-    await loadDirectory();
     const stored = readSettings();
+    // ChatGPT SIWC is a built-in route; it does not need the pi-ai catalog
+    // subprocess before a conversation can start.
+    if (stored.provider !== "chatgpt-siwc") await loadDirectory();
     if (stored.provider && !providers.some((item) => item.id === stored.provider)) await savedProviders();
     return { choice: stored.choice, ...selection(stored) };
   };
