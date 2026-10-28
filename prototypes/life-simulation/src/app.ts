@@ -48,6 +48,7 @@ let selected = 0;
 let pasted = "";
 let error = "";
 let subchoice: DecisionKind | null = null;
+let choiceCollapsed = false;
 let sampleIndex = 0;
 let restartWasPlaying: boolean | null = null;
 const root = document.querySelector<HTMLDivElement>("#app");
@@ -55,7 +56,7 @@ if (!root) throw new Error("Missing app");
 const t = (zh: string, en: string) => (locale === "zh" ? zh : en);
 const pair = (v: readonly [string, string]) => v[locale === "zh" ? 0 : 1];
 const money = (n: number) =>
-  `¥${(n / 100).toLocaleString(locale === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 0 })}`;
+  `${n < 0 ? "−" : ""}¥${(Math.abs(n) / 100).toLocaleString(locale === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 0 })}`;
 const seed = () => crypto.getRandomValues(new Uint32Array(1))[0].toString(36).toUpperCase();
 const button = (id: string, label: string, cls = "") =>
   `<button type="button" id="${id}" class="${cls}">${label}</button>`;
@@ -143,18 +144,25 @@ function story(st: Story) {
 }
 function controls() {
   const finished = nextOffset() >= YEARS;
-  return `<div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<span class="year-duration">${t("约", "About")} ${yearDuration(speed) / 1000} ${t("秒 / 年", "sec / year")}</span><div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}</div>${
-    finished
-      ? ""
-      : `<div class="focus-row"><span>${t("下一年重心", "Next year’s focus")}</span>${Object.entries(
-          focusLabels,
-        )
-          .map(
-            ([k, v]) =>
-              `<button type="button" data-focus="${k}" aria-pressed="${(config?.plans[nextOffset()]?.focus ?? state().focus) === k}">${pair(v)}</button>`,
-          )
-          .join("")}</div>`
-  }`;
+  const current = run?.changed.at(-1);
+  return `<div class="timebar"><div class="time-heading"><strong>${current?.year ?? config?.year} <small>· ${state().age} ${t("岁", "years")}</small></strong><span class="play-status">${finished ? t("本局回顾", "Life review") : pending() ? t("等待抉择", "Awaiting your choice") : playing ? t("时间流动中", "Time is running") : t("已暂停", "Paused")}</span></div><div class="playback-toolbar">${button("pause", playing ? t("暂停", "Pause") : t("继续", "Continue"), "primary")}<div class="speed-group">${[1, 2, 4].map((n) => `<button type="button" data-speed="${n}" aria-pressed="${speed === n}">${n}×</button>`).join("")}</div><span class="year-duration">${t("约", "About")} ${yearDuration(speed) / 1000} ${t("秒 / 年", "sec / year")}</span>${button("skip", t("到下个抉择 ↠", "Next choice ↠"), "quiet")}</div></div>`;
+}
+function focusPanel() {
+  if (nextOffset() >= YEARS) return "";
+  return `<section class="focus-panel panel"><div class="section-heading"><h2>${t("下一年重心", "Next year’s focus")}</h2><span>${(config?.year ?? 2026) + nextOffset()}</span></div><div class="focus-row">${Object.entries(
+    focusLabels,
+  )
+    .map(
+      ([k, v]) =>
+        `<button type="button" data-focus="${k}" aria-pressed="${(config?.plans[nextOffset()]?.focus ?? state().focus) === k}">${pair(v)}</button>`,
+    )
+    .join("")}</div></section>`;
+}
+function decisionArea() {
+  if (!pending()) return "";
+  if (choiceCollapsed)
+    return `<section class="decision-waiting"><b>${t("抉择待定 · 时间暂停", "Decision pending · Time paused")}</b>${button("choice-expand", t("展开抉择", "Show choices"))}</section>`;
+  return `<div class="decision-area">${button("choice-collapse", t("收起抉择", "Collapse choices"), "text-button")}${choicePanel()}</div>`;
 }
 function choicePanel() {
   if (!pending()) return "";
@@ -225,6 +233,13 @@ const entryLabels: Record<string, [string, string]> = {
   rest: ["休整", "Rest"],
   "sale-fees": ["出售费用", "Sale fees"],
 };
+function habitsPanel(s: State) {
+  if (nextOffset() >= YEARS) return "";
+  return `<section class="habits panel"><details id="habits-panel"><summary>${t("长期习惯", "Long-term habits")}</summary><label class="check"><input id="habit-job" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).jobSearch ? "checked" : ""}>${t("每两年找一次转职", "Job search every two years")}</label><label class="check"><input id="habit-training" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).training ? "checked" : ""}>${t("每两年一次职训", "Training every two years")}</label><label>${t("每月定投 · RMB", "Monthly investment · RMB")}<select id="habit-invest">${[0, 500, 1000, 2000].map((n) => option(String(n), money(yuan(n)), String((config?.plans[nextOffset()]?.habits ?? state().habits).monthlyInvestment / 100))).join("")}</select></label>${s.habitsPending.length ? `<div class="tag">${t("等待资金或身份条件", "Waiting for funds or role")}: ${s.habitsPending.map((k) => (k === "training" ? t("职训", "Training") : k === "investment" ? t("定投", "Investment") : t("转职", "Search"))).join("、")}</div>` : ""}</details></section>`;
+}
+function householdPanel(s: State) {
+  return `<section class="household-panel panel"><h2>${t("模拟生活", "Life in this game")}</h2><div class="household"><span>${t({ rent: "租住", shared: "合租", owned: "自有住房", temporary: "临时住宿" }[s.housing], s.housing)}</span><span>${pair(roleLabels[s.role])}</span>${s.abroad ? `<span>${t("海外生活", "Living abroad")}</span>` : ""}${s.family.partner ? `<span>${t("伴侣", "Partner")}</span>` : ""}${s.family.children ? `<span>${t("孩子", "Children")} × ${s.family.children}</span>` : ""}${s.family.pet ? `<span>${t("宠物", "Pet")}</span>` : ""}</div></section>`;
+}
 function ledgerPanel(s: State) {
   const row = run?.changed[selected - 1];
   const groups = new Map<string, number>();
@@ -250,21 +265,33 @@ function ledgerPanel(s: State) {
         ["结余", "Saved income", gross - costs],
       ] as const)
     : [];
-  return `<aside class="finances panel"><div class="section-heading"><h2>${t("这一年的账", "This year’s money")}</h2><span class="tag">${t("模拟 RMB", "SIM RMB")}</span></div><dl class="balance">${[
+  const balances: [string, string][] = [
     ["cash", t("现金", "Cash")],
     ["deposits", t("存款", "Deposits")],
     ["bonds", t("债券", "Bonds")],
     ["stocks", t("股票", "Stocks")],
     ["property", t("房产", "Property")],
     ["debt", t("负债", "Debt")],
+  ];
+  const balanceRow = ([key, label]: [string, string]) =>
+    `<div><dt>${label}</dt><dd>${money(s.assets[key as keyof Omit<State["assets"], "interestRate">])}</dd></div>`;
+  const zero = balances.filter(([key]) => s.assets[key as keyof Omit<State["assets"], "interestRate">] === 0);
+  return `<section class="finances panel"><div class="section-heading"><h2>${t("资产与收支", "Money")}</h2><span class="tag">${t("模拟 RMB", "SIM RMB")}</span></div><div class="money-total"><span>${t("净资产", "Net assets")}</span><strong>${money(netWorth(s.assets))}</strong></div><dl class="balance">${balances
+    .filter(([key]) => s.assets[key as keyof Omit<State["assets"], "interestRate">] !== 0)
+    .map(balanceRow)
+    .join(
+      "",
+    )}${s.assets.debt ? `<div><dt>${t("借款利率", "Debt rate")}</dt><dd>${(s.assets.interestRate * 100).toFixed(1)}%</dd></div>` : ""}</dl>${zero.length ? `<details id="zero-balances"><summary>${t("零余额账户", "Zero balances")} · ${zero.length}</summary><dl>${zero.map(balanceRow).join("")}</dl></details>` : ""}<h3>${row?.year ?? config?.year} · ${t("年度收支", "Annual cash flow")}</h3><dl class="annual-summary"><div><dt>${t("收入", "Income")}</dt><dd>${money(gross)}</dd></div><div><dt>${t("支出", "Expenses")}</dt><dd>${money(costs)}</dd></div><div><dt>${t("净资产变化", "Net change")}</dt><dd>${row ? money(row.journal.closing - row.journal.opening) : "—"}</dd></div></dl><details id="journal-panel"><summary>${t("年度明细", "Annual breakdown")}</summary><dl class="journal">${[
+    ...groups,
   ]
+    .filter(([, v]) => v !== 0)
     .map(
-      ([key, label]) =>
-        `<div><dt>${label}</dt><dd>${money(s.assets[key as keyof Omit<State["assets"], "interestRate">])}</dd></div>`,
+      ([k, v]) =>
+        `<div><dt>${entryLabels[k] ? pair(entryLabels[k]) : e(k)}</dt><dd>${v > 0 ? "+" : ""}${money(v)}</dd></div>`,
     )
     .join(
       "",
-    )}<div><dt>${t("借款利率", "Debt rate")}</dt><dd>${(s.assets.interestRate * 100).toFixed(1)}%</dd></div></dl><details open><summary>${t("净资产变化", "Net asset movement")} ${row ? money(row.journal.closing - row.journal.opening) : ""}</summary><dl class="journal">${[...groups].map(([k, v]) => `<div><dt>${entryLabels[k] ? pair(entryLabels[k]) : e(k)}</dt><dd>${v > 0 ? "+" : ""}${money(v)}</dd></div>`).join("")}</dl></details><div class="principal-note">${t("归还本金 · 资产负债转账", "Principal · balance transfer")}: ${money(row?.journal.principalPaid ?? 0)}</div><details><summary>${t("收入去向 · 估算", "Income allocation · estimate")}</summary><dl>${ratios.map(([zh, en, value]) => `<div><dt>${t(zh, en)}</dt><dd>${Math.round((value / gross) * 100)}%</dd></div>`).join("")}</dl></details><details id="habits-panel"><summary>${t("长期习惯", "Long-term habits")}</summary><label class="check"><input id="habit-job" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).jobSearch ? "checked" : ""}>${t("每两年找一次转职", "Job search every two years")}</label><label class="check"><input id="habit-training" type="checkbox" ${(config?.plans[nextOffset()]?.habits ?? state().habits).training ? "checked" : ""}>${t("每两年一次职训", "Training every two years")}</label><label>${t("每月定投 · RMB", "Monthly investment · RMB")}<select id="habit-invest">${[0, 500, 1000, 2000].map((n) => option(String(n), money(yuan(n)), String((config?.plans[nextOffset()]?.habits ?? state().habits).monthlyInvestment / 100))).join("")}</select></label>${s.habitsPending.length ? `<div class="tag">${t("等待资金或身份条件", "Waiting for funds or role")}: ${s.habitsPending.map((k) => (k === "training" ? t("职训", "Training") : k === "investment" ? t("定投", "Investment") : t("转职", "Search"))).join("、")}</div>` : ""}</details><div class="household"><b>${t("生活", "Life")}</b><span>${t({ rent: "租住", shared: "合租", owned: "自有住房", temporary: "临时住宿" }[s.housing], s.housing)}</span>${s.family.partner ? `<span>${t("伴侣", "Partner")}</span>` : ""}${s.family.children ? `<span>${t("孩子", "Children")} × ${s.family.children}</span>` : ""}${s.family.pet ? `<span>${t("宠物", "Pet")}</span>` : ""}</div></aside>`;
+    )}</dl>${row?.journal.principalPaid ? `<div class="principal-note">${t("归还本金 · 转账", "Principal · transfer")}: ${money(row.journal.principalPaid)}</div>` : ""}</details><details id="allocation-panel"><summary>${t("收入去向 · 估算", "Income allocation · estimate")}</summary><dl>${ratios.map(([zh, en, value]) => `<div><dt>${t(zh, en)}</dt><dd>${Math.round((value / gross) * 100)}%</dd></div>`).join("")}</dl></details></section>`;
 }
 function conclusion() {
   if (nextOffset() < YEARS || !run) return "";
@@ -276,7 +303,7 @@ function playPage() {
   if (!run || !config) return "";
   const s = shownState();
   const row = run.changed[selected - 1];
-  return `<main class="game-shell">${identity(s)}<section class="game-main"><div class="scene-top"><span>${row?.year ?? config.year} · ${s.age} ${t("岁", "years")}</span><span>${row?.market.crisis ? t("市场冲击", "Market shock") : t("日子继续", "Life goes on")} · ${t("指数", "Index")} ${((row?.market.returns.stocks ?? 0) * 100).toFixed(1)}%</span></div><div class="life-scene">${sceneSvg(s, locale)}</div>${controls()}${choicePanel()}<section class="events-feed" aria-label="${t("年度事件", "Annual events")}">${row?.stories.map(story).join("") ?? ""}</section>${conclusion()}<nav class="year-nav" aria-label="${t("年份回顾", "Year review")}">${run.changed.map((r, i) => `<button type="button" data-year="${i + 1}" aria-current="${selected === i + 1 ? "true" : "false"}">${r.age}${r.decision ? " ◆" : ""}</button>`).join("")}</nav><details id="route-panel" class="route-review"><summary>${t("双线回顾", "Two paths")} · ${t("同一个世界", "One shared world")}</summary>${mapSvg(run, selected, locale)}<div class="baseline-story">${run.baseline[selected - 1]?.stories.map(story).join("") ?? ""}</div></details><details id="rules-panel" class="rules"><summary>${t("规则、参数与来源", "Rules, parameters & sources")}</summary><p>${t("人民币为游戏金额；初始资产统一设定。四属性未知用中性 50，原卡仍保留未知。行情均值、波动、税社保和事件概率是作者设定，不是个人预测。", "RMB amounts and starting balances are simulated. Unknown stats use neutral 50; the source card retains unknown. Return means, volatility, tax/social rates and event odds are authored game assumptions, not personal predictions.")}</p><p>${t("一般知识对投资行为只有弱关联；性格随机项独立。知识不改变市场回报。定投按每月末结算，年内用平滑路径复合到同一年度行情。", "General knowledge has a weak game association with investment behavior; temperament is independent. Knowledge never changes market returns. Recurring investments settle at each month-end on a smooth path compounding to the shared annual return.")}</p><ul>${(["deposits", "bonds", "stocks", "property"] as const).map((k) => `<li>${pair(entryLabels[k])}: μ ${(marketConfig[k].mean * 100).toFixed(1)}%, σ ${(marketConfig[k].volatility * 100).toFixed(1)}% · <a href="${marketConfig[k].reference}" target="_blank" rel="noreferrer">${t("机制参考", "Mechanism reference")}</a></li>`).join("")}</ul><code>${e(config.worldSeed)} / ${e(config.lifeSeed)}</code></details></section>${ledgerPanel(s)}</main>`;
+  return `${controls()}<main class="game-shell">${identity(s)}<section class="game-main"><div class="scene-top"><span>${row?.year ?? config.year} · ${s.age} ${t("岁", "years")}</span><span>${row?.market.crisis ? t("市场冲击", "Market shock") : t("日子继续", "Life goes on")} · ${t("指数", "Index")} ${((row?.market.returns.stocks ?? 0) * 100).toFixed(1)}%</span></div><div class="life-scene">${sceneSvg(s, locale, true)}</div>${focusPanel()}${decisionArea()}<section class="events-feed panel" aria-label="${t("年度事件", "Annual events")}"><div class="section-heading"><h2>${t("人生记录", "Life journal")}</h2><span>${row?.year} · ${s.age} ${t("岁", "years")}</span></div><nav class="year-nav" aria-label="${t("年份回顾", "Year review")}">${run.changed.map((r, i) => `<button type="button" data-year="${i + 1}" aria-current="${selected === i + 1 ? "true" : "false"}">${r.age}${r.decision ? " ◆" : ""}</button>`).join("")}</nav>${row?.stories.map(story).join("") ?? ""}${selected < nextOffset() ? button("latest", t("回到现在", "Back to now"), "text-button") : ""}</section>${conclusion()}<details id="route-panel" class="route-review"><summary>${t("双线回顾", "Two paths")} · ${t("同一个世界", "One shared world")}</summary>${mapSvg(run, selected, locale)}<div class="baseline-story">${run.baseline[selected - 1]?.stories.map(story).join("") ?? ""}</div></details><details id="rules-panel" class="rules"><summary>${t("规则、参数与来源", "Rules, parameters & sources")}</summary><p>${t("人民币为游戏金额；初始资产采用可修改的模拟设定。四属性未知用中性 50，原卡仍保留未知。行情均值、波动、税社保和事件概率是作者设定，不是个人预测。", "RMB amounts and editable starting balances are simulated. Unknown stats use neutral 50; the source card retains unknown. Return means, volatility, tax/social rates and event odds are authored game assumptions, not personal predictions.")}</p><p>${t("一般知识对投资行为只有弱关联；性格随机项独立。知识不改变市场回报。定投按每月末结算，年内用平滑路径复合到同一年度行情。", "General knowledge has a weak game association with investment behavior; temperament is independent. Knowledge never changes market returns. Recurring investments settle at each month-end on a smooth path compounding to the shared annual return.")}</p><ul>${(["deposits", "bonds", "stocks", "property"] as const).map((k) => `<li>${pair(entryLabels[k])}: μ ${(marketConfig[k].mean * 100).toFixed(1)}%, σ ${(marketConfig[k].volatility * 100).toFixed(1)}% · <a href="${marketConfig[k].reference}" target="_blank" rel="noreferrer">${t("机制参考", "Mechanism reference")}</a></li>`).join("")}</ul><code>${e(config.worldSeed)} / ${e(config.lifeSeed)}</code></details></section><aside class="life-sidebar">${householdPanel(s)}${ledgerPanel(s)}${habitsPanel(state())}</aside></main>`;
 }
 function restartDialog() {
   return `<dialog id="restart-dialog" aria-labelledby="restart-title"><h2 id="restart-title">${t("重新开始这一局？", "Restart this life?")}</h2><p>${t("当前进度会被替换。", "This will replace your current progress.")}</p><div class="dialog-actions">${button("restart-cancel", t("取消", "Cancel"), "primary")}${button("restart-confirm", t("确认重玩", "Restart"))}</div></dialog>`;
@@ -335,6 +362,7 @@ function begin(c?: Config) {
   playing = true;
   error = "";
   subchoice = null;
+  choiceCollapsed = false;
   advance();
   window.scrollTo(0, 0);
 }
@@ -365,11 +393,12 @@ function advance(renderNow = true) {
   if (renderNow) render();
 }
 function decide(d: Decision) {
-  if (!config) return;
+  if (!config || !pending()) return;
   performance.mark("kaitu:decision-input");
   const i = nextOffset();
   config.decisions[i] = d;
   subchoice = null;
+  choiceCollapsed = false;
   playing = true;
   try {
     advance();
@@ -410,6 +439,7 @@ function render() {
   const openPanels = [...document.querySelectorAll<HTMLDetailsElement>("details[id][open]")].map(
     (el) => el.id,
   );
+  document.body.classList.toggle("playing-game", page === "play");
   document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
   root.innerHTML = `${
     header() +
@@ -535,6 +565,7 @@ function render() {
     render();
   });
   onAll("[data-decision]", (el) => {
+    if (!pending()) return;
     const kind = el.dataset.decision as DecisionKind;
     if (["business", "invest", "custom"].includes(kind)) {
       subchoice = kind;
@@ -548,6 +579,20 @@ function render() {
     decide({ kind: "invest", investment: el.dataset.investment as Decision["investment"] }),
   );
   onAll("[data-custom]", (el) => decide({ kind: "custom", custom: el.dataset.custom as Decision["custom"] }));
+  click("latest", () => {
+    selected = nextOffset();
+    render();
+  });
+  click("choice-collapse", () => {
+    choiceCollapsed = true;
+    playing = false;
+    render();
+  });
+  click("choice-expand", () => {
+    choiceCollapsed = false;
+    playing = false;
+    render();
+  });
   click("choice-back", () => {
     subchoice = null;
     render();
@@ -589,6 +634,8 @@ function render() {
       yearTimer.stop();
       const pause = document.getElementById("pause");
       if (pause) pause.textContent = t("继续", "Continue");
+      const status = document.querySelector(".play-status");
+      if (status && !pending() && nextOffset() < YEARS) status.textContent = t("已暂停", "Paused");
     });
   }
   yearTimer.schedule(speed);
