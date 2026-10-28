@@ -486,6 +486,7 @@ function Overview({
     if (captureOpen && view === "overview") document.getElementById("capture-text")?.focus();
   }, [captureOpen, view]);
   const [homeAskText, setHomeAskText] = useState("");
+  const [homeAskError, setHomeAskError] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
@@ -640,6 +641,14 @@ function Overview({
     setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
+  };
+  const handoffAsk = (text: string) => {
+    if (handoffPending.current || !props.renderAsk) return false;
+    const event = new Event("kaitu:before-ask-draft", { cancelable: true });
+    if (!window.dispatchEvent(event)) return false;
+    handoffPending.current = true;
+    prompt(text, true);
+    return true;
   };
   const askNext = (item: { title: string; module: string }) =>
     prompt(
@@ -1133,9 +1142,20 @@ function Overview({
               }}
               loadLibrary={props.loadLibrary}
               ask={(text) => {
-                prompt(text);
+                if (!handoffAsk(text)) {
+                  setHomeAskError(
+                    t(
+                      "问问里还有未发送的内容，请先处理后再继续。",
+                      "Finish the unsent content in Ask before continuing.",
+                    ),
+                  );
+                  return;
+                }
+                setHomeAskError("");
                 setHomeAskText("");
               }}
+              canAsk={!!props.renderAsk}
+              askError={homeAskError}
               askText={homeAskText}
               setAskText={setHomeAskText}
               loadAtlas={props.loadLifeAtlas}
@@ -1446,14 +1466,7 @@ function Overview({
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
-                onDraft={(text) => {
-                  if (handoffPending.current || !props.renderAsk) return false;
-                  const event = new Event("kaitu:before-ask-draft", { cancelable: true });
-                  if (!window.dispatchEvent(event)) return false;
-                  handoffPending.current = true;
-                  prompt(text, true);
-                  return true;
-                }}
+                onDraft={handoffAsk}
               />
             </div>
           ))}

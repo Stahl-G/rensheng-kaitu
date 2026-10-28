@@ -297,6 +297,8 @@ function App() {
                 busy={busy}
                 start={() => setPanel("capture")}
                 ask={explain}
+                canAsk
+                askError=""
                 askText={homeAsk}
                 setAskText={setHomeAsk}
                 openAtlas={() => {}}

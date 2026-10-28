@@ -30,6 +30,8 @@ export function LifeHome({
   memory,
   busy,
   ask,
+  canAsk,
+  askError,
   askText,
   setAskText,
   loadAtlas,
@@ -52,6 +54,8 @@ export function LifeHome({
   memory: () => void;
   busy: boolean;
   ask: (text: string) => void;
+  canAsk: boolean;
+  askError: string;
   askText: string;
   setAskText: (text: string) => void;
   loadAtlas?: () => Promise<import("@kaitu/core").LifeAtlasState>;
@@ -194,24 +198,27 @@ export function LifeHome({
           )}
         </button>
       )}
-      <form
-        className={todayCss.askHome}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (askText.trim()) ask(askText);
-        }}
-      >
-        <label htmlFor="today-ask">{t("想聊些什么？", "What would you like to talk about?")}</label>
-        <textarea
-          id="today-ask"
-          value={askText}
-          onChange={(event) => setAskText(event.target.value)}
-          placeholder={t("写下来，或使用系统听写", "Write here or use system dictation")}
-        />
-        <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
-          {t("去问问继续", "Continue in Ask")}
-        </button>
-      </form>
+      {canAsk && (
+        <form
+          className={todayCss.askHome}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (askText.trim()) ask(askText);
+          }}
+        >
+          <label htmlFor="today-ask">{t("想聊些什么？", "What would you like to talk about?")}</label>
+          <textarea
+            id="today-ask"
+            value={askText}
+            onChange={(event) => setAskText(event.target.value)}
+            placeholder={t("写下来，或使用系统听写", "Write here or use system dictation")}
+          />
+          <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
+            {t("去问问继续", "Continue in Ask")}
+          </button>
+          {askError && <p role="alert">{askError}</p>}
+        </form>
+      )}
       {!firstVisit && facts.length > 0 && (
         <div className={todayCss.mirror}>
           {[...paragraphs.values()].map((metrics) => {
