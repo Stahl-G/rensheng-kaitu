@@ -157,12 +157,12 @@ function job<T>(data: object, progress?: (fraction: number) => void): Promise<T>
     });
   });
 }
-function refreshSource(s: Session) {
+function refreshSource(s: Session, now = new Date()) {
   if (!s.requested || !s.dirty || s.loading) return;
   clearTimeout(s.refreshTimer);
   s.dirty = false;
   s.loading = true;
-  void job<AtlasSource>({ kind: "source", root: s.root })
+  void job<AtlasSource>({ kind: "source", root: s.root, now: now.toISOString() })
     .then((source) => {
       s.source = source;
       s.sourceError = null;
@@ -173,7 +173,7 @@ function refreshSource(s: Session) {
     .finally(() => {
       s.loading = false;
       notify(s);
-      if (s.dirty) refreshSource(s);
+      if (s.dirty) refreshSource(s, now);
     });
 }
 /** File watchers invalidate once; page reads use the in-memory projection. */
@@ -215,7 +215,7 @@ export function readLifeAtlas(
 ): LifeAtlasState {
   const s = session(ws);
   s.requested = true;
-  refreshSource(s);
+  refreshSource(s, now);
   const candidate = s.manifest.candidates.find((c) => c.id === (id ?? s.manifest.active) && !c.archived);
   if (id && !candidate) throw new KaituError("地图方案不存在", "NOT_FOUND");
   const mapped = s.source

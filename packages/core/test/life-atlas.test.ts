@@ -211,6 +211,71 @@ test("projection treats education as history, respects record deletions and leav
   expect(scoreDomain(domain, new Date("2026-10-27T00:00:00Z")).coverage).toBe(0);
 });
 
+test("project and learning content explores land without claiming recent activity", async () => {
+  const ws = await freshWorkspace();
+  for (const [file, stage, body] of [
+    ["projects/content/STATUS.md", "active", "# 合成标题\n已整理的接口资料与现状。\n"],
+    ["learning/content/STATUS.md", "active", "# 合成标题\n已整理的学习资料。\n"],
+    ["projects/shell/STATUS.md", "active", "# 合成标题\n<!-- empty -->\n---\n- [ ] 一个计划\n"],
+    ["learning/guess/STATUS.md", "inferred", "推测资料。\n"],
+  ])
+    ws.writeText(
+      file,
+      `---\ntitle: 合成标题\nstage: ${stage}\nupdated: 2026-10-26\nnext:\n  - id: p\n    title: 合成计划\n    status: todo\n---\n${body}`,
+    );
+  const source = atlasSource(ws, new Date("2026-10-27"));
+  const facts = source.data.domains.flatMap((d) => d.facts);
+  for (const [file, clarity] of [
+    ["projects/content/STATUS.md", 1],
+    ["learning/content/STATUS.md", 1],
+    ["projects/shell/STATUS.md", 0.18],
+    ["learning/guess/STATUS.md", 0.18],
+  ] as const) {
+    const selected = facts.filter((f) => f.source === file);
+    const d = mapDomains({ domains: [{ id: "check", title: "合成", facts: selected }] })[0];
+    for (const time of ["2026-10-27", "2026-11-26"])
+      expect(scoreDomain(d, new Date(time))).toMatchObject({ clarity, glow: 0 });
+  }
+  const plans = facts.filter((f) => f.kind === "plan");
+  const d = mapDomains({ domains: [{ id: "plans", title: "计划", facts: plans }] })[0];
+  expect(scoreDomain(d, new Date("2026-10-27"))).toMatchObject({ clarity: 0.18, glow: 0 });
+});
+
+test("activity selection and scoring share an injected clock", async () => {
+  const ws = await freshWorkspace();
+  const dates = [
+    "2026-01-01",
+    "2026-10-26",
+    "2026-11-01",
+    ...Array.from({ length: 6 }, (_, i) => `2026-11-0${i + 2}`),
+  ];
+  for (const [i, date] of dates.entries())
+    addRecord(
+      ws,
+      "workout",
+      { exercise: "合成训练", sets: 3, reps: 5, weight_kg: 20, session_id: date, ts: `${date}T10:00:00Z` },
+      { by: i < 3 ? "user" : "agent" },
+    );
+  const now = new Date("2026-10-27");
+  const spy = vi.spyOn(Date, "now");
+  try {
+    const results = ["2026-10-27", "2026-11-10"].map((wall) => {
+      spy.mockReturnValue(Date.parse(wall));
+      const source = atlasSource(ws, now);
+      const d = mapDomains(source.data, {
+        version: 1,
+        discover: false,
+        domains: source.rules.filter((r) => r.id === "health"),
+      })[0];
+      return { facts: d.facts, score: scoreDomain(d, now) };
+    });
+    expect(results[1]).toEqual(results[0]);
+    expect(results[0].score).toMatchObject({ clarity: 1, glow: 1 });
+  } finally {
+    spy.mockRestore();
+  }
+});
+
 test("real activity illuminates briefly while explored terrain remains clear", async () => {
   const ws = await freshWorkspace();
   ws.writeText(

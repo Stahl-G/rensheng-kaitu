@@ -5,7 +5,9 @@ import { atlasSource } from "./life-atlas-source.js";
 import { Workspace } from "./workspace.js";
 try {
   if (workerData.kind === "source")
-    parentPort?.postMessage({ result: atlasSource(new Workspace(workerData.root, { maintain: false })) });
+    parentPort?.postMessage({
+      result: atlasSource(new Workspace(workerData.root, { maintain: false }), new Date(workerData.now)),
+    });
   else {
     const { generateAtlas } = await import("@kaitu/cartographer");
     const resource = generateAtlas(

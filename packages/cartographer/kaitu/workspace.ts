@@ -3,6 +3,8 @@ export interface Fact {
   id: string; title: string; kind: FactKind; status: string; source: string; updated?: string
   /** Derived event time for a verified real activity; never a file modification timestamp. */
   actualActivityAt?: string
+  /** Nonempty source content, excluding title/headings; does not attest authorship or completion. */
+  hasContent?: boolean
   progress?: { current: number; target: number; unit: string }
   detail?: string
 }
