@@ -89,6 +89,17 @@ test("map histories preserve terrain and positions while projecting current reco
   } finally {
     if (first.resource) first.resource.svg = originalSvg;
   }
+  ws.writeText("phone/life-atlas.json", "{broken synthetic output");
+  ws.writeText("phone/week.json", "{broken synthetic output");
+  const repairNotice = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await writePhoneSnapshots(ws, new Date("2026-10-28T08:02:00Z"), { force: true });
+    expect(ws.readJson<{ resourceId: string }>("phone/life-atlas.json").resourceId).toBe(firstId);
+    expect(ws.readJson<{ format: string }>("phone/week.json").format).toBe("kaitu.phone.week");
+    expect(repairNotice).toHaveBeenCalledTimes(2);
+  } finally {
+    repairNotice.mockRestore();
+  }
   const key = first.resource?.key;
   const borders = first.resource?.regions.borders;
   ws.writeText(
