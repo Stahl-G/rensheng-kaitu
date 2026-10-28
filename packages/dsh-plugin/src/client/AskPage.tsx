@@ -293,6 +293,7 @@ export function AskPage({
   );
   const [modelQuery, setModelQuery] = useState("");
   const modelRequestSeq = useRef(0);
+  const modelTrigger = useRef<HTMLButtonElement>(null);
   const [addMenu, setAddMenu] = useState(false);
   const [liveText, setLiveText] = useState("");
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -1531,6 +1532,7 @@ export function AskPage({
                 type="button"
                 className={css.model}
                 disabled={busy || !settings?.configured}
+                ref={modelTrigger}
                 aria-label={t("选择模型", "Choose model")}
                 aria-haspopup="dialog"
                 aria-expanded={modelMenu}
@@ -1553,6 +1555,29 @@ export function AskPage({
                   open
                   className={`${v2["mode-pop"]} ${css.modelPopover}`}
                   aria-label={t("当前 AI", "Current AI")}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setModelMenu(false);
+                      modelTrigger.current?.focus();
+                      return;
+                    }
+                    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+                    const items = Array.from(
+                      event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+                    );
+                    if (!items.length) return;
+                    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+                    const next =
+                      event.key === "ArrowDown"
+                        ? (index + 1) % items.length
+                        : index <= 0
+                          ? items.length - 1
+                          : index - 1;
+                    event.preventDefault();
+                    items[next]?.focus();
+                  }}
                 >
                   <input
                     className={css.modelSearch}
@@ -1560,6 +1585,8 @@ export function AskPage({
                     value={modelQuery}
                     onChange={(event) => setModelQuery(event.target.value)}
                     placeholder={t("搜索模型或服务商…", "Search models or providers…")}
+                    // biome-ignore lint/a11y/noAutofocus: 打开模型面板后立即可键盘搜索。
+                    autoFocus
                   />
                   {localRuntime && (
                     <p className={v2.small}>
