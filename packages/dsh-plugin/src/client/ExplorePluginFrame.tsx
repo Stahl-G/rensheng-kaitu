@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PersonalServices } from "./PersonalPages.js";
 import css from "./Prototype.module.css";
 import { useT } from "./i18n.js";
@@ -9,12 +9,14 @@ export function ExplorePluginFrame({
   plugins,
   onRemoved,
   onDraft,
+  active,
 }: {
   id: string;
   title: string;
   plugins: PersonalServices["plugins"];
   onRemoved: (id: string) => void;
   onDraft: (draft: string) => boolean;
+  active: boolean;
 }) {
   const t = useT();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -35,7 +37,7 @@ export function ExplorePluginFrame({
       active = false;
     };
   }, [plugins, id]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!url) return;
     const removed = (event: MessageEvent) => {
       if (
@@ -57,10 +59,15 @@ export function ExplorePluginFrame({
         data.draft.length > 200_000
       )
         return;
-      const accepted = delivered.current.has(data.id) || onDraft(data.draft);
+      const accepted = delivered.current.has(data.id) || (active && onDraft(data.draft));
       if (accepted) delivered.current.add(data.id);
       frame.current?.contentWindow?.postMessage(
-        { type: "kaitu:open-ask-draft-result", id: data.id, accepted },
+        {
+          type: "kaitu:open-ask-draft-result",
+          id: data.id,
+          accepted,
+          ...(!accepted && !active ? { reason: "inactive" } : {}),
+        },
         event.origin,
       );
     };
@@ -70,7 +77,7 @@ export function ExplorePluginFrame({
       window.removeEventListener("message", removed);
       window.removeEventListener("message", receiveDraft);
     };
-  }, [url, id, onRemoved, onDraft]);
+  }, [url, id, onRemoved, onDraft, active]);
   return (
     <>
       {error ? <p role="alert">{error}</p> : !loaded && <output>{t("正在打开…", "Opening…")}</output>}

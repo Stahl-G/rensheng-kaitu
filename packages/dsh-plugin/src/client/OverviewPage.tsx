@@ -1466,6 +1466,7 @@ function Overview({
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
+                active={view === "explore" && explore === entry.id}
                 onDraft={handoffAsk}
               />
             </div>
