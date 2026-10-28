@@ -635,6 +635,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                       const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
                       await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
                       await phones.stop();
+                      await home.pause();
                       const oldRoot = ws.root;
                       try {
                         if (relocate) await options.onWorkspaceChanging?.();
@@ -642,9 +643,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                       } finally {
                         try {
                           if (ws.root !== oldRoot) startWatching();
-                          home.invalidate();
                           if (relocate) await options.onWorkspaceChanged?.();
                         } finally {
+                          home.resume();
                           options.ask?.relocate(ws.root);
                           phones.start();
                           notify();

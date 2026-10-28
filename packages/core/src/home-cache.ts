@@ -16,10 +16,12 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
   let generation = 0;
   let root = ws.root;
   let closed = false;
+  let paused = false;
   let worker: Worker | null = null;
+  let retiring: Promise<unknown> = Promise.resolve();
   let timer: ReturnType<typeof setTimeout> | undefined;
   function rebuild() {
-    if (closed || worker) return;
+    if (closed || paused || worker) return;
     const current = generation;
     const entry = [
       "./home-worker.js",
@@ -49,9 +51,9 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
-      void active.terminate();
+      retiring = Promise.all([retiring, active.terminate()]);
       worker = null;
-      if (closed) return;
+      if (closed || paused) return;
       if (current !== generation) {
         rebuild();
         return;
@@ -78,6 +80,18 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
   return {
     read: () => state,
     invalidate,
+    async pause() {
+      paused = true;
+      clearTimeout(timer);
+      const active = worker;
+      worker = null;
+      if (active) retiring = Promise.all([retiring, active.terminate()]);
+      await retiring;
+    },
+    resume() {
+      paused = false;
+      invalidate();
+    },
     close() {
       closed = true;
       clearTimeout(timer);

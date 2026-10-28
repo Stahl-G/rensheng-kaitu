@@ -80,7 +80,9 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   expect(response.status).toBe(200);
   const { path } = (await response.json()) as { path: string };
   expect(ws.readText(path)).toContain("合成搬迁期间原文");
-  expect((await post("moveStorage", [join(root, "back"), false, "local"])).status).toBe(200);
+  const returning = await post("moveStorage", [join(root, "back"), false, "local"]);
+  const returningBody = await returning.json();
+  expect(returning.status, JSON.stringify(returningBody)).toBe(200);
   for (const file of [...captures, path]) {
     expect(ws.exists(file)).toBe(true);
     expect(await isTracked(ws, file)).toBe(true);
