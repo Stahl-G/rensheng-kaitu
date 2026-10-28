@@ -23,7 +23,13 @@ function savedProviders(ctx) {
     if (entry.options.id === "llm-pi-ai")
       for (const [provider, config] of Object.entries(override.providers ?? {}))
         if (modelIds(config?.models).length)
-          rows.push({ provider, api: config.api, baseURL: config.baseURL, models: modelIds(config.models) });
+          rows.push({
+            provider,
+            api: config.api,
+            baseURL: config.baseURL,
+            auth: config.apiKeyEnv ? "key" : "dsh",
+            models: modelIds(config.models),
+          });
   }
   return rows;
 }

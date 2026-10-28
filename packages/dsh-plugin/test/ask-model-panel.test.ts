@@ -35,7 +35,7 @@ test("model search chooses the matching provider and a failed switch keeps the o
               ...settings,
               saved: [
                 { provider: "first", name: "First", models: ["shared"] },
-                { provider: "second", name: "Second", models: ["shared"] },
+                { provider: "second", name: "Second", models: ["shared"], auth: "dsh" },
               ],
             }
           : { authenticated: false },
@@ -73,7 +73,7 @@ test("model search chooses the matching provider and a failed switch keeps the o
     await act(async () => {
       await matches[0]?.props.onClick();
     });
-    expect(requests).toEqual([{ choice: "builtin", provider: "second", model: "shared" }]);
+    expect(requests).toEqual([{ choice: "builtin", provider: "second", model: "shared", auth: "dsh" }]);
     expect(
       root.root
         .findAllByType("button")

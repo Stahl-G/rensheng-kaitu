@@ -73,7 +73,7 @@ interface Settings {
   supportsImages?: boolean;
   providers: Provider[];
   /** 已添加的服务商和模型，存在 DSH 的 profile 里。 */
-  saved?: { provider: string; name: string; models: string[] }[];
+  saved?: { provider: string; name: string; models: string[]; auth?: "key" | "dsh" }[];
   reasoningEffort?: string;
   modelCapabilities?: {
     id: string;
@@ -852,6 +852,7 @@ export function AskPage({
     permissionMode?: string,
     reasoningEffort?: string | null,
     forceBuiltin = false,
+    auth?: "key" | "dsh",
   ) => {
     if (!settings?.configured) return;
     modelRequestSeq.current++;
@@ -875,6 +876,7 @@ export function AskPage({
                 choice: "builtin",
                 provider,
                 model: id,
+                ...(auth ? { auth } : {}),
                 ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
               },
         ),
@@ -1676,7 +1678,9 @@ export function AskPage({
                                 settings.model === id
                               }
                               disabled={busy || saving}
-                              onClick={() => void switchModel(row.provider, id, undefined, undefined, true)}
+                              onClick={() =>
+                                void switchModel(row.provider, id, undefined, undefined, true, row.auth)
+                              }
                             >
                               {id}
                             </button>
