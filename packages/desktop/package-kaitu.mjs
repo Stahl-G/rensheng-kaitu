@@ -258,6 +258,7 @@ async function packageApplication() {
     set("NSHumanReadableCopyright", productCopyright);
     set("NSAppleEventsUsageDescription", "开图将你确认的时间段加入日历，并同步改期和取消。");
     set("NSMicrophoneUsageDescription", "人生开图使用麦克风将语音转为消息草稿。");
+    set("NSSpeechRecognitionUsageDescription", "人生开图在本机将你说的话转为消息草稿。");
     // 取消 dsh:// 协议声明，避免抢占原 DSH 应用的链接。
     execFileSync("/usr/bin/plutil", ["-remove", "CFBundleURLTypes", outputPlist]);
     const { ElectronAsarIntegrity: integrity } = JSON.parse(
@@ -295,6 +296,18 @@ async function packageApplication() {
         join(directory, "launcher.c"),
         "-o",
         join(macos, "Kaitu"),
+      ],
+      { stdio: "inherit" },
+    );
+    execFileSync(
+      "/usr/bin/xcrun",
+      [
+        "swiftc",
+        "-target",
+        "arm64-apple-macos12.0",
+        join(directory, "speech-helper.swift"),
+        "-o",
+        join(macos, "KaituSpeech"),
       ],
       { stdio: "inherit" },
     );

@@ -75,6 +75,10 @@ export interface OverviewPageProps
     source?: "manual" | "footprints",
   ) => Promise<import("@kaitu/core").WeatherState>;
   initialChatDraft?: string;
+  speech?: (
+    action: "status" | "start" | "stop" | "cancel",
+    locale?: string,
+  ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
   navigation?: PanelNavigation;
   load: () => Promise<OverviewData>;
@@ -485,6 +489,8 @@ function Overview({
   useEffect(() => {
     if (captureOpen && view === "overview") document.getElementById("capture-text")?.focus();
   }, [captureOpen, view]);
+  const [homeAskText, setHomeAskText] = useState("");
+  const [homeAskError, setHomeAskError] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
@@ -639,6 +645,14 @@ function Overview({
     setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
+  };
+  const handoffAsk = (text: string) => {
+    if (handoffPending.current || !props.renderAsk) return false;
+    const event = new Event("kaitu:before-ask-draft", { cancelable: true });
+    if (!window.dispatchEvent(event)) return false;
+    handoffPending.current = true;
+    prompt(text, true);
+    return true;
   };
   const askNext = (item: { title: string; module: string }) =>
     prompt(
@@ -1124,7 +1138,6 @@ function Overview({
               capture={capture}
               start={() => setCaptureOpen(true)}
               library={() => openRecord(data.notes.length ? "inbox" : "")}
-              addNext={() => (data.plans.goals.length ? openRecord("projects") : startMatter(""))}
               busy={busy}
               loadProjects={props.loadProjects}
               openProject={(slug) => {
@@ -1132,25 +1145,40 @@ function Overview({
                 setProjectFocus(slug);
               }}
               loadLibrary={props.loadLibrary}
-              save={async (text) => {
-                const saved = await props.capture(text);
-                await refresh();
-                return saved;
+              weather={
+                props.loadWeather && props.setWeatherPlace ? (
+                  <TodayWeather
+                    compact
+                    load={props.loadWeather}
+                    setPlace={props.setWeatherPlace}
+                    loadLifeMap={props.loadLifeMap}
+                    subscribe={props.subscribe}
+                  />
+                ) : undefined
+              }
+              ask={(text) => {
+                if (!handoffAsk(text)) {
+                  setHomeAskError(
+                    t(
+                      "问问里还有未发送的内容，请先处理后再继续。",
+                      "Finish the unsent content in Ask before continuing.",
+                    ),
+                  );
+                  return;
+                }
+                setHomeAskError("");
+                setHomeAskText("");
               }}
-              complete={async (item) => {
-                await props.completeNext(item.file, item.id);
-                await refresh();
-              }}
-              source={(entry) => {
-                openRecord("inbox");
-                setLibraryEntry({
-                  ...entry,
-                  source: "me",
-                  originalSource: entry.file,
-                  date: data.today,
-                  status: "raw",
-                  destination: null,
-                });
+              canAsk={!!props.renderAsk}
+              askError={homeAskError}
+              askText={homeAskText}
+              setAskText={setHomeAskText}
+              speech={props.speech}
+              insertSpeech={(text) => setHomeAskText((current) => (current ? `${current}\n${text}` : text))}
+              loadAtlas={props.loadLifeAtlas}
+              openAtlas={() => {
+                setExplore("life-map");
+                setView("explore");
               }}
               adopt={(id) => void run(() => props.adoptTask(id))}
               dismiss={(id) => void run(() => props.cancelTask(id))}
@@ -1456,14 +1484,7 @@ function Overview({
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
                 active={view === "explore" && explore === entry.id}
-                onDraft={(text) => {
-                  if (handoffPending.current || !props.renderAsk) return false;
-                  const event = new Event("kaitu:before-ask-draft", { cancelable: true });
-                  if (!window.dispatchEvent(event)) return false;
-                  handoffPending.current = true;
-                  prompt(text, true);
-                  return true;
-                }}
+                onDraft={handoffAsk}
               />
             </div>
           ))}
