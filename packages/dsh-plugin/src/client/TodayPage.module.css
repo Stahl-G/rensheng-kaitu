@@ -763,3 +763,12 @@
 .askHome textarea {
   min-height: 100px;
 }
+
+.dateWeather {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  min-width: 0;
+}

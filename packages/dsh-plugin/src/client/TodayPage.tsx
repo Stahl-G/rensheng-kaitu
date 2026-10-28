@@ -38,6 +38,7 @@ export function LifeHome({
   insertSpeech,
   loadAtlas,
   openAtlas,
+  weather,
   adopt,
   dismiss,
   loadLibrary,
@@ -67,6 +68,7 @@ export function LifeHome({
   insertSpeech: (text: string) => void;
   loadAtlas?: () => Promise<import("@kaitu/core").LifeAtlasState>;
   openAtlas: () => void;
+  weather?: ReactNode;
   adopt: (id: string) => void;
   dismiss: (id: string) => void;
   loadLibrary: (query: { section: "inbox"; source: string; before?: string }) => Promise<LibraryData>;
@@ -235,7 +237,10 @@ export function LifeHome({
   return (
     <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
       <header className={todayCss.homeHeading}>
-        <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+        <div className={todayCss.dateWeather}>
+          <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+          {weather}
+        </div>
         {!firstVisit && (
           <button
             id="life-handover-start"

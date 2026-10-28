@@ -1145,6 +1145,17 @@ function Overview({
                 setProjectFocus(slug);
               }}
               loadLibrary={props.loadLibrary}
+              weather={
+                props.loadWeather && props.setWeatherPlace ? (
+                  <TodayWeather
+                    compact
+                    load={props.loadWeather}
+                    setPlace={props.setWeatherPlace}
+                    loadLifeMap={props.loadLifeMap}
+                    subscribe={props.subscribe}
+                  />
+                ) : undefined
+              }
               ask={(text) => {
                 if (!handoffAsk(text)) {
                   setHomeAskError(
