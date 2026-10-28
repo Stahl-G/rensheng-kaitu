@@ -75,6 +75,7 @@ interface Settings {
   /** 已添加的服务商和模型，存在 DSH 的 profile 里。 */
   saved?: { provider: string; name: string; models: string[]; auth?: "key" | "dsh" }[];
   reasoningEffort?: string;
+  modelCapabilityError?: boolean;
   modelCapabilities?: {
     id: string;
     reasoning?: { efforts: { id: string; name?: string }[]; defaultEffort?: string };
@@ -780,7 +781,11 @@ export function AskPage({
                 : undefined,
           };
         });
-        setCatalogStatus(null);
+        setCatalogStatus(
+          catalog.modelCapabilityError
+            ? t("模型能力读取失败，请重试", "Could not load model capabilities. Try again.")
+            : null,
+        );
       })
       .catch((err) => {
         if (request === modelRequestSeq.current) setCatalogStatus(err.message);
@@ -1675,18 +1680,32 @@ export function AskPage({
                     ?.efforts?.length ? (
                     <section aria-label={t("推理强度", "Reasoning effort")}>
                       <p>{t("推理强度（下次发送生效）", "Reasoning effort (next message)")}</p>
-                      <button
-                        type="button"
-                        className={css.model}
-                        disabled={saving || busy}
-                        aria-pressed={!settings.reasoningEffort}
-                        onClick={() => void switchModel(settings.provider, settings.model, undefined, null)}
-                      >
-                        {t("默认", "Default")}
-                      </button>
+                      {settings.modelCapabilities.find((model) => model.id === settings.model)?.reasoning
+                        ?.defaultEffort && (
+                        <button
+                          type="button"
+                          className={css.model}
+                          disabled={saving || busy}
+                          aria-pressed={
+                            !settings.reasoningEffort ||
+                            settings.reasoningEffort ===
+                              settings.modelCapabilities.find((model) => model.id === settings.model)
+                                ?.reasoning?.defaultEffort
+                          }
+                          onClick={() => void switchModel(settings.provider, settings.model, undefined, null)}
+                        >
+                          {t("默认", "Default")}
+                        </button>
+                      )}
                       {settings.modelCapabilities
                         .find((model) => model.id === settings.model)
-                        ?.reasoning?.efforts.map((effort) => (
+                        ?.reasoning?.efforts.filter(
+                          (effort) =>
+                            effort.id !==
+                            settings.modelCapabilities?.find((model) => model.id === settings.model)
+                              ?.reasoning?.defaultEffort,
+                        )
+                        .map((effort) => (
                           <button
                             type="button"
                             key={effort.id}

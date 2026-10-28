@@ -218,6 +218,8 @@ test("a delayed old catalog cannot attach its effort to a same-named model after
     await act(async () => {
       trigger()?.props.onClick();
     });
+    expect(root.root.findAllByType("button").some((x) => x.children.includes("High"))).toBe(true);
+    expect(root.root.findAllByType("button").some((x) => x.children.includes("默认"))).toBe(false);
     await act(async () => {
       trigger()?.props.onClick();
     });
@@ -241,6 +243,64 @@ test("a delayed old catalog cannot attach its effort to a same-named model after
     });
     expect(root.root.findAllByType("section").some((x) => x.props["aria-label"] === "推理强度")).toBe(false);
     expect(trigger()?.findAllByType("span")[0]?.children.join("")).toContain("Second");
+  } finally {
+    if (root) act(() => root.unmount());
+  }
+});
+
+test("a capability lookup failure leaves saved models selectable and offers retry", async () => {
+  const settings = {
+    configured: true,
+    choice: "builtin",
+    provider: "first",
+    providerName: "First",
+    model: "shared",
+    protocols: [],
+    providers: [],
+    localAgents: [],
+  };
+  vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+    const method = url.split("/").at(-1);
+    const args = JSON.parse(init.body);
+    const values: Record<string, unknown> = {
+      askSettings: settings,
+      askList: [],
+      overview: { projects: [], allNext: [], notes: [] },
+      automation: { asked: true, tasks: {} },
+      askSupport:
+        args[0] === "builtinSettings"
+          ? {
+              ...settings,
+              modelCapabilityError: true,
+              saved: [{ provider: "other", name: "Other", models: ["available"] }],
+            }
+          : { authenticated: false },
+    };
+    return { ok: true, json: async () => values[method ?? ""] ?? {} };
+  });
+  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal(
+    "EventSource",
+    class {
+      close() {}
+    },
+  );
+  let root!: ReactTestRenderer;
+  try {
+    await act(async () => {
+      root = create(createElement(AskPage, { workspace: "synthetic" }));
+    });
+    await act(async () => {
+      root.root
+        .findAllByType("button")
+        .find((x) => x.props["aria-label"] === "选择模型")
+        ?.props.onClick();
+    });
+    const buttons = root.root.findAllByType("button");
+    expect(buttons.some((x) => x.children.includes("available"))).toBe(true);
+    expect(buttons.some((x) => x.children.includes("重试读取"))).toBe(true);
   } finally {
     if (root) act(() => root.unmount());
   }

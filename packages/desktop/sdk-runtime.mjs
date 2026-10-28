@@ -400,9 +400,16 @@ export function createSdkRuntime({
         includeSaved || !providers.some((entry) => entry.id === settings.provider)
           ? await savedProviders()
           : undefined;
+      let modelCapabilityError;
+      let models = siwcModels;
+      if (settings.provider === "chatgpt-siwc") {
+        try {
+          models = await api.models({ provider: "chatgpt-siwc" });
+        } catch {
+          modelCapabilityError = true;
+        }
+      }
       if (saved) {
-        const models =
-          settings.provider === "chatgpt-siwc" ? await api.models({ provider: "chatgpt-siwc" }) : siwcModels;
         if (models.length)
           saved.push({
             provider: "chatgpt-siwc",
@@ -410,17 +417,20 @@ export function createSdkRuntime({
             models: models.map((model) => model.id),
           });
       }
-      const modelCapabilities =
-        settings.provider === "chatgpt-siwc"
-          ? siwcModels
-          : settings.auth === "dsh"
-            ? await api.models({ provider: settings.provider, auth: "dsh" })
-            : [];
+      let modelCapabilities = settings.provider === "chatgpt-siwc" && !modelCapabilityError ? models : [];
+      if (settings.provider !== "chatgpt-siwc" && settings.auth === "dsh") {
+        try {
+          modelCapabilities = await api.models({ provider: settings.provider, auth: "dsh" });
+        } catch {
+          modelCapabilityError = true;
+        }
+      }
       return {
         ...settings,
         providers,
         ...(saved ? { saved } : {}),
         ...(modelCapabilities.length ? { modelCapabilities } : {}),
+        ...(modelCapabilityError ? { modelCapabilityError } : {}),
         search: await describeSearch(),
       };
     },
@@ -459,6 +469,11 @@ export function createSdkRuntime({
           const models = await api.support("siwc/models");
           const model = models.find((item) => item.id === settings.model);
           if (!model) throw new KaituError("模型不在当前账号目录中，请刷新模型列表", "AI_MODEL");
+          if (input.reasoningEffort === null) {
+            const defaultEffort = model.reasoning?.defaultEffort;
+            if (!defaultEffort) throw new KaituError("该模型未提供默认推理档位", "AI_MODEL");
+            settings.reasoningEffort = defaultEffort;
+          }
           if (
             settings.reasoningEffort &&
             !model.reasoning?.efforts?.some((effort) => effort.id === settings.reasoningEffort)
@@ -467,6 +482,19 @@ export function createSdkRuntime({
           settings.supportsImages = model.image;
           settings.auth = "dsh";
         } else {
+          if (input.reasoningEffort !== undefined) {
+            if (settings.auth !== "dsh") throw new KaituError("该服务未提供推理档位", "AI_MODEL");
+            const model = (
+              await api.models({ provider: settings.provider, model: settings.model, auth: "dsh" })
+            ).find((item) => item.id === settings.model);
+            if (input.reasoningEffort === null) {
+              const defaultEffort = model?.reasoning?.defaultEffort;
+              if (!defaultEffort) throw new KaituError("该模型未提供默认推理档位", "AI_MODEL");
+              settings.reasoningEffort = defaultEffort;
+            }
+            if (!model?.reasoning?.efforts?.some((effort) => effort.id === settings.reasoningEffort))
+              throw new KaituError("该模型没有提供所选推理档位", "AI_MODEL");
+          }
           const ref = credentialRef(settings.provider);
           // 切回已添加过的服务商和模型时只确认 Key 还在，不再发验证请求。
           const known =
