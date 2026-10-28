@@ -146,11 +146,17 @@ export function LifeAtlasPage({
       clearInterval(timer);
     };
   }, [state?.loading, state?.running, refresh, loadLifeAtlasProgress]);
-  // Freshness changes with time even when no record is uploaded.
+  // Recheck only when an active light expires; opening the map also reads current data.
   useEffect(() => {
-    const timer = setInterval(refresh, 60_000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+    const deadlines = (state?.domains ?? [])
+      .filter((domain) => domain.score.glow)
+      .flatMap((domain) => domain.facts.map((fact) => Date.parse(fact.actualActivityAt ?? "")))
+      .filter((time) => Number.isFinite(time) && time <= Date.now() && time + 7 * 86400000 > Date.now())
+      .map((time) => time + 7 * 86400000);
+    if (!deadlines.length) return;
+    const timer = setTimeout(refresh, Math.max(0, Math.min(...deadlines) - Date.now()) + 50);
+    return () => clearTimeout(timer);
+  }, [state?.domains, refresh]);
   const resource = state?.resource;
   useEffect(() => {
     if (!resource || typeof window === "undefined") return;
@@ -535,6 +541,16 @@ export function LifeAtlasPage({
                       const lines = atlasLabel(d.title);
                       return (
                         <g key={d.id} pointerEvents="none">
+                          {!!d.score.glow && (
+                            <circle
+                              cx={p.x + 26}
+                              cy={p.y - 32}
+                              r="7"
+                              fill="#d69330"
+                              stroke="#fff1c4"
+                              strokeWidth="3"
+                            />
+                          )}
                           <path
                             d={`M${p.x} ${p.y - 32 - (lines.length - 1) * 28}l4 5-4 5-4-5Z`}
                             fill="#826b44"
@@ -563,23 +579,8 @@ export function LifeAtlasPage({
                       transform={`translate(${resource.compass.cx} ${resource.compass.cy})`}
                       pointerEvents="none"
                     >
-                      <circle r="34" fill="none" stroke="#b2a480" strokeWidth="3.5" />
-                      <circle
-                        r="34"
-                        fill="none"
-                        stroke="#6f8056"
-                        strokeWidth="4.5"
-                        strokeDasharray={2 * Math.PI * 34}
-                        strokeDashoffset={2 * Math.PI * 34 * (1 - (state?.coverage ?? 0))}
-                        transform="rotate(-90)"
-                      />
-                      <circle r="21" fill="#eadbb6" />
-                      <text textAnchor="middle" y="5" fontSize="14" fill="#4f593e">
-                        {state?.coverage === null ? "—" : `${Math.round((state?.coverage ?? 0) * 100)}%`}
-                      </text>
-                      <text textAnchor="middle" y="61" fontSize="14" fill="#7c6d50">
-                        {t("档案完善度", "Profile coverage")}
-                      </text>
+                      <circle r="30" fill="#eadbb6" stroke="#b2a480" strokeWidth="2" />
+                      <path d="M0 -22L6 0 0 22 -6 0Z" fill="#6f8056" stroke="#4f593e" strokeWidth="1" />
                     </g>
                   </g>
                 </svg>
@@ -625,25 +626,6 @@ export function LifeAtlasPage({
                   {t("关闭", "Close")} ×
                 </button>
                 <h3>{detail.title}</h3>
-                <p>
-                  {t("档案完善度", "Profile coverage")} ·{" "}
-                  {detail.score.coverage === null
-                    ? t("待了解", "Not assessed")
-                    : `${Math.round(detail.score.coverage * 100)}%`}
-                </p>
-                <small>
-                  {detail.temporal.kind === "historical"
-                    ? t("来路经历保留，不随时间变淡。", "Past experiences stay clear over time.")
-                    : detail.score.latest
-                      ? t(
-                          `最近资料：${detail.score.latest}；时间越久，地图逐渐变淡。`,
-                          `Latest record: ${detail.score.latest}. Older records gradually fade.`,
-                        )
-                      : t(
-                          "资料日期待补充，不能判断近期状态。",
-                          "Dates are missing; current status is unknown.",
-                        )}
-                </small>
                 {detail.facts.length ? (
                   <ul>
                     {detail.facts.map((fact) => (
@@ -663,12 +645,6 @@ export function LifeAtlasPage({
                   </ul>
                 ) : (
                   <p>{t("这个领域还没有资料。", "No records in this area yet.")}</p>
-                )}
-                {!!detail.score.missing.length && (
-                  <p>
-                    {t("还可以补充：", "You can add: ")}
-                    {detail.score.missing.join(" · ")}
-                  </p>
                 )}
               </aside>
             )}
