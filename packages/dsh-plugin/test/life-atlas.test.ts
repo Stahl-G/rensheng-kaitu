@@ -3,12 +3,18 @@ import { type LifeAtlasState, readPreferences, savePreferences } from "@kaitu/co
 import { createElement } from "react";
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { expect, test, vi } from "vitest";
-import { LifeAtlasPage, atlasLabel } from "../src/client/LifeAtlasPage.js";
+import { LifeAtlasPage, atlasLabel, mapAvailableHeight } from "../src/client/LifeAtlasPage.js";
 import {
   defaultExploreEntries,
   exploreDestination,
   migrateLifeMapFirst,
 } from "../src/client/explore-modules.js";
+
+test("map height stays stable when its scroll container moves", () => {
+  expect(mapAvailableHeight(800, 300, 0)).toBe(484);
+  expect(mapAvailableHeight(800, 100, 200)).toBe(484);
+  expect(mapAvailableHeight(600, 300, 0)).toBe(284);
+});
 
 test("map-first migration persists across restarts and preserves later reorder or hiding", () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-map-pref-"));
@@ -135,6 +141,20 @@ test("existing map collapses controls and keyboard activation opens the correct 
     );
   });
   expect(root.root.findAllByType("fieldset")).toHaveLength(0);
+  const svg = () => root.root.findByProps({ "aria-label": "人生地图区域" });
+  const fitWidth = svg().props.style.width;
+  act(() => root.root.findByProps({ "aria-label": "放大地图" }).props.onClick());
+  expect(svg().props.style.width).not.toBe(fitWidth);
+  expect(generate).not.toHaveBeenCalled();
+  act(() =>
+    root.root
+      .findByType("nav")
+      .findAllByType("button")
+      .find((button) => button.children.includes("适应窗口"))
+      ?.props.onClick(),
+  );
+  expect(svg().props.style.width).toBe(fitWidth);
+  expect(change).not.toHaveBeenCalled();
   const region = root.root.findByProps({ role: "button" });
   act(() => region.props.onKeyDown({ key: "Enter", preventDefault() {} }));
   expect(root.root.findByType("aside").props["aria-label"]).toBe("健康");
