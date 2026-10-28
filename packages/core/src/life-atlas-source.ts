@@ -17,12 +17,15 @@ export interface AtlasSource {
   rules: DomainRule[];
   modules: { id: string; title: string; available: boolean; recommended: boolean }[];
   gaps: string[];
+  /** Internal cache validity for time-dependent activity selection; not a persisted map field. */
+  selectionWindow: { from: number | null; until: number | null };
 }
 
 /** Runs in the background worker; uses the existing workspace reader and record revision semantics. */
-export function atlasSource(ws: Workspace): AtlasSource {
+export function atlasSource(ws: Workspace, now = new Date()): AtlasSource {
   const domains = new Map<string, { id: string; title: string; facts: Fact[]; priority?: number }>();
   const gaps: string[] = [];
+  const selectionWindow: AtlasSource["selectionWindow"] = { from: null, until: null };
   const sources: string[] = [];
   let bytesRead = 0;
   const add = (id: string, title: string, fact?: Fact) => {
@@ -75,7 +78,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
       try {
         const value = text(file);
         if (!value) continue;
-        const { data: m } = parseFrontmatter<{
+        const { data: m, body } = parseFrontmatter<{
           title?: string;
           updated?: string;
           stage?: string;
@@ -86,7 +89,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
         const creation = dir === "projects" && m.links?.some((link) => link.role === "manuscript");
         const target = creation ? "creation" : id;
         const title = creation ? "创作" : def.name;
-        if (m.title)
+        if (m.title?.trim())
           add(target, title, {
             id: file,
             title: m.title,
@@ -94,6 +97,21 @@ export function atlasSource(ws: Workspace): AtlasSource {
             status: m.stage ?? "recorded",
             source: file,
             updated: m.updated,
+            ...(["projects", "learning"].includes(dir)
+              ? {
+                  hasContent: body
+                    .replace(/<!--[\s\S]*?-->/g, "")
+                    .split(/\r?\n/)
+                    .some((line) => {
+                      const value = line.trim();
+                      return (
+                        !!value &&
+                        !/^(?:#{1,6}(?:\s|$)|[-*_]{3,}$|[-*+]\s+\[[ xX]\])/.test(value) &&
+                        value !== m.title?.trim()
+                      );
+                    }),
+                }
+              : {}),
             ...(m.progress ? { progress: m.progress } : {}),
           });
         for (const next of m.next ?? [])
@@ -208,7 +226,18 @@ export function atlasSource(ws: Workspace): AtlasSource {
       const verified = all
         .filter(isActualWorkout)
         .sort((a, b) => Date.parse(String(a.ts)) - Date.parse(String(b.ts)));
-      const latestCompleted = verified.findLast((row) => Date.parse(String(row.ts)) <= Date.now());
+      const latestCompleted = verified.findLast((row) => Date.parse(String(row.ts)) <= now.getTime());
+      const next = verified.find((row) => Date.parse(String(row.ts)) > now.getTime());
+      if (latestCompleted)
+        selectionWindow.from = Math.max(
+          selectionWindow.from ?? Number.NEGATIVE_INFINITY,
+          Date.parse(String(latestCompleted.ts)),
+        );
+      if (next)
+        selectionWindow.until = Math.min(
+          selectionWindow.until ?? Number.POSITIVE_INFINITY,
+          Date.parse(String(next.ts)),
+        );
       for (const row of [verified[0], latestCompleted, verified.at(-1)])
         if (row && !selected.some((item) => item.id === row.id)) selected.unshift(row);
     }
@@ -288,6 +317,7 @@ export function atlasSource(ws: Workspace): AtlasSource {
       (["health", "work"].indexOf(b.id) < 0 ? 2 : ["health", "work"].indexOf(b.id)),
   );
   return {
+    selectionWindow,
     data: { title: "人生地图", domains: [...domains.values()], sources, bytesRead, gaps },
     rules,
     modules: ordered.map((d) => ({

@@ -80,7 +80,8 @@ export function scoreDomain(domain:MappedDomain,now:Date):DomainScore {
  }
  const activityDates=domain.facts.filter(f=>!uncertain.has(f.status)).map(f=>Date.parse(f.actualActivityAt??'')).filter(n=>Number.isFinite(n)&&n<=now.getTime())
  const hasExperience=domain.facts.some(f=>f.kind==='experience'&&['observed','user_reported'].includes(f.status))
- const clarity=hasExperience||activityDates.length?1:.18
+ const hasContent=domain.facts.some(f=>!uncertain.has(f.status)&&['project','topic'].includes(f.kind)&&f.hasContent===true)
+ const clarity=hasExperience||activityDates.length||hasContent?1:.18
  const glow=activityDates.some(n=>now.getTime()-n<7*86400000)?1:0
  return {coverage,freshness,clarity,glow,latest,missing:applicable.filter(f=>!f.evidence.length).map(f=>f.label)}
 }

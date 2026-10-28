@@ -102,7 +102,6 @@ export function TodayWeather({
   setPlace,
   loadLifeMap,
   subscribe,
-  compact = false,
 }: {
   load: () => Promise<WeatherState>;
   setPlace: (
@@ -113,14 +112,12 @@ export function TodayWeather({
   ) => Promise<WeatherState>;
   loadLifeMap: () => Promise<LifeMapData>;
   subscribe?: (refresh: () => void) => () => void;
-  compact?: boolean;
 }) {
   const t = useT();
   const locale = useLocale();
   const [state, setState] = useState<WeatherState | null>(null);
   const [draft, setDraft] = useState("");
   const [asking, setAsking] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(() => rememberedOpen() ?? new Date().getHours() < 13);
@@ -150,7 +147,6 @@ export function TodayWeather({
   }, [refresh, subscribe]);
   // 还没有城市、或城市本来就跟着足迹时，用足迹里的现居城市；用户手选的不覆盖。
   useEffect(() => {
-    if (compact) return;
     let active = true;
     void Promise.all([load(), loadLifeMap()])
       .then(async ([current, map]) => {
@@ -171,7 +167,7 @@ export function TodayWeather({
     return () => {
       active = false;
     };
-  }, [apply, compact, load, loadLifeMap, setPlace]);
+  }, [apply, load, loadLifeMap, setPlace]);
   // 刚换城市还没取到：读几次本机缓存，取到、失败或读满 10 次就停。
   const placeKey = state?.place
     ? `${state.place.latitude.toFixed(2)},${state.place.longitude.toFixed(2)}`
@@ -200,24 +196,18 @@ export function TodayWeather({
     } catch {}
   };
   if (!state)
-    return compact && loadError ? (
-      <div className={css.compactNotice} role="alert">
+    return loadError ? (
+      <div className={css.ask} role="alert">
         {t("天气暂时无法读取", "Weather is unavailable")}
         <button type="button" onClick={refresh}>
           {t("重试", "Retry")}
         </button>
       </div>
     ) : null;
-  if (compact && !state.place && !asking)
-    return (
-      <button type="button" className={css.compactButton} onClick={() => setAsking(true)}>
-        {t("设置天气", "Set weather")}
-      </button>
-    );
   if (!state.place || asking)
     return (
       <form
-        className={compact ? css.compactNotice : css.ask}
+        className={css.ask}
         onSubmit={async (event) => {
           event.preventDefault();
           if (!draft.trim()) return;
@@ -241,7 +231,7 @@ export function TodayWeather({
         <button type="submit" disabled={!draft.trim()}>
           {t("好了", "Done")}
         </button>
-        {(asking || compact) && (
+        {asking && (
           <button type="button" onClick={() => setAsking(false)}>
             {t("取消", "Cancel")}
           </button>
@@ -252,7 +242,7 @@ export function TodayWeather({
   const forecast = state.forecast;
   if (!forecast)
     return state.error ? (
-      <div className={compact ? css.compactNotice : css.ask} role="alert">
+      <div className={css.ask} role="alert">
         <span>
           {t(`暂时取不到${state.place.name}的天气：`, `Couldn't get the weather for ${state.place.name}: `)}
           {state.error}
@@ -265,7 +255,7 @@ export function TodayWeather({
         </button>
       </div>
     ) : (
-      <output className={compact ? css.compactNotice : css.ask}>
+      <output className={css.ask}>
         {t(`正在取${state.place.name}的天气…`, `Getting the weather for ${state.place.name}…`)}
       </output>
     );
@@ -292,45 +282,6 @@ export function TodayWeather({
       {t("天气数据 Open-Meteo", "Weather data by Open-Meteo")}
     </a>
   );
-  if (compact && !detailsOpen)
-    return (
-      <button
-        type="button"
-        className={css.compactButton}
-        onClick={() => setDetailsOpen(true)}
-        aria-label={t(
-          `${state.place.name}，${condition(forecast.current.code, t)}，${round(forecast.current.temperature)}，查看天气详情`,
-          `${state.place.name}, ${condition(forecast.current.code, t)}, ${round(forecast.current.temperature)}, view weather details`,
-        )}
-      >
-        {state.place.name} · {condition(forecast.current.code, t)} · {round(forecast.current.temperature)}
-        {updated ? ` · ${updated}` : ""}
-      </button>
-    );
-  if (compact && detailsOpen)
-    return (
-      <section className={css.compactDetails} aria-label={t("今天的天气", "Today's weather")}>
-        <div>
-          {place} · {condition(forecast.current.code, t)} · {round(forecast.current.temperature)}
-        </div>
-        <div>
-          {t("最高", "H")} {round(forecast.today.max)} · {t("最低", "L")} {round(forecast.today.min)}{" "}
-          {updated}
-        </div>
-        <ol className={css.compactHours} aria-label={t("逐时预报", "Hourly forecast")}>
-          {forecast.hourly.slice(0, 6).map((hour, index) => (
-            <li key={hour.time}>
-              {index === 0 ? t("现在", "Now") : hour.time.slice(11, 13)} · {condition(hour.code, t)} ·{" "}
-              {round(hour.temperature)}
-            </li>
-          ))}
-        </ol>
-        {credit}
-        <button type="button" className={css.compactButton} onClick={() => setDetailsOpen(false)}>
-          {t("收起", "Collapse")}
-        </button>
-      </section>
-    );
   if (!open)
     return (
       <section

@@ -547,7 +547,7 @@ function Overview({
       }
       setHomeAskText("");
       setHomeAskError("");
-      if (!send) homeOperation.current = null;
+      homeOperation.current = null;
     } catch (error) {
       setHomeAskError(error instanceof Error ? error.message : String(error));
     } finally {

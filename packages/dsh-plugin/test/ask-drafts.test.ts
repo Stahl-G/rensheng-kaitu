@@ -65,76 +65,88 @@ test("keeps separate unsent drafts for the new conversation and an existing conv
   await act(async () => app.unmount());
 });
 
-test("a saved handoff sends once without replacing a pre-existing new-conversation draft", async () => {
-  const requests: { method: string; args: unknown[] }[] = [];
-  const settings = {
-    configured: true,
-    choice: "builtin",
-    provider: "example",
-    providerName: "Example",
-    model: "model",
-    protocols: [],
-    providers: [],
-    localAgents: [],
-  };
-  const row = {
-    id: "session-handoff",
-    title: "Handoff",
-    created: new Date().toISOString(),
-    updated: new Date().toISOString(),
-    handoff: { requestId: "capture-operation-1", phase: "ready" },
-  };
-  vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
-    const method = url.split("/").at(-1) ?? "";
-    const args = JSON.parse(init.body) as unknown[];
-    requests.push({ method, args });
-    const values: Record<string, unknown> = {
-      askSettings: settings,
-      askList: [row],
-      askCreate: row,
-      askSend: {},
-      overview: { projects: [], allNext: [], notes: [] },
-      automation: { asked: true, tasks: {} },
+test.each(["completed", "uncertain", "failed"])(
+  "a %s handoff preserves recovery and sends once without replacing a draft",
+  async (status) => {
+    const requests: { method: string; args: unknown[] }[] = [];
+    const settings = {
+      configured: true,
+      choice: "builtin",
+      provider: "example",
+      providerName: "Example",
+      model: "model",
+      protocols: [],
+      providers: [],
+      localAgents: [],
     };
-    return { ok: true, json: async () => values[method] ?? {} };
-  });
-  vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
-  vi.stubGlobal("addEventListener", vi.fn());
-  vi.stubGlobal("removeEventListener", vi.fn());
-  vi.stubGlobal(
-    "EventSource",
-    class {
-      close() {}
-    },
-  );
-  let app!: ReturnType<typeof create>;
-  await act(async () => {
-    app = create(createElement(AskPage, { workspace: "synthetic" }));
-  });
-  await act(async () =>
-    app.root.findByType("textarea").props.onChange({ target: { value: "unsent", selectionStart: 6 } }),
-  );
-  const handoff = {
-    requestId: "capture-operation-1",
-    text: "synthetic question",
-    references: ["projects/demo/STATUS.md"],
-    capturedPath: "inbox/synthetic.md",
-  };
-  await act(async () => {
-    app.update(createElement(AskPage, { workspace: "synthetic", autoSubmit: handoff }));
-  });
-  expect(requests.filter((item) => item.method === "askSend")).toHaveLength(1);
-  expect(requests.find((item) => item.method === "askSend")?.args[3]).toBe(handoff.requestId);
-  await act(async () => {
-    app.update(createElement(AskPage, { workspace: "synthetic", autoSubmit: { ...handoff } }));
-  });
-  expect(requests.filter((item) => item.method === "askSend")).toHaveLength(1);
-  await act(async () =>
-    app.root
-      .findAllByType("button")
-      .find((item) => item.children.includes("＋ 新对话"))
-      ?.props.onClick(),
-  );
-  expect(app.root.findByType("textarea").props.value).toBe("unsent");
-  await act(async () => app.unmount());
-});
+    const row = {
+      id: "session-handoff",
+      title: "Handoff",
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      handoff: { requestId: "capture-operation-1", phase: "ready" },
+    };
+    vi.stubGlobal("fetch", async (url: string, init: { body: string }) => {
+      const method = url.split("/").at(-1) ?? "";
+      const args = JSON.parse(init.body) as unknown[];
+      requests.push({ method, args });
+      const values: Record<string, unknown> = {
+        askSettings: settings,
+        askList: [row],
+        askCreate: row,
+        askSend: {},
+        askHandoffStatus: { status, sessionId: row.id },
+        overview: { projects: [], allNext: [], notes: [] },
+        automation: { asked: true, tasks: {} },
+      };
+      return { ok: true, json: async () => values[method] ?? {} };
+    });
+    vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    vi.stubGlobal("addEventListener", vi.fn());
+    vi.stubGlobal("removeEventListener", vi.fn());
+    vi.stubGlobal(
+      "EventSource",
+      class {
+        close() {}
+      },
+    );
+    let app!: ReturnType<typeof create>;
+    await act(async () => {
+      app = create(createElement(AskPage, { workspace: "synthetic" }));
+    });
+    await act(async () =>
+      app.root.findByType("textarea").props.onChange({ target: { value: "unsent", selectionStart: 6 } }),
+    );
+    const handoff = {
+      requestId: "capture-operation-1",
+      text: "synthetic question",
+      references: ["projects/demo/STATUS.md"],
+      capturedPath: "inbox/synthetic.md",
+    };
+    await act(async () => {
+      app.update(createElement(AskPage, { workspace: "synthetic", autoSubmit: handoff }));
+    });
+    expect(requests.filter((item) => item.method === "askSend")).toHaveLength(1);
+    expect(requests.find((item) => item.method === "askSend")?.args[3]).toBe(handoff.requestId);
+    expect(app.root.findAllByType("output")).toHaveLength(status === "completed" ? 0 : 1);
+    await act(async () => {
+      app.update(createElement(AskPage, { workspace: "synthetic", autoSubmit: { ...handoff } }));
+    });
+    expect(requests.filter((item) => item.method === "askSend")).toHaveLength(1);
+    await act(async () =>
+      app.root
+        .findAllByType("button")
+        .find((item) => item.children.includes("＋ 新对话"))
+        ?.props.onClick(),
+    );
+    await act(async () =>
+      app.update(createElement(AskPage, { workspace: "synthetic", active: false, autoSubmit: handoff })),
+    );
+    await act(async () =>
+      app.update(createElement(AskPage, { workspace: "synthetic", active: true, autoSubmit: handoff })),
+    );
+    expect(requests.filter((item) => item.method === "askSend")).toHaveLength(1);
+    expect(app.root.findByType("textarea").props.value).toBe("unsent");
+    await act(async () => app.unmount());
+  },
+);
