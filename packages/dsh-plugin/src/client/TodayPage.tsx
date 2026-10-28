@@ -91,15 +91,19 @@ export function LifeHome({
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
   const [atlasImage, setAtlasImage] = useState<string | null>(null);
+  const [atlasStatus, setAtlasStatus] = useState<"loading" | "ready" | "error">("loading");
   useEffect(() => {
     if (!loadAtlas) return;
     let active = true;
     void loadAtlas()
       .then((atlas) => {
-        if (active) setAtlasImage(atlas.resource?.svg ?? null);
+        if (active) {
+          setAtlasImage(atlas.resource?.svg ?? null);
+          setAtlasStatus("ready");
+        }
       })
       .catch(() => {
-        if (active) setAtlasImage(null);
+        if (active) setAtlasStatus("error");
       });
     return () => {
       active = false;
@@ -180,7 +184,13 @@ export function LifeHome({
           {atlasImage ? (
             <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(atlasImage)}`} alt="" />
           ) : (
-            <small>{t("还没有人生地图 · 去开图查看", "No life map yet · Open Explore")}</small>
+            <small>
+              {atlasStatus === "loading"
+                ? t("正在读取地图…", "Loading map…")
+                : atlasStatus === "error"
+                  ? t("地图暂时无法读取 · 去开图查看", "Map unavailable · Open Explore")
+                  : t("还没有人生地图 · 去开图查看", "No life map yet · Open Explore")}
+            </small>
           )}
         </button>
       )}
