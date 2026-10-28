@@ -30,6 +30,10 @@ const parameterNames = {
   plates: "Tectonic plates",
 };
 const colors = ["#7d8f65", "#ad885a", "#8b9a88", "#b3966d", "#8a9c9f", "#b08a80"];
+/** Keep the map's available height stable when its scroll container moves. */
+export function mapAvailableHeight(viewportHeight: number, mapTop: number, scrollTop: number): number {
+  return Math.max(200, viewportHeight - (mapTop + scrollTop) - 16);
+}
 /** Fits long Chinese/Latin labels into two lines; full names remain in accessible region controls. */
 export function atlasLabel(title: string): string[] {
   const lines: string[] = [];
@@ -151,8 +155,20 @@ export function LifeAtlasPage({
   useEffect(() => {
     if (!resource || typeof window === "undefined") return;
     const measure = () => {
-      const top = mapFrame.current?.getBoundingClientRect().top;
-      if (top !== undefined) setMapHeight(Math.max(200, window.innerHeight - top - 16));
+      const map = mapFrame.current;
+      if (!map) return;
+      let root = map.parentElement;
+      while (root && !/(auto|scroll)/.test(window.getComputedStyle(root).overflowY))
+        root = root.parentElement;
+      if (root) {
+        const top = map.getBoundingClientRect().top - root.getBoundingClientRect().top - root.clientTop;
+        setMapHeight(mapAvailableHeight(root.clientHeight, top, root.scrollTop));
+      } else {
+        const scrolling = document.scrollingElement;
+        setMapHeight(
+          mapAvailableHeight(window.innerHeight, map.getBoundingClientRect().top, scrolling?.scrollTop ?? 0),
+        );
+      }
     };
     measure();
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);

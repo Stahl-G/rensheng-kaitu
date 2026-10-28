@@ -3,12 +3,18 @@ import { type LifeAtlasState, readPreferences, savePreferences } from "@kaitu/co
 import { createElement } from "react";
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { expect, test, vi } from "vitest";
-import { LifeAtlasPage, atlasLabel } from "../src/client/LifeAtlasPage.js";
+import { LifeAtlasPage, atlasLabel, mapAvailableHeight } from "../src/client/LifeAtlasPage.js";
 import {
   defaultExploreEntries,
   exploreDestination,
   migrateLifeMapFirst,
 } from "../src/client/explore-modules.js";
+
+test("map height stays stable when its scroll container moves", () => {
+  expect(mapAvailableHeight(800, 300, 0)).toBe(484);
+  expect(mapAvailableHeight(800, 100, 200)).toBe(484);
+  expect(mapAvailableHeight(600, 300, 0)).toBe(284);
+});
 
 test("map-first migration persists across restarts and preserves later reorder or hiding", () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-map-pref-"));
