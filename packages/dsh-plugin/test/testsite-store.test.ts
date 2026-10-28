@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { todayChoices, todaySourceGroups } from "../src/client/next-presentation.js";
+import { todaySourceGroups } from "../src/client/next-presentation.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -91,11 +91,6 @@ test("Today demo scenarios keep sources and goal links through review, capture a
   store.selectMode("data");
   const data = store.overview();
   expect(data.proposedTasks).toEqual([]);
-  const choice = todayChoices(data, 60)[0];
-  expect(choice?.goal).toBe(data.plans.goals[0]?.title);
-  expect(choice?.item.id).toBe(data.plans.goals[0]?.next?.id);
-  expect(todayChoices(data, 10)[0]?.opening).toBe(true);
-  expect(todayChoices(data, 5)).toEqual([]);
   expect(data.metrics.every((metric) => todaySourceGroups(metric, data.timeZone, "zh-CN").length > 0)).toBe(
     true,
   );

@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,10 +24,14 @@ function fixture() {
   for (const dir of [home, workspace, payload]) mkdirSync(dir);
   const calls = join(root, "calls.jsonl");
   const unavailable = join(root, "unavailable");
+  const holdModels = join(root, "hold-models");
+  const failModels = join(root, "fail-models");
+  const noDefault = join(root, "no-default");
   const helper = join(root, "credentials.mjs");
+  const credentialCalls = join(root, "credential-calls.jsonl");
   writeFileSync(
     helper,
-    `for await (const chunk of process.stdin) {}\nprocess.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true,"search":{}}');`,
+    `import {appendFileSync} from 'node:fs'; for await (const chunk of process.stdin) {}\nappendFileSync(${JSON.stringify(credentialCalls)}, JSON.stringify(process.argv[2])+'\\n'); process.stdout.write(process.argv[2] === 'catalog' ? '[]' : '{"configured":true,"search":{}}');`,
   );
   const modules = fileURLToPath(new URL("../../cli/node_modules", import.meta.url));
   const protocol = pathToFileURL(
@@ -47,7 +59,11 @@ rpc.onRequest(async (method, params) => {
   if (method === 'kaitu/saveProvider') return [];
   if (method.startsWith('kaitu/siwc/')) {
     if (existsSync(${JSON.stringify(unavailable)})) throw Error('ChatGPT service unavailable');
-    if (method.endsWith('/models')) return [{id:'synthetic',name:'Synthetic'}];
+    if (method.endsWith('/models')) {
+      if (existsSync(${JSON.stringify(failModels)})) throw Error('synthetic model failure');
+      while (existsSync(${JSON.stringify(holdModels)})) await new Promise(resolve => setTimeout(resolve, 10));
+      return [{id:'synthetic',name:'Synthetic',reasoning:{...(existsSync(${JSON.stringify(noDefault)}) ? {} : {defaultEffort:'low'}),efforts:[{id:'low',name:'Low'},{id:'high',name:'High'}]}}];
+    }
     return {authenticated:!method.endsWith('/signOut'),planEnabled:true,signingIn:false,activeAccountId:'synthetic',models:[]};
   }
   if (method === 'session/prompt') {
@@ -81,8 +97,37 @@ rpc.start();`,
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-  return { root, home, workspace, sdk, select, requests, unavailable };
+  return {
+    root,
+    home,
+    workspace,
+    sdk,
+    select,
+    requests,
+    unavailable,
+    holdModels,
+    failModels,
+    noDefault,
+    credentialCalls,
+  };
 }
+
+test("ChatGPT conversation startup does not launch the unrelated provider catalog", async () => {
+  const f = fixture();
+  f.select();
+  try {
+    const runtime = await f.sdk.runtime();
+    await runtime.close();
+    const calls = existsSync(f.credentialCalls) ? readFileSync(f.credentialCalls, "utf8") : "";
+    expect(calls).not.toContain('"catalog"');
+    // Catalogs remain available when explicitly requested by the picker.
+    await f.sdk.catalogSettings(true);
+    expect(readFileSync(f.credentialCalls, "utf8")).toContain('"catalog"');
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
 
 test("idle sign-out invalidates real Ask caches; re-login sends spawn a fresh process without saving the model", async () => {
   const f = fixture();
@@ -132,11 +177,140 @@ test("account sign-in and models work without a workspace directory", async () =
   try {
     expect((await f.sdk.support("siwc/status")).authenticated).toBe(true);
     await f.sdk.support("siwc/beginSignIn");
-    expect(await f.sdk.support("siwc/models")).toEqual([{ id: "synthetic", name: "Synthetic" }]);
+    expect(await f.sdk.support("siwc/models")).toEqual([
+      {
+        id: "synthetic",
+        name: "Synthetic",
+        reasoning: {
+          defaultEffort: "low",
+          efforts: [
+            { id: "low", name: "Low" },
+            { id: "high", name: "High" },
+          ],
+        },
+      },
+    ]);
     await f.sdk.support("siwc/cancelSignIn");
     await f.sdk.support("siwc/signOut");
     const initialization = f.requests().find((row) => row.method === "initialize");
     expect(initialization.params).not.toHaveProperty("cwd");
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("advertised reasoning effort persists and reaches the next SDK initialization", async () => {
+  const f = fixture();
+  f.select();
+  try {
+    await f.sdk.configure({
+      choice: "builtin",
+      provider: "chatgpt-siwc",
+      model: "synthetic",
+      reasoningEffort: "high",
+    });
+    const runtime = await f.sdk.runtime();
+    expect(
+      f
+        .requests()
+        .filter((row) => row.method === "initialize" && !row.params.capabilities)
+        .at(-1).params.reasoningEffort,
+    ).toBe("high");
+    await runtime.close();
+    await expect(
+      f.sdk.configure({
+        choice: "builtin",
+        provider: "chatgpt-siwc",
+        model: "synthetic",
+        reasoningEffort: "unsupported",
+      }),
+    ).rejects.toMatchObject({ code: "AI_MODEL" });
+    expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBe("high");
+    writeFileSync(f.noDefault, "no default");
+    await expect(
+      f.sdk.configure({
+        choice: "builtin",
+        provider: "chatgpt-siwc",
+        model: "synthetic",
+        reasoningEffort: null,
+      }),
+    ).rejects.toMatchObject({ code: "AI_MODEL" });
+    expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBe("high");
+    rmSync(f.noDefault);
+    await f.sdk.configure({
+      choice: "builtin",
+      provider: "chatgpt-siwc",
+      model: "synthetic",
+      reasoningEffort: null,
+    });
+    expect(JSON.parse(readFileSync(join(f.home, "kaitu-ai.json"), "utf8")).reasoningEffort).toBe("low");
+    const afterReset = await f.sdk.runtime();
+    expect(
+      f
+        .requests()
+        .filter((row) => row.method === "initialize" && !row.params.capabilities)
+        .at(-1).params.reasoningEffort,
+    ).toBe("low");
+    await afterReset.close();
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("a settings read during a delayed provider switch cannot retain the old connection", async () => {
+  const f = fixture();
+  f.select("deepseek-official");
+  writeFileSync(f.holdModels, "hold");
+  try {
+    const saving = f.sdk.configure({ choice: "builtin", provider: "chatgpt-siwc", model: "synthetic" });
+    const until = Date.now() + 5000;
+    while (
+      (!existsSync(join(f.root, "calls.jsonl")) ||
+        !f.requests().some((row) => row.method === "kaitu/siwc/models")) &&
+      Date.now() < until
+    )
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(f.requests().some((row) => row.method === "kaitu/siwc/models")).toBe(true);
+    expect((await f.sdk.settings()).provider).toBe("deepseek-official");
+    rmSync(f.holdModels);
+    expect((await saving).provider).toBe("chatgpt-siwc");
+    expect((await f.sdk.settings()).provider).toBe("chatgpt-siwc");
+  } finally {
+    rmSync(f.holdModels, { force: true });
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("a model capability failure preserves the other saved providers", async () => {
+  const f = fixture();
+  f.select();
+  try {
+    await f.sdk.settings();
+    writeFileSync(f.failModels, "fail");
+    const catalog = await f.sdk.catalogSettings(true);
+    expect(catalog.modelCapabilityError).toBe(true);
+    expect(
+      catalog.saved.some((row) => row.provider === "deepseek-official" && row.models.includes("synthetic")),
+    ).toBe(true);
+  } finally {
+    await f.sdk.closeSupport();
+    rmSync(f.root, { recursive: true, force: true });
+  }
+});
+
+test("unavailable ChatGPT status does not hide other saved models", async () => {
+  const f = fixture();
+  f.select();
+  writeFileSync(f.unavailable, "fail");
+  try {
+    const catalog = await f.sdk.catalogSettings(true);
+    expect(catalog.modelCapabilityError).toBe(true);
+    expect(
+      catalog.saved.some((row) => row.provider === "deepseek-official" && row.models.includes("synthetic")),
+    ).toBe(true);
   } finally {
     await f.sdk.closeSupport();
     rmSync(f.root, { recursive: true, force: true });

@@ -144,6 +144,18 @@
       },
       "versions": [
         {
+          "version": "0.1.5",
+          "publishTimestamp": 1793155922,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-kaitu-fortune.git",
+            "commit": "1bc0966fd40ebe228455b1ecf7e548d400355340"
+          },
+          "engines": {
+            "dsh": "0.2.1-rc.3"
+          }
+        },
+        {
           "version": "0.1.4",
           "publishTimestamp": 1792832443,
           "source": {

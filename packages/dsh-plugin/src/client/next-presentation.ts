@@ -46,23 +46,6 @@ export function nextPresentation(
   return { title, source };
 }
 
-/** Display choices keep the original next step and never invent a duration. */
-export function todayChoices(data: import("../types.js").OverviewData, energy: number) {
-  if (energy === 5) return [];
-  return data.allNext
-    .flatMap((item) => {
-      if (item.proposed) return [];
-      const goal =
-        data.plans.goals.find((goal) => goal.next?.id === item.id)?.title ??
-        Object.values(data.plans.sources).find((entry) => entry.taskId === item.id)?.goalTitle;
-      if (!goal) return [];
-      const match = /(\d+)\s*(分钟|小时|minutes?|mins?|hours?|hrs?)/i.exec(item.title);
-      const minutes = match ? Number(match[1]) * (/小时|hours?|hrs?/i.test(match[2] ?? "") ? 60 : 1) : null;
-      return [{ item, goal, minutes, opening: energy === 10 && (minutes === null || minutes > 10) }];
-    })
-    .slice(0, 3);
-}
-
 /** Use the workspace's already-resolved local day, including near UTC midnight. */
 export function todayDate(day: string, locale: Locale, short = false) {
   return new Intl.DateTimeFormat(locale, {
