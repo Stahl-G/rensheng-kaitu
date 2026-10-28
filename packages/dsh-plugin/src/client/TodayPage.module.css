@@ -721,3 +721,45 @@
 .question form > button {
   flex-shrink: 0;
 }
+
+.atlasPreview {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  margin: 24px 0 0;
+  padding: 18px;
+  text-align: start;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.atlasPreview img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.atlasPreview small {
+  color: var(--muted);
+}
+.askHome {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 24px;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.askHome label {
+  font-weight: 600;
+}
+.askHome textarea {
+  min-height: 100px;
+}

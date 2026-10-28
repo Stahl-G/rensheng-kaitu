@@ -80,6 +80,7 @@ function App() {
   const t = (zh: string, en: string) => (locale === "en" ? en : zh);
   const mode = store.mode();
   const [homeKey, setHomeKey] = useState(0);
+  const [homeAsk, setHomeAsk] = useState("");
   const [panel, setPanel] = useState<"capture" | "package" | "answer" | "project" | "prompt" | null>(null);
   const [draft, setDraft] = useState("");
   const [reviewing, setReviewing] = useState(false);
@@ -295,7 +296,10 @@ function App() {
                 capture={null}
                 busy={busy}
                 start={() => setPanel("capture")}
-                save={store.capture}
+                ask={explain}
+                askText={homeAsk}
+                setAskText={setHomeAsk}
+                openAtlas={() => {}}
                 adopt={(id) => run(() => store.adopt(id))}
                 dismiss={(id) => run(() => store.dismiss(id))}
                 loadLibrary={store.library}
@@ -309,11 +313,6 @@ function App() {
                     );
                     setPanel("project");
                   });
-                }}
-                source={(entry) => {
-                  navigate("records");
-                  setSection("inbox");
-                  setOriginal(state.notes.find((note) => note.file === entry.file));
                 }}
                 library={() => {
                   navigate("records");

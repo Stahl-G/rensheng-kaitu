@@ -485,6 +485,7 @@ function Overview({
   useEffect(() => {
     if (captureOpen && view === "overview") document.getElementById("capture-text")?.focus();
   }, [captureOpen, view]);
+  const [homeAskText, setHomeAskText] = useState("");
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
@@ -1131,21 +1132,16 @@ function Overview({
                 setProjectFocus(slug);
               }}
               loadLibrary={props.loadLibrary}
-              save={async (text) => {
-                const saved = await props.capture(text);
-                await refresh();
-                return saved;
+              ask={(text) => {
+                prompt(text);
+                setHomeAskText("");
               }}
-              source={(entry) => {
-                openRecord("inbox");
-                setLibraryEntry({
-                  ...entry,
-                  source: "me",
-                  originalSource: entry.file,
-                  date: data.today,
-                  status: "raw",
-                  destination: null,
-                });
+              askText={homeAskText}
+              setAskText={setHomeAskText}
+              loadAtlas={props.loadLifeAtlas}
+              openAtlas={() => {
+                setExplore("life-map");
+                setView("explore");
               }}
               adopt={(id) => void run(() => props.adoptTask(id))}
               dismiss={(id) => void run(() => props.cancelTask(id))}

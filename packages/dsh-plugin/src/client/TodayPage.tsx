@@ -7,7 +7,6 @@ import type {
   OverviewData,
   OverviewMetric,
   OverviewNext,
-  OverviewSource,
 } from "../types.js";
 import css from "./Prototype.module.css";
 import todayCss from "./TodayPage.module.css";
@@ -30,8 +29,11 @@ export function LifeHome({
   handover,
   memory,
   busy,
-  save,
-  source,
+  ask,
+  askText,
+  setAskText,
+  loadAtlas,
+  openAtlas,
   adopt,
   dismiss,
   loadLibrary,
@@ -49,8 +51,11 @@ export function LifeHome({
   handover: () => void;
   memory: () => void;
   busy: boolean;
-  save: (text: string) => Promise<unknown>;
-  source: (entry: OverviewSource) => void;
+  ask: (text: string) => void;
+  askText: string;
+  setAskText: (text: string) => void;
+  loadAtlas?: () => Promise<import("@kaitu/core").LifeAtlasState>;
+  openAtlas: () => void;
   adopt: (id: string) => void;
   dismiss: (id: string) => void;
   loadLibrary: (query: { section: "inbox"; source: string; before?: string }) => Promise<LibraryData>;
@@ -75,7 +80,6 @@ export function LifeHome({
     () => todayProjectFacts(projects?.cutoff === data.cutoff ? projects.items : [], data.today, locale),
     [projects, data.cutoff, data.today, locale],
   );
-  const composing = useRef(false);
   const sourceRegion = useRef<HTMLElement>(null);
   const sourceTrigger = useRef<HTMLButtonElement | null>(null);
   const [factSource, setFactSource] = useState<OverviewMetric | null>(null);
@@ -86,10 +90,21 @@ export function LifeHome({
     setFactSource(null);
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
-  const [answer, setAnswer] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const savingRef = useRef(false);
+  const [atlasImage, setAtlasImage] = useState<string | null>(null);
+  useEffect(() => {
+    if (!loadAtlas) return;
+    let active = true;
+    void loadAtlas()
+      .then((atlas) => {
+        if (active) setAtlasImage(atlas.resource?.svg ?? null);
+      })
+      .catch(() => {
+        if (active) setAtlasImage(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadAtlas]);
   const [todayNotes, setTodayNotes] = useState<{ day: string; cutoff: string; entries: InboxEntry[] } | null>(
     null,
   );
@@ -112,26 +127,6 @@ export function LifeHome({
       active = false;
     };
   }, [data.today, data.cutoff, loadLibrary]);
-  const marker = `${data.today} · 开图想问你`;
-  const noteBody = (text: string) => text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
-  const saved =
-    todayNotes?.day === data.today
-      ? todayNotes.entries.find((note) => note.text.startsWith(marker))
-      : undefined;
-  const proposedQuestion = firstVisit
-    ? t("最近有什么事，是你想改变的？", "What would you like to change lately?")
-    : data.plans.goals.find((goal) => !goal.next)
-      ? t(
-          `「${data.plans.goals.find((goal) => !goal.next)?.title}」，你想先试哪一步？`,
-          `What first step would you try for “${data.plans.goals.find((goal) => !goal.next)?.title}”?`,
-        )
-      : t("最近做的哪件事，让你觉得值得？", "What felt worthwhile lately?");
-  const questionRef = useRef({ day: data.today, text: proposedQuestion });
-  if (questionRef.current.day !== data.today)
-    questionRef.current = { day: data.today, text: proposedQuestion };
-  const question = saved
-    ? noteBody(saved.text).split("\n")[1] || questionRef.current.text
-    : questionRef.current.text;
   const facts = useMemo(
     () =>
       data.metrics
@@ -161,21 +156,6 @@ export function LifeHome({
   };
   const valueText = (metric: OverviewMetric) =>
     `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
-  const store = async (text: string, done: () => void | Promise<void>) => {
-    if (savingRef.current || busy) return;
-    savingRef.current = true;
-    setSaving(true);
-    setError("");
-    try {
-      await save(text);
-      await done();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
-  };
   return (
     <section className={todayCss.mirrorHome} aria-label={t("今天", "Today")}>
       <header className={todayCss.homeHeading}>
@@ -194,6 +174,34 @@ export function LifeHome({
           <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
         )}
       </header>
+      {loadAtlas && (
+        <button type="button" className={todayCss.atlasPreview} onClick={openAtlas}>
+          <span>{t("人生地图", "Life map")}</span>
+          {atlasImage ? (
+            <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(atlasImage)}`} alt="" />
+          ) : (
+            <small>{t("还没有人生地图 · 去开图查看", "No life map yet · Open Explore")}</small>
+          )}
+        </button>
+      )}
+      <form
+        className={todayCss.askHome}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (askText.trim()) ask(askText);
+        }}
+      >
+        <label htmlFor="today-ask">{t("想聊些什么？", "What would you like to talk about?")}</label>
+        <textarea
+          id="today-ask"
+          value={askText}
+          onChange={(event) => setAskText(event.target.value)}
+          placeholder={t("写下来，或使用系统听写", "Write here or use system dictation")}
+        />
+        <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
+          {t("去问问继续", "Continue in Ask")}
+        </button>
+      </form>
       {!firstVisit && facts.length > 0 && (
         <div className={todayCss.mirror}>
           {[...paragraphs.values()].map((metrics) => {
@@ -333,57 +341,6 @@ export function LifeHome({
           </button>
         </section>
       )}
-      <section className={todayCss.question}>
-        <h2>{t("开图想问你", "A question for you")}</h2>
-        <p>{question}</p>
-        {saved ? (
-          <button
-            type="button"
-            className={css.link}
-            onClick={() => source({ ...saved, text: noteBody(saved.text) })}
-          >
-            {t("已记下，回看原文", "Saved — read your words")}
-          </button>
-        ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!composing.current && answer.trim())
-                void store(`${marker}\n${question}\n\n${answer.trim()}`, () => setAnswer(""));
-            }}
-          >
-            <input
-              aria-label={question}
-              placeholder={t("随口答一句就好", "A sentence is enough")}
-              type="text"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              onCompositionStart={() => {
-                composing.current = true;
-              }}
-              onCompositionEnd={() => {
-                composing.current = false;
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key === "Enter" &&
-                  (composing.current || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)
-                )
-                  event.preventDefault();
-              }}
-              disabled={saving}
-            />
-            <button
-              type="submit"
-              className={css.btn}
-              disabled={saving || busy || !answer.trim() || todayNotes?.day !== data.today}
-            >
-              {saving ? t("正在保存…", "Saving…") : t("记下", "Keep")}
-            </button>
-          </form>
-        )}
-      </section>
-      {error && <p role="alert">{error}</p>}
       <footer className={todayCss.homeLinks}>
         <button id="life-capture-start" type="button" className={css.link} onClick={start}>
           {t("随手记一句", "Keep a quick note")}
