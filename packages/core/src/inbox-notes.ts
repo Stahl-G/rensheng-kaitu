@@ -1,4 +1,5 @@
-import { mkdirSync, readdirSync, renameSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, relative } from "node:path";
 import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
@@ -39,6 +40,93 @@ export async function captureNote(ws: Workspace, text: string, investment?: stri
     ),
   );
   return { path, version: await snapshot(ws, "你保存了一条原文记录") };
+}
+
+export type CaptureReceipt = { status: "not_found" | "saved" | "uncertain"; path: string | null };
+type CaptureIntent = { version: 1; path: string; hash: string };
+const operationIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function captureIntentPath(ws: Workspace, operationId: string) {
+  if (!operationIdPattern.test(operationId)) throw new KaituError("记录操作编号不合法", "BAD_ARGS");
+  return ws.resolve(`.kaitu/capture-operations/${operationId.toLowerCase()}.json`, { internal: true });
+}
+const captureHash = (text: string) => createHash("sha256").update(text.trim()).digest("hex");
+function captureIntent(file: string): CaptureIntent | null {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as CaptureIntent;
+    if (parsed.version !== 1 || !isCaptureSource(parsed.path) || !/^[a-f0-9]{64}$/.test(parsed.hash))
+      return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** A missing receipt is safe to create; an incomplete/moved receipt must never trigger another write. */
+export function readCaptureReceipt(ws: Workspace, operationId: string): CaptureReceipt {
+  const file = captureIntentPath(ws, operationId);
+  if (!existsSync(file)) return { status: "not_found", path: null };
+  const intent = captureIntent(file);
+  if (!intent || !ws.exists(intent.path)) return { status: "uncertain", path: null };
+  try {
+    const content = ws.readText(intent.path);
+    if (noteMetadata(content).kind !== "capture" || captureHash(frontmatterBody(content)) !== intent.hash)
+      return { status: "uncertain", path: null };
+  } catch {
+    return { status: "uncertain", path: null };
+  }
+  return { status: "saved", path: intent.path };
+}
+
+/** Local operation receipt is created before the note, so retry never silently writes a second copy. */
+export async function captureNoteOnce(
+  ws: Workspace,
+  text: string,
+  operationId: string,
+  options: { scheduleVersion?: (message: string) => void } = {},
+) {
+  if (typeof text !== "string" || !text.trim() || text.length > 100000)
+    throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
+  const file = captureIntentPath(ws, operationId);
+  const now = new Date();
+  const date = localDate(now, ws.timeZone());
+  const intent: CaptureIntent = {
+    version: 1,
+    path: `inbox/notes/${date}/${ulid().toLowerCase()}.md`,
+    hash: captureHash(text),
+  };
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(file, JSON.stringify(intent), { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    const prior = captureIntent(file);
+    if (prior && prior.hash !== intent.hash) throw new KaituError("这个记录操作已用于其他内容", "CONFLICT");
+    const receipt = readCaptureReceipt(ws, operationId);
+    return {
+      ...(receipt.status === "not_found" ? { status: "uncertain" as const, path: null } : receipt),
+      version: null,
+    };
+  }
+  ws.writeText(
+    intent.path,
+    stringifyFrontmatter(
+      { agent: "你", date, created: isoInZone(now, ws.timeZone()), kind: "capture" },
+      text.trim(),
+    ),
+  );
+  try {
+    if (options.scheduleVersion) {
+      options.scheduleVersion("你保存了一条原文记录");
+      return { status: "saved" as const, path: intent.path, version: null };
+    }
+    return {
+      status: "saved" as const,
+      path: intent.path,
+      version: await snapshot(ws, "你保存了一条原文记录"),
+    };
+  } catch {
+    return { status: "saved" as const, path: intent.path, version: null, versionError: true };
+  }
 }
 
 export function noteAgent(value: unknown): string {
