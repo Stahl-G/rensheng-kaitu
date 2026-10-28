@@ -10,7 +10,11 @@ interface TimerDriver {
 export function createYearTimer(
   canAdvance: () => boolean,
   advance: () => void,
-  driver: TimerDriver = { set: setTimeout, clear: clearTimeout },
+  driver: TimerDriver = {
+    // Browser timer methods require the Window receiver; never alias them onto the driver.
+    set: (callback, delay) => globalThis.setTimeout(callback, delay),
+    clear: (handle) => globalThis.clearTimeout(handle),
+  },
 ) {
   let handle: ReturnType<typeof setTimeout> | undefined;
   let generation = 0;

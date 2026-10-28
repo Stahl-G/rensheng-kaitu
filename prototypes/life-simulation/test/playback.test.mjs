@@ -87,3 +87,25 @@ test("year clock waits at each speed, stops for decisions/details/hidden tabs, a
   assert.equal(years, 6);
   clock.stop();
 });
+
+test("default timer driver retains the host receiver when scheduling and cancelling", (context) => {
+  const delays = [];
+  const cancelled = [];
+  context.mock.method(globalThis, "setTimeout", function (_callback, delay) {
+    assert.equal(this, globalThis, "browser timers reject a driver object as this");
+    delays.push(delay);
+    return 42;
+  });
+  context.mock.method(globalThis, "clearTimeout", function (handle) {
+    assert.equal(this, globalThis, "clearTimeout must also retain the host receiver");
+    cancelled.push(handle);
+  });
+  const clock = createYearTimer(
+    () => true,
+    () => assert.fail("Cancelled timer fired"),
+  );
+  clock.schedule(2);
+  clock.stop();
+  assert.deepEqual(delays, [22500]);
+  assert.deepEqual(cancelled, [42]);
+});
