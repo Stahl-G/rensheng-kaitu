@@ -169,6 +169,8 @@ export function LifeHome({
     setFactSource(null);
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
+  const [selectedThread, setSelectedThread] = useState(0);
+  const [atlasData, setAtlasData] = useState<import("@kaitu/core").LifeAtlasState | null>(null);
   const [atlasImage, setAtlasImage] = useState<string | null>(null);
   const [atlasStatus, setAtlasStatus] = useState<"loading" | "ready" | "error">("loading");
   useEffect(() => {
@@ -177,6 +179,7 @@ export function LifeHome({
     void loadAtlas()
       .then((atlas) => {
         if (active) {
+          setAtlasData(atlas);
           setAtlasImage(atlas.resource?.svg ?? null);
           setAtlasStatus("ready");
         }
@@ -265,10 +268,61 @@ export function LifeHome({
         )}
       </header>
       {loadAtlas && (
-        <button type="button" className={todayCss.atlasPreview} onClick={openAtlas}>
-          <span>{t("人生地图", "Life map")}</span>
-          {atlasImage ? (
-            <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(atlasImage)}`} alt="" />
+        <div className={todayCss.atlasPreview}>
+          <button type="button" className={css.link} onClick={openAtlas}>
+            {t("人生地图", "Life map")}
+          </button>
+          {atlasImage && atlasData?.resource ? (
+            <svg
+              width="100%"
+              height="148"
+              viewBox={`0 0 ${atlasData.resource.width} ${atlasData.resource.height}`}
+            >
+              <title>{t("人生地图", "Life map")}</title>
+              <image
+                href={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(atlasImage)}`}
+                width={atlasData.resource.width}
+                height={atlasData.resource.height}
+              />
+              {home?.data?.threads.map((thread, index) => {
+                const domain = atlasData.domains.find((d) =>
+                  d.facts.some(
+                    (f) => f.source === thread.file && (thread.kind !== "goal" || f.id === thread.id),
+                  ),
+                );
+                const point = domain && atlasData.resource?.regions.provinces[domain.slot];
+                if (!point) return null;
+                return (
+                  // biome-ignore lint/a11y/useValidAnchor: SVG link selects the linked save point below.
+                  <a
+                    key={thread.key}
+                    href="#home-savepoint"
+                    tabIndex={0}
+                    aria-label={thread.title}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      setSelectedThread(index);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedThread(index);
+                      }
+                    }}
+                  >
+                    <circle
+                      cx={point.x}
+                      cy={point.y}
+                      r={index === selectedThread ? 22 : 14}
+                      fill={index === selectedThread ? "#d9902f" : "#2b4c7e"}
+                      stroke="#fffdf8"
+                      strokeWidth="4"
+                    />
+                    <title>{thread.title}</title>
+                  </a>
+                );
+              })}
+            </svg>
           ) : (
             <small>
               {atlasStatus === "loading"
@@ -278,10 +332,18 @@ export function LifeHome({
                   : t("还没有人生地图 · 去开图查看", "No life map yet · Open Explore")}
             </small>
           )}
-        </button>
+        </div>
       )}
       {home && (
-        <Savepoint data={home} openProject={openProject} library={library} adopt={adopt} dismiss={dismiss} />
+        <Savepoint
+          selected={selectedThread}
+          select={setSelectedThread}
+          data={home}
+          openProject={openProject}
+          library={library}
+          adopt={adopt}
+          dismiss={dismiss}
+        />
       )}
       {canAsk && (
         <form
@@ -441,7 +503,7 @@ export function LifeHome({
             {nextPresentation({ title: project.recentLog.text }, locale).title}
           </p>
         ))}
-      {!!data.proposedTasks.length && (
+      {!home && !!data.proposedTasks.length && (
         <section className={todayCss.aiSuggestions}>
           <h2>{t("AI 留的建议", "Suggestions from AI")}</h2>
           {data.proposedTasks.map((item) => (
@@ -540,12 +602,16 @@ export function LifeHome({
 }
 
 function Savepoint({
+  selected,
+  select,
   data,
   openProject,
   library,
   adopt,
   dismiss,
 }: {
+  selected: number;
+  select: (index: number) => void;
   data: import("@kaitu/core").HomeState;
   openProject: (slug: string) => void;
   library: () => void;
@@ -553,12 +619,12 @@ function Savepoint({
   dismiss: (id: string) => void;
 }) {
   const t = useT();
-  const [selected, setSelected] = useState(0);
+
   const threads = data.data?.threads ?? [];
   const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
   return (
     <div className={todayCss.savepointGrid}>
-      <article className={todayCss.savepointCard}>
+      <article id="home-savepoint" className={todayCss.savepointCard}>
         <p className={css.eyebrow}>{t("存档点", "Save point")}</p>
         {thread ? (
           <>
@@ -597,7 +663,7 @@ function Savepoint({
                 <button
                   type="button"
                   className={css.link}
-                  onClick={() => setSelected((selected + 1) % threads.length)}
+                  onClick={() => select((selected + 1) % threads.length)}
                 >
                   {t("换一个", "Another")}
                 </button>
