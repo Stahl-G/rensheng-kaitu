@@ -16,11 +16,13 @@ import {
   changeLifeAtlas,
   generateLifeAtlas,
   invalidateLifeAtlas,
+  phoneLifeAtlas,
   readLifeAtlas,
   readLifeAtlasProgress,
   subscribeLifeAtlas,
 } from "../src/life-atlas.js";
 import { localStateRoot } from "../src/local-state.js";
+import { writePhoneSnapshots } from "../src/phone-snapshots.js";
 import { addRecord, deleteRecord } from "../src/records.js";
 import type { Workspace } from "../src/workspace.js";
 import { freshWorkspace } from "./helpers.js";
@@ -42,11 +44,11 @@ test("map histories preserve terrain and positions while projecting current reco
   const ws = await freshWorkspace();
   ws.writeText(
     "health/STATUS.md",
-    "---\nupdated: 2026-10-20\nnext:\n  - id: walking\n    title: 合成测试：每天散步\n    status: todo\n---\n",
+    "---\nupdated: 2026-10-20T08:00:00Z\nnext:\n  - id: walking\n    title: 合成测试：每天散步\n    status: todo\n---\n",
   );
   ws.writeText(
     "learning/agent/STATUS.md",
-    "---\ntitle: Agent 与 AI 基础\nupdated: 2026-10-20\nstage: active\n---\n",
+    "---\ntitle: Agent 与 AI 基础\nupdated: 2026-10-20T08:00:00Z\nstage: active\n---\n",
   );
   const source = await settled(ws);
   expect(source.modules.find((m) => m.id === "health")?.recommended).toBe(true);
@@ -68,6 +70,12 @@ test("map histories preserve terrain and positions while projecting current reco
     ["health", 0],
     ["learning", 1],
   ]);
+  const phone = phoneLifeAtlas(ws);
+  expect(phone?.resourceId).toBe(firstId);
+  expect(phone?.resource).toEqual(first.resource);
+  expect(phone).not.toHaveProperty("candidates");
+  await writePhoneSnapshots(ws, new Date("2026-10-28T08:00:00Z"), { force: true });
+  expect(ws.readJson<{ resourceId: string }>("phone/life-atlas.json").resourceId).toBe(firstId);
   const key = first.resource?.key;
   const borders = first.resource?.regions.borders;
   ws.writeText(
@@ -102,6 +110,7 @@ test("map histories preserve terrain and positions while projecting current reco
   const second = await settled(ws);
   const secondId = second.latest as string;
   expect(second.active).toBe(firstId);
+  expect(phoneLifeAtlas(ws)?.resourceId).toBe(firstId);
   const preview = readLifeAtlas(ws, secondId);
   expect(preview.resource?.terrainCacheHit).toBe(true);
   expect(preview.resource?.key).toBe(key);

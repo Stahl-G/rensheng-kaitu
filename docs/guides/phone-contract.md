@@ -94,3 +94,17 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+## 人生地图只读投影
+
+`phone/life-atlas.json` 是可丢弃的版本 1 快照（`format: kaitu.phone.life-atlas`），
+沿现有文件夹或 GitHub 手机快照通道发布；不改变业务资料、地图存档或 `phone/map.json`。
+旧手机忽略新文件；缺少此文件表示桌面尚未发布，`resource: null` 表示尚未采用地图。
+
+字段：`generated_at` 为资料投影时间；`resourceId` 是既有候选 ID；`resource` 原样使用
+Cartographer AtlasResource（SVG、尺寸、margin、regions、compass、settings）；
+`domains` 复用当前 AtlasDomain（既有 slot、facts、temporal、score）；仅视觉渐淡的 clarity / freshness
+取百分之一精度，避免不可见的分钟变化重复上传整张 SVG。另有 `coverage`、`gaps`。
+不发布候选历史、缓存或本机路径。采用地图、源资料变化和重新启动会触发后台投影；
+资料读取失败保留已发布快照，UI 按快照时间展示。生成失败仍可发布原采用地图。
+手机只读，首版不生成、不采用、不改写地图。

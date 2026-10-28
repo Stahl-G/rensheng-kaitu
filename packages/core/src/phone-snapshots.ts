@@ -1,6 +1,7 @@
 import { watch } from "node:fs";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
+import { phoneLifeAtlas, subscribeLifeAtlas } from "./life-atlas.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
@@ -56,7 +57,21 @@ export async function writePhoneSnapshots(
     if (name === "today" && computer) rememberComputerSnapshot(ws, now);
     writes++;
   }
-  return writes + writePhoneReceipts(ws, [], now);
+  const receipts = writePhoneReceipts(ws, [], now);
+  // Atlas failure must not prevent Today, Week, Map, Library or receipts from being published.
+  const atlas = computer ? phoneLifeAtlas(ws, now) : undefined;
+  if (atlas) {
+    const file = "phone/life-atlas.json";
+    const previous = ws.exists(file) ? ws.readJson<typeof atlas>(file) : undefined;
+    if (
+      !previous ||
+      JSON.stringify({ ...atlas, generated_at: previous.generated_at }) !== JSON.stringify(previous)
+    ) {
+      ws.writeJson(file, atlas);
+      writes++;
+    }
+  }
+  return writes + receipts;
 }
 
 /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */
@@ -102,6 +117,7 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
     /* 不支持递归监听时由定时器刷新。 */
   }
   const off = subscribeWorkspaceBackup(ws, schedule);
+  const offAtlas = subscribeLifeAtlas(ws, schedule);
   const interval = setInterval(schedule, 60000);
   interval.unref();
   schedule();
@@ -111,5 +127,6 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
     clearInterval(interval);
     watcher?.close();
     off();
+    offAtlas();
   };
 }
