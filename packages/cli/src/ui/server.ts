@@ -966,7 +966,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopAtlas();
-    home.close();
+    await home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();
@@ -994,7 +994,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     watcher?.close();
     unwatchFile(backupState, backupChanged);
     stopAtlas();
-    home.close();
+    await home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();
