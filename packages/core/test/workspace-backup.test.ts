@@ -117,6 +117,8 @@ it("保留用户的无 remote 仓库与 worktree 指针；有明确来源的旧�
 it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重复同步不重复查可见性或提交", async () => {
   const a = await clonedWorkspace();
   a.writeText("me/profile.md", "# Synthetic author\n");
+  a.writeJson("phone/life-atlas.json", { format: "kaitu.phone.life-atlas", resourceId: "synthetic" });
+  a.writeJson("phone/private-unpublished.json", { secret: "synthetic" });
   a.writeJson(".kaitu/secrets.json", { github_token: "synthetic-only" }, { internal: true });
   a.writeText("health/files/example.mp4", "synthetic media");
   a.writeJson("secrets.json", { value: "synthetic-only" });
@@ -124,6 +126,8 @@ it("合成工作区备份、恢复、两端往返；凭据与媒体排除，重�
   const m = remoteMock();
   await connectWorkspaceBackup(a, { repo: "synthetic/backup", text: true, records: true }, m.remote);
   await syncWorkspaceBackup(a, m.remote);
+  expect(m.files()["phone/life-atlas.json"]).toContain("synthetic");
+  expect(m.files()["phone/private-unpublished.json"]).toBeUndefined();
   expect(Object.keys(m.files()).some((p) => /\.kaitu|\.git|\.mp4|secrets|credentials/.test(p))).toBe(false);
   const target = join(tmp(), "restored");
   await restoreWorkspaceBackup(target, a, { repo: "synthetic/backup" }, m.remote);

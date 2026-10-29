@@ -267,6 +267,39 @@ export function readLifeAtlas(
     coverage: totalCoverage(mapped),
   };
 }
+/** Disposable phone projection of the adopted map; never exports candidates or terrain caches. */
+export function phoneLifeAtlas(ws: Workspace, now = new Date()) {
+  if (!session(ws).manifest.active) return;
+  const state = readLifeAtlas(ws, undefined, now);
+  if (state.loading) return;
+  if (state.errorKind === "source" && state.error) throw new KaituError(state.error, "SOURCE_UNAVAILABLE");
+  // Invisible fade increments must not upload the full SVG on every minute tick.
+  for (const domain of state.domains) {
+    domain.score.clarity = Math.round(domain.score.clarity * 100) / 100;
+    if (domain.score.freshness !== null)
+      domain.score.freshness = Math.round(domain.score.freshness * 100) / 100;
+  }
+  const domains: Pick<AtlasDomain, "id" | "title" | "slot" | "facts" | "temporal" | "score">[] =
+    state.domains.map(({ id, title, slot, facts, temporal, score }) => ({
+      id,
+      title,
+      slot,
+      facts,
+      temporal,
+      score,
+    }));
+  return {
+    format: "kaitu.phone.life-atlas",
+    version: 1,
+    generated_at: now.toISOString(),
+    resourceId: state.resourceId,
+    resource: state.resource,
+    domains,
+    coverage: state.coverage,
+    gaps: state.gaps,
+  };
+}
+
 export function readLifeAtlasProgress(ws: Workspace) {
   const s = session(ws);
   return { running: s.running, progress: s.progress };

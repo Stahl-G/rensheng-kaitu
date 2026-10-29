@@ -94,3 +94,31 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+## 人生地图投影与本机资源
+
+`phone/life-atlas.json` 是可丢弃的版本 1 快照（`format: kaitu.phone.life-atlas`），
+沿现有文件夹或 GitHub 手机快照通道发布；不改变业务资料、地图存档或 `phone/map.json`。
+旧手机忽略新文件；缺少此文件表示桌面尚未发布，`resource: null` 表示尚未采用地图。
+
+字段：`generated_at` 为资料投影时间；`resourceId` 是既有候选 ID；`resource` 原样使用
+Cartographer AtlasResource（SVG、尺寸、margin、regions、compass、settings）；
+`domains` 复用当前 AtlasDomain（既有 slot、facts、temporal、score）；仅视觉渐淡的 clarity / freshness
+取百分之一精度，避免不可见的分钟变化重复上传整张 SVG。另有 `coverage`、`gaps`。
+不发布候选历史、缓存或本机路径。采用地图、源资料变化和重新启动会触发后台投影；
+资料读取失败保留已发布快照，UI 按快照时间展示。生成失败仍可发布原采用地图。
+同步快照仍只读。手机可离线复用同一 Cartographer 地形/区域/SVG 算法生成自己的地图，
+完整资源、seed、历史和本机采用记录保存在 App 私有目录；不会改写电脑的采用记录。
+本机地图使用手机既有事项/笔记和同步资料元数据，不另造业务正本。
+手机可导入过去的完整快照或桌面 maps/<UUID>.json 原始资源，手动导出后再由用户带走。
+生成与缓存显示不以电脑或服务器可用为前提。
+
+人生地图保留用户已采用的全部领域（包括财务），仅供手机 UI 查看。
+不传重复携带事实的 facets；手机只使用 id/title/slot/facts/temporal/score。
+桌面 agentCanRead 与 iOS AskWorkspace 在读取入口拒绝 phone/life-atlas.json 和 phone/library.json，
+同时检查实际路径，链接别名也不能绕过；人可视页面仍通过既有 WorkspaceStore.read 读取。
+现有公共导航只使用过滤过的 library.navigation，不增加这些混合快照或地图事实到 AI 薄上下文。
+
+单份 UTF-8 JSON 上限与手机一致，均为 16 MiB；超限时保留上次快照并报告错误。
+SVG、区域与领域资料封装于同一个 JSON，使用既有临时文件 + rename 原子写入；
+Drive 沿用读取前后版本核对，GitHub 沿用文件 blob 版本，手机在验证成功后才替换缓存。

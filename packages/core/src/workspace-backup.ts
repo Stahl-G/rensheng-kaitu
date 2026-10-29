@@ -150,7 +150,7 @@ function selected(path: string, c: Pick<BackupConnection, "text" | "records">): 
     )
   )
     return false;
-  if (parts[0] === "phone") return /^phone\/(today|week|map|library|receipts)\.json$/.test(path);
+  if (parts[0] === "phone") return /^phone\/(today|week|map|library|receipts|life-atlas)\.json$/.test(path);
   if (parts[0] === "inbox")
     return /^inbox\/(agents\/[^/]+\.(?:md|jsonl?|txt)|health\/[^/]+\.health\.json|notes\/.+\.md)$/.test(path);
   return (c.text && /\.(md|txt)$/i.test(path)) || (c.records && /\.(jsonl?|ya?ml|csv|ics|toml)$/i.test(path));

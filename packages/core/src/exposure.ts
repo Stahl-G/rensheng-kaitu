@@ -61,6 +61,8 @@ function relativePath(root: string, path: string): string {
 }
 
 function allowedPath(ws: Workspace, relative: string, connection: AgentConnection): boolean {
+  // Human UI snapshots may mix finance and private-memory metadata across modules.
+  if (["phone/life-atlas.json", "phone/library.json"].includes(relative.toLowerCase())) return false;
   const parts = relative.split("/");
   const name = parts.at(-1)?.toLowerCase() ?? "";
   if (

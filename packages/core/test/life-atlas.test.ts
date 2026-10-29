@@ -16,11 +16,13 @@ import {
   changeLifeAtlas,
   generateLifeAtlas,
   invalidateLifeAtlas,
+  phoneLifeAtlas,
   readLifeAtlas,
   readLifeAtlasProgress,
   subscribeLifeAtlas,
 } from "../src/life-atlas.js";
 import { localStateRoot } from "../src/local-state.js";
+import { writePhoneSnapshots } from "../src/phone-snapshots.js";
 import { addRecord, deleteRecord } from "../src/records.js";
 import type { Workspace } from "../src/workspace.js";
 import { freshWorkspace } from "./helpers.js";
@@ -42,12 +44,13 @@ test("map histories preserve terrain and positions while projecting current reco
   const ws = await freshWorkspace();
   ws.writeText(
     "health/STATUS.md",
-    "---\nupdated: 2026-10-20\nnext:\n  - id: walking\n    title: 合成测试：每天散步\n    status: todo\n---\n",
+    "---\nupdated: 2026-10-20T08:00:00Z\nnext:\n  - id: walking\n    title: 合成测试：每天散步\n    status: todo\n---\n",
   );
   ws.writeText(
     "learning/agent/STATUS.md",
-    "---\ntitle: Agent 与 AI 基础\nupdated: 2026-10-20\nstage: active\n---\n",
+    "---\ntitle: Agent 与 AI 基础\nupdated: 2026-10-20T08:00:00Z\nstage: active\n---\n",
   );
+  ws.writeText("finance/STATUS.md", "---\ntitle: 合成私密财务\nupdated: 2026-10-20T08:00:00Z\n---\n");
   const source = await settled(ws);
   expect(source.modules.find((m) => m.id === "health")?.recommended).toBe(true);
   const changed = vi.fn();
@@ -68,6 +71,35 @@ test("map histories preserve terrain and positions while projecting current reco
     ["health", 0],
     ["learning", 1],
   ]);
+  const phone = phoneLifeAtlas(ws);
+  expect(phone?.resourceId).toBe(firstId);
+  expect(phone?.resource).toEqual(first.resource);
+  expect(phone).not.toHaveProperty("candidates");
+  expect(phone?.domains.every((d) => !("facets" in d))).toBe(true);
+  await writePhoneSnapshots(ws, new Date("2026-10-28T08:00:00Z"), { force: true });
+  expect(ws.readJson<{ resourceId: string }>("phone/life-atlas.json").resourceId).toBe(firstId);
+  const published = ws.readText("phone/life-atlas.json");
+  const originalSvg = first.resource?.svg as string;
+  if (first.resource) first.resource.svg = "x".repeat(16 * 1024 * 1024);
+  try {
+    await expect(writePhoneSnapshots(ws, new Date("2026-10-28T08:01:00Z"), { force: true })).rejects.toThrow(
+      "16 MiB",
+    );
+    expect(ws.readText("phone/life-atlas.json")).toBe(published);
+  } finally {
+    if (first.resource) first.resource.svg = originalSvg;
+  }
+  ws.writeText("phone/life-atlas.json", "{broken synthetic output");
+  ws.writeText("phone/week.json", "{broken synthetic output");
+  const repairNotice = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await writePhoneSnapshots(ws, new Date("2026-10-28T08:02:00Z"), { force: true });
+    expect(ws.readJson<{ resourceId: string }>("phone/life-atlas.json").resourceId).toBe(firstId);
+    expect(ws.readJson<{ format: string }>("phone/week.json").format).toBe("kaitu.phone.week");
+    expect(repairNotice).toHaveBeenCalledTimes(2);
+  } finally {
+    repairNotice.mockRestore();
+  }
   const key = first.resource?.key;
   const borders = first.resource?.regions.borders;
   ws.writeText(
@@ -102,6 +134,7 @@ test("map histories preserve terrain and positions while projecting current reco
   const second = await settled(ws);
   const secondId = second.latest as string;
   expect(second.active).toBe(firstId);
+  expect(phoneLifeAtlas(ws)?.resourceId).toBe(firstId);
   const preview = readLifeAtlas(ws, secondId);
   expect(preview.resource?.terrainCacheHit).toBe(true);
   expect(preview.resource?.key).toBe(key);
@@ -111,8 +144,13 @@ test("map histories preserve terrain and positions while projecting current reco
     ["learning", 1],
     ["finance", 2],
   ]);
-  expect(preview.domains.find((d) => d.id === "finance")?.facts).toEqual([]);
+  expect(preview.domains.find((d) => d.id === "finance")?.facts.some((f) => f.title === "合成私密财务")).toBe(
+    true,
+  );
   changeLifeAtlas(ws, secondId, "adopt");
+  const shared = phoneLifeAtlas(ws);
+  expect(shared?.domains.some((d) => d.id === "finance")).toBe(true);
+  expect(JSON.stringify(shared)).toContain("合成私密财务");
   changeLifeAtlas(ws, firstId, "archive");
   expect(() => readLifeAtlas(ws, firstId)).toThrow();
   changeLifeAtlas(ws, firstId, "restore");

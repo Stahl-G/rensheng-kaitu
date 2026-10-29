@@ -27,6 +27,14 @@ it("各连接独立保存财务读取选择，敏感记忆、密钥和链接遵�
       sensitive: true,
     });
     ws.writeText("finance/note.md", "Synthetic finance");
+    for (const name of ["life-atlas", "library"]) {
+      ws.writeJson(`phone/${name}.json`, {
+        format: `kaitu.phone.${name}`,
+        title: "Synthetic private finance",
+      });
+      symlinkSync(ws.resolve(`phone/${name}.json`), join(root, `${name}-alias.json`));
+      expect(ws.readText(`phone/${name}.json`)).toContain("Synthetic private finance");
+    }
     ws.writeText("me/secrets.json", "{}");
     for (const file of ["me/id_ecdsa", "me/id_ed25519_sk", "me/private.p8", "me/keys.jks"])
       ws.writeText(file, "Synthetic key material");
@@ -42,6 +50,10 @@ it("各连接独立保存财务读取选择，敏感记忆、密钥和链接遵�
         expect(agentCanRead(ws, "finance-alias.md", connection)).toBe(allowed);
         expect(agentCanRead(ws, `memory/${open.file}`, connection)).toBe(true);
         for (const file of [
+          "phone/life-atlas.json",
+          "phone/library.json",
+          "life-atlas-alias.json",
+          "library-alias.json",
           ".kaitu/config.json",
           "me/secrets.json",
           "me/id_ecdsa",

@@ -1,6 +1,6 @@
 import { MinHeap } from '../src/gen/util.js'
 import { contours, categoryBorders, pathData } from '../src/render/atlas/svg/contour.js'
-import type { Terrain } from './core.js'
+import type { Terrain } from './terrain.js'
 import { territoryStep } from '../src/gen/political.js'
 import { reliefKm } from '../src/gen/types.js'
 import { riverThreshold } from '../src/gen/world.js'
