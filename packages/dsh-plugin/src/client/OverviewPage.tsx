@@ -103,6 +103,7 @@ export interface OverviewPageProps
     onSettings: (section: "ai" | "local-ai") => void,
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
+    onOrganize?: (source: string) => Promise<void>,
   ) => ReactNode;
 }
 const modules = [
@@ -231,6 +232,7 @@ function Overview({
     setImportAttempt((value) => value + 1);
   };
   const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
+  const [reviewClipboard, setReviewClipboard] = useState(false);
   const askPanel = useRef<HTMLDivElement>(null);
   const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
@@ -1347,6 +1349,7 @@ function Overview({
                   {...props}
                   key={reviewMatter.source}
                   initial={reviewMatter}
+                  clipboard={reviewClipboard}
                   content={onboarding.content.matter}
                   builtin={builtinAi}
                   onPrompt={prompt}
@@ -1389,6 +1392,12 @@ function Overview({
                   const value = await props.loadLibrary({});
                   setLibrary(value);
                   await refresh();
+                }}
+                organize={async (text) => {
+                  const matter = await props.saveOnboardingMatter(text);
+                  openRecord("inbox");
+                  setReviewClipboard(true);
+                  setReviewMatter(matter);
                 }}
                 onFile={openFileImport}
                 onAdd={(kind) => {
@@ -1457,6 +1466,7 @@ function Overview({
                     },
                   }}
                   onReview={(file) => {
+                    setReviewClipboard(false);
                     void props
                       .readOnboardingMatter(file)
                       .then(setReviewMatter)
@@ -1618,6 +1628,13 @@ function Overview({
               openAskSettings,
               promptNewConversation,
               homeSubmit,
+              async (source) => {
+                const matter = await props.readOnboardingMatter(source);
+                openRecord("inbox");
+                setReviewClipboard(true);
+                setReviewMatter(matter);
+                setHomeSubmit(undefined);
+              },
             )}
           </div>
         )}

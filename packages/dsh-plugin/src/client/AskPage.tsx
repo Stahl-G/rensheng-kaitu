@@ -267,6 +267,7 @@ export function AskPage({
   onConnections,
   onToday,
   onSettings,
+  onOrganize,
 }: {
   workspace: string;
   active?: boolean;
@@ -279,6 +280,7 @@ export function AskPage({
   onConnections?: () => void;
   onToday?: () => void;
   onSettings?: (section: "ai" | "local-ai") => void;
+  onOrganize?: (source: string) => Promise<void>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -759,6 +761,11 @@ export function AskPage({
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
   const [handoffState, setHandoffState] = useState<"sending" | "retry" | "uncertain" | "failed" | null>(null);
+  const organizeSaved = (source: string) => {
+    void onOrganize?.(source)
+      .then(() => setHandoffState(null))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  };
   const checkHandoff = useCallback(async () => {
     if (!autoSubmit) return;
     const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
@@ -1192,13 +1199,28 @@ export function AskPage({
         >
           {loaded && !settings?.configured && !selected ? (
             <div className={css.noKey}>
-              <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
-              <p>
-                {t(
-                  "开图本身不带 AI。接上以后，问问只读你允许的那部分资料来回答；每次发出去的内容都写在输入框下面。",
-                  "Kaitu does not include an AI. Once connected, Ask reads the data you allow; the details appear below the composer before you send.",
-                )}
-              </p>
+              <h1>
+                {autoSubmit
+                  ? t("原文已保存", "Original saved")
+                  : t("先接上一个 AI。", "Connect an AI first.")}
+              </h1>
+              {autoSubmit && onOrganize && (
+                <button
+                  type="button"
+                  className={css.routePrimary}
+                  onClick={() => organizeSaved(autoSubmit.capturedPath)}
+                >
+                  {t("用其他 AI 整理", "Organize with another AI")}
+                </button>
+              )}
+              {!autoSubmit && (
+                <p>
+                  {t(
+                    "开图本身不带 AI。接上以后，问问只读你允许的那部分资料来回答；每次发出去的内容都写在输入框下面。",
+                    "Kaitu does not include an AI. Once connected, Ask reads the data you allow; the details appear below the composer before you send.",
+                  )}
+                </p>
+              )}
               <section className={css.routes} aria-label={t("接 AI 的方式", "Ways to connect AI")}>
                 <div>
                   <span>
@@ -1402,8 +1424,16 @@ export function AskPage({
                   : t("发送结果未知", "Send status unknown")}
             {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
               autoSubmit && <p>{autoSubmit.text}</p>}
-            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
-              autoSubmit && <small>{autoSubmit.capturedPath}</small>}
+            {handoffState === "retry" && !settings?.configured && selected && autoSubmit && onOrganize && (
+              <button
+                type="button"
+                onClick={() => {
+                  organizeSaved(autoSubmit.capturedPath);
+                }}
+              >
+                {t("用其他 AI 整理", "Organize with another AI")}
+              </button>
+            )}
             {(handoffState === "uncertain" || handoffState === "failed" || handoffState === "sending") && (
               <button
                 type="button"

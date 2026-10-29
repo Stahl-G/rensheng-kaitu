@@ -104,6 +104,7 @@ export function LibraryPage({
   open,
   overview,
   capture,
+  organize,
   onAdd,
   onFile,
   onOpenOriginal,
@@ -123,6 +124,7 @@ export function LibraryPage({
   open: (id: string) => void;
   overview?: OverviewData | null;
   capture?: (text: string) => Promise<unknown>;
+  organize?: (text: string) => Promise<void>;
   onAdd?: (kind: "file" | "phone" | "organizer" | "category") => void;
 }) {
   const t = useT();
@@ -323,12 +325,20 @@ export function LibraryPage({
             )}
             <span className={css.chip}>
               {t(
-                item.status === "review" ? "要你核对" : item.status === "organized" ? "已整理" : "只存了原文",
-                item.status === "review"
-                  ? "To review"
-                  : item.status === "organized"
-                    ? "Organized"
-                    : "Saved as is",
+                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                  ? "已采纳"
+                  : item.status === "review"
+                    ? "要你核对"
+                    : item.status === "organized"
+                      ? "已整理"
+                      : "只存了原文",
+                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                  ? "Adopted"
+                  : item.status === "review"
+                    ? "To review"
+                    : item.status === "organized"
+                      ? "Organized"
+                      : "Saved as is",
               )}
             </span>
           </button>
@@ -364,7 +374,8 @@ export function LibraryPage({
               setBusy(true);
               setError("");
               try {
-                await capture(draft);
+                if (organize) await organize(draft);
+                else await capture(draft);
                 setDraft(null);
               } catch (err) {
                 setError(err instanceof Error ? err.message : String(err));
@@ -383,7 +394,11 @@ export function LibraryPage({
               />
             </label>
             <button type="submit" disabled={busy || !draft.trim()}>
-              {busy ? t("正在保存…", "Saving…") : t("保存原文", "Save original")}
+              {busy
+                ? t("正在保存…", "Saving…")
+                : organize
+                  ? t("保存并整理", "Save and organize")
+                  : t("保存原文", "Save original")}
             </button>
             <button type="button" disabled={busy} onClick={() => setDraft(null)}>
               {t("取消", "Cancel")}
@@ -555,15 +570,14 @@ export function InboxPage({
       if (seq === generation.current) setLoading(false);
     }
   };
-  const activeStatus =
-    status ?? (next || entries?.some((entry) => entry.status === "review") ? "review" : "all");
   const destinationFor = (entry: InboxEntry) => sources?.[entry.file.split("/").at(-1) ?? ""];
+  const needsReview = (entry: InboxEntry) => entry.status === "review" && !destinationFor(entry);
+  const activeStatus = status ?? (next || entries?.some(needsReview) ? "review" : "all");
   const savedAsIs = (entry: InboxEntry) =>
     entry.status === "organized" && !!sources && !entry.destination && !destinationFor(entry);
   const filtered =
     entries?.filter(
-      (entry) =>
-        activeStatus === "all" || (activeStatus === "saved" ? savedAsIs(entry) : entry.status === "review"),
+      (entry) => activeStatus === "all" || (activeStatus === "saved" ? savedAsIs(entry) : needsReview(entry)),
     ) ?? [];
   const selectedEntry = filtered.find((entry) => entry.file === selected);
   const away = overview?.sync.cloudOrganizer?.away;
@@ -682,20 +696,28 @@ export function InboxPage({
                   <span className={inboxStyles.meta}>
                     {sourceLabel(row.source)} ·{" "}
                     {t(
-                      row.status === "review"
-                        ? "要你核对"
-                        : savedAsIs(row)
-                          ? "只存了原文"
-                          : row.status === "organized"
-                            ? "已整理"
-                            : "还没整理",
-                      row.status === "review"
-                        ? "To review"
-                        : savedAsIs(row)
-                          ? "Saved as is"
-                          : row.status === "organized"
-                            ? "Organized"
-                            : "Not organized yet",
+                      destinationFor(row)
+                        ? "已采纳"
+                        : row.status === "review"
+                          ? "要你核对"
+                          : savedAsIs(row)
+                            ? "只存了原文"
+                            : row.status === "organized"
+                              ? "已整理"
+                              : overview?.sync.organizer
+                                ? "还没整理"
+                                : "已保存",
+                      destinationFor(row)
+                        ? "Adopted"
+                        : row.status === "review"
+                          ? "To review"
+                          : savedAsIs(row)
+                            ? "Saved as is"
+                            : row.status === "organized"
+                              ? "Organized"
+                              : overview?.sync.organizer
+                                ? "Not organized yet"
+                                : "Saved",
                     )}
                   </span>
                 </button>
@@ -736,24 +758,29 @@ export function InboxPage({
                     <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}
-                {review && selectedEntry.originalSource && selectedEntry.status !== "organized" && (
-                  <InboxReview
-                    key={selectedEntry.file}
-                    file={selectedEntry.originalSource}
-                    services={review}
-                    done={() => {
-                      setSelected(
-                        filtered.find((row) => row.file !== selectedEntry.file && row.status !== "organized")
-                          ?.file ?? null,
-                      );
-                      void reload.current();
-                    }}
-                    onReview={onReview}
-                  />
-                )}
+                {review &&
+                  selectedEntry.originalSource &&
+                  selectedEntry.status !== "organized" &&
+                  !destinationFor(selectedEntry) && (
+                    <InboxReview
+                      key={selectedEntry.file}
+                      file={selectedEntry.originalSource}
+                      services={review}
+                      done={() => {
+                        setSelected(
+                          filtered.find(
+                            (row) => row.file !== selectedEntry.file && row.status !== "organized",
+                          )?.file ?? null,
+                        );
+                        void reload.current();
+                      }}
+                      onReview={onReview}
+                    />
+                  )}
                 {!review &&
                   onReview &&
                   selectedEntry.originalSource &&
+                  !destinationFor(selectedEntry) &&
                   selectedEntry.status !== "organized" && (
                     <button
                       type="button"
