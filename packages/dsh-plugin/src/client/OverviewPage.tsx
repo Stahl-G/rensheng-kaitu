@@ -419,6 +419,11 @@ function Overview({
   const [libraryState, setLibraryState] = useState<{ root: string | undefined; data: LibraryData } | null>(
     null,
   );
+  const [libraryFailure, setLibraryFailure] = useState<{ root: string | undefined; message: string } | null>(
+    null,
+  );
+  const libraryReadError = libraryFailure?.root === workspaceRoot ? libraryFailure?.message : undefined;
+  const retryLibrary = useRef<() => void>(() => {});
   const library = libraryState?.root === workspaceRoot ? (libraryState?.data ?? null) : null;
   const currentWorkspace = useRef(workspaceRoot);
   currentWorkspace.current = workspaceRoot;
@@ -636,11 +641,19 @@ function Overview({
         const value = await props.loadLibrary({
           section: record === "notes" || record === "health" ? record : record ? "summary" : undefined,
         });
-        if (seq === sequence) setLibrary(value);
+        if (seq === sequence) {
+          setLibrary(value);
+          setLibraryFailure(null);
+        }
       } catch (err) {
-        if (seq === sequence) setError(err instanceof Error ? err.message : String(err));
+        if (seq === sequence)
+          setLibraryFailure({
+            root: workspaceRoot,
+            message: err instanceof Error ? err.message : String(err),
+          });
       }
     };
+    retryLibrary.current = () => void load();
     void load();
     const off = props.subscribe?.(() => void load());
     return () => {
@@ -1360,6 +1373,8 @@ function Overview({
                 }}
                 searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
+                readError={libraryReadError}
+                retry={() => retryLibrary.current()}
                 open={openRecord}
                 onOpenOriginal={(entry) => {
                   openRecord("inbox");

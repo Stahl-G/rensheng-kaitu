@@ -99,6 +99,8 @@ export function LibraryPage({
   query,
   onQuery,
   data,
+  readError,
+  retry,
   open,
   overview,
   capture,
@@ -116,6 +118,8 @@ export function LibraryPage({
   onOpenNote: (file: string) => void;
   onOpenGoal: (id: string) => void;
   data: LibraryData | null;
+  readError?: string;
+  retry?: () => void;
   open: (id: string) => void;
   overview?: OverviewData | null;
   capture?: (text: string) => Promise<unknown>;
@@ -154,6 +158,7 @@ export function LibraryPage({
   const goals = searching ? (overview?.plans.goals ?? []).filter((goal) => matches(goal.title)) : [];
   const notes = searching && found?.term === term ? found.notes : [];
   const searchingNotes = searching && found?.term !== term;
+  const noteCount = searchingNotes ? "…" : found?.error ? t("未完成", "incomplete") : notes.length;
   const hints: Record<string, [string, string]> = {
     calendar: ["添加日程或连接日历", "Add an event or connect a calendar"],
     projects: ["记下正在做的项目", "Add a project you are working on"],
@@ -181,14 +186,18 @@ export function LibraryPage({
       {searching && (
         <section aria-label={t("搜索结果", "Search results")} className={styles.searchResults}>
           <h2>{t("搜索结果", "Search results")}</h2>
-          {!data || !overview ? (
+          {readError ? (
+            <p role="alert">
+              {t("搜索未完成，请重试读取资料。", "Search incomplete. Retry loading the library.")}
+            </p>
+          ) : !data || !overview ? (
             <output>{t("正在读取资料…", "Loading…")}</output>
           ) : (
             <>
               <output className={styles.meta}>
                 {t(
-                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记 ${notes.length}${notes.length === 50 ? "（前 50 条）" : ""}`,
-                  `Originals ${originals.length} · Goals ${goals.length} · Notes ${notes.length}${notes.length === 50 ? " (first 50)" : ""}`,
+                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记 ${noteCount}${notes.length === 50 ? "（前 50 条）" : ""}`,
+                  `Originals ${originals.length} · Goals ${goals.length} · Notes ${noteCount}${notes.length === 50 ? " (first 50)" : ""}`,
                 )}
               </output>
               {searchingNotes && <output>{t("正在搜索笔记正文…", "Searching note contents…")}</output>}
@@ -202,6 +211,11 @@ export function LibraryPage({
                 >
                   <span className={css.chip}>{t("原文", "Original")}</span>
                   <span className={styles.preview}>{item.text}</span>
+                  {item.error && (
+                    <span className={css.error}>
+                      {t("原文头部读取失败", "Original header could not be read")}
+                    </span>
+                  )}
                   <time className={styles.meta}>{item.date?.slice(0, 10)}</time>
                 </button>
               ))}
@@ -238,6 +252,16 @@ export function LibraryPage({
             </>
           )}
         </section>
+      )}
+      {readError && (
+        <p role="alert">
+          {readError}{" "}
+          {retry && (
+            <button type="button" className={css.link} onClick={retry}>
+              {t("重试", "Retry")}
+            </button>
+          )}
+        </p>
       )}
       <section
         className={styles.inbox}
@@ -298,6 +322,9 @@ export function LibraryPage({
           <button type="button" className={styles.row} key={item.file} onClick={() => onOpenOriginal(item)}>
             <time className={styles.meta}>{item.date?.slice(0, 10) ?? ""}</time>
             <span className={styles.preview}>{item.text}</span>
+            {item.error && (
+              <span className={css.error}>{t("原文头部读取失败", "Original header could not be read")}</span>
+            )}
             <span className={css.chip}>
               {t(
                 item.status === "review" ? "要你核对" : item.status === "organized" ? "已整理" : "只存了原文",
@@ -503,6 +530,8 @@ export function InboxPage({
     };
     reload.current = load;
     setEntries(null);
+    setNext(null);
+    setError("");
     void load();
     const off = subscribe?.(() => void load());
     return () => {
@@ -595,7 +624,11 @@ export function InboxPage({
         ))}
       </div>
       {error && <p role="alert">{error}</p>}
-      {!entries ? (
+      {!entries && error ? (
+        <button type="button" className={css.link} onClick={() => void reload.current()}>
+          {t("重试读取", "Retry loading")}
+        </button>
+      ) : !entries ? (
         <p className={css.small}>{t("正在读取收件箱…", "Loading inbox…")}</p>
       ) : !entries?.length ? (
         <p className={css.emptyState}>
@@ -642,6 +675,11 @@ export function InboxPage({
                   onClick={() => setSelected(row.file)}
                 >
                   <strong className={inboxStyles.preview}>{row.text.split("\n")[0]}</strong>
+                  {row.error && (
+                    <span className={css.error}>
+                      {t("原文头部读取失败", "Original header could not be read")}
+                    </span>
+                  )}
                   <time className={inboxStyles.meta}>
                     {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
                   </time>
@@ -669,6 +707,15 @@ export function InboxPage({
             </div>
             {selectedEntry && (
               <article className={inboxStyles.detail} aria-label={t("这一条原文", "Selected original")}>
+                {selectedEntry.error && (
+                  <p role="alert">
+                    {t(
+                      "原文头部读取失败，请检查原文件。",
+                      "Could not read the original header. Check the original file.",
+                    )}{" "}
+                    <code>{selectedEntry.file}</code>
+                  </p>
+                )}
                 <p className={inboxStyles.meta}>
                   {t("原文", "Original")} · {selectedEntry.date?.slice(0, 16).replace("T", " ")}
                 </p>

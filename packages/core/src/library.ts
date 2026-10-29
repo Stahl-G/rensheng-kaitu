@@ -4,7 +4,7 @@ import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes, isCaptureSource } from "./inbox-notes.js";
 import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
@@ -29,6 +29,7 @@ export interface InboxEntry {
   date: string | null;
   status: "organized" | "review" | "raw";
   destination: string | null;
+  error?: "INVALID_FRONTMATTER";
 }
 export interface LibraryQuery {
   section?: "summary" | "inbox" | "notes" | "health";
@@ -60,8 +61,31 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       : undefined;
   // 还没从云盘下载的笔记先不列，下载后自然出现。
   const entry = (file: string, organized: boolean): InboxEntry[] => {
-    const parsed = ws.scanParsed(file, "library-note", parseFrontmatter);
+    const parsed = ws.scanParsed(file, "library-note", (text) => {
+      try {
+        return { ...parseFrontmatter(text), error: undefined };
+      } catch {
+        return {
+          data: {} as Record<string, unknown>,
+          body: frontmatterBody(text),
+          error: "INVALID_FRONTMATTER" as const,
+        };
+      }
+    });
     if (!parsed) return [];
+    if (parsed.error)
+      return [
+        {
+          file,
+          text: parsed.body.trim(),
+          source: "other",
+          originalSource: null,
+          date: null,
+          status: "review",
+          destination: null,
+          error: parsed.error,
+        },
+      ];
     const { data, body } = parsed;
     const captureSource =
       data.kind === "capture" && typeof data.date === "string"
@@ -248,7 +272,8 @@ function inboxPage(
     for (const file of files) {
       if (query.before && file.key.localeCompare(query.before) >= 0) continue;
       for (const value of read(file.file, file.organized)) {
-        if (query.source && query.source !== "all" && value.source !== query.source) continue;
+        // An unreadable header cannot be classified; keep its explicit error visible.
+        if (query.source && query.source !== "all" && value.source !== query.source && !value.error) continue;
         entries.push({ key: file.key, value });
         if (entries.length > limit)
           return {
