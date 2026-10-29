@@ -40,17 +40,11 @@
   gap: 10px;
   margin-bottom: 4px;
 }
-.dot,
 .shape {
   display: inline-block;
   flex: none;
   border-radius: 50%; /* biome-ignore lint/correctness/noUnknownProperty: dsh requires round markers. */
   corner-shape: round;
-}
-.dot {
-  width: 10px;
-  height: 10px;
-  background: var(--kt-map);
 }
 .primary,
 .control,
@@ -246,18 +240,6 @@
 }
 .mapNotice button {
   margin-left: 8px;
-}
-.precision {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  border-radius: 6px;
-  padding: 4px 8px;
-  background: var(--kt-card);
-  color: var(--kt-secondary);
-  font-size: 12px;
-  line-height: 18px;
-  pointer-events: none;
 }
 .page .mapControls {
   position: absolute;

@@ -172,8 +172,7 @@ button.row {
 .capture button {
   margin: 12px 8px 0 0;
 }
-.page :focus-visible,
-.split :focus-visible {
+.page :focus-visible {
   outline: 3px solid var(--link-line);
   outline-offset: 3px;
 }

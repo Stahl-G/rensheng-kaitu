@@ -1,20 +1,6 @@
 .page {
   width: 100%;
 }
-.layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 40px 48px;
-  align-items: start;
-}
-.layout > * {
-  min-width: 0;
-  margin: 0;
-}
-.layout h2 {
-  font-size: 18px;
-  font-weight: 600;
-}
 .focusSection,
 .start {
   grid-column: 1;
@@ -25,7 +11,6 @@
   background: var(--surface);
   border-radius: 16px;
 }
-.suggestions,
 .steps {
   grid-column: 1;
   grid-row: 2;
@@ -33,19 +18,10 @@
   padding: 20px;
   border-radius: 16px;
 }
-.upcoming,
-.modules {
+.upcoming {
   grid-column: 1;
   grid-row: 3;
 }
-.agenda {
-  grid-column: 2;
-  grid-row: 2;
-  padding: 20px;
-  background: var(--surface);
-  border-radius: 16px;
-}
-.review,
 .storage {
   grid-column: 2;
   grid-row: 3;
@@ -103,22 +79,6 @@
 .topics button {
   min-height: 36px;
 }
-.moduleGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-.moduleGrid button {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: start;
-  padding: 20px;
-  color: var(--ink);
-  font: inherit;
-}
-.moduleGrid span,
 .grow small,
 .storage p {
   color: var(--muted);
@@ -170,16 +130,6 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.secondary {
-  margin-top: 40px;
-  border-top: 1px solid var(--line);
-  padding-top: 20px;
-}
-.secondary > summary {
-  cursor: pointer;
-  color: var(--muted);
-  min-height: 36px;
-}
 .capture form {
   display: flex;
   flex-wrap: wrap;
@@ -204,21 +154,7 @@
 .goal[open] summary {
   white-space: normal;
 }
-@container (max-width: 1179px) {
-  .layout {
-    grid-template-columns: minmax(0, 1fr) 288px;
-    gap: 32px;
-  }
-}
 @container (max-width: 959px) {
-  .layout {
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-  }
-  .layout > * {
-    width: 100%;
-  }
   .focusSection,
   .start {
     order: 1;
@@ -226,26 +162,17 @@
   .capture {
     order: 2;
   }
-  .suggestions,
   .steps {
     order: 3;
   }
-  .upcoming,
-  .modules {
+  .upcoming {
     order: 4;
   }
-  .agenda {
-    order: 5;
-  }
-  .review,
   .storage {
     order: 6;
   }
 }
 @container (max-width: 639px) {
-  .moduleGrid {
-    grid-template-columns: 1fr;
-  }
   .start h1,
   .focus h2,
   .focusSection > section > h2 {
@@ -306,61 +233,18 @@
   color: var(--ink);
   font: inherit;
 }
-.agenda [data-agenda-row] {
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 6px;
-  padding: 12px 0;
-}
-.agenda [data-agenda-row] > :last-child {
-  grid-column: auto;
-}
-.agenda [data-agenda-row] > span:last-child {
-  display: none;
-}
-.agenda [data-agenda-row] > div {
-  display: flex;
-  gap: 4px;
-}
-.agenda [data-agenda-row] button {
-  min-width: 36px;
-  padding: 4px;
-  border: 0;
-  background: transparent;
-}
-.agenda [data-agenda-row] > span {
-  overflow-wrap: anywhere;
-}
 
-.left,
-.right {
-  display: flex;
-  flex-direction: column;
-  gap: 40px;
-  min-width: 0;
-}
-.left > *,
-.right > * {
-  width: 100%;
-  margin: 0;
-  min-width: 0;
-}
 .focusSection,
 .start {
   order: 1;
 }
-.suggestions,
 .steps {
   order: 2;
 }
-.upcoming,
-.modules {
+.upcoming {
   order: 3;
 }
 @container (max-width: 959px) {
-  .left,
-  .right {
-    display: contents;
-  }
   .focusSection,
   .start {
     order: 1;
@@ -368,206 +252,19 @@
   .capture {
     order: 2;
   }
-  .suggestions,
   .steps {
     order: 3;
   }
-  .upcoming,
-  .modules {
+  .upcoming {
     order: 4;
   }
-  .agenda {
-    order: 5;
-  }
-  .review,
   .storage {
     order: 6;
   }
 }
 
-.moduleGrid .firstAction {
-  color: var(--link);
-  font-weight: 600;
-}
 .steps [aria-label] {
   color: var(--link);
-}
-
-.lifeHome {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.lifeHeading h1 {
-  margin: 8px 0 12px;
-  font: 600 clamp(28px, 3.4cqw, 40px) / 1.4 var(--serif);
-  text-wrap: balance;
-}
-.lifeHeading > p:last-child,
-.lifeHero p,
-.lifeCard p {
-  color: var(--ink2);
-  line-height: 1.75;
-}
-.lifeHero {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 32px;
-  align-items: center;
-  padding: 32px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: var(--surface);
-}
-.lifeHero h2 {
-  font: 600 28px / 1.4 var(--serif);
-}
-.lifeHero p {
-  margin: 12px 0 20px;
-}
-.lifeHero small {
-  display: block;
-  margin-top: 12px;
-  color: var(--muted);
-}
-.lifeNote {
-  padding: 24px;
-  background: var(--sunken);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  min-width: 0;
-}
-.lifeNote p,
-.lifeDetail {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
-.lifeSteps,
-.lifeCards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-.lifeSteps {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.lifeSteps button {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 10px;
-  text-align: start;
-  color: var(--ink);
-  font: inherit;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  cursor: pointer;
-}
-.lifeSteps button > span {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--control);
-  color: var(--link);
-}
-.lifeSteps small {
-  display: block;
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.lifeCard {
-  display: flex;
-  flex-direction: column;
-  align-items: start;
-  min-width: 0;
-  gap: 12px;
-  padding: 24px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.lifeCard h2 {
-  font: 600 23px / 1.4 var(--serif);
-}
-.lifeCard p {
-  font-size: 14px;
-  margin: 0;
-}
-.lifeDetail {
-  font-size: 13px;
-  color: var(--muted);
-  -webkit-line-clamp: 2;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  width: 100%;
-}
-.lifeCard[data-kind="handover"] > svg {
-  color: var(--news-ink);
-}
-.lifeCard[data-kind="health"] > svg {
-  color: var(--health-ink);
-}
-.lifeAction {
-  margin-top: auto;
-  padding-top: 8px;
-  color: var(--link);
-  font-size: 14px;
-}
-.lifeCard:hover,
-.lifeSteps button:hover {
-  background: var(--control);
-}
-.lifeCard:focus-visible,
-.lifeSteps button:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 3px;
-}
-.lifeLinks,
-.lifeDivider {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-.lifeDivider {
-  border-top: 1px solid var(--line);
-  padding-top: 28px;
-  margin: 40px 0 24px;
-}
-@container (max-width: 639px) {
-  .lifeHero,
-  .lifeCards,
-  .lifeSteps {
-    grid-template-columns: 1fr;
-  }
-  .lifeHero {
-    padding: 20px;
-  }
-  .lifeHero h2 {
-    font-size: 25px;
-  }
-  .lifeNote {
-    padding: 18px;
-  }
-  .lifeSteps {
-    gap: 0;
-  }
 }
 
 .mirrorHome {
@@ -609,24 +306,9 @@
   box-decoration-break: clone;
   text-decoration: none;
 }
-.question h2,
 .aiSuggestions h2 {
   font-size: 15px;
   font-weight: 600;
-}
-.question {
-  margin-top: 32px;
-  border: 1px solid var(--line);
-  padding: 24px;
-  border-radius: 8px;
-}
-.question > p {
-  font-size: 21px;
-}
-.question form {
-  display: grid;
-  gap: 16px;
-  justify-items: start;
 }
 .mirrorHome textarea {
   width: 100%;
@@ -653,9 +335,6 @@
 @container (max-width: 639px) {
   .mirrorHome {
     margin-top: 12px;
-  }
-  .question {
-    padding: 18px;
   }
 }
 
@@ -696,30 +375,6 @@
 .factLink:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 3px;
-}
-.question form {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.question input {
-  flex: 1;
-  min-width: 0;
-  width: 0;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  padding: 12px 0;
-  border-radius: 0;
-}
-.question input:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 3px;
-}
-.question form > button {
-  flex-shrink: 0;
 }
 
 .atlasPreview {
