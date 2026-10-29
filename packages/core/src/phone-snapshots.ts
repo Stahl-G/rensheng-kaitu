@@ -58,7 +58,9 @@ export async function writePhoneSnapshots(
       if (name === "today" && computer) rememberComputerSnapshot(ws, now);
       writes++;
     } catch (cause) {
-      errors.push(new Error(`${file} 生成失败，请检查文件格式`, { cause }));
+      errors.push(
+        new Error(`${file} 生成失败：${cause instanceof Error ? cause.message : String(cause)}`, { cause }),
+      );
     }
   }
   writes += writePhoneReceipts(ws, [], now);
