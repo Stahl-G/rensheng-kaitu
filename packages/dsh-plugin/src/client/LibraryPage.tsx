@@ -5,7 +5,7 @@ import type {
   OnboardingMatterDraft,
   PlansData,
 } from "@kaitu/core";
-import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
@@ -183,14 +183,10 @@ export function LibraryPage({
           placeholder={t("搜索原文、目标、笔记正文", "Search originals, goals and note contents")}
         />
       </div>
-      {searching && (
+      {searching && !readError && (
         <section aria-label={t("搜索结果", "Search results")} className={styles.searchResults}>
           <h2>{t("搜索结果", "Search results")}</h2>
-          {readError ? (
-            <p role="alert">
-              {t("搜索未完成，请重试读取资料。", "Search incomplete. Retry loading the library.")}
-            </p>
-          ) : !data || !overview ? (
+          {!data || !overview ? (
             <output>{t("正在读取资料…", "Loading…")}</output>
           ) : (
             <>

@@ -139,7 +139,6 @@ export function OnboardingMatter(
   const [error, setError] = useState("");
   const [raw, setRaw] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
-  const [externalRequested, setExternalRequested] = useState(false);
   const [noAi, setNoAi] = useState(false);
   const [manual, setManual] = useState(!props.initial?.draft);
   const applied = useRef(JSON.stringify(props.initial?.draft ?? null));
@@ -210,7 +209,6 @@ export function OnboardingMatter(
         ? `Use kaitu_onboarding matter-read to read the original ${saved.source}. Summarize the current goal and what is known. If there is a clear thing to push, give one next step; if the person doesn't know what to do, give 2–3 possible paths (why it fits, what's unclear, one low-cost experiment), without preselecting a path or next step. Call matter-draft to save a draft for me to review. Don't create tasks or adopt other suggestions. I'll review and adopt in Kaitu.`
         : `请用 kaitu_onboarding 的 matter-read 读取原文 ${saved.source}，整理当前目标和已知现状；已有明确的事时给一个下一步，不知道做什么时给 2–3 条可能路径（为什么适合、还有哪些不清楚、一个低成本小实验），不要预选路径或下一步。调用 matter-draft 保存供我核对的草稿。不要创建待办或采纳其他建议。我会回到开图核对并采纳。`,
     );
-    setExternalRequested(true);
   };
   const organize = async () => {
     const saved = await save();

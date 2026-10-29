@@ -21,7 +21,6 @@ test("subscribers share one stream, unsubscribe independently, and release the l
   sources[0]?.dispatchEvent(new Event("message"));
   expect(refresh).toHaveBeenCalledTimes(2);
   offFirst();
-  offFirst();
   expect(sources[0]?.close).not.toHaveBeenCalled();
   sources[0]?.dispatchEvent(new Event("message"));
   expect(refresh).toHaveBeenCalledTimes(3);

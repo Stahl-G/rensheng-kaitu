@@ -723,12 +723,11 @@ function Savepoint({
         {data.error && <p role="alert">{data.error}</p>}
       </section>
       <aside className={todayCss.savepointSide}>
-        {
-          <section className={todayCss.savepointCard}>
-            <h3>{t("最近的痕迹", "Recent traces")}</h3>
-            {!data.data?.traces.length && <p>{t("还没有近期痕迹", "No recent traces")}</p>}
+        <section className={todayCss.savepointCard}>
+          <h3>{t("最近的痕迹", "Recent traces")}</h3>
+          {data.data?.traces.length ? (
             <ol className={todayCss.traceList}>
-              {data.data?.traces.slice(0, 3).map((trace) => (
+              {data.data.traces.slice(0, 3).map((trace) => (
                 <li key={trace.key}>
                   <span title={trace.label}>
                     {trace.label}
@@ -742,8 +741,10 @@ function Savepoint({
                 </li>
               ))}
             </ol>
-          </section>
-        }
+          ) : (
+            <p>{t("还没有近期痕迹", "No recent traces")}</p>
+          )}
+        </section>
         {!!data.data?.pending.length && (
           <section className={todayCss.savepointCard}>
             <h3>{t("待确认", "Pending")}</h3>

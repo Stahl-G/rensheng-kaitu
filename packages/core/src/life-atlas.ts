@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { AtlasResource, DomainRule, DomainScore, MapSettings, MappedDomain } from "@kaitu/cartographer";
 import { mapDomains, scoreDomain, totalCoverage } from "@kaitu/cartographer/domains";
-import { PARAMETER_PORTS, STYLE_PORTS, settings } from "@kaitu/cartographer/settings";
+import { settings } from "@kaitu/cartographer/settings";
 import { KaituError } from "./errors.js";
 import type { AtlasSource } from "./life-atlas-source.js";
 import {
@@ -20,8 +20,6 @@ import { localStateRoot } from "./local-state.js";
 import type { Workspace } from "./workspace.js";
 export type { MapSettings } from "@kaitu/cartographer";
 export type AtlasDomain = MappedDomain & { slot: number; score: DomainScore };
-export const atlasParameters = PARAMETER_PORTS,
-  atlasStyles: MapSettings["style"][] = STYLE_PORTS;
 export interface AtlasCandidate {
   id: string;
   createdAt: string;

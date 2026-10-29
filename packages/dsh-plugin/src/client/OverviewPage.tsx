@@ -1,9 +1,9 @@
-import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
+import type { OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
-import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
-import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
+import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
+import { CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
@@ -25,7 +25,7 @@ import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
-import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
+import { OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { Plugins } from "./Plugins.js";
@@ -43,7 +43,7 @@ import {
   exploreModules,
   migrateLifeMapFirst,
 } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
+import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
 
@@ -343,8 +343,6 @@ function Overview({
       active = false;
     };
   }, [workspaceRoot, props.loadPreferences]);
-  const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
-  const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   // Navigation owns unsaved input; no files, query results or whole pages are retained.
@@ -540,7 +538,6 @@ function Overview({
     setHomeSaveState("saving");
     try {
       const content = text.trim();
-      if (!content) return;
       if (homeOperation.current?.text !== content)
         homeOperation.current = { text: content, id: crypto.randomUUID() };
       const operation = homeOperation.current;
@@ -610,12 +607,11 @@ function Overview({
             setGuide((current) => (current === undefined ? null : current));
           },
         ),
-        update(props.loadCalendarPush, setPush),
       ]);
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding, props.loadCalendarPush]);
+  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
   useEffect(() => {
     void refresh();
     return () => {
@@ -799,21 +795,6 @@ function Overview({
     setView("overview");
     if (source) openSource(source);
   };
-  const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
-    if (item.id === "storage") startGuide(STORAGE_STEP);
-    else if (item.id === "matter") startGuide(1);
-    else if (item.id === "memory") startGuide(5);
-    else if (item.id === "starts") startGuide(2);
-    else if (item.id === "sources") startGuide(item.action.target === "starts" ? 2 : 3);
-    else if (item.id === "ai") startGuide(4);
-    else if (item.id === "plan")
-      prompt(
-        t(
-          "请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。",
-          "Based on where I am, my schedule and my next steps, plan my day. Propose a plan for me to confirm first.",
-        ),
-      );
-  };
   /** 「在原来的 AI 里继续」贴回的回答：先存原文，再读成待核对草稿，打开核对页。 */
   const handoverAnswer = async (answer: string) => {
     const matter = await props.saveOnboardingMatter(answer);
@@ -929,7 +910,6 @@ function Overview({
       )}
     </section>
   );
-  const focus = data?.next[0];
   const startMatter = (text: string) => {
     setGuideText(text);
     startGuide(1);

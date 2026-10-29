@@ -25,7 +25,6 @@ import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories, memoryInput, memoryType, normalizedMemory } from "./memory.js";
-import { listRecordTypes } from "./modules.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
 import { type ExperienceInput, addExperiences } from "./places.js";

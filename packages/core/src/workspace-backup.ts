@@ -14,7 +14,6 @@ import {
   githubCliLoginState,
   githubCliRequest,
   githubCliStatus,
-  memoryRepositoryDescription,
 } from "./github-cli.js";
 import { parseGithubRepo, setGithubToken } from "./github.js";
 import { invalidateHistoryFile } from "./history.js";

@@ -4,7 +4,7 @@ import { expect, test, vi } from "vitest";
 import { LibraryPage } from "../src/client/LibraryPage.js";
 import type { LibraryData, OverviewData } from "../src/types.js";
 
-test("资料读取失败时搜索显示可重试错误，不把旧数据当成零条结果", async () => {
+test("资料读取失败时搜索显示可重试的错误，不显示零条结果", async () => {
   const retry = vi.fn();
   let app!: ReturnType<typeof create>;
   try {
@@ -26,7 +26,7 @@ test("资料读取失败时搜索显示可重试错误，不把旧数据当成�
       );
     });
     const text = JSON.stringify(app.toJSON());
-    expect(text).toContain("搜索未完成");
+    expect(text).toContain("读取资料失败");
     expect(text).not.toContain("没有匹配");
     expect(text).not.toContain("原文 0");
     await act(async () =>

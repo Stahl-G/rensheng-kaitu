@@ -1,16 +1,7 @@
 import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
 import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
 import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
-import {
-  Fragment,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";

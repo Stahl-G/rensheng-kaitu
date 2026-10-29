@@ -65,11 +65,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       try {
         return { ...parseFrontmatter(text), error: undefined };
       } catch {
-        return {
-          data: {} as Record<string, unknown>,
-          body: frontmatterBody(text),
-          error: "INVALID_FRONTMATTER" as const,
-        };
+        return { body: frontmatterBody(text), error: "INVALID_FRONTMATTER" as const };
       }
     });
     if (!parsed) return [];
