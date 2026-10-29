@@ -7,6 +7,7 @@ import { expect, it } from "vitest";
 import {
   nextPresentation,
   todayDate,
+  todayNumber,
   todayProjectDate,
   todayProjectFacts,
   todaySourceGroups,
@@ -188,4 +189,13 @@ it("首页从现有原始日志优先取人工进展，只将同步正增量作�
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+it("rounds displayed averages without changing their source values", () => {
+  const protein = 1000 / 7;
+  const sleep = 52 / 7;
+  expect(todayNumber(protein, "zh-CN")).toBe("142.9");
+  expect(todayNumber(sleep, "en")).toBe("7.4");
+  expect(todayNumber(3, "zh-CN")).toBe("3");
+  expect(protein).toBe(1000 / 7);
 });

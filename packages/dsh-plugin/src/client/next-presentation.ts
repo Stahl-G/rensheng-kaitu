@@ -5,6 +5,10 @@ const paths = /(?<![\w:/.-])(?:[A-Za-z]:[\\/]|~?\/|[\w.-]+\/)[^\s（）(),，;�
 const technicalField = /\b(?:source|ref|record_?id)\s*[:=：]\s*[^\s,，;；()（）]+/gi;
 const recordID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/i;
 
+export function todayNumber(value: number, locale: Locale, maximumFractionDigits = 1) {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits }).format(value);
+}
+
 /** Display only: actions and Agent context keep the original item. */
 export function nextPresentation(
   item: Pick<OverviewNext, "title" | "source" | "by" | "ref">,

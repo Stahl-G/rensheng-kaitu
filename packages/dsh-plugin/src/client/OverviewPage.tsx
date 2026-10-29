@@ -521,9 +521,16 @@ function Overview({
   const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
+  const [homeSaveState, setHomeSaveState] = useState<"saving" | "saved" | null>(null);
+  useEffect(() => {
+    if (homeSaveState !== "saved") return;
+    const timer = setTimeout(() => setHomeSaveState(null), 3000);
+    return () => clearTimeout(timer);
+  }, [homeSaveState]);
   const saveHome = async (text: string, send: boolean) => {
-    if (!props.captureOnce || homeSaving.current) return;
+    if (!props.captureOnce || homeSaving.current || !text.trim()) return;
     homeSaving.current = true;
+    setHomeSaveState("saving");
     try {
       const content = text.trim();
       if (!content) return;
@@ -548,7 +555,9 @@ function Overview({
       setHomeAskText("");
       setHomeAskError("");
       homeOperation.current = null;
+      setHomeSaveState(send ? null : "saved");
     } catch (error) {
+      setHomeSaveState(null);
       setHomeAskError(error instanceof Error ? error.message : String(error));
     } finally {
       homeSaving.current = false;
@@ -1238,6 +1247,13 @@ function Overview({
               }}
               canAsk={!!props.renderAsk}
               askError={homeAskError}
+              saveStatus={
+                homeSaveState === "saving"
+                  ? t("正在记下…", "Saving…")
+                  : homeSaveState === "saved"
+                    ? t("已记下", "Saved")
+                    : ""
+              }
               askText={homeAskText}
               setAskText={setHomeAskText}
               speech={props.speech}

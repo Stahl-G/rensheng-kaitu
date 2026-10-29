@@ -14,6 +14,7 @@ import { useLocale, useT } from "./i18n.js";
 import {
   nextPresentation,
   todayDate,
+  todayNumber,
   todayProjectDate,
   todayProjectFacts,
   todaySourceGroups,
@@ -34,6 +35,7 @@ export function LifeHome({
   ask,
   canAsk,
   askError,
+  saveStatus,
   askText,
   setAskText,
   speech,
@@ -63,6 +65,7 @@ export function LifeHome({
   ask: (text: string) => void;
   canAsk: boolean;
   askError: string;
+  saveStatus?: string;
   askText: string;
   setAskText: (text: string) => void;
   speech?: (
@@ -249,7 +252,7 @@ export function LifeHome({
     setFactSource(metric);
   };
   const valueText = (metric: OverviewMetric) =>
-    `${metric.estimated ? t("约", "about ") : ""}${Number(metric.value?.toFixed(metric.key === "protein" && metric.estimated ? 0 : 1))}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
+    `${metric.estimated ? t("约", "about ") : ""}${metric.value === null ? "—" : todayNumber(metric.value, locale, metric.key === "protein" && metric.estimated ? 0 : 1)}${metric.key === "workouts" ? t(" 次", " workouts") : metric.key === "sleep" ? t(" 小时", " hours") : metric.key === "protein" ? t(" 克", " g") : ` ${metric.unit}`}`;
   return (
     <section
       className={`${todayCss.mirrorHome} ${home ? todayCss.savepointHome : ""}`}
@@ -443,6 +446,9 @@ export function LifeHome({
                 </div>
               )}
               {voiceMessage && <output>{voiceMessage}</output>}
+              <output aria-live="polite" className={todayCss.saveStatus}>
+                {saveStatus}
+              </output>
               {save && (
                 <button
                   type="button"
@@ -644,6 +650,7 @@ function Savepoint({
   dismiss: (id: string) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
 
   const threads = data.data?.threads ?? [];
   const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
@@ -700,17 +707,21 @@ function Savepoint({
           <section className={todayCss.savepointCard}>
             <h3>{t("最近的痕迹", "Recent traces")}</h3>
             {!data.data?.traces.length && <p>{t("还没有近期痕迹", "No recent traces")}</p>}
-            {data.data?.traces.slice(0, 3).map((trace) => (
-              <p key={trace.key}>
-                <span>
-                  {trace.label}
-                  {trace.value !== null
-                    ? ` ${trace.estimated ? "≈" : ""}${trace.value} ${trace.unit ?? ""}`
-                    : ""}
-                </span>
-                <time>{trace.date}</time>
-              </p>
-            ))}
+            <ol className={todayCss.traceList}>
+              {data.data?.traces.slice(0, 3).map((trace) => (
+                <li key={trace.key}>
+                  <span title={trace.label}>
+                    {trace.label}
+                    {trace.value !== null
+                      ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
+                      : ""}
+                  </span>
+                  <time dateTime={trace.date} title={trace.date}>
+                    {todayProjectDate(trace.date, data.data?.today ?? trace.date, locale)}
+                  </time>
+                </li>
+              ))}
+            </ol>
           </section>
         }
         {!!data.data?.pending.length && (

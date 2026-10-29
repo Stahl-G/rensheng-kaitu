@@ -845,7 +845,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  height: clamp(360px, 46vh, 430px);
+  height: clamp(410px, 55vh, 520px);
   padding: 16px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -985,7 +985,7 @@
   gap: 12px;
   min-width: 0;
 }
-.savepointSide .savepointCard > p {
+.traceList > li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -994,7 +994,7 @@
   padding-top: 12px;
   margin: 12px 0 0;
 }
-.savepointSide p > span {
+.traceList > li > span {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1035,18 +1035,23 @@
 .projectChoice h3 {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   overflow: hidden;
 }
 
 .savepointHome .askHome {
   align-content: stretch;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.savepointHome .askHome label {
+  flex: none;
 }
 .composer {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--bg);
@@ -1131,7 +1136,7 @@
   .projectChoice h3 {
     font-size: 18px;
   }
-  .savepointSide .savepointCard > p {
+  .traceList > li {
     padding-top: 8px;
     margin-top: 8px;
   }
@@ -1144,5 +1149,36 @@
   }
   .savepointHome .atlasPreview {
     height: 360px;
+  }
+}
+
+.traceList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.traceList > li {
+  align-items: baseline;
+}
+.traceList time {
+  white-space: nowrap;
+}
+.saveStatus {
+  color: var(--muted);
+  font-size: 13px;
+}
+.saveStatus:empty {
+  display: none;
+}
+.savepointHome .askHome .saveStatus {
+  flex-basis: auto;
+}
+.projectChoice p {
+  -webkit-line-clamp: 2;
+}
+@media (max-width: 760px) {
+  .traceList > li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
   }
 }
