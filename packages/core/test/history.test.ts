@@ -18,7 +18,7 @@ import {
   snapshot,
   snapshotNow,
 } from "../src/index.js";
-import { clonedWorkspace, freshWorkspace, tmp, workout } from "./helpers.js";
+import { clonedWorkspace, tmp, workout } from "./helpers.js";
 
 it("另一台电脑打开同步资料时，没有本机版本库也能读取并建立首个版本", async () => {
   const original = await clonedWorkspace();
@@ -41,7 +41,7 @@ it("另一台电脑打开同步资料时，没有本机版本库也能读取并�
 });
 
 it("后台版本保留同长度改写、追加记录、删除与收件箱归档，恢复可读回", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = "me/synthetic.md";
   const note = "inbox/notes/2026-10-24/synthetic.note.md";
   ws.writeText(file, "before\n");
@@ -76,7 +76,7 @@ it("后台版本保留同长度改写、追加记录、删除与收件箱归档�
 });
 
 it("后台保存的未知事件和 ignore 变化仍盘点未报告的文件，敏感索引项仍移出", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const ignored = "me/synthetic-ignore.txt";
   ws.writeText(".gitignore", `${ws.readText(".gitignore")}\n${ignored}\n`);
   ws.writeText(ignored, "合成内容\n");
@@ -113,7 +113,7 @@ it("后台保存的未知事件和 ignore 变化仍盘点未报告的文件，�
 });
 
 it("暂不提交的外部原文在下一次显式后台保存时一并进入版本", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const external = "inbox/notes/2026-10-24/external.note.md";
   const own = "inbox/notes/2026-10-24/own.note.md";
   ws.writeText(external, "合成外部原文\n");

@@ -17,10 +17,10 @@ import {
   validateWorkspace,
   workspaceFileStampsAsync,
 } from "../src/index.js";
-import { freshWorkspace, tmp } from "./helpers.js";
+import { clonedWorkspace, tmp } from "./helpers.js";
 
 it("现状只计数原文，打开原文列表仍读取完整内容", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     for (let i = 0; i < 20; i++) ws.writeText(`inbox/notes/2026-10-20/${i}.md`, `合成原文 ${i}\n`);
     ws.writeText("me/profile.md", "合成档案\n");
@@ -61,7 +61,7 @@ it("现状只计数原文，打开原文列表仍读取完整内容", async () =
 
 describe("工作台写入", () => {
   it("确认建议和完成 next 只修改目标字段，保留正文并各生成一个合法版本", async () => {
-    const ws = await freshWorkspace();
+    const ws = await clonedWorkspace();
     const body = "# 原文\n\n训练后再决定强度。\n";
     const plan = {
       date: "2026-10-15",
@@ -102,7 +102,7 @@ describe("工作台写入", () => {
   });
 
   it("Agent 手写的 STATUS.md 缺 id 也能读，今天页能完成那一步；无 frontmatter 的交接也算", async () => {
-    const ws = await freshWorkspace("Asia/Shanghai");
+    const ws = await clonedWorkspace("Asia/Shanghai");
     ws.writeText(
       "health/STATUS.md",
       "---\nnext:\n  - 晚上 40 分钟力量训练\n  - { title: 买蛋白粉, status: done }\n---\n",
@@ -127,7 +127,7 @@ describe("工作台写入", () => {
   });
 
   it("下一步和日程写了认不出的状态、优先级、类型、时间，校验报给 Agent，写回时不丢", async () => {
-    const ws = await freshWorkspace("Asia/Shanghai");
+    const ws = await clonedWorkspace("Asia/Shanghai");
     for (const [status, block] of [
       ["{ title: 跑步, status: 完成 }", '{ title: 会议, start: "10:00", end: "11:00", status: 取消 }'],
       ["{ title: 跑步, status: donee }", '{ title: 会议, start: "10:00", end: "11:00", status: maybe }'],

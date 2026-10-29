@@ -12,10 +12,10 @@ import {
   startLearning,
   validateWorkspace,
 } from "../src/index.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 it("资料进入既有主题，真实理解与疑问追加保存，重新打开可继续；完成须明确选择", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const snapshots: string[] = [];
     deferSnapshots(ws, (message) => snapshots.push(message));
@@ -75,7 +75,7 @@ it("资料进入既有主题，真实理解与疑问追加保存，重新打开�
 });
 
 it("非法输入和过期完成操作不写资料；不同标题的 slug 碰撞不会合并", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   deferSnapshots(ws, () => {});
   try {
     for (const input of [
@@ -108,7 +108,7 @@ it("非法输入和过期完成操作不写资料；不同标题的 slug 碰撞�
 });
 
 it("既有 STATUS 简写经过同一规范化可读取、添资料与保存，正文不丢失", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   deferSnapshots(ws, () => {});
   try {
     const file = "learning/legacy/STATUS.md";
@@ -142,7 +142,7 @@ it("既有 STATUS 简写经过同一规范化可读取、添资料与保存，�
 });
 
 it("同一次已完成保存跨重开重试不重复总结或完成；新操作允许相同学习内容", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   deferSnapshots(ws, () => {});
   try {
     const topic = await startLearning(ws, { title: "Retry learning" });
@@ -186,7 +186,7 @@ it("同一次已完成保存跨重开重试不重复总结或完成；新操作�
 });
 
 it("旧界面不能把相同 id 下已被改名的下一步误标完成", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   deferSnapshots(ws, () => {});
   try {
     const topic = await startLearning(ws, { title: "Concurrent edit" });
