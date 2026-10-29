@@ -265,6 +265,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let saveAt = Number.POSITIVE_INFINITY;
   let saveQueued = false;
+  let versionQueue: Promise<void> = Promise.resolve();
+  let snapshotsPaused = false;
   let closed = false;
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
@@ -312,7 +314,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   };
   let messages: string[] = [];
   function scheduleSave(delay: number) {
-    if (closed || saveQueued) return;
+    if (closed || saveQueued || snapshotsPaused) return;
     const due = performance.now() + delay;
     // 第一条未保存改动确定本轮最晚开始时间，连续编辑只能提前、不能延后。
     if (saveTimer && saveAt <= due) return;
@@ -322,13 +324,30 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       saveTimer = undefined;
       saveAt = Number.POSITIVE_INFINITY;
       saveQueued = true;
-      void exclusive(async () => {
-        saveQueued = false;
-        await saveExternal(true);
-      }).catch(reportError);
+      void saveExternal(true).catch(reportError);
     }, delay);
   }
-  async function saveExternal(changedOnly = false) {
+  function saveExternal(changedOnly = false) {
+    const result = versionQueue.then(() => {
+      saveQueued = false;
+      return saveExternalNow(changedOnly);
+    });
+    versionQueue = result.catch(() => {});
+    return result;
+  }
+  async function withoutSnapshotTimer<T>(operation: () => Promise<T>) {
+    snapshotsPaused = true;
+    clearTimeout(saveTimer);
+    saveTimer = undefined;
+    saveAt = Number.POSITIVE_INFINITY;
+    try {
+      return await operation();
+    } finally {
+      snapshotsPaused = false;
+      scheduleSave(messages.length ? versionDelay : snapshotDelay);
+    }
+  }
+  async function saveExternalNow(changedOnly = false) {
     const own = [...new Set(messages)];
     messages = [];
     let pending = true;
@@ -627,31 +646,35 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               : method.startsWith("ask") || method === "projectGoalSuggest"
                 ? await productRequest(ws, method, args, options.ask, calendarPush)
                 : relocate || method === "restoreVersion"
-                  ? await exclusive(async () => {
-                      workspaceGeneration++;
-                      await calendarQueue;
-                      await saveExternal();
-                      const opening = method === "workspaceBackup" && args[0] === "activate";
-                      const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
-                      await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
-                      await phones.stop();
-                      await home.pause();
-                      const oldRoot = ws.root;
-                      try {
-                        if (relocate) await options.onWorkspaceChanging?.();
-                        return await productRequest(ws, method, args, options.ask, calendarPush);
-                      } finally {
+                  ? await exclusive(() =>
+                      withoutSnapshotTimer(async () => {
+                        workspaceGeneration++;
+                        await calendarQueue;
+                        await saveExternal();
+                        const opening = method === "workspaceBackup" && args[0] === "activate";
+                        const target = opening
+                          ? (args[1] as { root?: unknown } | undefined)?.root
+                          : undefined;
+                        await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
+                        await phones.stop();
+                        await home.pause();
+                        const oldRoot = ws.root;
                         try {
-                          if (ws.root !== oldRoot) startWatching();
-                          if (relocate) await options.onWorkspaceChanged?.();
+                          if (relocate) await options.onWorkspaceChanging?.();
+                          return await productRequest(ws, method, args, options.ask, calendarPush);
                         } finally {
-                          home.resume();
-                          options.ask?.relocate(ws.root);
-                          phones.start();
-                          notify();
+                          try {
+                            if (ws.root !== oldRoot) startWatching();
+                            if (relocate) await options.onWorkspaceChanged?.();
+                          } finally {
+                            home.resume();
+                            options.ask?.relocate(ws.root);
+                            phones.start();
+                            notify();
+                          }
                         }
-                      }
-                    })
+                      }),
+                    )
                   : productMutations.has(method) && !backupRead
                     ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
                     : await productRequest(ws, method, args, options.ask, calendarPush);
@@ -798,46 +821,48 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/sync/disable":
           case "/api/drive/enable":
           case "/api/drive/disable": {
-            workspaceGeneration++;
-            await calendarQueue;
-            await saveExternal();
-            await options.ask?.prepareRelocation();
-            await phones.stop();
-            const oldRoot = ws.root;
-            try {
-              await options.onWorkspaceChanging?.();
-              if (!url.pathname.endsWith("enable"))
-                return await disableSync(ws, {
-                  to: typeof data.to === "string" && data.to ? data.to : undefined,
-                });
-              // 只有开启同步才要说明同步方式；关闭沿用原来的 {to}。
-              const mode = url.pathname === "/api/drive/enable" ? "drive" : field(data, "mode");
-              if (!["icloud", "drive", "nutstore"].includes(mode))
-                throw new KaituError("请选择 icloud、drive 或 nutstore", "BAD_ARGS");
-              return await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
-                dir:
-                  typeof data.dir === "string" && data.dir
-                    ? data.dir
-                    : typeof data.driveDir === "string" && data.driveDir
-                      ? data.driveDir
-                      : undefined,
-                name: typeof data.name === "string" ? data.name : undefined,
-                ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
-              });
-            } finally {
+            return withoutSnapshotTimer(async () => {
+              workspaceGeneration++;
+              await calendarQueue;
+              await saveExternal();
+              await options.ask?.prepareRelocation();
+              await phones.stop();
+              const oldRoot = ws.root;
               try {
-                startWatching();
-                if (ws.root !== oldRoot) {
-                  aiChild?.kill();
-                  aiChild = undefined;
-                  aiReady = undefined;
-                }
-                await options.onWorkspaceChanged?.();
+                await options.onWorkspaceChanging?.();
+                if (!url.pathname.endsWith("enable"))
+                  return await disableSync(ws, {
+                    to: typeof data.to === "string" && data.to ? data.to : undefined,
+                  });
+                // 只有开启同步才要说明同步方式；关闭沿用原来的 {to}。
+                const mode = url.pathname === "/api/drive/enable" ? "drive" : field(data, "mode");
+                if (!["icloud", "drive", "nutstore"].includes(mode))
+                  throw new KaituError("请选择 icloud、drive 或 nutstore", "BAD_ARGS");
+                return await enableSync(ws, mode === "icloud" ? "icloud" : "drive", {
+                  dir:
+                    typeof data.dir === "string" && data.dir
+                      ? data.dir
+                      : typeof data.driveDir === "string" && data.driveDir
+                        ? data.driveDir
+                        : undefined,
+                  name: typeof data.name === "string" ? data.name : undefined,
+                  ...(mode === "nutstore" ? { provider: "nutstore" as const } : {}),
+                });
               } finally {
-                options.ask?.relocate(ws.root);
-                phones.start();
+                try {
+                  startWatching();
+                  if (ws.root !== oldRoot) {
+                    aiChild?.kill();
+                    aiChild = undefined;
+                    aiReady = undefined;
+                  }
+                  await options.onWorkspaceChanged?.();
+                } finally {
+                  options.ask?.relocate(ws.root);
+                  phones.start();
+                }
               }
-            }
+            });
           }
           case "/api/projects/sync":
             return typeof data.slug === "string" ? syncProject(ws, data.slug) : syncProjects(ws);
@@ -858,40 +883,44 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           case "/api/memory/delete":
             return removeMemory(ws, field(data, "file"), { by: "user" });
           case "/api/restore": {
-            workspaceGeneration++;
-            await calendarQueue;
-            await saveExternal();
-            await options.ask?.prepareRelocation();
-            await phones.stop();
-            try {
-              return await restore(ws, field(data, "version"));
-            } finally {
-              options.ask?.relocate(ws.root);
-              phones.start();
-            }
+            return withoutSnapshotTimer(async () => {
+              workspaceGeneration++;
+              await calendarQueue;
+              await saveExternal();
+              await options.ask?.prepareRelocation();
+              await phones.stop();
+              try {
+                return await restore(ws, field(data, "version"));
+              } finally {
+                options.ask?.relocate(ws.root);
+                phones.start();
+              }
+            });
           }
           case "/api/import/confirm": {
-            await saveExternal();
-            const token = field(data, "token");
-            const upload = uploads.get(token);
-            if (!upload || upload.expires < Date.now())
-              throw new KaituError("预览已过期，请重新选择文件", "CONFLICT");
-            try {
-              if (createHash("sha256").update(ws.readBytes(upload.file)).digest("hex") !== upload.digest)
-                throw new KaituError("文件已变化，请重新预览", "CONFLICT");
-              const preview = await importUpload(ws, upload.source, upload.file, true, upload.name);
-              if (JSON.stringify(preview) !== JSON.stringify(upload.preview)) {
-                throw new KaituError("文件夹已变化，请重新预览后确认", "CONFLICT");
+            return withoutSnapshotTimer(async () => {
+              await saveExternal();
+              const token = field(data, "token");
+              const upload = uploads.get(token);
+              if (!upload || upload.expires < Date.now())
+                throw new KaituError("预览已过期，请重新选择文件", "CONFLICT");
+              try {
+                if (createHash("sha256").update(ws.readBytes(upload.file)).digest("hex") !== upload.digest)
+                  throw new KaituError("文件已变化，请重新预览", "CONFLICT");
+                const preview = await importUpload(ws, upload.source, upload.file, true, upload.name);
+                if (JSON.stringify(preview) !== JSON.stringify(upload.preview)) {
+                  throw new KaituError("文件夹已变化，请重新预览后确认", "CONFLICT");
+                }
+                const before = (await history(ws, { limit: 1 }))[0]?.oid;
+                return {
+                  result: await importUpload(ws, upload.source, upload.file, false, upload.name),
+                  before,
+                };
+              } finally {
+                discardUpload(ws, upload.file);
+                uploads.delete(token);
               }
-              const before = (await history(ws, { limit: 1 }))[0]?.oid;
-              return {
-                result: await importUpload(ws, upload.source, upload.file, false, upload.name),
-                before,
-              };
-            } finally {
-              discardUpload(ws, upload.file);
-              uploads.delete(token);
-            }
+            });
           }
           default:
             throw new KaituError("接口不存在", "NOT_FOUND");

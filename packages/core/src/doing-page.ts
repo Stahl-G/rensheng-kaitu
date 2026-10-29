@@ -30,31 +30,34 @@ function topics(ws: Workspace, dir: string) {
     .map((entry) => `${dir}/${entry.name}/STATUS.md`)
     .filter((file) => ws.exists(file))
     .sort()
-    .map((file) => {
-      const parsed = parseFrontmatter<ModuleStatus & { title?: string; due?: string }>(ws.readText(file));
-      const body = parsed.body;
-      const data = normalizeStatus(
-        parsed.data as unknown as Record<string, unknown>,
-      ) as unknown as typeof parsed.data;
-      if (!schemas().builtin("status.schema.json")(data))
-        throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");
-      const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
-      const text = body
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .split(/\r?\n/)
-        .filter((line) => line.trim() && !/^\s*#/.test(line))
-        .join(" ")
-        .replace(/^\s*[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
-        .trim();
-      const next = data.next?.find((item) => item.status === "todo" || item.status === "proposed");
-      return {
-        file,
-        title: data.title || heading || "暂无记录",
-        status: text.match(/^.*?(?:[。！？]|[.!?](?=\s|$)|$)/)?.[0]?.trim() || next?.title || null,
-        due: data.due || next?.due || null,
-        progress: data.progress ?? null,
-        next: next?.title ?? null,
-      };
+    .flatMap((file) => {
+      const topic = ws.scanParsed(file, "doing-topic", (source) => {
+        const parsed = parseFrontmatter<ModuleStatus & { title?: string; due?: string }>(source);
+        const body = parsed.body;
+        const data = normalizeStatus(
+          parsed.data as unknown as Record<string, unknown>,
+        ) as unknown as typeof parsed.data;
+        if (!schemas().builtin("status.schema.json")(data))
+          throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");
+        const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+        const text = body
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .split(/\r?\n/)
+          .filter((line) => line.trim() && !/^\s*#/.test(line))
+          .join(" ")
+          .replace(/^\s*[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
+          .trim();
+        const next = data.next?.find((item) => item.status === "todo" || item.status === "proposed");
+        return {
+          file,
+          title: data.title || heading || "暂无记录",
+          status: text.match(/^.*?(?:[。！？]|[.!?](?=\s|$)|$)/)?.[0]?.trim() || next?.title || null,
+          due: data.due || next?.due || null,
+          progress: data.progress ?? null,
+          next: next?.title ?? null,
+        };
+      });
+      return topic ? [topic] : [];
     });
 }
 
