@@ -38,6 +38,9 @@ export interface DirectionsPageProps {
   goals?: MeGoal[];
   /** Shared planning actions are supplied by Overview without duplicating their write flow. */
   planningContent?: ReactNode;
+  initialDirection?: string;
+  onBack?: () => void;
+  backLabel?: string;
   onPrompt: (text: string) => void;
 }
 const states = {
@@ -267,7 +270,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
   const stateLabel = (status: Direction["status"]) => (locale === "en" ? statesEn[status] : states[status]);
   const [clipboard, setClipboard] = useState(false);
   const [data, setData] = useState<ExplorationData | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(props.initialDirection ?? null);
   const [filter, setFilter] = useState("current");
   const [tab, setTab] = useState("overview");
   const [form, setForm] = useState<"direction" | "experiment" | "note" | null>(null);
@@ -449,6 +452,15 @@ export function DirectionsPage(props: DirectionsPageProps) {
         )}
       </section>
     );
+  if (selected && !direction)
+    return (
+      <section className={css.page} aria-label={t("探索方向", "Directions")}>
+        <p role="alert">{t("未找到这个方向", "Direction not found")}</p>
+        <button type="button" className={base.link} onClick={props.onBack ?? (() => setSelected(null))}>
+          {props.backLabel ?? label("← 全部方向")}
+        </button>
+      </section>
+    );
   return (
     <section className={css.page} aria-label={t("探索方向", "Directions")}>
       {error && (
@@ -502,11 +514,12 @@ export function DirectionsPage(props: DirectionsPageProps) {
               className={base.link}
               type="button"
               onClick={() => {
-                setSelected(null);
+                if (props.onBack) props.onBack();
+                else setSelected(null);
                 setReceipt(null);
               }}
             >
-              {label("← 全部方向")}
+              {props.backLabel ?? label("← 全部方向")}
             </button>
             <span className={base.muted}>{stateLabel(direction.status)}</span>
           </header>

@@ -20,12 +20,14 @@ type Mode = "next" | "complete" | "defer";
  */
 export function PlansCard({
   plans,
+  goalId,
   addGoalNext,
   changeNext,
   refresh,
   open,
 }: {
   plans: PlansData;
+  goalId?: string;
   addGoalNext: (goalId: string, title: string) => Promise<unknown>;
   changeNext: (id: string, rev: number, action: string, value: string) => Promise<unknown>;
   refresh: () => Promise<void>;
@@ -41,7 +43,8 @@ export function PlansCard({
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  if (!plans.goals.length) return null;
+  const goals = goalId ? plans.goals.filter((goal) => goal.id === goalId) : plans.goals;
+  if (!goals.length) return null;
   const start = (goal: PlansData["goals"][number], mode: Mode, initial = "") => {
     const same = editing?.goal === goal.id && editing.mode === mode;
     const next = goal.next ? { id: goal.next.id, rev: goal.next.rev } : undefined;
@@ -180,24 +183,21 @@ export function PlansCard({
           {t("你带来的规划", "Your plans")}
         </h2>
         <span className={css.small}>
-          {t(
-            `${plans.goals.length} 个目标`,
-            `${plans.goals.length} goal${plans.goals.length > 1 ? "s" : ""}`,
-          )}
+          {t(`${goals.length} 个目标`, `${goals.length} goal${goals.length > 1 ? "s" : ""}`)}
         </span>
       </div>
       <div className={`${css.card} ${css["list-card"]} ${css.plans}`}>
-        {plans.goals.slice(0, 5).map(row)}
-        {plans.goals.length > 5 && (
+        {goals.slice(0, 5).map(row)}
+        {goals.length > 5 && (
           <details>
             <summary className={css.link}>
-              {t(`其余 ${plans.goals.length - 5} 个目标`, `${plans.goals.length - 5} more goals`)}
+              {t(`其余 ${goals.length - 5} 个目标`, `${goals.length - 5} more goals`)}
             </summary>
-            {plans.goals.slice(5).map(row)}
+            {goals.slice(5).map(row)}
           </details>
         )}
       </div>
-      {(plans.projects > 0 || plans.directions > 0) && (
+      {!goalId && (plans.projects > 0 || plans.directions > 0) && (
         <p className={css.small}>
           {plans.projects > 0 && (
             <button type="button" className={css.link} onClick={() => open("projects")}>

@@ -3,6 +3,7 @@ import type { AtlasAction, AtlasGenerateInput, LifeAtlasState, MapSettings } fro
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import css from "./LifeAtlasPage.module.css";
 import { useLocale, useT } from "./i18n.js";
+import { type RecordTarget, atlasRecordTarget } from "./progress-map.js";
 
 export interface LifeAtlasPageProps {
   loadLifeAtlas: (id?: string, refresh?: boolean, knownResourceId?: string) => Promise<LifeAtlasState>;
@@ -10,6 +11,7 @@ export interface LifeAtlasPageProps {
   generateLifeAtlas: (input: AtlasGenerateInput) => Promise<LifeAtlasState>;
   changeLifeAtlas: (id: string, action: AtlasAction) => Promise<LifeAtlasState>;
   subscribe?: (refresh: () => void) => () => void;
+  openRecord?: (target: RecordTarget) => void;
 }
 const styleNames: Record<string, readonly [string, string]> = {
   fantasy: ["奇幻羊皮", "Fantasy"],
@@ -58,6 +60,7 @@ export function LifeAtlasPage({
   generateLifeAtlas,
   changeLifeAtlas,
   subscribe,
+  openRecord,
 }: LifeAtlasPageProps) {
   const t = useT();
   const locale = useLocale();
@@ -630,7 +633,16 @@ export function LifeAtlasPage({
                   <ul>
                     {detail.facts.map((fact) => (
                       <li key={fact.id}>
-                        <span>{fact.title}</span>
+                        {openRecord && atlasRecordTarget(fact) ? (
+                          <button
+                            type="button"
+                            onClick={() => openRecord(atlasRecordTarget(fact) as RecordTarget)}
+                          >
+                            {fact.title}
+                          </button>
+                        ) : (
+                          <span>{fact.title}</span>
+                        )}
                         <small>
                           {fact.updated?.slice(0, 10) ?? t("日期待补充", "Undated")} ·{" "}
                           {fact.status === "needs_review" || fact.status === "unknown"

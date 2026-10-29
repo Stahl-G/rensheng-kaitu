@@ -3,14 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { ExplorationData, OverviewProject } from "../types.js";
 import css from "./ProgressMap.module.css";
 import { useT } from "./i18n.js";
-import { type ProgressRow, progressRows } from "./progress-map.js";
+import { type ProgressRow, type RecordTarget, progressRows } from "./progress-map.js";
 
 export interface ProgressMapProps {
   plans: PlansData | undefined;
   projects: OverviewProject[];
   loadExploration: () => Promise<ExplorationData>;
   subscribe?: (refresh: () => void) => () => void;
-  open: (section: "directions" | "projects" | "plans") => void;
+  open: (target: RecordTarget) => void;
 }
 
 const MAX_ROWS = 6;
@@ -95,7 +95,7 @@ function Row({ row, open }: { row: ProgressRow; open: ProgressMapProps["open"] }
     <button
       type="button"
       className={`${css.row} ${css[row.kind]}`}
-      onClick={() => open(row.kind === "goal" ? "plans" : row.kind === "project" ? "projects" : "directions")}
+      onClick={() => open({ kind: row.kind, id: row.id })}
       title={status}
     >
       <span className={css.label}>

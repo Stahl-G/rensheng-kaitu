@@ -329,6 +329,8 @@ export function ProjectsPage(
     subscribe?: (refresh: () => void) => () => void;
     /** 从别处点进来时直接打开这个项目的详情。 */
     initialProject?: string;
+    onBack?: () => void;
+    backLabel?: string;
   },
 ) {
   const t = useT();
@@ -336,6 +338,7 @@ export function ProjectsPage(
   const [project, setProject] = useState<ProjectDetailData | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [opening, setOpening] = useState(!!props.initialProject);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [repo, setRepo] = useState("");
@@ -382,10 +385,15 @@ export function ProjectsPage(
     }
   };
   const open = async (slug: string) => {
-    const detail = await props.loadProject(slug);
-    setProject(detail);
-    setRepo(detail.github?.repo ?? "");
-    setBinding(false);
+    setOpening(true);
+    try {
+      const detail = await props.loadProject(slug);
+      setProject(detail);
+      setRepo(detail.github?.repo ?? "");
+      setBinding(false);
+    } finally {
+      setOpening(false);
+    }
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: 只在指定的项目变化时打开一次。
   useEffect(() => {
@@ -400,12 +408,19 @@ export function ProjectsPage(
   const github = (item: DoingProject) =>
     item.github ? <Repository github={item.github} today={today} timeZone={props.timeZone} /> : null;
   return (
-    <div className={css.page} aria-busy={busy}>
+    <div className={css.page} aria-busy={busy || opening}>
       {error && <p role="alert">{error}</p>}
-      {project ? (
+      {opening ? (
+        <output>{t("正在读取项目…", "Loading project…")}</output>
+      ) : project ? (
         <>
-          <button type="button" className={css.link} disabled={busy} onClick={() => setProject(null)}>
-            {t("← 全部项目", "← All projects")}
+          <button
+            type="button"
+            className={css.link}
+            disabled={busy}
+            onClick={props.onBack ?? (() => setProject(null))}
+          >
+            {props.backLabel ?? t("← 全部项目", "← All projects")}
           </button>
           <header className={css.header}>
             <h2>{project.view?.title ?? project.title}</h2>
