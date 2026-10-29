@@ -1167,9 +1167,6 @@
   color: var(--muted);
   font-size: 13px;
 }
-.saveStatus:empty {
-  display: none;
-}
 .savepointHome .askHome .saveStatus {
   flex-basis: auto;
 }

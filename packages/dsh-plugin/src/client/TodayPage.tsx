@@ -446,7 +446,11 @@ export function LifeHome({
                 </div>
               )}
               {voiceMessage && <output>{voiceMessage}</output>}
-              <output aria-live="polite" className={todayCss.saveStatus}>
+              <output
+                aria-live="polite"
+                aria-atomic="true"
+                className={saveStatus ? todayCss.saveStatus : css.sr}
+              >
                 {saveStatus}
               </output>
               {save && (

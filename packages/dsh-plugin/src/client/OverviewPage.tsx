@@ -521,15 +521,17 @@ function Overview({
   const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
+  const homeDraftVersion = useRef(0);
   const [homeSaveState, setHomeSaveState] = useState<"saving" | "saved" | null>(null);
   useEffect(() => {
-    if (homeSaveState !== "saved") return;
+    if (homeSaveState !== "saved" || view !== "overview") return;
     const timer = setTimeout(() => setHomeSaveState(null), 3000);
     return () => clearTimeout(timer);
-  }, [homeSaveState]);
+  }, [homeSaveState, view]);
   const saveHome = async (text: string, send: boolean) => {
     if (!props.captureOnce || homeSaving.current || !text.trim()) return;
     homeSaving.current = true;
+    const draftVersion = homeDraftVersion.current;
     setHomeSaveState("saving");
     try {
       const content = text.trim();
@@ -552,7 +554,7 @@ function Overview({
         setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
         setView("ask");
       }
-      setHomeAskText("");
+      if (homeDraftVersion.current === draftVersion) setHomeAskText("");
       setHomeAskError("");
       homeOperation.current = null;
       setHomeSaveState(send ? null : "saved");
@@ -1251,13 +1253,21 @@ function Overview({
                 homeSaveState === "saving"
                   ? t("正在记下…", "Saving…")
                   : homeSaveState === "saved"
-                    ? t("已记下", "Saved")
+                    ? homeAskText.trim()
+                      ? t("上一条已记下", "Previous entry saved")
+                      : t("已记下", "Saved")
                     : ""
               }
               askText={homeAskText}
-              setAskText={setHomeAskText}
+              setAskText={(text) => {
+                homeDraftVersion.current++;
+                setHomeAskText(text);
+              }}
               speech={props.speech}
-              insertSpeech={(text) => setHomeAskText((current) => (current ? `${current}\n${text}` : text))}
+              insertSpeech={(text) => {
+                homeDraftVersion.current++;
+                setHomeAskText((current) => (current ? `${current}\n${text}` : text));
+              }}
               loadAtlas={props.loadLifeAtlas}
               openAtlas={() => {
                 setExplore("life-map");

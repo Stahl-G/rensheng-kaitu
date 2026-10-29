@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { AskPage } from "../client/AskPage.js";
 import { OverviewPage, type OverviewPageProps } from "../client/OverviewPage.js";
+import { createEventSubscription } from "./event-source.js";
 
 async function call<T>(method: string, ...args: unknown[]): Promise<T> {
   const response = await fetch(`/api/product/${method}`, {
@@ -89,11 +90,7 @@ const props: OverviewPageProps = {
       onSettings={onSettings}
     />
   ),
-  subscribe: (refresh) => {
-    const events = new EventSource("/api/events");
-    events.onmessage = refresh;
-    return () => events.close();
-  },
+  subscribe: createEventSubscription("/api/events"),
   load: async () => {
     const data = await call<Awaited<ReturnType<OverviewPageProps["load"]>>>("overview");
     workspace = data.root;
