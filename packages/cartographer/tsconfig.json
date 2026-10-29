@@ -4,6 +4,7 @@
     "rootDir": ".",
     "outDir": "dist",
     "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
     "lib": [
       "ES2023",
       "DOM"
