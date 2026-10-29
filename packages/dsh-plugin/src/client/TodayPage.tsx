@@ -48,11 +48,15 @@ export function LifeHome({
   loadLibrary,
   loadProjects,
   openProject,
+  openGoal,
+  begin,
 }: {
   save?: (text: string) => void;
   home?: import("@kaitu/core").HomeState | null;
   loadProjects: () => Promise<DoingProject[]>;
   openProject: (slug: string) => void;
+  openGoal?: (id: string) => void;
+  begin?: () => void;
   data: OverviewData;
   firstVisit: boolean;
   capture: ReactNode;
@@ -350,6 +354,8 @@ export function LifeHome({
           select={setSelectedThread}
           data={home}
           openProject={openProject}
+          openGoal={openGoal}
+          begin={firstVisit ? begin : undefined}
           library={library}
           adopt={adopt}
           dismiss={dismiss}
@@ -641,6 +647,8 @@ function Savepoint({
   select,
   data,
   openProject,
+  openGoal,
+  begin,
   library,
   adopt,
   dismiss,
@@ -649,6 +657,8 @@ function Savepoint({
   select: (index: number) => void;
   data: import("@kaitu/core").HomeState;
   openProject: (slug: string) => void;
+  openGoal?: (id: string) => void;
+  begin?: () => void;
   library: () => void;
   adopt: (id: string) => void;
   dismiss: (id: string) => void;
@@ -690,7 +700,13 @@ function Savepoint({
                 type="button"
                 className={css.btn}
                 aria-label={t(`打开${item.title}`, `Open ${item.title}`)}
-                onClick={() => (item.kind === "project" ? openProject(item.id) : library())}
+                onClick={() =>
+                  item.kind === "project"
+                    ? openProject(item.id)
+                    : item.kind === "goal" && openGoal
+                      ? openGoal(item.id)
+                      : library()
+                }
               >
                 →
               </button>
@@ -699,8 +715,8 @@ function Savepoint({
         ) : (
           <div className={todayCss.continueCard}>
             <p>{data.loading ? t("正在读取…", "Loading…") : t("还没有项目", "No projects yet")}</p>
-            <button type="button" className={css.btn} onClick={library}>
-              {t("打开资料", "Open Library")}
+            <button type="button" className={css.btn} onClick={begin ?? library}>
+              {begin ? t("开始", "Get started") : t("打开资料", "Open Library")}
             </button>
           </div>
         )}

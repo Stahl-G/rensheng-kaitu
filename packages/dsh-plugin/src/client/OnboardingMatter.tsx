@@ -114,6 +114,7 @@ export function OnboardingMatter(
   props: OnboardingServices & {
     initial: Matter | null;
     initialText?: string;
+    initialGoal?: string;
     content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
@@ -126,7 +127,9 @@ export function OnboardingMatter(
   const [text, setText] = useState(props.initialText ?? "");
   const [matter, setMatter] = useState<Matter | null>(props.initial);
   const [draft, setDraft] = useState<OnboardingMatterDraft>(
-    props.initial?.draft ? editable(props.initial.draft) : { goal: "", current: "", next: "" },
+    props.initial?.draft
+      ? editable(props.initial.draft)
+      : { goal: props.initialGoal ?? "", current: "", next: "" },
   );
   const [paths, setPaths] = useState<OnboardingPath[]>(props.initial?.draft?.paths ?? []);
   const [path, setPath] = useState(-1);

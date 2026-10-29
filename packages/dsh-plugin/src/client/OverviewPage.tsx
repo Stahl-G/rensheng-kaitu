@@ -1238,6 +1238,11 @@ function Overview({
                 openRecord("projects");
                 setProjectFocus(slug);
               }}
+              openGoal={(id) => {
+                openRecord("projects");
+                setLibraryGoal(id);
+              }}
+              begin={() => startGuide(0)}
               loadLibrary={props.loadLibrary}
               weather={
                 props.loadWeather && props.setWeatherPlace ? (

@@ -45,6 +45,7 @@ export function OnboardingPage(props: Props) {
   const { status, step } = props;
   const { content, choices } = status;
   const [matterText, setMatterText] = useState(props.initialText ?? "");
+  const [confirmedGoal, setConfirmedGoal] = useState<string>();
   const [matterDestination, setMatterDestination] = useState<Destination | null>(null);
   const [entry, setEntry] = useState<"matter" | "memory">("matter");
   const memoryMode = step === 5 || (step === 1 && entry === "memory");
@@ -296,6 +297,7 @@ export function OnboardingPage(props: Props) {
           busy={busy}
           start={(text) => {
             setMatterText(text);
+            setConfirmedGoal(text);
             setMatterDestination("today");
             setEntry("matter");
             void run(next);
@@ -351,6 +353,7 @@ export function OnboardingPage(props: Props) {
             onBusy={setBusy}
             initial={matterDestination === null ? status.draft : null}
             initialText={matterText}
+            initialGoal={confirmedGoal}
             content={content.matter}
             onDone={async () => {
               await save({ seen: true });
