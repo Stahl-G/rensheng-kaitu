@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import fs, { mkdtempSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -6,6 +7,7 @@ import {
   addTask,
   createProject,
   history,
+  historyDirectory,
   initWorkspace,
   isTracked,
   listTasks,
@@ -13,6 +15,7 @@ import {
   readRecords,
   saveOnboardingMatter,
   setProject,
+  snapshotNow,
   workspaceBackupStatus,
 } from "@kaitu/core";
 import { afterEach, expect, it, vi } from "vitest";
@@ -21,6 +24,11 @@ import type { AskService } from "../src/ui/ask.js";
 import { startUi } from "../src/ui/server.js";
 
 vi.mock("../../core/src/calendar-fetch.js", () => ({ fetchCalendar: vi.fn() }));
+const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  return { ...core, snapshotNow: vi.fn(core.snapshotNow) };
+});
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
@@ -124,6 +132,27 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     return fetched.promise;
   });
   const { ws, task, before, post } = await setup();
+  const saved = gate<string>();
+  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
+    const version = await original.snapshotNow(...args);
+    if (version) {
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: version,
+        filepath: task.file,
+      });
+      const revisions = Buffer.from(blob)
+        .toString()
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      if (revisions.some((row) => row.id === task.record.id && row.status === "done")) saved.resolve(version);
+    }
+    return version;
+  });
   const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
   try {
     await started.promise;
@@ -131,7 +160,8 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     const done = await post("tasks/done", { id: task.record.id });
     expect(done.status).toBe(200);
     expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
-    await expect.poll(async () => (await history(ws))[0]?.oid).not.toBe(before);
+    // Wait for a real commit containing the completed task while the network gate stays closed.
+    expect(await saved.promise).not.toBe(before);
     expect((await post("restore", { version: before })).status).toBe(200);
   } finally {
     fetched.resolve(
