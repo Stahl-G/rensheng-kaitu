@@ -169,8 +169,16 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
         .at(-1) ?? null,
   });
   const notes = [
-    ...doing.learning.map((row) => ({ ...row, status: row.next, kind: "笔记" as const })),
-    ...doing.decisions.map((row) => ({ ...row, kind: "决定" as const })),
+    ...doing.learning.map((row) => ({
+      ...row,
+      status: row.error ? `文件格式有误，请检查：${row.file}` : row.next,
+      kind: "笔记" as const,
+    })),
+    ...doing.decisions.map((row) => ({
+      ...row,
+      status: row.error ? `文件格式有误，请检查：${row.file}` : row.status,
+      kind: "决定" as const,
+    })),
   ];
   return {
     ...(page ? { next: page.next } : {}),
