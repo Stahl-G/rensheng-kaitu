@@ -26,6 +26,7 @@ interface Props
   builtin: boolean;
   initialSource?: string;
   initialText?: string;
+  workspaceRoot?: string;
   setStep: (step: number) => void;
   onStatus: (status: OnboardingStatus) => void;
   refresh: () => Promise<void>;
@@ -291,6 +292,7 @@ export function OnboardingPage(props: Props) {
     return (
       <>
         <TodayStart
+          workspaceRoot={props.workspaceRoot}
           status={status}
           connect={() => move(4)}
           storage={() => move(STORAGE_STEP)}

@@ -771,6 +771,7 @@ export function TodayStart({
   memory,
   connect,
   storage,
+  workspaceRoot,
   status,
   busy = false,
 }: {
@@ -778,6 +779,7 @@ export function TodayStart({
   memory: () => void;
   connect: () => void;
   storage?: () => void;
+  workspaceRoot?: string;
   status: import("@kaitu/core").OnboardingStatus | null;
   busy?: boolean;
 }) {
@@ -788,31 +790,16 @@ export function TodayStart({
       ? !!(status?.draft || status?.next || status?.checklist.items.find((item) => item.id === id)?.done)
       : !!status?.checklist.items.find((item) => item.id === id)?.done;
   const steps = [
-    ["matter", t("写下一件事", "Write down one thing"), t("就在上面", "Start above"), () => start(goal)],
-    [
-      "memory",
-      t("把 AI 记得的你搬过来", "Bring over what AI remembers"),
-      t("也可以导入笔记和日历", "You can also import notes and calendars"),
-      memory,
-    ],
-    [
-      "ai",
-      t("接上 AI（可以先跳过）", "Connect AI (optional)"),
-      t("不接也能记录、看日程和足迹", "Notes, schedules and footprints work without AI"),
-      connect,
-    ],
+    ["matter", t("写下一件事", "Write down one thing"), () => start(goal)],
+    ["memory", t("把 AI 记得的你搬过来", "Bring over what AI remembers"), memory],
+    ["ai", t("接上 AI（可以先跳过）", "Connect AI (optional)"), connect],
   ] as const;
   return (
     <>
       <section className={todayCss.start}>
         <p className={css.eyebrow}>{t("欢迎来到开图", "Welcome to Kaitu")}</p>
         <h1>{t("从一件事开始。", "Start with one thing.")}</h1>
-        <p>
-          {t(
-            "现在最想做成的一件事是什么？写一句就行，以后随时能改。",
-            "What would you most like to do? One sentence is enough; you can change it later.",
-          )}
-        </p>
+        <label htmlFor="onboarding-goal">{t("最想做成的一件事", "One thing to do")}</label>
         <form
           className={todayCss.goalForm}
           onSubmit={(e) => {
@@ -821,6 +808,7 @@ export function TodayStart({
           }}
         >
           <input
+            id="onboarding-goal"
             className={css.input}
             aria-label={t("最想做成的一件事", "One thing to do")}
             placeholder={t("比如：两年内出版第一本散文集", "For example: publish my first essay collection")}
@@ -858,14 +846,13 @@ export function TodayStart({
       {!steps.every(([id]) => stepDone(id)) && (
         <section className={todayCss.steps}>
           <h2>{t("三步用起来", "Three steps to get started")}</h2>
-          {steps.map(([id, title, hint, action], i) => (
+          {steps.map(([id, title, action], i) => (
             <div className={css.row} key={id}>
               <span aria-label={stepDone(id) ? t("已完成", "Done") : undefined}>
                 {stepDone(id) ? "✓" : i + 1}
               </span>
               <span className={todayCss.grow}>
                 <b>{title}</b>
-                <small>{hint}</small>
               </span>
               {i > 0 && (
                 <button type="button" className={css.btn} onClick={action}>
@@ -878,13 +865,13 @@ export function TodayStart({
       )}
       {storage && (
         <section className={todayCss.storage}>
-          <h2>{t("你的资料在哪", "Where your data lives")}</h2>
-          <p>
-            {t(
-              "都存在你选的文件夹里，是普通文件，随时可以带走。",
-              "Ordinary files in your chosen folder, ready to take with you.",
-            )}
-          </p>
+          <h2>
+            {workspaceRoot
+              ?.replace(/[\\/]+$/, "")
+              .split(/[\\/]/)
+              .at(-1) ?? t("资料", "Data")}
+          </h2>
+          <p className={todayCss.storagePath}>{workspaceRoot ?? t("正在读取…", "Loading…")}</p>
           <button type="button" className={css.link} onClick={storage}>
             {t("换个位置", "Change location")}
           </button>
