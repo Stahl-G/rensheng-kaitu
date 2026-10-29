@@ -27,11 +27,12 @@ describe("对话检索", () => {
         q,
       ).toEqual([file]);
     }
-    for (let i = 0; i < 120; i++) {
+    // 超过默认 20 条结果上限即可覆盖多文件索引；耗时测量使用仓库外的大样本。
+    for (let i = 0; i < 24; i++) {
       const other = `chats/2026/10/archive-${i}.jsonl`;
       writeFileSync(
         ws.resolve(other),
-        `${JSON.stringify({ ...rows[0], id: `archive-${i}`, title: "旧对话" })}\n${JSON.stringify({ ...rows[1], text: "归档正文".repeat(1000) })}\n`,
+        `${JSON.stringify({ ...rows[0], id: `archive-${i}`, title: "旧对话" })}\n${JSON.stringify({ ...rows[1], text: "归档正文".repeat(32) })}\n`,
       );
     }
     searchChats(ws, "力量训练");
