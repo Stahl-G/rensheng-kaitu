@@ -261,6 +261,7 @@ export function LifeHome({
     <section
       className={`${todayCss.mirrorHome} ${home ? todayCss.savepointHome : ""}`}
       aria-label={t("今天", "Today")}
+      data-first-visit={firstVisit || undefined}
     >
       <header className={todayCss.homeHeading}>
         <div className={todayCss.dateWeather}>
@@ -282,7 +283,7 @@ export function LifeHome({
         )}
       </header>
       {loadAtlas && (
-        <div className={todayCss.atlasPreview}>
+        <div className={todayCss.atlasPreview} data-empty={!atlasImage || undefined}>
           <button type="button" className={css.link} onClick={openAtlas}>
             {t("人生地图", "Life map")}
           </button>
