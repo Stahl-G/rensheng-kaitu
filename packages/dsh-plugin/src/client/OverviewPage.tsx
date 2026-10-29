@@ -963,7 +963,16 @@ function Overview({
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
   const plansCard = data?.plans && (
     <PlansCard
-      plans={data.plans}
+      plans={
+        libraryGoal
+          ? {
+              ...data.plans,
+              goals: data.plans.goals.filter((goal) => goal.id === libraryGoal),
+              projects: 0,
+              directions: 0,
+            }
+          : data.plans
+      }
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
       refresh={refresh}
@@ -1418,9 +1427,21 @@ function Overview({
               <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
               <>
+                {libraryGoal && (
+                  <button type="button" className={css.link} onClick={() => setLibraryGoal(undefined)}>
+                    {t("← 全部规划", "← All plans")}
+                  </button>
+                )}
+                {libraryGoal && data && !data.plans.goals.some((goal) => goal.id === libraryGoal) && (
+                  <output>{t("未找到这个目标", "Goal not found")}</output>
+                )}
                 {plansCard}
-                {renderTasks(true)}
-                <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
+                {!libraryGoal && (
+                  <>
+                    {renderTasks(true)}
+                    <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
+                  </>
+                )}
               </>
             ) : record === "health" ? (
               <HealthLibrary
