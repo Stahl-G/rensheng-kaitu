@@ -1632,7 +1632,7 @@
 }
 .referenceApp .content {
   max-width: 1440px;
-  padding: 24px 28px 56px;
+  padding-inline: 28px;
 }
 @media (max-width: 760px) {
   .referenceApp .top {
@@ -1654,7 +1654,7 @@
     display: none;
   }
   .referenceApp .content {
-    padding: 20px 12px 40px;
+    padding-inline: 12px;
   }
 }
 
