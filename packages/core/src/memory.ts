@@ -489,7 +489,6 @@ function captureFile(key: string): string {
   return `context_capture-${createHash("sha256").update(key).digest("hex")}.md`;
 }
 
-/** One observation per call: no review queue and no multi-file transaction to recover. */
 export const memoryCaptureSchema = z
   .object({
     idempotency_key: z.string().min(1).max(300),
@@ -588,7 +587,6 @@ export async function captureMemory(
       rmSync(ws.resolve(temporary), { force: true });
     }
   }
-  // Read the authoritative file, never use a chat reply as proof of persistence.
   const entry = { ...readMemory(ws, file).data, file };
   let status = entry.ended ? "undone" : previous ? "duplicate" : "saved";
   try {

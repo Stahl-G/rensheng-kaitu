@@ -42,7 +42,7 @@
     },
     "origin": {
       "enum": ["user-stated", "ai-estimate", "ai-suggestion"],
-      "description": "用户陈述、AI估算或AI建议；不代表已采纳承诺"
+      "description": "用户陈述、AI估算或AI建议"
     },
     "observed_at": {
       "type": "string",

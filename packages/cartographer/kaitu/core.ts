@@ -51,4 +51,3 @@ export function getTerrain(dir:string, seed:string, variant=0, progress?:Progres
  }
  const terrain={world,anchors};atomic(path,serialize(terrain));return {terrain,cacheHit:false,key}
 }
-export { atomic }

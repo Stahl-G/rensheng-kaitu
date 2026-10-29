@@ -196,7 +196,7 @@ Calendar 的脚本接口不提供账户选择；新建日历所属账户随本�
 
 ## 历史：DSH 0.2.1-rc.2 适配与验证
 
-以下记录是 rc.2 / host-1 当时的实现与验证，不代表 rc.3 真机验收结果。该轮内核及 npm 引擎固定为 0.2.1-rc.2，Cordis 对齐宿主的 4.0.5，HOST_API 为 1。
+以下记录是 rc.2 / host-1 当时的实现与验证。该轮内核及 npm 引擎固定为 0.2.1-rc.2，Cordis 对齐宿主的 4.0.5，HOST_API 为 1。
 删除 rc.2 的手动 Agent 恢复、followup 与句柄销毁分支，恢复统一走 SDK `session/resume`，并转发 `session/wait`。
 恢复入口仍核对所属工作区，应用当前对话模式；完整 Agent 与资料模式共用这条接入。
 

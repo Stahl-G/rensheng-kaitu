@@ -15,13 +15,12 @@ export type { Fact, LifeData } from './workspace.js'
 /** Called only inside a desktop worker. Terrain cache contains no personal records. */
 export function generateAtlas(cache: string, seed: string, variant: number, input: MapSettings,
  progress?: (stage: string, fraction: number) => void) {
- const selected = input
- const result = getTerrain(cache,seed,variant,progress,{...THEME_CONFIG,...selected.terrain})
+ const result = getTerrain(cache,seed,variant,progress,{...THEME_CONFIG,...input.terrain})
  const regions = buildRegions(result.terrain)
- const svg = renderNative(result.terrain,selected.style,'',true,selected)
+ const svg = renderNative(result.terrain,input.style,'',true,input)
  const dimensions = svg.match(/width="([0-9.]+)" height="([0-9.]+)"/)!
- const width=Number(dimensions[1]),height=Number(dimensions[2]),theme=themeById(selected.style),margin=marginOf(theme,2)
- return {key:result.key,seed,variant,settings:selected,generator:GENERATOR_VERSION,upstream:UPSTREAM_SHA,regionVersion:REGION_VERSION,
+ const width=Number(dimensions[1]),height=Number(dimensions[2]),theme=themeById(input.style),margin=marginOf(theme,2)
+ return {key:result.key,seed,variant,settings:input,generator:GENERATOR_VERSION,upstream:UPSTREAM_SHA,regionVersion:REGION_VERSION,
    svg,regions,width,height,margin,compass:compassSpot(theme,2,width-margin*2,height-margin*2),terrainCacheHit:result.cacheHit}
 }
 export type AtlasResource=ReturnType<typeof generateAtlas>

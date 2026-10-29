@@ -112,12 +112,6 @@ export function ChatGptConnection({ onAuthorized }: { onAuthorized(): void }) {
           "Uses your ChatGPT plan. Background requests such as titles, compaction and tool review may also use your allowance.",
         )}
       </p>
-      <p>
-        {t(
-          "授权页面显示 Kaitu ChatGPT SIWC；不会提供 ChatGPT 聊天记录、记忆或连接器。",
-          "The authorization page identifies Kaitu ChatGPT SIWC; it does not grant access to ChatGPT history, memory or connectors.",
-        )}
-      </p>
       {!status && busy && (
         <p>
           <output>{t("正在检查 ChatGPT 连接…", "Checking ChatGPT connection…")}</output>
