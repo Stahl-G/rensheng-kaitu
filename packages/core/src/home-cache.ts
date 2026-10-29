@@ -77,26 +77,27 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
     timer = setTimeout(rebuild, 100);
   }
   timer = setTimeout(rebuild, 0);
+  async function stopWorker() {
+    clearTimeout(timer);
+    const active = worker;
+    worker = null;
+    if (active) retiring = Promise.all([retiring, active.terminate()]);
+    await retiring;
+  }
   return {
     read: () => state,
     invalidate,
     async pause() {
       paused = true;
-      clearTimeout(timer);
-      const active = worker;
-      worker = null;
-      if (active) retiring = Promise.all([retiring, active.terminate()]);
-      await retiring;
+      await stopWorker();
     },
     resume() {
       paused = false;
       invalidate();
     },
-    close() {
+    async close() {
       closed = true;
-      clearTimeout(timer);
-      void worker?.terminate();
-      worker = null;
+      await stopWorker();
     },
   };
 }
