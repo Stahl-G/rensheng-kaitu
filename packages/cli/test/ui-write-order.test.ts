@@ -6,21 +6,26 @@ import {
   addTask,
   createProject,
   history,
-  initWorkspace,
   isTracked,
   listTasks,
   readOnboardingMatter,
   readRecords,
   saveOnboardingMatter,
   setProject,
+  snapshotNow,
   workspaceBackupStatus,
 } from "@kaitu/core";
 import { afterEach, expect, it, vi } from "vitest";
 import { fetchCalendar } from "../../core/src/calendar-fetch.js";
+import { clonedWorkspace } from "../../core/test/helpers.js";
 import type { AskService } from "../src/ui/ask.js";
 import { startUi } from "../src/ui/server.js";
 
 vi.mock("../../core/src/calendar-fetch.js", () => ({ fetchCalendar: vi.fn() }));
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  return { ...core, snapshotNow: vi.fn(core.snapshotNow) };
+});
 const cleanup: (() => Promise<unknown>)[] = [];
 afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
@@ -31,7 +36,7 @@ afterEach(async () => {
 it("同时保存的原文都进入真实版本，搬往同步目录期间的写入排在搬迁后", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
-  const ws = await initWorkspace(join(root, "source"));
+  const ws = await clonedWorkspace("Asia/Shanghai", join(root, "source"));
   const entered = gate<void>();
   const resume = gate<void>();
   const ui = await startUi(ws, {
@@ -100,7 +105,7 @@ function gate<T>() {
 async function setup(ask?: AskService, prepare?: (ws: Workspace) => Promise<void>) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-order-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
-  const ws = await initWorkspace(root);
+  const ws = await clonedWorkspace("Asia/Shanghai", root);
   const task = await addTask(ws, { title: "合成任务" });
   const other = await addTask(ws, { title: "合成待取消" });
   await prepare?.(ws);
@@ -124,6 +129,17 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     return fetched.promise;
   });
   const { ws, task, before, post } = await setup();
+  const saved = gate<void>();
+  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
+    const version = await original.snapshotNow(...args);
+    if (
+      version &&
+      listTasks(ws, { status: "all" }).some((row) => row.id === task.record.id && row.status === "done")
+    )
+      saved.resolve();
+    return version;
+  });
   const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
   try {
     await started.promise;
@@ -131,7 +147,9 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     const done = await post("tasks/done", { id: task.record.id });
     expect(done.status).toBe(200);
     expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
-    await expect.poll(async () => (await history(ws))[0]?.oid).not.toBe(before);
+    // Wait for the real background commit; this ordering check has no 1-second performance limit.
+    await saved.promise;
+    expect((await history(ws))[0]?.oid).not.toBe(before);
     expect((await post("restore", { version: before })).status).toBe(200);
   } finally {
     fetched.resolve(

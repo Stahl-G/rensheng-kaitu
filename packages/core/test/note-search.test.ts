@@ -2,10 +2,10 @@ import { renameSync, rmSync, writeFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { deferSnapshots, readLearning, restore, saveLearningCheckin, startLearning } from "../src/index.js";
 import { disposeNoteIndex, searchLibraryNotes } from "../src/note-search.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 it("正常保存的学习正文可搜索并打开所属主题，后续保存和仅正文更新会刷新索引", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   deferSnapshots(ws, () => {});
   try {
     const topic = await startLearning(ws, { title: "合成植物学习" });
@@ -46,7 +46,7 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
 });
 
 it("学习正文外部修改、删除和版本恢复保持一致，索引与摘要去掉密钥和本机路径", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   try {
     const topic = await startLearning(ws, { title: "合成版本学习" });
     const file = `learning/${topic.topic}/STATUS.md`;
@@ -85,7 +85,7 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
 });
 
 it("正文索引支持中英文、转义、修改、重命名和删除，热搜索不读资料文件", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const file = "decisions/synthetic/STATUS.md";
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nOnly the body contains 海边散步 and 50%_value.");

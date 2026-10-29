@@ -9,11 +9,12 @@ import {
   workspaceBackupStatus,
 } from "../src/workspace-backup.js";
 import type { WorkspaceWrite } from "../src/workspace.js";
-import { freshWorkspace, tmp } from "./helpers.js";
+import { clonedWorkspace, tmp } from "./helpers.js";
 
 // Only the external gh executable is fake; creation, inspection and upload use product code.
 function fakeGithub() {
   const bin = tmp();
+  const watchers = new Set<fs.FSWatcher>();
   const control = join(bin, "control.json");
   const entered = join(bin, "entered");
   const release = join(bin, "release");
@@ -57,7 +58,22 @@ const stage = args[0] === "repo" ? args[1] : args.find(a => a.startsWith("repos/
       fs.rmSync(release, { force: true });
       fs.writeFileSync(control, JSON.stringify({ stage, fail }));
     },
-    started: () => vi.waitFor(() => expect(fs.existsSync(entered)).toBe(true)),
+    started: () =>
+      new Promise<void>((resolve, reject) => {
+        const ready = () => {
+          if (!fs.existsSync(entered)) return;
+          watcher.close();
+          resolve();
+        };
+        const watcher = fs.watch(bin, ready);
+        watchers.add(watcher);
+        watcher.on("close", () => watchers.delete(watcher));
+        watcher.on("error", reject);
+        ready();
+      }),
+    close: () => {
+      for (const watcher of watchers) watcher.close();
+    },
     release: () => fs.writeFileSync(release, "go"),
     calls: () =>
       fs
@@ -76,7 +92,7 @@ it.skipIf(process.platform === "win32")(
     try {
       for (const stage of ["create", "inspect"]) {
         for (const change of ["disconnect", "connect", "create", "root"]) {
-          const ws = await freshWorkspace();
+          const ws = await clonedWorkspace();
           fs.rmSync(join(ws.root, "README.md"), { force: true });
           gh.block(stage);
           const pending = workspaceBackupRequest(ws, "create", {
@@ -91,7 +107,7 @@ it.skipIf(process.platform === "win32")(
           await gh.started();
           if (change === "disconnect") disconnectWorkspaceBackup(ws);
           else if (change === "root") {
-            ws.root = (await freshWorkspace()).root;
+            ws.root = (await clonedWorkspace()).root;
             fs.rmSync(join(ws.root, "README.md"), { force: true });
             disconnectWorkspaceBackup(ws);
           } else if (change === "create") {
@@ -134,6 +150,7 @@ it.skipIf(process.platform === "win32")(
         }
       }
     } finally {
+      gh.close();
       vi.unstubAllEnvs();
     }
   },
@@ -144,7 +161,7 @@ it.skipIf(process.platform === "win32")(
   async () => {
     const gh = fakeGithub();
     try {
-      const ws = await freshWorkspace();
+      const ws = await clonedWorkspace();
       fs.rmSync(join(ws.root, "README.md"), { force: true });
       for (const stage of ["create", "inspect"]) {
         gh.block(stage, true);
@@ -206,6 +223,7 @@ it.skipIf(process.platform === "win32")(
           ),
       ).toBe(true);
     } finally {
+      gh.close();
       vi.unstubAllEnvs();
     }
   },

@@ -23,7 +23,7 @@ import {
 import { localStateRoot } from "../src/local-state.js";
 import { addRecord, deleteRecord } from "../src/records.js";
 import type { Workspace } from "../src/workspace.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace } from "./helpers.js";
 
 async function settled(ws: Workspace) {
   const end = Date.now() + 25_000;
@@ -39,7 +39,7 @@ async function settled(ws: Workspace) {
 }
 
 test("map histories preserve terrain and positions while projecting current records, including new domains", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   ws.writeText(
     "health/STATUS.md",
     "---\nupdated: 2026-10-20\nnext:\n  - id: walking\n    title: 合成测试：每天散步\n    status: todo\n---\n",
@@ -167,7 +167,7 @@ test("map histories preserve terrain and positions while projecting current reco
 }, 40_000);
 
 test("projection treats education as history, respects record deletions and leaves unknown areas empty", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const empty = atlasSource(ws);
   expect(empty.modules.every((m) => !m.available && !m.recommended)).toBe(true);
   ws.writeText("learning/llm/STATUS.md", "---\ntitle: 大语言模型基础\nupdated: 2026-10-20\n---\n");
@@ -212,7 +212,7 @@ test("projection treats education as history, respects record deletions and leav
 });
 
 test("project and learning content explores land without claiming recent activity", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   for (const [file, stage, body] of [
     ["projects/content/STATUS.md", "active", "# 合成标题\n已整理的接口资料与现状。\n"],
     ["learning/content/STATUS.md", "active", "# 合成标题\n已整理的学习资料。\n"],
@@ -242,7 +242,7 @@ test("project and learning content explores land without claiming recent activit
 });
 
 test("cached activity selection refreshes across event boundaries and backwards without file changes", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   for (const date of ["2026-01-01", "2026-10-26", "2026-11-09", "2026-12-01"])
     addRecord(
       ws,
@@ -296,7 +296,7 @@ test("cached activity selection refreshes across event boundaries and backwards 
 }, 40_000);
 
 test("activity selection and scoring share an injected clock", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const dates = [
     "2026-01-01",
     "2026-10-26",
@@ -331,7 +331,7 @@ test("activity selection and scoring share an injected clock", async () => {
 });
 
 test("real activity illuminates briefly while explored terrain remains clear", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   ws.writeText(
     "health/STATUS.md",
     "---\nupdated: 2026-10-26\nnext:\n  - id: plan\n    title: 合成计划\n    status: todo\n---\n",
@@ -411,7 +411,7 @@ test("real activity illuminates briefly while explored terrain remains clear", a
   expect(nextMonth.domains[0].score).toMatchObject({ clarity: 1, glow: 0 });
   const agent = { ...domain, facts: domain.facts.map((f) => ({ ...f, actualActivityAt: undefined })) };
   expect(scoreDomain(agent, new Date("2026-10-27T00:00:00Z"))).toMatchObject({ clarity: 0.18, glow: 0 });
-  const imported = await freshWorkspace();
+  const imported = await clonedWorkspace();
   addRecord(
     imported,
     "workout",
@@ -448,7 +448,7 @@ test("real activity illuminates briefly while explored terrain remains clear", a
 }, 40_000);
 
 test("full archives can permanently delete a map, reclaim actual bytes and generate again", async () => {
-  const ws = await freshWorkspace();
+  const ws = await clonedWorkspace();
   const folder = join(
     localStateRoot(),
     "cartography",
