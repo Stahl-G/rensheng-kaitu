@@ -607,7 +607,7 @@ export async function productRequest(
     case "jobs":
       return readJobs(ws);
     case "news":
-      return readNews(ws);
+      return readNews(ws, new Date(), { partial: true });
     case "suggestNewsKeywords":
       return suggestNewsKeywords(ws, ask);
     case "saveNewsKeywords":
