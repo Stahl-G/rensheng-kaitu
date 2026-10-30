@@ -1,6 +1,6 @@
 import { readdirSync } from "node:fs";
 import { type ReadWarning, readIssue } from "./errors.js";
-import { buildHealthDashboard } from "./health-dashboard.js";
+import { buildHealthDashboard, estimated, offset } from "./health-dashboard.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -9,12 +9,6 @@ import { localDate, parseTs } from "./time.js";
 import { type NextItem, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-function offset(date: string, days: number) {
-  return new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
-}
-function estimated(row: StoredRecord) {
-  return Number(row.uncertainty) > 0 || /估算|estimate|caloriemate|nut.?ai/i.test(String(row.source));
-}
 function part(row: StoredRecord): string | null {
   if (typeof row.body_part === "string") return row.body_part;
   if (row.modality === "cardio") return null;

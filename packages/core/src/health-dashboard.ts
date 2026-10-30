@@ -4,9 +4,9 @@ import { sleepStageMinutes, sleepStageTimeline, validSleepStages } from "./sleep
 import { localDate } from "./time.js";
 
 const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
-const estimated = (row: StoredRecord) =>
+export const estimated = (row: StoredRecord) =>
   Number(row.uncertainty) > 0 || /估算|estimate|caloriemate|nut.?ai/i.test(String(row.source));
-const offset = (date: string, days: number) =>
+export const offset = (date: string, days: number) =>
   new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 
 /** Pure projection of already folded records. The caller owns reading, invalidation and publication. */
@@ -72,23 +72,31 @@ export function buildHealthDashboard(
       range: values.length >= 2 ? { q1: quantile(0.25), q3: quantile(0.75) } : null,
     };
   });
-  let bmi: { value: number; ts: string; weightKg: number; heightCm: number; estimated: boolean } | null =
-    null;
+  let bmi: {
+    value: number;
+    ts: string;
+    weightKg: number;
+    heightCm: number;
+    heightDate: string;
+    estimated: boolean;
+  } | null = null;
   const heights = groups.get("height:cm") ?? [];
   for (const weight of [...(groups.get("weight:kg") ?? [])].reverse()) {
     if (day(weight.ts) < offset(today, -83)) break;
-    const height = heights.findLast(
-      (r) => Date.parse(r.ts) <= Date.parse(weight.ts) && day(r.ts) === day(weight.ts),
-    );
+    const height = heights.findLast((row) => {
+      const value = number(row.value);
+      return value !== null && value > 0 && Date.parse(row.ts) <= Date.parse(weight.ts);
+    });
     const weightKg = number(weight.value);
     const heightCm = number(height?.value);
-    if (weightKg !== null && weightKg > 0 && heightCm !== null && heightCm > 0) {
+    if (height && weightKg !== null && weightKg > 0 && heightCm !== null && heightCm > 0) {
       bmi = {
         value: weightKg / (heightCm / 100) ** 2,
         ts: weight.ts,
         weightKg,
         heightCm,
-        estimated: estimated(weight) || (height ? estimated(height) : false),
+        heightDate: day(height.ts),
+        estimated: estimated(weight) || estimated(height),
       };
       break;
     }
