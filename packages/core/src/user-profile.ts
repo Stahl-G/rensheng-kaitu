@@ -40,11 +40,15 @@ export function userNavigation(ws: Workspace) {
       if (original && !original.split("/").at(-1)?.includes(".")) {
         if (ws.isUnavailable(original)) available = false;
       } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        if (!agentCanRead(ws, child, reader)) continue;
         if (ws.isUnavailable(child)) {
           available = false;
           continue;
         }
-        for (const name of ["STATUS.md", "log.md", "notes.md"]) paths.add(`${child}/${name}`);
+        for (const name of readdirSync(ws.resolve(child))) {
+          const path = placeholderOriginal(`${child}/${name}`) ?? `${child}/${name}`;
+          if (["STATUS.md", "log.md", "notes.md"].includes(path.slice(child.length + 1))) paths.add(path);
+        }
       }
     }
   }
