@@ -1,3 +1,4 @@
+import type { ReadWarning } from "@kaitu/core";
 import type {
   BankMail,
   FinanceImportOptions,
@@ -157,12 +158,12 @@ export interface OverviewData {
   pending: number;
   inboxNotes: number;
   notes: (OverviewSource & { status: "received" | "needs_review" })[];
-  warnings: string[];
+  warnings: ReadWarning[];
 }
 
 export interface DoingProject {
   error?: string;
-  warnings?: string[];
+  warnings?: ReadWarning[];
   progress?: { label: string; current: number; target: number; unit?: string } | null;
   slug: string;
   title: string;

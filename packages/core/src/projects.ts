@@ -8,12 +8,12 @@ import { YAMLParseError } from "yaml";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { normalizeStatus } from "./doc-input.js";
+import { type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
 import { type GithubOptions, projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
-import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
 import {
@@ -202,12 +202,9 @@ export function projectMetrics(ws: Workspace, options: ReadOptions & { slug?: st
     const ref = findRecordType(ws, "project_metric");
     const file = recordFileFor(ref, localMonth(parseTs(row.ts), ws.timeZone()));
     const error = new KaituError(
-      pick(
-        normalizeLocale(readPreferences().locale),
-        `${file} 指标记录 ${row.id} 无法用于计算`,
-        `${file} Metric record ${row.id} cannot be used in calculations`,
-      ),
+      `${file} 指标记录 ${row.id} 无法用于计算`,
       "CORRUPT",
+      readIssue("project_metric", `${file} ${row.id}`, `${file} 指标记录 ${row.id} 无法用于计算`),
     );
     if (!options.onError) throw error;
     options.onError(error);
@@ -230,11 +227,11 @@ export function listProjects(
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   // 指标只读一次，再按项目分组。
   const allMetrics = new Map<string, StoredRecord[]>();
-  const warnings: string[] = [];
+  const warnings: ReadWarning[] = [];
   const metricType = ws.exists("projects/module.json") ? findRecordType(ws, "project_metric") : null;
   if (metricType)
     for (const r of projectMetrics(ws, {
-      onError: options.partial ? (error) => warnings.push(error.message) : undefined,
+      onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
     }))
       if (Date.parse(r.ts) <= now.getTime()) {
         const key = String(r.project);
@@ -272,7 +269,7 @@ export function listProjects(
         github: project.error
           ? null
           : projectGithub(ws, slug, now, {
-              onError: options.partial ? (error) => warnings.push(error.message) : undefined,
+              onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
             }),
         completion: project.data.progress
           ? {

@@ -1,6 +1,6 @@
+import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
-import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listRecordTypes } from "./modules.js";
 import type { Experience } from "./places.js";
 import {
@@ -121,12 +121,9 @@ export const committedExperiences = (ws: Workspace, opts: ReadOptions = {}) =>
     )
       return true;
     const error = new KaituError(
-      pick(
-        normalizeLocale(readPreferences().locale),
-        `足迹记录 ${row.id} 地点或日期无法显示`,
-        `Experience record ${row.id} has an undisplayable place or date`,
-      ),
+      `足迹记录 ${row.id} 地点或日期无法显示`,
       "CORRUPT",
+      readIssue("experience_place_date", row.id, `足迹记录 ${row.id} 地点或日期无法显示`),
     );
     if (!opts.onError) throw error;
     opts.onError(error);

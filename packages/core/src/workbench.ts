@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { YAMLParseError } from "yaml";
 import { publicRecords } from "./agent-tools.js";
 import { normalizeDocument } from "./doc-input.js";
+import { type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
@@ -133,7 +134,7 @@ export function readWorkbench(
 ) {
   const connection = remote === true ? "remote-mcp" : remote || undefined;
   const today = localDate(now, ws.timeZone());
-  const warnings: string[] = [];
+  const warnings: ReadWarning[] = [];
   if (historyNeedsRetry(ws))
     warnings.push(
       pick(
@@ -165,7 +166,7 @@ export function readWorkbench(
       read(
         type,
         () => {
-          const rows = readRecords(ws, type, { onError: (error) => warnings.push(error.message) });
+          const rows = readRecords(ws, type, { onError: (error) => warnings.push(readWarning(error)) });
           return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 
@@ -192,13 +193,7 @@ export function readWorkbench(
           onError: (slug) => warnings.push(`项目 ${slug} 暂时无法读取，请检查文件格式。`),
         }).filter((project) => {
           if (!project.error) return true;
-          warnings.push(
-            pick(
-              normalizeLocale(readPreferences().locale),
-              `${project.error} 文件格式不合法`,
-              `${project.error} Invalid document`,
-            ),
-          );
+          warnings.push(readIssue("invalid_document", project.error, `${project.error} 文件格式不合法`));
           return false;
         }),
       [],

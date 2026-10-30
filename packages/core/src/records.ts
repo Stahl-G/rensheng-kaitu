@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
-import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import {
   type RecordTypeRef,
   findRecordType,
@@ -317,12 +317,9 @@ function fileRevisions(
   }) ?? { rows: [], errors: [] };
   for (const location of parsed.errors) {
     const error = new KaituError(
-      pick(
-        normalizeLocale(readPreferences().locale),
-        `${location} 记录格式不合法`,
-        `${location} Invalid record`,
-      ),
+      `${location} 记录格式不合法`,
       "CORRUPT",
+      readIssue("invalid_record", location, `${location} 记录格式不合法`),
     );
     if (!onError) throw error;
     onError(error);

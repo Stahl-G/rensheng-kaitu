@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { type ReadWarning, readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { readExploration } from "./exploration.js";
 import { localStateRoot } from "./local-state.js";
@@ -14,7 +15,7 @@ import type { Workspace } from "./workspace.js";
  * 每段原文都有 id（g: 目标、p: 项目、n: 下一步、l: 日志、d: 方向），引用必须指明出自哪一段。
  */
 export interface DirectionMapInput {
-  warnings?: string[];
+  warnings?: ReadWarning[];
   today: string;
   locale: Locale;
   goals: { id: string; source: string; title: string; why?: string; due?: string }[];
@@ -72,7 +73,7 @@ export function directionMapInput(
   now = new Date(),
   options: { partial?: boolean } = {},
 ): DirectionMapInput {
-  const warnings: string[] = [];
+  const warnings: ReadWarning[] = [];
   const zone = ws.timeZone();
   const today = localDate(now, zone);
   const since = localDate(new Date(Date.parse(`${today}T12:00:00Z`) - 30 * DAY), "UTC");
@@ -83,7 +84,7 @@ export function directionMapInput(
       );
     } catch (error) {
       if (!options.partial || !(error instanceof SyntaxError)) throw error;
-      warnings.push(pick(locale, "me/goals.json 文件格式不合法", "me/goals.json Invalid document"));
+      warnings.push(readIssue("invalid_document", "me/goals.json", "me/goals.json 文件格式不合法"));
       return [];
     }
   })()

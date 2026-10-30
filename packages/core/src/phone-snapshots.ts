@@ -39,7 +39,10 @@ export async function writePhoneSnapshots(
     week: () => buildPhoneWeek(data, at),
     map: () => {
       const map = lifeMap(ws, now);
-      if (map.warnings?.length) throw new Error(map.warnings.join("; "));
+      if (map.warnings?.length)
+        throw new Error(
+          map.warnings.map((warning) => (typeof warning === "string" ? warning : warning.message)).join("; "),
+        );
       return buildPhoneMap(data, map, readExploration(ws), at);
     },
     library: () => buildPhoneLibrary(ws, data, at),

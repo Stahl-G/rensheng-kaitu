@@ -1,4 +1,5 @@
 import { readAvatar } from "./avatar.js";
+import { type ReadWarning, readWarning } from "./errors.js";
 import { committedExperiences } from "./experience-imports.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import {
@@ -28,7 +29,7 @@ export interface MeRules {
   no_tasks_after?: string;
 }
 export interface MeData {
-  warnings?: string[];
+  warnings?: ReadWarning[];
   name: string | null;
   bio: string | null;
   avatar: string | null;
@@ -59,7 +60,7 @@ export interface MeData {
 }
 
 export function readMe(ws: Workspace): MeData {
-  const warnings: string[] = [];
+  const warnings: ReadWarning[] = [];
   const memories = listMemories(ws, { includeArchived: true }).map(
     ({
       file,
@@ -107,7 +108,7 @@ export function readMe(ws: Workspace): MeData {
     archivedMemories: memories.filter((memory) => memory.ended),
     memoryReplacements: pendingMemoryReplacements(ws),
     avatar: readAvatar(ws),
-    career: committedExperiences(ws, { onError: (error) => warnings.push(error.message) })
+    career: committedExperiences(ws, { onError: (error) => warnings.push(readWarning(error)) })
       .filter(
         (item) =>
           (item.event_type === "studied" || item.event_type === "worked") &&

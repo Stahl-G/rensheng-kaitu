@@ -1,4 +1,5 @@
 import { statSync } from "node:fs";
+import { type ReadWarning, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
 import { listProjects, projectDirectory, projectMetrics, projectSnapshot, setProject } from "./projects.js";
@@ -48,11 +49,11 @@ export function readProjectsPage(
 ) {
   const { slug, now = new Date(), loaded, partial } = options;
   const tasks = new Map<string, ReturnType<typeof listTasks>>();
-  const warnings: string[] = [];
+  const warnings: ReadWarning[] = [];
   const openTasks = loaded
     ? ((loaded.records.task ?? []).filter((task) => task.status === "open") as Task[])
     : (readRecords(ws, "task", {
-        onError: partial ? (error) => warnings.push(error.message) : undefined,
+        onError: partial ? (error) => warnings.push(readWarning(error)) : undefined,
       }).filter((row) => row.status === "open") as Task[]);
   for (const task of openTasks) {
     if (!task.project) continue;
@@ -95,7 +96,7 @@ export function readProjectPage(ws: Workspace, slug: string, options: { partial?
   const warnings = [...summary.warnings];
   const metrics = projectMetrics(ws, {
     slug,
-    onError: options.partial ? (error) => warnings.push(error.message) : undefined,
+    onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
   });
   const architecture = `${projectDirectory(ws, slug)}/architecture.html`;
   return {

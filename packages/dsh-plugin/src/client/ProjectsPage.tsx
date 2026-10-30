@@ -419,7 +419,9 @@ export function ProjectsPage(
           <button type="button" onClick={props.onBack ?? (() => setProject(null))}>
             {t("← 全部项目", "← All projects")}
           </button>
-          <ReadWarnings warnings={[`${project.error} 文件格式不合法`]} />
+          <ReadWarnings
+            warnings={[{ code: "invalid_document", location: project.error, message: "Invalid document" }]}
+          />
           <OpenPath path={project.error} />
           <pre>{project.body}</pre>
         </>
@@ -716,7 +718,11 @@ export function ProjectsPage(
                     >
                       {item.title} →
                     </button>
-                    <ReadWarnings warnings={[`${item.error} 文件格式不合法`]} />
+                    <ReadWarnings
+                      warnings={[
+                        { code: "invalid_document", location: item.error, message: "Invalid document" },
+                      ]}
+                    />
                   </article>
                 ) : (
                   <article className={css.card} key={item.slug}>

@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { normalizeLocale, pick, readPreferences } from "./locale.js";
+import { type ReadWarning, readIssue } from "./errors.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -30,7 +30,7 @@ function part(row: StoredRecord): string | null {
   );
 }
 
-function cloudWorkouts(ws: Workspace, warnings: string[]) {
+function cloudWorkouts(ws: Workspace, warnings: ReadWarning[]) {
   const rows: Record<string, unknown>[] = [];
   function walk(dir: string) {
     if (!ws.exists(dir)) return;
@@ -48,11 +48,7 @@ function cloudWorkouts(ws: Workspace, warnings: string[]) {
             } catch (error) {
               if (!(error instanceof SyntaxError)) throw error;
               warnings.push(
-                pick(
-                  normalizeLocale(readPreferences().locale),
-                  `${file}:${i + 1} 记录格式不合法`,
-                  `${file}:${i + 1} Invalid record`,
-                ),
+                readIssue("invalid_record", `${file}:${i + 1}`, `${file}:${i + 1} 记录格式不合法`),
               );
               return [];
             }
@@ -97,13 +93,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const meals = records("meal").filter((row) => {
     if (Array.isArray(row.items) && row.items.every((item) => item && typeof item.name === "string"))
       return true;
-    data.warnings.push(
-      pick(
-        normalizeLocale(readPreferences().locale),
-        `饮食记录 ${row.id} 无法显示食物列表`,
-        `Meal record ${row.id} cannot display its food list`,
-      ),
-    );
+    data.warnings.push(readIssue("meal_items", row.id, `饮食记录 ${row.id} 无法显示食物列表`));
     return false;
   });
   const dates = (count: number) => Array.from({ length: count }, (_, i) => offset(data.today, i + 1 - count));

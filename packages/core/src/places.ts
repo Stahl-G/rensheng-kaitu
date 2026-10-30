@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { type ReadWarning, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import {
   commitExperienceImport,
@@ -68,7 +69,7 @@ export interface LifeMapFeature {
   properties: { layer: MapLayer; place: Experience["place"]; experiences: Experience[] };
 }
 export interface LifeMapData {
-  warnings?: string[];
+  warnings?: ReadWarning[];
   type: "FeatureCollection";
   asOf: string;
   features: LifeMapFeature[];
@@ -369,8 +370,8 @@ export async function resolveExperience(ws: Workspace, id: string, geonameid: nu
 
 export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   const asOf = localDate(now, ws.timeZone());
-  const warnings = new Set<string>();
-  const opts = { onError: (error: KaituError) => warnings.add(error.message) };
+  const warnings = new Set<ReadWarning>();
+  const opts = { onError: (error: KaituError) => warnings.add(readWarning(error)) };
   const rows = committedExperiences(ws, opts)
     .map((item) => {
       const place = item.review ? item.place : displayPlace(item.place);
