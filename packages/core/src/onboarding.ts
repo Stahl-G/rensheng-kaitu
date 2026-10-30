@@ -26,7 +26,7 @@ import type { BatchImportResult } from "./importers/batch.js";
 import {
   archiveInboxNote,
   captureNote,
-  findInboxNote,
+  findCaptureNote,
   isCaptureSource,
   noteMetadata,
 } from "./inbox-notes.js";
@@ -1384,7 +1384,7 @@ function onboardingNext(ws: Workspace, task: Task): OnboardingNext {
 }
 export function readOnboardingMatter(ws: Workspace, source: string): OnboardingMatter {
   if (!isCaptureSource(source)) throw new KaituError("请选择已保存的原文记录", "BAD_ARGS");
-  const file = findInboxNote(ws, basename(source));
+  const file = findCaptureNote(ws, source);
   const text = file ? ws.scanText(file) : undefined;
   if (!text || noteMetadata(text).kind !== "capture") throw new KaituError("原文记录不存在", "NOT_FOUND");
   if (source !== `inbox/notes/${noteMetadata(text).date}/${basename(source)}`)
@@ -1464,7 +1464,7 @@ export async function keepOnboardingMatter(ws: Workspace, source: string): Promi
     ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
   }
   // 核对过、只留原文：归档后不再算待整理，每日整理也不会再为它起草。
-  const file = findInboxNote(ws, basename(source));
+  const file = findCaptureNote(ws, source);
   if (file && !file.startsWith("inbox/notes/done/")) archiveInboxNote(ws, file);
   await snapshot(ws, "你只保留了原文，未采纳下一步");
   return readOnboardingMatter(ws, source);
@@ -1514,7 +1514,7 @@ export async function adoptOnboardingMatter(
     doc.data.next = (doc.data.next ?? []).filter((item) => item.id !== matterId(source));
     ws.writeText("me/STATUS.md", stringifyFrontmatter(doc.data, doc.body));
     // 原文已经整理成下一步，归档后不再算待整理，依据仍可按原路径读回。
-    const file = findInboxNote(ws, basename(source));
+    const file = findCaptureNote(ws, source);
     if (file && !file.startsWith("inbox/notes/done/")) archiveInboxNote(ws, file);
   });
   if (!task) throw new KaituError("下一步未保存", "WRITE_FAILED");
