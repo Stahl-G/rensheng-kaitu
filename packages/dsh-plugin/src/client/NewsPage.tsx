@@ -4,6 +4,7 @@ import type { NewsAction, NewsData, NewsFeedback, NewsItem, NewsVia } from "../t
 import { NewsExtra, TrendDetails } from "./NewsContent.js";
 import css from "./NewsPage.module.css";
 import { NewsRules } from "./NewsRules.js";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT } from "./i18n.js";
 
 export interface NewsPageProps {
@@ -261,6 +262,7 @@ export function NewsPage(props: NewsPageProps) {
           </button>
         </p>
       )}
+      <ReadWarnings warnings={data?.warnings} />
       {added.length > 0 && (
         <output className={css.saved}>
           {t("已加入 AI 建议，去今天页采纳", "Added as an AI suggestion. Adopt it in Today.")}

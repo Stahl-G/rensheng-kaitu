@@ -1,5 +1,5 @@
 import { normalizeStatus } from "./doc-input.js";
-import { KaituError } from "./errors.js";
+import { KaituError, type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { listModules } from "./modules.js";
@@ -66,6 +66,7 @@ export interface TrendContent {
 }
 export interface Trend extends StoredRecord, TrendContent {}
 export interface NewsData {
+  warnings?: ReadWarning[];
   feedback: Record<string, NewsFeedback>;
   date: string;
   picked: NewsItem[];
@@ -152,13 +153,77 @@ export async function saveNewsKeywords(ws: Workspace, input: string[]): Promise<
   return keywords;
 }
 
-export function readNews(ws: Workspace, now = new Date()): NewsData {
+// Check only shapes consumed by the reading view, not today's write schema or enum values.
+function readableNews(row: StoredRecord, type: "news_item" | "trend"): boolean {
+  if (type === "news_item" && row.published_at !== undefined) {
+    try {
+      parseTs(row.published_at as string);
+    } catch {
+      return false;
+    }
+  }
+  const object = (value: unknown): value is Record<string, unknown> =>
+    !!value && typeof value === "object" && !Array.isArray(value);
+  const strings = (value: Record<string, unknown>, fields: string[]) =>
+    fields.every((key) => value[key] === undefined || typeof value[key] === "string");
+  const list = (value: unknown, item: (value: unknown) => boolean) =>
+    value === undefined || (Array.isArray(value) && value.every(item));
+  const text = (value: unknown) => typeof value === "string";
+  const fields = (names: string[]) => (value: unknown) =>
+    object(value) && names.every((name) => text(value[name]));
+  const post = (value: unknown) =>
+    object(value) &&
+    strings(value, ["author", "handle", "text", "url", "posted_at"]) &&
+    list(value.media, text) &&
+    ["likes", "reposts", "replies"].every(
+      (key) => value[key] === undefined || (typeof value[key] === "number" && Number.isFinite(value[key])),
+    );
+  return (
+    (type === "news_item" ? text(row.title) && text(row.source) : text(row.topic)) &&
+    strings(row, [
+      "summary",
+      "url",
+      "image",
+      "published_at",
+      "via",
+      "status",
+      "kind",
+      "author",
+      "quote",
+      "venue",
+      "repo",
+      "version",
+      "channel",
+      "duration",
+      "comment",
+    ]) &&
+    (row.posts === undefined || (typeof row.posts === "number" && Number.isFinite(row.posts))) &&
+    list(row.authors, text) &&
+    list(row.details, text) &&
+    list(row.samples, post) &&
+    list(row.discussion, fields(["stance", "quote", "who"])) &&
+    list(row.highlights, fields(["time", "text"])) &&
+    list(row.sources, fields(["name", "url"])) &&
+    (row.post === undefined || post(row.post)) &&
+    (row.relevance === undefined ||
+      (object(row.relevance) && strings(row.relevance, ["module", "ref", "reason"])))
+  );
+}
+
+export function readNews(ws: Workspace, now = new Date(), options: { partial?: boolean } = {}): NewsData {
+  const warnings: ReadWarning[] = [];
+  const onError = options.partial ? (error: KaituError) => warnings.push(readWarning(error)) : undefined;
+  const readable = (type: "news_item" | "trend") => (row: StoredRecord) => {
+    if (!options.partial || readableNews(row, type)) return true;
+    warnings.push(readIssue("invalid_record", row.id, `${row.id} 记录格式不合法`));
+    return false;
+  };
   const zone = ws.timeZone();
   const date = localDate(now, zone);
   const from = new Date(`${date}T00:00:00Z`);
   from.setUTCDate(from.getUTCDate() - 2);
   const firstDay = from.toISOString().slice(0, 10);
-  const recent = (readRecords(ws, "news_item") as NewsItem[])
+  const recent = (readRecords(ws, "news_item", { onError }).filter(readable("news_item")) as NewsItem[])
     .filter((row) => {
       const published = parseTs(row.published_at ?? row.ts);
       return localDate(published, zone) >= firstDay && published <= now;
@@ -183,9 +248,12 @@ export function readNews(ws: Workspace, now = new Date()): NewsData {
     date,
     feedback: readNewsFeedback(ws),
     picked,
-    trends: (readRecords(ws, "trend", { from: date, to: date }) as Trend[]).reverse(),
+    trends: (
+      readRecords(ws, "trend", { from: date, to: date, onError }).filter(readable("trend")) as Trend[]
+    ).reverse(),
     others: fresh.filter((row) => !chosen.has(row.id)),
     sources,
+    ...(warnings.length ? { warnings } : {}),
     keywords: settings.keywords ?? null,
     feedCount: settings.feeds?.length ?? null,
     moduleNames: Object.fromEntries(

@@ -15,6 +15,7 @@ import {
   readLearning,
   readLibrary,
   readMe,
+  readNews,
   readOverviewPage,
   readProjectPage,
   readProjectsPage,
@@ -25,6 +26,7 @@ import {
   setProject,
   startLearning,
   syncProject,
+  ulid,
   updateRecord,
   writePhoneSnapshots,
 } from "../src/index.js";
@@ -376,6 +378,159 @@ it("rebuilds corrupt derived phone JSON but propagates access failures and prese
     spy.mockRestore();
   } finally {
     vi.restoreAllMocks();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("news, trends, directions and experiments isolate malformed lines while writes stay strict", async () => {
+  const ws = await clonedWorkspace();
+  deferSnapshots(ws, () => {});
+  try {
+    const now = new Date("2026-10-30T12:00:00Z");
+    const news = addRecord(
+      ws,
+      "news_item",
+      { title: "Readable news", url: "https://example.com/news", source: "Synthetic", via: "user" },
+      { now, by: "user" },
+    );
+    const trend = addRecord(ws, "trend", { topic: "Readable trend", via: "user" }, { now, by: "user" });
+    const direction = addRecord(
+      ws,
+      "direction",
+      {
+        title: "Readable direction",
+        motivation: "Learn",
+        hypothesis: "Try",
+        status: "active",
+        favorite: false,
+      },
+      { now, by: "user" },
+    );
+    const experiment = addRecord(
+      ws,
+      "exploration_experiment",
+      {
+        direction_id: direction.record.id,
+        question: "Does it help?",
+        action: "Readable experiment",
+        budget: "One hour",
+        deadline: "2026-11-01",
+        criteria: "One result",
+        status: "planned",
+        conclusion: "unassessed",
+      },
+      { now, by: "user" },
+    );
+    const entries = [news, trend, direction, experiment];
+    const before = new Map(entries.map((entry) => [entry.file, ws.readText(entry.file)]));
+    for (const entry of entries) ws.appendLine(entry.file, '{"broken":\n{"also_broken":');
+    const read = readNews(ws, now, { partial: true });
+    expect([...read.picked, ...read.others].map((row) => row.id)).toContain(news.record.id);
+    expect(read.trends.map((row) => row.id)).toContain(trend.record.id);
+    const exploration = readExploration(ws, { partial: true });
+    expect(exploration.directions.map((row) => row.id)).toContain(direction.record.id);
+    expect(exploration.experiments.map((row) => row.id)).toContain(experiment.record.id);
+    expect(exploration.timeline.map((row) => row.record_id)).toEqual(
+      expect.arrayContaining([direction.record.id, experiment.record.id]),
+    );
+    const warnings = [...(read.warnings ?? []), ...(exploration.warnings ?? [])];
+    for (const entry of entries) {
+      for (const line of [2, 3])
+        expect(
+          warnings.filter(
+            (warning) =>
+              typeof warning !== "string" &&
+              warning.code === "invalid_record" &&
+              warning.location === `${entry.file}:${line}`,
+          ),
+        ).toHaveLength(1);
+      expect(() => updateRecord(ws, entry.type, entry.record.id, {}, { now, by: "user" })).toThrow(
+        "记录格式不合法",
+      );
+      expect(ws.readText(entry.file)).toBe(`${before.get(entry.file)}{"broken":\n{"also_broken":\n`);
+      ws.writeText(entry.file, before.get(entry.file) as string);
+    }
+    expect(readNews(ws, now, { partial: true }).warnings).toBeUndefined();
+    expect(readExploration(ws, { partial: true }).warnings).toBeUndefined();
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("reading isolates unusable view fields without applying the current write schema to old rows", async () => {
+  const ws = await clonedWorkspace();
+  deferSnapshots(ws, () => {});
+  try {
+    const now = new Date("2026-10-30T12:00:00Z");
+    const news = addRecord(
+      ws,
+      "news_item",
+      { title: "Historical news", url: "https://example.com/legacy", source: "Synthetic", via: "user" },
+      { now, by: "user" },
+    );
+    const trend = addRecord(ws, "trend", { topic: "Historical trend", via: "user" }, { now, by: "user" });
+    const direction = addRecord(
+      ws,
+      "direction",
+      {
+        title: "Historical direction",
+        motivation: "Learn",
+        hypothesis: "Try",
+        status: "active",
+        favorite: false,
+      },
+      { now, by: "user" },
+    );
+    const experiment = addRecord(
+      ws,
+      "exploration_experiment",
+      {
+        direction_id: direction.record.id,
+        question: "Observe",
+        action: "Historical experiment",
+        budget: "One hour",
+        deadline: "2026-11-01",
+        criteria: "One result",
+        status: "planned",
+        conclusion: "unassessed",
+      },
+      { now, by: "user" },
+    );
+    const cases = [
+      [news, { source: {} }],
+      [trend, { samples: [null] }],
+      [direction, { updated_at: 42 }],
+      [experiment, { action: {} }],
+    ] as const;
+    const badIds: string[] = [];
+    const before = new Map<string, string>();
+    for (const [entry, broken] of cases) {
+      const id = ulid();
+      badIds.push(id);
+      ws.writeText(
+        entry.file,
+        `${JSON.stringify({ ...entry.record, historical_extension: { retained: true } })}\n${JSON.stringify({ ...entry.record, id, ...broken })}\n`,
+      );
+      before.set(entry.file, ws.readText(entry.file));
+    }
+    const read = readNews(ws, now, { partial: true });
+    const exploration = readExploration(ws, { partial: true });
+    expect([...read.picked, ...read.others].map((row) => row.id)).toEqual([news.record.id]);
+    expect(read.trends.map((row) => row.id)).toEqual([trend.record.id]);
+    expect(exploration.directions.map((row) => row.id)).toEqual([direction.record.id]);
+    expect(exploration.experiments.map((row) => row.id)).toEqual([experiment.record.id]);
+    const warnings = [...(read.warnings ?? []), ...(exploration.warnings ?? [])];
+    for (const id of badIds)
+      expect(
+        warnings.filter(
+          (warning) =>
+            typeof warning !== "string" && warning.code === "invalid_record" && warning.location === id,
+        ),
+      ).toHaveLength(1);
+    for (const [file, text] of before) expect(ws.readText(file)).toBe(text);
+    ws.appendLine(news.file, JSON.stringify({ ...news.record, id: ulid(), published_at: "2026-10-30" }));
+    expect([...readNews(ws, now, { partial: true }).others].map((row) => row.id)).toEqual([news.record.id]);
+  } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

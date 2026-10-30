@@ -668,7 +668,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("news")
   async news(): Promise<NewsData> {
-    return readNews(this.workspace);
+    return readNews(this.workspace, new Date(), { partial: true });
   }
 
   @Remote("saveNewsKeywords")

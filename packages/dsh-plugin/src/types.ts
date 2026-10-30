@@ -47,6 +47,7 @@ export interface NewsTrend extends TrendContent {
   id: string;
 }
 export interface NewsData {
+  warnings?: ReadWarning[];
   feedback: Record<string, NewsFeedback>;
   date: string;
   picked: NewsItem[];
