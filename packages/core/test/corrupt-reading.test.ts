@@ -20,6 +20,7 @@ import {
   readProjectsPage,
   readRecords,
   readWorkbench,
+  refreshOverview,
   saveProjectGoal,
   setProject,
   startLearning,
@@ -85,6 +86,9 @@ it("a corrupt record line preserves readable rows and strict writes; phone sourc
     ws.writeText(first.file, broken);
     const data = readWorkbench(ws);
     expect(data.records.task?.map((row) => row.id)).toEqual([first.record.id, second.record.id]);
+    refreshOverview(ws);
+    expect(ws.readText("OVERVIEW.md")).toContain(`${first.file}:2 记录格式不合法`);
+    expect(ws.readText("OVERVIEW.md")).not.toContain("[object Object]");
     expect(data.warnings).toContainEqual(
       expect.objectContaining({ code: "invalid_record", location: `${first.file}:2` }),
     );

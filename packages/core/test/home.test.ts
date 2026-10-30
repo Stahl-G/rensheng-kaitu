@@ -47,7 +47,9 @@ it("projects existing goals, projects and learning without reading or mutating t
     const now = new Date("2026-10-28T12:00:00Z");
     ws.writeText("projects/broken/STATUS.md", "---\ntitle: [\n---\n");
     const loaded = await readHomeSources(ws, now);
-    expect(loaded.overview.warnings.some((warning) => warning.includes("broken"))).toBe(true);
+    expect(loaded.overview.warnings).toContainEqual(
+      expect.objectContaining({ code: "invalid_document", location: "projects/broken/STATUS.md" }),
+    );
     expect(loaded.projects.some((item) => item.slug === "fixture")).toBe(true);
     const workbench = readWorkbench(ws, now);
     const input = loaded;
