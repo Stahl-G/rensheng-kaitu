@@ -154,7 +154,20 @@ export async function saveNewsKeywords(ws: Workspace, input: string[]): Promise<
 }
 
 // Check only shapes consumed by the reading view, not today's write schema or enum values.
+// readRecords returns immutable rows; editing a source file creates new identities.
+const newsShapes = {
+  news_item: new WeakMap<StoredRecord, boolean>(),
+  trend: new WeakMap<StoredRecord, boolean>(),
+};
 function readableNews(row: StoredRecord, type: "news_item" | "trend"): boolean {
+  const cached = newsShapes[type].get(row);
+  if (cached !== undefined) return cached;
+  const valid = checkNewsShape(row, type);
+  newsShapes[type].set(row, valid);
+  return valid;
+}
+
+function checkNewsShape(row: StoredRecord, type: "news_item" | "trend"): boolean {
   if (type === "news_item" && row.published_at !== undefined) {
     try {
       parseTs(row.published_at as string);

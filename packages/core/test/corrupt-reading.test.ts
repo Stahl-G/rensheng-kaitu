@@ -1,4 +1,4 @@
-import { rmSync, writeFileSync } from "node:fs";
+import { rmSync, utimesSync, writeFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
 import { suggestProjectGoal } from "../../cli/src/ui/project-ai.js";
 import {
@@ -512,10 +512,13 @@ it("reading isolates unusable view fields without applying the current write sch
         `${JSON.stringify({ ...entry.record, historical_extension: { retained: true } })}\n${JSON.stringify({ ...entry.record, id, ...broken })}\n`,
       );
       before.set(entry.file, ws.readText(entry.file));
+      utimesSync(ws.resolve(entry.file), new Date(0), new Date(0));
     }
     const read = readNews(ws, now, { partial: true });
     const exploration = readExploration(ws, { partial: true });
     expect([...read.picked, ...read.others].map((row) => row.id)).toEqual([news.record.id]);
+    expect(readNews(ws, now, { partial: true })).toEqual(read);
+    expect(readExploration(ws, { partial: true })).toEqual(exploration);
     expect(read.trends.map((row) => row.id)).toEqual([trend.record.id]);
     expect(exploration.directions.map((row) => row.id)).toEqual([direction.record.id]);
     expect(exploration.experiments.map((row) => row.id)).toEqual([experiment.record.id]);
@@ -530,6 +533,22 @@ it("reading isolates unusable view fields without applying the current write sch
     for (const [file, text] of before) expect(ws.readText(file)).toBe(text);
     ws.appendLine(news.file, JSON.stringify({ ...news.record, id: ulid(), published_at: "2026-10-30" }));
     expect([...readNews(ws, now, { partial: true }).others].map((row) => row.id)).toEqual([news.record.id]);
+    // Correcting the same IDs must replace cached shape failures, including nested fields.
+    for (const [index, [entry]] of cases.entries()) {
+      ws.writeText(
+        entry.file,
+        `${JSON.stringify(entry.record)}\n${JSON.stringify({ ...entry.record, id: badIds[index] })}\n`,
+      );
+      utimesSync(ws.resolve(entry.file), new Date(0), new Date(0));
+    }
+    const fixedNews = readNews(ws, now, { partial: true });
+    const fixedExploration = readExploration(ws, { partial: true });
+    expect(fixedNews.warnings).toBeUndefined();
+    expect(fixedNews.others).toHaveLength(2);
+    expect(fixedNews.trends).toHaveLength(2);
+    expect(fixedExploration.warnings).toBeUndefined();
+    expect(fixedExploration.directions).toHaveLength(2);
+    expect(fixedExploration.experiments).toHaveLength(2);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

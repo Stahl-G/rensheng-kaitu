@@ -235,8 +235,12 @@ export async function writeExploration(
   };
 }
 
+// Immutable record identities are replaced when scanParsed observes a file change.
+const explorationShapes = new WeakMap<StoredRecord, boolean>();
 function readableExploration(row: StoredRecord): boolean {
-  return (
+  const cached = explorationShapes.get(row);
+  if (cached !== undefined) return cached;
+  const valid =
     [
       "title",
       "motivation",
@@ -265,8 +269,9 @@ function readableExploration(row: StoredRecord): boolean {
         row.references.every(
           (ref) =>
             ref && typeof ref === "object" && typeof ref.kind === "string" && typeof ref.ref === "string",
-        )))
-  );
+        )));
+  explorationShapes.set(row, valid);
+  return valid;
 }
 
 export function readExploration(ws: Workspace, options: { partial?: boolean } = {}) {
