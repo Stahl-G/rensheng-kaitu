@@ -1,5 +1,6 @@
 import { rmSync } from "node:fs";
 import {
+  addTask,
   adoptOnboardingMatter,
   captureNoteOnce,
   matterPrompt,
@@ -12,19 +13,95 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   saveOnboardingMatter,
+  stringifyFrontmatter,
 } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
 import { AskPage } from "../src/client/AskPage.js";
-import { LibraryPage } from "../src/client/LibraryPage.js";
+import { InboxPage, LibraryPage } from "../src/client/LibraryPage.js";
 import { OnboardingMatter } from "../src/client/OnboardingMatter.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 
 vi.mock("../src/client/PaperMap.js", () => ({ PaperMap: () => null }));
 afterEach(() => vi.unstubAllGlobals());
+
+test("同名原文按完整来源区分采纳，归档后仍能找到原下一步", async () => {
+  const ws = await freshWorkspace();
+  const source = "inbox/notes/2020-01-02/01aa0000000000000000000000.md";
+  const other = source.replace("2020-01-02", "2020-01-03");
+  let app: ReturnType<typeof create> | undefined;
+  try {
+    for (const [file, date, text] of [
+      ["inbox/notes/done/2020-01-04/01aa0000000000000000000000.md", "2020-01-02", "第一条合成原文"],
+      [other, "2020-01-03", "第二条合成原文"],
+    ])
+      ws.writeText(file, stringifyFrontmatter({ kind: "capture", date, agent: "你" }, text));
+    const task = await addTask(ws, { title: "核对第一条原文", source });
+    const data = readLibrary(ws, { section: "inbox" });
+    const overview = await readOverviewPage(ws);
+    const opened = vi.fn();
+    for (const page of ["summary", "inbox"]) {
+      await act(async () => {
+        app = create(
+          page === "summary"
+            ? createElement(LibraryPage, {
+                data,
+                overview,
+                query: "",
+                onQuery() {},
+                open() {},
+                searchLibraryNotes: async () => [],
+                onOpenOriginal() {},
+                onOpenNote() {},
+                onOpenGoal() {},
+              })
+            : createElement(InboxPage, {
+                initialEntry: data.inbox[0],
+                loadLibrary: async () => data,
+                connect() {},
+                openNext: opened,
+                sources: overview.plans.sources,
+              }),
+        );
+      });
+      const row = (text: string) => {
+        const found = app?.root
+          .findAllByType("button")
+          .find((button) =>
+            button
+              .findAllByType(page === "summary" ? "span" : "strong")
+              .some((item) => item.children.includes(text)),
+          );
+        if (!found) throw new Error(`Missing original row: ${text}`);
+        return found;
+      };
+      const labels = (text: string) =>
+        row(text)
+          .findAllByType("span")
+          .flatMap((span) => span.children.filter((child) => typeof child === "string"))
+          .join("");
+      expect(labels("第二条合成原文")).not.toContain("已采纳");
+      expect(labels("第一条合成原文")).toContain("已采纳");
+      if (page === "inbox") {
+        await act(async () => row("第一条合成原文").props.onClick());
+        const next = app?.root
+          .findAllByType("button")
+          .find((button) => button.children.includes("变成下一步：核对第一条原文"));
+        expect(next).toBeDefined();
+        await act(async () => next?.props.onClick());
+        expect(opened).toHaveBeenCalledWith(task.record.id, undefined);
+      }
+      await act(async () => app?.unmount());
+      app = undefined;
+    }
+  } finally {
+    if (app) await act(async () => app?.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 test.each(["library", "today"])(
   "%s 无Key入口可复制、回填并采纳，坏回答可手改且原文只存一份",

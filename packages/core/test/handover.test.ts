@@ -109,7 +109,7 @@ it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核
     ).toMatchObject({
       status: "organized",
     });
-    const source = matter.source.split("/").at(-1) as string;
+    const source = matter.source;
     expect((await readOverviewPage(ws)).plans.sources[source]).toMatchObject({
       taskId: next.id,
       title: "周二晚上先练 20 分钟",
