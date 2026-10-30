@@ -38,6 +38,11 @@
   font-size: 30px;
   font-weight: 600;
 }
+.bmiHeight {
+  margin-top: 4px;
+  color: var(--kt-muted);
+  font-size: 12px;
+}
 .dashboardChart {
   margin: 14px 0 0;
 }

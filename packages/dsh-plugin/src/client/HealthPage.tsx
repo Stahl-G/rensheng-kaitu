@@ -617,7 +617,13 @@ function HealthDashboard({ data }: { data: HealthData }) {
                       {number(dash.bmi.value)}
                     </strong>
                   </dd>
-                  <time>{localDay(dash.bmi.ts)}</time>
+                  <time dateTime={dash.bmi.ts}>{localDay(dash.bmi.ts)}</time>
+                  {dash.bmi.heightDate && (
+                    <div className={css.bmiHeight}>
+                      {t("身高", "Height")} {number(dash.bmi.heightCm)} cm ·{" "}
+                      <time dateTime={dash.bmi.heightDate}>{dash.bmi.heightDate}</time>
+                    </div>
+                  )}
                 </div>
               )}
               {activity?.basalKcal != null && (
