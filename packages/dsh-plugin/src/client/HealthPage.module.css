@@ -639,47 +639,130 @@
   }
 }
 
-.overview {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-}
-.overview dt,
-.overview small {
-  color: var(--kt-muted);
-  font-size: 12px;
-  line-height: 20px;
-}
-.overview dd {
-  margin: 8px 0 0;
-}
-.overview strong {
-  display: block;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.overview small {
-  display: block;
-  margin-top: 8px;
-}
 .warning {
   color: var(--danger);
 }
-@container (max-width: 1179px) {
-  .overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@container (max-width: 639px) {
-  .overview {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
-.overview progress {
-  width: 100%;
+.dashboardChart .rangeBand {
+  opacity: 0.14;
+}
+.dashboardChart .meanLine {
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+.chartLegend,
+.stageLegend,
+.moodLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 11px;
+  color: var(--kt-muted);
+}
+.chartLegend span::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  margin-right: 5px;
+  border-top: 2px dashed var(--health-chart);
+}
+.chartLegend [data-kind="range"]::before {
   height: 8px;
-  margin-top: 10px;
-  accent-color: var(--health);
+  border: 0;
+  background: var(--health-chart);
+  opacity: 0.25;
+}
+.dashboardValues small,
+.cardioMetric > time {
+  display: block;
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+.stages {
+  margin: 12px 0;
+}
+.timeline {
+  position: relative;
+  height: 64px;
+  margin-bottom: 8px;
+}
+.timeline > span {
+  position: absolute;
+  height: 12px;
+  top: 24px;
+  min-width: 1px;
+  background: var(--kt-muted);
+}
+.stageLegend span::before,
+.moodLegend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--stage-color);
+}
+.timeline > [data-stage] {
+  background: var(--stage-color);
+}
+.stages [data-stage="awake"] {
+  --stage-color: #b78b56;
+  top: 0;
+}
+.stages [data-stage="asleep_rem"] {
+  --stage-color: #9bb8d3;
+  top: 15px;
+}
+.stages [data-stage="asleep_core"] {
+  --stage-color: #527ba7;
+  top: 30px;
+}
+.stages [data-stage="asleep_deep"] {
+  --stage-color: #2e4c73;
+  top: 45px;
+}
+.stages [data-stage="asleep_unspecified"] {
+  --stage-color: #858f9c;
+}
+.stages [data-stage="in_bed"] {
+  --stage-color: #aaa59c;
+}
+.moodStrip {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  margin: 12px 0;
+}
+.moodStrip > span {
+  height: 22px;
+  border-radius: 4px;
+  background: var(--stage-color);
+}
+.page [data-tone="pleasant"] {
+  --stage-color: var(--health-chart);
+}
+.page [data-tone="neutral"] {
+  --stage-color: #a6aaa0;
+}
+.page [data-tone="unpleasant"] {
+  --stage-color: #b78b56;
+}
+.page [data-tone="missing"] {
+  --stage-color: var(--kt-control);
+}
+[data-theme="dark"] .stages [data-stage="awake"],
+[data-theme="dark"] .page [data-tone="unpleasant"] {
+  --stage-color: #d0ac79;
+}
+[data-theme="dark"] .stages [data-stage="asleep_rem"] {
+  --stage-color: #b3cae2;
+}
+[data-theme="dark"] .stages [data-stage="asleep_core"] {
+  --stage-color: #7f9fc6;
+}
+[data-theme="dark"] .stages [data-stage="asleep_deep"] {
+  --stage-color: #5377a4;
+}
+[data-theme="dark"] .stages [data-stage="asleep_unspecified"] {
+  --stage-color: #9da9b7;
 }
