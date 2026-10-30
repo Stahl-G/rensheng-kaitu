@@ -13,6 +13,7 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
+  type HomeState,
   type Hometown,
   type ImportSource,
   type JobsData,
@@ -70,6 +71,7 @@ import {
   confirmOnboardingImport,
   confirmOnboardingMemory,
   confirmOnboardingSetup,
+  createHomeCache,
   createProject,
   decideProposal,
   defaultRoot,
@@ -194,6 +196,9 @@ export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
   private readonly scheduleVersion: (message: string) => void;
+  private readonly homeCache: ReturnType<typeof createHomeCache>;
+  private readonly homeListeners = new Set<() => void>();
+  private disposed = false;
 
   constructor(
     ctx: Context,
@@ -204,6 +209,14 @@ export class KaituOverviewService extends TypertRemoteService {
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
+    this.homeCache = createHomeCache(this.workspace, () => {
+      for (const notify of this.homeListeners) notify();
+    });
+    ctx.effect(() => async () => {
+      this.disposed = true;
+      for (const notify of this.homeListeners) notify();
+      await this.homeCache.close();
+    });
     this.files = dshFiles(this.workspace);
     ctx.effect(() => () => {
       this.files.dispose();
@@ -222,8 +235,42 @@ export class KaituOverviewService extends TypertRemoteService {
         return await performWrite(operation);
       } finally {
         this.files.invalidate();
+        this.homeCache.invalidate();
       }
     };
+  }
+
+  @Remote("home")
+  async home(): Promise<HomeState> {
+    return this.homeCache.read();
+  }
+
+  @Remote({ name: "homeUpdates", mode: "stream" })
+  async *homeUpdates(): AsyncIterable<HomeState> {
+    const signal = this.ctx.invocation?.signal;
+    let dirty = true;
+    let wake: (() => void) | undefined;
+    const notify = () => {
+      dirty = true;
+      wake?.();
+    };
+    this.homeListeners.add(notify);
+    signal?.addEventListener("abort", notify, { once: true });
+    try {
+      while (!this.disposed && !signal?.aborted) {
+        if (!dirty)
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+          });
+        wake = undefined;
+        if (this.disposed || signal?.aborted) return;
+        dirty = false;
+        yield this.homeCache.read();
+      }
+    } finally {
+      this.homeListeners.delete(notify);
+      signal?.removeEventListener("abort", notify);
+    }
   }
 
   @Remote("findWorkspaceFiles")

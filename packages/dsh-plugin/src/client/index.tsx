@@ -210,6 +210,26 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              loadHome: async () => {
+                const result = await ctx.remote.kaitu.home();
+                if (!result.ok) throw new Error(result.error.message);
+                return result.value;
+              },
+              subscribeHome: (update: (value: import("@kaitu/core").HomeState) => void) => {
+                const stream = ctx.remote.kaitu.homeUpdates();
+                let live = true;
+                void (async () => {
+                  try {
+                    for await (const value of stream) if (live) update(value);
+                  } catch {
+                    if (live) update({ data: null, loading: false, error: "首页连接中断" });
+                  }
+                })();
+                return () => {
+                  live = false;
+                  stream.dispose();
+                };
+              },
               keepOnboardingMatter: async (source: string) => {
                 const r = await ctx.remote.kaitu.onboardingMatterKeep(source);
                 if (!r.ok) throw new Error(r.error.message);

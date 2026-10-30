@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("returning home confirms the previous save and keeps text edited while it was pending", async () => {
+function browserGlobals() {
   vi.stubGlobal("window", new EventTarget());
   vi.stubGlobal("document", {
     body: { hasAttribute: () => false },
@@ -34,6 +34,10 @@ test("returning home confirms the previous save and keeps text edited while it w
       disconnect() {}
     },
   );
+}
+
+test("returning home confirms the previous save and keeps text edited while it was pending", async () => {
+  browserGlobals();
   const ws = await freshWorkspace();
   const overview = await readOverviewPage(ws);
   const home = readHome(await readHomeSources(ws));
@@ -48,7 +52,7 @@ test("returning home confirms the previous save and keeps text edited while it w
     hosted: true,
     loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
     load: async () => overview,
-    loadHome: async () => ({ data: home, loading: false, error: null }),
+    loadHome: async () => ({ data: home, presentation: overview, loading: false, error: null }),
     loadCalendar: async () => readCalendar(ws),
     loadMe: async () => ({}),
     loadOnboarding: async () => ({ showGuide: false }),
@@ -89,6 +93,46 @@ test("returning home confirms the previous save and keeps text edited while it w
     expect(current().props.saveStatus).toBe("");
   } finally {
     if (app) await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("the subscribed home projection renders while unrelated page reads are still pending", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  const sources = await readHomeSources(ws);
+  const home = readHome(sources);
+  const pending = () => new Promise<never>(() => {});
+  let update: ((state: import("@kaitu/core").HomeState) => void) | undefined;
+  const unsubscribe = vi.fn();
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: pending,
+    loadCalendar: pending,
+    loadMe: pending,
+    loadOnboarding: pending,
+    loadHome: async () => ({ data: home, presentation: sources.overview, loading: false, error: null }),
+    subscribeHome: (listener: typeof update) => {
+      update = listener;
+      return unsubscribe;
+    },
+    renderAsk: () => null,
+  } as unknown as OverviewPageProps;
+  let app: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    expect(app?.root.findByType(LifeHome).props.home.data).toEqual(home);
+    const next = { ...home, pending: [{ id: "proposal", title: "New proposal" }] };
+    await act(async () =>
+      update?.({ data: next, presentation: sources.overview, loading: false, error: null }),
+    );
+    expect(app?.root.findByType(LifeHome).props.home.data.pending).toEqual(next.pending);
+  } finally {
+    if (app) await act(async () => app?.unmount());
+    expect(unsubscribe).toHaveBeenCalledOnce();
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

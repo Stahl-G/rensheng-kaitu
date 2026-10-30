@@ -6,7 +6,7 @@ import type { Workspace } from "./workspace.js";
 
 type Overview = Pick<
   Awaited<ReturnType<typeof readOverviewPage>>,
-  "today" | "timeZone" | "plans" | "metrics" | "versions" | "proposedTasks" | "warnings"
+  "today" | "timeZone" | "cutoff" | "plans" | "metrics" | "versions" | "proposedTasks" | "warnings"
 >;
 type Projects = ReturnType<typeof readProjectsPage>;
 type LearningStatus = WorkbenchData["statuses"][number];
