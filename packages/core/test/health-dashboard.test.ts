@@ -17,7 +17,8 @@ it("健康趋势读满12周并折叠修订，BMI只配同期身高，缺记录�
   const deleted = metric("2026-10-20T08:00:00", "weight", 100, "kg");
   deleteRecord(ws, "metric", deleted.id);
   metric("2026-10-29T07:00:00", "height", 190, "cm");
-  metric("2026-10-30T08:00:00", "weight", 80, "kg");
+  const latestWeight = metric("2026-10-30T08:00:00", "weight", 80, "kg");
+  updateRecord(ws, "metric", latestWeight.id, { source: "estimate" });
   metric("2026-10-31T08:00:00", "weight", 99, "kg");
   const now = new Date("2026-10-30T12:00:00+07:00");
   expect(readHealthPage(ws, now).dashboard.bmi).toBeNull();
@@ -33,6 +34,7 @@ it("健康趋势读满12周并折叠修订，BMI只配同期身高，缺记录�
   });
   const result = readHealthPage(ws, now).dashboard;
   expect(result.bmi?.value).toBeCloseTo(80 / 1.8 ** 2);
+  expect(result.bmi?.estimated).toBe(true);
   expect(result.metrics.find((m) => m.kind === "weight")?.points.map((p) => p.value)).toEqual([70, 75, 80]);
   expect(result.metrics.find((m) => m.kind === "weight")).toMatchObject({
     change: 10,
@@ -57,7 +59,7 @@ it("一年睡眠保持醒来日与未知阶段，坏分期隔离，训练能量�
     start: "2026-01-01T23:00:00+07:00",
     end: "2026-01-02T07:00:00+07:00",
     duration_min: 480,
-    source: "manual",
+    source: "estimate",
   };
   addRecord(ws, "sleep", sleep);
   addRecord(ws, "workout", {
@@ -73,7 +75,7 @@ it("一年睡眠保持醒来日与未知阶段，坏分期隔离，训练能量�
   const now = new Date("2026-10-30T12:00:00+07:00");
   const page = readHealthPage(ws, now);
   expect(page.dashboard.sleep).toMatchObject([
-    { date: "2026-01-02", durationMin: 480, stages: null, stageMinutes: null },
+    { date: "2026-01-02", durationMin: 480, stages: null, stageMinutes: null, estimated: true },
   ]);
   expect(page.training.recent[0]?.exercises[0]).toMatchObject({ kcal: 320, avgHr: 138, pace: 360 });
   expect(page.training.heatmap.find((d) => d.date === "2026-10-30")).toMatchObject({

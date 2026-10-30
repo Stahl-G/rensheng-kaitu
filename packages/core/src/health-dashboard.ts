@@ -72,7 +72,8 @@ export function buildHealthDashboard(
       range: values.length >= 2 ? { q1: quantile(0.25), q3: quantile(0.75) } : null,
     };
   });
-  let bmi: { value: number; ts: string; weightKg: number; heightCm: number } | null = null;
+  let bmi: { value: number; ts: string; weightKg: number; heightCm: number; estimated: boolean } | null =
+    null;
   const heights = groups.get("height:cm") ?? [];
   for (const weight of [...(groups.get("weight:kg") ?? [])].reverse()) {
     if (day(weight.ts) < offset(today, -83)) break;
@@ -82,7 +83,13 @@ export function buildHealthDashboard(
     const weightKg = number(weight.value);
     const heightCm = number(height?.value);
     if (weightKg !== null && weightKg > 0 && heightCm !== null && heightCm > 0) {
-      bmi = { value: weightKg / (heightCm / 100) ** 2, ts: weight.ts, weightKg, heightCm };
+      bmi = {
+        value: weightKg / (heightCm / 100) ** 2,
+        ts: weight.ts,
+        weightKg,
+        heightCm,
+        estimated: estimated(weight) || (height ? estimated(height) : false),
+      };
       break;
     }
   }
@@ -100,6 +107,7 @@ export function buildHealthDashboard(
     });
     return {
       date,
+      estimated: matches.some(estimated),
       steps: max("steps"),
       activeKcal: max("active_kcal"),
       basalKcal: basal.length ? Math.max(...basal) : null,
@@ -136,6 +144,7 @@ export function buildHealthDashboard(
           start: row.start,
           end: row.end,
           durationMin,
+          estimated: estimated(row),
           stages,
           stageMinutes: stages ? sleepStageMinutes(stages) : null,
         },
