@@ -1,11 +1,10 @@
 import { lstatSync, readdirSync } from "node:fs";
-import { basename } from "node:path";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
-import { inboxNotes, isCaptureSource } from "./inbox-notes.js";
+import { inboxNotes, originalCaptureSource } from "./inbox-notes.js";
 import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
@@ -86,11 +85,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
         },
       ];
     const { data, body } = parsed;
-    const captureSource =
-      data.kind === "capture" && typeof data.date === "string"
-        ? `inbox/notes/${data.date}/${basename(file)}`
-        : null;
-    const originalSource = isCaptureSource(captureSource) ? captureSource : null;
+    const originalSource = originalCaptureSource(file, data);
     const channelSource =
       typeof data.agent === "string"
         ? data.agent.match(/^只读采集 · (gmail|imap|slack|feishu)$/)?.[1]

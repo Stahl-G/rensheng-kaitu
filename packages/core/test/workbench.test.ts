@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, utimesSync, writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { normalizeStatus } from "../src/doc-input.js";
 import {
@@ -18,6 +18,33 @@ import {
   workspaceFileStampsAsync,
 } from "../src/index.js";
 import { freshWorkspace, tmp } from "./helpers.js";
+
+it("工作台复用未变的文档，外部同长度改写、损坏和修复立即可见", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const file = "learning/synthetic/STATUS.md";
+    const original = "---\ntitle: 合成旧计划\nupdated: 2026-10-15T00:00:00Z\n---\n原文\n";
+    ws.writeText(file, original);
+    const old = new Date(Date.now() - 60000);
+    utimesSync(ws.resolve(file), old, old);
+    const status = () => readWorkbench(ws).statuses.find((item) => item.file === file);
+    expect(status()?.data.title).toBe("合成旧计划");
+    expect(() => {
+      const item = status();
+      if (item) item.data.title = "意外修改";
+    }).toThrow(TypeError);
+    writeFileSync(ws.resolve(file), original.replace("旧计划", "新计划"));
+    expect(status()?.data.title).toBe("合成新计划");
+    writeFileSync(ws.resolve(file), "---\ntitle: [broken\n---\n原文\n");
+    const broken = readWorkbench(ws);
+    expect(broken.statuses.some((item) => item.file === file)).toBe(false);
+    expect(broken.warnings.some((warning) => warning.includes(file))).toBe(true);
+    writeFileSync(ws.resolve(file), original);
+    expect(status()?.data.title).toBe("合成旧计划");
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 it("现状只计数原文，打开原文列表仍读取完整内容", async () => {
   const ws = await freshWorkspace();

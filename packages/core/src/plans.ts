@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { basename } from "node:path";
 import { KaituError } from "./errors.js";
 import { schemas } from "./schema.js";
 import type { Task } from "./tasks.js";
@@ -122,7 +121,7 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
         ? byId.get(ref.id)
         : byTitle.get(ref.title.trim().toLowerCase());
     if (task.source)
-      sources[basename(task.source)] = {
+      sources[task.source] = {
         taskId: task.id,
         title: task.title,
         ...(goal ? { goalId: goal.id, goalTitle: goal.title } : {}),

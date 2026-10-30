@@ -19,6 +19,45 @@ export function isCaptureSource(source: unknown): source is string {
   return /^[0-9a-z]{26}\.md$/.test(name) || (name.endsWith(".note.md") && phoneInboxName.test(name));
 }
 
+function captureName(file: string): string {
+  const name = basename(file);
+  // availableInboxPath adds a ULID when two originals collide in the archive.
+  return file.startsWith("inbox/notes/done/") ? name.replace(/-[0-9a-z]{26}(?=\.md$)/, "") : name;
+}
+
+export function originalCaptureSource(file: string, data: Record<string, unknown>): string | null {
+  const source =
+    data.kind === "capture" && typeof data.date === "string"
+      ? `inbox/notes/${data.date}/${captureName(file)}`
+      : null;
+  return isCaptureSource(source) ? source : null;
+}
+
+/** Exact live path first; only matching archive filenames need their metadata read. */
+export function findCaptureNote(ws: Workspace, source: string): string | undefined {
+  if (!isCaptureSource(source)) return;
+  if (ws.exists(source)) return source;
+  const name = basename(source);
+  const archived = (directory: string): string | undefined => {
+    if (!ws.exists(directory)) return;
+    for (const entry of readdirSync(ws.resolve(directory), { withFileTypes: true })) {
+      const file = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) {
+        const found = archived(file);
+        if (found) return found;
+      } else if (
+        entry.isFile() &&
+        captureName(file) === name &&
+        originalCaptureSource(file, noteMetadata(ws.scanText(file) ?? "")) === source
+      )
+        return file;
+    }
+  };
+  const file = archived("inbox/notes/done");
+  if (!file && findInboxNote(ws, name)) throw new KaituError("原文来源与保存记录不一致", "BAD_ARGS");
+  return file;
+}
+
 /** 无需模型的原文记录，供任意 Agent 后续整理。 */
 export async function captureNote(ws: Workspace, text: string, investment?: string, limit = 100000) {
   if (typeof text !== "string" || !text.trim() || text.length > limit)

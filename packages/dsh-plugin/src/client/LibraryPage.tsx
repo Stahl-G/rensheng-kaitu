@@ -313,14 +313,14 @@ export function LibraryPage({
             )}
             <span className={css.chip}>
               {t(
-                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                overview?.plans.sources[item.originalSource ?? item.file]
                   ? "已采纳"
                   : item.status === "review"
                     ? "要你核对"
                     : item.status === "organized"
                       ? "已整理"
                       : "只存了原文",
-                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                overview?.plans.sources[item.originalSource ?? item.file]
                   ? "Adopted"
                   : item.status === "review"
                     ? "To review"
@@ -557,7 +557,7 @@ export function InboxPage({
       if (seq === generation.current) setLoading(false);
     }
   };
-  const destinationFor = (entry: InboxEntry) => sources?.[entry.file.split("/").at(-1) ?? ""];
+  const destinationFor = (entry: InboxEntry) => sources?.[entry.originalSource ?? entry.file];
   const needsReview = (entry: InboxEntry) => entry.status === "review" && !destinationFor(entry);
   const activeStatus = status ?? (next || entries?.some(needsReview) ? "review" : "all");
   const savedAsIs = (entry: InboxEntry) =>
