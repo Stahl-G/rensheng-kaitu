@@ -18,6 +18,12 @@ function fakeGithub() {
   const entered = join(bin, "entered");
   const release = join(bin, "release");
   const calls = join(bin, "calls.jsonl");
+  let ready: Promise<void>;
+  let markReady: () => void;
+  const watcher = fs.watch(bin, () => {
+    if (fs.existsSync(entered)) markReady();
+  });
+  watcher.unref();
   fs.writeFileSync(calls, "");
   fs.writeFileSync(
     join(bin, "gh"),
@@ -55,9 +61,13 @@ const stage = args[0] === "repo" ? args[1] : args.find(a => a.startsWith("repos/
     block(stage: string, fail = false) {
       fs.rmSync(entered, { force: true });
       fs.rmSync(release, { force: true });
+      ready = new Promise<void>((resolve) => {
+        markReady = resolve;
+      });
       fs.writeFileSync(control, JSON.stringify({ stage, fail }));
     },
-    started: () => vi.waitFor(() => expect(fs.existsSync(entered)).toBe(true)),
+    started: () => ready,
+    close: () => watcher.close(),
     release: () => fs.writeFileSync(release, "go"),
     calls: () =>
       fs
@@ -134,6 +144,7 @@ it.skipIf(process.platform === "win32")(
         }
       }
     } finally {
+      gh.close();
       vi.unstubAllEnvs();
     }
   },
@@ -206,6 +217,7 @@ it.skipIf(process.platform === "win32")(
           ),
       ).toBe(true);
     } finally {
+      gh.close();
       vi.unstubAllEnvs();
     }
   },
