@@ -9,6 +9,7 @@ import {
   readHealthPage,
   readLearning,
   readLibrary,
+  readMe,
   readOverviewPage,
   readProjectPage,
   readProjectsPage,
@@ -16,6 +17,7 @@ import {
   readWorkbench,
   saveProjectGoal,
   startLearning,
+  syncProject,
   updateRecord,
   writePhoneSnapshots,
 } from "../src/index.js";
@@ -124,7 +126,7 @@ it("isolates damaged project, footprint, health and finance files without allowi
     });
     const experience = addRecord(ws, "experience", {
       place: { name: "Berlin", country: "DE", precision: "city" },
-      event_type: "lived",
+      event_type: "worked",
       fact_status: "user_reported",
       start: "2020",
       time_precision: "year",
@@ -161,6 +163,12 @@ it("isolates damaged project, footprint, health and finance files without allowi
     const map = lifeMap(ws);
     expect(map.experiences.map((row) => row.id)).toContain(experience.record.id);
     expect(map.warnings?.some((warning) => warning.includes(experience.file))).toBe(true);
+    const me = readMe(ws);
+    expect(me.career.map((row) => row.id)).toContain(experience.record.id);
+    expect(me.warnings?.some((warning) => warning.includes(experience.file))).toBe(true);
+    expect((await readOverviewPage(ws)).warnings.some((warning) => warning.includes(experience.file))).toBe(
+      true,
+    );
     const library = readLibrary(ws);
     expect(library.sections.find((section) => section.id === "health")?.count).toBeGreaterThan(0);
     expect(library.warnings?.some((warning) => warning.includes(account.file))).toBe(true);
@@ -177,6 +185,18 @@ it("isolates damaged project, footprint, health and finance files without allowi
     expect(readProjectsPage(ws).find((row) => row.slug === bad.slug)?.error).toBeUndefined();
     expect(lifeMap(ws).warnings).toEqual([]);
     expect(financeOverview(ws).warnings).toBeUndefined();
+    addRecord(ws, "project_metric", { project: good.slug, kind: "commits", value: 10 });
+    addRecord(ws, "project_metric", { project: good.slug, kind: "commits", value: 20 });
+    const invalidMetric = ws.readText(metric.file).replace('"value":20', '"value":"20"');
+    ws.writeText(metric.file, invalidMetric);
+    const statusBefore = ws.readText(`projects/${good.slug}/STATUS.md`);
+    await expect(syncProject(ws, good.slug)).rejects.toThrow("记录格式不合法");
+    await expect(
+      saveProjectGoal(ws, good.slug, { label: "Commits", current: 0, target: 100, unit: "次提交" }),
+    ).rejects.toThrow();
+    expect(ws.readText(`projects/${good.slug}/STATUS.md`)).toBe(statusBefore);
+    expect(ws.readText(metric.file)).toBe(invalidMetric);
+    ws.writeText(metric.file, before.get(metric.file) as string);
     const read = ws.readText.bind(ws);
     const denied = Object.assign(new Error("synthetic permission denied"), { code: "EACCES" });
     const blocked = new Set([metric.file, workout.file, account.file, experience.file]);

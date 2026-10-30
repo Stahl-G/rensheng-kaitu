@@ -531,13 +531,13 @@ export async function syncProject(ws: Workspace, slug: string, options: GithubOp
 async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
+    const existing = readRecords(ws, "project_metric").filter((r) => r.project === slug);
     const sorted = sortLog(project.log);
     if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
     const now = options.now ?? new Date();
     const tz = ws.timeZone();
     const today = localDate(now, tz);
     const firstDay = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-    const existing = readRecords(ws, "project_metric").filter((r) => r.project === slug);
     const issues: { path: string; message: string }[] = [];
     const written: StoredRecord[] = [];
     function metric(kind: "words" | "commits", date: string, value: number, detail?: string[]) {

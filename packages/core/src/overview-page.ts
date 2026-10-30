@@ -210,7 +210,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date(), loaded?:
     (row) => row.status === "suggested",
   ).length;
   const mapPendingImports = pendingExperienceImports(ws).length;
-  const experiences = committedExperiences(ws);
+  const experiences = committedExperiences(ws, {
+    onError: (error) => data.warnings.push(error.message),
+  });
   const mapNeedsReview = experiences.filter(
     (row) => row.review || !experienceLayer(row as unknown as TimedExperience, data.today),
   ).length;

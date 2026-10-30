@@ -299,8 +299,8 @@ function fileRevisions(
   ref: RecordTypeRef,
   onError?: (error: KaituError) => void,
 ): readonly StoredRecord[] {
-  const validate = onError ? validatorFor(ws, ref) : undefined;
-  const parsed = ws.scanParsed(file, validate ? `records-view:${ref.type}` : "records", (text) => {
+  const validate = validatorFor(ws, ref);
+  const parsed = ws.scanParsed(file, `records:${ref.type}`, (text) => {
     const rows: StoredRecord[] = [];
     const errors: string[] = [];
     text.split("\n").forEach((raw, i) => {
@@ -308,7 +308,7 @@ function fileRevisions(
       try {
         const row = JSON.parse(raw) as StoredRecord;
         if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
-        if (validate && !row.deleted && !validate(row)) throw new Error("Invalid record fields");
+        if (!row.deleted && !validate(row)) throw new Error("Invalid record fields");
         rows.push(row);
       } catch {
         errors.push(`${file}:${i + 1} 记录格式不合法`);
