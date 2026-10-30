@@ -40,3 +40,18 @@ for (const { name, schema } of schemas) {
   });
 }
 writeFileSync(join(output, "manifest.json"), JSON.stringify({ sourceHash }));
+
+// Use the same self-contained workers in core, CLI, native App and installed plugin.
+for (const name of ["home-worker", "phone-worker"])
+  await build({
+    entryPoints: [join(root, `packages/core/src/${name}.ts`)],
+    outfile: join(root, `packages/core/dist/${name}.js`),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    external: ["better-sqlite3"],
+    banner: {
+      js: 'import { createRequire as workerRequire } from "node:module"; const require = workerRequire(import.meta.url);',
+    },
+  });

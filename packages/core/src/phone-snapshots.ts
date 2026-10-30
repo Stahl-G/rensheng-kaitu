@@ -359,7 +359,9 @@ export function startPhoneSnapshots(
   const off = subscribeWorkspaceBackup(ws, schedule);
   const interval = setInterval(schedule, 60000);
   interval.unref();
-  schedule();
+  // The initial view has no edit burst to debounce.
+  timer = setTimeout(() => void run(), 0);
+  timer.unref();
   return async () => {
     closed = true;
     clearTimeout(timer);

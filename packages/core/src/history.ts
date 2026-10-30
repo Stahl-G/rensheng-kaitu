@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import git, { type TreeEntry } from "isomorphic-git";
 import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
@@ -490,7 +490,8 @@ function observeHistoryReads(paths: Set<string>) {
     const method = promises[name];
     Object.assign(promises, {
       [name]: (...args: unknown[]) => {
-        if (typeof args[0] === "string") paths.add(args[0]);
+        // isomorphic-git may mix '/' with native separators on Windows.
+        if (typeof args[0] === "string") paths.add(resolve(args[0]));
         return Reflect.apply(method, fs.promises, args);
       },
     });
