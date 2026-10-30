@@ -6,6 +6,7 @@ import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { type AgentConnection, agentCanRead } from "./exposure.js";
 import { type Frontmatter, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { deepFreeze } from "./frozen.js";
 import { historyNeedsRetry, snapshot } from "./history.js";
 import { countInboxNotes } from "./inbox-notes.js";
 import { normalizeLocale, pick, readPreferences } from "./locale.js";
@@ -108,16 +109,20 @@ export function statusFiles(ws: Workspace): { file: string; module: string }[] {
 
 function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
   if (!ws.exists(file)) return { data: fallback, body: "" };
-  const parsed = parseFrontmatter<T>(ws.readText(file));
   const schema =
     file === "NOW.md"
       ? "now.schema.json"
       : file.endsWith("STATUS.md")
         ? "status.schema.json"
         : "rules.schema.json";
-  const data = normalizeDocument(schema, parsed.data) as T;
-  if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
-  return { ...parsed, data };
+  return (
+    ws.scanParsed(file, `workbench:${schema}`, (text) => {
+      const parsed = parseFrontmatter<T>(text);
+      const data = normalizeDocument(schema, parsed.data) as T;
+      if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
+      return deepFreeze({ ...parsed, data });
+    }) ?? { data: fallback, body: "" }
+  );
 }
 
 export function readWorkbench(
