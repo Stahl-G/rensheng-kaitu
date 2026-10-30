@@ -1643,12 +1643,24 @@
     display: none;
   }
   .referenceApp .tabs {
-    justify-content: center;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .referenceApp .tabs button {
+    flex-direction: row;
     min-height: 40px;
-    padding: 0 8px;
+    padding: 0 4px;
+    gap: 4px;
     font-size: 14px;
+  }
+  .referenceApp .reviewBadge {
+    position: static;
+    min-width: 16px;
+    height: 18px;
+    padding: 0 3px;
+    font-size: 10px;
   }
   .referenceApp .tabs button svg {
     display: none;
