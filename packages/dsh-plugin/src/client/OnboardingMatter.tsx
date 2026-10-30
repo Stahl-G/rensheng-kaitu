@@ -114,6 +114,8 @@ export function OnboardingMatter(
   props: OnboardingServices & {
     initial: Matter | null;
     initialText?: string;
+    initialGoal?: string;
+    clipboard?: boolean;
     content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
@@ -126,7 +128,9 @@ export function OnboardingMatter(
   const [text, setText] = useState(props.initialText ?? "");
   const [matter, setMatter] = useState<Matter | null>(props.initial);
   const [draft, setDraft] = useState<OnboardingMatterDraft>(
-    props.initial?.draft ? editable(props.initial.draft) : { goal: "", current: "", next: "" },
+    props.initial?.draft
+      ? editable(props.initial.draft)
+      : { goal: props.initialGoal ?? "", current: "", next: "" },
   );
   const [paths, setPaths] = useState<OnboardingPath[]>(props.initial?.draft?.paths ?? []);
   const [path, setPath] = useState(-1);
@@ -136,7 +140,6 @@ export function OnboardingMatter(
   const [error, setError] = useState("");
   const [raw, setRaw] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
-  const [externalRequested, setExternalRequested] = useState(false);
   const [noAi, setNoAi] = useState(false);
   const [manual, setManual] = useState(!props.initial?.draft);
   const applied = useRef(JSON.stringify(props.initial?.draft ?? null));
@@ -207,7 +210,6 @@ export function OnboardingMatter(
         ? `Use kaitu_onboarding matter-read to read the original ${saved.source}. Summarize the current goal and what is known. If there is a clear thing to push, give one next step; if the person doesn't know what to do, give 2–3 possible paths (why it fits, what's unclear, one low-cost experiment), without preselecting a path or next step. Call matter-draft to save a draft for me to review. Don't create tasks or adopt other suggestions. I'll review and adopt in Kaitu.`
         : `请用 kaitu_onboarding 的 matter-read 读取原文 ${saved.source}，整理当前目标和已知现状；已有明确的事时给一个下一步，不知道做什么时给 2–3 条可能路径（为什么适合、还有哪些不清楚、一个低成本小实验），不要预选路径或下一步。调用 matter-draft 保存供我核对的草稿。不要创建待办或采纳其他建议。我会回到开图核对并采纳。`,
     );
-    setExternalRequested(true);
   };
   const organize = async () => {
     const saved = await save();
@@ -258,7 +260,7 @@ export function OnboardingMatter(
           ? props.content.question
           : hasDraft
             ? t(`开图从${subject}里看到的`, `What Kaitu found in ${subject}`)
-            : t("原文已保存，接下来由你选择", "Your text is saved. Choose what comes next")}
+            : t("写下你的目标和一个下一步", "Write your goal and one next step")}
       </h1>
       {error && (
         <p role="alert" className={v2.error}>
@@ -336,24 +338,22 @@ export function OnboardingMatter(
         <>
           <div className={css.badges}>
             <span>{t("原文已保存", "Text saved")}</span>
-            <span>
-              {hasDraft ? t("需要你核对", "Needs your review") : t("等你整理", "Ready to organize")}
-            </span>
+            {hasDraft && <span>{t("需要你核对", "Needs your review")}</span>}
           </div>
           {busy && !organizing && <output className={v2.small}>{t("正在保存…", "Saving…")}</output>}
-          {manual && (
-            <p className={v2.small}>
-              {t(
-                "可以自己写目标和下一步，也可以只保留原文后结束。",
-                "Write a goal and next step yourself, or finish with just your original text saved.",
-              )}
-            </p>
-          )}
           <div className={css.footerActions}>
             <button type="button" className={quiet} disabled={busy} onClick={() => void run(keep)}>
               {t("保留原文并结束", "Keep the text and finish")}
             </button>
           </div>
+          {manual && props.clipboard && (
+            <ClipboardOrganize
+              source={matter.source}
+              promptOnboardingMatter={props.promptOnboardingMatter}
+              pasteOnboardingMatter={props.pasteOnboardingMatter}
+              onDraft={apply}
+            />
+          )}
           <div className={css.draftFields}>
             {field("goal", t("当前目标", "Current goal"))}
             {field("current", t("已知现状", "What's known now"))}
@@ -398,7 +398,7 @@ export function OnboardingMatter(
               : t(`依据 · 查看${subject}`, `Source · view ${subject}`)}
           </button>
           {raw && <pre className={css.original}>{matter.text}</pre>}
-          {manual && (
+          {manual && !props.clipboard && (
             <details>
               <summary>{t("用其他 AI 整理（可选）", "Organize with another AI (optional)")}</summary>
               <ClipboardOrganize
@@ -416,17 +416,23 @@ export function OnboardingMatter(
               </output>
             )}
             <div className={css.footerActions}>
-              {props.builtin ? (
-                !noAi && (
-                  <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                    {t("用当前 AI 整理", "Organize with the current AI")}
+              {!props.clipboard &&
+                (props.builtin ? (
+                  !noAi && (
+                    <button
+                      type="button"
+                      className={quiet}
+                      disabled={busy}
+                      onClick={() => void run(organize)}
+                    >
+                      {t("用当前 AI 整理", "Organize with the current AI")}
+                    </button>
+                  )
+                ) : (
+                  <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
+                    {t("请当前 AI 整理", "Ask the current AI")}
                   </button>
-                )
-              ) : (
-                <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
-                  {t("请当前 AI 整理", "Ask the current AI")}
-                </button>
-              )}
+                ))}
               <button
                 type="button"
                 className={primary}

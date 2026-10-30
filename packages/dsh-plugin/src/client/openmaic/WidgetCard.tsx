@@ -76,13 +76,6 @@ const overlayBarStyle: CSSProperties = {
   borderBottom: "1px solid var(--dsw-alias-border-l2, rgba(255 255 255 / 12%))",
 };
 
-const overlayFrameStyle: CSSProperties = {
-  flex: 1,
-  width: "100%",
-  border: 0,
-  background: "transparent",
-};
-
 const closeBtnStyle: CSSProperties = {
   appearance: "none",
   marginLeft: "auto",

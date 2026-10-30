@@ -293,26 +293,39 @@ export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[]
 }
 
 /** 一个数据文件里的全部行：文件没变时不再读取、解析和校验。行对象已冻结，可以共用。 */
-function fileRevisions(ws: Workspace, file: string): readonly StoredRecord[] {
-  return (
-    ws.scanParsed(file, "records", (text) => {
-      const rows: StoredRecord[] = [];
-      text.split("\n").forEach((raw, i) => {
-        if (!raw.trim()) return;
-        try {
-          const row = JSON.parse(raw) as StoredRecord;
-          if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
-          rows.push(row);
-        } catch {
-          throw new KaituError(`${file}:${i + 1} 记录格式不合法`, "CORRUPT");
-        }
-      });
-      return deepFreeze(rows);
-    }) ?? []
-  );
+function fileRevisions(
+  ws: Workspace,
+  file: string,
+  onError?: (error: KaituError) => void,
+): readonly StoredRecord[] {
+  const parsed = ws.scanParsed(file, "records", (text) => {
+    const rows: StoredRecord[] = [];
+    const errors: string[] = [];
+    text.split("\n").forEach((raw, i) => {
+      if (!raw.trim()) return;
+      try {
+        const row = JSON.parse(raw) as StoredRecord;
+        if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
+        rows.push(row);
+      } catch {
+        errors.push(`${file}:${i + 1} 记录格式不合法`);
+      }
+    });
+    return deepFreeze({ rows, errors });
+  }) ?? { rows: [], errors: [] };
+  for (const message of parsed.errors) {
+    const error = new KaituError(message, "CORRUPT");
+    if (!onError) throw error;
+    onError(error);
+  }
+  return parsed.rows;
 }
 
-function revisionsFor(ws: Workspace, ref: RecordTypeRef): StoredRecord[] {
+function revisionsFor(
+  ws: Workspace,
+  ref: RecordTypeRef,
+  onError?: (error: KaituError) => void,
+): StoredRecord[] {
   const { dir, match } = recordFilePattern(ref);
   const abs = resolveRecordPath(ws, ref, dir);
   if (!existsSync(abs)) return [];
@@ -322,14 +335,18 @@ function revisionsFor(ws: Workspace, ref: RecordTypeRef): StoredRecord[] {
     .flatMap((f) => {
       const file = `${dir}/${f}`;
       resolveRecordPath(ws, ref, file);
-      return fileRevisions(ws, file);
+      return fileRevisions(ws, file, onError);
     });
 }
 
 /** 按 id 折叠：rev 大者胜；rev 相同时后出现者胜。 */
-function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord> {
+function latestById(
+  ws: Workspace,
+  ref: RecordTypeRef,
+  onError?: (error: KaituError) => void,
+): Map<string, StoredRecord> {
   const latest = new Map<string, StoredRecord>();
-  for (const rec of revisionsFor(ws, ref)) {
+  for (const rec of revisionsFor(ws, ref, onError)) {
     const prev = latest.get(rec.id);
     if (!prev || (rec.rev ?? 1) >= (prev.rev ?? 1)) latest.set(rec.id, rec);
   }
@@ -337,6 +354,8 @@ function latestById(ws: Workspace, ref: RecordTypeRef): Map<string, StoredRecord
 }
 
 export interface ReadOptions {
+  /** 只读投影逐行报告坏记录；写入所用的默认读取仍拒绝不完整历史。 */
+  onError?: (error: KaituError) => void;
   /** 本地日期 YYYY-MM-DD（含） */
   from?: string;
   /** 本地日期 YYYY-MM-DD（含） */
@@ -348,7 +367,7 @@ export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {})
   const tz = ws.timeZone();
   const day = (r: StoredRecord) => isoInZone(parseTs(r.ts), tz).slice(0, 10);
   // 排序前把时间各解析一次，不在比较函数里反复解析。
-  return [...latestById(ws, ref).values()]
+  return [...latestById(ws, ref, opts.onError).values()]
     .filter((r) => !r.deleted)
     .filter((r) => (!opts.from || day(r) >= opts.from) && (!opts.to || day(r) <= opts.to))
     .map((record) => ({ record, at: parseTs(record.ts).getTime() }))

@@ -1,16 +1,7 @@
 import { activeAtToken, formatFileMention } from "@deepseek-ai/dsh-file-reference/grammar";
 import { openmaicMetaFrom } from "@kaitu/core/teaching-frame";
 import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
-import {
-  Fragment,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";
@@ -276,6 +267,7 @@ export function AskPage({
   onConnections,
   onToday,
   onSettings,
+  onOrganize,
 }: {
   workspace: string;
   active?: boolean;
@@ -288,6 +280,7 @@ export function AskPage({
   onConnections?: () => void;
   onToday?: () => void;
   onSettings?: (section: "ai" | "local-ai") => void;
+  onOrganize?: (source: string) => Promise<void>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -768,6 +761,11 @@ export function AskPage({
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
   const [handoffState, setHandoffState] = useState<"sending" | "retry" | "uncertain" | "failed" | null>(null);
+  const organizeSaved = (source: string) => {
+    void onOrganize?.(source)
+      .then(() => setHandoffState(null))
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+  };
   const checkHandoff = useCallback(async () => {
     if (!autoSubmit) return;
     const receipt = await call<AskHandoffStatus>("askHandoffStatus", autoSubmit.requestId);
@@ -1201,21 +1199,25 @@ export function AskPage({
         >
           {loaded && !settings?.configured && !selected ? (
             <div className={css.noKey}>
-              <h1>{t("先接上一个 AI。", "Connect an AI first.")}</h1>
-              <p>
-                {t(
-                  "开图本身不带 AI。接上以后，问问只读你允许的那部分资料来回答；每次发出去的内容都写在输入框下面。",
-                  "Kaitu does not include an AI. Once connected, Ask reads the data you allow; the details appear below the composer before you send.",
-                )}
-              </p>
+              <h1>
+                {autoSubmit
+                  ? t("原文已保存", "Original saved")
+                  : t("先接上一个 AI。", "Connect an AI first.")}
+              </h1>
+              {autoSubmit && onOrganize && (
+                <button
+                  type="button"
+                  className={css.routePrimary}
+                  onClick={() => organizeSaved(autoSubmit.capturedPath)}
+                >
+                  {t("用其他 AI 整理", "Organize with another AI")}
+                </button>
+              )}
               <section className={css.routes} aria-label={t("接 AI 的方式", "Ways to connect AI")}>
                 <div>
                   <span>
                     <strong>{t("填一个 DeepSeek Key", "Add a DeepSeek key")}</strong>{" "}
-                    <small>{t("推荐新手", "Good for starters")}</small>
-                    <p>
-                      {t("用自己的 Key 连接，按用量付费。", "Connect with your own key and pay for usage.")}
-                    </p>
+                    <small>{t("按用量付费", "Usage-based billing")}</small>
                   </span>
                   <button type="button" className={css.routePrimary} onClick={connectKey}>
                     {t("去填 Key", "Add a key")}
@@ -1224,12 +1226,6 @@ export function AskPage({
                 <div>
                   <span>
                     <strong>{t("用这台电脑上已经有的 AI", "Use AI already on this computer")}</strong>
-                    <p>
-                      {t(
-                        "装了 Claude Code 或 Codex 的话，可以直接接上。",
-                        "Connect an installed Agent such as Claude Code or Codex.",
-                      )}
-                    </p>
                   </span>
                   <button type="button" onClick={checkLocal}>
                     {t("去设置", "Open settings")}
@@ -1238,12 +1234,6 @@ export function AskPage({
                 <div>
                   <span>
                     <strong>{t("先不接", "Not now")}</strong>
-                    <p>
-                      {t(
-                        "记录、原文、日程、足迹、健康都照常能用。",
-                        "Notes, originals, calendar, footprints and health remain available.",
-                      )}
-                    </p>
                   </span>
                   <button type="button" disabled={!onToday} onClick={onToday}>
                     {t("回到今天", "Back to Today")}
@@ -1411,8 +1401,16 @@ export function AskPage({
                   : t("发送结果未知", "Send status unknown")}
             {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
               autoSubmit && <p>{autoSubmit.text}</p>}
-            {(handoffState === "retry" || handoffState === "uncertain" || handoffState === "failed") &&
-              autoSubmit && <small>{autoSubmit.capturedPath}</small>}
+            {handoffState === "retry" && !settings?.configured && selected && autoSubmit && onOrganize && (
+              <button
+                type="button"
+                onClick={() => {
+                  organizeSaved(autoSubmit.capturedPath);
+                }}
+              >
+                {t("用其他 AI 整理", "Organize with another AI")}
+              </button>
+            )}
             {(handoffState === "uncertain" || handoffState === "failed" || handoffState === "sending") && (
               <button
                 type="button"

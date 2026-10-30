@@ -142,7 +142,6 @@ export function StorageChoice({
                   : undefined;
                 return base && (normalized === base || normalized.startsWith(`${base}/`));
               });
-              const target = detected?.id ?? provider;
               const name = "kaitu-ai-memory";
               const leaf = selected.split(/[\\/]/).at(-1)?.toLowerCase();
               setPath(

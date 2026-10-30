@@ -22,14 +22,6 @@
 .header p {
   margin-top: 4px;
 }
-.dot {
-  width: 10px;
-  height: 10px;
-  flex: none;
-  border-radius: 50%; /* biome-ignore lint/correctness/noUnknownProperty: dsh requires round markers. */
-  corner-shape: round;
-  background: var(--kt-finance);
-}
 .actions {
   justify-content: flex-start;
 }

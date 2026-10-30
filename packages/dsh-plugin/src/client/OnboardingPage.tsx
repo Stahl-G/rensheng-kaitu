@@ -26,6 +26,7 @@ interface Props
   builtin: boolean;
   initialSource?: string;
   initialText?: string;
+  workspaceRoot?: string;
   setStep: (step: number) => void;
   onStatus: (status: OnboardingStatus) => void;
   refresh: () => Promise<void>;
@@ -45,6 +46,7 @@ export function OnboardingPage(props: Props) {
   const { status, step } = props;
   const { content, choices } = status;
   const [matterText, setMatterText] = useState(props.initialText ?? "");
+  const [confirmedGoal, setConfirmedGoal] = useState<string>();
   const [matterDestination, setMatterDestination] = useState<Destination | null>(null);
   const [entry, setEntry] = useState<"matter" | "memory">("matter");
   const memoryMode = step === 5 || (step === 1 && entry === "memory");
@@ -290,12 +292,14 @@ export function OnboardingPage(props: Props) {
     return (
       <>
         <TodayStart
+          workspaceRoot={props.workspaceRoot}
           status={status}
           connect={() => move(4)}
           storage={() => move(STORAGE_STEP)}
           busy={busy}
           start={(text) => {
             setMatterText(text);
+            setConfirmedGoal(text);
             setMatterDestination("today");
             setEntry("matter");
             void run(next);
@@ -351,6 +355,7 @@ export function OnboardingPage(props: Props) {
             onBusy={setBusy}
             initial={matterDestination === null ? status.draft : null}
             initialText={matterText}
+            initialGoal={confirmedGoal}
             content={content.matter}
             onDone={async () => {
               await save({ seen: true });
@@ -654,59 +659,6 @@ export function OnboardingPage(props: Props) {
           )}
         </>
       )}
-    </section>
-  );
-}
-
-export function OnboardingChecklist({
-  status,
-  restart,
-  go,
-}: {
-  status: OnboardingStatus;
-  restart: () => void;
-  go: (item: OnboardingStatus["checklist"]["items"][number]) => void;
-}) {
-  const t = useT();
-  if (!status.checklist.visible) return null;
-  return (
-    <section className={`${v2.card} ${css.checklist}`} aria-labelledby="onboarding-checklist">
-      <div className={v2["sec-head"]}>
-        <h2 id="onboarding-checklist">
-          {t("开始使用", "Get started")} · {status.checklist.completed}/{status.checklist.total}
-        </h2>
-        <button type="button" className={v2.link} onClick={restart}>
-          {t("重新走一遍", "Start over")}
-        </button>
-      </div>
-      <progress
-        className={css.progress}
-        aria-label={t("开始使用进度", "Getting started progress")}
-        value={status.checklist.completed}
-        max={status.checklist.total}
-      />
-      {status.checklist.items.map((item) => (
-        <div className={css.checkItem} data-done={item.done} key={item.id}>
-          <span className={css.tick} aria-hidden="true">
-            {item.done ? "✓" : ""}
-          </span>
-          <div className={v2.stack}>
-            <b>{item.title}</b>
-            <span className={v2.small}>
-              {item.done
-                ? t("已完成", "Done")
-                : item.skipped
-                  ? t("先跳过，随时能继续", "Skipped for now; continue anytime")
-                  : t("还没完成", "Not yet")}
-            </span>
-          </div>
-          {!item.done && (
-            <button type="button" className={quiet} onClick={() => go(item)}>
-              {item.action.label}
-            </button>
-          )}
-        </div>
-      ))}
     </section>
   );
 }

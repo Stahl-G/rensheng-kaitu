@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { homedir } from "node:os";
-import { dirname, extname, isAbsolute, join, matchesGlob, relative, resolve } from "node:path";
+import { extname, isAbsolute, join, matchesGlob, relative, resolve } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import git from "isomorphic-git";
 import { SaxesParser } from "saxes";

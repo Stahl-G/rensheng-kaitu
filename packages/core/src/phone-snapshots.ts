@@ -34,29 +34,38 @@ export async function writePhoneSnapshots(
     );
   const at = now.toISOString();
   const snapshots = {
-    today: buildPhoneToday(data, at, ws),
-    week: buildPhoneWeek(data, at),
-    map: buildPhoneMap(data, lifeMap(ws, now), readExploration(ws), at),
-    library: buildPhoneLibrary(ws, data, at),
+    today: () => buildPhoneToday(data, at, ws),
+    week: () => buildPhoneWeek(data, at),
+    map: () => buildPhoneMap(data, lifeMap(ws, now), readExploration(ws), at),
+    library: () => buildPhoneLibrary(ws, data, at),
   };
   let writes = 0;
-  for (const [name, snapshot] of Object.entries(snapshots)) {
-    const value = { ...snapshot, generator: options.generator ?? { kind: "computer" } };
+  const errors: Error[] = [];
+  for (const [name, build] of Object.entries(snapshots)) {
     const file = `phone/${name}.json`;
-    if (ws.exists(file)) {
-      const previous = ws.readJson<typeof value>(file);
-      if ("navigation" in value && value.navigation.status === "unavailable" && "navigation" in previous)
-        value.navigation.files = previous.navigation.files.filter((file) =>
-          agentCanRead(ws, file.path, { id: "handover", finance: false }),
-        );
-      if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
-        continue;
+    try {
+      const value = { ...build(), generator: options.generator ?? { kind: "computer" } };
+      if (ws.exists(file)) {
+        const previous = ws.readJson<typeof value>(file);
+        if ("navigation" in value && value.navigation.status === "unavailable" && "navigation" in previous)
+          value.navigation.files = previous.navigation.files.filter((file) =>
+            agentCanRead(ws, file.path, { id: "handover", finance: false }),
+          );
+        if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
+          continue;
+      }
+      ws.writeJson(file, value);
+      if (name === "today" && computer) rememberComputerSnapshot(ws, now);
+      writes++;
+    } catch (cause) {
+      errors.push(
+        new Error(`${file} 生成失败：${cause instanceof Error ? cause.message : String(cause)}`, { cause }),
+      );
     }
-    ws.writeJson(file, value);
-    if (name === "today" && computer) rememberComputerSnapshot(ws, now);
-    writes++;
   }
-  return writes + writePhoneReceipts(ws, [], now);
+  writes += writePhoneReceipts(ws, [], now);
+  if (errors.length) throw new AggregateError(errors, errors.map((error) => error.message).join("；"));
+  return writes;
 }
 
 /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */

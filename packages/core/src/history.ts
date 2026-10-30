@@ -7,7 +7,7 @@ import { HISTORY_MARKER } from "./history-ownership.js";
 import { batchOverview, refreshOverview } from "./overview.js";
 import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
-import { type Workspace, stateDirectory } from "./workspace.js";
+import type { Workspace } from "./workspace.js";
 
 /** 永远不进版本历史的路径（.gitignore 之外再兜底一次）。 */
 export const NEVER_TRACK = [

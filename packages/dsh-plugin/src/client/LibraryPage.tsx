@@ -5,7 +5,7 @@ import type {
   OnboardingMatterDraft,
   PlansData,
 } from "@kaitu/core";
-import { type CSSProperties, Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
 import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
@@ -99,9 +99,12 @@ export function LibraryPage({
   query,
   onQuery,
   data,
+  readError,
+  retry,
   open,
   overview,
   capture,
+  organize,
   onAdd,
   onFile,
   onOpenOriginal,
@@ -116,9 +119,12 @@ export function LibraryPage({
   onOpenNote: (file: string) => void;
   onOpenGoal: (id: string) => void;
   data: LibraryData | null;
+  readError?: string;
+  retry?: () => void;
   open: (id: string) => void;
   overview?: OverviewData | null;
   capture?: (text: string) => Promise<unknown>;
+  organize?: (text: string) => Promise<void>;
   onAdd?: (kind: "file" | "phone" | "organizer" | "category") => void;
 }) {
   const t = useT();
@@ -154,6 +160,7 @@ export function LibraryPage({
   const goals = searching ? (overview?.plans.goals ?? []).filter((goal) => matches(goal.title)) : [];
   const notes = searching && found?.term === term ? found.notes : [];
   const searchingNotes = searching && found?.term !== term;
+  const noteCount = searchingNotes ? "…" : found?.error ? t("未完成", "incomplete") : notes.length;
   const hints: Record<string, [string, string]> = {
     calendar: ["添加日程或连接日历", "Add an event or connect a calendar"],
     projects: ["记下正在做的项目", "Add a project you are working on"],
@@ -164,12 +171,6 @@ export function LibraryPage({
   return (
     <div className={styles.page}>
       <div className={styles.heading}>
-        <p>
-          {t(
-            "你留下的原文，和从中整理出的东西。原文永远保留。",
-            "What you've saved, and what Kaitu organized from it. Originals are always kept.",
-          )}
-        </p>
         <input
           type="search"
           value={query}
@@ -178,7 +179,7 @@ export function LibraryPage({
           placeholder={t("搜索原文、目标、笔记正文", "Search originals, goals and note contents")}
         />
       </div>
-      {searching && (
+      {searching && !readError && (
         <section aria-label={t("搜索结果", "Search results")} className={styles.searchResults}>
           <h2>{t("搜索结果", "Search results")}</h2>
           {!data || !overview ? (
@@ -187,8 +188,8 @@ export function LibraryPage({
             <>
               <output className={styles.meta}>
                 {t(
-                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记 ${notes.length}${notes.length === 50 ? "（前 50 条）" : ""}`,
-                  `Originals ${originals.length} · Goals ${goals.length} · Notes ${notes.length}${notes.length === 50 ? " (first 50)" : ""}`,
+                  `原文 ${originals.length} · 目标 ${goals.length} · 笔记 ${noteCount}${notes.length === 50 ? "（前 50 条）" : ""}`,
+                  `Originals ${originals.length} · Goals ${goals.length} · Notes ${noteCount}${notes.length === 50 ? " (first 50)" : ""}`,
                 )}
               </output>
               {searchingNotes && <output>{t("正在搜索笔记正文…", "Searching note contents…")}</output>}
@@ -202,6 +203,11 @@ export function LibraryPage({
                 >
                   <span className={css.chip}>{t("原文", "Original")}</span>
                   <span className={styles.preview}>{item.text}</span>
+                  {item.error && (
+                    <span className={css.error}>
+                      {t("原文头部读取失败", "Original header could not be read")}
+                    </span>
+                  )}
                   <time className={styles.meta}>{item.date?.slice(0, 10)}</time>
                 </button>
               ))}
@@ -238,6 +244,16 @@ export function LibraryPage({
             </>
           )}
         </section>
+      )}
+      {readError && (
+        <p role="alert">
+          {readError}{" "}
+          {retry && (
+            <button type="button" className={css.link} onClick={retry}>
+              {t("重试", "Retry")}
+            </button>
+          )}
+        </p>
       )}
       <section
         className={styles.inbox}
@@ -286,26 +302,29 @@ export function LibraryPage({
             · {away.returnedAt.slice(0, 16).replace("T", " ")}
           </p>
         )}
-        {items.length === 0 && (
-          <p>
-            {t(
-              "所有进来的东西都先放在这里，整理好再分到下面各类。",
-              "Everything arrives here first, then is organized into the categories below.",
-            )}
-          </p>
-        )}
         {items.slice(0, 3).map((item) => (
           <button type="button" className={styles.row} key={item.file} onClick={() => onOpenOriginal(item)}>
             <time className={styles.meta}>{item.date?.slice(0, 10) ?? ""}</time>
             <span className={styles.preview}>{item.text}</span>
+            {item.error && (
+              <span className={css.error}>{t("原文头部读取失败", "Original header could not be read")}</span>
+            )}
             <span className={css.chip}>
               {t(
-                item.status === "review" ? "要你核对" : item.status === "organized" ? "已整理" : "只存了原文",
-                item.status === "review"
-                  ? "To review"
-                  : item.status === "organized"
-                    ? "Organized"
-                    : "Saved as is",
+                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                  ? "已采纳"
+                  : item.status === "review"
+                    ? "要你核对"
+                    : item.status === "organized"
+                      ? "已整理"
+                      : "只存了原文",
+                overview?.plans.sources[item.file.split("/").at(-1) ?? ""]
+                  ? "Adopted"
+                  : item.status === "review"
+                    ? "To review"
+                    : item.status === "organized"
+                      ? "Organized"
+                      : "Saved as is",
               )}
             </span>
           </button>
@@ -341,7 +360,8 @@ export function LibraryPage({
               setBusy(true);
               setError("");
               try {
-                await capture(draft);
+                if (organize) await organize(draft);
+                else await capture(draft);
                 setDraft(null);
               } catch (err) {
                 setError(err instanceof Error ? err.message : String(err));
@@ -360,7 +380,11 @@ export function LibraryPage({
               />
             </label>
             <button type="submit" disabled={busy || !draft.trim()}>
-              {busy ? t("正在保存…", "Saving…") : t("保存原文", "Save original")}
+              {busy
+                ? t("正在保存…", "Saving…")
+                : organize
+                  ? t("保存并整理", "Save and organize")
+                  : t("保存原文", "Save original")}
             </button>
             <button type="button" disabled={busy} onClick={() => setDraft(null)}>
               {t("取消", "Cancel")}
@@ -374,27 +398,27 @@ export function LibraryPage({
         {data?.sections
           .filter((section) => section.id !== "inbox")
           .map((section) => (
-            <button
-              type="button"
-              className={styles.category}
-              key={section.id}
-              style={tones[section.id]}
-              onClick={() => open(section.id)}
-            >
-              <strong className={styles.title}>
-                <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
-                {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-              </strong>
-              <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
-                {section.count ?? "—"}
-              </span>
-              <span className={styles.meta}>
-                {section.count === 0 && hints[section.id]
-                  ? t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")
-                  : section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
-              </span>
+            <article className={styles.category} key={section.id} style={tones[section.id]}>
+              <button type="button" className={styles.categoryOpen} onClick={() => open(section.id)}>
+                <strong className={styles.title}>
+                  <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
+                  {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+                </strong>
+                <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
+                  {section.count ?? "—"}
+                </span>
+              </button>
+              {section.count === 0 && hints[section.id] ? (
+                <button type="button" className={css.link} onClick={() => open(section.id)}>
+                  {t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")}
+                </button>
+              ) : section.sources.length > 0 ? (
+                <span className={styles.meta}>
+                  {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
+                </span>
+              ) : null}
               {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
-            </button>
+            </article>
           ))}
         {onAdd && (
           <button
@@ -406,7 +430,6 @@ export function LibraryPage({
               <span className={styles.icon}>{icon(<path d="M12 5v14M5 12h14" />)}</span>
               {t("添加一类", "Add a category")}
             </strong>
-            <span className={styles.meta}>{t("比如工作与求职", "For example, work and jobs")}</span>
           </button>
         )}
         {!data && <output>{t("正在读取资料…", "Loading…")}</output>}
@@ -503,6 +526,8 @@ export function InboxPage({
     };
     reload.current = load;
     setEntries(null);
+    setNext(null);
+    setError("");
     void load();
     const off = subscribe?.(() => void load());
     return () => {
@@ -530,15 +555,14 @@ export function InboxPage({
       if (seq === generation.current) setLoading(false);
     }
   };
-  const activeStatus =
-    status ?? (next || entries?.some((entry) => entry.status === "review") ? "review" : "all");
   const destinationFor = (entry: InboxEntry) => sources?.[entry.file.split("/").at(-1) ?? ""];
+  const needsReview = (entry: InboxEntry) => entry.status === "review" && !destinationFor(entry);
+  const activeStatus = status ?? (next || entries?.some(needsReview) ? "review" : "all");
   const savedAsIs = (entry: InboxEntry) =>
     entry.status === "organized" && !!sources && !entry.destination && !destinationFor(entry);
   const filtered =
     entries?.filter(
-      (entry) =>
-        activeStatus === "all" || (activeStatus === "saved" ? savedAsIs(entry) : entry.status === "review"),
+      (entry) => activeStatus === "all" || (activeStatus === "saved" ? savedAsIs(entry) : needsReview(entry)),
     ) ?? [];
   const selectedEntry = filtered.find((entry) => entry.file === selected);
   const away = overview?.sync.cloudOrganizer?.away;
@@ -595,7 +619,11 @@ export function InboxPage({
         ))}
       </div>
       {error && <p role="alert">{error}</p>}
-      {!entries ? (
+      {!entries && error ? (
+        <button type="button" className={css.link} onClick={() => void reload.current()}>
+          {t("重试读取", "Retry loading")}
+        </button>
+      ) : !entries ? (
         <p className={css.small}>{t("正在读取收件箱…", "Loading inbox…")}</p>
       ) : !entries?.length ? (
         <p className={css.emptyState}>
@@ -642,26 +670,39 @@ export function InboxPage({
                   onClick={() => setSelected(row.file)}
                 >
                   <strong className={inboxStyles.preview}>{row.text.split("\n")[0]}</strong>
+                  {row.error && (
+                    <span className={css.error}>
+                      {t("原文头部读取失败", "Original header could not be read")}
+                    </span>
+                  )}
                   <time className={inboxStyles.meta}>
                     {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
                   </time>
                   <span className={inboxStyles.meta}>
                     {sourceLabel(row.source)} ·{" "}
                     {t(
-                      row.status === "review"
-                        ? "要你核对"
-                        : savedAsIs(row)
-                          ? "只存了原文"
-                          : row.status === "organized"
-                            ? "已整理"
-                            : "还没整理",
-                      row.status === "review"
-                        ? "To review"
-                        : savedAsIs(row)
-                          ? "Saved as is"
-                          : row.status === "organized"
-                            ? "Organized"
-                            : "Not organized yet",
+                      destinationFor(row)
+                        ? "已采纳"
+                        : row.status === "review"
+                          ? "要你核对"
+                          : savedAsIs(row)
+                            ? "只存了原文"
+                            : row.status === "organized"
+                              ? "已整理"
+                              : overview?.sync.organizer
+                                ? "还没整理"
+                                : "已保存",
+                      destinationFor(row)
+                        ? "Adopted"
+                        : row.status === "review"
+                          ? "To review"
+                          : savedAsIs(row)
+                            ? "Saved as is"
+                            : row.status === "organized"
+                              ? "Organized"
+                              : overview?.sync.organizer
+                                ? "Not organized yet"
+                                : "Saved",
                     )}
                   </span>
                 </button>
@@ -669,6 +710,15 @@ export function InboxPage({
             </div>
             {selectedEntry && (
               <article className={inboxStyles.detail} aria-label={t("这一条原文", "Selected original")}>
+                {selectedEntry.error && (
+                  <p role="alert">
+                    {t(
+                      "原文头部读取失败，请检查原文件。",
+                      "Could not read the original header. Check the original file.",
+                    )}{" "}
+                    <code>{selectedEntry.file}</code>
+                  </p>
+                )}
                 <p className={inboxStyles.meta}>
                   {t("原文", "Original")} · {selectedEntry.date?.slice(0, 16).replace("T", " ")}
                 </p>
@@ -693,24 +743,29 @@ export function InboxPage({
                     <p className={styles.meta}>{t("只保留了原文", "Saved as is")}</p>
                   ) : null;
                 })()}
-                {review && selectedEntry.originalSource && selectedEntry.status !== "organized" && (
-                  <InboxReview
-                    key={selectedEntry.file}
-                    file={selectedEntry.originalSource}
-                    services={review}
-                    done={() => {
-                      setSelected(
-                        filtered.find((row) => row.file !== selectedEntry.file && row.status !== "organized")
-                          ?.file ?? null,
-                      );
-                      void reload.current();
-                    }}
-                    onReview={onReview}
-                  />
-                )}
+                {review &&
+                  selectedEntry.originalSource &&
+                  selectedEntry.status !== "organized" &&
+                  !destinationFor(selectedEntry) && (
+                    <InboxReview
+                      key={selectedEntry.file}
+                      file={selectedEntry.originalSource}
+                      services={review}
+                      done={() => {
+                        setSelected(
+                          filtered.find(
+                            (row) => row.file !== selectedEntry.file && row.status !== "organized",
+                          )?.file ?? null,
+                        );
+                        void reload.current();
+                      }}
+                      onReview={onReview}
+                    />
+                  )}
                 {!review &&
                   onReview &&
                   selectedEntry.originalSource &&
+                  !destinationFor(selectedEntry) &&
                   selectedEntry.status !== "organized" && (
                     <button
                       type="button"

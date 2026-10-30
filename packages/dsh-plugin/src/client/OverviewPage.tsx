@@ -1,9 +1,9 @@
-import type { CalendarPushSettings, OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
+import type { OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
-import { Agenda, CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
-import { CalendarPushResult, CalendarSlotForm } from "./CalendarPush.js";
+import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
+import { CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
 import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
@@ -25,7 +25,7 @@ import type { MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
-import { OnboardingPage, STORAGE_STEP } from "./OnboardingPage.js";
+import { OnboardingPage } from "./OnboardingPage.js";
 import { PersonalPages, type PersonalServices } from "./PersonalPages.js";
 import { PlansCard } from "./Plans.js";
 import { Plugins } from "./Plugins.js";
@@ -43,9 +43,10 @@ import {
   exploreModules,
   migrateLifeMapFirst,
 } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale, dateFormat } from "./i18n.js";
+import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
+import type { RecordTarget } from "./progress-map.js";
 
 export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
@@ -103,6 +104,7 @@ export interface OverviewPageProps
     onSettings: (section: "ai" | "local-ai") => void,
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
+    onOrganize?: (source: string) => Promise<void>,
   ) => ReactNode;
 }
 const modules = [
@@ -231,6 +233,7 @@ function Overview({
     setImportAttempt((value) => value + 1);
   };
   const [reviewMatter, setReviewMatter] = useState<Matter | null>(null);
+  const [reviewClipboard, setReviewClipboard] = useState(false);
   const askPanel = useRef<HTMLDivElement>(null);
   const [aiKeyRequest, setAiKeyRequest] = useState(0);
   const guideVisible = guide !== undefined && guide !== null;
@@ -343,8 +346,6 @@ function Overview({
       active = false;
     };
   }, [workspaceRoot, props.loadPreferences]);
-  const pendingProposals = data?.blocks.filter((b) => b.status === "pending" && b.kind === "proposal") ?? [];
-  const [push, setPush] = useState<CalendarPushSettings | null>(null);
   const [slot, setSlot] = useState<{ file: string; id: string } | null>(null);
   const [calendar, setCalendar] = useState<CalendarData | null>(null);
   // Navigation owns unsaved input; no files, query results or whole pages are retained.
@@ -406,6 +407,8 @@ function Overview({
   const [libraryFile, setLibraryFile] = useState<string>();
   const [libraryGoal, setLibraryGoal] = useState<string>();
   const [projectFocus, setProjectFocus] = useState<string>();
+  const [directionFocus, setDirectionFocus] = useState<string>();
+  const [recordOrigin, setRecordOrigin] = useState<"overview" | "life-map" | "directions">();
   useEffect(() => {
     if (view !== "records" || record !== "projects" || !libraryGoal) return;
     const target = document.getElementById(`plan-${libraryGoal}`);
@@ -419,6 +422,11 @@ function Overview({
   const [libraryState, setLibraryState] = useState<{ root: string | undefined; data: LibraryData } | null>(
     null,
   );
+  const [libraryFailure, setLibraryFailure] = useState<{ root: string | undefined; message: string } | null>(
+    null,
+  );
+  const libraryReadError = libraryFailure?.root === workspaceRoot ? libraryFailure?.message : undefined;
+  const retryLibrary = useRef<() => void>(() => {});
   const library = libraryState?.root === workspaceRoot ? (libraryState?.data ?? null) : null;
   const currentWorkspace = useRef(workspaceRoot);
   currentWorkspace.current = workspaceRoot;
@@ -433,6 +441,10 @@ function Overview({
     setLearningSource(undefined);
     setLibraryFile(undefined);
     setLibraryEntry(undefined);
+    setLibraryGoal(undefined);
+    setProjectFocus(undefined);
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
   }, [workspaceRoot]);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
@@ -521,12 +533,20 @@ function Overview({
   const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
+  const homeDraftVersion = useRef(0);
+  const [homeSaveState, setHomeSaveState] = useState<"saving" | "saved" | null>(null);
+  useEffect(() => {
+    if (homeSaveState !== "saved" || view !== "overview") return;
+    const timer = setTimeout(() => setHomeSaveState(null), 3000);
+    return () => clearTimeout(timer);
+  }, [homeSaveState, view]);
   const saveHome = async (text: string, send: boolean) => {
-    if (!props.captureOnce || homeSaving.current) return;
+    if (!props.captureOnce || homeSaving.current || !text.trim()) return;
     homeSaving.current = true;
+    const draftVersion = homeDraftVersion.current;
+    setHomeSaveState("saving");
     try {
       const content = text.trim();
-      if (!content) return;
       if (homeOperation.current?.text !== content)
         homeOperation.current = { text: content, id: crypto.randomUUID() };
       const operation = homeOperation.current;
@@ -545,10 +565,12 @@ function Overview({
         setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
         setView("ask");
       }
-      setHomeAskText("");
+      if (homeDraftVersion.current === draftVersion) setHomeAskText("");
       setHomeAskError("");
       homeOperation.current = null;
+      setHomeSaveState(send ? null : "saved");
     } catch (error) {
+      setHomeSaveState(null);
       setHomeAskError(error instanceof Error ? error.message : String(error));
     } finally {
       homeSaving.current = false;
@@ -594,12 +616,11 @@ function Overview({
             setGuide((current) => (current === undefined ? null : current));
           },
         ),
-        update(props.loadCalendarPush, setPush),
       ]);
     } catch (err) {
       if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
     }
-  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding, props.loadCalendarPush]);
+  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
   useEffect(() => {
     void refresh();
     return () => {
@@ -625,11 +646,19 @@ function Overview({
         const value = await props.loadLibrary({
           section: record === "notes" || record === "health" ? record : record ? "summary" : undefined,
         });
-        if (seq === sequence) setLibrary(value);
+        if (seq === sequence) {
+          setLibrary(value);
+          setLibraryFailure(null);
+        }
       } catch (err) {
-        if (seq === sequence) setError(err instanceof Error ? err.message : String(err));
+        if (seq === sequence)
+          setLibraryFailure({
+            root: workspaceRoot,
+            message: err instanceof Error ? err.message : String(err),
+          });
       }
     };
+    retryLibrary.current = () => void load();
     void load();
     const off = props.subscribe?.(() => void load());
     return () => {
@@ -699,10 +728,39 @@ function Overview({
     setLibraryFile(undefined);
     setLibraryGoal(undefined);
     setProjectFocus(undefined);
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
     setView("records");
+  };
+  const openTarget = (target: RecordTarget, origin?: "overview" | "life-map" | "directions") => {
+    if (target.kind === "direction") {
+      setDirectionFocus(target.id);
+      setExplore("directions");
+      setView("explore");
+    } else {
+      openRecord("projects");
+      if (target.kind === "project") setProjectFocus(target.id);
+      else setLibraryGoal(target.id);
+    }
+    setRecordOrigin(origin);
+  };
+  const recordBackLabel =
+    recordOrigin === "overview"
+      ? t("← 今天", "← Today")
+      : recordOrigin === "life-map"
+        ? t("← 人生地图", "← Life map")
+        : t("← 方向", "← Directions");
+  const returnToRecordOrigin = () => {
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
+    if (recordOrigin === "overview") setView("overview");
+    else {
+      setExplore(recordOrigin ?? "directions");
+      setView("explore");
+    }
   };
   const prompt = (text: string, newConversation = false) => {
     setPromptNewConversation(newConversation);
@@ -774,21 +832,6 @@ function Overview({
     setGuide(step);
     setView("overview");
     if (source) openSource(source);
-  };
-  const checklistAction = (item: OnboardingStatus["checklist"]["items"][number]) => {
-    if (item.id === "storage") startGuide(STORAGE_STEP);
-    else if (item.id === "matter") startGuide(1);
-    else if (item.id === "memory") startGuide(5);
-    else if (item.id === "starts") startGuide(2);
-    else if (item.id === "sources") startGuide(item.action.target === "starts" ? 2 : 3);
-    else if (item.id === "ai") startGuide(4);
-    else if (item.id === "plan")
-      prompt(
-        t(
-          "请根据我的现状、日程和下一步，帮我安排今天，先提出待确认的计划。",
-          "Based on where I am, my schedule and my next steps, plan my day. Propose a plan for me to confirm first.",
-        ),
-      );
   };
   /** 「在原来的 AI 里继续」贴回的回答：先存原文，再读成待核对草稿，打开核对页。 */
   const handoverAnswer = async (answer: string) => {
@@ -905,7 +948,6 @@ function Overview({
       )}
     </section>
   );
-  const focus = data?.next[0];
   const startMatter = (text: string) => {
     setGuideText(text);
     startGuide(1);
@@ -940,6 +982,7 @@ function Overview({
   const plansCard = data?.plans && (
     <PlansCard
       plans={data.plans}
+      goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
       refresh={refresh}
@@ -957,6 +1000,7 @@ function Overview({
           generateLifeAtlas={props.generateLifeAtlas}
           changeLifeAtlas={props.changeLifeAtlas}
           subscribe={props.subscribe}
+          openRecord={(target) => openTarget(target, "life-map")}
         />
       ) : null,
     health: (
@@ -991,6 +1035,16 @@ function Overview({
     directions: (
       <DirectionsPage
         {...child}
+        key={directionFocus ?? "directions"}
+        initialDirection={directionFocus}
+        onBack={
+          directionFocus
+            ? recordOrigin
+              ? returnToRecordOrigin
+              : () => setDirectionFocus(undefined)
+            : undefined
+        }
+        backLabel={recordOrigin ? recordBackLabel : undefined}
         goals={personal?.goals}
         onConnect={() => openAskSettings("ai")}
         planningContent={
@@ -1005,9 +1059,10 @@ function Overview({
                 dismiss={props.dismissDirectionLink}
                 onConnect={() => openAskSettings("ai")}
                 openProject={(slug) => {
-                  openRecord("projects");
-                  setProjectFocus(slug);
+                  openTarget({ kind: "project", id: slug }, "directions");
                 }}
+                openGoal={(id) => openTarget({ kind: "goal", id }, "directions")}
+                openDirection={(id) => openTarget({ kind: "direction", id }, "directions")}
               />
             ) : (
               <ProgressMap
@@ -1015,13 +1070,7 @@ function Overview({
                 projects={data?.projects ?? []}
                 loadExploration={props.loadExploration}
                 subscribe={props.subscribe}
-                open={(section) => {
-                  if (section === "projects") openRecord("projects");
-                  else if (section === "plans") {
-                    planning.current?.scrollIntoView({ block: "start" });
-                    planning.current?.focus({ preventScroll: true });
-                  } else setExplore("directions");
-                }}
+                open={(target) => openTarget(target, "directions")}
               />
             )}
             {!data?.plans.goals.length && (
@@ -1036,7 +1085,11 @@ function Overview({
   };
 
   return (
-    <div className={css.app} data-theme={theme} lang={locale === "en" ? "en" : "zh-CN"}>
+    <div
+      className={`${css.app} ${props.loadHome ? css.referenceApp : ""}`}
+      data-theme={theme}
+      lang={locale === "en" ? "en" : "zh-CN"}
+    >
       <header className={css.top}>
         <div className={css.brand}>
           <KaituMark size={26} />
@@ -1075,6 +1128,8 @@ function Overview({
               aria-current={view === id ? "page" : undefined}
               onClick={() => {
                 setView(id as View);
+                setRecordOrigin(undefined);
+                setDirectionFocus(undefined);
                 if (id === "overview") void refresh();
                 if (id === "explore") setExplore(exploreStart ?? "loading");
                 setRecord("");
@@ -1122,7 +1177,7 @@ function Overview({
         </div>
       </header>
       <main
-        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? todayCss.page : ""}`}
+        className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? `${todayCss.page} ${props.loadHome ? css.todayContent : ""}` : ""}`}
       >
         {props.desktopUpdate && view !== "settings" && (
           <FeatureUpdates request={props.desktopUpdate} compact />
@@ -1170,6 +1225,7 @@ function Overview({
               builtin={builtinAi}
               initialSource={guideSource}
               initialText={guideText}
+              workspaceRoot={workspaceRoot}
               setStep={setGuide}
               onStatus={setOnboarding}
               refresh={refresh}
@@ -1207,9 +1263,12 @@ function Overview({
               busy={busy}
               loadProjects={props.loadProjects}
               openProject={(slug) => {
-                openRecord("projects");
-                setProjectFocus(slug);
+                openTarget({ kind: "project", id: slug }, "overview");
               }}
+              openGoal={(id) => {
+                openTarget({ kind: "goal", id }, "overview");
+              }}
+              begin={() => startGuide(0)}
               loadLibrary={props.loadLibrary}
               weather={
                 props.loadWeather && props.setWeatherPlace ? (
@@ -1234,10 +1293,25 @@ function Overview({
               }}
               canAsk={!!props.renderAsk}
               askError={homeAskError}
+              saveStatus={
+                homeSaveState === "saving"
+                  ? t("正在记下…", "Saving…")
+                  : homeSaveState === "saved"
+                    ? homeAskText.trim()
+                      ? t("上一条已记下", "Previous entry saved")
+                      : t("已记下", "Saved")
+                    : ""
+              }
               askText={homeAskText}
-              setAskText={setHomeAskText}
+              setAskText={(text) => {
+                homeDraftVersion.current++;
+                setHomeAskText(text);
+              }}
               speech={props.speech}
-              insertSpeech={(text) => setHomeAskText((current) => (current ? `${current}\n${text}` : text))}
+              insertSpeech={(text) => {
+                homeDraftVersion.current++;
+                setHomeAskText((current) => (current ? `${current}\n${text}` : text));
+              }}
               loadAtlas={props.loadLifeAtlas}
               openAtlas={() => {
                 setExplore("life-map");
@@ -1269,7 +1343,7 @@ function Overview({
         {view === "records" && (
           <>
             <div className={css.sec}>
-              {record && (
+              {record && !projectFocus && !libraryGoal && (
                 <button type="button" className={css.link} onClick={() => setRecord("")}>
                   {t("← 资料", "← Library")}
                 </button>
@@ -1310,6 +1384,7 @@ function Overview({
                   {...props}
                   key={reviewMatter.source}
                   initial={reviewMatter}
+                  clipboard={reviewClipboard}
                   content={onboarding.content.matter}
                   builtin={builtinAi}
                   onPrompt={prompt}
@@ -1330,6 +1405,8 @@ function Overview({
                 }}
                 searchLibraryNotes={props.searchLibraryNotes}
                 data={library}
+                readError={libraryReadError}
+                retry={() => retryLibrary.current()}
                 open={openRecord}
                 onOpenOriginal={(entry) => {
                   openRecord("inbox");
@@ -1351,6 +1428,12 @@ function Overview({
                   setLibrary(value);
                   await refresh();
                 }}
+                organize={async (text) => {
+                  const matter = await props.saveOnboardingMatter(text);
+                  openRecord("inbox");
+                  setReviewClipboard(true);
+                  setReviewMatter(matter);
+                }}
                 onFile={openFileImport}
                 onAdd={(kind) => {
                   if (kind === "file") openFileImport(null);
@@ -1368,9 +1451,38 @@ function Overview({
               <CalendarPage {...props} initialAdding={calendarAdding} />
             ) : record === "projects" ? (
               <>
-                {plansCard}
-                {renderTasks(true)}
-                <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
+                {libraryGoal && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={recordOrigin ? returnToRecordOrigin : () => setLibraryGoal(undefined)}
+                  >
+                    {recordOrigin ? recordBackLabel : t("← 全部规划", "← All plans")}
+                  </button>
+                )}
+                {libraryGoal && data && !data.plans.goals.some((goal) => goal.id === libraryGoal) && (
+                  <output>{t("未找到这个目标", "Goal not found")}</output>
+                )}
+                {!projectFocus && plansCard}
+                {!libraryGoal && (
+                  <>
+                    {!projectFocus && renderTasks(true)}
+                    <ProjectsLibrary
+                      key={projectFocus ?? "all-projects"}
+                      {...child}
+                      timeZone={data?.timeZone}
+                      initialProject={projectFocus}
+                      onBack={
+                        projectFocus
+                          ? recordOrigin
+                            ? returnToRecordOrigin
+                            : () => setProjectFocus(undefined)
+                          : undefined
+                      }
+                      backLabel={recordOrigin ? recordBackLabel : undefined}
+                    />
+                  </>
+                )}
               </>
             ) : record === "health" ? (
               <HealthLibrary
@@ -1406,6 +1518,7 @@ function Overview({
                     },
                   }}
                   onReview={(file) => {
+                    setReviewClipboard(false);
                     void props
                       .readOnboardingMatter(file)
                       .then(setReviewMatter)
@@ -1567,6 +1680,13 @@ function Overview({
               openAskSettings,
               promptNewConversation,
               homeSubmit,
+              async (source) => {
+                const matter = await props.readOnboardingMatter(source);
+                openRecord("inbox");
+                setReviewClipboard(true);
+                setReviewMatter(matter);
+                setHomeSubmit(undefined);
+              },
             )}
           </div>
         )}

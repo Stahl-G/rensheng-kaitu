@@ -43,34 +43,6 @@
   flex-wrap: wrap;
   padding: 12px 0;
 }
-.directionRow {
-  display: flex;
-  gap: 24px;
-  justify-content: space-between;
-  align-items: start;
-  padding: 24px 0;
-  border: 0;
-  border-bottom: 1px solid var(--kt-control);
-  background: transparent;
-  color: var(--kt-text);
-  text-align: left;
-  width: 100%;
-}
-.directionRow > div {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  flex: 1;
-}
-.page .directionRow h2 {
-  font-size: 19px;
-}
-.directionRow p {
-  color: var(--kt-secondary);
-}
-.directionRow:hover {
-  background: var(--kt-subtle);
-}
 .statement {
   display: grid;
   gap: 8px;
@@ -175,19 +147,9 @@
   .fieldsRow {
     grid-template-columns: 1fr;
   }
-  .directionRow {
-    flex-direction: column;
-    gap: 12px;
-  }
   .form {
     padding: 16px;
   }
-}
-
-.page .cards h3 {
-  font-size: 19px;
-  line-height: 27px;
-  font-weight: 600;
 }
 
 /* C: one direction per card; existing details and edits remain available. */

@@ -153,7 +153,7 @@ export function readWorkbench(
       read(
         type,
         () => {
-          const rows = readRecords(ws, type);
+          const rows = readRecords(ws, type, { onError: (error) => warnings.push(error.message) });
           return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 

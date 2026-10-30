@@ -82,3 +82,32 @@ it("缺少媒体文件仍可接收、显示和归档手机原文，引用不搬�
     rmSync(emptyMedia, { recursive: true, force: true });
   }
 });
+
+it("单条 YAML 头部损坏不阻断其他原文，并保留正文、读取错误和原件", async () => {
+  const ws = await freshWorkspace();
+  const broken = "inbox/notes/2026-10-29/broken.note.md";
+  const valid = "inbox/notes/2026-10-29/saved.note.md";
+  const original =
+    "---\nagent: synthetic\ndate: 2026-10-29\nsource: A title: subtitle\n---\n\n完整合成原文\n第二段保持不变。\n";
+  try {
+    ws.writeText(broken, original);
+    ws.writeText(valid, "---\nkind: capture\ndate: 2026-10-29\n---\n\n保存后可找回的合成原文\n完整末段。\n");
+    for (const query of [undefined, { section: "inbox", source: "me" } as const]) {
+      const entries = readLibrary(ws, query).inbox;
+      expect(entries.find((entry) => entry.file === broken)).toMatchObject({
+        error: "INVALID_FRONTMATTER",
+        text: "完整合成原文\n第二段保持不变。",
+        originalSource: null,
+        date: null,
+      });
+      expect(entries.find((entry) => entry.text.includes("保存后可找回"))).toMatchObject({
+        file: valid,
+        text: "保存后可找回的合成原文\n完整末段。",
+        source: "me",
+      });
+    }
+    expect(ws.readText(broken)).toBe(original);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});

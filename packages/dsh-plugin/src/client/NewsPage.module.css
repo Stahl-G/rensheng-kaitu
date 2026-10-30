@@ -78,7 +78,6 @@
   gap: 16px;
 }
 .image,
-.thumbnail,
 .trendImage {
   display: block;
   flex: none;
@@ -140,12 +139,10 @@
   align-items: center;
 }
 .meta,
-.empty,
-.footnote {
+.empty {
   color: var(--kt-muted);
 }
-.meta,
-.footnote {
+.meta {
   font-size: 12px;
   line-height: 18px;
 }
@@ -221,10 +218,6 @@
   margin-bottom: 2px;
   font-weight: 400;
 }
-.thumbnail {
-  width: 72px;
-  height: 52px;
-}
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -249,15 +242,6 @@
 }
 .sources dd {
   margin: 0;
-}
-.inbox {
-  margin-top: 12px !important;
-  color: var(--kt-muted);
-  font-size: 12px;
-}
-.footnote {
-  text-align: center;
-  padding-top: 4px;
 }
 .empty {
   padding: 12px 2px;
@@ -292,34 +276,25 @@
   width: 100%;
   min-width: 0;
 }
-.cardLead,
 .trendLead {
   list-style: none;
   cursor: pointer;
   border-radius: 12px;
 }
-.cardLead::-webkit-details-marker,
 .trendLead::-webkit-details-marker {
   display: none;
-}
-.cardLead {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
 }
 .trendLead {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.cardLead:focus-visible,
 .trendLead:focus-visible,
 .button:focus-visible,
 .link:focus-visible {
   outline: 3px solid var(--link-line);
   outline-offset: 4px;
 }
-.cardLead:hover .title,
 .trendLead:hover .title {
   color: var(--kt-link);
 }
@@ -360,11 +335,6 @@
 .expanded h4,
 .expanded p {
   margin: 0;
-}
-.points {
-  margin: 0;
-  padding-left: 22px;
-  line-height: 1.7;
 }
 .post {
   padding: 16px;
@@ -424,18 +394,6 @@
   font-size: 12px;
   font-style: normal;
 }
-.analysis {
-  padding: 14px;
-  border-radius: 10px;
-  background: var(--kt-feed-tint);
-  line-height: 1.7;
-}
-.ai {
-  margin-left: 8px;
-  color: var(--kt-feed-ink);
-  font-size: 12px;
-  font-weight: 400;
-}
 .other {
   align-items: flex-start;
   padding: 16px 0;
@@ -461,16 +419,6 @@
   grid-column: 1 / -1;
 }
 @container (max-width: 580px) {
-  .cardLead {
-    flex-direction: column;
-  }
-  .cardLead .body {
-    flex-basis: auto;
-  }
-  .cardLead .image {
-    width: 100%;
-    height: 150px;
-  }
   .mediaGrid {
     grid-template-columns: minmax(0, 1fr);
   }
