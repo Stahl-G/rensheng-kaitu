@@ -1632,6 +1632,7 @@
 }
 .referenceApp .content {
   max-width: 1440px;
+  padding-inline: 28px;
 }
 @media (max-width: 760px) {
   .referenceApp .top {
@@ -1651,6 +1652,9 @@
   }
   .referenceApp .tabs button svg {
     display: none;
+  }
+  .referenceApp .content {
+    padding-inline: 12px;
   }
 }
 
