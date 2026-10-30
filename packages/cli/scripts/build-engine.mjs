@@ -42,15 +42,16 @@ cpSync(join(root, "packages/core/data"), join(root, "packages/cli/dist/data"), {
 
 await bundleCartographerWorker(output, ".");
 
-await build({
-  entryPoints: [join(root, "packages/core/dist/home-worker.js")],
-  outfile: join(output, "home-worker.js"),
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node22",
-  external: ["better-sqlite3"],
-  banner: {
-    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
-  },
-});
+for (const name of ["home-worker", "phone-worker"])
+  await build({
+    entryPoints: [join(root, `packages/core/dist/${name}.js`)],
+    outfile: join(output, `${name}.js`),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    external: ["better-sqlite3"],
+    banner: {
+      js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+    },
+  });

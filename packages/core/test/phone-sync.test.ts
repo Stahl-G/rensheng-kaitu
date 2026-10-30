@@ -1,6 +1,6 @@
 import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { assertAgentWrite } from "../src/agent-file-policy.js";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.js";
 import {
@@ -32,8 +32,10 @@ import {
 } from "../src/index.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
 import { writePhoneReceipts } from "../src/phone-receipts.js";
+import { startPhoneSnapshots } from "../src/phone-snapshots.js";
 import { projectionDirectory } from "../src/projection-cache.js";
 import { ulid } from "../src/ulid.js";
+import * as backup from "../src/workspace-backup.js";
 import {
   type BackupFiles,
   type BackupRemote,
@@ -43,6 +45,60 @@ import {
 import { clonedWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
+it("background phone computation publishes through the owner queue and discards a moved root", async () => {
+  const ws = await clonedWorkspace();
+  const other = await clonedWorkspace();
+  const root = ws.root;
+  addRecord(ws, "task", { title: "Old root" });
+  addRecord(other, "task", { title: "New root" });
+  const original = ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined;
+  const status = vi.spyOn(backup, "workspaceBackupStatus").mockReturnValue({
+    connection: { enabled: true },
+  } as ReturnType<typeof backup.workspaceBackupStatus>);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let queued = false;
+  const errors: unknown[] = [];
+  const stop = startPhoneSnapshots(
+    ws,
+    (error) => errors.push(error),
+    async (operation) => {
+      queued = true;
+      await gate;
+      return operation();
+    },
+  );
+  try {
+    await expect.poll(() => queued, { timeout: 15000 }).toBe(true);
+    expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
+    ws.root = other.root;
+    release();
+    await expect
+      .poll(
+        () => {
+          if (!other.exists("phone/today.json")) return [];
+          return other
+            .readJson<{ mobile: { tasks: { title: string }[] } }>("phone/today.json")
+            .mobile.tasks.map((task) => task.title);
+        },
+        { timeout: 15000 },
+      )
+      .toEqual(["New root"]);
+    expect(errors).toEqual([]);
+    await stop();
+    ws.root = root;
+    expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
+  } finally {
+    release();
+    await stop();
+    status.mockRestore();
+    rmSync(root, { recursive: true, force: true });
+    rmSync(other.root, { recursive: true, force: true });
+  }
+});
 
 it("reuses published snapshots across reopen without hiding edits, errors or expiring receipts", async () => {
   const ws = await clonedWorkspace();

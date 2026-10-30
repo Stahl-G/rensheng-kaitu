@@ -33,6 +33,20 @@ await build({
     ].join("\n"),
   },
 });
+// Background entry points must ship with the independently installed plugin too.
+for (const name of ["home-worker", "phone-worker"])
+  await build({
+    entryPoints: [join(root, `packages/core/dist/${name}.js`)],
+    outfile: join(output, `dist/${name}.js`),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    external: ["better-sqlite3"],
+    banner: {
+      js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+    },
+  });
 cpSync(join(root, "packages/dsh-plugin/dist/client.js"), join(output, "dist/client.js"));
 // assetsRoot() 从 dist/ 往上找 schemas/ 与 templates/；城市数据按 ../data/cities.json 读。
 for (const [from, to] of [

@@ -53,7 +53,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.effect(() => startWorkspaceBackup(ws));
   ctx.effect(() => startProjectGithubSync(ws));
   ctx.effect(() => startWeatherSync().stop);
-  ctx.effect(() => startPhoneSnapshots(ws));
+  ctx.effect(() => startPhoneSnapshots(ws, (error) => ctx.logger.warn(String(error)), queue));
   collectors.start();
   ctx.effect(() => () => collectors.stop());
   ctx.effect(() => startCalendarLoop(ws, queue));

@@ -1,5 +1,7 @@
-import { watch } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Worker } from "node:worker_threads";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
@@ -21,7 +23,7 @@ import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange, readWorkbench } from "./workbench.js";
 import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
-import type { Workspace } from "./workspace.js";
+import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export function phoneReadable(ws: Workspace) {
   return syncMode(ws.root) !== "local" || workspaceBackupStatus(ws).connection?.enabled === true;
@@ -50,47 +52,43 @@ function unchangedSources(
   return JSON.stringify(normalize(before)) === JSON.stringify(normalize(after));
 }
 
-export async function writePhoneSnapshots(
-  ws: Workspace,
-  now = new Date(),
-  options: { force?: boolean; generator?: PhoneGenerator } = {},
-) {
-  if (!options.force && !phoneReadable(ws)) return 0;
+export function phoneSnapshotsCurrent(ws: Workspace, now: Date, generator?: PhoneGenerator): boolean {
   const input = { root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) };
-  const generator = JSON.stringify(options.generator ?? { kind: "computer" });
-  let before: ProjectionManifest | undefined;
   try {
-    const hit = published.get(ws) ?? readProjection<Published>(input, "phone", now);
+    const memory = published.get(ws);
+    const hit = memory ?? readProjection<Published>(input, "phone", now);
     if (
       hit &&
       hit.root === input.root &&
       hit.state === input.state &&
-      hit.value.generator === generator &&
+      hit.value.generator === JSON.stringify(generator ?? { kind: "computer" }) &&
       hit.value.since <= now.getTime() &&
       hit.day === projectionDay(now, hit.timeZone) &&
       (hit.expires === null || now.getTime() < hit.expires) &&
-      projectionUnchanged(input, hit.manifest) &&
+      (!memory || projectionUnchanged(input, hit.manifest)) &&
       projectionUnchanged(input, hit.value.outputs)
     ) {
       published.set(ws, hit);
-      return 0;
+      return true;
     }
-    before = projectionManifest(input);
   } catch {
-    // Cache/index availability must not replace the original reader's error handling.
+    // A missing index cannot replace original-file checks.
   }
   published.delete(ws);
+  return false;
+}
+
+/** Read-only computation; the owner publishes through its existing mutation queue. */
+export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?: PhoneGenerator) {
+  const input = { root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) };
+  let before: ProjectionManifest | undefined;
+  try {
+    before = projectionManifest(input);
+  } catch {
+    /* Original reads still report their errors. */
+  }
   const sources = readWorkbench(ws, now);
   const data = await readOverviewPage(ws, now, sources);
-  const computer = options.generator?.kind !== "agent";
-  if (computer)
-    rememberOrganizer(
-      ws,
-      ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined,
-      undefined,
-      data.daily ?? undefined,
-      now,
-    );
   const at = now.toISOString();
   const snapshots = {
     today: () => buildPhoneToday(data, at, ws),
@@ -105,14 +103,54 @@ export async function writePhoneSnapshots(
     },
     library: () => buildPhoneLibrary(ws, data, at),
   };
-  let writes = 0;
   let cacheable = true;
+  const prepared = Object.entries(snapshots).map(([name, build]) => {
+    try {
+      const value = { ...build(), generator: generator ?? { kind: "computer" as const } };
+      cacheable = schemas().builtin(`phone-${name}.schema.json`)(value) && cacheable;
+      return { name, value, error: undefined };
+    } catch (error) {
+      return { name, value: undefined, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  return {
+    input,
+    before,
+    snapshots: prepared,
+    cacheable,
+    timeZone: data.timeZone,
+    day: data.today,
+    daily: data.daily,
+    expires: projectionExpiry(sources, now),
+  };
+}
+export type PreparedPhoneSnapshots = Awaited<ReturnType<typeof preparePhoneSnapshots>>;
+
+export function publishPhoneSnapshots(
+  ws: Workspace,
+  prepared: PreparedPhoneSnapshots,
+  now: Date,
+  generator?: PhoneGenerator,
+) {
+  const { input, before } = prepared;
+  if (ws.root !== input.root) throw new Error("快照工作区已经改变");
+  const computer = generator?.kind !== "agent";
+  if (computer)
+    rememberOrganizer(
+      ws,
+      ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined,
+      undefined,
+      prepared.daily ?? undefined,
+      now,
+    );
+  let writes = 0;
+  const cacheable = prepared.cacheable;
   const errors: Error[] = [];
-  for (const [name, build] of Object.entries(snapshots)) {
+  for (const { name, value: built, error } of prepared.snapshots) {
     const file = `phone/${name}.json`;
     try {
-      const value = { ...build(), generator: options.generator ?? { kind: "computer" } };
-      cacheable = schemas().builtin(`phone-${name}.schema.json`)(value) && cacheable;
+      if (!built) throw new Error(error);
+      const value = built;
       if (ws.exists(file)) {
         let previous: typeof value | undefined;
         try {
@@ -146,13 +184,13 @@ export async function writePhoneSnapshots(
       const manifest = projectionManifest(input);
       if (unchangedSources(before, manifest, input.root, input.state)) {
         const expiry = Math.min(
-          projectionExpiry(sources, now) ?? Number.POSITIVE_INFINITY,
+          prepared.expires ?? Number.POSITIVE_INFINITY,
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
         );
         const value: Published = {
           since: now.getTime(),
-          generator,
-          outputs: [...Object.keys(snapshots), "receipts"].map((name) => {
+          generator: JSON.stringify(generator ?? { kind: "computer" }),
+          outputs: [...prepared.snapshots.map((item) => item.name), "receipts"].map((name) => {
             const path = ws.resolve(`phone/${name}.json`);
             return [path, projectionFingerprint(path)];
           }),
@@ -160,8 +198,8 @@ export async function writePhoneSnapshots(
         writeProjection(input, "phone", {
           manifest,
           value,
-          timeZone: data.timeZone,
-          day: data.today,
+          timeZone: prepared.timeZone,
+          day: prepared.day,
           expires: Number.isFinite(expiry) ? expiry : null,
         });
         const saved = readProjection<Published>(input, "phone", now);
@@ -174,23 +212,125 @@ export async function writePhoneSnapshots(
   return writes;
 }
 
+export async function writePhoneSnapshots(
+  ws: Workspace,
+  now = new Date(),
+  options: { force?: boolean; generator?: PhoneGenerator } = {},
+) {
+  if (!options.force && !phoneReadable(ws)) return 0;
+  if (phoneSnapshotsCurrent(ws, now, options.generator)) return 0;
+  return publishPhoneSnapshots(
+    ws,
+    await preparePhoneSnapshots(ws, now, options.generator),
+    now,
+    options.generator,
+  );
+}
+
 /** 常驻进程在后台生成，监听只负责失效；同步盘漏事件时每分钟补看一次。 */
-export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => void = () => {}) {
+export function startPhoneSnapshots(
+  ws: Workspace,
+  report: (error: unknown) => void = () => {},
+  write: WorkspaceWrite = (operation) => operation(),
+) {
   let timer: NodeJS.Timeout | undefined;
   let running = false;
   let again = false;
   let closed = false;
+  let generation = 0;
+  let worker: Worker | undefined;
+  let retiring: Promise<unknown> = Promise.resolve();
+  function retire(active: Worker) {
+    if (worker === active) worker = undefined;
+    retiring = Promise.all([retiring, active.terminate()]);
+  }
+  function prepare(root: string, now: Date): Promise<PreparedPhoneSnapshots | undefined> {
+    if (!worker) {
+      const entry = [
+        "./phone-worker.js",
+        "../dist/phone-worker.js",
+        "../engine/phone-worker.js",
+        "../../dist/engine/phone-worker.js",
+      ]
+        .map((path) => new URL(path, import.meta.url))
+        .find((path) => existsSync(fileURLToPath(path)));
+      if (!entry) return Promise.reject(new Error("手机快照组件缺失"));
+      worker = new Worker(entry);
+      const active = worker;
+      active.once("exit", () => {
+        if (worker === active) worker = undefined;
+      });
+      active.on("error", (error) => {
+        if (running) return; // The pending request owns its rejection and retirement.
+        retire(active);
+        if (!closed) report(error);
+      });
+    }
+    const active = worker;
+    active.ref();
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        clearTimeout(timeout);
+        active.off("message", received);
+        active.off("error", failed);
+        active.off("exit", exited);
+        active.unref();
+      };
+      const failed = (error: Error) => {
+        cleanup();
+        retire(active);
+        reject(error);
+      };
+      const exited = () => {
+        cleanup();
+        reject(new Error("手机快照读取中断"));
+      };
+      const received = (message: { prepared?: PreparedPhoneSnapshots; error?: string }) => {
+        cleanup();
+        if (message.error) reject(new Error(message.error));
+        else resolve(message.prepared);
+      };
+      const timeout = setTimeout(() => failed(new Error("手机快照读取超时")), 30000);
+      active.once("message", received);
+      active.once("error", failed);
+      active.once("exit", exited);
+      active.postMessage({ root, at: now.toISOString() });
+    });
+  }
   const run = async () => {
     if (closed) return;
+    if (watchedRoot !== ws.root) observe();
+    if (!phoneReadable(ws)) return;
     if (running) {
       again = true;
       return;
     }
     running = true;
+    const root = ws.root;
+    const request = generation;
     try {
-      await writePhoneSnapshots(ws);
+      const now = new Date();
+      const prepared = await prepare(root, now);
+      if (closed) return;
+      if (ws.root !== root || request !== generation) {
+        again = true;
+        return;
+      }
+      if (prepared)
+        await write(async () => {
+          if (closed) return;
+          if (
+            ws.root !== root ||
+            request !== generation ||
+            (prepared.before && !projectionUnchanged(prepared.input, prepared.before))
+          ) {
+            again = true;
+            return;
+          }
+          publishPhoneSnapshots(ws, prepared, now);
+        });
     } catch (error) {
-      report(error);
+      if (!closed) report(error);
     } finally {
       running = false;
       if (again) {
@@ -200,31 +340,48 @@ export function startPhoneSnapshots(ws: Workspace, report: (error: unknown) => v
     }
   };
   const schedule = () => {
+    if (closed) return;
+    generation++;
     clearTimeout(timer);
     timer = setTimeout(() => void run(), 2000);
     timer.unref();
   };
-  let watcher: ReturnType<typeof watch> | undefined;
-  try {
-    watcher = watch(ws.root, { recursive: true }, (_event, file) => {
-      if (file && !ignoredWorkspaceChange(file)) schedule();
-    });
-    watcher.on("error", () => {
-      watcher?.close();
-      watcher = undefined;
-    });
-  } catch {
-    /* 不支持递归监听时由定时器刷新。 */
+  let watchers: ReturnType<typeof watch>[] = [];
+  let watchedRoot = "";
+  function observe() {
+    for (const watcher of watchers) watcher.close();
+    watchers = [];
+    watchedRoot = ws.root;
+    const state = dirname(ws.resolve(".kaitu/cache", { internal: true }));
+    for (const root of new Set([ws.root, state])) {
+      try {
+        const watcher = watch(root, { recursive: true }, (_event, file) => {
+          const path = String(file ?? "").replaceAll("\\", "/");
+          if (!path || !ignoredWorkspaceChange(root === ws.root ? path : `.kaitu/${path}`)) schedule();
+        });
+        watcher.unref();
+        watcher.on("error", () => {
+          watcher.close();
+          schedule();
+        });
+        watchers.push(watcher);
+      } catch {
+        /* Periodic refresh covers systems without recursive watches. */
+      }
+    }
   }
+  observe();
   const off = subscribeWorkspaceBackup(ws, schedule);
   const interval = setInterval(schedule, 60000);
   interval.unref();
   schedule();
-  return () => {
+  return async () => {
     closed = true;
     clearTimeout(timer);
     clearInterval(interval);
-    watcher?.close();
+    for (const watcher of watchers) watcher.close();
     off();
+    if (worker) retire(worker);
+    await retiring;
   };
 }

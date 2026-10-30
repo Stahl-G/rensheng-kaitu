@@ -306,7 +306,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const stopProjectSync = startProjectGithubSync(ws, notify);
   const weather = startWeatherSync(notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError());
+  const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive);
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -1000,7 +1000,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     stopProjectSync();
     weather.stop();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
@@ -1028,7 +1028,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     stopProjectSync();
     weather.stop();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
