@@ -1,6 +1,6 @@
 import { isAbsolute } from "node:path";
 import { readDoing } from "./doing-page.js";
-import { KaituError } from "./errors.js";
+import { KaituError, type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { type ExperienceSource, readSourceContent } from "./experience-source.js";
 import { explorationCommandSchema } from "./exploration-contract.js";
 import { snapshot } from "./history.js";
@@ -94,9 +94,9 @@ const types = ["direction", "exploration_experiment", "direction_note", "explora
 export function isExplorationType(type: string): boolean {
   return types.includes(type);
 }
-function rows<T>(ws: Workspace, type: string): T[] {
+function rows<T>(ws: Workspace, type: string, onError?: (error: KaituError) => void): T[] {
   if (!listRecordTypes(ws).some((r) => r.type === type)) return [];
-  const records = readRecords(ws, type);
+  const records = readRecords(ws, type, { onError });
   return records as unknown as T[];
 }
 function current<T extends ExplorationRecord>(ws: Workspace, type: string, id: string, revision?: number): T {
@@ -235,22 +235,64 @@ export async function writeExploration(
   };
 }
 
+function readableExploration(row: StoredRecord): boolean {
+  return (
+    [
+      "title",
+      "motivation",
+      "hypothesis",
+      "unknowns",
+      "updated_at",
+      "direction_id",
+      "experiment_id",
+      "question",
+      "action",
+      "budget",
+      "deadline",
+      "criteria",
+      "result",
+      "source",
+      "investment",
+      "status",
+      "conclusion",
+      "text",
+      "kind",
+      "stance",
+      "date",
+    ].every((key) => row[key] === undefined || typeof row[key] === "string") &&
+    (row.references === undefined ||
+      (Array.isArray(row.references) &&
+        row.references.every(
+          (ref) =>
+            ref && typeof ref === "object" && typeof ref.kind === "string" && typeof ref.ref === "string",
+        )))
+  );
+}
+
 export function readExploration(ws: Workspace, options: { partial?: boolean } = {}) {
   const projects = listProjects(ws, options);
-  const warnings = [
+  const warnings: ReadWarning[] = [
     ...new Set(
       projects.flatMap((project) => [...project.warnings, ...(project.error ? [project.error] : [])]),
     ),
   ];
-  const directions = rows<Direction>(ws, "direction").sort(
-    (a, b) =>
-      Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
-  );
-  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment");
+  const onError = options.partial ? (error: KaituError) => warnings.push(readWarning(error)) : undefined;
+  const readable = (row: ExplorationRecord) => {
+    if (!options.partial || readableExploration(row as StoredRecord)) return true;
+    warnings.push(readIssue("invalid_record", row.id, `${row.id} 记录格式不合法`));
+    return false;
+  };
+  const directions = rows<Direction>(ws, "direction", onError)
+    .filter(readable)
+    .sort(
+      (a, b) =>
+        Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
+    );
+  const experiments = rows<ExplorationExperiment>(ws, "exploration_experiment", onError).filter(readable);
   const checkins = rows<
     ExplorationRecord & { experiment_id: string; date: string; done: boolean; note?: string }
-  >(ws, "exploration_checkin");
-  const notes = rows<DirectionNote>(ws, "direction_note");
+  >(ws, "exploration_checkin", onError).filter(readable);
+  const notes = rows<DirectionNote>(ws, "direction_note", onError).filter(readable);
   const timeline: {
     id: string;
     record_id: string;
@@ -265,7 +307,9 @@ export function readExploration(ws: Workspace, options: { partial?: boolean } = 
   for (const type of types) {
     if (!listRecordTypes(ws).some((r) => r.type === type)) continue;
     const previous = new Map<string, StoredRecord>();
-    for (const record of readRecordRevisions(ws, type).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1))) {
+    for (const record of readRecordRevisions(ws, type, { onError })
+      .filter(readable)
+      .sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1))) {
       if (record.deleted) continue;
       if (type !== "direction" && !record.direction_id) continue;
       const old = previous.get(record.id);
