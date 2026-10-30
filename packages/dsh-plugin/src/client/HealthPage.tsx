@@ -315,6 +315,227 @@ function Photos({
     </Section>
   );
 }
+function DashboardChart({
+  points,
+  unit,
+  title,
+  bars = false,
+}: {
+  points: { date: string; value: number | null; estimated?: boolean }[];
+  unit: string;
+  title: string;
+  bars?: boolean;
+}) {
+  const values = points.flatMap((p) => (p.value !== null && Number.isFinite(p.value) ? [p.value] : []));
+  if (!values.length) return null;
+  const low = bars ? 0 : Math.min(...values);
+  const high = Math.max(...values, low + 1);
+  const x = (i: number) => 12 + (i * 376) / Math.max(1, points.length - 1);
+  const y = (n: number) => 94 - ((n - low) * 78) / (high - low);
+  return (
+    <figure className={css.dashboardChart}>
+      <figcaption>
+        {title} <span>{unit}</span>
+      </figcaption>
+      <svg viewBox="0 0 400 110" role="img" aria-label={title}>
+        {points.map((p, i) =>
+          p.value === null || !Number.isFinite(p.value) ? null : (
+            <g key={`${p.date}-${i}`} tabIndex={0}>
+              <title>{`${p.date}: ${p.estimated ? "≈" : ""}${number(p.value)} ${unit}`}</title>
+              {bars ? (
+                <rect x={x(i) - 8} y={y(p.value)} width="16" height={Math.max(1, 94 - y(p.value))} />
+              ) : (
+                <>
+                  {i > 0 && points[i - 1]?.value !== null && (
+                    <line x1={x(i - 1)} y1={y(points[i - 1]?.value ?? p.value)} x2={x(i)} y2={y(p.value)} />
+                  )}
+                  <circle cx={x(i)} cy={y(p.value)} r="3" />
+                </>
+              )}
+            </g>
+          ),
+        )}
+      </svg>
+      <div className={css.dashboardDates}>
+        <time>{points[0]?.date}</time>
+        <time>{points.at(-1)?.date}</time>
+      </div>
+    </figure>
+  );
+}
+
+function HealthDashboard({ data }: { data: HealthData }) {
+  const t = useT();
+  const ordered = (kind: string, unit: string) =>
+    (data.metrics.find((m) => m.kind === kind && m.unit === unit)?.points ?? [])
+      .filter(
+        (p): p is typeof p & { value: number } => typeof p.value === "number" && Number.isFinite(p.value),
+      )
+      .slice()
+      .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  const body = [
+    { kind: "weight", title: t("体重", "Weight"), unit: "kg" },
+    { kind: "body_fat", title: t("体脂率", "Body fat"), unit: "%" },
+    { kind: "height", title: t("身高", "Height"), unit: "cm" },
+  ]
+    .map((m) => ({ ...m, points: ordered(m.kind, m.unit) }))
+    .filter((m) => m.points.length);
+  const cardio = [
+    { kind: "resting_hr", title: t("静息心率", "Resting heart rate"), unit: "bpm" },
+    { kind: "hrv_sdnn", title: "HRV", unit: "ms" },
+    { kind: "walking_hr", title: t("步行心率", "Walking heart rate"), unit: "bpm" },
+  ]
+    .map((m) => ({ ...m, points: ordered(m.kind, m.unit) }))
+    .filter((m) => m.points.length);
+  const steps = data.steps.slice(-7);
+  const sleep = data.sleep.slice(-7);
+  const latestSteps = data.steps.find((p) => p.date === data.today)?.value;
+  const latestSleep = [...data.sleep].reverse().find((p) => p.value !== null);
+  const hasTraining = data.training.recent.length > 0;
+  const hasAny =
+    body.length || cardio.length || steps.some((p) => p.value !== null) || latestSleep || hasTraining;
+  const others = [
+    ["heart_rate_daily", t("每日心率", "Daily heart rate")],
+    ["blood_oxygen", t("血氧", "Blood oxygen")],
+    ["vo2max", t("最大摄氧量", "VO₂ max")],
+    ["respiratory_rate", t("呼吸频率", "Respiratory rate")],
+    ["body_temperature", t("体温", "Temperature")],
+    ["glucose", t("血糖", "Blood glucose")],
+    ["bp", t("血压", "Blood pressure")],
+    ["heart_notifications", t("心率通知", "Heart notifications")],
+  ];
+  return (
+    <>
+      {!hasAny && <p className={css.empty}>{t("暂无健康记录", "No health records")}</p>}
+      <div className={css.dashboard}>
+        {!!body.length && (
+          <Section title={t("身体", "Body")}>
+            <dl className={css.dashboardValues}>
+              {body.map((m) => (
+                <div key={m.kind}>
+                  <dt>{m.title}</dt>
+                  <dd>
+                    <strong>
+                      {m.points.at(-1)?.estimated ? "≈" : ""}
+                      {number(m.points.at(-1)?.value ?? 0)}
+                    </strong>{" "}
+                    {m.unit}
+                  </dd>
+                  <time>{m.points.at(-1)?.date}</time>
+                </div>
+              ))}
+            </dl>
+            {body
+              .filter((m) => m.kind !== "height")
+              .map((m) => (
+                <DashboardChart key={m.kind} title={m.title} unit={m.unit} points={m.points} />
+              ))}
+          </Section>
+        )}
+        {steps.some((p) => p.value !== null) && (
+          <Section title={t("今日活动", "Activity today")}>
+            <dl className={css.dashboardValues}>
+              <div>
+                <dt>{t("步数", "Steps")}</dt>
+                <dd>
+                  <strong>{latestSteps == null ? "—" : number(latestSteps)}</strong>
+                </dd>
+                <time>{data.today}</time>
+              </div>
+            </dl>
+            <DashboardChart
+              title={t("步数 · 近 7 天", "Steps · last 7 days")}
+              points={steps}
+              unit={t("步", "steps")}
+              bars
+            />
+          </Section>
+        )}
+        {latestSleep && (
+          <Section title={t("睡眠", "Sleep")}>
+            <dl className={css.dashboardValues}>
+              <div>
+                <dt>{latestSleep.date}</dt>
+                <dd>
+                  <strong>{number(latestSleep.value ?? 0)}</strong> {t("小时", "hours")}
+                </dd>
+              </div>
+            </dl>
+            <div className={css.sleepChart}>
+              <DashboardChart
+                title={t("睡眠 · 近 7 天", "Sleep · last 7 days")}
+                points={sleep}
+                unit={t("小时", "hours")}
+                bars
+              />
+            </div>
+          </Section>
+        )}
+        {!!cardio.length && (
+          <Section title={t("心肺与恢复", "Cardio and recovery")}>
+            {cardio.map((m) => (
+              <div key={m.kind} className={css.cardioMetric}>
+                <strong>
+                  {m.title} · {number(m.points.at(-1)?.value ?? 0)} {m.unit}
+                </strong>
+                <DashboardChart title={m.title} unit={m.unit} points={m.points} />
+              </div>
+            ))}
+          </Section>
+        )}
+        {hasTraining && (
+          <Section title={t("训练", "Training")}>
+            <div className={css.calendar} aria-label={t("训练 · 近 5 周", "Training · last 5 weeks")}>
+              {data.training.heatmap.map((d) => (
+                <span
+                  key={d.date}
+                  data-level={
+                    d.minutes === null || d.minutes <= 0 ? 0 : d.minutes >= 60 ? 3 : d.minutes >= 30 ? 2 : 1
+                  }
+                  title={`${d.date}: ${d.minutes === null ? t("未记录", "Not logged") : `${number(d.minutes)} min`}`}
+                />
+              ))}
+            </div>
+            <div className={css.legend}>
+              <span>{t("未记录", "Not logged")}</span>
+              <span>1–29 min</span>
+              <span>30–59 min</span>
+              <span>60+ min</span>
+            </div>
+            {data.training.recent.slice(0, 3).map((session) => (
+              <div key={session.id} className={css.row}>
+                <time>{session.date}</time>
+                <span className={css.grow}>{session.exercises.map((e) => e.name).join(" · ")}</span>
+                {session.duration !== null && <span>{number(session.duration)} min</span>}
+              </div>
+            ))}
+          </Section>
+        )}
+      </div>
+      <section className={css.otherMetrics} aria-label={t("其他指标", "Other metrics")}>
+        <h2>{t("其他指标", "Other metrics")}</h2>
+        {others.map(([kind, title]) => {
+          const metric = data.metrics.find((m) => m.kind === kind);
+          const latest = metric?.points
+            .slice()
+            .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))
+            .at(-1);
+          return (
+            <span key={kind} title={latest?.date}>
+              {title}{" "}
+              <strong>
+                {latest
+                  ? `${typeof latest.value === "number" ? number(latest.value) : latest.value} ${metric?.unit}`
+                  : t("无记录", "No records")}
+              </strong>
+            </span>
+          );
+        })}
+      </section>
+    </>
+  );
+}
+
 export function HealthPage({
   loadHealth,
   loadHealthPhoto,
@@ -447,33 +668,11 @@ export function HealthPage({
             : t("暂无训练目标", "No training goal yet");
   const maxReps = Math.max(...(training?.heatmap.map((d) => d.repetitions ?? 0) ?? []), 1);
   const maxMinutes = Math.max(...(training?.heatmap.map((d) => d.minutes ?? 0) ?? []), 1);
-  const monday = data
-    ? new Date(
-        Date.parse(`${data.today}T12:00:00Z`) -
-          ((new Date(`${data.today}T12:00:00Z`).getUTCDay() + 6) % 7) * 86400000,
-      )
-        .toISOString()
-        .slice(0, 10)
-    : "";
-  const average = (points: Point[]) => {
-    const logged = points.filter((point) => point.date >= monday && point.value !== null);
-    return {
-      value: logged.length
-        ? logged.reduce((total, point) => total + (point.value ?? 0), 0) / logged.length
-        : null,
-      count: logged.length,
-      estimated: logged.some((point) => point.estimated),
-    };
-  };
-  const protein = average(data?.nutrition.protein ?? []);
-  const sleep = average(data?.sleep ?? []);
-  const steps = average(data?.steps ?? []);
   const weights = (
     data?.metrics.find((metric) => metric.kind === "weight" && metric.unit === "kg")?.points ?? []
   )
     .slice()
     .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
-  const weight = weights.at(-1);
   const weightChanges = weights.flatMap((point, index) => {
     const previous = weights[index - 1];
     if (
@@ -486,30 +685,6 @@ export function HealthPage({
     const change = point.value - previous.value;
     return Math.abs(change) > 3 ? [{ point, change }] : [];
   });
-  const coverage = (count: number) => t(`本周 ${count} 天有记录`, `${count} days logged this week`);
-  const summary = [
-    [t("本周训练", "Workouts this week"), amount(training?.week ?? null, t("次", "sessions")), ruleText],
-    [
-      t("蛋白质", "Protein"),
-      amount(protein.value, t("克 / 天", "g / day"), protein.estimated),
-      `${coverage(protein.count)}${data?.nutrition.target?.length ? t(` · 目标 ${data.nutrition.target.join("–")} 克 / 天`, ` · Target ${data.nutrition.target.join("–")} g / day`) : ""}`,
-    ],
-    [
-      t("睡眠", "Sleep"),
-      amount(sleep.value, t("小时 / 晚", "hours / night"), sleep.estimated),
-      coverage(sleep.count),
-    ],
-    [
-      t("步数", "Steps"),
-      amount(steps.value, t("步 / 天", "steps / day"), steps.estimated),
-      coverage(steps.count),
-    ],
-    [
-      t("体重", "Weight"),
-      amount(typeof weight?.value === "number" ? weight.value : null, "kg", weight?.estimated),
-      weight?.date ?? t("记一次测量，开始追踪变化", "Log a measurement to start tracking changes"),
-    ],
-  ];
   const recent = [
     ...(training?.recent ?? []).map((session) => ({
       id: `workout-${session.id}`,
@@ -543,7 +718,6 @@ export function HealthPage({
             <span aria-hidden="true" />
             {t("健康", "Health")}
           </h1>
-          <p>{t("这周概况与最近的记录", "This week and your recent records")}</p>
         </div>
         <div className={css.actions}>
           <button
@@ -609,31 +783,7 @@ export function HealthPage({
         </p>
       ) : (
         <>
-          <dl className={css.overview} aria-label={t("健康概况", "Health summary")}>
-            {summary.map(([title, value, note], index) => (
-              <div className={css.card} key={title}>
-                <dt>{title}</dt>
-                <dd>
-                  <strong>{value}</strong>
-                  {index === 0 && target?.[0] && training.week !== null && (
-                    <progress
-                      aria-label={t("本周训练目标", "Weekly workout goal")}
-                      value={training.week}
-                      max={target[0]}
-                    />
-                  )}
-                  {index === 1 && data.nutrition.target?.[0] && protein.value !== null && (
-                    <progress
-                      aria-label={t("每日蛋白质目标", "Daily protein goal")}
-                      value={protein.value}
-                      max={data.nutrition.target[0]}
-                    />
-                  )}
-                  <small>{note}</small>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <HealthDashboard data={data} />
           {weightChanges.map(({ point, change }) => (
             <p key={point.id} className={css.warning}>
               {t(
