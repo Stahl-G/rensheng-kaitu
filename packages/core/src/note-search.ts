@@ -2,8 +2,8 @@ import { type FSWatcher, readdirSync, watch } from "node:fs";
 import { setImmediate } from "node:timers/promises";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { excerpt, openIndex } from "./chat-search.js";
+import { readTopicStatus } from "./doing-page.js";
 import { KaituError } from "./errors.js";
-import { parseFrontmatter } from "./frontmatter.js";
 import { redact } from "./handover.js";
 import { readLibraryDocument } from "./library.js";
 import type { Workspace } from "./workspace.js";
@@ -17,6 +17,7 @@ export interface NoteSearchResult {
 type IndexState = {
   root: string;
   dirty: Set<string> | null;
+  errors: Set<string>;
   pending?: Promise<void>;
   watcher?: FSWatcher;
 };
@@ -60,7 +61,10 @@ async function synchronize(ws: Workspace, state: IndexState): Promise<void> {
       db.exec(
         "CREATE VIRTUAL TABLE IF NOT EXISTS notes USING fts5(file UNINDEXED, title, text, tokenize='trigram')",
       );
-      if (!dirty) db.exec("DELETE FROM notes");
+      if (!dirty) {
+        db.exec("DELETE FROM notes");
+        state.errors.clear();
+      }
       const remove = db.prepare("DELETE FROM notes WHERE file = ?");
       const insert = db.prepare("INSERT INTO notes(file, title, text) VALUES (?, ?, ?)");
       // Short transactions let other work use the shared, rebuildable index between batches.
@@ -69,10 +73,12 @@ async function synchronize(ws: Workspace, state: IndexState): Promise<void> {
         try {
           for (const file of files.slice(start, start + 250)) {
             if (dirty) remove.run(file);
+            state.errors.delete(file);
             if (!ws.exists(file) || ws.conflictCopy(file)) continue;
-            const { data, body } = parseFrontmatter(readLibraryDocument(ws, file));
+            const { data, body } = readTopicStatus(readLibraryDocument(ws, file));
+            if (!data) state.errors.add(file);
             const title =
-              typeof data.title === "string" ? data.title : (body.match(/^#\s+(.+)$/m)?.[1] ?? file);
+              typeof data?.title === "string" ? data.title : (body.match(/^#\s+(.+)$/m)?.[1] ?? file);
             const notesFile = file.replace(/\/STATUS\.md$/, "/notes.md");
             let notes = "";
             if (file.startsWith("learning/") && ws.exists(notesFile) && !ws.conflictCopy(notesFile)) {
@@ -105,7 +111,7 @@ export async function searchLibraryNotes(ws: Workspace, query: string): Promise<
   let state = indexes.get(ws);
   if (state?.root !== ws.root) {
     disposeNoteIndex(ws);
-    state = { root: ws.root, dirty: null };
+    state = { root: ws.root, dirty: null, errors: new Set() };
     indexes.set(ws, state);
     const current = state;
     try {
@@ -153,7 +159,7 @@ export async function searchLibraryNotes(ws: Workspace, query: string): Promise<
       file: String(row.file),
       title: String(row.title),
       kind: String(row.file).startsWith("decisions/") ? "决定" : "笔记",
-      snippet: excerpt(String(row.text), term),
+      snippet: `${state.errors.has(String(row.file)) ? "文件格式有误，请检查 / Invalid document: " : ""}${excerpt(String(row.text), term)}`,
     }));
   } finally {
     db.close();

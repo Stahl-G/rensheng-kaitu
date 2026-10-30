@@ -1,19 +1,21 @@
 import { readdirSync } from "node:fs";
+import { YAMLParseError } from "yaml";
 import { normalizeStatus } from "./doc-input.js";
-import { KaituError } from "./errors.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
 import { schemas } from "./schema.js";
 import type { ModuleStatus } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export interface DoingDecision {
   file: string;
+  error?: "INVALID_DOCUMENT";
   title: string;
   status: string | null;
   due: string | null;
 }
 export interface DoingLearning {
   file: string;
+  error?: "INVALID_DOCUMENT";
   title: string;
   progress: NonNullable<ModuleStatus["progress"]> | null;
   next: string | null;
@@ -23,6 +25,23 @@ export interface DoingData {
   learning: DoingLearning[];
 }
 
+/** 目录和搜索共用只读解析；坏头部仍保留正文，写入接口沿用严格校验。 */
+export function readTopicStatus(source: string) {
+  type Status = ModuleStatus & { title?: string; due?: string };
+  const body = frontmatterBody(source);
+  let data: Status | null = null;
+  try {
+    const raw = parseFrontmatter(source).data;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const normalized = normalizeStatus(raw);
+      if (schemas().builtin("status.schema.json")(normalized)) data = normalized as unknown as Status;
+    }
+  } catch (error) {
+    if (!(error instanceof YAMLParseError)) throw error;
+  }
+  return { data, body };
+}
+
 function topics(ws: Workspace, dir: string) {
   if (!ws.exists(dir)) return [];
   return readdirSync(ws.resolve(dir), { withFileTypes: true })
@@ -30,16 +49,20 @@ function topics(ws: Workspace, dir: string) {
     .map((entry) => `${dir}/${entry.name}/STATUS.md`)
     .filter((file) => ws.exists(file))
     .sort()
-    .flatMap((file) => {
+    .flatMap<DoingDecision & DoingLearning>((file) => {
       const topic = ws.scanParsed(file, "doing-topic", (source) => {
-        const parsed = parseFrontmatter<ModuleStatus & { title?: string; due?: string }>(source);
-        const body = parsed.body;
-        const data = normalizeStatus(
-          parsed.data as unknown as Record<string, unknown>,
-        ) as unknown as typeof parsed.data;
-        if (!schemas().builtin("status.schema.json")(data))
-          throw new KaituError(`状态文件格式不合法：${file}`, "INVALID_DOCUMENT");
+        const { data, body } = readTopicStatus(source);
         const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+        if (!data)
+          return {
+            file,
+            title: heading || file,
+            status: null,
+            due: null,
+            progress: null,
+            next: null,
+            error: "INVALID_DOCUMENT" as const,
+          };
         const text = body
           .replace(/<!--[\s\S]*?-->/g, "")
           .split(/\r?\n/)
@@ -63,8 +86,15 @@ function topics(ws: Workspace, dir: string) {
 
 export function readDoing(ws: Workspace): DoingData {
   return {
-    decisions: topics(ws, "decisions").map(({ file, title, status, due }) => ({ file, title, status, due })),
-    learning: topics(ws, "learning").map(({ file, title, progress, next }) => ({
+    decisions: topics(ws, "decisions").map(({ file, title, status, due, error }) => ({
+      file,
+      title,
+      status,
+      due,
+      ...(error ? { error } : {}),
+    })),
+    learning: topics(ws, "learning").map(({ file, title, progress, next, error }) => ({
+      ...(error ? { error } : {}),
       file,
       title,
       progress,
