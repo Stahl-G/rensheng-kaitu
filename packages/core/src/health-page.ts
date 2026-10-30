@@ -65,7 +65,26 @@ function cloudWorkouts(ws: Workspace, warnings: ReadWarning[]) {
   return rows;
 }
 
-export function readHealthPage(ws: Workspace, now = new Date()) {
+type CompleteHealthPage = ReturnType<typeof buildHealthPage>;
+type TrainingSession = CompleteHealthPage["training"]["recent"][number];
+type Exercise = TrainingSession["exercises"][number];
+type Measurements = Pick<Exercise, "kcal" | "avgHr" | "pace">;
+
+/** Additive fields remain optional for older providers; this reader always populates them. */
+export type HealthPageData = Omit<CompleteHealthPage, "dashboard" | "training"> & {
+  dashboard?: CompleteHealthPage["dashboard"];
+  training: Omit<CompleteHealthPage["training"], "recent"> & {
+    recent: (Omit<TrainingSession, "exercises"> & {
+      exercises: (Omit<Exercise, keyof Measurements> & Partial<Measurements>)[];
+    })[];
+  };
+};
+
+export function readHealthPage(ws: Workspace, now = new Date()): HealthPageData {
+  return buildHealthPage(ws, now);
+}
+
+function buildHealthPage(ws: Workspace, now: Date) {
   const data = readWorkbench(ws, now);
   const statusNext = data.statuses.find((s) => s.file === "health/STATUS.md")?.data.next ?? [];
   const tasks = (data.records.task ?? []) as Task[];
