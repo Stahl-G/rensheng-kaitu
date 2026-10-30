@@ -351,6 +351,8 @@ export function readExploration(ws: Workspace, options: { partial?: boolean } = 
       previous.set(record.id, record);
     }
   }
+  // Current rows and revision history report the same source failure; retain distinct messages.
+  const uniqueWarnings = [...new Map(warnings.map((warning) => [JSON.stringify(warning), warning])).values()];
   return {
     references: {
       projects: projects.filter((project) => !project.error).map((p) => ({ id: p.slug, title: p.title })),
@@ -358,7 +360,7 @@ export function readExploration(ws: Workspace, options: { partial?: boolean } = 
         .decisions.map((d) => ({ path: d.file.replace(/STATUS\.md$/, "decision.md"), title: d.title }))
         .filter((d) => ws.exists(d.path)),
     },
-    ...(warnings.length ? { warnings } : {}),
+    ...(uniqueWarnings.length ? { warnings: uniqueWarnings } : {}),
     directions,
     experiments,
     checkins,

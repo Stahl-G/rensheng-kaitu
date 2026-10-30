@@ -423,7 +423,7 @@ it("news, trends, directions and experiments isolate malformed lines while write
     );
     const entries = [news, trend, direction, experiment];
     const before = new Map(entries.map((entry) => [entry.file, ws.readText(entry.file)]));
-    for (const entry of entries) ws.appendLine(entry.file, '{"broken":');
+    for (const entry of entries) ws.appendLine(entry.file, '{"broken":\n{"also_broken":');
     const read = readNews(ws, now, { partial: true });
     expect([...read.picked, ...read.others].map((row) => row.id)).toContain(news.record.id);
     expect(read.trends.map((row) => row.id)).toContain(trend.record.id);
@@ -435,13 +435,19 @@ it("news, trends, directions and experiments isolate malformed lines while write
     );
     const warnings = [...(read.warnings ?? []), ...(exploration.warnings ?? [])];
     for (const entry of entries) {
-      expect(warnings).toContainEqual(
-        expect.objectContaining({ code: "invalid_record", location: `${entry.file}:2` }),
-      );
+      for (const line of [2, 3])
+        expect(
+          warnings.filter(
+            (warning) =>
+              typeof warning !== "string" &&
+              warning.code === "invalid_record" &&
+              warning.location === `${entry.file}:${line}`,
+          ),
+        ).toHaveLength(1);
       expect(() => updateRecord(ws, entry.type, entry.record.id, {}, { now, by: "user" })).toThrow(
         "记录格式不合法",
       );
-      expect(ws.readText(entry.file)).toBe(`${before.get(entry.file)}{"broken":\n`);
+      expect(ws.readText(entry.file)).toBe(`${before.get(entry.file)}{"broken":\n{"also_broken":\n`);
       ws.writeText(entry.file, before.get(entry.file) as string);
     }
     expect(readNews(ws, now, { partial: true }).warnings).toBeUndefined();
@@ -515,7 +521,12 @@ it("reading isolates unusable view fields without applying the current write sch
     expect(exploration.experiments.map((row) => row.id)).toEqual([experiment.record.id]);
     const warnings = [...(read.warnings ?? []), ...(exploration.warnings ?? [])];
     for (const id of badIds)
-      expect(warnings).toContainEqual(expect.objectContaining({ code: "invalid_record", location: id }));
+      expect(
+        warnings.filter(
+          (warning) =>
+            typeof warning !== "string" && warning.code === "invalid_record" && warning.location === id,
+        ),
+      ).toHaveLength(1);
     for (const [file, text] of before) expect(ws.readText(file)).toBe(text);
     ws.appendLine(news.file, JSON.stringify({ ...news.record, id: ulid(), published_at: "2026-10-30" }));
     expect([...readNews(ws, now, { partial: true }).others].map((row) => row.id)).toEqual([news.record.id]);
