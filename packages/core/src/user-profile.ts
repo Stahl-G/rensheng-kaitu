@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { agentCanRead } from "./exposure.js";
+import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { redact, userProfileSections } from "./handover.js";
 import { type Locale, pick } from "./locale.js";
@@ -20,14 +20,15 @@ const unavailable = (locale: Locale) =>
 /** Shared, disposable discovery view. No memory titles, finance, summaries or record rows. */
 export function userNavigation(ws: Workspace) {
   const reader = { id: "handover", finance: false } as const;
+  const canRead = agentReadFilter(ws, reader);
   const modules = listModules(ws)
-    .filter((module) => agentCanRead(ws, `${module.dir}/module.json`, reader))
+    .filter((module) => canRead(`${module.dir}/module.json`))
     .map((module) => ({ path: `${module.dir}/module.json`, title: redact(module.def.name, "zh-CN") }));
   const paths = new Set(["NOW.md", "me/profile.md", "me/rules.md", "me/goals.json", "me/STATUS.md"]);
   let available = true;
   // Match the established project/topic layout; attachments, JSONL and private memories stay out.
   for (const directory of ["projects", "learning", "decisions"]) {
-    if (!agentCanRead(ws, directory, reader)) continue;
+    if (!canRead(directory)) continue;
     if (ws.isUnavailable(directory)) {
       available = false;
       continue;
@@ -40,7 +41,7 @@ export function userNavigation(ws: Workspace) {
       if (original && !original.split("/").at(-1)?.includes(".")) {
         if (ws.isUnavailable(original)) available = false;
       } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        if (!agentCanRead(ws, child, reader)) continue;
+        if (!canRead(child)) continue;
         if (ws.isUnavailable(child)) {
           available = false;
           continue;
@@ -54,7 +55,7 @@ export function userNavigation(ws: Workspace) {
   }
   const files: { path: string; title: string; updated_at: string }[] = [];
   for (const path of [...paths].sort()) {
-    if (!agentCanRead(ws, path, reader)) continue;
+    if (!canRead(path)) continue;
     if (ws.isUnavailable(path)) {
       available = false;
       continue;

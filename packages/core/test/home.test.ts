@@ -46,12 +46,22 @@ it("projects existing goals, projects and learning without reading or mutating t
     });
     const now = new Date("2026-10-28T12:00:00Z");
     ws.writeText("projects/broken/STATUS.md", "---\ntitle: [\n---\n");
+    ws.writeText(
+      "inbox/notes/2026-10-28/original.md",
+      "---\nkind: capture\ndate: 2026-10-28\n---\nAn original",
+    );
     const loaded = await readHomeSources(ws, now);
     expect(loaded.overview.warnings).toContainEqual(
       expect.objectContaining({ code: "invalid_document", location: "projects/broken/STATUS.md" }),
     );
     expect(loaded.projects.some((item) => item.slug === "fixture")).toBe(true);
     const workbench = readWorkbench(ws, now);
+    expect(readHome(loaded)).toEqual(
+      readHome({
+        ...loaded,
+        overview: await readOverviewPage(ws, now, workbench),
+      }),
+    );
     const input = loaded;
     expect(loaded.projects).toEqual(readProjectsPage(ws, { now, loaded: workbench, partial: true }));
     const before = JSON.stringify(input);

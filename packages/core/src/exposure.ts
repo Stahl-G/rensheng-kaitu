@@ -1,5 +1,5 @@
 import { relative, resolve, sep } from "node:path";
-import { agentRelativePath } from "./agent-file-policy.js";
+import { agentPathResolver, agentRelativePath } from "./agent-file-policy.js";
 import { KaituError } from "./errors.js";
 import { normalizedMemory } from "./memory.js";
 import { moduleAtDirectory } from "./modules.js";
@@ -43,16 +43,41 @@ export function setFinanceAccess(ws: Workspace, id: AgentConnectionId, allowed: 
 
 /** The same file boundary is used by MCP, Ask and the user-built handover pack. */
 export function agentCanRead(ws: Workspace, path: string, connection: AgentConnection): boolean {
+  return canRead(ws, path, connection, (file) => agentRelativePath(ws.root, file));
+}
+
+/** Use only within one synchronous scan, never retain across requests or workspace changes. */
+export function agentReadFilter(ws: Workspace, connection: AgentConnection) {
+  try {
+    const resolvePath = agentPathResolver(ws.root);
+    const modules = new Map<string, boolean>();
+    const financeModule = (dir: string) => {
+      if (!modules.has(dir)) modules.set(dir, moduleAtDirectory(ws, dir)?.def.id === "finance");
+      return modules.get(dir) === true;
+    };
+    return (path: string) => canRead(ws, path, connection, resolvePath, financeModule);
+  } catch {
+    return () => false;
+  }
+}
+
+function canRead(
+  ws: Workspace,
+  path: string,
+  connection: AgentConnection,
+  resolvePath: (path: string) => string,
+  financeModule = (dir: string) => moduleAtDirectory(ws, dir)?.def.id === "finance",
+): boolean {
   let relative: string;
   try {
-    relative = agentRelativePath(ws.root, path);
+    relative = resolvePath(path);
   } catch {
     return false;
   }
   const physical = relative;
   const lexical = relativePath(ws.root, path);
   return (lexical === physical ? [physical] : [lexical, physical]).every((value) =>
-    allowedPath(ws, value, connection),
+    allowedPath(ws, value, connection, financeModule),
   );
 }
 
@@ -60,7 +85,12 @@ function relativePath(root: string, path: string): string {
   return relative(root, resolve(root, path)).split(sep).join("/");
 }
 
-function allowedPath(ws: Workspace, relative: string, connection: AgentConnection): boolean {
+function allowedPath(
+  ws: Workspace,
+  relative: string,
+  connection: AgentConnection,
+  financeModule: (dir: string) => boolean,
+): boolean {
   const parts = relative.split("/");
   const name = parts.at(-1)?.toLowerCase() ?? "";
   if (
@@ -80,7 +110,7 @@ function allowedPath(ws: Workspace, relative: string, connection: AgentConnectio
   }
   let finance = parts[0] === "finance";
   try {
-    finance ||= moduleAtDirectory(ws, parts[0] ?? "")?.def.id === "finance";
+    finance ||= financeModule(parts[0] ?? "");
   } catch {
     return false;
   }
