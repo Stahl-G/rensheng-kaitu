@@ -18,7 +18,7 @@ import {
   projectionManifest,
   projectionUnchanged,
   readProjection,
-  retainHistoryInputs,
+  withHistoryInputs,
   writeProjection,
 } from "./projection-cache.js";
 import { schemas } from "./schema.js";
@@ -97,10 +97,11 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
       return { name, value: undefined, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  const historyInputs = historyReadInputs(ws);
   return {
-    historyInputs: historyReadInputs(ws),
+    historyInputs,
     input,
-    before,
+    before: before && withHistoryInputs(before, historyInputs),
     snapshots: prepared,
     cacheable,
     timeZone: data.timeZone,
@@ -166,8 +167,13 @@ export function publishPhoneSnapshots(
   if (errors.length) throw new AggregateError(errors, errors.map((error) => error.message).join("；"));
   if (before && cacheable) {
     try {
-      const manifest = projectionManifest(input);
-      if (JSON.stringify(before) === JSON.stringify(manifest)) {
+      const manifest = withHistoryInputs(projectionManifest(input), prepared.historyInputs);
+      if (
+        manifest &&
+        prepared.historyInputs &&
+        projectionUnchanged(input, prepared.historyInputs) &&
+        JSON.stringify(before) === JSON.stringify(manifest)
+      ) {
         const expiry = Math.min(
           prepared.expires ?? Number.POSITIVE_INFINITY,
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
@@ -181,7 +187,7 @@ export function publishPhoneSnapshots(
           }),
         };
         writeProjection(input, "phone", {
-          manifest: retainHistoryInputs(input, manifest, prepared.historyInputs),
+          manifest,
           value,
           timeZone: prepared.timeZone,
           day: prepared.day,

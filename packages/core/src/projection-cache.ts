@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import {
+  type BigIntStats,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -15,7 +16,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { localStateRoot } from "./local-state.js";
 
 // Disposable implementation data, never part of a workspace or its synchronization format.
-const version = 3;
+const version = 4;
 export type ProjectionInputs = { root: string; state: string };
 export type ProjectionManifest = [path: string, stamp: string][];
 type Projection<T> = {
@@ -55,15 +56,18 @@ export function projectionDirectory(input: ProjectionInputs): string | undefined
 
 export function projectionFingerprint(path: string): string {
   try {
-    const item = lstatSync(path, { bigint: true });
-    const fields = [item.ino, item.mode, item.size, item.mtimeNs, item.ctimeNs].join(":");
-    if (!item.isSymbolicLink()) return fields;
-    const target = statSync(path, { bigint: true });
-    return `${fields}:${readlinkSync(path)}:${target.ino}:${target.mode}:${target.size}:${target.mtimeNs}:${target.ctimeNs}`;
+    return fingerprint(path, lstatSync(path, { bigint: true }));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return "missing";
     throw error;
   }
+}
+
+function fingerprint(path: string, item: BigIntStats): string {
+  const fields = [item.ino, item.mode, item.size, item.mtimeNs, item.ctimeNs].join(":");
+  if (!item.isSymbolicLink()) return fields;
+  const target = statSync(path, { bigint: true });
+  return `${fields}:${readlinkSync(path)}:${target.ino}:${target.mode}:${target.size}:${target.mtimeNs}:${target.ctimeNs}`;
 }
 
 function children(input: ProjectionInputs, path: string) {
@@ -74,21 +78,23 @@ function children(input: ProjectionInputs, path: string) {
       return false;
     return (
       path !== input.state ||
-      (!["cache", "secrets.json", "organizer.json"].includes(entry.name) &&
+      (!["cache", "secrets.json", "organizer.json", "history.git"].includes(entry.name) &&
         !entry.name.startsWith("index.sqlite"))
     );
   });
 }
-function directoryFingerprint(input: ProjectionInputs, path: string): string {
-  const item = lstatSync(path, { bigint: true });
+function directoryFingerprint(
+  input: ProjectionInputs,
+  path: string,
+  item = lstatSync(path, { bigint: true }),
+  entries?: ReturnType<typeof children>,
+): string {
   if (!item.isDirectory()) return projectionFingerprint(path);
   return `directory:${item.ino}:${item.mode}:${JSON.stringify(
-    children(input, path)
-      .map((entry) => entry.name)
-      .sort(),
+    (entries ?? children(input, path)).map((entry) => entry.name).sort(),
   )}`;
 }
-function accessFingerprint(path: string): string {
+export function projectionAccessFingerprint(path: string): string {
   try {
     const item = lstatSync(path, { bigint: true });
     return item.isDirectory() ? `access:${item.ino}:${item.mode}` : projectionFingerprint(path);
@@ -98,43 +104,33 @@ function accessFingerprint(path: string): string {
   }
 }
 
-/** Log views need the refs/commit objects actually read, not every historical source blob. */
-export function retainHistoryInputs(
-  input: ProjectionInputs,
+/** Append the fingerprints captured before Git reads, without scanning historical source blobs. */
+export function withHistoryInputs(
   manifest: ProjectionManifest,
-  paths?: readonly string[],
-): ProjectionManifest {
-  if (!paths) return manifest;
-  const root = join(input.state, "history.git");
-  const required = new Set(paths.filter((path) => inside(root, path)));
-  const parents = new Set([root]);
-  for (const path of required) {
-    for (let parent = dirname(path); inside(root, parent); parent = dirname(parent)) {
-      parents.add(parent);
-      if (parent === root) break;
-    }
-  }
-  const previous = new Map(manifest);
-  return [
-    ...manifest.filter(([path]) => !inside(root, path)),
-    ...[...parents]
-      .filter((path) => !required.has(path))
-      .map((path): [string, string] => [path, accessFingerprint(path)]),
-    ...[...required].map((path): [string, string] => [
-      path,
-      previous.get(path) ?? projectionFingerprint(path),
-    ]),
-  ];
+  history?: ProjectionManifest,
+): ProjectionManifest | undefined {
+  // An unobserved history read cannot produce a reusable cache.
+  return history ? [...manifest, ...history] : undefined;
 }
 
 /** Directory fingerprints detect additions/deletions; file fingerprints detect in-place edits. */
 export function projectionManifest(input: ProjectionInputs): ProjectionManifest {
   const entries = new Map<string, string>();
   const walk = (path: string) => {
-    entries.set(path, projectionFingerprint(path));
-    if (entries.get(path) === "missing" || !lstatSync(path).isDirectory()) return;
-    if (path === input.root || path === input.state) entries.set(path, directoryFingerprint(input, path));
-    for (const entry of children(input, path)) walk(join(path, entry.name));
+    let item: BigIntStats;
+    try {
+      item = lstatSync(path, { bigint: true });
+      entries.set(path, fingerprint(path, item));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      entries.set(path, "missing");
+      return;
+    }
+    if (!item.isDirectory()) return;
+    const listed = children(input, path);
+    if (path === input.root || path === input.state)
+      entries.set(path, directoryFingerprint(input, path, item, listed));
+    for (const entry of listed) walk(join(path, entry.name));
   };
   walk(resolve(input.root));
   walk(resolve(input.state));
@@ -160,7 +156,7 @@ export function projectionUnchanged(input: ProjectionInputs, manifest: Projectio
       (before.startsWith("directory:")
         ? directoryFingerprint(input, path)
         : before.startsWith("access:")
-          ? accessFingerprint(path)
+          ? projectionAccessFingerprint(path)
           : projectionFingerprint(path)) === before,
   );
 }

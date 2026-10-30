@@ -7,7 +7,7 @@ import {
   projectionExpiry,
   projectionManifest,
   projectionUnchanged,
-  retainHistoryInputs,
+  withHistoryInputs,
   writeProjection,
 } from "./projection-cache.js";
 import { Workspace } from "./workspace.js";
@@ -64,6 +64,7 @@ async function build(request: Request) {
     const data = readHome(sources);
     const { today, timeZone, cutoff, metrics, proposedTasks, warnings } = sources.overview;
     const presentation = { today, timeZone, cutoff, metrics, proposedTasks, warnings };
+    if (manifest) manifest = withHistoryInputs(manifest, historyReadInputs(workspace));
     if (manifest && !projectionUnchanged(input, manifest))
       parentPort?.postMessage({ changed: true, generation });
     else {
@@ -76,7 +77,7 @@ async function build(request: Request) {
         if (manifest)
           writeProjection(input, "home", {
             ...metadata,
-            manifest: retainHistoryInputs(input, manifest, historyReadInputs(workspace)),
+            manifest,
             value: { data, presentation },
           });
       } catch {

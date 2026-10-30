@@ -5,7 +5,12 @@ import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
 import { HISTORY_MARKER } from "./history-ownership.js";
 import { batchOverview, refreshOverview } from "./overview.js";
-import { type ProjectionManifest, projectionFingerprint, projectionUnchanged } from "./projection-cache.js";
+import {
+  type ProjectionManifest,
+  projectionAccessFingerprint,
+  projectionFingerprint,
+  projectionUnchanged,
+} from "./projection-cache.js";
 import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -479,19 +484,32 @@ const logs = new WeakMap<
   Workspace,
   Map<string, { versions: readonly Version[]; manifest: ProjectionManifest }>
 >();
-const logInputs = new WeakMap<Workspace, { root: string; paths: string[] }>();
-export function historyReadInputs(ws: Workspace): string[] | undefined {
+const logInputs = new WeakMap<Workspace, { root: string; manifest: ProjectionManifest }>();
+export function historyReadInputs(ws: Workspace): ProjectionManifest | undefined {
   const input = logInputs.get(ws);
-  return input?.root === ws.root ? input.paths : undefined;
+  return input?.root === ws.root ? input.manifest : undefined;
 }
-function observeHistoryReads(paths: Set<string>) {
+function observeHistoryReads(root: string, paths: Map<string, string>) {
   const promises = { ...fs.promises };
   for (const name of ["readFile", "lstat", "stat", "readdir"] as const) {
     const method = promises[name];
     Object.assign(promises, {
       [name]: (...args: unknown[]) => {
         // isomorphic-git may mix '/' with native separators on Windows.
-        if (typeof args[0] === "string") paths.add(resolve(args[0]));
+        if (typeof args[0] === "string") {
+          const path = resolve(args[0]);
+          if (!paths.has(path) || paths.get(path)?.startsWith("access:"))
+            paths.set(path, projectionFingerprint(path));
+          // Parent replacement/permissions matter, but unrelated blobs in a fanout directory do not.
+          for (
+            let parent = dirname(path);
+            parent === root || parent.startsWith(`${root}${sep}`);
+            parent = dirname(parent)
+          ) {
+            if (!paths.has(parent)) paths.set(parent, projectionAccessFingerprint(parent));
+            if (parent === root) break;
+          }
+        }
         return Reflect.apply(method, fs.promises, args);
       },
     });
@@ -504,11 +522,12 @@ export async function history(
   ws: Workspace,
   opts: { path?: string; limit?: number } = {},
 ): Promise<Version[]> {
-  const paths = new Set<string>();
-  const io = observeHistoryReads(paths);
+  const directory = historyDirectory(ws);
+  const paths = new Map([[directory, projectionAccessFingerprint(directory)]]);
+  const io = observeHistoryReads(directory, paths);
   const head = hasHistory(ws) ? await headOid(ws, io) : null;
   if (!head) {
-    logInputs.set(ws, { root: ws.root, paths: [...paths] });
+    logInputs.set(ws, { root: ws.root, manifest: [...paths] });
     return [];
   }
   const filepath = opts.path?.replace(/\/+$/, "") || undefined;
@@ -517,7 +536,7 @@ export async function history(
   if (cached) {
     try {
       if (projectionUnchanged({ root: ws.root, state: dirname(historyDirectory(ws)) }, cached.manifest)) {
-        logInputs.set(ws, { root: ws.root, paths: [...paths, ...cached.manifest.map(([path]) => path)] });
+        logInputs.set(ws, { root: ws.root, manifest: [...new Map([...cached.manifest, ...paths])] });
         return [...cached.versions];
       }
     } catch {
@@ -528,10 +547,10 @@ export async function history(
   const map =
     logs.get(ws) ?? new Map<string, { versions: readonly Version[]; manifest: ProjectionManifest }>();
   if (map.size > 20) map.clear();
-  const manifest: ProjectionManifest = [...paths].map((path) => [path, projectionFingerprint(path)]);
+  const manifest: ProjectionManifest = [...paths];
   map.set(key, { versions: Object.freeze(versions.map((version) => Object.freeze(version))), manifest });
   logs.set(ws, map);
-  logInputs.set(ws, { root: ws.root, paths: [...paths] });
+  logInputs.set(ws, { root: ws.root, manifest });
   return versions;
 }
 

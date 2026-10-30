@@ -84,6 +84,16 @@ it("publishes background data, retains it during refresh, and discards obsolete 
     if (!head) throw new Error("Expected history");
     const commit = join(historyDirectory(ws), "objects", head.slice(0, 2), head.slice(2));
     const savedCommit = readFileSync(commit);
+    const unrelated = join(dirname(commit), "unused-history-blob");
+    try {
+      writeFileSync(unrelated, "not referenced by the version list");
+      cache = createHomeCache(ws, () => notifications++);
+      expect(cache.read()).toMatchObject({ loading: false, error: null });
+      expect(cache.read().data?.pending[0]?.title).toBe("External change");
+      await cache.close();
+    } finally {
+      rmSync(unrelated, { force: true });
+    }
     try {
       writeFileSync(commit, "corrupt commit object");
       cache = createHomeCache(ws, () => notifications++);
