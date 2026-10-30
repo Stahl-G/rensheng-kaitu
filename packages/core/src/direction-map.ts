@@ -92,7 +92,7 @@ export function directionMapInput(
     }));
   // 和项目页同一条路：STATUS 的下一步加上挂在项目上的未完成待办。
   const projects = readProjectsPage(ws).flatMap((project) => {
-    if (project.stage === "done") return [];
+    if (project.error || project.stage === "done") return [];
     const seen = new Map<string, number>();
     return [
       {

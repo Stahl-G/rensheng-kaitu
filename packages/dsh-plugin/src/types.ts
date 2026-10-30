@@ -161,6 +161,8 @@ export interface OverviewData {
 }
 
 export interface DoingProject {
+  error?: string;
+  warnings?: string[];
   progress?: { label: string; current: number; target: number; unit?: string } | null;
   slug: string;
   title: string;

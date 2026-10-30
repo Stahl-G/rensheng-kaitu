@@ -37,12 +37,14 @@ export interface LibraryQuery {
   source?: string;
 }
 export interface LibraryData {
+  warnings?: string[];
   next?: string | null;
   sections: LibraryItem[];
   inbox: InboxEntry[];
   notes: { file: string; title: string; kind: "笔记" | "决定"; status: string | null }[];
 }
 export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryData {
+  const warnings: string[] = [];
   const section = query.section;
   if (section && !["summary", "inbox", "notes", "health"].includes(section))
     throw new KaituError("未知资料分类", "BAD_ARGS");
@@ -130,7 +132,8 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       }
     }
   if (!page) inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  const records = (types: string[]) => types.flatMap((type) => readRecords(ws, type));
+  const records = (types: string[]) =>
+    types.flatMap((type) => readRecords(ws, type, { onError: (error) => warnings.push(error.message) }));
   const health =
     !section || section === "health"
       ? records(
@@ -184,6 +187,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
     ...(page ? { next: page.next } : {}),
     inbox,
     notes,
+    warnings,
     sections: [
       {
         id: "calendar",
@@ -200,7 +204,13 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       {
         id: "projects",
         title: "在做的事",
-        count: !section ? listProjects(ws).length : null,
+        count: !section
+          ? listProjects(ws, { partial: true }).filter((project) => {
+              warnings.push(...project.warnings);
+              if (project.error) warnings.push(`${project.error} 文件格式不合法`);
+              return !project.error;
+            }).length
+          : null,
         sources: ["本机项目档案"],
         latest: null,
       },

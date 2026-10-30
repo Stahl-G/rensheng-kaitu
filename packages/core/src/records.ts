@@ -288,17 +288,19 @@ export function recordLines(ws: Workspace, ref: RecordTypeRef): RecordLine[] {
 }
 
 /** 读取已有追加历史，包含修正前的原始记录与删除标记。 */
-export function readRecordRevisions(ws: Workspace, type: string): StoredRecord[] {
-  return revisionsFor(ws, findRecordType(ws, type));
+export function readRecordRevisions(ws: Workspace, type: string, opts: ReadOptions = {}): StoredRecord[] {
+  return revisionsFor(ws, findRecordType(ws, type), opts.onError);
 }
 
 /** 一个数据文件里的全部行：文件没变时不再读取、解析和校验。行对象已冻结，可以共用。 */
 function fileRevisions(
   ws: Workspace,
   file: string,
+  ref: RecordTypeRef,
   onError?: (error: KaituError) => void,
 ): readonly StoredRecord[] {
-  const parsed = ws.scanParsed(file, "records", (text) => {
+  const validate = onError ? validatorFor(ws, ref) : undefined;
+  const parsed = ws.scanParsed(file, validate ? `records-view:${ref.type}` : "records", (text) => {
     const rows: StoredRecord[] = [];
     const errors: string[] = [];
     text.split("\n").forEach((raw, i) => {
@@ -306,6 +308,7 @@ function fileRevisions(
       try {
         const row = JSON.parse(raw) as StoredRecord;
         if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
+        if (validate && !row.deleted && !validate(row)) throw new Error("Invalid record fields");
         rows.push(row);
       } catch {
         errors.push(`${file}:${i + 1} 记录格式不合法`);
@@ -335,7 +338,7 @@ function revisionsFor(
     .flatMap((f) => {
       const file = `${dir}/${f}`;
       resolveRecordPath(ws, ref, file);
-      return fileRevisions(ws, file, onError);
+      return fileRevisions(ws, file, ref, onError);
     });
 }
 

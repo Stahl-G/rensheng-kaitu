@@ -2,6 +2,7 @@ import { directionText } from "@kaitu/core/direction-copy";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { HealthData, MeGoal } from "../types.js";
 import css from "./HealthPage.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT } from "./i18n.js";
 
 export interface HealthPageProps {
@@ -599,6 +600,7 @@ export function HealthPage({
           </button>
         </p>
       )}
+      <ReadWarnings warnings={data?.warnings} />
       {!data || !training ? (
         <p className={css.empty}>
           {error

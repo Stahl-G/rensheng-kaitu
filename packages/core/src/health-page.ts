@@ -29,7 +29,7 @@ function part(row: StoredRecord): string | null {
   );
 }
 
-function cloudWorkouts(ws: Workspace) {
+function cloudWorkouts(ws: Workspace, warnings: string[]) {
   const rows: Record<string, unknown>[] = [];
   function walk(dir: string) {
     if (!ws.exists(dir)) return;
@@ -37,19 +37,23 @@ function cloudWorkouts(ws: Workspace) {
       const file = `${dir}/${entry.name}`;
       if (entry.isDirectory()) walk(file);
       else if (entry.isFile() && entry.name.endsWith(".records.jsonl")) {
-        try {
-          const records = ws
-            .readText(file)
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .map((line) => JSON.parse(line));
-          const agent = records.find((r) => typeof r?.agent === "string")?.agent;
-          rows.push(
-            ...records.filter((r) => r?.type === "workout").map((r) => ({ ...r, agent: r.agent ?? agent })),
-          );
-        } catch {
-          // 损坏的归档不影响训练记录读取。
-        }
+        const records = ws
+          .readText(file)
+          .split(/\r?\n/)
+          .flatMap((line, i) => {
+            if (!line.trim()) return [];
+            try {
+              return [JSON.parse(line)];
+            } catch (error) {
+              if (!(error instanceof SyntaxError)) throw error;
+              warnings.push(`${file}:${i + 1} 记录格式不合法`);
+              return [];
+            }
+          });
+        const agent = records.find((r) => typeof r?.agent === "string")?.agent;
+        rows.push(
+          ...records.filter((r) => r?.type === "workout").map((r) => ({ ...r, agent: r.agent ?? agent })),
+        );
       }
     }
   }
@@ -95,7 +99,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const workouts = records("workout").filter(
     (row) => Date.parse(row.ts) >= trainingEarliest && day(row.ts) >= trainingFrom,
   );
-  const cloud = cloudWorkouts(ws);
+  const cloud = cloudWorkouts(ws, data.warnings);
   const recorder = (row: StoredRecord) => {
     if (row.by === "user") return "你";
     const archived = cloud.find(
@@ -175,6 +179,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     metrics.set(key, rows);
   }
   return {
+    ...(data.warnings.length ? { warnings: data.warnings } : {}),
     today: data.today,
     timeZone: data.timeZone,
     training: {

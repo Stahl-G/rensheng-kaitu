@@ -141,7 +141,14 @@ export function readWorkbench(
   function read<T>(label: string, fn: () => T, fallback: T): T {
     try {
       return fn();
-    } catch {
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        ["EACCES", "EPERM", "OUT_OF_SCOPE"].includes(String(error.code))
+      )
+        throw error;
       warnings.push(`${label}暂时无法读取，请让 Agent 检查文件格式。`);
       return fallback;
     }
@@ -176,7 +183,12 @@ export function readWorkbench(
       () =>
         listProjects(ws, {
           now,
+          partial: true,
           onError: (slug) => warnings.push(`项目 ${slug} 暂时无法读取，请检查文件格式。`),
+        }).filter((project) => {
+          if (!project.error) return true;
+          warnings.push(`${project.error} 文件格式不合法`);
+          return false;
         }),
       [],
     ),

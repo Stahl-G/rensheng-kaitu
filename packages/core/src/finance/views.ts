@@ -41,19 +41,18 @@ function context(ws: Workspace, options: FinanceViewOptions) {
   const asOf = options.asOf ?? new Date().toISOString();
   parseTs(asOf);
   const until = Date.parse(asOf);
+  const warnings: string[] = [];
+  const read = (type: string) => readRecords(ws, type, { onError: (error) => warnings.push(error.message) });
   const transactions = reconcileFinance(
-    (readRecords(ws, "finance_transaction") as FinanceTransaction[]).filter((r) => Date.parse(r.ts) <= until),
+    (read("finance_transaction") as FinanceTransaction[]).filter((r) => Date.parse(r.ts) <= until),
   );
   return {
     asOf,
+    warnings,
     transactions,
-    accounts: (readRecords(ws, "finance_account") as FinanceAccount[]).filter(
-      (r) => Date.parse(r.ts) <= until,
-    ),
-    holdings: (readRecords(ws, "finance_holding_snapshot") as FinanceHolding[]).filter(
-      (r) => Date.parse(r.ts) <= until,
-    ),
-    rates: (readRecords(ws, "finance_fx_rate") as FinanceFxRate[]).filter((r) => Date.parse(r.ts) <= until),
+    accounts: (read("finance_account") as FinanceAccount[]).filter((r) => Date.parse(r.ts) <= until),
+    holdings: (read("finance_holding_snapshot") as FinanceHolding[]).filter((r) => Date.parse(r.ts) <= until),
+    rates: (read("finance_fx_rate") as FinanceFxRate[]).filter((r) => Date.parse(r.ts) <= until),
   };
 }
 function convert(entries: Entry[], target: string, rates: FinanceFxRate[]) {
@@ -168,6 +167,7 @@ const entry = (currency: string | null, metric: FinanceNumber, date: string): En
 export function financeAccounts(ws: Workspace, options: FinanceViewOptions = {}) {
   const ctx = context(ws, options);
   return {
+    ...(ctx.warnings.length ? { warnings: ctx.warnings } : {}),
     period: { from: null, to: ctx.asOf, as_of: ctx.asOf },
     accounts: ctx.accounts.map((a) => {
       const rows = ctx.transactions.filter((t) => t.account === a.id);
@@ -222,6 +222,7 @@ export function financeOverview(ws: Workspace, options: FinanceViewOptions = {})
     };
   });
   return {
+    ...(ctx.warnings.length ? { warnings: ctx.warnings } : {}),
     period: { from: null, to: ctx.asOf, as_of: ctx.asOf },
     currencies: groups,
     records: [
@@ -331,6 +332,7 @@ export function financeCashflow(ws: Workspace, from: string, to: string, options
     };
   });
   return {
+    ...(ctx.warnings.length ? { warnings: ctx.warnings } : {}),
     period: { from, to, as_of: ctx.asOf },
     currencies,
     consumption_categories: ["expense", "interest", "refund"].flatMap((category) =>
@@ -495,6 +497,7 @@ export function financeInvestments(ws: Workspace, options: FinanceViewOptions = 
     };
   });
   return {
+    ...(ctx.warnings.length ? { warnings: ctx.warnings } : {}),
     period: { from: null, to: ctx.asOf, as_of: ctx.asOf },
     holdings,
     currencies,

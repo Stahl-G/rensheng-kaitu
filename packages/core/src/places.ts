@@ -68,6 +68,7 @@ export interface LifeMapFeature {
   properties: { layer: MapLayer; place: Experience["place"]; experiences: Experience[] };
 }
 export interface LifeMapData {
+  warnings?: string[];
   type: "FeatureCollection";
   asOf: string;
   features: LifeMapFeature[];
@@ -368,7 +369,9 @@ export async function resolveExperience(ws: Workspace, id: string, geonameid: nu
 
 export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   const asOf = localDate(now, ws.timeZone());
-  const rows = experiences(ws)
+  const warnings = new Set<string>();
+  const opts = { onError: (error: KaituError) => warnings.add(error.message) };
+  const rows = committedExperiences(ws, opts)
     .map((item) => {
       const place = item.review ? item.place : displayPlace(item.place);
       return place === item.place ? item : { ...item, place };
@@ -380,7 +383,7 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   const groups = new Map<string, LifeMapFeature>();
   const hidden = new Map<string, { item?: Experience; revision: number; deleted: boolean }>();
   if (listRecordTypes(ws).some((ref) => ref.type === "experience")) {
-    const revisions = committedExperienceRevisions(ws).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1));
+    const revisions = committedExperienceRevisions(ws, opts).sort((a, b) => (a.rev ?? 1) - (b.rev ?? 1));
     for (const record of revisions) {
       hidden.set(record.id, {
         item: record.deleted ? hidden.get(record.id)?.item : (record as unknown as Experience),
@@ -408,6 +411,7 @@ export function lifeMap(ws: Workspace, now = new Date()): LifeMapData {
   }
   return {
     type: "FeatureCollection",
+    warnings: [...warnings],
     asOf,
     hometown: readHometown(ws),
     cityNames: chineseCityNames(rows.map((row) => row.place)),
