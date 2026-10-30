@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { type ReadWarning, readIssue } from "./errors.js";
+import { buildHealthDashboard } from "./health-dashboard.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -143,6 +144,9 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
         weight: typeof r.weight_kg === "number" ? r.weight_kg : null,
         distance: typeof r.distance_km === "number" ? r.distance_km : null,
         duration: typeof r.duration_min === "number" ? r.duration_min : null,
+        kcal: typeof r.kcal === "number" ? r.kcal : null,
+        avgHr: typeof r.avg_hr === "number" ? r.avg_hr : null,
+        pace: typeof r.avg_pace_s_per_km === "number" ? r.avg_pace_s_per_km : null,
         recorder: recorder(r),
         estimated: estimated(r),
       })),
@@ -187,9 +191,11 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     rows.push(row);
     metrics.set(key, rows);
   }
+  const dashboard = buildHealthDashboard(data.records, data.today, data.timeZone, now, data.warnings);
   return {
     ...(data.warnings.length ? { warnings: data.warnings } : {}),
     today: data.today,
+    dashboard,
     timeZone: data.timeZone,
     training: {
       week: thisWeek.length ? thisWeek.length : null,
