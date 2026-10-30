@@ -17,12 +17,16 @@ export function DirectionMap({
   dismiss,
   onConnect,
   openProject,
+  openGoal,
+  openDirection,
 }: {
   load: (locale: Locale) => Promise<DirectionMapState>;
   generate: (locale: Locale) => Promise<DirectionMapState>;
   dismiss: (goal: string, project: string) => Promise<DirectionMapState>;
   onConnect?: () => void;
   openProject: (slug: string) => void;
+  openGoal?: (id: string) => void;
+  openDirection?: (id: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -202,7 +206,13 @@ export function DirectionMap({
                 className={css.goal}
                 style={{ ["--tone" as string]: `var(${toneOf(goal.id)})` }}
               >
-                <strong>{goal.title}</strong>
+                {openGoal ? (
+                  <button type="button" className={css.title} onClick={() => openGoal(goal.id)}>
+                    {goal.title}
+                  </button>
+                ) : (
+                  <strong>{goal.title}</strong>
+                )}
                 {goal.why && <p>{goal.why}</p>}
               </div>
             ))}
@@ -211,7 +221,13 @@ export function DirectionMap({
                 <h3>{t("也在探索", "Also exploring")}</h3>
                 {input.directions.map((direction) => (
                   <div key={direction.id} className={`${css.card} ${css.direction}`}>
-                    <strong>{direction.title}</strong>
+                    {openDirection ? (
+                      <button type="button" className={css.title} onClick={() => openDirection(direction.id)}>
+                        {direction.title}
+                      </button>
+                    ) : (
+                      <strong>{direction.title}</strong>
+                    )}
                     {direction.status === "paused" && (
                       <span className={css.meta}> · {t("先放一放", "Paused")}</span>
                     )}

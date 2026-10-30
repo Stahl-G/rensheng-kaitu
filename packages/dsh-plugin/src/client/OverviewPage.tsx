@@ -46,6 +46,7 @@ import {
 import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
+import type { RecordTarget } from "./progress-map.js";
 
 export interface OverviewPageProps
   extends Omit<MePageProps, "onImportMemory">,
@@ -406,6 +407,8 @@ function Overview({
   const [libraryFile, setLibraryFile] = useState<string>();
   const [libraryGoal, setLibraryGoal] = useState<string>();
   const [projectFocus, setProjectFocus] = useState<string>();
+  const [directionFocus, setDirectionFocus] = useState<string>();
+  const [recordOrigin, setRecordOrigin] = useState<"overview" | "life-map" | "directions">();
   useEffect(() => {
     if (view !== "records" || record !== "projects" || !libraryGoal) return;
     const target = document.getElementById(`plan-${libraryGoal}`);
@@ -438,6 +441,10 @@ function Overview({
     setLearningSource(undefined);
     setLibraryFile(undefined);
     setLibraryEntry(undefined);
+    setLibraryGoal(undefined);
+    setProjectFocus(undefined);
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
   }, [workspaceRoot]);
   const [personal, setPersonal] = useState<MeData | null>(null);
   const exploreContent =
@@ -721,10 +728,39 @@ function Overview({
     setLibraryFile(undefined);
     setLibraryGoal(undefined);
     setProjectFocus(undefined);
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
     setCalendarAdding(false);
     setFinanceImporting(false);
     setRecord(modules.some(([key]) => key === id) ? id : "");
     setView("records");
+  };
+  const openTarget = (target: RecordTarget, origin?: "overview" | "life-map" | "directions") => {
+    if (target.kind === "direction") {
+      setDirectionFocus(target.id);
+      setExplore("directions");
+      setView("explore");
+    } else {
+      openRecord("projects");
+      if (target.kind === "project") setProjectFocus(target.id);
+      else setLibraryGoal(target.id);
+    }
+    setRecordOrigin(origin);
+  };
+  const recordBackLabel =
+    recordOrigin === "overview"
+      ? t("← 今天", "← Today")
+      : recordOrigin === "life-map"
+        ? t("← 人生地图", "← Life map")
+        : t("← 方向", "← Directions");
+  const returnToRecordOrigin = () => {
+    setDirectionFocus(undefined);
+    setRecordOrigin(undefined);
+    if (recordOrigin === "overview") setView("overview");
+    else {
+      setExplore(recordOrigin ?? "directions");
+      setView("explore");
+    }
   };
   const prompt = (text: string, newConversation = false) => {
     setPromptNewConversation(newConversation);
@@ -945,16 +981,8 @@ function Overview({
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
   const plansCard = data?.plans && (
     <PlansCard
-      plans={
-        libraryGoal
-          ? {
-              ...data.plans,
-              goals: data.plans.goals.filter((goal) => goal.id === libraryGoal),
-              projects: 0,
-              directions: 0,
-            }
-          : data.plans
-      }
+      plans={data.plans}
+      goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
       refresh={refresh}
@@ -972,6 +1000,7 @@ function Overview({
           generateLifeAtlas={props.generateLifeAtlas}
           changeLifeAtlas={props.changeLifeAtlas}
           subscribe={props.subscribe}
+          openRecord={(target) => openTarget(target, "life-map")}
         />
       ) : null,
     health: (
@@ -1006,6 +1035,16 @@ function Overview({
     directions: (
       <DirectionsPage
         {...child}
+        key={directionFocus ?? "directions"}
+        initialDirection={directionFocus}
+        onBack={
+          directionFocus
+            ? recordOrigin
+              ? returnToRecordOrigin
+              : () => setDirectionFocus(undefined)
+            : undefined
+        }
+        backLabel={recordOrigin ? recordBackLabel : undefined}
         goals={personal?.goals}
         onConnect={() => openAskSettings("ai")}
         planningContent={
@@ -1020,9 +1059,10 @@ function Overview({
                 dismiss={props.dismissDirectionLink}
                 onConnect={() => openAskSettings("ai")}
                 openProject={(slug) => {
-                  openRecord("projects");
-                  setProjectFocus(slug);
+                  openTarget({ kind: "project", id: slug }, "directions");
                 }}
+                openGoal={(id) => openTarget({ kind: "goal", id }, "directions")}
+                openDirection={(id) => openTarget({ kind: "direction", id }, "directions")}
               />
             ) : (
               <ProgressMap
@@ -1030,13 +1070,7 @@ function Overview({
                 projects={data?.projects ?? []}
                 loadExploration={props.loadExploration}
                 subscribe={props.subscribe}
-                open={(section) => {
-                  if (section === "projects") openRecord("projects");
-                  else if (section === "plans") {
-                    planning.current?.scrollIntoView({ block: "start" });
-                    planning.current?.focus({ preventScroll: true });
-                  } else setExplore("directions");
-                }}
+                open={(target) => openTarget(target, "directions")}
               />
             )}
             {!data?.plans.goals.length && (
@@ -1094,6 +1128,8 @@ function Overview({
               aria-current={view === id ? "page" : undefined}
               onClick={() => {
                 setView(id as View);
+                setRecordOrigin(undefined);
+                setDirectionFocus(undefined);
                 if (id === "overview") void refresh();
                 if (id === "explore") setExplore(exploreStart ?? "loading");
                 setRecord("");
@@ -1227,12 +1263,10 @@ function Overview({
               busy={busy}
               loadProjects={props.loadProjects}
               openProject={(slug) => {
-                openRecord("projects");
-                setProjectFocus(slug);
+                openTarget({ kind: "project", id: slug }, "overview");
               }}
               openGoal={(id) => {
-                openRecord("projects");
-                setLibraryGoal(id);
+                openTarget({ kind: "goal", id }, "overview");
               }}
               begin={() => startGuide(0)}
               loadLibrary={props.loadLibrary}
@@ -1309,7 +1343,7 @@ function Overview({
         {view === "records" && (
           <>
             <div className={css.sec}>
-              {record && (
+              {record && !projectFocus && !libraryGoal && (
                 <button type="button" className={css.link} onClick={() => setRecord("")}>
                   {t("← 资料", "← Library")}
                 </button>
@@ -1418,18 +1452,35 @@ function Overview({
             ) : record === "projects" ? (
               <>
                 {libraryGoal && (
-                  <button type="button" className={css.link} onClick={() => setLibraryGoal(undefined)}>
-                    {t("← 全部规划", "← All plans")}
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={recordOrigin ? returnToRecordOrigin : () => setLibraryGoal(undefined)}
+                  >
+                    {recordOrigin ? recordBackLabel : t("← 全部规划", "← All plans")}
                   </button>
                 )}
                 {libraryGoal && data && !data.plans.goals.some((goal) => goal.id === libraryGoal) && (
                   <output>{t("未找到这个目标", "Goal not found")}</output>
                 )}
-                {plansCard}
+                {!projectFocus && plansCard}
                 {!libraryGoal && (
                   <>
-                    {renderTasks(true)}
-                    <ProjectsLibrary {...child} timeZone={data?.timeZone} initialProject={projectFocus} />
+                    {!projectFocus && renderTasks(true)}
+                    <ProjectsLibrary
+                      key={projectFocus ?? "all-projects"}
+                      {...child}
+                      timeZone={data?.timeZone}
+                      initialProject={projectFocus}
+                      onBack={
+                        projectFocus
+                          ? recordOrigin
+                            ? returnToRecordOrigin
+                            : () => setProjectFocus(undefined)
+                          : undefined
+                      }
+                      backLabel={recordOrigin ? recordBackLabel : undefined}
+                    />
                   </>
                 )}
               </>
