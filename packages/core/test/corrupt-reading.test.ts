@@ -183,10 +183,6 @@ it("isolates damaged project, footprint, health and finance files without allowi
     expect(() => generateDirectionMap(ws, ask)).toThrow("记录格式不合法");
     expect(ask).not.toHaveBeenCalled();
     await expect(suggestProjectGoal(ws, good.slug)).rejects.toMatchObject({ code: "CORRUPT" });
-    ws.appendLine(
-      meal.file,
-      JSON.stringify({ ...meal.record, id: "01K00000000000000000000000", items: null }),
-    );
     const health = readHealthPage(ws);
     expect(health.training.recent[0]?.exercises[0]?.name).toBe("Squat");
     expect(health.nutrition.meals.map((row) => row.items)).toEqual(["Synthetic rice"]);
@@ -219,6 +215,37 @@ it("isolates damaged project, footprint, health and finance files without allowi
     expect(readProjectsPage(ws).find((row) => row.slug === bad.slug)?.error).toBeUndefined();
     expect(lifeMap(ws).warnings).toEqual([]);
     expect(financeOverview(ws).warnings).toBeUndefined();
+    ws.appendLine(
+      meal.file,
+      JSON.stringify({ ...meal.record, id: "01K00000000000000000000000", items: null }),
+    );
+    ws.appendLine(
+      experience.file,
+      JSON.stringify({ ...experience.record, id: "01K00000000000000000000001", place: null }),
+    );
+    ws.appendLine(
+      account.file,
+      JSON.stringify({
+        ...account.record,
+        id: "01K00000000000000000000002",
+        balance: "invalid",
+        balance_at: account.record.ts,
+      }),
+    );
+    ws.appendLine(
+      experience.file,
+      JSON.stringify({ ...experience.record, id: "01K00000000000000000000003", start: 2021 }),
+    );
+    expect(lifeMap(ws).experiences.map((row) => row.id)).toContain(experience.record.id);
+    expect(lifeMap(ws).warnings?.some((warning) => warning.includes("地点或日期无法显示"))).toBe(true);
+    expect(financeOverview(ws).records.map((row) => row.id)).toContain(account.record.id);
+    expect(financeOverview(ws).warnings?.some((warning) => warning.includes("无法用于计算"))).toBe(true);
+    ws.writeText(experience.file, before.get(experience.file) as string);
+    ws.writeText(account.file, before.get(account.file) as string);
+    const invalidMeal = readHealthPage(ws);
+    expect(invalidMeal.nutrition.meals.map((row) => row.items)).toEqual(["Synthetic rice"]);
+    expect(invalidMeal.warnings).toHaveLength(1);
+    ws.writeText(meal.file, before.get(meal.file) as string);
     await writePhoneSnapshots(ws, new Date("2026-10-30T12:00:00Z"), { force: true });
     const phoneMap = ws.readText("phone/map.json");
     ws.appendLine(github.file, '{"broken":');
@@ -231,8 +258,12 @@ it("isolates damaged project, footprint, health and finance files without allowi
     addRecord(ws, "project_metric", { project: good.slug, kind: "commits", value: 20 });
     const invalidMetric = ws.readText(metric.file).replace('"value":20', '"value":"20"');
     ws.writeText(metric.file, invalidMetric);
+    expect(readRecords(ws, "project_metric").some((row) => row.value === "20")).toBe(true);
+    const partialMetrics = readProjectPage(ws, good.slug, { partial: true });
+    expect(partialMetrics.metrics.filter((row) => row.kind === "commits")).toHaveLength(1);
+    expect(partialMetrics.warnings.some((warning) => warning.includes("无法用于计算"))).toBe(true);
     const statusBefore = ws.readText(`projects/${good.slug}/STATUS.md`);
-    await expect(syncProject(ws, good.slug)).rejects.toThrow("记录格式不合法");
+    await expect(syncProject(ws, good.slug)).rejects.toThrow("无法用于计算");
     await expect(
       saveProjectGoal(ws, good.slug, { label: "Commits", current: 0, target: 100, unit: "次提交" }),
     ).rejects.toThrow();

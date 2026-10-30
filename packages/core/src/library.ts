@@ -6,6 +6,7 @@ import { readDoing } from "./doing-page.js";
 import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes, isCaptureSource } from "./inbox-notes.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listRecordTypes } from "./modules.js";
 import { listProjects } from "./projects.js";
 import { readRecords } from "./records.js";
@@ -207,7 +208,14 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
         count: !section
           ? listProjects(ws, { partial: true }).filter((project) => {
               warnings.push(...project.warnings);
-              if (project.error) warnings.push(`${project.error} 文件格式不合法`);
+              if (project.error)
+                warnings.push(
+                  pick(
+                    normalizeLocale(readPreferences().locale),
+                    `${project.error} 文件格式不合法`,
+                    `${project.error} Invalid document`,
+                  ),
+                );
               return !project.error;
             }).length
           : null,

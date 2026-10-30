@@ -13,9 +13,17 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
 import { type GithubOptions, projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
-import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
+import {
+  type By,
+  type ReadOptions,
+  type StoredRecord,
+  addRecord,
+  readRecords,
+  updateRecord,
+} from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -179,6 +187,34 @@ export function projectStatusFiles(ws: Workspace) {
     }
   });
 }
+/** Project calculations require numeric values, independently of a module's evolving schema. */
+export function projectMetrics(ws: Workspace, options: ReadOptions & { slug?: string } = {}) {
+  return readRecords(ws, "project_metric", options).filter((row) => {
+    if (options.slug && row.project !== options.slug) return false;
+    if (
+      typeof row.project === "string" &&
+      typeof row.kind === "string" &&
+      typeof row.value === "number" &&
+      Number.isFinite(row.value) &&
+      row.value >= 0
+    )
+      return true;
+    const ref = findRecordType(ws, "project_metric");
+    const file = recordFileFor(ref, localMonth(parseTs(row.ts), ws.timeZone()));
+    const error = new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `${file} 指标记录 ${row.id} 无法用于计算`,
+        `${file} Metric record ${row.id} cannot be used in calculations`,
+      ),
+      "CORRUPT",
+    );
+    if (!options.onError) throw error;
+    options.onError(error);
+    return false;
+  });
+}
+
 export function listProjects(
   ws: Workspace,
   options: {
@@ -197,7 +233,7 @@ export function listProjects(
   const warnings: string[] = [];
   const metricType = ws.exists("projects/module.json") ? findRecordType(ws, "project_metric") : null;
   if (metricType)
-    for (const r of readRecords(ws, "project_metric", {
+    for (const r of projectMetrics(ws, {
       onError: options.partial ? (error) => warnings.push(error.message) : undefined,
     }))
       if (Date.parse(r.ts) <= now.getTime()) {
@@ -535,7 +571,7 @@ export async function syncProject(ws: Workspace, slug: string, options: GithubOp
 async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
-    const existing = readRecords(ws, "project_metric").filter((r) => r.project === slug);
+    const existing = projectMetrics(ws, { slug });
     const sorted = sortLog(project.log);
     if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
     const now = options.now ?? new Date();
@@ -676,9 +712,7 @@ async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOpti
     const progress = project.data.progress;
     if (progress?.unit === "字" && wordsOk) progress.current = words;
     if (progress?.unit === "次提交" && reposOk) {
-      const all = readRecords(ws, "project_metric").filter(
-        (row) => row.project === slug && row.kind === "commits",
-      );
+      const all = projectMetrics(ws, { slug }).filter((row) => row.kind === "commits");
       progress.current = all.reduce((sum, row) => sum + Number(row.value), 0);
     }
     project.data.updated = isoInZone(now, tz);

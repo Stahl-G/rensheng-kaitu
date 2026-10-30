@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import {
   type RecordTypeRef,
   findRecordType,
@@ -299,7 +300,6 @@ function fileRevisions(
   ref: RecordTypeRef,
   onError?: (error: KaituError) => void,
 ): readonly StoredRecord[] {
-  const validate = validatorFor(ws, ref);
   const parsed = ws.scanParsed(file, `records:${ref.type}`, (text) => {
     const rows: StoredRecord[] = [];
     const errors: string[] = [];
@@ -308,16 +308,22 @@ function fileRevisions(
       try {
         const row = JSON.parse(raw) as StoredRecord;
         if (!schemas().builtin("record-base.schema.json")(row)) throw new Error("Invalid record");
-        if (!row.deleted && !validate(row)) throw new Error("Invalid record fields");
         rows.push(row);
       } catch {
-        errors.push(`${file}:${i + 1} 记录格式不合法`);
+        errors.push(`${file}:${i + 1}`);
       }
     });
     return deepFreeze({ rows, errors });
   }) ?? { rows: [], errors: [] };
-  for (const message of parsed.errors) {
-    const error = new KaituError(message, "CORRUPT");
+  for (const location of parsed.errors) {
+    const error = new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `${location} 记录格式不合法`,
+        `${location} Invalid record`,
+      ),
+      "CORRUPT",
+    );
     if (!onError) throw error;
     onError(error);
   }

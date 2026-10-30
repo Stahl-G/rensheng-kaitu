@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
-import { listProjects, projectDirectory, projectSnapshot, setProject } from "./projects.js";
+import { listProjects, projectDirectory, projectMetrics, projectSnapshot, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import type { Task, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
@@ -93,9 +93,10 @@ export function readProjectPage(ws: Workspace, slug: string, options: { partial?
   const summary = readProjectsPage(ws, { slug, ...options }).find((item) => item.slug === slug);
   if (!summary) throw new KaituError("找不到项目", "NOT_FOUND");
   const warnings = [...summary.warnings];
-  const metrics = readRecords(ws, "project_metric", {
+  const metrics = projectMetrics(ws, {
+    slug,
     onError: options.partial ? (error) => warnings.push(error.message) : undefined,
-  }).filter((row) => row.project === slug);
+  });
   const architecture = `${projectDirectory(ws, slug)}/architecture.html`;
   return {
     ...summary,

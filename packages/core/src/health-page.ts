@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -46,7 +47,13 @@ function cloudWorkouts(ws: Workspace, warnings: string[]) {
               return [JSON.parse(line)];
             } catch (error) {
               if (!(error instanceof SyntaxError)) throw error;
-              warnings.push(`${file}:${i + 1} 记录格式不合法`);
+              warnings.push(
+                pick(
+                  normalizeLocale(readPreferences().locale),
+                  `${file}:${i + 1} 记录格式不合法`,
+                  `${file}:${i + 1} Invalid record`,
+                ),
+              );
               return [];
             }
           });
@@ -87,6 +94,18 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
   const records = (type: string, field = "ts") =>
     (data.records[type] ?? []).filter((row) => Date.parse(String(row[field])) <= now.getTime());
+  const meals = records("meal").filter((row) => {
+    if (Array.isArray(row.items) && row.items.every((item) => item && typeof item.name === "string"))
+      return true;
+    data.warnings.push(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `饮食记录 ${row.id} 无法显示食物列表`,
+        `Meal record ${row.id} cannot display its food list`,
+      ),
+    );
+    return false;
+  });
   const dates = (count: number) => Array.from({ length: count }, (_, i) => offset(data.today, i + 1 - count));
   const from = offset(data.today, -29);
   const month = data.today.slice(0, 7);
@@ -162,7 +181,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     : null;
   const max = weights.length ? Math.max(...weights.map((w) => w.weight)) : null;
   const daily = (type: string, field: string, count: number, dateField = "ts", divisor = 1) => {
-    const rows = records(type, dateField);
+    const rows = type === "meal" ? meals : records(type, dateField);
     const totals = dailyRecordTotals(rows, data.timeZone, field, dateField, divisor);
     return dates(count).map((date) => ({
       date,
@@ -218,7 +237,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
       calories: daily("meal", "kcal", 7),
       protein: daily("meal", "protein_g", 7),
       target: data.rules.data.nutrition?.protein_g ?? null,
-      meals: records("meal")
+      meals: meals
         .filter((r) => day(r.ts) >= from)
         .reverse()
         .map((r) => ({

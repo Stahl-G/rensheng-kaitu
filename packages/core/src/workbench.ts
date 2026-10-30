@@ -187,7 +187,13 @@ export function readWorkbench(
           onError: (slug) => warnings.push(`项目 ${slug} 暂时无法读取，请检查文件格式。`),
         }).filter((project) => {
           if (!project.error) return true;
-          warnings.push(`${project.error} 文件格式不合法`);
+          warnings.push(
+            pick(
+              normalizeLocale(readPreferences().locale),
+              `${project.error} 文件格式不合法`,
+              `${project.error} Invalid document`,
+            ),
+          );
           return false;
         }),
       [],

@@ -83,7 +83,7 @@ export function directionMapInput(
       );
     } catch (error) {
       if (!options.partial || !(error instanceof SyntaxError)) throw error;
-      warnings.push("me/goals.json 文件格式不合法");
+      warnings.push(pick(locale, "me/goals.json 文件格式不合法", "me/goals.json Invalid document"));
       return [];
     }
   })()

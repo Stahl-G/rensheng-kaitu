@@ -1,3 +1,4 @@
+import { normalizeLocale, pick, readPreferences } from "../locale.js";
 import { readRecords } from "../records.js";
 import { localDate, parseTs } from "../time.js";
 import type { Workspace } from "../workspace.js";
@@ -42,7 +43,35 @@ function context(ws: Workspace, options: FinanceViewOptions) {
   parseTs(asOf);
   const until = Date.parse(asOf);
   const warnings: string[] = [];
-  const read = (type: string) => readRecords(ws, type, { onError: (error) => warnings.push(error.message) });
+  const read = (type: string) =>
+    readRecords(ws, type, { onError: (error) => warnings.push(error.message) }).filter((row) => {
+      const fields =
+        type === "finance_account"
+          ? ["balance"]
+          : type === "finance_transaction"
+            ? ["amount", "cost"]
+            : type === "finance_holding_snapshot"
+              ? ["quantity", "cost", "price", "market_value"]
+              : ["rate"];
+      const valid =
+        fields.every(
+          (field) =>
+            row[field] == null ||
+            (typeof row[field] === "string" && /^-?\d+(?:\.\d+)?$/.test(row[field] as string)),
+        ) &&
+        (type !== "finance_transaction" ||
+          (typeof row.amount === "string" && Array.isArray(row.related_ids))) &&
+        (type !== "finance_fx_rate" || typeof row.rate === "string");
+      if (!valid)
+        warnings.push(
+          pick(
+            normalizeLocale(readPreferences().locale),
+            `财务记录 ${row.id} 无法用于计算`,
+            `Finance record ${row.id} cannot be used in calculations`,
+          ),
+        );
+      return valid;
+    });
   const transactions = reconcileFinance(
     (read("finance_transaction") as FinanceTransaction[]).filter((r) => Date.parse(r.ts) <= until),
   );

@@ -13,11 +13,7 @@ export function ReadWarnings({ warnings = [] }: { warnings?: string[] }) {
       </p>
       <ul>
         {[...new Set(warnings)].map((warning) => (
-          <li key={warning}>
-            {warning
-              .replace("记录格式不合法", t("记录格式不合法", "Invalid record"))
-              .replace("文件格式不合法", t("文件格式不合法", "Invalid document"))}
-          </li>
+          <li key={warning}>{warning}</li>
         ))}
       </ul>
     </div>

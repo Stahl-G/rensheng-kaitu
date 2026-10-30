@@ -1,5 +1,6 @@
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
+import { normalizeLocale, pick, readPreferences } from "./locale.js";
 import { listRecordTypes } from "./modules.js";
 import type { Experience } from "./places.js";
 import {
@@ -112,7 +113,25 @@ function committedRecords(ws: Workspace, type: string, opts: ReadOptions = {}): 
   return [...latest.values()].filter((row) => !row.deleted);
 }
 export const committedExperiences = (ws: Workspace, opts: ReadOptions = {}) =>
-  committedRecords(ws, "experience", opts) as unknown as Experience[];
+  (committedRecords(ws, "experience", opts) as unknown as Experience[]).filter((row) => {
+    if (
+      row.place &&
+      typeof row.place.name === "string" &&
+      [row.start, row.end].every((date) => date === undefined || typeof date === "string")
+    )
+      return true;
+    const error = new KaituError(
+      pick(
+        normalizeLocale(readPreferences().locale),
+        `足迹记录 ${row.id} 地点或日期无法显示`,
+        `Experience record ${row.id} has an undisplayable place or date`,
+      ),
+      "CORRUPT",
+    );
+    if (!opts.onError) throw error;
+    opts.onError(error);
+    return false;
+  });
 export async function commitExperienceImport(
   ws: Workspace,
   entries: StoredRecord[],
