@@ -43,6 +43,42 @@ import {
 } from "../src/index.js";
 import { clonedWorkspace } from "./helpers.js";
 
+it("不同日期同名原文分别读取、采纳或保留，归档冲突改名后仍按原始来源回读", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-matter-source-"));
+  try {
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
+    const name = "01aa0000000000000000000000.md";
+    const sources = ["2020-01-02", "2020-01-03", "2020-01-04"].map((date, index) => {
+      const source = `inbox/notes/${date}/${name}`;
+      ws.writeText(source, stringifyFrontmatter({ kind: "capture", date, agent: "你" }, `合成原文${index}`));
+      return source;
+    });
+    for (const [index, source] of sources.entries())
+      expect(readOnboardingMatter(ws, source).text.trim()).toBe(`合成原文${index}`);
+    for (const [index, source] of sources.entries()) {
+      expect(readOnboardingMatter(ws, source).text.trim()).toBe(`合成原文${index}`);
+      const draft = { goal: `目标${index}`, current: `现状${index}`, next: `下一步${index}` };
+      await draftOnboardingMatter(ws, source, draft);
+      if (index < 2) await adoptOnboardingMatter(ws, source, draft);
+      else await keepOnboardingMatter(ws, source);
+      expect(ws.exists(source)).toBe(false);
+    }
+    for (const [index, source] of sources.entries()) {
+      expect(readOnboardingMatter(ws, source).text.trim()).toBe(`合成原文${index}`);
+      expect(
+        readLibrary(ws, { section: "inbox" }).inbox.find((entry) => entry.originalSource === source)?.text,
+      ).toBe(`合成原文${index}`);
+    }
+    expect(
+      listTasks(ws)
+        .map((task) => task.source)
+        .sort(),
+    ).toEqual(sources.slice(0, 2));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("粘贴解析保留未知与不合格式行，处理列表、时间及已有和批内重复", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-"));
   try {
