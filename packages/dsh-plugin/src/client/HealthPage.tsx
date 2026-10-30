@@ -389,7 +389,7 @@ function HealthDashboard({ data }: { data: HealthData }) {
     .filter((m) => m.points.length);
   const steps = data.steps.slice(-7);
   const sleep = data.sleep.slice(-7);
-  const latestSteps = data.steps.find((p) => p.date === data.today)?.value;
+  const latestSteps = data.steps.find((p) => p.date === data.today);
   const latestSleep = [...data.sleep].reverse().find((p) => p.value !== null);
   const hasTraining = data.training.recent.length > 0;
   const hasAny =
@@ -438,7 +438,11 @@ function HealthDashboard({ data }: { data: HealthData }) {
               <div>
                 <dt>{t("步数", "Steps")}</dt>
                 <dd>
-                  <strong>{latestSteps == null ? "—" : number(latestSteps)}</strong>
+                  <strong>
+                    {latestSteps?.value == null
+                      ? "—"
+                      : `${latestSteps.estimated ? "≈" : ""}${number(latestSteps.value)}`}
+                  </strong>
                 </dd>
                 <time>{data.today}</time>
               </div>
@@ -457,7 +461,11 @@ function HealthDashboard({ data }: { data: HealthData }) {
               <div>
                 <dt>{latestSleep.date}</dt>
                 <dd>
-                  <strong>{number(latestSleep.value ?? 0)}</strong> {t("小时", "hours")}
+                  <strong>
+                    {latestSleep.estimated ? "≈" : ""}
+                    {number(latestSleep.value ?? 0)}
+                  </strong>{" "}
+                  {t("小时", "hours")}
                 </dd>
               </div>
             </dl>
@@ -476,7 +484,8 @@ function HealthDashboard({ data }: { data: HealthData }) {
             {cardio.map((m) => (
               <div key={m.kind} className={css.cardioMetric}>
                 <strong>
-                  {m.title} · {number(m.points.at(-1)?.value ?? 0)} {m.unit}
+                  {m.title} · {m.points.at(-1)?.estimated ? "≈" : ""}
+                  {number(m.points.at(-1)?.value ?? 0)} {m.unit}
                 </strong>
                 <DashboardChart title={m.title} unit={m.unit} points={m.points} />
               </div>
