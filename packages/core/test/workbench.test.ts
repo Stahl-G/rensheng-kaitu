@@ -8,6 +8,7 @@ import {
   inboxNotes,
   initWorkspace,
   parseFrontmatter,
+  readDoing,
   readStatus,
   readWorkbench,
   refreshOverview,
@@ -32,6 +33,7 @@ it("工作台复用未变的文档，外部同长度改写、损坏和修复立�
     const reads = vi.spyOn(ws, "readBytes");
     expect(status()?.data.title).toBe("合成旧计划");
     expect(userNavigation(ws).files.find((item) => item.path === file)?.title).toBe("合成旧计划");
+    expect(readDoing(ws).learning.find((item) => item.file === file)?.title).toBe("合成旧计划");
     expect(reads.mock.calls.filter(([path]) => path === file)).toHaveLength(1);
     expect(() => {
       const item = status();
@@ -45,9 +47,14 @@ it("工作台复用未变的文档，外部同长度改写、损坏和修复立�
     expect(broken.statuses.some((item) => item.file === file)).toBe(false);
     expect(broken.warnings.some((warning) => warning.includes(file))).toBe(true);
     expect(userNavigation(ws).files.find((item) => item.path === file)?.title).toBe(file);
+    expect(readDoing(ws).learning.find((item) => item.file === file)).toMatchObject({
+      error: "INVALID_DOCUMENT",
+      title: file,
+    });
     writeFileSync(ws.resolve(file), original);
     expect(status()?.data.title).toBe("合成旧计划");
     expect(userNavigation(ws).files.find((item) => item.path === file)?.title).toBe("合成旧计划");
+    expect(readDoing(ws).learning.find((item) => item.file === file)?.title).toBe("合成旧计划");
     reads.mockRestore();
   } finally {
     rmSync(ws.root, { recursive: true, force: true });

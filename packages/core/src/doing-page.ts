@@ -1,7 +1,8 @@
 import { readdirSync } from "node:fs";
 import { YAMLParseError } from "yaml";
 import { normalizeStatus } from "./doc-input.js";
-import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
+import { type Frontmatter, frontmatterBody, parseFrontmatter } from "./frontmatter.js";
+import { deepFreeze } from "./frozen.js";
 import { schemas } from "./schema.js";
 import type { ModuleStatus } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -26,12 +27,12 @@ export interface DoingData {
 }
 
 /** 目录和搜索共用只读解析；坏头部仍保留正文，写入接口沿用严格校验。 */
-export function readTopicStatus(source: string) {
+export function readTopicStatus(source: string, parse: (text: string) => Frontmatter = parseFrontmatter) {
   type Status = ModuleStatus & { title?: string; due?: string };
   const body = frontmatterBody(source);
   let data: Status | null = null;
   try {
-    const raw = parseFrontmatter(source).data;
+    const raw = parse(source).data;
     if (raw && typeof raw === "object" && !Array.isArray(raw)) {
       const normalized = normalizeStatus(raw);
       if (schemas().builtin("status.schema.json")(normalized)) data = normalized as unknown as Status;
@@ -50,35 +51,39 @@ function topics(ws: Workspace, dir: string) {
     .filter((file) => ws.exists(file))
     .sort()
     .flatMap<DoingDecision & DoingLearning>((file) => {
-      const topic = ws.scanParsed(file, "doing-topic", (source) => {
-        const { data, body } = readTopicStatus(source);
-        const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
-        if (!data)
+      const topic = ws.scanParsed(file, "doing-topic", {
+        read: (source, read) => {
+          const { data, body } = readTopicStatus(source, () =>
+            read("frontmatter", (text) => deepFreeze(parseFrontmatter(text))),
+          );
+          const heading = body.match(/^#\s+(.+)$/m)?.[1]?.trim();
+          if (!data)
+            return {
+              file,
+              title: heading || file,
+              status: null,
+              due: null,
+              progress: null,
+              next: null,
+              error: "INVALID_DOCUMENT" as const,
+            };
+          const text = body
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .split(/\r?\n/)
+            .filter((line) => line.trim() && !/^\s*#/.test(line))
+            .join(" ")
+            .replace(/^\s*[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
+            .trim();
+          const next = data.next?.find((item) => item.status === "todo" || item.status === "proposed");
           return {
             file,
-            title: heading || file,
-            status: null,
-            due: null,
-            progress: null,
-            next: null,
-            error: "INVALID_DOCUMENT" as const,
+            title: data.title || heading || "暂无记录",
+            status: text.match(/^.*?(?:[。！？]|[.!?](?=\s|$)|$)/)?.[0]?.trim() || next?.title || null,
+            due: data.due || next?.due || null,
+            progress: data.progress ?? null,
+            next: next?.title ?? null,
           };
-        const text = body
-          .replace(/<!--[\s\S]*?-->/g, "")
-          .split(/\r?\n/)
-          .filter((line) => line.trim() && !/^\s*#/.test(line))
-          .join(" ")
-          .replace(/^\s*[-*+]\s+(?:\[[ xX]\]\s*)?/, "")
-          .trim();
-        const next = data.next?.find((item) => item.status === "todo" || item.status === "proposed");
-        return {
-          file,
-          title: data.title || heading || "暂无记录",
-          status: text.match(/^.*?(?:[。！？]|[.!?](?=\s|$)|$)/)?.[0]?.trim() || next?.title || null,
-          due: data.due || next?.due || null,
-          progress: data.progress ?? null,
-          next: next?.title ?? null,
-        };
+        },
       });
       return topic ? [topic] : [];
     });
