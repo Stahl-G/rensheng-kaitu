@@ -156,7 +156,8 @@ it("Apple Health：流式 zip 映射、按来源聚合、跨月切分，幂等�
   expect(await history(ws)).toHaveLength(1);
   const result = await importAppleHealth(ws, zip);
   expect(result.version).not.toBeNull();
-  expect(result.ignored.unsupported).toBe(3);
+  // Awake and InBed are now retained as stages; only the unsupported quantity is ignored.
+  expect(result.ignored.unsupported).toBe(1);
   const metrics = readRecords(ws, "metric");
   expect(metrics).toHaveLength(6);
   expect(metrics.find((r) => r.kind === "weight")).toMatchObject({
@@ -354,6 +355,15 @@ it("健康并列列表中文睡眠阶段跨午夜合并，重叠只计一次，�
   expect(readRecords(ws, "sleep")).toMatchObject([
     { start: "2026-10-14T23:30:00+07:00", end: "2026-10-15T06:00:00+07:00", duration_min: 360 },
   ]);
+  const record = readRecords(ws, "sleep")[0];
+  expect(record?.stages).toEqual([
+    { start: "2026-10-14T23:30:00+07:00", end: "2026-10-15T01:00:00+07:00", stage: "asleep_core" },
+    { start: "2026-10-14T23:30:00+07:00", end: "2026-10-15T06:00:00+07:00", stage: "in_bed" },
+    { start: "2026-10-15T00:30:00+07:00", end: "2026-10-15T02:30:00+07:00", stage: "asleep_deep" },
+    { start: "2026-10-15T02:30:00+07:00", end: "2026-10-15T03:00:00+07:00", stage: "awake" },
+    { start: "2026-10-15T03:00:00+07:00", end: "2026-10-15T06:00:00+07:00", stage: "asleep_rem" },
+  ]);
+  expect((await importHealthShortcut(ws, file)).version).toBeNull();
   expect(validateWorkspace(ws)).toEqual([]);
 });
 
