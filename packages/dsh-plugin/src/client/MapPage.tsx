@@ -11,6 +11,7 @@ import { type ExperienceImportControlProps, ExperienceImportControls } from "./E
 import { HometownEditor } from "./HometownEditor.js";
 import css from "./MapPage.module.css";
 import { PaperMap } from "./PaperMap.js";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { SourceEvidence } from "./SourceEvidence.js";
 import { footprintAnchor, footprintData } from "./footprint-state.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
@@ -575,6 +576,7 @@ export function MapPage({
           {home ? `⌂ ${t("家乡", "Hometown")}${t("：", ": ")}${home.name}` : t("设置家乡", "Set hometown")}
         </button>
       </div>
+      <ReadWarnings warnings={data?.warnings} />
       {data && editingHome && (
         <HometownEditor
           initial={home?.name ?? ""}

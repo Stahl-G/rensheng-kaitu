@@ -1,3 +1,4 @@
+import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
@@ -9,6 +10,7 @@ import {
 } from "./record-transaction.js";
 import {
   type By,
+  type ReadOptions,
   type StoredRecord,
   addRecords,
   readRecordRevisions,
@@ -87,7 +89,7 @@ export async function recoverExperienceImports(ws: Workspace) {
     recovered.push(await recoverRecordTransaction(ws, plan.id));
   return recovered;
 }
-function committedRevisions(ws: Workspace, type: string): StoredRecord[] {
+function committedRevisions(ws: Workspace, type: string, opts: ReadOptions = {}): StoredRecord[] {
   if (!supported(ws, type)) return [];
   const pending = new Set(
     pendingExperienceImports(ws).flatMap((plan) =>
@@ -96,19 +98,37 @@ function committedRevisions(ws: Workspace, type: string): StoredRecord[] {
         .map(({ record }) => `${record.id}:${record.rev ?? 1}`),
     ),
   );
-  return readRecordRevisions(ws, type).filter((record) => !pending.has(`${record.id}:${record.rev ?? 1}`));
+  return readRecordRevisions(ws, type, opts).filter(
+    (record) => !pending.has(`${record.id}:${record.rev ?? 1}`),
+  );
 }
-export const committedExperienceRevisions = (ws: Workspace) => committedRevisions(ws, "experience");
-function committedRecords(ws: Workspace, type: string): StoredRecord[] {
+export const committedExperienceRevisions = (ws: Workspace, opts: ReadOptions = {}) =>
+  committedRevisions(ws, "experience", opts);
+function committedRecords(ws: Workspace, type: string, opts: ReadOptions = {}): StoredRecord[] {
   const latest = new Map<string, StoredRecord>();
-  for (const row of committedRevisions(ws, type)) {
+  for (const row of committedRevisions(ws, type, opts)) {
     const previous = latest.get(row.id);
     if (!previous || (row.rev ?? 1) >= (previous.rev ?? 1)) latest.set(row.id, row);
   }
   return [...latest.values()].filter((row) => !row.deleted);
 }
-export const committedExperiences = (ws: Workspace) =>
-  committedRecords(ws, "experience") as unknown as Experience[];
+export const committedExperiences = (ws: Workspace, opts: ReadOptions = {}) =>
+  (committedRecords(ws, "experience", opts) as unknown as Experience[]).filter((row) => {
+    if (
+      row.place &&
+      typeof row.place.name === "string" &&
+      [row.start, row.end].every((date) => date === undefined || typeof date === "string")
+    )
+      return true;
+    const error = new KaituError(
+      `足迹记录 ${row.id} 地点或日期无法显示`,
+      "CORRUPT",
+      readIssue("experience_place_date", row.id, `足迹记录 ${row.id} 地点或日期无法显示`),
+    );
+    if (!opts.onError) throw error;
+    opts.onError(error);
+    return false;
+  });
 export async function commitExperienceImport(
   ws: Workspace,
   entries: StoredRecord[],

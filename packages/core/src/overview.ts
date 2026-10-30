@@ -210,7 +210,7 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
     `- 日均睡眠：${r.averageSleepHours?.toFixed(1) ?? "待补"} 小时`,
     `- 日均蛋白质：${r.averageProteinG?.toFixed(1) ?? "待补"} g`,
     `- 最新体重：${r.latestWeight ? `${r.latestWeight.value} ${r.latestWeight.unit ?? "kg"}（${r.latestWeight.ts}）` : "待补"}`,
-    ...data.warnings.map((warning) => `- ${warning}`),
+    ...data.warnings.map((warning) => `- ${typeof warning === "string" ? warning : warning.message}`),
     "",
   );
   // 接力说明与整理规则随版本维护，GitHub 与同步盘使用同一份入口。

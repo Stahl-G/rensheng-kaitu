@@ -2,6 +2,7 @@ import { lstatSync, readdirSync } from "node:fs";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { readCalendar } from "./calendar.js";
 import { readDoing } from "./doing-page.js";
+import { type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { frontmatterBody, parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes, originalCaptureSource } from "./inbox-notes.js";
@@ -36,12 +37,14 @@ export interface LibraryQuery {
   source?: string;
 }
 export interface LibraryData {
+  warnings?: ReadWarning[];
   next?: string | null;
   sections: LibraryItem[];
   inbox: InboxEntry[];
   notes: { file: string; title: string; kind: "笔记" | "决定"; status: string | null }[];
 }
 export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryData {
+  const warnings: ReadWarning[] = [];
   const section = query.section;
   if (section && !["summary", "inbox", "notes", "health"].includes(section))
     throw new KaituError("未知资料分类", "BAD_ARGS");
@@ -125,7 +128,8 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       }
     }
   if (!page) inbox.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
-  const records = (types: string[]) => types.flatMap((type) => readRecords(ws, type));
+  const records = (types: string[]) =>
+    types.flatMap((type) => readRecords(ws, type, { onError: (error) => warnings.push(readWarning(error)) }));
   const health =
     !section || section === "health"
       ? records(
@@ -179,6 +183,7 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
     ...(page ? { next: page.next } : {}),
     inbox,
     notes,
+    warnings,
     sections: [
       {
         id: "calendar",
@@ -195,7 +200,16 @@ export function readLibrary(ws: Workspace, query: LibraryQuery = {}): LibraryDat
       {
         id: "projects",
         title: "在做的事",
-        count: !section ? listProjects(ws).length : null,
+        count: !section
+          ? listProjects(ws, { partial: true }).filter((project) => {
+              warnings.push(...project.warnings);
+              if (project.error)
+                warnings.push(
+                  readIssue("invalid_document", project.error, `${project.error} 文件格式不合法`),
+                );
+              return !project.error;
+            }).length
+          : null,
         sources: ["本机项目档案"],
         latest: null,
       },

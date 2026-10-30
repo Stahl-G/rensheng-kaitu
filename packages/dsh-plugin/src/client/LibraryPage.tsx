@@ -19,6 +19,7 @@ import {
 import styles from "./LibraryPage.module.css";
 import { MediaPreview, type MediaServices } from "./MediaPreview.js";
 import css from "./Prototype.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT, versionText } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -170,6 +171,7 @@ export function LibraryPage({
   };
   return (
     <div className={styles.page}>
+      <ReadWarnings warnings={data?.warnings} />
       <div className={styles.heading}>
         <input
           type="search"

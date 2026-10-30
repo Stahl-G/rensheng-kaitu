@@ -7,7 +7,7 @@ import { snapshot } from "./history.js";
 import type { ModuleDef } from "./modules.js";
 import { batchOverview } from "./overview.js";
 import { appendLog, readProject } from "./projects.js";
-import { type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
+import { type ReadOptions, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, parseTs } from "./time.js";
 import type { Workspace, WorkspaceWrite } from "./workspace.js";
@@ -214,13 +214,13 @@ function requester(ws: Workspace, state: GithubState, options: GithubOptions, no
     return { body: body as T, status, link };
   };
 }
-function snapshots(ws: Workspace, slug: string, now: Date): GithubSnapshot[] {
+function snapshots(ws: Workspace, slug: string, now: Date, opts: ReadOptions = {}): GithubSnapshot[] {
   if (
     !ws.exists("projects/module.json") ||
     !ws.readJson<ModuleDef>("projects/module.json").records?.github_snapshot
   )
     return [];
-  return readRecords(ws, "github_snapshot").filter(
+  return readRecords(ws, "github_snapshot", opts).filter(
     (r) => r.project === slug && parseTs(r.ts) <= now,
   ) as GithubSnapshot[];
 }
@@ -456,10 +456,10 @@ async function syncGithubNow(ws: Workspace, slug: string, options: GithubOptions
   }
 }
 
-export function projectGithub(ws: Workspace, slug: string, now = new Date()) {
+export function projectGithub(ws: Workspace, slug: string, now = new Date(), opts: ReadOptions = {}) {
   const repo = readProject(ws, slug).data.github?.repo;
   if (!repo) return null;
-  const rows = snapshots(ws, slug, now);
+  const rows = snapshots(ws, slug, now, opts);
   const latest = rows.at(-1) ?? null;
   const state = readState(ws).repos[slug];
   return {

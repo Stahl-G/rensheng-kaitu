@@ -4,9 +4,11 @@ import { extname, isAbsolute, join, matchesGlob, relative, resolve } from "node:
 import { strFromU8, unzipSync } from "fflate";
 import git from "isomorphic-git";
 import { SaxesParser } from "saxes";
+import { YAMLParseError } from "yaml";
 import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { normalizeStatus } from "./doc-input.js";
+import { type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
@@ -14,7 +16,14 @@ import { type GithubOptions, projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
 import { findRecordType, recordFileFor } from "./modules.js";
 import { batchOverview } from "./overview.js";
-import { type By, type StoredRecord, addRecord, readRecords, updateRecord } from "./records.js";
+import {
+  type By,
+  type ReadOptions,
+  type StoredRecord,
+  addRecord,
+  readRecords,
+  updateRecord,
+} from "./records.js";
 import { schemas } from "./schema.js";
 import { isoInZone, localDate, localMonth, localTimeToInstant, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
@@ -118,14 +127,30 @@ export function readProject(ws: Workspace, slug: string) {
   };
 }
 /** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
-function projectSnapshot(ws: Workspace, slug: string) {
+export function projectSnapshot(ws: Workspace, slug: string, partial = false) {
   const dir = projectDirectory(ws, slug);
-  const status = ws.scanParsed(`${dir}/STATUS.md`, "project", (text) => {
-    const raw = parseFrontmatter<ProjectStatus>(text);
-    const parsed = { ...raw, data: projectStatus(raw.data, slug) };
-    parsed.data.links ??= [];
-    checkStatus(parsed.data);
-    return deepFreeze(parsed);
+  const status = ws.scanParsed(`${dir}/STATUS.md`, partial ? "project-partial" : "project", (text) => {
+    try {
+      const raw = parseFrontmatter<ProjectStatus>(text);
+      if (!raw.data || typeof raw.data !== "object" || Array.isArray(raw.data))
+        throw new KaituError("项目状态格式不合法", "INVALID_DOCUMENT");
+      const parsed = { ...raw, data: projectStatus(raw.data, slug), error: undefined as string | undefined };
+      parsed.data.links ??= [];
+      checkStatus(parsed.data);
+      return deepFreeze(parsed);
+    } catch (error) {
+      if (
+        !partial ||
+        (!(error instanceof YAMLParseError) &&
+          !(error instanceof KaituError && error.code === "INVALID_DOCUMENT"))
+      )
+        throw error;
+      return deepFreeze({
+        data: { title: slug, kind: "personal", stage: "active", links: [], updated: null } as ProjectStatus,
+        body: text,
+        error: `${dir}/STATUS.md`,
+      });
+    }
   });
   if (!status) throw new KaituError("找不到项目", "NOT_FOUND");
   const log = ws.exists(`${dir}/log.md`)
@@ -162,9 +187,39 @@ export function projectStatusFiles(ws: Workspace) {
     }
   });
 }
+/** Project calculations require numeric values, independently of a module's evolving schema. */
+export function projectMetrics(ws: Workspace, options: ReadOptions & { slug?: string } = {}) {
+  return readRecords(ws, "project_metric", options).filter((row) => {
+    if (options.slug && row.project !== options.slug) return false;
+    if (
+      typeof row.project === "string" &&
+      typeof row.kind === "string" &&
+      typeof row.value === "number" &&
+      Number.isFinite(row.value) &&
+      row.value >= 0
+    )
+      return true;
+    const ref = findRecordType(ws, "project_metric");
+    const file = recordFileFor(ref, localMonth(parseTs(row.ts), ws.timeZone()));
+    const error = new KaituError(
+      `${file} 指标记录 ${row.id} 无法用于计算`,
+      "CORRUPT",
+      readIssue("project_metric", `${file} ${row.id}`, `${file} 指标记录 ${row.id} 无法用于计算`),
+    );
+    if (!options.onError) throw error;
+    options.onError(error);
+    return false;
+  });
+}
+
 export function listProjects(
   ws: Workspace,
-  options: { now?: Date; slug?: string; onError?: (slug: string, error: unknown) => void } = {},
+  options: {
+    now?: Date;
+    slug?: string;
+    partial?: boolean;
+    onError?: (slug: string, error: unknown) => void;
+  } = {},
 ) {
   const now = options.now ?? new Date();
   const tz = ws.timeZone();
@@ -172,9 +227,12 @@ export function listProjects(
   const from = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
   // 指标只读一次，再按项目分组。
   const allMetrics = new Map<string, StoredRecord[]>();
+  const warnings: ReadWarning[] = [];
   const metricType = ws.exists("projects/module.json") ? findRecordType(ws, "project_metric") : null;
   if (metricType)
-    for (const r of readRecords(ws, "project_metric"))
+    for (const r of projectMetrics(ws, {
+      onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
+    }))
       if (Date.parse(r.ts) <= now.getTime()) {
         const key = String(r.project);
         const list = allMetrics.get(key);
@@ -182,7 +240,7 @@ export function listProjects(
         else allMetrics.set(key, [r]);
       }
   const projectFor = (slug: string) => {
-    const project = projectSnapshot(ws, slug);
+    const project = projectSnapshot(ws, slug, options.partial);
     const metrics = allMetrics.get(slug) ?? [];
     const words = metrics.filter((r) => r.kind === "words");
     const recentWords = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) >= from);
@@ -193,6 +251,8 @@ export function listProjects(
       {
         slug,
         title: project.data.title,
+        error: project.error,
+        warnings,
         kind: project.data.kind,
         stage: project.data.stage,
         blocked: (project.data.blocked ?? []).flatMap((item) => {
@@ -206,7 +266,11 @@ export function listProjects(
         links: project.data.links,
         progress: project.data.progress ?? null,
         next: project.data.next ?? [],
-        github: projectGithub(ws, slug, now),
+        github: project.error
+          ? null
+          : projectGithub(ws, slug, now, {
+              onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
+            }),
         completion: project.data.progress
           ? {
               done: project.data.progress.current,
@@ -273,7 +337,12 @@ export function listProjects(
     try {
       return projectFor(slug);
     } catch (error) {
-      if (!options.onError) throw error;
+      if (
+        !options.onError ||
+        (!(error instanceof YAMLParseError) &&
+          !(error instanceof KaituError && error.code === "INVALID_DOCUMENT"))
+      )
+        throw error;
       options.onError(slug, error);
       return [];
     }
@@ -499,13 +568,13 @@ export async function syncProject(ws: Workspace, slug: string, options: GithubOp
 async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOptions) {
   return batchOverview(ws, async () => {
     const project = readProject(ws, slug);
+    const existing = projectMetrics(ws, { slug });
     const sorted = sortLog(project.log);
     if (sorted !== project.log) ws.writeText(`${project.dir}/log.md`, sorted, { internal: true });
     const now = options.now ?? new Date();
     const tz = ws.timeZone();
     const today = localDate(now, tz);
     const firstDay = new Date(Date.parse(`${today}T12:00:00Z`) - 6 * 86400000).toISOString().slice(0, 10);
-    const existing = readRecords(ws, "project_metric").filter((r) => r.project === slug);
     const issues: { path: string; message: string }[] = [];
     const written: StoredRecord[] = [];
     function metric(kind: "words" | "commits", date: string, value: number, detail?: string[]) {
@@ -640,9 +709,7 @@ async function syncProjectLocal(ws: Workspace, slug: string, options: GithubOpti
     const progress = project.data.progress;
     if (progress?.unit === "字" && wordsOk) progress.current = words;
     if (progress?.unit === "次提交" && reposOk) {
-      const all = readRecords(ws, "project_metric").filter(
-        (row) => row.project === slug && row.kind === "commits",
-      );
+      const all = projectMetrics(ws, { slug }).filter((row) => row.kind === "commits");
       progress.current = all.reduce((sum, row) => sum + Number(row.value), 0);
     }
     project.data.updated = isoInZone(now, tz);

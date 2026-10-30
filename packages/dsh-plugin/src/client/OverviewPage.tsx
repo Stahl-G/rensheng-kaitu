@@ -31,6 +31,7 @@ import { PlansCard } from "./Plans.js";
 import { Plugins } from "./Plugins.js";
 import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
+import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
@@ -1193,7 +1194,9 @@ function Overview({
               {t(`${data.warnings.length} 项资料需要检查`, `${data.warnings.length} items need checking`)}
             </summary>
             {data.warnings.map((warning) => (
-              <p key={warning}>{warning}</p>
+              <p key={JSON.stringify(warning)}>
+                <WarningText warning={warning} />
+              </p>
             ))}
           </details>
         ) : null}

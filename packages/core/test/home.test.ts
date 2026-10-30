@@ -47,11 +47,13 @@ it("projects existing goals, projects and learning without reading or mutating t
     const now = new Date("2026-10-28T12:00:00Z");
     ws.writeText("projects/broken/STATUS.md", "---\ntitle: [\n---\n");
     const loaded = await readHomeSources(ws, now);
-    expect(loaded.overview.warnings.some((warning) => warning.includes("broken"))).toBe(true);
+    expect(loaded.overview.warnings).toContainEqual(
+      expect.objectContaining({ code: "invalid_document", location: "projects/broken/STATUS.md" }),
+    );
     expect(loaded.projects.some((item) => item.slug === "fixture")).toBe(true);
     const workbench = readWorkbench(ws, now);
     const input = loaded;
-    expect(loaded.projects).toEqual(readProjectsPage(ws, undefined, now, workbench));
+    expect(loaded.projects).toEqual(readProjectsPage(ws, { now, loaded: workbench, partial: true }));
     const before = JSON.stringify(input);
     const read = vi.spyOn(ws, "readText");
     const home = readHome(input);
@@ -187,7 +189,7 @@ it("keeps empty and old workspaces honest, including missing sources and future 
     const workbench = readWorkbench(ws, now);
     const empty = readHome({
       overview,
-      projects: readProjectsPage(ws, undefined, now),
+      projects: readProjectsPage(ws, { now }),
       statuses: workbench.statuses,
       records: workbench.records,
     });

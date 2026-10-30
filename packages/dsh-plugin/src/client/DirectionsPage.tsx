@@ -14,6 +14,7 @@ import { DirectionForm, ExperimentForm, NoteForm } from "./DirectionForms.js";
 import css from "./DirectionsPage.module.css";
 import base from "./OverviewPage.module.css";
 import v2 from "./Prototype.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { SourceEvidence } from "./SourceEvidence.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 
@@ -463,6 +464,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
     );
   return (
     <section className={css.page} aria-label={t("探索方向", "Directions")}>
+      <ReadWarnings warnings={data.warnings} />
       {error && (
         <p role="alert" className={base.notice}>
           {error}

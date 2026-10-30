@@ -1,9 +1,10 @@
 import { statSync } from "node:fs";
+import { type ReadWarning, readWarning } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
-import { listProjects, projectDirectory, readProject, setProject } from "./projects.js";
+import { listProjects, projectDirectory, projectMetrics, projectSnapshot, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
-import { type Task, listTasks } from "./tasks.js";
+import type { Task, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
 import type { ModuleStatus, WorkbenchData } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -39,14 +40,21 @@ export function projectSummary(text: string) {
 
 export function readProjectsPage(
   ws: Workspace,
-  slug?: string,
-  now = new Date(),
-  loaded?: Pick<WorkbenchData, "projects" | "records">,
+  options: {
+    slug?: string;
+    now?: Date;
+    loaded?: Pick<WorkbenchData, "projects" | "records">;
+    partial?: boolean;
+  } = {},
 ) {
+  const { slug, now = new Date(), loaded, partial } = options;
   const tasks = new Map<string, ReturnType<typeof listTasks>>();
+  const warnings: ReadWarning[] = [];
   const openTasks = loaded
     ? ((loaded.records.task ?? []).filter((task) => task.status === "open") as Task[])
-    : listTasks(ws);
+    : (readRecords(ws, "task", {
+        onError: partial ? (error) => warnings.push(readWarning(error)) : undefined,
+      }).filter((row) => row.status === "open") as Task[]);
   for (const task of openTasks) {
     if (!task.project) continue;
     const group = tasks.get(task.project) ?? [];
@@ -56,7 +64,7 @@ export function readProjectsPage(
   const today = localDate(now, ws.timeZone());
   const projects = loaded
     ? loaded.projects.filter((project) => !slug || project.slug === slug)
-    : listProjects(ws, { slug, now });
+    : listProjects(ws, { slug, now, partial });
   return projects.map((project) => {
     const next = [...project.next];
     for (const task of tasks.get(project.slug) ?? []) {
@@ -70,6 +78,7 @@ export function readProjectsPage(
     });
     return {
       ...project,
+      warnings: [...project.warnings, ...warnings],
       next,
       recentLog: recent ? { date: recent.date, text: projectSummary(recent.text) } : null,
       recent7: {
@@ -80,16 +89,21 @@ export function readProjectsPage(
   });
 }
 
-export function readProjectPage(ws: Workspace, slug: string) {
-  const project = readProject(ws, slug);
-  const summary = readProjectsPage(ws, slug).find((item) => item.slug === slug);
+export function readProjectPage(ws: Workspace, slug: string, options: { partial?: boolean } = {}) {
+  const project = projectSnapshot(ws, slug, options.partial);
+  const summary = readProjectsPage(ws, { slug, ...options }).find((item) => item.slug === slug);
   if (!summary) throw new KaituError("找不到项目", "NOT_FOUND");
-  const metrics = readRecords(ws, "project_metric").filter((row) => row.project === slug);
+  const warnings = [...summary.warnings];
+  const metrics = projectMetrics(ws, {
+    slug,
+    onError: options.partial ? (error) => warnings.push(readWarning(error)) : undefined,
+  });
   const architecture = `${projectDirectory(ws, slug)}/architecture.html`;
   return {
     ...summary,
+    warnings: [...new Set(warnings)],
     ...readProjectView(ws, slug),
-    body: clean(project.body),
+    body: project.error ? project.body : clean(project.body),
     progress: project.data.progress ?? null,
     logs: projectLogs(project.log),
     metrics: metrics.map((row) => ({

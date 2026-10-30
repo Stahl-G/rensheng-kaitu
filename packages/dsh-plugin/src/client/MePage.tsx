@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MeData, MeRules } from "../types.js";
 import { AvatarCropDialog } from "./AvatarCropDialog.js";
 import css from "./Prototype.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useT } from "./i18n.js";
 import { memoryDisplayText } from "./memory-presentation.js";
 
@@ -253,6 +254,7 @@ export function MePage({
     data?.goals.filter((goal) => !goal.status || ["active", "paused"].includes(goal.status)) ?? [];
   return (
     <div className={css["me-body"]}>
+      <ReadWarnings warnings={data?.warnings} />
       {error && (
         <p role="alert" className={css.error}>
           {error}

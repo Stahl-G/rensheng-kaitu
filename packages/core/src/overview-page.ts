@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { readAutomation } from "./automation.js";
 import { driveStatus } from "./drive.js";
+import { readWarning } from "./errors.js";
 import { committedExperiences, pendingExperienceImports } from "./experience-imports.js";
 import { type TimedExperience, experienceLayer } from "./experience-time.js";
 import { history } from "./history.js";
@@ -210,7 +211,9 @@ export async function readOverviewPage(ws: Workspace, now = new Date(), loaded?:
     (row) => row.status === "suggested",
   ).length;
   const mapPendingImports = pendingExperienceImports(ws).length;
-  const experiences = committedExperiences(ws);
+  const experiences = committedExperiences(ws, {
+    onError: (error) => data.warnings.push(readWarning(error)),
+  });
   const mapNeedsReview = experiences.filter(
     (row) => row.review || !experienceLayer(row as unknown as TimedExperience, data.today),
   ).length;

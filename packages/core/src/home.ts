@@ -23,7 +23,7 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
   const overview = await readOverviewPage(ws, now, data);
   return {
     overview,
-    projects: readProjectsPage(ws, undefined, now, data),
+    projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
   };

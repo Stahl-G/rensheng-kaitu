@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { type ReadWarning, readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { readExploration } from "./exploration.js";
 import { localStateRoot } from "./local-state.js";
@@ -14,6 +15,7 @@ import type { Workspace } from "./workspace.js";
  * 每段原文都有 id（g: 目标、p: 项目、n: 下一步、l: 日志、d: 方向），引用必须指明出自哪一段。
  */
 export interface DirectionMapInput {
+  warnings?: ReadWarning[];
   today: string;
   locale: Locale;
   goals: { id: string; source: string; title: string; why?: string; due?: string }[];
@@ -69,7 +71,9 @@ export function directionMapInput(
   ws: Workspace,
   locale: Locale = "zh-CN",
   now = new Date(),
+  options: { partial?: boolean } = {},
 ): DirectionMapInput {
+  const warnings: ReadWarning[] = [];
   const zone = ws.timeZone();
   const today = localDate(now, zone);
   const since = localDate(new Date(Date.parse(`${today}T12:00:00Z`) - 30 * DAY), "UTC");
@@ -78,7 +82,9 @@ export function directionMapInput(
       return ws.readJson<{ id: string; title: string; status: string; target?: string; due?: string }[]>(
         "me/goals.json",
       );
-    } catch {
+    } catch (error) {
+      if (!options.partial || !(error instanceof SyntaxError)) throw error;
+      warnings.push(readIssue("invalid_document", "me/goals.json", "me/goals.json 文件格式不合法"));
       return [];
     }
   })()
@@ -91,8 +97,9 @@ export function directionMapInput(
       ...(goal.due ? { due: goal.due } : {}),
     }));
   // 和项目页同一条路：STATUS 的下一步加上挂在项目上的未完成待办。
-  const projects = readProjectsPage(ws).flatMap((project) => {
-    if (project.stage === "done") return [];
+  const projects = readProjectsPage(ws, options).flatMap((project) => {
+    warnings.push(...project.warnings, ...(project.error ? [project.error] : []));
+    if (project.error || project.stage === "done") return [];
     const seen = new Map<string, number>();
     return [
       {
@@ -127,8 +134,10 @@ export function directionMapInput(
       },
     ];
   });
-  const directions = readExploration(ws)
-    .directions.filter((direction) => ["active", "paused"].includes(direction.status))
+  const exploration = readExploration(ws, options);
+  warnings.push(...(exploration.warnings ?? []));
+  const directions = exploration.directions
+    .filter((direction) => ["active", "paused"].includes(direction.status))
     .slice(0, 8)
     .map((direction) => ({
       id: direction.id,
@@ -137,7 +146,14 @@ export function directionMapInput(
       motivation: direction.motivation.slice(0, 300),
       status: direction.status,
     }));
-  return { today, locale, goals, projects, directions };
+  return {
+    today,
+    locale,
+    goals,
+    projects,
+    directions,
+    ...(warnings.length ? { warnings: [...new Set(warnings)] } : {}),
+  };
 }
 
 /** 每段原文 id 对应的文字；引用只在这里面查连续片段，不在序列化的结构上查。 */
@@ -344,7 +360,7 @@ function save(ws: Workspace, state: Partial<Saved>) {
 export function readDirectionMap(ws: Workspace, locale: Locale = "zh-CN"): DirectionMapState {
   const saved = load(ws);
   // 目标、项目、下一步是事实，没生成过看法也照常画；看法是按某种语言写的，换了界面语言就先不显示。
-  const input = directionMapInput(ws, locale);
+  const input = directionMapInput(ws, locale, new Date(), { partial: true });
   const usable = saved.map && saved.input?.locale === locale ? saved.map : null;
   const map = usable ? verify(usable, input) : null;
   if (map) map.links = map.links.filter((link) => !saved.dismissed.includes(`${link.goal}|${link.project}`));

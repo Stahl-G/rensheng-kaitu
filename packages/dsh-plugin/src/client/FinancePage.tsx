@@ -11,6 +11,7 @@ import type {
   FinanceRemoteViewOptions,
 } from "../types.js";
 import css from "./FinancePage.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT } from "./i18n.js";
 
 export interface FinancePageProps {
@@ -908,6 +909,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
           </button>
         </p>
       )}
+      <ReadWarnings warnings={data?.overview.warnings} />
       {message && <output className={css.notice}>{message}</output>}
       {importing && data && (
         <ImportPanel

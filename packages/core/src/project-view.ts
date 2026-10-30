@@ -48,13 +48,19 @@ export function readProjectView(ws: Workspace, slug: string): ViewResult {
   try {
     const view = ws.readJson<ProjectView>(file);
     const registry = schemas();
-    if (!registry.builtin("project-view.schema.json#/$defs/envelope")(view)) throw new Error("格式错误");
+    if (!registry.builtin("project-view.schema.json#/$defs/envelope")(view))
+      throw new KaituError("项目视图格式不合法", "INVALID_DOCUMENT");
     if ("blocks" in view) {
       const block = registry.builtin("project-view.schema.json#/$defs/block");
       view.blocks = view.blocks.filter((item) => block(item) && validReferences(item));
     }
     return { view, viewError: null };
-  } catch {
+  } catch (error) {
+    if (
+      !(error instanceof SyntaxError) &&
+      !(error instanceof KaituError && error.code === "INVALID_DOCUMENT")
+    )
+      throw error;
     return { view: null, viewError: "项目视图无法解析，请让 AI 修正 view.json。" };
   }
 }

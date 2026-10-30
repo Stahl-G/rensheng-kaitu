@@ -235,7 +235,13 @@ export async function writeExploration(
   };
 }
 
-export function readExploration(ws: Workspace) {
+export function readExploration(ws: Workspace, options: { partial?: boolean } = {}) {
+  const projects = listProjects(ws, options);
+  const warnings = [
+    ...new Set(
+      projects.flatMap((project) => [...project.warnings, ...(project.error ? [project.error] : [])]),
+    ),
+  ];
   const directions = rows<Direction>(ws, "direction").sort(
     (a, b) =>
       Number(b.favorite) - Number(a.favorite) || (b.updated_at ?? b.ts).localeCompare(a.updated_at ?? a.ts),
@@ -303,11 +309,12 @@ export function readExploration(ws: Workspace) {
   }
   return {
     references: {
-      projects: listProjects(ws).map((p) => ({ id: p.slug, title: p.title })),
+      projects: projects.filter((project) => !project.error).map((p) => ({ id: p.slug, title: p.title })),
       decisions: readDoing(ws)
         .decisions.map((d) => ({ path: d.file.replace(/STATUS\.md$/, "decision.md"), title: d.title }))
         .filter((d) => ws.exists(d.path)),
     },
+    ...(warnings.length ? { warnings } : {}),
     directions,
     experiments,
     checkins,

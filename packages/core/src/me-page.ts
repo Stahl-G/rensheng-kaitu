@@ -1,4 +1,5 @@
 import { readAvatar } from "./avatar.js";
+import { type ReadWarning, readWarning } from "./errors.js";
 import { committedExperiences } from "./experience-imports.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import {
@@ -28,6 +29,7 @@ export interface MeRules {
   no_tasks_after?: string;
 }
 export interface MeData {
+  warnings?: ReadWarning[];
   name: string | null;
   bio: string | null;
   avatar: string | null;
@@ -58,6 +60,7 @@ export interface MeData {
 }
 
 export function readMe(ws: Workspace): MeData {
+  const warnings: ReadWarning[] = [];
   const memories = listMemories(ws, { includeArchived: true }).map(
     ({
       file,
@@ -95,6 +98,7 @@ export function readMe(ws: Workspace): MeData {
   const heading = profile.body.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? null;
   const bio = profile.body.split(/\r?\n\s*\r?\n/).find((p) => p.trim() && !/^(#|（|\()/.test(p.trim()));
   return {
+    warnings,
     name:
       profile.data.name?.trim() || (heading && !/^(档案|个人档案|我的档案)$/.test(heading) ? heading : null),
     bio: profile.data.bio?.trim() || bio?.trim().replace(/\s*\n\s*/g, " ") || null,
@@ -104,7 +108,7 @@ export function readMe(ws: Workspace): MeData {
     archivedMemories: memories.filter((memory) => memory.ended),
     memoryReplacements: pendingMemoryReplacements(ws),
     avatar: readAvatar(ws),
-    career: committedExperiences(ws)
+    career: committedExperiences(ws, { onError: (error) => warnings.push(readWarning(error)) })
       .filter(
         (item) =>
           (item.event_type === "studied" || item.event_type === "worked") &&

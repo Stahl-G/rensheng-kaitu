@@ -6,6 +6,7 @@ import { ArchitectureCard } from "./ArchitectureCard.js";
 import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT } from "./i18n.js";
 
 const PROJECT_UNITS_EN: Record<string, string> = {
@@ -410,8 +411,20 @@ export function ProjectsPage(
   return (
     <div className={css.page} aria-busy={busy || opening}>
       {error && <p role="alert">{error}</p>}
+      <ReadWarnings warnings={project?.warnings ?? projects?.flatMap((item) => item.warnings ?? [])} />
       {opening ? (
         <output>{t("正在读取项目…", "Loading project…")}</output>
+      ) : project?.error ? (
+        <>
+          <button type="button" onClick={props.onBack ?? (() => setProject(null))}>
+            {t("← 全部项目", "← All projects")}
+          </button>
+          <ReadWarnings
+            warnings={[{ code: "invalid_document", location: project.error, message: "Invalid document" }]}
+          />
+          <OpenPath path={project.error} />
+          <pre>{project.body}</pre>
+        </>
       ) : project ? (
         <>
           <button
@@ -695,67 +708,84 @@ export function ProjectsPage(
             </p>
           ) : (
             <div className={css.projects}>
-              {projects.map((item) => (
-                <article className={css.card} key={item.slug}>
-                  <div className={css.cardHeading}>
+              {projects.map((item) =>
+                item.error ? (
+                  <article className={css.card} key={item.slug}>
                     <button
                       type="button"
                       className={css.title}
-                      disabled={busy}
                       onClick={() => void run(() => open(item.slug))}
                     >
                       {item.title} →
                     </button>
-                    <span className={css.stage}>
-                      {
+                    <ReadWarnings
+                      warnings={[
+                        { code: "invalid_document", location: item.error, message: "Invalid document" },
+                      ]}
+                    />
+                  </article>
+                ) : (
+                  <article className={css.card} key={item.slug}>
+                    <div className={css.cardHeading}>
+                      <button
+                        type="button"
+                        className={css.title}
+                        disabled={busy}
+                        onClick={() => void run(() => open(item.slug))}
+                      >
+                        {item.title} →
+                      </button>
+                      <span className={css.stage}>
                         {
-                          active: t("进行中", "Active"),
-                          paused: t("暂停", "Paused"),
-                          done: t("完成", "Done"),
-                          idea: t("想法", "Idea"),
-                        }[item.stage]
-                      }
-                    </span>
-                  </div>
-                  <Progress project={item} />
-                  <p>
-                    {t("下一步：", "Next step: ")}
-                    {item.next.find((next) => next.status === "todo" || next.status === "proposed")?.title ??
-                      t("还没有下一步", "No next step yet")}
-                  </p>
-                  {item.recentLog && (
-                    <p className={css.log}>
-                      {item.recentLog.date} · {item.recentLog.text}
+                          {
+                            active: t("进行中", "Active"),
+                            paused: t("暂停", "Paused"),
+                            done: t("完成", "Done"),
+                            idea: t("想法", "Idea"),
+                          }[item.stage]
+                        }
+                      </span>
+                    </div>
+                    <Progress project={item} />
+                    <p>
+                      {t("下一步：", "Next step: ")}
+                      {item.next.find((next) => next.status === "todo" || next.status === "proposed")
+                        ?.title ?? t("还没有下一步", "No next step yet")}
                     </p>
-                  )}
-                  {github(item)}
-                  <div className={css.actions}>
-                    <button
-                      type="button"
-                      className={css.link}
-                      disabled={busy}
-                      onClick={() => void run(() => open(item.slug))}
-                    >
-                      {t("项目详情", "Project details")}
-                    </button>
-                    <button
-                      type="button"
-                      className={css.link}
-                      disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          await open(item.slug);
-                          setBinding(true);
-                        })
-                      }
-                    >
-                      {item.github
-                        ? t("更换 GitHub 仓库", "Change GitHub repository")
-                        : t("绑定 GitHub 仓库", "Link GitHub repository")}
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    {item.recentLog && (
+                      <p className={css.log}>
+                        {item.recentLog.date} · {item.recentLog.text}
+                      </p>
+                    )}
+                    {github(item)}
+                    <div className={css.actions}>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() => void run(() => open(item.slug))}
+                      >
+                        {t("项目详情", "Project details")}
+                      </button>
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await open(item.slug);
+                            setBinding(true);
+                          })
+                        }
+                      >
+                        {item.github
+                          ? t("更换 GitHub 仓库", "Change GitHub repository")
+                          : t("绑定 GitHub 仓库", "Link GitHub repository")}
+                      </button>
+                    </div>
+                  </article>
+                ),
+              )}
             </div>
           )}
         </>

@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { type ReadWarning, readIssue } from "./errors.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -29,7 +30,7 @@ function part(row: StoredRecord): string | null {
   );
 }
 
-function cloudWorkouts(ws: Workspace) {
+function cloudWorkouts(ws: Workspace, warnings: ReadWarning[]) {
   const rows: Record<string, unknown>[] = [];
   function walk(dir: string) {
     if (!ws.exists(dir)) return;
@@ -37,19 +38,25 @@ function cloudWorkouts(ws: Workspace) {
       const file = `${dir}/${entry.name}`;
       if (entry.isDirectory()) walk(file);
       else if (entry.isFile() && entry.name.endsWith(".records.jsonl")) {
-        try {
-          const records = ws
-            .readText(file)
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .map((line) => JSON.parse(line));
-          const agent = records.find((r) => typeof r?.agent === "string")?.agent;
-          rows.push(
-            ...records.filter((r) => r?.type === "workout").map((r) => ({ ...r, agent: r.agent ?? agent })),
-          );
-        } catch {
-          // 损坏的归档不影响训练记录读取。
-        }
+        const records = ws
+          .readText(file)
+          .split(/\r?\n/)
+          .flatMap((line, i) => {
+            if (!line.trim()) return [];
+            try {
+              return [JSON.parse(line)];
+            } catch (error) {
+              if (!(error instanceof SyntaxError)) throw error;
+              warnings.push(
+                readIssue("invalid_record", `${file}:${i + 1}`, `${file}:${i + 1} 记录格式不合法`),
+              );
+              return [];
+            }
+          });
+        const agent = records.find((r) => typeof r?.agent === "string")?.agent;
+        rows.push(
+          ...records.filter((r) => r?.type === "workout").map((r) => ({ ...r, agent: r.agent ?? agent })),
+        );
       }
     }
   }
@@ -83,6 +90,12 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const day = (ts: unknown) => localDate(parseTs(String(ts)), data.timeZone);
   const records = (type: string, field = "ts") =>
     (data.records[type] ?? []).filter((row) => Date.parse(String(row[field])) <= now.getTime());
+  const meals = records("meal").filter((row) => {
+    if (Array.isArray(row.items) && row.items.every((item) => item && typeof item.name === "string"))
+      return true;
+    data.warnings.push(readIssue("meal_items", row.id, `饮食记录 ${row.id} 无法显示食物列表`));
+    return false;
+  });
   const dates = (count: number) => Array.from({ length: count }, (_, i) => offset(data.today, i + 1 - count));
   const from = offset(data.today, -29);
   const month = data.today.slice(0, 7);
@@ -95,7 +108,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
   const workouts = records("workout").filter(
     (row) => Date.parse(row.ts) >= trainingEarliest && day(row.ts) >= trainingFrom,
   );
-  const cloud = cloudWorkouts(ws);
+  const cloud = cloudWorkouts(ws, data.warnings);
   const recorder = (row: StoredRecord) => {
     if (row.by === "user") return "你";
     const archived = cloud.find(
@@ -158,7 +171,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     : null;
   const max = weights.length ? Math.max(...weights.map((w) => w.weight)) : null;
   const daily = (type: string, field: string, count: number, dateField = "ts", divisor = 1) => {
-    const rows = records(type, dateField);
+    const rows = type === "meal" ? meals : records(type, dateField);
     const totals = dailyRecordTotals(rows, data.timeZone, field, dateField, divisor);
     return dates(count).map((date) => ({
       date,
@@ -175,6 +188,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     metrics.set(key, rows);
   }
   return {
+    ...(data.warnings.length ? { warnings: data.warnings } : {}),
     today: data.today,
     timeZone: data.timeZone,
     training: {
@@ -213,7 +227,7 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
       calories: daily("meal", "kcal", 7),
       protein: daily("meal", "protein_g", 7),
       target: data.rules.data.nutrition?.protein_g ?? null,
-      meals: records("meal")
+      meals: meals
         .filter((r) => day(r.ts) >= from)
         .reverse()
         .map((r) => ({

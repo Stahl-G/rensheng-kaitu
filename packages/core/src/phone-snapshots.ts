@@ -6,6 +6,7 @@ import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
 import { lifeMap } from "./places.js";
+import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange } from "./workbench.js";
 import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
@@ -36,7 +37,14 @@ export async function writePhoneSnapshots(
   const snapshots = {
     today: () => buildPhoneToday(data, at, ws),
     week: () => buildPhoneWeek(data, at),
-    map: () => buildPhoneMap(data, lifeMap(ws, now), readExploration(ws), at),
+    map: () => {
+      const map = lifeMap(ws, now);
+      if (map.warnings?.length)
+        throw new Error(
+          map.warnings.map((warning) => (typeof warning === "string" ? warning : warning.message)).join("; "),
+        );
+      return buildPhoneMap(data, map, readExploration(ws), at);
+    },
     library: () => buildPhoneLibrary(ws, data, at),
   };
   let writes = 0;
@@ -46,13 +54,21 @@ export async function writePhoneSnapshots(
     try {
       const value = { ...build(), generator: options.generator ?? { kind: "computer" } };
       if (ws.exists(file)) {
-        const previous = ws.readJson<typeof value>(file);
-        if ("navigation" in value && value.navigation.status === "unavailable" && "navigation" in previous)
-          value.navigation.files = previous.navigation.files.filter((file) =>
-            agentCanRead(ws, file.path, { id: "handover", finance: false }),
-          );
-        if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
-          continue;
+        let previous: typeof value | undefined;
+        try {
+          const parsed = ws.readJson<typeof value>(file);
+          if (schemas().builtin(`phone-${name}.schema.json`)(parsed)) previous = parsed;
+        } catch (error) {
+          if (!(error instanceof SyntaxError)) throw error;
+        }
+        if (previous) {
+          if ("navigation" in value && value.navigation.status === "unavailable" && "navigation" in previous)
+            value.navigation.files = previous.navigation.files.filter((file) =>
+              agentCanRead(ws, file.path, { id: "handover", finance: false }),
+            );
+          if (JSON.stringify({ ...value, generated_at: previous.generated_at }) === JSON.stringify(previous))
+            continue;
+        }
       }
       ws.writeJson(file, value);
       if (name === "today" && computer) rememberComputerSnapshot(ws, now);
