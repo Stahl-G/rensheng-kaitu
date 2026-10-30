@@ -1650,10 +1650,15 @@
   }
   .referenceApp .tabs button {
     flex-direction: row;
+    flex-wrap: wrap;
     min-height: 40px;
-    padding: 0 4px;
+    padding: 4px;
     gap: 4px;
+    row-gap: 0;
     font-size: 14px;
+  }
+  .referenceApp .tabs button > span {
+    flex: none;
   }
   .referenceApp .reviewBadge {
     position: static;
