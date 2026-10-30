@@ -111,6 +111,7 @@ USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile
 - 手机自然记忆仅在 today.mobile.actions 声明 capture_memory 时投递，沿用相同来源/幂等/纠正规则；以回执 memory.file/status 核对共享库结果，未支持时不得声称已入共享库。
 - projects/、learning/、decisions/：项目、学习与决定的状态及日志。
 - explore/、health/、feed/：方向与足迹、健康、资讯，按模块说明取。
+- sleep 可选 stages 只保存原始阶段 start/end/stage；缺失阶段不猜造，awake/in_bed 不计睡眠总时长，原始重叠按睡眠区间并集计一次。
 - inbox/agents/：新投递；inbox/notes/：待处理原文；handoffs/：接续任务的交接。
 
 ## 按当前任务做

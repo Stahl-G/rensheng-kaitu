@@ -38,6 +38,10 @@
     "./phone-projections": {
       "types": "./dist/phone-projections.d.ts",
       "default": "./dist/phone-projections.js"
+    },
+    "./health-dashboard": {
+      "types": "./dist/health-dashboard.d.ts",
+      "default": "./dist/health-dashboard.js"
     }
   },
   "scripts": {
