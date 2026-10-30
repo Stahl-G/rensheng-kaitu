@@ -224,13 +224,23 @@ async function changedStatus(
 ): Promise<Awaited<ReturnType<typeof git.statusMatrix>> | undefined> {
   const gitdir = historyDirectory(ws);
   const tracked = await git.listFiles({ fs: io, dir: ws.root, gitdir, cache });
-  const paths = [...new Set(files.filter((file) => !neverTrack(file)))];
+  const paths = new Set(files.filter((file) => !neverTrack(file)));
   for (const file of paths) {
-    // 目录创建/删除/替换沿用完整盘点，保留树与文件互换、符号链接的 Git 语义。
+    // Existing trees, file/tree replacement and symlinks keep Git's complete walk.
     if (tracked.some((path) => path.startsWith(`${file}/`))) return;
     try {
       const stat = await fs.promises.lstat(join(ws.root, file));
-      if (!stat.isFile()) return;
+      if (stat.isDirectory()) {
+        if (tracked.includes(file)) return;
+        paths.delete(file);
+        if (await git.isIgnored({ fs: io, dir: ws.root, gitdir, filepath: file })) continue;
+        // A new capture directory has no tracked descendants. Discover only that
+        // subtree rather than rescan the entire workspace for each new date.
+        for (const name of await fs.promises.readdir(join(ws.root, file))) {
+          const child = `${file}/${name}`;
+          if (!neverTrack(child)) paths.add(child);
+        }
+      } else if (!stat.isFile()) return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
