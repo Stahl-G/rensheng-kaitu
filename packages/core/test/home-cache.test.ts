@@ -29,6 +29,7 @@ it("publishes background data, retains it during refresh, and discards obsolete 
     cache.invalidate();
     await expect.poll(() => cache.read().data?.threads[0]?.title, { timeout: 15000 }).toBe("latest");
     expect(cache.read().loading).toBe(false);
+    expect(JSON.parse(cache.readSerialized())).toEqual(cache.read());
     expect(notifications).toBeGreaterThanOrEqual(2);
     await cache.close();
     const count = notifications;
@@ -75,6 +76,7 @@ it("publishes background data, retains it during refresh, and discards obsolete 
     rmSync(directory, { recursive: true, force: true });
     cache = createHomeCache(ws, () => notifications++);
     expect(cache.read()).toMatchObject({ loading: true, data: null });
+    expect(JSON.parse(cache.readSerialized())).toEqual(cache.read());
     await expect.poll(() => cache.read().data?.pending[0]?.title, { timeout: 15000 }).toBe("External change");
     other = await freshWorkspace();
     ws.root = other.root;
@@ -87,7 +89,7 @@ it("publishes background data, retains it during refresh, and discards obsolete 
   }
 });
 
-it("close waits for workers still retiring after publishing their result", async () => {
+it("retains the worker between updates and waits for its termination on close", async () => {
   const ws = await freshWorkspace();
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
@@ -100,11 +102,12 @@ it("close waits for workers still retiring after publishing their result", async
   const cache = createHomeCache(ws, () => {});
   try {
     await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
-    expect(stopping).toHaveBeenCalled();
+    expect(stopping).not.toHaveBeenCalled();
     let closed = false;
     const close = Promise.resolve(cache.close()).then(() => {
       closed = true;
     });
+    expect(stopping).toHaveBeenCalledOnce();
     await Promise.resolve();
     expect(closed).toBe(false);
     release();

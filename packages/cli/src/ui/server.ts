@@ -638,46 +638,46 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             ),
           );
         }
+        if (method === "home") {
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          return res.end(home.readSerialized());
+        }
         const result =
-          method === "home"
-            ? home.read()
-            : method === "openAi"
-              ? await openAi()
-              : method.startsWith("ask") || method === "projectGoalSuggest"
-                ? await productRequest(ws, method, args, options.ask, calendarPush)
-                : relocate || method === "restoreVersion"
-                  ? await exclusive(() =>
-                      withoutSnapshotTimer(async () => {
-                        workspaceGeneration++;
-                        await calendarQueue;
-                        await saveExternal();
-                        const opening = method === "workspaceBackup" && args[0] === "activate";
-                        const target = opening
-                          ? (args[1] as { root?: unknown } | undefined)?.root
-                          : undefined;
-                        await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
-                        await phones.stop();
-                        await home.pause();
-                        const oldRoot = ws.root;
+          method === "openAi"
+            ? await openAi()
+            : method.startsWith("ask") || method === "projectGoalSuggest"
+              ? await productRequest(ws, method, args, options.ask, calendarPush)
+              : relocate || method === "restoreVersion"
+                ? await exclusive(() =>
+                    withoutSnapshotTimer(async () => {
+                      workspaceGeneration++;
+                      await calendarQueue;
+                      await saveExternal();
+                      const opening = method === "workspaceBackup" && args[0] === "activate";
+                      const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
+                      await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
+                      await phones.stop();
+                      await home.pause();
+                      const oldRoot = ws.root;
+                      try {
+                        if (relocate) await options.onWorkspaceChanging?.();
+                        return await productRequest(ws, method, args, options.ask, calendarPush);
+                      } finally {
                         try {
-                          if (relocate) await options.onWorkspaceChanging?.();
-                          return await productRequest(ws, method, args, options.ask, calendarPush);
+                          if (ws.root !== oldRoot) startWatching();
+                          if (relocate) await options.onWorkspaceChanged?.();
                         } finally {
-                          try {
-                            if (ws.root !== oldRoot) startWatching();
-                            if (relocate) await options.onWorkspaceChanged?.();
-                          } finally {
-                            home.resume();
-                            options.ask?.relocate(ws.root);
-                            phones.start();
-                            notify();
-                          }
+                          home.resume();
+                          options.ask?.relocate(ws.root);
+                          phones.start();
+                          notify();
                         }
-                      }),
-                    )
-                  : productMutations.has(method) && !backupRead
-                    ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
-                    : await productRequest(ws, method, args, options.ask, calendarPush);
+                      }
+                    }),
+                  )
+                : productMutations.has(method) && !backupRead
+                  ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
+                  : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
         if (productMutations.has(method) && !backupRead) notify();
