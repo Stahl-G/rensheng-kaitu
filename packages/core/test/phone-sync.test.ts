@@ -1,6 +1,6 @@
 import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { expect, it, vi } from "vitest";
+import { expect, it, onTestFailed, vi } from "vitest";
 import { assertAgentWrite } from "../src/agent-file-policy.js";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.js";
 import {
@@ -47,6 +47,16 @@ import { clonedWorkspace, workout } from "./helpers.js";
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
 
 it("background phone computation publishes through the owner queue and discards a moved root", async () => {
+  const started = performance.now();
+  let phase = "initialize";
+  const errors: unknown[] = [];
+  onTestFailed(() => {
+    console.error("phone-background-stage", {
+      phase,
+      elapsedMs: performance.now() - started,
+      errors: errors.map(String),
+    });
+  });
   const ws = await clonedWorkspace();
   const other = await clonedWorkspace();
   const root = ws.root;
@@ -61,7 +71,6 @@ it("background phone computation publishes through the owner queue and discards 
     release = resolve;
   });
   let queued = false;
-  const errors: unknown[] = [];
   const stop = startPhoneSnapshots(
     ws,
     (error) => errors.push(error),
@@ -72,10 +81,12 @@ it("background phone computation publishes through the owner queue and discards 
     },
   );
   try {
+    phase = "waiting-owner-queue";
     await expect.poll(() => queued, { timeout: 15000 }).toBe(true);
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
     ws.root = other.root;
     release();
+    phase = "waiting-new-root";
     await expect
       .poll(
         () => {
@@ -88,9 +99,11 @@ it("background phone computation publishes through the owner queue and discards 
       )
       .toEqual(["New root"]);
     expect(errors).toEqual([]);
+    phase = "closing";
     await stop();
     ws.root = root;
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
+    phase = "finished";
   } finally {
     release();
     await stop();
