@@ -115,6 +115,7 @@ export function OnboardingMatter(
     initial: Matter | null;
     initialText?: string;
     initialGoal?: string;
+    clipboard?: boolean;
     content: OnboardingContent["matter"];
     builtin: boolean;
     onPrompt: (text: string) => void;
@@ -337,9 +338,7 @@ export function OnboardingMatter(
         <>
           <div className={css.badges}>
             <span>{t("原文已保存", "Text saved")}</span>
-            <span>
-              {hasDraft ? t("需要你核对", "Needs your review") : t("等你整理", "Ready to organize")}
-            </span>
+            {hasDraft && <span>{t("需要你核对", "Needs your review")}</span>}
           </div>
           {busy && !organizing && <output className={v2.small}>{t("正在保存…", "Saving…")}</output>}
           {manual && (
@@ -355,6 +354,14 @@ export function OnboardingMatter(
               {t("保留原文并结束", "Keep the text and finish")}
             </button>
           </div>
+          {manual && props.clipboard && (
+            <ClipboardOrganize
+              source={matter.source}
+              promptOnboardingMatter={props.promptOnboardingMatter}
+              pasteOnboardingMatter={props.pasteOnboardingMatter}
+              onDraft={apply}
+            />
+          )}
           <div className={css.draftFields}>
             {field("goal", t("当前目标", "Current goal"))}
             {field("current", t("已知现状", "What's known now"))}
@@ -399,7 +406,7 @@ export function OnboardingMatter(
               : t(`依据 · 查看${subject}`, `Source · view ${subject}`)}
           </button>
           {raw && <pre className={css.original}>{matter.text}</pre>}
-          {manual && (
+          {manual && !props.clipboard && (
             <details>
               <summary>{t("用其他 AI 整理（可选）", "Organize with another AI (optional)")}</summary>
               <ClipboardOrganize
@@ -417,17 +424,23 @@ export function OnboardingMatter(
               </output>
             )}
             <div className={css.footerActions}>
-              {props.builtin ? (
-                !noAi && (
-                  <button type="button" className={quiet} disabled={busy} onClick={() => void run(organize)}>
-                    {t("用当前 AI 整理", "Organize with the current AI")}
+              {!props.clipboard &&
+                (props.builtin ? (
+                  !noAi && (
+                    <button
+                      type="button"
+                      className={quiet}
+                      disabled={busy}
+                      onClick={() => void run(organize)}
+                    >
+                      {t("用当前 AI 整理", "Organize with the current AI")}
+                    </button>
+                  )
+                ) : (
+                  <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
+                    {t("请当前 AI 整理", "Ask the current AI")}
                   </button>
-                )
-              ) : (
-                <button type="button" className={quiet} disabled={busy} onClick={() => external(matter)}>
-                  {t("请当前 AI 整理", "Ask the current AI")}
-                </button>
-              )}
+                ))}
               <button
                 type="button"
                 className={primary}

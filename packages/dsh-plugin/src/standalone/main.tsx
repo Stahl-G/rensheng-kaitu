@@ -75,11 +75,13 @@ const props: OverviewPageProps = {
     onSettings,
     newConversation,
     autoSubmit,
+    onOrganize,
   ) => (
     <AskPage
       workspace={workspace}
       active={active}
       autoSubmit={autoSubmit}
+      onOrganize={onOrganize}
       initialPrompt={prompt}
       initialPromptRequest={promptRequest}
       initialPromptNewConversation={newConversation}
