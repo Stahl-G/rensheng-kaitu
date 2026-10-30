@@ -212,7 +212,13 @@ export class Workspace {
    * 读文件并解析；文件没变时直接用上次的结果，不再读和解析。跳过的文件与 scanText 相同。
    * 结果会被之后的请求共用，调用方不能修改（解析函数可以冻结它）。解析出错不缓存，下次照样报错。
    */
-  scanParsed<T>(rel: string, kind: string, parse: (text: string) => T): T | undefined {
+  scanParsed<T>(
+    rel: string,
+    kind: string,
+    parse:
+      | ((text: string) => T)
+      | { read: (text: string, read: <V>(kind: string, parse: (text: string) => V) => V) => T },
+  ): T | undefined {
     if (this.conflictCopy(rel) || placeholderName(rel)) return;
     const stamp = this.stableStamp(rel);
     const previous = this.parsed.get(rel);
@@ -224,11 +230,17 @@ export class Workspace {
       this.parsed.delete(rel);
       return;
     }
-    const value = parse(text);
+    const values = hit?.values ?? new Map<string, unknown>();
+    // A derived view can reuse an intermediate parse of this exact source text.
+    const read = <V>(kind: string, parse: (text: string) => V): V => {
+      if (values.has(kind)) return values.get(kind) as V;
+      const value = parse(text);
+      values.set(kind, value);
+      return value;
+    };
+    const value = read(kind, (text) => (typeof parse === "function" ? parse(text) : parse.read(text, read)));
     if (stamp) {
-      const entry = hit ?? { stamp, text, values: new Map<string, unknown>() };
-      entry.values.set(kind, value);
-      this.parsed.set(rel, entry);
+      this.parsed.set(rel, { stamp, text, values });
     } else this.parsed.delete(rel);
     return value;
   }

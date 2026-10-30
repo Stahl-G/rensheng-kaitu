@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { deepFreeze } from "./frozen.js";
 import { redact, userProfileSections } from "./handover.js";
 import { type Locale, pick } from "./locale.js";
 import { findRecordType, listModules, recordFilePattern } from "./modules.js";
@@ -61,17 +62,19 @@ export function userNavigation(ws: Workspace) {
       continue;
     }
     if (!ws.exists(path)) continue;
-    const title = ws.scanParsed(path, "agent-navigation-title", (text) => {
-      // A missing/invalid summary never makes an original undiscoverable.
-      try {
-        const { data, body } = parseFrontmatter(text);
-        return redact(
-          typeof data.title === "string" ? data.title : (body.match(/^# +(.+)$/m)?.[1] ?? path),
-          "zh-CN",
-        ).slice(0, 120);
-      } catch {
-        return path;
-      }
+    const title = ws.scanParsed(path, "agent-navigation-title", {
+      read: (_text, read) => {
+        // A missing/invalid summary never makes an original undiscoverable.
+        try {
+          const { data, body } = read("frontmatter", (text) => deepFreeze(parseFrontmatter(text)));
+          return redact(
+            typeof data.title === "string" ? data.title : (body.match(/^# +(.+)$/m)?.[1] ?? path),
+            "zh-CN",
+          ).slice(0, 120);
+        } catch {
+          return path;
+        }
+      },
     });
     if (title === undefined) {
       available = false;
