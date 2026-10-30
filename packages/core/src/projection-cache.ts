@@ -41,7 +41,7 @@ export function projectionDirectory(input: ProjectionInputs): string | undefined
   return join(base, digest(`${realpathSync(input.root)}\0${realpathSync(input.state)}`));
 }
 
-function stamp(path: string): string {
+export function projectionFingerprint(path: string): string {
   try {
     const item = lstatSync(path, { bigint: true });
     const fields = [item.ino, item.mode, item.size, item.mtimeNs, item.ctimeNs].join(":");
@@ -58,7 +58,7 @@ function stamp(path: string): string {
 export function projectionManifest(input: ProjectionInputs): ProjectionManifest {
   const entries = new Map<string, string>();
   const walk = (path: string, state: boolean, relativePath = "") => {
-    entries.set(path, stamp(path));
+    entries.set(path, projectionFingerprint(path));
     if (entries.get(path) === "missing" || !lstatSync(path).isDirectory()) return;
     for (const entry of readdirSync(path, { withFileTypes: true })) {
       if ([".git", "node_modules", ".DS_Store"].includes(entry.name) || entry.name.endsWith(".tmp")) continue;
@@ -72,9 +72,9 @@ export function projectionManifest(input: ProjectionInputs): ProjectionManifest 
   walk(resolve(input.root), false);
   walk(resolve(input.state), true);
   const config = join(input.root, ".kaitu/config.json");
-  entries.set(config, stamp(config));
+  entries.set(config, projectionFingerprint(config));
   const preferences = join(localStateRoot(), "preferences.json");
-  entries.set(preferences, stamp(preferences));
+  entries.set(preferences, projectionFingerprint(preferences));
   return [...entries];
 }
 
@@ -83,7 +83,7 @@ export function projectionUnchanged(input: ProjectionInputs, manifest: Projectio
   return manifest.every(
     ([path, before]) =>
       (inside(input.root, path) || inside(input.state, path) || path === preferences) &&
-      stamp(path) === before,
+      projectionFingerprint(path) === before,
   );
 }
 

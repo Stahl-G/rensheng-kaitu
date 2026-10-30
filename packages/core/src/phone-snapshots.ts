@@ -1,14 +1,25 @@
 import { watch } from "node:fs";
+import { dirname, join } from "node:path";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
-import { writePhoneReceipts } from "./phone-receipts.js";
+import { phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { lifeMap } from "./places.js";
+import {
+  type ProjectionManifest,
+  projectionDay,
+  projectionExpiry,
+  projectionFingerprint,
+  projectionManifest,
+  projectionUnchanged,
+  readProjection,
+  writeProjection,
+} from "./projection-cache.js";
 import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
-import { ignoredWorkspaceChange } from "./workbench.js";
+import { ignoredWorkspaceChange, readWorkbench } from "./workbench.js";
 import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
@@ -17,13 +28,60 @@ export function phoneReadable(ws: Workspace) {
 }
 export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
 
+type Published = { since: number; generator: string; outputs: ProjectionManifest };
+type PublishedCache = NonNullable<ReturnType<typeof readProjection<Published>>>;
+const published = new WeakMap<Workspace, PublishedCache>();
+
+// Building snapshots writes organizer bookkeeping and can create the phone directory. Those
+// writes do not feed any phone projection; every other original and directory entry must match.
+function unchangedSources(
+  before: ProjectionManifest,
+  after: ProjectionManifest,
+  root: string,
+  state: string,
+) {
+  const normalize = (manifest: ProjectionManifest) =>
+    manifest
+      .filter(([path]) => path !== join(state, "organizer.json"))
+      .map(([path, stamp]) => [
+        path,
+        path === root || path === state ? stamp.split(":").slice(0, 2).join(":") : stamp,
+      ]);
+  return JSON.stringify(normalize(before)) === JSON.stringify(normalize(after));
+}
+
 export async function writePhoneSnapshots(
   ws: Workspace,
   now = new Date(),
   options: { force?: boolean; generator?: PhoneGenerator } = {},
 ) {
   if (!options.force && !phoneReadable(ws)) return 0;
-  const data = await readOverviewPage(ws, now);
+  const input = { root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) };
+  const generator = JSON.stringify(options.generator ?? { kind: "computer" });
+  let before: ProjectionManifest | undefined;
+  try {
+    const hit = published.get(ws) ?? readProjection<Published>(input, "phone", now);
+    if (
+      hit &&
+      hit.root === input.root &&
+      hit.state === input.state &&
+      hit.value.generator === generator &&
+      hit.value.since <= now.getTime() &&
+      hit.day === projectionDay(now, hit.timeZone) &&
+      (hit.expires === null || now.getTime() < hit.expires) &&
+      projectionUnchanged(input, hit.manifest) &&
+      projectionUnchanged(input, hit.value.outputs)
+    ) {
+      published.set(ws, hit);
+      return 0;
+    }
+    before = projectionManifest(input);
+  } catch {
+    // Cache/index availability must not replace the original reader's error handling.
+  }
+  published.delete(ws);
+  const sources = readWorkbench(ws, now);
+  const data = await readOverviewPage(ws, now, sources);
   const computer = options.generator?.kind !== "agent";
   if (computer)
     rememberOrganizer(
@@ -48,11 +106,13 @@ export async function writePhoneSnapshots(
     library: () => buildPhoneLibrary(ws, data, at),
   };
   let writes = 0;
+  let cacheable = true;
   const errors: Error[] = [];
   for (const [name, build] of Object.entries(snapshots)) {
     const file = `phone/${name}.json`;
     try {
       const value = { ...build(), generator: options.generator ?? { kind: "computer" } };
+      cacheable = schemas().builtin(`phone-${name}.schema.json`)(value) && cacheable;
       if (ws.exists(file)) {
         let previous: typeof value | undefined;
         try {
@@ -81,6 +141,36 @@ export async function writePhoneSnapshots(
   }
   writes += writePhoneReceipts(ws, [], now);
   if (errors.length) throw new AggregateError(errors, errors.map((error) => error.message).join("；"));
+  if (before && cacheable) {
+    try {
+      const manifest = projectionManifest(input);
+      if (unchangedSources(before, manifest, input.root, input.state)) {
+        const expiry = Math.min(
+          projectionExpiry(sources, now) ?? Number.POSITIVE_INFINITY,
+          ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
+        );
+        const value: Published = {
+          since: now.getTime(),
+          generator,
+          outputs: [...Object.keys(snapshots), "receipts"].map((name) => {
+            const path = ws.resolve(`phone/${name}.json`);
+            return [path, projectionFingerprint(path)];
+          }),
+        };
+        writeProjection(input, "phone", {
+          manifest,
+          value,
+          timeZone: data.timeZone,
+          day: data.today,
+          expires: Number.isFinite(expiry) ? expiry : null,
+        });
+        const saved = readProjection<Published>(input, "phone", now);
+        if (saved) published.set(ws, saved);
+      }
+    } catch {
+      // Successful publication remains successful if its disposable marker cannot be saved.
+    }
+  }
   return writes;
 }
 

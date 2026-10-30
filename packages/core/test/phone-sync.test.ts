@@ -1,5 +1,5 @@
-import { rmSync } from "node:fs";
-import { basename, join } from "node:path";
+import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { expect, it } from "vitest";
 import { assertAgentWrite } from "../src/agent-file-policy.js";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.js";
@@ -31,6 +31,8 @@ import {
   writePhoneSnapshots,
 } from "../src/index.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
+import { writePhoneReceipts } from "../src/phone-receipts.js";
+import { projectionDirectory } from "../src/projection-cache.js";
 import { ulid } from "../src/ulid.js";
 import {
   type BackupFiles,
@@ -41,6 +43,84 @@ import {
 import { clonedWorkspace, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
+
+it("reuses published snapshots across reopen without hiding edits, errors or expiring receipts", async () => {
+  const ws = await clonedWorkspace();
+  const other = await clonedWorkspace();
+  const root = ws.root;
+  const now = new Date("2026-10-18T12:00:00Z");
+  const task = addRecord(ws, "task", { title: "Original", ts: now.toISOString() });
+  const path = ws.resolve(task.file);
+  const today = () => ws.readJson<{ mobile: { tasks: { title: string }[] } }>("phone/today.json");
+  const output = () => ["today", "week", "map", "library"].map((name) => ws.readText(`phone/${name}.json`));
+  try {
+    await writePhoneSnapshots(ws, now, { force: true });
+    const original = output();
+    expect(await writePhoneSnapshots(new Workspace(root, { maintain: false }), now, { force: true })).toBe(0);
+    expect(output()).toEqual(original);
+    const changed = readFileSync(path, "utf8").replace('"Original"', '"External edit"');
+    writeFileSync(path, changed);
+    await writePhoneSnapshots(ws, now, { force: true });
+    expect(today().mobile.tasks[0]?.title).toBe("External edit");
+    const incremental = output();
+    const cache = projectionDirectory({
+      root,
+      state: dirname(ws.resolve(".kaitu/cache", { internal: true })),
+    });
+    if (!cache) throw new Error("Projection directory missing");
+    rmSync(cache, { recursive: true, force: true });
+    await writePhoneSnapshots(new Workspace(root, { maintain: false }), now, { force: true });
+    expect(output()).toEqual(incremental);
+    writeFileSync(path, `${changed.trimEnd()}\n{broken\n`);
+    await expect(writePhoneSnapshots(ws, now, { force: true })).rejects.toThrow("生成失败");
+    expect(today().mobile.tasks[0]?.title).toBe("External edit");
+    writeFileSync(path, changed);
+    if (process.platform !== "win32") {
+      try {
+        chmodSync(path, 0);
+        await expect(writePhoneSnapshots(ws, now, { force: true })).rejects.toThrow();
+      } finally {
+        chmodSync(path, 0o600);
+      }
+    }
+    await writePhoneSnapshots(ws, now, { force: true });
+    writePhoneReceipts(
+      ws,
+      [
+        {
+          ref: "receipt",
+          kind: "file",
+          status: "applied",
+          at: new Date(now.getTime() - 14 * 86400000 + 500).toISOString(),
+        },
+      ],
+      now,
+    );
+    await writePhoneSnapshots(ws, now, { force: true });
+    expect(phoneReceipts(ws)).toHaveLength(1);
+    await writePhoneSnapshots(ws, new Date(now.getTime() + 1000), { force: true });
+    expect(phoneReceipts(ws)).toEqual([]);
+    addRecord(ws, "metric", {
+      kind: "weight",
+      value: 72,
+      unit: "kg",
+      source: "user",
+      ts: new Date(now.getTime() + 3600000).toISOString(),
+    });
+    await writePhoneSnapshots(ws, now, { force: true });
+    expect(ws.readJson<{ health: { weight: unknown } }>("phone/week.json").health.weight).toBeNull();
+    await writePhoneSnapshots(ws, new Date(now.getTime() + 3600000), { force: true });
+    expect(
+      ws.readJson<{ health: { weight: { value: number } } }>("phone/week.json").health.weight.value,
+    ).toBe(72);
+    ws.root = other.root;
+    await writePhoneSnapshots(ws, now, { force: true });
+    expect(today().mobile.tasks).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(other.root, { recursive: true, force: true });
+  }
+});
 
 it("未完成的记忆操作绑定首次 client_id，改投其他 op 不覆盖计划且原操作仍可恢复", async () => {
   const ws = await clonedWorkspace();
