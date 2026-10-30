@@ -5,7 +5,7 @@ import { holdOverview } from "../src/overview.js";
 import { type StoredRecord, addRecord, deleteRecord, updateRecord } from "../src/records.js";
 import { freshWorkspace } from "./helpers.js";
 
-it("健康趋势读满12周并折叠修订，BMI只配同期身高，缺记录不冒充零", async () => {
+it("健康趋势读满12周并折叠修订，BMI采用称重前最近有效身高，缺记录不冒充零", async () => {
   const ws = await freshWorkspace("Asia/Ho_Chi_Minh");
   holdOverview(ws);
   const metric = (ts: string, kind: string, value: number, unit: string) =>
@@ -16,14 +16,20 @@ it("健康趋势读满12周并折叠修订，BMI只配同期身高，缺记录�
   updateRecord(ws, "metric", corrected.id, { value: 75 });
   const deleted = metric("2026-10-20T08:00:00", "weight", 100, "kg");
   deleteRecord(ws, "metric", deleted.id);
-  metric("2026-10-29T07:00:00", "height", 190, "cm");
+  metric("2025-10-29T07:00:00", "height", 190, "cm");
   const latestWeight = metric("2026-10-30T08:00:00", "weight", 80, "kg");
   updateRecord(ws, "metric", latestWeight.id, { source: "estimate" });
   metric("2026-10-31T08:00:00", "weight", 99, "kg");
   const now = new Date("2026-10-30T12:00:00+07:00");
-  expect(readHealthPage(ws, now).dashboard?.bmi).toBeNull();
+  expect(readHealthPage(ws, now).dashboard?.bmi).toMatchObject({ heightCm: 190, heightDate: "2025-10-29" });
+  expect(readHealthPage(ws, now).dashboard?.bmi?.value).toBeCloseTo(80 / 1.9 ** 2);
   metric("2026-10-30T07:00:00", "height", 180, "cm");
-  metric("2026-10-30T10:00:00", "height", 150, "cm");
+  metric("2026-10-30T07:30:00", "height", 0, "cm");
+  const futureHeight = metric("2026-10-30T10:00:00", "height", 150, "cm");
+  expect(
+    buildHealthDashboard({ metric: [latestWeight, futureHeight] }, "2026-10-30", "Asia/Ho_Chi_Minh", now, [])
+      .bmi,
+  ).toBeNull();
   addRecord(ws, "activity", {
     ts: "2026-10-30T00:00:00+07:00",
     date: "2026-10-30",
@@ -36,6 +42,7 @@ it("健康趋势读满12周并折叠修订，BMI只配同期身高，缺记录�
   if (!result) throw new Error("Current reader must return the dashboard");
   expect(result.bmi?.value).toBeCloseTo(80 / 1.8 ** 2);
   expect(result.bmi?.estimated).toBe(true);
+  expect(result.bmi).toMatchObject({ heightCm: 180, heightDate: "2026-10-30" });
   expect(result.metrics.find((m) => m.kind === "weight")?.points.map((p) => p.value)).toEqual([70, 75, 80]);
   expect(result.metrics.find((m) => m.kind === "weight")).toMatchObject({
     change: 10,
