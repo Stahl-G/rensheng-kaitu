@@ -97,7 +97,7 @@ export function readProjectPage(ws: Workspace, slug: string) {
     ...summary,
     warnings: [...new Set(warnings)],
     ...readProjectView(ws, slug),
-    body: clean(project.body),
+    body: project.error ? project.body : clean(project.body),
     progress: project.data.progress ?? null,
     logs: projectLogs(project.log),
     metrics: metrics.map((row) => ({

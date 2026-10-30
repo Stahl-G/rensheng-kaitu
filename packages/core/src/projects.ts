@@ -9,7 +9,7 @@ import { writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { normalizeStatus } from "./doc-input.js";
 import { KaituError } from "./errors.js";
-import { frontmatterBody, parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
 import { type GithubOptions, projectGithub, syncGithub } from "./github.js";
 import { batchSnapshot, snapshot } from "./history.js";
@@ -139,7 +139,7 @@ export function projectSnapshot(ws: Workspace, slug: string, partial = false) {
         throw error;
       return deepFreeze({
         data: { title: slug, kind: "personal", stage: "active", links: [], updated: null } as ProjectStatus,
-        body: frontmatterBody(text),
+        body: text,
         error: `${dir}/STATUS.md`,
       });
     }

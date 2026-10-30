@@ -146,7 +146,7 @@ it("isolates damaged project, footprint, health and finance files without allowi
     const detail = readProjectPage(ws, good.slug);
     expect(detail.metrics[0]?.value).toBe(12);
     expect(detail.warnings.some((warning) => warning.includes(metric.file))).toBe(true);
-    expect(readProjectPage(ws, bad.slug).body).toBe("Original project body");
+    expect(readProjectPage(ws, bad.slug).body).toBe(broken);
     ws.appendLine(
       meal.file,
       JSON.stringify({ ...meal.record, id: "01K00000000000000000000000", items: null }),
