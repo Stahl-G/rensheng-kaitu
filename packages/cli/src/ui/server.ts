@@ -295,6 +295,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       .catch(() => {});
   };
   const notify = () => {
+    if (closed) return;
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
@@ -990,7 +991,6 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopAtlas();
-    await home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();
@@ -1000,10 +1000,14 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await options.ask?.close();
     files.dispose();
     disposeNoteIndex(ws);
-    await exclusive(async () => {
-      await calendarQueue;
-      await saveExternal();
-    });
+    try {
+      await exclusive(async () => {
+        await calendarQueue;
+        await saveExternal();
+      });
+    } finally {
+      await home.close({ refresh: true });
+    }
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

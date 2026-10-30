@@ -26,10 +26,12 @@ export function createHomeCache(
   let state: HomeState = { data: null, loading: true, error: null };
   let serialized = JSON.stringify(state);
   let refreshing = serialized;
+  let settled: (() => void) | undefined;
   function publish(next: HomeState) {
     state = next;
     serialized = JSON.stringify(next);
     refreshing = JSON.stringify({ ...next, loading: true, error: null });
+    if (!next.loading) settled?.();
   }
   let generation = 0;
   let root = ws.root;
@@ -243,7 +245,22 @@ export function createHomeCache(
       paused = false;
       invalidate();
     },
-    async close() {
+    async close(options: { refresh?: boolean } = {}) {
+      if (options.refresh && !closed && !paused && state.data && !readProjection(inputs(), "home")) {
+        // The final Git save changes a real dependency. Persist its final view before
+        // stopping, but a disposable projection must not hold shutdown indefinitely.
+        await new Promise<void>((resolve) => {
+          const limit = setTimeout(resolve, 1000);
+          settled = () => {
+            clearTimeout(limit);
+            resolve();
+          };
+          invalidate();
+          clearTimeout(timer);
+          rebuild();
+        });
+        settled = undefined;
+      }
       closed = true;
       clearInterval(check);
       for (const watcher of watchers) watcher.close();

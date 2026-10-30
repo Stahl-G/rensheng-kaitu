@@ -40,6 +40,20 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(join(root, "source"));
+  const started = performance.now();
+  const saves: { started: number; finished?: number; committed?: boolean }[] = [];
+  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
+    const save: (typeof saves)[number] = { started: performance.now() - started };
+    saves.push(save);
+    try {
+      const result = await original.snapshotNow(...args);
+      save.committed = !!result;
+      return result;
+    } finally {
+      save.finished = performance.now() - started;
+    }
+  });
   const entered = gate<void>();
   const resume = gate<void>();
   const ui = await startUi(ws, {
@@ -66,7 +80,17 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       return ((await response.json()) as { path: string }).path;
     }),
   );
-  await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
+  const capturedAt = performance.now() - started;
+  try {
+    await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
+  } catch (error) {
+    console.error("Concurrent capture version timing", {
+      capturedAt,
+      failedAt: performance.now() - started,
+      saves,
+    });
+    throw error;
+  }
   for (const file of captures) expect(await isTracked(ws, file)).toBe(true);
   const target = join(root, "sync");
   const moving = post("moveStorage", [target, true, "nutstore"]);
