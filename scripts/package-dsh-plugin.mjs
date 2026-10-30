@@ -14,6 +14,7 @@ const name = "kaitu-dsh";
 
 rmSync(output, { recursive: true, force: true });
 mkdirSync(join(output, "dist"), { recursive: true });
+cpSync(join(root, "packages/core/dist/validators"), join(output, "dist/validators"), { recursive: true });
 await build({
   entryPoints: [join(root, "packages/dsh-plugin/src/index.ts")],
   outfile: join(output, "dist/index.js"),

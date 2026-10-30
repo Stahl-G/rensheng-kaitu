@@ -1,9 +1,10 @@
 import { existsSync, watch } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
+import { historyReadInputs } from "./history.js";
 import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
@@ -17,6 +18,7 @@ import {
   projectionManifest,
   projectionUnchanged,
   readProjection,
+  retainHistoryInputs,
   writeProjection,
 } from "./projection-cache.js";
 import { schemas } from "./schema.js";
@@ -33,24 +35,6 @@ export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: strin
 type Published = { since: number; generator: string; outputs: ProjectionManifest };
 type PublishedCache = NonNullable<ReturnType<typeof readProjection<Published>>>;
 const published = new WeakMap<Workspace, PublishedCache>();
-
-// Building snapshots writes organizer bookkeeping and can create the phone directory. Those
-// writes do not feed any phone projection; every other original and directory entry must match.
-function unchangedSources(
-  before: ProjectionManifest,
-  after: ProjectionManifest,
-  root: string,
-  state: string,
-) {
-  const normalize = (manifest: ProjectionManifest) =>
-    manifest
-      .filter(([path]) => path !== join(state, "organizer.json"))
-      .map(([path, stamp]) => [
-        path,
-        path === root || path === state ? stamp.split(":").slice(0, 2).join(":") : stamp,
-      ]);
-  return JSON.stringify(normalize(before)) === JSON.stringify(normalize(after));
-}
 
 export function phoneSnapshotsCurrent(ws: Workspace, now: Date, generator?: PhoneGenerator): boolean {
   const input = { root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) };
@@ -114,6 +98,7 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
     }
   });
   return {
+    historyInputs: historyReadInputs(ws),
     input,
     before,
     snapshots: prepared,
@@ -182,7 +167,7 @@ export function publishPhoneSnapshots(
   if (before && cacheable) {
     try {
       const manifest = projectionManifest(input);
-      if (unchangedSources(before, manifest, input.root, input.state)) {
+      if (JSON.stringify(before) === JSON.stringify(manifest)) {
         const expiry = Math.min(
           prepared.expires ?? Number.POSITIVE_INFINITY,
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
@@ -196,7 +181,7 @@ export function publishPhoneSnapshots(
           }),
         };
         writeProjection(input, "phone", {
-          manifest,
+          manifest: retainHistoryInputs(input, manifest, prepared.historyInputs),
           value,
           timeZone: prepared.timeZone,
           day: prepared.day,

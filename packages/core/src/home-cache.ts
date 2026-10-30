@@ -3,8 +3,9 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { HomeData, HomeSources } from "./home.js";
-import { projectionDay, readProjection } from "./projection-cache.js";
-import type { Workspace } from "./workspace.js";
+import { publishOverview } from "./overview.js";
+import { projectionDay, projectionUnchanged, readProjection } from "./projection-cache.js";
+import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export interface HomeState {
   data: HomeData | null;
@@ -17,7 +18,11 @@ export interface HomeState {
 }
 
 /** One background projection per open workspace; requests only read the published state. */
-export function createHomeCache(ws: Workspace, notify: () => void) {
+export function createHomeCache(
+  ws: Workspace,
+  notify: () => void,
+  options: { write?: WorkspaceWrite; report?: (error: unknown) => void } = {},
+) {
   let state: HomeState = { data: null, loading: true, error: null };
   let serialized = JSON.stringify(state);
   let refreshing = serialized;
@@ -32,6 +37,7 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
   let paused = false;
   let worker: Worker | null = null;
   let pending: number | null = null;
+  let summaryOnly = false;
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let retiring: Promise<unknown> = Promise.resolve();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -87,9 +93,10 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
     publish({ data: null, loading: false, error });
     notify();
   }
-  function rebuild() {
+  function rebuild(onlySummary = false) {
     if (closed || paused || pending !== null) return;
-    const request = { root: ws.root, generation };
+    summaryOnly = onlySummary;
+    const request = { root: ws.root, generation, summary: !!options.write, summaryOnly };
     pending = generation;
     if (worker) {
       worker.ref();
@@ -120,6 +127,36 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
       const active = worker;
       active.on("message", (message) => {
         if (worker !== active || closed || paused) return;
+        if (message.summary || message.summaryError) {
+          if (message.summaryOnly && summaryOnly && pending === message.generation) {
+            clearTimeout(deadline);
+            pending = null;
+          }
+          if (pending === null) active.unref();
+          if (message.generation !== generation) {
+            if (state.loading) rebuild();
+            return;
+          }
+          if (message.summaryError) {
+            options.report?.(new Error(message.summaryError));
+            return;
+          }
+          void options
+            .write?.(async () => {
+              if (closed || paused || message.generation !== generation || ws.root !== message.input.root)
+                return;
+              if (
+                (message.manifest && !projectionUnchanged(message.input, message.manifest)) ||
+                !publishOverview(ws, message.summary)
+              ) {
+                invalidate();
+                return;
+              }
+              notify();
+            })
+            .catch((error) => options.report?.(error));
+          return;
+        }
         clearTimeout(deadline);
         pending = null;
         if (message.changed) generation++;
@@ -195,6 +232,9 @@ export function createHomeCache(ws: Workspace, notify: () => void) {
       return serialized;
     },
     invalidate,
+    refreshDerived: () => {
+      if (options.write) rebuild(!state.loading);
+    },
     async pause() {
       paused = true;
       await stopWorker();

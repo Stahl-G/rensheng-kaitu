@@ -15,7 +15,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { localStateRoot } from "./local-state.js";
 
 // Disposable implementation data, never part of a workspace or its synchronization format.
-const version = 2;
+const version = 3;
 export type ProjectionInputs = { root: string; state: string };
 export type ProjectionManifest = [path: string, stamp: string][];
 type Projection<T> = {
@@ -66,23 +66,78 @@ export function projectionFingerprint(path: string): string {
   }
 }
 
+function children(input: ProjectionInputs, path: string) {
+  return readdirSync(path, { withFileTypes: true }).filter((entry) => {
+    if ([".git", "node_modules", ".DS_Store"].includes(entry.name) || entry.name.endsWith(".tmp"))
+      return false;
+    if (path === input.root && [".kaitu", "phone", "OVERVIEW.md", "USER.md"].includes(entry.name))
+      return false;
+    return (
+      path !== input.state ||
+      (!["cache", "secrets.json", "organizer.json"].includes(entry.name) &&
+        !entry.name.startsWith("index.sqlite"))
+    );
+  });
+}
+function directoryFingerprint(input: ProjectionInputs, path: string): string {
+  const item = lstatSync(path, { bigint: true });
+  if (!item.isDirectory()) return projectionFingerprint(path);
+  return `directory:${item.ino}:${item.mode}:${JSON.stringify(
+    children(input, path)
+      .map((entry) => entry.name)
+      .sort(),
+  )}`;
+}
+function accessFingerprint(path: string): string {
+  try {
+    const item = lstatSync(path, { bigint: true });
+    return item.isDirectory() ? `access:${item.ino}:${item.mode}` : projectionFingerprint(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return "missing";
+    throw error;
+  }
+}
+
+/** Log views need the refs/commit objects actually read, not every historical source blob. */
+export function retainHistoryInputs(
+  input: ProjectionInputs,
+  manifest: ProjectionManifest,
+  paths?: readonly string[],
+): ProjectionManifest {
+  if (!paths) return manifest;
+  const root = join(input.state, "history.git");
+  const required = new Set(paths.filter((path) => inside(root, path)));
+  const parents = new Set([root]);
+  for (const path of required) {
+    for (let parent = dirname(path); inside(root, parent); parent = dirname(parent)) {
+      parents.add(parent);
+      if (parent === root) break;
+    }
+  }
+  const previous = new Map(manifest);
+  return [
+    ...manifest.filter(([path]) => !inside(root, path)),
+    ...[...parents]
+      .filter((path) => !required.has(path))
+      .map((path): [string, string] => [path, accessFingerprint(path)]),
+    ...[...required].map((path): [string, string] => [
+      path,
+      previous.get(path) ?? projectionFingerprint(path),
+    ]),
+  ];
+}
+
 /** Directory fingerprints detect additions/deletions; file fingerprints detect in-place edits. */
 export function projectionManifest(input: ProjectionInputs): ProjectionManifest {
   const entries = new Map<string, string>();
-  const walk = (path: string, state: boolean, relativePath = "") => {
+  const walk = (path: string) => {
     entries.set(path, projectionFingerprint(path));
     if (entries.get(path) === "missing" || !lstatSync(path).isDirectory()) return;
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      if ([".git", "node_modules", ".DS_Store"].includes(entry.name) || entry.name.endsWith(".tmp")) continue;
-      const child = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-      if (!state && [".kaitu", "phone", "OVERVIEW.md", "USER.md"].includes(child)) continue;
-      if (state && (child === "cache" || child.startsWith("index.sqlite") || child === "secrets.json"))
-        continue;
-      walk(join(path, entry.name), state, child);
-    }
+    if (path === input.root || path === input.state) entries.set(path, directoryFingerprint(input, path));
+    for (const entry of children(input, path)) walk(join(path, entry.name));
   };
-  walk(resolve(input.root), false);
-  walk(resolve(input.state), true);
+  walk(resolve(input.root));
+  walk(resolve(input.state));
   const config = join(input.root, ".kaitu/config.json");
   entries.set(config, projectionFingerprint(config));
   const preferences = join(localStateRoot(), "preferences.json");
@@ -92,10 +147,21 @@ export function projectionManifest(input: ProjectionInputs): ProjectionManifest 
 
 export function projectionUnchanged(input: ProjectionInputs, manifest: ProjectionManifest): boolean {
   const preferences = join(localStateRoot(), "preferences.json");
+  const root = `${input.root}${sep}`;
+  const state = `${input.state}${sep}`;
   return manifest.every(
     ([path, before]) =>
-      (inside(input.root, path) || inside(input.state, path) || path === preferences) &&
-      projectionFingerprint(path) === before,
+      (path === input.root ||
+        path === input.state ||
+        path.startsWith(root) ||
+        path.startsWith(state) ||
+        path === preferences) &&
+      resolve(path) === path &&
+      (before.startsWith("directory:")
+        ? directoryFingerprint(input, path)
+        : before.startsWith("access:")
+          ? accessFingerprint(path)
+          : projectionFingerprint(path)) === before,
   );
 }
 

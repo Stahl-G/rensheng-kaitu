@@ -48,7 +48,6 @@ import {
   readPhoto,
   readPreferences,
   readWorkbench,
-  refreshOverview,
   removeMemory,
   removePhoto,
   renderTeachingFrame,
@@ -300,7 +299,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
-  const home = createHomeCache(ws, notify);
+  const home = createHomeCache(ws, notify, { write: exclusive, report: () => reportError() });
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
@@ -400,12 +399,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       scheduleInbox();
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-      void exclusive(async () => {
-        refreshOverview(ws);
-        notify();
-      })
-        .then(syncCalendar)
-        .catch(reportError);
+      home.refreshDerived();
+      syncCalendar();
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }

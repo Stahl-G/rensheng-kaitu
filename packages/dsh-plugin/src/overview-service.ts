@@ -209,9 +209,14 @@ export class KaituOverviewService extends TypertRemoteService {
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
-    this.homeCache = createHomeCache(this.workspace, () => {
-      for (const notify of this.homeListeners) notify();
-    });
+    this.homeCache = createHomeCache(
+      this.workspace,
+      () => {
+        for (const notify of this.homeListeners) notify();
+      },
+      { write: this.write, report: (error) => ctx.logger.warn(String(error)) },
+    );
+    setImmediate(() => this.homeCache.refreshDerived());
     ctx.effect(() => async () => {
       this.disposed = true;
       for (const notify of this.homeListeners) notify();

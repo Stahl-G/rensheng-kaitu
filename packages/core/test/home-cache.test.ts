@@ -2,6 +2,7 @@ import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "nod
 import { dirname, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
+import { history, historyDirectory } from "../src/history.js";
 import { createHomeCache } from "../src/home-cache.js";
 import { projectionDirectory } from "../src/projection-cache.js";
 import { addRecord } from "../src/records.js";
@@ -77,6 +78,21 @@ it("publishes background data, retains it during refresh, and discards obsolete 
     cache = createHomeCache(ws, () => notifications++);
     expect(cache.read()).toMatchObject({ loading: true, data: null });
     expect(JSON.parse(cache.readSerialized())).toEqual(cache.read());
+    await expect.poll(() => cache.read().data?.pending[0]?.title, { timeout: 15000 }).toBe("External change");
+    await cache.close();
+    const head = (await history(ws))[0]?.oid;
+    if (!head) throw new Error("Expected history");
+    const commit = join(historyDirectory(ws), "objects", head.slice(0, 2), head.slice(2));
+    const savedCommit = readFileSync(commit);
+    try {
+      writeFileSync(commit, "corrupt commit object");
+      cache = createHomeCache(ws, () => notifications++);
+      expect(cache.read().loading).toBe(true);
+      await expect.poll(() => cache.read().error, { timeout: 15000 }).toBe("首页读取失败");
+      expect(cache.read().data).toBeNull();
+    } finally {
+      writeFileSync(commit, savedCommit);
+    }
     await expect.poll(() => cache.read().data?.pending[0]?.title, { timeout: 15000 }).toBe("External change");
     other = await freshWorkspace();
     ws.root = other.root;

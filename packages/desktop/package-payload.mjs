@@ -20,6 +20,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json"));
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
+  cpSync(join(root, "packages/core/dist/validators"), join(payload, "dist/validators"), { recursive: true });
   writeFileSync(
     join(payload, "payload.json"),
     JSON.stringify({ version: payloadVersion, dshVersion, hostApi: HOST_API }),

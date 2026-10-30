@@ -150,7 +150,7 @@ function sourceFingerprint(ws: Workspace, navigation: ReturnType<typeof userNavi
 }
 
 /** Disposable output, deliberately bypassing original-file download/history write guards. */
-export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
+export function prepareUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
   const publisher = ws.exists(setting) ? ws.readJson<{ publisher: string | null }>(setting).publisher : null;
   if (!publisher) return { status: "disabled" };
   const path = ws.resolve(file);
@@ -213,13 +213,36 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
   const oldTime = previous ? parseFrontmatter(previous).data.generated : undefined;
   if (typeof oldTime === "string" && previous === render(oldTime))
     return { status: based_on === "unavailable" ? "unavailable" : "current" };
-  const text = render(now.toISOString());
+  return {
+    status: based_on === "unavailable" ? "unavailable" : "current",
+    change: { root: ws.root, publisher, previous, evicted, text: render(now.toISOString()) },
+  };
+}
+
+export type UserProfileChange = NonNullable<ReturnType<typeof prepareUserProfile>["change"]>;
+
+/** Recheck publication ownership after background computation; never overwrite a concurrent edit. */
+export function publishUserProfile(ws: Workspace, change: UserProfileChange): boolean {
+  const { publisher, previous, evicted, text } = change;
+  if (
+    change.root !== ws.root ||
+    !ws.exists(setting) ||
+    ws.readJson<{ publisher: string | null }>(setting).publisher !== publisher ||
+    ws.isUnavailable(file) !== evicted
+  )
+    return false;
+  const path = ws.resolve(file);
+  if (!evicted) {
+    if (ws.exists(file)) {
+      if (!lstatSync(path).isFile() || readFileSync(path, "utf8") !== previous) return false;
+    } else if (previous) return false;
+  }
   if (!evicted && !ws.exists(file)) {
     try {
       writeFileSync(path, text, { flag: "wx" });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      return { status: "other-publisher" };
+      return false;
     }
   } else {
     const temp = `${path}.${randomUUID()}.tmp`;
@@ -231,5 +254,12 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
     }
   }
   if (evicted) rmSync(ws.resolve(".USER.md.icloud"), { force: true });
-  return { status: based_on === "unavailable" ? "unavailable" : "current" };
+  return true;
+}
+
+export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
+  const prepared = prepareUserProfile(ws, now, locale);
+  return {
+    status: prepared.change && !publishUserProfile(ws, prepared.change) ? "other-publisher" : prepared.status,
+  };
 }
