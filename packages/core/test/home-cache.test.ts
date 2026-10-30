@@ -1,5 +1,5 @@
-import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
 import { createHomeCache } from "../src/home-cache.js";
@@ -36,6 +36,16 @@ it("publishes background data, retains it during refresh, and discards obsolete 
     expect(notifications).toBe(count);
     if (!directory) throw new Error("Projection cache missing");
     expect(directory?.startsWith(ws.root)).toBe(false);
+    const stateRoot = process.env.KAITU_LOCAL_STATE_DIR;
+    const alias = join(dirname(ws.root), "cache-alias");
+    symlinkSync(ws.root, alias, "junction");
+    try {
+      process.env.KAITU_LOCAL_STATE_DIR = alias;
+      expect(projectionDirectory({ root: ws.root, state: join(ws.root, ".kaitu") })).toBeUndefined();
+    } finally {
+      process.env.KAITU_LOCAL_STATE_DIR = stateRoot;
+      rmSync(alias);
+    }
     cache = createHomeCache(ws, () => notifications++);
     expect(cache.read()).toMatchObject({ loading: false, error: null });
     expect(cache.read().data?.threads[0]?.title).toBe("latest");

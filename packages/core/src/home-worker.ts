@@ -14,13 +14,18 @@ try {
     root: workspace.root,
     state: dirname(workspace.resolve(".kaitu/cache", { internal: true })),
   };
-  const manifest = projectionManifest(input);
+  let manifest: ReturnType<typeof projectionManifest> | undefined;
+  try {
+    manifest = projectionManifest(input);
+  } catch {
+    // Cache discovery must not hide originals the established reader can still read.
+  }
   const now = new Date();
   const sources = await readHomeSources(workspace, now);
   const data = readHome(sources);
   const { today, timeZone, cutoff, metrics, proposedTasks, warnings } = sources.overview;
   const presentation = { today, timeZone, cutoff, metrics, proposedTasks, warnings };
-  if (!projectionUnchanged(input, manifest)) parentPort?.postMessage({ changed: true });
+  if (manifest && !projectionUnchanged(input, manifest)) parentPort?.postMessage({ changed: true });
   else {
     const metadata = {
       timeZone: sources.overview.timeZone,
@@ -28,7 +33,7 @@ try {
       expires: projectionExpiry(sources, now),
     };
     try {
-      writeProjection(input, "home", { ...metadata, manifest, value: { data, presentation } });
+      if (manifest) writeProjection(input, "home", { ...metadata, manifest, value: { data, presentation } });
     } catch {
       /* A cache write failure must not hide readable originals. */
     }
