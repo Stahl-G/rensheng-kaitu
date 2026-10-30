@@ -51,7 +51,7 @@ it("projects existing goals, projects and learning without reading or mutating t
     expect(loaded.projects.some((item) => item.slug === "fixture")).toBe(true);
     const workbench = readWorkbench(ws, now);
     const input = loaded;
-    expect(loaded.projects).toEqual(readProjectsPage(ws, undefined, now, workbench));
+    expect(loaded.projects).toEqual(readProjectsPage(ws, { now, loaded: workbench, partial: true }));
     const before = JSON.stringify(input);
     const read = vi.spyOn(ws, "readText");
     const home = readHome(input);
@@ -187,7 +187,7 @@ it("keeps empty and old workspaces honest, including missing sources and future 
     const workbench = readWorkbench(ws, now);
     const empty = readHome({
       overview,
-      projects: readProjectsPage(ws, undefined, now),
+      projects: readProjectsPage(ws, { now }),
       statuses: workbench.statuses,
       records: workbench.records,
     });

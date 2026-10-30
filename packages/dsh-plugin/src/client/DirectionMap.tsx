@@ -1,6 +1,7 @@
 import type { DirectionMapState, DirectionQuote } from "@kaitu/core";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import css from "./DirectionMap.module.css";
+import { ReadWarnings } from "./ReadWarnings.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 
 // 目标的颜色按顺序取模块色；颜色只用来分组，不代表含义。
@@ -156,6 +157,7 @@ export function DirectionMap({
   return (
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
       {header}
+      <ReadWarnings warnings={input?.warnings} />
       {!map && (
         <p className={css.intro}>
           {t(

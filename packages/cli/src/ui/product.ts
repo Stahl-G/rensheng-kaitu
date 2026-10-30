@@ -477,7 +477,7 @@ export async function productRequest(
     case "recoverExperienceImports":
       return { recovered: (await recoverExperienceImports(ws)).length };
     case "exploration":
-      return readExploration(ws);
+      return readExploration(ws, { partial: true });
     case "explorationWrite":
       return writeExploration(ws, args[0] as ExplorationCommand, "user");
     case "explorationSource":
@@ -506,9 +506,9 @@ export async function productRequest(
     case "doing":
       return readDoing(ws);
     case "projects":
-      return readProjectsPage(ws);
+      return readProjectsPage(ws, { partial: true });
     case "projectDetail":
-      return readProjectPage(ws, text(0));
+      return readProjectPage(ws, text(0), { partial: true });
     case "projectCreate":
       return createProject(ws, { title: text(0), kind: "personal" });
     case "lifeAtlas":

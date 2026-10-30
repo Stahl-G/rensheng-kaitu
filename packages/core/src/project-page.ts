@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { KaituError } from "./errors.js";
 import { readProjectView } from "./project-view.js";
-import { listProjects, projectDirectory, projectSnapshot, readProject, setProject } from "./projects.js";
+import { listProjects, projectDirectory, projectSnapshot, setProject } from "./projects.js";
 import { readRecords } from "./records.js";
 import type { Task, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
@@ -39,17 +39,21 @@ export function projectSummary(text: string) {
 
 export function readProjectsPage(
   ws: Workspace,
-  slug?: string,
-  now = new Date(),
-  loaded?: Pick<WorkbenchData, "projects" | "records">,
+  options: {
+    slug?: string;
+    now?: Date;
+    loaded?: Pick<WorkbenchData, "projects" | "records">;
+    partial?: boolean;
+  } = {},
 ) {
+  const { slug, now = new Date(), loaded, partial } = options;
   const tasks = new Map<string, ReturnType<typeof listTasks>>();
   const warnings: string[] = [];
   const openTasks = loaded
     ? ((loaded.records.task ?? []).filter((task) => task.status === "open") as Task[])
-    : (readRecords(ws, "task", { onError: (error) => warnings.push(error.message) }).filter(
-        (row) => row.status === "open",
-      ) as Task[]);
+    : (readRecords(ws, "task", {
+        onError: partial ? (error) => warnings.push(error.message) : undefined,
+      }).filter((row) => row.status === "open") as Task[]);
   for (const task of openTasks) {
     if (!task.project) continue;
     const group = tasks.get(task.project) ?? [];
@@ -59,7 +63,7 @@ export function readProjectsPage(
   const today = localDate(now, ws.timeZone());
   const projects = loaded
     ? loaded.projects.filter((project) => !slug || project.slug === slug)
-    : listProjects(ws, { slug, now, partial: true });
+    : listProjects(ws, { slug, now, partial });
   return projects.map((project) => {
     const next = [...project.next];
     for (const task of tasks.get(project.slug) ?? []) {
@@ -84,13 +88,13 @@ export function readProjectsPage(
   });
 }
 
-export function readProjectPage(ws: Workspace, slug: string) {
-  const project = projectSnapshot(ws, slug, true);
-  const summary = readProjectsPage(ws, slug).find((item) => item.slug === slug);
+export function readProjectPage(ws: Workspace, slug: string, options: { partial?: boolean } = {}) {
+  const project = projectSnapshot(ws, slug, options.partial);
+  const summary = readProjectsPage(ws, { slug, ...options }).find((item) => item.slug === slug);
   if (!summary) throw new KaituError("找不到项目", "NOT_FOUND");
   const warnings = [...summary.warnings];
   const metrics = readRecords(ws, "project_metric", {
-    onError: (error) => warnings.push(error.message),
+    onError: options.partial ? (error) => warnings.push(error.message) : undefined,
   }).filter((row) => row.project === slug);
   const architecture = `${projectDirectory(ws, slug)}/architecture.html`;
   return {
@@ -132,8 +136,6 @@ export function validateProjectGoal(input: ProjectGoal): ProjectGoal {
 
 export async function saveProjectGoal(ws: Workspace, slug: string, input: ProjectGoal) {
   const goal = validateProjectGoal(input);
-  readProject(ws, slug);
-  readRecords(ws, "project_metric");
   const project = readProjectPage(ws, slug);
   const words = project.metrics.filter((row) => row.kind === "words").at(-1);
   if (goal.unit === "字" && words) goal.current = words.value;

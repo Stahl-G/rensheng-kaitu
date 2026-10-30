@@ -1,11 +1,16 @@
 import { rmSync, writeFileSync } from "node:fs";
 import { expect, it, vi } from "vitest";
+import { suggestProjectGoal } from "../../cli/src/ui/project-ai.js";
 import {
   addRecord,
   createProject,
   deferSnapshots,
   financeOverview,
+  generateDirectionMap,
   lifeMap,
+  projectGithub,
+  readDirectionMap,
+  readExploration,
   readHealthPage,
   readLearning,
   readLibrary,
@@ -16,6 +21,7 @@ import {
   readRecords,
   readWorkbench,
   saveProjectGoal,
+  setProject,
   startLearning,
   syncProject,
   updateRecord,
@@ -106,6 +112,21 @@ it("isolates damaged project, footprint, health and finance files without allowi
   try {
     const good = await createProject(ws, { title: "Readable project", kind: "personal" });
     const bad = await createProject(ws, { title: "Broken project", kind: "personal" });
+    await setProject(ws, good.slug, { github: { repo: "synthetic/project" } });
+    const github = addRecord(ws, "github_snapshot", {
+      project: good.slug,
+      repo: "synthetic/project",
+      stars: 1,
+      forks: 0,
+      open_issues: 0,
+      open_prs: 0,
+      default_branch: "main",
+      archived: false,
+      pushed_at: null,
+      latest_release: null,
+      commits: [],
+      ci: { state: "none", run_at: null, url: null },
+    });
     const file = `projects/${bad.slug}/STATUS.md`;
     const original = ws.readText(file);
     const broken = "---\ntitle: [broken\n---\nOriginal project body\n";
@@ -139,16 +160,29 @@ it("isolates damaged project, footprint, health and finance files without allowi
       protein_g: 5,
       source: "manual",
     });
-    const files = [metric.file, workout.file, account.file, experience.file, meal.file];
+    const files = [metric.file, workout.file, account.file, experience.file, meal.file, github.file];
     const before = new Map(files.map((file) => [file, ws.readText(file)]));
     for (const file of files) ws.appendLine(file, '{"broken":');
-    const projects = readProjectsPage(ws);
+    const projects = readProjectsPage(ws, { partial: true });
     expect(projects.find((row) => row.slug === bad.slug)?.error).toBe(file);
     expect(projects.find((row) => row.slug === good.slug)?.title).toBe("Readable project");
-    const detail = readProjectPage(ws, good.slug);
+    const detail = readProjectPage(ws, good.slug, { partial: true });
     expect(detail.metrics[0]?.value).toBe(12);
     expect(detail.warnings.some((warning) => warning.includes(metric.file))).toBe(true);
-    expect(readProjectPage(ws, bad.slug).body).toBe(broken);
+    expect(detail.github?.latest?.stars).toBe(1);
+    expect(detail.warnings.some((warning) => warning.includes(github.file))).toBe(true);
+    expect(readWorkbench(ws).projects.map((project) => project.slug)).toContain(good.slug);
+    expect(() => projectGithub(ws, good.slug)).toThrow("记录格式不合法");
+    expect(readProjectPage(ws, bad.slug, { partial: true }).body).toBe(broken);
+    const directions = readExploration(ws, { partial: true });
+    expect(directions.references.projects.map((project) => project.id)).toContain(good.slug);
+    expect(directions.references.projects.map((project) => project.id)).not.toContain(bad.slug);
+    expect(directions.warnings?.some((warning) => warning.includes(metric.file))).toBe(true);
+    expect(readDirectionMap(ws).input?.projects.map((project) => project.slug)).toContain(good.slug);
+    const ask = vi.fn();
+    expect(() => generateDirectionMap(ws, ask)).toThrow("记录格式不合法");
+    expect(ask).not.toHaveBeenCalled();
+    await expect(suggestProjectGoal(ws, good.slug)).rejects.toMatchObject({ code: "CORRUPT" });
     ws.appendLine(
       meal.file,
       JSON.stringify({ ...meal.record, id: "01K00000000000000000000000", items: null }),
@@ -185,6 +219,14 @@ it("isolates damaged project, footprint, health and finance files without allowi
     expect(readProjectsPage(ws).find((row) => row.slug === bad.slug)?.error).toBeUndefined();
     expect(lifeMap(ws).warnings).toEqual([]);
     expect(financeOverview(ws).warnings).toBeUndefined();
+    await writePhoneSnapshots(ws, new Date("2026-10-30T12:00:00Z"), { force: true });
+    const phoneMap = ws.readText("phone/map.json");
+    ws.appendLine(github.file, '{"broken":');
+    await expect(writePhoneSnapshots(ws, new Date("2026-10-31T12:00:00Z"), { force: true })).rejects.toThrow(
+      "phone/map.json",
+    );
+    expect(ws.readText("phone/map.json")).toBe(phoneMap);
+    ws.writeText(github.file, before.get(github.file) as string);
     addRecord(ws, "project_metric", { project: good.slug, kind: "commits", value: 10 });
     addRecord(ws, "project_metric", { project: good.slug, kind: "commits", value: 20 });
     const invalidMetric = ws.readText(metric.file).replace('"value":20', '"value":"20"');

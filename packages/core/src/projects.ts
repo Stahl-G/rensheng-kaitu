@@ -233,7 +233,11 @@ export function listProjects(
         links: project.data.links,
         progress: project.data.progress ?? null,
         next: project.data.next ?? [],
-        github: project.error ? null : projectGithub(ws, slug, now),
+        github: project.error
+          ? null
+          : projectGithub(ws, slug, now, {
+              onError: options.partial ? (error) => warnings.push(error.message) : undefined,
+            }),
         completion: project.data.progress
           ? {
               done: project.data.progress.current,

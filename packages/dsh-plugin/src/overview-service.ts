@@ -648,7 +648,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("exploration")
   async exploration(): Promise<ExplorationData> {
-    return readExploration(this.workspace);
+    return readExploration(this.workspace, { partial: true });
   }
   @Remote("explorationWrite")
   async explorationWrite(command: ExplorationCommand): Promise<{ id: string; version: string | null }> {
@@ -806,12 +806,12 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("projects")
   async projects(): Promise<DoingProject[]> {
-    return readProjectsPage(this.workspace);
+    return readProjectsPage(this.workspace, { partial: true });
   }
 
   @Remote("projectDetail")
   async projectDetail(slug: string): Promise<ProjectDetailData> {
-    return readProjectPage(this.workspace, slug);
+    return readProjectPage(this.workspace, slug, { partial: true });
   }
 
   @Remote("projectCreate")
