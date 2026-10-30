@@ -390,12 +390,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);
   }
-  function changedFile(file: string) {
+  function changedFile(file: string, invalidateHome = true) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
     invalidateHistoryFile(ws, file);
     invalidateLifeAtlas(ws, file);
-    home.invalidate();
+    if (invalidateHome) home.invalidate();
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
@@ -1046,7 +1046,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   // 启动前已有的改动也走后台保存；与提交共用一次盘点，不另做全量查找。
   setImmediate(() => {
     if (closed) return;
-    changedFile("工作区");
+    // createHomeCache already checked the persisted projection against the current originals.
+    changedFile("工作区", false);
     scheduleInbox();
   });
   const url = `http://127.0.0.1:${port}`;

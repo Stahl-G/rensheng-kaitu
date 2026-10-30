@@ -34,10 +34,22 @@ const inside = (root: string, path: string) => {
 };
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 
+function canonicalDestination(path: string): string {
+  let parent = path;
+  for (;;) {
+    try {
+      return resolve(realpathSync(parent), relative(parent, path));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT" || dirname(parent) === parent) throw error;
+      parent = dirname(parent);
+    }
+  }
+}
+
 export function projectionDirectory(input: ProjectionInputs): string | undefined {
   const base = resolve(localStateRoot(), "cache", "projections");
   // An explicitly configured local-state path may be inside a workspace; never cache there.
-  if (inside(realpathSync(input.root), base)) return;
+  if (inside(realpathSync(input.root), canonicalDestination(base))) return;
   return join(base, digest(`${realpathSync(input.root)}\0${realpathSync(input.state)}`));
 }
 
