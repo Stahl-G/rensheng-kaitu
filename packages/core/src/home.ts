@@ -4,7 +4,10 @@ import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-type Overview = Awaited<ReturnType<typeof readOverviewPage>>;
+type Overview = Pick<
+  Awaited<ReturnType<typeof readOverviewPage>>,
+  "today" | "timeZone" | "plans" | "metrics" | "versions" | "proposedTasks" | "warnings"
+>;
 type Projects = ReturnType<typeof readProjectsPage>;
 type LearningStatus = WorkbenchData["statuses"][number];
 
@@ -19,8 +22,9 @@ export interface HomeSources {
  * The workbench-derived inputs share one read and one timestamp. File I/O outside that read is not a filesystem transaction.
  */
 export async function readHomeSources(ws: Workspace, now = new Date()): Promise<HomeSources> {
-  const data = readWorkbench(ws, now);
-  const overview = await readOverviewPage(ws, now, data);
+  // Home has no raw-note or memory list; keep those reads in the full overview.
+  const data = readWorkbench(ws, now, false, true);
+  const overview = await readOverviewPage(ws, now, data, false);
   return {
     overview,
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
