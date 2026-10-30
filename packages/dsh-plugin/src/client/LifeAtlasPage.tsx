@@ -249,7 +249,6 @@ export function LifeAtlasPage({
         <legend>
           {t("选择入图的模块", "Choose areas to map")} · {selected.length}/12
         </legend>
-        <p>{t("前两个区域靠近中心。", "The first two areas sit near the center.")}</p>
         <div className={css.modules}>
           {state?.modules.map((m) => (
             <label key={m.id}>
@@ -299,12 +298,7 @@ export function LifeAtlasPage({
           </ol>
         )}
         {!state?.modules.length && !state?.loading && (
-          <p>
-            {t(
-              "还没有可入图的模块。先在「全部模块」或资料里选择关注的领域。",
-              "No areas are available yet. Choose your interests in All modules or add records first.",
-            )}
-          </p>
+          <p>{t("还没有可入图的模块。", "No areas are available yet.")}</p>
         )}
       </fieldset>
       <fieldset disabled={state?.running}>
@@ -384,7 +378,6 @@ export function LifeAtlasPage({
               ? t("生成新方案并保存", "Generate and save a candidate")
               : t("生成我的地图", "Generate my map")}
         </button>
-        <small>{t("每次生成都会存档。", "Every candidate is saved.")}</small>
       </fieldset>
     </div>
   );
@@ -396,14 +389,6 @@ export function LifeAtlasPage({
           <h2>
             {resource ? t("我的人生地图", "My life map") : t("生成你的人生地图", "Create your life map")}
           </h2>
-          <p>
-            {resource
-              ? t("移到区域上查看，点击后展开资料。", "Hover to explore; click a region for its records.")
-              : t(
-                  "从你关心的模块开始，让资料逐渐成图。",
-                  "Start with the areas you care about. Let your records fill the map.",
-                )}
-          </p>
         </div>
         {resource && (
           <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
@@ -431,7 +416,7 @@ export function LifeAtlasPage({
       {(state?.loading || state?.running) && (
         <output className={css.status}>
           {state.running
-            ? t("正在绘制地形，完成后会自动存档…", "Drawing terrain; the result will be saved automatically…")
+            ? t("正在绘制地形…", "Drawing terrain…")
             : t("正在更新模块资料…", "Refreshing module records…")}
           {state.running && <progress max="1" value={state.progress} />}
         </output>
@@ -610,7 +595,6 @@ export function LifeAtlasPage({
                 <output className={css.hover}>
                   <strong>{detail.title}</strong>
                   <span>{detail.facts[0]?.title ?? t("资料待补充", "No details yet")}</span>
-                  <small>{t("点击展开资料", "Click to open records")}</small>
                 </output>
               )}
             </div>
@@ -671,12 +655,6 @@ export function LifeAtlasPage({
       {history && (
         <section className={css.history} aria-label={t("地图存档", "Map history")}>
           <h3>{t("地图存档", "Map history")}</h3>
-          <p>
-            {t(
-              "旧地图显示最新资料。移除可恢复；永久删除后释放存档空间。",
-              "Older maps show current records. Removed maps can be restored; permanent deletion frees storage.",
-            )}
-          </p>
           {state?.storage && (
             <p>
               {state.storage.count}/{state.storage.maxCount} · {(state.storage.bytes / 1024 ** 2).toFixed(1)}{" "}

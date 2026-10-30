@@ -1213,22 +1213,11 @@ export function AskPage({
                   {t("用其他 AI 整理", "Organize with another AI")}
                 </button>
               )}
-              {!autoSubmit && (
-                <p>
-                  {t(
-                    "开图本身不带 AI。接上以后，问问只读你允许的那部分资料来回答；每次发出去的内容都写在输入框下面。",
-                    "Kaitu does not include an AI. Once connected, Ask reads the data you allow; the details appear below the composer before you send.",
-                  )}
-                </p>
-              )}
               <section className={css.routes} aria-label={t("接 AI 的方式", "Ways to connect AI")}>
                 <div>
                   <span>
                     <strong>{t("填一个 DeepSeek Key", "Add a DeepSeek key")}</strong>{" "}
-                    <small>{t("推荐新手", "Good for starters")}</small>
-                    <p>
-                      {t("用自己的 Key 连接，按用量付费。", "Connect with your own key and pay for usage.")}
-                    </p>
+                    <small>{t("按用量付费", "Usage-based billing")}</small>
                   </span>
                   <button type="button" className={css.routePrimary} onClick={connectKey}>
                     {t("去填 Key", "Add a key")}
@@ -1237,12 +1226,6 @@ export function AskPage({
                 <div>
                   <span>
                     <strong>{t("用这台电脑上已经有的 AI", "Use AI already on this computer")}</strong>
-                    <p>
-                      {t(
-                        "装了 Claude Code 或 Codex 的话，可以直接接上。",
-                        "Connect an installed Agent such as Claude Code or Codex.",
-                      )}
-                    </p>
                   </span>
                   <button type="button" onClick={checkLocal}>
                     {t("去设置", "Open settings")}
@@ -1251,12 +1234,6 @@ export function AskPage({
                 <div>
                   <span>
                     <strong>{t("先不接", "Not now")}</strong>
-                    <p>
-                      {t(
-                        "记录、原文、日程、足迹、健康都照常能用。",
-                        "Notes, originals, calendar, footprints and health remain available.",
-                      )}
-                    </p>
                   </span>
                   <button type="button" disabled={!onToday} onClick={onToday}>
                     {t("回到今天", "Back to Today")}

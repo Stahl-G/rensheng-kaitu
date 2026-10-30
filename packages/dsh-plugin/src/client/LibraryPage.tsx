@@ -171,12 +171,6 @@ export function LibraryPage({
   return (
     <div className={styles.page}>
       <div className={styles.heading}>
-        <p>
-          {t(
-            "你留下的原文，和从中整理出的东西。原文永远保留。",
-            "What you've saved, and what Kaitu organized from it. Originals are always kept.",
-          )}
-        </p>
         <input
           type="search"
           value={query}
@@ -308,14 +302,6 @@ export function LibraryPage({
             · {away.returnedAt.slice(0, 16).replace("T", " ")}
           </p>
         )}
-        {items.length === 0 && (
-          <p>
-            {t(
-              "所有进来的东西都先放在这里，整理好再分到下面各类。",
-              "Everything arrives here first, then is organized into the categories below.",
-            )}
-          </p>
-        )}
         {items.slice(0, 3).map((item) => (
           <button type="button" className={styles.row} key={item.file} onClick={() => onOpenOriginal(item)}>
             <time className={styles.meta}>{item.date?.slice(0, 10) ?? ""}</time>
@@ -412,27 +398,27 @@ export function LibraryPage({
         {data?.sections
           .filter((section) => section.id !== "inbox")
           .map((section) => (
-            <button
-              type="button"
-              className={styles.category}
-              key={section.id}
-              style={tones[section.id]}
-              onClick={() => open(section.id)}
-            >
-              <strong className={styles.title}>
-                <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
-                {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-              </strong>
-              <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
-                {section.count ?? "—"}
-              </span>
-              <span className={styles.meta}>
-                {section.count === 0 && hints[section.id]
-                  ? t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")
-                  : section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
-              </span>
+            <article className={styles.category} key={section.id} style={tones[section.id]}>
+              <button type="button" className={styles.categoryOpen} onClick={() => open(section.id)}>
+                <strong className={styles.title}>
+                  <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
+                  {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+                </strong>
+                <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
+                  {section.count ?? "—"}
+                </span>
+              </button>
+              {section.count === 0 && hints[section.id] ? (
+                <button type="button" className={css.link} onClick={() => open(section.id)}>
+                  {t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")}
+                </button>
+              ) : section.sources.length > 0 ? (
+                <span className={styles.meta}>
+                  {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
+                </span>
+              ) : null}
               {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
-            </button>
+            </article>
           ))}
         {onAdd && (
           <button
@@ -444,7 +430,6 @@ export function LibraryPage({
               <span className={styles.icon}>{icon(<path d="M12 5v14M5 12h14" />)}</span>
               {t("添加一类", "Add a category")}
             </strong>
-            <span className={styles.meta}>{t("比如工作与求职", "For example, work and jobs")}</span>
           </button>
         )}
         {!data && <output>{t("正在读取资料…", "Loading…")}</output>}

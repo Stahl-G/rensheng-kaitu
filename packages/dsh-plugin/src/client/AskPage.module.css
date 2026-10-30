@@ -668,12 +668,6 @@ output.progress,
   font-size: 32px;
   margin-bottom: 12px;
 }
-.noKey > p {
-  color: var(--ink2);
-  line-height: 1.7;
-  max-width: 560px;
-  margin: 0 auto;
-}
 .routes {
   margin: 28px 0;
   padding: 8px 24px;
@@ -693,12 +687,6 @@ output.progress,
 }
 .routes span {
   flex: 1;
-}
-.routes p {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
-  margin: 6px 0 0;
 }
 .routes small {
   display: inline-block;

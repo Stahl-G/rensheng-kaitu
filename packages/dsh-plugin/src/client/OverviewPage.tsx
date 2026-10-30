@@ -1189,6 +1189,7 @@ function Overview({
               builtin={builtinAi}
               initialSource={guideSource}
               initialText={guideText}
+              workspaceRoot={workspaceRoot}
               setStep={setGuide}
               onStatus={setOnboarding}
               refresh={refresh}
