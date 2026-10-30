@@ -167,13 +167,9 @@ export function publishPhoneSnapshots(
   if (errors.length) throw new AggregateError(errors, errors.map((error) => error.message).join("；"));
   if (before && cacheable) {
     try {
-      const manifest = withHistoryInputs(projectionManifest(input), prepared.historyInputs);
-      if (
-        manifest &&
-        prepared.historyInputs &&
-        projectionUnchanged(input, prepared.historyInputs) &&
-        JSON.stringify(before) === JSON.stringify(manifest)
-      ) {
+      // The captured directory fingerprints already detect additions and removals.
+      // Recheck these sources once; do not enumerate and reread our own cache after publication.
+      if (projectionUnchanged(input, before)) {
         const expiry = Math.min(
           prepared.expires ?? Number.POSITIVE_INFINITY,
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
@@ -186,14 +182,13 @@ export function publishPhoneSnapshots(
             return [path, projectionFingerprint(path)];
           }),
         };
-        writeProjection(input, "phone", {
-          manifest,
+        const saved = writeProjection(input, "phone", {
+          manifest: before.map(([path, stamp]) => [path, stamp]),
           value,
           timeZone: prepared.timeZone,
           day: prepared.day,
           expires: Number.isFinite(expiry) ? expiry : null,
         });
-        const saved = readProjection<Published>(input, "phone", now);
         if (saved) published.set(ws, saved);
       }
     } catch {

@@ -228,18 +228,20 @@ export function writeProjection<T>(
   input: ProjectionInputs,
   name: string,
   data: Pick<Projection<T>, "value" | "timeZone" | "day" | "expires" | "manifest">,
-): void {
+): Projection<T> | undefined {
   const directory = projectionDirectory(input);
   if (!directory) return;
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const actual = realpathSync(directory);
   if (inside(realpathSync(input.root), actual) || !inside(realpathSync(localStateRoot()), actual)) return;
-  const content = JSON.stringify({ version, ...input, ...data });
+  const saved = { version, ...input, ...data };
+  const content = JSON.stringify(saved);
   const path = join(directory, `${name}.json`);
   const temp = join(dirname(path), `.${name}.${randomUUID()}.tmp`);
   try {
     writeFileSync(temp, JSON.stringify({ checksum: digest(content), content }), { mode: 0o600, flag: "wx" });
     renameSync(temp, path);
+    return saved;
   } finally {
     rmSync(temp, { force: true });
   }

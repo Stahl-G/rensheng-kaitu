@@ -83,7 +83,7 @@ export class Workspace {
   private cloud = false;
   private unread = new Set<string>();
   /** 按文件状态缓存的解析结果，见 scanParsed。 */
-  private parsed = new Map<string, { stamp: string; value: unknown }>();
+  private parsed = new Map<string, { stamp: string; text: string; values: Map<string, unknown> }>();
   private zone: { stamp: string; timeZone: string } | null = null;
 
   get isICloud(): boolean {
@@ -214,18 +214,22 @@ export class Workspace {
    */
   scanParsed<T>(rel: string, kind: string, parse: (text: string) => T): T | undefined {
     if (this.conflictCopy(rel) || placeholderName(rel)) return;
-    const key = `${kind}\0${rel}`;
     const stamp = this.stableStamp(rel);
-    const hit = this.parsed.get(key);
-    if (stamp && hit?.stamp === stamp) return hit.value as T;
-    const text = this.scanText(rel);
+    const previous = this.parsed.get(rel);
+    const hit = stamp && previous?.stamp === stamp ? previous : undefined;
+    if (hit?.values.has(kind)) return hit.values.get(kind) as T;
+    // Different projections may parse the same document, but share its unchanged source text.
+    const text = hit?.text ?? this.scanText(rel);
     if (text === undefined) {
-      this.parsed.delete(key);
+      this.parsed.delete(rel);
       return;
     }
     const value = parse(text);
-    if (stamp) this.parsed.set(key, { stamp, value });
-    else this.parsed.delete(key);
+    if (stamp) {
+      const entry = hit ?? { stamp, text, values: new Map<string, unknown>() };
+      entry.values.set(kind, value);
+      this.parsed.set(rel, entry);
+    } else this.parsed.delete(rel);
     return value;
   }
 
