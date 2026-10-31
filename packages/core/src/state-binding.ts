@@ -52,6 +52,14 @@ function bindingFile(root: string): string {
     `${createHash("sha256").update(canonical(root)).digest("hex")}.json`,
   );
 }
+
+function writeBinding(file: string, content: string | Buffer) {
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  const temp = `${file}.${randomUUID()}.tmp`;
+  writeFileSync(temp, content, { mode: 0o600 });
+  renameSync(temp, file);
+}
+
 export function setStateBinding(
   root: string,
   state: string,
@@ -70,12 +78,35 @@ export function setStateBinding(
     mode,
     ...(old?.mediaRoot ? { mediaRoot: old.mediaRoot } : {}),
   };
-  mkdirSync(join(localStateRoot(), "workspaces"), { recursive: true, mode: 0o700 });
-  const temp = `${file}.${randomUUID()}.tmp`;
-  writeFileSync(temp, JSON.stringify(binding), { mode: 0o600 });
-  renameSync(temp, file);
+  writeBinding(file, JSON.stringify(binding));
   return binding;
 }
+
+/** Register before moving originals; a failed move restores the exact prior registration. */
+export function moveWithStateBinding(
+  root: string,
+  state: string,
+  mode: Binding["mode"],
+  identity: string,
+  move: () => void,
+): void {
+  const file = bindingFile(root);
+  const previous = existsSync(file) ? readFileSync(file) : undefined;
+  // A failed atomic registration must leave the physical workspace untouched.
+  setStateBinding(root, state, mode, identity);
+  try {
+    move();
+  } catch (error) {
+    try {
+      if (previous === undefined) rmSync(file, { force: true });
+      else writeBinding(file, previous);
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], "迁移失败，状态登记回滚也失败", { cause: error });
+    }
+    throw error;
+  }
+}
+
 /** Per-device media selection stays in the existing local workspace registry. */
 export function setMediaRootBinding(root: string, mediaRoot: string): void {
   const binding = { ...stateBinding(root), mediaRoot };
