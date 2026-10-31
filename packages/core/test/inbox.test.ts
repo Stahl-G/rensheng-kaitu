@@ -1,6 +1,8 @@
 import { rmSync } from "node:fs";
+import { join } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { expect, it } from "vitest";
+import * as packaged from "../dist/index.js";
 import {
   history,
   inboxNotes,
@@ -12,7 +14,38 @@ import {
   readStatus,
   validateWorkspace,
 } from "../src/index.js";
-import { clonedWorkspace, workout } from "./helpers.js";
+import { clonedWorkspace, tmp, workout } from "./helpers.js";
+
+it("构建产物导入合法新闻与趋势，仍拒绝损坏的嵌套字段", async () => {
+  const root = tmp();
+  const ws = await packaged.initWorkspace(join(root, "workspace"), { timeZone: "UTC" });
+  const post = { url: "https://example.invalid/post", text: "Synthetic source post" };
+  const news = {
+    type: "news_item",
+    title: "Synthetic packaged news",
+    url: "https://example.invalid/news",
+    source: "Synthetic publisher",
+    via: "rss",
+    status: "new",
+    kind: "x_post",
+    post,
+  };
+  const trend = { type: "trend", topic: "Synthetic packaged trend", via: "user", samples: [post] };
+  const file = "inbox/agents/packaged.records.jsonl";
+  try {
+    ws.writeText(file, `${[news, trend].map((row) => JSON.stringify(row)).join("\n")}\n`);
+    expect(await packaged.processInbox(ws, { stableMs: 0 })).toMatchObject({ processed: [file], notes: [] });
+    expect(packaged.readRecords(ws, "news_item")).toMatchObject([{ title: news.title, post }]);
+    expect(packaged.readRecords(ws, "trend")).toMatchObject([{ topic: trend.topic, samples: [post] }]);
+    const invalid = JSON.stringify({ ...news, url: "https://example.invalid/bad", post: { url: "invalid" } });
+    ws.writeText("inbox/agents/invalid.records.jsonl", `${invalid}\n`);
+    expect((await packaged.processInbox(ws, { stableMs: 0 })).notes).toHaveLength(1);
+    expect(packaged.readRecords(ws, "news_item")).toHaveLength(1);
+    expect(packaged.inboxNotes(ws).some((note) => note.content.includes(invalid))).toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 it("四种收件箱各一个带来源版本，混合记录保留合法行与错误笔记，未稳定文件留到下一轮", async () => {
   const ws = await clonedWorkspace();
