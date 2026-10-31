@@ -383,7 +383,7 @@ function DashboardChart({
         )}
         {range && (
           <span data-kind="range">
-            Q1–Q3 {number(range.q1)}–{number(range.q3)} {unit}
+            {t("中间一半", "Middle half")} {number(range.q1)}–{number(range.q3)} {unit}
           </span>
         )}
       </div>
@@ -428,7 +428,7 @@ function SleepStages({ night, time }: { night: Dashboard["sleep"][number]; time:
           const minutes = night.stageMinutes?.[stage as keyof typeof names];
           return minutes == null || minutes <= 0 ? null : (
             <span key={stage} data-stage={stage}>
-              {name} {number(minutes)} min
+              {name} {number(minutes)} {t("分钟", "min")}
             </span>
           );
         })}
