@@ -89,8 +89,12 @@ export function listRecordTypes(ws: Workspace): RecordTypeRef[] {
   return out;
 }
 
-export function findRecordType(ws: Workspace, type: string): RecordTypeRef {
-  const hits = listRecordTypes(ws).filter((r) => r.type === type);
+export function findRecordType(
+  ws: Workspace,
+  type: string,
+  types: readonly RecordTypeRef[] = listRecordTypes(ws),
+): RecordTypeRef {
+  const hits = types.filter((r) => r.type === type);
   if (hits.length === 0) throw new KaituError(`没有模块定义记录类型「${type}」`, "UNKNOWN_TYPE");
   if (hits.length > 1) {
     throw new KaituError(
