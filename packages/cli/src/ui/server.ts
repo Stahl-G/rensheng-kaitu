@@ -300,11 +300,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
+  // 与下面的 startPhoneSnapshots 必须紧邻、同步；其他后台写入在两者之后启动。
   const home = createHomeCache(ws, notify, {
     write: exclusive,
     report: () => reportError(),
     shareStartupChecks: phoneReadable(ws),
   });
+  // 共享检查只限本次同步启动窗口；微任务后读数失效，后续检查重新读取原件。
   const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive, home.startupChecks);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
