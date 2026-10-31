@@ -376,8 +376,14 @@ export interface ReadOptions {
   to?: string;
 }
 
-export function readRecords(ws: Workspace, type: string, opts: ReadOptions = {}): StoredRecord[] {
-  const ref = findRecordType(ws, type);
+/** A caller reading several types may share the type list resolved at that read's entry. */
+export function readRecords(
+  ws: Workspace,
+  type: string,
+  opts: ReadOptions = {},
+  types?: readonly RecordTypeRef[],
+): StoredRecord[] {
+  const ref = findRecordType(ws, type, types);
   const tz = ws.timeZone();
   const day = (r: StoredRecord) => isoInZone(parseTs(r.ts), tz).slice(0, 10);
   // 排序前把时间各解析一次，不在比较函数里反复解析。
