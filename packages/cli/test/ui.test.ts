@@ -221,6 +221,7 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
   const { ws, ui } = await setup();
+  const started = performance.now();
   const post = (path: string, body: unknown) =>
     fetch(`${ui.url}${path}`, {
       method: "POST",
@@ -238,12 +239,36 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rmSync(folder, { recursive: true, force: true });
       rmSync(back, { recursive: true, force: true });
     });
+    const beforeEnable = ws.root;
+    const enableSent = performance.now() - started;
     const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
+    const enableReturned = performance.now() - started;
+    const enabledBody = await enabled.json();
+    const enablePhase = {
+      route: enable,
+      sent: enableSent,
+      returned: enableReturned,
+      rootChanged: ws.root !== beforeEnable,
+      atTarget: ws.root === join(folder, "kaitu-ai-memory"),
+    };
+    expect(enabled.status, JSON.stringify({ ...enablePhase, response: enabledBody })).toBe(200);
+    expect(enabledBody.mode).toBe("drive");
+    const beforeDisable = ws.root;
+    const disableSent = performance.now() - started;
     const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
+    const disableReturned = performance.now() - started;
+    const disabledBody = await disabled.json();
+    const disablePhase = {
+      route: disable,
+      sent: disableSent,
+      returned: disableReturned,
+      rootChanged: ws.root !== beforeDisable,
+      atTarget: ws.root === join(back, "kaitu"),
+    };
+    const diagnostic = JSON.stringify({ enable: enablePhase, disable: disablePhase });
+    process.stderr.write(`Sync transition diagnostic ${diagnostic}\n`);
+    expect(disabled.status, JSON.stringify({ ...disablePhase, response: disabledBody })).toBe(200);
+    expect(disabledBody.mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
   }
 });
