@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { initWorkspace, isTracked, snapshotNow } from "@kaitu/core";
+import { createHomeCache, initWorkspace, isTracked, snapshotNow } from "@kaitu/core";
 import { expect, it, vi } from "vitest";
 import { startUi } from "../src/ui/server.js";
 
@@ -39,6 +39,19 @@ it("saving a version does not delay a new capture, and closing flushes both orig
     return (await response.json()) as { path: string };
   };
   try {
+    await expect
+      .poll(
+        async () => {
+          const response = await fetch(`${ui.url}/api/product/home`, {
+            method: "POST",
+            headers: { "X-Kaitu": "1", Origin: ui.url },
+            body: "[]",
+          });
+          return ((await response.json()) as { loading: boolean }).loading;
+        },
+        { timeout: 15000 },
+      )
+      .toBe(false);
     const first = await capture("Synthetic original A");
     await saving;
     let saved = false;
@@ -58,6 +71,12 @@ it("saving a version does not delay a new capture, and closing flushes both orig
     resume();
     await closing;
     for (const file of [first.path, second.path]) expect(await isTracked(ws, file)).toBe(true);
+    const reopened = createHomeCache(ws, () => {});
+    try {
+      expect(reopened.read()).toMatchObject({ loading: false, error: null });
+    } finally {
+      await reopened.close();
+    }
   } finally {
     resume();
     await (closing ?? ui.close());

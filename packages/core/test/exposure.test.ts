@@ -1,7 +1,8 @@
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
+import { agentReadFilter } from "../src/exposure.js";
 import {
   addMemory,
   addRecord,
@@ -90,5 +91,39 @@ it("每份资料包按本次选择加入财务摘要，连接开关和敏感记�
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("a navigation scan resolves every target and a new scan observes changed roots", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-navigation-boundary-"));
+  const outside = mkdtempSync(join(tmpdir(), "kaitu-navigation-outside-"));
+  try {
+    const ws = await initWorkspace(root);
+    ws.writeText("learning/note.md", "Synthetic note");
+    ws.writeText("finance/note.md", "Synthetic finance");
+    writeFileSync(join(outside, "note.md"), "Outside");
+    symlinkSync(ws.resolve("learning/note.md"), join(root, "alias.md"));
+    const canRead = agentReadFilter(ws, { id: "handover", finance: false });
+    expect(canRead("alias.md")).toBe(true);
+    for (const target of [
+      join(outside, "note.md"),
+      ws.resolve("finance/note.md"),
+      ws.resolve(".kaitu/config.json", { internal: true }),
+    ]) {
+      rmSync(join(root, "alias.md"));
+      symlinkSync(target, join(root, "alias.md"));
+      expect(canRead("alias.md")).toBe(false);
+    }
+    rmSync(join(root, "alias.md"));
+    symlinkSync(join(outside, "missing.md"), join(root, "alias.md"));
+    expect(canRead("alias.md")).toBe(false);
+    ws.root = outside;
+    expect(agentReadFilter(ws, { id: "handover", finance: false })("note.md")).toBe(true);
+    expect(agentReadFilter(ws, { id: "handover", finance: false })(join(root, "learning/note.md"))).toBe(
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });

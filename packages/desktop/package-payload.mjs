@@ -20,6 +20,7 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json"));
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
+  cpSync(join(root, "packages/core/dist/validators"), join(payload, "dist/validators"), { recursive: true });
   writeFileSync(
     join(payload, "payload.json"),
     JSON.stringify({ version: payloadVersion, dshVersion, hostApi: HOST_API }),
@@ -146,16 +147,8 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
     banner: { js: nodeBanner },
     external: ["better-sqlite3"],
   });
-  await build({
-    entryPoints: [join(root, "packages/core/dist/home-worker.js")],
-    outfile: join(payload, "dist/home-worker.js"),
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: "node22",
-    banner: { js: nodeBanner },
-    external: ["better-sqlite3"],
-  });
+  for (const name of ["home-worker", "phone-worker"])
+    cpSync(join(root, `packages/core/dist/${name}.js`), join(payload, `dist/${name}.js`));
   await bundleCartographerWorker(payload, "dist", target);
   mkdirSync(join(payload, "licenses"), { recursive: true });
   cpSync(join(root, "LICENSE"), join(payload, "licenses", "kaitu.txt"));

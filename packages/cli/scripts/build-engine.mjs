@@ -9,6 +9,7 @@ const { build } = createRequire(join(root, "packages/dsh-plugin/package.json"))(
 const output = join(root, "packages/cli/dist/engine");
 const desktop = join(root, "packages/desktop");
 mkdirSync(output, { recursive: true });
+cpSync(join(root, "packages/core/dist/validators"), join(output, "validators"), { recursive: true });
 for (const [name, entry] of Object.entries({
   service: join(root, "packages/cli/runtime/service.mjs"),
   "mcp-stdio": join(root, "packages/cli/dist/local-agents/mcp-stdio.js"),
@@ -42,15 +43,5 @@ cpSync(join(root, "packages/core/data"), join(root, "packages/cli/dist/data"), {
 
 await bundleCartographerWorker(output, ".");
 
-await build({
-  entryPoints: [join(root, "packages/core/dist/home-worker.js")],
-  outfile: join(output, "home-worker.js"),
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node22",
-  external: ["better-sqlite3"],
-  banner: {
-    js: 'import { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
-  },
-});
+for (const name of ["home-worker", "phone-worker"])
+  cpSync(join(root, `packages/core/dist/${name}.js`), join(output, `${name}.js`));

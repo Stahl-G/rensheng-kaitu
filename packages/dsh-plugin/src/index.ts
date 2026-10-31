@@ -31,10 +31,10 @@ export const inject = ["tools", "systemPrompt", "skills", "typert"];
 export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   if (config.workspace !== undefined && !isAbsolute(config.workspace))
     throw new Error("workspace 必须是绝对路径");
-  let ws = new Workspace(config.workspace ?? defaultRoot());
+  let ws = new Workspace(config.workspace ?? defaultRoot(), { deferOverview: true });
   if (!ws.exists(".kaitu/config.json") && ws.exists("WORKSPACE-MOVED.md")) {
     const target = /^当前位置：(.+)$/m.exec(ws.readText("WORKSPACE-MOVED.md"))?.[1];
-    if (target && isAbsolute(target)) ws = new Workspace(target);
+    if (target && isAbsolute(target)) ws = new Workspace(target, { deferOverview: true });
   }
   if (!ws.exists(".kaitu/config.json")) {
     ws = await initWorkspace(ws.root, { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
@@ -53,7 +53,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   ctx.effect(() => startWorkspaceBackup(ws));
   ctx.effect(() => startProjectGithubSync(ws));
   ctx.effect(() => startWeatherSync().stop);
-  ctx.effect(() => startPhoneSnapshots(ws));
+  ctx.effect(() => startPhoneSnapshots(ws, (error) => ctx.logger.warn(String(error)), queue));
   collectors.start();
   ctx.effect(() => () => collectors.stop());
   ctx.effect(() => startCalendarLoop(ws, queue));

@@ -120,9 +120,12 @@ it("暂不提交的外部原文在下一次显式后台保存时一并进入版�
   expect(await snapshotNow(ws, () => null, undefined, { changedOnly: true })).toBeNull();
   expect(await isTracked(ws, external)).toBe(false);
   ws.writeText(own, "合成用户原文\n");
+  ws.writeText("inbox/notes/2026-10-24/ignored.tmp", "合成临时文件\n");
+  invalidateHistoryFile(ws, "inbox/notes/2026-10-24");
   await snapshotNow(ws, "保存原文", undefined, { changedOnly: true });
   expect(await isTracked(ws, external)).toBe(true);
   expect(await isTracked(ws, own)).toBe(true);
+  expect(await isTracked(ws, "inbox/notes/2026-10-24/ignored.tmp")).toBe(false);
 });
 
 describe("版本历史", () => {

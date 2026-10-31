@@ -1,12 +1,37 @@
-import { describe, expect, it } from "vitest";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import { describe, expect, it, vi } from "vitest";
+import { SchemaRegistry as PackagedSchemaRegistry } from "../dist/schema.js";
 import { schemas, validateWorkspace } from "../src/index.js";
 import { freshWorkspace } from "./helpers.js";
 
 const base = { id: "01J9Z8Y7X6W5V4T3S2R1Q0P9N8", ts: "2026-10-15T21:00:00+08:00", by: "agent" };
+const packaged = new PackagedSchemaRegistry();
 
 function valid(name: string, data: unknown): boolean {
-  return schemas().builtin(name)(data) as boolean;
+  const runtime = schemas().builtin(name);
+  const compiled = packaged.builtin(name);
+  const result = runtime(data) as boolean;
+  expect(compiled(data)).toBe(result);
+  expect(compiled.errors).toEqual(runtime.errors);
+  return result;
 }
+
+it("packaged validators enforce the same fields and formats without runtime schema compilation", () => {
+  const compile = vi.spyOn(Ajv2020.prototype, "addSchema").mockImplementation(() => {
+    throw new Error("Runtime schema compiler was invoked");
+  });
+  try {
+    const registry = new PackagedSchemaRegistry();
+    const task = registry.builtin("task.schema.json");
+    expect(task({ ...base, title: "Compiled validation", status: "open" })).toBe(true);
+    expect(task({ ...base, title: "Bad timestamp", status: "open", ts: "2026-10-30" })).toBe(false);
+    expect(task({ ...base, status: "open" })).toBe(false);
+    expect(registry.resolveSchema("https://kaitu.local/schemas/task.schema.json")).toEqual(task.schema);
+    expect(compile).not.toHaveBeenCalled();
+  } finally {
+    compile.mockRestore();
+  }
+});
 
 describe("记录 schema", () => {
   it.each([

@@ -1,10 +1,16 @@
 import fs from "node:fs";
-import { basename, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import git, { type TreeEntry } from "isomorphic-git";
 import { quarantineBankContent } from "./bank-mail.js";
 import { KaituError } from "./errors.js";
 import { HISTORY_MARKER } from "./history-ownership.js";
 import { batchOverview, refreshOverview } from "./overview.js";
+import {
+  type ProjectionManifest,
+  projectionAccessFingerprint,
+  projectionFingerprint,
+  projectionUnchanged,
+} from "./projection-cache.js";
 import { isUserProfile, placeholderOriginal } from "./sync-files.js";
 import { isoInZone } from "./time.js";
 import type { Workspace } from "./workspace.js";
@@ -129,9 +135,9 @@ export function maintainHistoryIgnore(ws: Workspace): void {
     ws.writeText(".gitignore", `${ignore}${ignore.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
 }
 
-async function headOid(ws: Workspace): Promise<string | null> {
+async function headOid(ws: Workspace, io = fs): Promise<string | null> {
   try {
-    return await git.resolveRef({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
+    return await git.resolveRef({ fs: io, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
   } catch {
     return null;
   }
@@ -218,13 +224,23 @@ async function changedStatus(
 ): Promise<Awaited<ReturnType<typeof git.statusMatrix>> | undefined> {
   const gitdir = historyDirectory(ws);
   const tracked = await git.listFiles({ fs: io, dir: ws.root, gitdir, cache });
-  const paths = [...new Set(files.filter((file) => !neverTrack(file)))];
+  const paths = new Set(files.filter((file) => !neverTrack(file)));
   for (const file of paths) {
-    // 目录创建/删除/替换沿用完整盘点，保留树与文件互换、符号链接的 Git 语义。
+    // Existing trees, file/tree replacement and symlinks keep Git's complete walk.
     if (tracked.some((path) => path.startsWith(`${file}/`))) return;
     try {
       const stat = await fs.promises.lstat(join(ws.root, file));
-      if (!stat.isFile()) return;
+      if (stat.isDirectory()) {
+        if (tracked.includes(file)) return;
+        paths.delete(file);
+        if (await git.isIgnored({ fs: io, dir: ws.root, gitdir, filepath: file })) continue;
+        // A new capture directory has no tracked descendants. Discover only that
+        // subtree rather than rescan the entire workspace for each new date.
+        for (const name of await fs.promises.readdir(join(ws.root, file))) {
+          const child = `${file}/${name}`;
+          if (!neverTrack(child)) paths.add(child);
+        }
+      } else if (!stat.isFile()) return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
@@ -474,24 +490,77 @@ export interface Version {
 }
 
 /** 版本列表只在 HEAD 变化时改变：按 HEAD、条数、路径和时区缓存，不必每次重读提交对象。 */
-const logs = new WeakMap<Workspace, Map<string, readonly Version[]>>();
+const logs = new WeakMap<
+  Workspace,
+  Map<string, { versions: readonly Version[]; manifest: ProjectionManifest }>
+>();
+const logInputs = new WeakMap<Workspace, { root: string; manifest: ProjectionManifest }>();
+export function historyReadInputs(ws: Workspace): ProjectionManifest | undefined {
+  const input = logInputs.get(ws);
+  return input?.root === ws.root ? input.manifest : undefined;
+}
+function observeHistoryReads(root: string, paths: Map<string, string>) {
+  const promises = { ...fs.promises };
+  for (const name of ["readFile", "lstat", "stat", "readdir"] as const) {
+    const method = promises[name];
+    Object.assign(promises, {
+      [name]: (...args: unknown[]) => {
+        // isomorphic-git may mix '/' with native separators on Windows.
+        if (typeof args[0] === "string") {
+          const path = resolve(args[0]);
+          if (!paths.has(path) || paths.get(path)?.startsWith("access:"))
+            paths.set(path, projectionFingerprint(path));
+          // Parent replacement/permissions matter, but unrelated blobs in a fanout directory do not.
+          for (
+            let parent = dirname(path);
+            parent === root || parent.startsWith(`${root}${sep}`);
+            parent = dirname(parent)
+          ) {
+            if (!paths.has(parent)) paths.set(parent, projectionAccessFingerprint(parent));
+            if (parent === root) break;
+          }
+        }
+        return Reflect.apply(method, fs.promises, args);
+      },
+    });
+  }
+  return { ...fs, promises };
+}
 
 /** 版本列表，新的在前；给了 path 只列改动过它的版本。 */
 export async function history(
   ws: Workspace,
   opts: { path?: string; limit?: number } = {},
 ): Promise<Version[]> {
-  const head = hasHistory(ws) ? await headOid(ws) : null;
-  if (!head) return [];
+  const directory = historyDirectory(ws);
+  const paths = new Map([[directory, projectionAccessFingerprint(directory)]]);
+  const io = observeHistoryReads(directory, paths);
+  const head = hasHistory(ws) ? await headOid(ws, io) : null;
+  if (!head) {
+    logInputs.set(ws, { root: ws.root, manifest: [...paths] });
+    return [];
+  }
   const filepath = opts.path?.replace(/\/+$/, "") || undefined;
-  const key = `${head}\0${opts.limit ?? ""}\0${filepath ?? ""}\0${ws.timeZone()}`;
+  const key = `${ws.root}\0${head}\0${opts.limit ?? ""}\0${filepath ?? ""}\0${ws.timeZone()}`;
   const cached = logs.get(ws)?.get(key);
-  if (cached) return [...cached];
-  const versions = await readLog(ws, filepath, opts.limit);
-  const map = logs.get(ws) ?? new Map<string, readonly Version[]>();
+  if (cached) {
+    try {
+      if (projectionUnchanged({ root: ws.root, state: dirname(historyDirectory(ws)) }, cached.manifest)) {
+        logInputs.set(ws, { root: ws.root, manifest: [...new Map([...cached.manifest, ...paths])] });
+        return [...cached.versions];
+      }
+    } catch {
+      /* Re-run the established reader so permission/corruption errors are preserved. */
+    }
+  }
+  const versions = await readLog(ws, filepath, opts.limit, io);
+  const map =
+    logs.get(ws) ?? new Map<string, { versions: readonly Version[]; manifest: ProjectionManifest }>();
   if (map.size > 20) map.clear();
-  map.set(key, Object.freeze(versions.map((version) => Object.freeze(version))));
+  const manifest: ProjectionManifest = [...paths];
+  map.set(key, { versions: Object.freeze(versions.map((version) => Object.freeze(version))), manifest });
   logs.set(ws, map);
+  logInputs.set(ws, { root: ws.root, manifest });
   return versions;
 }
 
@@ -499,10 +568,11 @@ async function readLog(
   ws: Workspace,
   filepath: string | undefined,
   limit: number | undefined,
+  io = fs,
 ): Promise<Version[]> {
   let entries: Awaited<ReturnType<typeof git.log>>;
   try {
-    entries = await git.log({ fs, dir: ws.root, gitdir: historyDirectory(ws), depth: limit, filepath });
+    entries = await git.log({ fs: io, dir: ws.root, gitdir: historyDirectory(ws), depth: limit, filepath });
   } catch (e) {
     if ((e as { code?: string }).code === "NotFoundError") return [];
     throw e;

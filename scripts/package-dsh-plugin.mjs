@@ -14,6 +14,7 @@ const name = "kaitu-dsh";
 
 rmSync(output, { recursive: true, force: true });
 mkdirSync(join(output, "dist"), { recursive: true });
+cpSync(join(root, "packages/core/dist/validators"), join(output, "dist/validators"), { recursive: true });
 await build({
   entryPoints: [join(root, "packages/dsh-plugin/src/index.ts")],
   outfile: join(output, "dist/index.js"),
@@ -33,6 +34,9 @@ await build({
     ].join("\n"),
   },
 });
+// Background entry points must ship with the independently installed plugin too.
+for (const name of ["home-worker", "phone-worker"])
+  cpSync(join(root, `packages/core/dist/${name}.js`), join(output, `dist/${name}.js`));
 cpSync(join(root, "packages/dsh-plugin/dist/client.js"), join(output, "dist/client.js"));
 // assetsRoot() 从 dist/ 往上找 schemas/ 与 templates/；城市数据按 ../data/cities.json 读。
 for (const [from, to] of [
