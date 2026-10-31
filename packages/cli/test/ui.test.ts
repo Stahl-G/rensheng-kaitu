@@ -1,25 +1,147 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   createHomeCache,
   history,
   localDate,
+  localStateRoot,
   parseFrontmatter,
   readRecords,
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { appleHealthZip, clonedWorkspace } from "../../core/test/helpers.js";
-import { startUi } from "../src/ui/server.js";
+import { type UiOptions, startUi } from "../src/ui/server.js";
+
+const syncDiagnostic = vi.hoisted(() => ({
+  observe: null as null | (<T>(operation: string, run: () => Promise<T>) => Promise<T>),
+  resource: null as null | ((kind: string, key: unknown, path?: unknown, detail?: unknown) => void),
+}));
+// Test-only observers call the real operations and preserve their return values/errors.
+vi.mock("node:fs", async (original) => {
+  const fs = await original<typeof import("node:fs")>();
+  const owner = () =>
+    new Error().stack
+      ?.match(
+        /(?:home-cache|phone-snapshots|note-search|server|drive|state-binding|workspace|history)\.[cm]?[jt]s/g,
+      )
+      ?.slice(0, 3);
+  return {
+    ...fs,
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => {
+      try {
+        return fs.renameSync(...args);
+      } catch (error) {
+        syncDiagnostic.resource?.("rename-error", args[1], args[0], owner());
+        throw error;
+      }
+    },
+    openSync: (...args: Parameters<typeof fs.openSync>) => {
+      const fd = fs.openSync(...args);
+      syncDiagnostic.resource?.("open", fd, args[0], { flags: args[1], owner: owner() });
+      return fd;
+    },
+    closeSync: (fd: number) => {
+      const result = fs.closeSync(fd);
+      syncDiagnostic.resource?.("close", fd);
+      return result;
+    },
+    watch: (...args: Parameters<typeof fs.watch>) => {
+      const watcher = fs.watch(...args);
+      syncDiagnostic.resource?.("watch", watcher, args[0], owner());
+      watcher.once("close", () => syncDiagnostic.resource?.("close", watcher));
+      return watcher;
+    },
+  };
+});
+vi.mock("node:worker_threads", async (original) => {
+  const threads = await original<typeof import("node:worker_threads")>();
+  return {
+    ...threads,
+    Worker: class extends threads.Worker {
+      constructor(...args: ConstructorParameters<typeof threads.Worker>) {
+        super(...args);
+        syncDiagnostic.resource?.(
+          "worker",
+          this,
+          args[1]?.workerData?.root,
+          String(args[0]).match(/(?:home|phone)-worker\.[cm]?js/)?.[0] ?? "unknown-worker",
+        );
+        this.on("message", (message) =>
+          syncDiagnostic.resource?.(
+            "worker-response",
+            this,
+            undefined,
+            message?.summary ? "summary" : message?.data ? "data" : message?.prepared ? "prepared" : "other",
+          ),
+        );
+        this.once("exit", () => syncDiagnostic.resource?.("close", this));
+      }
+      postMessage(...args: Parameters<import("node:worker_threads").Worker["postMessage"]>) {
+        syncDiagnostic.resource?.("worker-request", this, args[0]?.root);
+        return super.postMessage(...args);
+      }
+    },
+  };
+});
+vi.mock("node:sqlite", async (original) => {
+  const sqlite = await original<typeof import("node:sqlite")>();
+  return {
+    ...sqlite,
+    DatabaseSync: class extends sqlite.DatabaseSync {
+      constructor(...args: ConstructorParameters<typeof sqlite.DatabaseSync>) {
+        super(...args);
+        syncDiagnostic.resource?.("sqlite", this, args[0]);
+      }
+      close() {
+        const result = super.close();
+        syncDiagnostic.resource?.("close", this);
+        return result;
+      }
+    },
+  };
+});
+vi.mock("node:fs/promises", async (original) => {
+  const fs = await original<typeof import("node:fs/promises")>();
+  return {
+    ...fs,
+    readFile: (...args: Parameters<typeof fs.readFile>) => {
+      const result = fs.readFile(...args);
+      syncDiagnostic.resource?.("read-pending", result, args[0]);
+      void result.then(
+        () => syncDiagnostic.resource?.("close", result),
+        () => syncDiagnostic.resource?.("close", result),
+      );
+      return result;
+    },
+  };
+});
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  const call = <T>(operation: string, run: () => Promise<T>) =>
+    syncDiagnostic.observe ? syncDiagnostic.observe(operation, run) : run();
+  return {
+    ...core,
+    enableSync: (...args: Parameters<typeof core.enableSync>) =>
+      call("enable", () => core.enableSync(...args)),
+    disableSync: (...args: Parameters<typeof core.disableSync>) =>
+      call("disable", () => core.disableSync(...args)),
+    snapshotNow: (...args: Parameters<typeof core.snapshotNow>) =>
+      call("snapshot", () => core.snapshotNow(...args)),
+  };
+});
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup(prepareHome = false) {
+async function setup(
+  prepareHome = false,
+  hooks: Pick<UiOptions, "onWorkspaceChanging" | "onWorkspaceChanged"> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await clonedWorkspace(undefined, root);
@@ -46,6 +168,7 @@ async function setup(prepareHome = false) {
     }
   }
   const ui = await startUi(ws, {
+    ...hooks,
     port: 0,
     open: false,
     snapshotDelayMs: 80,
@@ -220,13 +343,111 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 });
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
-  const { ws, ui } = await setup();
-  const post = (path: string, body: unknown) =>
-    fetch(`${ui.url}${path}`, {
+  let started = 0;
+  let route = "";
+  let phase = "preparation";
+  let pathRoots: [string, string][] = [];
+  const describePath = (value: unknown, roots: [string, string][]) => {
+    if (typeof value !== "string" || !isAbsolute(value)) return "redacted";
+    for (const [role, root] of roots) {
+      const path = relative(root, value);
+      if (path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path)))
+        return `${role}${path ? `/${path.split(sep).join("/")}` : ""}`;
+    }
+    return "redacted";
+  };
+  const events: Record<string, unknown>[] = [];
+  const mark = (operation: string, detail = {}) => {
+    events.push({ route, phase, operation, at: performance.now() - started, ...detail });
+  };
+  const resources = new Map<unknown, { kind: string; path: unknown; detail: unknown; signal?: string }>();
+  const resourceSummary = () =>
+    [...resources.values()].map((resource) => ({
+      ...resource,
+      path: describePath(resource.path, pathRoots),
+    }));
+  syncDiagnostic.resource = (kind, key, path, detail) => {
+    if (kind === "close") resources.delete(key);
+    else if (kind === "worker-response") {
+      const resource = resources.get(key);
+      if (resource) resource.signal = String(detail);
+    } else if (kind === "worker-request") {
+      const resource = resources.get(key);
+      if (resource) Object.assign(resource, { path, signal: "request-posted" });
+    } else if (kind === "rename-error") {
+      mark("rename-error-resources", {
+        path: describePath(path, pathRoots),
+        dest: describePath(key, pathRoots),
+        caller: detail,
+        // Live handles and worker messages are observations, not proof of a Windows lock.
+        resources: [...resources.values()].map((resource) => ({
+          ...resource,
+          path: describePath(resource.path, pathRoots),
+          exactSource: resource.path === path,
+          exactTarget: resource.path === key,
+        })),
+        workerFileReads: "unknown: worker messages do not expose file handles",
+      });
+    } else resources.set(key, { kind, path, detail });
+  };
+  cleanup.push(async () => {
+    syncDiagnostic.resource = null;
+  });
+  const { ws, ui } = await setup(false, {
+    onWorkspaceChanging: async () => {
+      phase = "execution";
+      mark("before-core-migration", { resources: resourceSummary() });
+    },
+    onWorkspaceChanged: async () => {
+      phase = "finalization";
+      mark("after-watcher-restart");
+    },
+  });
+  started = performance.now();
+  syncDiagnostic.observe = <T>(operation: string, run: () => Promise<T>): Promise<T> => {
+    if (!route) return run();
+    const context = { route, phase };
+    const roots = pathRoots;
+    mark(`${operation}-start`, context);
+    const result = run();
+    // Observe settlement while returning the original Promise/rejection unchanged.
+    void result.then(
+      () => mark(`${operation}-return`, context),
+      (error) => {
+        const detail = error as (NodeJS.ErrnoException & { dest?: string }) | null;
+        mark(`${operation}-error`, {
+          ...context,
+          name: detail?.name,
+          code: detail?.code,
+          syscall: detail?.syscall,
+          ...(detail?.syscall === "rename"
+            ? { path: describePath(detail.path, roots), dest: describePath(detail.dest, roots) }
+            : {}),
+        });
+        process.stderr.write(`Sync original error diagnostic ${JSON.stringify(events)}\n`);
+      },
+    );
+    return result;
+  };
+  cleanup.push(async () => {
+    syncDiagnostic.observe = null;
+  });
+  const post = (path: string, body: unknown, target: string) => {
+    // All three scopes come from this synthetic test and its isolated local-state setup.
+    pathRoots = [
+      ["source-root", ws.root],
+      ["target-root", target],
+      ["state-root", localStateRoot()],
+    ];
+    route = path;
+    phase = "preparation";
+    mark("http-send");
+    return fetch(`${ui.url}${path}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(body),
     });
+  };
   for (const [enable, disable, body] of [
     ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
     ["/api/drive/enable", "/api/drive/disable", {}],
@@ -238,12 +459,36 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rmSync(folder, { recursive: true, force: true });
       rmSync(back, { recursive: true, force: true });
     });
-    const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
-    const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
+    const beforeEnable = ws.root;
+    const enableSent = performance.now() - started;
+    const enabled = await post(enable, { ...body, dir: folder }, join(folder, "kaitu-ai-memory"));
+    const enableReturned = performance.now() - started;
+    const enabledBody = await enabled.json();
+    const enablePhase = {
+      route: enable,
+      sent: enableSent,
+      returned: enableReturned,
+      rootChanged: ws.root !== beforeEnable,
+      atTarget: ws.root === join(folder, "kaitu-ai-memory"),
+    };
+    expect(enabled.status, JSON.stringify({ ...enablePhase, response: enabledBody, events })).toBe(200);
+    expect(enabledBody.mode).toBe("drive");
+    const beforeDisable = ws.root;
+    const disableSent = performance.now() - started;
+    const disabled = await post(disable, { to: join(back, "kaitu") }, join(back, "kaitu"));
+    const disableReturned = performance.now() - started;
+    const disabledBody = await disabled.json();
+    const disablePhase = {
+      route: disable,
+      sent: disableSent,
+      returned: disableReturned,
+      rootChanged: ws.root !== beforeDisable,
+      atTarget: ws.root === join(back, "kaitu"),
+    };
+    const diagnostic = JSON.stringify({ enable: enablePhase, disable: disablePhase, events });
+    process.stderr.write(`Sync transition diagnostic ${diagnostic}\n`);
+    expect(disabled.status, JSON.stringify({ ...disablePhase, response: disabledBody, events })).toBe(200);
+    expect(disabledBody.mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
   }
 });
