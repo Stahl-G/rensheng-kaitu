@@ -49,16 +49,39 @@ const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suf
 it("background phone computation publishes through the owner queue and discards a moved root", async () => {
   const started = performance.now();
   let phase = "initialize";
+  const stages: { stage: string; atMs: number }[] = [{ stage: phase, atMs: 0 }];
+  const note = (stage: string, at = performance.now()) => stages.push({ stage, atMs: at - started });
+  const mark = (next: string) => {
+    phase = next;
+    note(next);
+  };
+  let ownerPolls = 0;
+  let newRootPolls = 0;
   const errors: unknown[] = [];
-  onTestFailed(() => {
-    console.error("phone-background-stage", {
-      phase,
-      elapsedMs: performance.now() - started,
-      errors: errors.map(String),
-    });
-  });
-  const ws = await clonedWorkspace();
-  const other = await clonedWorkspace();
+  const report = (outcome: string) => {
+    process.stderr.write(
+      `phone-background-stage ${JSON.stringify({
+        outcome,
+        phase,
+        elapsedMs: performance.now() - started,
+        ownerPolls,
+        newRootPolls,
+        stages: stages.map((entry, i) => ({
+          ...entry,
+          sincePreviousMs: entry.atMs - (stages[i - 1]?.atMs ?? 0),
+        })),
+        errors: errors.map(String),
+      })}\n`,
+    );
+  };
+  onTestFailed(() => report("failed"));
+  const clone = (name: string) =>
+    clonedWorkspace(undefined, undefined, (entry) => note(`${name}/${entry.stage}`, entry.at));
+  mark("first-clone");
+  const ws = await clone("first-clone");
+  mark("second-clone");
+  const other = await clone("second-clone");
+  mark("prepare-records");
   const root = ws.root;
   addRecord(ws, "task", { title: "Old root" });
   addRecord(other, "task", { title: "New root" });
@@ -71,25 +94,39 @@ it("background phone computation publishes through the owner queue and discards 
     release = resolve;
   });
   let queued = false;
+  mark("start-background");
   const stop = startPhoneSnapshots(
     ws,
     (error) => errors.push(error),
     async (operation) => {
+      note("owner-queue-entered");
       queued = true;
       await gate;
+      note("owner-queue-released");
       return operation();
     },
   );
   try {
-    phase = "waiting-owner-queue";
-    await expect.poll(() => queued, { timeout: 15000 }).toBe(true);
-    expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
-    ws.root = other.root;
-    release();
-    phase = "waiting-new-root";
+    mark("waiting-owner-queue");
     await expect
       .poll(
         () => {
+          ownerPolls++;
+          return queued;
+        },
+        { timeout: 15000 },
+      )
+      .toBe(true);
+    mark("owner-queue-observed");
+    expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
+    ws.root = other.root;
+    mark("root-changed");
+    release();
+    mark("waiting-new-root");
+    await expect
+      .poll(
+        () => {
+          newRootPolls++;
           if (!other.exists("phone/today.json")) return [];
           return other
             .readJson<{ mobile: { tasks: { title: string }[] } }>("phone/today.json")
@@ -98,12 +135,15 @@ it("background phone computation publishes through the owner queue and discards 
         { timeout: 15000 },
       )
       .toEqual(["New root"]);
+    mark("new-root-published");
     expect(errors).toEqual([]);
-    phase = "closing";
+    mark("closing");
     await stop();
+    mark("closed");
     ws.root = root;
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
-    phase = "finished";
+    mark("finished");
+    report("body-complete");
   } finally {
     release();
     await stop();
