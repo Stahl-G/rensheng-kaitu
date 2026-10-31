@@ -1,9 +1,170 @@
 .page {
+  --health-chart: #52745b;
+  --health-soft: #e7eee4;
+  --health-medium: #a6bea0;
+  --sleep-chart: #42658b;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+.dashboard .card {
+  border: 1px solid var(--kt-control);
+  box-shadow: none;
+}
+.dashboardValues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  margin: 0 0 18px;
+  font-variant-numeric: tabular-nums;
+}
+.dashboardValues dt,
+.dashboardValues time {
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+.dashboardValues dd {
+  margin: 4px 0;
+}
+.dashboardValues strong {
+  font-size: 30px;
+  font-weight: 600;
+}
+.dashboardChart {
+  margin: 14px 0 0;
+}
+.dashboardChart figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.dashboardChart figcaption::before {
+  content: "";
+  width: 10px;
+  height: 3px;
+  background: var(--health-chart);
+}
+.dashboardChart figcaption > span {
+  margin-left: auto;
+  color: var(--kt-muted);
+}
+.dashboardChart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dashboardChart line {
+  stroke: var(--health-chart);
+  stroke-width: 2;
+}
+.dashboardChart circle,
+.dashboardChart rect {
+  fill: var(--health-chart);
+}
+.dashboardChart g:focus-visible {
+  outline: 2px solid var(--kt-text);
+}
+.dashboardDates {
+  display: flex;
+  justify-content: space-between;
+  color: var(--kt-muted);
+  font-size: 11px;
+}
+.sleepChart {
+  --health-chart: var(--sleep-chart);
+}
+.cardioMetric + .cardioMetric {
+  margin-top: 18px;
+}
+.cardioMetric > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 8px 0;
+}
+.calendar > span {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: var(--kt-control);
+}
+.calendar > span[data-level="1"] {
+  background: var(--health-soft);
+}
+.calendar > span[data-level="2"] {
+  background: var(--health-medium);
+}
+.calendar > span[data-level="3"] {
+  background: var(--health-chart);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-size: 11px;
+  color: var(--kt-muted);
+}
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--kt-control);
+}
+.legend span:nth-child(2)::before {
+  background: var(--health-soft);
+}
+.legend span:nth-child(3)::before {
+  background: var(--health-medium);
+}
+.legend span:nth-child(4)::before {
+  background: var(--health-chart);
+}
+.otherMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+.otherMetrics h2 {
+  font-size: 14px;
+  margin-right: 4px;
+}
+.otherMetrics > span {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--kt-control);
+  font-size: 12px;
+}
+.otherMetrics strong {
+  font-weight: 500;
+  margin-left: 5px;
+}
+[data-theme="dark"] .page {
+  --health-chart: #adc7a7;
+  --health-soft: #303e2f;
+  --health-medium: #637f5c;
+  --sleep-chart: #9bb7dc;
+}
+@media (max-width: 800px) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .page h1,
 .page h2,
