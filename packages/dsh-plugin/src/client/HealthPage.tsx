@@ -315,6 +315,510 @@ function Photos({
     </Section>
   );
 }
+function DashboardChart({
+  points,
+  unit,
+  title,
+  bars = false,
+  average = false,
+  range,
+}: {
+  points: { date: string; value: number | null; estimated?: boolean }[];
+  unit: string;
+  title: string;
+  bars?: boolean;
+  average?: boolean;
+  range?: { q1: number; q3: number } | null;
+}) {
+  const t = useT();
+  const values = points.flatMap((p) => (p.value !== null && Number.isFinite(p.value) ? [p.value] : []));
+  if (!values.length) return null;
+  const low = bars ? 0 : Math.min(...values);
+  const high = Math.max(...values, low + 1);
+  const first = Date.parse(points[0]?.date ?? "");
+  const last = Date.parse(points.at(-1)?.date ?? "");
+  const x = (i: number) =>
+    last === first ? 200 : 12 + ((Date.parse(points[i]?.date ?? "") - first) * 376) / (last - first);
+  const y = (n: number) => 94 - ((n - low) * 78) / (high - low);
+  const mean = average ? values.reduce((sum, n) => sum + n, 0) / values.length : null;
+  return (
+    <figure className={css.dashboardChart}>
+      <figcaption>
+        {title} <span>{unit}</span>
+      </figcaption>
+      <svg viewBox="0 0 400 110" role="img" aria-label={title}>
+        {range && (
+          <rect
+            className={css.rangeBand}
+            x="12"
+            y={y(range.q3)}
+            width="376"
+            height={Math.max(0, y(range.q1) - y(range.q3))}
+          />
+        )}
+        {mean !== null && <line className={css.meanLine} x1="12" x2="388" y1={y(mean)} y2={y(mean)} />}
+        {points.map((p, i) =>
+          p.value === null || !Number.isFinite(p.value) ? null : (
+            <g key={`${p.date}-${i}`} tabIndex={0}>
+              <title>{`${p.date}: ${p.estimated ? "≈" : ""}${number(p.value)} ${unit}`}</title>
+              {bars ? (
+                <rect x={x(i) - 8} y={y(p.value)} width="16" height={Math.max(0, 94 - y(p.value))} />
+              ) : (
+                <>
+                  {i > 0 && points[i - 1]?.value !== null && (
+                    <line x1={x(i - 1)} y1={y(points[i - 1]?.value ?? p.value)} x2={x(i)} y2={y(p.value)} />
+                  )}
+                  <circle cx={x(i)} cy={y(p.value)} r="3" />
+                </>
+              )}
+            </g>
+          ),
+        )}
+      </svg>
+      <div className={css.chartLegend}>
+        {mean !== null && (
+          <span data-kind="mean">
+            {t("均值", "Mean")} {number(mean)} {unit}
+          </span>
+        )}
+        {range && (
+          <span data-kind="range">
+            {t("中间一半", "Middle half")} {number(range.q1)}–{number(range.q3)} {unit}
+          </span>
+        )}
+      </div>
+      <div className={css.dashboardDates}>
+        <time>{points[0]?.date}</time>
+        <time>{points.at(-1)?.date}</time>
+      </div>
+    </figure>
+  );
+}
+
+type Dashboard = NonNullable<HealthData["dashboard"]>;
+function SleepStages({ night, time }: { night: Dashboard["sleep"][number]; time: (ts: string) => string }) {
+  const t = useT();
+  const names = {
+    awake: t("清醒", "Awake"),
+    asleep_rem: "REM",
+    asleep_core: t("核心", "Core"),
+    asleep_deep: t("深睡", "Deep"),
+    asleep_unspecified: t("睡眠 · 未分期", "Asleep · unspecified"),
+    in_bed: t("在床", "In bed"),
+  };
+  const span = Date.parse(night.end) - Date.parse(night.start);
+  if (!night.stages?.length || span <= 0) return null;
+  return (
+    <figure className={css.stages}>
+      <div className={css.timeline} role="img" aria-label={t("睡眠阶段", "Sleep stages")}>
+        {night.stages.map((stage, i) => (
+          <span
+            key={`${stage.start}-${i}`}
+            data-stage={stage.stage}
+            title={`${names[stage.stage]} ${time(stage.start)}–${time(stage.end)}`}
+            style={{
+              left: `${((Date.parse(stage.start) - Date.parse(night.start)) / span) * 100}%`,
+              width: `${((Date.parse(stage.end) - Date.parse(stage.start)) / span) * 100}%`,
+            }}
+          />
+        ))}
+      </div>
+      <figcaption className={css.stageLegend}>
+        {Object.entries(names).map(([stage, name]) => {
+          const minutes = night.stageMinutes?.[stage as keyof typeof names];
+          return minutes == null || minutes <= 0 ? null : (
+            <span key={stage} data-stage={stage}>
+              {name} {number(minutes)} {t("分钟", "min")}
+            </span>
+          );
+        })}
+      </figcaption>
+    </figure>
+  );
+}
+
+function HealthDashboard({ data }: { data: HealthData }) {
+  const t = useT();
+  const locale = useLocale();
+  const dash = data.dashboard;
+  const localDay = (ts: string) =>
+    new Intl.DateTimeFormat(locale, { timeZone: data.timeZone, dateStyle: "short" }).format(new Date(ts));
+  const names: Record<string, string> = {
+    very_unpleasant: t("很不愉快", "Very unpleasant"),
+    unpleasant: t("不愉快", "Unpleasant"),
+    slightly_unpleasant: t("有点不愉快", "Slightly unpleasant"),
+    neutral: t("一般", "Neutral"),
+    slightly_pleasant: t("有点愉快", "Slightly pleasant"),
+    pleasant: t("愉快", "Pleasant"),
+    very_pleasant: t("很愉快", "Very pleasant"),
+    abdominal_cramps: t("腹部痉挛", "Abdominal cramps"),
+    appetite_changes: t("食欲变化", "Appetite changes"),
+    chest_tightness_or_pain: t("胸闷或胸痛", "Chest tightness or pain"),
+    coughing: t("咳嗽", "Coughing"),
+    dizziness: t("头晕", "Dizziness"),
+    fatigue: t("疲劳", "Fatigue"),
+    headache: t("头痛", "Headache"),
+    nausea: t("恶心", "Nausea"),
+    shortness_of_breath: t("气短", "Shortness of breath"),
+    sore_throat: t("咽痛", "Sore throat"),
+    chills: t("发冷", "Chills"),
+    mild: t("轻度", "Mild"),
+    moderate: t("中度", "Moderate"),
+    severe: t("重度", "Severe"),
+    unspecified: t("未注明", "Unspecified"),
+    decreased: t("减少", "Decreased"),
+    increased: t("增加", "Increased"),
+    high_heart_rate: t("高心率通知", "High heart rate"),
+    low_heart_rate: t("低心率通知", "Low heart rate"),
+    irregular_rhythm: t("心律不齐通知", "Irregular rhythm"),
+  };
+  const name = (value: string | null) => (value ? (names[value] ?? value.replaceAll("_", " ")) : "");
+  const time = (ts: string) =>
+    new Intl.DateTimeFormat(locale, {
+      timeZone: data.timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(ts));
+  const groups =
+    dash?.metrics ??
+    data.metrics.map((metric) => {
+      const points = metric.points.slice().sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+      return { ...metric, points, latest: points.at(-1), change: null, range: null };
+    });
+  const series = (kind: string, unit: string) => {
+    const metric = groups.find((m) => m.kind === kind && m.unit === unit);
+    if (!metric?.latest || typeof metric.latest.value !== "number") return [];
+    return [
+      {
+        ...metric,
+        latest: { ...metric.latest, value: metric.latest.value },
+        points: metric.points.filter(
+          (p): p is typeof p & { value: number } => typeof p.value === "number" && Number.isFinite(p.value),
+        ),
+      },
+    ];
+  };
+  const body = [
+    { kind: "weight", title: t("体重", "Weight"), unit: "kg" },
+    { kind: "body_fat", title: t("体脂率", "Body fat"), unit: "%" },
+    { kind: "height", title: t("身高", "Height"), unit: "cm" },
+  ].flatMap((m) => series(m.kind, m.unit).map((s) => ({ ...m, ...s })));
+  const cardio = [
+    { kind: "resting_hr", title: t("静息心率", "Resting heart rate"), unit: "bpm" },
+    { kind: "hrv_sdnn", title: "HRV", unit: "ms" },
+    { kind: "walking_hr", title: t("步行心率", "Walking heart rate"), unit: "bpm" },
+  ].flatMap((m) => series(m.kind, m.unit).map((s) => ({ ...m, ...s })));
+  const steps =
+    dash?.activity.map((d) => ({ date: d.date, value: d.steps, estimated: d.estimated })) ??
+    data.steps.slice(-7);
+  const activity = dash?.activity.find((d) => d.date === data.today);
+  const activityEstimated =
+    activity?.estimated ?? data.steps.find((d) => d.date === data.today)?.estimated ?? false;
+  const activityValues = [
+    [
+      t("步数", "Steps"),
+      activity ? activity.steps : data.steps.find((d) => d.date === data.today)?.value,
+      t("步", "steps"),
+    ],
+    [t("锻炼", "Exercise"), activity?.exerciseMin, "min"],
+    [t("活动热量", "Active energy"), activity?.activeKcal, "kcal"],
+    [t("距离", "Distance"), activity?.distanceKm, "km"],
+    [t("爬楼", "Flights climbed"), activity?.flightsClimbed, t("层", "flights")],
+  ].filter((v) => typeof v[1] === "number");
+  const night = dash?.sleep.at(-1);
+  const sleep = dash
+    ? steps.map((d) => {
+        const records = dash.sleep.filter((n) => n.date === d.date);
+        return {
+          date: d.date,
+          value: records.length ? records.reduce((sum, n) => sum + n.durationMin, 0) / 60 : null,
+          estimated: records.some((n) => n.estimated),
+        };
+      })
+    : data.sleep.slice(-7);
+  const latestSleep = night
+    ? { date: night.date, value: night.durationMin / 60, estimated: night.estimated }
+    : dash
+      ? undefined
+      : [...data.sleep].reverse().find((p) => p.value !== null);
+  const hasTraining =
+    data.training.recent.length > 0 || data.training.heatmap.some((d) => (d.sessions ?? 0) > 0);
+  const moodTone = (value: string | null) =>
+    value === "neutral"
+      ? "neutral"
+      : ["slightly_pleasant", "pleasant", "very_pleasant"].includes(value ?? "")
+        ? "pleasant"
+        : ["slightly_unpleasant", "unpleasant", "very_unpleasant"].includes(value ?? "")
+          ? "unpleasant"
+          : "missing";
+  const moodNames = {
+    pleasant: t("愉快", "Pleasant"),
+    neutral: t("一般", "Neutral"),
+    unpleasant: t("不愉快", "Unpleasant"),
+    missing: t("未记录", "Not logged"),
+  };
+  const hasMood = dash?.mood.some((m) => m.valence !== null);
+  const symptoms = dash?.symptoms ?? [];
+  const hasAny =
+    groups.some((m) => m.latest) ||
+    data.nutrition.meals.length ||
+    data.photos.length ||
+    dash?.heartNotifications.length ||
+    body.length ||
+    cardio.length ||
+    activityValues.length ||
+    steps.some((p) => p.value !== null) ||
+    latestSleep ||
+    hasTraining ||
+    hasMood ||
+    symptoms.length;
+  const others = [
+    ["heart_rate_daily", t("每日心率", "Daily heart rate")],
+    ["blood_oxygen", t("血氧", "Blood oxygen")],
+    ["vo2max", t("最大摄氧量", "VO₂ max")],
+    ["respiratory_rate", t("呼吸频率", "Respiratory rate")],
+    ["body_temperature", t("体温", "Temperature")],
+    ["glucose", t("血糖", "Blood glucose")],
+    ["bp", t("血压", "Blood pressure")],
+  ];
+  return (
+    <>
+      {!hasAny && <p className={css.empty}>{t("暂无健康记录", "No health records")}</p>}
+      <div className={css.dashboard}>
+        {(!!body.length || dash?.bmi || activity?.basalKcal != null) && (
+          <Section title={t("身体", "Body")}>
+            <dl className={css.dashboardValues}>
+              {body.map((m) => (
+                <div key={m.kind}>
+                  <dt>{m.title}</dt>
+                  <dd>
+                    <strong>
+                      {m.latest.estimated ? "≈" : ""}
+                      {number(m.latest.value)}
+                    </strong>{" "}
+                    {m.unit}
+                  </dd>
+                  <time>{m.latest.date}</time>
+                  {m.change !== null && (
+                    <small>
+                      {m.change > 0 ? "+" : ""}
+                      {number(m.change)} {m.unit}
+                    </small>
+                  )}
+                </div>
+              ))}
+              {dash?.bmi && (
+                <div>
+                  <dt>BMI</dt>
+                  <dd>
+                    <strong>
+                      {dash.bmi.estimated ? "≈" : ""}
+                      {number(dash.bmi.value)}
+                    </strong>
+                  </dd>
+                  <time dateTime={dash.bmi.ts}>{localDay(dash.bmi.ts)}</time>
+                  {dash.bmi.heightDate && (
+                    <div className={css.bmiHeight}>
+                      {t("身高", "Height")} {number(dash.bmi.heightCm)} cm ·{" "}
+                      <time dateTime={dash.bmi.heightDate}>{dash.bmi.heightDate}</time>
+                    </div>
+                  )}
+                </div>
+              )}
+              {activity?.basalKcal != null && (
+                <div>
+                  <dt>{t("基础热量", "Basal energy")}</dt>
+                  <dd>
+                    <strong>
+                      {activity.estimated ? "≈" : ""}
+                      {number(activity.basalKcal)}
+                    </strong>{" "}
+                    kcal
+                  </dd>
+                  <time>{activity.date}</time>
+                </div>
+              )}
+            </dl>
+            {body
+              .filter((m) => m.kind !== "height")
+              .map((m) => (
+                <DashboardChart key={m.kind} title={m.title} unit={m.unit} points={m.points} />
+              ))}
+          </Section>
+        )}
+        {(activityValues.length > 0 || steps.some((p) => p.value !== null)) && (
+          <Section title={t("今日活动", "Activity today")} note={data.today}>
+            <dl className={css.dashboardValues}>
+              {activityValues.map(([label, value, unit]) => (
+                <div key={String(label)}>
+                  <dt>{label}</dt>
+                  <dd>
+                    <strong>
+                      {activityEstimated ? "≈" : ""}
+                      {number(Number(value))}
+                    </strong>{" "}
+                    {unit}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <DashboardChart
+              title={t("步数 · 近 7 天", "Steps · last 7 days")}
+              points={steps}
+              unit={t("步", "steps")}
+              bars
+              average
+            />
+          </Section>
+        )}
+        {latestSleep && (
+          <Section title={t("睡眠", "Sleep")} note={latestSleep.date}>
+            <dl className={css.dashboardValues}>
+              <div>
+                <dt>{night ? `${time(night.start)}–${time(night.end)}` : latestSleep.date}</dt>
+                <dd>
+                  <strong>
+                    {latestSleep.estimated ? "≈" : ""}
+                    {number(latestSleep.value ?? 0)}
+                  </strong>{" "}
+                  {t("小时", "hours")}
+                </dd>
+              </div>
+            </dl>
+            {night && <SleepStages night={night} time={time} />}
+            <div className={css.sleepChart}>
+              <DashboardChart
+                title={t("睡眠 · 近 7 天", "Sleep · last 7 days")}
+                points={sleep}
+                unit={t("小时", "hours")}
+                bars
+                average
+              />
+            </div>
+          </Section>
+        )}
+        {!!cardio.length && (
+          <Section title={t("心肺与恢复", "Cardio and recovery")}>
+            {cardio.map((m) => (
+              <div key={m.kind} className={css.cardioMetric}>
+                <strong>
+                  {m.title} · {m.latest.estimated ? "≈" : ""}
+                  {number(m.latest.value)} {m.unit}
+                </strong>
+                <time>{m.latest.date}</time>
+                <DashboardChart title={m.title} unit={m.unit} points={m.points} range={m.range} />
+              </div>
+            ))}
+          </Section>
+        )}
+        {hasTraining && (
+          <Section title={t("训练", "Training")}>
+            <div className={css.calendar} aria-label={t("训练 · 近 5 周", "Training · last 5 weeks")}>
+              {data.training.heatmap.map((d) => (
+                <span
+                  key={d.date}
+                  data-level={
+                    d.minutes === null || d.minutes <= 0 ? 0 : d.minutes >= 60 ? 3 : d.minutes >= 30 ? 2 : 1
+                  }
+                  title={`${d.date}: ${d.minutes === null ? t("时长未记录", "Duration not logged") : `${number(d.minutes)} min`}`}
+                />
+              ))}
+            </div>
+            <div className={css.legend}>
+              <span>{t("未记录", "Not logged")}</span>
+              <span>1–29 min</span>
+              <span>30–59 min</span>
+              <span>60+ min</span>
+            </div>
+            {data.training.recent.slice(0, 3).map((session) => (
+              <div key={session.id} className={css.row}>
+                <time>{session.date}</time>
+                <div className={css.grow}>
+                  {session.exercises.map((e) => (
+                    <div key={e.id}>
+                      {e.name} {e.distance != null && <span>{number(e.distance)} km</span>}{" "}
+                      {e.kcal != null && <span>{number(e.kcal)} kcal</span>}{" "}
+                      {e.avgHr != null && (
+                        <span>
+                          {t("均", "avg")} {number(e.avgHr)} bpm
+                        </span>
+                      )}{" "}
+                      {e.pace != null && e.pace > 0 && (
+                        <span>
+                          {Math.floor(Math.round(e.pace) / 60)}:
+                          {String(Math.round(e.pace) % 60).padStart(2, "0")} /km
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {session.duration !== null && <span>{number(session.duration)} min</span>}
+              </div>
+            ))}
+          </Section>
+        )}
+        {(hasMood || symptoms.length > 0) && (
+          <Section title={t("心情与症状", "Mood and symptoms")}>
+            {hasMood && (
+              <>
+                <div
+                  className={css.moodStrip}
+                  role="img"
+                  aria-label={t("近 14 天心情", "Mood · last 14 days")}
+                >
+                  {dash?.mood.map((m) => (
+                    <span
+                      key={m.date}
+                      data-tone={moodTone(m.valence)}
+                      title={`${m.date}: ${name(m.valence) || moodNames.missing}`}
+                    />
+                  ))}
+                </div>
+                <div className={css.moodLegend}>
+                  {Object.entries(moodNames).map(([tone, label]) => (
+                    <span key={tone} data-tone={tone}>
+                      {label} {dash?.mood.filter((m) => moodTone(m.valence) === tone).length}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+            {symptoms.map((symptom) => (
+              <div key={symptom.id} className={css.row}>
+                <time>{localDay(symptom.ts)}</time>
+                <span className={css.grow}>{name(symptom.kind)}</span>
+                <span>{name(symptom.severity ?? symptom.appetiteChange)}</span>
+              </div>
+            ))}
+          </Section>
+        )}
+      </div>
+      <section className={css.otherMetrics} aria-label={t("其他指标", "Other metrics")}>
+        <h2>{t("其他指标", "Other metrics")}</h2>
+        {others.map(([kind, title]) => {
+          const metric = groups.find((m) => m.kind === kind);
+          const latest = metric?.latest;
+          return (
+            <span key={kind} title={latest?.date}>
+              {title}{" "}
+              <strong>
+                {latest
+                  ? `${latest.estimated ? "≈" : ""}${typeof latest.value === "number" ? number(latest.value) : latest.value} ${metric?.unit}`
+                  : t("无记录", "No records")}
+              </strong>
+            </span>
+          );
+        })}
+        <span>
+          {t("心率通知", "Heart notifications")}{" "}
+          <strong>{name(dash?.heartNotifications.at(-1)?.kind ?? null) || t("无记录", "No records")}</strong>
+        </span>
+      </section>
+    </>
+  );
+}
+
 export function HealthPage({
   loadHealth,
   loadHealthPhoto,
@@ -447,33 +951,11 @@ export function HealthPage({
             : t("暂无训练目标", "No training goal yet");
   const maxReps = Math.max(...(training?.heatmap.map((d) => d.repetitions ?? 0) ?? []), 1);
   const maxMinutes = Math.max(...(training?.heatmap.map((d) => d.minutes ?? 0) ?? []), 1);
-  const monday = data
-    ? new Date(
-        Date.parse(`${data.today}T12:00:00Z`) -
-          ((new Date(`${data.today}T12:00:00Z`).getUTCDay() + 6) % 7) * 86400000,
-      )
-        .toISOString()
-        .slice(0, 10)
-    : "";
-  const average = (points: Point[]) => {
-    const logged = points.filter((point) => point.date >= monday && point.value !== null);
-    return {
-      value: logged.length
-        ? logged.reduce((total, point) => total + (point.value ?? 0), 0) / logged.length
-        : null,
-      count: logged.length,
-      estimated: logged.some((point) => point.estimated),
-    };
-  };
-  const protein = average(data?.nutrition.protein ?? []);
-  const sleep = average(data?.sleep ?? []);
-  const steps = average(data?.steps ?? []);
   const weights = (
     data?.metrics.find((metric) => metric.kind === "weight" && metric.unit === "kg")?.points ?? []
   )
     .slice()
     .sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
-  const weight = weights.at(-1);
   const weightChanges = weights.flatMap((point, index) => {
     const previous = weights[index - 1];
     if (
@@ -486,30 +968,6 @@ export function HealthPage({
     const change = point.value - previous.value;
     return Math.abs(change) > 3 ? [{ point, change }] : [];
   });
-  const coverage = (count: number) => t(`本周 ${count} 天有记录`, `${count} days logged this week`);
-  const summary = [
-    [t("本周训练", "Workouts this week"), amount(training?.week ?? null, t("次", "sessions")), ruleText],
-    [
-      t("蛋白质", "Protein"),
-      amount(protein.value, t("克 / 天", "g / day"), protein.estimated),
-      `${coverage(protein.count)}${data?.nutrition.target?.length ? t(` · 目标 ${data.nutrition.target.join("–")} 克 / 天`, ` · Target ${data.nutrition.target.join("–")} g / day`) : ""}`,
-    ],
-    [
-      t("睡眠", "Sleep"),
-      amount(sleep.value, t("小时 / 晚", "hours / night"), sleep.estimated),
-      coverage(sleep.count),
-    ],
-    [
-      t("步数", "Steps"),
-      amount(steps.value, t("步 / 天", "steps / day"), steps.estimated),
-      coverage(steps.count),
-    ],
-    [
-      t("体重", "Weight"),
-      amount(typeof weight?.value === "number" ? weight.value : null, "kg", weight?.estimated),
-      weight?.date ?? t("记一次测量，开始追踪变化", "Log a measurement to start tracking changes"),
-    ],
-  ];
   const recent = [
     ...(training?.recent ?? []).map((session) => ({
       id: `workout-${session.id}`,
@@ -543,7 +1001,6 @@ export function HealthPage({
             <span aria-hidden="true" />
             {t("健康", "Health")}
           </h1>
-          <p>{t("这周概况与最近的记录", "This week and your recent records")}</p>
         </div>
         <div className={css.actions}>
           <button
@@ -577,6 +1034,7 @@ export function HealthPage({
             ["睡眠", "Sleep", "记录昨晚的睡眠：", "Log last night’s sleep:"],
             ["身体数据", "Measurement", "记录今天的身体数据：", "Log today’s measurements:"],
             ["体态照片", "Progress photo", "帮我记录今天的体态照片", "Help me log today’s progress photos"],
+            ["健康目标", "Health goal", "帮我设一个健康目标", "Help me set a health goal"],
           ].map(([zh, en, prompt, english]) => (
             <button
               key={zh}
@@ -609,31 +1067,7 @@ export function HealthPage({
         </p>
       ) : (
         <>
-          <dl className={css.overview} aria-label={t("健康概况", "Health summary")}>
-            {summary.map(([title, value, note], index) => (
-              <div className={css.card} key={title}>
-                <dt>{title}</dt>
-                <dd>
-                  <strong>{value}</strong>
-                  {index === 0 && target?.[0] && training.week !== null && (
-                    <progress
-                      aria-label={t("本周训练目标", "Weekly workout goal")}
-                      value={training.week}
-                      max={target[0]}
-                    />
-                  )}
-                  {index === 1 && data.nutrition.target?.[0] && protein.value !== null && (
-                    <progress
-                      aria-label={t("每日蛋白质目标", "Daily protein goal")}
-                      value={protein.value}
-                      max={data.nutrition.target[0]}
-                    />
-                  )}
-                  <small>{note}</small>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <HealthDashboard data={data} />
           {weightChanges.map(({ point, change }) => (
             <p key={point.id} className={css.warning}>
               {t(
@@ -654,94 +1088,98 @@ export function HealthPage({
             </p>
           ))}
           <div className={css.footer}>
-            <section aria-label={t("健康目标", "Health goals")}>
-              <div className={css.heading}>
-                <h2>{t("健康目标", "Health goals")}</h2>
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() => ask(t("帮我设一个健康目标", "Help me set a health goal"))}
-                >
-                  {t("新建目标", "New goal")}
-                </button>
-              </div>
-              {!data.goals.length ? (
-                <Empty>
-                  {t("和开图聊聊你想达到的健康目标。", "Tell Kaitu about a health goal you want to reach.")}
-                </Empty>
-              ) : (
-                data.goals.map((goal: MeGoal) => (
-                  <article className={`${css.card} ${css.goal}`} key={goal.id}>
-                    <h3>
-                      {t("目标", "Goal")} · {goal.title}
-                    </h3>
-                    {(goal.metric || goal.target) && (
-                      <p>{[goal.metric, goal.target].filter(Boolean).join(" · ")}</p>
+            {data.goals.length > 0 && (
+              <section aria-label={t("健康目标", "Health goals")}>
+                <div className={css.heading}>
+                  <h2>{t("健康目标", "Health goals")}</h2>
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => ask(t("帮我设一个健康目标", "Help me set a health goal"))}
+                  >
+                    {t("新建目标", "New goal")}
+                  </button>
+                </div>
+                {!data.goals.length ? (
+                  <Empty>
+                    {t("和开图聊聊你想达到的健康目标。", "Tell Kaitu about a health goal you want to reach.")}
+                  </Empty>
+                ) : (
+                  data.goals.map((goal: MeGoal) => (
+                    <article className={`${css.card} ${css.goal}`} key={goal.id}>
+                      <h3>
+                        {t("目标", "Goal")} · {goal.title}
+                      </h3>
+                      {(goal.metric || goal.target) && (
+                        <p>{[goal.metric, goal.target].filter(Boolean).join(" · ")}</p>
+                      )}
+                      {goal.approach && (
+                        <p>
+                          <span>{t("现在的做法", "Current approach")}</span>
+                          {goal.approach}
+                        </p>
+                      )}
+                      {goal.actual && (
+                        <p>
+                          <span>{t("实际发生", "What happened")}</span>
+                          {goal.actual}
+                        </p>
+                      )}
+                      {goal.due && (
+                        <p>
+                          <span>{t("下次回看", "Next review")}</span>
+                          {goal.due}
+                        </p>
+                      )}
+                    </article>
+                  ))
+                )}
+              </section>
+            )}
+            {data.next.length > 0 && (
+              <Section title={t("健康的下一步", "Health next steps")}>
+                {receipt && <output>{receipt}</output>}
+                {!data.next.length ? (
+                  <Empty>
+                    {t(
+                      "让开图根据最近的记录帮你安排下一步。",
+                      "Ask Kaitu for a next step based on your recent records.",
                     )}
-                    {goal.approach && (
-                      <p>
-                        <span>{t("现在的做法", "Current approach")}</span>
-                        {goal.approach}
-                      </p>
-                    )}
-                    {goal.actual && (
-                      <p>
-                        <span>{t("实际发生", "What happened")}</span>
-                        {goal.actual}
-                      </p>
-                    )}
-                    {goal.due && (
-                      <p>
-                        <span>{t("下次回看", "Next review")}</span>
-                        {goal.due}
-                      </p>
-                    )}
-                  </article>
-                ))
-              )}
-            </section>
-            <Section title={t("健康的下一步", "Health next steps")}>
-              {receipt && <output>{receipt}</output>}
-              {!data.next.length ? (
-                <Empty>
-                  {t(
-                    "让开图根据最近的记录帮你安排下一步。",
-                    "Ask Kaitu for a next step based on your recent records.",
-                  )}
-                </Empty>
-              ) : (
-                data.next.map((item) => (
-                  <div className={css.next} key={item.id}>
-                    <span aria-hidden="true" />
-                    <span>
-                      {directionText(item.title, 120)}
-                      {item.status === "proposed" && <small>{t(" · AI 建议", " · AI suggestion")}</small>}
-                      {item.due && <small> · {item.due}</small>}
-                    </span>
-                    {item.status === "proposed" && item.taskId && (
-                      <div className={css.actions}>
-                        <button
-                          type="button"
-                          className={css.button}
-                          disabled={!!acting}
-                          onClick={() => void decideTask(item.taskId as string, true)}
-                        >
-                          {acting === item.taskId ? t("正在保存…", "Saving…") : t("采纳", "Adopt")}
-                        </button>
-                        <button
-                          type="button"
-                          className={css.link}
-                          disabled={!!acting}
-                          onClick={() => void decideTask(item.taskId as string, false)}
-                        >
-                          {t("不用了", "Not needed")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-            </Section>
+                  </Empty>
+                ) : (
+                  data.next.map((item) => (
+                    <div className={css.next} key={item.id}>
+                      <span aria-hidden="true" />
+                      <span>
+                        {directionText(item.title, 120)}
+                        {item.status === "proposed" && <small>{t(" · AI 建议", " · AI suggestion")}</small>}
+                        {item.due && <small> · {item.due}</small>}
+                      </span>
+                      {item.status === "proposed" && item.taskId && (
+                        <div className={css.actions}>
+                          <button
+                            type="button"
+                            className={css.button}
+                            disabled={!!acting}
+                            onClick={() => void decideTask(item.taskId as string, true)}
+                          >
+                            {acting === item.taskId ? t("正在保存…", "Saving…") : t("采纳", "Adopt")}
+                          </button>
+                          <button
+                            type="button"
+                            className={css.link}
+                            disabled={!!acting}
+                            onClick={() => void decideTask(item.taskId as string, false)}
+                          >
+                            {t("不用了", "Not needed")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </Section>
+            )}
           </div>
           <Section
             title={t("最近记录", "Recent records")}

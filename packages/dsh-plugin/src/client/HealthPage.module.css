@@ -1,9 +1,175 @@
 .page {
+  --health-chart: #52745b;
+  --health-soft: #e7eee4;
+  --health-medium: #a6bea0;
+  --sleep-chart: #42658b;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+.dashboard .card {
+  border: 1px solid var(--kt-control);
+  box-shadow: none;
+}
+.dashboardValues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 28px;
+  margin: 0 0 18px;
+  font-variant-numeric: tabular-nums;
+}
+.dashboardValues dt,
+.dashboardValues time {
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+.dashboardValues dd {
+  margin: 4px 0;
+}
+.dashboardValues strong {
+  font-size: 30px;
+  font-weight: 600;
+}
+.bmiHeight {
+  margin-top: 4px;
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+.dashboardChart {
+  margin: 14px 0 0;
+}
+.dashboardChart figcaption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.dashboardChart figcaption::before {
+  content: "";
+  width: 10px;
+  height: 3px;
+  background: var(--health-chart);
+}
+.dashboardChart figcaption > span {
+  margin-left: auto;
+  color: var(--kt-muted);
+}
+.dashboardChart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dashboardChart line {
+  stroke: var(--health-chart);
+  stroke-width: 2;
+}
+.dashboardChart circle,
+.dashboardChart rect {
+  fill: var(--health-chart);
+}
+.dashboardChart g:focus-visible {
+  outline: 2px solid var(--kt-text);
+}
+.dashboardDates {
+  display: flex;
+  justify-content: space-between;
+  color: var(--kt-muted);
+  font-size: 11px;
+}
+.sleepChart {
+  --health-chart: var(--sleep-chart);
+}
+.cardioMetric + .cardioMetric {
+  margin-top: 18px;
+}
+.cardioMetric > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin: 8px 0;
+}
+.calendar > span {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: var(--kt-control);
+}
+.calendar > span[data-level="1"] {
+  background: var(--health-soft);
+}
+.calendar > span[data-level="2"] {
+  background: var(--health-medium);
+}
+.calendar > span[data-level="3"] {
+  background: var(--health-chart);
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+  font-size: 11px;
+  color: var(--kt-muted);
+}
+.legend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--kt-control);
+}
+.legend span:nth-child(2)::before {
+  background: var(--health-soft);
+}
+.legend span:nth-child(3)::before {
+  background: var(--health-medium);
+}
+.legend span:nth-child(4)::before {
+  background: var(--health-chart);
+}
+.otherMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+.otherMetrics h2 {
+  font-size: 14px;
+  margin-right: 4px;
+}
+.otherMetrics > span {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--kt-control);
+  font-size: 12px;
+}
+.otherMetrics strong {
+  font-weight: 500;
+  margin-left: 5px;
+}
+[data-theme="dark"] .page {
+  --health-chart: #adc7a7;
+  --health-soft: #303e2f;
+  --health-medium: #637f5c;
+  --sleep-chart: #9bb7dc;
+}
+@media (max-width: 800px) {
+  .dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .page h1,
 .page h2,
@@ -478,47 +644,130 @@
   }
 }
 
-.overview {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-}
-.overview dt,
-.overview small {
-  color: var(--kt-muted);
-  font-size: 12px;
-  line-height: 20px;
-}
-.overview dd {
-  margin: 8px 0 0;
-}
-.overview strong {
-  display: block;
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.overview small {
-  display: block;
-  margin-top: 8px;
-}
 .warning {
   color: var(--danger);
 }
-@container (max-width: 1179px) {
-  .overview {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@container (max-width: 639px) {
-  .overview {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 
-.overview progress {
-  width: 100%;
+.dashboardChart .rangeBand {
+  opacity: 0.14;
+}
+.dashboardChart .meanLine {
+  stroke-dasharray: 4 3;
+  opacity: 0.7;
+}
+.chartLegend,
+.stageLegend,
+.moodLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 11px;
+  color: var(--kt-muted);
+}
+.chartLegend span::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  margin-right: 5px;
+  border-top: 2px dashed var(--health-chart);
+}
+.chartLegend [data-kind="range"]::before {
   height: 8px;
-  margin-top: 10px;
-  accent-color: var(--health);
+  border: 0;
+  background: var(--health-chart);
+  opacity: 0.25;
+}
+.dashboardValues small,
+.cardioMetric > time {
+  display: block;
+  color: var(--kt-muted);
+  font-size: 12px;
+}
+.stages {
+  margin: 12px 0;
+}
+.timeline {
+  position: relative;
+  height: 64px;
+  margin-bottom: 8px;
+}
+.timeline > span {
+  position: absolute;
+  height: 12px;
+  top: 24px;
+  min-width: 1px;
+  background: var(--kt-muted);
+}
+.stageLegend span::before,
+.moodLegend span::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  background: var(--stage-color);
+}
+.timeline > [data-stage] {
+  background: var(--stage-color);
+}
+.stages [data-stage="awake"] {
+  --stage-color: #b78b56;
+  top: 0;
+}
+.stages [data-stage="asleep_rem"] {
+  --stage-color: #9bb8d3;
+  top: 15px;
+}
+.stages [data-stage="asleep_core"] {
+  --stage-color: #527ba7;
+  top: 30px;
+}
+.stages [data-stage="asleep_deep"] {
+  --stage-color: #2e4c73;
+  top: 45px;
+}
+.stages [data-stage="asleep_unspecified"] {
+  --stage-color: #858f9c;
+}
+.stages [data-stage="in_bed"] {
+  --stage-color: #aaa59c;
+}
+.moodStrip {
+  display: grid;
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+  gap: 4px;
+  margin: 12px 0;
+}
+.moodStrip > span {
+  height: 22px;
+  border-radius: 4px;
+  background: var(--stage-color);
+}
+.page [data-tone="pleasant"] {
+  --stage-color: var(--health-chart);
+}
+.page [data-tone="neutral"] {
+  --stage-color: #a6aaa0;
+}
+.page [data-tone="unpleasant"] {
+  --stage-color: #b78b56;
+}
+.page [data-tone="missing"] {
+  --stage-color: var(--kt-control);
+}
+[data-theme="dark"] .stages [data-stage="awake"],
+[data-theme="dark"] .page [data-tone="unpleasant"] {
+  --stage-color: #d0ac79;
+}
+[data-theme="dark"] .stages [data-stage="asleep_rem"] {
+  --stage-color: #b3cae2;
+}
+[data-theme="dark"] .stages [data-stage="asleep_core"] {
+  --stage-color: #7f9fc6;
+}
+[data-theme="dark"] .stages [data-stage="asleep_deep"] {
+  --stage-color: #5377a4;
+}
+[data-theme="dark"] .stages [data-stage="asleep_unspecified"] {
+  --stage-color: #9da9b7;
 }
