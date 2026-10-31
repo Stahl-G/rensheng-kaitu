@@ -1,4 +1,3 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import fs, { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -41,77 +40,16 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(join(root, "source"));
-  const started = performance.now();
-  const saves: {
-    started: number;
-    checked?: number;
-    files?: number;
-    hasPending?: boolean;
-    finished?: number;
-    committed?: boolean;
-    oid?: string | null;
-  }[] = [];
-  type Listing = { ref?: string; started: number; finished?: number; fileCount?: number };
-  const attempts: {
-    started: number;
-    head?: string;
-    headResolvedAt?: number;
-    listings?: Listing[];
-    finished?: number;
-    tracked?: boolean;
-  }[] = [];
-  const pollContext = new AsyncLocalStorage<(typeof attempts)[number]>();
-  const { default: observedGit } = await vi.importActual<{ default: typeof git }>(
-    createRequire(new URL("../../core/package.json", import.meta.url)).resolve("isomorphic-git"),
-  );
-  const resolveRef = observedGit.resolveRef;
-  vi.spyOn(observedGit, "resolveRef").mockImplementation(async (...args: unknown[]) => {
-    const oid = await Reflect.apply(resolveRef, observedGit, args);
-    const attempt = pollContext.getStore();
-    const input = args[0] as { ref?: string; dir?: string };
-    if (attempt && input.ref === "HEAD" && input.dir === ws.root) {
-      attempt.head = oid;
-      attempt.headResolvedAt = performance.now() - started;
-    }
-    return oid;
-  });
-  const listFiles = observedGit.listFiles;
-  vi.spyOn(observedGit, "listFiles").mockImplementation(async (...args: unknown[]) => {
-    const attempt = pollContext.getStore();
-    const input = args[0] as { ref?: string; dir?: string };
-    if (!attempt || input.dir !== ws.root) return Reflect.apply(listFiles, observedGit, args);
-    const listing: Listing = { ref: input.ref, started: performance.now() - started };
-    attempt.listings ??= [];
-    attempt.listings.push(listing);
-    try {
-      const files = await Reflect.apply(listFiles, observedGit, args);
-      listing.fileCount = files.length;
-      return files;
-    } finally {
-      listing.finished = performance.now() - started;
-    }
-  });
+  const snapshots: Promise<string | null>[] = [];
+  let snapshotStarted = gate<void>();
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
-  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
-    const save: (typeof saves)[number] = { started: performance.now() - started };
-    saves.push(save);
-    const message = args[1];
-    if (typeof message === "function") {
-      args[1] = (files, pending) => {
-        save.checked = performance.now() - started;
-        save.files = files.length;
-        save.hasPending = pending;
-        return message(files, pending);
-      };
+  vi.mocked(snapshotNow).mockImplementation((...args) => {
+    const result = original.snapshotNow(...args);
+    if (args[0] === ws) {
+      snapshots.push(result);
+      snapshotStarted.resolve();
     }
-    try {
-      const result = await original.snapshotNow(...args);
-      save.committed = !!result;
-      save.oid = result;
-      return result;
-    } finally {
-      save.finished = performance.now() - started;
-    }
+    return result;
   });
   const entered = gate<void>();
   const resume = gate<void>();
@@ -138,74 +76,46 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       const response = await post("capture", [`合成并发原文 ${i}`]);
       expect(response.status).toBe(200);
       const { path } = (await response.json()) as { path: string };
-      originals.set(path, ws.readText(path));
+      const originalText = ws.readText(path);
+      expect(originalText).toContain(`合成并发原文 ${i}`);
+      originals.set(path, originalText);
       return path;
     }),
   );
-  const capturedAt = performance.now() - started;
-  async function reportVersions(failedAt?: number) {
-    const head = await git.resolveRef({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
-    const versions = [];
-    const oids = new Set([
-      ...saves.flatMap((save) => (save.oid ? [save.oid] : [])),
-      ...attempts.flatMap((attempt) => (attempt.head ? [attempt.head] : [])),
-      head,
-    ]);
-    for (const oid of oids) {
-      const files: string[] = await git.listFiles({
+  // Capture returns after scheduling; observe the real background commit, never flush it here.
+  let version: string | undefined;
+  for (let index = 0; !version; index++) {
+    if (index === snapshots.length) {
+      snapshotStarted = gate<void>();
+      await snapshotStarted.promise;
+    }
+    const oid = await snapshots[index];
+    if (!oid) continue;
+    const files: string[] = await git.listFiles({
+      fs,
+      dir: ws.root,
+      gitdir: historyDirectory(ws),
+      ref: oid,
+    });
+    // An earlier/startup commit is not evidence that this concurrent batch was saved.
+    if (!captures.every((file) => files.includes(file))) continue;
+    for (const file of captures) {
+      const { blob } = await git.readBlob({
         fs,
         dir: ws.root,
         gitdir: historyDirectory(ws),
-        ref: oid,
+        oid,
+        filepath: file,
       });
-      const originalsInVersion = [];
-      for (const path of captures) {
-        const present = files.includes(path);
-        const { blob } = present
-          ? await git.readBlob({ fs, dir: ws.root, gitdir: historyDirectory(ws), oid, filepath: path })
-          : { blob: undefined };
-        originalsInVersion.push({
-          path,
-          present,
-          complete: blob !== undefined && Buffer.from(blob).toString() === originals.get(path),
-        });
-      }
-      versions.push({ oid, fileCount: files.length, originals: originalsInVersion });
+      expect(Buffer.from(blob).toString(), `${oid}:${file}`).toBe(originals.get(file));
     }
-    process.stderr.write(
-      `Concurrent capture version diagnostic ${JSON.stringify({ capturedAt, failedAt, saves, attempts, head, versions })}\n`,
-    );
+    version = oid;
   }
-  try {
-    await expect
-      .poll(() => {
-        const attempt: (typeof attempts)[number] = { started: performance.now() - started };
-        attempts.push(attempt);
-        return pollContext.run(attempt, async () => {
-          try {
-            attempt.tracked = await isTracked(ws, captures.at(-1) as string);
-            return attempt.tracked;
-          } finally {
-            attempt.finished = performance.now() - started;
-          }
-        });
-      })
-      .toBe(true);
-  } catch (error) {
-    const failedAt = performance.now() - started;
-    console.error("Concurrent capture version timing", {
-      capturedAt,
-      failedAt,
-      saves,
-      attempts,
-    });
-    await reportVersions(failedAt).catch((diagnosticError) =>
-      console.error("Version diagnostic failed", diagnosticError),
-    );
-    throw error;
-  }
-  await reportVersions();
-  for (const file of captures) expect(await isTracked(ws, file)).toBe(true);
+  expect(originals.size).toBe(12);
+  console.error("Concurrent capture committed version", {
+    oid: version,
+    completeOriginals: originals.size,
+  });
   const target = join(root, "sync");
   const moving = post("moveStorage", [target, true, "nutstore"]);
   await entered.promise;
