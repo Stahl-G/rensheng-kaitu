@@ -140,17 +140,15 @@ export class Workspace {
   resolve(rel: string, opts: { internal?: boolean } = {}): string {
     if (isAbsolute(rel)) throw new ScopeError(`只接受工作区内的相对路径：${rel}`);
     const abs = resolve(this.root, rel);
-    if (!isInside(this.root, abs)) throw new ScopeError(`路径超出工作区：${rel}`);
-    const parts = relative(this.root, abs).split(sep);
+    const local = relative(this.root, abs);
+    if (isAbsolute(local) || local === ".." || local.startsWith(`..${sep}`))
+      throw new ScopeError(`路径超出工作区：${rel}`);
+    const parts = local.split(sep);
     const top = parts[0];
     if (parts.includes(STATE_DIR) && !opts.internal)
       throw new ScopeError(`.kaitu/ 由程序管理，不能直接写入：${rel}`);
     if (parts.includes(".git")) throw new ScopeError(`不能写入版本库目录：${rel}`);
-    if (
-      top === STATE_DIR &&
-      abs !== join(this.root, STATE_DIR) &&
-      relative(this.root, abs) !== join(STATE_DIR, "config.json")
-    ) {
+    if (top === STATE_DIR && abs !== join(this.root, STATE_DIR) && local !== join(STATE_DIR, "config.json")) {
       const state = stateDirectory(this.root, this.icloud);
       return resolve(state, relative(join(this.root, STATE_DIR), abs));
     }
