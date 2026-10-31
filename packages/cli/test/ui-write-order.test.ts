@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import fs, { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   type Workspace,
   addTask,
@@ -54,24 +54,28 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   const attempts: {
     started: number;
     head?: string;
-    headResolvedAt?: number;
+    headReadAt?: number;
+    ref?: string;
     finished?: number;
     tracked?: boolean;
   }[] = [];
   const pollContext = new AsyncLocalStorage<(typeof attempts)[number]>();
-  const { default: observedGit } = await vi.importActual<{ default: typeof git }>(
-    createRequire(new URL("../../core/package.json", import.meta.url)).resolve("isomorphic-git"),
-  );
-  const resolveRef = observedGit.resolveRef;
-  vi.spyOn(observedGit, "resolveRef").mockImplementation(async (...args: unknown[]) => {
-    const oid = await Reflect.apply(resolveRef, observedGit, args);
+  const readFile = fs.promises.readFile;
+  vi.spyOn(fs.promises, "readFile").mockImplementation(async (...args: unknown[]) => {
+    const value = await Reflect.apply(readFile, fs.promises, args);
     const attempt = pollContext.getStore();
-    const input = args[0] as { ref?: string; dir?: string };
-    if (attempt && input.ref === "HEAD" && input.dir === ws.root) {
-      attempt.head = oid;
-      attempt.headResolvedAt = performance.now() - started;
+    if (attempt && typeof args[0] === "string") {
+      const ref = relative(historyDirectory(ws), args[0]).replaceAll("\\", "/");
+      if (ref === "HEAD" || ref.startsWith("refs/")) {
+        const oid = String(value).trim();
+        if (/^[0-9a-f]{40}$/.test(oid)) {
+          attempt.head = oid;
+          attempt.ref = ref;
+          attempt.headReadAt = performance.now() - started;
+        }
+      }
     }
-    return oid;
+    return value;
   });
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   vi.mocked(snapshotNow).mockImplementation(async (...args) => {
