@@ -18,7 +18,107 @@ import { type UiOptions, startUi } from "../src/ui/server.js";
 
 const syncDiagnostic = vi.hoisted(() => ({
   observe: null as null | (<T>(operation: string, run: () => Promise<T>) => Promise<T>),
+  resource: null as null | ((kind: string, key: unknown, path?: unknown, detail?: unknown) => void),
 }));
+// Test-only observers call the real operations and preserve their return values/errors.
+vi.mock("node:fs", async (original) => {
+  const fs = await original<typeof import("node:fs")>();
+  const owner = () =>
+    new Error().stack
+      ?.match(
+        /(?:home-cache|phone-snapshots|note-search|server|drive|state-binding|workspace|history)\.[cm]?[jt]s/g,
+      )
+      ?.slice(0, 3);
+  return {
+    ...fs,
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => {
+      try {
+        return fs.renameSync(...args);
+      } catch (error) {
+        syncDiagnostic.resource?.("rename-error", args[1], args[0], owner());
+        throw error;
+      }
+    },
+    openSync: (...args: Parameters<typeof fs.openSync>) => {
+      const fd = fs.openSync(...args);
+      syncDiagnostic.resource?.("open", fd, args[0], { flags: args[1], owner: owner() });
+      return fd;
+    },
+    closeSync: (fd: number) => {
+      const result = fs.closeSync(fd);
+      syncDiagnostic.resource?.("close", fd);
+      return result;
+    },
+    watch: (...args: Parameters<typeof fs.watch>) => {
+      const watcher = fs.watch(...args);
+      syncDiagnostic.resource?.("watch", watcher, args[0], owner());
+      watcher.once("close", () => syncDiagnostic.resource?.("close", watcher));
+      return watcher;
+    },
+  };
+});
+vi.mock("node:worker_threads", async (original) => {
+  const threads = await original<typeof import("node:worker_threads")>();
+  return {
+    ...threads,
+    Worker: class extends threads.Worker {
+      constructor(...args: ConstructorParameters<typeof threads.Worker>) {
+        super(...args);
+        syncDiagnostic.resource?.(
+          "worker",
+          this,
+          args[1]?.workerData?.root,
+          String(args[0]).match(/(?:home|phone)-worker\.[cm]?js/)?.[0] ?? "unknown-worker",
+        );
+        this.on("message", (message) =>
+          syncDiagnostic.resource?.(
+            "worker-response",
+            this,
+            undefined,
+            message?.summary ? "summary" : message?.data ? "data" : message?.prepared ? "prepared" : "other",
+          ),
+        );
+        this.once("exit", () => syncDiagnostic.resource?.("close", this));
+      }
+      postMessage(...args: Parameters<import("node:worker_threads").Worker["postMessage"]>) {
+        syncDiagnostic.resource?.("worker-request", this, args[0]?.root);
+        return super.postMessage(...args);
+      }
+    },
+  };
+});
+vi.mock("node:sqlite", async (original) => {
+  const sqlite = await original<typeof import("node:sqlite")>();
+  return {
+    ...sqlite,
+    DatabaseSync: class extends sqlite.DatabaseSync {
+      constructor(...args: ConstructorParameters<typeof sqlite.DatabaseSync>) {
+        super(...args);
+        syncDiagnostic.resource?.("sqlite", this, args[0]);
+      }
+      close() {
+        const result = super.close();
+        syncDiagnostic.resource?.("close", this);
+        return result;
+      }
+    },
+  };
+});
+vi.mock("node:fs/promises", async (original) => {
+  const fs = await original<typeof import("node:fs/promises")>();
+  return {
+    ...fs,
+    readFile: (...args: Parameters<typeof fs.readFile>) => {
+      const result = fs.readFile(...args);
+      syncDiagnostic.resource?.("read-pending", result, args[0]);
+      void result.then(
+        () => syncDiagnostic.resource?.("close", result),
+        () => syncDiagnostic.resource?.("close", result),
+      );
+      return result;
+    },
+  };
+});
 vi.mock("@kaitu/core", async (original) => {
   const core = await original<typeof import("@kaitu/core")>();
   const call = <T>(operation: string, run: () => Promise<T>) =>
@@ -260,10 +360,43 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
   const mark = (operation: string, detail = {}) => {
     events.push({ route, phase, operation, at: performance.now() - started, ...detail });
   };
+  const resources = new Map<unknown, { kind: string; path: unknown; detail: unknown; signal?: string }>();
+  const resourceSummary = () =>
+    [...resources.values()].map((resource) => ({
+      ...resource,
+      path: describePath(resource.path, pathRoots),
+    }));
+  syncDiagnostic.resource = (kind, key, path, detail) => {
+    if (kind === "close") resources.delete(key);
+    else if (kind === "worker-response") {
+      const resource = resources.get(key);
+      if (resource) resource.signal = String(detail);
+    } else if (kind === "worker-request") {
+      const resource = resources.get(key);
+      if (resource) Object.assign(resource, { path, signal: "request-posted" });
+    } else if (kind === "rename-error") {
+      mark("rename-error-resources", {
+        path: describePath(path, pathRoots),
+        dest: describePath(key, pathRoots),
+        caller: detail,
+        // Live handles and worker messages are observations, not proof of a Windows lock.
+        resources: [...resources.values()].map((resource) => ({
+          ...resource,
+          path: describePath(resource.path, pathRoots),
+          exactSource: resource.path === path,
+          exactTarget: resource.path === key,
+        })),
+        workerFileReads: "unknown: worker messages do not expose file handles",
+      });
+    } else resources.set(key, { kind, path, detail });
+  };
+  cleanup.push(async () => {
+    syncDiagnostic.resource = null;
+  });
   const { ws, ui } = await setup(false, {
     onWorkspaceChanging: async () => {
       phase = "execution";
-      mark("before-core-migration");
+      mark("before-core-migration", { resources: resourceSummary() });
     },
     onWorkspaceChanged: async () => {
       phase = "finalization";
