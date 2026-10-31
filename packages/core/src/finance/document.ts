@@ -1,6 +1,4 @@
 import { Unzip, UnzipInflate } from "fflate";
-import readXlsx from "read-excel-file/node";
-import { readXls } from "xls-reader";
 import { KaituError } from "../errors.js";
 import { type CsvRow, parseFinanceCsv } from "./csv.js";
 import { clean } from "./providers/shared.js";
@@ -31,11 +29,13 @@ export async function readFinanceDocument(bytes: Buffer, sheet?: string) {
   }
   if (zip || ole) {
     const sheets: ReadonlyArray<{ name: string; rows: ReadonlyArray<ReadonlyArray<unknown>> }> = zip
-      ? (await readXlsx(bytes, { parseNumber: (value) => value })).map((s) => ({
-          name: s.sheet,
-          rows: s.data,
-        }))
-      : readXls(bytes).sheets;
+      ? (await (await import("read-excel-file/node")).default(bytes, { parseNumber: (value) => value })).map(
+          (s) => ({
+            name: s.sheet,
+            rows: s.data,
+          }),
+        )
+      : (await import("xls-reader")).readXls(bytes).sheets;
     const tables = sheets
       .map((s) => ({
         name: s.name,

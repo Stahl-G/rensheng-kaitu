@@ -26,7 +26,7 @@ import {
   writePhoneSnapshots,
 } from "../src/index.js";
 import { setStateBinding } from "../src/state-binding.js";
-import { userNavigation } from "../src/user-profile.js";
+import { prepareUserProfile, publishUserProfile, userNavigation } from "../src/user-profile.js";
 import {
   type BackupFiles,
   type BackupRemote,
@@ -107,6 +107,16 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
   addRecord(second, "task", { title: "第二台正常写", status: "open" }, { by: "user" });
   expect(readRecords(second, "task")).toHaveLength(1);
   expect(second.readText("USER.md")).toBe(ws.readText("USER.md"));
+  rmSync(ws.resolve("USER.md"));
+  const prepared = prepareUserProfile(ws);
+  if (!prepared.change) throw new Error("Expected a prepared profile");
+  ws.writeText("USER.md", "# A concurrent user document\n");
+  expect(publishUserProfile(ws, prepared.change)).toBe(false);
+  expect(ws.readText("USER.md")).toBe("# A concurrent user document\n");
+  rmSync(ws.resolve("USER.md"));
+  configureProfilePublisher(ws, false);
+  expect(publishUserProfile(ws, prepared.change)).toBe(false);
+  expect(ws.exists("USER.md")).toBe(false);
 });
 
 it("来源占位撤下旧正文，恢复后再生成；画像占位不阻断修改、删除、恢复和升级", async () => {

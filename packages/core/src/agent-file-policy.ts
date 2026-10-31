@@ -4,16 +4,25 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { ScopeError } from "./errors.js";
 import { localStateRoot } from "./local-state.js";
 
-function checkedAgentPath(root: string, path: string) {
+function pathScope(root: string) {
   const realRoot = realpathSync.native(root);
-  const target = resolve(root, path);
   const home = resolve(process.env.KAITU_APP_HOME || join(process.env.HOME || homedir(), ".kaitu-app"));
-  const inside = (base: string, path: string) => {
-    const rel = relative(base, path);
-    return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
-  };
   const homeWithin = inside(root, home) || (existsSync(home) && inside(realRoot, realpathSync.native(home)));
   const managed = [localStateRoot(), ...(homeWithin ? [home] : [])];
+  const protectedRoots = [...managed, join(root, ".kaitu"), join(root, ".git")]
+    .filter((directory) => existsSync(directory))
+    .map((directory) => realpathSync.native(directory));
+  return { realRoot, managed, protectedRoots };
+}
+
+function inside(base: string, path: string) {
+  const rel = relative(base, path);
+  return rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`));
+}
+
+function checkedAgentPath(root: string, path: string, scope = pathScope(root)) {
+  const { realRoot, managed, protectedRoots } = scope;
+  const target = resolve(root, path);
   if (managed.some((directory) => inside(directory, target)))
     throw new ScopeError("本机程序状态不对 AI 开放");
   const check = (base: string, value: string) => {
@@ -42,9 +51,8 @@ function checkedAgentPath(root: string, path: string) {
   }
   const realTarget = realpathSync.native(probe);
   check(realRoot, realTarget);
-  for (const directory of [...managed, join(root, ".kaitu"), join(root, ".git")]) {
-    if (!existsSync(directory)) continue;
-    const rel = relative(realpathSync.native(directory), realTarget);
+  for (const directory of protectedRoots) {
+    const rel = relative(directory, realTarget);
     if (rel === "" || (!isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`)))
       throw new ScopeError("程序状态不对 AI 开放");
   }
@@ -54,6 +62,12 @@ function checkedAgentPath(root: string, path: string) {
       .split(sep)
       .join("/"),
   };
+}
+
+/** One synchronous traversal: roots are fixed, each target still resolves and checks its actual path. */
+export function agentPathResolver(root: string): (file: string) => string {
+  const scope = pathScope(root);
+  return (file) => checkedAgentPath(root, file, scope).relativePath;
 }
 
 export function assertAgentPath(root: string, path: string): string {

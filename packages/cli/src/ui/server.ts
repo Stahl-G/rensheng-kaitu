@@ -48,7 +48,6 @@ import {
   readPhoto,
   readPreferences,
   readWorkbench,
-  refreshOverview,
   removeMemory,
   removePhoto,
   renderTeachingFrame,
@@ -296,17 +295,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       .catch(() => {});
   };
   const notify = () => {
+    if (closed) return;
     for (const client of clients)
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
-  const home = createHomeCache(ws, notify);
+  const home = createHomeCache(ws, notify, { write: exclusive, report: () => reportError() });
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
   const weather = startWeatherSync(notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError());
+  const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive);
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -390,22 +390,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       }).catch(reportError);
     }, options.refreshDelayMs ?? 300);
   }
-  function changedFile(file: string) {
+  function changedFile(file: string, invalidateHome = true) {
     files.invalidate();
     if (closed || ignoredWorkspaceChange(file)) return;
     invalidateHistoryFile(ws, file);
     invalidateLifeAtlas(ws, file);
-    home.invalidate();
+    if (invalidateHome) home.invalidate();
     if (file === "inbox" || file.startsWith("inbox/agents") || file.startsWith("inbox/health"))
       scheduleInbox();
     clearTimeout(refreshTimer);
     refreshTimer = setTimeout(() => {
-      void exclusive(async () => {
-        refreshOverview(ws);
-        notify();
-      })
-        .then(syncCalendar)
-        .catch(reportError);
+      home.refreshDerived();
+      syncCalendar();
     }, options.refreshDelayMs ?? 300);
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
@@ -638,46 +634,46 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
             ),
           );
         }
+        if (method === "home") {
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          return res.end(home.readSerialized());
+        }
         const result =
-          method === "home"
-            ? home.read()
-            : method === "openAi"
-              ? await openAi()
-              : method.startsWith("ask") || method === "projectGoalSuggest"
-                ? await productRequest(ws, method, args, options.ask, calendarPush)
-                : relocate || method === "restoreVersion"
-                  ? await exclusive(() =>
-                      withoutSnapshotTimer(async () => {
-                        workspaceGeneration++;
-                        await calendarQueue;
-                        await saveExternal();
-                        const opening = method === "workspaceBackup" && args[0] === "activate";
-                        const target = opening
-                          ? (args[1] as { root?: unknown } | undefined)?.root
-                          : undefined;
-                        await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
-                        await phones.stop();
-                        await home.pause();
-                        const oldRoot = ws.root;
+          method === "openAi"
+            ? await openAi()
+            : method.startsWith("ask") || method === "projectGoalSuggest"
+              ? await productRequest(ws, method, args, options.ask, calendarPush)
+              : relocate || method === "restoreVersion"
+                ? await exclusive(() =>
+                    withoutSnapshotTimer(async () => {
+                      workspaceGeneration++;
+                      await calendarQueue;
+                      await saveExternal();
+                      const opening = method === "workspaceBackup" && args[0] === "activate";
+                      const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
+                      await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
+                      await phones.stop();
+                      await home.pause();
+                      const oldRoot = ws.root;
+                      try {
+                        if (relocate) await options.onWorkspaceChanging?.();
+                        return await productRequest(ws, method, args, options.ask, calendarPush);
+                      } finally {
                         try {
-                          if (relocate) await options.onWorkspaceChanging?.();
-                          return await productRequest(ws, method, args, options.ask, calendarPush);
+                          if (ws.root !== oldRoot) startWatching();
+                          if (relocate) await options.onWorkspaceChanged?.();
                         } finally {
-                          try {
-                            if (ws.root !== oldRoot) startWatching();
-                            if (relocate) await options.onWorkspaceChanged?.();
-                          } finally {
-                            home.resume();
-                            options.ask?.relocate(ws.root);
-                            phones.start();
-                            notify();
-                          }
+                          home.resume();
+                          options.ask?.relocate(ws.root);
+                          phones.start();
+                          notify();
                         }
-                      }),
-                    )
-                  : productMutations.has(method) && !backupRead
-                    ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
-                    : await productRequest(ws, method, args, options.ask, calendarPush);
+                      }
+                    }),
+                  )
+                : productMutations.has(method) && !backupRead
+                  ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
+                  : await productRequest(ws, method, args, options.ask, calendarPush);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
         if (planMutations.has(method)) syncCalendar();
         if (productMutations.has(method) && !backupRead) notify();
@@ -995,20 +991,23 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await phones.stop();
     await collectors.stop();
     stopAtlas();
-    await home.close();
     stopBackup();
     stopProjectSync();
     weather.stop();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
     disposeNoteIndex(ws);
-    await exclusive(async () => {
-      await calendarQueue;
-      await saveExternal();
-    });
+    try {
+      await exclusive(async () => {
+        await calendarQueue;
+        await saveExternal();
+      });
+    } finally {
+      await home.close({ refresh: true });
+    }
     for (const upload of uploads.values()) discardUpload(ws, upload.file);
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),
@@ -1028,7 +1027,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     stopProjectSync();
     weather.stop();
     stopOrganizer();
-    stopPhone();
+    await stopPhone();
     clearInterval(calendarTimer);
     for (const external of externalWatchers) external.close();
     clearInterval(heartbeat);
@@ -1046,7 +1045,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   // 启动前已有的改动也走后台保存；与提交共用一次盘点，不另做全量查找。
   setImmediate(() => {
     if (closed) return;
-    changedFile("工作区");
+    // createHomeCache already checked the persisted projection against the current originals.
+    changedFile("工作区", false);
     scheduleInbox();
   });
   const url = `http://127.0.0.1:${port}`;

@@ -117,11 +117,13 @@ function document<T>(ws: Workspace, file: string, fallback: T): Frontmatter<T> {
         ? "status.schema.json"
         : "rules.schema.json";
   return (
-    ws.scanParsed(file, `workbench:${schema}`, (text) => {
-      const parsed = parseFrontmatter<T>(text);
-      const data = normalizeDocument(schema, parsed.data) as T;
-      if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
-      return deepFreeze({ ...parsed, data });
+    ws.scanParsed(file, `workbench:${schema}`, {
+      read: (_text, read) => {
+        const parsed = read("frontmatter", (text) => deepFreeze(parseFrontmatter<T>(text)));
+        const data = normalizeDocument(schema, parsed.data) as T;
+        if (!schemas().builtin(schema)(data)) throw new KaituError("文档格式不合法", "INVALID_DOCUMENT");
+        return deepFreeze({ ...parsed, data });
+      },
     }) ?? { data: fallback, body: "" }
   );
 }

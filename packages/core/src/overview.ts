@@ -8,7 +8,7 @@ import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
 import { timeZoneNotice } from "./time.js";
-import { refreshUserProfile } from "./user-profile.js";
+import { prepareUserProfile, publishUserProfile } from "./user-profile.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
@@ -112,19 +112,24 @@ export async function batchOverview<T>(ws: Workspace, operation: () => Promise<T
   }
 }
 
-function put(ws: Workspace, file: string, text: string) {
-  if (ws.exists(file) && ws.scanText(file) === undefined) return;
-  if (!ws.exists(file) || ws.readText(file) !== text) ws.writeText(file, text);
-}
-
-export function refreshOverview(ws: Workspace, now = new Date()): void {
+export function prepareOverview(ws: Workspace, now = new Date()) {
+  const documents: { file: string; text: string; previous: string | undefined }[] = [];
+  let profile: ReturnType<typeof prepareUserProfile> | undefined;
   try {
-    refreshUserProfile(ws, now);
+    profile = prepareUserProfile(ws, now);
   } catch {
     /* Derived output cannot block original writes. */
   }
-  if (!ws.exists(".kaitu/config.json") || !ws.exists("NOW.md") || !ws.exists("me/rules.md")) return;
-  if ([".kaitu/config.json", "NOW.md", "me/rules.md"].some((file) => ws.scanText(file) === undefined)) return;
+  const result = { root: ws.root, documents, profile };
+  function put(file: string, text: string) {
+    const exists = ws.exists(file);
+    const previous = exists ? ws.scanText(file) : undefined;
+    if (exists && previous === undefined) return;
+    if (text !== previous) documents.push({ file, text, previous });
+  }
+  if (!ws.exists(".kaitu/config.json") || !ws.exists("NOW.md") || !ws.exists("me/rules.md")) return result;
+  if ([".kaitu/config.json", "NOW.md", "me/rules.md"].some((file) => ws.scanText(file) === undefined))
+    return result;
   const data = readStatus(ws, now, true);
   const lines = [
     `# 开图现状 · ${data.today}`,
@@ -215,12 +220,33 @@ export function refreshOverview(ws: Workspace, now = new Date()): void {
   );
   // 接力说明与整理规则随版本维护，GitHub 与同步盘使用同一份入口。
   if (syncMode(ws.root) === "drive" || workspaceBackupEnabled(ws))
-    put(ws, "AGENT-README.md", renderAgentReadme(ws, now));
-  put(ws, "ORGANIZER.md", renderOrganizer());
+    put("AGENT-README.md", renderAgentReadme(ws, now));
+  put("ORGANIZER.md", renderOrganizer());
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
   const withoutTime = (value: string) => value.replace(/^生成时间：.*$/m, "");
   if (!ws.exists("OVERVIEW.md") || withoutTime(ws.scanText("OVERVIEW.md") ?? "") !== withoutTime(text)) {
-    put(ws, "OVERVIEW.md", text);
+    put("OVERVIEW.md", text);
   }
+  return result;
+}
+
+export function publishOverview(ws: Workspace, prepared: ReturnType<typeof prepareOverview>): boolean {
+  if (prepared.root !== ws.root) return false;
+  for (const { file, previous } of prepared.documents) {
+    if ((ws.exists(file) ? ws.scanText(file) : undefined) !== previous) return false;
+  }
+  if (prepared.profile?.change) {
+    try {
+      publishUserProfile(ws, prepared.profile.change);
+    } catch {
+      /* Preserve original-write availability. */
+    }
+  }
+  for (const { file, text } of prepared.documents) ws.writeText(file, text);
+  return true;
+}
+
+export function refreshOverview(ws: Workspace, now = new Date()): void {
+  publishOverview(ws, prepareOverview(ws, now));
 }

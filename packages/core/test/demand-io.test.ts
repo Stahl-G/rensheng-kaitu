@@ -36,6 +36,9 @@ it("资料目录不读正文，收件箱逐页遍历及来源筛选不漏项，�
       "---\nupdated: null\nnext:\n  - id: topic-next\n    title: 合法主题下一步\n    status: todo\n---\n# files 主题\n",
     );
     create("custom/nested/files/STATUS.md", "---\nupdated: null\n---\n合法自建主题\n");
+    // Initialization may already have cached this text on slower filesystems.
+    // An external rewrite makes the exact cold-read assertions below deterministic.
+    create("me/STATUS.md", ws.readText("me/STATUS.md"));
     const reads = vi.spyOn(ws, "readBytes");
     const summary = readLibrary(ws, { section: "summary" });
     expect(summary.sections.some((section) => section.id === "inbox")).toBe(true);

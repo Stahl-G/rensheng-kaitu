@@ -85,6 +85,7 @@ export interface OverviewPageProps
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
+  subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
   subscribe?: (refresh: () => void) => () => void;
   capture: (text: string) => Promise<unknown>;
@@ -525,12 +526,19 @@ function Overview({
         });
     };
     refresh();
-    const unsubscribe = props.subscribe?.(refresh);
+    const unsubscribe = props.subscribeHome
+      ? props.subscribeHome((value) => {
+          if (live) setHomeState(value);
+        })
+      : props.subscribe?.(refresh);
     return () => {
       live = false;
       unsubscribe?.();
     };
-  }, [props.loadHome, props.subscribe]);
+  }, [props.loadHome, props.subscribe, props.subscribeHome]);
+  const homeReady = !props.loadHome || !!homeState?.data || !!homeState?.error;
+  const homePresentation = data ?? homeState?.presentation;
+  const readWarnings = data?.warnings ?? homeState?.presentation?.warnings ?? [];
   const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
@@ -623,19 +631,24 @@ function Overview({
     }
   }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
   useEffect(() => {
-    void refresh();
+    if (!homeReady) return;
+    // The first screen uses its own projection; unrelated reads start after React can paint it.
+    const timer = setTimeout(() => void refresh(), 0);
     return () => {
+      clearTimeout(timer);
       sequence.current++;
     };
-  }, [refresh]);
+  }, [refresh, homeReady]);
   useEffect(
     () =>
-      props.subscribe?.(() => {
-        // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。
-        if (writing.current) refreshPending.current = true;
-        else void refresh();
-      }),
-    [props.subscribe, refresh],
+      homeReady
+        ? props.subscribe?.(() => {
+            // 本机写入的通知由 run 的写后刷新接住，不同时发起另一整组读取。
+            if (writing.current) refreshPending.current = true;
+            else void refresh();
+          })
+        : undefined,
+    [props.subscribe, refresh, homeReady],
   );
   // 资料只在进入资料页时读；今天页不等待归档原文、财务和全部笔记。
   useEffect(() => {
@@ -1188,19 +1201,19 @@ function Overview({
             {error}
           </p>
         )}
-        {data?.warnings.length ? (
+        {readWarnings.length ? (
           <details className={css.small}>
             <summary>
-              {t(`${data.warnings.length} 项资料需要检查`, `${data.warnings.length} items need checking`)}
+              {t(`${readWarnings.length} 项资料需要检查`, `${readWarnings.length} items need checking`)}
             </summary>
-            {data.warnings.map((warning) => (
+            {readWarnings.map((warning) => (
               <p key={JSON.stringify(warning)}>
                 <WarningText warning={warning} />
               </p>
             ))}
           </details>
         ) : null}
-        {guide === undefined && !error && (
+        {guide === undefined && !homeState?.data && !error && (
           <output className={css.small}>{t("正在读取开图…", "Loading Kaitu…")}</output>
         )}
         {guideVisible && view !== "overview" && (
@@ -1253,95 +1266,98 @@ function Overview({
             }}
           />
         )}
-        {view === "overview" && !guideVisible && guide !== undefined && data && (
-          <>
-            <LifeHome
-              home={homeState}
-              data={data}
-              firstVisit={data.empty && !onboarding?.hasUserData}
-              writing={captureOpen}
-              capture={capture}
-              start={() => setCaptureOpen(true)}
-              library={() => openRecord(data.notes.length ? "inbox" : "")}
-              busy={busy}
-              loadProjects={props.loadProjects}
-              openProject={(slug) => {
-                openTarget({ kind: "project", id: slug }, "overview");
-              }}
-              openGoal={(id) => {
-                openTarget({ kind: "goal", id }, "overview");
-              }}
-              begin={() => startGuide(0)}
-              loadLibrary={props.loadLibrary}
-              weather={
-                props.loadWeather && props.setWeatherPlace ? (
-                  <TodayWeather
-                    load={props.loadWeather}
-                    setPlace={props.setWeatherPlace}
-                    loadLifeMap={props.loadLifeMap}
-                    subscribe={props.subscribe}
-                  />
-                ) : undefined
-              }
-              save={
-                props.captureOnce
-                  ? (text) => {
-                      void saveHome(text, false);
-                    }
-                  : undefined
-              }
-              ask={(text) => {
-                if (props.captureOnce) void saveHome(text, true);
-                else handoffAsk(text);
-              }}
-              canAsk={!!props.renderAsk}
-              askError={homeAskError}
-              saveStatus={
-                homeSaveState === "saving"
-                  ? t("正在记下…", "Saving…")
-                  : homeSaveState === "saved"
-                    ? homeAskText.trim()
-                      ? t("上一条已记下", "Previous entry saved")
-                      : t("已记下", "Saved")
-                    : ""
-              }
-              askText={homeAskText}
-              setAskText={(text) => {
-                homeDraftVersion.current++;
-                setHomeAskText(text);
-              }}
-              speech={props.speech}
-              insertSpeech={(text) => {
-                homeDraftVersion.current++;
-                setHomeAskText((current) => (current ? `${current}\n${text}` : text));
-              }}
-              loadAtlas={props.loadLifeAtlas}
-              openAtlas={() => {
-                setExplore("life-map");
-                setView("explore");
-              }}
-              adopt={(id) => void run(() => props.adoptTask(id))}
-              dismiss={(id) => void run(() => props.cancelTask(id))}
-              handover={() => setHandoverOpen(true)}
-              memory={() => startGuide(5)}
-            />
-            {handoverOpen && (
-              <section id="home-handover" tabIndex={-1} className={css.sec}>
-                <button
-                  type="button"
-                  className={css.link}
-                  onClick={() => {
-                    setHandoverOpen(false);
-                    requestAnimationFrame(() => document.getElementById("life-handover-start")?.focus());
-                  }}
-                >
-                  {t("← 返回首页", "← Back to home")}
-                </button>
-                <HandoverPanel loadHandover={props.loadHandover} onAnswer={handoverAnswer} />
-              </section>
-            )}
-          </>
-        )}
+        {view === "overview" &&
+          !guideVisible &&
+          (guide !== undefined || homeState?.data) &&
+          homePresentation && (
+            <>
+              <LifeHome
+                home={homeState}
+                data={homePresentation}
+                firstVisit={!!data?.empty && !onboarding?.hasUserData}
+                writing={captureOpen}
+                capture={capture}
+                start={() => setCaptureOpen(true)}
+                library={() => openRecord(data?.notes.length ? "inbox" : "")}
+                busy={busy}
+                loadProjects={props.loadProjects}
+                openProject={(slug) => {
+                  openTarget({ kind: "project", id: slug }, "overview");
+                }}
+                openGoal={(id) => {
+                  openTarget({ kind: "goal", id }, "overview");
+                }}
+                begin={() => startGuide(0)}
+                loadLibrary={props.loadLibrary}
+                weather={
+                  props.loadWeather && props.setWeatherPlace ? (
+                    <TodayWeather
+                      load={props.loadWeather}
+                      setPlace={props.setWeatherPlace}
+                      loadLifeMap={props.loadLifeMap}
+                      subscribe={props.subscribe}
+                    />
+                  ) : undefined
+                }
+                save={
+                  props.captureOnce
+                    ? (text) => {
+                        void saveHome(text, false);
+                      }
+                    : undefined
+                }
+                ask={(text) => {
+                  if (props.captureOnce) void saveHome(text, true);
+                  else handoffAsk(text);
+                }}
+                canAsk={!!props.renderAsk}
+                askError={homeAskError}
+                saveStatus={
+                  homeSaveState === "saving"
+                    ? t("正在记下…", "Saving…")
+                    : homeSaveState === "saved"
+                      ? homeAskText.trim()
+                        ? t("上一条已记下", "Previous entry saved")
+                        : t("已记下", "Saved")
+                      : ""
+                }
+                askText={homeAskText}
+                setAskText={(text) => {
+                  homeDraftVersion.current++;
+                  setHomeAskText(text);
+                }}
+                speech={props.speech}
+                insertSpeech={(text) => {
+                  homeDraftVersion.current++;
+                  setHomeAskText((current) => (current ? `${current}\n${text}` : text));
+                }}
+                loadAtlas={props.loadLifeAtlas}
+                openAtlas={() => {
+                  setExplore("life-map");
+                  setView("explore");
+                }}
+                adopt={(id) => void run(() => props.adoptTask(id))}
+                dismiss={(id) => void run(() => props.cancelTask(id))}
+                handover={() => setHandoverOpen(true)}
+                memory={() => startGuide(5)}
+              />
+              {handoverOpen && (
+                <section id="home-handover" tabIndex={-1} className={css.sec}>
+                  <button
+                    type="button"
+                    className={css.link}
+                    onClick={() => {
+                      setHandoverOpen(false);
+                      requestAnimationFrame(() => document.getElementById("life-handover-start")?.focus());
+                    }}
+                  >
+                    {t("← 返回首页", "← Back to home")}
+                  </button>
+                  <HandoverPanel loadHandover={props.loadHandover} onAnswer={handoverAnswer} />
+                </section>
+              )}
+            </>
+          )}
 
         {view === "records" && (
           <>

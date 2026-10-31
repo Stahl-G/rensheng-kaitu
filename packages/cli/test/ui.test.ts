@@ -3,6 +3,7 @@ import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  createHomeCache,
   history,
   localDate,
   parseFrontmatter,
@@ -18,7 +19,7 @@ const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup() {
+async function setup(prepareHome = false) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await clonedWorkspace(undefined, root);
@@ -35,6 +36,15 @@ async function setup() {
     ),
   );
   await snapshot(ws, "计划");
+  if (prepareHome) {
+    const home = createHomeCache(ws, () => {});
+    try {
+      await expect.poll(() => home.read().loading, { timeout: 15000 }).toBe(false);
+      expect(home.read().error).toBeNull();
+    } finally {
+      await home.close();
+    }
+  }
   const ui = await startUi(ws, {
     port: 0,
     open: false,
@@ -46,7 +56,18 @@ async function setup() {
   return { ws, ui };
 }
 it("拒绝错误 Host、缺少 X-Kaitu 或非本机 Origin 的写操作", async () => {
-  const { ws, ui } = await setup();
+  const { ws, ui } = await setup(true);
+  const home = await fetch(`${ui.url}/api/product/home`, {
+    method: "POST",
+    headers: { "X-Kaitu": "1", Origin: ui.url },
+    body: "[]",
+  });
+  expect(home.status).toBe(200);
+  expect(await home.json()).toMatchObject({
+    loading: false,
+    error: null,
+    data: { today: expect.any(String) },
+  });
   const before = await history(ws);
   const status = await new Promise<number | undefined>((resolve, reject) => {
     const req = httpRequest(`${ui.url}/api/state`, { headers: { Host: "attacker.example" } }, (res) => {
