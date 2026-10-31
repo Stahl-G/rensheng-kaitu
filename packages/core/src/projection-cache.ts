@@ -19,6 +19,33 @@ import { localStateRoot } from "./local-state.js";
 const version = 4;
 export type ProjectionInputs = { root: string; state: string };
 export type ProjectionManifest = [path: string, stamp: string][];
+type FingerprintKind = "directory" | "access" | "file";
+
+/** One synchronous startup observation; never reuse metadata after yielding to edits/events. */
+export class ProjectionChecks {
+  private values: Map<string, string> | undefined = new Map();
+  private input?: ProjectionInputs;
+
+  constructor() {
+    queueMicrotask(() => {
+      this.values = undefined;
+    });
+  }
+
+  read(input: ProjectionInputs, path: string, kind: FingerprintKind): string {
+    if (!this.values) return currentFingerprint(input, path, kind);
+    if (this.input?.root !== input.root || this.input?.state !== input.state) {
+      this.values.clear();
+      this.input = { ...input };
+    }
+    const key = `${kind}\0${path}`;
+    const previous = this.values.get(key);
+    if (previous !== undefined) return previous;
+    const current = currentFingerprint(input, path, kind);
+    this.values.set(key, current);
+    return current;
+  }
+}
 type Projection<T> = {
   version: number;
   root: string;
@@ -104,6 +131,14 @@ export function projectionAccessFingerprint(path: string): string {
   }
 }
 
+function currentFingerprint(input: ProjectionInputs, path: string, kind: FingerprintKind): string {
+  return kind === "directory"
+    ? directoryFingerprint(input, path)
+    : kind === "access"
+      ? projectionAccessFingerprint(path)
+      : projectionFingerprint(path);
+}
+
 /** Append the fingerprints captured before Git reads, without scanning historical source blobs. */
 export function withHistoryInputs(
   manifest: ProjectionManifest,
@@ -141,24 +176,33 @@ export function projectionManifest(input: ProjectionInputs): ProjectionManifest 
   return [...entries];
 }
 
-export function projectionUnchanged(input: ProjectionInputs, manifest: ProjectionManifest): boolean {
+export function projectionUnchanged(
+  input: ProjectionInputs,
+  manifest: ProjectionManifest,
+  checks?: ProjectionChecks,
+): boolean {
   const preferences = join(localStateRoot(), "preferences.json");
   const root = `${input.root}${sep}`;
   const state = `${input.state}${sep}`;
-  return manifest.every(
-    ([path, before]) =>
-      (path === input.root ||
+  return manifest.every(([path, before]) => {
+    if (
+      !(
+        path === input.root ||
         path === input.state ||
         path.startsWith(root) ||
         path.startsWith(state) ||
-        path === preferences) &&
-      resolve(path) === path &&
-      (before.startsWith("directory:")
-        ? directoryFingerprint(input, path)
-        : before.startsWith("access:")
-          ? projectionAccessFingerprint(path)
-          : projectionFingerprint(path)) === before,
-  );
+        path === preferences
+      ) ||
+      resolve(path) !== path
+    )
+      return false;
+    const kind = before.startsWith("directory:")
+      ? "directory"
+      : before.startsWith("access:")
+        ? "access"
+        : "file";
+    return (checks ? checks.read(input, path, kind) : currentFingerprint(input, path, kind)) === before;
+  });
 }
 
 const dayFormats = new Map<string, Intl.DateTimeFormat>();
@@ -193,6 +237,7 @@ export function readProjection<T>(
   input: ProjectionInputs,
   name: string,
   now = new Date(),
+  checks?: ProjectionChecks,
 ): Projection<T> | undefined {
   try {
     const directory = projectionDirectory(input);
@@ -215,7 +260,7 @@ export function readProjection<T>(
       (item.expires !== null && item.expires <= now.getTime()) ||
       !Array.isArray(item.manifest) ||
       !item.manifest.length ||
-      !projectionUnchanged(input, item.manifest)
+      !projectionUnchanged(input, item.manifest, checks)
     )
       return;
     return item;

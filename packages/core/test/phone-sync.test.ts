@@ -63,9 +63,7 @@ it("background phone computation publishes through the owner queue and discards 
   addRecord(ws, "task", { title: "Old root" });
   addRecord(other, "task", { title: "New root" });
   const original = ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined;
-  const status = vi.spyOn(backup, "workspaceBackupStatus").mockReturnValue({
-    connection: { enabled: true },
-  } as ReturnType<typeof backup.workspaceBackupStatus>);
+  const status = vi.spyOn(backup, "workspaceBackupEnabled").mockReturnValue(true);
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;

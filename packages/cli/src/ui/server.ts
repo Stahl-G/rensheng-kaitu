@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
-import { createHomeCache } from "@kaitu/core";
+import { createHomeCache, phoneReadable } from "@kaitu/core";
 import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
@@ -300,13 +300,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
-  const home = createHomeCache(ws, notify, { write: exclusive, report: () => reportError() });
+  // 与下面的 startPhoneSnapshots 必须紧邻、同步；其他后台写入在两者之后启动。
+  const home = createHomeCache(ws, notify, {
+    write: exclusive,
+    report: () => reportError(),
+    shareStartupChecks: phoneReadable(ws),
+  });
+  // 共享检查只限本次同步启动窗口；微任务后读数失效，后续检查重新读取原件。
+  const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive, home.startupChecks);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
   const weather = startWeatherSync(notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive);
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
