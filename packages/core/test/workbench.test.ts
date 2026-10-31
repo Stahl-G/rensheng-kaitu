@@ -2,6 +2,7 @@ import { rmSync, utimesSync, writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { normalizeStatus } from "../src/doc-input.js";
 import {
+  addRecord,
   completeNext,
   decideProposal,
   history,
@@ -9,6 +10,7 @@ import {
   initWorkspace,
   parseFrontmatter,
   readDoing,
+  readRecords,
   readStatus,
   readWorkbench,
   refreshOverview,
@@ -20,6 +22,58 @@ import {
 } from "../src/index.js";
 import { userNavigation } from "../src/user-profile.js";
 import { freshWorkspace, tmp } from "./helpers.js";
+
+it("每轮工作台读取更新类型定义，重复类型不读入，坏行仍区分只读与严格读取", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const input = { kind: "weight", value: 70, unit: "kg", source: "user" };
+    const first = addRecord(ws, "metric", input, { by: "user" });
+    const original = ws.readText(first.file);
+    expect(readWorkbench(ws).records.metric?.map((row) => row.id)).toContain(first.record.id);
+    const module = ws.readJson<{
+      id: string;
+      name: string;
+      records: Record<string, { path: string }>;
+    }>("health/module.json");
+    ws.writeJson("duplicate/module.json", { ...module, id: "duplicate-health", name: "Synthetic duplicate" });
+    expect(readWorkbench(ws).records.metric).toEqual([]);
+    let ambiguous: unknown;
+    try {
+      readRecords(ws, "metric");
+    } catch (error) {
+      ambiguous = error;
+    }
+    expect(ambiguous).toMatchObject({ code: "AMBIGUOUS_TYPE" });
+    rmSync(ws.resolve("duplicate"), { recursive: true, force: true });
+    expect(readWorkbench(ws).records.metric?.map((row) => row.id)).toContain(first.record.id);
+
+    const metric = module.records.metric;
+    if (!metric) throw new Error("Missing synthetic metric definition");
+    metric.path = "data/metrics-new/{YYYY-MM}.jsonl";
+    writeFileSync(ws.resolve("health/module.json"), JSON.stringify(module));
+    const changed = new Date(Date.now() + 5000);
+    utimesSync(ws.resolve("health/module.json"), changed, changed);
+    expect(readWorkbench(ws).records.metric).toEqual([]);
+    const second = addRecord(ws, "metric", { ...input, value: 72 }, { by: "user" });
+    expect(readWorkbench(ws).records.metric?.map((row) => row.id)).toEqual([second.record.id]);
+    writeFileSync(ws.resolve(second.file), `${ws.readText(second.file).trimEnd()}\n{broken\n`);
+    const data = readWorkbench(ws);
+    expect(data.records.metric?.map((row) => row.id)).toEqual([second.record.id]);
+    expect(data.warnings).toContainEqual(
+      expect.objectContaining({ code: "invalid_record", location: `${second.file}:2` }),
+    );
+    let corrupt: unknown;
+    try {
+      readRecords(ws, "metric");
+    } catch (error) {
+      corrupt = error;
+    }
+    expect(corrupt).toMatchObject({ code: "CORRUPT" });
+    expect(ws.readText(first.file)).toBe(original);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 it("工作台复用未变的文档，外部同长度改写、损坏和修复立即可见", async () => {
   const ws = await freshWorkspace();
