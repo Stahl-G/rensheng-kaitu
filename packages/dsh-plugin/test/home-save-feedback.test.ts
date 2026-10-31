@@ -136,3 +136,73 @@ test("the subscribed home projection renders while unrelated page reads are stil
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+test("home shows actual traces, hides empty traces and keeps genuine pending decisions", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  const sources = await readHomeSources(ws);
+  const home = readHome(sources);
+  const project = {
+    key: "project:synthetic:words",
+    date: home.today,
+    kind: "project-metric" as const,
+    label: "Synthetic project progress",
+    value: 600,
+    unit: "words",
+    estimated: false,
+    sourceFiles: ["projects/data/project_metric/2026-10.jsonl"],
+  };
+  const weight = {
+    ...project,
+    key: "metric:weight",
+    kind: "metric" as const,
+    label: "Synthetic body measurement",
+    value: 71,
+    unit: "kg",
+    sourceFiles: ["health/data/metric/2026-10.jsonl"],
+  };
+  const pending = [{ id: "proposal", title: "Synthetic user decision" }];
+  let update!: (state: import("@kaitu/core").HomeState) => void;
+  const state = (traces: import("@kaitu/core").HomeTrace[], decisions = pending) => ({
+    data: { ...home, traces, pending: decisions },
+    presentation: sources.overview,
+    loading: false,
+    error: null,
+  });
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => sources.overview,
+    loadHome: async () => state([project, weight]),
+    subscribeHome: (listener: typeof update) => {
+      update = listener;
+      return () => {};
+    },
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadLibrary: async () => ({ inbox: [] }),
+    renderAsk: () => null,
+  } as unknown as OverviewPageProps;
+  let app: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    const content = () => JSON.stringify(app?.toJSON());
+    expect(content()).toContain(project.label);
+    expect(content()).toContain(weight.label);
+    expect(content()).toContain(pending[0]?.title);
+    await act(async () => update(state([])));
+    expect(app?.root.findAllByType("ol")).toHaveLength(0);
+    expect(content()).toContain(pending[0]?.title);
+    await act(async () => update(state([], [])));
+    expect(app?.root.findAllByType("aside")).toHaveLength(0);
+    expect(app?.root.findAllByProps({ "data-has-side": false })).toHaveLength(1);
+  } finally {
+    if (app) await act(async () => app?.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
