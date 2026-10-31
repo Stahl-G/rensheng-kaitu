@@ -11,15 +11,36 @@ import {
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { appleHealthZip, clonedWorkspace } from "../../core/test/helpers.js";
-import { startUi } from "../src/ui/server.js";
+import { type UiOptions, startUi } from "../src/ui/server.js";
+
+const syncDiagnostic = vi.hoisted(() => ({
+  observe: null as null | (<T>(operation: string, run: () => Promise<T>) => Promise<T>),
+}));
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  const call = <T>(operation: string, run: () => Promise<T>) =>
+    syncDiagnostic.observe ? syncDiagnostic.observe(operation, run) : run();
+  return {
+    ...core,
+    enableSync: (...args: Parameters<typeof core.enableSync>) =>
+      call("enable", () => core.enableSync(...args)),
+    disableSync: (...args: Parameters<typeof core.disableSync>) =>
+      call("disable", () => core.disableSync(...args)),
+    snapshotNow: (...args: Parameters<typeof core.snapshotNow>) =>
+      call("snapshot", () => core.snapshotNow(...args)),
+  };
+});
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup(prepareHome = false) {
+async function setup(
+  prepareHome = false,
+  hooks: Pick<UiOptions, "onWorkspaceChanging" | "onWorkspaceChanged"> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await clonedWorkspace(undefined, root);
@@ -46,6 +67,7 @@ async function setup(prepareHome = false) {
     }
   }
   const ui = await startUi(ws, {
+    ...hooks,
     port: 0,
     open: false,
     snapshotDelayMs: 80,
@@ -220,14 +242,58 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 });
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
-  const { ws, ui } = await setup();
-  const started = performance.now();
-  const post = (path: string, body: unknown) =>
-    fetch(`${ui.url}${path}`, {
+  let started = 0;
+  let route = "";
+  let phase = "preparation";
+  const events: Record<string, unknown>[] = [];
+  const mark = (operation: string, detail = {}) => {
+    events.push({ route, phase, operation, at: performance.now() - started, ...detail });
+  };
+  const { ws, ui } = await setup(false, {
+    onWorkspaceChanging: async () => {
+      phase = "execution";
+      mark("before-core-migration");
+    },
+    onWorkspaceChanged: async () => {
+      phase = "finalization";
+      mark("after-watcher-restart");
+    },
+  });
+  started = performance.now();
+  syncDiagnostic.observe = <T>(operation: string, run: () => Promise<T>): Promise<T> => {
+    if (!route) return run();
+    const context = { route, phase };
+    mark(`${operation}-start`, context);
+    const result = run();
+    // Observe settlement while returning the original Promise/rejection unchanged.
+    void result.then(
+      () => mark(`${operation}-return`, context),
+      (error) => {
+        const detail = error as NodeJS.ErrnoException | null;
+        mark(`${operation}-error`, {
+          ...context,
+          name: detail?.name,
+          code: detail?.code,
+          syscall: detail?.syscall,
+        });
+        process.stderr.write(`Sync original error diagnostic ${JSON.stringify(events)}\n`);
+      },
+    );
+    return result;
+  };
+  cleanup.push(async () => {
+    syncDiagnostic.observe = null;
+  });
+  const post = (path: string, body: unknown) => {
+    route = path;
+    phase = "preparation";
+    mark("http-send");
+    return fetch(`${ui.url}${path}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(body),
     });
+  };
   for (const [enable, disable, body] of [
     ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
     ["/api/drive/enable", "/api/drive/disable", {}],
@@ -251,7 +317,7 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rootChanged: ws.root !== beforeEnable,
       atTarget: ws.root === join(folder, "kaitu-ai-memory"),
     };
-    expect(enabled.status, JSON.stringify({ ...enablePhase, response: enabledBody })).toBe(200);
+    expect(enabled.status, JSON.stringify({ ...enablePhase, response: enabledBody, events })).toBe(200);
     expect(enabledBody.mode).toBe("drive");
     const beforeDisable = ws.root;
     const disableSent = performance.now() - started;
@@ -265,9 +331,9 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rootChanged: ws.root !== beforeDisable,
       atTarget: ws.root === join(back, "kaitu"),
     };
-    const diagnostic = JSON.stringify({ enable: enablePhase, disable: disablePhase });
+    const diagnostic = JSON.stringify({ enable: enablePhase, disable: disablePhase, events });
     process.stderr.write(`Sync transition diagnostic ${diagnostic}\n`);
-    expect(disabled.status, JSON.stringify({ ...disablePhase, response: disabledBody })).toBe(200);
+    expect(disabled.status, JSON.stringify({ ...disablePhase, response: disabledBody, events })).toBe(200);
     expect(disabledBody.mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
   }
