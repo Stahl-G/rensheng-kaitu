@@ -4,6 +4,22 @@ import { join } from "node:path";
 import { expect, test, vi } from "vitest";
 import { createSpeech } from "../speech.mjs";
 
+const children = vi.hoisted(() => [] as import("node:child_process").ChildProcess[]);
+
+// These helpers are shell text, not the shipped Swift executable. Keep real child
+// processes and pipes without charging fresh temporary-executable startup to waitFor.
+vi.mock("node:child_process", async (importOriginal) => {
+  const childProcess = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...childProcess,
+    spawn: (file: string, args: string[], options: import("node:child_process").SpawnOptions) => {
+      const child = childProcess.spawn("/bin/sh", [file, ...args], options);
+      children.push(child);
+      return child;
+    },
+  };
+});
+
 test.skipIf(process.platform !== "darwin")(
   "speech session transfers a synthetic result, and cancellation cannot leave it running",
   async () => {
@@ -25,6 +41,9 @@ test.skipIf(process.platform !== "darwin")(
       );
       await speech.request("start");
       expect((await speech.request("cancel")).state).toBe("cancelled");
+      await vi.waitFor(() =>
+        expect(children.every((child) => child.exitCode !== null || child.signalCode !== null)).toBe(true),
+      );
     } finally {
       speech.close();
       rmSync(dir, { recursive: true, force: true });
