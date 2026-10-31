@@ -59,7 +59,8 @@ export class SchemaRegistry {
   }
 
   resolveSchema(ref: string): unknown {
-    const schema = this.compiled ? this.definitions.get(ref) : this.ajv.getSchema(ref)?.schema;
+    // The compiled index contains top-level IDs; AJV still resolves fragments and custom refs.
+    const schema = (this.compiled ? this.definitions.get(ref) : undefined) ?? this.ajv.getSchema(ref)?.schema;
     if (!schema) throw new Error(`找不到 schema：${ref}`);
     return schema;
   }
