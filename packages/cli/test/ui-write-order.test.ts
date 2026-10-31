@@ -1,8 +1,7 @@
-import { AsyncLocalStorage } from "node:async_hooks";
 import fs, { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import {
   type Workspace,
   addTask,
@@ -49,34 +48,7 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
     hasPending?: boolean;
     finished?: number;
     committed?: boolean;
-    oid?: string | null;
   }[] = [];
-  const attempts: {
-    started: number;
-    head?: string;
-    headReadAt?: number;
-    ref?: string;
-    finished?: number;
-    tracked?: boolean;
-  }[] = [];
-  const pollContext = new AsyncLocalStorage<(typeof attempts)[number]>();
-  const readFile = fs.promises.readFile;
-  vi.spyOn(fs.promises, "readFile").mockImplementation(async (...args: unknown[]) => {
-    const value = await Reflect.apply(readFile, fs.promises, args);
-    const attempt = pollContext.getStore();
-    if (attempt && typeof args[0] === "string") {
-      const ref = relative(historyDirectory(ws), args[0]).replaceAll("\\", "/");
-      if (ref === "HEAD" || ref.startsWith("refs/")) {
-        const oid = String(value).trim();
-        if (/^[0-9a-f]{40}$/.test(oid)) {
-          attempt.head = oid;
-          attempt.ref = ref;
-          attempt.headReadAt = performance.now() - started;
-        }
-      }
-    }
-    return value;
-  });
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   vi.mocked(snapshotNow).mockImplementation(async (...args) => {
     const save: (typeof saves)[number] = { started: performance.now() - started };
@@ -93,7 +65,6 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
     try {
       const result = await original.snapshotNow(...args);
       save.committed = !!result;
-      save.oid = result;
       return result;
     } finally {
       save.finished = performance.now() - started;
@@ -118,79 +89,24 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(args),
     });
-  const originals = new Map<string, string>();
   const captures = await Promise.all(
     Array.from({ length: 12 }, async (_, i) => {
       const response = await post("capture", [`合成并发原文 ${i}`]);
       expect(response.status).toBe(200);
-      const { path } = (await response.json()) as { path: string };
-      originals.set(path, ws.readText(path));
-      return path;
+      return ((await response.json()) as { path: string }).path;
     }),
   );
   const capturedAt = performance.now() - started;
-  async function reportVersions(failedAt?: number) {
-    const head = await git.resolveRef({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
-    const versions = [];
-    const oids = new Set([
-      ...saves.flatMap((save) => (save.oid ? [save.oid] : [])),
-      ...attempts.flatMap((attempt) => (attempt.head ? [attempt.head] : [])),
-      head,
-    ]);
-    for (const oid of oids) {
-      const files: string[] = await git.listFiles({
-        fs,
-        dir: ws.root,
-        gitdir: historyDirectory(ws),
-        ref: oid,
-      });
-      const originalsInVersion = [];
-      for (const path of captures) {
-        const present = files.includes(path);
-        const { blob } = present
-          ? await git.readBlob({ fs, dir: ws.root, gitdir: historyDirectory(ws), oid, filepath: path })
-          : { blob: undefined };
-        originalsInVersion.push({
-          path,
-          present,
-          complete: blob !== undefined && Buffer.from(blob).toString() === originals.get(path),
-        });
-      }
-      versions.push({ oid, fileCount: files.length, originals: originalsInVersion });
-    }
-    process.stderr.write(
-      `Concurrent capture version diagnostic ${JSON.stringify({ capturedAt, failedAt, saves, attempts, head, versions })}\n`,
-    );
-  }
   try {
-    await expect
-      .poll(() => {
-        const attempt: (typeof attempts)[number] = { started: performance.now() - started };
-        attempts.push(attempt);
-        return pollContext.run(attempt, async () => {
-          try {
-            attempt.tracked = await isTracked(ws, captures.at(-1) as string);
-            return attempt.tracked;
-          } finally {
-            attempt.finished = performance.now() - started;
-          }
-        });
-      })
-      .toBe(true);
+    await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
   } catch (error) {
-    const failedAt = performance.now() - started;
     console.error("Concurrent capture version timing", {
       capturedAt,
-      failedAt,
+      failedAt: performance.now() - started,
       saves,
-      attempts,
     });
-    await reportVersions(failedAt).catch((diagnosticError) =>
-      console.error("Version diagnostic failed", diagnosticError),
-    );
     throw error;
   }
-  await reportVersions();
   for (const file of captures) expect(await isTracked(ws, file)).toBe(true);
   const target = join(root, "sync");
   const moving = post("moveStorage", [target, true, "nutstore"]);
