@@ -669,8 +669,11 @@ function Savepoint({
 
   const threads = data.data?.threads ?? [];
   const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
+  const traces =
+    data.data?.traces.filter((trace) => trace.kind === "project-metric" || trace.kind === "metric") ?? [];
+  const hasSide = traces.length > 0 || !!data.data?.pending.length;
   return (
-    <div className={todayCss.savepointGrid}>
+    <div className={todayCss.savepointGrid} data-has-side={hasSide}>
       <section id="home-savepoint" className={todayCss.continueSection}>
         <div className={todayCss.sectionHeading}>
           <h2>{t("接着上次", "Pick up where you left off")}</h2>
@@ -723,46 +726,46 @@ function Savepoint({
         )}
         {data.error && <p role="alert">{data.error}</p>}
       </section>
-      <aside className={todayCss.savepointSide}>
-        <section className={todayCss.savepointCard}>
-          <h3>{t("最近的痕迹", "Recent traces")}</h3>
-          {data.data?.traces.length ? (
-            <ol className={todayCss.traceList}>
-              {data.data.traces.slice(0, 3).map((trace) => (
-                <li key={trace.key}>
-                  <span title={trace.label}>
-                    {trace.label}
-                    {trace.value !== null
-                      ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
-                      : ""}
-                  </span>
-                  <time dateTime={trace.date} title={trace.date}>
-                    {todayProjectDate(trace.date, data.data?.today ?? trace.date, locale)}
-                  </time>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p>{t("还没有近期痕迹", "No recent traces")}</p>
+      {hasSide && (
+        <aside className={todayCss.savepointSide}>
+          {traces.length > 0 && (
+            <section className={todayCss.savepointCard}>
+              <h3>{t("最近的痕迹", "Recent traces")}</h3>
+              <ol className={todayCss.traceList}>
+                {traces.slice(0, 3).map((trace) => (
+                  <li key={trace.key}>
+                    <span title={trace.label}>
+                      {trace.label}
+                      {trace.value !== null
+                        ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
+                        : ""}
+                    </span>
+                    <time dateTime={trace.date} title={trace.date}>
+                      {todayProjectDate(trace.date, data.data?.today ?? trace.date, locale)}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            </section>
           )}
-        </section>
-        {!!data.data?.pending.length && (
-          <section className={todayCss.savepointCard}>
-            <h3>{t("待确认", "Pending")}</h3>
-            {data.data.pending.slice(0, 2).map((item) => (
-              <div key={item.id}>
-                <p>{item.title}</p>
-                <button type="button" className={css.btn} onClick={() => adopt(item.id)}>
-                  {t("采纳", "Adopt")}
-                </button>
-                <button type="button" className={css.link} onClick={() => dismiss(item.id)}>
-                  {t("略过", "Dismiss")}
-                </button>
-              </div>
-            ))}
-          </section>
-        )}
-      </aside>
+          {!!data.data?.pending.length && (
+            <section className={todayCss.savepointCard}>
+              <h3>{t("待确认", "Pending")}</h3>
+              {data.data.pending.slice(0, 2).map((item) => (
+                <div key={item.id}>
+                  <p>{item.title}</p>
+                  <button type="button" className={css.btn} onClick={() => adopt(item.id)}>
+                    {t("采纳", "Adopt")}
+                  </button>
+                  <button type="button" className={css.link} onClick={() => dismiss(item.id)}>
+                    {t("略过", "Dismiss")}
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

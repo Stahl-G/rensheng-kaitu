@@ -2,6 +2,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it, vi } from "vitest";
 import { SchemaRegistry as PackagedSchemaRegistry } from "../dist/schema.js";
 import { schemas, validateWorkspace } from "../src/index.js";
+import { SCHEMA_BASE } from "../src/schema.js";
 import { freshWorkspace } from "./helpers.js";
 
 const base = { id: "01J9Z8Y7X6W5V4T3S2R1Q0P9N8", ts: "2026-10-15T21:00:00+08:00", by: "agent" };
@@ -31,6 +32,22 @@ it("packaged validators enforce the same fields and formats without runtime sche
   } finally {
     compile.mockRestore();
   }
+});
+
+it("packaged schemas resolve local and cross-schema fragments", () => {
+  const registry = new PackagedSchemaRegistry();
+  for (const fragment of ["post", "discussion", "post/properties/url"]) {
+    const ref = `${SCHEMA_BASE}news-item.schema.json#/$defs/${fragment}`;
+    expect(registry.resolveSchema(ref)).toEqual(schemas().resolveSchema(ref));
+  }
+  const trend = registry.resolveSchema(`${SCHEMA_BASE}trend.schema.json`) as {
+    properties: { samples: { items: { $ref: string } } };
+  };
+  const post = new URL(trend.properties.samples.items.$ref, SCHEMA_BASE).href;
+  expect(registry.resolveSchema(post)).toMatchObject({ required: ["url"] });
+  expect(() => registry.resolveSchema(`${SCHEMA_BASE}news-item.schema.json#/$defs/missing`)).toThrow(
+    "找不到 schema",
+  );
 });
 
 describe("记录 schema", () => {

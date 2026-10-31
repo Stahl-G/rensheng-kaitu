@@ -48,7 +48,10 @@ export function createHomeCache(
   let expires: number | null = null;
   let watchers: FSWatcher[] = [];
   const inputs = () => ({ root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) });
-  const cached = readProjection<Pick<HomeState, "data" | "presentation">>(inputs(), "home");
+  const previous = readProjection<Pick<HomeState, "data" | "presentation">>(inputs(), "home");
+  const cached = previous?.value.data?.traces.some((trace) => trace.kind === "version")
+    ? undefined
+    : previous;
   if (cached) {
     publish({ ...cached.value, loading: false, error: null });
     ({ timeZone, day, expires } = cached);
