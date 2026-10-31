@@ -337,7 +337,7 @@ goal_priority: [g1]
 | task（me 模块） | `title`、`status: proposed / open / done / cancelled`（Agent 新建为 proposed，用户在界面采纳后为 open；用户界面直接新增仍为 open）；可选 `due`（日期或带偏移时间）、`remind_at`（带偏移时间）、`project`（slug）、`notes`、`source` |
 | meal | `meal`（早/午/晚/加餐）、`items[]`（`name`、`grams?`）、`kcal`、`protein_g`、`carbs_g?`、`fat_g?`、`uncertainty?`、`photo?`、`source` |
 | supplement | `name`、`amount`、`unit` |
-| sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source` |
+| sleep | `start`、`end`、`duration_min`、`score?`、`hrv?`、`resting_hr?`、`source`、`stages?` |
 | activity | `date`、`steps?`、`active_kcal?`、`total_kcal?`、`source`；可选 `source_exported_at` 为健康来源导出时间，旧快照不覆盖新快照，较新纠正允许下降 |
 | metric | `kind`（weight / body_fat / height / bp / glucose / hrv_sdnn …）、`value`、`unit`、`source` |
 | symptom | `kind`、`source`；普通症状填 `severity: unspecified / mild / moderate / severe`，食欲变化只填 `appetite_change: unspecified / decreased / increased` |
@@ -350,6 +350,7 @@ goal_priority: [g1]
 | feed_item | 在 `.kaitu/cache` 中，不进版本历史；简报写入 `digests/` |
 
 待办按创建时间 `ts` 分月，状态变化通过 `updateRecord` 追加同 id 的修订，保留创建时间。
+睡眠可选 `stages`（2026-10-30 用户批准）为原始 `{start,end,stage}` 数组，时间带时区且落在该睡眠记录内；stage 沿用健康导出的 `awake/in_bed/asleep_unspecified/asleep_core/asleep_deep/asleep_rem`。旧记录不要求此字段，不从总时长猜阶段。总睡眠按 asleep 区间并集，清醒和在床不相加；具名阶段重叠冲突仅在派生视图归未分期，原始片段保留。Apple `kaitu.health.v1` 导出契约、记录自然键和追加修订不变。
 日期型 due 在用户时区当天结束后才过期，时间型 due 按具体时刻过期；今天到期和今天提醒按用户时区查询。
 `kaitu status`、OVERVIEW.md 和今天页列出今天到期、已过期、今天提醒的 open 待办；今天页可标完成。
 提醒暂由早间计划与今天页列出，推送通道留到 M5。收件箱 records 可新增 proposed task；手机 adopt_task 只采纳已有建议，同一 id 重复采纳不追加修订，笔记中的待办由晚间复盘整理。

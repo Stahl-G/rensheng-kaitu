@@ -1,5 +1,6 @@
 import { readdirSync } from "node:fs";
 import { type ReadWarning, readIssue } from "./errors.js";
+import { buildHealthDashboard, estimated, offset } from "./health-dashboard.js";
 import type { Pose } from "./photos.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, workoutSessions } from "./status.js";
@@ -8,12 +9,6 @@ import { localDate, parseTs } from "./time.js";
 import { type NextItem, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
-function offset(date: string, days: number) {
-  return new Date(Date.parse(`${date}T12:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
-}
-function estimated(row: StoredRecord) {
-  return Number(row.uncertainty) > 0 || /估算|estimate|caloriemate|nut.?ai/i.test(String(row.source));
-}
 function part(row: StoredRecord): string | null {
   if (typeof row.body_part === "string") return row.body_part;
   if (row.modality === "cardio") return null;
@@ -64,7 +59,26 @@ function cloudWorkouts(ws: Workspace, warnings: ReadWarning[]) {
   return rows;
 }
 
-export function readHealthPage(ws: Workspace, now = new Date()) {
+type CompleteHealthPage = ReturnType<typeof buildHealthPage>;
+type TrainingSession = CompleteHealthPage["training"]["recent"][number];
+type Exercise = TrainingSession["exercises"][number];
+type Measurements = Pick<Exercise, "kcal" | "avgHr" | "pace">;
+
+/** Additive fields remain optional for older providers; this reader always populates them. */
+export type HealthPageData = Omit<CompleteHealthPage, "dashboard" | "training"> & {
+  dashboard?: CompleteHealthPage["dashboard"];
+  training: Omit<CompleteHealthPage["training"], "recent"> & {
+    recent: (Omit<TrainingSession, "exercises"> & {
+      exercises: (Omit<Exercise, keyof Measurements> & Partial<Measurements>)[];
+    })[];
+  };
+};
+
+export function readHealthPage(ws: Workspace, now = new Date()): HealthPageData {
+  return buildHealthPage(ws, now);
+}
+
+function buildHealthPage(ws: Workspace, now: Date) {
   const data = readWorkbench(ws, now);
   const statusNext = data.statuses.find((s) => s.file === "health/STATUS.md")?.data.next ?? [];
   const tasks = (data.records.task ?? []) as Task[];
@@ -143,6 +157,9 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
         weight: typeof r.weight_kg === "number" ? r.weight_kg : null,
         distance: typeof r.distance_km === "number" ? r.distance_km : null,
         duration: typeof r.duration_min === "number" ? r.duration_min : null,
+        kcal: typeof r.kcal === "number" ? r.kcal : null,
+        avgHr: typeof r.avg_hr === "number" ? r.avg_hr : null,
+        pace: typeof r.avg_pace_s_per_km === "number" ? r.avg_pace_s_per_km : null,
         recorder: recorder(r),
         estimated: estimated(r),
       })),
@@ -187,9 +204,11 @@ export function readHealthPage(ws: Workspace, now = new Date()) {
     rows.push(row);
     metrics.set(key, rows);
   }
+  const dashboard = buildHealthDashboard(data.records, data.today, data.timeZone, now, data.warnings);
   return {
     ...(data.warnings.length ? { warnings: data.warnings } : {}),
     today: data.today,
+    dashboard,
     timeZone: data.timeZone,
     training: {
       week: thisWeek.length ? thisWeek.length : null,

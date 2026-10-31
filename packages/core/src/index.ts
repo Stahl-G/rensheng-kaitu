@@ -50,6 +50,8 @@ export * from "./template-version.js";
 
 export * from "./overview-page.js";
 export * from "./health-page.js";
+export type { HealthDashboard } from "./health-dashboard.js";
+export type { SleepStage } from "./sleep-stages.js";
 export * from "./github.js";
 
 export * from "./finance/index.js";
