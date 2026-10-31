@@ -4,8 +4,11 @@ import { Worker } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
 import { history, historyDirectory } from "../src/history.js";
 import { createHomeCache } from "../src/home-cache.js";
+import { phoneSnapshotsCurrent, startPhoneSnapshots, writePhoneSnapshots } from "../src/phone-snapshots.js";
 import { projectionDirectory } from "../src/projection-cache.js";
 import { addRecord } from "../src/records.js";
+import * as backup from "../src/workspace-backup.js";
+import { Workspace } from "../src/workspace.js";
 import { freshWorkspace } from "./helpers.js";
 
 it("publishes background data, retains it during refresh, and discards obsolete loads", async () => {
@@ -143,6 +146,50 @@ it("retains the worker between updates and waits for its termination on close", 
     release();
     await cache.close();
     stopping.mockRestore();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("reopens published home and phone without redundant work, then observes external edits", async () => {
+  const ws = await freshWorkspace();
+  const task = addRecord(ws, "task", { title: "Before external edit" });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  let cache = createHomeCache(ws, () => {});
+  let stopPhone = async () => {};
+  const errors: unknown[] = [];
+  const status = vi.spyOn(backup, "workspaceBackupStatus").mockReturnValue({
+    connection: { enabled: true },
+  } as ReturnType<typeof backup.workspaceBackupStatus>);
+  const requests = vi.spyOn(Worker.prototype, "postMessage");
+  try {
+    await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
+    await cache.close();
+    requests.mockClear();
+    const reopened = new Workspace(ws.root, { maintain: false });
+    cache = createHomeCache(reopened, () => {});
+    expect(cache.read()).toMatchObject({ loading: false, error: null });
+    expect(cache.read().data?.pending[0]?.title).toBe("Before external edit");
+    stopPhone = startPhoneSnapshots(reopened, (error) => errors.push(error), undefined, cache.startupChecks);
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    expect(requests).not.toHaveBeenCalled();
+    const path = ws.resolve(task.file);
+    writeFileSync(path, readFileSync(path, "utf8").replace("Before external edit", "After external edit"));
+    expect(phoneSnapshotsCurrent(reopened, new Date(), undefined, cache.startupChecks)).toBe(false);
+    await expect
+      .poll(
+        () =>
+          reopened.readJson<{ mobile: { tasks: { title: string }[] } }>("phone/today.json").mobile.tasks[0]
+            ?.title,
+        { timeout: 15000 },
+      )
+      .toBe("After external edit");
+    expect(errors).toEqual([]);
+    expect(requests).toHaveBeenCalled();
+  } finally {
+    await stopPhone();
+    await cache.close();
+    requests.mockRestore();
+    status.mockRestore();
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
