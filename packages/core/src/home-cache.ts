@@ -108,7 +108,7 @@ export function createHomeCache(
   function rebuild(onlySummary = false) {
     if (closed || paused || pending !== null) return;
     summaryOnly = onlySummary;
-    const request = { root: ws.root, generation, summary: !!options.write, summaryOnly };
+    const request = { root: ws.root, generation, summaryOnly };
     pending = generation;
     if (worker) {
       worker.ref();
@@ -184,6 +184,8 @@ export function createHomeCache(
           error: message.error ?? null,
         });
         active.unref();
+        // Obsolete data must not spend the next load's worker time preparing documents.
+        if (message.data && options.write) rebuild(true);
         notify();
       });
       active.once("error", () => failed(active, "首页读取失败"));
