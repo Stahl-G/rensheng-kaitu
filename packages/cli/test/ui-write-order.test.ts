@@ -51,10 +51,12 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
     committed?: boolean;
     oid?: string | null;
   }[] = [];
+  type Listing = { ref?: string; started: number; finished?: number; fileCount?: number };
   const attempts: {
     started: number;
     head?: string;
     headResolvedAt?: number;
+    listings?: Listing[];
     finished?: number;
     tracked?: boolean;
   }[] = [];
@@ -72,6 +74,22 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       attempt.headResolvedAt = performance.now() - started;
     }
     return oid;
+  });
+  const listFiles = observedGit.listFiles;
+  vi.spyOn(observedGit, "listFiles").mockImplementation(async (...args: unknown[]) => {
+    const attempt = pollContext.getStore();
+    const input = args[0] as { ref?: string; dir?: string };
+    if (!attempt || input.dir !== ws.root) return Reflect.apply(listFiles, observedGit, args);
+    const listing: Listing = { ref: input.ref, started: performance.now() - started };
+    attempt.listings ??= [];
+    attempt.listings.push(listing);
+    try {
+      const files = await Reflect.apply(listFiles, observedGit, args);
+      listing.fileCount = files.length;
+      return files;
+    } finally {
+      listing.finished = performance.now() - started;
+    }
   });
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   vi.mocked(snapshotNow).mockImplementation(async (...args) => {
