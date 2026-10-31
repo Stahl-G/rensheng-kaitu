@@ -137,32 +137,23 @@ test("the subscribed home projection renders while unrelated page reads are stil
   }
 });
 
-test("home shows actual traces, hides system-only traces and keeps genuine pending decisions", async () => {
+test("home shows actual traces, hides empty traces and keeps genuine pending decisions", async () => {
   browserGlobals();
   const ws = await freshWorkspace();
   const sources = await readHomeSources(ws);
   const home = readHome(sources);
-  const version = {
-    key: "version:synthetic",
-    date: home.today,
-    kind: "version" as const,
-    label: "Synthetic Agent version save",
-    value: null,
-    unit: null,
-    estimated: false,
-    sourceFiles: [],
-  };
   const project = {
-    ...version,
     key: "project:synthetic:words",
+    date: home.today,
     kind: "project-metric" as const,
     label: "Synthetic project progress",
     value: 600,
     unit: "words",
+    estimated: false,
     sourceFiles: ["projects/data/project_metric/2026-10.jsonl"],
   };
   const weight = {
-    ...version,
+    ...project,
     key: "metric:weight",
     kind: "metric" as const,
     label: "Synthetic body measurement",
@@ -182,7 +173,7 @@ test("home shows actual traces, hides system-only traces and keeps genuine pendi
     hosted: true,
     loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
     load: async () => sources.overview,
-    loadHome: async () => state([version, { ...version, key: "version:cloud" }, project, weight]),
+    loadHome: async () => state([project, weight]),
     subscribeHome: (listener: typeof update) => {
       update = listener;
       return () => {};
@@ -203,12 +194,11 @@ test("home shows actual traces, hides system-only traces and keeps genuine pendi
     const content = () => JSON.stringify(app?.toJSON());
     expect(content()).toContain(project.label);
     expect(content()).toContain(weight.label);
-    expect(content()).not.toContain(version.label);
     expect(content()).toContain(pending[0]?.title);
-    await act(async () => update(state([version])));
+    await act(async () => update(state([])));
     expect(app?.root.findAllByType("ol")).toHaveLength(0);
     expect(content()).toContain(pending[0]?.title);
-    await act(async () => update(state([version], [])));
+    await act(async () => update(state([], [])));
     expect(app?.root.findAllByType("aside")).toHaveLength(0);
     expect(app?.root.findAllByProps({ "data-has-side": false })).toHaveLength(1);
   } finally {

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -115,7 +116,7 @@ it("publishes background data, retains it during refresh, and discards obsolete 
   }
 });
 
-it("rebuilds a legacy system-only home cache so actual observations are not displaced", async () => {
+it("rebuilds the previous projection format and then reuses the current home cache", async () => {
   const ws = await freshWorkspace();
   addRecord(ws, "metric", { kind: "weight", value: 71, unit: "kg", source: "synthetic scale" });
   const input = {
@@ -147,6 +148,17 @@ it("rebuilds a legacy system-only home cache so actual observations are not disp
         },
       },
     });
+    expect(readProjection(input, "home")).toBeDefined();
+    const directory = projectionDirectory(input);
+    if (!directory) throw new Error("Expected local projection directory");
+    const file = join(directory, "home.json");
+    const envelope = JSON.parse(readFileSync(file, "utf8"));
+    const content = JSON.stringify({ ...JSON.parse(envelope.content), version: 4 });
+    writeFileSync(
+      file,
+      JSON.stringify({ checksum: createHash("sha256").update(content).digest("hex"), content }),
+    );
+    expect(readProjection(input, "home")).toBeUndefined();
     cache = createHomeCache(ws, () => {});
     expect(cache.read()).toMatchObject({ data: null, loading: true });
     await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);

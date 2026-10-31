@@ -56,7 +56,7 @@ export interface HomeThread {
 export interface HomeTrace {
   key: string;
   date: string;
-  kind: "metric" | "project-metric" | "version";
+  kind: "metric" | "project-metric";
   label: string;
   value: number | null;
   unit: string | null;

@@ -669,8 +669,7 @@ function Savepoint({
 
   const threads = data.data?.threads ?? [];
   const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
-  const traces =
-    data.data?.traces.filter((trace) => trace.kind === "project-metric" || trace.kind === "metric") ?? [];
+  const traces = data.data?.traces ?? [];
   const hasSide = traces.length > 0 || !!data.data?.pending.length;
   return (
     <div className={todayCss.savepointGrid} data-has-side={hasSide}>
