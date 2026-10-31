@@ -61,7 +61,12 @@ function organizerOn(ws: Workspace): boolean {
 }
 
 /** 总览只做查询与投影，文件和记录均通过现有 core 接口读取。 */
-export async function readOverviewPage(ws: Workspace, now = new Date(), loaded?: WorkbenchData) {
+export async function readOverviewPage(
+  ws: Workspace,
+  now = new Date(),
+  loaded?: WorkbenchData,
+  includeNotes = true,
+) {
   const data = loaded ?? readWorkbench(ws, now);
   const status = summarizeStatus(data);
   const cutoff = now.toISOString();
@@ -192,7 +197,7 @@ export async function readOverviewPage(ws: Workspace, now = new Date(), loaded?:
             ? "me"
             : "today",
   }));
-  const capturedNotes = [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")];
+  const capturedNotes = includeNotes ? [...inboxNotes(ws), ...inboxNotes(ws, "inbox/notes/done")] : [];
   const capturedWeek = capturedNotes.filter(
     (note) =>
       note.kind === "capture" &&

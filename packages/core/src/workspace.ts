@@ -83,7 +83,7 @@ export class Workspace {
   private cloud = false;
   private unread = new Set<string>();
   /** 按文件状态缓存的解析结果，见 scanParsed。 */
-  private parsed = new Map<string, { stamp: string; value: unknown }>();
+  private parsed = new Map<string, { stamp: string; text: string; values: Map<string, unknown> }>();
   private zone: { stamp: string; timeZone: string } | null = null;
 
   get isICloud(): boolean {
@@ -212,20 +212,36 @@ export class Workspace {
    * 读文件并解析；文件没变时直接用上次的结果，不再读和解析。跳过的文件与 scanText 相同。
    * 结果会被之后的请求共用，调用方不能修改（解析函数可以冻结它）。解析出错不缓存，下次照样报错。
    */
-  scanParsed<T>(rel: string, kind: string, parse: (text: string) => T): T | undefined {
+  scanParsed<T>(
+    rel: string,
+    kind: string,
+    parse:
+      | ((text: string) => T)
+      | { read: (text: string, read: <V>(kind: string, parse: (text: string) => V) => V) => T },
+  ): T | undefined {
     if (this.conflictCopy(rel) || placeholderName(rel)) return;
-    const key = `${kind}\0${rel}`;
     const stamp = this.stableStamp(rel);
-    const hit = this.parsed.get(key);
-    if (stamp && hit?.stamp === stamp) return hit.value as T;
-    const text = this.scanText(rel);
+    const previous = this.parsed.get(rel);
+    const hit = stamp && previous?.stamp === stamp ? previous : undefined;
+    if (hit?.values.has(kind)) return hit.values.get(kind) as T;
+    // Different projections may parse the same document, but share its unchanged source text.
+    const text = hit?.text ?? this.scanText(rel);
     if (text === undefined) {
-      this.parsed.delete(key);
+      this.parsed.delete(rel);
       return;
     }
-    const value = parse(text);
-    if (stamp) this.parsed.set(key, { stamp, value });
-    else this.parsed.delete(key);
+    const values = hit?.values ?? new Map<string, unknown>();
+    // A derived view can reuse an intermediate parse of this exact source text.
+    const read = <V>(kind: string, parse: (text: string) => V): V => {
+      if (values.has(kind)) return values.get(kind) as V;
+      const value = parse(text);
+      values.set(kind, value);
+      return value;
+    };
+    const value = read(kind, (text) => (typeof parse === "function" ? parse(text) : parse.read(text, read)));
+    if (stamp) {
+      this.parsed.set(rel, { stamp, text, values });
+    } else this.parsed.delete(rel);
     return value;
   }
 

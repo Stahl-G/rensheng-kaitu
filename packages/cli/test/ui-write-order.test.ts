@@ -40,6 +40,36 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(join(root, "source"));
+  const started = performance.now();
+  const saves: {
+    started: number;
+    checked?: number;
+    files?: number;
+    hasPending?: boolean;
+    finished?: number;
+    committed?: boolean;
+  }[] = [];
+  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
+    const save: (typeof saves)[number] = { started: performance.now() - started };
+    saves.push(save);
+    const message = args[1];
+    if (typeof message === "function") {
+      args[1] = (files, pending) => {
+        save.checked = performance.now() - started;
+        save.files = files.length;
+        save.hasPending = pending;
+        return message(files, pending);
+      };
+    }
+    try {
+      const result = await original.snapshotNow(...args);
+      save.committed = !!result;
+      return result;
+    } finally {
+      save.finished = performance.now() - started;
+    }
+  });
   const entered = gate<void>();
   const resume = gate<void>();
   const ui = await startUi(ws, {
@@ -66,7 +96,17 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       return ((await response.json()) as { path: string }).path;
     }),
   );
-  await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
+  const capturedAt = performance.now() - started;
+  try {
+    await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
+  } catch (error) {
+    console.error("Concurrent capture version timing", {
+      capturedAt,
+      failedAt: performance.now() - started,
+      saves,
+    });
+    throw error;
+  }
   for (const file of captures) expect(await isTracked(ws, file)).toBe(true);
   const target = join(root, "sync");
   const moving = post("moveStorage", [target, true, "nutstore"]);
@@ -132,10 +172,18 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     return fetched.promise;
   });
   const { ws, task, before, post } = await setup();
+  const trace: { event: string; ms: number }[] = [];
+  const startedAt = performance.now();
+  const mark = (event: string) => trace.push({ event, ms: performance.now() - startedAt });
+  const diagnostic = setTimeout(() => console.error("Calendar version wait", trace), 10000);
+  diagnostic.unref();
+  cleanup.push(async () => clearTimeout(diagnostic));
   const saved = gate<string>();
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   vi.mocked(snapshotNow).mockImplementation(async (...args) => {
+    mark(args[0] === ws ? "snapshot-start" : "snapshot-workspace-mismatch");
     const version = await original.snapshotNow(...args);
+    mark(version ? "snapshot-committed" : "snapshot-noop");
     if (version) {
       const { blob } = await git.readBlob({
         fs,
@@ -144,21 +192,27 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
         oid: version,
         filepath: task.file,
       });
+      mark("snapshot-blob-read");
       const revisions = Buffer.from(blob)
         .toString()
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line));
-      if (revisions.some((row) => row.id === task.record.id && row.status === "done")) saved.resolve(version);
+      if (revisions.some((row) => row.id === task.record.id && row.status === "done")) {
+        mark("completed-task-in-version");
+        saved.resolve(version);
+      } else mark("snapshot-task-not-done");
     }
     return version;
   });
   const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
   try {
     await started.promise;
+    mark("calendar-waiting");
     // 不释放网络 gate：旧的全局队列在这里无法完成。
     const done = await post("tasks/done", { id: task.record.id });
     expect(done.status).toBe(200);
+    mark("task-response");
     expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
     // Wait for a real commit containing the completed task while the network gate stays closed.
     expect(await saved.promise).not.toBe(before);

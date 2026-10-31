@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
-import { extractText, getDocumentProxy } from "unpdf";
 import { z } from "zod";
 import { KaituError } from "./errors.js";
 import {
@@ -59,6 +58,7 @@ export async function uploadResume(ws: Workspace, name: string, base64: string):
   const mime = type(bytes, name);
   const pages: string[] = [];
   if (mime === "application/pdf") {
+    const { extractText, getDocumentProxy } = await import("unpdf");
     let pdf: Awaited<ReturnType<typeof getDocumentProxy>> | undefined;
     try {
       pdf = await getDocumentProxy(new Uint8Array(bytes));

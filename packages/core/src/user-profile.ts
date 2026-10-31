@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { agentCanRead } from "./exposure.js";
+import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { deepFreeze } from "./frozen.js";
 import { redact, userProfileSections } from "./handover.js";
 import { type Locale, pick } from "./locale.js";
 import { findRecordType, listModules, recordFilePattern } from "./modules.js";
@@ -20,14 +21,15 @@ const unavailable = (locale: Locale) =>
 /** Shared, disposable discovery view. No memory titles, finance, summaries or record rows. */
 export function userNavigation(ws: Workspace) {
   const reader = { id: "handover", finance: false } as const;
+  const canRead = agentReadFilter(ws, reader);
   const modules = listModules(ws)
-    .filter((module) => agentCanRead(ws, `${module.dir}/module.json`, reader))
+    .filter((module) => canRead(`${module.dir}/module.json`))
     .map((module) => ({ path: `${module.dir}/module.json`, title: redact(module.def.name, "zh-CN") }));
   const paths = new Set(["NOW.md", "me/profile.md", "me/rules.md", "me/goals.json", "me/STATUS.md"]);
   let available = true;
   // Match the established project/topic layout; attachments, JSONL and private memories stay out.
   for (const directory of ["projects", "learning", "decisions"]) {
-    if (!agentCanRead(ws, directory, reader)) continue;
+    if (!canRead(directory)) continue;
     if (ws.isUnavailable(directory)) {
       available = false;
       continue;
@@ -40,7 +42,7 @@ export function userNavigation(ws: Workspace) {
       if (original && !original.split("/").at(-1)?.includes(".")) {
         if (ws.isUnavailable(original)) available = false;
       } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        if (!agentCanRead(ws, child, reader)) continue;
+        if (!canRead(child)) continue;
         if (ws.isUnavailable(child)) {
           available = false;
           continue;
@@ -54,23 +56,25 @@ export function userNavigation(ws: Workspace) {
   }
   const files: { path: string; title: string; updated_at: string }[] = [];
   for (const path of [...paths].sort()) {
-    if (!agentCanRead(ws, path, reader)) continue;
+    if (!canRead(path)) continue;
     if (ws.isUnavailable(path)) {
       available = false;
       continue;
     }
     if (!ws.exists(path)) continue;
-    const title = ws.scanParsed(path, "agent-navigation-title", (text) => {
-      // A missing/invalid summary never makes an original undiscoverable.
-      try {
-        const { data, body } = parseFrontmatter(text);
-        return redact(
-          typeof data.title === "string" ? data.title : (body.match(/^# +(.+)$/m)?.[1] ?? path),
-          "zh-CN",
-        ).slice(0, 120);
-      } catch {
-        return path;
-      }
+    const title = ws.scanParsed(path, "agent-navigation-title", {
+      read: (_text, read) => {
+        // A missing/invalid summary never makes an original undiscoverable.
+        try {
+          const { data, body } = read("frontmatter", (text) => deepFreeze(parseFrontmatter(text)));
+          return redact(
+            typeof data.title === "string" ? data.title : (body.match(/^# +(.+)$/m)?.[1] ?? path),
+            "zh-CN",
+          ).slice(0, 120);
+        } catch {
+          return path;
+        }
+      },
     });
     if (title === undefined) {
       available = false;
@@ -149,7 +153,7 @@ function sourceFingerprint(ws: Workspace, navigation: ReturnType<typeof userNavi
 }
 
 /** Disposable output, deliberately bypassing original-file download/history write guards. */
-export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
+export function prepareUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
   const publisher = ws.exists(setting) ? ws.readJson<{ publisher: string | null }>(setting).publisher : null;
   if (!publisher) return { status: "disabled" };
   const path = ws.resolve(file);
@@ -212,13 +216,36 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
   const oldTime = previous ? parseFrontmatter(previous).data.generated : undefined;
   if (typeof oldTime === "string" && previous === render(oldTime))
     return { status: based_on === "unavailable" ? "unavailable" : "current" };
-  const text = render(now.toISOString());
+  return {
+    status: based_on === "unavailable" ? "unavailable" : "current",
+    change: { root: ws.root, publisher, previous, evicted, text: render(now.toISOString()) },
+  };
+}
+
+export type UserProfileChange = NonNullable<ReturnType<typeof prepareUserProfile>["change"]>;
+
+/** Recheck publication ownership after background computation; never overwrite a concurrent edit. */
+export function publishUserProfile(ws: Workspace, change: UserProfileChange): boolean {
+  const { publisher, previous, evicted, text } = change;
+  if (
+    change.root !== ws.root ||
+    !ws.exists(setting) ||
+    ws.readJson<{ publisher: string | null }>(setting).publisher !== publisher ||
+    ws.isUnavailable(file) !== evicted
+  )
+    return false;
+  const path = ws.resolve(file);
+  if (!evicted) {
+    if (ws.exists(file)) {
+      if (!lstatSync(path).isFile() || readFileSync(path, "utf8") !== previous) return false;
+    } else if (previous) return false;
+  }
   if (!evicted && !ws.exists(file)) {
     try {
       writeFileSync(path, text, { flag: "wx" });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      return { status: "other-publisher" };
+      return false;
     }
   } else {
     const temp = `${path}.${randomUUID()}.tmp`;
@@ -230,5 +257,12 @@ export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Loca
     }
   }
   if (evicted) rmSync(ws.resolve(".USER.md.icloud"), { force: true });
-  return { status: based_on === "unavailable" ? "unavailable" : "current" };
+  return true;
+}
+
+export function refreshUserProfile(ws: Workspace, now = new Date(), locale: Locale = "zh-CN") {
+  const prepared = prepareUserProfile(ws, now, locale);
+  return {
+    status: prepared.change && !publishUserProfile(ws, prepared.change) ? "other-publisher" : prepared.status,
+  };
 }

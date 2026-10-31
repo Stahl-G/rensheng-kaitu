@@ -2,6 +2,7 @@ import { createReadStream, readFileSync, statSync } from "node:fs";
 import { Unzip, UnzipInflate } from "fflate";
 import { SaxesParser } from "saxes";
 import { KaituError } from "../errors.js";
+import type { SleepStageName } from "../sleep-stages.js";
 import { isoInZone, localDate, localTimeToInstant, parseTs } from "../time.js";
 import type { Workspace } from "../workspace.js";
 import { type BatchOptions, type Candidate, candidate, importBatch } from "./batch.js";
@@ -18,7 +19,15 @@ function checkInput(file: string): void {
 }
 
 const QUANTITY = "HKQuantityTypeIdentifier";
-const ASLEEP = new Set(["Asleep", "AsleepCore", "AsleepDeep", "AsleepREM", "AsleepUnspecified"]);
+const STAGES: Record<string, SleepStageName> = {
+  Asleep: "asleep_unspecified",
+  AsleepUnspecified: "asleep_unspecified",
+  AsleepCore: "asleep_core",
+  AsleepDeep: "asleep_deep",
+  AsleepREM: "asleep_rem",
+  Awake: "awake",
+  InBed: "in_bed",
+};
 interface Segment {
   start: number;
   end: number;
@@ -191,7 +200,7 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
   const ignored: Record<string, number> = { unsupported: 0, incomplete_bp: 0 };
   const pressure = new Map<string, { ts: string; systolic?: number; diastolic?: number }>();
   const daily = new Map<string, Map<string, Map<string, number>>>();
-  const sleep = new Map<string, Segment[]>();
+  const sleep = new Map<string, (Segment & { stage: SleepStageName })[]>();
   function add(sample: HealthSample) {
     if (++samples > MAX_SAMPLES) importLimit("健康文件超过 100000 个样本");
     const span = +parseTs(sample.end) - +parseTs(sample.start);
@@ -281,14 +290,15 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
     const ts = isoInZone(start, zone);
     const source = sample.source;
     if (type === "HKCategoryTypeIdentifierSleepAnalysis") {
-      if (!ASLEEP.has(String(sample.value ?? "").replace("HKCategoryValueSleepAnalysis", ""))) {
+      const stage = STAGES[String(sample.value ?? "").replace("HKCategoryValueSleepAnalysis", "")];
+      if (!stage) {
         ignored.unsupported = (ignored.unsupported ?? 0) + 1;
         return;
       }
       const end = parseTs(sample.end).getTime();
       if (end < +start) throw new Error("Invalid sleep interval");
       const segments = sleep.get(source) ?? [];
-      segments.push({ start: +start, end });
+      segments.push({ start: +start, end, stage });
       sleep.set(source, segments);
       return;
     }
@@ -427,7 +437,7 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
     }
     const nights = new Map<string, Map<string, Session[]>>();
     for (const [source, segments] of sleep) {
-      for (const session of sessions(segments)) {
+      for (const session of sessions(segments.filter((s) => s.stage.startsWith("asleep_")))) {
         // 用醒来时间向前移十二小时区分夜间睡眠与次日夜晚，保留同来源的独立小睡。
         const night = localDate(new Date(session.end - 43200000), zone);
         const sources = nights.get(night) ?? new Map<string, Session[]>();
@@ -441,8 +451,22 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
           right.reduce((sum, s) => sum + s.duration, 0) - left.reduce((sum, s) => sum + s.duration, 0) ||
           a.localeCompare(b),
       )[0];
-      for (const session of selected?.[1] ?? []) {
+      if (!selected) continue;
+      for (const session of selected[1]) {
         const start = isoInZone(new Date(session.start), zone);
+        const stages = (sleep.get(selected[0]) ?? [])
+          .filter((s) => s.start < session.end && s.end > session.start)
+          .map((s) => ({
+            start: isoInZone(new Date(Math.max(s.start, session.start)), zone),
+            end: isoInZone(new Date(Math.min(s.end, session.end)), zone),
+            stage: s.stage,
+          }))
+          .sort(
+            (a, b) =>
+              Date.parse(a.start) - Date.parse(b.start) ||
+              Date.parse(a.end) - Date.parse(b.end) ||
+              a.stage.localeCompare(b.stage),
+          );
         emit(
           candidate("sleep", {
             ts: start,
@@ -450,6 +474,7 @@ export function healthCandidates(zone: string, window?: HealthWindow) {
             end: isoInZone(new Date(session.end), zone),
             duration_min: session.duration / 60000,
             source: "apple-health",
+            stages: stages.filter((s, i) => i === 0 || JSON.stringify(s) !== JSON.stringify(stages[i - 1])),
           }),
         );
       }

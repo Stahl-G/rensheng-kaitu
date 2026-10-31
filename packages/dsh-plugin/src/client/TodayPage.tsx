@@ -57,7 +57,7 @@ export function LifeHome({
   openProject: (slug: string) => void;
   openGoal?: (id: string) => void;
   begin?: () => void;
-  data: OverviewData;
+  data: Pick<OverviewData, "today" | "timeZone" | "cutoff" | "metrics" | "proposedTasks">;
   firstVisit: boolean;
   capture: ReactNode;
   writing: boolean;

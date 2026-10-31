@@ -13,6 +13,7 @@ import {
 import { mergeNewsRecord } from "./news.js";
 import { normalizeRecordInput } from "./record-input.js";
 import { formatErrors, schemas } from "./schema.js";
+import { validSleepStages } from "./sleep-stages.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
@@ -92,6 +93,13 @@ function validateRecord(
     throw new KaituError(`「${ref.type}」记录不合法：${issues}`, "INVALID_RECORD");
   }
   // 自定义 schema 不一定引用公共字段，这里统一再校验一次
+  if (
+    ref.type === "sleep" &&
+    !record.deleted &&
+    record.stages !== undefined &&
+    !validSleepStages(record.stages, record.start, record.end)
+  )
+    throw new KaituError("睡眠阶段须在记录起止时间内且结束晚于开始", "INVALID_RECORD");
   const base = reg.builtin("record-base.schema.json");
   if (!base(record))
     throw new KaituError(
