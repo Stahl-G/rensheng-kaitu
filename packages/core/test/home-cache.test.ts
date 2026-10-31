@@ -157,16 +157,14 @@ it("reopens published home and phone without redundant work, then observes exter
   let cache = createHomeCache(ws, () => {});
   let stopPhone = async () => {};
   const errors: unknown[] = [];
-  const status = vi.spyOn(backup, "workspaceBackupStatus").mockReturnValue({
-    connection: { enabled: true },
-  } as ReturnType<typeof backup.workspaceBackupStatus>);
+  const status = vi.spyOn(backup, "workspaceBackupEnabled").mockReturnValue(true);
   const requests = vi.spyOn(Worker.prototype, "postMessage");
   try {
     await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
     await cache.close();
     requests.mockClear();
     const reopened = new Workspace(ws.root, { maintain: false });
-    cache = createHomeCache(reopened, () => {});
+    cache = createHomeCache(reopened, () => {}, { shareStartupChecks: true });
     expect(cache.read()).toMatchObject({ loading: false, error: null });
     expect(cache.read().data?.pending[0]?.title).toBe("Before external edit");
     stopPhone = startPhoneSnapshots(reopened, (error) => errors.push(error), undefined, cache.startupChecks);

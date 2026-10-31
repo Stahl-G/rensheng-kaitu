@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
-import { createHomeCache } from "@kaitu/core";
+import { createHomeCache, phoneReadable } from "@kaitu/core";
 import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
@@ -300,7 +300,11 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
-  const home = createHomeCache(ws, notify, { write: exclusive, report: () => reportError() });
+  const home = createHomeCache(ws, notify, {
+    write: exclusive,
+    report: () => reportError(),
+    shareStartupChecks: phoneReadable(ws),
+  });
   const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive, home.startupChecks);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);

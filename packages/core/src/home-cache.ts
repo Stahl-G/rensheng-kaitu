@@ -21,7 +21,11 @@ export interface HomeState {
 export function createHomeCache(
   ws: Workspace,
   notify: () => void,
-  options: { write?: WorkspaceWrite; report?: (error: unknown) => void } = {},
+  options: {
+    write?: WorkspaceWrite;
+    report?: (error: unknown) => void;
+    shareStartupChecks?: boolean;
+  } = {},
 ) {
   let state: HomeState = { data: null, loading: true, error: null };
   let serialized = JSON.stringify(state);
@@ -48,7 +52,7 @@ export function createHomeCache(
   let expires: number | null = null;
   let watchers: FSWatcher[] = [];
   const inputs = () => ({ root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) });
-  const startupChecks = new ProjectionChecks();
+  const startupChecks = options.shareStartupChecks ? new ProjectionChecks() : undefined;
   const cached = readProjection<Pick<HomeState, "data" | "presentation">>(
     inputs(),
     "home",

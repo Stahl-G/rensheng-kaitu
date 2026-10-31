@@ -25,11 +25,11 @@ import {
 import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange, readWorkbench } from "./workbench.js";
-import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
+import { subscribeWorkspaceBackup, workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export function phoneReadable(ws: Workspace) {
-  return syncMode(ws.root) !== "local" || workspaceBackupStatus(ws).connection?.enabled === true;
+  return syncMode(ws.root) !== "local" || workspaceBackupEnabled(ws);
 }
 export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
 
