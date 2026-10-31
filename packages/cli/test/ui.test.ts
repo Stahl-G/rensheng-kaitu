@@ -1,11 +1,12 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   createHomeCache,
   history,
   localDate,
+  localStateRoot,
   parseFrontmatter,
   readRecords,
   snapshot,
@@ -245,6 +246,16 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
   let started = 0;
   let route = "";
   let phase = "preparation";
+  let pathRoots: [string, string][] = [];
+  const describePath = (value: unknown, roots: [string, string][]) => {
+    if (typeof value !== "string" || !isAbsolute(value)) return "redacted";
+    for (const [role, root] of roots) {
+      const path = relative(root, value);
+      if (path === "" || (path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path)))
+        return `${role}${path ? `/${path.split(sep).join("/")}` : ""}`;
+    }
+    return "redacted";
+  };
   const events: Record<string, unknown>[] = [];
   const mark = (operation: string, detail = {}) => {
     events.push({ route, phase, operation, at: performance.now() - started, ...detail });
@@ -263,18 +274,22 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
   syncDiagnostic.observe = <T>(operation: string, run: () => Promise<T>): Promise<T> => {
     if (!route) return run();
     const context = { route, phase };
+    const roots = pathRoots;
     mark(`${operation}-start`, context);
     const result = run();
     // Observe settlement while returning the original Promise/rejection unchanged.
     void result.then(
       () => mark(`${operation}-return`, context),
       (error) => {
-        const detail = error as NodeJS.ErrnoException | null;
+        const detail = error as (NodeJS.ErrnoException & { dest?: string }) | null;
         mark(`${operation}-error`, {
           ...context,
           name: detail?.name,
           code: detail?.code,
           syscall: detail?.syscall,
+          ...(detail?.syscall === "rename"
+            ? { path: describePath(detail.path, roots), dest: describePath(detail.dest, roots) }
+            : {}),
         });
         process.stderr.write(`Sync original error diagnostic ${JSON.stringify(events)}\n`);
       },
@@ -284,7 +299,13 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
   cleanup.push(async () => {
     syncDiagnostic.observe = null;
   });
-  const post = (path: string, body: unknown) => {
+  const post = (path: string, body: unknown, target: string) => {
+    // All three scopes come from this synthetic test and its isolated local-state setup.
+    pathRoots = [
+      ["source-root", ws.root],
+      ["target-root", target],
+      ["state-root", localStateRoot()],
+    ];
     route = path;
     phase = "preparation";
     mark("http-send");
@@ -307,7 +328,7 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
     });
     const beforeEnable = ws.root;
     const enableSent = performance.now() - started;
-    const enabled = await post(enable, { ...body, dir: folder });
+    const enabled = await post(enable, { ...body, dir: folder }, join(folder, "kaitu-ai-memory"));
     const enableReturned = performance.now() - started;
     const enabledBody = await enabled.json();
     const enablePhase = {
@@ -321,7 +342,7 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
     expect(enabledBody.mode).toBe("drive");
     const beforeDisable = ws.root;
     const disableSent = performance.now() - started;
-    const disabled = await post(disable, { to: join(back, "kaitu") });
+    const disabled = await post(disable, { to: join(back, "kaitu") }, join(back, "kaitu"));
     const disableReturned = performance.now() - started;
     const disabledBody = await disabled.json();
     const disablePhase = {
