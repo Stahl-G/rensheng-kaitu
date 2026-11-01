@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,18 +24,18 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
   const ctx = new Context();
   const ws = await initWorkspace(root);
   const paths = [".agents/skills/life-portrait/SKILL.md", ".claude/skills/life-portrait/SKILL.md"] as const;
-  const stale = () =>
+  const setTemplateVersion = (template_version = "old") =>
     ws.writeJson(
       ".kaitu/config.json",
-      { ...ws.readJson<object>(".kaitu/config.json"), template_version: "old" },
+      { ...ws.readJson<object>(".kaitu/config.json"), template_version },
       { internal: true },
     );
   try {
     const original = ws.readText(paths[0]);
     expect(ws.readText(paths[1])).toBe(original);
     for (const path of paths) rmSync(ws.resolve(path));
-    stale();
-    expect((await upgradeWorkspace(ws, { dryRun: true })).changes).toEqual(expect.arrayContaining(paths));
+    setTemplateVersion("ecdb0d8cead1");
+    expect((await upgradeWorkspace(ws, { dryRun: true })).changes).toEqual(paths);
     expect(ws.exists(paths[0])).toBe(false);
     await upgradeWorkspace(ws);
     for (const path of paths) expect(ws.readText(path)).toBe(original);
@@ -54,7 +55,7 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
     for (const extra of extras) ws.writeText(extra, "Custom material");
     for (const update of [() => writeAgentsMd(ws), () => upgradeWorkspace(ws)]) {
       for (const path of paths) ws.writeText(path, oldCandidate);
-      stale();
+      setTemplateVersion();
       await update();
       for (const path of paths) expect(ws.readText(path)).toBe(original);
       for (const extra of extras) expect(ws.readText(extra)).toBe("Custom material");
@@ -62,16 +63,33 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
     const custom = `${original}\nCustom portrait instructions\n`; // 原 frontmatter 未改。
     ws.writeText(paths[0], oldCandidate);
     ws.writeText(paths[1], custom);
-    stale();
+    setTemplateVersion();
     await upgradeWorkspace(ws);
     expect(ws.readText(paths[0])).toBe(original);
     expect(ws.readText(paths[1])).toBe(custom);
     ws.writeText(paths[0], custom);
-    stale();
+    setTemplateVersion();
     await upgradeWorkspace(ws);
     writeAgentsMd(ws);
     for (const path of paths) expect(ws.readText(path)).toBe(custom);
     for (const extra of extras) expect(ws.readText(extra)).toBe("Custom material");
+    const unrelated = [".agents", ".claude"].flatMap((base) =>
+      ["SKILL.md", "reference.md"].map((name) => `${base}/skills/log-workout/${name}`),
+    );
+    for (const path of unrelated) ws.writeText(path, "Unrelated customization");
+    setTemplateVersion("ecdb0d8cead1"); // cdca9959 的实际模板版本，不伪造一次全量升级。
+    const config = ws.readText(".kaitu/config.json");
+    ws.writeText(paths[0], oldCandidate);
+    expect((await upgradeWorkspace(ws, { dryRun: true })).changes).toEqual([paths[0]]);
+    expect(ws.readText(paths[0])).toBe(oldCandidate);
+    expect(await upgradeWorkspace(ws)).toMatchObject({ changes: [paths[0]], version: null });
+    expect(ws.readText(paths[0])).toBe(original);
+    expect(ws.readText(paths[1])).toBe(custom);
+    for (const path of unrelated) expect(ws.readText(path)).toBe("Unrelated customization");
+    for (const extra of extras) expect(ws.readText(extra)).toBe("Custom material");
+    expect(ws.readText(".kaitu/config.json")).toBe(config);
+    expect((await upgradeWorkspace(ws)).changes).toEqual([]);
+    ws.writeText(paths[0], custom);
     const provider = new KaituSkillProvider(ws);
     const skill = (await provider.list({})).find((item) => item.name === "life-portrait");
     if (!skill) throw new Error("Portrait skill missing");
@@ -104,4 +122,3 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
     rmSync(root, { recursive: true, force: true });
   }
 });
-import { createHash } from "node:crypto";
