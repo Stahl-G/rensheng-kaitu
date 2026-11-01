@@ -9,12 +9,14 @@ test("portrait only fills an empty draft and saved links open outside the conver
   const requests: string[] = [];
   const openPath = vi.fn();
   const services = { openPath, findFiles: async () => [], pickDirectory: async () => null };
+  let configured = true;
+  let stream: { onmessage?: (message: { data: string }) => void };
   vi.stubGlobal("fetch", async (url: string) => {
     const method = url.split("/").at(-1) ?? "";
     requests.push(method);
     const values: Record<string, unknown> = {
       askSettings: {
-        configured: true,
+        configured,
         choice: "builtin",
         provider: "example",
         providerName: "Example",
@@ -23,7 +25,7 @@ test("portrait only fills an empty draft and saved links open outside the conver
         providers: [],
         localAgents: [],
       },
-      askList: [],
+      askList: [{ id: "existing", title: "Existing", created: "2026-11-01", updated: "2026-11-01" }],
       overview: { projects: [], allNext: [], notes: [] },
       automation: { asked: true, tasks: {} },
     };
@@ -35,6 +37,10 @@ test("portrait only fills an empty draft and saved links open outside the conver
   vi.stubGlobal(
     "EventSource",
     class {
+      constructor() {
+        stream = this;
+      }
+      onmessage?: (message: { data: string }) => void;
       close() {}
     },
   );
@@ -88,6 +94,34 @@ test("portrait only fills an empty draft and saved links open outside the conver
       1,
     );
     expect(input().props.value).toBe("");
+    await act(async () =>
+      app.root
+        .findAllByType("button")
+        .find((item) => item.children.includes("Existing"))
+        ?.props.onClick(),
+    );
+    expect(
+      app.root.findAll((item) => item.type === "button" && item.children.includes("生成我的人生开图")),
+    ).toHaveLength(0);
+    await act(async () =>
+      stream.onmessage?.({
+        data: JSON.stringify({
+          id: "synthetic-message",
+          type: "user/message",
+          data: { content: "Synthetic question" },
+        }),
+      }),
+    );
+    expect(
+      app.root.findAll((item) => item.type === "button" && item.children.includes("生成我的人生开图")),
+    ).toHaveLength(0);
+    configured = false;
+    await act(async () =>
+      app.update(wrap(createElement(AskPage, { key: "unconfigured", workspace: "synthetic" }))),
+    );
+    expect(button().props.disabled).toBe(false);
+    await act(async () => button().props.onClick());
+    expect(input().props.value).toBe("按 life-portrait 技能，为我生成人生开图");
     expect(requests).not.toContain("askSend");
     expect(requests).not.toContain("askCreate");
 

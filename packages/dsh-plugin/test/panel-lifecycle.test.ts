@@ -74,7 +74,7 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
     release,
     [Symbol.dispose]: release,
   };
-  const setDraft = vi.fn();
+  const initializeDraft = vi.fn(() => "applied" as const);
   const services: PluginAskServices = {
     workspacePath: async () => "/synthetic/kaitu",
     workspaces: { create: vi.fn(async () => ({ workspaceId: "synthetic-workspace" })) },
@@ -83,7 +83,7 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
       retain: vi.fn(() => reference),
       scope: () => scope as ReturnType<PluginAskServices["sessions"]["scope"]>,
     },
-    conversation: { input: { for: () => ({ setDraft }) } },
+    conversation: { input: { requestDraftInitialization: initializeDraft } },
   };
   const session = createPluginAskSession(services);
   const shown: SessionReference[] = [];
@@ -116,7 +116,10 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   expect(shown.at(-1)).toBe(reference);
   expect(services.sessions.create).toHaveBeenCalledTimes(1);
   expect(services.sessions.retain).toHaveBeenCalledTimes(1);
-  expect(setDraft).toHaveBeenCalledExactlyOnceWith("合成预填");
+  expect(initializeDraft).toHaveBeenCalledExactlyOnceWith(binding, {
+    prompt: "合成预填",
+    whenDraftExists: "keep",
+  });
   await act(async () => {
     root.unmount();
   });

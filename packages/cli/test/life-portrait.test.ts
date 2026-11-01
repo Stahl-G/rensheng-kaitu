@@ -5,7 +5,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { FsError } from "@deepseek-ai/dsh-fs";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
 import { openNativeAssociatedPath, openNativePath } from "@deepseek-ai/dsh-native-command";
-import { initWorkspace, stringifyFrontmatter, upgradeWorkspace, writeAgentsMd } from "@kaitu/core";
+import { initWorkspace, upgradeWorkspace, writeAgentsMd } from "@kaitu/core";
 import { expect, test, vi } from "vitest";
 import { dshFiles } from "../../core/src/dsh-files.js";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
@@ -38,18 +38,40 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
     expect(ws.exists(paths[0])).toBe(false);
     await upgradeWorkspace(ws);
     for (const path of paths) expect(ws.readText(path)).toBe(original);
-    const custom = stringifyFrontmatter(
-      { name: "life-portrait", description: "My portrait" },
-      "Custom portrait instructions",
+    // 还原未发布 v1 ZIP 的三处环境适配，完整哈希保证使用真实旧候选。
+    const oldCandidate = original
+      .replace("按钮只填入：", "按钮只需发送：")
+      .replace("`，由用户自己发送。", "`。")
+      .replace(
+        "在开图问问中用已有的文件写入工具保存 HTML，按工具提供的“仅当不存在时创建”语义防止竞争覆盖；`kaitu_workspace write` 只支持 Markdown/JSON，不能用于 HTML。",
+        "",
+      )
+      .replace(/，并使用 Markdown 链接，例如 .*?不在开图内嵌执行。/, "；");
+    expect(createHash("sha256").update(oldCandidate).digest("hex")).toBe(
+      "c7ba29142055a7ef8762715b5a6e9ff64b32c95029ac8fb3e8fa9dca33e6f957",
     );
-    for (const path of paths) ws.writeText(path, custom);
-    const extra = ".agents/skills/life-portrait/reference.md";
-    ws.writeText(extra, "Custom material");
+    const extras = paths.map((path) => path.replace("SKILL.md", "reference.md"));
+    for (const extra of extras) ws.writeText(extra, "Custom material");
+    for (const update of [() => writeAgentsMd(ws), () => upgradeWorkspace(ws)]) {
+      for (const path of paths) ws.writeText(path, oldCandidate);
+      stale();
+      await update();
+      for (const path of paths) expect(ws.readText(path)).toBe(original);
+      for (const extra of extras) expect(ws.readText(extra)).toBe("Custom material");
+    }
+    const custom = `${original}\nCustom portrait instructions\n`; // 原 frontmatter 未改。
+    ws.writeText(paths[0], oldCandidate);
+    ws.writeText(paths[1], custom);
+    stale();
+    await upgradeWorkspace(ws);
+    expect(ws.readText(paths[0])).toBe(original);
+    expect(ws.readText(paths[1])).toBe(custom);
+    ws.writeText(paths[0], custom);
     stale();
     await upgradeWorkspace(ws);
     writeAgentsMd(ws);
     for (const path of paths) expect(ws.readText(path)).toBe(custom);
-    expect(ws.readText(extra)).toBe("Custom material");
+    for (const extra of extras) expect(ws.readText(extra)).toBe("Custom material");
     const provider = new KaituSkillProvider(ws);
     const skill = (await provider.list({})).find((item) => item.name === "life-portrait");
     if (!skill) throw new Error("Portrait skill missing");
@@ -82,3 +104,4 @@ test("portrait skills survive upgrades and SDK HTML files use exclusive creation
     rmSync(root, { recursive: true, force: true });
   }
 });
+import { createHash } from "node:crypto";
