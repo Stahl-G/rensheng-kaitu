@@ -40,14 +40,20 @@ afterAll(async () => {
 export async function clonedWorkspace(
   timeZone = "Asia/Shanghai",
   root = join(tmp(), "kaitu"),
+  onStage?: (entry: CloneStage) => void,
 ): Promise<Workspace> {
   // Preserve setup progress when a test's overall deadline expires before its assertions.
   const stages: CloneStage[] = [];
   activeClones?.push(stages);
-  const mark = (stage: string) => stages.push({ stage, at: performance.now() });
+  const mark = (stage: string) => {
+    const entry = { stage, at: performance.now() };
+    stages.push(entry);
+    onStage?.(entry);
+  };
   mark("seed-wait");
   let seed = seeds.get(timeZone);
   if (!seed) {
+    mark("seed-initialize");
     seed = freshWorkspace(timeZone);
     seeds.set(timeZone, seed);
   }
