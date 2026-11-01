@@ -40,7 +40,7 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
     expect(await searchLibraryNotes(ws, "枫树")).toHaveLength(1);
     expect(read).not.toHaveBeenCalled();
   } finally {
-    disposeNoteIndex(ws);
+    await disposeNoteIndex(ws);
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
@@ -79,7 +79,7 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
     await restore(ws, saved.version as string, { path: `learning/${topic.topic}` });
     expect((await searchLibraryNotes(ws, "合成恢复正文"))[0]?.file).toBe(file);
   } finally {
-    disposeNoteIndex(ws);
+    await disposeNoteIndex(ws);
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
@@ -172,7 +172,7 @@ it("正文索引支持中英文、转义、修改、重命名和删除，热搜�
     cleanupStarted = true;
     mark("cleanup-start");
     try {
-      disposeNoteIndex(ws);
+      await disposeNoteIndex(ws);
       mark("dispose-returned");
       rmSync(ws.root, { recursive: true, force: true });
       mark("cleanup-complete");

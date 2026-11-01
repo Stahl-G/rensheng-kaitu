@@ -7,6 +7,17 @@ import { freshWorkspace } from "../../core/test/helpers.js";
 import { startUi } from "../src/ui/server.js";
 
 const active = vi.hoisted(() => new Map<FSWatcher, string>());
+const shutdown = vi.hoisted(() => ({ error: undefined as Error | undefined }));
+vi.mock("../../core/src/note-search.js", async (original) => {
+  const notes = await original<typeof import("../../core/src/note-search.js")>();
+  return {
+    ...notes,
+    disposeNoteIndex: async (ws: Parameters<typeof notes.disposeNoteIndex>[0]) => {
+      await notes.disposeNoteIndex(ws);
+      if (shutdown.error) throw shutdown.error;
+    },
+  };
+});
 vi.mock("node:fs", async (original) => {
   const fs = await original<typeof import("node:fs")>();
   return {
@@ -49,6 +60,7 @@ it("closes old directory listeners before moving and observes real edits at the 
     return response.json();
   };
   const file = "decisions/synthetic/STATUS.md";
+  const failures: unknown[] = [];
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n迁移前正文");
     expect(await search("迁移前")).toHaveLength(1);
@@ -73,13 +85,44 @@ it("closes old directory listeners before moving and observes real edits at the 
     );
     await expect.poll(() => search("新目录")).toHaveLength(1);
     await expect.poll(async () => (await home())?.threads[0]?.title, { timeout: 15000 }).toBe("新目录目标");
+    shutdown.error = new Error("synthetic index shutdown failure");
+  } catch (error) {
+    failures.push(error);
   } finally {
-    await ui.close();
-    await setImmediate();
-    expect([...active.values()]).not.toContain(ws.root);
-    expect([...active.values()]).not.toContain(dirname(ws.resolve(".kaitu/cache", { internal: true })));
-    rmSync(root, { recursive: true, force: true });
+    try {
+      if (shutdown.error) await expect(ui.close()).rejects.toBe(shutdown.error);
+      else await ui.close();
+      await expect(fetch(ui.url)).rejects.toThrow();
+    } catch (error) {
+      failures.push(error);
+      shutdown.error = undefined;
+      // Only clean up a server proved still listening; preserve any assertion failure.
+      if (
+        await fetch(ui.url).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        try {
+          await ui.close();
+        } catch (cleanupError) {
+          failures.push(cleanupError);
+        }
+      }
+    } finally {
+      shutdown.error = undefined;
+    }
+    try {
+      await setImmediate();
+      expect([...active.values()]).not.toContain(ws.root);
+      expect([...active.values()]).not.toContain(dirname(ws.resolve(".kaitu/cache", { internal: true })));
+      rmSync(root, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  if (failures.length > 1) throw new AggregateError(failures, "UI lifecycle and cleanup failed");
+  if (failures.length) throw failures[0];
 });
 
 it("refreshes an already open atlas after restoring a version at the same root", async () => {
