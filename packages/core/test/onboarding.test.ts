@@ -453,6 +453,7 @@ it("原文来源校验拒绝手机记录、伪文件名、错日期及越界路�
 it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来源的下一步并可记结果", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-matter-"));
   try {
+    vi.setSystemTime(new Date("2026-10-17T12:00:00Z"));
     const ws = await clonedWorkspace("Asia/Ho_Chi_Minh", join(root, "ws"));
     const original = "我在准备一个合成展览。AI 建议整理作品、联系场地、制作海报。";
     const matter = await saveOnboardingMatter(ws, original);
@@ -544,6 +545,7 @@ it("原文单独保存不生成待办，AI 草稿待核对，采纳一条带来�
     ).toBe(true);
     expect(validateWorkspace(ws)).toEqual([]);
   } finally {
+    vi.useRealTimers();
     rmSync(root, { recursive: true, force: true });
   }
 });
