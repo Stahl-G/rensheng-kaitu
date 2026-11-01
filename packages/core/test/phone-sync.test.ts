@@ -1,4 +1,4 @@
-import { chmodSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { expect, it, onTestFailed, vi } from "vitest";
 import { assertAgentWrite } from "../src/agent-file-policy.js";
@@ -42,7 +42,7 @@ import {
   connectWorkspaceBackup,
   syncWorkspaceBackup,
 } from "../src/workspace-backup.js";
-import { clonedWorkspace, workout } from "./helpers.js";
+import { clonedWorkspace, tmp, workout } from "./helpers.js";
 
 const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suffix}`;
 
@@ -58,7 +58,10 @@ it("background phone computation publishes through the owner queue and discards 
     });
   });
   const ws = await clonedWorkspace();
-  const other = await clonedWorkspace();
+  const otherRoot = join(tmp(), "kaitu");
+  // Reuse the maintained clone while keeping both roots independently writable.
+  cpSync(ws.root, otherRoot, { recursive: true });
+  const other = new Workspace(otherRoot, { maintain: false });
   const root = ws.root;
   addRecord(ws, "task", { title: "Old root" });
   addRecord(other, "task", { title: "New root" });
