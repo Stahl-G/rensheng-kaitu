@@ -17,6 +17,8 @@ export interface HealthPageProps {
   onSelectTab?: (tab: string) => void;
 }
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
+const hasTrainingData = (training: HealthData["training"]) =>
+  training.recent.length > 0 || training.heatmap.some((day) => day.sessions !== null);
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
 const sessions = (n: number) => `${n} ${n === 1 ? "session" : "sessions"}`;
 const reps = (n: number) => `${n} ${n === 1 ? "rep" : "reps"}`;
@@ -542,8 +544,7 @@ function HealthDashboard({ data }: { data: HealthData }) {
     : dash
       ? undefined
       : [...data.sleep].reverse().find((p) => p.value !== null);
-  const hasTraining =
-    data.training.recent.length > 0 || data.training.heatmap.some((d) => (d.sessions ?? 0) > 0);
+  const hasTraining = hasTrainingData(data.training);
   const moodTone = (value: string | null) =>
     value === "neutral"
       ? "neutral"
@@ -1256,7 +1257,7 @@ export function HealthPage({
             ))}
           </div>
           <div id="health-panel" role="tabpanel" aria-labelledby={`health-tab-${tab}`} className={css.panel}>
-            {tab === "训练" && (
+            {tab === "训练" && hasTrainingData(training) && (
               <>
                 <dl className={css.stats}>
                   {[
