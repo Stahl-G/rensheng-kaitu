@@ -19,7 +19,7 @@ import { snapshot } from "./history.js";
 import { localStateRoot } from "./local-state.js";
 import { refreshOverview } from "./overview.js";
 import { rebaseProjectLinks } from "./projects.js";
-import { setStateBinding, stateBinding } from "./state-binding.js";
+import { moveWithStateBinding, setStateBinding, stateBinding } from "./state-binding.js";
 import { requestICloudDownload } from "./sync-files.js";
 import {
   type SyncMode,
@@ -287,8 +287,9 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   }
   const extras = readdirSync(join(old, ".kaitu")).filter((file) => file !== "config.json");
   if (extras.length) throw new KaituError("同步文件夹的 .kaitu/ 有额外文件，请先核对再迁移", "CONFLICT");
-  move(old, target);
-  setStateBinding(target, join(target, ".kaitu"), "local", stateBinding(old).id);
+  moveWithStateBinding(target, join(target, ".kaitu"), "local", stateBinding(old).id, () =>
+    move(old, target),
+  );
   ws.root = target;
   try {
     rmSync(join(target, ".kaitu"), { recursive: true });
