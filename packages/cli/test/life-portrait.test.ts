@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import { FsError } from "@deepseek-ai/dsh-fs";
 import { LocalFileSystem } from "@deepseek-ai/dsh-fs-local";
 import { openNativeAssociatedPath, openNativePath } from "@deepseek-ai/dsh-native-command";
-import { initWorkspace, upgradeWorkspace, writeAgentsMd } from "@kaitu/core";
+import { Workspace, initWorkspace, upgradeWorkspace, writeAgentsMd } from "@kaitu/core";
 import { expect, test, vi } from "vitest";
+import { canWritePortraitSkill } from "../../core/src/agents-md.js";
 import { dshFiles } from "../../core/src/dsh-files.js";
 // @ts-expect-error Desktop support modules run directly in Electron Node.
 import { confinedFileSystem } from "../../desktop/sdk-filesystem.mjs";
@@ -18,6 +19,23 @@ vi.mock("@deepseek-ai/dsh-native-command", async (original) => ({
   openNativePath: vi.fn(),
   openNativeAssociatedPath: vi.fn(),
 }));
+
+test("current portrait template hash is registered in the application trust table", () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-portrait-trust-"));
+  const ws = new Workspace(root, { maintain: false });
+  const path = ".agents/skills/life-portrait/SKILL.md";
+  const template = readFileSync(new URL(`../../../templates/kaitu/${path}`, import.meta.url));
+  const hash = createHash("sha256").update(template).digest("hex");
+  try {
+    mkdirSync(dirname(ws.resolve(path)), { recursive: true });
+    writeFileSync(ws.resolve(path), template);
+    expect(canWritePortraitSkill(ws, path), `Register reviewed portrait template SHA-256: ${hash}`).toBe(
+      true,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("portrait skills survive upgrades and SDK HTML files use exclusive creation and the external opener", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-portrait-"));
