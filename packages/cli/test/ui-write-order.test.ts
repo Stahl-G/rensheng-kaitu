@@ -30,10 +30,13 @@ vi.mock("@kaitu/core", async (original) => {
   return { ...core, snapshotNow: vi.fn(core.snapshotNow) };
 });
 const cleanup: (() => Promise<unknown>)[] = [];
+const beforeClose: (() => void)[] = [];
 afterEach(async () => {
-  for (const close of cleanup.splice(0).reverse()) await close();
+  // A timed-out test does not unwind its pending promises or run its finally.
+  for (const release of beforeClose.splice(0).reverse()) release();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+  for (const close of cleanup.splice(0).reverse()) await close();
 });
 
 it("同时保存的原文都进入真实版本，搬往同步目录期间的写入排在搬迁后", async () => {
@@ -167,65 +170,72 @@ async function setup(ask?: AskService, prepare?: (ws: Workspace) => Promise<void
   return { ws, task, other, before, post };
 }
 
-it("日历网络未返回时任务可完成和存版本，恢复后不应用旧拉取", async () => {
+it("日历网络未返回时任务可完成和存版本，恢复后不应用旧拉取", async ({ signal }) => {
   const fetched = gate<Buffer>();
   const started = gate<void>();
   vi.mocked(fetchCalendar).mockImplementation(() => {
     started.resolve();
     return fetched.promise;
   });
-  const { ws, task, before, post } = await setup();
-  const trace: { event: string; ms: number }[] = [];
-  const startedAt = performance.now();
-  const mark = (event: string) => trace.push({ event, ms: performance.now() - startedAt });
-  const diagnostic = setTimeout(() => console.error("Calendar version wait", trace), 10000);
-  diagnostic.unref();
-  cleanup.push(async () => clearTimeout(diagnostic));
-  const saved = gate<string>();
-  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
-  vi.mocked(snapshotNow).mockImplementation(async (...args) => {
-    mark(args[0] === ws ? "snapshot-start" : "snapshot-workspace-mismatch");
-    const version = await original.snapshotNow(...args);
-    mark(version ? "snapshot-committed" : "snapshot-noop");
-    if (version) {
-      const { blob } = await git.readBlob({
-        fs,
-        dir: ws.root,
-        gitdir: historyDirectory(ws),
-        oid: version,
-        filepath: task.file,
-      });
-      mark("snapshot-blob-read");
-      const revisions = Buffer.from(blob)
-        .toString()
-        .trim()
-        .split("\n")
-        .map((line) => JSON.parse(line));
-      if (revisions.some((row) => row.id === task.record.id && row.status === "done")) {
-        mark("completed-task-in-version");
-        saved.resolve(version);
-      } else mark("snapshot-task-not-done");
-    }
-    return version;
-  });
-  const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
-  try {
-    await started.promise;
-    mark("calendar-waiting");
-    // 不释放网络 gate：旧的全局队列在这里无法完成。
-    const done = await post("tasks/done", { id: task.record.id });
-    expect(done.status).toBe(200);
-    mark("task-response");
-    expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
-    // Wait for a real commit containing the completed task while the network gate stays closed.
-    expect(await saved.promise).not.toBe(before);
-    expect((await post("restore", { version: before })).status).toBe(200);
-  } finally {
+  const release = () =>
     fetched.resolve(
       Buffer.from(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:old-fetch\r\nDTSTART:20261023T120000Z\r\nDTEND:20261023T130000Z\r\nSUMMARY:Synthetic\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
       ),
     );
+  beforeClose.push(release);
+  const snapshots: Promise<string | null>[] = [];
+  let snapshotStarted = gate<void>();
+  const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  // Install before startUi: a snapshot already in flight can include the later task write.
+  const { ws, task, before, post } = await setup(undefined, async (workspace) => {
+    vi.mocked(snapshotNow).mockImplementation((...args) => {
+      const result = original.snapshotNow(...args);
+      if (args[0] === workspace) {
+        snapshots.push(result);
+        snapshotStarted.resolve();
+      }
+      return result;
+    });
+  });
+  const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
+  try {
+    await started.promise;
+    // 不释放网络 gate：旧的全局队列在这里无法完成。
+    const done = await post("tasks/done", { id: task.record.id });
+    expect(done.status).toBe(200);
+    expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
+    const completed = ws.readText(task.file);
+    // A no-op is legitimate if an earlier background commit already contains this write.
+    // Inspect the actual immutable tree; do not flush or request another snapshot.
+    let saved: string | undefined;
+    for (let index = 0; !saved; index++) {
+      if (index === snapshots.length) {
+        snapshotStarted = gate<void>();
+        await snapshotStarted.promise;
+      }
+      const oid =
+        (await snapshots[index]) ??
+        (await git.resolveRef({
+          fs,
+          dir: ws.root,
+          gitdir: historyDirectory(ws),
+          ref: "HEAD",
+        }));
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid,
+        filepath: task.file,
+      });
+      if (Buffer.from(blob).toString() === completed) saved = oid;
+    }
+    signal.throwIfAborted();
+    expect(saved).not.toBe(before);
+    expect((await post("restore", { version: before })).status).toBe(200);
+  } finally {
+    release();
   }
   expect((await calendar).status).toBe(409);
   expect(readRecords(ws, "event")).toHaveLength(0);
