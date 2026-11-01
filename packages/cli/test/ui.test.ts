@@ -11,9 +11,29 @@ import {
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { appleHealthZip, clonedWorkspace } from "../../core/test/helpers.js";
 import { startUi } from "../src/ui/server.js";
+
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  const observed =
+    <Args extends unknown[], Result>(name: string, operation: (...args: Args) => Promise<Result>) =>
+    async (...args: Args) => {
+      try {
+        return await operation(...args);
+      } catch (error) {
+        // These requests only use the isolated synthetic workspace from setup().
+        console.error("sync-operation-error", { operation: name, error });
+        throw error;
+      }
+    };
+  return {
+    ...core,
+    enableSync: observed("enable", core.enableSync),
+    disableSync: observed("disable", core.disableSync),
+  };
+});
 
 const cleanup: (() => Promise<void>)[] = [];
 afterEach(async () => {
@@ -239,11 +259,15 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rmSync(back, { recursive: true, force: true });
     });
     const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
+    const enabledBody = await enabled.json();
+    console.info("sync-request-stage", { route: enable, status: enabled.status, body: enabledBody });
+    expect(enabled.status, JSON.stringify(enabledBody)).toBe(200);
+    expect(enabledBody.mode).toBe("drive");
     const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
+    const disabledBody = await disabled.json();
+    console.info("sync-request-stage", { route: disable, status: disabled.status, body: disabledBody });
+    expect(disabled.status, JSON.stringify(disabledBody)).toBe(200);
+    expect(disabledBody.mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
   }
 });

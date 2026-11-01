@@ -22,6 +22,7 @@ type IndexState = {
   watcher?: FSWatcher;
 };
 const indexes = new WeakMap<Workspace, IndexState>();
+const pauses = new WeakMap<Workspace, { done: Promise<boolean>; resume: (open: boolean) => void }>();
 const notePath = /^(learning|decisions)\/[^./][^/]*\/STATUS\.md$/;
 
 export function invalidateNoteIndex(ws: Workspace, file: string): void {
@@ -34,6 +35,55 @@ export function invalidateNoteIndex(ws: Workspace, file: string): void {
 export function disposeNoteIndex(ws: Workspace): void {
   indexes.get(ws)?.watcher?.close();
   indexes.delete(ws);
+  pauses.get(ws)?.resume(false);
+  pauses.delete(ws);
+}
+
+/** Stop the listener and drain an in-flight SQLite build before moving its directories. */
+export async function pauseNoteIndex(ws: Workspace): Promise<void> {
+  if (!pauses.has(ws)) {
+    let resume!: (open: boolean) => void;
+    const done = new Promise<boolean>((resolve) => {
+      resume = resolve;
+    });
+    pauses.set(ws, { done, resume });
+  }
+  const state = indexes.get(ws);
+  state?.watcher?.close();
+  if (state) state.watcher = undefined;
+  await state?.pending;
+}
+
+export function resumeNoteIndex(ws: Workspace): void {
+  const pause = pauses.get(ws);
+  if (!pause) return;
+  const state = indexes.get(ws);
+  if (state) {
+    state.root = ws.root;
+    state.dirty = null;
+    observe(ws, state);
+  }
+  pauses.delete(ws);
+  pause.resume(true);
+}
+
+function observe(ws: Workspace, state: IndexState) {
+  try {
+    const watcher = watch(ws.root, { recursive: true }, (_event, file) => {
+      if (file) invalidateNoteIndex(ws, String(file).replaceAll("\\", "/"));
+      else state.dirty = null;
+    });
+    state.watcher = watcher;
+    watcher.unref();
+    watcher.on("error", () => {
+      if (state.watcher !== watcher) return;
+      watcher.close();
+      state.watcher = undefined;
+      state.dirty = null;
+    });
+  } catch {
+    /* The caller receives the same unavailable-listener error below. */
+  }
 }
 
 async function synchronize(ws: Workspace, state: IndexState): Promise<void> {
@@ -108,26 +158,18 @@ async function synchronize(ws: Workspace, state: IndexState): Promise<void> {
 export async function searchLibraryNotes(ws: Workspace, query: string): Promise<NoteSearchResult[]> {
   const term = query.trim();
   if (!term) return [];
+  const pause = pauses.get(ws);
+  if (pause) {
+    if (!(await pause.done))
+      throw new KaituError("笔记搜索已关闭 / Note search closed", "NOTE_SEARCH_UNAVAILABLE");
+    return searchLibraryNotes(ws, query);
+  }
   let state = indexes.get(ws);
   if (state?.root !== ws.root) {
     disposeNoteIndex(ws);
     state = { root: ws.root, dirty: null, errors: new Set() };
     indexes.set(ws, state);
-    const current = state;
-    try {
-      current.watcher = watch(ws.root, { recursive: true }, (_event, file) => {
-        if (file) invalidateNoteIndex(ws, String(file).replaceAll("\\", "/"));
-        else current.dirty = null;
-      });
-      current.watcher.unref();
-      current.watcher.on("error", () => {
-        current.watcher?.close();
-        current.watcher = undefined;
-        current.dirty = null;
-      });
-    } catch {
-      /* The caller receives the same unavailable-listener error below. */
-    }
+    observe(ws, state);
   }
   if (!state.watcher) {
     disposeNoteIndex(ws);
@@ -142,6 +184,9 @@ export async function searchLibraryNotes(ws: Workspace, query: string): Promise<
         if (state) state.pending = undefined;
       });
     await state.pending;
+    if (indexes.get(ws) !== state)
+      throw new KaituError("笔记搜索已关闭 / Note search closed", "NOTE_SEARCH_UNAVAILABLE");
+    if (pauses.has(ws)) return searchLibraryNotes(ws, query);
   }
   const db = openIndex(ws);
   try {

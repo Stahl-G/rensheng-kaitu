@@ -53,9 +53,13 @@ export function createHomeCache(
     publish({ ...cached.value, loading: false, error: null });
     ({ timeZone, day, expires } = cached);
   }
-  function observe() {
+  function stopObserving() {
     for (const watcher of watchers) watcher.close();
     watchers = [];
+  }
+  function observe() {
+    stopObserving();
+    if (paused || closed) return;
     for (const directory of new Set([ws.root, inputs().state])) {
       try {
         const watcher = watch(directory, { recursive: true }, (_event, file) => {
@@ -239,10 +243,13 @@ export function createHomeCache(
     },
     async pause() {
       paused = true;
+      stopObserving();
       await stopWorker();
     },
     resume() {
+      if (closed || !paused) return;
       paused = false;
+      if (root === ws.root) observe();
       invalidate();
     },
     async close(options: { refresh?: boolean } = {}) {
@@ -263,7 +270,7 @@ export function createHomeCache(
       }
       closed = true;
       clearInterval(check);
-      for (const watcher of watchers) watcher.close();
+      stopObserving();
       await stopWorker();
     },
   };

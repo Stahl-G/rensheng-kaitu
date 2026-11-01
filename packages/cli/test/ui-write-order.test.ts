@@ -101,6 +101,8 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
     await expect.poll(() => isTracked(ws, captures.at(-1) as string)).toBe(true);
   } catch (error) {
     console.error("Concurrent capture version timing", {
+      phase: "before-migration-head-tracking",
+      captureResponses: captures.length,
       capturedAt,
       failedAt: performance.now() - started,
       saves,
