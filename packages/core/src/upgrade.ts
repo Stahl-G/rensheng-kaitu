@@ -87,6 +87,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   for (const name of builtinSkills) {
     for (const base of [".agents", ".claude"]) {
       const directory = `${base}/skills/${name}`;
+      if (name === "life-portrait" && ws.exists(`${directory}/SKILL.md`)) continue;
       const desired = new Set<string>();
       for (const [file, bytes] of files) {
         if (!file.startsWith(`${skillRoot}${name}/`)) continue;

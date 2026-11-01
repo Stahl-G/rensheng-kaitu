@@ -1,11 +1,16 @@
 import { Fragment } from "react";
+import { OpenPath } from "./DshFiles.js";
 
 function inline(text: string) {
   return text
-    .split(/(\*\*[^*]+\*\*|\[(?:[^\[\]]|\[[^\]]*\])+\]\(https?:\/\/\S+\)|https?:\/\/[^\s<>]+)/g)
+    .split(
+      /(\*\*[^*]+\*\*|\[(?:[^\[\]]|\[[^\]]*\])+\]\((?:https?:\/\/\S+|reviews\/portrait\/\d{4}-\d{2}-\d{2}(?:-\d+)?\.html)\)|https?:\/\/[^\s<>]+)/g,
+    )
     .map((piece, index) => {
       const key = `${index}:${piece}`;
       if (piece.startsWith("**")) return <strong key={key}>{piece.slice(2, -2)}</strong>;
+      const portrait = /^\[[\s\S]+\]\((reviews\/portrait\/\d{4}-\d{2}-\d{2}(?:-\d+)?\.html)\)$/.exec(piece);
+      if (portrait?.[1]) return <OpenPath key={key} path={portrait[1]} />;
       const link = /^\[([\s\S]+)\]\((https?:\/\/\S+)\)$/.exec(piece);
       const address = link?.[2] ?? (/^https?:\/\//.test(piece) ? piece.replace(/[.,!?;:]+$/, "") : "");
       if (!address) return piece;

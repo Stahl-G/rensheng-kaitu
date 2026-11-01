@@ -235,6 +235,11 @@
   gap: 8px;
   width: 100%;
 }
+.portraitAction {
+  margin: 16px max(16px, 7%) 0;
+  width: auto;
+  flex: none;
+}
 .suggestions button {
   text-align: left;
   padding: 8px 14px;
