@@ -1,13 +1,19 @@
-import { type FSWatcher, renameSync, rmSync, watch, writeFileSync } from "node:fs";
+import fs, { type FSWatcher, renameSync, rmSync, watch, writeFileSync } from "node:fs";
+import { opendir } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { setImmediate } from "node:timers/promises";
 import {
   createHomeCache,
   disposeNoteIndex,
+  history,
+  historyDirectory,
   isTracked,
   pauseNoteIndex,
+  readLifeAtlas,
   resumeNoteIndex,
   searchLibraryNotes,
+  workspaceFileStampsAsync,
 } from "@kaitu/core";
 import { afterEach, expect, it, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
@@ -17,7 +23,19 @@ vi.mock("node:fs", async (original) => {
   const fs = await original<typeof import("node:fs")>();
   return { ...fs, watch: vi.fn(fs.watch), renameSync: vi.fn(fs.renameSync) };
 });
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  return { ...core, workspaceFileStampsAsync: vi.fn(core.workspaceFileStampsAsync) };
+});
+const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
 afterEach(() => vi.clearAllMocks());
+function gate() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve: () => resolve() };
+}
 
 function observeHandles() {
   const active = new Map<FSWatcher, string>();
@@ -99,7 +117,9 @@ it("releases all UI directory listeners before migration and restores them after
   let migrations = 0;
   let closed = false;
   let closingMove: Promise<void> | undefined;
-  let entered!: () => void;
+  const entered = gate();
+  const releaseMove = gate();
+  const releaseScan = gate();
   const ui = await startUi(ws, {
     port: 0,
     open: false,
@@ -110,7 +130,7 @@ it("releases all UI directory listeners before migration and restores them after
       expect(handles.active.size).toBe(0);
       migrations++;
       if (closingMove) {
-        entered();
+        entered.resolve();
         await closingMove;
       }
     },
@@ -164,6 +184,19 @@ it("releases all UI directory listeners before migration and restores them after
         )
         .toBe(`目标${index}`);
       await expect.poll(() => isTracked(ws, file)).toBe(true);
+      await expect
+        .poll(async () => {
+          const oid = (await history(ws))[0]?.oid;
+          const { blob } = await git.readBlob({
+            fs,
+            dir: ws.root,
+            gitdir: historyDirectory(ws),
+            oid,
+            filepath: file,
+          });
+          return Buffer.from(blob).toString();
+        })
+        .toContain(`恢复轮次${index}`);
       const response = await post(path, body);
       expect(response.status, await response.text()).toBe(200);
       expect(ws.root).toBe(target);
@@ -174,23 +207,48 @@ it("releases all UI directory listeners before migration and restores them after
     writeFileSync(ws.resolve(file), "---\ntitle: 合成决定\n---\n最终目录正文");
     await expect.poll(() => search("最终目录")).toHaveLength(1);
     expect(migrations).toBe(4);
-    let release!: () => void;
-    closingMove = new Promise<void>((resolve) => {
-      release = resolve;
+    const version = (await history(ws))[0]?.oid;
+    const moduleFile = "learning/module.json";
+    const module = ws.readJson<{ name: string }>(moduleFile);
+    ws.writeJson(moduleFile, { ...module, name: "合成改名" });
+    const atlasTitle = () => readLifeAtlas(ws).modules.find((item) => item.id === "learning")?.title;
+    await expect.poll(atlasTitle, { timeout: 15000 }).toBe("合成改名");
+    expect((await post("/api/product/restoreVersion", [version])).status).toBe(200);
+    await expect.poll(atlasTitle, { timeout: 15000 }).toBe(module.name);
+    const scanning = gate();
+    const aborted = gate();
+    vi.mocked(workspaceFileStampsAsync).mockImplementationOnce(async (workspace, { signal } = {}) => {
+      const directory = await opendir(workspace.root);
+      signal?.addEventListener("abort", aborted.resolve, { once: true });
+      scanning.resolve();
+      await releaseScan.promise;
+      await directory.close();
+      return new Map();
     });
-    const movingEntered = new Promise<void>((resolve) => {
-      entered = resolve;
-    });
+    const retired = [...handles.active.keys()];
+    for (const [watcher, path] of handles.active)
+      if (path === ws.root) watcher.emit("error", new Error("synthetic watch failure"));
+    await scanning.promise;
+    closingMove = releaseMove.promise;
     const moving = post("/api/product/moveStorage", [join(root, "closed"), false, "local"]);
-    await movingEntered;
+    await aborted.promise;
+    await expect.poll(() => handles.active.size).toBe(0);
+    await setImmediate();
+    expect(migrations).toBe(4);
+    for (const watcher of retired) watcher.emit("error", new Error("late synthetic watch error"));
+    expect(vi.mocked(workspaceFileStampsAsync)).toHaveBeenCalledTimes(1);
+    releaseScan.resolve();
+    await entered.promise;
     const closing = ui.close();
     closed = true;
-    release();
+    releaseMove.resolve();
     expect((await moving).status).toBe(200);
     await closing;
     await setImmediate();
     expect(handles.active.size).toBe(0);
   } finally {
+    releaseScan.resolve();
+    releaseMove.resolve();
     vi.mocked(renameSync).mockImplementation(originalRename);
     if (!closed) await ui.close();
     await setImmediate();

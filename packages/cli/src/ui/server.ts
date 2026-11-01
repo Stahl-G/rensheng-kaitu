@@ -271,6 +271,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let closed = false;
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
+  let pollPending: Promise<void> = Promise.resolve();
   let stamps = new Map<string, string>();
   let pollingAbort: AbortController | undefined;
   const versionDelay = options.versionDelayMs ?? 2000;
@@ -456,10 +457,15 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       } finally {
         // One scan at a time; a stopped watcher cannot schedule another scan.
         if (!closed && !controller.signal.aborted)
-          polling = setTimeout(() => void poll(), Math.max(delay, performance.now() - started));
+          polling = setTimeout(
+            () => {
+              pollPending = poll();
+            },
+            Math.max(delay, performance.now() - started),
+          );
       }
     }
-    void poll();
+    pollPending = poll();
   };
   function stopWatching() {
     watchingPaused = true;
@@ -474,6 +480,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await stopPhone();
     await home.pause();
     await pauseNoteIndex(ws);
+    await pollPending;
   }
   function resumeWatching() {
     if (closed) {
@@ -483,6 +490,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     if (!watchingPaused) return;
     try {
       startWatching();
+      changedFile("工作区", false);
     } finally {
       resumeNoteIndex(ws);
       home.resume();
