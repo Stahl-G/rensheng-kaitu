@@ -56,7 +56,7 @@ export interface HomeThread {
 export interface HomeTrace {
   key: string;
   date: string;
-  kind: "metric" | "project-metric" | "version";
+  kind: "metric" | "project-metric";
   label: string;
   value: number | null;
   unit: string | null;
@@ -241,21 +241,6 @@ export function readHome(input: HomeSources): HomeData {
       unit: metric.unit,
       estimated: metric.estimated,
       sourceFiles: [...new Set(metric.sources.map((source) => source.file))],
-    });
-  }
-  for (const version of overview.versions) {
-    if (version.source !== "agent" && version.source !== "cloud") continue;
-    const date = day(version.time, overview.timeZone, overview.today);
-    if (!date || date < threshold) continue;
-    traces.push({
-      key: `version:${version.oid}`,
-      date,
-      kind: "version",
-      label: version.text,
-      value: null,
-      unit: null,
-      estimated: false,
-      sourceFiles: [],
     });
   }
   traces.sort((a, b) => b.date.localeCompare(a.date) || a.key.localeCompare(b.key));

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import type { HomeData, HomeSources } from "./home.js";
 import { publishOverview } from "./overview.js";
-import { projectionDay, projectionUnchanged, readProjection } from "./projection-cache.js";
+import { ProjectionChecks, projectionDay, projectionUnchanged, readProjection } from "./projection-cache.js";
 import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export interface HomeState {
@@ -21,7 +21,11 @@ export interface HomeState {
 export function createHomeCache(
   ws: Workspace,
   notify: () => void,
-  options: { write?: WorkspaceWrite; report?: (error: unknown) => void } = {},
+  options: {
+    write?: WorkspaceWrite;
+    report?: (error: unknown) => void;
+    shareStartupChecks?: boolean;
+  } = {},
 ) {
   let state: HomeState = { data: null, loading: true, error: null };
   let serialized = JSON.stringify(state);
@@ -48,7 +52,13 @@ export function createHomeCache(
   let expires: number | null = null;
   let watchers: FSWatcher[] = [];
   const inputs = () => ({ root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) });
-  const cached = readProjection<Pick<HomeState, "data" | "presentation">>(inputs(), "home");
+  const startupChecks = options.shareStartupChecks ? new ProjectionChecks() : undefined;
+  const cached = readProjection<Pick<HomeState, "data" | "presentation">>(
+    inputs(),
+    "home",
+    new Date(),
+    startupChecks,
+  );
   if (cached) {
     publish({ ...cached.value, loading: false, error: null });
     ({ timeZone, day, expires } = cached);
@@ -102,7 +112,7 @@ export function createHomeCache(
   function rebuild(onlySummary = false) {
     if (closed || paused || pending !== null) return;
     summaryOnly = onlySummary;
-    const request = { root: ws.root, generation, summary: !!options.write, summaryOnly };
+    const request = { root: ws.root, generation, summaryOnly };
     pending = generation;
     if (worker) {
       worker.ref();
@@ -178,6 +188,8 @@ export function createHomeCache(
           error: message.error ?? null,
         });
         active.unref();
+        // Obsolete data must not spend the next load's worker time preparing documents.
+        if (message.data && options.write) rebuild(true);
         notify();
       });
       active.once("error", () => failed(active, "首页读取失败"));
@@ -232,6 +244,7 @@ export function createHomeCache(
     return state;
   }
   return {
+    startupChecks: cached ? startupChecks : undefined,
     read,
     readSerialized: () => {
       read();

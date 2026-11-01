@@ -1,11 +1,15 @@
+import { createHash } from "node:crypto";
 import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
 import { history, historyDirectory } from "../src/history.js";
-import { createHomeCache } from "../src/home-cache.js";
-import { projectionDirectory } from "../src/projection-cache.js";
+import { type HomeState, createHomeCache } from "../src/home-cache.js";
+import { phoneSnapshotsCurrent, startPhoneSnapshots, writePhoneSnapshots } from "../src/phone-snapshots.js";
+import { projectionDirectory, readProjection, writeProjection } from "../src/projection-cache.js";
 import { addRecord } from "../src/records.js";
+import * as backup from "../src/workspace-backup.js";
+import { Workspace } from "../src/workspace.js";
 import { freshWorkspace } from "./helpers.js";
 
 it("publishes background data, retains it during refresh, and discards obsolete loads", async () => {
@@ -115,6 +119,67 @@ it("publishes background data, retains it during refresh, and discards obsolete 
   }
 });
 
+it("rebuilds the previous projection format and then reuses the current home cache", async () => {
+  const ws = await freshWorkspace();
+  addRecord(ws, "metric", { kind: "weight", value: 71, unit: "kg", source: "synthetic scale" });
+  const input = {
+    root: ws.root,
+    state: dirname(ws.resolve(".kaitu/cache", { internal: true })),
+  };
+  let cache = createHomeCache(ws, () => {});
+  try {
+    await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
+    const previous = readProjection<Pick<HomeState, "data" | "presentation">>(input, "home");
+    if (!previous?.value.data) throw new Error("Expected saved home projection");
+    await cache.close();
+    writeProjection(input, "home", {
+      ...previous,
+      value: {
+        ...previous.value,
+        data: {
+          ...previous.value.data,
+          traces: Array.from({ length: 3 }, (_, i) => ({
+            key: `version:legacy-${i}`,
+            kind: "version" as const,
+            date: previous.day,
+            label: "Synthetic legacy system save",
+            value: null,
+            unit: null,
+            estimated: false,
+            sourceFiles: [],
+          })),
+        },
+      },
+    });
+    expect(readProjection(input, "home")).toBeDefined();
+    const directory = projectionDirectory(input);
+    if (!directory) throw new Error("Expected local projection directory");
+    const file = join(directory, "home.json");
+    const envelope = JSON.parse(readFileSync(file, "utf8"));
+    const content = JSON.stringify({ ...JSON.parse(envelope.content), version: 4 });
+    writeFileSync(
+      file,
+      JSON.stringify({ checksum: createHash("sha256").update(content).digest("hex"), content }),
+    );
+    expect(readProjection(input, "home")).toBeUndefined();
+    cache = createHomeCache(ws, () => {});
+    expect(cache.read()).toMatchObject({ data: null, loading: true });
+    await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
+    expect(cache.read().data?.traces).toEqual([
+      expect.objectContaining({ kind: "metric", value: 71, unit: "kg" }),
+    ]);
+    await cache.close();
+    cache = createHomeCache(ws, () => {});
+    expect(cache.read()).toMatchObject({ loading: false, error: null });
+    expect(cache.read().data?.traces).toEqual([
+      expect.objectContaining({ kind: "metric", value: 71, unit: "kg" }),
+    ]);
+  } finally {
+    await cache.close();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
 it("retains the worker between updates and waits for its termination on close", async () => {
   const ws = await freshWorkspace();
   let release!: () => void;
@@ -143,6 +208,48 @@ it("retains the worker between updates and waits for its termination on close", 
     release();
     await cache.close();
     stopping.mockRestore();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+it("reopens published home and phone without redundant work, then observes external edits", async () => {
+  const ws = await freshWorkspace();
+  const task = addRecord(ws, "task", { title: "Before external edit" });
+  await writePhoneSnapshots(ws, new Date(), { force: true });
+  let cache = createHomeCache(ws, () => {});
+  let stopPhone = async () => {};
+  const errors: unknown[] = [];
+  const status = vi.spyOn(backup, "workspaceBackupEnabled").mockReturnValue(true);
+  const requests = vi.spyOn(Worker.prototype, "postMessage");
+  try {
+    await expect.poll(() => cache.read().loading, { timeout: 15000 }).toBe(false);
+    await cache.close();
+    requests.mockClear();
+    const reopened = new Workspace(ws.root, { maintain: false });
+    cache = createHomeCache(reopened, () => {}, { shareStartupChecks: true });
+    expect(cache.read()).toMatchObject({ loading: false, error: null });
+    expect(cache.read().data?.pending[0]?.title).toBe("Before external edit");
+    stopPhone = startPhoneSnapshots(reopened, (error) => errors.push(error), undefined, cache.startupChecks);
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    expect(requests).not.toHaveBeenCalled();
+    const path = ws.resolve(task.file);
+    writeFileSync(path, readFileSync(path, "utf8").replace("Before external edit", "After external edit"));
+    expect(phoneSnapshotsCurrent(reopened, new Date(), undefined, cache.startupChecks)).toBe(false);
+    await expect
+      .poll(
+        () =>
+          reopened.readJson<{ mobile: { tasks: { title: string }[] } }>("phone/today.json").mobile.tasks[0]
+            ?.title,
+        { timeout: 15000 },
+      )
+      .toBe("After external edit");
+    expect(errors).toEqual([]);
+    expect(requests).toHaveBeenCalled();
+  } finally {
+    await stopPhone();
+    await cache.close();
+    requests.mockRestore();
+    status.mockRestore();
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

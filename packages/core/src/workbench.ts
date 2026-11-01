@@ -162,13 +162,19 @@ export function readWorkbench(
     }
   }
   const modules = listModules(ws);
+  const recordTypes = listRecordTypes(ws);
   const records = Object.fromEntries(
-    listRecordTypes(ws).map(({ type }) => [
+    recordTypes.map(({ type }) => [
       type,
       read(
         type,
         () => {
-          const rows = readRecords(ws, type, { onError: (error) => warnings.push(readWarning(error)) });
+          const rows = readRecords(
+            ws,
+            type,
+            { onError: (error) => warnings.push(readWarning(error)) },
+            recordTypes,
+          );
           return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 
