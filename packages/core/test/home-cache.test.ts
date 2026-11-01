@@ -1,16 +1,59 @@
 import { createHash } from "node:crypto";
-import { chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import { expect, it, vi } from "vitest";
 import { history, historyDirectory } from "../src/history.js";
 import { type HomeState, createHomeCache } from "../src/home-cache.js";
+import { readHomeSources } from "../src/home.js";
 import { phoneSnapshotsCurrent, startPhoneSnapshots, writePhoneSnapshots } from "../src/phone-snapshots.js";
-import { projectionDirectory, readProjection, writeProjection } from "../src/projection-cache.js";
+import {
+  projectionDirectory,
+  projectionManifest,
+  projectionUnchanged,
+  readProjection,
+  writeProjection,
+} from "../src/projection-cache.js";
 import { addRecord } from "../src/records.js";
 import * as backup from "../src/workspace-backup.js";
 import { Workspace } from "../src/workspace.js";
-import { freshWorkspace } from "./helpers.js";
+import { clonedWorkspace, freshWorkspace } from "./helpers.js";
+
+it("invalidates home data when external bad rows appear in custom health file records", async () => {
+  const ws = await clonedWorkspace("UTC");
+  try {
+    const definition = ws.readJson<{
+      records: Record<string, { path: string; schema: string }>;
+    }>("health/module.json");
+    definition.records.synthetic_metric = {
+      path: "files/measurements/{YYYY-MM}.jsonl",
+      schema: "schemas/metric.schema.json",
+    };
+    ws.writeJson("health/module.json", definition);
+    const { file } = addRecord(ws, "synthetic_metric", {
+      ts: "2026-11-01T00:00:00Z",
+      kind: "weight",
+      value: 70,
+      unit: "kg",
+      source: "synthetic scale",
+    });
+    const now = new Date("2026-11-01T12:00:00Z");
+    expect((await readHomeSources(ws, now)).overview.warnings).toEqual([]);
+    const input = { root: ws.root, state: ws.resolve(".kaitu", { internal: true }) };
+    const manifest = projectionManifest(input);
+    expect(projectionUnchanged(input, manifest)).toBe(true);
+    const path = ws.resolve(file);
+    const original = readFileSync(path, "utf8");
+    appendFileSync(path, "{broken\n");
+    expect(projectionUnchanged(input, manifest)).toBe(false);
+    expect((await readHomeSources(ws, now)).overview.warnings).toContainEqual(
+      expect.objectContaining({ code: "invalid_record", location: `${file}:2` }),
+    );
+    expect(readFileSync(path, "utf8")).toBe(`${original}{broken\n`);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 it("publishes background data, retains it during refresh, and discards obsolete loads", async () => {
   const ws = await freshWorkspace();
