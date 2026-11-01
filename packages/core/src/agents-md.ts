@@ -161,8 +161,11 @@ export function renderAgentsMd(ws: Workspace): string {
 
 export function writeAgentsMd(ws: Workspace): void {
   for (const skill of skills()) {
-    for (const base of [".agents", ".claude"])
-      ws.writeText(`${base}/skills/${skill.name}/SKILL.md`, skill.text);
+    for (const base of [".agents", ".claude"]) {
+      const path = `${base}/skills/${skill.name}/SKILL.md`;
+      if (skill.name === "life-portrait" && ws.exists(path)) continue;
+      ws.writeText(path, skill.text);
+    }
   }
   ws.writeText(
     "RECORDS.md",

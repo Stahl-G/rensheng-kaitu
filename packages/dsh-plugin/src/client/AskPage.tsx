@@ -424,14 +424,21 @@ export function AskPage({
   const activeSession = useRef<string | null>(null);
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
+  const draftOccupied = !!(
+    draft.trim() ||
+    attachments.length ||
+    sessionReferences.length ||
+    fileReferences.length ||
+    busy ||
+    readingFiles
+  );
   useEffect(() => {
     const guard = (event: Event) => {
-      if (draft.trim() || attachments.length || sessionReferences.length || busy || readingFiles)
-        event.preventDefault();
+      if (draftOccupied) event.preventDefault();
     };
     window.addEventListener("kaitu:before-ask-draft", guard);
     return () => window.removeEventListener("kaitu:before-ask-draft", guard);
-  }, [draft, attachments, sessionReferences, busy, readingFiles]);
+  }, [draftOccupied]);
   const referenceThreads = threads.filter(
     (thread) =>
       thread.id !== selected &&
@@ -1170,6 +1177,24 @@ export function AskPage({
         )}
       </nav>
       <section className={css.conversation} aria-label={t("问问开图", "Ask Kaitu")}>
+        <div className={`${css.suggestions} ${css.portraitAction}`}>
+          <button
+            type="button"
+            disabled={draftOccupied}
+            onClick={() => {
+              if (draftOccupied) return;
+              setDraft(
+                t(
+                  "按 life-portrait 技能，为我生成人生开图",
+                  "Use the life-portrait skill to create my life portrait.",
+                ),
+              );
+              input.current?.focus();
+            }}
+          >
+            {t("生成我的人生开图", "Create my life portrait")}
+          </button>
+        </div>
         <div className={css.mobileNew}>
           <button
             type="button"

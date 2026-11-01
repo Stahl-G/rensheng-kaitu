@@ -1,9 +1,9 @@
-import { resolve } from "node:path";
+import { relative, resolve, sep } from "node:path";
 import {
   DEFAULT_FILE_SEARCH_EXCLUDED_DIRECTORIES,
   WorkspaceFileSearch,
 } from "@deepseek-ai/dsh-file-reference-local/search";
-import { openNativeAssociatedPath, revealNativePath } from "@deepseek-ai/dsh-native-command";
+import { openNativeAssociatedPath, openNativePath, revealNativePath } from "@deepseek-ai/dsh-native-command";
 import { assertAgentPath } from "./agent-file-policy.js";
 import { listProjects } from "./projects.js";
 import type { Workspace } from "./workspace.js";
@@ -51,7 +51,10 @@ export function dshFiles(ws: Workspace): DshFiles {
         project.links.some((link) => resolve(link.path) === target),
       );
       if (!linked) assertAgentPath(ws.root, target);
-      await (action === "reveal" ? revealNativePath : openNativeAssociatedPath)(
+      const portrait = /^reviews\/portrait\/\d{4}-\d{2}-\d{2}(?:-\d+)?\.html$/.test(
+        relative(ws.root, target).split(sep).join("/"),
+      );
+      await (action === "reveal" ? revealNativePath : portrait ? openNativePath : openNativeAssociatedPath)(
         target,
         AbortSignal.timeout(10000),
       );
