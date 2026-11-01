@@ -1,4 +1,3 @@
-import type { Context } from "@deepseek-ai/cordis";
 import type {
   ISessions,
   SessionReference,
@@ -7,6 +6,7 @@ import type {
 import type {
   ConversationSnapshot,
   ConversationViewsProps,
+  IConversation,
 } from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
@@ -27,7 +27,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 export interface PluginAskServices {
   sessions: Pick<ISessions, "create" | "retain" | "scope">;
   workspaces: { create(input: { path: string }): Promise<{ workspaceId: string }> };
-  conversation: { input: { for(scope: Context): { setDraft(text: string): void } } };
+  conversation: { input: Pick<IConversation["input"], "requestDraftInitialization"> };
   workspacePath: () => Promise<string>;
 }
 
@@ -84,8 +84,10 @@ export function PluginAsk({
   }, [session]);
   useEffect(() => {
     if (!reference || (!prompt && !promptRequest)) return;
-    const scope = services.sessions.scope(reference.sessionId);
-    if (scope) services.conversation.input.for(scope).setDraft(prompt);
+    services.conversation.input.requestDraftInitialization(reference.binding, {
+      prompt,
+      whenDraftExists: "keep",
+    });
   }, [reference, prompt, promptRequest, services]);
   if (error) return <p role="alert">{error}</p>;
   if (!reference) return null;

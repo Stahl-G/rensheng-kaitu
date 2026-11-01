@@ -1177,24 +1177,6 @@ export function AskPage({
         )}
       </nav>
       <section className={css.conversation} aria-label={t("问问开图", "Ask Kaitu")}>
-        <div className={`${css.suggestions} ${css.portraitAction}`}>
-          <button
-            type="button"
-            disabled={draftOccupied}
-            onClick={() => {
-              if (draftOccupied) return;
-              setDraft(
-                t(
-                  "按 life-portrait 技能，为我生成人生开图",
-                  "Use the life-portrait skill to create my life portrait.",
-                ),
-              );
-              input.current?.focus();
-            }}
-          >
-            {t("生成我的人生开图", "Create my life portrait")}
-          </button>
-        </div>
         <div className={css.mobileNew}>
           <button
             type="button"
@@ -1266,17 +1248,37 @@ export function AskPage({
                 </div>
               </section>
             </div>
-          ) : (
-            settings?.configured &&
-            !events.some((event) => event.type === "user/message") && (
-              <div className={css.welcome}>
+          ) : null}
+          {!selected && !events.some((event) => event.type === "user/message") && (
+            <div className={css.welcome}>
+              {settings?.configured && (
                 <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
-                <div className={css.suggestions}>
-                  {questions.map((question) => (
+              )}
+              <div className={css.suggestions}>
+                <button
+                  type="button"
+                  disabled={draftOccupied}
+                  onClick={() => {
+                    if (draftOccupied) return;
+                    setDraft(
+                      t(
+                        "按 life-portrait 技能，为我生成人生开图",
+                        "Use the life-portrait skill to create my life portrait.",
+                      ),
+                    );
+                    input.current?.focus();
+                  }}
+                >
+                  {t("生成我的人生开图", "Create my life portrait")}
+                </button>
+                {settings?.configured &&
+                  questions.map((question) => (
                     <button
                       type="button"
                       key={question}
+                      disabled={draftOccupied}
                       onClick={() => {
+                        if (draftOccupied) return;
                         setDraft(question);
                         input.current?.focus();
                       }}
@@ -1284,9 +1286,8 @@ export function AskPage({
                       {question}
                     </button>
                   ))}
-                </div>
               </div>
-            )
+            </div>
           )}
           {events.map((event) => {
             const data = event.data;

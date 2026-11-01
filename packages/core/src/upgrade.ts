@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { writeAgentsMd } from "./agents-md.js";
+import { canWritePortraitSkill, writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { doctor } from "./doctor.js";
 import { GITIGNORE, invalidateHistoryFile, snapshot, userOwnsGitignore } from "./history.js";
@@ -87,7 +87,17 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
   for (const name of builtinSkills) {
     for (const base of [".agents", ".claude"]) {
       const directory = `${base}/skills/${name}`;
-      if (name === "life-portrait" && ws.exists(`${directory}/SKILL.md`)) continue;
+      if (name === "life-portrait") {
+        const path = `${directory}/SKILL.md`;
+        const bytes = files.get(`${skillRoot}${name}/SKILL.md`);
+        if (
+          bytes &&
+          canWritePortraitSkill(ws, path) &&
+          (!ws.exists(path) || !ws.readBytes(path).equals(bytes))
+        )
+          writes.set(path, bytes);
+        continue; // 只升级官方正文，用户附带材料不覆盖、不清理。
+      }
       const desired = new Set<string>();
       for (const [file, bytes] of files) {
         if (!file.startsWith(`${skillRoot}${name}/`)) continue;

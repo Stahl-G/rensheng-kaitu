@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
@@ -8,6 +9,19 @@ import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
+// 改模板前保留旧官方正文的完整 SHA256 和来源；不要收录用户修改稿。
+// 以下仅为已交付的已知候选，不代表已正式发布；信任表来自应用，不读工作区清单。
+const portraitCandidates = new Set([
+  "c7ba29142055a7ef8762715b5a6e9ff64b32c95029ac8fb3e8fa9dca33e6f957", // v1 ZIP 原稿
+  "8a57eff594b3222f3b921f0c2046a85098b06ef2b6c12d03d212cc21392dd2ea", // RC5 模板适配稿
+]);
+
+export function canWritePortraitSkill(ws: Workspace, path: string): boolean {
+  return (
+    !ws.exists(path) || portraitCandidates.has(createHash("sha256").update(ws.readBytes(path)).digest("hex"))
+  );
+}
+
 const routes = [
   {
     request: "记一顿饭",
@@ -163,7 +177,7 @@ export function writeAgentsMd(ws: Workspace): void {
   for (const skill of skills()) {
     for (const base of [".agents", ".claude"]) {
       const path = `${base}/skills/${skill.name}/SKILL.md`;
-      if (skill.name === "life-portrait" && ws.exists(path)) continue;
+      if (skill.name === "life-portrait" && !canWritePortraitSkill(ws, path)) continue;
       ws.writeText(path, skill.text);
     }
   }
