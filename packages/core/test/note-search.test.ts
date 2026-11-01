@@ -1,5 +1,5 @@
 import { renameSync, rmSync, writeFileSync } from "node:fs";
-import { expect, it, vi } from "vitest";
+import { expect, it, onTestFailed, vi } from "vitest";
 import { deferSnapshots, readLearning, restore, saveLearningCheckin, startLearning } from "../src/index.js";
 import { disposeNoteIndex, searchLibraryNotes } from "../src/note-search.js";
 import { freshWorkspace } from "./helpers.js";
@@ -85,28 +85,107 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
 });
 
 it("正文索引支持中英文、转义、修改、重命名和删除，热搜索不读资料文件", async () => {
+  const started = performance.now();
   const ws = await freshWorkspace();
   const file = "decisions/synthetic/STATUS.md";
+  let stage = "workspace-ready";
+  let cleanupStarted = false;
+  const failures: { phase: string; error: unknown }[] = [];
+  const queries: {
+    id: number;
+    stage: string;
+    startedMs: number;
+    settledMs?: number;
+    outcome?: string;
+    error?: unknown;
+  }[] = [];
+  const stages: { stage: string; elapsedMs: number; pendingQueryIds: number[] }[] = [];
+  const describe = (error: unknown) =>
+    error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          code: (error as NodeJS.ErrnoException).code,
+          syscall: (error as NodeJS.ErrnoException).syscall,
+        }
+      : { value: String(error) };
+  const mark = (next: string) => {
+    stage = next;
+    stages.push({
+      stage,
+      elapsedMs: performance.now() - started,
+      pendingQueryIds: queries.filter((query) => query.settledMs === undefined).map((query) => query.id),
+    });
+  };
+  const report = (status: string) => {
+    process.stderr.write(
+      `${JSON.stringify({ test: "note-search-cleanup", status, stages, queries, failures: failures.map(({ phase, error }) => ({ phase, error: describe(error) })) })}\n`,
+    );
+  };
+  onTestFailed(() => report("failed"));
+  const search = (query: string) => {
+    const observed: (typeof queries)[number] = {
+      id: queries.length + 1,
+      stage,
+      startedMs: performance.now() - started,
+    };
+    queries.push(observed);
+    const result = searchLibraryNotes(ws, query);
+    const settle = (outcome: string, error?: unknown) => {
+      observed.settledMs = performance.now() - started;
+      observed.outcome = outcome;
+      if (outcome === "rejected") observed.error = describe(error);
+      if (cleanupStarted) report("query-settled-after-cleanup-start");
+    };
+    void result.then(
+      () => settle("fulfilled"),
+      (error) => settle("rejected", error),
+    );
+    return result;
+  };
+  mark(stage);
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nOnly the body contains 海边散步 and 50%_value.");
-    expect(await searchLibraryNotes(ws, "海边")).toEqual([
-      expect.objectContaining({ file, title: "合成决定" }),
-    ]);
+    expect(await search("海边")).toEqual([expect.objectContaining({ file, title: "合成决定" })]);
+    mark("initial-search-checked");
     const read = vi.spyOn(ws, "readText");
-    expect(await searchLibraryNotes(ws, "ONLY THE BODY")).toHaveLength(1);
-    expect(await searchLibraryNotes(ws, "%_")).toHaveLength(1);
+    expect(await search("ONLY THE BODY")).toHaveLength(1);
+    expect(await search("%_")).toHaveLength(1);
     expect(read).not.toHaveBeenCalled();
+    mark("warm-search-checked");
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nChanged to 山间散步.");
-    expect(await searchLibraryNotes(ws, "海边")).toEqual([]);
-    expect(await searchLibraryNotes(ws, "山间")).toHaveLength(1);
+    expect(await search("海边")).toEqual([]);
+    expect(await search("山间")).toHaveLength(1);
+    mark("updated-search-checked");
     renameSync(ws.resolve("decisions/synthetic"), ws.resolve("decisions/renamed"));
-    await vi.waitFor(async () =>
-      expect((await searchLibraryNotes(ws, "山间"))[0]?.file).toBe("decisions/renamed/STATUS.md"),
-    );
+    mark("rename-wait-start");
+    await vi.waitFor(async () => expect((await search("山间"))[0]?.file).toBe("decisions/renamed/STATUS.md"));
+    mark("rename-checked");
     rmSync(ws.resolve("decisions/renamed"), { recursive: true });
-    await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "山间")).toEqual([]));
+    mark("delete-wait-start");
+    await vi.waitFor(async () => expect(await search("山间")).toEqual([]));
+    mark("body-complete");
+  } catch (error) {
+    failures.push({ phase: "body", error });
   } finally {
-    disposeNoteIndex(ws);
-    rmSync(ws.root, { recursive: true, force: true });
+    cleanupStarted = true;
+    mark("cleanup-start");
+    try {
+      disposeNoteIndex(ws);
+      mark("dispose-returned");
+      rmSync(ws.root, { recursive: true, force: true });
+      mark("cleanup-complete");
+    } catch (error) {
+      failures.push({ phase: "cleanup", error });
+    } finally {
+      report("cleanup-attempt-finished");
+    }
   }
+  if (failures.length > 1)
+    throw new AggregateError(
+      failures.map((failure) => failure.error),
+      "Note search body and cleanup failed",
+    );
+  if (failures.length) throw failures[0]?.error;
 });
