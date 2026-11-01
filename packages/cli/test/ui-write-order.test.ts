@@ -186,6 +186,9 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
   beforeClose.push(release);
   const snapshots: Promise<string | null>[] = [];
   let snapshotStarted = gate<void>();
+  const abortObservation = () => snapshotStarted.resolve();
+  signal.addEventListener("abort", abortObservation, { once: true });
+  beforeClose.push(() => signal.removeEventListener("abort", abortObservation));
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   // Install before startUi: a snapshot already in flight can include the later task write.
   const { ws, task, before, post } = await setup(undefined, async (workspace) => {
@@ -198,11 +201,14 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
       return result;
     });
   });
+  signal.throwIfAborted();
   const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
   try {
     await started.promise;
+    signal.throwIfAborted();
     // 不释放网络 gate：旧的全局队列在这里无法完成。
     const done = await post("tasks/done", { id: task.record.id });
+    signal.throwIfAborted();
     expect(done.status).toBe(200);
     expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("done");
     const completed = ws.readText(task.file);
@@ -210,18 +216,23 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     // Inspect the actual immutable tree; do not flush or request another snapshot.
     let saved: string | undefined;
     for (let index = 0; !saved; index++) {
+      signal.throwIfAborted();
       if (index === snapshots.length) {
         snapshotStarted = gate<void>();
         await snapshotStarted.promise;
+        signal.throwIfAborted();
       }
-      const oid =
-        (await snapshots[index]) ??
-        (await git.resolveRef({
+      let oid = await snapshots[index];
+      signal.throwIfAborted();
+      if (!oid) {
+        oid = await git.resolveRef({
           fs,
           dir: ws.root,
           gitdir: historyDirectory(ws),
           ref: "HEAD",
-        }));
+        });
+        signal.throwIfAborted();
+      }
       const { blob } = await git.readBlob({
         fs,
         dir: ws.root,
@@ -229,6 +240,7 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
         oid,
         filepath: task.file,
       });
+      signal.throwIfAborted();
       if (Buffer.from(blob).toString() === completed) saved = oid;
     }
     signal.throwIfAborted();
