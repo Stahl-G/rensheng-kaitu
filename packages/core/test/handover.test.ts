@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, it } from "vitest";
+import { expect, it, onTestFailed } from "vitest";
 import {
   addGoalNext,
   addMemory,
@@ -29,9 +29,18 @@ import {
 import { clonedWorkspace } from "./helpers.js";
 
 it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参考链接仍可追溯", async () => {
+  const started = performance.now();
+  const stages: { stage: string; elapsedMs: number }[] = [];
+  const mark = (stage: string, at = performance.now()) => stages.push({ stage, elapsedMs: at - started });
+  const report = (status: string) => {
+    process.stderr.write(`${JSON.stringify({ test: "handover-directions", status, stages })}\n`);
+  };
+  onTestFailed(() => report("failed"));
   const root = mkdtempSync(join(tmpdir(), "kaitu-direction-copy-"));
   try {
-    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "workspace"));
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "workspace"), ({ stage, at }) =>
+      mark(stage, at),
+    );
     const answer = JSON.stringify([
       {
         title: "试一次周末摄影",
@@ -41,7 +50,9 @@ it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参
         references: [{ kind: "source", ref: "https://example.org/photography" }],
       },
     ]);
+    mark("first-paste-start");
     const result = await pasteDirections(ws, answer);
+    mark("first-paste-done");
     const saved = readExploration(ws).directions.find((item) => item.id === result.ids[0]);
     expect(saved?.title).toBe("试一次周末摄影");
     expect(saved?.motivation.length).toBeLessThan(250);
@@ -50,10 +61,15 @@ it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参
     expect(saved?.motivation).not.toContain("/Users/");
     expect(saved?.hypothesis).toBe("这周末用手机拍三张照片，每周保留 2/3 次散步时间，看看是否愿意继续。");
     expect(saved?.references).toEqual([{ kind: "source", ref: "https://example.org/photography" }]);
+    mark("duplicate-paste-start");
     expect(await pasteDirections(ws, answer)).toEqual({ ids: [], skipped: 1 });
+    mark("duplicate-paste-done");
   } finally {
+    mark("cleanup-start");
     rmSync(root, { recursive: true, force: true });
+    mark("cleanup-done");
   }
+  report("body-complete");
 });
 
 it("贴回自己 AI 的回答：标签行、英文路径和 JSON 都读成待核对草稿，缺项说明原因", async () => {
