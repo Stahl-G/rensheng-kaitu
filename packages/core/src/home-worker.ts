@@ -12,7 +12,7 @@ import {
 } from "./projection-cache.js";
 import { Workspace } from "./workspace.js";
 let workspace: Workspace | undefined;
-type Request = { root: string; generation: number; summary?: boolean; summaryOnly?: boolean };
+type Request = { root: string; generation: number; summaryOnly?: boolean };
 function summary(request: Request) {
   if (!workspace) return;
   try {
@@ -84,7 +84,6 @@ async function build(request: Request) {
         /* A cache write failure must not hide readable originals. */
       }
       parentPort?.postMessage({ data, presentation, ...metadata, generation });
-      if (request.summary) summary(request);
     }
   } catch {
     parentPort?.postMessage({ error: "首页读取失败", generation });
