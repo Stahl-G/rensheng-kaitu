@@ -163,6 +163,8 @@ function clearInvalidated(ws: Workspace, checked: ReadonlyMap<string, symbol>): 
 function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map()) {
   if (!ws.isICloud && !changed.size) return fs;
   const gitdir = historyDirectory(ws);
+  // 无文件名的事件也要读正文；完整遍历本身不会绕过 Git 的整秒 stat 缓存。
+  const all = changed.has("工作区") || changed.has(".");
   const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
     if (typeof path === "string") {
       const rel = relative(ws.root, path);
@@ -176,11 +178,11 @@ function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map
   }) as typeof fs.promises.readFile;
   const lstat = (async (...args: Parameters<typeof fs.promises.lstat>) => {
     const stat = await fs.promises.lstat(...args);
-    const path = String(args[0]);
+    const path = resolve(String(args[0]));
     // 用户目录事件不能使 Git 自己的索引失效，否则每个工作区条目都会重读整份 index。
     if (path === gitdir || path.startsWith(`${gitdir}${sep}`)) return stat;
     const file = relative(ws.root, String(args[0])).split(sep).join("/");
-    let affected = changed.has(file);
+    let affected = all || changed.has(file);
     for (
       let slash = file.lastIndexOf("/");
       !affected && slash >= 0;
