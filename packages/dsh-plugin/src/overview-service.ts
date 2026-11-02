@@ -223,9 +223,9 @@ export class KaituOverviewService extends TypertRemoteService {
       await this.homeCache.close();
     });
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => () => {
+    ctx.effect(() => async () => {
       this.files.dispose();
-      disposeNoteIndex(this.workspace);
+      await disposeNoteIndex(this.workspace);
     });
     this.scheduleVersion = (message) => {
       setImmediate(() => {
