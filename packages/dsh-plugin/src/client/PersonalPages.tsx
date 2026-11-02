@@ -1114,7 +1114,7 @@ export function PersonalPages(
                     disabled={busy}
                     onClick={() => void run(async () => props.privacyNotice?.(), "")}
                   >
-                    {t("资料去向与隐私说明", "Data destinations and privacy")}
+                    {t("隐私", "Privacy")}
                   </button>
                 )}
                 <div className={`${css.small} ${settingsCss.buildInfo}`}>

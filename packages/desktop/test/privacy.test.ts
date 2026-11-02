@@ -30,28 +30,35 @@ class NoticeWindow extends EventEmitter {
     this.url = url;
     this.emit("ready-to-show");
   });
-  submit(
-    action = "acknowledge",
-    items = ["storage", "ai", "sync", "location", "connections", "permissions"],
-    version = PRIVACY_NOTICE_VERSION,
-  ) {
+  openPolicy() {
+    const url = new URL(this.url);
+    url.hash = "policy";
+    this.url = url.href;
+    this.webContents.emit("did-navigate-in-page", {}, url.href, true);
+  }
+  submit(action = "acknowledge", version = PRIVACY_NOTICE_VERSION) {
     const url = new URL("https://kaitu.invalid/privacy");
     url.searchParams.set("action", action);
     url.searchParams.set("version", version);
-    for (const id of items) url.searchParams.append("item", id);
     const preventDefault = vi.fn();
     this.webContents.emit("will-navigate", { preventDefault }, url.href);
     expect(preventDefault).toHaveBeenCalledOnce();
   }
 }
 
-test("逐项确认才保存本机版本，退出、旧版本、只读回看和保存失败不放行", async () => {
+test("开始使用才保存本机已读版本；阅读政策、旧版本、回看和保存失败不放行", async () => {
   savePreferences({ locale: "en", exploreEntries: ["health"], privacyNoticeVersion: "older" });
   const window = new NoticeWindow();
   const pending = showPrivacyNotice({ window });
-  window.submit("acknowledge", ["storage"]);
+  let completed = false;
+  void pending.then(() => {
+    completed = true;
+  });
+  window.openPolicy();
+  await Promise.resolve();
+  expect(completed).toBe(false);
   expect(readPreferences().privacyNoticeVersion).toBe("older");
-  window.submit("acknowledge", undefined, "older");
+  window.submit("acknowledge", "older");
   expect(readPreferences().privacyNoticeVersion).toBe("older");
   window.submit();
   expect(await pending).toBe(true);
@@ -65,7 +72,7 @@ test("逐项确认才保存本机版本，退出、旧版本、只读回看和�
   expect(returning.loadURL).not.toHaveBeenCalled();
   const reviewing = new NoticeWindow();
   const review = showPrivacyNotice({ window: reviewing, review: true });
-  reviewing.submit("exit");
+  reviewing.submit("close");
   expect(await review).toBe(false);
   expect(readPreferences().privacyNoticeVersion).toBe(PRIVACY_NOTICE_VERSION);
 
@@ -95,7 +102,7 @@ test("逐项确认才保存本机版本，退出、旧版本、只读回看和�
   expect(await showPrivacyNotice({ window: closing, review: true })).toBe(false);
 });
 
-test("旧用户已开启自动任务也须先知悉；退出前不读工作区、不启动服务或 AI", async () => {
+test("旧用户已开启自动任务仍可先读完整政策；关闭前不读工作区、不启动服务或 AI", async () => {
   const root = join(process.env.KAITU_APP_HOME as string, "workspace");
   const ws = await initWorkspace(root);
   configureAutomation(ws, { morning: true, organizer: true, news: true });
@@ -133,11 +140,14 @@ test("旧用户已开启自动任务也须先知悉；退出前不读工作区�
   // The constructor returns before startDesktop installs the gate and loads its page.
   await Promise.resolve();
   expect(window.url.startsWith("data:text/html")).toBe(true);
+  window.openPolicy();
+  await Promise.resolve();
+  expect(readPreferences().privacyNoticeVersion).toBe("older");
   expect(reads).not.toHaveBeenCalled();
   expect(network).not.toHaveBeenCalled();
   expect(startUi).not.toHaveBeenCalled();
   expect(createAiProcess).not.toHaveBeenCalled();
-  window.submit("exit");
+  window.emit("closed");
   await startup;
   expect(app.quit).toHaveBeenCalledOnce();
   expect(readPreferences().privacyNoticeVersion).toBe("older");

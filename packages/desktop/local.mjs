@@ -308,7 +308,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
       const notice = new BrowserWindow({
         parent: window,
         modal: true,
-        title: "资料去向 / Where your data goes",
+        title: "隐私 / Privacy",
         width: 820,
         height: 800,
         minWidth: 360,
