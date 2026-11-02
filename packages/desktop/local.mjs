@@ -91,6 +91,11 @@ export function createLocalAsk({
   });
 }
 
+export async function startDesktopAutomation(plugins, ai, settings) {
+  if (settings.asked && Object.values(settings.tasks).some(Boolean))
+    await plugins.open(() => ai.open({ background: true }));
+}
+
 export function createDesktopCreator({ directory, ask, plugins, notify }) {
   const creator = createCreatorService({ directory, plugins });
   const generator = createPageGenerator({ creator, ask, onChanged: notify });
@@ -300,10 +305,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     getWorkspace: () => ws.root,
     workspace: ws,
   });
-  const startAutomation = async () => {
-    const settings = readAutomation(ws);
-    if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
-  };
+  const startAutomation = () => startDesktopAutomation(plugins, ai, readAutomation(ws));
   let closing = false;
   const plugins = createPluginService({
     fetchIndex: (url, options) => window.webContents.session.fetch(url, options),

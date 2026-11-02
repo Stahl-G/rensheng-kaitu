@@ -95,7 +95,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
           (name) => !name.startsWith("@deepseek-ai/"),
         )
       : [];
-  let changing = false;
+  let phase = "idle";
   let pendingChange;
   let recoveryError;
   const states = new Map();
@@ -130,12 +130,12 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   refreshStates();
   // All mutations share the same desktop/sdk pair, including market installs and removals.
   const change = (operation) => {
-    if (changing)
+    if (phase !== "idle")
       throw new KaituError(
         "插件正在变更，请等完成 / Plugins are changing. Wait for completion.",
         "PLUGIN_BUSY",
       );
-    changing = true;
+    phase = "changing";
     pendingChange = (async () => {
       let shouldResume = false;
       try {
@@ -196,14 +196,18 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
           refreshStates();
           if (recovered) {
             shouldResume = false;
+            phase = "resuming";
             await onChanged();
           }
         }
       } finally {
         try {
-          if (shouldResume) await onChanged();
+          if (shouldResume) {
+            phase = "resuming";
+            await onChanged();
+          }
         } finally {
-          changing = false;
+          phase = "idle";
         }
       }
     })();
@@ -247,7 +251,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
     settled: () => pendingChange ?? Promise.resolve(),
     open(open) {
       if (recoveryError) throw recoveryError;
-      if (changing)
+      if (phase === "changing")
         throw new KaituError(
           "插件正在变更，请等完成 / Plugins are changing. Wait for completion.",
           "PLUGIN_BUSY",
