@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readPreferences, savePreferences } from "../core/dist/index.js";
 
 // Bump when the notice or outgoing-data scope changes, including for existing installations.
-export const PRIVACY_NOTICE_VERSION = "2026-11-02.1";
+export const PRIVACY_NOTICE_VERSION = "2026-11-02.2";
 const ACTION = "https://kaitu.invalid/privacy";
 const items = [
   [
@@ -33,8 +33,8 @@ const items = [
     "location",
     ["天气与地图", "Weather and maps"],
     [
-      "天气把所选城市（也可能来自足迹现居城市）的坐标发给 Open-Meteo；地图放大后向 OpenFreeMap 和 AWS Terrain Tiles 请求当前区域的瓦片。服务会收到请求区域、IP 地址等常规网络信息。",
-      "Weather sends the selected city's coordinates, which may come from your current city in Footprints, to Open-Meteo. Zooming in requests map tiles for the visible area from OpenFreeMap and AWS Terrain Tiles. These services receive the requested area, IP address and standard network metadata.",
+      "天气把所选城市（也可能来自足迹现居城市）的坐标发给 Open-Meteo；显示地图细节时（包括自动移至现居城市），会向 OpenFreeMap 和 AWS Terrain Tiles 请求当前区域的瓦片。服务会收到请求区域、IP 地址等常规网络信息。",
+      "Weather sends the selected city's coordinates, which may come from your current city in Footprints, to Open-Meteo. Displaying map details, including when the map automatically moves to your current city, requests tiles for the visible area from OpenFreeMap and AWS Terrain Tiles. These services receive the requested area, IP address and standard network metadata.",
     ],
   ],
   [
