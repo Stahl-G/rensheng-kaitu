@@ -15,6 +15,7 @@ const portraitCandidates = new Set([
   "c7ba29142055a7ef8762715b5a6e9ff64b32c95029ac8fb3e8fa9dca33e6f957", // v1 ZIP 原稿
   "8a57eff594b3222f3b921f0c2046a85098b06ef2b6c12d03d212cc21392dd2ea", // RC5 模板适配稿
   "128a843f26cfc6b75d95b5d6a13c3013c36cd2185f4d40969bb632f02984e5cc", // 用户认可的 v3 创作提示词（2026-11-02）
+  "b2e58271fee4477eff5842e3a4d66994ae3c8705210b992c9a7c4bf0c92b3a44", // v3 两句补充：明暗随人、事实规则留在幕后（2026-11-02）
 ]);
 
 export function canWritePortraitSkill(ws: Workspace, path: string): boolean {
