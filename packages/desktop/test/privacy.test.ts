@@ -86,6 +86,13 @@ test("逐项确认才保存本机版本，退出、旧版本、只读回看和�
   closed.emit("closed");
   expect(await cancellation).toBe(false);
   expect(readFileSync(file)).toEqual(persisted);
+  const closing = new NoticeWindow();
+  closing.isDestroyed = () => true;
+  closing.loadURL = vi.fn(async () => {
+    closing.emit("closed");
+    throw new Error("ERR_ABORTED");
+  });
+  expect(await showPrivacyNotice({ window: closing, review: true })).toBe(false);
 });
 
 test("旧用户已开启自动任务也须先知悉；退出前不读工作区、不启动服务或 AI", async () => {

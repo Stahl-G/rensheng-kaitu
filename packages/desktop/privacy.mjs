@@ -148,6 +148,7 @@ export async function showPrivacyNotice({ window, systemLocale = "zh-CN", review
     return await result;
   } catch (error) {
     cleanup();
+    if (window.isDestroyed()) return false;
     throw error;
   }
 }

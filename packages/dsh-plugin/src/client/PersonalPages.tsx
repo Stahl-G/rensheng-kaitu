@@ -1107,7 +1107,7 @@ export function PersonalPages(
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
                 {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}
-                {props.privacyNotice && (
+                {props.privacyNotice && data.dshVersion && (
                   <button
                     type="button"
                     className={css.link}
